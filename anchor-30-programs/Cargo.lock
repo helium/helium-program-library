@@ -2660,7 +2660,7 @@ dependencies = [
 [[package]]
 name = "tuktuk-program"
 version = "0.1.0"
-source = "git+https://github.com/helium/tuktuk.git?rev=1fb3ee9#1fb3ee95a7737e08ce94f01ff1207e7ae088de06"
+source = "git+https://github.com/helium/tuktuk.git?rev=1b2384c#1b2384cffc8e6121b19e6c8908683f3788a37034"
 dependencies = [
  "anchor-lang",
 ]

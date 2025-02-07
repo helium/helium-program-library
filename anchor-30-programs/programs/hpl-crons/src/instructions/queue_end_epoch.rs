@@ -242,12 +242,14 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
         transaction: TransactionSourceV0::CompiledV0(compiled_tx.clone()),
         crank_reward: None,
         free_tasks: 0,
+        description: format!("end epoch {}", curr_epoch),
       },
       TaskReturnV0 {
         trigger: end_of_epoch_trigger,
         transaction: TransactionSourceV0::CompiledV0(compiled_reschedule_tx.clone()),
         crank_reward: None,
         free_tasks: 2,
+        description: format!("queue end epoch {}", curr_epoch),
       },
     ]
     .into_iter(),

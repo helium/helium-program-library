@@ -16,4 +16,6 @@ pub struct DelegationClaimBotV0 {
   pub task_queue: Pubkey,
   pub rent_refund: Pubkey,
   pub bump_seed: u8,
+  pub last_claimed_epoch: u64,
+  pub queued: bool,
 }

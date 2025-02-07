@@ -6,23 +6,21 @@ import {
 } from "@helium/helium-sub-daos-sdk";
 import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import {
-  compileTransaction,
   customSignerKey,
   init as initTuktuk,
   taskKey,
 } from "@helium/tuktuk-sdk";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import { getAccount } from "@solana/spl-token";
+import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   PublicKey,
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
+import BN from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import { HplCrons } from "../../target/types/hpl_crons";
-import BN from "bn.js";
 
 const PROGRAM_ID = new PublicKey("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 
@@ -138,69 +136,37 @@ export async function run(args: any = process.argv) {
     delegatedPositionAcc.subDao
   );
   const daoAcc = await hsdProgram.account.daoV0.fetch(subDaoAcc.dao);
-  const { transaction, remainingAccounts } = compileTransaction(
-    [
-      await program.methods
-        .queueDelegationClaimV0()
-        .accountsStrict({
-          delegationClaimBot: claimBot,
-          position: delegatedPositionAcc.position,
-          subDao: delegatedPositionAcc.subDao,
-          dao: subDaoAcc.dao,
-          mint: positionAcc.mint,
-          hntMint: daoAcc.hntMint,
-          positionAuthority: (
-            await getAccount(provider.connection, positionTokenAccount.address)
-          ).owner,
-          positionTokenAccount: positionTokenAccount.address,
-          taskQueue,
-          rentRefund: provider.wallet.publicKey,
-          delegatedPosition,
-          systemProgram: SystemProgram.programId,
-          payer: customWallet,
-          positionClaimPayer,
-          delegatorAta: getAssociatedTokenAddressSync(
-            daoAcc.hntMint,
-            provider.wallet.publicKey
-          ),
-          taskReturnAccount: PublicKey.findProgramAddressSync(
-            [Buffer.from("task_return_account", "utf-8")],
-            PROGRAM_ID
-          )[0],
-        })
-        .instruction(),
-    ],
-    [
-      [Buffer.from("helium", "utf-8"), bumpBuffer],
-      [Buffer.from("position", "utf-8"), positionClaimPayerBumpBuffer],
-    ]
-  );
+  const { instruction, pubkeys } = await program.methods
+    .startDelegationClaimBotV0({
+      taskId: nextAvailable,
+    })
+    .accountsPartial({
+      delegationClaimBot: claimBot,
+      subDao: delegatedPositionAcc.subDao,
+      dao: subDaoAcc.dao,
+      mint: positionAcc.mint,
+      hntMint: daoAcc.hntMint,
+      positionAuthority: (
+        await getAccount(provider.connection, positionTokenAccount.address)
+      ).owner,
+      positionTokenAccount: positionTokenAccount.address,
+      taskQueue,
+      delegatedPosition,
+      systemProgram: SystemProgram.programId,
+      delegatorAta: getAssociatedTokenAddressSync(
+        daoAcc.hntMint,
+        provider.wallet.publicKey
+      ),
+      task,
+    })
+    .prepare();
 
-  // @ts-ignore
-  const endOfEpoch = (delegatedPositionAcc.lastClaimedEpoch as BN)
-    .add(new BN(2))
-    .mul(new BN(EPOCH_LENGTH));
+  console.log("Queue authority is", pubkeys.queueAuthority!.toBase58());
+  instructions.push(instruction);
 
-  instructions.push(
-    await tuktukProgram.methods
-      .queueTaskV0({
-        id: nextAvailable,
-        trigger: { timestamp: [endOfEpoch.sub(new BN(60 * 10))] },
-        crankReward: null,
-        freeTasks: 2,
-        transaction: {
-          compiledV0: [transaction],
-        },
-      })
-      .accounts({
-        task,
-        taskQueue,
-      })
-      .remainingAccounts(remainingAccounts)
-      .instruction()
-  );
-
-  await sendInstructionsWithPriorityFee(provider, instructions);
+  await sendInstructionsWithPriorityFee(provider, instructions, {
+    computeUnitLimit: 500000,
+  });
 }
 
 function nextAvailableTaskIds(taskBitmap: Buffer, n: number): number[] {

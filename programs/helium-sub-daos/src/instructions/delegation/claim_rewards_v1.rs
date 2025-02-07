@@ -75,6 +75,8 @@ pub struct ClaimRewardsV1<'info> {
   #[account(
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
+    // Ensure that a pre HIP-138 claim can't accidentally be done.
+    constraint = dao_epoch_info.delegation_rewards_issued > 0,
     constraint = dao_epoch_info.done_issuing_rewards @ ErrorCode::EpochNotClosed
   )]
   pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,

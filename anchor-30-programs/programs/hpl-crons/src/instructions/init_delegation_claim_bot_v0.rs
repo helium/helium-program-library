@@ -48,6 +48,8 @@ pub fn handler(ctx: Context<InitDelegationClaimBotV0>) -> Result<()> {
       task_queue: ctx.accounts.task_queue.key(),
       bump_seed: ctx.bumps.delegation_claim_bot,
       rent_refund: ctx.accounts.payer.key(),
+      last_claimed_epoch: ctx.accounts.delegated_position.last_claimed_epoch,
+      queued: false,
     });
   Ok(())
 }

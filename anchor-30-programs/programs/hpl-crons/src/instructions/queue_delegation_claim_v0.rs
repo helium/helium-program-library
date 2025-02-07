@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use anchor_lang::{
   prelude::*,
   system_program::{self, transfer, Transfer},
@@ -24,7 +26,7 @@ use crate::{
   DelegationClaimBotV0, EPOCH_LENGTH,
 };
 
-const TEN_MINUTES: i64 = 60 * 10;
+pub const TEN_MINUTES: i64 = 60 * 10;
 
 #[derive(Accounts)]
 pub struct QueueDelegationClaimV0<'info> {
@@ -94,7 +96,11 @@ pub struct QueueDelegationClaimV0<'info> {
 }
 
 pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> {
-  let curr_epoch = ctx.accounts.delegated_position.last_claimed_epoch + 1;
+  let curr_epoch = max(
+    ctx.accounts.delegated_position.last_claimed_epoch + 1,
+    ctx.accounts.delegation_claim_bot.last_claimed_epoch + 1,
+  );
+  ctx.accounts.delegation_claim_bot.last_claimed_epoch = curr_epoch;
   let bump = ctx.bumps.payer;
   let seeds = vec![
     vec![b"helium".to_vec(), bump.to_le_bytes().to_vec()],
@@ -227,12 +233,14 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
         transaction: TransactionSourceV0::CompiledV0(compiled_tx.clone()),
         crank_reward: None,
         free_tasks: 0,
+        description: format!("delegation epoch {}", curr_epoch),
       },
       TaskReturnV0 {
         trigger: before_epoch_trigger,
         transaction: TransactionSourceV0::CompiledV0(compiled_reschedule_tx.clone()),
         crank_reward: None,
         free_tasks: 2,
+        description: format!("queue delegation epoch {}", curr_epoch),
       },
     ]
     .into_iter(),

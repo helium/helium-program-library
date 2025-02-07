@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 declare_id!("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 
+mod error;
 mod instructions;
 mod state;
 
@@ -72,5 +73,12 @@ pub mod hpl_crons {
     ctx: Context<QueueDelegationClaimV0>,
   ) -> Result<tuktuk_program::RunTaskReturnV0> {
     queue_delegation_claim_v0::handler(ctx)
+  }
+
+  pub fn start_delegation_claim_bot_v0(
+    ctx: Context<StartDelegationClaimBotV0>,
+    args: StartDelegationClaimBotArgsV0,
+  ) -> Result<()> {
+    start_delegation_claim_bot_v0::handler(ctx, args)
   }
 }
