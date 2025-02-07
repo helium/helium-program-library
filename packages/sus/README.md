@@ -38,7 +38,7 @@ console.log(result)
 
 ## Human-readable Writable Accounts (and changes)
 
-On Solana, every transaciton must declare which accounts can be changed over the course of a transaction. This is an important way to detect bad behavior. If a transaction is meant to swap SOL for HNT and it labels your USDC account as writable, this is a problem!
+On Solana, every transaction must declare which accounts can be changed over the course of a transaction. This is an important way to detect bad behavior. If a transaction is meant to swap SOL for HNT and it labels your USDC account as writable, this is a problem!
 
 Transaction simulation is not a silver bullet, it can be tricked. We cannot rely on simulated balance changes to reflect what _can_ happen in a transaction. As such, we should flag which important accounts are at risk.
 
