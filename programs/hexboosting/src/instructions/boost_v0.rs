@@ -1,4 +1,3 @@
-use crate::{error::ErrorCode, DeviceTypeV0};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -8,7 +7,7 @@ use mobile_entity_manager::CarrierV0;
 use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 use shared_utils::resize_to_fit;
 
-use crate::{BoostConfigV0, BoostedHexV1};
+use crate::{error::ErrorCode, BoostConfigV0, BoostedHexV1, DeviceTypeV0};
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
@@ -43,10 +42,8 @@ pub struct BoostV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
-    has_one = payment_mint,
+    has_one = dc_mint,
     has_one = price_oracle,
-    seeds = ["boost_config".as_bytes(), payment_mint.key().as_ref()],
-    bump = boost_config.bump_seed,
   )]
   pub boost_config: Box<Account<'info, BoostConfigV0>>,
   #[account(
@@ -61,11 +58,11 @@ pub struct BoostV0<'info> {
   )]
   pub price_oracle: Account<'info, PriceUpdateV2>,
   #[account(mut)]
-  pub payment_mint: Box<Account<'info, Mint>>,
+  pub dc_mint: Box<Account<'info, Mint>>,
   #[account(
     mut,
     associated_token::authority = payer,
-    associated_token::mint = payment_mint,
+    associated_token::mint = dc_mint,
   )]
   pub payment_account: Box<Account<'info, TokenAccount>>,
   #[account(
@@ -205,7 +202,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
     CpiContext::new(
       ctx.accounts.token_program.to_account_info(),
       Burn {
-        mint: ctx.accounts.payment_mint.to_account_info(),
+        mint: ctx.accounts.dc_mint.to_account_info(),
         from: ctx.accounts.payment_account.to_account_info(),
         authority: ctx.accounts.payer.to_account_info(),
       },
