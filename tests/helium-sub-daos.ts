@@ -13,6 +13,7 @@ import {
   createAtaAndMint,
   createAtaAndTransfer,
   createMint,
+  createMintInstructions,
   roundToDecimals,
   sendInstructions,
   toBN,
@@ -60,6 +61,8 @@ import { createPosition, initVsr } from "./utils/vsr";
 // @ts-ignore
 import bs58 from "bs58";
 import { random } from "./utils/string";
+import { notEmittedKey, init as initBurn } from "@helium/no-emit-sdk";
+import { NoEmit } from "../target/types/no_emit";
 
 chai.use(chaiAsPromised);
 
@@ -73,6 +76,7 @@ const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
 const SCALE = 100;
+const NOT_EMITTED_AMOUNT = 1000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -93,6 +97,7 @@ describe("helium-sub-daos", () => {
   );
 
   let dcProgram: Program<DataCredits>;
+  let noEmitProgram: Program<NoEmit>;
   let hemProgram: Program<HeliumEntityManager>;
   let cbProgram: Program<CircuitBreaker>;
   let vsrProgram: Program<VoterStakeRegistry>;
@@ -113,6 +118,11 @@ describe("helium-sub-daos", () => {
       provider,
       anchor.workspace.DataCredits.programId,
       anchor.workspace.DataCredits.idl
+    );
+    noEmitProgram = await initBurn(
+      provider,
+      anchor.workspace.NoEmit.programId,
+      anchor.workspace.NoEmit.idl
     );
     cbProgram = await cbInit(
       provider,
@@ -840,6 +850,72 @@ describe("helium-sub-daos", () => {
             });
           });
 
+          it("accounts for not emitted HNT when calculating utility scores", async () => {
+            const notEmitMint = Keypair.generate();
+            await hemProgram.methods
+              .issueNotEmittedEntityV0()
+              .preInstructions(
+                await createMintInstructions(provider, 0, me, me, notEmitMint)
+              )
+              .accounts({
+                dao,
+                mint: notEmitMint.publicKey,
+              })
+              .signers([notEmitMint])
+              .rpc({ skipPreflight: true });
+
+            const tokenMint = await createMint(provider, 2, me, me);
+            const burnAmount = new BN(NOT_EMITTED_AMOUNT);
+            await createAtaAndMint(
+              provider,
+              tokenMint,
+              burnAmount,
+              notEmittedKey()[0]
+            );
+
+            await noEmitProgram.methods
+              .noEmitV0()
+              .accounts({
+                mint: tokenMint,
+              })
+              .rpc({ skipPreflight: true });
+
+            const { subDaoEpochInfo } = await burnDc(10);
+            const epoch = (
+              await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+            ).epoch;
+
+            const method = program.methods
+              .calculateUtilityScoreV0({
+                epoch,
+              })
+              .accounts({
+                subDao,
+                dao,
+              });
+
+            const { daoEpochInfo } = await method.pubkeys();
+            await method.rpc({ skipPreflight: true });
+
+            const daoEpochInfoAcc = await program.account.daoEpochInfoV0.fetch(
+              daoEpochInfo!
+            );
+
+            expect(daoEpochInfoAcc.numNotEmitted.toString()).to.eq(
+              burnAmount.toString()
+            );
+
+            const expectedRewards = EPOCH_REWARDS + burnAmount.toNumber();
+            expect(daoEpochInfoAcc.totalRewards.toString()).to.eq(
+              EPOCH_REWARDS + burnAmount.toNumber()
+            );
+
+            const expectedSupply = initialSupply.add(new BN(expectedRewards));
+            expect(daoEpochInfoAcc.currentHntSupply.toString()).to.eq(
+              expectedSupply.toString()
+            );
+          });
+
           describe("with calculated rewards", () => {
             let epoch: anchor.BN;
             let subDaoEpochInfo: PublicKey;
@@ -919,7 +995,9 @@ describe("helium-sub-daos", () => {
                 1 // Allow for 1 unit of difference to handle rounding
               );
               expect((postHstBalance - preHstBalance).toString()).to.eq("0");
-              expect((postTreasuryBalance - preTreasuryBalance).toString()).to.eq("0");
+              expect(
+                (postTreasuryBalance - preTreasuryBalance).toString()
+              ).to.eq("0");
 
               const acc = await program.account.subDaoEpochInfoV0.fetch(
                 subDaoEpochInfo
