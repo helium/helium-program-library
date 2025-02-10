@@ -101,9 +101,6 @@ pub fn handler(
     ))
     .unwrap();
 
-  ctx.accounts.dao_epoch_info.vehnt_at_epoch_start +=
-    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start;
-
   ctx.accounts.dao_epoch_info.epoch = args.epoch;
 
   ctx.accounts.dao_epoch_info.current_hnt_supply = curr_supply
@@ -143,6 +140,9 @@ pub fn handler(
     &mut ctx.accounts.sub_dao_epoch_info,
     epoch_end_ts,
   )?;
+
+  ctx.accounts.dao_epoch_info.vehnt_at_epoch_start +=
+    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start;
 
   ctx.accounts.dao_epoch_info.dao = ctx.accounts.dao.key();
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();

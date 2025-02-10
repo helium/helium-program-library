@@ -2012,10 +2012,10 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
+ "data-credits",
  "default-env",
  "helium-sub-daos",
  "mobile-entity-manager",
- "pyth-solana-receiver-sdk",
  "shared-utils",
  "solana-security-txt",
 ]
