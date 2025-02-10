@@ -199,8 +199,8 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
   // Trigger the claim 10m after the epoch closes
   let after_epoch_trigger = TriggerV0::Timestamp(epoch_ts + TEN_MINUTES);
 
-  // Trigger the transaction that schedules the next claim 10m before the epoch ends
-  let before_epoch_trigger = TriggerV0::Timestamp(epoch_ts - TEN_MINUTES);
+  // Trigger the transaction that schedules the next claim 10m before the next epoch ends
+  let before_epoch_trigger = TriggerV0::Timestamp(epoch_ts + (EPOCH_LENGTH as i64) - TEN_MINUTES);
 
   // Pay for the tasks
   let task_costs = 2 * ctx.accounts.task_queue.min_crank_reward;
@@ -240,7 +240,7 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
         transaction: TransactionSourceV0::CompiledV0(compiled_reschedule_tx.clone()),
         crank_reward: None,
         free_tasks: 2,
-        description: format!("queue delegation epoch {}", curr_epoch),
+        description: format!("queue delegation epoch {}", curr_epoch + 1),
       },
     ]
     .into_iter(),
