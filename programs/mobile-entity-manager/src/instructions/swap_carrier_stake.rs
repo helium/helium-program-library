@@ -29,7 +29,6 @@ pub struct SwapCarrierStake<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   pub dnt_mint: Box<Account<'info, Mint>>,
   pub hnt_mint: Box<Account<'info, Mint>>,
-  pub token_account: Box<Account<'info, TokenAccount>>,
   #[account(
     mut,
     associated_token::mint = hnt_mint,
