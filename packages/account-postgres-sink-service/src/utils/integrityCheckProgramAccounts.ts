@@ -73,7 +73,7 @@ export const integrityCheckProgramAccounts = async ({
       const currentSlot = await connection.getSlot();
       let blockTime24HoursAgo: number | null = null;
       let attemptSlot = currentSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
-      const SLOTS_INCREMENT = 10;
+      const SLOTS_INCREMENT = 2;
 
       for (
         let blockTimeAttemps = 0;
@@ -86,7 +86,7 @@ export const integrityCheckProgramAccounts = async ({
         });
 
         if (!blockTime24HoursAgo) {
-          attemptSlot += SLOTS_INCREMENT; // move forward 10 slots each attempt
+          attemptSlot += SLOTS_INCREMENT; // move forward 2 slots each attempt
           console.warn(
             `Failed to get blocktime for slot ${
               attemptSlot - SLOTS_INCREMENT
