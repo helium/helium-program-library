@@ -124,7 +124,7 @@ pub fn handler(
     .checked_add(std::cmp::min(
       prev_supply
         .saturating_sub(curr_supply)
-        .saturating_sub(not_emitted),
+        .saturating_add(not_emitted),
       ctx.accounts.dao.net_emissions_cap,
     ))
     .unwrap();
