@@ -43,7 +43,6 @@ import b58 from "bs58";
 import os from "os";
 import yargs from "yargs/yargs";
 
-const FANOUT_NAME = "HST";
 const IOT_OPERATIONS_FUND = "iot_operations_fund";
 const NOT_EMITTED = "not_emitted";
 const MAX_CLAIM_AMOUNT = new BN("207020547945205");
@@ -206,47 +205,6 @@ export async function run(args: any = process.argv) {
 
       targetTs = targetTs.add(new BN(EPOCH_LENGTH));
     }
-
-    // distribute hst
-    const hydraProgram = await initHydra(provider);
-    const [fanoutK] = fanoutKey(FANOUT_NAME);
-    const members = (await hydraProgram.account.fanoutVoucherV0.all()).filter(
-      (m) => m.account.fanout.equals(fanoutK)
-    );
-
-    const instructions = (
-      await Promise.all(
-        members.map(async (member) => {
-          const mint = member.account.mint;
-          const owners = await provider.connection.getTokenLargestAccounts(
-            mint
-          );
-          const owner = (
-            await getAccount(provider.connection, owners.value[0].address)
-          ).owner;
-
-          try {
-            return await hydraProgram.methods
-              .distributeV0()
-              .accounts({
-                payer: provider.wallet.publicKey,
-                fanout: fanoutK,
-                owner,
-                mint,
-              })
-              .instruction();
-          } catch (err: any) {
-            errors.push(
-              `Failed to distribute hst for ${mint.toBase58()}: ${err}`
-            );
-          }
-        })
-      )
-    ).filter(truthy);
-
-    await batchParallelInstructionsWithPriorityFee(provider, instructions, {
-      basePriorityFee,
-    });
 
     // distribute iot operations fund
     const hemProgram = await initHem(provider);
