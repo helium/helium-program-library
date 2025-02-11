@@ -3302,6 +3302,34 @@
           }
         }
       ]
+    },
+    {
+      "name": "tempBackfillMobileInfo",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "mobileInfo",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "TempBackfillMobileInfoArgs"
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -4020,6 +4048,28 @@
       }
     },
     {
+      "name": "TempBackfillMobileInfoArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "location",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "deploymentInfo",
+            "type": {
+              "option": {
+                "defined": "MobileDeploymentInfoV0"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "MetadataArgs",
       "type": {
         "kind": "struct",
@@ -4379,19 +4429,19 @@
             "name": "IotConfig",
             "fields": [
               {
-                "name": "min_gain",
+                "name": "minGain",
                 "type": "i32"
               },
               {
-                "name": "max_gain",
+                "name": "maxGain",
                 "type": "i32"
               },
               {
-                "name": "full_location_staking_fee",
+                "name": "fullLocationStakingFee",
                 "type": "u64"
               },
               {
-                "name": "dataonly_location_staking_fee",
+                "name": "dataonlyLocationStakingFee",
                 "type": "u64"
               }
             ]
@@ -4400,11 +4450,11 @@
             "name": "MobileConfig",
             "fields": [
               {
-                "name": "full_location_staking_fee",
+                "name": "fullLocationStakingFee",
                 "type": "u64"
               },
               {
-                "name": "dataonly_location_staking_fee",
+                "name": "dataonlyLocationStakingFee",
                 "type": "u64"
               }
             ]
@@ -4413,7 +4463,7 @@
             "name": "MobileConfigV1",
             "fields": [
               {
-                "name": "fees_by_device",
+                "name": "feesByDevice",
                 "type": {
                   "vec": {
                     "defined": "DeviceFeesV0"
@@ -4426,7 +4476,7 @@
             "name": "MobileConfigV2",
             "fields": [
               {
-                "name": "fees_by_device",
+                "name": "feesByDevice",
                 "type": {
                   "vec": {
                     "defined": "DeviceFeesV1"
@@ -4473,11 +4523,11 @@
                 "type": "u16"
               },
               {
-                "name": "mechanical_down_tilt",
+                "name": "mechanicalDownTilt",
                 "type": "u16"
               },
               {
-                "name": "electrical_down_tilt",
+                "name": "electricalDownTilt",
                 "type": "u16"
               }
             ]
@@ -4486,7 +4536,7 @@
             "name": "CbrsInfoV0",
             "fields": [
               {
-                "name": "radio_infos",
+                "name": "radioInfos",
                 "type": {
                   "vec": {
                     "defined": "RadioInfoV0"
@@ -4595,8 +4645,5 @@
       "name": "ArithmeticError",
       "msg": "Arithmetic error"
     }
-  ],
-  "metadata": {
-    "address": "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8"
-  }
+  ]
 }

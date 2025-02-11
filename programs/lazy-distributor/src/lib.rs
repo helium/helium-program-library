@@ -106,6 +106,12 @@ pub mod lazy_distributor {
   pub fn dummy_ix(_ctx: Context<DummyIx>) -> Result<()> {
     Err(error!(crate::error::ErrorCode::DummyInstruction))
   }
+
+  pub fn temp_update_matching_destination(
+    ctx: Context<TempUpdateMatchingDestination>,
+  ) -> Result<()> {
+    temp_update_matching_destination::handler(ctx)
+  }
 }
 
 #[derive(Accounts)]

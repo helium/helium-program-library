@@ -186,7 +186,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     .iter()
     .filter(|&proposal| proposal_set.contains(&proposal.proposal))
     .count();
-  let not_two_proposals = ctx.accounts.dao.recent_proposals.len() < 2
+  let not_four_proposals = ctx.accounts.dao.recent_proposals.len() < 4
     || ctx
       .accounts
       .dao
@@ -194,7 +194,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
       .iter()
       .filter(|p| p.proposal != Pubkey::default())
       .count()
-      < 2;
+      < 4;
 
   let amount_left = ctx.accounts.delegator_pool.amount;
   let amount = std::cmp::min(rewards, amount_left);
@@ -208,7 +208,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     TransferArgsV0 { amount },
   )?;
 
-  if !not_two_proposals && eligible_count < 2 {
+  if !not_four_proposals && eligible_count < 2 {
     msg!(
       "Position is not eligible, burning rewards. Position proposals {:?}, recent proposals {:?}",
       ctx.accounts.delegated_position.recent_proposals,
