@@ -21,8 +21,6 @@ pub struct ClaimRewardsArgsV0 {
   pub epoch: u64,
 }
 
-const TUKTUK_ID: Pubkey = pubkey!("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
-const TASK_QUEUE_KEY: Pubkey = pubkey!("H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7");
 const TUKTUK_SIGNER_KEY: Pubkey = pubkey!("8m6iyXwcu8obaXdqKwzBqHE5HM2tRZZfSXV5qNALiPk4");
 
 #[derive(Accounts)]
