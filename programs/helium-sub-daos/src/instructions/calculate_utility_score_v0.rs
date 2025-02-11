@@ -49,18 +49,21 @@ pub struct CalculateUtilityScoreV0<'info> {
     init_if_needed,
     payer = payer,
     space = SubDaoEpochInfoV0::SIZE,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &(args.epoch - 1).to_le_bytes()],
-    bump,
-  )]
-  pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
-  #[account(
-    init_if_needed,
-    payer = payer,
-    space = SubDaoEpochInfoV0::SIZE,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  pub system_program: Program<'info, System>,
+  pub token_program: Program<'info, Token>,
+  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
+  #[account(
+    init_if_needed,
+    payer = payer,
+    space = SubDaoEpochInfoV0::SIZE,
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &(args.epoch - 1).to_le_bytes()],
+    bump,
+  )]
+  pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(
     seeds = [b"not_emitted_counter", hnt_mint.key().as_ref()],
     seeds::program = no_emit_program.key(),
@@ -68,10 +71,6 @@ pub struct CalculateUtilityScoreV0<'info> {
   )]
   /// CHECK: May not have ever been initialized
   pub not_emitted_counter: UncheckedAccount<'info>,
-
-  pub system_program: Program<'info, System>,
-  pub token_program: Program<'info, Token>,
-  pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub no_emit_program: Program<'info, NoEmit>,
 }
 
