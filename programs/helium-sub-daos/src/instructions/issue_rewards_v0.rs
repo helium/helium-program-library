@@ -162,7 +162,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     )
     .or_arith_error()?;
 
-  ctx.accounts.sub_dao_epoch_info.previous_percentage = prev_percentage
+  ctx.accounts.sub_dao_epoch_info.previous_percentage = percent_share
     .checked_mul(&PreciseNumber::new(u32::MAX as u128).or_arith_error()?)
     .or_arith_error()?
     .to_imprecise()
