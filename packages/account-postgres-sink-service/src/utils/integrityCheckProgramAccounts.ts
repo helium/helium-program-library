@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import retry, { Options as RetryOptions } from "async-retry";
-import deepEqual from "fast-deep-equal";
+import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
 import pLimit from "p-limit";
@@ -84,6 +84,10 @@ export const integrityCheckProgramAccounts = async ({
           slot: attemptSlot,
           provider,
         });
+
+        if (blockTime24HoursAgo) {
+          break;
+        }
 
         if (!blockTime24HoursAgo) {
           attemptSlot += SLOTS_INCREMENT; // move forward 2 slots each attempt

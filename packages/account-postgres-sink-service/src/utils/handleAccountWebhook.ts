@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import deepEqual from "fast-deep-equal";
+import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
 import { Sequelize, Transaction } from "sequelize";
