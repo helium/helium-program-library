@@ -348,53 +348,62 @@ describe("helium-sub-daos", () => {
         .signers([mint])
         .rpc({ skipPreflight: true });
 
-      const notEmittAmount = new BN(NOT_EMITTED_AMOUNT);
+      const notEmittedAmount = new BN(NOT_EMITTED_AMOUNT);
       const [noEmitWallet] = notEmittedKey();
-      await createAtaAndTransfer(
-        provider,
-        hntMint,
-        notEmittAmount,
-        me,
-        noEmitWallet
+      const [noEmitCounterKey] = notEmittedCounterKey(hntMint);
+
+      async function emitAndVerifyEpoch() {
+        await createAtaAndTransfer(
+          provider,
+          hntMint,
+          notEmittedAmount,
+          me,
+          noEmitWallet
+        );
+
+        await noEmitProgram.methods
+          .noEmitV0()
+          .accounts({ mint: hntMint })
+          .rpc({ skipPreflight: true });
+
+        const { subDaoEpochInfo } = await burnDc(10);
+        const epoch = (
+          await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+        ).epoch;
+
+        const method = program.methods
+          .calculateUtilityScoreV0({ epoch })
+          .accounts({ subDao, dao });
+
+        const { daoEpochInfo } = await method.pubkeys();
+        await method.rpc({ skipPreflight: true });
+
+        const noEmitCounter =
+          await noEmitProgram.account.notEmittedCounterV0.fetch(
+            noEmitCounterKey
+          );
+        const daoEpochInfoAcc = await program.account.daoEpochInfoV0.fetch(
+          daoEpochInfo!
+        );
+
+        return { noEmitCounter, daoEpochInfoAcc };
+      }
+
+      const firstEpoch = await emitAndVerifyEpoch();
+      expect(firstEpoch.daoEpochInfoAcc.cumulativeNotEmitted.toString()).to.eq(
+        firstEpoch.noEmitCounter.amountNotEmitted.toString()
+      );
+      expect(firstEpoch.daoEpochInfoAcc.notEmitted.toString()).to.eq(
+        notEmittedAmount.toString()
       );
 
-      await noEmitProgram.methods
-        .noEmitV0()
-        .accounts({ mint: hntMint })
-        .rpc({ skipPreflight: true });
-
-      const { subDaoEpochInfo } = await burnDc(10);
-      const epoch = (
-        await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
-      ).epoch;
-
-      const method = program.methods
-        .calculateUtilityScoreV0({
-          epoch,
-        })
-        .accounts({
-          subDao,
-          dao,
-        });
-
-      const { daoEpochInfo } = await method.pubkeys();
-      await method.rpc({ skipPreflight: true });
-
-      const daoEpochInfoAcc = await program.account.daoEpochInfoV0.fetch(
-        daoEpochInfo!
-      );
-
-      expect(daoEpochInfoAcc.numNotEmitted.toString()).to.eq(
-        notEmittAmount.toString()
-      );
-
-      const expectedRewards = EPOCH_REWARDS + notEmittAmount.toNumber();
-      expect(daoEpochInfoAcc.totalRewards.toString()).to.eq(
+      let expectedRewards = EPOCH_REWARDS + notEmittedAmount.toNumber();
+      expect(firstEpoch.daoEpochInfoAcc.totalRewards.toString()).to.eq(
         expectedRewards.toString()
       );
 
       const supply = (await getMint(provider.connection, hntMint)).supply;
-      expect(daoEpochInfoAcc.currentHntSupply.toString()).to.eq(
+      expect(firstEpoch.daoEpochInfoAcc.currentHntSupply.toString()).to.eq(
         new BN(supply.toString()).add(new BN(expectedRewards)).toString()
       );
     });
