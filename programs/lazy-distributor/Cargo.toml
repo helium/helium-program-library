@@ -1,6 +1,6 @@
 [package]
 name = "lazy-distributor"
-version = "0.2.1"
+version = "0.2.2"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -30,3 +30,4 @@ shared-utils = { workspace = true }
 account-compression-cpi = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
+solana-program = { workspace = true }

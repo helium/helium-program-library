@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import deepEqual from "fast-deep-equal";
+import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
 import { Sequelize, Transaction } from "sequelize";
@@ -81,16 +81,25 @@ export const handleAccountWebhook = async ({
 
       let sanitized = sanitizeAccount(decodedAcc);
 
-      await Promise.all(
-        pluginsByAccountType[accName].map(async (plugin) => {
-          if (plugin?.processAccount) {
+      for (const plugin of pluginsByAccountType[accName] || []) {
+        if (plugin?.processAccount) {
+          try {
             sanitized = await plugin.processAccount(sanitized, t);
+          } catch (err) {
+            console.warn(
+              `Plugin processing failed for account ${account.pubkey}`,
+              err
+            );
+            // Continue with unmodified sanitized data instead of failing
+            continue;
           }
-        })
-      );
+        }
+      }
 
       if (isDelete) {
-        let ignoreDelete = accounts.find(acc => acc.type == accName)?.ignore_deletes;
+        let ignoreDelete = accounts.find(
+          (acc) => acc.type == accName
+        )?.ignore_deletes;
         if (!ignoreDelete) {
           await model.destroy({
             where: { address: account.pubkey },

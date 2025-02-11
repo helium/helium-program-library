@@ -50,7 +50,7 @@ jobs:
         run: |
           find programs -type f -name '*.rs' -exec sed -i "s/b\"nJWGUMOK\"/b\"devnethelium5\"/g" {} \;
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         name: Cache Toml Cli
         id: cache-toml-cli
         with:
