@@ -1,21 +1,23 @@
-use crate::error::ErrorCode;
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Transfer;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{self, Mint, MintTo, Token, TokenAccount},
+  token::{self, Mint, MintTo, Token, TokenAccount, Transfer},
 };
-use helium_sub_daos::SubDaoV0;
+use helium_sub_daos::{DaoV0, SubDaoV0};
 use mpl_token_metadata::types::{CollectionDetails, DataV2};
-use shared_utils::create_metadata_accounts_v3;
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
-  Metadata as MetadataProgram,
+use shared_utils::{
+  create_metadata_accounts_v3,
+  token_metadata::{
+    create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
+    Metadata as MetadataProgram,
+  },
 };
 
-// 500m MOBILE
-pub const CARRIER_STAKE_AMOUNT: u64 = 500_000_000_000_000;
+use crate::{error::ErrorCode, state::*};
+
+// 100k HNT
+#[allow(clippy::inconsistent_digit_grouping)]
+pub const CARRIER_STAKE_AMOUNT: u64 = 100_000_00000000;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeCarrierArgsV0 {
@@ -41,10 +43,10 @@ pub struct InitializeCarrierV0<'info> {
   )]
   pub carrier: Box<Account<'info, CarrierV0>>,
   #[account(
-    has_one = dnt_mint
+    has_one = dao
   )]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,
-  pub dnt_mint: Box<Account<'info, Mint>>,
+  pub hnt_mint: Box<Account<'info, Mint>>,
   #[account(
     init,
     payer = payer,
@@ -80,14 +82,14 @@ pub struct InitializeCarrierV0<'info> {
   pub token_account: Box<Account<'info, TokenAccount>>,
   #[account(
     mut,
-    associated_token::mint = dnt_mint,
+    associated_token::mint = hnt_mint,
     associated_token::authority = payer,
   )]
   pub source: Box<Account<'info, TokenAccount>>,
   #[account(
     init_if_needed,
     payer = payer,
-    associated_token::mint = dnt_mint,
+    associated_token::mint = hnt_mint,
     associated_token::authority = carrier,
   )]
   pub escrow: Box<Account<'info, TokenAccount>>,
@@ -97,6 +99,10 @@ pub struct InitializeCarrierV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub rent: Sysvar<'info, Rent>,
+  #[account(
+    has_one = hnt_mint
+  )]
+  pub dao: Box<Account<'info, DaoV0>>,
 }
 
 impl<'info> InitializeCarrierV0<'info> {

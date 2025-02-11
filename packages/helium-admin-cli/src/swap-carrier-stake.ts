@@ -1,15 +1,13 @@
 import * as anchor from "@coral-xyz/anchor";
-import { boostConfigKey, init as initHex } from "@helium/hexboosting-sdk";
-import { MOBILE_MINT } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { carrierKey, init as initMem } from "@helium/mobile-entity-manager-sdk";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair, sendInstructionsOrSquads } from "./utils";
-import {
-  init as initHsd,
-  subDaoKey,
-} from "@helium/helium-sub-daos-sdk";
+import { HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -22,6 +20,12 @@ export async function run(args: any = process.argv) {
       alias: "u",
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
+    },
+    name: {
+      alias: "n",
+      type: "string",
+      required: true,
+      describe: "Name of the carrier, case sensitive",
     },
     executeTransaction: {
       type: "boolean",
@@ -36,30 +40,26 @@ export async function run(args: any = process.argv) {
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
-    startAuthority: {
+    updateAuthority: {
       type: "string",
-      describe: "The new start authority to set",
+      describe: "The new update authority to set",
     },
-    rentReclaimAuthority: {
+    issuingAuthority: {
       type: "string",
-      describe: "The rent reclaim authority to set",
+      describe: "The new issuing authority to set",
     },
-    priceOracle: {
+    hexboostAuthority: {
       type: "string",
-      describe: "The new price oracle to set",
-    },
-    minimumPeriods: {
-      type: "number",
-      describe: "The new minimum number of periods",
-    },
-    boostPrice: {
-      type: "string",
-      describe: "The boost price in bones",
+      describe: "The new hexboost authority to set",
     },
     dntMint: {
       type: "string",
-      describe: "DNT mint of the boost config",
+      describe: "DNT mint of the subdao to approve on",
       default: MOBILE_MINT.toBase58(),
+    },
+    incentiveEscrowFundBps: {
+      type: "number",
+      describe: "The new incentive escrow fund bps to set",
     },
   });
   const argv = await yarg.argv;
@@ -68,31 +68,40 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
-  const program = await initHex(provider);
-  const hsdProgram = await initHsd(provider);
+  const program = await initMem(provider);
 
   const instructions: TransactionInstruction[] = [];
 
   const dntMint = new PublicKey(argv.dntMint);
-  const subDaoK = subDaoKey(dntMint)[0]
-  const subDao = await hsdProgram.account.subDaoV0.fetch(subDaoK)
+  const subDao = subDaoKey(dntMint)[0];
+  const carrier = carrierKey(subDao, argv.name)[0];
+  const carrierAcc = await program.account.carrierV0.fetch(carrier);
+  const authority = carrierAcc.updateAuthority;
+
   instructions.push(
     await program.methods
-      .updateBoostConfigV0({
-        startAuthority: argv.startAuthority
-          ? new PublicKey(argv.startAuthority)
-          : null,
-        rentReclaimAuthority: argv.rentReclaimAuthority
-          ? new PublicKey(argv.rentReclaimAuthority)
-          : null,
-        priceOracle: argv.priceOracle ? new PublicKey(argv.priceOracle) : null,
-        minimumPeriods: argv.minimumPeriods || null,
-        boostPrice: argv.boostPrice ? new anchor.BN(argv.boostPrice) : null,
-        dcMint: null,
-      })
+      .swapCarrierStake()
       .accounts({
-        boostConfig: boostConfigKey(dntMint)[0],
-        authority: subDao.authority,
+        carrier,
+        updateAuthority: carrierAcc.updateAuthority,
+        newStakeSource: getAssociatedTokenAddressSync(
+          HNT_MINT,
+          authority,
+        ),
+        originalStakeDestination: getAssociatedTokenAddressSync(
+          MOBILE_MINT,
+          authority,
+        ),
+        originalStake: getAssociatedTokenAddressSync(
+          MOBILE_MINT,
+          carrier,
+        ),
+        newEscrow: getAssociatedTokenAddressSync(
+          HNT_MINT,
+          carrier,
+        ),
+        dntMint: MOBILE_MINT,
+        hntMint: HNT_MINT,
       })
       .instruction()
   );
