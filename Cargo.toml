@@ -38,3 +38,4 @@ price-oracle = { path = "./programs/price-oracle", features = ["cpi"] }
 no-emit = { path = "./programs/no-emit", features = ["cpi"] }
 time = "0.3.36"
 data-credits = { path = "./programs/data-credits" }
+solana-program = "1.16"

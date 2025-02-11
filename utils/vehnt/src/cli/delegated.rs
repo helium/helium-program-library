@@ -3,11 +3,7 @@ use std::{
   rc::Rc,
 };
 
-use crate::cli::epoch_info::get_sub_dao_epoch_infos;
-
-use super::*;
 use anchor_client::{Client, Cluster};
-
 use anchor_lang::AccountDeserialize;
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
@@ -20,6 +16,9 @@ use solana_sdk::{
   compute_budget::ComputeBudgetInstruction, pubkey::Pubkey, signature::read_keypair_file,
   signer::Signer, transaction::Transaction,
 };
+
+use super::*;
+use crate::cli::epoch_info::get_sub_dao_epoch_infos;
 
 #[derive(Debug, Clone, clap::Args)]
 /// Fetches all delegated positions and total HNT, veHNT, and subDAO delegations.
@@ -112,9 +111,7 @@ impl Delegated {
     let positions_with_delegations: Vec<FullPosition> = delegated_positions
       .iter()
       .zip(positions_raw)
-      .filter(|((_, delegated_position), position)| {
-        position.is_some()
-      })
+      .filter(|((_, delegated_position), position)| position.is_some())
       .map(|((pubkey, delegated_position), position)| {
         let position_unwrapped = position.unwrap();
         let mut data = position_unwrapped.data.as_slice();
@@ -167,12 +164,56 @@ impl Delegated {
     epoch_infos_by_subdao_and_epoch.insert(Pubkey::from_str(IOT_SUBDAO).unwrap(), HashMap::new());
     epoch_infos_by_subdao_and_epoch
       .insert(Pubkey::from_str(MOBILE_SUBDAO).unwrap(), HashMap::new());
+
+    // Create lookup tables for each subnetwork mapping PDA to correct epoch
+    let mut pda_to_epoch: HashMap<Pubkey, HashMap<Pubkey, u64>> = HashMap::new();
+    pda_to_epoch.insert(Pubkey::from_str(IOT_SUBDAO).unwrap(), HashMap::new());
+    pda_to_epoch.insert(Pubkey::from_str(MOBILE_SUBDAO).unwrap(), HashMap::new());
+
+    let curr_epoch = current_epoch(curr_ts as i64);
+    for sub_dao in [IOT_SUBDAO, MOBILE_SUBDAO].iter() {
+      let sub_dao_pubkey = Pubkey::from_str(sub_dao).unwrap();
+      for epoch in (curr_epoch - 730)..(curr_epoch + 1500) {
+        let pda = Pubkey::find_program_address(
+          &[
+            b"sub_dao_epoch_info",
+            sub_dao_pubkey.as_ref(),
+            &epoch.to_le_bytes(),
+          ],
+          &helium_sub_daos::id(),
+        )
+        .0;
+        pda_to_epoch
+          .get_mut(&sub_dao_pubkey)
+          .unwrap()
+          .insert(pda, epoch);
+      }
+    }
+
     for info in infos {
-        if info.1.sub_dao == Pubkey::from_str(IOT_SUBDAO).unwrap() || info.1.sub_dao == Pubkey::from_str(MOBILE_SUBDAO).unwrap() {
-      epoch_infos_by_subdao_and_epoch
+      if info.1.sub_dao == Pubkey::from_str(IOT_SUBDAO).unwrap()
+        || info.1.sub_dao == Pubkey::from_str(MOBILE_SUBDAO).unwrap()
+      {
+        let mut epoch = info.1.epoch;
+        let correct_pda = Pubkey::find_program_address(
+          &[
+            b"sub_dao_epoch_info",
+            info.1.sub_dao.as_ref(),
+            &info.1.epoch.to_le_bytes(),
+          ],
+          &helium_sub_daos::id(),
+        );
+        if correct_pda.0 != info.0 {
+          epoch = *pda_to_epoch
+            .get(&info.1.sub_dao)
+            .unwrap()
+            .get(&info.0)
+            .unwrap();
+        }
+        epoch_infos_by_subdao_and_epoch
           .get_mut(&info.1.sub_dao)
           .unwrap()
-          .insert(info.1.epoch, info);
+          .insert(epoch, info);
       }
     }
     let mut new_epoch_infos_by_subdao_and_epoch: HashMap<
@@ -190,7 +231,7 @@ impl Delegated {
         position.delegated_position.start_ts,
         &position.position,
         &voting_mint_config,
-        position.delegated_position.expiration_ts
+        position.delegated_position.expiration_ts,
       )?;
       let vehnt = position
         .position
@@ -203,19 +244,37 @@ impl Delegated {
       let new_epoch_infos_by_epoch = new_epoch_infos_by_subdao_and_epoch
         .get_mut(&position.delegated_position.sub_dao)
         .unwrap();
-      let end_epoch = current_epoch(position.position.lockup.end_ts);
+      let end_epoch = current_epoch(std::cmp::min(
+        position.position.lockup.end_ts,
+        position.delegated_position.expiration_ts,
+      ));
       let genesis_end_epoch = current_epoch(position.position.genesis_end - 1);
 
       // Initialize a new epoch info from the existing one if it hasn't been already
       {
         let has_new_epoch_info = new_epoch_infos_by_epoch.contains_key(&end_epoch);
-        let end_epoch_info = epoch_infos_by_epoch.get_mut(&end_epoch).unwrap();
-
-        if !has_new_epoch_info {
-          let mut new = end_epoch_info.clone();
-          new.1.vehnt_in_closing_positions = 0;
-          new.1.fall_rates_from_closing_positions = 0;
-          new_epoch_infos_by_epoch.insert(end_epoch, new);
+        if let Some(end_epoch_info) = epoch_infos_by_epoch.get_mut(&end_epoch) {
+          if !has_new_epoch_info {
+            let mut new = end_epoch_info.clone();
+            new.1.vehnt_in_closing_positions = 0;
+            new.1.fall_rates_from_closing_positions = 0;
+            new_epoch_infos_by_epoch.insert(end_epoch, new);
+          }
+        } else if !has_new_epoch_info {
+          let mut new = SubDaoEpochInfoV0::default();
+          new.vehnt_in_closing_positions = 0;
+          new.fall_rates_from_closing_positions = 0;
+          new.epoch = end_epoch;
+          let key = Pubkey::find_program_address(
+            &[
+              b"sub_dao_epoch_info",
+              position.delegated_position.sub_dao.as_ref(),
+              &end_epoch.to_le_bytes(),
+            ],
+            &helium_sub_daos::id(),
+          )
+          .0;
+          new_epoch_infos_by_epoch.insert(end_epoch, (key, new));
         }
       }
       {
@@ -223,7 +282,7 @@ impl Delegated {
         if genesis_end_epoch > 0 {
           let genesis_end_epoch_info = epoch_infos_by_epoch
             .get(&genesis_end_epoch)
-            .map(|v| v.clone())
+            .cloned()
             .unwrap_or_else(|| {
               (
                 Pubkey::find_program_address(
@@ -273,7 +332,7 @@ impl Delegated {
       }
 
       if position.position.lockup.kind == LockupKind::Constant
-        || current_epoch(position.position.lockup.end_ts) > current_epoch(curr_ts)
+        || current_epoch(position.delegated_position.expiration_ts) > current_epoch(curr_ts)
       {
         match SubDao::try_from(position.delegated_position.sub_dao).unwrap() {
           SubDao::Mobile => {
@@ -322,19 +381,27 @@ impl Delegated {
                 != new_sub_dao_epoch_info.1.fall_rates_from_closing_positions;
               let has_vehnt_diff = sub_dao_epoch_info.1.vehnt_in_closing_positions
                 != new_sub_dao_epoch_info.1.vehnt_in_closing_positions;
-              if has_fall_rate_diff || has_vehnt_diff {
+              let has_epoch_diff = sub_dao_epoch_info.1.epoch != new_sub_dao_epoch_info.1.epoch
+                || *inner_key != sub_dao_epoch_info.1.epoch;
+              if has_fall_rate_diff || has_vehnt_diff || has_epoch_diff {
                 println!(
                   "Entry for key {:?},
                   Fall Rates: {}
                               {}
                   VeHNT:      {}
                               {}
+                  Epoch:      {}
+                  New Epoch:  {}
+                  Watching epoch: {}
                 ",
                   sub_dao_epoch_info.0,
                   sub_dao_epoch_info.1.fall_rates_from_closing_positions,
                   new_sub_dao_epoch_info.1.fall_rates_from_closing_positions,
                   sub_dao_epoch_info.1.vehnt_in_closing_positions,
-                  new_sub_dao_epoch_info.1.vehnt_in_closing_positions
+                  new_sub_dao_epoch_info.1.vehnt_in_closing_positions,
+                  sub_dao_epoch_info.1.epoch,
+                  new_sub_dao_epoch_info.1.epoch,
+                  inner_key
                 );
                 // Uncomment if endpoint added back and needed.
                 loop {
@@ -353,11 +420,11 @@ impl Delegated {
                         } else {
                           None
                         },
-                        epoch: new_sub_dao_epoch_info.1.epoch,
+                        epoch: *inner_key,
                       },
                     })
                     .accounts(TempUpdateSubDaoEpochInfo {
-                      sub_dao_epoch_info: sub_dao_epoch_info.0,
+                      sub_dao_epoch_info: new_sub_dao_epoch_info.0,
                       authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
                         .unwrap(),
                       sub_dao: new_sub_dao_epoch_info.1.sub_dao,
