@@ -1,5 +1,5 @@
 {
-  "version": "0.2.11",
+  "version": "0.2.12",
   "name": "helium_entity_manager",
   "instructions": [
     {
@@ -3302,34 +3302,6 @@
           }
         }
       ]
-    },
-    {
-      "name": "tempBackfillMobileInfo",
-      "accounts": [
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "mobileInfo",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": "TempBackfillMobileInfoArgs"
-          }
-        }
-      ]
     }
   ],
   "accounts": [
@@ -4043,28 +4015,6 @@
           {
             "name": "maxBufferSize",
             "type": "u32"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TempBackfillMobileInfoArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "location",
-            "type": {
-              "option": "u64"
-            }
-          },
-          {
-            "name": "deploymentInfo",
-            "type": {
-              "option": {
-                "defined": "MobileDeploymentInfoV0"
-              }
-            }
           }
         ]
       }
