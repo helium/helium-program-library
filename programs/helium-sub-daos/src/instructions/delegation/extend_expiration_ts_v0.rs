@@ -99,12 +99,15 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
-  let expiration_ts = ctx
-    .accounts
-    .proxy_config
-    .get_current_season(registrar.clock_unix_timestamp())
-    .unwrap()
-    .end;
+  let expiration_ts = min(
+    ctx
+      .accounts
+      .proxy_config
+      .get_current_season(registrar.clock_unix_timestamp())
+      .unwrap()
+      .end,
+    position.lockup.end_ts,
+  );
   let epoch = current_epoch(registrar.clock_unix_timestamp());
 
   // Calculate vehnt info once
