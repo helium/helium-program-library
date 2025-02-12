@@ -30,6 +30,7 @@ import {
   getConcurrentMerkleTreeAccountSize,
 } from '@solana/spl-account-compression';
 import { HeliumEntityManager } from '../target/types/helium_entity_manager';
+import { createAtaAndMint, createMint } from '@helium/spl-utils';
 
 chai.use(chaiAsPromised);
 
@@ -80,12 +81,15 @@ describe('mobile-entity-manager', () => {
 
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
+    const hntMint = await createMint(provider, 8, me, me);
+    await createAtaAndMint(provider, hntMint, new BN("10000000000000"), me);
     ({ dao } = await initTestDao(
       hsdProgram,
       provider,
       100,
       me,
-      dataCredits.dcMint
+      dataCredits.dcMint,
+      hntMint
     ));
     ({ subDao } = await initTestSubdao({
       hsdProgram,
@@ -135,7 +139,7 @@ describe('mobile-entity-manager', () => {
     expect(carrierAcc.approved).to.be.false;
 
     const escrowAcc = await getAccount(provider.connection, escrow!);
-    expect(escrowAcc.amount.toString()).to.eq('500000000000000');
+    expect(escrowAcc.amount.toString()).to.eq("10000000000000");
   });
 
   describe('with a carrier', async () => {
