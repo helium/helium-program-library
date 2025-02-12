@@ -39,7 +39,7 @@ pub struct StartDelegationClaimBotV0<'info> {
     mut,
     has_one = task_queue,
     has_one = delegated_position,
-    // constraint = !delegation_claim_bot.queued @ ErrorCode::TaskAlreadyExists,
+    constraint = !delegation_claim_bot.queued @ ErrorCode::TaskAlreadyExists,
   )]
   pub delegation_claim_bot: Box<Account<'info, DelegationClaimBotV0>>,
   #[account(mut)]
