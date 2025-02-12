@@ -1,37 +1,17 @@
 use anchor_lang::prelude::*;
 
-declare_id!("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
-
 mod error;
+mod external_programs;
 mod instructions;
 mod state;
 
+pub use external_programs::{
+  helium_entity_manager, helium_sub_daos, no_emit, voter_stake_registry,
+};
 pub use instructions::*;
 pub use state::*;
 
-mod no_emit {
-  use anchor_lang::{declare_id, declare_program};
-
-  declare_id!("noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv");
-
-  declare_program!(no_emit);
-}
-
-mod helium_sub_daos {
-  use anchor_lang::{declare_id, declare_program};
-
-  declare_id!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
-
-  declare_program!(helium_sub_daos);
-}
-
-mod voter_stake_registry {
-  use anchor_lang::{declare_id, declare_program};
-
-  declare_id!("hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8");
-
-  declare_program!(voter_stake_registry);
-}
+declare_id!("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 
 const EPOCH_LENGTH: u64 = 60 * 60 * 24;
 
@@ -80,5 +60,26 @@ pub mod hpl_crons {
     args: StartDelegationClaimBotArgsV0,
   ) -> Result<()> {
     start_delegation_claim_bot_v0::handler(ctx, args)
+  }
+
+  pub fn init_entity_claim_cron_v0(
+    ctx: Context<InitEntityClaimCronV0>,
+    args: InitEntityClaimCronArgsV0,
+  ) -> Result<()> {
+    init_entity_claim_cron_v0::handler(ctx, args)
+  }
+
+  pub fn add_entity_to_cron_v0(
+    ctx: Context<AddEntityToCronV0>,
+    args: AddEntityToCronArgsV0,
+  ) -> Result<()> {
+    add_entity_to_cron_v0::handler(ctx, args)
+  }
+
+  pub fn remove_entity_from_cron_v0(
+    ctx: Context<RemoveEntityFromCronV0>,
+    args: RemoveEntityFromCronArgsV0,
+  ) -> Result<()> {
+    remove_entity_from_cron_v0::handler(ctx, args)
   }
 }
