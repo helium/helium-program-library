@@ -152,8 +152,16 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
       vec![None; ctx.accounts.lazy_distributor.oracles.len()];
   }
 
-  ctx.accounts.recipient.current_rewards[usize::from(args.oracle_index)] =
-    Some(args.current_rewards);
+  let oracle_index = usize::from(args.oracle_index);
+  if let Some(current_rewards) = ctx.accounts.recipient.current_rewards[oracle_index] {
+    require_gte!(
+      args.current_rewards,
+      current_rewards,
+      ErrorCode::InvalidCurrentRewards
+    );
+  }
+
+  ctx.accounts.recipient.current_rewards[oracle_index] = Some(args.current_rewards);
 
   resize_to_fit(
     &ctx.accounts.payer.to_account_info(),
