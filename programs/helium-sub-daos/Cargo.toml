@@ -31,6 +31,7 @@ no-emit = { workspace = true }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
 nft-proxy = { path = "../../utils/nft-proxy" }
 proposal = { path = "../../utils/proposal" }
+solana-program = { workspace = true }
 
 time = "0.3.17"
 solana-security-txt = { workspace = true }
@@ -38,4 +39,3 @@ default-env = { workspace = true }
 
 [dev-dependencies]
 rust_decimal = "=1.26.0"
-

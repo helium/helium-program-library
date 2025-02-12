@@ -41,4 +41,11 @@ pub mod rewards_oracle {
   ) -> Result<()> {
     set_current_rewards_wrapper_v1::handler(ctx, args)
   }
+
+  pub fn set_current_rewards_wrapper_v2(
+    ctx: Context<SetCurrentRewardsWrapperV2>,
+    args: SetCurrentRewardsWrapperArgsV1,
+  ) -> Result<()> {
+    set_current_rewards_wrapper_v2::handler(ctx, args)
+  }
 }

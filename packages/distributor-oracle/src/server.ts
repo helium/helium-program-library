@@ -1,5 +1,12 @@
 import dotenv from "dotenv";
 dotenv.config();
+import {
+  compileTransaction,
+  customSignerKey,
+  init as initTuktuk,
+  RemoteTaskTransactionV0,
+} from "@helium/tuktuk-sdk";
+import { sign } from "tweetnacl";
 // @ts-ignore
 import {
   AnchorProvider,
@@ -21,9 +28,11 @@ import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import {
+  distributeCompressionRewards,
   init as initLazy,
   lazyDistributorKey,
   PROGRAM_ID as LD_PID,
+  recipientKey,
 } from "@helium/lazy-distributor-sdk";
 import {
   init as initRewards,
@@ -59,6 +68,7 @@ import cors from "@fastify/cors";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import { register, totalRewardsGauge } from "./metrics";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 const HNT = process.env.HNT_MINT
   ? new PublicKey(process.env.HNT_MINT)
@@ -181,6 +191,8 @@ export class OracleServer {
   server: string | undefined;
 
   constructor(
+    // tuktuk is on a different version of anchor, so this has to be done.
+    public tuktukProgram: any,
     public ldProgram: Program<LazyDistributor>,
     public roProgram: Program<RewardsOracle>,
     public hemProgram: Program<HeliumEntityManager>,
@@ -253,6 +265,8 @@ export class OracleServer {
     }>("/", this.getCurrentRewardsHandler.bind(this));
     this.app.post("/", this.signTransactionHandler.bind(this));
     this.app.post("/bulk-sign", this.signBulkTransactionsHandler.bind(this));
+    this.app.post("/v1/tuktuk/:keyToAssetKey", this.tuktukHandler.bind(this));
+    this.app.post("/v1/sign/:keyToAssetKey", this.signHandler.bind(this));
   }
 
   private async getActiveDevicesHandler(
@@ -336,7 +350,7 @@ export class OracleServer {
   private async signTransaction(
     data: number[]
   ): Promise<{ success: boolean; message?: string; transaction?: Buffer }> {
-    console.log("data is", data)
+    console.log("data is", data);
     const conn = this.ldProgram.provider.connection;
     const tx = VersionedTransaction.deserialize(new Uint8Array(data));
     const LUTs = (
@@ -373,9 +387,7 @@ export class OracleServer {
         (x) => x.name === "lazyDistributor"
       )!;
     const payerIdxInitCompressionRecipient =
-      initCompressionRecipientTx.accounts.findIndex(
-        (x) => x.name === "payer"
-      )!;
+      initCompressionRecipientTx.accounts.findIndex((x) => x.name === "payer")!;
     const mintIdx = initRecipientTx.accounts.findIndex(
       (x) => x.name === "mint"
     )!;
@@ -441,10 +453,13 @@ export class OracleServer {
 
       // Since recipient wont exist to fetch to get the mint id, grab it from the init recipient ix
       if (decoded.name === "initializeRecipientV0") {
-        const recipient = allAccs[ix.accountKeyIndexes[recipientIdxInitRecipient]].toBase58();
+        const recipient =
+          allAccs[ix.accountKeyIndexes[recipientIdxInitRecipient]].toBase58();
         recipientToLazyDistToMint[recipient] ||= {};
         const lazyDist =
-          allAccs[ix.accountKeyIndexes[lazyDistributorIdxInitRecipient]].toBase58();
+          allAccs[
+            ix.accountKeyIndexes[lazyDistributorIdxInitRecipient]
+          ].toBase58();
         recipientToLazyDistToMint[recipient][lazyDist] =
           allAccs[ix.accountKeyIndexes[mintIdx]];
       }
@@ -452,16 +467,25 @@ export class OracleServer {
       // Since recipient wont exist to fetch to get the asset id, grab it from the init recipient ix
       if (decoded.name === "initializeCompressionRecipientV0") {
         const recipient =
-          allAccs[ix.accountKeyIndexes[recipientIdxInitCompressionRecipient]].toBase58();
+          allAccs[
+            ix.accountKeyIndexes[recipientIdxInitCompressionRecipient]
+          ].toBase58();
         recipientToLazyDistToMint[recipient] ||= {};
         const lazyDist =
-          allAccs[ix.accountKeyIndexes[lazyDistributorIdxInitCompressionRecipient]].toBase58();
+          allAccs[
+            ix.accountKeyIndexes[lazyDistributorIdxInitCompressionRecipient]
+          ].toBase58();
         const merkleTree =
           allAccs[ix.accountKeyIndexes[merkleTreeIdxInitCompressionRecipient]];
         const payer =
-          allAccs[ix.accountKeyIndexes[payerIdxInitCompressionRecipient]].toBase58();
+          allAccs[
+            ix.accountKeyIndexes[payerIdxInitCompressionRecipient]
+          ].toBase58();
 
-        if (process.env.WILL_PAY_RECIPIENT !== "true" && payer === this.oracle.publicKey.toBase58()) {
+        if (
+          process.env.WILL_PAY_RECIPIENT !== "true" &&
+          payer === this.oracle.publicKey.toBase58()
+        ) {
           return {
             success: false,
             message: "Cannot set this oracle as the payer",
@@ -518,7 +542,9 @@ export class OracleServer {
       let entityKey: Buffer;
       let keyToAssetK: PublicKey | undefined = undefined;
       if (
-        allAccs[ix.accountKeyIndexes[wrapperOracleKeyIdx]].equals(this.oracle.publicKey) &&
+        allAccs[ix.accountKeyIndexes[wrapperOracleKeyIdx]].equals(
+          this.oracle.publicKey
+        ) &&
         allAccs[ix.programIdIndex].equals(RO_PID)
       ) {
         let decoded = (
@@ -541,7 +567,9 @@ export class OracleServer {
           };
         }
       } else if (
-        allAccs[ix.accountKeyIndexes[oracleKeyIdx]].equals(this.oracle.publicKey) &&
+        allAccs[ix.accountKeyIndexes[oracleKeyIdx]].equals(
+          this.oracle.publicKey
+        ) &&
         allAccs[ix.programIdIndex].equals(LD_PID)
       ) {
         let decoded = (
@@ -606,12 +634,173 @@ export class OracleServer {
       tx.sign([this.oracle]);
     } catch (e: any) {
       if (!e.message.toString().includes("Cannot sign with non signer key")) {
-        throw e
+        throw e;
       }
     }
 
     const serialized = tx.serialize();
     return { success: true, transaction: Buffer.from(serialized) };
+  }
+
+  private async signHandler(
+    request: FastifyRequest<{
+      Params: { keyToAssetKey: string };
+    }>,
+    reply: FastifyReply
+  ) {
+    try {
+      let keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
+        new PublicKey(request.params.keyToAssetKey)
+      );
+      const entityKey = decodeEntityKey(
+        keyToAsset.entityKey,
+        keyToAsset.keySerialization
+      )!;
+
+      const message = {
+        lazyDistributor: this.lazyDistributor,
+        oracleIndex: process.env.ORACLE_INDEX
+          ? parseInt(process.env.ORACLE_INDEX)
+          : 0,
+        currentRewards: new BN(await this.db.getCurrentRewardsByEntity(entityKey)),
+        asset: keyToAsset.asset,
+      };
+      const serializedMessage = await this.ldProgram.coder.accounts.encode(
+        "SetCurrentRewardsTransactionV0",
+        message
+      );
+      const resp = {
+        message,
+        serialiedMessage: serializedMessage.toString("base64"),
+        signature: Buffer.from(
+          sign.detached(Uint8Array.from(serializedMessage), this.oracle.secretKey)
+        ).toString("base64"),
+      };
+      reply.status(200).send(resp);
+    } catch (err) {
+      console.error(err);
+      reply.status(500).send({
+        message: "Request failed",
+      });
+    }
+  }
+
+  private async tuktukHandler(
+    request: FastifyRequest<{
+      Params: { keyToAssetKey: string };
+      Body: { task_queue: string; task: string; task_queued_at: number };
+    }>,
+    reply: FastifyReply
+  ) {
+    const taskQueue = new PublicKey(request.body.task_queue);
+    const task = new PublicKey(request.body.task);
+    const taskQueuedAt = new BN(request.body.task_queued_at);
+    try {
+      const [wallet, bump] = customSignerKey(taskQueue, [
+        Buffer.from("oracle"),
+      ]);
+      const bumpBuffer = Buffer.alloc(1);
+      bumpBuffer.writeUint8(bump);
+      let keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
+        new PublicKey(request.params.keyToAssetKey)
+      );
+      const recipient = recipientKey(this.lazyDistributor, keyToAsset.asset)[0];
+      let recipientAcc = await this.ldProgram.account.recipientV0.fetch(
+        recipient
+      );
+
+      let distributeIx;
+      if (
+        recipientAcc.destination &&
+        !recipientAcc.destination.equals(PublicKey.default)
+      ) {
+        const destination = recipientAcc.destination;
+        distributeIx = await this.ldProgram.methods
+          .distributeCustomDestinationV0()
+          .accounts({
+            common: {
+              payer: wallet,
+              recipient: recipient,
+              lazyDistributor: this.lazyDistributor,
+              rewardsMint: DNT,
+              owner: destination,
+              destinationAccount: getAssociatedTokenAddressSync(
+                DNT,
+                destination,
+                true
+              ),
+            },
+          })
+          .instruction();
+      } else {
+        distributeIx = await (
+          await distributeCompressionRewards({
+            program: this.ldProgram,
+            assetId: keyToAsset.asset,
+            lazyDistributor: this.lazyDistributor,
+            rewardsMint: DNT,
+            payer: wallet,
+          })
+        ).instruction();
+      }
+
+      const entityKey = decodeEntityKey(
+        keyToAsset.entityKey,
+        keyToAsset.keySerialization
+      )!;
+
+      const instructions: TransactionInstruction[] = [
+        await this.roProgram.methods
+          .setCurrentRewardsWrapperV2({
+            currentRewards: new BN(await this.db.getCurrentRewardsByEntity(entityKey)),
+            oracleIndex: process.env.ORACLE_INDEX
+              ? parseInt(process.env.ORACLE_INDEX)
+              : 0,
+          })
+          .accounts({
+            lazyDistributor: this.lazyDistributor,
+            recipient,
+            payer: wallet,
+            keyToAsset: new PublicKey(request.params.keyToAssetKey),
+          })
+          .instruction(),
+        distributeIx,
+      ];
+      const { transaction, remainingAccounts } = await compileTransaction(
+        instructions,
+        [[Buffer.from("oracle"), bumpBuffer]]
+      );
+      const remoteTx = new RemoteTaskTransactionV0({
+        task,
+        taskQueuedAt,
+        transaction: {
+          ...transaction,
+          accounts: remainingAccounts.map((acc) => acc.pubkey),
+        },
+      });
+      const serialized = await RemoteTaskTransactionV0.serialize(
+        this.tuktukProgram.coder.accounts,
+        remoteTx
+      );
+      const resp = {
+        transaction: serialized.toString("base64"),
+        signature: Buffer.from(
+          sign.detached(Uint8Array.from(serialized), this.oracle.secretKey)
+        ).toString("base64"),
+        remaining_accounts: remainingAccounts.map((acc) => ({
+          pubkey: acc.pubkey.toBase58(),
+          is_signer: acc.isSigner,
+          is_writable: acc.isWritable,
+        })),
+      };
+      console.log(resp);
+      reply.status(200).send(resp);
+    } catch (err) {
+      console.error(err);
+      reply.status(500).send({
+        message: "Request failed",
+      });
+    }
   }
 
   private async signBulkTransactionsHandler(
@@ -666,7 +855,7 @@ export class OracleServer {
       res
         .status(400)
         .send({ error: result.message || "Error signing transaction" });
-      return
+      return;
     }
 
     res.send({ success: true, transaction: result.transaction });
@@ -689,12 +878,14 @@ export class OracleServer {
         )
       )
     );
+    const tuktukProgram = await initTuktuk(provider);
     const ldProgram = await initLazy(provider);
     const roProgram = await initRewards(provider);
     const hemProgram = await initHeliumEntityManager(provider);
 
     const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
     const server = new OracleServer(
+      tuktukProgram,
       ldProgram,
       roProgram,
       hemProgram,

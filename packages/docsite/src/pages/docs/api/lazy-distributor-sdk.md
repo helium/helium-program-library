@@ -178,15 +178,32 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
-### tempUpdateMatchingDestination
+### setCurrentRewardsV1
 
 #### Accounts
 
-| Name              | Mutability | Signer | Docs |
-| ----------------- | ---------- | ------ | ---- |
-| authority         | immut      | yes    |      |
-| originalRecipient | immut      | no     |      |
-| recipient         | mut        | no     |      |
+| Name               | Mutability | Signer | Docs                                                                                                                                                   |
+| ------------------ | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| payer              | mut        | yes    |                                                                                                                                                        |
+| lazyDistributor    | immut      | no     |                                                                                                                                                        |
+| recipient          | mut        | no     |                                                                                                                                                        |
+| sysvarInstructions | immut      | no     | the supplied Sysvar could be anything else. The Instruction Sysvar has not been implemented in the Anchor framework yet, so this is the safe approach. |
+| systemProgram      | immut      | no     |                                                                                                                                                        |
+
+#### Args
+
+| Name | Type                    | Docs |
+| ---- | ----------------------- | ---- |
+| args | SetCurrentRewardsArgsV0 |      |
+
+### dummyIx
+
+#### Accounts
+
+| Name   | Mutability | Signer | Docs |
+| ------ | ---------- | ------ | ---- |
+| dummy  | mut        | no     |      |
+| dummy2 | immut      | no     |      |
 
 #### Args
 
@@ -194,6 +211,22 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | ---- | ---- |
 
 ## Accounts
+
+### RemoteTaskTransactionV0
+
+| Field            | Type                  |
+| ---------------- | --------------------- |
+| verificationHash | [object Object]       |
+| transaction      | CompiledTransactionV0 |
+
+### SetCurrentRewardsTransactionV0
+
+| Field           | Type      |
+| --------------- | --------- |
+| lazyDistributor | publicKey |
+| oracleIndex     | u16       |
+| currentRewards  | u64       |
+| asset           | publicKey |
 
 ### LazyDistributorV0
 
@@ -263,6 +296,25 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | -------------- | ---- |
 | oracleIndex    | u16  |
 | currentRewards | u64  |
+
+### CompiledInstructionV0
+
+| Field          | Type  |
+| -------------- | ----- |
+| programIdIndex | u8    |
+| accounts       | bytes |
+| data           | bytes |
+
+### CompiledTransactionV0
+
+| Field        | Type                  |
+| ------------ | --------------------- |
+| numRwSigners | u8                    |
+| numRoSigners | u8                    |
+| numRw        | u8                    |
+| accounts     | publicKey             |
+| instructions | CompiledInstructionV0 |
+| signerSeeds  | bytes                 |
 
 ### UpdateCompressionDestinationArgsV0
 

@@ -1718,9 +1718,7 @@
           "name": "position_token_account"
         },
         {
-          "name": "position_authority",
-          "writable": true,
-          "signer": true
+          "name": "position_authority"
         },
         {
           "name": "registrar"
@@ -1891,6 +1889,11 @@
         },
         {
           "name": "token_program"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
@@ -2835,6 +2838,34 @@
         },
         {
           "name": "vsr_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "temp_fix_claimed_epoch",
+      "discriminator": [
+        176,
+        165,
+        131,
+        240,
+        113,
+        28,
+        229,
+        177
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "delegated_position",
+          "writable": true
         },
         {
           "name": "system_program"

@@ -1,4 +1,4 @@
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 import { resolveIndividual } from "./individual";
 
 export const heliumCommonResolver = resolveIndividual(async ({ path }) => {
@@ -27,6 +27,8 @@ export const heliumCommonResolver = resolveIndividual(async ({ path }) => {
       return new PublicKey("1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w");
     case "noEmitProgram":
       return new PublicKey("noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv");
+    case "sysvarInstructions":
+      return SYSVAR_INSTRUCTIONS_PUBKEY;
     default:
       return;
   }
