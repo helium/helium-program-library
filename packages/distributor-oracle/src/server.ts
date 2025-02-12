@@ -749,7 +749,6 @@ export class OracleServer {
         keyToAsset.keySerialization
       )!;
 
-      // Transfer some tokens from lazy signer to me
       const instructions: TransactionInstruction[] = [
         await this.roProgram.methods
           .setCurrentRewardsWrapperV2({
