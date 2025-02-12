@@ -1,6 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
 import * as client from "@helium/distributor-oracle";
-import { fanoutKey, init as initHydra } from "@helium/fanout-sdk";
 import {
   init as initHem,
   keyToAssetKey,
@@ -24,14 +23,11 @@ import {
   HNT_MINT,
   IOT_MINT,
   MOBILE_MINT,
-  batchParallelInstructionsWithPriorityFee,
   createMintInstructions,
   sendAndConfirmWithRetry,
   sendInstructions,
   sendInstructionsWithPriorityFee,
-  truthy,
 } from "@helium/spl-utils";
-import { getAccount } from "@solana/spl-token";
 import {
   Connection,
   Keypair,
@@ -332,6 +328,7 @@ export async function run(args: any = process.argv) {
             lazyDistributor,
             assetId
           );
+
           const tx = await client.formTransaction({
             program: lazyProgram,
             rewardsOracleProgram: rewardsOracleProgram,
@@ -340,6 +337,7 @@ export async function run(args: any = process.argv) {
             asset: assetId,
             lazyDistributor,
           });
+
           const signed = await provider.wallet.signTransaction(tx);
           await sendAndConfirmWithRetry(
             provider.connection,
@@ -347,20 +345,25 @@ export async function run(args: any = process.argv) {
             { skipPreflight: true },
             "confirmed"
           );
-
-          await sendInstructions(provider, [
-            await noEmitProgram.methods
-              .noEmitV0()
-              .accounts({
-                mint: token,
-              })
-              .instruction(),
-          ]);
         } catch (err: any) {
           errors.push(
             `Failed to distribute burn funds for mint ${token.toBase58()}: ${err}`
           );
         }
+      }
+
+      try {
+        console.log("No emit");
+        await sendInstructions(provider, [
+          await noEmitProgram.methods
+            .noEmitV0()
+            .accounts({
+              mint: hntMint,
+            })
+            .instruction(),
+        ]);
+      } catch (err: any) {
+        errors.push(`Failed to run noEmitV0`);
       }
     }
 

@@ -117,8 +117,14 @@ pub fn handler(
       .saturating_sub(prev_cumulative_not_emitted);
   };
 
-  ctx.accounts.dao_epoch_info.not_emitted = not_emitted;
-  ctx.accounts.dao_epoch_info.cumulative_not_emitted = cumulative_not_emitted;
+  if ctx.accounts.dao_epoch_info.not_emitted == 0 {
+    ctx.accounts.dao_epoch_info.not_emitted = not_emitted;
+  }
+
+  if ctx.accounts.dao_epoch_info.cumulative_not_emitted == 0 {
+    ctx.accounts.dao_epoch_info.cumulative_not_emitted = cumulative_not_emitted;
+  }
+
   ctx.accounts.dao_epoch_info.total_rewards = ctx
     .accounts
     .dao

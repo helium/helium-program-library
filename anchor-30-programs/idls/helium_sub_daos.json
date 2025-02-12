@@ -2,7 +2,7 @@
   "address": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
   "metadata": {
     "name": "helium_sub_daos",
-    "version": "0.1.12",
+    "version": "0.2.9",
     "spec": "0.1.0"
   },
   "instructions": [
@@ -866,6 +866,51 @@
         {
           "name": "prev_sub_dao_epoch_info",
           "writable": true
+        },
+        {
+          "name": "not_emitted_counter",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  110,
+                  111,
+                  116,
+                  95,
+                  101,
+                  109,
+                  105,
+                  116,
+                  116,
+                  101,
+                  100,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114,
+                  34
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hnt_mint",
+                "account": "Mint"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "no_emit_program"
+            }
+          }
+        },
+        {
+          "name": "no_emit_program"
         }
       ],
       "args": [
@@ -1666,7 +1711,8 @@
           ]
         },
         {
-          "name": "mint"
+          "name": "mint",
+          "writable": true
         },
         {
           "name": "position_token_account"
@@ -2668,34 +2714,6 @@
       "args": []
     },
     {
-      "name": "temp_resize_account",
-      "discriminator": [
-        116,
-        35,
-        102,
-        170,
-        253,
-        108,
-        40,
-        64
-      ],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "account",
-          "writable": true
-        },
-        {
-          "name": "system_program"
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "track_vote_v0",
       "discriminator": [
         196,
@@ -3668,6 +3686,14 @@
           },
           {
             "name": "vehnt_at_epoch_start",
+            "type": "u64"
+          },
+          {
+            "name": "cumulative_not_emitted",
+            "type": "u64"
+          },
+          {
+            "name": "not_emitted",
             "type": "u64"
           }
         ]
