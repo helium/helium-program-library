@@ -144,6 +144,12 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
         token_program: spl_token::ID,
         circuit_breaker_program: CIRCUIT_BREAKER_PROGRAM,
         prev_sub_dao_epoch_info: *prev_sub_dao_epoch_info,
+        not_emitted_counter: Pubkey::find_program_address(
+          &[b"not_emitted_counter", hnt_mint.as_ref()],
+          &no_emit::ID,
+        )
+        .0,
+        no_emit_program: no_emit::ID,
       }
       .to_account_metas(None),
       data: calc_args.data(),
