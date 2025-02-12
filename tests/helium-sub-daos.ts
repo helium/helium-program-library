@@ -1014,6 +1014,7 @@ describe("helium-sub-daos", () => {
                 .accounts({
                   position,
                   subDao,
+                  payer: positionAuthorityKp.publicKey,
                   positionAuthority: positionAuthorityKp.publicKey,
                 })
                 .signers([positionAuthorityKp]);

@@ -65,13 +65,13 @@ export const mobileEntityManagerResolvers = combineResolvers(
   ataResolver({
     instruction: "initializeCarrierV0",
     account: "source",
-    mint: "dntMint",
+    mint: "hntMint",
     owner: "payer",
   }),
   ataResolver({
     instruction: "initializeCarrierV0",
     account: "escrow",
-    mint: "dntMint",
+    mint: "hntMint",
     owner: "carrier",
   })
 );
