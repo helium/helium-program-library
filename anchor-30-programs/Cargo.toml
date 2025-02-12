@@ -15,7 +15,8 @@ codegen-units = 1
 
 [workspace.dependencies]
 anchor-lang = "0.30.1"
+anchor-spl = { version = "0.30.1", features = ["mint", "token"] }
 spl-associated-token-account = "2.3.0"
 spl-token = "4.0.0"
-tuktuk-program = { git = "https://github.com/helium/tuktuk.git", rev = "1fb3ee9" }
-tuktuk-sdk = { git = "https://github.com/helium/tuktuk.git", rev = "1fb3ee9" }
+tuktuk-program = { git = "https://github.com/helium/tuktuk.git", rev = "1b2384c" }
+tuktuk-sdk = { git = "https://github.com/helium/tuktuk.git", rev = "1b2384c" }
