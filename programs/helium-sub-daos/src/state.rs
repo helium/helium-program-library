@@ -158,6 +158,8 @@ pub struct DaoEpochInfoV0 {
   // The number of delegation rewards issued this epoch, so that delegators can claim their share of the rewards
   pub delegation_rewards_issued: u64,
   pub vehnt_at_epoch_start: u64,
+  pub cumulative_not_emitted: u64,
+  pub not_emitted: u64,
 }
 
 #[derive(Debug, InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Default)]

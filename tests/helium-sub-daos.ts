@@ -13,6 +13,7 @@ import {
   createAtaAndMint,
   createAtaAndTransfer,
   createMint,
+  createMintInstructions,
   roundToDecimals,
   sendInstructions,
   toBN,
@@ -60,6 +61,12 @@ import { createPosition, initVsr } from "./utils/vsr";
 // @ts-ignore
 import bs58 from "bs58";
 import { random } from "./utils/string";
+import {
+  notEmittedKey,
+  notEmittedCounterKey,
+  init as initBurn,
+} from "@helium/no-emit-sdk";
+import { NoEmit } from "../target/types/no_emit";
 
 chai.use(chaiAsPromised);
 
@@ -73,6 +80,7 @@ const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
 const MAX_LOCKUP = 4 * SECS_PER_YEAR;
 const SCALE = 100;
+const NOT_EMITTED_AMOUNT = 1000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -93,6 +101,7 @@ describe("helium-sub-daos", () => {
   );
 
   let dcProgram: Program<DataCredits>;
+  let noEmitProgram: Program<NoEmit>;
   let hemProgram: Program<HeliumEntityManager>;
   let cbProgram: Program<CircuitBreaker>;
   let vsrProgram: Program<VoterStakeRegistry>;
@@ -113,6 +122,11 @@ describe("helium-sub-daos", () => {
       provider,
       anchor.workspace.DataCredits.programId,
       anchor.workspace.DataCredits.idl
+    );
+    noEmitProgram = await initBurn(
+      provider,
+      anchor.workspace.NoEmit.programId,
+      anchor.workspace.NoEmit.idl
     );
     cbProgram = await cbInit(
       provider,
@@ -318,6 +332,80 @@ describe("helium-sub-daos", () => {
       );
 
       expect(epochInfo.dcBurned.toNumber()).eq(toBN(10, 0).toNumber());
+    });
+
+    it("accounts for not emitted HNT when calculating utility scores", async () => {
+      const mint = Keypair.generate();
+      await hemProgram.methods
+        .issueNotEmittedEntityV0()
+        .preInstructions(
+          await createMintInstructions(provider, 0, me, me, mint)
+        )
+        .accounts({
+          dao,
+          mint: mint.publicKey,
+        })
+        .signers([mint])
+        .rpc({ skipPreflight: true });
+
+      const notEmittedAmount = new BN(NOT_EMITTED_AMOUNT);
+      const [noEmitWallet] = notEmittedKey();
+      const [noEmitCounterKey] = notEmittedCounterKey(hntMint);
+
+      async function emitAndVerifyEpoch() {
+        await createAtaAndTransfer(
+          provider,
+          hntMint,
+          notEmittedAmount,
+          me,
+          noEmitWallet
+        );
+
+        await noEmitProgram.methods
+          .noEmitV0()
+          .accounts({ mint: hntMint })
+          .rpc({ skipPreflight: true });
+
+        const { subDaoEpochInfo } = await burnDc(10);
+        const epoch = (
+          await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+        ).epoch;
+
+        const method = program.methods
+          .calculateUtilityScoreV0({ epoch })
+          .accounts({ subDao, dao });
+
+        const { daoEpochInfo } = await method.pubkeys();
+        await method.rpc({ skipPreflight: true });
+
+        const noEmitCounter =
+          await noEmitProgram.account.notEmittedCounterV0.fetch(
+            noEmitCounterKey
+          );
+        const daoEpochInfoAcc = await program.account.daoEpochInfoV0.fetch(
+          daoEpochInfo!
+        );
+
+        return { noEmitCounter, daoEpochInfoAcc };
+      }
+
+      const firstEpoch = await emitAndVerifyEpoch();
+      expect(firstEpoch.daoEpochInfoAcc.cumulativeNotEmitted.toString()).to.eq(
+        firstEpoch.noEmitCounter.amountNotEmitted.toString()
+      );
+      expect(firstEpoch.daoEpochInfoAcc.notEmitted.toString()).to.eq(
+        notEmittedAmount.toString()
+      );
+
+      let expectedRewards = EPOCH_REWARDS + notEmittedAmount.toNumber();
+      expect(firstEpoch.daoEpochInfoAcc.totalRewards.toString()).to.eq(
+        expectedRewards.toString()
+      );
+
+      const supply = (await getMint(provider.connection, hntMint)).supply;
+      expect(firstEpoch.daoEpochInfoAcc.currentHntSupply.toString()).to.eq(
+        new BN(supply.toString()).add(new BN(expectedRewards)).toString()
+      );
     });
 
     describe("with position", () => {
@@ -919,7 +1007,9 @@ describe("helium-sub-daos", () => {
                 1 // Allow for 1 unit of difference to handle rounding
               );
               expect((postHstBalance - preHstBalance).toString()).to.eq("0");
-              expect((postTreasuryBalance - preTreasuryBalance).toString()).to.eq("0");
+              expect(
+                (postTreasuryBalance - preTreasuryBalance).toString()
+              ).to.eq("0");
 
               const acc = await program.account.subDaoEpochInfoV0.fetch(
                 subDaoEpochInfo
