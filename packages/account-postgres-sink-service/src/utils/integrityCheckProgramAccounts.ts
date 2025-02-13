@@ -91,7 +91,7 @@ export const integrityCheckProgramAccounts = async ({
 
         if (!blockTime24HoursAgo) {
           attemptSlot += SLOTS_INCREMENT; // move forward 2 slots each attempt
-          console.warn(
+          console.log(
             `Failed to get blocktime for slot ${
               attemptSlot - SLOTS_INCREMENT
             }, trying slot ${attemptSlot}`
@@ -231,7 +231,7 @@ export const integrityCheckProgramAccounts = async ({
                       try {
                         sanitized = await plugin.processAccount(sanitized, t);
                       } catch (err) {
-                        console.warn(
+                        console.log(
                           `Plugin processing failed for account ${c.pubkey}`,
                           err
                         );
@@ -299,7 +299,7 @@ export const integrityCheckProgramAccounts = async ({
     await retry(performIntegrityCheck, {
       ...retryOptions,
       onRetry: (error, attempt) => {
-        console.warn(
+        console.log(
           `Integrity check ${programId} attempt ${attempt}: Retrying due to ${error.message}`
         );
       },
