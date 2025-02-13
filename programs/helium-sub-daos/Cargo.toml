@@ -1,6 +1,6 @@
 [package]
 name = "helium-sub-daos"
-version = "0.2.6"
+version = "0.2.9"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -30,6 +30,7 @@ circuit-breaker = { workspace = true }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
 nft-proxy = { path = "../../utils/nft-proxy" }
 proposal = { path = "../../utils/proposal" }
+solana-program = { workspace = true }
 
 time = "0.3.17"
 solana-security-txt = { workspace = true }
@@ -37,4 +38,3 @@ default-env = { workspace = true }
 
 [dev-dependencies]
 rust_decimal = "=1.26.0"
-

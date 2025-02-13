@@ -147,6 +147,18 @@ pub struct MakerV0 {
   pub dao: Pubkey,
 }
 
+#[macro_export]
+macro_rules! maker_seeds {
+  ( $maker:expr ) => {
+    &[
+      b"maker".as_ref(),
+      $maker.dao.as_ref(),
+      $maker.name.as_bytes(),
+      &[$maker.bump_seed],
+    ]
+  };
+}
+
 #[account]
 #[derive(Default)]
 pub struct MakerApprovalV0 {

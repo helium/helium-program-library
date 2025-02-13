@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import retry, { Options as RetryOptions } from "async-retry";
-import deepEqual from "fast-deep-equal";
+import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
 import pLimit from "p-limit";
@@ -71,12 +71,37 @@ export const integrityCheckProgramAccounts = async ({
     try {
       const program = new anchor.Program(idl, programId, provider);
       const currentSlot = await connection.getSlot();
-      const twentyFourHoursAgoSlot =
-        currentSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // (assuming a slot duration of 400ms)
-      const blockTime24HoursAgo = await getBlockTimeWithRetry({
-        slot: twentyFourHoursAgoSlot,
-        provider,
-      });
+      let blockTime24HoursAgo: number | null = null;
+      let attemptSlot = currentSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
+      const SLOTS_INCREMENT = 2;
+
+      for (
+        let blockTimeAttemps = 0;
+        blockTimeAttemps < 10 && !blockTime24HoursAgo;
+        blockTimeAttemps++
+      ) {
+        blockTime24HoursAgo = await getBlockTimeWithRetry({
+          slot: attemptSlot,
+          provider,
+        });
+
+        if (blockTime24HoursAgo) {
+          break;
+        }
+
+        if (!blockTime24HoursAgo) {
+          attemptSlot += SLOTS_INCREMENT; // move forward 2 slots each attempt
+          console.log(
+            `Failed to get blocktime for slot ${
+              attemptSlot - SLOTS_INCREMENT
+            }, trying slot ${attemptSlot}`
+          );
+        }
+      }
+
+      if (!blockTime24HoursAgo) {
+        throw new Error("Unable to get any blocktime in the last 24 hours");
+      }
 
       const txIdsByAccountId: { [key: string]: string[] } = {};
       const corrections: {
@@ -201,18 +226,19 @@ export const integrityCheckProgramAccounts = async ({
                     ...sanitizeAccount(decodedAcc),
                   };
 
-                  if (pluginsByAccountType[accName]?.length > 0) {
-                    const pluginResults = await Promise.all(
-                      pluginsByAccountType[accName].map((plugin) =>
-                        plugin?.processAccount
-                          ? plugin.processAccount(sanitized)
-                          : sanitized
-                      )
-                    );
-                    sanitized = pluginResults.reduce(
-                      (acc, curr) => ({ ...acc, ...curr }),
-                      sanitized
-                    );
+                  for (const plugin of pluginsByAccountType[accName] || []) {
+                    if (plugin?.processAccount) {
+                      try {
+                        sanitized = await plugin.processAccount(sanitized, t);
+                      } catch (err) {
+                        console.log(
+                          `Plugin processing failed for account ${c.pubkey}`,
+                          err
+                        );
+                        // Continue with unmodified sanitized data instead of failing
+                        continue;
+                      }
+                    }
                   }
 
                   const existing = await model.findByPk(c.pubkey, {
@@ -273,7 +299,7 @@ export const integrityCheckProgramAccounts = async ({
     await retry(performIntegrityCheck, {
       ...retryOptions,
       onRetry: (error, attempt) => {
-        console.warn(
+        console.log(
           `Integrity check ${programId} attempt ${attempt}: Retrying due to ${error.message}`
         );
       },

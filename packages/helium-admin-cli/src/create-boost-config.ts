@@ -89,8 +89,10 @@ export async function run(args: any = process.argv) {
   const dntMint = new PublicKey(argv.dntMint);
   const mint = await getMint(program.provider.connection, dntMint);
   const subDao = (await subDaoKey(dntMint))[0];
+  const subDaoAccount = await hsdProgram.account.subDaoV0.fetch(subDao);
+  const dao = await hsdProgram.account.daoV0.fetch(subDaoAccount.dao);
 
-  const subDaoAuth = (await hsdProgram.account.subDaoV0.fetch(subDao)).authority
+  const subDaoAuth = subDaoAccount.authority;
   const instructions = [
     await program.methods
       .initializeBoostConfigV0({
@@ -99,7 +101,7 @@ export async function run(args: any = process.argv) {
         minimumPeriods: argv.minimumPeriods,
       })
       .accounts({
-        dntMint,
+        dcMint: dao.dcMint,
         priceOracle: new PublicKey(argv.priceOracle),
         rentReclaimAuthority: new PublicKey(argv.rentReclaimAuthority),
         authority: subDaoAuth,

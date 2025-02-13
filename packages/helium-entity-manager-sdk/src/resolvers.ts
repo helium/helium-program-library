@@ -30,7 +30,7 @@ export const heliumEntityManagerResolvers = combineResolvers(
   ataResolver({
     instruction: "approveMakerV0",
     account: "escrow",
-    mint: "dntMint",
+    mint: "hntMint",
     owner: "maker",
   }),
   resolveIndividual(async ({ path, provider }) => {

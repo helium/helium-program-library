@@ -10,7 +10,6 @@ pub mod instructions;
 pub mod state;
 
 pub use instructions::*;
-
 pub use state::*;
 
 #[cfg(not(feature = "no-entrypoint"))]
@@ -204,5 +203,9 @@ pub mod helium_entity_manager {
     args: TempBackfillMobileInfoArgs,
   ) -> Result<()> {
     temp_backfill_mobile_info::handler(ctx, args)
+  }
+
+  pub fn swap_maker_stake(ctx: Context<SwapMakerStake>) -> Result<()> {
+    swap_maker_stake::handler(ctx)
   }
 }

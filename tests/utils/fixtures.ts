@@ -33,7 +33,7 @@ const DEFAULT_METADATA_URL =
   "https://c3zu2nc2m4x6zvqf5lofrtdbsa4niuh6drvzi7lq4n465ykbd3fa.arweave.net/FvNNNFpnL-zWBercWMxhkDjUUP4ca5R9cON57uFBHso/";
 
 export const DC_FEE = 5000000;
-export const MAKER_STAKING_FEE = toBN(10, 6);
+export const MAKER_STAKING_FEE = toBN(1, 8);
 
 export const initTestDataCredits = async (
   program: Program<DataCredits>,
@@ -217,7 +217,7 @@ export const initTestMaker = async (
   );
   const {
     instruction: approve,
-    pubkeys: { dntMint },
+    pubkeys: { hntMint },
   } = await program.methods
     .approveMakerV0()
     .accounts({
@@ -227,7 +227,7 @@ export const initTestMaker = async (
     .prepare();
   await createAtaAndTransfer(
     provider,
-    dntMint!,
+    hntMint!,
     rewConfig.stakingRequirement,
     provider.wallet.publicKey,
     maker

@@ -24,7 +24,7 @@ export const hexboostingResolvers = combineResolvers(
   }),
   ataResolver({
     instruction: "boostV0",
-    mint: "paymentMint",
+    mint: "dcMint",
     account: "paymentAccount",
     owner: "payer",
   })

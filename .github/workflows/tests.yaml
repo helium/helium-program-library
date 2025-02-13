@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         name: Cache Cargo registry + index
         id: cache-cargo-build
         with:
@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         name: Cache Cargo registry + index
         id: cache-cargo-build
         with:

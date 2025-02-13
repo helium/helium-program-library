@@ -38,6 +38,7 @@ interface IOutputAccount {
 
 export const CursorManager = (stalenessThreshold: number) => {
   let checkInterval: NodeJS.Timeout | undefined;
+  let isReconnecting = false;
 
   const formatStaleness = (staleness: number): string => {
     const stalenessInHours = staleness / 3600000;
@@ -64,6 +65,8 @@ export const CursorManager = (stalenessThreshold: number) => {
   const checkStaleness = async (
     onStale?: () => void
   ): Promise<string | undefined> => {
+    if (isReconnecting) return undefined;
+
     const cursor = await getLatestCursor();
     if (!cursor) return undefined;
 
@@ -75,6 +78,7 @@ export const CursorManager = (stalenessThreshold: number) => {
           staleness
         )} old), connecting from current block`
       );
+      isReconnecting = true;
       onStale && onStale();
       return undefined;
     }
@@ -94,12 +98,17 @@ export const CursorManager = (stalenessThreshold: number) => {
     }
   };
 
+  const resetReconnecting = (): void => {
+    isReconnecting = false;
+  };
+
   return {
     getLatestCursor,
     updateCursor,
     checkStaleness,
     startStalenessCheck,
     stopStalenessCheck,
+    resetReconnecting,
   };
 };
 
@@ -173,6 +182,7 @@ export const setupSubstream = async (
 
       attemptCount = 0;
       isConnecting = false;
+      cursorManager.resetReconnecting();
 
       for await (const response of streamBlocks(transport, request)) {
         const message = response.message;
@@ -183,42 +193,37 @@ export const setupSubstream = async (
         }
 
         if (message.case === "blockScopedData") {
-          try {
-            const output = unpackMapOutput(response, registry);
-            const cursor = message.value.cursor;
-            if (output !== undefined && !isEmptyMessage(output)) {
-              const accountPromises = (output as any).accounts
-                .map(async (account: IOutputAccount) => {
-                  const { owner, address, data, deleted } = account;
-                  const ownerKey = new PublicKey(owner);
-                  const addressKey = new PublicKey(address);
-                  const config = configs.find(
-                    (x) => x.programId === ownerKey.toBase58()
-                  );
+          const output = unpackMapOutput(response, registry);
+          const cursor = message.value.cursor;
+          if (output !== undefined && !isEmptyMessage(output)) {
+            const accountPromises = (output as any).accounts
+              .map(async (account: IOutputAccount) => {
+                const { owner, address, data, deleted } = account;
+                const ownerKey = new PublicKey(owner);
+                const addressKey = new PublicKey(address);
+                const config = configs.find(
+                  (x) => x.programId === ownerKey.toBase58()
+                );
 
-                  if (!config) return null;
+                if (!config) return null;
 
-                  return handleAccountWebhook({
-                    fastify: server,
-                    programId: ownerKey,
-                    accounts: config.accounts,
-                    account: {
-                      pubkey: addressKey.toBase58(),
-                      data: [data, undefined],
-                    },
-                    isDelete: deleted,
-                    pluginsByAccountType:
-                      pluginsByAccountTypeByProgram[ownerKey.toBase58()] || {},
-                  });
-                })
-                .filter(Boolean);
+                return handleAccountWebhook({
+                  fastify: server,
+                  programId: ownerKey,
+                  accounts: config.accounts,
+                  account: {
+                    pubkey: addressKey.toBase58(),
+                    data: [data, undefined],
+                  },
+                  isDelete: deleted,
+                  pluginsByAccountType:
+                    pluginsByAccountTypeByProgram[ownerKey.toBase58()] || {},
+                });
+              })
+              .filter(Boolean);
 
-              await Promise.all(accountPromises);
-              await cursorManager.updateCursor(cursor);
-            }
-          } catch (err) {
-            console.error("Substream error:", err);
-            throw err;
+            await Promise.all(accountPromises);
+            await cursorManager.updateCursor(cursor);
           }
         }
       }
@@ -226,6 +231,7 @@ export const setupSubstream = async (
       cursorManager.stopStalenessCheck();
       console.log("Substream connection error:", err);
       isConnecting = false;
+      cursorManager.resetReconnecting();
       handleReconnect(attemptCount + 1);
     }
   };

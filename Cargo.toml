@@ -25,6 +25,7 @@ anchor-lang = { version = "0.28.0", features = ["init-if-needed"] }
 anchor-spl = { version = "0.28.0", features = ["mint", "token"] }
 mpl-token-metadata = { version = "3.2.0" }
 account-compression-cpi = { rev = "a499196", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
+solana-program = "1.16"
 bubblegum-cpi = { rev = "a499196", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
 solana-security-txt = "1.1.1"
 default-env = "0.1.1"
@@ -37,3 +38,4 @@ mobile-entity-manager = { path = "./programs/mobile-entity-manager", features = 
 price-oracle = { path = "./programs/price-oracle", features = ["cpi"] }
 no-emit = { path = "./programs/no-emit", features = ["cpi"] }
 time = "0.3.36"
+data-credits = { path = "./programs/data-credits" }
