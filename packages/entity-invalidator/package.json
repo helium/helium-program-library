@@ -32,7 +32,7 @@
     "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.28.0",
+    "@coral-xyz/anchor": "^0.30.1",
     "@helium/account-fetch-cache": "^0.9.24-alpha.0",
     "@helium/helium-entity-manager-sdk": "^0.9.24-alpha.0",
     "@helium/spl-utils": "^0.9.24-alpha.0",

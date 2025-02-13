@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use proposal::{ProposalState, ProposalV0};
+use proposal::{accounts::ProposalV0, types::ProposalState};
 
 use crate::state::*;
 

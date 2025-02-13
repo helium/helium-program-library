@@ -1,8 +1,12 @@
-use crate::canopy::fill_in_proof_from_canopy;
-use crate::error::ErrorCode;
-use crate::util::{is_executed, set_executed};
-use crate::{merkle_proof::verify, state::*};
 use anchor_lang::{prelude::*, solana_program, solana_program::instruction::Instruction};
+
+use crate::{
+  canopy::fill_in_proof_from_canopy,
+  error::ErrorCode,
+  merkle_proof::verify,
+  state::*,
+  util::{is_executed, set_executed},
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CompiledInstruction {
@@ -119,7 +123,7 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
   let lazy_signer_seeds: &[&[u8]] = &[
     b"lazy_signer",
     ctx.accounts.lazy_transactions.name.as_bytes(),
-    &[ctx.bumps["lazy_signer"]],
+    &[ctx.bumps.lazy_signer],
   ];
 
   let prefix: Vec<&[u8]> = vec![b"user", ctx.accounts.lazy_transactions.name.as_bytes()];

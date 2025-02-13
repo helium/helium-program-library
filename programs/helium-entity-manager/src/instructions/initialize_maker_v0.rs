@@ -1,5 +1,3 @@
-use crate::error::ErrorCode;
-use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -7,10 +5,13 @@ use anchor_spl::{
 };
 use helium_sub_daos::DaoV0;
 use mpl_token_metadata::types::{CollectionDetails, DataV2};
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
+use shared_utils::{
+  create_metadata_accounts_v3,
+  token_metadata::{create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3},
+  Metadata,
 };
-use shared_utils::{create_metadata_accounts_v3, Metadata};
+
+use crate::{error::ErrorCode, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeMakerArgsV0 {
@@ -97,7 +98,7 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     b"maker",
     ctx.accounts.dao.to_account_info().key.as_ref(),
     args.name.as_bytes(),
-    &[ctx.bumps["maker"]],
+    &[ctx.bumps.maker],
   ]];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
@@ -163,8 +164,8 @@ pub fn handler(ctx: Context<InitializeMakerV0>, args: InitializeMakerArgsV0) -> 
     collection: ctx.accounts.collection.key(),
     merkle_tree: Pubkey::default(),
     // Initialized via set_maker_tree
-    bump_seed: ctx.bumps["maker"],
-    collection_bump_seed: ctx.bumps["collection"],
+    bump_seed: ctx.bumps.maker,
+    collection_bump_seed: ctx.bumps.collection,
     dao: ctx.accounts.dao.key(),
   });
 

@@ -142,7 +142,7 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
     b"carrier",
     ctx.accounts.sub_dao.to_account_info().key.as_ref(),
     args.name.as_bytes(),
-    &[ctx.bumps["carrier"]],
+    &[ctx.bumps.carrier],
   ]];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
@@ -210,8 +210,8 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
     collection: ctx.accounts.collection.key(),
     merkle_tree: Pubkey::default(),
     // Initialized via set_carrier_tree
-    bump_seed: ctx.bumps["carrier"],
-    collection_bump_seed: ctx.bumps["collection"],
+    bump_seed: ctx.bumps.carrier,
+    collection_bump_seed: ctx.bumps.collection,
     sub_dao: ctx.accounts.sub_dao.key(),
     escrow: ctx.accounts.escrow.key(),
     hexboost_authority: args.hexboost_authority,

@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "treasury_management"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -26,4 +27,3 @@ circuit-breaker = { workspace = true }
 anchor-spl = { workspace = true }
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
-default-env = { workspace = true }

@@ -4,10 +4,12 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount, Transfer},
 };
 use mpl_token_metadata::types::{Collection, DataV2};
-use shared_utils::create_metadata_accounts_v3;
-use shared_utils::token_metadata::{
-  create_master_edition_v3, verify_collection_item, CreateMasterEditionV3,
-  CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
+use shared_utils::{
+  create_metadata_accounts_v3,
+  token_metadata::{
+    create_master_edition_v3, verify_collection_item, CreateMasterEditionV3,
+    CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
+  },
 };
 
 use crate::{fanout_seeds, voucher_seeds, FanoutV0, FanoutVoucherV0};
@@ -152,7 +154,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     stake_account: ctx.accounts.stake_account.key(),
     total_inflow: ctx.accounts.token_account.amount,
     total_dust: 0,
-    bump_seed: ctx.bumps["voucher"],
+    bump_seed: ctx.bumps.voucher,
   });
   ctx.accounts.fanout.total_staked_shares = ctx
     .accounts

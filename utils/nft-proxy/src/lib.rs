@@ -1,8 +1,11 @@
 use anchor_lang::prelude::*;
-
-anchor_gen::generate_cpi_crate!("./idl.json");
+use nft_proxy::{accounts::ProxyConfigV0, types::SeasonV0};
 
 declare_id!("nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p");
+
+declare_program!(nft_proxy);
+
+pub use nft_proxy::*;
 
 impl ProxyConfigV0 {
   // Binary search for the timestamp closest to but after `unix_time`

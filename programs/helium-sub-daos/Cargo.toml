@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "helium_sub_daos"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -34,7 +35,6 @@ solana-program = { workspace = true }
 
 time = "0.3.17"
 solana-security-txt = { workspace = true }
-default-env = { workspace = true }
 
 [dev-dependencies]
 rust_decimal = "=1.26.0"

@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "shared_utils"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []

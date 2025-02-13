@@ -65,8 +65,8 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 }
 
-pub fn handler(
-  ctx: Context<CalculateUtilityScoreV0>,
+pub fn handler<'info>(
+  ctx: Context<'_, 'info, '_, 'info, CalculateUtilityScoreV0<'info>>,
   args: CalculateUtilityScoreArgsV0,
 ) -> Result<()> {
   let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
@@ -77,14 +77,9 @@ pub fn handler(
   let curr_supply = ctx.accounts.hnt_mint.supply;
   let mut prev_supply = curr_supply;
   let mut prev_total_utility_score = 0;
-  if ctx.accounts.prev_dao_epoch_info.lamports() > 0
-    && !ctx
-      .accounts
-      .prev_dao_epoch_info
-      .to_account_info()
-      .data_is_empty()
-  {
-    let info: Account<DaoEpochInfoV0> = Account::try_from(&ctx.accounts.prev_dao_epoch_info)?;
+  let prev_dao_epoch_info = &mut ctx.accounts.prev_dao_epoch_info;
+  if prev_dao_epoch_info.lamports() > 0 && !prev_dao_epoch_info.to_account_info().data_is_empty() {
+    let info: Account<DaoEpochInfoV0> = Account::try_from(prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
     prev_total_utility_score = info.total_utility_score;
   }
@@ -146,13 +141,12 @@ pub fn handler(
 
   ctx.accounts.dao_epoch_info.dao = ctx.accounts.dao.key();
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
-  ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
+  ctx.accounts.sub_dao_epoch_info.bump_seed = ctx.bumps.sub_dao_epoch_info;
   ctx.accounts.sub_dao_epoch_info.initialized = true;
   ctx.accounts.prev_sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
-  ctx.accounts.prev_sub_dao_epoch_info.bump_seed =
-    *ctx.bumps.get("prev_sub_dao_epoch_info").unwrap();
+  ctx.accounts.prev_sub_dao_epoch_info.bump_seed = ctx.bumps.prev_sub_dao_epoch_info;
   ctx.accounts.prev_sub_dao_epoch_info.epoch = args.epoch - 1;
-  ctx.accounts.dao_epoch_info.bump_seed = *ctx.bumps.get("dao_epoch_info").unwrap();
+  ctx.accounts.dao_epoch_info.bump_seed = ctx.bumps.dao_epoch_info;
 
   // Calculate utility score
   // utility score = V = veHNT_dnp

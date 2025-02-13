@@ -1,6 +1,4 @@
-use crate::state::*;
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
+use anchor_lang::{prelude::*, solana_program::hash::hash};
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{
@@ -9,6 +7,8 @@ use anchor_spl::{
   },
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct DelegateDataCreditsArgsV0 {
@@ -83,7 +83,7 @@ pub fn handler(ctx: Context<DelegateDataCreditsV0>, args: DelegateDataCreditsArg
       router_key: args.router_key,
       sub_dao: ctx.accounts.sub_dao.key(),
       escrow_account: ctx.accounts.escrow_account.key(),
-      bump: ctx.bumps["delegated_data_credits"],
+      bump: ctx.bumps.delegated_data_credits,
     });
 
   let signer_seeds: &[&[&[u8]]] = &[&[

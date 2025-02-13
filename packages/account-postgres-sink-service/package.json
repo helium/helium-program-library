@@ -35,7 +35,7 @@
     "@bufbuild/protobuf": "^1.10.0",
     "@connectrpc/connect": "^1.4.0",
     "@connectrpc/connect-node": "^1.4.0",
-    "@coral-xyz/anchor": "^0.28.0",
+    "@coral-xyz/anchor": "^0.30.1",
     "@fastify/cors": "^8.1.1",
     "@helium/account-fetch-cache": "^0.9.24-alpha.0",
     "@helium/spl-utils": "^0.9.24-alpha.0",

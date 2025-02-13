@@ -1,14 +1,12 @@
 use std::str::FromStr;
 
-use crate::state::*;
-use crate::{error::ErrorCode, TESTING};
+use account_compression_cpi::program::SplAccountCompression;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
-use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
-
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{burn, Burn, Mint, Token},
 };
+use bubblegum_cpi::get_asset_id;
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnWithoutTrackingV0},
@@ -18,10 +16,10 @@ use data_credits::{
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
 use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
-
-use account_compression_cpi::program::SplAccountCompression;
-use bubblegum_cpi::get_asset_id;
+use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 use shared_utils::*;
+
+use crate::{error::ErrorCode, state::*, TESTING};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardDataOnlyMobileHotspotArgsV0 {
@@ -176,7 +174,7 @@ pub fn handler<'info>(
 
   ctx.accounts.mobile_info.set_inner(MobileHotspotInfoV0 {
     asset: asset_id,
-    bump_seed: ctx.bumps["mobile_info"],
+    bump_seed: ctx.bumps.mobile_info,
     location: None,
     is_full_hotspot: false,
     num_location_asserts: 0,

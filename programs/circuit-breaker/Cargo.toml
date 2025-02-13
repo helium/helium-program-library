@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "circuit_breaker"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -25,4 +26,3 @@ anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
-default-env = { workspace = true }

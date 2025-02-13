@@ -1,7 +1,5 @@
-use crate::state::*;
+use account_compression_cpi::account_compression::program::SplAccountCompression;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
-
-use account_compression_cpi::program::SplAccountCompression;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -17,6 +15,8 @@ use data_credits::{
 };
 use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
 use shared_utils::*;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct OnboardDataOnlyIotHotspotArgsV0 {
@@ -146,7 +146,7 @@ pub fn handler<'info>(
   let mut dc_fee = ctx.accounts.sub_dao.onboarding_data_only_dc_fee;
   ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
-    bump_seed: ctx.bumps["iot_info"],
+    bump_seed: ctx.bumps.iot_info,
     location: None,
     elevation: args.elevation,
     gain: args.gain,

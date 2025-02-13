@@ -1,9 +1,8 @@
-use crate::error::VsrError;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
+use proposal::accounts::{ProposalConfigV0, ProposalV0};
 
-use crate::{registrar_seeds, state::*};
-use proposal::{ProposalConfigV0, ProposalV0};
+use crate::{error::VsrError, registrar_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct VoteArgsV0 {
@@ -68,7 +67,7 @@ pub fn handler(ctx: Context<VoteV0>, args: VoteArgsV0) -> Result<()> {
     marker.rent_refund = ctx.accounts.payer.key();
   }
   marker.proposal = ctx.accounts.proposal.key();
-  marker.bump_seed = ctx.bumps["marker"];
+  marker.bump_seed = ctx.bumps.marker;
   marker.voter = ctx.accounts.voter.key();
   marker.mint = ctx.accounts.mint.key();
   marker.registrar = ctx.accounts.registrar.key();
@@ -117,7 +116,7 @@ pub fn handler(ctx: Context<VoteV0>, args: VoteArgsV0) -> Result<()> {
       },
       &[registrar_seeds!(ctx.accounts.registrar)],
     ),
-    proposal::VoteArgsV0 {
+    proposal::types::VoteArgsV0 {
       remove_vote: false,
       choice: args.choice,
       weight,

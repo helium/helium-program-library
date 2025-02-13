@@ -31,7 +31,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.28.0",
+    "@coral-xyz/anchor": "^0.30.1",
     "@helium/account-fetch-cache": "^0.9.24-alpha.0",
     "@helium/distributor-oracle": "^0.9.24-alpha.0",
     "@helium/fanout-sdk": "^0.9.24-alpha.0",

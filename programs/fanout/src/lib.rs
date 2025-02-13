@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 #[cfg(not(feature = "no-entrypoint"))]
-use {default_env::default_env, solana_security_txt::security_txt};
+use solana_security_txt::security_txt;
 
 declare_id!("fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6");
 
@@ -17,13 +17,10 @@ security_txt! {
   project_url: "http://helium.com",
   contacts: "email:hello@helium.foundation",
   policy: "https://github.com/helium/helium-program-library/tree/master/SECURITY.md",
-
-
-  // Optional Fields
   preferred_languages: "en",
   source_code: "https://github.com/helium/helium-program-library/tree/master/programs/fanout",
-  source_revision: default_env!("GITHUB_SHA", ""),
-  source_release: default_env!("GITHUB_REF_NAME", ""),
+  source_revision: const_env!("GITHUB_SHA"),
+  source_release: const_env!("GITHUB_REF_NAME"),
   auditors: "Sec3"
 }
 

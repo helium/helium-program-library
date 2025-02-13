@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "data_credits"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -25,7 +26,7 @@ anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 helium-sub-daos = { workspace = true }
 circuit-breaker = { workspace = true }
-pyth-solana-receiver-sdk = "0.3.0"
+pyth-solana-receiver-sdk = { workspace = true }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
 solana-security-txt = { workspace = true }
-default-env = { workspace = true }
+pythnet-sdk = { workspace = true }

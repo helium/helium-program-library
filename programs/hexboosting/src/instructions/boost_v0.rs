@@ -98,7 +98,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
   let mut is_initialized = ctx.accounts.boosted_hex.location != 0;
   ctx.accounts.boosted_hex.boost_config = ctx.accounts.boost_config.key();
   ctx.accounts.boosted_hex.location = args.location;
-  ctx.accounts.boosted_hex.bump_seed = ctx.bumps["boosted_hex"];
+  ctx.accounts.boosted_hex.bump_seed = ctx.bumps.boosted_hex;
   ctx.accounts.boosted_hex.version += 1;
   ctx.accounts.boosted_hex.device_type = args.device_type;
 

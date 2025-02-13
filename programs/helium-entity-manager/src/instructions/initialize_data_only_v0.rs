@@ -1,5 +1,3 @@
-use crate::error::ErrorCode;
-use crate::{data_only_config_seeds, state::*};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -12,10 +10,13 @@ use bubblegum_cpi::{
 };
 use helium_sub_daos::DaoV0;
 use mpl_token_metadata::types::{CollectionDetails, DataV2};
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
+use shared_utils::{
+  create_metadata_accounts_v3,
+  token_metadata::{create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3},
+  Metadata,
 };
-use shared_utils::{create_metadata_accounts_v3, Metadata};
+
+use crate::{data_only_config_seeds, error::ErrorCode, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataOnlyArgsV0 {
@@ -111,8 +112,8 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
     authority: args.authority,
     collection: ctx.accounts.collection.key(),
     merkle_tree: Pubkey::default(),
-    bump_seed: ctx.bumps["data_only_config"],
-    collection_bump_seed: ctx.bumps["collection"],
+    bump_seed: ctx.bumps.data_only_config,
+    collection_bump_seed: ctx.bumps.collection,
     dao,
     new_tree_depth: args.new_tree_depth,
     new_tree_buffer_size: args.new_tree_buffer_size,

@@ -169,7 +169,7 @@ pub fn handler(
       shares: args.shares,
       carrier: ctx.accounts.carrier.key(),
       name: args.name,
-      bump_seed: ctx.bumps["incentive_escrow_program"],
+      bump_seed: ctx.bumps.incentive_escrow_program,
     });
 
   Ok(())

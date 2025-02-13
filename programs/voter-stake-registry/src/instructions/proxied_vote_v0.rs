@@ -1,9 +1,8 @@
-use crate::{error::VsrError, VoteArgsV0};
 use anchor_lang::prelude::*;
-use nft_proxy::ProxyAssignmentV0;
+use nft_proxy::accounts::ProxyAssignmentV0;
+use proposal::accounts::{ProposalConfigV0, ProposalV0};
 
-use crate::{registrar_seeds, state::*};
-use proposal::{ProposalConfigV0, ProposalV0};
+use crate::{error::VsrError, registrar_seeds, state::*, VoteArgsV0};
 
 #[derive(Accounts)]
 pub struct ProxiedVoteV0<'info> {
@@ -78,7 +77,7 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
     }
   }
   marker.proposal = ctx.accounts.proposal.key();
-  marker.bump_seed = ctx.bumps["marker"];
+  marker.bump_seed = ctx.bumps.marker;
   marker.voter = ctx.accounts.voter.key();
   marker.mint = ctx.accounts.position.mint;
   marker.registrar = ctx.accounts.registrar.key();
@@ -127,7 +126,7 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
       },
       &[registrar_seeds!(ctx.accounts.registrar)],
     ),
-    proposal::VoteArgsV0 {
+    proposal::types::VoteArgsV0 {
       remove_vote: false,
       choice: args.choice,
       weight,

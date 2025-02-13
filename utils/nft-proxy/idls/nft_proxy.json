@@ -1,0 +1,455 @@
+{
+  "address": "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p",
+  "metadata": {
+    "name": "nft_proxy",
+    "version": "0.0.1",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "initialize_proxy_config_v0",
+      "discriminator": [
+        8,
+        242,
+        247,
+        214,
+        208,
+        16,
+        189,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority"
+        },
+        {
+          "name": "proxy_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  34
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeProxyConfigArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "assign_proxy_v0",
+      "discriminator": [
+        107,
+        214,
+        197,
+        124,
+        248,
+        222,
+        169,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "asset"
+        },
+        {
+          "name": "approver",
+          "signer": true
+        },
+        {
+          "name": "voter",
+          "docs": [
+            "or in the case of a primary proxy (first in the line), Pubkey::default"
+          ]
+        },
+        {
+          "name": "token_account"
+        },
+        {
+          "name": "proxy_config"
+        },
+        {
+          "name": "current_proxy_assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116,
+                  34
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proxy_config",
+                "account": "ProxyConfigV0"
+              },
+              {
+                "kind": "account",
+                "path": "asset",
+                "account": "Mint"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient"
+        },
+        {
+          "name": "next_proxy_assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116,
+                  34
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proxy_config",
+                "account": "ProxyConfigV0"
+              },
+              {
+                "kind": "account",
+                "path": "asset",
+                "account": "Mint"
+              },
+              {
+                "kind": "account",
+                "path": "recipient"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "AssignProxyArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "unassign_proxy_v0",
+      "discriminator": [
+        23,
+        104,
+        235,
+        220,
+        139,
+        184,
+        41,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "rent_refund",
+          "writable": true
+        },
+        {
+          "name": "asset"
+        },
+        {
+          "name": "approver",
+          "signer": true
+        },
+        {
+          "name": "voter",
+          "docs": [
+            "or in the case of a primary proxy (first in the line), Pubkey::default"
+          ]
+        },
+        {
+          "name": "token_account"
+        },
+        {
+          "name": "current_proxy_assignment",
+          "relations": [
+            "voter",
+            "asset"
+          ]
+        },
+        {
+          "name": "prev_proxy_assignment",
+          "writable": true
+        },
+        {
+          "name": "proxy_assignment",
+          "writable": true,
+          "relations": [
+            "rent_refund"
+          ]
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ProxyConfigV0",
+      "discriminator": [
+        187,
+        22,
+        143,
+        173,
+        201,
+        68,
+        34,
+        64
+      ]
+    },
+    {
+      "name": "ProxyAssignmentV0",
+      "discriminator": [
+        196,
+        152,
+        78,
+        155,
+        132,
+        136,
+        147,
+        55
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ExpirationExceedsMax",
+      "msg": "The specified expiration time exceeds the maximum allowed for this proxy configuration"
+    },
+    {
+      "code": 6001,
+      "name": "ExpirationExceedsSeasonMax",
+      "msg": "The specified expiration time exceeds the maximum allowed for this season"
+    },
+    {
+      "code": 6002,
+      "name": "ExpirationPast",
+      "msg": "The specified expiration time has already passed"
+    },
+    {
+      "code": 6003,
+      "name": "ExpirationExceedsPreceedingProxy",
+      "msg": "The specified expiration time exceeds the expiration of the existing delegatio"
+    }
+  ],
+  "types": [
+    {
+      "name": "AssignProxyArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "expiration_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeProxyConfigArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "max_proxy_time",
+            "type": "i64"
+          },
+          {
+            "name": "seasons",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SeasonV0"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeasonV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "start",
+            "type": "i64"
+          },
+          {
+            "name": "end",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProxyConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "max_proxy_time",
+            "type": "i64"
+          },
+          {
+            "name": "seasons",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SeasonV0"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProxyAssignmentV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "proxy_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u16"
+          },
+          {
+            "name": "next_voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "rent_refund",
+            "type": "pubkey"
+          },
+          {
+            "name": "expiration_time",
+            "type": "i64"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

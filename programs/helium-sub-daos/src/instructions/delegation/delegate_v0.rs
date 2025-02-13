@@ -202,7 +202,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   ctx.accounts.closing_time_sub_dao_epoch_info.sub_dao = sub_dao.key();
   ctx.accounts.closing_time_sub_dao_epoch_info.epoch = current_epoch(expiration_ts);
   ctx.accounts.closing_time_sub_dao_epoch_info.bump_seed =
-    ctx.bumps["closing_time_sub_dao_epoch_info"];
+    ctx.bumps.closing_time_sub_dao_epoch_info;
 
   let genesis_end_is_closing = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
     == ctx.accounts.closing_time_sub_dao_epoch_info.key();
@@ -221,7 +221,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
       &SubDaoEpochInfoV0WithDescriminator {
         sub_dao_epoch_info: SubDaoEpochInfoV0 {
           epoch: genesis_end_epoch,
-          bump_seed: ctx.bumps["genesis_end_sub_dao_epoch_info"],
+          bump_seed: ctx.bumps.genesis_end_sub_dao_epoch_info,
           sub_dao: sub_dao.key(),
           previous_percentage: 0,
           dc_burned: 0,
@@ -293,7 +293,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   delegated_position.sub_dao = ctx.accounts.sub_dao.key();
   delegated_position.mint = ctx.accounts.mint.key();
   delegated_position.position = ctx.accounts.position.key();
-  delegated_position.bump_seed = ctx.bumps["delegated_position"];
+  delegated_position.bump_seed = ctx.bumps.delegated_position;
   delegated_position.expiration_ts = expiration_ts;
 
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();

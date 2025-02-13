@@ -109,7 +109,7 @@ pub struct CloseDelegationV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
+pub fn handler<'info>(ctx: Context<'_, 'info, '_, 'info, CloseDelegationV0<'info>>) -> Result<()> {
   // load the vehnt information
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;
@@ -177,9 +177,9 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   }
 
   // Closing time and genesis end can be the same account
-  let mut parsed: Account<SubDaoEpochInfoV0>;
   let end_and_genesis_same = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
     == ctx.accounts.closing_time_sub_dao_epoch_info.key();
+  let mut parsed: Account<SubDaoEpochInfoV0>;
   let genesis_end_sub_dao_epoch_info: &mut Account<SubDaoEpochInfoV0> = if end_and_genesis_same {
     &mut ctx.accounts.closing_time_sub_dao_epoch_info
   } else {
@@ -253,7 +253,7 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   }
 
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
-  ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
+  ctx.accounts.sub_dao_epoch_info.bump_seed = ctx.bumps.sub_dao_epoch_info;
   ctx.accounts.sub_dao_epoch_info.initialized = true;
 
   // EDGE CASE: When the closing time epoch infos are the same as the current epoch info,

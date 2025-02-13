@@ -1,10 +1,12 @@
-use crate::{error::VsrError, RelinquishVoteArgsV1};
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use nft_proxy::ProxyAssignmentV0;
-use proposal::{ProposalConfigV0, ProposalV0};
+use nft_proxy::accounts::ProxyAssignmentV0;
+use proposal::{
+  accounts::{ProposalConfigV0, ProposalV0},
+  types::VoteArgsV0,
+};
 
-use crate::{registrar_seeds, state::*};
+use crate::{error::VsrError, registrar_seeds, state::*, RelinquishVoteArgsV1};
 
 #[derive(Accounts)]
 pub struct ProxiedRelinquishVoteV0<'info> {
@@ -96,7 +98,7 @@ pub fn handler(ctx: Context<ProxiedRelinquishVoteV0>, args: RelinquishVoteArgsV1
       },
       &[registrar_seeds!(ctx.accounts.registrar)],
     ),
-    proposal::VoteArgsV0 {
+    VoteArgsV0 {
       remove_vote: true,
       choice: args.choice,
       weight: marker.weight,

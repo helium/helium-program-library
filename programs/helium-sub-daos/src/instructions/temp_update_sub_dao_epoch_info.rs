@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
-use crate::state::*;
 use anchor_lang::prelude::*;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TempUpdateSubDaoEpochInfoArgs {
@@ -41,7 +42,7 @@ pub fn handler(
 
   ctx.accounts.sub_dao_epoch_info.epoch = args.epoch;
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
-  ctx.accounts.sub_dao_epoch_info.bump_seed = ctx.bumps["sub_dao_epoch_info"];
+  ctx.accounts.sub_dao_epoch_info.bump_seed = ctx.bumps.sub_dao_epoch_info;
 
   if let Some(fall_rates_from_closing_positions) = args.fall_rates_from_closing_positions {
     ctx

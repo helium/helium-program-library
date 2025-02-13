@@ -1,9 +1,8 @@
-use crate::error::VsrError;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use proposal::{ProposalConfigV0, ProposalV0};
+use proposal::accounts::{ProposalConfigV0, ProposalV0};
 
-use crate::{registrar_seeds, state::*};
+use crate::{error::VsrError, registrar_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct RelinquishVoteArgsV1 {
@@ -95,7 +94,7 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
       },
       &[registrar_seeds!(ctx.accounts.registrar)],
     ),
-    proposal::VoteArgsV0 {
+    proposal::types::VoteArgsV0 {
       remove_vote: true,
       choice: args.choice,
       weight: marker.weight,

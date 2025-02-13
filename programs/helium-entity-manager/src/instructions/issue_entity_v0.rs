@@ -1,11 +1,7 @@
-use std::cmp::min;
-use std::str::FromStr;
+use std::{cmp::min, str::FromStr};
 
-use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode};
-use crate::{key_to_asset_seeds, state::*};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
+use anchor_lang::{prelude::*, solana_program::hash::hash};
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use bubblegum_cpi::{
@@ -15,6 +11,8 @@ use bubblegum_cpi::{
   Collection, Creator, MetadataArgs, TokenProgramVersion, TokenStandard, TreeConfig,
 };
 use helium_sub_daos::DaoV0;
+
+use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode, key_to_asset_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueEntityArgsV0 {
@@ -142,7 +140,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
     asset: asset_id,
     dao: ctx.accounts.dao.key(),
     entity_key: args.entity_key.clone(),
-    bump_seed: ctx.bumps["key_to_asset"],
+    bump_seed: ctx.bumps.key_to_asset,
     key_serialization: KeySerialization::B58,
   });
 
@@ -195,7 +193,7 @@ pub fn handler(ctx: Context<IssueEntityV0>, args: IssueEntityArgsV0) -> Result<(
   let entity_creator_seeds: &[&[&[u8]]] = &[&[
     b"entity_creator",
     ctx.accounts.dao.to_account_info().key.as_ref(),
-    &[ctx.bumps["entity_creator"]],
+    &[ctx.bumps.entity_creator],
   ]];
   let mut creator = ctx.accounts.entity_creator.to_account_info();
   creator.is_signer = true;

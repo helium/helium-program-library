@@ -1,3 +1,6 @@
+[profile.release]
+overflow-checks = true
+
 [workspace]
 members = [
   "programs/*",
@@ -12,6 +15,7 @@ exclude = [
   "utils/ecc-sig-verifier",
   "utils/migration-tx-executor",
   "utils/vehnt",
+  "utils/default-env",
   "utils/hpl-utils",
   "utils/bulk-claim-rewards",
   "utils/generate-test-gateway-txn",
@@ -21,14 +25,14 @@ exclude = [
 ]
 
 [workspace.dependencies]
-anchor-lang = { version = "0.28.0", features = ["init-if-needed"] }
-anchor-spl = { version = "0.28.0", features = ["mint", "token"] }
+anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
+anchor-spl = { version = "0.30.1", features = ["mint", "token", "metadata"] }
 mpl-token-metadata = { version = "3.2.0" }
-account-compression-cpi = { rev = "a499196", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
-solana-program = "1.16"
-bubblegum-cpi = { rev = "a499196", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
+account-compression-cpi = { rev = "2e22607", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
+solana-program = "1.18"
+bubblegum-cpi = { rev = "2e22607", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
 solana-security-txt = "1.1.1"
-default-env = "0.1.1"
+default-env = { path = "./utils/default-env" }
 shared-utils = { path = "./utils/shared-utils" }
 circuit-breaker = { path = "./programs/circuit-breaker", features = ["cpi"] }
 helium-sub-daos = { path = "./programs/helium-sub-daos", features = ["cpi"] }
@@ -39,3 +43,5 @@ price-oracle = { path = "./programs/price-oracle", features = ["cpi"] }
 no-emit = { path = "./programs/no-emit", features = ["cpi"] }
 time = "0.3.36"
 data-credits = { path = "./programs/data-credits" }
+pyth-solana-receiver-sdk = "=0.3.2"
+pythnet-sdk = "=2.3.1"

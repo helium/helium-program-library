@@ -1,13 +1,12 @@
-use crate::errors::DataCreditsErrors;
-use crate::state::*;
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
+use anchor_lang::{prelude::*, solana_program::hash::hash};
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
+
+use crate::{errors::DataCreditsErrors, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct GenesisIssueDelegatedDataCreditsArgsV0 {
@@ -93,7 +92,7 @@ pub fn handler(
       router_key: args.router_key,
       sub_dao: ctx.accounts.sub_dao.key(),
       escrow_account: ctx.accounts.escrow_account.key(),
-      bump: ctx.bumps["delegated_data_credits"],
+      bump: ctx.bumps.delegated_data_credits,
     });
 
   let signer_seeds: &[&[&[u8]]] = &[&[

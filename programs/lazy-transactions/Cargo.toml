@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "lazy_transactions"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -27,4 +28,3 @@ spl-concurrent-merkle-tree = "0.2.0"
 bytemuck = "1.13.0"
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
-default-env = { workspace = true }

@@ -1,11 +1,11 @@
-use crate::state::*;
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
+use anchor_lang::{prelude::*, solana_program::hash::hash};
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{transfer, Mint, Token, TokenAccount, Transfer},
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ChangeDelegatedSubDaoArgsV0 {
@@ -97,7 +97,7 @@ pub fn handler(
       router_key: args.router_key.clone(),
       sub_dao: ctx.accounts.destination_sub_dao.key(),
       escrow_account: ctx.accounts.destination_escrow_account.key(),
-      bump: ctx.bumps["destination_delegated_data_credits"],
+      bump: ctx.bumps.destination_delegated_data_credits,
     });
 
   transfer(
