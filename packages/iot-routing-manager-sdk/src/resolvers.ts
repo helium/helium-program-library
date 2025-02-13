@@ -1,4 +1,4 @@
-import { Accounts, BorshAccountsCoder, Program, Provider } from "@coral-xyz/anchor";
+import { BorshAccountsCoder, Program, Provider } from "@coral-xyz/anchor";
 import { heliumCommonResolver } from "@helium/anchor-resolvers";
 import {
   ataResolver,
@@ -8,8 +8,13 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import { devaddrConstraintKey, netIdKey, organizationKey } from "./pdas";
 import { PROGRAM_ID } from "./constants";
-import { heliumEntityManagerResolvers, keyToAssetKey, programApprovalKey, sharedMerkleKey } from "@helium/helium-entity-manager-sdk";
-import { IDL } from "@helium/idls/lib/types/iot_routing_manager";
+import {
+  heliumEntityManagerResolvers,
+  keyToAssetKey,
+  programApprovalKey,
+  sharedMerkleKey,
+} from "@helium/helium-entity-manager-sdk";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export const lazyDistributorResolvers = combineResolvers(
   heliumCommonResolver,
@@ -76,11 +81,11 @@ export const lazyDistributorResolvers = combineResolvers(
 );
 
 async function getNetId(provider: Provider, netId: PublicKey) {
-  const idl = await Program.fetchIdl(PROGRAM_ID, provider);
+  const idl = await fetchBackwardsCompatibleIdl(PROGRAM_ID, provider);
   const netIdAccount = await provider.connection.getAccountInfo(netId);
   if (!netIdAccount) {
     throw new Error("NetId account not found");
   }
-  const coder = new BorshAccountsCoder(idl!)
-  return coder.decode("NetIdV0", netIdAccount.data)
+  const coder = new BorshAccountsCoder(idl!);
+  return coder.decode("NetIdV0", netIdAccount.data);
 }

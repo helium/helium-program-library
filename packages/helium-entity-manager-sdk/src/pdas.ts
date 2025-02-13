@@ -12,8 +12,11 @@ const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
 export const entityCreatorKey = (
   dao: PublicKey,
   programId: PublicKey = PROGRAM_ID
-) => 
-  PublicKey.findProgramAddressSync([Buffer.from("entity_creator", "utf-8"), dao.toBuffer()], programId);
+) =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("entity_creator", "utf-8"), dao.toBuffer()],
+    programId
+  );
 
 export const rewardableEntityConfigKey = (
   subDao: PublicKey,
@@ -38,16 +41,22 @@ export const hotspotCollectionKey = (
     programId
   );
 
-export const dataOnlyConfigKey = (dao: PublicKey, programId: PublicKey = PROGRAM_ID) => 
+export const dataOnlyConfigKey = (
+  dao: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) =>
   PublicKey.findProgramAddressSync(
     [Buffer.from("data_only_config", "utf-8"), dao.toBuffer()],
-    programId,
+    programId
   );
 
-export const dataOnlyEscrowKey = (dataOnly: PublicKey, programId: PublicKey = PROGRAM_ID) => 
+export const dataOnlyEscrowKey = (
+  dataOnly: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) =>
   PublicKey.findProgramAddressSync(
     [Buffer.from("data_only_escrow", "utf-8"), dataOnly.toBuffer()],
-    programId,
+    programId
   );
 
 export const sharedMerkleKey = (
@@ -62,7 +71,11 @@ export const sharedMerkleKey = (
   );
 };
 
-export const makerKey = (dao: PublicKey, name: String, programId: PublicKey = PROGRAM_ID) =>
+export const makerKey = (
+  dao: PublicKey,
+  name: String,
+  programId: PublicKey = PROGRAM_ID
+) =>
   PublicKey.findProgramAddressSync(
     [Buffer.from("maker", "utf-8"), dao.toBuffer(), Buffer.from(name, "utf-8")],
     programId
@@ -116,11 +129,11 @@ export function decodeEntityKey(
   keySerialization: any = { b58: {} }
 ): string | undefined {
   if (typeof keySerialization.b58 != "undefined") {
-    return bs58.encode(entityKey)
+    return bs58.encode(entityKey);
   }
 
   if (typeof keySerialization.utf8 != "undefined") {
-    return entityKey.toString("utf-8")
+    return entityKey.toString("utf-8");
   }
 }
 
@@ -130,11 +143,7 @@ export const keyToAssetKeyRaw = (
   programId: PublicKey = PROGRAM_ID
 ) => {
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("key_to_asset", "utf-8"),
-      dao.toBuffer(),
-      hashedEntityKey,
-    ],
+    [Buffer.from("key_to_asset", "utf-8"), dao.toBuffer(), hashedEntityKey],
     programId
   );
 };
@@ -149,7 +158,7 @@ export const keyToAssetKey = (
     if (encoding == "b58" || Address.isValid(entityKey)) {
       entityKey = Buffer.from(bs58.decode(entityKey));
     } else {
-      entityKey = Buffer.from(entityKey, encoding)
+      entityKey = Buffer.from(entityKey, encoding);
     }
   }
   const hash = sha256(entityKey);

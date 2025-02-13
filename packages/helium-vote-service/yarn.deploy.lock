@@ -145,7 +145,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.9.23":
+"@helium/account-fetch-cache@^0.9.24-alpha.0":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -167,7 +167,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.9.23":
+"@helium/anchor-resolvers@^0.9.24-alpha.0":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -212,8 +212,8 @@ __metadata:
     "@fastify/cors": ^8.1.1
     "@fastify/static": ^6
     "@helium/organization-sdk": ^0.0.15
-    "@helium/spl-utils": ^0.9.23
-    "@helium/voter-stake-registry-sdk": ^0.9.23
+    "@helium/spl-utils": ^0.9.24-alpha.0
+    "@helium/voter-stake-registry-sdk": ^0.9.24-alpha.0
     "@solana/web3.js": ^1.91.1
     "@types/bn.js": ^5.1.1
     "@types/lodash": ^4.17.6
@@ -233,7 +233,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/idls@^0.9.23":
+"@helium/idls@^0.9.24-alpha.0":
   version: 0.0.0-use.local
   resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
@@ -302,14 +302,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/spl-utils@^0.9.23":
+"@helium/spl-utils@^0.9.24-alpha.0":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/account-fetch-cache": ^0.9.23
+    "@helium/account-fetch-cache": ^0.9.24-alpha.0
     "@helium/address": ^4.10.2
-    "@helium/anchor-resolvers": ^0.9.23
+    "@helium/anchor-resolvers": ^0.9.24-alpha.0
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -324,15 +324,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/voter-stake-registry-sdk@^0.9.23":
+"@helium/voter-stake-registry-sdk@^0.9.24-alpha.0":
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.28.0
-    "@helium/anchor-resolvers": ^0.9.23
-    "@helium/idls": ^0.9.23
+    "@helium/anchor-resolvers": ^0.9.24-alpha.0
+    "@helium/idls": ^0.9.24-alpha.0
     "@helium/nft-proxy-sdk": ^0.0.15
-    "@helium/spl-utils": ^0.9.23
+    "@helium/spl-utils": ^0.9.24-alpha.0
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0
@@ -673,9 +673,9 @@ __metadata:
   linkType: hard
 
 "@types/lodash@npm:^4.17.6":
-  version: 4.17.7
-  resolution: "@types/lodash@npm:4.17.7"
-  checksum: 09e58a119cd8a70acfb33f8623dc2fc54f74cdce3b3429b879fc2daac4807fe376190a04b9e024dd300f9a3ee1876d6623979cefe619f70654ca0fe0c47679a7
+  version: 4.17.6
+  resolution: "@types/lodash@npm:4.17.6"
+  checksum: f748c672f49c54ee631a0fab6f26d56ab99bd68a4fb91604b5d7525a72102dd1917209c12d7078c988a375edb5dc70ca600db05ac01785306fd64470048cd16c
   languageName: node
   linkType: hard
 
@@ -973,8 +973,8 @@ __metadata:
   linkType: hard
 
 "aws-sdk@npm:^2.1650.0":
-  version: 2.1682.0
-  resolution: "aws-sdk@npm:2.1682.0"
+  version: 2.1650.0
+  resolution: "aws-sdk@npm:2.1650.0"
   dependencies:
     buffer: 4.9.2
     events: 1.1.1
@@ -986,7 +986,7 @@ __metadata:
     util: ^0.12.4
     uuid: 8.0.0
     xml2js: 0.6.2
-  checksum: ab3b60fdb635d89951787cbe81cc530247858c0ff095f983b3fd2e4357a85161931d4495ea363ce19bb71069e613b463c4f8047a8d60c69ba4f8eaea265d6bf9
+  checksum: 60188893d4bdd81f56a3d4b5dd642e8f2ed80816519166ef68decb009fbfcb57a6b389436429f27ec9fa99450f43f21182c718e9660b8a44174485f9ab1102a6
   languageName: node
   linkType: hard
 
@@ -1319,7 +1319,7 @@ __metadata:
   version: 0.5.4
   resolution: "content-disposition@npm:0.5.4"
   dependencies:
-    safe-buffer: 5.2.1
+    safe-buffer: "npm:5.2.1"
   checksum: afb9d545e296a5171d7574fcad634b2fdf698875f4006a9dd04a3e1333880c5c0c98d47b560d01216fb6505a54a2ba6a843ee3a02ec86d7e911e8315255f56c3
   languageName: node
   linkType: hard
@@ -1378,14 +1378,14 @@ __metadata:
   linkType: hard
 
 "debug@npm:^4.1.1, debug@npm:^4.3.5":
-  version: 4.3.6
-  resolution: "debug@npm:4.3.6"
+  version: 4.3.5
+  resolution: "debug@npm:4.3.5"
   dependencies:
     ms: 2.1.2
   peerDependenciesMeta:
     supports-color:
       optional: true
-  checksum: 1630b748dea3c581295e02137a9f5cbe2c1d85fea35c1e6597a65ca2b16a6fce68cec61b299d480787ef310ba927dc8c92d3061faba0ad06c6a724672f66be7f
+  checksum: 7c002b51e256257f936dda09eb37167df952758c57badf6bf44bdc40b89a4bcb8e5a0a2e4c7b53f97c69e2970dd5272d33a757378a12c8f8e64ea7bf99e8e86e
   languageName: node
   linkType: hard
 

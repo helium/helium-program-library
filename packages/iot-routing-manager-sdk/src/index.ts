@@ -3,6 +3,7 @@ import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { lazyDistributorResolvers } from "./resolvers";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export * from "./constants";
 export * from "./pdas";
@@ -11,11 +12,12 @@ export * from "./resolvers";
 export async function init(
   provider: AnchorProvider,
   programId: PublicKey = PROGRAM_ID,
-  idl?: Idl | null,
+  idl?: Idl | null
 ): Promise<Program<IotRoutingManager>> {
   if (!idl) {
-    idl = await Program.fetchIdl(programId, provider);
+    idl = await fetchBackwardsCompatibleIdl(programId, provider);
   }
+
   const iotRoutingManager = new Program<IotRoutingManager>(
     idl as IotRoutingManager,
     programId,
@@ -25,5 +27,6 @@ export async function init(
       return lazyDistributorResolvers;
     }
   ) as Program<IotRoutingManager>;
+
   return iotRoutingManager;
 }
