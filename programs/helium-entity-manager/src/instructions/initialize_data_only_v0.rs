@@ -1,10 +1,10 @@
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use bubblegum_cpi::{
+use bubblegum_cpi::bubblegum::{
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
 };

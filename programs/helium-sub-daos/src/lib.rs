@@ -87,7 +87,9 @@ pub mod helium_sub_daos {
     delegate_v0::handler(ctx)
   }
 
-  pub fn close_delegation_v0(ctx: Context<CloseDelegationV0>) -> Result<()> {
+  pub fn close_delegation_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, CloseDelegationV0<'info>>,
+  ) -> Result<()> {
     close_delegation_v0::handler(ctx)
   }
 

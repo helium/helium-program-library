@@ -19,7 +19,6 @@ export async function init(
 
   const hexboosting = new Program<Hexboosting>(
     idl as Hexboosting,
-    programId,
     provider,
     undefined,
     () => hexboostingResolvers

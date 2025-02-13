@@ -20,7 +20,6 @@ export async function init(
 
   const dataCredits = new Program<DataCredits>(
     idl as DataCredits,
-    programId,
     provider,
     undefined,
     () => dataCreditsResolvers

@@ -27,10 +27,6 @@ overflow-checks = true
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 bytemuck = "1.12.3"
-# WARNING: Be careful about upgrading the spl-governance dependency!
-#          Recently the discriminator for new VoterWeightRecord accounts has changed, and upgrading
-#          this dependency here without also upgrading the spl-governance program instance beforehand
-#          would lead to VWR accounts that are unusable until the spl-governance program is upgraded.
 solana-program = { workspace = true }
 static_assertions = "1.1"
 mpl-token-metadata = { workspace = true }
@@ -39,3 +35,4 @@ proposal = { path = "../../utils/proposal" }
 nft-proxy = { path = "../../utils/nft-proxy" }
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
+default-env = { workspace = true }

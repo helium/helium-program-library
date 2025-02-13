@@ -28,3 +28,4 @@ spl-concurrent-merkle-tree = "0.2.0"
 bytemuck = "1.13.0"
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
+default-env = { workspace = true }

@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, solana_program::hash::hash};
+use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
@@ -11,6 +11,7 @@ use shared_utils::{
   Metadata,
 };
 
+use super::hash_entity_key;
 use crate::state::*;
 
 pub const IOT_OPERATIONS_FUND: &str = "iot_operations_fund";
@@ -37,7 +38,7 @@ pub struct IssueIotOperationsFundV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(&String::from(IOT_OPERATIONS_FUND).into_bytes()).to_bytes()
+      &hash_entity_key(&String::from(IOT_OPERATIONS_FUND).into_bytes()),
     ],
     bump
   )]

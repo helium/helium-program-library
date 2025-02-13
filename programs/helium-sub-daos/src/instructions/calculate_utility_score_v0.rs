@@ -4,7 +4,9 @@ use circuit_breaker::CircuitBreaker;
 use shared_utils::precise_number::PreciseNumber;
 use voter_stake_registry::state::Registrar;
 
-use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH};
+use crate::{
+  current_epoch, error::ErrorCode, state::*, try_from, update_subdao_vehnt, EPOCH_LENGTH,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CalculateUtilityScoreArgsV0 {
@@ -65,8 +67,8 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
 }
 
-pub fn handler<'info>(
-  ctx: Context<'_, 'info, '_, 'info, CalculateUtilityScoreV0<'info>>,
+pub fn handler(
+  ctx: Context<CalculateUtilityScoreV0>,
   args: CalculateUtilityScoreArgsV0,
 ) -> Result<()> {
   let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
@@ -79,7 +81,7 @@ pub fn handler<'info>(
   let mut prev_total_utility_score = 0;
   let prev_dao_epoch_info = &mut ctx.accounts.prev_dao_epoch_info;
   if prev_dao_epoch_info.lamports() > 0 && !prev_dao_epoch_info.to_account_info().data_is_empty() {
-    let info: Account<DaoEpochInfoV0> = Account::try_from(prev_dao_epoch_info)?;
+    let info: Account<DaoEpochInfoV0> = try_from!(Account<DaoEpochInfoV0>, prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
     prev_total_utility_score = info.total_utility_score;
   }

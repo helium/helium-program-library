@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, solana_program::hash::hash};
+use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{self, Mint, MintTo, Token, TokenAccount},
@@ -15,6 +15,7 @@ use shared_utils::{
   Metadata,
 };
 
+use super::hash_entity_key;
 use crate::{constants::ENTITY_METADATA_URL, key_to_asset_seeds, state::*};
 
 pub const NOT_EMITTED: &str = "not_emitted";
@@ -38,7 +39,7 @@ pub struct IssueNotEmittedEntityV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(&String::from(NOT_EMITTED).into_bytes()).to_bytes()
+      &hash_entity_key(&String::from(NOT_EMITTED).into_bytes()),
     ],
     bump
   )]

@@ -19,7 +19,7 @@ export * from "./constants";
 export * from "./pdas";
 export { MerkleTree };
 
-type CompiledInstruction = IdlTypes<LazyTransactions>["CompiledInstruction"];
+type CompiledInstruction = IdlTypes<LazyTransactions>["compiledInstruction"];
 
 export async function init(
   provider: AnchorProvider,
@@ -31,7 +31,6 @@ export async function init(
   }
   const lazyTransactions = new Program<LazyTransactions>(
     idl as LazyTransactions,
-    programId,
     provider
   ) as Program<LazyTransactions>;
   return lazyTransactions;

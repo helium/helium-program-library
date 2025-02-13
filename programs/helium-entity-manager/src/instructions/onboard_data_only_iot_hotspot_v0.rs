@@ -29,6 +29,10 @@ pub struct OnboardDataOnlyIotHotspotArgsV0 {
   pub gain: Option<i32>,
 }
 
+pub fn hash_entity_key(name: &[u8]) -> [u8; 32] {
+  hash(name).to_bytes()
+}
+
 #[derive(Accounts)]
 #[instruction(args: OnboardDataOnlyIotHotspotArgsV0)]
 pub struct OnboardDataOnlyIotHotspotV0<'info> {
@@ -43,7 +47,7 @@ pub struct OnboardDataOnlyIotHotspotV0<'info> {
     seeds = [
       b"iot_info", 
       rewardable_entity_config.key().as_ref(),
-      &hash(&key_to_asset.entity_key[..]).to_bytes()
+      &hash_entity_key(&key_to_asset.entity_key[..])
     ],
     bump,
   )]

@@ -39,7 +39,6 @@ export const init = async (
 
   const heliumVoterStakeRegistry = new Program<VoterStakeRegistry>(
     idl as VoterStakeRegistry,
-    programId,
     provider,
     undefined,
     () => {

@@ -185,7 +185,7 @@ __metadata:
     ts-loader: ^9.2.3
     typescript: ^5.2.2
   peerDependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
   languageName: unknown
   linkType: soft
 
@@ -229,7 +229,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.9.24-alpha.0
     "@helium/idls": ^0.9.24-alpha.0
     "@helium/spl-utils": ^0.9.24-alpha.0
@@ -246,7 +246,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/distributor-oracle@workspace:."
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@fastify/cors": ^8.1.1
     "@helium/account-fetch-cache": ^0.9.24-alpha.0
     "@helium/address": ^4.10.2
@@ -289,7 +289,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/helium-entity-manager-sdk@workspace:packages/helium-entity-manager-sdk"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@helium/address": ^4.10.2
     "@helium/anchor-resolvers": ^0.9.24-alpha.0
     "@helium/helium-sub-daos-sdk": ^0.9.24-alpha.0
@@ -312,7 +312,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/helium-sub-daos-sdk@workspace:packages/helium-sub-daos-sdk"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.9.24-alpha.0
     "@helium/circuit-breaker-sdk": ^0.9.24-alpha.0
     "@helium/nft-proxy-sdk": ^0.0.15
@@ -332,7 +332,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@solana/web3.js": ^1.91.1
     bn.js: ^5.2.0
     borsh: ^0.7.0
@@ -346,7 +346,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/lazy-distributor-sdk@workspace:packages/lazy-distributor-sdk"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.9.24-alpha.0
     "@helium/circuit-breaker-sdk": ^0.9.24-alpha.0
     "@helium/spl-utils": ^0.9.24-alpha.0
@@ -385,7 +385,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/no-emit-sdk@workspace:packages/no-emit-sdk"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.5.0
     "@helium/idls": ^0.9.24-alpha.0
     "@helium/spl-utils": ^0.9.24-alpha.0
@@ -402,7 +402,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/rewards-oracle-sdk@workspace:packages/rewards-oracle-sdk"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.9.24-alpha.0
     "@helium/idls": ^0.9.24-alpha.0
     "@helium/spl-utils": ^0.9.24-alpha.0
@@ -419,7 +419,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@helium/account-fetch-cache": ^0.9.24-alpha.0
     "@helium/address": ^4.10.2
     "@helium/anchor-resolvers": ^0.9.24-alpha.0
@@ -441,7 +441,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/treasury-management-sdk@workspace:packages/treasury-management-sdk"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.9.24-alpha.0
     "@helium/circuit-breaker-sdk": ^0.9.24-alpha.0
     "@helium/idls": ^0.9.24-alpha.0
@@ -481,7 +481,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.9.24-alpha.0
     "@helium/idls": ^0.9.24-alpha.0
     "@helium/nft-proxy-sdk": ^0.0.15

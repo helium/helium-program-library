@@ -9,7 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "rewards_oracle"
 
 [features]
-idl-build = ["anchor-lang/idl-build"]
+idl-build = ["anchor-lang/idl-build", "lazy-distributor/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -23,3 +23,4 @@ anchor-lang = { workspace = true }
 lazy-distributor = { workspace = true, features = ["cpi"] }
 helium-entity-manager = { workspace = true }
 solana-security-txt = { workspace = true }
+default-env = { workspace = true }

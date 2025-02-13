@@ -1,4 +1,4 @@
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::{
   prelude::*,
   solana_program::{
@@ -6,10 +6,10 @@ use anchor_lang::{
     system_instruction::{self},
   },
 };
-use bubblegum_cpi::{
+use bubblegum_cpi::bubblegum::{
+  accounts::TreeConfig,
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
-  TreeConfig,
 };
 
 use crate::{data_only_config_seeds, error::ErrorCode, state::*};
@@ -114,7 +114,7 @@ pub fn handler(ctx: Context<UpdateDataOnlyTreeV0>) -> Result<()> {
     &[&[
       b"data_only_escrow",
       ctx.accounts.data_only_config.key().as_ref(),
-      &[ctx.bump.data_only_escrow],
+      &[ctx.bumps.data_only_escrow],
     ]],
   )?;
   Ok(())

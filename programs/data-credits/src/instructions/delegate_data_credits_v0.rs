@@ -16,6 +16,10 @@ pub struct DelegateDataCreditsArgsV0 {
   pub router_key: String,
 }
 
+pub fn hash_name(name: &str) -> [u8; 32] {
+  hash(name.as_bytes()).to_bytes()
+}
+
 #[derive(Accounts)]
 #[instruction(args: DelegateDataCreditsArgsV0)]
 pub struct DelegateDataCreditsV0<'info> {
@@ -26,7 +30,7 @@ pub struct DelegateDataCreditsV0<'info> {
     seeds = [
       "delegated_data_credits".as_bytes(),
       sub_dao.key().as_ref(),
-      &hash(args.router_key.as_bytes()).to_bytes()
+      &hash_name(&args.router_key)
     ],
     bump,
   )]

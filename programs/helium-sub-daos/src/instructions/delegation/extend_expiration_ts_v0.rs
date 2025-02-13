@@ -2,12 +2,59 @@ use std::{cmp::min, str::FromStr};
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use nft_proxy::ProxyConfigV0;
+use nft_proxy::accounts::ProxyConfigV0;
 use voter_stake_registry::state::{PositionV0, Registrar};
 
 use crate::{
-  caclulate_vhnt_info, current_epoch, id, DaoV0, DelegatedPositionV0, SubDaoEpochInfoV0, SubDaoV0,
+  caclulate_vhnt_info, current_epoch, id, try_from, DaoV0, DelegatedPositionV0, SubDaoEpochInfoV0,
+  SubDaoV0,
 };
+
+pub fn get_genesis_end_epoch_bytes(
+  position: &PositionV0,
+  registrar: &Registrar,
+  proxy_config: &ProxyConfigV0,
+) -> [u8; 8] {
+  let ts = if position.genesis_end <= registrar.clock_unix_timestamp() {
+    min(
+      proxy_config
+        .get_current_season(registrar.clock_unix_timestamp())
+        .unwrap()
+        .end,
+      position.lockup.end_ts,
+    )
+  } else {
+    position.genesis_end
+  };
+  current_epoch(ts).to_le_bytes()
+}
+
+fn get_old_closing_epoch_bytes(
+  position: &PositionV0,
+  delegated_position: &DelegatedPositionV0,
+) -> [u8; 8] {
+  current_epoch(if delegated_position.expiration_ts == 0 {
+    position.lockup.end_ts
+  } else {
+    min(position.lockup.end_ts, delegated_position.expiration_ts)
+  })
+  .to_le_bytes()
+}
+
+fn get_new_closing_epoch_bytes(
+  position: &PositionV0,
+  proxy_config: &ProxyConfigV0,
+  registrar: &Registrar,
+) -> [u8; 8] {
+  current_epoch(min(
+    proxy_config
+      .get_current_season(registrar.clock_unix_timestamp())
+      .unwrap()
+      .end,
+    position.lockup.end_ts,
+  ))
+  .to_le_bytes()
+}
 
 #[derive(Accounts)]
 pub struct ExtendExpirationTsV0<'info> {
@@ -51,13 +98,7 @@ pub struct ExtendExpirationTsV0<'info> {
   pub delegated_position: Account<'info, DelegatedPositionV0>,
   #[account(
     mut,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
-        if delegated_position.expiration_ts == 0 {
-          position.lockup.end_ts
-        } else {
-          min(position.lockup.end_ts, delegated_position.expiration_ts)
-        }
-    ).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &get_old_closing_epoch_bytes(&position, &delegated_position)],
     bump,
   )]
   pub old_closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -65,9 +106,7 @@ pub struct ExtendExpirationTsV0<'info> {
     init_if_needed,
     payer = payer,
     space = SubDaoEpochInfoV0::SIZE,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
-        min(proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end, position.lockup.end_ts)
-    ).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &get_new_closing_epoch_bytes(&position, &proxy_config, &registrar)],
     bump,
   )]
   pub closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -76,17 +115,9 @@ pub struct ExtendExpirationTsV0<'info> {
     seeds = [
       "sub_dao_epoch_info".as_bytes(), 
       sub_dao.key().as_ref(),
-      &current_epoch(
-        // If the genesis piece is no longer in effect (has been purged), 
-        // no need to pass an extra account here. Just pass the closing time sdei and
-        // do not change it.
-        if position.genesis_end <= registrar.clock_unix_timestamp() {
-          min(proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end, position.lockup.end_ts)
-        } else {
-          position.genesis_end
-        }
-      ).to_le_bytes()
+      &get_genesis_end_epoch_bytes(&position, &registrar, &proxy_config)
     ],
+
     bump,
   )]
   /// CHECK: Verified when needed in the inner instr
@@ -160,7 +191,7 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
     // Update closing_time_sdei
     ctx.accounts.closing_time_sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
     ctx.accounts.closing_time_sub_dao_epoch_info.bump_seed =
-      *ctx.bumps.get("closing_time_sub_dao_epoch_info").unwrap();
+      ctx.bumps.closing_time_sub_dao_epoch_info;
     ctx.accounts.closing_time_sub_dao_epoch_info.epoch = current_epoch(expiration_ts);
     let closing_time_sdei = &mut ctx.accounts.closing_time_sub_dao_epoch_info;
     if closing_time_sdei.epoch > epoch {
@@ -197,11 +228,9 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
     } else if genesis_end_is_old_closing {
       &mut ctx.accounts.old_closing_time_sub_dao_epoch_info
     } else {
-      parsed = Account::try_from(
-        &ctx
-          .accounts
-          .genesis_end_sub_dao_epoch_info
-          .to_account_info(),
+      parsed = try_from!(
+        Account<SubDaoEpochInfoV0>,
+        &ctx.accounts.genesis_end_sub_dao_epoch_info
       )?;
       &mut parsed
     };

@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, solana_program::hash::hash};
+use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
@@ -6,7 +6,7 @@ use circuit_breaker::{
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
 
-use crate::{errors::DataCreditsErrors, state::*};
+use crate::{errors::DataCreditsErrors, hash_name, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct GenesisIssueDelegatedDataCreditsArgsV0 {
@@ -24,7 +24,7 @@ pub struct GenesisIssueDelegatedDataCreditsV0<'info> {
     seeds = [
       "delegated_data_credits".as_bytes(),
       sub_dao.key().as_ref(),
-      &hash(args.router_key.as_bytes()).to_bytes()
+      &hash_name(&args.router_key)
     ],
     bump,
   )]

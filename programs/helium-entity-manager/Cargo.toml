@@ -37,3 +37,4 @@ solana-security-txt = { workspace = true }
 no-emit = { workspace = true }
 pyth-solana-receiver-sdk = { workspace = true }
 pythnet-sdk = { workspace = true }
+default-env = { workspace = true }

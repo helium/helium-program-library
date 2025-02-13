@@ -1,5 +1,5 @@
-use account_compression_cpi::program::SplAccountCompression;
-use anchor_lang::{prelude::*, solana_program::hash::hash};
+use account_compression_cpi::account_compression::program::SplAccountCompression;
+use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token},
@@ -16,7 +16,7 @@ use data_credits::{
 use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
 use shared_utils::*;
 
-use crate::state::*;
+use crate::{hash_entity_key, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardIotHotspotArgsV0 {
@@ -44,7 +44,7 @@ pub struct OnboardIotHotspotV0<'info> {
     seeds = [
       b"iot_info",
       rewardable_entity_config.key().as_ref(),
-      &hash(&key_to_asset.entity_key[..]).to_bytes()
+      &hash_entity_key(&key_to_asset.entity_key[..])
     ],
     bump,
   )]

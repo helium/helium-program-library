@@ -9,7 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "no_emit"
 
 [features]
-idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -27,3 +27,4 @@ anchor-spl = { workspace = true }
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
 helium-sub-daos = { workspace = true }
+default-env = { workspace = true }

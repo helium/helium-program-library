@@ -1,18 +1,23 @@
 use std::{cmp::min, str::FromStr};
 
-use account_compression_cpi::{program::SplAccountCompression, Noop};
-use anchor_lang::{prelude::*, solana_program::hash::hash};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
+use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
 use bubblegum_cpi::{
-  cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
+  bubblegum::{
+    accounts::TreeConfig,
+    cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
+    program::Bubblegum,
+    types::{Collection, Creator, MetadataArgs, TokenProgramVersion, TokenStandard},
+  },
   get_asset_id,
-  program::Bubblegum,
-  Collection, Creator, MetadataArgs, TokenProgramVersion, TokenStandard, TreeConfig,
 };
 use helium_sub_daos::DaoV0;
 
-use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode, key_to_asset_seeds, state::*};
+use crate::{
+  constants::ENTITY_METADATA_URL, error::ErrorCode, hash_entity_key, key_to_asset_seeds, state::*,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueEntityArgsV0 {
@@ -73,7 +78,7 @@ pub struct IssueEntityV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(&args.entity_key[..]).to_bytes()
+      &hash_entity_key(&args.entity_key[..])
     ],
     bump
   )]

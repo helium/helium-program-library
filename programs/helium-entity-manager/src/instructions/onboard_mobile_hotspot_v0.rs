@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use account_compression_cpi::program::SplAccountCompression;
-use anchor_lang::{prelude::*, solana_program::hash::hash};
+use account_compression_cpi::account_compression::program::SplAccountCompression;
+use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{burn, Burn, Mint, Token},
@@ -19,7 +19,7 @@ use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
 use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 use shared_utils::*;
 
-use crate::{error::ErrorCode, state::*, TESTING};
+use crate::{error::ErrorCode, hash_entity_key, state::*, TESTING};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardMobileHotspotArgsV0 {
@@ -47,7 +47,7 @@ pub struct OnboardMobileHotspotV0<'info> {
     seeds = [
       b"mobile_info", 
       rewardable_entity_config.key().as_ref(),
-      &hash(&key_to_asset.entity_key[..]).to_bytes()
+      &hash_entity_key(&key_to_asset.entity_key[..])
     ],
     bump,
   )]

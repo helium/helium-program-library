@@ -710,7 +710,7 @@ function parseInstructions({
             return {
               parsed: {
                 name: parsed.name,
-                programName: idl.name,
+                programName: idl.metadata.name,
                 data: parsed.data,
                 accounts: formatted.accounts,
               },
@@ -892,7 +892,7 @@ function decodeIdlStruct(
     const coder = new BorshAccountsCoder(idl);
     const descriminator = account.data.slice(0, 8);
     const type = idl.accounts?.find((account) =>
-      BorshAccountsCoder.accountDiscriminator(account.name).equals(
+      new BorshAccountsCoder(idl).accountDiscriminator(account.name).equals(
         descriminator
       )
     )?.name;

@@ -824,6 +824,7 @@ version = "0.1.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "default-env",
  "shared-utils",
  "solana-security-txt",
 ]
@@ -1014,6 +1015,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
+ "default-env",
  "helium-sub-daos",
  "lazy-transactions",
  "pyth-solana-receiver-sdk",
@@ -1142,6 +1144,7 @@ version = "0.1.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "default-env",
  "mpl-token-metadata 3.2.3",
  "shared-utils",
  "solana-security-txt",
@@ -1256,6 +1259,7 @@ dependencies = [
  "bubblegum-cpi",
  "bytemuck",
  "data-credits",
+ "default-env",
  "helium-sub-daos",
  "mpl-token-metadata 3.2.3",
  "no-emit",
@@ -1272,6 +1276,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
+ "default-env",
  "mpl-token-metadata 3.2.3",
  "nft-proxy",
  "proposal",
@@ -1310,6 +1315,7 @@ dependencies = [
  "anchor-spl",
  "bytemuck",
  "data-credits",
+ "default-env",
  "helium-sub-daos",
  "mobile-entity-manager",
  "shared-utils",
@@ -1456,6 +1462,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
+ "default-env",
  "shared-utils",
  "solana-security-txt",
  "spl-concurrent-merkle-tree",
@@ -1602,6 +1609,7 @@ dependencies = [
  "bs58 0.3.1",
  "bubblegum-cpi",
  "bytemuck",
+ "default-env",
  "helium-entity-manager",
  "helium-sub-daos",
  "mpl-token-metadata 3.2.3",
@@ -1649,6 +1657,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "default-env",
  "helium-sub-daos",
  "shared-utils",
  "solana-security-txt",
@@ -2130,6 +2139,7 @@ name = "rewards-oracle"
 version = "0.2.2"
 dependencies = [
  "anchor-lang",
+ "default-env",
  "helium-entity-manager",
  "lazy-distributor",
  "solana-security-txt",
@@ -2960,6 +2970,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
+ "default-env",
  "shared-utils",
  "solana-security-txt",
 ]
@@ -3036,6 +3047,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
+ "default-env",
  "itertools",
  "mpl-token-metadata 3.2.3",
  "nft-proxy",

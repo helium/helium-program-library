@@ -1,15 +1,14 @@
-use crate::circuit_breaker::*;
-use crate::errors::*;
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::spl_token::instruction::AuthorityType;
-use anchor_spl::token::{set_authority, SetAuthority};
-use anchor_spl::token::{Mint, Token};
+use anchor_spl::token::{
+  set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token,
+};
 use circuit_breaker::{
   cpi::{accounts::InitializeMintWindowedBreakerV0, initialize_mint_windowed_breaker_v0},
   CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
 };
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+
+use crate::{circuit_breaker::*, errors::*, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsArgsV0 {
@@ -69,16 +68,10 @@ pub fn handler(
   ctx.accounts.data_credits.authority = args.authority;
   ctx.accounts.data_credits.hnt_price_oracle = ctx.accounts.hnt_price_oracle.key();
 
-  ctx.accounts.data_credits.data_credits_bump = *ctx
-    .bumps
-    .get("data_credits")
-    .ok_or(DataCreditsErrors::BumpNotAvailable)?;
+  ctx.accounts.data_credits.data_credits_bump = ctx.bumps.data_credits;
 
   ctx.accounts.data_credits.account_payer = ctx.accounts.account_payer.key();
-  ctx.accounts.data_credits.account_payer_bump = *ctx
-    .bumps
-    .get("account_payer")
-    .ok_or(DataCreditsErrors::BumpNotAvailable)?;
+  ctx.accounts.data_credits.account_payer_bump = ctx.bumps.account_payer;
 
   msg!("Claiming mint and freeze authority");
   initialize_mint_windowed_breaker_v0(

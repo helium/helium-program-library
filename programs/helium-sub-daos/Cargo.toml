@@ -9,7 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "helium_sub_daos"
 
 [features]
-idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "voter-stake-registry/idl-build", "circuit-breaker/idl-build", "treasury-management/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -32,6 +32,7 @@ treasury-management = { path = "../treasury-management", features = ["cpi"] }
 nft-proxy = { path = "../../utils/nft-proxy" }
 proposal = { path = "../../utils/proposal" }
 solana-program = { workspace = true }
+default-env = { workspace = true }
 
 time = "0.3.17"
 solana-security-txt = { workspace = true }

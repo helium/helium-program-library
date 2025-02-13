@@ -8,9 +8,49 @@ use voter_stake_registry::{
 };
 
 use crate::{
-  caclulate_vhnt_info, current_epoch, id, state::*, update_subdao_vehnt, PrecisePosition,
-  VehntInfo, TESTING,
+  caclulate_vhnt_info, current_epoch, get_sub_dao_epoch_info_seed, id, state::*,
+  update_subdao_vehnt, PrecisePosition, VehntInfo, TESTING,
 };
+
+pub fn get_genesis_end_epoch_bytes(
+  position: &PositionV0,
+  registrar: &Registrar,
+  delegated_position: &DelegatedPositionV0,
+) -> [u8; 8] {
+  current_epoch(
+    // If the genesis piece is no longer in effect (has been purged),
+    // no need to pass an extra account here. Just pass the closing time sdei and
+    // do not change it.
+    if position.genesis_end <= registrar.clock_unix_timestamp() {
+      min(
+        position.lockup.end_ts,
+        if delegated_position.expiration_ts == 0 {
+          position.lockup.end_ts
+        } else {
+          min(position.lockup.end_ts, delegated_position.expiration_ts)
+        },
+      )
+    } else {
+      position.genesis_end
+    },
+  )
+  .to_le_bytes()
+}
+
+pub fn get_closing_epoch_bytes(
+  position: &PositionV0,
+  delegated_position: &DelegatedPositionV0,
+) -> [u8; 8] {
+  current_epoch(min(
+    position.lockup.end_ts,
+    if delegated_position.expiration_ts == 0 {
+      position.lockup.end_ts
+    } else {
+      min(position.lockup.end_ts, delegated_position.expiration_ts)
+    },
+  ))
+  .to_le_bytes()
+}
 
 #[derive(Accounts)]
 pub struct CloseDelegationV0<'info> {
@@ -57,7 +97,7 @@ pub struct CloseDelegationV0<'info> {
     init_if_needed,
     payer = payer,
     space = SubDaoEpochInfoV0::SIZE,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &get_sub_dao_epoch_info_seed(&registrar)],
     bump,
   )]
   pub sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -65,16 +105,7 @@ pub struct CloseDelegationV0<'info> {
   // They were used when delegate_v0 was called
   #[account(
     mut,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
-        min(
-            position.lockup.end_ts,
-            if delegated_position.expiration_ts == 0 {
-                position.lockup.end_ts
-            } else {
-                min(position.lockup.end_ts, delegated_position.expiration_ts)
-            }
-        )
-    ).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &get_closing_epoch_bytes(&position, &delegated_position)],
     bump = closing_time_sub_dao_epoch_info.bump_seed,
   )]
   pub closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -83,23 +114,7 @@ pub struct CloseDelegationV0<'info> {
     seeds = [
       "sub_dao_epoch_info".as_bytes(), 
       sub_dao.key().as_ref(),
-      &current_epoch(
-        // If the genesis piece is no longer in effect (has been purged), 
-        // no need to pass an extra account here. Just pass the closing time sdei and
-        // do not change it.
-        if position.genesis_end <= registrar.clock_unix_timestamp() {
-          min(
-              position.lockup.end_ts,
-              if delegated_position.expiration_ts == 0 {
-                position.lockup.end_ts
-              } else {
-                min(position.lockup.end_ts, delegated_position.expiration_ts)
-              }
-            )
-        } else {
-          position.genesis_end
-        }
-      ).to_le_bytes()
+      &get_genesis_end_epoch_bytes(&position, &registrar, &delegated_position)
     ],
     bump = genesis_end_sub_dao_epoch_info.bump_seed,
   )]
@@ -109,7 +124,7 @@ pub struct CloseDelegationV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler<'info>(ctx: Context<'_, 'info, '_, 'info, CloseDelegationV0<'info>>) -> Result<()> {
+pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   // load the vehnt information
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;
@@ -179,24 +194,17 @@ pub fn handler<'info>(ctx: Context<'_, 'info, '_, 'info, CloseDelegationV0<'info
   // Closing time and genesis end can be the same account
   let end_and_genesis_same = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
     == ctx.accounts.closing_time_sub_dao_epoch_info.key();
-  let mut parsed: Account<SubDaoEpochInfoV0>;
+  let genesis_end_sub_dao_epoch_info_original =
+    ctx.accounts.genesis_end_sub_dao_epoch_info.as_mut();
   let genesis_end_sub_dao_epoch_info: &mut Account<SubDaoEpochInfoV0> = if end_and_genesis_same {
     &mut ctx.accounts.closing_time_sub_dao_epoch_info
   } else {
-    parsed = Account::try_from(
-      &ctx
-        .accounts
-        .genesis_end_sub_dao_epoch_info
-        .to_account_info(),
-    )?;
-    &mut parsed
+    genesis_end_sub_dao_epoch_info_original
   };
 
   // Once start ts passes, everything gets purged. We only
   // need this correction when the epoch has not passed
-  if position.genesis_end > curr_ts
-    && ctx.accounts.genesis_end_sub_dao_epoch_info.start_ts() > curr_ts
-  {
+  if position.genesis_end > curr_ts && genesis_end_sub_dao_epoch_info.start_ts() > curr_ts {
     genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions =
       genesis_end_sub_dao_epoch_info
         .fall_rates_from_closing_positions

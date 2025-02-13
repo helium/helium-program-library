@@ -1,6 +1,4 @@
-use crate::{error::ErrorCode, rewardable_entity_config_seeds, state::*, TESTING};
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -18,6 +16,9 @@ use helium_sub_daos::{
   program::HeliumSubDaos,
   DaoV0, SubDaoV0, TrackDcOnboardingFeesArgsV0,
 };
+
+use super::hash_entity_key;
+use crate::{error::ErrorCode, rewardable_entity_config_seeds, state::*, TESTING};
 
 #[derive(Accounts)]
 pub struct TempPayMobileOnboardingFeeV0<'info> {
@@ -63,7 +64,7 @@ pub struct TempPayMobileOnboardingFeeV0<'info> {
     seeds = [
       "mobile_info".as_bytes(),
       rewardable_entity_config.key().as_ref(),
-      &hash(&key_to_asset.entity_key[..]).to_bytes()
+      &hash_entity_key(&key_to_asset.entity_key[..])
     ],
     bump,
     constraint = mobile_info.device_type == MobileDeviceTypeV0::Cbrs

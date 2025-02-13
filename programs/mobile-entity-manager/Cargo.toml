@@ -34,3 +34,4 @@ shared-utils = { workspace = true }
 helium-entity-manager = { workspace = true }
 helium-sub-daos = { workspace = true }
 solana-security-txt = { workspace = true }
+default-env = { workspace = true }

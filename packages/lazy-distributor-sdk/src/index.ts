@@ -23,7 +23,6 @@ export async function init(
   }
   const lazyDistributor = new Program<LazyDistributor>(
     idl as LazyDistributor,
-    programId,
     provider,
     undefined,
     () => {
