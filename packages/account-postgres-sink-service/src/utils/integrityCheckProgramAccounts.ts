@@ -232,7 +232,7 @@ export const integrityCheckProgramAccounts = async ({
                         sanitized = await plugin.processAccount(sanitized, t);
                       } catch (err) {
                         console.warn(
-                          `Plugin processing failed for account ${account.pubkey}`,
+                          `Plugin processing failed for account ${c.pubkey}`,
                           err
                         );
                         // Continue with unmodified sanitized data instead of failing
