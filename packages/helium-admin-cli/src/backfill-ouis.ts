@@ -216,7 +216,6 @@ export async function run(args: any = process.argv) {
           .instruction(),
       ],
       {
-        computeUnitLimit: 500000,
         signers: [merkle],
       }
     );
@@ -303,9 +302,7 @@ export async function run(args: any = process.argv) {
   ).filter(truthy);
 
   console.log(`Initializing (${orgIxs.length}) organizations`);
-  await batchParallelInstructionsWithPriorityFee(provider, orgIxs, {
-    computeUnitLimit: 500000,
-  });
+  await batchParallelInstructionsWithPriorityFee(provider, orgIxs);
 
   const orgApprovalIxs = (
     await Promise.all(
