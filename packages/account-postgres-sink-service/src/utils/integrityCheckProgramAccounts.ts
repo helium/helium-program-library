@@ -226,18 +226,19 @@ export const integrityCheckProgramAccounts = async ({
                     ...sanitizeAccount(decodedAcc),
                   };
 
-                  if (pluginsByAccountType[accName]?.length > 0) {
-                    const pluginResults = await Promise.all(
-                      pluginsByAccountType[accName].map((plugin) =>
-                        plugin?.processAccount
-                          ? plugin.processAccount(sanitized)
-                          : sanitized
-                      )
-                    );
-                    sanitized = pluginResults.reduce(
-                      (acc, curr) => ({ ...acc, ...curr }),
-                      sanitized
-                    );
+                  for (const plugin of pluginsByAccountType[accName] || []) {
+                    if (plugin?.processAccount) {
+                      try {
+                        sanitized = await plugin.processAccount(sanitized, t);
+                      } catch (err) {
+                        console.warn(
+                          `Plugin processing failed for account ${account.pubkey}`,
+                          err
+                        );
+                        // Continue with unmodified sanitized data instead of failing
+                        continue;
+                      }
+                    }
                   }
 
                   const existing = await model.findByPk(c.pubkey, {
