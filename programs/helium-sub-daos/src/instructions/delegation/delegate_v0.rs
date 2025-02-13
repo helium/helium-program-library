@@ -130,12 +130,15 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
 
-  let expiration_ts = ctx
-    .accounts
-    .proxy_config
-    .get_current_season(curr_ts)
-    .unwrap()
-    .end;
+  let expiration_ts = min(
+    ctx
+      .accounts
+      .proxy_config
+      .get_current_season(curr_ts)
+      .unwrap()
+      .end,
+    position.lockup.end_ts,
+  );
 
   let vehnt_info = caclulate_vhnt_info(curr_ts, position, voting_mint_config, expiration_ts)?;
   let VehntInfo {
