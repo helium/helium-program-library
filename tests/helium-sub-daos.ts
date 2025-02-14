@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-import { daoKey, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
+import { daoKey, delegatorRewardsPercent, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
@@ -1121,8 +1121,12 @@ describe("helium-sub-daos", () => {
               expect(
                 Number(postAtaBalance) - Number(preAtaBalance)
               ).to.be.within(
-                (EPOCH_REWARDS_PLUS_NET_EMISSIONS * 6) / 100 - 5,
-                (EPOCH_REWARDS_PLUS_NET_EMISSIONS * 6) / 100
+                EPOCH_REWARDS_PLUS_NET_EMISSIONS *
+                  (delegatorRewardsPercent(6).toNumber() / 10_000000000) -
+                  5,
+                EPOCH_REWARDS_PLUS_NET_EMISSIONS *
+                  (delegatorRewardsPercent(6).toNumber() / 10_000000000) +
+                  5
               );
             });
           });
