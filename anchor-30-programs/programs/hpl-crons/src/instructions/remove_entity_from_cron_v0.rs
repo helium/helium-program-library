@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use tuktuk_program::cron::cron::{
+use tuktuk_program::cron::{
   accounts::CronJobV0,
   cpi::{accounts::RemoveCronTransactionV0, remove_cron_transaction_v0},
   program::Cron,

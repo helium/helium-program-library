@@ -1,12 +1,12 @@
 use anchor_lang::prelude::*;
-use tuktuk_program::cron::cron::{
+use tuktuk_program::cron::{
   accounts::CronJobV0,
   cpi::{accounts::AddCronTransactionV0, add_cron_transaction_v0},
   program::Cron,
   types::{AddCronTransactionArgsV0, TransactionSourceV0},
 };
 
-use crate::helium_entity_manager::helium_entity_manager::accounts::KeyToAssetV0;
+use crate::helium_entity_manager::accounts::KeyToAssetV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct AddEntityToCronArgsV0 {

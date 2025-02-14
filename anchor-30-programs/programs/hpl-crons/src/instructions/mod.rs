@@ -6,6 +6,7 @@ pub mod init_epoch_tracker;
 pub mod queue_delegation_claim_v0;
 pub mod queue_end_epoch;
 pub mod remove_entity_from_cron_v0;
+pub mod requeue_entity_claim_cron_v0;
 pub mod start_delegation_claim_bot_v0;
 pub mod update_epoch_tracker;
 
@@ -17,5 +18,6 @@ pub use init_epoch_tracker::*;
 pub use queue_delegation_claim_v0::*;
 pub use queue_end_epoch::*;
 pub use remove_entity_from_cron_v0::*;
+pub use requeue_entity_claim_cron_v0::*;
 pub use start_delegation_claim_bot_v0::*;
 pub use update_epoch_tracker::*;

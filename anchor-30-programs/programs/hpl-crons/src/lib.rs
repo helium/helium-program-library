@@ -82,4 +82,8 @@ pub mod hpl_crons {
   ) -> Result<()> {
     remove_entity_from_cron_v0::handler(ctx, args)
   }
+
+  pub fn requeue_entity_claim_cron_v0(ctx: Context<RequeueEntityClaimCronV0>) -> Result<()> {
+    requeue_entity_claim_cron_v0::handler(ctx)
+  }
 }
