@@ -160,6 +160,7 @@ pub struct DaoEpochInfoV0 {
   pub vehnt_at_epoch_start: u64,
   pub cumulative_not_emitted: u64,
   pub not_emitted: u64,
+  pub smoothed_hnt_burned: u64,
 }
 
 #[derive(Debug, InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Default)]
