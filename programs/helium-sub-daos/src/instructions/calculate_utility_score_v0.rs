@@ -126,7 +126,7 @@ pub fn handler(
 
   let total_hnt_burned = prev_supply
     .saturating_sub(curr_supply)
-    .saturating_add(not_emitted);
+    .saturating_sub(not_emitted);
   ctx.accounts.dao_epoch_info.smoothed_hnt_burned = (SMOOTHING_FACTOR
     .checked_sub(1)
     .unwrap()

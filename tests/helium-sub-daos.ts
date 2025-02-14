@@ -397,7 +397,7 @@ describe("helium-sub-daos", () => {
         notEmittedAmount.toString()
       );
 
-      let expectedRewards = EPOCH_REWARDS + notEmittedAmount.toNumber();
+      let expectedRewards = EPOCH_REWARDS + Math.floor(6 / 7 * 300);
       expect(firstEpoch.daoEpochInfoAcc.totalRewards.toString()).to.eq(
         expectedRewards.toString()
       );
