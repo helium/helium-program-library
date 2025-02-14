@@ -74,6 +74,8 @@ pub struct CalculateUtilityScoreV0<'info> {
   pub no_emit_program: Program<'info, NoEmit>,
 }
 
+const SMOOTHING_FACTOR: u64 = 7;
+
 pub fn handler(
   ctx: Context<CalculateUtilityScoreV0>,
   args: CalculateUtilityScoreArgsV0,
@@ -117,6 +119,24 @@ pub fn handler(
       .saturating_sub(prev_cumulative_not_emitted);
   };
 
+  // Set smoothed hnt burned to 300 if it's not already set
+  if ctx.accounts.dao_epoch_info.smoothed_hnt_burned == 0 {
+    ctx.accounts.dao_epoch_info.smoothed_hnt_burned = 300;
+  }
+
+  let total_hnt_burned = prev_supply
+    .saturating_sub(curr_supply)
+    .saturating_sub(not_emitted);
+  ctx.accounts.dao_epoch_info.smoothed_hnt_burned = (SMOOTHING_FACTOR
+    .checked_sub(1)
+    .unwrap()
+    .checked_mul(ctx.accounts.dao_epoch_info.smoothed_hnt_burned)
+    .unwrap()
+    .checked_div(SMOOTHING_FACTOR)
+    .unwrap())
+  .checked_add(total_hnt_burned.checked_div(SMOOTHING_FACTOR).unwrap())
+  .unwrap();
+
   if ctx.accounts.dao_epoch_info.not_emitted == 0 {
     ctx.accounts.dao_epoch_info.not_emitted = not_emitted;
   }
@@ -132,9 +152,7 @@ pub fn handler(
     .get_emissions_at(end_of_epoch_ts)
     .unwrap()
     .checked_add(std::cmp::min(
-      prev_supply
-        .saturating_sub(curr_supply)
-        .saturating_add(not_emitted),
+      ctx.accounts.dao_epoch_info.smoothed_hnt_burned,
       ctx.accounts.dao.net_emissions_cap,
     ))
     .unwrap();

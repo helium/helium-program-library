@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-import { daoKey, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
+import { daoKey, delegatorRewardsPercent, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
@@ -75,6 +75,7 @@ const THREAD_PID = new PublicKey(
 );
 
 const EPOCH_REWARDS = 100000000;
+const EPOCH_REWARDS_PLUS_NET_EMISSIONS = EPOCH_REWARDS + Math.floor(6 / 7 * 300);
 const SUB_DAO_EPOCH_REWARDS = 10000000;
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
@@ -397,7 +398,7 @@ describe("helium-sub-daos", () => {
         notEmittedAmount.toString()
       );
 
-      let expectedRewards = EPOCH_REWARDS + notEmittedAmount.toNumber();
+      let expectedRewards = EPOCH_REWARDS_PLUS_NET_EMISSIONS;
       expect(firstEpoch.daoEpochInfoAcc.totalRewards.toString()).to.eq(
         expectedRewards.toString()
       );
@@ -690,10 +691,10 @@ describe("helium-sub-daos", () => {
           const veHnt = toNumber(subDaoInfo.vehntAtEpochStart, 8);
           const totalUtility = veHnt;
           expect(daoInfo.totalRewards.toString()).to.eq(
-            EPOCH_REWARDS.toString()
+            EPOCH_REWARDS_PLUS_NET_EMISSIONS.toString()
           );
           expect(daoInfo.currentHntSupply.toString()).to.eq(
-            new BN(supply.toString()).add(new BN(EPOCH_REWARDS)).toString()
+            new BN(supply.toString()).add(new BN(EPOCH_REWARDS_PLUS_NET_EMISSIONS)).toString()
           );
 
           expectBnAccuracy(
@@ -1003,7 +1004,7 @@ describe("helium-sub-daos", () => {
                 (await provider.connection.getAccountInfo(hstPool))?.data!
               ).amount;
               expect(Number(postHntBalance - preHntBalance)).to.be.closeTo(
-                EPOCH_REWARDS * (1 - 0.06),
+                EPOCH_REWARDS_PLUS_NET_EMISSIONS * (1 - 0.06),
                 1 // Allow for 1 unit of difference to handle rounding
               );
               expect((postHstBalance - preHstBalance).toString()).to.eq("0");
@@ -1120,8 +1121,12 @@ describe("helium-sub-daos", () => {
               expect(
                 Number(postAtaBalance) - Number(preAtaBalance)
               ).to.be.within(
-                (EPOCH_REWARDS * 6) / 100 - 5,
-                (EPOCH_REWARDS * 6) / 100
+                EPOCH_REWARDS_PLUS_NET_EMISSIONS *
+                  (delegatorRewardsPercent(6).toNumber() / 10_000000000) -
+                  5,
+                EPOCH_REWARDS_PLUS_NET_EMISSIONS *
+                  (delegatorRewardsPercent(6).toNumber() / 10_000000000) +
+                  5
               );
             });
           });
