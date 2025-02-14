@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry.d.ts";
-import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal.d.ts";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal";
 import { init as initProposal } from "@helium/proposal-sdk";
 import {
   createAtaAndMint,
@@ -43,7 +43,7 @@ import {
   init as initNftProxy,
   proxyAssignmentKey,
 } from "@helium/nft-proxy-sdk";
-import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy.d.ts";
+import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { ensureVSRIdl } from "./utils/fixtures";
 
 chai.use(chaiAsPromised);

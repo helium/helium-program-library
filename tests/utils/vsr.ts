@@ -1,5 +1,5 @@
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry.d.ts";
-import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy.d.ts";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import {
   createMintInstructions,
   sendInstructions,
@@ -35,7 +35,7 @@ export async function initVsr(
   genesisVotePowerMultiplierExpirationTs = 1,
   genesisVotePowerMultiplier = 0,
   // Default is to set proxy season to end so far ahead it isn't relevant
-  proxySeasonEnd = new BN(new Date().valueOf() / 1000 + (24 * 60 * 60 * 5 * 365)),
+  proxySeasonEnd = new BN(new Date().valueOf() / 1000 + 24 * 60 * 60 * 5 * 365)
 ) {
   const programVersion = await getGovernanceProgramVersion(
     program.provider.connection,
@@ -84,8 +84,9 @@ export async function initVsr(
     .accountsPartial({
       realm: realmPk,
       realmGoverningTokenMint: hntMint,
-      proxyConfig
+      proxyConfig,
     });
+  console.log("vsr", (await createRegistrar.instruction()).keys);
   instructions.push(await createRegistrar.instruction());
   const registrar = (await createRegistrar.pubkeys()).registrar as PublicKey;
 

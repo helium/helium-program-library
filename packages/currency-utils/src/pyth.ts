@@ -1,7 +1,13 @@
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/pyth_solana_receiver.json`.
+ */
 export type PythSolanaReceiver = {
   address: "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ";
   metadata: {
-    name: "pyth_solana_receiver";
+    name: "pythSolanaReceiver";
     version: "0.1.0";
     spec: "0.1.0";
   };
@@ -20,22 +26,22 @@ export type PythSolanaReceiver = {
           writable: true;
         },
         {
-          name: "system_program";
+          name: "systemProgram";
         }
       ];
       args: [
         {
-          name: "initial_config";
+          name: "initialConfig";
           type: {
             defined: {
-              name: "Config";
+              name: "config";
             };
           };
         }
       ];
     },
     {
-      name: "request_governance_authority_transfer";
+      name: "requestGovernanceAuthorityTransfer";
       discriminator: [92, 18, 67, 156, 27, 151, 183, 224];
       accounts: [
         {
@@ -49,13 +55,13 @@ export type PythSolanaReceiver = {
       ];
       args: [
         {
-          name: "target_governance_authority";
+          name: "targetGovernanceAuthority";
           type: "pubkey";
         }
       ];
     },
     {
-      name: "accept_governance_authority_transfer";
+      name: "acceptGovernanceAuthorityTransfer";
       discriminator: [254, 39, 222, 79, 64, 217, 205, 127];
       accounts: [
         {
@@ -70,7 +76,7 @@ export type PythSolanaReceiver = {
       args: [];
     },
     {
-      name: "set_data_sources";
+      name: "setDataSources";
       discriminator: [107, 73, 15, 119, 195, 116, 91, 210];
       accounts: [
         {
@@ -84,11 +90,11 @@ export type PythSolanaReceiver = {
       ];
       args: [
         {
-          name: "valid_data_sources";
+          name: "validDataSources";
           type: {
             vec: {
               defined: {
-                name: "DataSource";
+                name: "dataSource";
               };
             };
           };
@@ -96,7 +102,7 @@ export type PythSolanaReceiver = {
       ];
     },
     {
-      name: "set_fee";
+      name: "setFee";
       discriminator: [18, 154, 24, 18, 237, 214, 19, 80];
       accounts: [
         {
@@ -110,13 +116,13 @@ export type PythSolanaReceiver = {
       ];
       args: [
         {
-          name: "single_update_fee_in_lamports";
+          name: "singleUpdateFeeInLamports";
           type: "u64";
         }
       ];
     },
     {
-      name: "set_wormhole_address";
+      name: "setWormholeAddress";
       discriminator: [154, 174, 252, 157, 91, 215, 179, 156];
       accounts: [
         {
@@ -136,7 +142,7 @@ export type PythSolanaReceiver = {
       ];
     },
     {
-      name: "set_minimum_signatures";
+      name: "setMinimumSignatures";
       discriminator: [5, 210, 206, 124, 43, 68, 104, 149];
       accounts: [
         {
@@ -150,13 +156,13 @@ export type PythSolanaReceiver = {
       ];
       args: [
         {
-          name: "minimum_signatures";
+          name: "minimumSignatures";
           type: "u8";
         }
       ];
     },
     {
-      name: "post_update_atomic";
+      name: "postUpdateAtomic";
       docs: [
         "Post a price update using a VAA and a MerklePriceUpdate.",
         "This function allows you to post a price update in a single transaction.",
@@ -171,7 +177,7 @@ export type PythSolanaReceiver = {
           signer: true;
         },
         {
-          name: "guardian_set";
+          name: "guardianSet";
           docs: [
             "Instead we do the same steps in deserialize_guardian_set_checked."
           ];
@@ -184,7 +190,7 @@ export type PythSolanaReceiver = {
           writable: true;
         },
         {
-          name: "price_update_account";
+          name: "priceUpdateAccount";
           docs: [
             "The contraint is such that either the price_update_account is uninitialized or the payer is the write_authority.",
             "Pubkey::default() is the SystemProgram on Solana and it can't sign so it's impossible that price_update_account.write_authority == Pubkey::default() once the account is initialized"
@@ -193,10 +199,10 @@ export type PythSolanaReceiver = {
           signer: true;
         },
         {
-          name: "system_program";
+          name: "systemProgram";
         },
         {
-          name: "write_authority";
+          name: "writeAuthority";
           signer: true;
         }
       ];
@@ -205,14 +211,14 @@ export type PythSolanaReceiver = {
           name: "params";
           type: {
             defined: {
-              name: "PostUpdateAtomicParams";
+              name: "postUpdateAtomicParams";
             };
           };
         }
       ];
     },
     {
-      name: "post_update";
+      name: "postUpdate";
       docs: [
         "Post a price update using an encoded_vaa account and a MerklePriceUpdate calldata.",
         "This should be called after the client has already verified the Vaa via the Wormhole contract.",
@@ -226,7 +232,7 @@ export type PythSolanaReceiver = {
           signer: true;
         },
         {
-          name: "encoded_vaa";
+          name: "encodedVaa";
         },
         {
           name: "config";
@@ -236,7 +242,7 @@ export type PythSolanaReceiver = {
           writable: true;
         },
         {
-          name: "price_update_account";
+          name: "priceUpdateAccount";
           docs: [
             "The contraint is such that either the price_update_account is uninitialized or the payer is the write_authority.",
             "Pubkey::default() is the SystemProgram on Solana and it can't sign so it's impossible that price_update_account.write_authority == Pubkey::default() once the account is initialized"
@@ -245,10 +251,10 @@ export type PythSolanaReceiver = {
           signer: true;
         },
         {
-          name: "system_program";
+          name: "systemProgram";
         },
         {
-          name: "write_authority";
+          name: "writeAuthority";
           signer: true;
         }
       ];
@@ -257,14 +263,14 @@ export type PythSolanaReceiver = {
           name: "params";
           type: {
             defined: {
-              name: "PostUpdateParams";
+              name: "postUpdateParams";
             };
           };
         }
       ];
     },
     {
-      name: "reclaim_rent";
+      name: "reclaimRent";
       discriminator: [218, 200, 19, 197, 227, 89, 192, 22];
       accounts: [
         {
@@ -273,7 +279,7 @@ export type PythSolanaReceiver = {
           signer: true;
         },
         {
-          name: "price_update_account";
+          name: "priceUpdateAccount";
           writable: true;
         }
       ];
@@ -282,7 +288,7 @@ export type PythSolanaReceiver = {
   ];
   accounts: [
     {
-      name: "Config";
+      name: "config";
       discriminator: [155, 12, 170, 224, 30, 250, 204, 130];
     },
     {
@@ -293,123 +299,123 @@ export type PythSolanaReceiver = {
   errors: [
     {
       code: 6000;
-      name: "InvalidWormholeMessage";
+      name: "invalidWormholeMessage";
       msg: "Received an invalid wormhole message";
     },
     {
       code: 6001;
-      name: "DeserializeMessageFailed";
+      name: "deserializeMessageFailed";
       msg: "An error occurred when deserializing the message";
     },
     {
       code: 6002;
-      name: "InvalidPriceUpdate";
+      name: "invalidPriceUpdate";
       msg: "Received an invalid price update";
     },
     {
       code: 6003;
-      name: "UnsupportedMessageType";
+      name: "unsupportedMessageType";
       msg: "This type of message is not supported currently";
     },
     {
       code: 6004;
-      name: "InvalidDataSource";
+      name: "invalidDataSource";
       msg: "The tuple emitter chain, emitter doesn't match one of the valid data sources.";
     },
     {
       code: 6005;
-      name: "InsufficientFunds";
+      name: "insufficientFunds";
       msg: "Funds are insufficient to pay the receiving fee";
     },
     {
       code: 6006;
-      name: "WrongWriteAuthority";
+      name: "wrongWriteAuthority";
       msg: "This signer can't write to price update account";
     },
     {
       code: 6007;
-      name: "WrongVaaOwner";
+      name: "wrongVaaOwner";
       msg: "The posted VAA account has the wrong owner.";
     },
     {
       code: 6008;
-      name: "DeserializeVaaFailed";
+      name: "deserializeVaaFailed";
       msg: "An error occurred when deserializing the VAA.";
     },
     {
       code: 6009;
-      name: "InsufficientGuardianSignatures";
+      name: "insufficientGuardianSignatures";
       msg: "The number of guardian signatures is below the minimum";
     },
     {
       code: 6010;
-      name: "InvalidVaaVersion";
+      name: "invalidVaaVersion";
       msg: "Invalid VAA version";
     },
     {
       code: 6011;
-      name: "GuardianSetMismatch";
+      name: "guardianSetMismatch";
       msg: "Guardian set version in the VAA doesn't match the guardian set passed";
     },
     {
       code: 6012;
-      name: "InvalidGuardianOrder";
+      name: "invalidGuardianOrder";
       msg: "Guardian signature indices must be increasing";
     },
     {
       code: 6013;
-      name: "InvalidGuardianIndex";
+      name: "invalidGuardianIndex";
       msg: "Guardian index exceeds the number of guardians in the set";
     },
     {
       code: 6014;
-      name: "InvalidSignature";
+      name: "invalidSignature";
       msg: "A VAA signature is invalid";
     },
     {
       code: 6015;
-      name: "InvalidGuardianKeyRecovery";
+      name: "invalidGuardianKeyRecovery";
       msg: "The recovered guardian public key doesn't match the guardian set";
     },
     {
       code: 6016;
-      name: "WrongGuardianSetOwner";
+      name: "wrongGuardianSetOwner";
       msg: "The guardian set account is owned by the wrong program";
     },
     {
       code: 6017;
-      name: "InvalidGuardianSetPda";
+      name: "invalidGuardianSetPda";
       msg: "The Guardian Set account doesn't match the PDA derivation";
     },
     {
       code: 6018;
-      name: "GuardianSetExpired";
+      name: "guardianSetExpired";
       msg: "The Guardian Set is expired";
     },
     {
       code: 6019;
-      name: "GovernanceAuthorityMismatch";
+      name: "governanceAuthorityMismatch";
       msg: "The signer is not authorized to perform this governance action";
     },
     {
       code: 6020;
-      name: "TargetGovernanceAuthorityMismatch";
+      name: "targetGovernanceAuthorityMismatch";
       msg: "The signer is not authorized to accept the governance authority";
     },
     {
       code: 6021;
-      name: "NonexistentGovernanceAuthorityTransferRequest";
+      name: "nonexistentGovernanceAuthorityTransferRequest";
       msg: "The governance authority needs to request a transfer first";
     }
   ];
   types: [
     {
-      name: "PriceFeedMessage";
+      name: "priceFeedMessage";
       type: {
         kind: "struct";
         fields: [
           {
-            name: "feed_id";
+            name: "feedId";
             type: {
               array: ["u8", 32];
             };
@@ -427,26 +433,26 @@ export type PythSolanaReceiver = {
             type: "i32";
           },
           {
-            name: "publish_time";
+            name: "publishTime";
             type: "i64";
           },
           {
-            name: "prev_publish_time";
+            name: "prevPublishTime";
             type: "i64";
           },
           {
-            name: "ema_price";
+            name: "emaPrice";
             type: "i64";
           },
           {
-            name: "ema_conf";
+            name: "emaConf";
             type: "u64";
           }
         ];
       };
     },
     {
-      name: "MerklePriceUpdate";
+      name: "merklePriceUpdate";
       type: {
         kind: "struct";
         fields: [
@@ -466,7 +472,7 @@ export type PythSolanaReceiver = {
       };
     },
     {
-      name: "DataSource";
+      name: "dataSource";
       type: {
         kind: "struct";
         fields: [
@@ -482,7 +488,7 @@ export type PythSolanaReceiver = {
       };
     },
     {
-      name: "PostUpdateAtomicParams";
+      name: "postUpdateAtomicParams";
       type: {
         kind: "struct";
         fields: [
@@ -491,42 +497,42 @@ export type PythSolanaReceiver = {
             type: "bytes";
           },
           {
-            name: "merkle_price_update";
+            name: "merklePriceUpdate";
             type: {
               defined: {
-                name: "MerklePriceUpdate";
+                name: "merklePriceUpdate";
               };
             };
           },
           {
-            name: "treasury_id";
+            name: "treasuryId";
             type: "u8";
           }
         ];
       };
     },
     {
-      name: "PostUpdateParams";
+      name: "postUpdateParams";
       type: {
         kind: "struct";
         fields: [
           {
-            name: "merkle_price_update";
+            name: "merklePriceUpdate";
             type: {
               defined: {
-                name: "MerklePriceUpdate";
+                name: "merklePriceUpdate";
               };
             };
           },
           {
-            name: "treasury_id";
+            name: "treasuryId";
             type: "u8";
           }
         ];
       };
     },
     {
-      name: "VerificationLevel";
+      name: "verificationLevel";
       docs: [
         "* This enum represents how many guardian signatures were checked for a Pythnet price update\n * If full, guardian quorum has been attained\n * If partial, at least config.minimum signatures have been verified, but in the case config.minimum_signatures changes in the future we also include the number of signatures that were checked"
       ];
@@ -534,31 +540,31 @@ export type PythSolanaReceiver = {
         kind: "enum";
         variants: [
           {
-            name: "Partial";
+            name: "partial";
             fields: [
               {
-                name: "num_signatures";
+                name: "numSignatures";
                 type: "u8";
               }
             ];
           },
           {
-            name: "Full";
+            name: "full";
           }
         ];
       };
     },
     {
-      name: "Config";
+      name: "config";
       type: {
         kind: "struct";
         fields: [
           {
-            name: "governance_authority";
+            name: "governanceAuthority";
             type: "pubkey";
           },
           {
-            name: "target_governance_authority";
+            name: "targetGovernanceAuthority";
             type: {
               option: "pubkey";
             };
@@ -568,21 +574,21 @@ export type PythSolanaReceiver = {
             type: "pubkey";
           },
           {
-            name: "valid_data_sources";
+            name: "validDataSources";
             type: {
               vec: {
                 defined: {
-                  name: "DataSource";
+                  name: "dataSource";
                 };
               };
             };
           },
           {
-            name: "single_update_fee_in_lamports";
+            name: "singleUpdateFeeInLamports";
             type: "u64";
           },
           {
-            name: "minimum_signatures";
+            name: "minimumSignatures";
             type: "u8";
           }
         ];
@@ -594,27 +600,27 @@ export type PythSolanaReceiver = {
         kind: "struct";
         fields: [
           {
-            name: "write_authority";
+            name: "writeAuthority";
             type: "pubkey";
           },
           {
-            name: "verification_level";
+            name: "verificationLevel";
             type: {
               defined: {
-                name: "VerificationLevel";
+                name: "verificationLevel";
               };
             };
           },
           {
-            name: "price_message";
+            name: "priceMessage";
             type: {
               defined: {
-                name: "PriceFeedMessage";
+                name: "priceFeedMessage";
               };
             };
           },
           {
-            name: "posted_slot";
+            name: "postedSlot";
             type: "u64";
           }
         ];
@@ -622,7 +628,8 @@ export type PythSolanaReceiver = {
     }
   ];
 };
-export const IDL: PythSolanaReceiver = {
+
+export const IDL = {
   address: "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ",
   metadata: {
     name: "pyth_solana_receiver",

@@ -1,14 +1,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{self, Mint, MintTo, Token, TokenAccount},
-};
-use mpl_token_metadata::types::DataV2;
-use shared_utils::{
-  create_metadata_accounts_v3,
-  token_metadata::{
-    create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+  metadata::{
+    create_master_edition_v3, create_metadata_accounts_v3, mpl_token_metadata::types::DataV2,
+    CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
   },
+  token::{self, Mint, MintTo, Token, TokenAccount},
 };
 
 use crate::FanoutV0;
@@ -113,7 +110,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: ctx.accounts.fanout.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx.accounts.rent.to_account_info().clone(),
       },
       signer_seeds,
     ),
@@ -128,6 +125,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
       collection: None,
       uses: None,
     },
+    true,
     true,
     None,
   )?;
@@ -148,7 +146,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx.accounts.rent.to_account_info().clone(),
       },
       signer_seeds,
     ),

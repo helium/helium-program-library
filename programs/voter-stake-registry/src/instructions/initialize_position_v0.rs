@@ -3,15 +3,12 @@ use std::{convert::TryFrom, mem::size_of};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token,
-  token::{FreezeAccount, Mint, MintTo, Token, TokenAccount},
-};
-use mpl_token_metadata::types::{Collection, DataV2};
-use shared_utils::{
-  create_metadata_accounts_v3,
-  token_metadata::{
-    verify_sized_collection_item, CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
+  metadata::{
+    create_metadata_accounts_v3,
+    mpl_token_metadata::types::{Collection, DataV2},
+    verify_sized_collection_item, CreateMetadataAccountsV3, Metadata, VerifySizedCollectionItem,
   },
+  token::{self, FreezeAccount, Mint, MintTo, Token, TokenAccount},
 };
 
 use crate::{error::VsrError, position_seeds, registrar_seeds, state::*};
@@ -199,7 +196,11 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: ctx.accounts.position.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -216,32 +217,35 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
       uses: None,
     },
     true,
+    true,
     None,
   )?;
 
   let verify_signer_seeds: &[&[&[u8]]] = &[registrar_seeds!(ctx.accounts.registrar)];
 
-  verify_sized_collection_item(CpiContext::new_with_signer(
-    ctx
-      .accounts
-      .token_metadata_program
-      .to_account_info()
-      .clone(),
-    VerifyCollectionItem {
-      payer: ctx.accounts.payer.to_account_info().clone(),
-      metadata: ctx.accounts.metadata.to_account_info().clone(),
-      collection_authority: ctx.accounts.registrar.to_account_info().clone(),
-      collection_mint: ctx.accounts.collection.to_account_info().clone(),
-      collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
-      collection_master_edition: ctx
+  verify_sized_collection_item(
+    CpiContext::new_with_signer(
+      ctx
         .accounts
-        .collection_master_edition
+        .token_metadata_program
         .to_account_info()
         .clone(),
-      token_metadata_program: ctx.accounts.token_metadata_program.clone(),
-    },
-    verify_signer_seeds,
-  ))?;
+      VerifySizedCollectionItem {
+        payer: ctx.accounts.payer.to_account_info().clone(),
+        metadata: ctx.accounts.metadata.to_account_info().clone(),
+        collection_authority: ctx.accounts.registrar.to_account_info().clone(),
+        collection_mint: ctx.accounts.collection.to_account_info().clone(),
+        collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
+        collection_master_edition: ctx
+          .accounts
+          .collection_master_edition
+          .to_account_info()
+          .clone(),
+      },
+      verify_signer_seeds,
+    ),
+    Some(ctx.accounts.registrar.key()),
+  )?;
 
   Ok(())
 }

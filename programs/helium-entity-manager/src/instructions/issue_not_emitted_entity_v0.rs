@@ -1,19 +1,18 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
+  metadata::{
+    create_master_edition_v3, create_metadata_accounts_v3,
+    mpl_token_metadata::{
+      instructions::{VerifyCreatorV1Cpi, VerifyCreatorV1CpiAccounts},
+      types::{Creator, DataV2},
+    },
+    CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+  },
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use helium_sub_daos::DaoV0;
-use mpl_token_metadata::{
-  instructions::{VerifyCreatorV1Cpi, VerifyCreatorV1CpiAccounts},
-  types::{Creator, DataV2},
-};
 use no_emit::program::NoEmit;
-use shared_utils::{
-  create_metadata_accounts_v3,
-  token_metadata::{create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3},
-  Metadata,
-};
 
 use super::hash_entity_key;
 use crate::{constants::ENTITY_METADATA_URL, key_to_asset_seeds, state::*};
@@ -133,7 +132,11 @@ pub fn handler(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: update_auth.clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -162,6 +165,7 @@ pub fn handler(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
       collection: None,
     },
     true,
+    true,
     None,
   )?;
 
@@ -181,7 +185,11 @@ pub fn handler(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),

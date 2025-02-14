@@ -84,7 +84,6 @@ describe("helium-sub-daos", () => {
 
   const program = new Program<HeliumSubDaos>(
     anchor.workspace.HeliumSubDaos.idl,
-    anchor.workspace.HeliumSubDaos.programId,
     anchor.workspace.HeliumSubDaos.provider,
     anchor.workspace.HeliumSubDaos.coder,
     () => {

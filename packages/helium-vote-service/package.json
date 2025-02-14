@@ -34,7 +34,7 @@
   "dependencies": {
     "@fastify/cors": "^8.1.1",
     "@fastify/static": "^6",
-    "@helium/organization-sdk": "^0.1.0",
+    "@helium/organization-sdk": "^0.1.1",
     "@helium/spl-utils": "^0.10.0-alpha.0",
     "@helium/voter-stake-registry-sdk": "^0.10.0-alpha.0",
     "@solana/web3.js": "^1.91.1",

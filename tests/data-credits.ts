@@ -4,9 +4,9 @@ import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import {
-  PythSolanaReceiverProgram,
+  PythSolanaReceiver,
   pythSolanaReceiverIdl,
-} from "@pythnetwork/pyth-solana-receiver";
+} from "@helium/currency-utils";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAccount,
@@ -80,7 +80,7 @@ describe("data-credits", () => {
   let hsdProgram: Program<HeliumSubDaos>;
   let vsrProgram: Program<VoterStakeRegistry>;
   let nftProxyProgram: Program<NftProxy>;
-  let pythProgram: Program<PythSolanaReceiverProgram>;
+  let pythProgram: Program<PythSolanaReceiver>;
   let dcKey: PublicKey;
   let hntMint: PublicKey;
   let dcMint: PublicKey;
@@ -93,8 +93,7 @@ describe("data-credits", () => {
 
   beforeEach(async () => {
     pythProgram = new Program(
-      pythSolanaReceiverIdl,
-      new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
+      pythSolanaReceiverIdl as any,
     );
     program = await init(
       provider,

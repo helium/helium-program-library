@@ -47,7 +47,6 @@ export async function createCompressionNft({
 }> {
   const bubblegum = new Program<MplBubblegum>(
     BubblegumIdl as MplBubblegum,
-    new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"),
     provider,
     undefined,
     () => {

@@ -1,14 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { dataCreditsKey, init as initDataCredits } from "@helium/data-credits-sdk";
+import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
 import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
 import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
-import {
-  PythSolanaReceiverProgram,
-  pythSolanaReceiverIdl,
-} from "@pythnetwork/pyth-solana-receiver";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
@@ -57,7 +53,6 @@ describe("hexboosting", () => {
   let hemProgram: Program<HeliumEntityManager>;
   let hsdProgram: Program<HeliumSubDaos>;
   let dcProgram: Program<DataCredits>;
-  let pythProgram: Program<PythSolanaReceiverProgram>;
   let memProgram: Program<MobileEntityManager>;
   let carrier: PublicKey;
   let merkle: Keypair;
@@ -69,10 +64,6 @@ describe("hexboosting", () => {
       provider,
       anchor.workspace.Hexboosting.programId,
       anchor.workspace.Hexboosting.idl
-    );
-    pythProgram = new Program(
-      pythSolanaReceiverIdl,
-      new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
     );
     dcProgram = await initDataCredits(
       provider,

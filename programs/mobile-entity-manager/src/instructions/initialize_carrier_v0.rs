@@ -1,17 +1,14 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
+  metadata::{
+    create_master_edition_v3, create_metadata_accounts_v3,
+    mpl_token_metadata::types::{CollectionDetails, DataV2},
+    CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+  },
   token::{self, Mint, MintTo, Token, TokenAccount, Transfer},
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
-use mpl_token_metadata::types::{CollectionDetails, DataV2};
-use shared_utils::{
-  create_metadata_accounts_v3,
-  token_metadata::{
-    create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
-    Metadata as MetadataProgram,
-  },
-};
 
 use crate::{error::ErrorCode, state::*};
 
@@ -94,7 +91,7 @@ pub struct InitializeCarrierV0<'info> {
   )]
   pub escrow: Box<Account<'info, TokenAccount>>,
 
-  pub token_metadata_program: Program<'info, MetadataProgram>,
+  pub token_metadata_program: Program<'info, Metadata>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -161,7 +158,11 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: ctx.accounts.carrier.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -174,6 +175,7 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
       collection: None,
       uses: None,
     },
+    true,
     true,
     Some(CollectionDetails::V1 { size: 0 }),
   )?;
@@ -194,7 +196,11 @@ pub fn handler(ctx: Context<InitializeCarrierV0>, args: InitializeCarrierArgsV0)
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
