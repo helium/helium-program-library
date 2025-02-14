@@ -23,7 +23,7 @@ export async function fetchBackwardsCompatibleIdl(
   const idl = await Program.fetchIdl(programId, provider);
   // This is an Anchor 0.30+ IDL. Return the old IDLs
   // @ts-ignore
-  if (!idl || idl?.address) {
+  if (!idl || !idl?.address) {
     return IDLS_BY_PROGRAM[programId.toBase58()] || idl;
   }
 
