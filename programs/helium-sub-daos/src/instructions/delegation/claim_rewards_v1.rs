@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::pubkey};
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{burn, Burn, Mint, Token, TokenAccount},
@@ -21,6 +21,8 @@ pub struct ClaimRewardsArgsV0 {
   pub epoch: u64,
 }
 
+const TUKTUK_SIGNER_KEY: Pubkey = pubkey!("8m6iyXwcu8obaXdqKwzBqHE5HM2tRZZfSXV5qNALiPk4");
+
 #[derive(Accounts)]
 #[instruction(args: ClaimRewardsArgsV0)]
 pub struct ClaimRewardsV1<'info> {
@@ -40,8 +42,11 @@ pub struct ClaimRewardsV1<'info> {
     constraint = position_token_account.amount > 0
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
-  #[account(mut)]
-  pub position_authority: Signer<'info>,
+  /// CHECK: By constraint
+  #[account(
+    constraint = position_authority.is_signer && (position_authority.key() == payer.key()) || payer.key() == TUKTUK_SIGNER_KEY
+  )]
+  pub position_authority: AccountInfo<'info>,
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     has_one = registrar,
@@ -68,6 +73,8 @@ pub struct ClaimRewardsV1<'info> {
   #[account(
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
+    // Ensure that a pre HIP-138 claim can't accidentally be done.
+    constraint = dao_epoch_info.delegation_rewards_issued > 0,
     constraint = dao_epoch_info.done_issuing_rewards @ ErrorCode::EpochNotClosed
   )]
   pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
@@ -75,7 +82,7 @@ pub struct ClaimRewardsV1<'info> {
   pub delegator_pool: Box<Account<'info, TokenAccount>>,
   #[account(
     init_if_needed,
-    payer = position_authority,
+    payer = payer,
     associated_token::mint = hnt_mint,
     associated_token::authority = position_authority,
   )]
@@ -95,6 +102,8 @@ pub struct ClaimRewardsV1<'info> {
   pub circuit_breaker_program: Program<'info, CircuitBreaker>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
+  #[account(mut)]
+  pub payer: Signer<'info>,
 }
 
 impl<'info> ClaimRewardsV1<'info> {
@@ -158,7 +167,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
       .checked_mul(ctx.accounts.dao_epoch_info.delegation_rewards_issued as u128)
       .unwrap()
       .checked_div(ctx.accounts.dao_epoch_info.vehnt_at_epoch_start as u128)
-      .unwrap(),
+      .unwrap_or(0),
   )
   .unwrap();
 

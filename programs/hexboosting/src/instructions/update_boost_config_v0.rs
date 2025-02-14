@@ -1,6 +1,7 @@
-use crate::state::*;
 use anchor_lang::prelude::*;
 use helium_sub_daos::SubDaoV0;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateBoostConfigArgsV0 {
@@ -9,6 +10,7 @@ pub struct UpdateBoostConfigArgsV0 {
   pub boost_price: Option<u64>,
   pub minimum_periods: Option<u16>,
   pub price_oracle: Option<Pubkey>,
+  pub dc_mint: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -45,6 +47,10 @@ pub fn handler(ctx: Context<UpdateBoostConfigV0>, args: UpdateBoostConfigArgsV0)
 
   if let Some(price_oracle) = args.price_oracle {
     ctx.accounts.boost_config.price_oracle = price_oracle
+  }
+
+  if let Some(dc_mint) = args.dc_mint {
+    ctx.accounts.boost_config.dc_mint = dc_mint;
   }
 
   Ok(())

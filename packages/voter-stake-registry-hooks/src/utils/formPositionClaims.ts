@@ -151,6 +151,7 @@ export const formPositionClaims = async ({
                       epoch,
                     })
                     .accountsStrict({
+                      payer: provider.wallet.publicKey,
                       position: position.pubkey,
                       mint: position.mint,
                       positionTokenAccount: getAssociatedTokenAddressSync(

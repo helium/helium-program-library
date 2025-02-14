@@ -1983,6 +1983,7 @@ dependencies = [
  "nft-proxy",
  "proposal",
  "shared-utils",
+ "solana-program",
  "solana-security-txt",
  "time 0.3.36",
  "treasury-management",

@@ -76,7 +76,6 @@ export async function run(args: any = process.argv) {
   const dntMint = new PublicKey(argv.dntMint);
   const subDaoK = subDaoKey(dntMint)[0]
   const subDao = await hsdProgram.account.subDaoV0.fetch(subDaoK)
-
   instructions.push(
     await program.methods
       .updateBoostConfigV0({
@@ -89,6 +88,7 @@ export async function run(args: any = process.argv) {
         priceOracle: argv.priceOracle ? new PublicKey(argv.priceOracle) : null,
         minimumPeriods: argv.minimumPeriods || null,
         boostPrice: argv.boostPrice ? new anchor.BN(argv.boostPrice) : null,
+        dcMint: null,
       })
       .accounts({
         boostConfig: boostConfigKey(dntMint)[0],
