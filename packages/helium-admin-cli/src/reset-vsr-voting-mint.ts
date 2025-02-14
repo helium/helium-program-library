@@ -105,7 +105,7 @@ export async function run(args: any = process.argv) {
           genesisVotePowerMultiplier: 3,
           genesisVotePowerMultiplierExpirationTs: new anchor.BN(in7Days),
         })
-        .accounts({
+        .accountsPartial({
           registrar: daoAcc.registrar,
           realmAuthority: daoAcc.authority,
           mint: hntMint,
@@ -137,7 +137,7 @@ export async function run(args: any = process.argv) {
           genesisVotePowerMultiplier: 1,
           genesisVotePowerMultiplierExpirationTs: new anchor.BN(now),
         })
-        .accounts({
+        .accountsPartial({
           registrar: subdaoAcc.registrar,
           mint: dntMint,
           realmAuthority: subdaoAcc.authority,

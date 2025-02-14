@@ -90,7 +90,7 @@ export async function run(args: any = process.argv) {
       decimals: argv.decimals,
       authority,
     })
-    .accounts({
+    .accountsPartial({
       priceOracle: priceOracleKeypair.publicKey,
       payer: provider.wallet.publicKey,
     })

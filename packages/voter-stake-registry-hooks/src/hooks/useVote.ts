@@ -185,7 +185,7 @@ export const useVote = (proposalKey: PublicKey) => {
                       .proxiedVoteV0({
                         choice,
                       })
-                      .accounts({
+                      .accountsPartial({
                         proposal: proposalKey,
                         voter: provider.wallet.publicKey,
                         position: position.pubkey,
@@ -205,7 +205,7 @@ export const useVote = (proposalKey: PublicKey) => {
                     .voteV0({
                       choice,
                     })
-                    .accounts({
+                    .accountsPartial({
                       proposal: proposalKey,
                       voter: provider.wallet.publicKey,
                       position: position.pubkey,
@@ -218,7 +218,7 @@ export const useVote = (proposalKey: PublicKey) => {
               instructions.push(
                 await hsdProgram.methods
                   .trackVoteV0()
-                  .accounts({
+                  .accountsPartial({
                     proposal: proposalKey,
                     marker: markerK,
                     position: position.pubkey,

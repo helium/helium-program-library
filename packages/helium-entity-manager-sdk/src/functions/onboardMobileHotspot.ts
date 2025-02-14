@@ -61,7 +61,7 @@ export async function onboardMobileHotspot({
       } as any,
       deploymentInfo: deploymentInfo as any,
     })
-    .accounts({
+    .accountsPartial({
       // hotspot: assetId,
       ...accounts,
       dcFeePayer,

@@ -45,7 +45,7 @@ type Type = {
 
 const generateIdlDocs = (idlJson: any) => {
   const { instructions, accounts, types } = idlJson;
-  const realFileName = idlJson.name
+  const realFileName = idlJson.metadata.name
     .split(".")[0]
     .replace(/_/g, " ")
     .replace(/(^|\s)\S/g, (L) => L.toUpperCase());
@@ -118,7 +118,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 };
 
 const generateType = (type: Type, types: Type[]) => {
-  if (type.kind === "enum") {
+  if (type?.kind === "enum") {
     let mdFile = `| Variant | Fields |
 | ------- | ------ |
 `;
@@ -135,7 +135,7 @@ const generateType = (type: Type, types: Type[]) => {
 `;
     });
     return mdFile;
-  } else if (type.kind === "struct") {
+  } else if (type?.kind === "struct") {
     let mdFile = `| Field | Type |
 | ----- | ---- |
 `;
@@ -161,7 +161,7 @@ const generateType = (type: Type, types: Type[]) => {
 `;
     });
     return mdFile;
-  } else if (type.kind === "option") {
+  } else if (type?.kind === "option") {
     return `Option<${generateType(type.type, types)}>`;
   }
   return type;
@@ -224,17 +224,7 @@ const clearNavigation = () => {
 
 const generateAllIdlDocs = () => {
   // Get all idls from /target/idl folder
-  const idlPreFiles: string[] = fs.readdirSync("./target/idl");
-  const programDirsInPrograms = fs.readdirSync("./programs");
-  console.log("programDirsInPrograms", programDirsInPrograms);
-  const idlFiles = idlPreFiles.filter((file) => {
-    // Remove no-emit from navigation.js
-    if (file === "no_emit.json") {
-      return false;
-    }
-    return programDirsInPrograms.includes(file.replace("_", "-").split(".")[0]);
-  });
-
+  const idlFiles: string[] = fs.readdirSync("./target/idl");
   clearNavigation();
 
   idlFiles.forEach((fileName) => {

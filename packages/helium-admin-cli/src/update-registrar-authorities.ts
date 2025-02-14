@@ -42,7 +42,7 @@ export async function run(args: any = process.argv) {
       .updateRegistrarAuthorityV0({
         authority: new PublicKey(argv.authority)
       })
-      .accounts({
+      .accountsPartial({
         registrar,
         realmAuthority: registrarAcc.realmAuthority,
       })

@@ -80,7 +80,7 @@ export async function createCompressionNft({
           programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
         }),
       ])
-      .accounts({
+      .accountsPartial({
         merkleTree: merkle.publicKey,
       })
       .signers([merkle])
@@ -129,7 +129,7 @@ export async function createCompressionNft({
         tokenStandard: { nonFungible: {} },
         tokenProgramVersion: { original: {} },
       })
-      .accounts({
+      .accountsPartial({
         merkleTree: merkle.publicKey,
         leafOwner: recipient,
         leafDelegate: recipient,
@@ -147,7 +147,7 @@ export async function createCompressionNft({
         tokenStandard: { nonFungible: {} },
         tokenProgramVersion: { original: {} },
       })
-      .accounts({
+      .accountsPartial({
         merkleTree: merkle.publicKey,
         leafOwner: recipient,
         leafDelegate: recipient,

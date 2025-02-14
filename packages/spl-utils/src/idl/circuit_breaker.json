@@ -1,287 +1,424 @@
 {
-  "version": "0.1.1",
-  "name": "circuit_breaker",
+  "address": "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g",
+  "metadata": {
+    "name": "circuit_breaker",
+    "version": "0.1.1",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initializeMintWindowedBreakerV0",
-      "accounts": [
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "circuitBreaker",
-          "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "mint_windowed_breaker"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mintAuthority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
+      "name": "initialize_account_windowed_breaker_v0",
+      "discriminator": [
+        30,
+        64,
+        99,
+        35,
+        112,
+        159,
+        41,
+        177
       ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": "InitializeMintWindowedBreakerArgsV0"
-          }
-        }
-      ]
-    },
-    {
-      "name": "initializeAccountWindowedBreakerV0",
       "accounts": [
         {
           "name": "payer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "circuitBreaker",
-          "isMut": true,
-          "isSigner": false,
+          "name": "circuit_breaker",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "account_windowed_breaker"
+                "value": [
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  95,
+                  119,
+                  105,
+                  110,
+                  100,
+                  111,
+                  119,
+                  101,
+                  100,
+                  95,
+                  98,
+                  114,
+                  101,
+                  97,
+                  107,
+                  101,
+                  114
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "TokenAccount",
                 "path": "token_account"
               }
             ]
           }
         },
         {
-          "name": "tokenAccount",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "owner"
-          ]
+          "name": "token_account",
+          "writable": true
         },
         {
           "name": "owner",
-          "isMut": false,
-          "isSigner": true
+          "signer": true,
+          "relations": [
+            "token_account"
+          ]
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "InitializeAccountWindowedBreakerArgsV0"
+            "defined": {
+              "name": "InitializeAccountWindowedBreakerArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "mintV0",
+      "name": "initialize_mint_windowed_breaker_v0",
+      "discriminator": [
+        85,
+        108,
+        246,
+        210,
+        248,
+        3,
+        159,
+        167
+      ],
       "accounts": [
         {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "name": "payer",
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "to",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "mintAuthority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "circuitBreaker",
-          "isMut": true,
-          "isSigner": false,
+          "name": "circuit_breaker",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "mint_windowed_breaker"
+                "value": [
+                  109,
+                  105,
+                  110,
+                  116,
+                  95,
+                  119,
+                  105,
+                  110,
+                  100,
+                  111,
+                  119,
+                  101,
+                  100,
+                  95,
+                  98,
+                  114,
+                  101,
+                  97,
+                  107,
+                  101,
+                  114
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "mint"
               }
             ]
-          },
-          "relations": [
-            "mint_authority",
-            "mint"
-          ]
+          }
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "mint_authority",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "MintArgsV0"
+            "defined": {
+              "name": "InitializeMintWindowedBreakerArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "transferV0",
+      "name": "mint_v0",
+      "discriminator": [
+        210,
+        164,
+        161,
+        211,
+        71,
+        128,
+        223,
+        244
+      ],
       "accounts": [
         {
-          "name": "from",
-          "isMut": true,
-          "isSigner": false
+          "name": "mint",
+          "writable": true,
+          "relations": [
+            "circuit_breaker"
+          ]
         },
         {
           "name": "to",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
+          "name": "mint_authority",
+          "signer": true,
+          "relations": [
+            "circuit_breaker"
+          ]
         },
         {
-          "name": "circuitBreaker",
-          "isMut": true,
-          "isSigner": false,
+          "name": "circuit_breaker",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "account_windowed_breaker"
+                "value": [
+                  109,
+                  105,
+                  110,
+                  116,
+                  95,
+                  119,
+                  105,
+                  110,
+                  100,
+                  111,
+                  119,
+                  101,
+                  100,
+                  95,
+                  98,
+                  114,
+                  101,
+                  97,
+                  107,
+                  101,
+                  114
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "TokenAccount",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "MintArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "transfer_v0",
+      "discriminator": [
+        162,
+        182,
+        193,
+        97,
+        102,
+        85,
+        127,
+        189
+      ],
+      "accounts": [
+        {
+          "name": "from",
+          "writable": true
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "circuit_breaker"
+          ]
+        },
+        {
+          "name": "circuit_breaker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  95,
+                  119,
+                  105,
+                  110,
+                  100,
+                  111,
+                  119,
+                  101,
+                  100,
+                  95,
+                  98,
+                  114,
+                  101,
+                  97,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
                 "path": "from"
               }
             ]
-          },
-          "relations": [
-            "owner"
-          ]
+          }
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "TransferArgsV0"
+            "defined": {
+              "name": "TransferArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "updateAccountWindowedBreakerV0",
+      "name": "update_account_windowed_breaker_v0",
+      "discriminator": [
+        27,
+        56,
+        69,
+        95,
+        73,
+        104,
+        86,
+        18
+      ],
       "accounts": [
         {
-          "name": "circuitBreaker",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "authority"
-          ]
+          "name": "circuit_breaker",
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true,
+          "relations": [
+            "circuit_breaker"
+          ]
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "UpdateAccountWindowedBreakerArgsV0"
+            "defined": {
+              "name": "UpdateAccountWindowedBreakerArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "updateMintWindowedBreakerV0",
+      "name": "update_mint_windowed_breaker_v0",
+      "discriminator": [
+        250,
+        122,
+        77,
+        48,
+        101,
+        254,
+        243,
+        168
+      ],
       "accounts": [
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true,
+          "relations": [
+            "circuit_breaker"
+          ]
         },
         {
-          "name": "circuitBreaker",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "authority"
-          ]
+          "name": "circuit_breaker",
+          "writable": true
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "UpdateMintWindowedBreakerArgsV0"
+            "defined": {
+              "name": "UpdateMintWindowedBreakerArgsV0"
+            }
           }
         }
       ]
@@ -289,79 +426,90 @@
   ],
   "accounts": [
     {
-      "name": "MintWindowedCircuitBreakerV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "mintAuthority",
-            "type": "publicKey"
-          },
-          {
-            "name": "config",
-            "type": {
-              "defined": "WindowedCircuitBreakerConfigV0"
-            }
-          },
-          {
-            "name": "lastWindow",
-            "type": {
-              "defined": "WindowV0"
-            }
-          },
-          {
-            "name": "bumpSeed",
-            "type": "u8"
-          }
-        ]
-      }
+      "name": "AccountWindowedCircuitBreakerV0",
+      "discriminator": [
+        134,
+        11,
+        69,
+        100,
+        90,
+        132,
+        174,
+        187
+      ]
     },
+    {
+      "name": "MintWindowedCircuitBreakerV0",
+      "discriminator": [
+        205,
+        71,
+        15,
+        158,
+        97,
+        182,
+        161,
+        186
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "CircuitBreakerTriggered",
+      "msg": "The circuit breaker was triggered"
+    },
+    {
+      "code": 6001,
+      "name": "ArithmeticError",
+      "msg": "Error in arithmetic"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidConfig",
+      "msg": "Invalid config"
+    }
+  ],
+  "types": [
     {
       "name": "AccountWindowedCircuitBreakerV0",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "tokenAccount",
-            "type": "publicKey"
+            "name": "token_account",
+            "type": "pubkey"
           },
           {
             "name": "authority",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "config",
             "type": {
-              "defined": "WindowedCircuitBreakerConfigV0"
+              "defined": {
+                "name": "WindowedCircuitBreakerConfigV0"
+              }
             }
           },
           {
-            "name": "lastWindow",
+            "name": "last_window",
             "type": {
-              "defined": "WindowV0"
+              "defined": {
+                "name": "WindowV0"
+              }
             }
           },
           {
-            "name": "bumpSeed",
+            "name": "bump_seed",
             "type": "u8"
           }
         ]
       }
-    }
-  ],
-  "types": [
+    },
     {
       "name": "InitializeAccountWindowedBreakerArgsV0",
       "type": {
@@ -369,16 +517,18 @@
         "fields": [
           {
             "name": "authority",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "config",
             "type": {
-              "defined": "WindowedCircuitBreakerConfigV0"
+              "defined": {
+                "name": "WindowedCircuitBreakerConfigV0"
+              }
             }
           }
         ]
@@ -391,16 +541,18 @@
         "fields": [
           {
             "name": "authority",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
-            "name": "mintAuthority",
-            "type": "publicKey"
+            "name": "mint_authority",
+            "type": "pubkey"
           },
           {
             "name": "config",
             "type": {
-              "defined": "WindowedCircuitBreakerConfigV0"
+              "defined": {
+                "name": "WindowedCircuitBreakerConfigV0"
+              }
             }
           }
         ]
@@ -414,6 +566,60 @@
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MintWindowedCircuitBreakerV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "WindowedCircuitBreakerConfigV0"
+              }
+            }
+          },
+          {
+            "name": "last_window",
+            "type": {
+              "defined": {
+                "name": "WindowV0"
+              }
+            }
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Percent"
+          },
+          {
+            "name": "Absolute"
           }
         ]
       }
@@ -436,16 +642,18 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "newAuthority",
+            "name": "new_authority",
             "type": {
-              "option": "publicKey"
+              "option": "pubkey"
             }
           },
           {
             "name": "config",
             "type": {
               "option": {
-                "defined": "WindowedCircuitBreakerConfigV0"
+                "defined": {
+                  "name": "WindowedCircuitBreakerConfigV0"
+                }
               }
             }
           }
@@ -458,16 +666,18 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "newAuthority",
+            "name": "new_authority",
             "type": {
-              "option": "publicKey"
+              "option": "pubkey"
             }
           },
           {
             "name": "config",
             "type": {
               "option": {
-                "defined": "WindowedCircuitBreakerConfigV0"
+                "defined": {
+                  "name": "WindowedCircuitBreakerConfigV0"
+                }
               }
             }
           }
@@ -480,11 +690,11 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "lastAggregatedValue",
+            "name": "last_aggregated_value",
             "type": "u64"
           },
           {
-            "name": "lastUnixTimestamp",
+            "name": "last_unix_timestamp",
             "type": "i64"
           }
         ]
@@ -496,13 +706,15 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "windowSizeSeconds",
+            "name": "window_size_seconds",
             "type": "u64"
           },
           {
-            "name": "thresholdType",
+            "name": "threshold_type",
             "type": {
-              "defined": "ThresholdType"
+              "defined": {
+                "name": "ThresholdType"
+              }
             }
           },
           {
@@ -511,40 +723,6 @@
           }
         ]
       }
-    },
-    {
-      "name": "ThresholdType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Percent"
-          },
-          {
-            "name": "Absolute"
-          }
-        ]
-      }
     }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "CircuitBreakerTriggered",
-      "msg": "The circuit breaker was triggered"
-    },
-    {
-      "code": 6001,
-      "name": "ArithmeticError",
-      "msg": "Error in arithmetic"
-    },
-    {
-      "code": 6002,
-      "name": "InvalidConfig",
-      "msg": "Invalid config"
-    }
-  ],
-  "metadata": {
-    "address": "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g"
-  }
+  ]
 }

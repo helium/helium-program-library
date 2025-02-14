@@ -64,7 +64,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .approveCarrierV0()
-      .accounts({
+      .accountsPartial({
         carrier,
         authority,
       })

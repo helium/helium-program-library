@@ -98,7 +98,7 @@ export async function run(args: any = process.argv) {
           stopTs: new anchor.BN(argv.stopTs),
           name: argv.name,
         })
-        .accounts({ carrier, recipient: new PublicKey(argv.recipient), issuingAuthority })
+        .accountsPartial({ carrier, recipient: new PublicKey(argv.recipient), issuingAuthority })
         .instruction()
     );
   } else {
@@ -108,7 +108,7 @@ export async function run(args: any = process.argv) {
         stopTs: new anchor.BN(argv.stopTs),
         shares: argv.shares,
       })
-      .accounts({
+      .accountsPartial({
         carrier,
         incentiveEscrowProgram: incentiveProgramK,
         issuingAuthority

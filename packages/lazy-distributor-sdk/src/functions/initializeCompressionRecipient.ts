@@ -43,7 +43,7 @@ export async function initializeCompressionRecipient({
     .initializeCompressionRecipientV0({
       ...args,
     })
-    .accounts({
+    .accountsPartial({
       ...accounts,
       lazyDistributor,
       owner: new PublicKey(owner),

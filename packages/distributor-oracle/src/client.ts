@@ -416,7 +416,7 @@ export async function formBulkTransactions({
                 currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
                 oracleIndex: oracleIdx,
               })
-              .accounts({
+              .accountsPartial({
                 lazyDistributor,
                 recipient: recipientKeys[idx],
                 keyToAsset: keyToAssetK,
@@ -438,7 +438,7 @@ export async function formBulkTransactions({
         const destination = recipientAccs[idx]!.destination;
         distributeIx = await lazyDistributorProgram.methods
           .distributeCustomDestinationV0()
-          .accounts({
+          .accountsPartial({
             common: {
               payer,
               recipient: recipientKeys[idx],
@@ -615,7 +615,7 @@ export async function formTransaction({
     } else {
       initRecipientIx = await lazyDistributorProgram.methods
         .initializeRecipientV0()
-        .accounts({
+        .accountsPartial({
           lazyDistributor,
           mint: asset,
         })
@@ -631,7 +631,7 @@ export async function formTransaction({
         currentRewards: new BN(x.currentRewards),
         oracleIndex: idx,
       })
-      .accounts({
+      .accountsPartial({
         lazyDistributor,
         recipient,
         keyToAsset,
@@ -651,7 +651,7 @@ export async function formTransaction({
     instructions.push(
       await lazyDistributorProgram.methods
         .distributeCustomDestinationV0()
-        .accounts({
+        .accountsPartial({
           // @ts-ignore
           common: {
             payer,
@@ -684,7 +684,7 @@ export async function formTransaction({
   } else {
     const distributeIx = await lazyDistributorProgram.methods
       .distributeRewardsV0()
-      .accounts({
+      .accountsPartial({
         // @ts-ignore
         common: {
           payer,

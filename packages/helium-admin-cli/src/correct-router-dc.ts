@@ -79,7 +79,7 @@ export async function run(args: any = process.argv) {
               amount: toSend,
               routerKey,
             })
-            .accounts({
+            .accountsPartial({
               subDao: subdao,
               dcMint: DC_MINT,
             })
@@ -101,7 +101,7 @@ export async function run(args: any = process.argv) {
             .issueDataCreditsV0({
               amount: toRefund,
             })
-            .accounts({
+            .accountsPartial({
               dcMint: DC_MINT,
               to: ownerSolAddr,
             });

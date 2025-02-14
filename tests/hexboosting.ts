@@ -109,7 +109,7 @@ describe("hexboosting", () => {
         dcAmount: new BN("10000000000"),
         hntAmount: null,
       })
-      .accounts({
+      .accountsPartial({
         dcMint: dataCredits.dcMint,
         recipient: me,
       })
@@ -145,7 +145,7 @@ describe("hexboosting", () => {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ])
-      .accounts({
+      .accountsPartial({
         subDao,
       })
       .rpcAndKeys({ skipPreflight: true });
@@ -167,13 +167,13 @@ describe("hexboosting", () => {
         maxDepth: 3,
         maxBufferSize: 8,
       })
-      .accounts({ carrier, newMerkleTree: merkle.publicKey })
+      .accountsPartial({ carrier, newMerkleTree: merkle.publicKey })
       .preInstructions([createMerkle])
       .signers([merkle])
       .rpc({ skipPreflight: true });
     await memProgram.methods
       .approveCarrierV0()
-      .accounts({ carrier })
+      .accountsPartial({ carrier })
       .rpc({ skipPreflight: true });
   });
 
@@ -186,7 +186,7 @@ describe("hexboosting", () => {
         periodLength,
         minimumPeriods: 6,
       })
-      .accounts({
+      .accountsPartial({
         startAuthority: me,
         dcMint: mint,
         priceOracle,
@@ -215,7 +215,7 @@ describe("hexboosting", () => {
           periodLength: 60 * 60 * 24 * 30, // roughly one month,
           minimumPeriods: 6,
         })
-        .accounts({
+        .accountsPartial({
           startAuthority: me,
           dcMint: mint,
           priceOracle,
@@ -237,7 +237,7 @@ describe("hexboosting", () => {
           priceOracle: PublicKey.default,
           dcMint: mint,
         })
-        .accounts({
+        .accountsPartial({
           boostConfig,
         })
         .rpcAndKeys({ skipPreflight: true });
@@ -297,7 +297,7 @@ describe("hexboosting", () => {
             },
           ],
         })
-        .accounts({
+        .accountsPartial({
           dcMint: mint,
           carrier,
           boostConfig,
@@ -361,7 +361,7 @@ describe("hexboosting", () => {
               },
             ],
           })
-          .accounts({
+          .accountsPartial({
             dcMint: mint,
             carrier,
             boostConfig,
@@ -394,7 +394,7 @@ describe("hexboosting", () => {
               },
             ],
           })
-          .accounts({
+          .accountsPartial({
             dcMint: mint,
             carrier,
             boostConfig,
@@ -432,7 +432,7 @@ describe("hexboosting", () => {
           .startBoostV1({
             startTs: new BN(1),
           })
-          .accounts({
+          .accountsPartial({
             boostedHex,
           })
           .rpc({ skipPreflight: true });
@@ -456,7 +456,7 @@ describe("hexboosting", () => {
             .startBoostV1({
               startTs: new BN(1),
             })
-            .accounts({
+            .accountsPartial({
               boostedHex,
             })
             .rpc({ skipPreflight: true });
@@ -475,7 +475,7 @@ describe("hexboosting", () => {
 
           await program.methods
             .closeBoostV0()
-            .accounts({
+            .accountsPartial({
               boostedHex,
             })
             .rpc({ skipPreflight: true });

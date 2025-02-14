@@ -405,7 +405,7 @@ fn construct_ix_from_valid_infos<C: Deref<Target = impl Signer> + Clone>(
             entity_key: entity_key.clone(),
           },
         })
-        .accounts(SetEntityActiveV0 {
+        .accountsPartial(SetEntityActiveV0 {
           active_device_authority: helium_entity_program.payer(),
           rewardable_entity_config: sub_dao.rewardable_entity_config_key(),
           sub_dao: sub_dao.key(),
@@ -421,7 +421,7 @@ fn construct_ix_from_valid_infos<C: Deref<Target = impl Signer> + Clone>(
           helium_entity_program
             .request()
             .args(helium_entity_manager::instruction::TempPayMobileOnboardingFeeV0 {})
-            .accounts(TempPayMobileOnboardingFeeV0 {
+            .accountsPartial(TempPayMobileOnboardingFeeV0 {
               dc_fee_payer: helium_entity_program.payer(),
               dc_burner: get_associated_token_address(
                 &helium_entity_program.payer(),

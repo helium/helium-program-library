@@ -1,5 +1,5 @@
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry.d.ts";
+import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy.d.ts";
 import {
   createMintInstructions,
   sendInstructions,
@@ -72,7 +72,7 @@ export async function initVsr(
         },
       ],
     })
-    .accounts({
+    .accountsPartial({
       authority: me,
     })
     .rpcAndKeys();
@@ -81,7 +81,7 @@ export async function initVsr(
     .initializeRegistrarV0({
       positionUpdateAuthority,
     })
-    .accounts({
+    .accountsPartial({
       realm: realmPk,
       realmGoverningTokenMint: hntMint,
       proxyConfig
@@ -102,7 +102,7 @@ export async function initVsr(
         ),
         lockupSaturationSecs: new BN(86400 * 365 * 4), // 4 years
       })
-      .accounts({
+      .accountsPartial({
         registrar,
         mint: hntMint,
       })
@@ -155,7 +155,7 @@ export async function createPosition(
         kind: typeof options.kind == "undefined" ? { cliff: {} } : options.kind,
         periods: options.lockupPeriods,
       })
-      .accounts({
+      .accountsPartial({
         registrar,
         mint: mintKeypair.publicKey,
         depositMint: hntMint,
@@ -168,7 +168,7 @@ export async function createPosition(
   instructions.push(
     await program.methods
       .depositV0({ amount: toBN(options.lockupAmount, 8) })
-      .accounts({
+      .accountsPartial({
         registrar,
         position,
         mint: hntMint,

@@ -83,7 +83,7 @@ async function getSolanaUnixTimestamp(
         openProposals.map(async (p) => {
           return await stateProgram.methods
             .resolveV0()
-            .accounts({
+            .accountsPartial({
               proposal: p.pubkey,
             })
             .instruction();
@@ -162,7 +162,7 @@ async function getSolanaUnixTimestamp(
             if (index === sortedProxies.length - 1) {
               return proxyProgram.methods
                 .closeExpiredProxyV0()
-                .accounts({
+                .accountsPartial({
                   proxyAssignment: new PublicKey(proxy.publicKey),
                 })
                 .instruction();
@@ -174,7 +174,7 @@ async function getSolanaUnixTimestamp(
 
             return proxyProgram.methods
               .unassignExpiredProxyV0()
-              .accounts({
+              .accountsPartial({
                 prevProxyAssignment,
                 proxyAssignment: new PublicKey(proxy.publicKey),
               })

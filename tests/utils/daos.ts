@@ -80,7 +80,7 @@ export async function initTestDao(
         mint
       ),
     ])
-    .accounts({
+    .accountsPartial({
       rewardsEscrow,
       hntMint: mint,
       dcMint,
@@ -148,7 +148,7 @@ export async function initTestSubdao(
     .preInstructions([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
     ])
-    .accounts({
+    .accountsPartial({
       dao,
       dntMint,
       hntMint: daoAcc.hntMint,

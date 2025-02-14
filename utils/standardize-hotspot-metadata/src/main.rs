@@ -273,7 +273,7 @@ async fn main() -> Result<()> {
               },
             },
           })
-          .accounts(TempStandardizeEntity {
+          .accountsPartial(TempStandardizeEntity {
             key_to_asset,
             merkle_tree,
             maker: maker_opt.map(|m| *m.0),

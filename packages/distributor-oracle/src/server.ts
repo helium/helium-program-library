@@ -717,7 +717,7 @@ export class OracleServer {
         const destination = recipientAcc.destination;
         distributeIx = await this.ldProgram.methods
           .distributeCustomDestinationV0()
-          .accounts({
+          .accountsPartial({
             common: {
               payer: wallet,
               recipient: recipient,
@@ -757,7 +757,7 @@ export class OracleServer {
               ? parseInt(process.env.ORACLE_INDEX)
               : 0,
           })
-          .accounts({
+          .accountsPartial({
             lazyDistributor: this.lazyDistributor,
             recipient,
             payer: wallet,

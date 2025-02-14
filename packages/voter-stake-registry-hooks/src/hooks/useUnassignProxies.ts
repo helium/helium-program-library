@@ -76,7 +76,7 @@ export const useUnassignProxies = () => {
                   );
                   return nftProxyProgram.methods
                     .unassignProxyV0()
-                    .accounts({
+                    .accountsPartial({
                       asset: position.mint,
                       prevProxyAssignment,
                       currentProxyAssignment,

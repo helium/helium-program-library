@@ -44,7 +44,7 @@ export async function updateCompressionDestination<IDL extends Idl>({
     .updateCompressionDestinationV0({
       ...args,
     })
-    .accounts({
+    .accountsPartial({
       ...accounts,
       owner,
       recipient: recipientKey(lazyDistributor, assetId)[0],

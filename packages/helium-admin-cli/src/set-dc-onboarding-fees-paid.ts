@@ -66,7 +66,7 @@ export async function run(args: any = process.argv) {
       .adminSetDcOnboardingFeesPaid({
         dcOnboardingFeesPaid: new anchor.BN(argv.dcOnboardingFeesPaid),
       })
-      .accounts({
+      .accountsPartial({
         subDao: subDaoK,
         authority: subDaoAcc.authority,
       })

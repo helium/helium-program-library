@@ -78,7 +78,7 @@ export async function run(args: any = process.argv) {
         maxProxyTime: argv.maxProxyTime ? new anchor.BN(argv.maxProxyTime) : null,
         seasons,
       })
-      .accounts({
+      .accountsPartial({
         proxyConfig,
         authority: proxyConfigAcc.authority,
       })

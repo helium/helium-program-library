@@ -97,7 +97,7 @@ export async function run(args: any = process.argv) {
     ixs.push(
       await program.methods
         .initEpochTracker()
-        .accounts({
+        .accountsPartial({
           dao,
           authority: provider.wallet.publicKey,
         })
@@ -142,7 +142,7 @@ export async function run(args: any = process.argv) {
         },
         description: `queue end epoch ${epochTrackerAcc.epoch}`,
       })
-      .accounts({
+      .accountsPartial({
         task,
         taskQueue,
       })

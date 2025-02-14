@@ -59,7 +59,7 @@ export const useUndelegatePosition = () => {
         instructions.push([
           await hsdProgram.methods
             .closeDelegationV0()
-            .accounts({
+            .accountsPartial({
               position: position.pubkey,
               subDao: delegatedPosAcc.subDao,
             })

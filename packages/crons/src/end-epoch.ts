@@ -119,7 +119,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
                 [
                   await heliumSubDaosProgram.methods
                     .calculateUtilityScoreV0({ epoch })
-                    .accounts({ subDao: subDao.publicKey })
+                    .accountsPartial({ subDao: subDao.publicKey })
                     .instruction(),
                 ],
                 {
@@ -165,7 +165,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
                 [
                   await heliumSubDaosProgram.methods
                     .issueRewardsV0({ epoch })
-                    .accounts({ subDao: subDao.publicKey })
+                    .accountsPartial({ subDao: subDao.publicKey })
                     .instruction(),
                 ],
                 {
@@ -205,7 +205,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
           try {
             return await hydraProgram.methods
               .distributeV0()
-              .accounts({
+              .accountsPartial({
                 payer: provider.wallet.publicKey,
                 fanout: fanoutK,
                 owner,
@@ -236,7 +236,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
 
       const [recipient] = recipientKey(lazyDistributor, assetId);
       if (!(await provider.connection.getAccountInfo(recipient))) {
-        const method = lazyProgram.methods.initializeRecipientV0().accounts({
+        const method = lazyProgram.methods.initializeRecipientV0().accountsPartial({
           lazyDistributor,
           mint: assetId,
         });
@@ -318,7 +318,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
               )),
               await hemProgram.methods
                 .issueNotEmittedEntityV0()
-                .accounts({
+                .accountsPartial({
                   dao,
                   mint: mint.publicKey,
                 })
@@ -336,7 +336,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
           if (!(await provider.connection.getAccountInfo(recipient))) {
             const method = lazyProgram.methods
               .initializeRecipientV0()
-              .accounts({
+              .accountsPartial({
                 lazyDistributor,
                 mint: assetId,
               });
@@ -373,7 +373,7 @@ async function getSolanaUnixTimestamp(connection: Connection): Promise<bigint> {
           await sendInstructions(provider, [
             await noEmitProgram.methods
               .noEmitV0()
-              .accounts({
+              .accountsPartial({
                 mint: token,
               })
               .instruction(),

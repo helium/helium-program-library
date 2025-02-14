@@ -48,7 +48,7 @@ export const useDelegatePosition = () => {
           instructions.push(
             await hsdProgram.methods
               .closeDelegationV0()
-              .accounts({
+              .accountsPartial({
                 position: position.pubkey,
                 subDao: delegatedPosAcc.subDao,
               })
@@ -60,7 +60,7 @@ export const useDelegatePosition = () => {
           instructions.push(
             await hsdProgram.methods
               .delegateV0()
-              .accounts({
+              .accountsPartial({
                 position: position.pubkey,
                 subDao: subDao.pubkey,
               })

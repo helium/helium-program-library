@@ -116,7 +116,7 @@ describe("sus", () => {
           hntAmount: null,
           dcAmount: new BN(10),
         })
-        .accounts({
+        .accountsPartial({
           dcMint: DC_MINT,
         })
         .instruction(),
@@ -125,7 +125,7 @@ describe("sus", () => {
           amount: new BN(10),
           routerKey: "Foo",
         })
-        .accounts({
+        .accountsPartial({
           subDao: subDaoKey(IOT_MINT)[0],
         })
         .instruction()

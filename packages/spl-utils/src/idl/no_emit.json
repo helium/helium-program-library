@@ -1,68 +1,190 @@
 {
-  "version": "0.0.1",
-  "name": "no_emit",
+  "address": "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv",
+  "metadata": {
+    "name": "no_emit",
+    "version": "0.0.1",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "noEmitV0",
+      "name": "no_emit_v0",
+      "discriminator": [
+        1,
+        49,
+        211,
+        57,
+        73,
+        147,
+        227,
+        61
+      ],
       "accounts": [
         {
           "name": "payer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "noEmitWallet",
-          "isMut": false,
-          "isSigner": false,
+          "name": "no_emit_wallet",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "not_emitted"
+                "value": [
+                  110,
+                  111,
+                  116,
+                  95,
+                  101,
+                  109,
+                  105,
+                  116,
+                  116,
+                  101,
+                  100
+                ]
               }
             ]
           }
         },
         {
-          "name": "notEmittedCounter",
-          "isMut": true,
-          "isSigner": false,
+          "name": "not_emitted_counter",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "not_emitted_counter"
+                "value": [
+                  110,
+                  111,
+                  116,
+                  95,
+                  101,
+                  109,
+                  105,
+                  116,
+                  116,
+                  101,
+                  100,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "mint"
               }
             ]
           }
         },
         {
-          "name": "tokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "no_emit_wallet"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -71,22 +193,34 @@
   "accounts": [
     {
       "name": "NotEmittedCounterV0",
+      "discriminator": [
+        131,
+        6,
+        110,
+        176,
+        104,
+        133,
+        70,
+        109
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "NotEmittedCounterV0",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "amountNotEmitted",
+            "name": "amount_not_emitted",
             "type": "u64"
           },
           {
-            "name": "bumpSeed",
+            "name": "bump_seed",
             "type": "u8"
           }
         ]
       }
     }
-  ],
-  "metadata": {
-    "address": "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
-  }
+  ]
 }

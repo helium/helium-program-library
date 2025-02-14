@@ -1,96 +1,141 @@
 {
-  "version": "0.2.1",
-  "name": "price_oracle",
+  "address": "porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy",
+  "metadata": {
+    "name": "price_oracle",
+    "version": "0.2.1",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initializePriceOracleV0",
+      "name": "initialize_price_oracle_v0",
+      "discriminator": [
+        127,
+        56,
+        175,
+        142,
+        51,
+        216,
+        21,
+        242
+      ],
       "accounts": [
         {
-          "name": "priceOracle",
-          "isMut": true,
-          "isSigner": true
+          "name": "price_oracle",
+          "writable": true,
+          "signer": true
         },
         {
           "name": "payer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "InitializePriceOracleArgsV0"
+            "defined": {
+              "name": "InitializePriceOracleArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "updatePriceOracleV0",
-      "accounts": [
-        {
-          "name": "priceOracle",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "authority"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
+      "name": "submit_price_v0",
+      "discriminator": [
+        96,
+        43,
+        132,
+        42,
+        175,
+        38,
+        86,
+        141
       ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": "UpdatePriceOracleArgsV0"
-          }
-        }
-      ]
-    },
-    {
-      "name": "submitPriceV0",
       "accounts": [
         {
-          "name": "priceOracle",
-          "isMut": true,
-          "isSigner": false
+          "name": "price_oracle",
+          "writable": true
         },
         {
           "name": "oracle",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "SubmitPriceArgsV0"
+            "defined": {
+              "name": "SubmitPriceArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "updatePriceV0",
+      "name": "update_price_oracle_v0",
+      "discriminator": [
+        120,
+        111,
+        175,
+        119,
+        196,
+        216,
+        121,
+        192
+      ],
       "accounts": [
         {
-          "name": "priceOracle",
-          "isMut": true,
-          "isSigner": false
+          "name": "price_oracle",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "price_oracle"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpdatePriceOracleArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_price_v0",
+      "discriminator": [
+        70,
+        164,
+        118,
+        16,
+        169,
+        137,
+        66,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "price_oracle",
+          "writable": true
         }
       ],
       "args": []
@@ -99,133 +144,16 @@
   "accounts": [
     {
       "name": "PriceOracleV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "numOracles",
-            "type": "u8"
-          },
-          {
-            "name": "decimals",
-            "type": "u8"
-          },
-          {
-            "name": "oracles",
-            "type": {
-              "vec": {
-                "defined": "OracleV0"
-              }
-            }
-          },
-          {
-            "name": "currentPrice",
-            "type": {
-              "option": "u64"
-            }
-          },
-          {
-            "name": "lastCalculatedTimestamp",
-            "type": {
-              "option": "i64"
-            }
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "InitializePriceOracleArgsV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "oracles",
-            "type": {
-              "vec": {
-                "defined": "OracleV0"
-              }
-            }
-          },
-          {
-            "name": "decimals",
-            "type": "u8"
-          },
-          {
-            "name": "authority",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SubmitPriceArgsV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "oracleIndex",
-            "type": "u8"
-          },
-          {
-            "name": "price",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UpdatePriceOracleArgsV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "oracles",
-            "type": {
-              "option": {
-                "vec": {
-                  "defined": "OracleV0"
-                }
-              }
-            }
-          },
-          {
-            "name": "authority",
-            "type": {
-              "option": "publicKey"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "OracleV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "lastSubmittedTimestamp",
-            "type": {
-              "option": "i64"
-            }
-          },
-          {
-            "name": "lastSubmittedPrice",
-            "type": {
-              "option": "u64"
-            }
-          }
-        ]
-      }
+      "discriminator": [
+        131,
+        27,
+        117,
+        250,
+        250,
+        178,
+        196,
+        60
+      ]
     }
   ],
   "errors": [
@@ -250,7 +178,140 @@
       "msg": "Invalid argument"
     }
   ],
-  "metadata": {
-    "address": "porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy"
-  }
+  "types": [
+    {
+      "name": "InitializePriceOracleArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracles",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "OracleV0"
+                }
+              }
+            }
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OracleV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "last_submitted_timestamp",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "last_submitted_price",
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceOracleV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "num_oracles",
+            "type": "u8"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "oracles",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "OracleV0"
+                }
+              }
+            }
+          },
+          {
+            "name": "current_price",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "last_calculated_timestamp",
+            "type": {
+              "option": "i64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubmitPriceArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracle_index",
+            "type": "u8"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdatePriceOracleArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "oracles",
+            "type": {
+              "option": {
+                "vec": {
+                  "defined": {
+                    "name": "OracleV0"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "authority",
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    }
+  ]
 }

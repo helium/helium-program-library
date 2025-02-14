@@ -66,7 +66,7 @@ export async function run(args: any = process.argv) {
       })),
       authority: null
     })
-    .accounts({
+    .accountsPartial({
       priceOracle: oracleKey,
       authority: oracle.authority
     })

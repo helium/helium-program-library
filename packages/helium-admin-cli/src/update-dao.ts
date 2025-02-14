@@ -107,7 +107,7 @@ export async function run(args: any = process.argv) {
           newAuthority: new PublicKey(argv.newAuthority),
           config: null,
         })
-        .accounts({
+        .accountsPartial({
           circuitBreaker: hntCircuitBreaker,
           authority: hntCbAcc.authority,
         })
@@ -134,7 +134,7 @@ export async function run(args: any = process.argv) {
           : null,
         rewardsEscrow: null,  
       })
-      .accounts({
+      .accountsPartial({
         dao,
         authority: daoAcc.authority,
         payer: daoAcc.authority,

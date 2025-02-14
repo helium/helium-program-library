@@ -84,7 +84,7 @@ export async function run(args: any = process.argv) {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
-        .accounts({ carrier, recipient })
+        .accountsPartial({ carrier, recipient })
         .rpc({ skipPreflight: true })
     );
   }

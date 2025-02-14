@@ -83,7 +83,7 @@ export const useAssignProxies = () => {
                   undelegated.push(...toUndelegate);
                   return nftProxyProgram.methods
                     .unassignProxyV0()
-                    .accounts({
+                    .accountsPartial({
                       asset: position.mint,
                       prevProxyAssignment,
                       currentProxyAssignment,
@@ -118,7 +118,7 @@ export const useAssignProxies = () => {
             .assignProxyV0({
               expirationTime,
             })
-            .accounts({
+            .accountsPartial({
               asset: position.mint,
               recipient,
               proxyConfig: registrar.proxyConfig,

@@ -43,7 +43,7 @@ describe("fanout", () => {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ])
-      .accounts({
+      .accountsPartial({
         authority: provider.wallet.publicKey,
         membershipMint,
         fanoutMint,
@@ -76,7 +76,7 @@ describe("fanout", () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
-        .accounts({
+        .accountsPartial({
           authority: provider.wallet.publicKey,
           membershipMint,
           fanoutMint,
@@ -98,7 +98,7 @@ describe("fanout", () => {
         .preInstructions(
           await createMintInstructions(provider, 0, voucher, voucher, mint)
         )
-        .accounts({
+        .accountsPartial({
           fanout,
           recipient: recipient.publicKey,
           mint: mint.publicKey,
@@ -148,7 +148,7 @@ describe("fanout", () => {
             .preInstructions(
               await createMintInstructions(provider, 0, voucher, voucher, mint)
             )
-            .accounts({
+            .accountsPartial({
               fanout,
               recipient: wallet.publicKey,
               mint: mint.publicKey,
@@ -164,7 +164,7 @@ describe("fanout", () => {
           pubkeys: { receiptAccount, toAccount },
         } = await program.methods
           .unstakeV0()
-          .accounts({
+          .accountsPartial({
             mint: mint.publicKey,
             solDestination: provider.wallet.publicKey,
             voucherAuthority: wallet.publicKey,
@@ -186,7 +186,7 @@ describe("fanout", () => {
           for (const { wallet, mint } of positions) {
             await program.methods
               .distributeV0()
-              .accounts({
+              .accountsPartial({
                 fanout,
                 owner: wallet.publicKey,
                 mint: mint.publicKey,

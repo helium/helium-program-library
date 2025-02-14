@@ -53,7 +53,7 @@ export async function burnDataCredits({
       amount: toBN(amount, 0),
       routerKey: (await HeliumKeypair.makeRandom()).address.b58,
     })
-    .accounts({
+    .accountsPartial({
       subDao,
     });
   const delegatedDataCredits = (await useData.pubkeys()).delegatedDataCredits!;
@@ -62,7 +62,7 @@ export async function burnDataCredits({
     .burnDelegatedDataCreditsV0({
       amount: toBN(amount, 0),
     })
-    .accounts({
+    .accountsPartial({
       delegatedDataCredits,
     });
 
@@ -138,7 +138,7 @@ describe("data-credits", () => {
           threshold: new BN("10000000000000000000"),
         },
       })
-      .accounts({
+      .accountsPartial({
         hntMint,
         dcMint,
         payer: me,
@@ -208,7 +208,7 @@ describe("data-credits", () => {
             hntMint
           ),
         ])
-        .accounts({
+        .accountsPartial({
           dcMint,
           rewardsEscrow,
           hntMint,
@@ -235,7 +235,7 @@ describe("data-credits", () => {
           hntAmount: new BN(1 * 10 ** 8),
           dcAmount: null,
         })
-        .accounts({ dcMint })
+        .accountsPartial({ dcMint })
         .rpc({ skipPreflight: true });
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
@@ -272,7 +272,7 @@ describe("data-credits", () => {
           hntAmount: null,
           dcAmount: new BN(dcAmount),
         })
-        .accounts({ dcMint })
+        .accountsPartial({ dcMint })
         .rpc({ skipPreflight: true });
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
@@ -337,7 +337,7 @@ describe("data-credits", () => {
           newAuthority: PublicKey.default,
           hntPriceOracle: null,
         })
-        .accounts({
+        .accountsPartial({
           dcMint,
         })
         .rpc();
@@ -363,7 +363,7 @@ describe("data-credits", () => {
           amount: toBN(amount, 0),
           routerKey,
         })
-        .accounts({
+        .accountsPartial({
           subDao,
         });
       const sourceDelegatedDataCredits = (await methodA.pubkeys())
@@ -380,7 +380,7 @@ describe("data-credits", () => {
           amount: toBN(amount, 0),
           routerKey,
         })
-        .accounts({
+        .accountsPartial({
           delegatedDataCredits: sourceDelegatedDataCredits,
           destinationDelegatedDataCredits,
           subDao,

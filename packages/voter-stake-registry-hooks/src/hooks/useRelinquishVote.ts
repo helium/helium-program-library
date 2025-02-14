@@ -112,7 +112,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                       .proxiedRelinquishVoteV0({
                         choice,
                       })
-                      .accounts({
+                      .accountsPartial({
                         proposal,
                         voter: provider.wallet.publicKey,
                         position: position.pubkey,
@@ -131,7 +131,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                     .relinquishVoteV1({
                       choice,
                     })
-                    .accounts({
+                    .accountsPartial({
                       proposal,
                       voter: provider.wallet.publicKey,
                       position: position.pubkey,
@@ -143,7 +143,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
               instructions.push(
                 await hsdProgram.methods
                   .trackVoteV0()
-                  .accounts({
+                  .accountsPartial({
                     proposal,
                     marker: markerK,
                     position: position.pubkey,

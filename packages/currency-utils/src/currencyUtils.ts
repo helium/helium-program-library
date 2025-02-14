@@ -36,7 +36,6 @@ export const getOraclePrice = async ({
 }) => {
   const pythProgram: Program<PythSolanaReceiver> = new Program(
     pythSolanaReceiverIdl,
-    new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"),
     new AnchorProvider(connection, {} as Wallet, {
       skipPreflight: true,
     })

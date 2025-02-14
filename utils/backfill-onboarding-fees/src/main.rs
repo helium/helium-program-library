@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
       helium_entity_program
         .request()
         .args(helium_entity_manager::instruction::TempBackfillOnboardingFeesV0 {})
-        .accounts(TempBackfillOnboardingFeesV0 {
+        .accountsPartial(TempBackfillOnboardingFeesV0 {
           active_device_authority: kp.pubkey(),
           sub_dao: SubDao::Iot.key(),
           key_to_asset: *ktas_by_asset.get(&info.asset).unwrap().0,

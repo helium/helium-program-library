@@ -625,7 +625,7 @@ fn check_and_init_recipient<C: Deref<Target = impl Signer> + Clone>(
           },
         },
       )
-      .accounts(InitializeCompressionRecipientV0 {
+      .accountsPartial(InitializeCompressionRecipientV0 {
         payer: lazy_distributor_program.payer(),
         lazy_distributor,
         recipient: hotspot.recipient,
@@ -721,7 +721,7 @@ fn process_hotspot<C: Deref<Target = impl Signer> + Clone>(
             .map_err(|e| anyhow!("Failed to parse reward: {e}"))?,
         },
       })
-      .accounts(set_reward_accounts)
+      .accountsPartial(set_reward_accounts)
       .instructions()
       .map_err(|e| anyhow!("Failed to construct set reward instruction: {e}"))?[0];
 
@@ -752,7 +752,7 @@ fn process_hotspot<C: Deref<Target = impl Signer> + Clone>(
           },
         },
       )
-      .accounts(distribute_accounts)
+      .accountsPartial(distribute_accounts)
       .instructions()
       .map_err(|e| anyhow!("Failed to construct set reward instruction: {e}"))?;
 
@@ -784,7 +784,7 @@ fn process_hotspot<C: Deref<Target = impl Signer> + Clone>(
           },
         },
       )
-      .accounts(distribute_accounts)
+      .accountsPartial(distribute_accounts)
       .instructions()
       .map_err(|e| anyhow!("Failed to construct set reward instruction: {e}"))?;
 

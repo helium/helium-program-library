@@ -79,7 +79,7 @@ export async function run(args: any = process.argv) {
         .initEntityClaimCronV0({
           schedule: "0 0 2 * * *",
         })
-        .accounts({
+        .accountsPartial({
           taskQueue,
           cronJob,
           task,
@@ -102,7 +102,7 @@ export async function run(args: any = process.argv) {
     .addEntityToCronV0({
       index: cronJobAcc.nextTransactionId,
     })
-    .accounts({
+    .accountsPartial({
       keyToAsset,
       cronJob,
       cronJobTransaction: cronJobTransactionKey(cronJob, cronJobAcc.nextTransactionId)[0],

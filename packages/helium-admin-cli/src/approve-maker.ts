@@ -77,7 +77,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .approveMakerV0()
-      .accounts({
+      .accountsPartial({
         maker,
         authority,
         rewardableEntityConfig: entityConfigKey,

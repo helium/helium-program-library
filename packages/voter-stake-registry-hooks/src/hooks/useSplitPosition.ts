@@ -97,7 +97,7 @@ export const useSplitPosition = () => {
               kind: { [lockupKind]: {} },
               periods: lockupPeriodsInDays,
             } as any)
-            .accounts({
+            .accountsPartial({
               registrar: sourcePosition.registrar,
               mint: mintKeypair.publicKey,
               depositMint: mint,
@@ -112,7 +112,7 @@ export const useSplitPosition = () => {
               .transferV0({
                 amount: amountToTransfer,
               })
-              .accounts({
+              .accountsPartial({
                 sourcePosition: sourcePosition.pubkey,
                 targetPosition: targetPosition,
                 depositMint: mint,
@@ -126,7 +126,7 @@ export const useSplitPosition = () => {
               .transferV0({
                 amount: amountToTransfer,
               })
-              .accounts({
+              .accountsPartial({
                 sourcePosition: sourcePosition.pubkey,
                 targetPosition: targetPosition,
                 depositMint: mint,
@@ -139,7 +139,7 @@ export const useSplitPosition = () => {
           instructions.push(
             await vsrProgram.methods
               .closePositionV0()
-              .accounts({
+              .accountsPartial({
                 position: sourcePosition.pubkey,
               })
               .instruction()

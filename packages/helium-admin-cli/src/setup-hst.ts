@@ -120,7 +120,7 @@ export async function run(args: any = process.argv) {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ])
-      .accounts({
+      .accountsPartial({
         authority,
         membershipMint: hst,
         fanoutMint: hnt,
@@ -169,7 +169,7 @@ export async function run(args: any = process.argv) {
         .preInstructions(
           await createMintInstructions(provider, 0, voucher, voucher, mint)
         )
-        .accounts({
+        .accountsPartial({
           recipient: solAddress,
           fanout,
           mint: mint.publicKey,

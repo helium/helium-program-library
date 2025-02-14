@@ -71,7 +71,7 @@ export async function run(args: any = process.argv) {
             [
               await heliumSubDaosProgram.methods
                 .calculateUtilityScoreV0({ epoch })
-                .accounts({ subDao: subDao.publicKey })
+                .accountsPartial({ subDao: subDao.publicKey })
                 .instruction(),
             ],
             {
@@ -93,7 +93,7 @@ export async function run(args: any = process.argv) {
           await sendInstructionsWithPriorityFee(provider, [
             await heliumSubDaosProgram.methods
               .issueRewardsV0({ epoch })
-              .accounts({ subDao: subDao.publicKey })
+              .accountsPartial({ subDao: subDao.publicKey })
               .instruction(),
           ]);
         } catch (e: any) {
