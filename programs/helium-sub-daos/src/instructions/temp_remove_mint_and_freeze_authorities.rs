@@ -59,20 +59,6 @@ pub fn handler(ctx: Context<RemoveMintAndFreezeAuthorities>) -> Result<()> {
     None,
   )?;
 
-  // Mobile mint authority
-  set_authority(
-    CpiContext::new_with_signer(
-      ctx.accounts.token_program.to_account_info(),
-      SetAuthority {
-        account_or_mint: ctx.accounts.mobile_mint.to_account_info(),
-        current_authority: ctx.accounts.mobile_sub_dao.to_account_info(),
-      },
-      &[sub_dao_seeds!(ctx.accounts.mobile_sub_dao)],
-    ),
-    AuthorityType::MintTokens,
-    None,
-  )?;
-
   // Iot freeze authority
   set_authority(
     CpiContext::new_with_signer(
@@ -84,20 +70,6 @@ pub fn handler(ctx: Context<RemoveMintAndFreezeAuthorities>) -> Result<()> {
       &[sub_dao_seeds!(ctx.accounts.iot_sub_dao)],
     ),
     AuthorityType::FreezeAccount,
-    None,
-  )?;
-
-  // Iot mint authority
-  set_authority(
-    CpiContext::new_with_signer(
-      ctx.accounts.token_program.to_account_info(),
-      SetAuthority {
-        account_or_mint: ctx.accounts.iot_mint.to_account_info(),
-        current_authority: ctx.accounts.iot_sub_dao.to_account_info(),
-      },
-      &[sub_dao_seeds!(ctx.accounts.iot_sub_dao)],
-    ),
-    AuthorityType::MintTokens,
     None,
   )?;
 

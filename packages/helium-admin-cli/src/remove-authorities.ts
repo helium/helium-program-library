@@ -4,6 +4,7 @@ import {
   init as initHsd,
   subDaoKey
 } from "@helium/helium-sub-daos-sdk";
+import { init as initCircuitBreaker, mintWindowedBreakerKey } from "@helium/circuit-breaker-sdk";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
@@ -47,6 +48,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const program = await initHsd(provider);
+  const cbProgram = await initCircuitBreaker(provider);
 
   const instructions: TransactionInstruction[] = [];
 
@@ -63,6 +65,33 @@ export async function run(args: any = process.argv) {
         hntMint: HNT_MINT,
         iotSubDao: subDaoKey(IOT_MINT)[0],
         mobileSubDao: subDaoKey(MOBILE_MINT)[0],
+      })
+      .instruction()
+  );
+  const mobileCB = mintWindowedBreakerKey(MOBILE_MINT)[0];
+  const mobileCBAcc = await cbProgram.account.mintWindowedCircuitBreakerV0.fetch(mobileCB);
+  instructions.push(
+    await cbProgram.methods
+      .removeMintAuthorityV0()
+      .accounts({
+        mint: MOBILE_MINT,
+        circuitBreaker: mobileCB,
+        rentRefund: mobileCBAcc.authority,
+        authority: mobileCBAcc.authority,
+      })
+      .instruction()
+  );
+  const iotCB = mintWindowedBreakerKey(IOT_MINT)[0];
+  const iotCBAcc =
+    await cbProgram.account.mintWindowedCircuitBreakerV0.fetch(iotCB);
+  instructions.push(
+    await cbProgram.methods
+      .removeMintAuthorityV0()
+      .accounts({
+        mint: IOT_MINT,
+        circuitBreaker: iotCB,
+        rentRefund: iotCBAcc.authority,
+        authority: iotCBAcc.authority,
       })
       .instruction()
   );
