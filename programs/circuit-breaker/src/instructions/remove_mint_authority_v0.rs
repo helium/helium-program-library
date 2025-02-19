@@ -3,9 +3,7 @@ use anchor_spl::token::{
   set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token,
 };
 
-use crate::{
-  mint_windowed_circuit_breaker_seeds, MintWindowedCircuitBreakerV0, WindowedCircuitBreakerConfigV0,
-};
+use crate::{mint_windowed_circuit_breaker_seeds, MintWindowedCircuitBreakerV0};
 
 #[derive(Accounts)]
 pub struct RemoveMintAuthorityV0<'info> {
