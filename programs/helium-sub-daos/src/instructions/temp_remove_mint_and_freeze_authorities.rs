@@ -2,8 +2,12 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{
   set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token,
 };
+use solana_program::pubkey;
 
 use crate::{dao_seeds, sub_dao_seeds, DaoV0, SubDaoV0};
+
+const MOBILE_MINT: Pubkey = pubkey!("mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6");
+const IOT_MINT: Pubkey = pubkey!("iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns");
 
 #[derive(Accounts)]
 pub struct RemoveMintAndFreezeAuthorities<'info> {
@@ -15,16 +19,24 @@ pub struct RemoveMintAndFreezeAuthorities<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(mut)]
   pub hnt_mint: Box<Account<'info, Mint>>,
+  #[account(
+    has_one = dao
+  )]
   pub iot_sub_dao: Box<Account<'info, SubDaoV0>>,
+  #[account(
+    has_one = dao
+  )]
   pub mobile_sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
     mut,
-    constraint = mobile_mint.key() == mobile_sub_dao.dnt_mint
+    constraint = mobile_mint.key() == mobile_sub_dao.dnt_mint,
+    address = MOBILE_MINT
   )]
   pub mobile_mint: Box<Account<'info, Mint>>,
   #[account(
     mut,
-    constraint = iot_mint.key() == iot_sub_dao.dnt_mint
+    constraint = iot_mint.key() == iot_sub_dao.dnt_mint,
+    address = IOT_MINT
   )]
   pub iot_mint: Box<Account<'info, Mint>>,
   pub token_program: Program<'info, Token>,
