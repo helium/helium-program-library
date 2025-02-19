@@ -51,10 +51,12 @@ export async function run(args: any = process.argv) {
   const instructions: TransactionInstruction[] = [];
 
   const dao = daoKey(HNT_MINT)[0];
+  const daoAcc = await program.account.daoV0.fetch(dao);
   instructions.push(
     await program.methods
       .tempRemoveMintAndFreezeAuthorities()
       .accounts({
+        authority: daoAcc.authority,
         dao,
         mobileMint: MOBILE_MINT,
         iotMint: IOT_MINT,
