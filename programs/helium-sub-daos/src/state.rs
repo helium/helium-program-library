@@ -114,6 +114,13 @@ macro_rules! dao_seeds {
   };
 }
 
+#[macro_export]
+macro_rules! sub_dao_seeds {
+  ( $s:expr ) => {
+    &[b"sub_dao".as_ref(), $s.dnt_mint.as_ref(), &[$s.bump_seed]]
+  };
+}
+
 impl DaoV0 {
   pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
     let new_proposal = RecentProposal { proposal, ts };
