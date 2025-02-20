@@ -41,7 +41,10 @@ lazy-distributor = { path = "./programs/lazy-distributor", features = ["cpi"] }
 mobile-entity-manager = { path = "./programs/mobile-entity-manager", features = ["cpi"] }
 price-oracle = { path = "./programs/price-oracle", features = ["cpi"] }
 no-emit = { path = "./programs/no-emit", features = ["cpi"] }
+voter-stake-registry = { path = "./programs/voter-stake-registry", features = ["cpi"] }
 time = "0.3.36"
 data-credits = { path = "./programs/data-credits" }
 pyth-solana-receiver-sdk = "=0.3.2"
 pythnet-sdk = "=2.3.1"
+tuktuk-sdk = { version = "0.2.0" }
+tuktuk-program = { version = "0.2.0" }

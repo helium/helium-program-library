@@ -46,7 +46,7 @@ describe("circuit-breaker", () => {
           threshold: thresholdPercent(50),
         } as never,
       })
-      .accountsPartialPartial({
+      .accountsPartial({
         mint,
       });
     const circuitBreaker = (await method.pubkeys()).circuitBreaker!;
@@ -75,7 +75,7 @@ describe("circuit-breaker", () => {
           threshold: thresholdPercent(50),
         } as never,
       })
-      .accountsPartialPartial({
+      .accountsPartial({
         tokenAccount,
       });
     const circuitBreaker = (await method.pubkeys()).circuitBreaker!;
@@ -107,7 +107,7 @@ describe("circuit-breaker", () => {
             threshold: thresholdPercent(50),
           } as never,
         })
-        .accountsPartialPartial({
+        .accountsPartial({
           mint,
         });
       await createAtaAndMint(provider, mint, INITIAL_SUPPLY);
@@ -120,7 +120,7 @@ describe("circuit-breaker", () => {
         .mintV0({
           amount: new BN(50),
         })
-        .accountsPartialPartial({
+        .accountsPartial({
           mint,
           to: dest,
         });
@@ -160,7 +160,7 @@ describe("circuit-breaker", () => {
         .mintV0({
           amount: new BN(50),
         })
-        .accountsPartialPartial({
+        .accountsPartial({
           mint,
           to: dest,
         })
@@ -188,7 +188,7 @@ describe("circuit-breaker", () => {
         .mintV0({
           amount: new BN(80),
         })
-        .accountsPartialPartial({
+        .accountsPartial({
           mint,
           to: dest,
         })
@@ -246,7 +246,7 @@ describe("circuit-breaker", () => {
           } as never,
         })
         .signers([accountHolder])
-        .accountsPartialPartial({
+        .accountsPartial({
           tokenAccount,
           owner: accountHolder.publicKey,
         });
@@ -263,7 +263,7 @@ describe("circuit-breaker", () => {
           createAssociatedTokenAccountInstruction(me, dest, me, mint),
         ])
         .signers([accountHolder])
-        .accountsPartialPartial({
+        .accountsPartial({
           from: tokenAccount,
           to: dest,
           owner: accountHolder.publicKey,
@@ -292,7 +292,7 @@ describe("circuit-breaker", () => {
           createAssociatedTokenAccountInstruction(me, dest, me, mint),
         ])
         .signers([accountHolder])
-        .accountsPartialPartial({
+        .accountsPartial({
           from: tokenAccount,
           to: dest,
           owner: accountHolder.publicKey,
@@ -305,7 +305,7 @@ describe("circuit-breaker", () => {
             amount: new BN(50),
           })
           .signers([accountHolder])
-          .accountsPartialPartial({
+          .accountsPartial({
             from: tokenAccount,
             to: dest,
             owner: accountHolder.publicKey,
@@ -324,7 +324,7 @@ describe("circuit-breaker", () => {
           amount: new BN(50),
         })
         .signers([accountHolder])
-        .accountsPartialPartial({
+        .accountsPartial({
           from: tokenAccount,
           to: dest,
           owner: accountHolder.publicKey,

@@ -341,7 +341,7 @@ describe("helium-sub-daos", () => {
         .preInstructions(
           await createMintInstructions(provider, 0, me, me, mint)
         )
-        .accounts({
+        .accountsPartial({
           dao,
           mint: mint.publicKey,
         })
@@ -373,7 +373,7 @@ describe("helium-sub-daos", () => {
 
         const method = program.methods
           .calculateUtilityScoreV0({ epoch })
-          .accounts({ subDao, dao });
+          .accountsPartial({ subDao, dao });
 
         const { daoEpochInfo } = await method.pubkeys();
         await method.rpc({ skipPreflight: true });

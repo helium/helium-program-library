@@ -94,13 +94,9 @@ pub fn handler(
   let mut cumulative_not_emitted = 0;
   let mut not_emitted = 0;
 
-  if ctx.accounts.prev_dao_epoch_info.lamports() > 0
-    && !ctx
-      .accounts
-      .prev_dao_epoch_info
-      .to_account_info()
-      .data_is_empty()
-  {
+  let prev_dao_epoch_info = &mut ctx.accounts.prev_dao_epoch_info;
+
+  if prev_dao_epoch_info.lamports() > 0 && !prev_dao_epoch_info.to_account_info().data_is_empty() {
     let info: Account<DaoEpochInfoV0> = try_from!(Account<DaoEpochInfoV0>, prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
     prev_total_utility_score = info.total_utility_score;
@@ -114,7 +110,10 @@ pub fn handler(
       .to_account_info()
       .data_is_empty()
   {
-    let info: Account<NotEmittedCounterV0> = Account::try_from(&ctx.accounts.not_emitted_counter)?;
+    let info: Account<NotEmittedCounterV0> = try_from!(
+      Account<NotEmittedCounterV0>,
+      ctx.accounts.not_emitted_counter
+    )?;
     cumulative_not_emitted = info.amount_not_emitted;
     not_emitted = info
       .amount_not_emitted
