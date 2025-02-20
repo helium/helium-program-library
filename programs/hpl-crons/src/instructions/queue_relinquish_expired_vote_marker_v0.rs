@@ -25,6 +25,10 @@ pub struct QueueRelinquishExpiredVoteMarkerArgsV0 {
 pub struct QueueRelinquishExpiredVoteMarkerV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  pub voter: Signer<'info>,
+  #[account(
+    has_one = voter,
+  )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
   #[account(
     constraint = position.mint == marker.mint
