@@ -1,4 +1,8 @@
-use anchor_lang::{prelude::*, system_program, InstructionData};
+use anchor_lang::{
+  prelude::*,
+  system_program::{self, transfer, Transfer},
+  InstructionData,
+};
 use spl_token::solana_program::instruction::Instruction;
 use tuktuk_program::{
   compile_transaction,
@@ -7,7 +11,7 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::QueueTaskArgsV0,
-  TaskQueueV0, TransactionSourceV0, TriggerV0,
+  TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
 
 use crate::voter_stake_registry::{
@@ -33,6 +37,7 @@ pub struct QueueRelinquishExpiredVoteMarkerV0<'info> {
   pub position: Box<Account<'info, PositionV0>>,
   /// CHECK: Via seeds
   #[account(
+    mut,
     seeds = [b"queue_authority"],
     bump,
   )]
@@ -68,11 +73,31 @@ pub fn handler(
   )
   .unwrap();
 
+  // Queue authority pays for the task rent if it can, since we know it'll come back
+  // This makes voting cheaper for users.
+  let mut payer = ctx.accounts.payer.to_account_info();
+  let description = "relinquish expired vote marker".to_string();
+  let len = 8 + std::mem::size_of::<TaskV0>() + 60 + description.len();
+  let rent_needed = Rent::get()?.minimum_balance(len);
+  if ctx.accounts.queue_authority.lamports() > rent_needed {
+    payer = ctx.accounts.queue_authority.to_account_info();
+    transfer(
+      CpiContext::new_with_signer(
+        ctx.accounts.system_program.to_account_info(),
+        Transfer {
+          from: ctx.accounts.payer.to_account_info(),
+          to: ctx.accounts.queue_authority.to_account_info(),
+        },
+        &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
+      ),
+      ctx.accounts.task_queue.min_crank_reward,
+    )?;
+  }
   queue_task_v0(
     CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       QueueTaskV0 {
-        payer: ctx.accounts.payer.to_account_info(),
+        payer,
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task_queue_authority: ctx.accounts.task_queue.to_account_info(),
@@ -87,7 +112,7 @@ pub fn handler(
       crank_reward: None,
       free_tasks: 0,
       id: args.free_task_id,
-      description: "relinquish expired vote marker".to_string(),
+      description,
     },
   )?;
 
