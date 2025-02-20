@@ -86,4 +86,11 @@ pub mod hpl_crons {
   pub fn requeue_entity_claim_cron_v0(ctx: Context<RequeueEntityClaimCronV0>) -> Result<()> {
     requeue_entity_claim_cron_v0::handler(ctx)
   }
+
+  pub fn queue_relinquish_expired_vote_marker_v0(
+    ctx: Context<QueueRelinquishExpiredVoteMarkerV0>,
+    args: QueueRelinquishExpiredVoteMarkerArgsV0,
+  ) -> Result<()> {
+    queue_relinquish_expired_vote_marker_v0::handler(ctx, args)
+  }
 }
