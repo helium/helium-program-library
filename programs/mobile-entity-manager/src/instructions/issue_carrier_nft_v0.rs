@@ -132,6 +132,7 @@ pub fn handler(ctx: Context<IssueCarrierNftV0>, args: IssueCarrierNftArgsV0) -> 
         bubblegum_program: ctx.accounts.bubblegum_program.to_account_info(),
         compression_program: ctx.accounts.compression_program.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
+        shared_merkle: None,
       },
       seeds,
     ),

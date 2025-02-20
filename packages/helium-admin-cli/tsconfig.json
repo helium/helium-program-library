@@ -41,6 +41,9 @@
       "path": "../rewards-oracle-sdk"
     },
     {
+      "path": "../iot-routing-manager-sdk"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {
