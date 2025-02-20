@@ -9,10 +9,8 @@ use tuktuk_program::{
 use crate::{
   helium_sub_daos::{
     self,
-    helium_sub_daos::{
-      accounts::{DaoV0, SubDaoV0},
-      types::{CalculateUtilityScoreArgsV0, IssueRewardsArgsV0},
-    },
+    accounts::{DaoV0, SubDaoV0},
+    types::{CalculateUtilityScoreArgsV0, IssueRewardsArgsV0},
   },
   hpl_crons::CIRCUIT_BREAKER_PROGRAM,
   no_emit, EpochTrackerV0, EPOCH_LENGTH,
@@ -24,7 +22,7 @@ pub struct QueueEndEpoch<'info> {
   #[account(
     mut,
     seeds = [b"custom", task_queue.key().as_ref(), b"helium"],
-    seeds::program = tuktuk_program::ID,
+    seeds::program = tuktuk_program::tuktuk::ID,
     bump,
   )]
   pub payer: Signer<'info>,
@@ -82,10 +80,10 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
   )
   .0;
 
-  let calc_args = helium_sub_daos::helium_sub_daos::client::args::CalculateUtilityScoreV0 {
+  let calc_args = helium_sub_daos::client::args::CalculateUtilityScoreV0 {
     args: CalculateUtilityScoreArgsV0 { epoch: curr_epoch },
   };
-  let reward_args = helium_sub_daos::helium_sub_daos::client::args::IssueRewardsV0 {
+  let reward_args = helium_sub_daos::client::args::IssueRewardsV0 {
     args: IssueRewardsArgsV0 { epoch: curr_epoch },
   };
 
@@ -131,7 +129,7 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
   for (_, sub_dao_key, prev_sub_dao_epoch_info, sub_dao_epoch_info) in sub_dao_infos.iter() {
     ixs.push(Instruction {
       program_id: helium_sub_daos::ID,
-      accounts: helium_sub_daos::helium_sub_daos::client::accounts::CalculateUtilityScoreV0 {
+      accounts: helium_sub_daos::client::accounts::CalculateUtilityScoreV0 {
         payer: ctx.accounts.payer.key(),
         registrar: ctx.accounts.dao.registrar,
         dao: dao_key,
@@ -144,6 +142,12 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
         token_program: spl_token::ID,
         circuit_breaker_program: CIRCUIT_BREAKER_PROGRAM,
         prev_sub_dao_epoch_info: *prev_sub_dao_epoch_info,
+        not_emitted_counter: Pubkey::find_program_address(
+          &[b"not_emitted_counter", hnt_mint.as_ref()],
+          &no_emit::ID,
+        )
+        .0,
+        no_emit_program: no_emit::ID,
       }
       .to_account_metas(None),
       data: calc_args.data(),
@@ -154,7 +158,7 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
   for (sub_dao, sub_dao_key, prev_sub_dao_epoch_info, sub_dao_epoch_info) in sub_dao_infos.iter() {
     ixs.push(Instruction {
       program_id: helium_sub_daos::ID,
-      accounts: helium_sub_daos::helium_sub_daos::client::accounts::IssueRewardsV0 {
+      accounts: helium_sub_daos::client::accounts::IssueRewardsV0 {
         dao: dao_key,
         hnt_mint,
         sub_dao: *sub_dao_key,
@@ -179,7 +183,7 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
   let no_emit_wallet = Pubkey::find_program_address(&[b"not_emitted"], &no_emit::ID).0;
   ixs.push(Instruction {
     program_id: no_emit::ID,
-    accounts: no_emit::no_emit::client::accounts::NoEmitV0 {
+    accounts: no_emit::client::accounts::NoEmitV0 {
       system_program: ctx.accounts.system_program.key(),
       payer: ctx.accounts.payer.key(),
       no_emit_wallet,
@@ -196,7 +200,7 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
       token_program: spl_token::ID,
     }
     .to_account_metas(None),
-    data: no_emit::no_emit::client::args::NoEmitV0.data(),
+    data: no_emit::client::args::NoEmitV0.data(),
   });
 
   let bump = ctx.bumps.payer;

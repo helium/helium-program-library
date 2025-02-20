@@ -820,7 +820,7 @@ dependencies = [
 
 [[package]]
 name = "circuit-breaker"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1271,7 +1271,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1279,6 +1279,7 @@ dependencies = [
  "default-env",
  "mpl-token-metadata 3.2.3",
  "nft-proxy",
+ "no-emit",
  "proposal",
  "rust_decimal",
  "shared-utils",
@@ -1470,9 +1471,9 @@ dependencies = [
 
 [[package]]
 name = "lazy_static"
-version = "1.5.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
@@ -1658,7 +1659,6 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "default-env",
- "helium-sub-daos",
  "shared-utils",
  "solana-security-txt",
 ]

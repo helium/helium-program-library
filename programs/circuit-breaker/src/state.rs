@@ -44,6 +44,17 @@ pub struct MintWindowedCircuitBreakerV0 {
   pub bump_seed: u8,
 }
 
+#[macro_export]
+macro_rules! mint_windowed_circuit_breaker_seeds {
+  ( $cb:expr ) => {
+    &[
+      b"mint_windowed_breaker".as_ref(),
+      $cb.mint.as_ref(),
+      &[$cb.bump_seed],
+    ]
+  };
+}
+
 #[account]
 #[derive(Default)]
 pub struct AccountWindowedCircuitBreakerV0 {

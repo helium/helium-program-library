@@ -10,7 +10,6 @@ import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manage
 import {
   MOBILE_MINT,
   batchInstructionsToTxsWithPriorityFee,
-  batchParallelInstructionsWithPriorityFee,
   bulkSendTransactions,
   chunks,
   truthy,
@@ -193,23 +192,29 @@ export async function run(args: any = process.argv) {
               acc.wifiInfo.deploymentInfo.antenna ||
               decodedAcc.deploymentInfo?.wifiInfoV0?.antenna ||
               0,
-            elevation:
-              decodedAcc.deploymentInfo?.wifiInfoV0?.elevation ||
-              // floored since stored on chain as i32 representation in whole meters
-              Math.floor(acc.wifiInfo.deploymentInfo.elevation) ||
-              0,
-            azimuth:
-              decodedAcc.deploymentInfo?.wifiInfoV0?.azimuth ||
-              acc.wifiInfo.deploymentInfo.azimuth ||
-              0,
+            elevation: decodedAcc.deploymentInfo?.wifiInfoV0?.elevation || 0,
+            // elevation descrepency was found and backfilled so default to whats on chain
+            // decodedAcc.deploymentInfo?.wifiInfoV0?.elevation ||
+            // floored since stored on chain as i32 representation in whole meters
+            // Math.floor(acc.wifiInfo.deploymentInfo.elevation) ||
+            // 0,
+            azimuth: decodedAcc.deploymentInfo?.wifiInfoV0?.azimuth || 0,
+            // azimuth descrepency was found and backfilled so default to whats on chain
+            // decodedAcc.deploymentInfo?.wifiInfoV0?.azimuth ||
+            // acc.wifiInfo.deploymentInfo.azimuth ||
+            // 0,
             mechanicalDownTilt:
-              decodedAcc.deploymentInfo?.wifiInfoV0?.mechanicalDownTilt ||
-              acc.wifiInfo.deploymentInfo.mechanicalDownTilt ||
-              0,
+              decodedAcc.deploymentInfo?.wifiInfoV0?.mechanicalDownTilt || 0,
+            // mechanicalDownTilt descrepency was found and backfilled so default to whats on chain
+            // decodedAcc.deploymentInfo?.wifiInfoV0?.mechanicalDownTilt ||
+            // acc.wifiInfo.deploymentInfo.mechanicalDownTilt ||
+            // 0,
             electricalDownTilt:
-              decodedAcc.deploymentInfo?.wifiInfoV0?.electricalDownTilt ||
-              acc.wifiInfo.deploymentInfo.electricalDownTilt ||
-              0,
+              decodedAcc.deploymentInfo?.wifiInfoV0?.electricalDownTilt || 0,
+            // electricalDownTilt descrepency was found and backfilled so default to whats on chain
+            // decodedAcc.deploymentInfo?.wifiInfoV0?.electricalDownTilt ||
+            // acc.wifiInfo.deploymentInfo.electricalDownTilt ||
+            // 0,
           };
 
           const deploymentInfoChanged = !deepEqual(
@@ -236,6 +241,18 @@ export async function run(args: any = process.argv) {
           }
 
           if (Object.keys(correction).length > 0) {
+            if (!argv.commit) {
+              console.log({
+                pubkey: acc.pubkey,
+                current: {
+                  ...decodedAcc.deploymentInfo?.wifiInfoV0,
+                },
+                new: {
+                  ...correctedDeploymentInfo,
+                },
+              });
+            }
+
             return await hem.methods
               .tempBackfillMobileInfo({
                 location: correction.location || null,

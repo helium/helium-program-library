@@ -16,7 +16,7 @@ use tuktuk_program::{
 use super::TEN_MINUTES;
 use crate::{
   error::ErrorCode,
-  helium_sub_daos::helium_sub_daos::accounts::{DaoV0, DelegatedPositionV0, SubDaoV0},
+  helium_sub_daos::accounts::{DaoV0, DelegatedPositionV0, SubDaoV0},
   DelegationClaimBotV0, EPOCH_LENGTH,
 };
 
@@ -84,7 +84,7 @@ pub fn handler(
   ctx.accounts.delegation_claim_bot.queued = true;
   let (payer, payer_bump) = Pubkey::find_program_address(
     &[b"custom", ctx.accounts.task_queue.key().as_ref(), b"helium"],
-    &tuktuk_program::ID,
+    &tuktuk_program::tuktuk::ID,
   );
   let (position_claim_payer, position_claim_payer_bump) = Pubkey::find_program_address(
     &[
@@ -92,7 +92,7 @@ pub fn handler(
       ctx.accounts.task_queue.key().as_ref(),
       b"position",
     ],
-    &tuktuk_program::ID,
+    &tuktuk_program::tuktuk::ID,
   );
   let (compiled_tx, _) = compile_transaction(
     vec![Instruction {

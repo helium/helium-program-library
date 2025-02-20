@@ -2,7 +2,12 @@ import { NoEmit } from "@helium/idls/lib/types/no_emit";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import { ataResolver, combineResolvers, heliumCommonResolver, resolveIndividual } from "@helium/anchor-resolvers";
+import {
+  ataResolver,
+  combineResolvers,
+  heliumCommonResolver,
+  resolveIndividual,
+} from "@helium/anchor-resolvers";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export * from "./constants";
@@ -33,9 +38,9 @@ export async function init(
           instruction: "noEmitV0",
           account: "tokenAccount",
           mint: "mint",
-          owner: "noEmitWallet"
+          owner: "noEmitWallet",
         })
-      )
+      );
     }
   ) as Program<NoEmit>;
 

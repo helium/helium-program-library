@@ -16,13 +16,11 @@ use tuktuk_program::{
 use crate::{
   helium_sub_daos::{
     self,
-    helium_sub_daos::{
-      accounts::{DaoV0, DelegatedPositionV0, SubDaoV0},
-      types::ClaimRewardsArgsV0,
-    },
+    accounts::{DaoV0, DelegatedPositionV0, SubDaoV0},
+    types::ClaimRewardsArgsV0,
   },
   hpl_crons::CIRCUIT_BREAKER_PROGRAM,
-  voter_stake_registry::{self, voter_stake_registry::accounts::PositionV0},
+  voter_stake_registry::{self, accounts::PositionV0},
   DelegationClaimBotV0, EPOCH_LENGTH,
 };
 
@@ -44,14 +42,14 @@ pub struct QueueDelegationClaimV0<'info> {
   #[account(
     mut,
     seeds = [b"custom", task_queue.key().as_ref(), b"helium"],
-    seeds::program = tuktuk_program::ID,
+    seeds::program = tuktuk_program::tuktuk::ID,
     bump,
   )]
   pub payer: Signer<'info>,
   #[account(
     mut,
     seeds = [b"custom", task_queue.key().as_ref(), b"position"],
-    seeds::program = tuktuk_program::ID,
+    seeds::program = tuktuk_program::tuktuk::ID,
     bump,
   )]
   pub position_claim_payer: Signer<'info>,
@@ -140,7 +138,7 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
   }
   let ixs = vec![Instruction {
     program_id: helium_sub_daos::ID,
-    accounts: helium_sub_daos::helium_sub_daos::client::accounts::ClaimRewardsV1 {
+    accounts: helium_sub_daos::client::accounts::ClaimRewardsV1 {
       dao: ctx.accounts.sub_dao.dao,
       sub_dao: ctx.accounts.sub_dao.key(),
       position: ctx.accounts.position.key(),
@@ -162,7 +160,7 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
       payer: ctx.accounts.position_claim_payer.key(),
     }
     .to_account_metas(None),
-    data: helium_sub_daos::helium_sub_daos::client::args::ClaimRewardsV1 {
+    data: helium_sub_daos::client::args::ClaimRewardsV1 {
       args: ClaimRewardsArgsV0 { epoch: curr_epoch },
     }
     .data(),

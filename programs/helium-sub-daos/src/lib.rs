@@ -145,4 +145,10 @@ pub mod helium_sub_daos {
   pub fn track_vote_v0(ctx: Context<TrackVoteV0>) -> Result<()> {
     track_vote_v0::handler(ctx)
   }
+
+  pub fn temp_remove_mint_and_freeze_authorities(
+    ctx: Context<RemoveMintAndFreezeAuthorities>,
+  ) -> Result<()> {
+    temp_remove_mint_and_freeze_authorities::handler(ctx)
+  }
 }

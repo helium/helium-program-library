@@ -91,7 +91,7 @@ export const integrityCheckProgramAccounts = async ({
 
         if (!blockTime24HoursAgo) {
           attemptSlot += SLOTS_INCREMENT; // move forward 2 slots each attempt
-          console.warn(
+          console.log(
             `Failed to get blocktime for slot ${
               attemptSlot - SLOTS_INCREMENT
             }, trying slot ${attemptSlot}`
@@ -226,18 +226,19 @@ export const integrityCheckProgramAccounts = async ({
                     ...sanitizeAccount(decodedAcc),
                   };
 
-                  if (pluginsByAccountType[accName]?.length > 0) {
-                    const pluginResults = await Promise.all(
-                      pluginsByAccountType[accName].map((plugin) =>
-                        plugin?.processAccount
-                          ? plugin.processAccount(sanitized)
-                          : sanitized
-                      )
-                    );
-                    sanitized = pluginResults.reduce(
-                      (acc, curr) => ({ ...acc, ...curr }),
-                      sanitized
-                    );
+                  for (const plugin of pluginsByAccountType[accName] || []) {
+                    if (plugin?.processAccount) {
+                      try {
+                        sanitized = await plugin.processAccount(sanitized, t);
+                      } catch (err) {
+                        console.log(
+                          `Plugin processing failed for account ${c.pubkey}`,
+                          err
+                        );
+                        // Continue with unmodified sanitized data instead of failing
+                        continue;
+                      }
+                    }
                   }
 
                   const existing = await model.findByPk(c.pubkey, {
@@ -298,7 +299,7 @@ export const integrityCheckProgramAccounts = async ({
     await retry(performIntegrityCheck, {
       ...retryOptions,
       onRetry: (error, attempt) => {
-        console.warn(
+        console.log(
           `Integrity check ${programId} attempt ${attempt}: Retrying due to ${error.message}`
         );
       },

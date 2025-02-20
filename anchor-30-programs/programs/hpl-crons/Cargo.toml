@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "hpl_crons"
 
 [features]
+devnet = []
 default = []
 cpi = ["no-entrypoint"]
 no-entrypoint = []
