@@ -119,13 +119,15 @@ describe("helium-entity-manager", () => {
     await ensureHEMIdl(hemProgram);
 
     const dataCredits = await initTestDataCredits(dcProgram, provider);
+    const hntMint = dataCredits.hntMint;
     dcMint = dataCredits.dcMint;
     ({ dao } = await initTestDao(
       hsdProgram,
       provider,
       100,
       me,
-      dataCredits.dcMint
+      dataCredits.dcMint,
+      hntMint
     ));
     activeDeviceAuthority = Keypair.generate();
     ({ subDao } = await initTestSubdao({

@@ -53,6 +53,12 @@ startup_wait = 20000
 url = "https://api.mainnet-beta.solana.com"
 
 [[test.validator.clone]]
+address = "tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA" # tuktuk
+
+[[test.validator.clone]]
+address = "GkUxZMcw2RbwZ64VL3MvBtYNV8zim3y7UfzabFTybAUJ" # tuktuk-idl
+
+[[test.validator.clone]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" # token-metadata
 
 [[test.validator.clone]]

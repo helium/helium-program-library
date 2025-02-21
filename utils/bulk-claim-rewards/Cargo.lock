@@ -1126,7 +1126,7 @@ dependencies = [
 
 [[package]]
 name = "circuit-breaker"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2277,7 +2277,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.7"
+version = "0.2.12"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2298,13 +2298,15 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.1.6"
+version = "0.2.6"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
  "circuit-breaker",
  "default-env",
  "mpl-token-metadata",
+ "nft-proxy",
+ "proposal",
  "shared-utils",
  "solana-security-txt",
  "time 0.3.36",
@@ -2716,7 +2718,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -3897,7 +3899,7 @@ dependencies = [
 
 [[package]]
 name = "rewards-oracle"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -5873,7 +5875,7 @@ dependencies = [
 
 [[package]]
 name = "treasury-management"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -6096,7 +6098,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.3.2"
+version = "0.3.6"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

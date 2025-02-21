@@ -5,6 +5,7 @@ import { Program } from "@coral-xyz/anchor";
 import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
+  getMint
 } from "@solana/spl-token";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
@@ -15,9 +16,8 @@ import {
   mintWindowedBreakerKey,
   PROGRAM_ID,
   thresholdPercent,
-  ThresholdType
+  ThresholdType,
 } from "../packages/circuit-breaker-sdk";
-
 
 describe("circuit-breaker", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -56,7 +56,9 @@ describe("circuit-breaker", () => {
       circuitBreaker
     );
     expect(acct.lastWindow.lastAggregatedValue.toNumber()).to.eq(0);
-    expect(acct.config.threshold.toString()).to.eq(thresholdPercent(50).toString());
+    expect(acct.config.threshold.toString()).to.eq(
+      thresholdPercent(50).toString()
+    );
     expect(acct.config.windowSizeSeconds.toNumber()).to.eq(10);
   });
 
@@ -136,6 +138,22 @@ describe("circuit-breaker", () => {
       );
     });
 
+    it("allows removing the mint authority", async () => {
+      const method = await program.methods.removeMintAuthorityV0().accounts({
+        rentRefund: me,
+        circuitBreaker: mintWindowedBreakerKey(mint)[0],
+      });
+      const circuitBreaker = (await method.pubkeys()).circuitBreaker!;
+      await method.rpc({ skipPreflight: true });
+      const cb =
+        await program.account.mintWindowedCircuitBreakerV0.fetchNullable(
+          circuitBreaker
+        );
+      expect(cb).to.be.null;
+      const mintAcct = await getMint(provider.connection, mint);
+      expect(mintAcct.mintAuthority).to.be.null;
+    });
+
     it("does not allow minting past the breaker", async () => {
       const dest = await getAssociatedTokenAddress(mint, me);
       await program.methods
@@ -148,24 +166,24 @@ describe("circuit-breaker", () => {
         })
         .rpc({ skipPreflight: true });
 
-        try {
-          // Curr supply: 250, agg value: 50... Break threshold at 125
-          await program.methods
-            .mintV0({
-              amount: new BN(80),
-            })
-            .accounts({
-              mint,
-              to: dest,
-            })
-            .rpc({ skipPreflight: true });
-          throw new Error("should not get here");
-        } catch (e: any) {
-          expect(e.toString()).to.include("The circuit breaker was triggered");
-        }
+      try {
+        // Curr supply: 250, agg value: 50... Break threshold at 125
+        await program.methods
+          .mintV0({
+            amount: new BN(80),
+          })
+          .accounts({
+            mint,
+            to: dest,
+          })
+          .rpc({ skipPreflight: true });
+        throw new Error("should not get here");
+      } catch (e: any) {
+        expect(e.toString()).to.include("The circuit breaker was triggered");
+      }
 
       // Wait til the window passes
-      await new Promise(resolve => setTimeout(resolve, 10 * 1000));
+      await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
       await program.methods
         .mintV0({
           amount: new BN(80),
@@ -180,18 +198,23 @@ describe("circuit-breaker", () => {
     it("updates the breaker", async () => {
       const cb = mintWindowedBreakerKey(mint)[0];
 
-      await program.methods.updateMintWindowedBreakerV0({
-        newAuthority: PublicKey.default,
-        config: {
-          windowSizeSeconds: new BN(11),
-          thresholdType: ThresholdType.Percent as never,
-          threshold: thresholdPercent(50),
-        }
-      }).accounts({
-        circuitBreaker: cb,
-      }).rpc();
+      await program.methods
+        .updateMintWindowedBreakerV0({
+          newAuthority: PublicKey.default,
+          config: {
+            windowSizeSeconds: new BN(11),
+            thresholdType: ThresholdType.Percent as never,
+            threshold: thresholdPercent(50),
+          },
+        })
+        .accounts({
+          circuitBreaker: cb,
+        })
+        .rpc();
 
-      const cbAcc = await program.account.mintWindowedCircuitBreakerV0.fetch(cb);
+      const cbAcc = await program.account.mintWindowedCircuitBreakerV0.fetch(
+        cb
+      );
 
       assert.isTrue(PublicKey.default.equals(cbAcc.authority));
       assert.equal(cbAcc.config.windowSizeSeconds.toNumber(), 11);
@@ -205,13 +228,13 @@ describe("circuit-breaker", () => {
     const INITIAL_SUPPLY = 200;
 
     beforeEach(async () => {
-      mint = await createMint(
+      mint = await createMint(provider, 8, me, me);
+      tokenAccount = await createAtaAndMint(
         provider,
-        8,
-        me,
-        me
+        mint,
+        new BN(INITIAL_SUPPLY),
+        accountHolder.publicKey
       );
-      tokenAccount = await createAtaAndMint(provider, mint, new BN(INITIAL_SUPPLY), accountHolder.publicKey);
       const method = await program.methods
         .initializeAccountWindowedBreakerV0({
           authority: me,
@@ -290,7 +313,7 @@ describe("circuit-breaker", () => {
           .rpc({ skipPreflight: true });
         throw new Error("should not get here");
       } catch (e: any) {
-        console.error(e)
+        console.error(e);
         expect(e.toString()).to.include("The circuit breaker was triggered");
       }
 
@@ -311,18 +334,23 @@ describe("circuit-breaker", () => {
 
     it("updates the breaker", async () => {
       const cb = accountWindowedBreakerKey(tokenAccount)[0];
-      await program.methods.updateAccountWindowedBreakerV0({
-        newAuthority: PublicKey.default,
-        config: {
-          windowSizeSeconds: new BN(11),
-          thresholdType: ThresholdType.Percent as never,
-          threshold: thresholdPercent(50),
-        }
-      }).accounts({
-        circuitBreaker: cb,
-      }).rpc();
-      
-      const cbAcc = await program.account.accountWindowedCircuitBreakerV0.fetch(cb);
+      await program.methods
+        .updateAccountWindowedBreakerV0({
+          newAuthority: PublicKey.default,
+          config: {
+            windowSizeSeconds: new BN(11),
+            thresholdType: ThresholdType.Percent as never,
+            threshold: thresholdPercent(50),
+          },
+        })
+        .accounts({
+          circuitBreaker: cb,
+        })
+        .rpc();
+
+      const cbAcc = await program.account.accountWindowedCircuitBreakerV0.fetch(
+        cb
+      );
 
       assert.isTrue(PublicKey.default.equals(cbAcc.authority));
       assert.equal(cbAcc.config.windowSizeSeconds.toNumber(), 11);

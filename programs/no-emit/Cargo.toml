@@ -25,5 +25,4 @@ anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
-helium-sub-daos = { workspace = true }
 default-env = { workspace = true }
