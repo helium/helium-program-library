@@ -6,60 +6,60 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 ## Instructions
 
-### initializePriceOracleV0
+### initialize_price_oracle_v0
 
 #### Accounts
 
-| Name          | Mutability | Signer | Docs |
-| ------------- | ---------- | ------ | ---- |
-| priceOracle   | mut        | yes    |      |
-| payer         | mut        | yes    |      |
-| systemProgram | immut      | no     |      |
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| price_oracle   | immut      | no     |      |
+| payer          | immut      | no     |      |
+| system_program | immut      | no     |      |
 
 #### Args
 
-| Name | Type                        | Docs |
-| ---- | --------------------------- | ---- |
-| args | InitializePriceOracleArgsV0 |      |
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
 
-### updatePriceOracleV0
+### submit_price_v0
 
 #### Accounts
 
-| Name          | Mutability | Signer | Docs |
-| ------------- | ---------- | ------ | ---- |
-| priceOracle   | mut        | no     |      |
-| authority     | mut        | yes    |      |
-| systemProgram | immut      | no     |      |
+| Name         | Mutability | Signer | Docs |
+| ------------ | ---------- | ------ | ---- |
+| price_oracle | immut      | no     |      |
+| oracle       | immut      | no     |      |
 
 #### Args
 
-| Name | Type                    | Docs |
-| ---- | ----------------------- | ---- |
-| args | UpdatePriceOracleArgsV0 |      |
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
 
-### submitPriceV0
+### update_price_oracle_v0
 
 #### Accounts
 
-| Name        | Mutability | Signer | Docs |
-| ----------- | ---------- | ------ | ---- |
-| priceOracle | mut        | no     |      |
-| oracle      | immut      | yes    |      |
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| price_oracle   | immut      | no     |      |
+| authority      | immut      | no     |      |
+| system_program | immut      | no     |      |
 
 #### Args
 
-| Name | Type              | Docs |
-| ---- | ----------------- | ---- |
-| args | SubmitPriceArgsV0 |      |
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
 
-### updatePriceV0
+### update_price_v0
 
 #### Accounts
 
-| Name        | Mutability | Signer | Docs |
-| ----------- | ---------- | ------ | ---- |
-| priceOracle | mut        | no     |      |
+| Name         | Mutability | Signer | Docs |
+| ------------ | ---------- | ------ | ---- |
+| price_oracle | immut      | no     |      |
 
 #### Args
 
@@ -70,43 +70,47 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 ### PriceOracleV0
 
-| Field                   | Type      |
-| ----------------------- | --------- |
-| authority               | publicKey |
-| numOracles              | u8        |
-| decimals                | u8        |
-| oracles                 | OracleV0  |
-| currentPrice            | u64       |
-| lastCalculatedTimestamp | i64       |
+undefined
 
 ## Types
 
 ### InitializePriceOracleArgsV0
 
-| Field     | Type      |
-| --------- | --------- |
-| oracles   | OracleV0  |
-| decimals  | u8        |
-| authority | publicKey |
+| Field     | Type            |
+| --------- | --------------- |
+| oracles   | [object Object] |
+| decimals  | u8              |
+| authority | pubkey          |
+
+### OracleV0
+
+| Field                    | Type   |
+| ------------------------ | ------ |
+| authority                | pubkey |
+| last_submitted_timestamp | i64    |
+| last_submitted_price     | u64    |
+
+### PriceOracleV0
+
+| Field                     | Type            |
+| ------------------------- | --------------- |
+| authority                 | pubkey          |
+| num_oracles               | u8              |
+| decimals                  | u8              |
+| oracles                   | [object Object] |
+| current_price             | u64             |
+| last_calculated_timestamp | i64             |
 
 ### SubmitPriceArgsV0
 
-| Field       | Type |
-| ----------- | ---- |
-| oracleIndex | u8   |
-| price       | u64  |
+| Field        | Type |
+| ------------ | ---- |
+| oracle_index | u8   |
+| price        | u64  |
 
 ### UpdatePriceOracleArgsV0
 
 | Field     | Type            |
 | --------- | --------------- |
 | oracles   | [object Object] |
-| authority | publicKey       |
-
-### OracleV0
-
-| Field                  | Type      |
-| ---------------------- | --------- |
-| authority              | publicKey |
-| lastSubmittedTimestamp | i64       |
-| lastSubmittedPrice     | u64       |
+| authority | pubkey          |

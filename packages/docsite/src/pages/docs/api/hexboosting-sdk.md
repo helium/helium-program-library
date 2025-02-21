@@ -6,168 +6,148 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 ## Instructions
 
-### boostV0
+### boost_v0
+
+#### Accounts
+
+| Name                     | Mutability | Signer | Docs |
+| ------------------------ | ---------- | ------ | ---- |
+| payer                    | immut      | no     |      |
+| boost_config             | immut      | no     |      |
+| carrier                  | immut      | no     |      |
+| hexboost_authority       | immut      | no     |      |
+| data_credits             | immut      | no     |      |
+| dc_mint                  | immut      | no     |      |
+| payment_account          | immut      | no     |      |
+| boosted_hex              | immut      | no     |      |
+| system_program           | immut      | no     |      |
+| token_program            | immut      | no     |      |
+| associated_token_program | immut      | no     |      |
+| data_credits_program     | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
+### close_boost_v0
 
 #### Accounts
 
 | Name                   | Mutability | Signer | Docs |
 | ---------------------- | ---------- | ------ | ---- |
-| payer                  | mut        | yes    |      |
-| boostConfig            | immut      | no     |      |
-| carrier                | immut      | no     |      |
-| hexboostAuthority      | immut      | yes    |      |
-| dataCredits            | immut      | no     |      |
-| dcMint                 | mut        | no     |      |
-| paymentAccount         | mut        | no     |      |
-| boostedHex             | mut        | no     |      |
-| systemProgram          | immut      | no     |      |
-| tokenProgram           | immut      | no     |      |
-| associatedTokenProgram | immut      | no     |      |
-| dataCreditsProgram     | immut      | no     |      |
-
-#### Args
-
-| Name | Type        | Docs |
-| ---- | ----------- | ---- |
-| args | BoostArgsV0 |      |
-
-### initializeBoostConfigV0
-
-#### Accounts
-
-| Name                 | Mutability | Signer | Docs |
-| -------------------- | ---------- | ------ | ---- |
-| payer                | mut        | yes    |      |
-| subDao               | immut      | no     |      |
-| authority            | immut      | yes    |      |
-| rentReclaimAuthority | immut      | no     |      |
-| startAuthority       | immut      | no     |      |
-| priceOracle          | immut      | no     |      |
-| dcMint               | immut      | no     |      |
-| boostConfig          | mut        | no     |      |
-| systemProgram        | immut      | no     |      |
-| dao                  | immut      | no     |      |
-
-#### Args
-
-| Name | Type                        | Docs |
-| ---- | --------------------------- | ---- |
-| args | InitializeBoostConfigArgsV0 |      |
-
-### startBoostV0
-
-#### Accounts
-
-| Name           | Mutability | Signer | Docs |
-| -------------- | ---------- | ------ | ---- |
-| startAuthority | immut      | yes    |      |
-| boostConfig    | immut      | no     |      |
-| boostedHex     | mut        | no     |      |
-
-#### Args
-
-| Name | Type             | Docs |
-| ---- | ---------------- | ---- |
-| args | StartBoostArgsV0 |      |
-
-### startBoostV1
-
-#### Accounts
-
-| Name           | Mutability | Signer | Docs |
-| -------------- | ---------- | ------ | ---- |
-| startAuthority | immut      | yes    |      |
-| boostConfig    | immut      | no     |      |
-| boostedHex     | mut        | no     |      |
-
-#### Args
-
-| Name | Type             | Docs |
-| ---- | ---------------- | ---- |
-| args | StartBoostArgsV0 |      |
-
-### closeBoostV0
-
-#### Accounts
-
-| Name                 | Mutability | Signer | Docs |
-| -------------------- | ---------- | ------ | ---- |
-| rentReclaimAuthority | immut      | yes    |      |
-| boostConfig          | immut      | no     |      |
-| boostedHex           | mut        | no     |      |
+| rent_reclaim_authority | immut      | no     |      |
+| boost_config           | immut      | no     |      |
+| boosted_hex            | immut      | no     |      |
 
 #### Args
 
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
-### updateBoostConfigV0
+### initialize_boost_config_v0
 
 #### Accounts
 
-| Name        | Mutability | Signer | Docs |
-| ----------- | ---------- | ------ | ---- |
-| subDao      | immut      | no     |      |
-| authority   | immut      | yes    |      |
-| boostConfig | mut        | no     |      |
+| Name                   | Mutability | Signer | Docs |
+| ---------------------- | ---------- | ------ | ---- |
+| payer                  | immut      | no     |      |
+| sub_dao                | immut      | no     |      |
+| authority              | immut      | no     |      |
+| rent_reclaim_authority | immut      | no     |      |
+| start_authority        | immut      | no     |      |
+| price_oracle           | immut      | no     |      |
+| dc_mint                | immut      | no     |      |
+| boost_config           | immut      | no     |      |
+| system_program         | immut      | no     |      |
+| dao                    | immut      | no     |      |
 
 #### Args
 
-| Name | Type                    | Docs |
-| ---- | ----------------------- | ---- |
-| args | UpdateBoostConfigArgsV0 |      |
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
+### start_boost_v0
+
+#### Accounts
+
+| Name            | Mutability | Signer | Docs |
+| --------------- | ---------- | ------ | ---- |
+| start_authority | immut      | no     |      |
+| boost_config    | immut      | no     |      |
+| boosted_hex     | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
+### start_boost_v1
+
+#### Accounts
+
+| Name            | Mutability | Signer | Docs |
+| --------------- | ---------- | ------ | ---- |
+| start_authority | immut      | no     |      |
+| boost_config    | immut      | no     |      |
+| boosted_hex     | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
+### update_boost_config_v0
+
+#### Accounts
+
+| Name         | Mutability | Signer | Docs |
+| ------------ | ---------- | ------ | ---- |
+| sub_dao      | immut      | no     |      |
+| authority    | immut      | no     |      |
+| boost_config | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
 
 ## Accounts
 
 ### BoostConfigV0
 
-| Field                | Type      |
-| -------------------- | --------- |
-| priceOracle          | publicKey |
-| paymentMint          | publicKey |
-| subDao               | publicKey |
-| rentReclaimAuthority | publicKey |
-| boostPrice           | u64       |
-| periodLength         | u32       |
-| minimumPeriods       | u16       |
-| bumpSeed             | u8        |
-| startAuthority       | publicKey |
-| dcMint               | publicKey |
+undefined
 
 ### BoostedHexV0
 
-| Field          | Type            |
-| -------------- | --------------- |
-| boostConfig    | publicKey       |
-| location       | u64             |
-| startTs        | i64             |
-| reserved       | [object Object] |
-| bumpSeed       | u8              |
-| boostsByPeriod | bytes           |
-| version        | u32             |
+undefined
 
 ### BoostedHexV1
 
-| Field          | Type         |
-| -------------- | ------------ |
-| deviceType     | DeviceTypeV0 |
-| boostConfig    | publicKey    |
-| version        | u32          |
-| location       | u64          |
-| startTs        | i64          |
-| bumpSeed       | u8           |
-| boostsByPeriod | bytes        |
+undefined
+
+### CarrierV0
+
+undefined
+
+### DaoV0
+
+undefined
+
+### DataCreditsV0
+
+undefined
+
+### SubDaoV0
+
+undefined
 
 ## Types
-
-### BoostArgsV0
-
-| Field      | Type          |
-| ---------- | ------------- |
-| location   | u64           |
-| version    | u32           |
-| amounts    | BoostAmountV0 |
-| deviceType | DeviceTypeV0  |
 
 ### BoostAmountV0
 
@@ -176,30 +156,102 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | period | u16  |
 | amount | u8   |
 
-### InitializeBoostConfigArgsV0
+### BoostArgsV0
 
-| Field          | Type |
-| -------------- | ---- |
-| boostPrice     | u64  |
-| periodLength   | u32  |
-| minimumPeriods | u16  |
+| Field       | Type            |
+| ----------- | --------------- |
+| location    | u64             |
+| version     | u32             |
+| amounts     | [object Object] |
+| device_type | [object Object] |
 
-### StartBoostArgsV0
+### BoostConfigV0
 
-| Field   | Type |
-| ------- | ---- |
-| startTs | i64  |
+| Field                  | Type   |
+| ---------------------- | ------ |
+| price_oracle           | pubkey |
+| payment_mint           | pubkey |
+| sub_dao                | pubkey |
+| rent_reclaim_authority | pubkey |
+| boost_price            | u64    |
+| period_length          | u32    |
+| minimum_periods        | u16    |
+| bump_seed              | u8     |
+| start_authority        | pubkey |
+| dc_mint                | pubkey |
 
-### UpdateBoostConfigArgsV0
+### BoostedHexV0
 
-| Field                | Type      |
-| -------------------- | --------- |
-| startAuthority       | publicKey |
-| rentReclaimAuthority | publicKey |
-| boostPrice           | u64       |
-| minimumPeriods       | u16       |
-| priceOracle          | publicKey |
-| dcMint               | publicKey |
+| Field            | Type            |
+| ---------------- | --------------- |
+| boost_config     | pubkey          |
+| location         | u64             |
+| start_ts         | i64             |
+| reserved         | [object Object] |
+| bump_seed        | u8              |
+| boosts_by_period | bytes           |
+| version          | u32             |
+
+### BoostedHexV1
+
+| Field            | Type            |
+| ---------------- | --------------- |
+| device_type      | [object Object] |
+| boost_config     | pubkey          |
+| version          | u32             |
+| location         | u64             |
+| start_ts         | i64             |
+| bump_seed        | u8              |
+| boosts_by_period | bytes           |
+
+### CarrierV0
+
+| Field                     | Type   |
+| ------------------------- | ------ |
+| sub_dao                   | pubkey |
+| update_authority          | pubkey |
+| issuing_authority         | pubkey |
+| collection                | pubkey |
+| escrow                    | pubkey |
+| name                      | string |
+| merkle_tree               | pubkey |
+| approved                  | bool   |
+| collection_bump_seed      | u8     |
+| bump_seed                 | u8     |
+| hexboost_authority        | pubkey |
+| incentive_escrow_fund_bps | u16    |
+
+### DaoV0
+
+| Field                     | Type            |
+| ------------------------- | --------------- |
+| hnt_mint                  | pubkey          |
+| dc_mint                   | pubkey          |
+| authority                 | pubkey          |
+| registrar                 | pubkey          |
+| hst_pool                  | pubkey          |
+| net_emissions_cap         | u64             |
+| num_sub_daos              | u32             |
+| emission_schedule         | [object Object] |
+| hst_emission_schedule     | [object Object] |
+| bump_seed                 | u8              |
+| rewards_escrow            | pubkey          |
+| delegator_pool            | pubkey          |
+| delegator_rewards_percent | u64             |
+| proposal_namespace        | pubkey          |
+| recent_proposals          | [object Object] |
+
+### DataCreditsV0
+
+| Field              | Type   |
+| ------------------ | ------ |
+| dc_mint            | pubkey |
+| hnt_mint           | pubkey |
+| authority          | pubkey |
+| hnt_price_oracle   | pubkey |
+| data_credits_bump  | u8     |
+| account_payer      | pubkey |
+| account_payer_bump | u8     |
 
 ### DeviceTypeV0
 
@@ -209,3 +261,73 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | CbrsOutdoor |        |
 | WifiIndoor  |        |
 | WifiOutdoor |        |
+
+### EmissionScheduleItem
+
+| Field               | Type |
+| ------------------- | ---- |
+| start_unix_time     | i64  |
+| emissions_per_epoch | u64  |
+
+### InitializeBoostConfigArgsV0
+
+| Field           | Type |
+| --------------- | ---- |
+| boost_price     | u64  |
+| period_length   | u32  |
+| minimum_periods | u16  |
+
+### PercentItem
+
+| Field           | Type |
+| --------------- | ---- |
+| start_unix_time | i64  |
+| percent         | u8   |
+
+### RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |
+
+### StartBoostArgsV0
+
+| Field    | Type |
+| -------- | ---- |
+| start_ts | i64  |
+
+### SubDaoV0
+
+| Field                                  | Type            |
+| -------------------------------------- | --------------- |
+| dao                                    | pubkey          |
+| dnt_mint                               | pubkey          |
+| treasury                               | pubkey          |
+| rewards_escrow                         | pubkey          |
+| delegator_pool                         | pubkey          |
+| vehnt_delegated                        | u128            |
+| vehnt_last_calculated_ts               | i64             |
+| vehnt_fall_rate                        | u128            |
+| authority                              | pubkey          |
+| \_deprecated_active_device_aggregator  | pubkey          |
+| dc_burn_authority                      | pubkey          |
+| onboarding_dc_fee                      | u64             |
+| emission_schedule                      | [object Object] |
+| bump_seed                              | u8              |
+| registrar                              | pubkey          |
+| \_deprecated_delegator_rewards_percent | u64             |
+| onboarding_data_only_dc_fee            | u64             |
+| dc_onboarding_fees_paid                | u64             |
+| active_device_authority                | pubkey          |
+
+### UpdateBoostConfigArgsV0
+
+| Field                  | Type   |
+| ---------------------- | ------ |
+| start_authority        | pubkey |
+| rent_reclaim_authority | pubkey |
+| boost_price            | u64    |
+| minimum_periods        | u16    |
+| price_oracle           | pubkey |
+| dc_mint                | pubkey |
