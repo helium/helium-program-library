@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use nft_proxy::accounts::ProxyConfigV0;
+use modular_governance::nft_proxy::accounts::ProxyConfigV0;
 
 use crate::state::*;
 

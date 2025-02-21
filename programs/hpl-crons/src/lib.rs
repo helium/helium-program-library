@@ -89,4 +89,11 @@ pub mod hpl_crons {
   ) -> Result<()> {
     queue_relinquish_expired_vote_marker_v0::handler(ctx, args)
   }
+
+  pub fn queue_resolve_proposal_v0(
+    ctx: Context<QueueResolveProposalV0>,
+    args: QueueResolveProposalArgsV0,
+  ) -> Result<()> {
+    queue_resolve_proposal_v0::handler(ctx, args)
+  }
 }

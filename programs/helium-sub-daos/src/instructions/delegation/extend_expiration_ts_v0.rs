@@ -2,7 +2,7 @@ use std::{cmp::min, str::FromStr};
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use nft_proxy::accounts::ProxyConfigV0;
+use modular_governance::nft_proxy::accounts::ProxyConfigV0;
 use voter_stake_registry::state::{PositionV0, Registrar};
 
 use crate::{

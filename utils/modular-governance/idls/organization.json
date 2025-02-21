@@ -1,0 +1,287 @@
+{
+  "address": "orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f",
+  "metadata": {
+    "name": "organization",
+    "version": "0.1.1",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "initialize_organization_v0",
+      "discriminator": [44, 42, 174, 217, 128, 72, 101, 49],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "organization",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111, 114, 103, 97, 110, 105, 122, 97, 116, 105, 111, 110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeOrganizationArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_proposal_v0",
+      "discriminator": [63, 235, 9, 201, 163, 171, 206, 33],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": ["organization"]
+        },
+        {
+          "name": "owner"
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "proposal_config"
+        },
+        {
+          "name": "organization",
+          "writable": true
+        },
+        {
+          "name": "proposal_program",
+          "relations": ["organization"]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeProposalArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_organization_v0",
+      "discriminator": [38, 56, 42, 100, 134, 77, 32, 44],
+      "accounts": [
+        {
+          "name": "organization",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": ["organization"]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpdateOrganizationArgsV0"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "OrganizationV0",
+      "discriminator": [243, 189, 126, 191, 59, 72, 255, 68]
+    }
+  ],
+  "types": [
+    {
+      "name": "ChoiceArg",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "uri",
+            "docs": ["Any other data that you may want to put in here"],
+            "type": {
+              "option": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeOrganizationArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "default_proposal_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "uri",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeProposalArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "uri",
+            "type": "string"
+          },
+          {
+            "name": "max_choices_per_voter",
+            "type": "u16"
+          },
+          {
+            "name": "choices",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "ChoiceArg"
+                }
+              }
+            }
+          },
+          {
+            "name": "tags",
+            "type": {
+              "vec": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrganizationV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "num_proposals",
+            "type": "u32"
+          },
+          {
+            "name": "authority",
+            "docs": ["Authority to create proposals under this organization"],
+            "type": "pubkey"
+          },
+          {
+            "name": "default_proposal_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "uri",
+            "type": "string"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateOrganizationArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "default_proposal_config",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "proposal_program",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "uri",
+            "type": {
+              "option": "string"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -27,3 +27,5 @@ helium-entity-manager = { workspace = true }
 helium-sub-daos = { workspace = true }
 no-emit = { workspace = true }
 voter-stake-registry = { workspace = true }
+modular-governance = { workspace = true }
+

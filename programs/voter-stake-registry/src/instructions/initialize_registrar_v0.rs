@@ -10,7 +10,7 @@ use anchor_spl::{
   },
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use nft_proxy::nft_proxy::accounts::ProxyConfigV0;
+use modular_governance::nft_proxy::accounts::ProxyConfigV0;
 
 use crate::state::*;
 

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use proposal::accounts::{ProposalConfigV0, ProposalV0};
+use modular_governance::proposal::accounts::{ProposalConfigV0, ProposalV0};
 
 use crate::{error::VsrError, registrar_seeds, state::*};
 
@@ -103,10 +103,10 @@ pub fn handler(ctx: Context<VoteV0>, args: VoteArgsV0) -> Result<()> {
   };
   marker.weight = weight;
 
-  proposal::cpi::vote_v0(
+  modular_governance::proposal::cpi::vote_v0(
     CpiContext::new_with_signer(
       ctx.accounts.proposal_program.to_account_info(),
-      proposal::cpi::accounts::VoteV0 {
+      modular_governance::proposal::cpi::accounts::VoteV0 {
         voter: ctx.accounts.voter.to_account_info(),
         vote_controller: ctx.accounts.registrar.to_account_info(),
         state_controller: ctx.accounts.state_controller.to_account_info(),
@@ -116,7 +116,7 @@ pub fn handler(ctx: Context<VoteV0>, args: VoteArgsV0) -> Result<()> {
       },
       &[registrar_seeds!(ctx.accounts.registrar)],
     ),
-    proposal::types::VoteArgsV0 {
+    modular_governance::proposal::types::VoteArgsV0 {
       remove_vote: false,
       choice: args.choice,
       weight,

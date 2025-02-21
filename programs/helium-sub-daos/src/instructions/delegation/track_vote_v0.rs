@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use proposal::accounts::ProposalV0;
+use modular_governance::proposal::accounts::ProposalV0;
 use shared_utils::resize_to_fit;
 use voter_stake_registry::{
   state::{PositionV0, Registrar, VoteMarkerV0},

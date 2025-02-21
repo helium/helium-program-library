@@ -4,8 +4,7 @@ overflow-checks = true
 [workspace]
 members = [
   "programs/*",
-  "utils/proposal",
-  "utils/nft-proxy",
+  "utils/modular-governance",
 ]
 
 exclude = [
@@ -48,3 +47,4 @@ pyth-solana-receiver-sdk = "=0.3.2"
 pythnet-sdk = "=2.3.1"
 tuktuk-sdk = { version = "0.2.0" }
 tuktuk-program = { version = "0.2.0" }
+modular-governance = { path = "./utils/modular-governance" }

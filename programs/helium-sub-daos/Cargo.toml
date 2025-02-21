@@ -30,8 +30,7 @@ shared-utils = { workspace = true }
 circuit-breaker = { workspace = true }
 no-emit = { workspace = true }
 treasury-management = { path = "../treasury-management", features = ["cpi"] }
-nft-proxy = { path = "../../utils/nft-proxy" }
-proposal = { path = "../../utils/proposal" }
+modular-governance = { workspace = true }
 solana-program = { workspace = true }
 default-env = { workspace = true }
 

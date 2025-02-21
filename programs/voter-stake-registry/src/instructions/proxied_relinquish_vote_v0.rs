@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use nft_proxy::accounts::ProxyAssignmentV0;
-use proposal::{
-  accounts::{ProposalConfigV0, ProposalV0},
-  types::VoteArgsV0,
+use modular_governance::{
+  nft_proxy::accounts::ProxyAssignmentV0,
+  proposal::{
+    accounts::{ProposalConfigV0, ProposalV0},
+    types::VoteArgsV0,
+  },
 };
 
 use crate::{error::VsrError, registrar_seeds, state::*, RelinquishVoteArgsV1};
@@ -85,10 +87,10 @@ pub fn handler(ctx: Context<ProxiedRelinquishVoteV0>, args: RelinquishVoteArgsV1
     .filter(|c| *c != args.choice)
     .collect::<Vec<_>>();
 
-  proposal::cpi::vote_v0(
+  modular_governance::proposal::cpi::vote_v0(
     CpiContext::new_with_signer(
       ctx.accounts.proposal_program.to_account_info(),
-      proposal::cpi::accounts::VoteV0 {
+      modular_governance::proposal::cpi::accounts::VoteV0 {
         voter: ctx.accounts.voter.to_account_info(),
         vote_controller: ctx.accounts.registrar.to_account_info(),
         state_controller: ctx.accounts.state_controller.to_account_info(),

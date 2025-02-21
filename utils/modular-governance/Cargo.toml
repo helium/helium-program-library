@@ -1,12 +1,12 @@
 [package]
-name = "nft-proxy"
-version = "0.0.2"
-description = "Nft proxy cpi wrapper"
+name = "modular-governance"
+version = "0.1.0"
+description = "Modular Governance cpi wrappers"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "nft_proxy"
+name = "modular_governance"
 
 [features]
 default = ["cpi"]
@@ -16,5 +16,4 @@ no-log-ix-name = []
 cpi = ["no-entrypoint"]
 
 [dependencies]
-anchor-gen = { git = "https://github.com/ChewingGlass/anchor-gen.git" }
 anchor-lang = { workspace = true }
