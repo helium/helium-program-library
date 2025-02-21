@@ -144,7 +144,7 @@ pub fn handler(
       &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
     ),
     QueueTaskArgsV0 {
-      trigger: TriggerV0::Timestamp(trigger_time as i64),
+      trigger: TriggerV0::Timestamp(max(Clock::get()?.unix_timestamp, trigger_time as i64)),
       transaction: TransactionSourceV0::CompiledV0(compiled_tx),
       crank_reward: None,
       free_tasks: 2,

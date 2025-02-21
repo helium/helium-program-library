@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use anchor_lang::{prelude::*, InstructionData};
 use spl_token::solana_program::instruction::Instruction;
 use tuktuk_program::{
@@ -137,7 +139,10 @@ pub fn handler(ctx: Context<RequeueEntityClaimCronV0>) -> Result<()> {
       &[&[b"queue_authority", &[ctx.bumps.queue_authority]]],
     ),
     QueueTaskArgsV0 {
-      trigger: TriggerV0::Timestamp(ctx.accounts.cron_job.current_exec_ts - 60 * 5),
+      trigger: TriggerV0::Timestamp(max(
+        Clock::get()?.unix_timestamp,
+        ctx.accounts.cron_job.current_exec_ts - 60 * 5,
+      )),
       transaction: TransactionSourceV0::CompiledV0(queue_tx),
       crank_reward: None,
       free_tasks: ctx.accounts.cron_job.num_tasks_per_queue_call + 1,

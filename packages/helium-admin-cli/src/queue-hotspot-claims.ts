@@ -15,6 +15,7 @@ import yargs from "yargs/yargs";
 import {
   init as initHplCrons,
   entityCronAuthorityKey,
+  nextAvailableTaskIds,
 } from "@helium/hpl-crons-sdk";
 
 export async function run(args: any = process.argv) {
@@ -103,27 +104,4 @@ export async function run(args: any = process.argv) {
   await sendInstructionsWithPriorityFee(provider, instructions, {
     computeUnitLimit: 500000,
   });
-}
-
-export function nextAvailableTaskIds(taskBitmap: Buffer, n: number): number[] {
-  if (n === 0) {
-    return [];
-  }
-
-  const availableTaskIds: number[] = [];
-  for (let byteIdx = 0; byteIdx < taskBitmap.length; byteIdx++) {
-    const byte = taskBitmap[byteIdx];
-    if (byte !== 0xff) {
-      // If byte is not all 1s
-      for (let bitIdx = 0; bitIdx < 8; bitIdx++) {
-        if ((byte & (1 << bitIdx)) === 0) {
-          availableTaskIds.push(byteIdx * 8 + bitIdx);
-          if (availableTaskIds.length === n) {
-            return availableTaskIds;
-          }
-        }
-      }
-    }
-  }
-  return availableTaskIds;
 }

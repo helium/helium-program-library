@@ -15,8 +15,8 @@ import yargs from "yargs/yargs";
 import {
   init as initHplCrons,
   entityCronAuthorityKey,
+  nextAvailableTaskIds,
 } from "@helium/hpl-crons-sdk";
-import { nextAvailableTaskIds } from "./queue-hotspot-claims";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({

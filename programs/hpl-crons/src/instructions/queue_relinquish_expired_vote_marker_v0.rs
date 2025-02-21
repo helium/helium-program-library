@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use anchor_lang::{
   prelude::*,
   system_program::{self, transfer, Transfer},
@@ -106,7 +108,7 @@ pub fn handler(
       &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
     ),
     QueueTaskArgsV0 {
-      trigger: TriggerV0::Timestamp(args.trigger_ts),
+      trigger: TriggerV0::Timestamp(max(Clock::get()?.unix_timestamp, args.trigger_ts)),
       transaction: TransactionSourceV0::CompiledV0(compiled_tx),
       crank_reward: None,
       free_tasks: 0,

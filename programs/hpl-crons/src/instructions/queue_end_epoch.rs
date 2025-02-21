@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use anchor_lang::{prelude::*, system_program, InstructionData};
 use helium_sub_daos::{
   accounts::CalculateUtilityScoreV0, instruction::IssueRewardsV0, CalculateUtilityScoreArgsV0,
@@ -221,8 +223,10 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
   };
   let (compiled_reschedule_tx, _) = compile_transaction(vec![reschedule_ix], seeds).unwrap();
 
-  let end_of_epoch_trigger =
-    TriggerV0::Timestamp(((curr_epoch + 1) * EPOCH_LENGTH).try_into().unwrap());
+  let end_of_epoch_trigger = TriggerV0::Timestamp(max(
+    Clock::get()?.unix_timestamp,
+    ((curr_epoch + 1) * EPOCH_LENGTH).try_into().unwrap(),
+  ));
 
   let return_accounts = write_return_tasks(WriteReturnTasksArgs {
     program_id: crate::ID,

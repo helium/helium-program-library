@@ -3,24 +3,25 @@ import { init as hsdInit } from "@helium/helium-sub-daos-sdk";
 import { useProposal } from "@helium/modular-governance-hooks";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
-  Status,
-  batchParallelInstructions,
-  truthy
-} from "@helium/spl-utils";
+  init as hplCronsInit,
+  nextAvailableTaskIds,
+  TASK_QUEUE_ID,
+} from "@helium/hpl-crons-sdk";
+import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import {
-  PublicKey,
-  TransactionInstruction
-} from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
+import { init as initTuktuk, taskKey } from "@helium/tuktuk-sdk";
 import { useVoteMarkers } from "./useVoteMarkers";
+import { useProposalEndTs } from "./useProposalEndTs";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
+  const endTs = useProposalEndTs(proposalKey);
   const { positions, provider, registrar } = useHeliumVsrState();
   const unixNow = useSolanaUnixNow();
   const sortedPositions = useMemo(() => {
@@ -158,6 +159,14 @@ export const useVote = (proposalKey: PublicKey) => {
       } else {
         const vsrProgram = await init(provider);
         const hsdProgram = await hsdInit(provider);
+        const hplCronsProgram = await hplCronsInit(provider);
+        const tuktukProgram = await initTuktuk(provider);
+        const freeTaskIds = nextAvailableTaskIds(
+          (await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID))
+            .taskBitmap,
+          sortedPositions.length
+        );
+
         const instructions = (
           await Promise.all(
             // vote with bigger positions first.
@@ -199,36 +208,58 @@ export const useVote = (proposalKey: PublicKey) => {
                       })
                       .instruction()
                   );
+                } else {
+                  instructions.push(
+                    await vsrProgram.methods
+                      .voteV0({
+                        choice,
+                      })
+                      .accountsPartial({
+                        proposal: proposalKey,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                        marker: markerK,
+                      })
+                      .instruction()
+                  );
                 }
+
                 instructions.push(
-                  await vsrProgram.methods
-                    .voteV0({
-                      choice,
-                    })
+                  await hsdProgram.methods
+                    .trackVoteV0()
                     .accountsPartial({
                       proposal: proposalKey,
-                      voter: provider.wallet.publicKey,
+                      marker: markerK,
                       position: position.pubkey,
-                      marker: voteMarkerKey(position.mint, proposalKey)[0],
                     })
                     .instruction()
                 );
+
+                if (endTs) {
+                  const freeTaskId = freeTaskIds.pop()!;
+                  instructions.push(
+                    await hplCronsProgram.methods
+                      .queueRelinquishExpiredVoteMarkerV0({
+                        freeTaskId,
+                        triggerTs: endTs.add(new BN(1)),
+                      })
+                      .accounts({
+                        marker: markerK,
+                        taskQueue: TASK_QUEUE_ID,
+                        position: position.pubkey,
+                        task: taskKey(TASK_QUEUE_ID, freeTaskId)[0],
+                      })
+                      .instruction()
+                  );
+                }
               }
 
-              instructions.push(
-                await hsdProgram.methods
-                  .trackVoteV0()
-                  .accountsPartial({
-                    proposal: proposalKey,
-                    marker: markerK,
-                    position: position.pubkey,
-                  })
-                  .instruction()
-              );
               return instructions;
             })
           )
-        ).filter(truthy).flat();
+        )
+          .filter(truthy)
+          .flat();
 
         if (onInstructions) {
           await onInstructions(instructions);

@@ -188,10 +188,14 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
   let (compiled_reschedule_tx, _) = compile_transaction(vec![reschedule_ix], seeds).unwrap();
 
   // Trigger the claim 10m after the epoch closes
-  let after_epoch_trigger = TriggerV0::Timestamp(epoch_ts + TEN_MINUTES);
+  let after_epoch_trigger =
+    TriggerV0::Timestamp(max(Clock::get()?.unix_timestamp, epoch_ts + TEN_MINUTES));
 
   // Trigger the transaction that schedules the next claim 10m before the next epoch ends
-  let before_epoch_trigger = TriggerV0::Timestamp(epoch_ts + (EPOCH_LENGTH as i64) - TEN_MINUTES);
+  let before_epoch_trigger = TriggerV0::Timestamp(max(
+    Clock::get()?.unix_timestamp,
+    epoch_ts + (EPOCH_LENGTH as i64) - TEN_MINUTES,
+  ));
 
   // Pay for the tasks
   let task_costs = 2 * ctx.accounts.task_queue.min_crank_reward;
