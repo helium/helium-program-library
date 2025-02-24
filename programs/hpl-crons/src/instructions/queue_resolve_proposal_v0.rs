@@ -19,8 +19,10 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::QueueTaskArgsV0,
-  TaskQueueV0, TransactionSourceV0, TriggerV0,
+  TaskQueueAuthorityV0, TaskQueueV0, TransactionSourceV0, TriggerV0,
 };
+
+use crate::error::ErrorCode;
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct QueueResolveProposalArgsV0 {
@@ -35,8 +37,7 @@ pub struct QueueResolveProposalV0<'info> {
   pub namespace: Box<Account<'info, OrganizationV0>>,
   #[account(
     has_one = proposal_config,
-    constraint = matches!(proposal.state, ProposalState::Voting { ..}),
-    constraint = proposal.owner == modular_governance::proposal::ID
+    constraint = matches!(proposal.state, ProposalState::Voting { .. }) @ ErrorCode::NotVoting,
   )]
   pub proposal: Box<Account<'info, ProposalV0>>,
   #[account(
@@ -53,6 +54,12 @@ pub struct QueueResolveProposalV0<'info> {
   pub queue_authority: AccountInfo<'info>,
   #[account(mut)]
   pub task_queue: Box<Account<'info, TaskQueueV0>>,
+  #[account(
+    seeds = [b"task_queue_authority", task_queue.key().as_ref(), queue_authority.key().as_ref()],
+    bump = task_queue_authority.bump_seed,
+    seeds::program = tuktuk_program.key(),
+  )]
+  pub task_queue_authority: Box<Account<'info, TaskQueueAuthorityV0>>,
   #[account(mut)]
   /// CHECK: via cpi
   pub task: AccountInfo<'info>,
@@ -100,7 +107,7 @@ pub fn handler(
 
   let description = format!("resolve proposal {}", ctx.accounts.proposal.name)
     .chars()
-    .take(42)
+    .take(40)
     .collect::<String>();
 
   queue_task_v0(
@@ -110,7 +117,7 @@ pub fn handler(
         payer: ctx.accounts.payer.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
         task_queue: ctx.accounts.task_queue.to_account_info(),
-        task_queue_authority: ctx.accounts.task_queue.to_account_info(),
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
         task: ctx.accounts.task.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },

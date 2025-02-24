@@ -6,4 +6,6 @@ pub enum ErrorCode {
   TaskAlreadyExists,
   #[msg("Cron job not removed from queue")]
   CronJobNotRemovedFromQueue,
+  #[msg("Proposal is not in voting state")]
+  NotVoting,
 }
