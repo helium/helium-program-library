@@ -184,6 +184,29 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### queue_resolve_proposal_v0
+
+#### Accounts
+
+| Name             | Mutability | Signer | Docs |
+| ---------------- | ---------- | ------ | ---- |
+| payer            | immut      | no     |      |
+| namespace        | immut      | no     |      |
+| proposal         | immut      | no     |      |
+| proposal_config  | immut      | no     |      |
+| state_controller | immut      | no     |      |
+| queue_authority  | immut      | no     |      |
+| task_queue       | immut      | no     |      |
+| task             | immut      | no     |      |
+| tuktuk_program   | immut      | no     |      |
+| system_program   | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### remove_entity_from_cron_v0
 
 #### Accounts
@@ -301,7 +324,23 @@ undefined
 
 undefined
 
+### OrganizationV0
+
+undefined
+
 ### PositionV0
+
+undefined
+
+### ProposalConfigV0
+
+undefined
+
+### ProposalV0
+
+undefined
+
+### ResolutionSettingsV0
 
 undefined
 
@@ -328,6 +367,14 @@ undefined
 | Field | Type |
 | ----- | ---- |
 | index | u32  |
+
+### Choice
+
+| Field  | Type   |
+| ------ | ------ |
+| weight | u128   |
+| name   | string |
+| uri    | string |
 
 ### CompiledInstructionV0
 
@@ -469,6 +516,18 @@ undefined
 | Cliff    |        |
 | Constant |        |
 
+### OrganizationV0
+
+| Field                   | Type   |
+| ----------------------- | ------ |
+| num_proposals           | u32    |
+| authority               | pubkey |
+| default_proposal_config | pubkey |
+| proposal_program        | pubkey |
+| name                    | string |
+| uri                     | string |
+| bump_seed               | u8     |
+
 ### PercentItem
 
 | Field           | Type |
@@ -490,12 +549,55 @@ undefined
 | bump_seed               | u8              |
 | vote_controller         | pubkey          |
 
+### ProposalConfigV0
+
+| Field            | Type   |
+| ---------------- | ------ |
+| vote_controller  | pubkey |
+| state_controller | pubkey |
+| on_vote_hook     | pubkey |
+| name             | string |
+| bump_seed        | u8     |
+
+### ProposalState
+
+| Variant   | Fields                                |
+| --------- | ------------------------------------- |
+| Draft     |                                       |
+| Cancelled |                                       |
+| Voting    | start_ts: i64                         |
+| Resolved  | choices: [object Object], end_ts: i64 |
+| Custom    | name: string, bin: bytes              |
+
+### ProposalV0
+
+| Field                 | Type            |
+| --------------------- | --------------- |
+| namespace             | pubkey          |
+| owner                 | pubkey          |
+| state                 | [object Object] |
+| created_at            | i64             |
+| proposal_config       | pubkey          |
+| max_choices_per_voter | u16             |
+| seed                  | bytes           |
+| name                  | string          |
+| uri                   | string          |
+| tags                  | string          |
+| choices               | [object Object] |
+| bump_seed             | u8              |
+
 ### QueueRelinquishExpiredVoteMarkerArgsV0
 
 | Field        | Type |
 | ------------ | ---- |
 | free_task_id | u16  |
 | trigger_ts   | i64  |
+
+### QueueResolveProposalArgsV0
+
+| Field        | Type |
+| ------------ | ---- |
+| free_task_id | u16  |
 
 ### RecentProposal
 
@@ -509,6 +611,37 @@ undefined
 | Field | Type |
 | ----- | ---- |
 | index | u32  |
+
+### ResolutionNode
+
+| Variant                   | Fields                   |
+| ------------------------- | ------------------------ |
+| Resolved                  | choices: [object Object] |
+| EndTimestamp              | end_ts: i64              |
+| OffsetFromStartTs         | offset: i64              |
+| ChoiceVoteWeight          | weight_threshold: u128   |
+| ChoicePercentage          | percentage: i32          |
+| Top                       | n: u16                   |
+| NumResolved               | n: u16                   |
+| And                       |                          |
+| Or                        |                          |
+| Not                       | choice_name: string      |
+| TotalWeight               | weight_threshold: u128   |
+| ChoicePercentageOfCurrent | percentage: i32          |
+
+### ResolutionSettingsV0
+
+| Field     | Type            |
+| --------- | --------------- |
+| name      | string          |
+| settings  | [object Object] |
+| bump_seed | u8              |
+
+### ResolutionStrategy
+
+| Field | Type            |
+| ----- | --------------- |
+| nodes | [object Object] |
 
 ### RunTaskReturnV0
 
