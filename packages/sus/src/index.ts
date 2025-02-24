@@ -4,7 +4,7 @@ import {
   BorshInstructionCoder,
   Idl,
 } from "@coral-xyz/anchor";
-import { decodeIdlAccount } from "@coral-xyz/anchor/dist/cjs/idl";
+import { convertIdlToCamelCase, decodeIdlAccount } from "@coral-xyz/anchor/dist/cjs/idl";
 import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import {
@@ -889,7 +889,7 @@ function decodeIdlStruct(
   }
 
   try {
-    const coder = new BorshAccountsCoder(idl);
+    const coder = new BorshAccountsCoder(convertIdlToCamelCase(idl));
     const descriminator = account.data.slice(0, 8);
     const type = idl.accounts?.find((account) =>
       new BorshAccountsCoder(idl).accountDiscriminator(account.name).equals(

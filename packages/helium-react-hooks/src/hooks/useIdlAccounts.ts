@@ -1,4 +1,5 @@
 import { BorshAccountsCoder, Idl, IdlAccounts } from "@coral-xyz/anchor";
+import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
 import { AllAccountsMap } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
 import {
@@ -21,7 +22,7 @@ export function useIdlAccounts<IDL extends Idl, A extends keyof AllAccountsMap<I
   const parser: TypedAccountParser<IdlAccounts<IDL>[A]> | undefined =
     useMemo(() => {
       if (idl) {
-        const coder = new BorshAccountsCoder(idl);
+        const coder = new BorshAccountsCoder(convertIdlToCamelCase(idl));
         const tpe = capitalizeFirstChar(type);
         return (pubkey, data) => {
           try {
