@@ -110,18 +110,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/anchor-resolvers@npm:^0.5.0":
-  version: 0.5.0
-  resolution: "@helium/anchor-resolvers@npm:0.5.0"
-  dependencies:
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-  peerDependencies:
-    "@coral-xyz/anchor": ^0.28.0
-  checksum: b20f52072bb8e1cb097e951c98a66149989035a58d3f4de1998c3043a1e04e36b6dee2e0760b99d0fbd5fa4e47f499972ad17f6560e1f3c7424e96a1e35343a9
-  languageName: node
-  linkType: hard
-
 "@helium/idls@^0.10.0-alpha.4":
   version: 0.0.0-use.local
   resolution: "@helium/idls@workspace:packages/idls"
@@ -141,7 +129,7 @@ __metadata:
   resolution: "@helium/no-emit-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
-    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/anchor-resolvers": ^0.10.0-alpha.4
     "@helium/idls": ^0.10.0-alpha.4
     "@helium/spl-utils": ^0.10.0-alpha.4
     bn.js: ^5.2.0
@@ -363,7 +351,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0, @solana/web3.js@npm:^1.78.4":
+"@solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0":
   version: 1.78.4
   resolution: "@solana/web3.js@npm:1.78.4"
   dependencies:

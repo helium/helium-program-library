@@ -157,18 +157,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@npm:^0.5.0":
-  version: 0.5.0
-  resolution: "@helium/anchor-resolvers@npm:0.5.0"
-  dependencies:
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.78.4
-  peerDependencies:
-    "@coral-xyz/anchor": ^0.28.0
-  checksum: b20f52072bb8e1cb097e951c98a66149989035a58d3f4de1998c3043a1e04e36b6dee2e0760b99d0fbd5fa4e47f499972ad17f6560e1f3c7424e96a1e35343a9
-  languageName: node
-  linkType: hard
-
 "@helium/circuit-breaker-sdk@^0.10.0-alpha.4":
   version: 0.0.0-use.local
   resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
@@ -247,7 +235,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.10.0-alpha.4
     "@helium/circuit-breaker-sdk": ^0.10.0-alpha.4
-    "@helium/nft-proxy-sdk": ^0.1.1
+    "@helium/nft-proxy-sdk": ^0.1.2
     "@helium/spl-utils": ^0.10.0-alpha.4
     "@helium/treasury-management-sdk": ^0.10.0-alpha.4
     "@helium/voter-stake-registry-sdk": ^0.10.0-alpha.4
@@ -284,15 +272,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/nft-proxy-sdk@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "@helium/nft-proxy-sdk@npm:0.1.1"
+"@helium/nft-proxy-sdk@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "@helium/nft-proxy-sdk@npm:0.1.2"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.2.17
     "@helium/modular-governance-idls": ^0.0.10
     "@solana/spl-token": ^0.3.8
-  checksum: e607ef01b2eceea499f9bd395334db2cd76f081ae134bd1b5387d1c35ff8df63f02e2cda8811ac598f6994901351a87baaa40617618eaa15bf965bd84f434b87
+  checksum: 1dd7cb64ddbcafd8d8f3dbfcd485190152bbcf75242bc8bdefe3e2a416a76332138ea0a8cf95cf243b8c37c2c9bd0d52b99e2881723bb648ea883e8c9568166a
   languageName: node
   linkType: hard
 
@@ -301,7 +289,7 @@ __metadata:
   resolution: "@helium/no-emit-sdk@workspace:packages/no-emit-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
-    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/anchor-resolvers": ^0.10.0-alpha.4
     "@helium/idls": ^0.10.0-alpha.4
     "@helium/spl-utils": ^0.10.0-alpha.4
     bn.js: ^5.2.0
@@ -360,7 +348,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.10.0-alpha.4
     "@helium/idls": ^0.10.0-alpha.4
-    "@helium/nft-proxy-sdk": ^0.1.1
+    "@helium/nft-proxy-sdk": ^0.1.2
     "@helium/spl-utils": ^0.10.0-alpha.4
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8

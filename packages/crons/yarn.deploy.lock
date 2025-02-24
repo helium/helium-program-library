@@ -213,18 +213,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@npm:^0.9.2":
-  version: 0.9.23
-  resolution: "@helium/anchor-resolvers@npm:0.9.23"
-  dependencies:
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.91.1
-  peerDependencies:
-    "@coral-xyz/anchor": ^0.28.0
-  checksum: d6050a29235b862000c6bc9519bc0567b7c10355576392b2e200c06a5795a7827e7ee92bf4e27cfb845accec3b9d888ef4e90e91851f08728bbe05fa313d0206
-  languageName: node
-  linkType: hard
-
 "@helium/circuit-breaker-sdk@^0.10.0-alpha.4":
   version: 0.0.0-use.local
   resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
@@ -255,14 +243,14 @@ __metadata:
     "@helium/idls": ^0.10.0-alpha.4
     "@helium/lazy-distributor-sdk": ^0.10.0-alpha.4
     "@helium/mobile-entity-manager-sdk": ^0.10.0-alpha.4
-    "@helium/nft-proxy-sdk": ^0.1.1
+    "@helium/nft-proxy-sdk": ^0.1.2
     "@helium/no-emit-sdk": ^0.10.0-alpha.4
-    "@helium/organization-sdk": ^0.1.1
+    "@helium/organization-sdk": ^0.1.2
     "@helium/price-oracle-sdk": ^0.10.0-alpha.4
-    "@helium/proposal-sdk": ^0.1.1
+    "@helium/proposal-sdk": ^0.1.2
     "@helium/rewards-oracle-sdk": ^0.10.0-alpha.4
     "@helium/spl-utils": ^0.10.0-alpha.4
-    "@helium/state-controller-sdk": ^0.1.1
+    "@helium/state-controller-sdk": ^0.1.2
     "@helium/treasury-management-sdk": ^0.10.0-alpha.4
     "@helium/voter-stake-registry-sdk": ^0.10.0-alpha.4
     "@solana/spl-token": ^0.3.8
@@ -296,7 +284,7 @@ __metadata:
     "@helium/lazy-distributor-sdk": ^0.10.0-alpha.4
     "@helium/rewards-oracle-sdk": ^0.10.0-alpha.4
     "@helium/spl-utils": ^0.10.0-alpha.4
-    "@helium/tuktuk-sdk": ^0.0.1
+    "@helium/tuktuk-sdk": ^0.0.3
     "@metaplex-foundation/mpl-bubblegum": ^0.7.0
     "@solana/spl-token": ^0.3.8
     "@types/bs58": ^4.0.1
@@ -372,7 +360,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.10.0-alpha.4
     "@helium/circuit-breaker-sdk": ^0.10.0-alpha.4
-    "@helium/nft-proxy-sdk": ^0.1.1
+    "@helium/nft-proxy-sdk": ^0.1.2
     "@helium/spl-utils": ^0.10.0-alpha.4
     "@helium/treasury-management-sdk": ^0.10.0-alpha.4
     "@helium/voter-stake-registry-sdk": ^0.10.0-alpha.4
@@ -445,25 +433,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/modular-governance-idls@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "@helium/modular-governance-idls@npm:0.1.1"
+"@helium/modular-governance-idls@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "@helium/modular-governance-idls@npm:0.1.2"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@solana/web3.js": ^1.78.4
-  checksum: 0c303b87227711623e9d984080a8bd0c9a8b091d8bd5e643caa6c599763175c64e6461819f6b21d71e6b2e4952f5d8823c3c96697a113e602dc4fb8ea7f690a8
+  checksum: 65bb41d6cdf4fedfc735a062fd453649b039c41feb9179aad0a7e49f2602d638bcf1e68a3348ff60e252db887e1874711c29ff5008ebf428ef5d7fd1426218e4
   languageName: node
   linkType: hard
 
-"@helium/nft-proxy-sdk@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "@helium/nft-proxy-sdk@npm:0.1.1"
+"@helium/nft-proxy-sdk@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "@helium/nft-proxy-sdk@npm:0.1.2"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.2.17
     "@helium/modular-governance-idls": ^0.0.10
     "@solana/spl-token": ^0.3.8
-  checksum: e607ef01b2eceea499f9bd395334db2cd76f081ae134bd1b5387d1c35ff8df63f02e2cda8811ac598f6994901351a87baaa40617618eaa15bf965bd84f434b87
+  checksum: 1dd7cb64ddbcafd8d8f3dbfcd485190152bbcf75242bc8bdefe3e2a416a76332138ea0a8cf95cf243b8c37c2c9bd0d52b99e2881723bb648ea883e8c9568166a
   languageName: node
   linkType: hard
 
@@ -472,7 +460,7 @@ __metadata:
   resolution: "@helium/no-emit-sdk@workspace:packages/no-emit-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
-    "@helium/anchor-resolvers": ^0.5.0
+    "@helium/anchor-resolvers": ^0.10.0-alpha.4
     "@helium/idls": ^0.10.0-alpha.4
     "@helium/spl-utils": ^0.10.0-alpha.4
     bn.js: ^5.2.0
@@ -484,15 +472,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/organization-sdk@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "@helium/organization-sdk@npm:0.1.1"
+"@helium/organization-sdk@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "@helium/organization-sdk@npm:0.1.2"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.5.0
-    "@helium/modular-governance-idls": ^0.1.1
-    "@helium/proposal-sdk": ^0.1.1
-  checksum: 26a1dc1bb0f56b9bb3d4c89560c46f24d4b776f8c89318c30acf3234c12db7a74494982280fe84b892e8bc99a912f9120e80ebfbfc46ff64db6da10ea2a05780
+    "@helium/modular-governance-idls": ^0.1.2
+    "@helium/proposal-sdk": ^0.1.2
+  checksum: f313faf8da2fd2b4406c99ce55fbd0f999b6b7f05cc99f227cfc8735ec149d12b4a20d63acdcd9c0b2ab66fb68739d427693ca5a00f12d9fc71569a70a85eb79
   languageName: node
   linkType: hard
 
@@ -512,14 +500,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/proposal-sdk@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "@helium/proposal-sdk@npm:0.1.1"
+"@helium/proposal-sdk@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "@helium/proposal-sdk@npm:0.1.2"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.5.0
-    "@helium/modular-governance-idls": ^0.1.1
-  checksum: cb09fe55175ff80ca3098ab92b97a112cd0ff852b8522d0d405ae2ef415062a406081ae573e88784fcfe40835fd28d030818cee5e570966d1256c6ef74148b33
+    "@helium/modular-governance-idls": ^0.1.2
+  checksum: c7b48dee525442c471461f87ea669f048a18ed77a7b6998964c1f925bcbe05b4afd40fd46a99aec317dd62ca7aafa21443f0d8ba6eff414c53d1eb4ed7e1cf9d
   languageName: node
   linkType: hard
 
@@ -562,14 +550,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/state-controller-sdk@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "@helium/state-controller-sdk@npm:0.1.1"
+"@helium/state-controller-sdk@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "@helium/state-controller-sdk@npm:0.1.2"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.5.0
-    "@helium/modular-governance-idls": ^0.1.1
-  checksum: a9ca7721e5e6112a24e4bb727ff3bf649eaa0a7ef3cd0385562103241bee18d15bf5aad9b8a08053c9649709417e8b7c0c5744f992cdafdcc4f2c7e08aaecf07
+    "@helium/modular-governance-idls": ^0.1.2
+  checksum: 7f71baca738176ae4829dd9692423aa3ec5a9a4789c198ae3dda25bd54e29f5e181018a77e967d70d441b37452af31eea265d311814a0b93a1311842699ff438
   languageName: node
   linkType: hard
 
@@ -591,25 +579,25 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/tuktuk-idls@npm:^0.0.1":
-  version: 0.0.1
-  resolution: "@helium/tuktuk-idls@npm:0.0.1"
+"@helium/tuktuk-idls@npm:^0.0.3":
+  version: 0.0.3
+  resolution: "@helium/tuktuk-idls@npm:0.0.3"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@solana/web3.js": ^1.95.2
-  checksum: 0df4c2975a1c2931bad0a42e727d130282e3ed95f026fb9d241e01a5463e707d9ddcbf5496539eb8fc4cbbc59cd4132bb04e3ad13c72ef95c38d30dc9e663886
+  checksum: d153f39fc381dcb58aa2297c4b3151c4e50528e7e44524457322b384a7dbda149dacccaac7d352c935b787e4efa9b8f8abdec445713c3d362944d0ff3661d848
   languageName: node
   linkType: hard
 
-"@helium/tuktuk-sdk@npm:^0.0.1":
-  version: 0.0.1
-  resolution: "@helium/tuktuk-sdk@npm:0.0.1"
+"@helium/tuktuk-sdk@npm:^0.0.3":
+  version: 0.0.3
+  resolution: "@helium/tuktuk-sdk@npm:0.0.3"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
-    "@helium/anchor-resolvers": ^0.9.2
-    "@helium/tuktuk-idls": ^0.0.1
+    "@helium/anchor-resolvers": ^0.10.0-alpha.4
+    "@helium/tuktuk-idls": ^0.0.3
     js-sha256: ^0.11.0
-  checksum: cf78afb27d8915914be50f2d238c2a5f378720cca2dafc9e1e3404036803c7b474d1a631c96a3f0660dacc96b607365b50268edfede8612b4e56b02d28e3fb88
+  checksum: c0eb2d207d5f503c4464902c4cdeb2685aad8e157552141e5893958c4bef2d46b04f9a60f491224cd16101f708005c635f099b33d6094a49b2dcd7dec9b2507d
   languageName: node
   linkType: hard
 
@@ -620,7 +608,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.10.0-alpha.4
     "@helium/idls": ^0.10.0-alpha.4
-    "@helium/nft-proxy-sdk": ^0.1.1
+    "@helium/nft-proxy-sdk": ^0.1.2
     "@helium/spl-utils": ^0.10.0-alpha.4
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
