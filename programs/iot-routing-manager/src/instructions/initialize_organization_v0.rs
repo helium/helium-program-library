@@ -220,7 +220,7 @@ pub fn handler(ctx: Context<InitializeOrganizationV0>) -> Result<()> {
     },
   )?;
 
-  let dc_fee: u64 = ctx.accounts.routing_manager.oui_fee_usd;
+  let dc_fee: u64 = ctx.accounts.routing_manager.oui_fee_usd * 100_000_u64;
 
   burn_without_tracking_v0(
     CpiContext::new(

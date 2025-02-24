@@ -84,7 +84,7 @@ pub fn handler(
     ctx.accounts.net_id.current_addr_offset = end_addr + 1;
   }
 
-  let dc_fee: u64 = ctx.accounts.routing_manager.devaddr_fee_usd;
+  let dc_fee: u64 = ctx.accounts.routing_manager.devaddr_fee_usd * 100_000_u64;
 
   burn_without_tracking_v0(
     CpiContext::new(
