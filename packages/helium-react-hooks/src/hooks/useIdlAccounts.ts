@@ -9,8 +9,8 @@ import {
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
 
-export const capitalizeFirstChar = (str) =>
-  str.charAt(0).toUpperCase() + str.substring(1);
+export const lowerFirstChar = (str) =>
+  str.charAt(0).toLowerCase() + str.substring(1);
 
 export function useIdlAccounts<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
   keys: PublicKey[] | undefined,
@@ -23,7 +23,7 @@ export function useIdlAccounts<IDL extends Idl, A extends keyof AllAccountsMap<I
     useMemo(() => {
       if (idl) {
         const coder = new BorshAccountsCoder(convertIdlToCamelCase(idl));
-        const tpe = capitalizeFirstChar(type);
+        const tpe = lowerFirstChar(type);
         return (pubkey, data) => {
           try {
             if (data.data.length === 0) return;
