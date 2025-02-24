@@ -4,14 +4,13 @@ use anchor_lang::prelude::*;
 #[derive(Default, InitSpace)]
 pub struct IotRoutingManagerV0 {
   pub sub_dao: Pubkey,
-  pub iot_mint: Pubkey,
-  pub iot_price_oracle: Pubkey,
+  pub dc_mint: Pubkey,
   pub update_authority: Pubkey,
   pub net_id_authority: Pubkey,
   pub collection: Pubkey, // The metaplex collection to be issued for Rewardable Entities
   // with 6 decimals of precision
-  pub devaddr_price_usd: u64,
-  pub oui_price_usd: u64,
+  pub devaddr_fee_usd: u64,
+  pub oui_fee_usd: u64,
   pub next_oui_id: u64,
   pub bump_seed: u8,
 }

@@ -18,8 +18,8 @@ import {
 import {
   batchParallelInstructionsWithPriorityFee,
   HNT_MINT,
+  DC_MINT,
   IOT_MINT,
-  IOT_PRICE_FEED,
   sendInstructionsWithPriorityFee,
   truthy,
 } from "@helium/spl-utils";
@@ -229,15 +229,15 @@ export async function run(args: any = process.argv) {
         await irm.methods
           .initializeRoutingManagerV0({
             metadataUrl: argv.metadataUrl,
-            devaddrPriceUsd: new anchor.BN(100_000000),
-            ouiPriceUsd: new anchor.BN(100_000000),
+            devaddrFeeUsd: new anchor.BN(100_000000),
+            ouiFeeUsd: new anchor.BN(100_000000),
           })
           .accounts({
             updateAuthority: wallet.publicKey,
             netIdAuthority: wallet.publicKey,
-            dntMint: IOT_MINT,
+            dcMint: DC_MINT,
             subDao,
-            iotPriceOracle: IOT_PRICE_FEED,
+            dao,
           })
           .instruction(),
       ],

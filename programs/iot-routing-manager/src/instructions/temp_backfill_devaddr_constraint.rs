@@ -22,7 +22,7 @@ pub struct TempBackfillDevaddrConstraint<'info> {
   #[account(mut)]
   pub net_id: Box<Account<'info, NetIdV0>>,
   #[account(
-    has_one = iot_mint,
+    has_one = dc_mint,
   )]
   pub routing_manager: Box<Account<'info, IotRoutingManagerV0>>,
   #[account(
@@ -32,7 +32,7 @@ pub struct TempBackfillDevaddrConstraint<'info> {
   )]
   pub organization: Box<Account<'info, OrganizationV0>>,
   #[account(mut)]
-  pub iot_mint: Box<Account<'info, Mint>>,
+  pub dc_mint: Box<Account<'info, Mint>>,
   #[account(
     init,
     payer = payer,

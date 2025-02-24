@@ -1,18 +1,27 @@
-use crate::error::ErrorCode;
-use crate::{net_id_seeds, routing_manager_seeds, state::*, TESTING};
+use crate::{net_id_seeds, routing_manager_seeds, state::*};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
-use anchor_spl::token::{burn, Burn, Mint, Token, TokenAccount};
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{Mint, Token, TokenAccount},
+};
 use bubblegum_cpi::program::Bubblegum;
 use bubblegum_cpi::TreeConfig;
+use data_credits::{
+  cpi::{
+    accounts::{BurnCommonV0, BurnWithoutTrackingV0},
+    burn_without_tracking_v0,
+  },
+  program::DataCredits,
+  BurnWithoutTrackingArgsV0, DataCreditsV0,
+};
 use helium_entity_manager::program::HeliumEntityManager;
 use helium_entity_manager::{
   cpi::accounts::IssueProgramEntityV0, cpi::issue_program_entity_v0, ProgramApprovalV0,
 };
 use helium_entity_manager::{IssueProgramEntityArgsV0, KeySerialization, SharedMerkleV0};
 use helium_sub_daos::{DaoV0, SubDaoV0};
-use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 
 #[cfg(feature = "devnet")]
 pub const ENTITY_METADATA_URL: &str = "https://entities.nft.test-helium.com";
@@ -34,26 +43,31 @@ pub struct InitializeOrganizationV0<'info> {
     mut,
     has_one = collection,
     has_one = sub_dao,
-    has_one = iot_mint,
-    has_one = iot_price_oracle,
+    has_one = dc_mint,
   )]
   pub routing_manager: Box<Account<'info, IotRoutingManagerV0>>,
   #[account(
     has_one = routing_manager,
   )]
   pub net_id: Box<Account<'info, NetIdV0>>,
+  #[account(
+    seeds=[
+      "dc".as_bytes(),
+      dc_mint.key().as_ref(),
+    ],
+    seeds::program = data_credits_program.key(),
+    bump = data_credits.data_credits_bump,
+    has_one = dc_mint
+  )]
+  pub data_credits: Box<Account<'info, DataCreditsV0>>,
   #[account(mut)]
-  pub iot_mint: Box<Account<'info, Mint>>,
+  pub dc_mint: Box<Account<'info, Mint>>,
   #[account(
     mut,
-    associated_token::mint = iot_mint,
+    associated_token::mint = dc_mint,
     associated_token::authority = payer,
   )]
-  pub payer_iot_account: Box<Account<'info, TokenAccount>>,
-  #[account(
-    constraint = iot_price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceFeedStale,
-  )]
-  pub iot_price_oracle: Box<Account<'info, PriceUpdateV2>>,
+  pub payer_dc_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: The new authority for this OUI
   pub authority: AccountInfo<'info>,
   #[account(
@@ -141,6 +155,8 @@ pub struct InitializeOrganizationV0<'info> {
   pub system_program: Program<'info, System>,
   pub helium_entity_manager_program: Program<'info, HeliumEntityManager>,
   pub token_program: Program<'info, Token>,
+  pub associated_token_program: Program<'info, AssociatedToken>,
+  pub data_credits_program: Program<'info, DataCredits>,
 }
 
 pub fn handler(ctx: Context<InitializeOrganizationV0>) -> Result<()> {
@@ -204,53 +220,25 @@ pub fn handler(ctx: Context<InitializeOrganizationV0>) -> Result<()> {
     },
   )?;
 
-  let message = ctx.accounts.iot_price_oracle.price_message;
-  let current_time = Clock::get()?.unix_timestamp;
-  require_gte!(
-    message
-      .publish_time
-      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
-    current_time,
-    ErrorCode::PythPriceNotFound
-  );
-  let iot_price = message.ema_price;
-  require_gt!(iot_price, 0);
+  let dc_fee: u64 = ctx.accounts.routing_manager.oui_fee_usd;
 
-  // Remove the confidence from the price to use the most conservative price
-  // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
-  let iot_price_with_conf = iot_price
-    .checked_sub(i64::try_from(message.ema_conf.checked_mul(2).unwrap()).unwrap())
-    .unwrap();
-  // Exponent is a negative number, likely -8
-  // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
-  // by the exponent
-  let exponent_dec = 10_u64
-    .checked_pow(u32::try_from(-message.exponent).unwrap())
-    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
-
-  require_gt!(iot_price_with_conf, 0);
-  let iot_fee = ctx
-    .accounts
-    .routing_manager
-    .oui_price_usd
-    .checked_mul(exponent_dec)
-    .unwrap()
-    .checked_div(iot_price_with_conf.try_into().unwrap())
-    .unwrap();
-
-  if iot_fee > 0 {
-    burn(
-      CpiContext::new(
-        ctx.accounts.token_program.to_account_info(),
-        Burn {
-          mint: ctx.accounts.iot_mint.to_account_info(),
-          from: ctx.accounts.payer_iot_account.to_account_info(),
-          authority: ctx.accounts.payer.to_account_info(),
+  burn_without_tracking_v0(
+    CpiContext::new(
+      ctx.accounts.data_credits_program.to_account_info(),
+      BurnWithoutTrackingV0 {
+        burn_accounts: BurnCommonV0 {
+          data_credits: ctx.accounts.data_credits.to_account_info(),
+          owner: ctx.accounts.payer.to_account_info(),
+          dc_mint: ctx.accounts.dc_mint.to_account_info(),
+          burner: ctx.accounts.payer_dc_account.to_account_info(),
+          associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
+          token_program: ctx.accounts.token_program.to_account_info(),
+          system_program: ctx.accounts.system_program.to_account_info(),
         },
-      ),
-      iot_fee,
-    )?;
-  }
+      },
+    ),
+    BurnWithoutTrackingArgsV0 { amount: dc_fee },
+  )?;
 
   ctx.accounts.routing_manager.next_oui_id += 1;
   Ok(())

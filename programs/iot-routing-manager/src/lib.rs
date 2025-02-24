@@ -11,6 +11,8 @@ pub mod state;
 pub use instructions::*;
 pub use state::*;
 
+pub const TESTING: bool = std::option_env!("TESTING").is_some();
+
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
   name: "IOT Routing Manager",

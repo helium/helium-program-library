@@ -44,7 +44,7 @@ pub struct TempBackfillOrganization<'info> {
     mut,
     has_one = collection,
     has_one = sub_dao,
-    has_one = iot_mint,
+    has_one = dc_mint,
   )]
   pub routing_manager: Box<Account<'info, IotRoutingManagerV0>>,
   #[account(
@@ -52,7 +52,7 @@ pub struct TempBackfillOrganization<'info> {
   )]
   pub net_id: Box<Account<'info, NetIdV0>>,
   #[account(mut)]
-  pub iot_mint: Box<Account<'info, Mint>>,
+  pub dc_mint: Box<Account<'info, Mint>>,
   /// CHECK: The new authority for this OUI
   pub authority: AccountInfo<'info>,
   #[account(

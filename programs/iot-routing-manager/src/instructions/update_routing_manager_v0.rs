@@ -35,11 +35,11 @@ pub fn handler(
   }
 
   if args.devaddr_price_usd.is_some() {
-    routing_manager.devaddr_price_usd = args.devaddr_price_usd.unwrap();
+    routing_manager.devaddr_fee_usd = args.devaddr_price_usd.unwrap();
   }
 
   if args.oui_price_usd.is_some() {
-    routing_manager.oui_price_usd = args.oui_price_usd.unwrap();
+    routing_manager.oui_fee_usd = args.oui_price_usd.unwrap();
   }
 
   Ok(())
