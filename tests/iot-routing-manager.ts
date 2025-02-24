@@ -120,8 +120,8 @@ describe("iot-routing-manager", () => {
     } = await irmProgram.methods
       .initializeRoutingManagerV0({
         metadataUrl: "https://some/url",
-        devaddrPriceUsd: new anchor.BN(100_000000),
-        ouiPriceUsd: new anchor.BN(100_000000),
+        devaddrFeeUsd: new anchor.BN(100_000000),
+        ouiFeeUsd: new anchor.BN(100_000000),
       })
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -129,9 +129,9 @@ describe("iot-routing-manager", () => {
       .accounts({
         updateAuthority: me,
         netIdAuthority: me,
-        dntMint: iotMint,
+        dcMint: dcMint,
         subDao,
-        iotPriceOracle: IOT_PRICE_FEED,
+        dao,
       })
       .rpcAndKeys({ skipPreflight: true });
 
@@ -151,8 +151,8 @@ describe("iot-routing-manager", () => {
       } = await irmProgram.methods
         .initializeRoutingManagerV0({
           metadataUrl: "https://some/url",
-          devaddrPriceUsd: new anchor.BN(100_000000),
-          ouiPriceUsd: new anchor.BN(100_000000),
+          devaddrFeeUsd: new anchor.BN(100_000000),
+          ouiFeeUsd: new anchor.BN(100_000000),
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -161,7 +161,7 @@ describe("iot-routing-manager", () => {
           updateAuthority: me,
           netIdAuthority: me,
           subDao,
-          iotPriceOracle: IOT_PRICE_FEED,
+          dao,
         })
         .rpcAndKeys({ skipPreflight: true });
       routingManager = routingManagerK!;
@@ -307,8 +307,8 @@ describe("iot-routing-manager", () => {
         .updateRoutingManagerV0({
           updateAuthority: PublicKey.default,
           netIdAuthority: PublicKey.default,
-          devaddrPriceUsd: new anchor.BN(10_000000),
-          ouiPriceUsd: new anchor.BN(10_000000),
+          devaddrFeeUsd: new anchor.BN(100_000000),
+          ouiFeeUsd: new anchor.BN(100_000000),
         })
         .accounts({
           routingManager,
@@ -323,11 +323,11 @@ describe("iot-routing-manager", () => {
       expect(routingManagerAcc.netIdAuthority.toBase58).to.eq(
         PublicKey.default.toBase58()
       );
-      expect(routingManagerAcc.devaddrPriceUsd.toNumber()).to.eq(
-        new anchor.BN(10_000000).toNumber()
+      expect(routingManagerAcc.devaddrFeeUsd.toNumber()).to.eq(
+        new anchor.BN(100_000000).toNumber()
       );
-      expect(routingManagerAcc.ouiPriceUsd.toNumber()).to.eq(
-        new anchor.BN(10_000000).toNumber()
+      expect(routingManagerAcc.ouiFeeUsd.toNumber()).to.eq(
+        new anchor.BN(100_000000).toNumber()
       );
     });
   });

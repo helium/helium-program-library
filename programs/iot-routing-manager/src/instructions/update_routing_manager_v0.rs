@@ -6,8 +6,8 @@ use crate::IotRoutingManagerV0;
 pub struct UpdateRoutingManagerArgsV0 {
   update_authority: Option<Pubkey>,
   net_id_authority: Option<Pubkey>,
-  devaddr_price_usd: Option<u64>,
-  oui_price_usd: Option<u64>,
+  devaddr_fee_usd: Option<u64>,
+  oui_fee_usd: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -34,12 +34,12 @@ pub fn handler(
     routing_manager.net_id_authority = args.net_id_authority.unwrap();
   }
 
-  if args.devaddr_price_usd.is_some() {
-    routing_manager.devaddr_fee_usd = args.devaddr_price_usd.unwrap();
+  if args.devaddr_fee_usd.is_some() {
+    routing_manager.devaddr_fee_usd = args.devaddr_fee_usd.unwrap();
   }
 
-  if args.oui_price_usd.is_some() {
-    routing_manager.oui_fee_usd = args.oui_price_usd.unwrap();
+  if args.oui_fee_usd.is_some() {
+    routing_manager.oui_fee_usd = args.oui_fee_usd.unwrap();
   }
 
   Ok(())

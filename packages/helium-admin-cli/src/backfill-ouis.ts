@@ -413,8 +413,8 @@ export async function run(args: any = process.argv) {
         .updateRoutingManagerV0({
           updateAuthority: null,
           netIdAuthority: ouiWallet,
-          devaddrPriceUsd: null,
-          ouiPriceUsd: null,
+          devaddrFeeUsd: null,
+          ouiFeeUsd: null,
         })
         .accounts({
           updateAuthority: wallet.publicKey,
