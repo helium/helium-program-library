@@ -118,7 +118,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.10.0-alpha.3":
+"@helium/account-fetch-cache@^0.10.0-alpha.4":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -140,7 +140,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.10.0-alpha.3":
+"@helium/anchor-resolvers@^0.10.0-alpha.4":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -154,14 +154,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/spl-utils@^0.10.0-alpha.3":
+"@helium/spl-utils@^0.10.0-alpha.4":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
-    "@helium/account-fetch-cache": ^0.10.0-alpha.3
+    "@helium/account-fetch-cache": ^0.10.0-alpha.4
     "@helium/address": ^4.10.2
-    "@helium/anchor-resolvers": ^0.10.0-alpha.3
+    "@helium/anchor-resolvers": ^0.10.0-alpha.4
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -182,9 +182,9 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.10.0-alpha.3
+    "@helium/account-fetch-cache": ^0.10.0-alpha.4
     "@helium/address": ^4.10.2
-    "@helium/spl-utils": ^0.10.0-alpha.3
+    "@helium/spl-utils": ^0.10.0-alpha.4
     "@jup-ag/api": ^6.0.6
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
