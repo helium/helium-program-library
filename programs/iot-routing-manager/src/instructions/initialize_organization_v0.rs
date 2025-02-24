@@ -1,4 +1,4 @@
-use crate::{net_id_seeds, routing_manager_seeds, state::*};
+use crate::{error::ErrorCode, net_id_seeds, routing_manager_seeds, state::*};
 use account_compression_cpi::{program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::hash::hash;
@@ -220,7 +220,12 @@ pub fn handler(ctx: Context<InitializeOrganizationV0>) -> Result<()> {
     },
   )?;
 
-  let dc_fee: u64 = ctx.accounts.routing_manager.oui_fee_usd * 100_000_u64;
+  let dc_fee: u64 = ctx
+    .accounts
+    .routing_manager
+    .oui_fee_usd
+    .checked_mul(100_000)
+    .ok_or(ErrorCode::ArithmeticError)?;
 
   burn_without_tracking_v0(
     CpiContext::new(
