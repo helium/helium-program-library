@@ -1,4 +1,4 @@
-import { Provider } from "@coral-xyz/anchor";
+import { Idl, Provider } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { Program } from "@coral-xyz/anchor";
 import circuitBreakerIdl from "./idl/circuit_breaker.json";
@@ -21,8 +21,14 @@ export async function fetchBackwardsCompatibleIdl(
   provider: Provider
 ) {
   const idl = await Program.fetchIdl(programId, provider);
+  return useBackwardsCompatibleIdl(programId, idl);
+}
+
+export function useBackwardsCompatibleIdl(
+  programId: PublicKey,
+  idl: Idl | null | undefined,
+) {
   // This is an Anchor 0.30+ IDL. Return the old IDLs
-  // @ts-ignore
   if (!idl || !idl?.address) {
     return IDLS_BY_PROGRAM[programId.toBase58()] || idl;
   }
