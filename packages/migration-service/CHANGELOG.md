@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.10.0-alpha.12](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.12) (2025-02-25)
+
+**Note:** Version bump only for package @helium/migration-service
+
+
+
+
+
 # [0.10.0-alpha.11](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.11) (2025-02-25)
 
 **Note:** Version bump only for package @helium/migration-service
