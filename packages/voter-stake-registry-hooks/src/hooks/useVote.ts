@@ -2,16 +2,9 @@ import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { init as hsdInit } from "@helium/helium-sub-daos-sdk";
 import { useProposal } from "@helium/modular-governance-hooks";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
-import {
-  Status,
-  batchParallelInstructions,
-  truthy
-} from "@helium/spl-utils";
+import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import {
-  PublicKey,
-  TransactionInstruction
-} from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
@@ -166,9 +159,8 @@ export const useVote = (proposalKey: PublicKey) => {
               const markerK = voteMarkerKey(position.mint, proposalKey)[0];
 
               const canVote = canPositionVote(index, choice);
+              const instructions: TransactionInstruction[] = [];
               if (canVote) {
-                const instructions: TransactionInstruction[] = [];
-
                 if (position.isProxiedToMe) {
                   if (
                     marker &&
@@ -215,20 +207,25 @@ export const useVote = (proposalKey: PublicKey) => {
                 );
               }
 
-              instructions.push(
-                await hsdProgram.methods
-                  .trackVoteV0()
-                  .accounts({
-                    proposal: proposalKey,
-                    marker: markerK,
-                    position: position.pubkey,
-                  })
-                  .instruction()
-              );
+              if (position.isDelegated) {
+                instructions.push(
+                  await hsdProgram.methods
+                    .trackVoteV0()
+                    .accounts({
+                      proposal: proposalKey,
+                      marker: markerK,
+                      position: position.pubkey,
+                    })
+                    .instruction()
+                );
+              }
+
               return instructions;
             })
           )
-        ).filter(truthy).flat();
+        )
+          .filter(truthy)
+          .flat();
 
         if (onInstructions) {
           await onInstructions(instructions);
