@@ -166,6 +166,13 @@ pub struct RecentProposal {
   pub ts: i64,
 }
 
+const ONE_WEEK: i64 = 60 * 60 * 24 * 7;
+impl RecentProposal {
+  pub fn is_in_progress(&self, curr_ts: i64) -> bool {
+    self.ts + ONE_WEEK > curr_ts
+  }
+}
+
 impl DaoEpochInfoV0 {
   pub fn size() -> usize {
     60 + 8 + std::mem::size_of::<DaoEpochInfoV0>()
