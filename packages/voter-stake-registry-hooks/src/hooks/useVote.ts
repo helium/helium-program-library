@@ -175,9 +175,8 @@ export const useVote = (proposalKey: PublicKey) => {
               const markerK = voteMarkerKey(position.mint, proposalKey)[0];
 
               const canVote = canPositionVote(index, choice);
+              const instructions: TransactionInstruction[] = [];
               if (canVote) {
-                const instructions: TransactionInstruction[] = [];
-
                 if (position.isProxiedToMe) {
                   if (
                     marker &&
