@@ -166,17 +166,18 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name            | Mutability | Signer | Docs |
-| --------------- | ---------- | ------ | ---- |
-| payer           | immut      | no     |      |
-| voter           | immut      | no     |      |
-| marker          | immut      | no     |      |
-| position        | immut      | no     |      |
-| queue_authority | immut      | no     |      |
-| task_queue      | immut      | no     |      |
-| task            | immut      | no     |      |
-| tuktuk_program  | immut      | no     |      |
-| system_program  | immut      | no     |      |
+| Name                 | Mutability | Signer | Docs |
+| -------------------- | ---------- | ------ | ---- |
+| payer                | immut      | no     |      |
+| voter                | immut      | no     |      |
+| marker               | immut      | no     |      |
+| position             | immut      | no     |      |
+| queue_authority      | immut      | no     |      |
+| task_queue           | immut      | no     |      |
+| task_queue_authority | immut      | no     |      |
+| task                 | immut      | no     |      |
+| tuktuk_program       | immut      | no     |      |
+| system_program       | immut      | no     |      |
 
 #### Args
 

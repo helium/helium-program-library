@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.10.0-alpha.10",
+  "version": "0.10.0-alpha.11",
   "description": "Receives requests from Helius webhooks",
   "repository": {
     "type": "git",
