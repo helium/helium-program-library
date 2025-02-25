@@ -116,7 +116,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                         proposal,
                         voter: provider.wallet.publicKey,
                         position: position.pubkey,
-                        marker: voteMarkerKey(position.mint, proposal)[0],
+                        marker: markerK,
                         proxyAssignment: proxyAssignmentKey(
                           registrar!.proxyConfig,
                           position.mint,
@@ -133,8 +133,9 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                     })
                     .accountsPartial({
                       proposal,
-                      voter: provider.wallet.publicKey,
                       position: position.pubkey,
+                      marker: markerK,
+                      voter: provider.wallet.publicKey,
                     })
                     .instruction()
                 );
