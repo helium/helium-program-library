@@ -98,9 +98,8 @@ export const useRelinquishVote = (proposal: PublicKey) => {
               const marker = markers?.[index]?.info;
               const markerK = voteMarkerKey(position.mint, proposal)[0];
 
+              const instructions: TransactionInstruction[] = [];
               if (marker && canRelinquishVote) {
-                const instructions: TransactionInstruction[] = [];
-
                 if (position.isProxiedToMe) {
                   if (marker.proxyIndex < (position.proxy?.index || 0)) {
                     // Do not vote with a position that has been delegated to us, but voting overidden
