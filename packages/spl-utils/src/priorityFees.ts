@@ -158,7 +158,20 @@ export async function withPriorityFees({
       ...rest,
     };
     const tx = await populateMissingDraftInfo(connection, temp);
-    const estimatedFee = await estimateComputeUnits(connection, toVersionedTx(tx));
+    let ixWithComputeUnits = tx.instructions;
+    if (
+      !tx.instructions.some((ix) =>
+        ix.programId.equals(ComputeBudgetProgram.programId)
+      )
+    ) {
+      ixWithComputeUnits = [
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: 1000000,
+        }),
+        ...tx.instructions,
+      ];
+    }
+    const estimatedFee = await estimateComputeUnits(connection, toVersionedTx({ ...tx, instructions: ixWithComputeUnits }));
     if (estimatedFee) {
       computeUnits = Math.ceil(estimatedFee * (computeScaleUp || 1.1));
     } else {
