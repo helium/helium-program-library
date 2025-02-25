@@ -144,7 +144,7 @@ export const useVote = (proposalKey: PublicKey) => {
     }: {
       choice: number; // Instead of sending the transaction, let the caller decide
       onInstructions?: (
-        instructions: TransactionInstruction[]
+        instructions: TransactionInstruction[][]
       ) => Promise<void>;
       onProgress?: (status: Status) => void;
       maxSignatureBatch?: number;
@@ -167,7 +167,7 @@ export const useVote = (proposalKey: PublicKey) => {
           sortedPositions.length
         );
 
-        const instructions = (
+        const instructions: TransactionInstruction[][] = (
           await Promise.all(
             // vote with bigger positions first.
             sortedPositions.map(async (position, index) => {
@@ -259,8 +259,7 @@ export const useVote = (proposalKey: PublicKey) => {
             })
           )
         )
-          .filter(truthy)
-          .flat();
+          .filter(i => i.length > 0)
 
         if (onInstructions) {
           await onInstructions(instructions);

@@ -13,7 +13,7 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::QueueTaskArgsV0,
-  TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
+  TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
 use voter_stake_registry::state::{PositionV0, VoteMarkerV0};
 
@@ -45,6 +45,12 @@ pub struct QueueRelinquishExpiredVoteMarkerV0<'info> {
   pub queue_authority: AccountInfo<'info>,
   #[account(mut)]
   pub task_queue: Box<Account<'info, TaskQueueV0>>,
+  #[account(
+    seeds = [b"task_queue_authority", task_queue.key().as_ref(), queue_authority.key().as_ref()],
+    bump = task_queue_authority.bump_seed,
+    seeds::program = tuktuk_program.key(),
+  )]
+  pub task_queue_authority: Box<Account<'info, TaskQueueAuthorityV0>>,
   #[account(mut)]
   /// CHECK: via cpi
   pub task: AccountInfo<'info>,
@@ -101,7 +107,7 @@ pub fn handler(
         payer,
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
         task_queue: ctx.accounts.task_queue.to_account_info(),
-        task_queue_authority: ctx.accounts.task_queue.to_account_info(),
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
         task: ctx.accounts.task.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },

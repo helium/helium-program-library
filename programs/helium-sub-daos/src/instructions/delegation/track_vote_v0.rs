@@ -56,6 +56,7 @@ pub struct TrackVoteV0<'info> {
     bump,
   )]
   pub dao_epoch_info: Account<'info, DaoEpochInfoV0>,
+  pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
 }
 pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {

@@ -679,7 +679,7 @@ export async function batchParallelInstructions({
   addressLookupTableAddresses = [],
 }: {
   provider: AnchorProvider;
-  instructions: TransactionInstruction[];
+  instructions: TransactionInstruction[] | TransactionInstruction[][];
   onProgress?: (status: Status) => void;
   triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
   extraSigners?: Keypair[];
@@ -695,7 +695,11 @@ export async function batchParallelInstructions({
   );
 
   for (const instruction of instructions) {
-    currentTxInstructions.push(instruction);
+    if (Array.isArray(instruction)) {
+      currentTxInstructions.push(...instruction);
+    } else {
+      currentTxInstructions.push(instruction);
+    }
     const tx = await toVersionedTx({
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
@@ -719,7 +723,11 @@ export async function batchParallelInstructions({
           signers: extraSigners,
           addressLookupTables,
         });
-        currentTxInstructions = [instruction];
+        if (Array.isArray(instruction)) {
+          currentTxInstructions = instruction;
+        } else {
+          currentTxInstructions = [instruction];
+        }
       } else {
         throw e;
       }
