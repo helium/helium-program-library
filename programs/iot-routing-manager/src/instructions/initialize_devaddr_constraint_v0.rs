@@ -89,6 +89,7 @@ pub fn handler(
     .routing_manager
     .devaddr_fee_usd
     .checked_mul(100_000)
+    .and_then(|result| result.checked_div(1_000_000))
     .ok_or(ErrorCode::ArithmeticError)?;
 
   burn_without_tracking_v0(
