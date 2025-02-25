@@ -11,6 +11,7 @@ import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
+import { lowerFirstChar } from "./handleAccountWebhook";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
@@ -46,7 +47,7 @@ export const upsertProgramAccounts = async ({
     throw new Error("idl does not have every account type");
   }
 
-  const program = new anchor.Program(idl, programId, provider);
+  const program = new anchor.Program(idl, provider);
 
   try {
     await sequelize.authenticate();
@@ -144,7 +145,7 @@ export const upsertProgramAccounts = async ({
             .map(({ pubkey, account }) => {
               try {
                 const decodedAcc = program.coder.accounts.decode(
-                  type,
+                  lowerFirstChar(type),
                   account.data
                 );
                 return {

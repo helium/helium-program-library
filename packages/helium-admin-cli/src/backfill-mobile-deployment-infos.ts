@@ -180,7 +180,7 @@ export async function run(args: any = process.argv) {
           } = {};
 
           const decodedAcc: MobileHotspotInfo = hem.coder.accounts.decode(
-            "MobileHotspotInfoV0",
+            "mobileHotspotInfoV0",
             acc.data as Buffer
           );
 
