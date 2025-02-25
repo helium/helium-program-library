@@ -447,6 +447,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | sub_dao            | immut      | no     |      |
 | delegated_position | immut      | no     |      |
 | dao_epoch_info     | immut      | no     |      |
+| vsr_program        | immut      | no     |      |
 | system_program     | immut      | no     |      |
 
 #### Args
