@@ -30,7 +30,7 @@ export async function fetchBackwardsCompatibleIdl(
 
 export function useBackwardsCompatibleIdl(
   programId: PublicKey,
-  idl: Idl | null | undefined,
+  idl: Idl | null | undefined
 ) {
   // This is an Anchor 0.30+ IDL. Return the old IDLs
   if (!idl || !idl?.address) {

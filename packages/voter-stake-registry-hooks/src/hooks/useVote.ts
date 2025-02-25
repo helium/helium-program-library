@@ -223,16 +223,18 @@ export const useVote = (proposalKey: PublicKey) => {
                   );
                 }
 
-                instructions.push(
-                  await hsdProgram.methods
-                    .trackVoteV0()
-                    .accountsPartial({
-                      proposal: proposalKey,
-                      marker: markerK,
-                      position: position.pubkey,
-                    })
-                    .instruction()
-                );
+                if (position.isDelegated) {
+                  instructions.push(
+                    await hsdProgram.methods
+                      .trackVoteV0()
+                      .accountsPartial({
+                        proposal: proposalKey,
+                        marker: markerK,
+                        position: position.pubkey,
+                      })
+                      .instruction()
+                  );
+                }
 
                 if (endTs) {
                   const freeTaskId = freeTaskIds.pop()!;
