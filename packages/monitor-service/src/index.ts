@@ -171,6 +171,13 @@ async function run() {
     mobile.activeDeviceAuthority,
     "mobile_active_device_oracle_sol"
   );
+  await monitorSolBalance(
+    new PublicKey(
+      process.env.HPL_CRONS_QUEUE_AUTHORITY_KEY ||
+        "2dbtp4u3axsLSXqgV6uhhsuTXEitveVdYu2GTdKgc1X8"
+    ),
+    "hpl_crons_queue_authority"
+  );
 
   for (const maker of makers) {
     await monitorSolBalance(
