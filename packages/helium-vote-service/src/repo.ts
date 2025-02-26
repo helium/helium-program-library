@@ -31,7 +31,7 @@ export const readProxiesAndUpsert = async () => {
   const existingProxiesNotInRepo = await Proxy.findAll({
     where: {
       name: {
-        [Op.notIn]: proxies.map((proxy) => proxy.name),
+        [Op.notIn]: proxies.map((proxy: any) => proxy.name),
       },
     },
   });
