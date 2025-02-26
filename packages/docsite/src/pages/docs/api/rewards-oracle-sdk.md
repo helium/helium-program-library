@@ -46,6 +46,27 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | ------------------------------ | ---- |
 | args | SetCurrentRewardsWrapperArgsV1 |      |
 
+### setCurrentRewardsWrapperV2
+
+#### Accounts
+
+| Name                   | Mutability | Signer | Docs                                                                                                                                                   |
+| ---------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| payer                  | mut        | yes    |                                                                                                                                                        |
+| lazyDistributor        | immut      | no     |                                                                                                                                                        |
+| recipient              | mut        | no     |                                                                                                                                                        |
+| keyToAsset             | immut      | no     |                                                                                                                                                        |
+| oracleSigner           | immut      | no     |                                                                                                                                                        |
+| lazyDistributorProgram | immut      | no     |                                                                                                                                                        |
+| systemProgram          | immut      | no     |                                                                                                                                                        |
+| sysvarInstructions     | immut      | no     | the supplied Sysvar could be anything else. The Instruction Sysvar has not been implemented in the Anchor framework yet, so this is the safe approach. |
+
+#### Args
+
+| Name | Type                           | Docs |
+| ---- | ------------------------------ | ---- |
+| args | SetCurrentRewardsWrapperArgsV1 |      |
+
 ## Accounts
 
 ## Types

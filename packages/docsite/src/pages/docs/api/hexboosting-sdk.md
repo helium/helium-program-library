@@ -16,13 +16,14 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | boostConfig            | immut      | no     |      |
 | carrier                | immut      | no     |      |
 | hexboostAuthority      | immut      | yes    |      |
-| priceOracle            | immut      | no     |      |
-| paymentMint            | mut        | no     |      |
+| dataCredits            | immut      | no     |      |
+| dcMint                 | mut        | no     |      |
 | paymentAccount         | mut        | no     |      |
 | boostedHex             | mut        | no     |      |
 | systemProgram          | immut      | no     |      |
 | tokenProgram           | immut      | no     |      |
 | associatedTokenProgram | immut      | no     |      |
+| dataCreditsProgram     | immut      | no     |      |
 
 #### Args
 
@@ -42,9 +43,10 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | rentReclaimAuthority | immut      | no     |      |
 | startAuthority       | immut      | no     |      |
 | priceOracle          | immut      | no     |      |
-| dntMint              | immut      | no     |      |
+| dcMint               | immut      | no     |      |
 | boostConfig          | mut        | no     |      |
 | systemProgram        | immut      | no     |      |
+| dao                  | immut      | no     |      |
 
 #### Args
 
@@ -130,6 +132,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | minimumPeriods       | u16       |
 | bumpSeed             | u8        |
 | startAuthority       | publicKey |
+| dcMint               | publicKey |
 
 ### BoostedHexV0
 
@@ -196,6 +199,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | boostPrice           | u64       |
 | minimumPeriods       | u16       |
 | priceOracle          | publicKey |
+| dcMint               | publicKey |
 
 ### DeviceTypeV0
 

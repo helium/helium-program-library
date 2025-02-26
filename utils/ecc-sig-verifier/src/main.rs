@@ -1,16 +1,22 @@
 #[macro_use]
 extern crate rocket;
-use anchor_lang::prelude::borsh;
-use anchor_lang::{prelude::Pubkey, AnchorDeserialize, AnchorSerialize};
+use std::{env, str::FromStr};
+
+use anchor_lang::{
+  prelude::{borsh, Pubkey},
+  AnchorDeserialize, AnchorSerialize,
+};
 use helium_crypto::{PublicKey, Verify};
 use rocket::{
   http::Status,
   serde::{json::Json, Deserialize, Serialize},
 };
-use solana_sdk::signer::Signer;
-use solana_sdk::{bs58, signature::read_keypair_file, transaction::Transaction};
-use std::env;
-use std::str::FromStr;
+use solana_sdk::{
+  bs58,
+  signature::{read_keypair_file, Signature},
+  signer::{Signer, SignerError},
+  transaction::VersionedTransaction,
+};
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -51,19 +57,39 @@ pub struct IssueDataOnlyEntityArgsV0 {
   pub entity_key: Vec<u8>,
 }
 
+struct ExistingSigner {
+  pub signature: Signature,
+  pub pubkey: Pubkey,
+}
+
+impl Signer for ExistingSigner {
+  fn try_pubkey(&self) -> Result<Pubkey, SignerError> {
+    Ok(self.pubkey)
+  }
+
+  fn try_sign_message(&self, _message: &[u8]) -> Result<Signature, SignerError> {
+    Ok(self.signature)
+  }
+
+  fn is_interactive(&self) -> bool {
+    false
+  }
+}
+
 #[post("/verify", format = "application/json", data = "<verify>")]
 async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Status> {
-  let solana_txn_hex = hex::decode(&verify.transaction).map_err(|e| {
+  let solana_txn_hex = hex::decode(verify.transaction).map_err(|e| {
     error!("failed to decode transaction: {:?}", e);
     Status::BadRequest
   })?;
-  let mut solana_txn: Transaction = bincode::deserialize(&solana_txn_hex).map_err(|e| {
+  let solana_txn: VersionedTransaction = bincode::deserialize(&solana_txn_hex).map_err(|e| {
     error!("failed to deserialize tx: {:?}", e);
     Status::BadRequest
   })?;
 
-  let account_keys = &solana_txn.message.account_keys;
-  if solana_txn.message.instructions.len() > 3 {
+  let account_keys = solana_txn.message.static_account_keys();
+  let instructions = solana_txn.message.instructions();
+  if instructions.len() > 3 {
     error!("Invalid instruction count");
     return Err(Status::BadRequest);
   }
@@ -72,10 +98,10 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   let mut compute_end_ix = 0;
   for i in 0..2 {
     compute_end_ix = i;
-    if i >= solana_txn.message.instructions.len() {
+    if i >= instructions.len() {
       break;
     }
-    let compute_ixn = &solana_txn.message.instructions[i];
+    let compute_ixn = &instructions[i];
     let compute_program_id = account_keys[compute_ixn.program_id_index as usize];
     if compute_program_id
       != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap()
@@ -92,8 +118,8 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
 
   let start_index = compute_end_ix + 1;
   // Second real ix (may) be a transfer
-  if solana_txn.message.instructions.len() - (compute_end_ix + 1) > 1 {
-    let transfer_ixn = &solana_txn.message.instructions[start_index + 1];
+  if instructions.len() - (compute_end_ix + 1) > 1 {
+    let transfer_ixn = &instructions[start_index + 1];
     let transfer_program_id = account_keys[transfer_ixn.program_id_index as usize];
     let transfer_from_acct = account_keys[transfer_ixn.accounts[0] as usize];
     if transfer_program_id != Pubkey::from_str("11111111111111111111111111111111").unwrap() {
@@ -107,7 +133,7 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   }
 
   // Verify it's entity manager instruction
-  let ixn = &solana_txn.message.instructions[start_index];
+  let ixn = &instructions[start_index];
   let program_id = account_keys[ixn.program_id_index as usize];
   if program_id != Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").unwrap() {
     error!("Pubkey mismatch");
@@ -148,22 +174,29 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   info!("pubkey: {:?}", pubkey.to_string());
 
   // Verify the ecc signature against the message
-  let msg = hex::decode(&verify.msg).map_err(|_| Status::BadRequest)?;
-  let signature = hex::decode(&verify.signature).map_err(|_| Status::BadRequest)?;
+  let msg = hex::decode(verify.msg).map_err(|_| Status::BadRequest)?;
+  let signature = hex::decode(verify.signature).map_err(|_| Status::BadRequest)?;
   pubkey.verify(&msg, &signature).map_err(|e| {
     error!("failed to verify signature: {:?}", e);
     Status::BadRequest
   })?;
 
   // Sign the solana transaction
-  solana_txn
-    .try_partial_sign(&[&keypair], solana_txn.message.recent_blockhash)
-    .map_err(|e| {
-      error!("failed to sign transaction: {:?}", e);
-      Status::BadRequest
-    })?;
+  let existing_signers_count = solana_txn.signatures.len() - 1;
+  let existing_signers: Vec<ExistingSigner> = (0..existing_signers_count)
+    .map(|s| ExistingSigner {
+      signature: solana_txn.signatures[s],
+      pubkey: account_keys[s],
+    })
+    .collect();
+  let mut signers: Vec<&dyn Signer> = existing_signers.iter().map(|s| s as &dyn Signer).collect();
+  signers.push(&keypair);
+  let new_tx = VersionedTransaction::try_new(solana_txn.message, &signers).map_err(|e| {
+    error!("failed to sign transaction: {:?}", e);
+    Status::BadRequest
+  })?;
 
-  let serialized_txn = hex::encode(&bincode::serialize(&solana_txn).map_err(|e| {
+  let serialized_txn = hex::encode(&bincode::serialize(&new_tx).map_err(|e| {
     error!("failed to serialize transaction: {:?}", e);
     Status::BadRequest
   })?);

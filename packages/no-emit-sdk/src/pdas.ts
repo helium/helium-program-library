@@ -7,3 +7,13 @@ export function notEmittedKey(programId = PROGRAM_ID): [PublicKey, number] {
     programId
   );
 }
+
+export function notEmittedCounterKey(
+  mint: PublicKey,
+  programId = PROGRAM_ID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("not_emitted_counter", "utf-8"), mint.toBuffer()],
+    programId
+  );
+}

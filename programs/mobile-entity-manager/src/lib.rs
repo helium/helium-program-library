@@ -84,4 +84,8 @@ pub mod mobile_entity_manager {
   ) -> Result<()> {
     update_incentive_program_v0::handler(ctx, args)
   }
+
+  pub fn swap_carrier_stake(ctx: Context<SwapCarrierStake>) -> Result<()> {
+    swap_carrier_stake::handler(ctx)
+  }
 }
