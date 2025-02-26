@@ -1,6 +1,6 @@
 {
   "name": "@helium/anchor-resolvers",
-  "version": "0.9.24-alpha.0",
+  "version": "0.9.24",
   "description": "Wrappers around anchor custom resolvers to make composition easier",
   "publishConfig": {
     "access": "public",
