@@ -191,20 +191,21 @@ export const useVote = (proposalKey: PublicKey) => {
                       })
                       .instruction()
                   );
+                } else {
+                  instructions.push(
+                    await vsrProgram.methods
+                      .voteV0({
+                        choice,
+                      })
+                      .accounts({
+                        proposal: proposalKey,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                        marker: voteMarkerKey(position.mint, proposalKey)[0],
+                      })
+                      .instruction()
+                  );
                 }
-                instructions.push(
-                  await vsrProgram.methods
-                    .voteV0({
-                      choice,
-                    })
-                    .accounts({
-                      proposal: proposalKey,
-                      voter: provider.wallet.publicKey,
-                      position: position.pubkey,
-                      marker: voteMarkerKey(position.mint, proposalKey)[0],
-                    })
-                    .instruction()
-                );
               }
 
               if (position.isDelegated) {
