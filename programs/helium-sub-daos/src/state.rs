@@ -224,7 +224,7 @@ impl DelegatedPositionV0 {
       Err(error!(ErrorCode::InvalidClaimEpoch))
     } else {
       let bit_index = (epoch - self.last_claimed_epoch - 1) as u128;
-      Ok(self.claimed_epochs_bitmap >> (127_u128 - bit_index) & 1 == 1)
+      Ok((self.claimed_epochs_bitmap >> (127_u128 - bit_index)) & 1 == 1)
     }
   }
 
