@@ -125,18 +125,20 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                       .instruction()
                   );
                 }
-                instructions.push(
-                  await vsrProgram.methods
-                    .relinquishVoteV1({
-                      choice,
-                    })
-                    .accounts({
-                      proposal,
-                      voter: provider.wallet.publicKey,
-                      position: position.pubkey,
-                    })
-                    .instruction()
-                );
+                {
+                  instructions.push(
+                    await vsrProgram.methods
+                      .relinquishVoteV1({
+                        choice,
+                      })
+                      .accounts({
+                        proposal,
+                        voter: provider.wallet.publicKey,
+                        position: position.pubkey,
+                      })
+                      .instruction()
+                  );
+                }
               }
 
               if (position.isDelegated) {
