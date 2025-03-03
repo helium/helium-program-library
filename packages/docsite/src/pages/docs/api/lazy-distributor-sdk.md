@@ -210,6 +210,21 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### tempUpdateMatchingDestination
+
+#### Accounts
+
+| Name              | Mutability | Signer | Docs |
+| ----------------- | ---------- | ------ | ---- |
+| authority         | immut      | yes    |      |
+| originalRecipient | immut      | no     |      |
+| recipient         | mut        | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ## Accounts
 
 ### RemoteTaskTransactionV0

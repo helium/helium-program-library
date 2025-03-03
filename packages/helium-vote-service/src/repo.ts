@@ -28,6 +28,16 @@ export const readProxiesAndUpsert = async () => {
     "utf-8"
   );
   const proxies = JSON.parse(proxiesJson);
+  const existingProxiesNotInRepo = await Proxy.findAll({
+    where: {
+      name: {
+        [Op.notIn]: proxies.map((proxy: any) => proxy.name),
+      },
+    },
+  });
+  for (const proxy of existingProxiesNotInRepo) {
+    await proxy.destroy();
+  }
   for (const proxy of proxies) {
     const existingProxy = await Proxy.findOne({
       where: {
