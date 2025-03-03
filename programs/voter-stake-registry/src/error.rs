@@ -161,4 +161,6 @@ pub enum VsrError {
   SamePosition,
   MaxChoicesExceeded,
   NoVoteForThisChoice,
+  #[msg("No changes to count")]
+  NoChangesToCount,
 }
