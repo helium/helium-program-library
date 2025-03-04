@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.27](https://github.com/helium/helium-program-library/compare/v0.9.26...v0.9.27) (2025-03-04)
+
+**Note:** Version bump only for package @helium/sus
+
+
+
+
+
 ## [0.9.26](https://github.com/helium/helium-program-library/compare/v0.9.25...v0.9.26) (2025-03-03)
 
 **Note:** Version bump only for package @helium/sus
