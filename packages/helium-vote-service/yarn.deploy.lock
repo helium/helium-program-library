@@ -23,6 +23,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@coral-xyz/anchor-errors@npm:^0.30.1":
+  version: 0.30.1
+  resolution: "@coral-xyz/anchor-errors@npm:0.30.1"
+  checksum: 52efca5a9c83824295360185865082eae39b375905df2c9f7aab0a094071168d34a23a2277ba0c9c947cb6c4574b947ced4634b25857995029aab6c3d030caff
+  languageName: node
+  linkType: hard
+
 "@coral-xyz/anchor@npm:^0.28.0":
   version: 0.28.0
   resolution: "@coral-xyz/anchor@npm:0.28.0"
@@ -46,6 +53,29 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@coral-xyz/anchor@npm:^0.30.1":
+  version: 0.30.1
+  resolution: "@coral-xyz/anchor@npm:0.30.1"
+  dependencies:
+    "@coral-xyz/anchor-errors": ^0.30.1
+    "@coral-xyz/borsh": ^0.30.1
+    "@noble/hashes": ^1.3.1
+    "@solana/web3.js": ^1.68.0
+    bn.js: ^5.1.2
+    bs58: ^4.0.1
+    buffer-layout: ^1.2.2
+    camelcase: ^6.3.0
+    cross-fetch: ^3.1.5
+    crypto-hash: ^1.3.0
+    eventemitter3: ^4.0.7
+    pako: ^2.0.3
+    snake-case: ^3.0.4
+    superstruct: ^0.15.4
+    toml: ^3.0.0
+  checksum: eb23f65c81127a09545f2e25f6409a175610a5113a523849702feff23c57d98fc89da0c23e7851ca21672fc54b2936455b5116c7de71a3924c94facd21dfe614
+  languageName: node
+  linkType: hard
+
 "@coral-xyz/borsh@npm:^0.28.0":
   version: 0.28.0
   resolution: "@coral-xyz/borsh@npm:0.28.0"
@@ -55,6 +85,18 @@ __metadata:
   peerDependencies:
     "@solana/web3.js": ^1.68.0
   checksum: bc2b06b777f9ed43d3b886d2350826bd44d5b932c4fd4471af5956e8755236f5854938c890ee4986d88f61d1439e1d84e715c43dcb6dca4e76198c1ce8dc7a58
+  languageName: node
+  linkType: hard
+
+"@coral-xyz/borsh@npm:^0.30.1":
+  version: 0.30.1
+  resolution: "@coral-xyz/borsh@npm:0.30.1"
+  dependencies:
+    bn.js: ^5.1.2
+    buffer-layout: ^1.2.0
+  peerDependencies:
+    "@solana/web3.js": ^1.68.0
+  checksum: eefe1aebc416f111fd19bed3515096db4492d725f9dad3a45064871812d1627ec6454189b9035bd77c4e7885bf58541792acf074b2242039cdbc247fb2698674
   languageName: node
   linkType: hard
 
@@ -181,6 +223,18 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@helium/anchor-resolvers@npm:^0.10.0-alpha.4":
+  version: 0.10.0-alpha.13
+  resolution: "@helium/anchor-resolvers@npm:0.10.0-alpha.13"
+  dependencies:
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.91.1
+  peerDependencies:
+    "@coral-xyz/anchor": ^0.30.1
+  checksum: 3632aa2af404dc91366ac147ca648f6db5cbcd6b15f7e56d2913c025c1eb24ab6f91618198a3cfcddefe3cffc471ab8537cd91faba174a5c9091fcafde14ed36
+  languageName: node
+  linkType: hard
+
 "@helium/anchor-resolvers@npm:^0.2.17":
   version: 0.2.21
   resolution: "@helium/anchor-resolvers@npm:0.2.21"
@@ -211,8 +265,10 @@ __metadata:
   dependencies:
     "@fastify/cors": ^8.1.1
     "@fastify/static": ^6
+    "@helium/account-fetch-cache": ^0.9.23
     "@helium/organization-sdk": ^0.0.15
     "@helium/spl-utils": ^0.9.23
+    "@helium/tuktuk-sdk": ^0.0.3
     "@helium/voter-stake-registry-sdk": ^0.9.23
     "@solana/web3.js": ^1.91.1
     "@types/bn.js": ^5.1.1
@@ -229,6 +285,7 @@ __metadata:
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     ts-node-dev: ^2.0.0
+    tweetnacl: ^1.0.3
     typescript: ^5.2.2
   languageName: unknown
   linkType: soft
@@ -323,6 +380,28 @@ __metadata:
     typescript: ^5.2.2
   languageName: unknown
   linkType: soft
+
+"@helium/tuktuk-idls@npm:^0.0.3":
+  version: 0.0.3
+  resolution: "@helium/tuktuk-idls@npm:0.0.3"
+  dependencies:
+    "@coral-xyz/anchor": ^0.30.1
+    "@solana/web3.js": ^1.95.2
+  checksum: d153f39fc381dcb58aa2297c4b3151c4e50528e7e44524457322b384a7dbda149dacccaac7d352c935b787e4efa9b8f8abdec445713c3d362944d0ff3661d848
+  languageName: node
+  linkType: hard
+
+"@helium/tuktuk-sdk@npm:^0.0.3":
+  version: 0.0.3
+  resolution: "@helium/tuktuk-sdk@npm:0.0.3"
+  dependencies:
+    "@coral-xyz/anchor": ^0.30.1
+    "@helium/anchor-resolvers": ^0.10.0-alpha.4
+    "@helium/tuktuk-idls": ^0.0.3
+    js-sha256: ^0.11.0
+  checksum: c0eb2d207d5f503c4464902c4cdeb2685aad8e157552141e5893958c4bef2d46b04f9a60f491224cd16101f708005c635f099b33d6094a49b2dcd7dec9b2507d
+  languageName: node
+  linkType: hard
 
 "@helium/voter-stake-registry-sdk@^0.9.23":
   version: 0.0.0-use.local
@@ -578,7 +657,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/web3.js@npm:^1.91.1":
+"@solana/web3.js@npm:^1.91.1, @solana/web3.js@npm:^1.95.2":
   version: 1.98.0
   resolution: "@solana/web3.js@npm:1.98.0"
   dependencies:
@@ -2265,6 +2344,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"js-sha256@npm:^0.11.0":
+  version: 0.11.0
+  resolution: "js-sha256@npm:0.11.0"
+  checksum: 742d34a0c6eb15247309f1c74889b5a51df01a96e4307375b420fbe973f2f25585012b4d3c8fa52a1b18546153d12587e6463bb725dc1bc58686da03e892c334
+  languageName: node
+  linkType: hard
+
 "js-sha256@npm:^0.9.0":
   version: 0.9.0
   resolution: "js-sha256@npm:0.9.0"
@@ -3806,6 +3892,13 @@ __metadata:
   version: 2.6.2
   resolution: "tslib@npm:2.6.2"
   checksum: 329ea56123005922f39642318e3d1f0f8265d1e7fcb92c633e0809521da75eeaca28d2cf96d7248229deb40e5c19adf408259f4b9640afd20d13aecc1430f3ad
+  languageName: node
+  linkType: hard
+
+"tweetnacl@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "tweetnacl@npm:1.0.3"
+  checksum: e4a57cac188f0c53f24c7a33279e223618a2bfb5fea426231991652a13247bea06b081fd745d71291fcae0f4428d29beba1b984b1f1ce6f66b06a6d1ab90645c
   languageName: node
   linkType: hard
 

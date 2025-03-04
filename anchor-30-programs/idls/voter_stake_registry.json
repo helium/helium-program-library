@@ -1,0 +1,2492 @@
+{
+  "version": "0.3.6",
+  "name": "voter_stake_registry",
+  "instructions": [
+    {
+      "name": "initializeRegistrarV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "The voting registrar. There can only be a single registrar",
+            "per governance realm and governing mint."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "realm"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "registrar"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "realm_governing_token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collection",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "collection"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Registrar",
+                "path": "registrar"
+              }
+            ]
+          }
+        },
+        {
+          "name": "metadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "masterEdition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "realm",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "An spl-governance realm",
+            "",
+            "realm is validated in the instruction:",
+            "- realm is owned by the governance_program_id",
+            "- realm_governing_token_mint must be the community or council mint",
+            "- realm_authority is realm.authority"
+          ]
+        },
+        {
+          "name": "governanceProgramId",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The program id of the spl-governance program the realm belongs to."
+          ]
+        },
+        {
+          "name": "realmGoverningTokenMint",
+          "isMut": false,
+          "isSigner": false,
+          "docs": ["Either the realm community mint or the council mint."]
+        },
+        {
+          "name": "realmAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proxyConfig",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializeRegistrarArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "configureVotingMintV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["realm_authority"]
+        },
+        {
+          "name": "realmAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false,
+          "docs": ["Tokens of this mint will produce vote weight"]
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "ConfigureVotingMintArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializePositionV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["collection"]
+        },
+        {
+          "name": "collection",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "collectionMetadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "collectionMasterEdition",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "collection"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "metadata",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "masterEdition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "metadata"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "token_metadata_program"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              },
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "edition"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "token_metadata_program"
+            }
+          }
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "recipient",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "depositMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "InitializePositionArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "depositV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["registrar"]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "depositToken",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["mint"]
+        },
+        {
+          "name": "depositAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "DepositArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdrawV0",
+      "accounts": [
+        {
+          "name": "positionAuthority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": ["registrar", "mint"]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "depositMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "destination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "WithdrawArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "closePositionV0",
+      "accounts": [
+        {
+          "name": "solDestination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": ["mint", "registrar"]
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "positionAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "resetLockupV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionUpdateAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": ["registrar", "mint"]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "ResetLockupArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "transferV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionUpdateAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "sourcePosition",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": ["registrar", "mint"]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "positionAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "targetPosition",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["registrar"]
+        },
+        {
+          "name": "depositMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "sourceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "targetVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "TransferArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "setTimeOffsetV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["realm_authority"]
+        },
+        {
+          "name": "realmAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "timeOffset",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "ledgerTransferPositionV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "position",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "position"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": ["mint"]
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "fromTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "toTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "from",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "to",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "approver",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateRegistrarAuthorityV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["realm_authority"]
+        },
+        {
+          "name": "realmAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "UpdateRegistrarAuthorityArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "voteV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "voter",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["mint", "registrar"]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["proposal_config"]
+        },
+        {
+          "name": "proposalConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["on_vote_hook", "state_controller"]
+        },
+        {
+          "name": "stateController",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "onVoteHook",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proposalProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "VoteArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "relinquishVoteV1",
+      "accounts": [
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          },
+          "relations": ["registrar", "mint", "rent_refund"]
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "voter",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["mint", "registrar"]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["proposal_config"]
+        },
+        {
+          "name": "proposalConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["on_vote_hook", "state_controller"]
+        },
+        {
+          "name": "stateController",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "onVoteHook",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proposalProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rentRefund",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "RelinquishVoteArgsV1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "relinquishExpiredVoteV0",
+      "accounts": [
+        {
+          "name": "rentRefund",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "VoteMarkerV0",
+                "path": "marker.mint"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          },
+          "relations": ["proposal", "rent_refund"]
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "proposal",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "proxiedRelinquishVoteV0",
+      "accounts": [
+        {
+          "name": "rentRefund",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "mint"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          },
+          "relations": ["registrar", "mint", "rent_refund"]
+        },
+        {
+          "name": "registrar",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "voter",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "proxyAssignment",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["voter"]
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["mint", "registrar"]
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["proposal_config"]
+        },
+        {
+          "name": "proposalConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["on_vote_hook", "state_controller"]
+        },
+        {
+          "name": "stateController",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "onVoteHook",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proposalProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "RelinquishVoteArgsV1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "proxiedVoteV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "position.mint"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registrar",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voter",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["registrar"]
+        },
+        {
+          "name": "proxyAssignment",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["voter"]
+        },
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["proposal_config"]
+        },
+        {
+          "name": "proposalConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["on_vote_hook", "state_controller"]
+        },
+        {
+          "name": "stateController",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "onVoteHook",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proposalProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "VoteArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "updateRegistrarV0",
+      "accounts": [
+        {
+          "name": "registrar",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["realm_authority"]
+        },
+        {
+          "name": "realmAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "proxyConfig",
+          "isMut": false,
+          "isSigner": false,
+          "isOptional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "tempReleasePositionV0",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "relinquishExpiredProxyVoteV0",
+      "accounts": [
+        {
+          "name": "rentRefund",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["proposal", "rent_refund"]
+        },
+        {
+          "name": "proposal",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "countProxyVoteV0",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "PositionV0",
+                "path": "position.mint"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registrar",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proxyMarker",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "proxy_marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          },
+          "relations": ["voter", "proposal"]
+        },
+        {
+          "name": "position",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["registrar"]
+        },
+        {
+          "name": "proxyAssignment",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["voter"]
+        },
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false,
+          "relations": ["proposal_config"]
+        },
+        {
+          "name": "proposalConfig",
+          "isMut": false,
+          "isSigner": false,
+          "relations": ["on_vote_hook", "state_controller"]
+        },
+        {
+          "name": "stateController",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "onVoteHook",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proposalProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "proxiedVoteV1",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "proxy_marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "proposal",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "VoteArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "proxiedRelinquishVoteV1",
+      "accounts": [
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "proxy_marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "VoteArgsV0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tempBackfillProxyMarker",
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "marker",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "proxy_marker"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "ProposalV0",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "proposal",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "VoteArgsV0"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "VoteMarkerV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "publicKey"
+          },
+          {
+            "name": "registrar",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposal",
+            "type": "publicKey"
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "choices",
+            "type": {
+              "vec": "u16"
+            }
+          },
+          {
+            "name": "weight",
+            "type": "u128"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "deprecatedRelinquished",
+            "docs": [
+              "Whether this vote has been cleared on the position after proposal expired",
+              "DEPRECATED. New votes will have markers closed after the vote completes."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "proxyIndex",
+            "type": "u16"
+          },
+          {
+            "name": "rentRefund",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProxyMarkerV0",
+      "docs": [
+        "Marker to indicate that a proxy intends to vote this way on a proposal,",
+        "all votes of proxies are permissionless based on this marker"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposal",
+            "type": "publicKey"
+          },
+          {
+            "name": "choices",
+            "type": {
+              "vec": "u16"
+            }
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "rentRefund",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registrar",
+            "type": "publicKey"
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "lockup",
+            "type": {
+              "defined": "Lockup"
+            }
+          },
+          {
+            "name": "amountDepositedNative",
+            "type": "u64"
+          },
+          {
+            "name": "votingMintConfigIdx",
+            "type": "u8"
+          },
+          {
+            "name": "numActiveVotes",
+            "type": "u16"
+          },
+          {
+            "name": "genesisEnd",
+            "type": "i64"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "voteController",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Registrar",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governanceProgramId",
+            "type": "publicKey"
+          },
+          {
+            "name": "realm",
+            "type": "publicKey"
+          },
+          {
+            "name": "realmGoverningTokenMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "realmAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "timeOffset",
+            "type": "i64"
+          },
+          {
+            "name": "positionUpdateAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "collection",
+            "type": "publicKey"
+          },
+          {
+            "name": "bumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "collectionBumpSeed",
+            "type": "u8"
+          },
+          {
+            "name": "reserved1",
+            "type": {
+              "array": ["u8", 4]
+            }
+          },
+          {
+            "name": "reserved2",
+            "type": {
+              "array": ["u64", 3]
+            }
+          },
+          {
+            "name": "proxyConfig",
+            "type": "publicKey"
+          },
+          {
+            "name": "votingMints",
+            "type": {
+              "vec": {
+                "defined": "VotingMintConfigV0"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "ConfigureVotingMintArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "idx",
+            "type": "u16"
+          },
+          {
+            "name": "baselineVoteWeightScaledFactor",
+            "type": "u64"
+          },
+          {
+            "name": "maxExtraLockupVoteWeightScaledFactor",
+            "type": "u64"
+          },
+          {
+            "name": "genesisVotePowerMultiplier",
+            "type": "u8"
+          },
+          {
+            "name": "genesisVotePowerMultiplierExpirationTs",
+            "type": "i64"
+          },
+          {
+            "name": "lockupSaturationSecs",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DepositArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializePositionArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kind",
+            "type": {
+              "defined": "LockupKind"
+            }
+          },
+          {
+            "name": "periods",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeRegistrarArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "positionUpdateAuthority",
+            "type": {
+              "option": "publicKey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RelinquishVoteArgsV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "choice",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResetLockupArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kind",
+            "type": {
+              "defined": "LockupKind"
+            }
+          },
+          {
+            "name": "periods",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateRegistrarAuthorityArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "choice",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WithdrawArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Lockup",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "startTs",
+            "type": "i64"
+          },
+          {
+            "name": "endTs",
+            "type": "i64"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": "LockupKind"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "VotingMintConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "baselineVoteWeightScaledFactor",
+            "type": "u64"
+          },
+          {
+            "name": "maxExtraLockupVoteWeightScaledFactor",
+            "type": "u64"
+          },
+          {
+            "name": "genesisVotePowerMultiplier",
+            "type": "u8"
+          },
+          {
+            "name": "genesisVotePowerMultiplierExpirationTs",
+            "type": "i64"
+          },
+          {
+            "name": "lockupSaturationSecs",
+            "type": "u64"
+          },
+          {
+            "name": "reserved",
+            "type": "i8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockupKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "Cliff"
+          },
+          {
+            "name": "Constant"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidRate",
+      "msg": "Exchange rate must be greater than zero"
+    },
+    {
+      "code": 6001,
+      "name": "RatesFull",
+      "msg": ""
+    },
+    {
+      "code": 6002,
+      "name": "VotingMintNotFound",
+      "msg": ""
+    },
+    {
+      "code": 6003,
+      "name": "DepositEntryNotFound",
+      "msg": ""
+    },
+    {
+      "code": 6004,
+      "name": "DepositEntryFull",
+      "msg": ""
+    },
+    {
+      "code": 6005,
+      "name": "VotingTokenNonZero",
+      "msg": ""
+    },
+    {
+      "code": 6006,
+      "name": "OutOfBoundsDepositEntryIndex",
+      "msg": ""
+    },
+    {
+      "code": 6007,
+      "name": "UnusedDepositEntryIndex",
+      "msg": ""
+    },
+    {
+      "code": 6008,
+      "name": "InsufficientUnlockedTokens",
+      "msg": ""
+    },
+    {
+      "code": 6009,
+      "name": "UnableToConvert",
+      "msg": ""
+    },
+    {
+      "code": 6010,
+      "name": "InvalidLockupPeriod",
+      "msg": ""
+    },
+    {
+      "code": 6011,
+      "name": "InvalidEndTs",
+      "msg": ""
+    },
+    {
+      "code": 6012,
+      "name": "InvalidDays",
+      "msg": ""
+    },
+    {
+      "code": 6013,
+      "name": "VotingMintConfigIndexAlreadyInUse",
+      "msg": ""
+    },
+    {
+      "code": 6014,
+      "name": "OutOfBoundsVotingMintConfigIndex",
+      "msg": ""
+    },
+    {
+      "code": 6015,
+      "name": "InvalidDecimals",
+      "msg": "Exchange rate decimals cannot be larger than registrar decimals"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidToDepositAndWithdrawInOneSlot",
+      "msg": ""
+    },
+    {
+      "code": 6017,
+      "name": "ShouldBeTheFirstIxInATx",
+      "msg": ""
+    },
+    {
+      "code": 6018,
+      "name": "ForbiddenCpi",
+      "msg": ""
+    },
+    {
+      "code": 6019,
+      "name": "InvalidMint",
+      "msg": ""
+    },
+    {
+      "code": 6020,
+      "name": "DebugInstruction",
+      "msg": ""
+    },
+    {
+      "code": 6021,
+      "name": "ClawbackNotAllowedOnDeposit",
+      "msg": ""
+    },
+    {
+      "code": 6022,
+      "name": "DepositStillLocked",
+      "msg": ""
+    },
+    {
+      "code": 6023,
+      "name": "InvalidAuthority",
+      "msg": ""
+    },
+    {
+      "code": 6024,
+      "name": "InvalidTokenOwnerRecord",
+      "msg": ""
+    },
+    {
+      "code": 6025,
+      "name": "InvalidRealmAuthority",
+      "msg": ""
+    },
+    {
+      "code": 6026,
+      "name": "VoterWeightOverflow",
+      "msg": ""
+    },
+    {
+      "code": 6027,
+      "name": "LockupSaturationMustBePositive",
+      "msg": ""
+    },
+    {
+      "code": 6028,
+      "name": "VotingMintConfiguredWithDifferentIndex",
+      "msg": ""
+    },
+    {
+      "code": 6029,
+      "name": "InternalProgramError",
+      "msg": ""
+    },
+    {
+      "code": 6030,
+      "name": "InsufficientLockedTokens",
+      "msg": ""
+    },
+    {
+      "code": 6031,
+      "name": "MustKeepTokensLocked",
+      "msg": ""
+    },
+    {
+      "code": 6032,
+      "name": "InvalidLockupKind",
+      "msg": ""
+    },
+    {
+      "code": 6033,
+      "name": "InvalidChangeToClawbackDepositEntry",
+      "msg": ""
+    },
+    {
+      "code": 6034,
+      "name": "InternalErrorBadLockupVoteWeight",
+      "msg": ""
+    },
+    {
+      "code": 6035,
+      "name": "DepositStartTooFarInFuture",
+      "msg": ""
+    },
+    {
+      "code": 6036,
+      "name": "VaultTokenNonZero",
+      "msg": ""
+    },
+    {
+      "code": 6037,
+      "name": "InvalidTimestampArguments",
+      "msg": ""
+    },
+    {
+      "code": 6038,
+      "name": "CastVoteIsNotAllowed",
+      "msg": "Cast vote is not allowed on update_voter_weight_record_v0 endpoint"
+    },
+    {
+      "code": 6039,
+      "name": "InvalidProgramId",
+      "msg": "Program id was not what was expected"
+    },
+    {
+      "code": 6040,
+      "name": "InvalidMintOwner",
+      "msg": ""
+    },
+    {
+      "code": 6041,
+      "name": "InvalidMintAmount",
+      "msg": ""
+    },
+    {
+      "code": 6042,
+      "name": "DuplicatedNftDetected",
+      "msg": ""
+    },
+    {
+      "code": 6043,
+      "name": "InvalidTokenOwnerForVoterWeightRecord",
+      "msg": ""
+    },
+    {
+      "code": 6044,
+      "name": "NftAlreadyVoted",
+      "msg": ""
+    },
+    {
+      "code": 6045,
+      "name": "InvalidProposalForNftVoteRecord",
+      "msg": ""
+    },
+    {
+      "code": 6046,
+      "name": "InvalidTokenOwnerForNftVoteRecord",
+      "msg": ""
+    },
+    {
+      "code": 6047,
+      "name": "UninitializedAccount",
+      "msg": ""
+    },
+    {
+      "code": 6048,
+      "name": "PositionNotWritable",
+      "msg": ""
+    },
+    {
+      "code": 6049,
+      "name": "InvalidVoteRecordForNftVoteRecord",
+      "msg": ""
+    },
+    {
+      "code": 6050,
+      "name": "VoteRecordMustBeWithdrawn",
+      "msg": ""
+    },
+    {
+      "code": 6051,
+      "name": "VoterWeightRecordMustBeExpired",
+      "msg": ""
+    },
+    {
+      "code": 6052,
+      "name": "InvalidMintForPosition",
+      "msg": ""
+    },
+    {
+      "code": 6053,
+      "name": "InvalidOwner",
+      "msg": ""
+    },
+    {
+      "code": 6054,
+      "name": "NoDepositOnGenesisPositions",
+      "msg": "You may not deposit additional tokens on a position created during the genesis period that still has the genesis multiplier"
+    },
+    {
+      "code": 6055,
+      "name": "ActiveVotesExist",
+      "msg": "Cannot change a position while active votes exist"
+    },
+    {
+      "code": 6056,
+      "name": "UnauthorizedPositionUpdateAuthority",
+      "msg": "Position update authority must sign off on this transaction"
+    },
+    {
+      "code": 6057,
+      "name": "SamePosition",
+      "msg": "Cannot transfer to the same position"
+    },
+    {
+      "code": 6058,
+      "name": "MaxChoicesExceeded"
+    },
+    {
+      "code": 6059,
+      "name": "NoVoteForThisChoice"
+    },
+    {
+      "code": 6060,
+      "name": "NoChangesToCount",
+      "msg": "No changes to count"
+    }
+  ]
+}

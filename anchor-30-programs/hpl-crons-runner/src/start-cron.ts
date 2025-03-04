@@ -104,6 +104,7 @@ export async function run(args: any = process.argv) {
         .instruction()
     );
   }
+  const epochTrackerAcc = await program.account.epochTrackerV0.fetch(epochTracker);
   const { transaction, remainingAccounts } = compileTransaction(
     [
       await program.methods
@@ -139,6 +140,7 @@ export async function run(args: any = process.argv) {
         transaction: {
           compiledV0: [transaction],
         },
+        description: `queue end epoch ${epochTrackerAcc.epoch}`,
       })
       .accounts({
         task,

@@ -34,8 +34,10 @@
   "dependencies": {
     "@fastify/cors": "^8.1.1",
     "@fastify/static": "^6",
+    "@helium/account-fetch-cache": "^0.9.23",
     "@helium/organization-sdk": "^0.0.15",
     "@helium/spl-utils": "^0.9.23",
+    "@helium/tuktuk-sdk": "^0.0.3",
     "@helium/voter-stake-registry-sdk": "^0.9.23",
     "@solana/web3.js": "^1.91.1",
     "aws-sdk": "^2.1650.0",
@@ -44,7 +46,8 @@
     "node-cache": "^5.1.2",
     "pg": "^8.12.0",
     "sequelize": "^6.28.0",
-    "simple-git": "^3.21.0"
+    "simple-git": "^3.21.0",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.1",
