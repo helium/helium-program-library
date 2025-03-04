@@ -100,7 +100,7 @@ impl Lockup {
 
   pub fn effective_end_ts(&self) -> i64 {
     match self.kind {
-      LockupKind::Cliff => i64::MAX,
+      LockupKind::Constant => i64::MAX,
       _ => self.end_ts,
     }
   }

@@ -2,7 +2,7 @@ import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { organizationKey } from "@helium/organization-sdk";
 import { createAtaAndTransferInstructions, HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
-import { getPositionKeysForOwner, init, positionKey } from "@helium/voter-stake-registry-sdk";
+import { getPositionKeysForOwner, init, positionKey, proxyVoteMarkerKey } from "@helium/voter-stake-registry-sdk";
 import Fastify, { FastifyInstance } from "fastify";
 import fs from "fs";
 import { camelCase, isPlainObject, mapKeys } from "lodash";
@@ -442,6 +442,8 @@ server.post<{
       const task = new PublicKey(request.body.task);
       const taskQueuedAt = new BN(request.body.task_queued_at);
       const taskQueueAcc = tuktukProgram.account.taskQueueV0.fetch(taskQueue)
+      const proxyVoteMarker = proxyVoteMarkerKey(wallet, proposal)[0];
+      const choices = (await voterStakeRegistryProgram.account.proxyMarkerV0.fetch(proxyVoteMarker)).choices
       try {
         const needsVote = (
           await sequelize.query(`
@@ -453,7 +455,7 @@ server.post<{
             LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset
             LEFT OUTER JOIN delegated_positions dp ON dp.position = pa.asset
             WHERE pa.voter = ${wallet.toBase58()} AND pa.index > 0
-              AND vm.address IS NULL 
+              AND (vm.address IS NULL OR NOT (vm.choices = ANY(ARRAY[${choices.join(',')}])))
               AND vm.registrar = ${HNT_REGISTRAR.toBase58()}
               AND vm.proposal = ${proposal.toBase58()}
             LIMIT ${MAX_VOTES_PER_TASK}
@@ -494,6 +496,7 @@ server.post<{
                 .countProxyVoteV0()
                 .accounts({
                   payer: pdaWallet,
+                  marker: proxyVoteMarker,
                   voter: wallet,
                   proxyAssignment: new PublicKey(vote.proxyAssignment),
                   registrar: HNT_REGISTRAR,
