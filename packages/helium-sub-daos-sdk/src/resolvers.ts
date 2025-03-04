@@ -173,11 +173,11 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
           !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
             ? proxyConfigAcc?.seasons?.reverse().find((s) =>
                 new BN(now.toString()).gte(s.start)
-              )?.end || positionAcc.lockup.endTs
+              )?.end || getEffectiveEndTs(positionAcc.lockup)
             : delegatedPositionAcc.expirationTs;
         const [key] = await subDaoEpochInfoKey(
           subDao,
-          bnMin(positionAcc.lockup.endTs, expirationTs)
+          bnMin(getEffectiveEndTs(positionAcc.lockup), expirationTs)
         );
 
         return key;
@@ -185,6 +185,13 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
     }
   }
 );
+
+function getEffectiveEndTs(lockup: { kind: any, endTs: BN }): BN {
+  if (!!lockup.kind.cliff) {
+    return lockup.endTs;
+  }
+  return new BN("9223372036854775807");
+}
 
 async function getSolanaUnixTimestamp(provider: Provider): Promise<bigint> {
   const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
@@ -237,9 +244,9 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
           .find((s) => new BN(now.toString()).gte(s.start))?.end;
         const expirationTs =
           !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
-            ? seasonEnd || positionAcc.lockup.endTs
+            ? seasonEnd || getEffectiveEndTs(positionAcc.lockup)
             : delegatedPositionAcc.expirationTs;
-        const epochTs = positionAcc.genesisEnd.lte(new BN(now)) ? min(positionAcc.lockup.endTs, expirationTs) : positionAcc.genesisEnd;
+        const epochTs = positionAcc.genesisEnd.lte(new BN(now)) ? min(getEffectiveEndTs(positionAcc.lockup), expirationTs) : positionAcc.genesisEnd;
         const [key] = await subDaoEpochInfoKey(
           subDao,
           epochTs
