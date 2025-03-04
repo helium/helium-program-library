@@ -129,7 +129,7 @@ export const HeliumVsrStateProvider: React.FC<{
 
   const delegatedPositionKeys = useMemo(() => {
     return positionKeys?.map((pk) => delegatedPositionKey(pk)[0]);
-  }, [positionKeys]);
+  }, [...(positionKeys || []), ...(proxiedPositionKeys || [])]);
 
   const { accounts: delegatedAccounts, loading: loadingDel } =
     useDelegatedPositions(delegatedPositionKeys);
