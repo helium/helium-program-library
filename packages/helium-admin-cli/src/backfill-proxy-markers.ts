@@ -1,20 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
+import { batchParallelInstructionsWithPriorityFee } from "@helium/spl-utils";
 import {
-  daoKey,
-  init as initDao,
-  subDaoKey,
-} from "@helium/helium-sub-daos-sdk";
-import { init as initVsr } from "@helium/voter-stake-registry-sdk";
+  init as initVsr,
+  proxyVoteMarkerKey,
+} from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import {
-  getTimestampFromDays,
-  getUnixTimestamp,
-  loadKeypair,
-  sendInstructionsOrSquads,
-} from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -41,9 +33,69 @@ export async function run(args: any = process.argv) {
   }
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
-  const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const hvsrProgram = await initVsr(provider);
   const markers = await hvsrProgram.account.voteMarkerV0.all();
-  const instructions: TransactionInstruction[] = [];
 
+  const proxyMarkers = markers.filter(
+    (marker) => marker.account.proxyIndex > 0
+  );
+  const proxyChoicesByProposal = proxyMarkers.reduce((acc, marker) => {
+    const proposal = marker.account.proposal.toBase58();
+    if (!acc[proposal]) {
+      acc[proposal] = {};
+    }
+    const key = marker.account.voter.toBase58();
+    const proxyChoices = acc[proposal][key];
+    if (proxyChoices && !arrayEquals(proxyChoices, marker.account.choices)) {
+      throw new Error(
+        `Proxy marker choice mismatch ${key} ${proxyChoices} ${marker.account.choices}`
+      );
+    } else {
+      acc[proposal][key] = marker.account.choices;
+    }
+    return acc;
+  }, {} as Record<string, Record<string, number[]>>);
+
+  const instructions: TransactionInstruction[] = [];
+  for (const [proposal, proxyChoices] of Object.entries(
+    proxyChoicesByProposal
+  )) {
+    for (const [voter, choices] of Object.entries(proxyChoices)) {
+      const proxyMarker = proxyVoteMarkerKey(
+        new PublicKey(voter),
+        new PublicKey(proposal),
+        hvsrProgram.programId
+      )[0];
+      const markerAccount = await hvsrProgram.account.proxyMarkerV0.fetch(
+        proxyMarker
+      );
+      for (const choice of choices) {
+        if (!markerAccount.choices.includes(choice)) {
+          instructions.push(
+            await hvsrProgram.methods
+              .tempBackfillProxyMarker({ choice })
+              .accounts({
+                voter: new PublicKey(voter),
+                proposal: new PublicKey(proposal),
+                marker: proxyMarker,
+              })
+              .instruction()
+          );
+        }
+      }
+    }
+  }
+
+  await batchParallelInstructionsWithPriorityFee(provider, instructions, {
+    onProgress: console.log,
+  });
+}
+
+function arrayEquals<T>(a: T[], b: T[]): boolean {
+  return (
+    Array.isArray(a) &&
+    Array.isArray(b) &&
+    a.length === b.length &&
+    a.every((val, index) => val === b[index])
+  );
 }

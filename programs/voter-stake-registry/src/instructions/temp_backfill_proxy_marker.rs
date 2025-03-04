@@ -11,13 +11,14 @@ pub struct TempBackfillProxyMarker<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
-    init,
+    init_if_needed,
     payer = payer,
     space = 8 + 32 + std::mem::size_of::<ProxyMarkerV0>() + 1 + 2 * proposal.choices.len(),
     seeds = ["proxy_marker".as_bytes(), voter.key().as_ref(), proposal.key().as_ref()],
     bump
   )]
   pub marker: Box<Account<'info, ProxyMarkerV0>>,
+  /// CHECK: Needed for seeds
   pub voter: AccountInfo<'info>,
   #[account(
     address = HPROD
