@@ -27,7 +27,7 @@ import {
   RemoteTaskTransactionV0,
 } from "@helium/tuktuk-sdk";
 import { sign } from "tweetnacl";
-import { getPrograms, provider, tuktukProgram, voterStakeRegistryProgram, keypair } from "./solana";
+import { getPrograms, provider, tuktukProgram, voterStakeRegistryProgram, keypair, heliumSubDaosProgram } from "./solana";
 import NodeCache from 'node-cache';
 import BN from "bn.js";
 import { SystemProgram } from "@solana/web3.js";
@@ -429,7 +429,7 @@ async function getRentMin() {
   }
   return rentMin
 }
-const MAX_VOTES_PER_TASK = 4
+const MAX_VOTES_PER_TASK = 3
 server.post<{
   Params: { proposal: string; wallet: string };
   Body: { task_queue: string; task: string; task_queued_at: number };
@@ -447,9 +447,11 @@ server.post<{
           await sequelize.query(`
             SELECT
               pa.asset,
-              pa.address as proxy_assignment
+              pa.address as proxy_assignment,
+              dp.address as delegated_position
             FROM proxy_assignments pa
             LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset
+            LEFT OUTER JOIN delegated_positions dp ON dp.position = pa.asset
             WHERE pa.voter = ${wallet.toBase58()} AND pa.index > 0
               AND vm.address IS NULL 
               AND vm.registrar = ${HNT_REGISTRAR.toBase58()}
@@ -486,10 +488,12 @@ server.post<{
               lamports: taskQueueAcc.minCrankReward.toNumber(),
             }),
             // Count as many votes as possible
-            ...await Promise.all(needsVote.map((vote) => {
-              return voterStakeRegistryProgram.methods
+            ...(await Promise.all(needsVote.map(async (vote) => {
+              const instructions: TransactionInstruction[] = []
+              const countIx = await voterStakeRegistryProgram.methods
                 .countProxyVoteV0()
                 .accounts({
+                  payer: pdaWallet,
                   voter: wallet,
                   proxyAssignment: new PublicKey(vote.proxyAssignment),
                   registrar: HNT_REGISTRAR,
@@ -497,7 +501,22 @@ server.post<{
                   proposal,
                 })
                 .instruction()
-            })),
+              instructions.push(countIx)
+                if (vote.delegatedPosition) {
+                  const delegatedCountIx = await heliumSubDaosProgram.methods
+                    .trackVoteV0()
+                    .accounts({
+                      payer: pdaWallet,
+                      delegatedPosition: new PublicKey(vote.delegatedPosition),
+                      registrar: HNT_REGISTRAR,
+                      position: positionKey(new PublicKey(vote.asset))[0],
+                      proposal,
+                    })
+                    .instruction();
+                  instructions.push(delegatedCountIx)
+                }
+              return instructions
+            }))).flat(),
             // Requeue ourselves
             await tuktukProgram.methods.returnTasksV0({
               tasks: [{

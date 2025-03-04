@@ -5,7 +5,9 @@ import { init } from "@helium/voter-stake-registry-sdk";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { Keypair } from "@solana/web3.js";
+import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import fs from "fs";
 
 anchor.setProvider(anchor.AnchorProvider.local(SOLANA_URL));
@@ -29,10 +31,14 @@ export const keypair = Keypair.fromSecretKey(
 );
 
 export let voterStakeRegistryProgram: Program<VoterStakeRegistry>;
+export let heliumSubDaosProgram: Program<HeliumSubDaos>;
 export let tuktukProgram: any;
 export async function getPrograms() {
   if (!voterStakeRegistryProgram) {
     voterStakeRegistryProgram = await init(provider);
+  }
+  if (!heliumSubDaosProgram) {
+    heliumSubDaosProgram = await initHeliumSubDaos(provider);
   }
   if (!tuktukProgram) {
     tuktukProgram = await initTuktuk(provider);
