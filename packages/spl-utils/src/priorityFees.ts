@@ -168,6 +168,9 @@ export async function withPriorityFees({
         ComputeBudgetProgram.setComputeUnitLimit({
           units: 1000000,
         }),
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: 1,
+        }),
         ...tx.instructions,
       ];
     }
