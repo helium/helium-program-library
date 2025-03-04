@@ -1,6 +1,7 @@
 use anchor_lang::{
   prelude::*,
   system_program::{self, transfer, Transfer},
+  InstructionData,
 };
 use spl_token::solana_program::instruction::Instruction;
 use tuktuk_program::{
@@ -14,9 +15,7 @@ use tuktuk_program::{
 };
 
 use crate::voter_stake_registry::{
-  self,
-  accounts::{PositionV0, ProxyMarkerV0, VoteMarkerV0},
-  client::args::RelinquishExpiredVoteV0,
+  self, accounts::ProxyMarkerV0, client::args::RelinquishExpiredVoteV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -42,11 +41,14 @@ pub struct QueueProxyVoteV0<'info> {
   pub payer: Signer<'info>,
   /// CHECK: Used in seeds
   pub voter: AccountInfo<'info>,
+  #[account(
+    has_one = voter,
+  )]
   pub marker: Box<Account<'info, ProxyMarkerV0>>,
   /// CHECK: via seeds
   #[account(
     mut,
-    seeds = [b"vote_payer", voter.key().as_ref()],
+    seeds = [b"custom", task_queue.key().as_ref(), b"vote_payer", voter.key().as_ref()],
     seeds::program = tuktuk_program::tuktuk::ID,
     bump,
   )]
@@ -62,7 +64,10 @@ pub struct QueueProxyVoteV0<'info> {
   pub task_queue: Box<Account<'info, TaskQueueV0>>,
   #[account(mut)]
   /// CHECK: via cpi
-  pub task: AccountInfo<'info>,
+  pub task_1: AccountInfo<'info>,
+  #[account(mut)]
+  /// CHECK: via cpi
+  pub task_2: AccountInfo<'info>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub system_program: Program<'info, System>,
 }
@@ -110,7 +115,7 @@ pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Re
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task_queue_authority: ctx.accounts.task_queue.to_account_info(),
-        task: ctx.accounts.task.to_account_info(),
+        task: ctx.accounts.task_1.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },
       &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
@@ -139,7 +144,7 @@ pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Re
         marker: ctx.accounts.marker.key(),
         proposal: ctx.accounts.marker.proposal.key(),
         system_program: system_program::ID,
-        rent_refund: ctx.accounts.marker.rent_refund.key(),
+        voter: ctx.accounts.voter.key(),
       }
       .to_account_metas(None)
       .to_vec(),
@@ -153,11 +158,11 @@ pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Re
     CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       QueueTaskV0 {
-        payer,
+        payer: ctx.accounts.payer.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task_queue_authority: ctx.accounts.task_queue.to_account_info(),
-        task: ctx.accounts.task.to_account_info(),
+        task: ctx.accounts.task_2.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },
       &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
@@ -168,7 +173,7 @@ pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Re
       crank_reward: None,
       free_tasks: 0,
       id: args.free_task_ids[1],
-      description,
+      description: "relinquish expired proxy vote".to_string(),
     },
   )?;
 

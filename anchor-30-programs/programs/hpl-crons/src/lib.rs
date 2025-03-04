@@ -94,7 +94,10 @@ pub mod hpl_crons {
     queue_relinquish_expired_vote_marker_v0::handler(ctx, args)
   }
 
-  pub fn queue_proxy_vote_v0(ctx: Context<QueueProxyVoteV0>) -> Result<()> {
-    queue_proxy_vote_v0::handler(ctx)
+  pub fn queue_proxy_vote_v0(
+    ctx: Context<QueueProxyVoteV0>,
+    args: QueueProxyVoteArgsV0,
+  ) -> Result<()> {
+    queue_proxy_vote_v0::handler(ctx, args)
   }
 }
