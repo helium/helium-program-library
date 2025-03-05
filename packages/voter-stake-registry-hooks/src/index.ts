@@ -13,6 +13,7 @@ export { useDao } from "./hooks/useDao";
 export { useExtendDelegation } from "./hooks/useExtendDelegation";
 export { useDelegatePosition } from "./hooks/useDelegatePosition";
 export { useDelegatedPositions } from "./hooks/useDelegatedPositions";
+export { useProposalEndTs } from "./hooks/useProposalEndTs";
 export { useExtendPosition } from "./hooks/useExtendPosition";
 export { useFlipPositionLockupKind } from "./hooks/useFlipPositionLockupKind";
 export { useKnownProxy } from "./hooks/useKnownProxy";

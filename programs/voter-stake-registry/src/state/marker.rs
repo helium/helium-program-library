@@ -19,3 +19,16 @@ pub struct VoteMarkerV0 {
   // Ensure the refund goes to whoever paid to create the marker when closing
   pub rent_refund: Pubkey,
 }
+
+/// Marker to indicate that a proxy intends to vote this way on a proposal,
+/// all votes of proxies are permissionless based on this marker
+#[account]
+#[derive(Default)]
+pub struct ProxyMarkerV0 {
+  pub voter: Pubkey,
+  pub proposal: Pubkey,
+  pub choices: Vec<u16>,
+  pub bump_seed: u8,
+  // Ensure the refund goes to whoever paid to create the marker when closing
+  pub rent_refund: Pubkey,
+}

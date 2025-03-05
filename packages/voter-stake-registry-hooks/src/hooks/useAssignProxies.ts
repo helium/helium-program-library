@@ -1,19 +1,18 @@
-import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, init, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
   Status,
   batchParallelInstructionsWithPriorityFee,
+  fetchBackwardsCompatibleIdl,
   truthy,
 } from "@helium/spl-utils";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token"
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import BN from "bn.js";
-import { useHeliumVsrState } from "../contexts/heliumVsrContext";
-import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ProxyAssignment } from "@helium/voter-stake-registry-sdk";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import BN from "bn.js";
 import { INDEXER_WAIT } from "../constants";
-import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
+import { PositionWithMeta } from "../sdk/types";
 
 export const useAssignProxies = () => {
   const { provider, registrar, mint, voteService } = useHeliumVsrState();
