@@ -40,7 +40,7 @@ export const useVote = (proposalKey: PublicKey) => {
             unixNow: new BN(unixNow),
           })
         );
-      })
+      }).map((p, index) => ({ ...p, index }))
     );
   }, [positions, unixNow]);
   const voteMarkerKeys = useMemo(() => {
@@ -297,7 +297,7 @@ export const useVote = (proposalKey: PublicKey) => {
               const marker = markers?.[position.index];
 
               // First time voting? Queue the relinquish
-              if (!marker) {
+              if (!marker?.account) {
                 let freeTaskId = nextAvailable.pop();
                 instructions.push(
                   await hplCronsProgram.methods
