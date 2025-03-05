@@ -50,11 +50,15 @@ pub struct TrackVoteV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = DaoEpochInfoV0::size(),
+    space = if dao_epoch_info.data_len() > 0 {
+        dao_epoch_info.data_len()
+    } else {
+        DaoEpochInfoV0::size()
+    },
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
     bump,
   )]
-  pub dao_epoch_info: Account<'info, DaoEpochInfoV0>,
+  pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
 }
