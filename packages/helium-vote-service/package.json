@@ -41,6 +41,7 @@
     "@helium/spl-utils": "^0.9.28",
     "@helium/tuktuk-sdk": "^0.0.3",
     "@helium/idls": "^0.9.28",
+    "@helium/no-emit-sdk": "^0.9.28",
     "@helium/helium-sub-daos-sdk": "^0.9.28",
     "@helium/voter-stake-registry-sdk": "^0.9.28",
     "@solana/web3.js": "^1.91.1",

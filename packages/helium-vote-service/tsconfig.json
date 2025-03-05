@@ -17,6 +17,9 @@
       "path": "../spl-utils"
     },
     {
+      "path": "../no-emit-sdk"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {
