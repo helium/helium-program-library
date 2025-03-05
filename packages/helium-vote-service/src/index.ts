@@ -441,7 +441,7 @@ server.get<{
 const HNT_REGISTRAR = new PublicKey(
   "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
 );
-const MAX_VOTES_PER_TASK = 2;
+const MAX_VOTES_PER_TASK = 1;
 const MARKERS_TO_CHECK = 10;
 
 server.post<{
