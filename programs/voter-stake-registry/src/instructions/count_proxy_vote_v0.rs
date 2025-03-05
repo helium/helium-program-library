@@ -69,21 +69,7 @@ pub struct CountProxyVoteV0<'info> {
 
 pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
   let marker = &mut ctx.accounts.marker;
-  // Marker has not been allocated yet, need to handle rent payment
-  if marker.rent_refund == Pubkey::default() {
-    let rent = Rent::get()?;
-    let reg_info = ctx.accounts.registrar.to_account_info();
-    let min_rent = rent.minimum_balance(reg_info.data_len());
-    let registrar_sol = reg_info.lamports();
-    let marker_rent = rent.minimum_balance(marker.to_account_info().data_len());
-    if registrar_sol > min_rent + marker_rent {
-      **reg_info.lamports.borrow_mut() -= marker_rent;
-      **ctx.accounts.payer.to_account_info().lamports.borrow_mut() += marker_rent;
-      marker.rent_refund = ctx.accounts.registrar.key()
-    } else {
-      marker.rent_refund = ctx.accounts.payer.key();
-    }
-  }
+
   marker.proposal = ctx.accounts.proposal.key();
   marker.bump_seed = ctx.bumps["marker"];
   marker.voter = ctx.accounts.voter.key();
@@ -174,6 +160,22 @@ pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
         weight,
       },
     )?;
+  }
+
+  // Marker has not been allocated yet, need to handle rent payment
+  if marker.rent_refund == Pubkey::default() {
+    let rent = Rent::get()?;
+    let reg_info = ctx.accounts.registrar.to_account_info();
+    let min_rent = rent.minimum_balance(reg_info.data_len());
+    let registrar_sol: u64 = reg_info.lamports();
+    let marker_rent = rent.minimum_balance(marker.to_account_info().data_len());
+    if registrar_sol > min_rent + marker_rent {
+      **reg_info.lamports.borrow_mut() -= marker_rent;
+      **ctx.accounts.payer.to_account_info().lamports.borrow_mut() += marker_rent;
+      marker.rent_refund = ctx.accounts.registrar.key()
+    } else {
+      marker.rent_refund = ctx.accounts.payer.key();
+    }
   }
 
   Ok(())

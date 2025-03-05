@@ -11,7 +11,7 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::QueueTaskArgsV0,
-  TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
+  TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
 
 use crate::voter_stake_registry::{
@@ -26,14 +26,14 @@ pub struct QueueProxyVoteArgsV0 {
 
 #[cfg(feature = "devnet")]
 // const VOTE_SERVICE_URL: &str = "https://helium-vote-service.web.test-helium.com";
-const VOTE_SERVICE_URL: &str = "http://localhost:3000";
+pub const VOTE_SERVICE_URL: &str = "http://localhost:3000";
 #[cfg(feature = "devnet")]
-const VOTE_SERVICE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
+pub const VOTE_SERVICE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
 
 #[cfg(not(feature = "devnet"))]
-const VOTE_SERVICE_URL: &str = "https://helium-vote-service.web.helium.io";
+pub const VOTE_SERVICE_URL: &str = "https://helium-vote-service.web.helium.io";
 #[cfg(not(feature = "devnet"))]
-const VOTE_SERVICE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
+pub const VOTE_SERVICE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
 
 #[derive(Accounts)]
 pub struct QueueProxyVoteV0<'info> {
@@ -62,6 +62,12 @@ pub struct QueueProxyVoteV0<'info> {
   pub queue_authority: AccountInfo<'info>,
   #[account(mut)]
   pub task_queue: Box<Account<'info, TaskQueueV0>>,
+  #[account(
+    seeds = [b"task_queue_authority", task_queue.key().as_ref(), queue_authority.key().as_ref()],
+    bump = task_queue_authority.bump_seed,
+    seeds::program = tuktuk_program.key(),
+  )]
+  pub task_queue_authority: Box<Account<'info, TaskQueueAuthorityV0>>,
   #[account(mut)]
   /// CHECK: via cpi
   pub task_1: AccountInfo<'info>,
@@ -114,7 +120,7 @@ pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Re
         payer,
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
         task_queue: ctx.accounts.task_queue.to_account_info(),
-        task_queue_authority: ctx.accounts.task_queue.to_account_info(),
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
         task: ctx.accounts.task_1.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },
@@ -161,14 +167,14 @@ pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Re
         payer: ctx.accounts.payer.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
         task_queue: ctx.accounts.task_queue.to_account_info(),
-        task_queue_authority: ctx.accounts.task_queue.to_account_info(),
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
         task: ctx.accounts.task_2.to_account_info(),
         system_program: ctx.accounts.system_program.to_account_info(),
       },
       &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
     ),
     QueueTaskArgsV0 {
-      trigger: TriggerV0::Now,
+      trigger: TriggerV0::Timestamp(args.vote_end_ts + 1),
       transaction: TransactionSourceV0::CompiledV0(compiled_tx),
       crank_reward: None,
       free_tasks: 0,

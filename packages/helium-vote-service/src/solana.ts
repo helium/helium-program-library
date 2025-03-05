@@ -3,12 +3,13 @@ import * as anchor from "@coral-xyz/anchor";
 import { SOLANA_URL } from "./env";
 import { init } from "@helium/voter-stake-registry-sdk";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
-import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
-import { Keypair } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
+import { init as initHplCrons } from "@helium/hpl-crons-sdk";
 import fs from "fs";
+import { Program } from "@coral-xyz/anchor";
 
 anchor.setProvider(anchor.AnchorProvider.local(SOLANA_URL));
 
@@ -33,6 +34,8 @@ export const keypair = Keypair.fromSecretKey(
 export let voterStakeRegistryProgram: Program<VoterStakeRegistry>;
 export let heliumSubDaosProgram: Program<HeliumSubDaos>;
 export let tuktukProgram: any;
+export let hplCronsProgram: any;
+
 export async function getPrograms() {
   if (!voterStakeRegistryProgram) {
     voterStakeRegistryProgram = await init(provider);
@@ -42,6 +45,9 @@ export async function getPrograms() {
   }
   if (!tuktukProgram) {
     tuktukProgram = await initTuktuk(provider);
+  }
+  if (!hplCronsProgram) {
+    hplCronsProgram = await initHplCrons(provider);
   }
 }
 

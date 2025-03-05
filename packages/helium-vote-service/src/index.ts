@@ -1,8 +1,18 @@
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { organizationKey } from "@helium/organization-sdk";
-import { createAtaAndTransferInstructions, HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
-import { getPositionKeysForOwner, init, positionKey, proxyVoteMarkerKey } from "@helium/voter-stake-registry-sdk";
+import {
+  createAtaAndTransferInstructions,
+  HNT_MINT,
+  IOT_MINT,
+  MOBILE_MINT,
+} from "@helium/spl-utils";
+import {
+  getPositionKeysForOwner,
+  init,
+  positionKey,
+  proxyVoteMarkerKey,
+} from "@helium/voter-stake-registry-sdk";
 import Fastify, { FastifyInstance } from "fastify";
 import fs from "fs";
 import { camelCase, isPlainObject, mapKeys } from "lodash";
@@ -27,8 +37,16 @@ import {
   RemoteTaskTransactionV0,
 } from "@helium/tuktuk-sdk";
 import { sign } from "tweetnacl";
-import { getPrograms, provider, tuktukProgram, voterStakeRegistryProgram, keypair, heliumSubDaosProgram } from "./solana";
-import NodeCache from 'node-cache';
+import {
+  getPrograms,
+  provider,
+  tuktukProgram,
+  voterStakeRegistryProgram,
+  keypair,
+  heliumSubDaosProgram,
+  hplCronsProgram,
+} from "./solana";
+import NodeCache from "node-cache";
 import BN from "bn.js";
 import { SystemProgram } from "@solana/web3.js";
 
@@ -165,11 +183,11 @@ server.get<{
   const page = Number(request.query.page || 1);
   const offset = Number((request.query.page || 1) - 1) * limit;
   const registrar = request.params.registrar;
-  const query = request.query.query || '';
-  
+  const query = request.query.query || "";
+
   // Create cache key from all params
   const cacheKey = `proxies:${registrar}:${limit}:${page}:${query}`;
-  
+
   // Try to get from cache first
   const cachedResult = proxyCache.get(cacheKey);
   if (cachedResult) {
@@ -177,7 +195,7 @@ server.get<{
   }
 
   const escapedRegistrar = sequelize.escape(registrar);
-  
+
   const proxies = await sequelize.query(`
 WITH
   positions_with_proxy_assignments AS (
@@ -244,10 +262,10 @@ OFFSET ${offset}
 LIMIT ${limit};
       `);
   const result = proxies[0];
-  
+
   // Store in cache before returning
   proxyCache.set(cacheKey, result);
-  
+
   return result;
 });
 
@@ -422,156 +440,164 @@ server.get<{
 const HNT_REGISTRAR = new PublicKey(
   "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
 );
-let rentMin: number;
-async function getRentMin() {
-  if (!rentMin) {
-    rentMin = await provider.connection.getMinimumBalanceForRentExemption(0)
-  }
-  return rentMin
-}
-const MAX_VOTES_PER_TASK = 3
+const MAX_VOTES_PER_TASK = 1;
 server.post<{
   Params: { proposal: string; wallet: string };
   Body: { task_queue: string; task: string; task_queued_at: number };
 }>("/v1/proposals/:proposal/proxy-vote/:wallet", async (request, reply) => {
   const proposal = new PublicKey(request.params.proposal);
   const wallet = new PublicKey(request.params.wallet);
-  await getPrograms()
+  await getPrograms();
 
-      const taskQueue = new PublicKey(request.body.task_queue);
-      const task = new PublicKey(request.body.task);
-      const taskQueuedAt = new BN(request.body.task_queued_at);
-      const taskQueueAcc = tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const proxyVoteMarker = proxyVoteMarkerKey(wallet, proposal)[0];
-      const choices = (await voterStakeRegistryProgram.account.proxyMarkerV0.fetch(proxyVoteMarker)).choices
-      try {
-        const needsVote = (
-          await sequelize.query(`
+  const taskQueue = new PublicKey(request.body.task_queue);
+  const task = new PublicKey(request.body.task);
+  const taskQueuedAt = new BN(request.body.task_queued_at);
+  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+  const proxyVoteMarker = proxyVoteMarkerKey(wallet, proposal)[0];
+  const choices = (
+    await voterStakeRegistryProgram.account.proxyMarkerV0.fetch(proxyVoteMarker)
+  ).choices;
+  try {
+    console.log(`
             SELECT
               pa.asset,
               pa.address as proxy_assignment,
               dp.address as delegated_position
             FROM proxy_assignments pa
-            LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset
+            LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset AND (
+              vm.registrar = '${HNT_REGISTRAR.toBase58()}' AND vm.proposal = '${proposal.toBase58()}'
+              AND vm.choices IS NOT DISTINCT FROM ARRAY[${choices.join(
+                ","
+              )}]::integer[]
+            )
             LEFT OUTER JOIN delegated_positions dp ON dp.position = pa.asset
-            WHERE pa.voter = ${wallet.toBase58()} AND pa.index > 0
-              AND (vm.address IS NULL OR NOT (vm.choices = ANY(ARRAY[${choices.join(',')}])))
-              AND vm.registrar = ${HNT_REGISTRAR.toBase58()}
-              AND vm.proposal = ${proposal.toBase58()}
+            WHERE pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND vm is NULL
+            LIMIT ${MAX_VOTES_PER_TASK}
+          `);
+    const needsVote = (
+      await sequelize.query(`
+            SELECT
+              pa.asset,
+              pa.address as proxy_assignment,
+              dp.address as delegated_position
+            FROM proxy_assignments pa
+            LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset AND (
+              vm.registrar = '${HNT_REGISTRAR.toBase58()}' AND vm.proposal = '${proposal.toBase58()}'
+              AND vm.choices IS NOT DISTINCT FROM ARRAY[${choices.join(
+                ","
+              )}]::integer[]
+            )
+            LEFT OUTER JOIN delegated_positions dp ON dp.position = pa.asset
+            WHERE pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND vm is NULL
             LIMIT ${MAX_VOTES_PER_TASK}
           `)
-        )[0].map(deepCamelCaseKeys);
+    )[0].map(deepCamelCaseKeys);
 
-        const [pdaWallet, bump] = customSignerKey(taskQueue, [
-          Buffer.from("vote_payer"),
-          wallet.toBuffer(),
-        ]);
-        const bumpBuffer = Buffer.alloc(1);
-        bumpBuffer.writeUint8(bump);
-        let instructions: TransactionInstruction[] = []
-        // Done, refund the pda wallet and end the task chain.
-        if (needsVote.length === 0) {
-          const pdaWalletBalance =
-            (await provider.connection.getAccountInfo(pdaWallet))?.lamports ||
-            0;
-          instructions.push(
-            SystemProgram.transfer({
-              fromPubkey: pdaWallet,
-              toPubkey: wallet,
-              lamports: pdaWalletBalance,
-            })
-          )
-        } else {
-          instructions.push(
-            // Fund the next crank turn
-            SystemProgram.transfer({
-              fromPubkey: pdaWallet,
-              toPubkey: task,
-              lamports: taskQueueAcc.minCrankReward.toNumber(),
-            }),
-            // Count as many votes as possible
-            ...(await Promise.all(needsVote.map(async (vote) => {
-              const instructions: TransactionInstruction[] = []
+    const [pdaWallet, bump] = customSignerKey(taskQueue, [
+      Buffer.from("vote_payer"),
+      wallet.toBuffer(),
+    ]);
+    const bumpBuffer = Buffer.alloc(1);
+    bumpBuffer.writeUint8(bump);
+    let instructions: TransactionInstruction[] = [];
+    // Done, refund the pda wallet and end the task chain.
+    if (needsVote.length === 0) {
+      const pdaWalletBalance =
+        (await provider.connection.getAccountInfo(pdaWallet))?.lamports || 0;
+      instructions.push(
+        SystemProgram.transfer({
+          fromPubkey: pdaWallet,
+          toPubkey: wallet,
+          lamports: pdaWalletBalance,
+        })
+      );
+    } else {
+      instructions.push(
+        // Fund the next crank turn
+        SystemProgram.transfer({
+          fromPubkey: pdaWallet,
+          toPubkey: task,
+          lamports: taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
+        }),
+        // Count as many votes as possible
+        ...(
+          await Promise.all(
+            needsVote.map(async (vote) => {
+              const instructions: TransactionInstruction[] = [];
               const countIx = await voterStakeRegistryProgram.methods
                 .countProxyVoteV0()
                 .accounts({
                   payer: pdaWallet,
-                  marker: proxyVoteMarker,
+                  proxyMarker: proxyVoteMarker,
                   voter: wallet,
                   proxyAssignment: new PublicKey(vote.proxyAssignment),
                   registrar: HNT_REGISTRAR,
                   position: positionKey(new PublicKey(vote.asset))[0],
                   proposal,
                 })
-                .instruction()
-              instructions.push(countIx)
-                if (vote.delegatedPosition) {
-                  const delegatedCountIx = await heliumSubDaosProgram.methods
-                    .trackVoteV0()
-                    .accounts({
-                      payer: pdaWallet,
-                      delegatedPosition: new PublicKey(vote.delegatedPosition),
-                      registrar: HNT_REGISTRAR,
-                      position: positionKey(new PublicKey(vote.asset))[0],
-                      proposal,
-                    })
-                    .instruction();
-                  instructions.push(delegatedCountIx)
-                }
-              return instructions
-            }))).flat(),
-            // Requeue ourselves
-            await tuktukProgram.methods.returnTasksV0({
-              tasks: [{
-                trigger: { now: {} },
-                transaction: {
-                  remoteV0: {
-                    signer: provider.wallet.publicKey,
-                    url: request.url,
-                  }
-                },
-                crankReward: null,
-                freeTasks: 1,
-                description: "Proxy vote",
-              }]
-            }).instruction()
-          );
-        }
+                .instruction();
+              instructions.push(countIx);
+              if (vote.delegatedPosition) {
+                const delegatedCountIx = await heliumSubDaosProgram.methods
+                  .trackVoteV0()
+                  .accounts({
+                    payer: pdaWallet,
+                    delegatedPosition: new PublicKey(vote.delegatedPosition),
+                    registrar: HNT_REGISTRAR,
+                    position: positionKey(new PublicKey(vote.asset))[0],
+                    proposal,
+                  })
+                  .instruction();
+                instructions.push(delegatedCountIx);
+              }
+              return instructions;
+            })
+          )
+        ).flat(),
+        // Requeue ourselves
+        await hplCronsProgram.methods
+          .requeueProxyVoteV0()
+          .accounts({
+            marker: proxyVoteMarker,
+          })
+          .instruction()
+      );
+    }
 
-        const { transaction, remainingAccounts } = await compileTransaction(
-          instructions,
-          [[Buffer.from("vote_payer"), wallet.toBuffer(), bumpBuffer]]
-        );
-        const remoteTx = new RemoteTaskTransactionV0({
-          task,
-          taskQueuedAt,
-          transaction: {
-            ...transaction,
-            accounts: remainingAccounts.map((acc) => acc.pubkey),
-          },
-        });
-        const serialized = await RemoteTaskTransactionV0.serialize(
-          tuktukProgram.coder.accounts,
-          remoteTx
-        );
-        const resp = {
-          transaction: serialized.toString("base64"),
-          signature: Buffer.from(
-            sign.detached(Uint8Array.from(serialized), keypair.secretKey)
-          ).toString("base64"),
-          remaining_accounts: remainingAccounts.map((acc) => ({
-            pubkey: acc.pubkey.toBase58(),
-            is_signer: acc.isSigner,
-            is_writable: acc.isWritable,
-          })),
-        };
-        reply.status(200).send(resp);
-      } catch (err) {
-        console.error(err);
-        reply.status(500).send({
-          message: "Request failed",
-        });
-      };
+    const { transaction, remainingAccounts } = await compileTransaction(
+      instructions,
+      [[Buffer.from("vote_payer"), wallet.toBuffer(), bumpBuffer]]
+    );
+    const remoteTx = new RemoteTaskTransactionV0({
+      task,
+      taskQueuedAt,
+      transaction: {
+        ...transaction,
+        accounts: remainingAccounts.map((acc) => acc.pubkey),
+      },
+    });
+    const serialized = await RemoteTaskTransactionV0.serialize(
+      tuktukProgram.coder.accounts,
+      remoteTx
+    );
+    const resp = {
+      transaction: serialized.toString("base64"),
+      signature: Buffer.from(
+        sign.detached(Uint8Array.from(serialized), keypair.secretKey)
+      ).toString("base64"),
+      remaining_accounts: remainingAccounts.map((acc) => ({
+        pubkey: acc.pubkey.toBase58(),
+        is_signer: acc.isSigner,
+        is_writable: acc.isWritable,
+      })),
+    };
+    reply.status(200).send(resp);
+  } catch (err) {
+    console.error(err);
+    reply.status(500).send({
+      message: "Request failed",
+    });
+  }
 });
 
 function deepCamelCaseKeys(obj: any): any {
