@@ -39,7 +39,11 @@ pub struct CalculateUtilityScoreV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = DaoEpochInfoV0::size(),
+    space = if dao_epoch_info.data_len() > 0 {
+        dao_epoch_info.data_len()
+    } else {
+        DaoEpochInfoV0::size()
+    },
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
     bump,
   )]
