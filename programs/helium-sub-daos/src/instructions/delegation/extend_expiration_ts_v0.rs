@@ -53,9 +53,9 @@ pub struct ExtendExpirationTsV0<'info> {
     mut,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
         if delegated_position.expiration_ts == 0 {
-          position.lockup.end_ts
+          position.lockup.effective_end_ts()
         } else {
-          min(position.lockup.end_ts, delegated_position.expiration_ts)
+          min(position.lockup.effective_end_ts(), delegated_position.expiration_ts)
         }
     ).to_le_bytes()],
     bump,
@@ -66,7 +66,7 @@ pub struct ExtendExpirationTsV0<'info> {
     payer = payer,
     space = SubDaoEpochInfoV0::SIZE,
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
-        min(proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end, position.lockup.end_ts)
+        min(proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end, position.lockup.effective_end_ts())
     ).to_le_bytes()],
     bump,
   )]
@@ -81,7 +81,7 @@ pub struct ExtendExpirationTsV0<'info> {
         // no need to pass an extra account here. Just pass the closing time sdei and
         // do not change it.
         if position.genesis_end <= registrar.clock_unix_timestamp() {
-          min(proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end, position.lockup.end_ts)
+          min(proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end, position.lockup.effective_end_ts())
         } else {
           position.genesis_end
         }
@@ -106,7 +106,7 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
       .get_current_season(registrar.clock_unix_timestamp())
       .unwrap()
       .end,
-    position.lockup.end_ts,
+    position.lockup.effective_end_ts(),
   );
   let epoch = current_epoch(registrar.clock_unix_timestamp());
 

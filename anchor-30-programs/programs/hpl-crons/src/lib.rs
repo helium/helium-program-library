@@ -93,4 +93,24 @@ pub mod hpl_crons {
   ) -> Result<()> {
     queue_relinquish_expired_vote_marker_v0::handler(ctx, args)
   }
+
+  pub fn queue_proxy_vote_v0(
+    ctx: Context<QueueProxyVoteV0>,
+    args: QueueProxyVoteArgsV0,
+  ) -> Result<()> {
+    queue_proxy_vote_v0::handler(ctx, args)
+  }
+
+  pub fn requeue_proxy_vote_v0(
+    ctx: Context<RequeueProxyVoteV0>,
+  ) -> Result<tuktuk_program::RunTaskReturnV0> {
+    requeue_proxy_vote_v0::handler(ctx)
+  }
+
+  pub fn queue_relinquish_expired_proxy_vote_marker_v0(
+    ctx: Context<QueueRelinquishExpiredProxyVoteMarkerV0>,
+    args: QueueRelinquishExpiredProxyVoteMarkerArgsV0,
+  ) -> Result<()> {
+    queue_relinquish_expired_proxy_vote_marker_v0::handler(ctx, args)
+  }
 }

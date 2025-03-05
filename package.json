@@ -44,6 +44,7 @@
     "@pythnetwork/pyth-solana-receiver": "^0.8.0",
     "@solana/spl-account-compression": "^0.1.4",
     "angry-purple-tiger": "^1.0.5",
+    "camelcase": "6.3.0",
     "lerna": "^5.5.4",
     "long": "^5.2.1"
   },

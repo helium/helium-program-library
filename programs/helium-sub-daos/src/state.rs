@@ -123,6 +123,11 @@ macro_rules! sub_dao_seeds {
 
 impl DaoV0 {
   pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
+    // Don't add the same proposal twice
+    if self.recent_proposals.iter().any(|p| p.proposal == proposal) {
+      return;
+    }
+
     let new_proposal = RecentProposal { proposal, ts };
     // Find the insertion point to maintain descending order by timestamp
     let insert_index = self

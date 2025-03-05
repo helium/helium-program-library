@@ -5,6 +5,9 @@
       "path": "../voter-stake-registry-sdk"
     },
     {
+      "path": "../account-fetch-cache"
+    },
+    {
       "path": "../spl-utils"
     },
     {

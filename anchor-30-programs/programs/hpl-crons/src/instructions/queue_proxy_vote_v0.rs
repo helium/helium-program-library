@@ -16,25 +16,43 @@ use tuktuk_program::{
 
 use crate::voter_stake_registry::{
   self,
-  accounts::{PositionV0, VoteMarkerV0},
-  client::args::RelinquishExpiredVoteV0,
+  accounts::ProxyMarkerV0,
+  client::args::{RelinquishExpiredProxyVoteV0, RelinquishExpiredVoteV0},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct QueueRelinquishExpiredVoteMarkerArgsV0 {
+pub struct QueueProxyVoteArgsV0 {
   pub free_task_id: u16,
-  pub trigger_ts: i64,
 }
 
+#[cfg(feature = "devnet")]
+const VOTE_SERVICE_URL: &str = "https://helium-vote-service.web.test-helium.com";
+#[cfg(feature = "devnet")]
+pub const VOTE_SERVICE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
+
+#[cfg(not(feature = "devnet"))]
+pub const VOTE_SERVICE_URL: &str = "https://helium-vote-service.web.helium.io";
+#[cfg(not(feature = "devnet"))]
+pub const VOTE_SERVICE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
+
 #[derive(Accounts)]
-pub struct QueueRelinquishExpiredVoteMarkerV0<'info> {
+pub struct QueueProxyVoteV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub marker: Box<Account<'info, VoteMarkerV0>>,
+  /// CHECK: Used in seeds
+  pub voter: AccountInfo<'info>,
   #[account(
-    constraint = position.mint == marker.mint
+    has_one = voter,
   )]
-  pub position: Box<Account<'info, PositionV0>>,
+  pub marker: Box<Account<'info, ProxyMarkerV0>>,
+  /// CHECK: via seeds
+  #[account(
+    mut,
+    seeds = [b"custom", task_queue.key().as_ref(), b"vote_payer", voter.key().as_ref()],
+    seeds::program = tuktuk_program::tuktuk::ID,
+    bump,
+  )]
+  pub pda_wallet: AccountInfo<'info>,
   /// CHECK: Via seeds
   #[account(
     mut,
@@ -57,32 +75,23 @@ pub struct QueueRelinquishExpiredVoteMarkerV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(
-  ctx: Context<QueueRelinquishExpiredVoteMarkerV0>,
-  args: QueueRelinquishExpiredVoteMarkerArgsV0,
-) -> Result<()> {
-  let (compiled_tx, _) = compile_transaction(
-    vec![Instruction {
-      program_id: voter_stake_registry::ID,
-      accounts: voter_stake_registry::client::accounts::RelinquishExpiredVoteV0 {
-        marker: ctx.accounts.marker.key(),
-        position: ctx.accounts.position.key(),
-        proposal: ctx.accounts.marker.proposal.key(),
-        system_program: system_program::ID,
-        rent_refund: ctx.accounts.marker.rent_refund.key(),
-      }
-      .to_account_metas(None)
-      .to_vec(),
-      data: RelinquishExpiredVoteV0 {}.data(),
-    }],
-    vec![],
-  )
-  .unwrap();
+pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Result<()> {
+  // Fund the fee payer wallet with 0.04 SOL. This should be enough for ~2000 votes. The rest will be refunded.
+  transfer(
+    CpiContext::new(
+      ctx.accounts.system_program.to_account_info(),
+      Transfer {
+        from: ctx.accounts.payer.to_account_info(),
+        to: ctx.accounts.pda_wallet.to_account_info(),
+      },
+    ),
+    40000000,
+  )?;
 
   // Queue authority pays for the task rent if it can, since we know it'll come back
   // This makes voting cheaper for users.
   let mut payer = ctx.accounts.payer.to_account_info();
-  let description = "relinquish expired vote marker".to_string();
+  let description = "proxy vote".to_string();
   let len = 8 + std::mem::size_of::<TaskV0>() + 60 + description.len();
   let rent_needed = Rent::get()?.minimum_balance(len);
   if ctx.accounts.queue_authority.lamports() > rent_needed {
@@ -99,6 +108,7 @@ pub fn handler(
       ctx.accounts.task_queue.min_crank_reward,
     )?;
   }
+
   queue_task_v0(
     CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
@@ -113,10 +123,16 @@ pub fn handler(
       &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
     ),
     QueueTaskArgsV0 {
-      trigger: TriggerV0::Timestamp(args.trigger_ts),
-      transaction: TransactionSourceV0::CompiledV0(compiled_tx),
+      trigger: TriggerV0::Now,
+      transaction: TransactionSourceV0::RemoteV0 {
+        url: format!(
+          "{}/v1/proposals/{}/proxy-vote/{}",
+          VOTE_SERVICE_URL, ctx.accounts.marker.proposal, ctx.accounts.marker.voter
+        ),
+        signer: VOTE_SERVICE_SIGNER,
+      },
       crank_reward: None,
-      free_tasks: 0,
+      free_tasks: 1,
       id: args.free_task_id,
       description,
     },

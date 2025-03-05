@@ -15,26 +15,20 @@ use tuktuk_program::{
 };
 
 use crate::voter_stake_registry::{
-  self,
-  accounts::{PositionV0, VoteMarkerV0},
-  client::args::RelinquishExpiredVoteV0,
+  self, accounts::ProxyMarkerV0, client::args::RelinquishExpiredProxyVoteV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct QueueRelinquishExpiredVoteMarkerArgsV0 {
+pub struct QueueRelinquishExpiredProxyVoteMarkerArgsV0 {
   pub free_task_id: u16,
   pub trigger_ts: i64,
 }
 
 #[derive(Accounts)]
-pub struct QueueRelinquishExpiredVoteMarkerV0<'info> {
+pub struct QueueRelinquishExpiredProxyVoteMarkerV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub marker: Box<Account<'info, VoteMarkerV0>>,
-  #[account(
-    constraint = position.mint == marker.mint
-  )]
-  pub position: Box<Account<'info, PositionV0>>,
+  pub marker: Box<Account<'info, ProxyMarkerV0>>,
   /// CHECK: Via seeds
   #[account(
     mut,
@@ -58,22 +52,21 @@ pub struct QueueRelinquishExpiredVoteMarkerV0<'info> {
 }
 
 pub fn handler(
-  ctx: Context<QueueRelinquishExpiredVoteMarkerV0>,
-  args: QueueRelinquishExpiredVoteMarkerArgsV0,
+  ctx: Context<QueueRelinquishExpiredProxyVoteMarkerV0>,
+  args: QueueRelinquishExpiredProxyVoteMarkerArgsV0,
 ) -> Result<()> {
   let (compiled_tx, _) = compile_transaction(
     vec![Instruction {
       program_id: voter_stake_registry::ID,
-      accounts: voter_stake_registry::client::accounts::RelinquishExpiredVoteV0 {
+      accounts: voter_stake_registry::client::accounts::RelinquishExpiredProxyVoteV0 {
         marker: ctx.accounts.marker.key(),
-        position: ctx.accounts.position.key(),
         proposal: ctx.accounts.marker.proposal.key(),
         system_program: system_program::ID,
         rent_refund: ctx.accounts.marker.rent_refund.key(),
       }
       .to_account_metas(None)
       .to_vec(),
-      data: RelinquishExpiredVoteV0 {}.data(),
+      data: RelinquishExpiredProxyVoteV0 {}.data(),
     }],
     vec![],
   )
@@ -82,7 +75,7 @@ pub fn handler(
   // Queue authority pays for the task rent if it can, since we know it'll come back
   // This makes voting cheaper for users.
   let mut payer = ctx.accounts.payer.to_account_info();
-  let description = "relinquish expired vote marker".to_string();
+  let description = "relinquish expired proxy vote marker".to_string();
   let len = 8 + std::mem::size_of::<TaskV0>() + 60 + description.len();
   let rent_needed = Rent::get()?.minimum_balance(len);
   if ctx.accounts.queue_authority.lamports() > rent_needed {

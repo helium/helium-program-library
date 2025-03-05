@@ -1,6 +1,6 @@
 import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
-import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { init, proxyVoteMarkerKey, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
+import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
@@ -9,8 +9,15 @@ import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import BN from "bn.js";
-import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
+import { init as hplCronsInit, TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
+import {
+  customSignerKey,
+  nextAvailableTaskIds,
+  taskKey,
+  taskQueueAuthorityKey,
+  init as tuktukInit,
+} from "@helium/tuktuk-sdk";
 
 export const useRelinquishVote = (proposal: PublicKey) => {
   const { positions, provider, registrar } = useHeliumVsrState();
@@ -87,8 +94,72 @@ export const useRelinquishVote = (proposal: PublicKey) => {
       } else {
         const vsrProgram = await init(provider);
         const hsdProgram = await initHsd(provider);
+        
+        const proxyVoteInstructions: TransactionInstruction[] = [];
+        if (sortedPositions.some((p) => p.isProxiedToMe)) {
+          const proxyVoteMarker = proxyVoteMarkerKey(
+            provider.wallet.publicKey,
+            proposal
+          )[0];
+          const proxyVoteMarkerInfo =
+            await vsrProgram.account.proxyMarkerV0.fetchNullable(
+              proxyVoteMarker
+            );
+          if (proxyVoteMarkerInfo?.choices.includes(choice)) {
+            const hplCronsProgram = await hplCronsInit(provider);
+            const tuktukProgram = await tuktukInit(provider);
+            const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
+              TASK_QUEUE_ID
+            );
+            const task1 = nextAvailableTaskIds(
+              taskQueue.taskBitmap,
+              1
+            )[0];
+            const queueAuthority = PublicKey.findProgramAddressSync(
+              [Buffer.from("queue_authority")],
+              hplCronsProgram.programId
+            )[0];
 
-        const instructions = (
+            proxyVoteInstructions.push(
+              await vsrProgram.methods
+                .proxiedRelinquishVoteV1({
+                  choice,
+                })
+                .accounts({
+                  proposal,
+                  voter: provider.wallet.publicKey,
+                  marker: proxyVoteMarker,
+                })
+                .instruction(),
+              await hplCronsProgram.methods
+                // @ts-ignore
+                .queueProxyVoteV0({
+                  freeTaskId: task1,
+                })
+                .accounts({
+                  marker: proxyVoteMarker,
+                  task: taskKey(TASK_QUEUE_ID, task1)[0],
+                  taskQueue: TASK_QUEUE_ID,
+                  payer: provider.wallet.publicKey,
+                  systemProgram: SystemProgram.programId,
+                  queueAuthority,
+                  tuktukProgram: tuktukProgram.programId,
+                  voter: provider.wallet.publicKey,
+                  pdaWallet: customSignerKey(TASK_QUEUE_ID, [
+                    Buffer.from("vote_payer"),
+                    provider.wallet.publicKey.toBuffer(),
+                  ])[0],
+                  taskQueueAuthority: taskQueueAuthorityKey(
+                    TASK_QUEUE_ID,
+                    queueAuthority
+                  )[0],
+                })
+                .instruction()
+            );
+          }
+        }
+
+        const normalVoteInstructions = (
           await Promise.all(
             sortedPositions.map(async (position, index) => {
               const canRelinquishVote = canPositionRelinquishVote(
@@ -99,59 +170,31 @@ export const useRelinquishVote = (proposal: PublicKey) => {
               const markerK = voteMarkerKey(position.mint, proposal)[0];
               const instructions: TransactionInstruction[] = [];
 
-              if (marker && canRelinquishVote) {
-                if (position.isProxiedToMe) {
-                  if (marker.proxyIndex < (position.proxy?.index || 0)) {
-                    // Do not vote with a position that has been delegated to us, but voting overidden
-                    return;
-                  }
-
-                  instructions.push(
-                    await vsrProgram.methods
-                      .proxiedRelinquishVoteV0({
-                        choice,
-                      })
-                      .accounts({
-                        proposal,
-                        voter: provider.wallet.publicKey,
-                        position: position.pubkey,
-                        marker: voteMarkerKey(position.mint, proposal)[0],
-                        proxyAssignment: proxyAssignmentKey(
-                          registrar!.proxyConfig,
-                          position.mint,
-                          provider.wallet.publicKey
-                        )[0],
-                      })
-                      .instruction()
-                  );
-                }
-                {
-                  instructions.push(
-                    await vsrProgram.methods
-                      .relinquishVoteV1({
-                        choice,
-                      })
-                      .accounts({
-                        proposal,
-                        voter: provider.wallet.publicKey,
-                        position: position.pubkey,
-                      })
-                      .instruction()
-                  );
-                }
-              }
-
-              if (position.isDelegated) {
+              if (marker && canRelinquishVote && !position.isProxiedToMe) {
                 instructions.push(
-                  await hsdProgram.methods
-                    .trackVoteV0()
+                  await vsrProgram.methods
+                    .relinquishVoteV1({
+                      choice,
+                    })
                     .accounts({
                       proposal,
-                      marker: markerK,
+                      voter: provider.wallet.publicKey,
                       position: position.pubkey,
                     })
                     .instruction()
                 );
+                if (position.isDelegated) {
+                  instructions.push(
+                    await hsdProgram.methods
+                      .trackVoteV0()
+                      .accounts({
+                        proposal,
+                        marker: markerK,
+                        position: position.pubkey,
+                      })
+                      .instruction()
+                  );
+                }
               }
 
               return instructions;
@@ -162,11 +205,17 @@ export const useRelinquishVote = (proposal: PublicKey) => {
           .flat();
 
         if (onInstructions) {
-          await onInstructions(instructions);
+          await onInstructions([
+            ...proxyVoteInstructions,
+            ...normalVoteInstructions,
+          ]);
         } else {
           await batchParallelInstructions({
             provider,
-            instructions,
+            instructions: [
+              ...proxyVoteInstructions,
+              ...normalVoteInstructions,
+            ],
             onProgress,
             triesRemaining: 10,
             extraSigners: [],
