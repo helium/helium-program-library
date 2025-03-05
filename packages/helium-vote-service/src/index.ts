@@ -474,7 +474,7 @@ server.post<{
                 ","
               )}]::integer[]
             )
-            LEFT OUTER JOIN delegated_positions dp ON dp.position = pa.asset
+            LEFT OUTER JOIN delegated_positions dp ON dp.mint = pa.asset
             WHERE pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND vm is NULL
             LIMIT ${MARKERS_TO_CHECK}
           `)
