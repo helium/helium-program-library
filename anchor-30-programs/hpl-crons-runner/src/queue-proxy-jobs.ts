@@ -92,13 +92,11 @@ export async function run(args: any = process.argv) {
       instructions.push(
         await program.methods
           .queueProxyVoteV0({
-            freeTaskIds: nextAvailable,
-            voteEndTs: endTs!,
+            freeTaskId: nextAvailable[0],
           })
           .accountsStrict({
             marker: marker.publicKey,
-            task1: taskKey(taskQueue, nextAvailable[0])[0],
-            task2: taskKey(taskQueue, nextAvailable[1])[0],
+            task: taskKey(taskQueue, nextAvailable[0])[0],
             taskQueue,
             payer: provider.wallet.publicKey,
             systemProgram: SystemProgram.programId,
@@ -114,7 +112,25 @@ export async function run(args: any = process.argv) {
               queueAuthority
             )[0],
           })
-
+          .instruction(),
+        await program.methods
+          .queueRelinquishExpiredProxyVoteMarkerV0({
+            freeTaskId: nextAvailable[0],
+            triggerTs: endTs!,
+          })
+          .accountsStrict({
+            marker: marker.publicKey,
+            task: taskKey(taskQueue, nextAvailable[1])[0],
+            taskQueue,
+            payer: provider.wallet.publicKey,
+            systemProgram: SystemProgram.programId,
+            queueAuthority,
+            tuktukProgram: tuktukProgram.programId,
+            taskQueueAuthority: taskQueueAuthorityKey(
+              taskQueue,
+              queueAuthority
+            )[0],
+          })
           .instruction()
       );
     }

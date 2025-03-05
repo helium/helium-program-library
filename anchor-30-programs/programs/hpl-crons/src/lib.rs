@@ -21,8 +21,6 @@ pub fn current_epoch(unix_timestamp: i64) -> u64 {
 
 #[program]
 pub mod hpl_crons {
-  use tuktuk_program::RunTaskReturnV0;
-
   use super::*;
 
   pub const CIRCUIT_BREAKER_PROGRAM: Pubkey =
@@ -107,5 +105,12 @@ pub mod hpl_crons {
     ctx: Context<RequeueProxyVoteV0>,
   ) -> Result<tuktuk_program::RunTaskReturnV0> {
     requeue_proxy_vote_v0::handler(ctx)
+  }
+
+  pub fn queue_relinquish_expired_proxy_vote_marker_v0(
+    ctx: Context<QueueRelinquishExpiredProxyVoteMarkerV0>,
+    args: QueueRelinquishExpiredProxyVoteMarkerArgsV0,
+  ) -> Result<()> {
+    queue_relinquish_expired_proxy_vote_marker_v0::handler(ctx, args)
   }
 }

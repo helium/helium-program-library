@@ -12,6 +12,7 @@ import {
   init,
   positionKey,
   proxyVoteMarkerKey,
+  voteMarkerKey,
 } from "@helium/voter-stake-registry-sdk";
 import Fastify, { FastifyInstance } from "fastify";
 import fs from "fs";
@@ -440,7 +441,9 @@ server.get<{
 const HNT_REGISTRAR = new PublicKey(
   "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
 );
-const MAX_VOTES_PER_TASK = 1;
+const MAX_VOTES_PER_TASK = 2;
+const MARKERS_TO_CHECK = 10;
+
 server.post<{
   Params: { proposal: string; wallet: string };
   Body: { task_queue: string; task: string; task_queued_at: number };
@@ -458,23 +461,7 @@ server.post<{
     await voterStakeRegistryProgram.account.proxyMarkerV0.fetch(proxyVoteMarker)
   ).choices;
   try {
-    console.log(`
-            SELECT
-              pa.asset,
-              pa.address as proxy_assignment,
-              dp.address as delegated_position
-            FROM proxy_assignments pa
-            LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset AND (
-              vm.registrar = '${HNT_REGISTRAR.toBase58()}' AND vm.proposal = '${proposal.toBase58()}'
-              AND vm.choices IS NOT DISTINCT FROM ARRAY[${choices.join(
-                ","
-              )}]::integer[]
-            )
-            LEFT OUTER JOIN delegated_positions dp ON dp.position = pa.asset
-            WHERE pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND vm is NULL
-            LIMIT ${MAX_VOTES_PER_TASK}
-          `);
-    const needsVote = (
+    const needsVoteRaw = (
       await sequelize.query(`
             SELECT
               pa.asset,
@@ -489,9 +476,34 @@ server.post<{
             )
             LEFT OUTER JOIN delegated_positions dp ON dp.position = pa.asset
             WHERE pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND vm is NULL
-            LIMIT ${MAX_VOTES_PER_TASK}
+            LIMIT ${MARKERS_TO_CHECK}
           `)
     )[0].map(deepCamelCaseKeys);
+
+    // Check against the RPC as it's more up-to-date
+    let needsVote: any[] = [];
+    for (const vote of needsVoteRaw) {
+      if (needsVote.length >= MAX_VOTES_PER_TASK) {
+        break;
+      }
+      const marker = voteMarkerKey(new PublicKey(vote.asset), proposal)[0];
+      const markerAccount =
+        await voterStakeRegistryProgram.account.voteMarkerV0.fetchNullable(
+          marker
+        );
+      if (!markerAccount || !arrayEquals(markerAccount.choices, choices)) {
+        needsVote.push(vote);
+      }
+    }
+
+    if (needsVote.length === 0 && needsVoteRaw.length === MARKERS_TO_CHECK) {
+      reply.code(503).send({
+        error: "Service Unavailable",
+        message:
+          "Indexer is still processing recent transactions, please retry later",
+      });
+      return;
+    }
 
     const [pdaWallet, bump] = customSignerKey(taskQueue, [
       Buffer.from("vote_payer"),
@@ -656,3 +668,10 @@ const start = async () => {
 };
 
 start();
+function arrayEquals(choices: number[], choices1: number[]) {
+  if (choices.length !== choices1.length) return false;
+  for (let i = 0; i < choices.length; i++) {
+    if (choices[i] !== choices1[i]) return false;
+  }
+  return true;
+}

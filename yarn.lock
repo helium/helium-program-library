@@ -1731,9 +1731,11 @@ __metadata:
     "@helium/circuit-breaker-sdk": ^0.9.23
     "@helium/helium-react-hooks": ^0.9.23
     "@helium/helium-sub-daos-sdk": ^0.9.23
+    "@helium/hpl-crons-sdk": ^0.10.0-alpha.13
     "@helium/modular-governance-hooks": ^0.0.15
     "@helium/modular-governance-idls": ^0.0.15
     "@helium/spl-utils": ^0.9.23
+    "@helium/tuktuk-sdk": ^0.0.3
     "@helium/voter-stake-registry-sdk": ^0.9.23
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/web3.js": ^1.91.1
