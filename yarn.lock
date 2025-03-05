@@ -1110,7 +1110,7 @@ __metadata:
     "@helium/hpl-crons-sdk": ^0.10.0-alpha.13
     "@helium/organization-sdk": ^0.0.15
     "@helium/spl-utils": ^0.9.23
-    "@helium/tuktuk-sdk": ^0.0.3
+    "@helium/tuktuk-sdk": ^0.0.4
     "@helium/voter-stake-registry-sdk": ^0.9.23
     "@solana/web3.js": ^1.91.1
     "@types/bn.js": ^5.1.1
@@ -1699,25 +1699,25 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/tuktuk-idls@npm:^0.0.3":
-  version: 0.0.3
-  resolution: "@helium/tuktuk-idls@npm:0.0.3"
+"@helium/tuktuk-idls@npm:^0.0.4":
+  version: 0.0.4
+  resolution: "@helium/tuktuk-idls@npm:0.0.4"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@solana/web3.js": ^1.95.2
-  checksum: d153f39fc381dcb58aa2297c4b3151c4e50528e7e44524457322b384a7dbda149dacccaac7d352c935b787e4efa9b8f8abdec445713c3d362944d0ff3661d848
+  checksum: 8dfeb6f3405947720f7d06ee97ccdcd243ff214d6a0967157d86f47f383b49fce92c9ce0a8b637075ca61634e7d0ff685f43a042fdc5fa2555198c450fb4d02d
   languageName: node
   linkType: hard
 
-"@helium/tuktuk-sdk@npm:^0.0.3":
-  version: 0.0.3
-  resolution: "@helium/tuktuk-sdk@npm:0.0.3"
+"@helium/tuktuk-sdk@npm:^0.0.4":
+  version: 0.0.4
+  resolution: "@helium/tuktuk-sdk@npm:0.0.4"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/anchor-resolvers": ^0.10.0-alpha.4
-    "@helium/tuktuk-idls": ^0.0.3
+    "@helium/tuktuk-idls": ^0.0.4
     js-sha256: ^0.11.0
-  checksum: c0eb2d207d5f503c4464902c4cdeb2685aad8e157552141e5893958c4bef2d46b04f9a60f491224cd16101f708005c635f099b33d6094a49b2dcd7dec9b2507d
+  checksum: dbadbcac8d8cbb9cd404a5b5d8ef24bb4ef1655f60df9f09f17a99aa4f86814aceab0fa000cb49da31413a5e5c301821ac6d969d81b3f7dc85fdd7e82f0fa4cd
   languageName: node
   linkType: hard
 
@@ -1735,7 +1735,7 @@ __metadata:
     "@helium/modular-governance-hooks": ^0.0.15
     "@helium/modular-governance-idls": ^0.0.15
     "@helium/spl-utils": ^0.9.23
-    "@helium/tuktuk-sdk": ^0.0.3
+    "@helium/tuktuk-sdk": ^0.0.4
     "@helium/voter-stake-registry-sdk": ^0.9.23
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/web3.js": ^1.91.1
