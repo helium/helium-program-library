@@ -26,8 +26,7 @@ pub struct QueueProxyVoteArgsV0 {
 }
 
 #[cfg(feature = "devnet")]
-// const VOTE_SERVICE_URL: &str = "https://helium-vote-service.web.test-helium.com";
-pub const VOTE_SERVICE_URL: &str = "http://localhost:3000";
+const VOTE_SERVICE_URL: &str = "https://helium-vote-service.web.test-helium.com";
 #[cfg(feature = "devnet")]
 pub const VOTE_SERVICE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
 
