@@ -3,6 +3,70 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.30](https://github.com/helium/helium-program-library/compare/v0.9.29...v0.9.30) (2025-03-06)
+
+**Note:** Version bump only for package @helium/anchor-resolvers
+
+
+
+
+
+## [0.9.29](https://github.com/helium/helium-program-library/compare/v0.9.28...v0.9.29) (2025-03-05)
+
+**Note:** Version bump only for package @helium/anchor-resolvers
+
+
+
+
+
+## [0.9.28](https://github.com/helium/helium-program-library/compare/v0.9.27...v0.9.28) (2025-03-05)
+
+**Note:** Version bump only for package @helium/anchor-resolvers
+
+
+
+
+
+## [0.9.27](https://github.com/helium/helium-program-library/compare/v0.9.26...v0.9.27) (2025-03-04)
+
+**Note:** Version bump only for package @helium/anchor-resolvers
+
+
+
+
+
+## [0.9.26](https://github.com/helium/helium-program-library/compare/v0.9.25...v0.9.26) (2025-03-03)
+
+**Note:** Version bump only for package @helium/anchor-resolvers
+
+
+
+
+
+## [0.9.25](https://github.com/helium/helium-program-library/compare/v0.9.23...v0.9.25) (2025-02-28)
+
+**Note:** Version bump only for package @helium/anchor-resolvers
+
+
+
+
+
+## [0.9.24](https://github.com/helium/helium-program-library/compare/v0.9.23...v0.9.24) (2025-02-26)
+
+**Note:** Version bump only for package @helium/anchor-resolvers
+
+
+
+
+
+## [0.9.24-alpha.0](https://github.com/helium/helium-program-library/compare/v0.9.23...v0.9.24-alpha.0) (2025-02-03)
+
+**Note:** Version bump only for package @helium/anchor-resolvers
+
+
+
+
+
 ## [0.9.23](https://github.com/helium/helium-program-library/compare/v0.9.22...v0.9.23) (2025-01-31)
 
 **Note:** Version bump only for package @helium/anchor-resolvers

@@ -111,9 +111,9 @@ export const estimateComputeUnits = async (
     return estimateComputeUnits(connection, tx, retries - 1)
   }
 
-  // Default to 200k compute if it failed
+  // Default to 1m compute if it failed
   if (sim.err) {
-    return Math.max(sim.unitsConsumed || 0, 200000)
+    return Math.max(sim.unitsConsumed || 0, 1000000)
   }
 
   return sim.unitsConsumed
@@ -158,7 +158,23 @@ export async function withPriorityFees({
       ...rest,
     };
     const tx = await populateMissingDraftInfo(connection, temp);
-    const estimatedFee = await estimateComputeUnits(connection, toVersionedTx(tx));
+    let ixWithComputeUnits = tx.instructions;
+    if (
+      !tx.instructions.some((ix) =>
+        ix.programId.equals(ComputeBudgetProgram.programId)
+      )
+    ) {
+      ixWithComputeUnits = [
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: 1000000,
+        }),
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: 1,
+        }),
+        ...tx.instructions,
+      ];
+    }
+    const estimatedFee = await estimateComputeUnits(connection, toVersionedTx({ ...tx, instructions: ixWithComputeUnits }));
     if (estimatedFee) {
       computeUnits = Math.ceil(estimatedFee * (computeScaleUp || 1.1));
     } else {

@@ -1,11 +1,8 @@
 use anchor_lang::{
   prelude::*,
-  system_program::{self, transfer, Transfer},
-  InstructionData,
+  system_program::{transfer, Transfer},
 };
-use spl_token::solana_program::instruction::Instruction;
 use tuktuk_program::{
-  compile_transaction,
   tuktuk::{
     cpi::{accounts::QueueTaskV0, queue_task_v0},
     program::Tuktuk,
@@ -14,11 +11,7 @@ use tuktuk_program::{
   TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
 
-use crate::voter_stake_registry::{
-  self,
-  accounts::ProxyMarkerV0,
-  client::args::{RelinquishExpiredProxyVoteV0, RelinquishExpiredVoteV0},
-};
+use crate::voter_stake_registry::accounts::ProxyMarkerV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct QueueProxyVoteArgsV0 {
@@ -26,7 +19,7 @@ pub struct QueueProxyVoteArgsV0 {
 }
 
 #[cfg(feature = "devnet")]
-const VOTE_SERVICE_URL: &str = "https://helium-vote-service.web.test-helium.com";
+pub const VOTE_SERVICE_URL: &str = "https://helium-vote-service.web.test-helium.com";
 #[cfg(feature = "devnet")]
 pub const VOTE_SERVICE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
 
@@ -75,18 +68,22 @@ pub struct QueueProxyVoteV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
+pub const VOTER_MIN_LAMPORTS: u64 = 40000000;
+
 pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Result<()> {
-  // Fund the fee payer wallet with 0.04 SOL. This should be enough for ~2000 votes. The rest will be refunded.
-  transfer(
-    CpiContext::new(
-      ctx.accounts.system_program.to_account_info(),
-      Transfer {
-        from: ctx.accounts.payer.to_account_info(),
-        to: ctx.accounts.pda_wallet.to_account_info(),
-      },
-    ),
-    40000000,
-  )?;
+  if ctx.accounts.pda_wallet.lamports() < VOTER_MIN_LAMPORTS {
+    // Fund the fee payer wallet with at least 0.04 SOL. This should be enough for ~2000 votes. The rest will be refunded.
+    transfer(
+      CpiContext::new(
+        ctx.accounts.system_program.to_account_info(),
+        Transfer {
+          from: ctx.accounts.payer.to_account_info(),
+          to: ctx.accounts.pda_wallet.to_account_info(),
+        },
+      ),
+      VOTER_MIN_LAMPORTS.saturating_sub(ctx.accounts.pda_wallet.lamports()),
+    )?;
+  }
 
   // Queue authority pays for the task rent if it can, since we know it'll come back
   // This makes voting cheaper for users.

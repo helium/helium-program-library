@@ -5,6 +5,7 @@ use {default_env::default_env, solana_security_txt::security_txt};
 declare_id!("1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w");
 
 pub mod circuit_breaker;
+pub mod ed25519;
 pub mod error;
 pub mod instructions;
 pub mod state;
@@ -95,9 +96,27 @@ pub mod lazy_distributor {
     distribute_custom_destination_v0::handler(ctx)
   }
 
+  pub fn set_current_rewards_v1(
+    ctx: Context<SetCurrentRewardsV1>,
+    args: SetCurrentRewardsArgsV0,
+  ) -> Result<()> {
+    set_current_rewards_v1::handler(ctx, args)
+  }
+
+  pub fn dummy_ix(_ctx: Context<DummyIx>) -> Result<()> {
+    Err(error!(crate::error::ErrorCode::DummyInstruction))
+  }
+
   pub fn temp_update_matching_destination(
     ctx: Context<TempUpdateMatchingDestination>,
   ) -> Result<()> {
     temp_update_matching_destination::handler(ctx)
   }
+}
+
+#[derive(Accounts)]
+pub struct DummyIx<'info> {
+  #[account(mut)]
+  pub dummy: Account<'info, RemoteTaskTransactionV0>,
+  pub dummy_2: Account<'info, SetCurrentRewardsTransactionV0>,
 }

@@ -1,10 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { init as initDataCredits } from "@helium/data-credits-sdk";
+import { dataCreditsKey, init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
 import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
-import { toBN } from "@helium/spl-utils";
+import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
 import {
   PythSolanaReceiverProgram,
   pythSolanaReceiverIdl,
@@ -102,14 +102,28 @@ describe("hexboosting", () => {
     );
     await ensureHEMIdl(hemProgram);
     const dataCredits = await initTestDataCredits(dcProgram, provider);
+    const hntMint = await createMint(provider, 8, me, me);
+    await createAtaAndMint(provider, hntMint, new BN("100000000000000"), me);
+    await dcProgram.methods
+      .mintDataCreditsV0({
+        dcAmount: new BN("10000000000"),
+        hntAmount: null,
+      })
+      .accounts({
+        dcMint: dataCredits.dcMint,
+        recipient: me,
+      })
+      .rpc({ skipPreflight: true });
     const { dao } = await initTestDao(
       hsdProgram,
       provider,
       100,
       me,
-      dataCredits.dcMint
+      dataCredits.dcMint,
+      hntMint
     );
-    ({ subDao, mint } = await initTestSubdao({
+    mint = dataCredits.dcMint;
+    ({ subDao } = await initTestSubdao({
       hsdProgram,
       provider,
       authority: me,
@@ -174,9 +188,10 @@ describe("hexboosting", () => {
       })
       .accounts({
         startAuthority: me,
-        dntMint: mint,
+        dcMint: mint,
         priceOracle,
         rentReclaimAuthority: me,
+        subDao,
       })
       .rpcAndKeys({ skipPreflight: true });
 
@@ -189,10 +204,12 @@ describe("hexboosting", () => {
   });
 
   describe("with boost config and price", () => {
-    let pythPrice: number = 0;
+    let boostConfig: PublicKey;
 
     beforeEach(async () => {
-      await program.methods
+      const {
+        pubkeys: { boostConfig: boostConfigK },
+      } = await program.methods
         .initializeBoostConfigV0({
           boostPrice: toBN(0.005, 6),
           periodLength: 60 * 60 * 24 * 30, // roughly one month,
@@ -200,18 +217,13 @@ describe("hexboosting", () => {
         })
         .accounts({
           startAuthority: me,
-          dntMint: mint,
+          dcMint: mint,
           priceOracle,
+          subDao,
           rentReclaimAuthority: me,
         })
         .rpcAndKeys({ skipPreflight: true });
-      const price = await pythProgram.account.priceUpdateV2.fetch(
-        new PublicKey("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx")
-      );
-      pythPrice = price.priceMessage.emaPrice.sub(
-        price.priceMessage.emaConf.mul(new BN(2))
-      ).toNumber() * 10 ** price.priceMessage.exponent;
-      console.log(pythPrice);
+      boostConfig = boostConfigK!;
     });
 
     it("allows updating boost config", async () => {
@@ -223,6 +235,7 @@ describe("hexboosting", () => {
           rentReclaimAuthority: PublicKey.default,
           minimumPeriods: 4,
           priceOracle: PublicKey.default,
+          dcMint: mint,
         })
         .accounts({
           boostConfig,
@@ -240,6 +253,7 @@ describe("hexboosting", () => {
         PublicKey.default.toBase58()
       );
       expect(account.minimumPeriods).to.eq(4);
+      expect(account.dcMint.toBase58()).to.eq(mint.toBase58());
     });
 
     it("does the initial boost", async () => {
@@ -284,8 +298,9 @@ describe("hexboosting", () => {
           ],
         })
         .accounts({
-          paymentMint: mint,
+          dcMint: mint,
           carrier,
+          boostConfig,
         })
         .rpcAndKeys({ skipPreflight: true });
 
@@ -297,7 +312,7 @@ describe("hexboosting", () => {
       ).amount;
 
       const expected = Number(
-        BigInt(toBN((6 * 0.005) / pythPrice, 6).toNumber())
+        BigInt(toBN((6 * 0.005), 6).toNumber())
       );
       expect(Number(preBalance - postBalance)).to.be.within(
         expected - 1,
@@ -347,8 +362,9 @@ describe("hexboosting", () => {
             ],
           })
           .accounts({
-            paymentMint: mint,
+            dcMint: mint,
             carrier,
+            boostConfig,
           })
           .rpcAndKeys({ skipPreflight: true });
       });
@@ -379,8 +395,9 @@ describe("hexboosting", () => {
             ],
           })
           .accounts({
-            paymentMint: mint,
+            dcMint: mint,
             carrier,
+            boostConfig,
           })
           .rpcAndKeys({ skipPreflight: true });
 
@@ -391,7 +408,7 @@ describe("hexboosting", () => {
           )
         ).amount;
 
-        const expected = BigInt(toBN((3 * 0.005) / pythPrice, 6).toNumber());
+        const expected = BigInt(toBN((3 * 0.005), 6).toNumber());
         const actual = preBalance - postBalance;
         expect(Number(actual)).to.be.within(
           Number(expected) - 1,

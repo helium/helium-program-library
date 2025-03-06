@@ -3,58 +3,47 @@ import { PublicKey, TransactionSignature } from "@solana/web3.js";
 
 interface GetTransactionSignaturesUptoBlockTimeArgs {
   programId: PublicKey;
-  provider: anchor.Provider;
   blockTime: number;
-  beforeSignature?: TransactionSignature;
-  transactionSignatures?: TransactionSignature[];
+  provider: anchor.Provider;
 }
 
 export const getTransactionSignaturesUptoBlockTime = async ({
   programId,
   blockTime,
-  beforeSignature = undefined,
-  transactionSignatures = [],
   provider,
-}: GetTransactionSignaturesUptoBlockTimeArgs): Promise<
-  TransactionSignature[]
-> => {
-  try {
-    const connection = provider.connection;
-    // Fetch transaction signatures for the address with pagination
-    const transactions = await connection.getSignaturesForAddress(
-      programId,
-      {
-        before: beforeSignature,
-      },
-      "finalized"
-    );
+}: Omit<
+  GetTransactionSignaturesUptoBlockTimeArgs,
+  "beforeSignature" | "transactionSignatures"
+>): Promise<TransactionSignature[]> => {
+  const results: TransactionSignature[] = [];
+  let beforeSignature: TransactionSignature | undefined = undefined;
 
-    if (
-      transactions.length === 0 ||
-      (transactions[0].blockTime && transactions[0].blockTime < blockTime)
-    ) {
-      return transactionSignatures;
+  try {
+    while (true) {
+      const transactions = await provider.connection.getSignaturesForAddress(
+        programId,
+        { before: beforeSignature },
+        "finalized"
+      );
+
+      if (
+        transactions.length === 0 ||
+        (transactions[0].blockTime && transactions[0].blockTime < blockTime)
+      ) {
+        break;
+      }
+
+      const newSignatures = transactions
+        .filter((tx) => !tx.err && tx.blockTime && tx.blockTime >= blockTime)
+        .map((tx) => tx.signature);
+
+      results.push(...newSignatures);
+      beforeSignature = transactions[transactions.length - 1].signature;
     }
 
-    transactions.forEach((transaction) => {
-      if (
-        !transaction.err &&
-        transaction.blockTime &&
-        transaction.blockTime >= blockTime
-      ) {
-        transactionSignatures.push(transaction.signature);
-      }
-    });
-
-    return getTransactionSignaturesUptoBlockTime({
-      programId,
-      blockTime,
-      beforeSignature: transactions[transactions.length - 1].signature,
-      transactionSignatures,
-      provider,
-    });
+    return results;
   } catch (err) {
     console.error("Error fetching transaction signatures:", err);
-    return [];
+    return results;
   }
 };

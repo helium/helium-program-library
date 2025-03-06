@@ -1,6 +1,6 @@
 [package]
 name = "ecc-sig-verifier"
-version = "0.0.1"
+version = "0.0.14"
 edition = "2021"
 
 [profile.release]

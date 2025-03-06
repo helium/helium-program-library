@@ -1,5 +1,5 @@
 {
-  "version": "0.1.12",
+  "version": "0.2.9",
   "name": "helium_sub_daos",
   "instructions": [
     {
@@ -676,6 +676,36 @@
           "name": "prevSubDaoEpochInfo",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "notEmittedCounter",
+          "isMut": false,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "not_emitted_counter"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "hnt_mint"
+              }
+            ],
+            "programId": {
+              "kind": "account",
+              "type": "publicKey",
+              "path": "no_emit_program"
+            }
+          }
+        },
+        {
+          "name": "noEmitProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
@@ -1333,7 +1363,7 @@
         },
         {
           "name": "mint",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -2151,27 +2181,6 @@
       "args": []
     },
     {
-      "name": "tempResizeAccount",
-      "accounts": [
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "account",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "trackVoteV0",
       "accounts": [
         {
@@ -2437,6 +2446,14 @@
           },
           {
             "name": "vehntAtEpochStart",
+            "type": "u64"
+          },
+          {
+            "name": "cumulativeNotEmitted",
+            "type": "u64"
+          },
+          {
+            "name": "notEmitted",
             "type": "u64"
           }
         ]
@@ -3279,8 +3296,5 @@
       "name": "InvalidMarker",
       "msg": "Invalid vote marker"
     }
-  ],
-  "metadata": {
-    "address": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR"
-  }
+  ]
 }

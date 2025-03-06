@@ -20,29 +20,19 @@ import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import { customSignerKey, taskKey, taskQueueAuthorityKey,nextAvailableTaskIds,  init as tuktukInit } from "@helium/tuktuk-sdk";
 import { useVoteMarkers } from "./useVoteMarkers";
 import { useProposalEndTs } from "./useProposalEndTs";
+import { useProxyVoteMarker } from "./useProxyVoteMarker";
+import { useSortedPositions } from "./useSortedPositions";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
-  const { positions, provider, registrar } = useHeliumVsrState();
+  const { provider, registrar } = useHeliumVsrState();
   const unixNow = useSolanaUnixNow();
-  const sortedPositions = useMemo(() => {
-    return (
-      unixNow &&
-      positions?.sort((a, b) => {
-        return -calcPositionVotingPower({
-          position: a,
-          registrar: registrar || null,
-          unixNow: new BN(unixNow),
-        }).cmp(
-          calcPositionVotingPower({
-            position: b,
-            registrar: registrar || null,
-            unixNow: new BN(unixNow),
-          })
-        );
-      }).map((p, index) => ({ ...p, index }))
-    );
-  }, [positions, unixNow]);
+  const proxyVoteMarkerK = useMemo(() => {
+    if (!provider?.wallet?.publicKey) return null;
+    return proxyVoteMarkerKey(provider.wallet.publicKey, proposalKey)[0];
+  }, [provider?.wallet?.publicKey, proposalKey]);
+  const { info: proxyVoteMarker } = useProxyVoteMarker(proxyVoteMarkerK);
+  const sortedPositions = useSortedPositions()
   const voteMarkerKeys = useMemo(() => {
     return sortedPositions
       ? sortedPositions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
@@ -67,6 +57,28 @@ export const useVote = (proposalKey: PublicKey) => {
       }, new Array(proposal?.choices.length));
     }
   }, [proposal, markers, sortedPositions]);
+  const didVote: boolean[] | undefined = useMemo(() => {
+    if (proposal && markers) {
+      const rawVoteWeights = markers.reduce((acc, marker, idx) => {
+        const position = sortedPositions?.[idx];
+        marker.info?.choices.forEach((choice) => {
+          // Only count my own and down the line vote weights
+          if (
+            (marker?.info?.proxyIndex || 0) >= (position?.proxy?.index || 0)
+          ) {
+            acc[choice] = (acc[choice] || marker.info && !marker.info.weight.isZero())
+          }
+        });
+        return acc;
+      }, new Array(proposal?.choices.length));
+
+      for (const choice of proxyVoteMarker?.choices || []) {
+        rawVoteWeights[choice] = true;
+      }
+
+      return rawVoteWeights;
+    }
+  }, [proposal, markers, sortedPositions, proxyVoteMarker]);
   const voters: PublicKey[][] | undefined = useMemo(() => {
     if (proposal && markers) {
       const nonUniqueResult = markers.reduce((acc, marker, idx) => {
@@ -133,10 +145,15 @@ export const useVote = (proposalKey: PublicKey) => {
   );
   const canVote = useCallback(
     (choice: number) => {
-      if (!markers) return false;
-      return markers.some((_, index) => canPositionVote(index, choice));
+      if (!markers || !proposal) return false;
+      const myPositions = sortedPositions.filter((p) => !p.isProxiedToMe);
+      const myPositionsCanVote = myPositions.some((p) => canPositionVote(p.index, choice));
+      const hasProxies = sortedPositions.some((p) => p.isProxiedToMe);
+      const hasNeverProxyVoted = hasProxies && !proxyVoteMarker;
+      const hasProxyVotedButCanVote = proxyVoteMarker && proxyVoteMarker.choices.length < proposal.maxChoicesPerVoter && !proxyVoteMarker.choices.includes(choice);
+      return myPositionsCanVote || hasNeverProxyVoted || hasProxyVotedButCanVote;
     },
-    [markers, canPositionVote]
+    [markers, canPositionVote, proxyVoteMarker]
   );
   const { error, loading, execute } = useAsyncCallback(
     async ({
@@ -349,5 +366,6 @@ export const useVote = (proposalKey: PublicKey) => {
     voteWeights,
     canVote,
     voters,
+    didVote,
   };
 };
