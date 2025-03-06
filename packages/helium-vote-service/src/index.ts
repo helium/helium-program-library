@@ -481,9 +481,10 @@ server.post<{
               vm is NULL
               OR (
                 vm.proxy_index >= pa.index AND
-                vm.choices IS DISTINCT FROM ARRAY[${choices.join(
-                  ","
-                )}]::integer[]
+                (
+                  NOT vm.choices <@ ARRAY[${choices.join(",")}]::integer[] OR
+                  NOT vm.choices @> ARRAY[${choices.join(",")}]::integer[]
+                )
               )
             )
             LIMIT ${MARKERS_TO_CHECK}
@@ -524,8 +525,6 @@ server.post<{
     let instructions: TransactionInstruction[] = [];
     // Done end the task chain.
     if (needsVote.length === 0) {
-      const pdaWalletBalance =
-        (await provider.connection.getAccountInfo(pdaWallet))?.lamports || 0;
       instructions.push(
         createMemoInstruction(
           `Voting done for voter ${wallet.toBase58()} proposal ${proposal.toBase58()}`,
@@ -688,10 +687,18 @@ const start = async () => {
 };
 
 start();
+
 function arrayEquals(choices: number[], choices1: number[]) {
   if (choices.length !== choices1.length) return false;
-  for (let i = 0; i < choices.length; i++) {
-    if (choices[i] !== choices1[i]) return false;
+
+  // Sort both arrays to normalize order
+  const sorted1 = [...choices].sort((a, b) => a - b);
+  const sorted2 = [...choices1].sort((a, b) => a - b);
+
+  // Compare sorted arrays
+  for (let i = 0; i < sorted1.length; i++) {
+    if (sorted1[i] !== sorted2[i]) return false;
   }
+
   return true;
 }
