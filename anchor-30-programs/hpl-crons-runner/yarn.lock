@@ -129,6 +129,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@helium/anchor-resolvers@npm:^0.10.0-alpha.4, @helium/anchor-resolvers@npm:^0.10.0-alpha.6":
+  version: 0.10.0-alpha.13
+  resolution: "@helium/anchor-resolvers@npm:0.10.0-alpha.13"
+  dependencies:
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.91.1
+  peerDependencies:
+    "@coral-xyz/anchor": ^0.30.1
+  checksum: 3632aa2af404dc91366ac147ca648f6db5cbcd6b15f7e56d2913c025c1eb24ab6f91618198a3cfcddefe3cffc471ab8537cd91faba174a5c9091fcafde14ed36
+  languageName: node
+  linkType: hard
+
 "@helium/anchor-resolvers@npm:^0.2.17":
   version: 0.2.21
   resolution: "@helium/anchor-resolvers@npm:0.2.21"
@@ -215,8 +227,11 @@ __metadata:
     "@coral-xyz/anchor": ^0.30.1
     "@helium/cron-sdk": ^0.0.2
     "@helium/helium-sub-daos-sdk": ^0.9.23
+    "@helium/organization-sdk": ^0.1.4
+    "@helium/proposal-sdk": ^0.1.4
     "@helium/spl-utils": ^0.9.19
-    "@helium/tuktuk-sdk": ^0.0.2
+    "@helium/state-controller-sdk": ^0.1.4
+    "@helium/tuktuk-sdk": ^0.0.4
     "@helium/voter-stake-registry-sdk": ^0.9.23
     "@solana/web3.js": ^1.91.1
     "@types/yargs": ^17.0.24
@@ -256,6 +271,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@helium/modular-governance-idls@npm:^0.1.4":
+  version: 0.1.4
+  resolution: "@helium/modular-governance-idls@npm:0.1.4"
+  dependencies:
+    "@coral-xyz/anchor": ^0.30.1
+    "@solana/web3.js": ^1.78.4
+  checksum: 5b23c2a614af863bd982d68268527ef09ce3046f49e22d41c8985c4210e9f1aec45092d78357fce0fe02fdf762e6ee424aa45bbc3dafa06b019cd1d4d59d1972
+  languageName: node
+  linkType: hard
+
 "@helium/nft-proxy-sdk@npm:^0.0.15":
   version: 0.0.15
   resolution: "@helium/nft-proxy-sdk@npm:0.0.15"
@@ -265,6 +290,29 @@ __metadata:
     "@helium/modular-governance-idls": ^0.0.10
     "@solana/spl-token": ^0.3.8
   checksum: ce22c3b786b00bb1a64baa33b040b0530d87420b49ab5b0b8a5704fbc184c71d93c01120d4fc8cf9fdc347b2a4a38c422011d86cc3e5e090243ee630f29e9456
+  languageName: node
+  linkType: hard
+
+"@helium/organization-sdk@npm:^0.1.4":
+  version: 0.1.4
+  resolution: "@helium/organization-sdk@npm:0.1.4"
+  dependencies:
+    "@coral-xyz/anchor": ^0.30.1
+    "@helium/anchor-resolvers": ^0.10.0-alpha.6
+    "@helium/modular-governance-idls": ^0.1.4
+    "@helium/proposal-sdk": ^0.1.4
+  checksum: 9402d65158269188150ce4581eccb0dc6143ee78d7765120db8128a984824358b4c68559a72b3670e3369fdd5675f85095f0ecdec92ecc40f0f885fa0c9462d4
+  languageName: node
+  linkType: hard
+
+"@helium/proposal-sdk@npm:^0.1.4":
+  version: 0.1.4
+  resolution: "@helium/proposal-sdk@npm:0.1.4"
+  dependencies:
+    "@coral-xyz/anchor": ^0.30.1
+    "@helium/anchor-resolvers": ^0.10.0-alpha.6
+    "@helium/modular-governance-idls": ^0.1.4
+  checksum: 725dfa9e110f805b829f10b7e4f92881bb718a0432a8d319d4245cd2ef13ff80c339552049722bbb5207a662afdec7814865ca8067a1c06b116ffc4b3a4b99c7
   languageName: node
   linkType: hard
 
@@ -308,6 +356,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@helium/state-controller-sdk@npm:^0.1.4":
+  version: 0.1.4
+  resolution: "@helium/state-controller-sdk@npm:0.1.4"
+  dependencies:
+    "@coral-xyz/anchor": ^0.30.1
+    "@helium/anchor-resolvers": ^0.10.0-alpha.6
+    "@helium/modular-governance-idls": ^0.1.4
+  checksum: 0bb5b9820b17492595c71dd6469ffff0525d39ed3bae5ead83a9007bbadf09d779a2ff95a9686fe294fd8d4d248eabc993df387415ba68bc7c3dcee756901cdd
+  languageName: node
+  linkType: hard
+
 "@helium/treasury-management-sdk@npm:^0.9.23":
   version: 0.9.23
   resolution: "@helium/treasury-management-sdk@npm:0.9.23"
@@ -333,15 +392,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/tuktuk-sdk@npm:^0.0.2":
-  version: 0.0.2
-  resolution: "@helium/tuktuk-sdk@npm:0.0.2"
+"@helium/tuktuk-idls@npm:^0.0.4":
+  version: 0.0.4
+  resolution: "@helium/tuktuk-idls@npm:0.0.4"
   dependencies:
     "@coral-xyz/anchor": ^0.30.1
-    "@helium/anchor-resolvers": ^0.9.2
-    "@helium/tuktuk-idls": ^0.0.2
+    "@solana/web3.js": ^1.95.2
+  checksum: 8dfeb6f3405947720f7d06ee97ccdcd243ff214d6a0967157d86f47f383b49fce92c9ce0a8b637075ca61634e7d0ff685f43a042fdc5fa2555198c450fb4d02d
+  languageName: node
+  linkType: hard
+
+"@helium/tuktuk-sdk@npm:^0.0.4":
+  version: 0.0.4
+  resolution: "@helium/tuktuk-sdk@npm:0.0.4"
+  dependencies:
+    "@coral-xyz/anchor": ^0.30.1
+    "@helium/anchor-resolvers": ^0.10.0-alpha.4
+    "@helium/tuktuk-idls": ^0.0.4
     js-sha256: ^0.11.0
-  checksum: 7bd0f009a24f0b14093fca407ff1db9f522c962016611dd765ae9af5b9abb5c93e78d9e79039fe3a5496683b4da537c01da9e72ef543138eb556536ec4b73190
+  checksum: dbadbcac8d8cbb9cd404a5b5d8ef24bb4ef1655f60df9f09f17a99aa4f86814aceab0fa000cb49da31413a5e5c301821ac6d969d81b3f7dc85fdd7e82f0fa4cd
   languageName: node
   linkType: hard
 

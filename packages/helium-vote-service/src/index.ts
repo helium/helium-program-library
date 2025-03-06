@@ -473,6 +473,7 @@ server.post<{
               AND vm.choices IS NOT DISTINCT FROM ARRAY[${choices.join(
                 ","
               )}]::integer[]
+              AND vm.proxy_index >= pa.index
             )
             LEFT OUTER JOIN delegated_positions dp ON dp.mint = pa.asset
             WHERE pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND vm is NULL
