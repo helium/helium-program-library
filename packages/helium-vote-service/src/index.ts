@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { organizationKey } from "@helium/organization-sdk";
+import { createMemoInstruction } from "@solana/spl-memo";
 import {
   createAtaAndTransferInstructions,
   HNT_MINT,
@@ -521,16 +522,15 @@ server.post<{
     const bumpBuffer = Buffer.alloc(1);
     bumpBuffer.writeUint8(bump);
     let instructions: TransactionInstruction[] = [];
-    // Done, refund the pda wallet and end the task chain.
+    // Done end the task chain.
     if (needsVote.length === 0) {
       const pdaWalletBalance =
         (await provider.connection.getAccountInfo(pdaWallet))?.lamports || 0;
       instructions.push(
-        SystemProgram.transfer({
-          fromPubkey: pdaWallet,
-          toPubkey: wallet,
-          lamports: pdaWalletBalance,
-        })
+        createMemoInstruction(
+          `Voting done for voter ${wallet.toBase58()} proposal ${proposal.toBase58()}`,
+          [pdaWallet]
+        )
       );
     } else {
       instructions.push(
