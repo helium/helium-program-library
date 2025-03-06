@@ -91,7 +91,7 @@ export async function run(args: any = process.argv) {
     const currTs = new Date().valueOf() / 1000;
     const endTs = endTsByProposal[marker.account.proposal.toBase58()];
     const proposal = proposalsByPubkey[marker.account.proposal.toBase58()];
-    if (endTs!.toNumber() > currTs && proposal?.organization === org) {
+    if (endTs!.toNumber() > currTs && proposal?.namespace?.equals(org)) {
       const queueAuthority = PublicKey.findProgramAddressSync(
         [Buffer.from("queue_authority")],
         program.programId
