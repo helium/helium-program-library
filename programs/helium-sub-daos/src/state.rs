@@ -260,6 +260,10 @@ impl DelegatedPositionV0 {
 
   // Add a proposal to the recent proposals list
   pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
+    if self.recent_proposals.iter().any(|p| p.proposal == proposal) {
+      return;
+    }
+
     let new_proposal = RecentProposal { proposal, ts };
     // Find the insertion point to maintain descending order by timestamp
     let insert_index = self
