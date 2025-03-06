@@ -441,6 +441,9 @@ server.get<{
 const HNT_REGISTRAR = new PublicKey(
   "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
 );
+const HELIUM_PROXY_CONFIG = new PublicKey(
+  "ADWefNt1foP9YJamZFjcUwuMUanw29bEhtsHBEbfKpWZ"
+);
 const MAX_VOTES_PER_TASK = 1;
 const MARKERS_TO_CHECK = 10;
 
@@ -470,13 +473,15 @@ server.post<{
             FROM proxy_assignments pa
             LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset AND (
               vm.registrar = '${HNT_REGISTRAR.toBase58()}' AND vm.proposal = '${proposal.toBase58()}'
-              AND vm.choices IS NOT DISTINCT FROM ARRAY[${choices.join(
-                ","
-              )}]::integer[]
-              AND vm.proxy_index >= pa.index
             )
             LEFT OUTER JOIN delegated_positions dp ON dp.mint = pa.asset
-            WHERE pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND vm is NULL
+            WHERE pa.proxy_config = ${HELIUM_PROXY_CONFIG.toBase58()} AND pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND (
+              vm is NULL
+              OR vm.proxy_index >= pa.index
+              OR vm.choices IS DISTINCT FROM ARRAY[${choices.join(
+                ","
+              )}]::integer[]
+            )
             LIMIT ${MARKERS_TO_CHECK}
           `)
     )[0].map(deepCamelCaseKeys);
