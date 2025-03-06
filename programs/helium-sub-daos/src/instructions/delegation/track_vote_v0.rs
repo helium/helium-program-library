@@ -93,8 +93,8 @@ pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
       "Proposals are now {:?}",
       ctx.accounts.delegated_position.recent_proposals
     );
-    // If greater than 0.5 SOL, registrar can pay
-    if ctx.accounts.registrar.to_account_info().lamports() > 500000000 {
+    // If greater than 0.5 SOL, dao can pay
+    if ctx.accounts.dao.to_account_info().lamports() > 500000000 {
       resize_to_fit_pda(
         &ctx.accounts.dao.to_account_info(),
         &ctx.accounts.delegated_position,
