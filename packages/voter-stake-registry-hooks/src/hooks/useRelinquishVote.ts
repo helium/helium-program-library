@@ -1,16 +1,6 @@
-import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
-import { init, proxyVoteMarkerKey, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
-import { useCallback, useMemo } from "react";
-import { useAsyncCallback } from "react-async-hook";
-import { useHeliumVsrState } from "../contexts/heliumVsrContext";
-import { useVoteMarkers } from "./useVoteMarkers";
-import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
-import { useSolanaUnixNow } from "@helium/helium-react-hooks";
-import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
-import BN from "bn.js";
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { init as hplCronsInit, TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
+import { batchParallelInstructions, Status, truthy } from "@helium/spl-utils";
 import {
   customSignerKey,
   nextAvailableTaskIds,
@@ -18,34 +8,30 @@ import {
   taskQueueAuthorityKey,
   init as tuktukInit,
 } from "@helium/tuktuk-sdk";
+import { init, proxyVoteMarkerKey, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
+import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import { useCallback, useMemo } from "react";
+import { useAsyncCallback } from "react-async-hook";
+import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
+import { useProxyVoteMarker } from "./useProxyVoteMarker";
+import { useSortedPositions } from "./useSortedPositions";
+import { useVoteMarkers } from "./useVoteMarkers";
 
 export const useRelinquishVote = (proposal: PublicKey) => {
-  const { positions, provider, registrar } = useHeliumVsrState();
-  const unixNow = useSolanaUnixNow();
-  const sortedPositions = useMemo(() => {
-    return (
-      unixNow &&
-      positions?.sort((a, b) => {
-        return -calcPositionVotingPower({
-          position: a,
-          registrar: registrar || null,
-          unixNow: new BN(unixNow),
-        }).cmp(
-          calcPositionVotingPower({
-            position: b,
-            registrar: registrar || null,
-            unixNow: new BN(unixNow),
-          })
-        );
-      })
-    );
-  }, [positions, unixNow]);
+  const { provider } = useHeliumVsrState();
+  const sortedPositions = useSortedPositions();
   const voteMarkerKeys = useMemo(() => {
     return sortedPositions
       ? sortedPositions.map((p) => voteMarkerKey(p.mint, proposal)[0])
       : [];
   }, [sortedPositions]);
   const { accounts: markers } = useVoteMarkers(voteMarkerKeys);
+  const proxyVoteMarkerK = useMemo(() => {
+    if (!provider?.wallet?.publicKey) return null;
+    return proxyVoteMarkerKey(provider.wallet.publicKey, proposal)[0];
+  }, [provider?.wallet?.publicKey, proposal]);
+  const { info: proxyVoteMarker } = useProxyVoteMarker(proxyVoteMarkerK);
   const canPositionRelinquishVote = useCallback(
     (index: number, choice: number) => {
       const position = sortedPositions?.[index];
@@ -65,9 +51,9 @@ export const useRelinquishVote = (proposal: PublicKey) => {
 
       return markers.some((_, index) =>
         canPositionRelinquishVote(index, choice)
-      );
+      ) || (proxyVoteMarker && proxyVoteMarker.choices.includes(choice));
     },
-    [markers, canPositionRelinquishVote]
+    [markers, canPositionRelinquishVote, proxyVoteMarker]
   );
 
   const { error, loading, execute } = useAsyncCallback(
