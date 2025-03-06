@@ -49,7 +49,6 @@ import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {
   Keypair,
   PublicKey,
-  Transaction,
   TransactionInstruction,
   ComputeBudgetProgram,
   VersionedTransaction,
@@ -79,12 +78,20 @@ const DNT = process.env.DNT_MINT
 const DAO = daoKey(HNT)[0];
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
+enum DeviceType {
+  IOT = "iot",
+  MOBILE = "mobile",
+}
+
+const getRewardTypeForDevice = (deviceType: DeviceType): string =>
+  `${deviceType.toString().toLowerCase()}_gateway`;
+
 export interface Database {
   getTotalRewards(): Promise<string>;
   getCurrentRewardsByEntity: (entityKey: string) => Promise<string>;
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
-  getActiveDevices(): Promise<number>;
+  getActiveDevices(type?: DeviceType): Promise<number>;
 }
 
 export class PgDatabase implements Database {
@@ -107,26 +114,23 @@ export class PgDatabase implements Database {
     return totalRewards;
   }
 
-  getActiveDevices(): Promise<number> {
+  getActiveDevices(type?: DeviceType): Promise<number> {
+    const rewardTypes = type
+      ? [getRewardTypeForDevice(type)]
+      : Object.values(DeviceType)
+          .filter((value) => isNaN(Number(value))) // Filter out numeric enum keys
+          .map((deviceType) =>
+            getRewardTypeForDevice(deviceType as DeviceType)
+          );
+
     return Reward.count({
       where: {
-        [Op.and]: [
-          {
-            lastReward: {
-              [Op.gte]: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30), // Active within the last 30 days
-            },
-          },
-          {
-            [Op.or]: [
-              {
-                rewardType: "mobile_gateway",
-              },
-              {
-                rewardType: "iot_gateway",
-              },
-            ],
-          },
-        ],
+        lastReward: {
+          [Op.gte]: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30), // Active within the last 30 days
+        },
+        rewardType: {
+          [Op.in]: rewardTypes,
+        },
       },
     });
   }
@@ -243,6 +247,14 @@ export class OracleServer {
   }
 
   private addRoutes() {
+    this.app.get(
+      "/active-iot-devices",
+      this.getActiveIotDevicesHandler.bind(this)
+    );
+    this.app.get(
+      "/active-mobile-devices",
+      this.getActiveMobileDevicesHandler.bind(this)
+    );
     this.app.get("/active-devices", this.getActiveDevicesHandler.bind(this));
     this.app.post("/bulk-rewards", this.getAllRewardsHandler.bind(this));
     this.app.get(
@@ -267,6 +279,32 @@ export class OracleServer {
     this.app.post("/bulk-sign", this.signBulkTransactionsHandler.bind(this));
     this.app.post("/v1/tuktuk/:keyToAssetKey", this.tuktukHandler.bind(this));
     this.app.post("/v1/sign/:keyToAssetKey", this.signHandler.bind(this));
+  }
+
+  private async getActiveIotDevicesHandler(
+    req: FastifyRequest<{
+      Querystring: { assetId?: string; entityKey?: string };
+    }>,
+    res: FastifyReply
+  ) {
+    const count = await this.db.getActiveDevices(DeviceType.IOT);
+
+    res.send({
+      count,
+    });
+  }
+
+  private async getActiveMobileDevicesHandler(
+    req: FastifyRequest<{
+      Querystring: { assetId?: string; entityKey?: string };
+    }>,
+    res: FastifyReply
+  ) {
+    const count = await this.db.getActiveDevices(DeviceType.MOBILE);
+
+    res.send({
+      count,
+    });
   }
 
   private async getActiveDevicesHandler(
@@ -662,7 +700,9 @@ export class OracleServer {
         oracleIndex: process.env.ORACLE_INDEX
           ? parseInt(process.env.ORACLE_INDEX)
           : 0,
-        currentRewards: new BN(await this.db.getCurrentRewardsByEntity(entityKey)),
+        currentRewards: new BN(
+          await this.db.getCurrentRewardsByEntity(entityKey)
+        ),
         asset: keyToAsset.asset,
       };
       const serializedMessage = await this.ldProgram.coder.accounts.encode(
@@ -673,7 +713,10 @@ export class OracleServer {
         message,
         serialiedMessage: serializedMessage.toString("base64"),
         signature: Buffer.from(
-          sign.detached(Uint8Array.from(serializedMessage), this.oracle.secretKey)
+          sign.detached(
+            Uint8Array.from(serializedMessage),
+            this.oracle.secretKey
+          )
         ).toString("base64"),
       };
       reply.status(200).send(resp);
@@ -752,7 +795,9 @@ export class OracleServer {
       const instructions: TransactionInstruction[] = [
         await this.roProgram.methods
           .setCurrentRewardsWrapperV2({
-            currentRewards: new BN(await this.db.getCurrentRewardsByEntity(entityKey)),
+            currentRewards: new BN(
+              await this.db.getCurrentRewardsByEntity(entityKey)
+            ),
             oracleIndex: process.env.ORACLE_INDEX
               ? parseInt(process.env.ORACLE_INDEX)
               : 0,
