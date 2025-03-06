@@ -68,18 +68,22 @@ pub struct QueueProxyVoteV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
+pub const VOTER_MIN_LAMPORTS: u64 = 40000000;
+
 pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Result<()> {
-  // Fund the fee payer wallet with 0.04 SOL. This should be enough for ~2000 votes. The rest will be refunded.
-  transfer(
-    CpiContext::new(
-      ctx.accounts.system_program.to_account_info(),
-      Transfer {
-        from: ctx.accounts.payer.to_account_info(),
-        to: ctx.accounts.pda_wallet.to_account_info(),
-      },
-    ),
-    40000000,
-  )?;
+  if ctx.accounts.pda_wallet.lamports() < VOTER_MIN_LAMPORTS {
+    // Fund the fee payer wallet with at least 0.04 SOL. This should be enough for ~2000 votes. The rest will be refunded.
+    transfer(
+      CpiContext::new(
+        ctx.accounts.system_program.to_account_info(),
+        Transfer {
+          from: ctx.accounts.payer.to_account_info(),
+          to: ctx.accounts.pda_wallet.to_account_info(),
+        },
+      ),
+      VOTER_MIN_LAMPORTS.saturating_sub(ctx.accounts.pda_wallet.lamports()),
+    )?;
+  }
 
   // Queue authority pays for the task rent if it can, since we know it'll come back
   // This makes voting cheaper for users.

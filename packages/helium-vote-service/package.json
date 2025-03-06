@@ -44,6 +44,7 @@
     "@helium/spl-utils": "^0.9.30",
     "@helium/tuktuk-sdk": "^0.0.4",
     "@helium/voter-stake-registry-sdk": "^0.9.30",
+    "@solana/spl-memo": "^0.2.5",
     "@solana/web3.js": "^1.91.1",
     "aws-sdk": "^2.1650.0",
     "dotenv": "^16.0.3",

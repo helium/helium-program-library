@@ -1118,6 +1118,7 @@ __metadata:
     "@helium/spl-utils": ^0.9.30
     "@helium/tuktuk-sdk": ^0.0.4
     "@helium/voter-stake-registry-sdk": ^0.9.30
+    "@solana/spl-memo": ^0.2.5
     "@solana/web3.js": ^1.91.1
     "@types/bn.js": ^5.1.1
     "@types/lodash": ^4.17.6
@@ -3742,6 +3743,17 @@ __metadata:
     bs58: "npm:^4.0.1"
     superstruct: "npm:^0.15.2"
   checksum: fef32195d07ec95e305d889af8f1a65cf0639005123dd955314971b677c2c3080a0d1786cd047c570a91008d96fdf2ddeb86e9310abc5dccb984162e55b64be4
+  languageName: node
+  linkType: hard
+
+"@solana/spl-memo@npm:^0.2.5":
+  version: 0.2.5
+  resolution: "@solana/spl-memo@npm:0.2.5"
+  dependencies:
+    buffer: ^6.0.3
+  peerDependencies:
+    "@solana/web3.js": ^1.91.6
+  checksum: 2a66ca1e7e8951f4a1f7ec6f953be0d81bb8b981da19f148fd3dcd8990e0d4bc62bb2600d3b0e47480cf0baffa8c710fcb50aabf9a12ef03574ba61140e5c68d
   languageName: node
   linkType: hard
 
