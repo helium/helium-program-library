@@ -1,5 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
-import { batchParallelInstructionsWithPriorityFee, sendInstructionsWithPriorityFee } from "@helium/spl-utils";
+import { organizationKey } from "@helium/organization-sdk";
+import { init as initProposal } from "@helium/proposal-sdk";
+import { batchParallelInstructionsWithPriorityFee } from "@helium/spl-utils";
+import { init as initStateController } from "@helium/state-controller-sdk";
 import {
   customSignerKey,
   init as initTuktuk,
@@ -16,9 +19,6 @@ import os from "os";
 import yargs from "yargs/yargs";
 import { HplCrons } from "../../target/types/hpl_crons";
 import { nextAvailableTaskIds } from "./queue-hotspot-claims";
-import { init as initProposal } from "@helium/proposal-sdk";
-import { init as initStateController } from "@helium/state-controller-sdk";
-import { organizationKey } from "@helium/organization-sdk";
 
 const PROGRAM_ID = new PublicKey("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 
@@ -84,7 +84,7 @@ export async function run(args: any = process.argv) {
     return acc;
   }, {} as Record<string, any>);
 
-  const nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, proxyMarkers.length * 2);
+  const nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, proxyMarkers.length);
   const instructions: TransactionInstruction[] = [];
   const org = organizationKey("Helium")[0]
   for (const marker of proxyMarkers) {
@@ -97,7 +97,6 @@ export async function run(args: any = process.argv) {
         program.programId
       )[0];
       const task1 = nextAvailable.pop()!;
-      const task2 = nextAvailable.pop()!;
       instructions.push(
         await program.methods
           .queueProxyVoteV0({
@@ -122,25 +121,6 @@ export async function run(args: any = process.argv) {
             )[0],
           })
           .instruction(),
-        await program.methods
-          .queueRelinquishExpiredProxyVoteMarkerV0({
-            freeTaskId: task2,
-            triggerTs: endTs!,
-          })
-          .accountsStrict({
-            marker: marker.publicKey,
-            task: taskKey(taskQueue, task2)[0],
-            taskQueue,
-            payer: provider.wallet.publicKey,
-            systemProgram: SystemProgram.programId,
-            queueAuthority,
-            tuktukProgram: tuktukProgram.programId,
-            taskQueueAuthority: taskQueueAuthorityKey(
-              taskQueue,
-              queueAuthority
-            )[0],
-          })
-          .instruction()
       );
     }
   }
