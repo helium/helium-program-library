@@ -471,16 +471,19 @@ server.post<{
               pa.address as proxy_assignment,
               dp.address as delegated_position
             FROM proxy_assignments pa
+            JOIN positions p ON p.mint = pa.asset AND p.registrar = '${HNT_REGISTRAR.toBase58()}'
             LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset AND (
               vm.registrar = '${HNT_REGISTRAR.toBase58()}' AND vm.proposal = '${proposal.toBase58()}'
             )
             LEFT OUTER JOIN delegated_positions dp ON dp.mint = pa.asset
             WHERE pa.proxy_config = '${HELIUM_PROXY_CONFIG.toBase58()}' AND pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND (
               vm is NULL
-              OR vm.proxy_index >= pa.index
-              OR vm.choices IS DISTINCT FROM ARRAY[${choices.join(
-                ","
-              )}]::integer[]
+              OR (
+                vm.proxy_index >= pa.index AND
+                vm.choices IS DISTINCT FROM ARRAY[${choices.join(
+                  ","
+                )}]::integer[]
+              )
             )
             LIMIT ${MARKERS_TO_CHECK}
           `)
@@ -565,7 +568,10 @@ server.post<{
                     position: positionKey(new PublicKey(vote.asset))[0],
                     proposal,
                     mint: new PublicKey(vote.asset),
-                    marker: voteMarkerKey(new PublicKey(vote.asset), proposal)[0],
+                    marker: voteMarkerKey(
+                      new PublicKey(vote.asset),
+                      proposal
+                    )[0],
                   })
                   .instruction();
                 instructions.push(delegatedCountIx);
