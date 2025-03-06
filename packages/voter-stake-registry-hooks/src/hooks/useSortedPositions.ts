@@ -14,8 +14,8 @@ export function useSortedPositions() {
       unixNow && positions
         ? positions
             .sort((a, b) => {
-              if (a.isProxiedToMe) return -1;
-              if (b.isProxiedToMe) return 1;
+              if (a.isProxiedToMe) return 1;
+              if (b.isProxiedToMe) return -1;
               return -calcPositionVotingPower({
                 position: a,
                 registrar: registrar || null,
