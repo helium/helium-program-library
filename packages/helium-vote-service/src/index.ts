@@ -475,7 +475,7 @@ server.post<{
               vm.registrar = '${HNT_REGISTRAR.toBase58()}' AND vm.proposal = '${proposal.toBase58()}'
             )
             LEFT OUTER JOIN delegated_positions dp ON dp.mint = pa.asset
-            WHERE pa.proxy_confi = ${HELIUM_PROXY_CONFIG} AND pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND (
+            WHERE pa.proxy_config = ${HELIUM_PROXY_CONFIG.toBase58()} AND pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND (
               vm is NULL
               OR vm.proxy_index >= pa.index
               OR vm.choices IS DISTINCT FROM ARRAY[${choices.join(
