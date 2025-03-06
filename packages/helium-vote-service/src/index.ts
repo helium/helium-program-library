@@ -441,6 +441,9 @@ server.get<{
 const HNT_REGISTRAR = new PublicKey(
   "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
 );
+const HELIUM_PROXY_CONFIG = new PublicKey(
+  "ADWefNt1foP9YJamZFjcUwuMUanw29bEhtsHBEbfKpWZ"
+);
 const MAX_VOTES_PER_TASK = 1;
 const MARKERS_TO_CHECK = 10;
 
@@ -472,7 +475,7 @@ server.post<{
               vm.registrar = '${HNT_REGISTRAR.toBase58()}' AND vm.proposal = '${proposal.toBase58()}'
             )
             LEFT OUTER JOIN delegated_positions dp ON dp.mint = pa.asset
-            WHERE pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND (
+            WHERE pa.proxy_confi = ${HELIUM_PROXY_CONFIG} AND pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND (
               vm is NULL
               OR vm.proxy_index >= pa.index
               OR vm.choices IS DISTINCT FROM ARRAY[${choices.join(
