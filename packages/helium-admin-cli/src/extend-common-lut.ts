@@ -60,9 +60,11 @@ export async function run(args: any = process.argv) {
 
   const accounts = [
     // Proposal config
-    "7Tp4CsSw5b62vdtUFiS9F3MMYdturt5q9ZuZpt9vwgby",
+    "22SWTDZVj1L81SXfwbEeUmdZBFj23MFmER3Gv8BmxbBS",
+    // Vote controller
+    "7Vrme34DXPH8ow4HEAatZKwZF9AR5vq8MZhA3CanMEbr",
     // State controller
-    "3tAi3bF6zHF4FsqFhh4JFQfnjkx9qNBKNsH6cLvK9pT8",
+    "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM",
     // Task queue
     "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7",
     // Task Queue Authority

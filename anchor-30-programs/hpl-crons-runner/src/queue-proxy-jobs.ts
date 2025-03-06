@@ -1,5 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
+import { batchParallelInstructionsWithPriorityFee, sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import {
   customSignerKey,
   init as initTuktuk,
@@ -18,6 +18,7 @@ import { HplCrons } from "../../target/types/hpl_crons";
 import { nextAvailableTaskIds } from "./queue-hotspot-claims";
 import { init as initProposal } from "@helium/proposal-sdk";
 import { init as initStateController } from "@helium/state-controller-sdk";
+import { organizationKey } from "@helium/organization-sdk";
 
 const PROGRAM_ID = new PublicKey("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 
@@ -57,46 +58,54 @@ export async function run(args: any = process.argv) {
   const vsrProgram = await initVsr(provider);
   const tuktukProgram = await initTuktuk(provider);
   const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
-  const nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2);
   // @ts-ignore
   const proxyMarkers = await vsrProgram.account.proxyMarkerV0.all();
 
-  const instructions: TransactionInstruction[] = [];
-  for (const marker of proxyMarkers) {
-    const proposal = await proposalProgram.account.proposalV0.fetch(
-      marker.account.proposal
-    );
-    const proposalConfig = await proposalProgram.account.proposalConfigV0.fetch(
-      proposal?.proposalConfig
-    );
-    const resolution =
-      await stateControllerProgram.account.resolutionSettingsV0.fetch(
-        proposalConfig?.stateController
-      );
+  const distinctProposals: Set<string> = new Set(proxyMarkers.map((m) => m.account.proposal.toBase58()));
+  const proposalKeys = Array.from(distinctProposals).map(d => new PublicKey(d));
+  const proposals = await proposalProgram.account.proposalV0.fetchMultiple(proposalKeys);
+  const proposalConfigs = await proposalProgram.account.proposalConfigV0.fetchMultiple(proposals.map(p => p!.proposalConfig));
+  const resolutions = await stateControllerProgram.account.resolutionSettingsV0.fetchMultiple(proposalConfigs.map(pc => pc!.stateController));
 
-    const currTs = new Date().valueOf() / 1000;
-    const endTs =
-      resolution &&
+  const endTsByProposal: Record<string, anchor.BN> = proposals.reduce((acc, proposal, i) => {
+    const resolution = resolutions[i]
+    acc[proposalKeys[i].toBase58()] = (resolution &&
       (proposal?.state.resolved
         ? proposal?.state.resolved.endTs
         : proposal?.state.voting?.startTs.add(
             resolution.settings.nodes.find(
               (node) => typeof node.offsetFromStartTs !== "undefined"
             )?.offsetFromStartTs?.offset ?? new anchor.BN(0)
-          ));
-    if (endTs!.toNumber() > currTs) {
+          )))!
+    return acc;
+  }, {} as Record<string, anchor.BN>);
+  const proposalsByPubkey = proposals.reduce((acc, proposal, i) => {
+    acc[proposalKeys[i].toBase58()] = proposal;
+    return acc;
+  }, {} as Record<string, any>);
+
+  const nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, proxyMarkers.length * 2);
+  const instructions: TransactionInstruction[] = [];
+  const org = organizationKey("Helium")[0]
+  for (const marker of proxyMarkers) {
+    const currTs = new Date().valueOf() / 1000;
+    const endTs = endTsByProposal[marker.account.proposal.toBase58()];
+    const proposal = proposalsByPubkey[marker.account.proposal.toBase58()];
+    if (endTs!.toNumber() > currTs && proposal?.organization === org) {
       const queueAuthority = PublicKey.findProgramAddressSync(
         [Buffer.from("queue_authority")],
         program.programId
       )[0];
+      const task1 = nextAvailable.pop()!;
+      const task2 = nextAvailable.pop()!;
       instructions.push(
         await program.methods
           .queueProxyVoteV0({
-            freeTaskId: nextAvailable[0],
+            freeTaskId: task1,
           })
           .accountsStrict({
             marker: marker.publicKey,
-            task: taskKey(taskQueue, nextAvailable[0])[0],
+            task: taskKey(taskQueue, task1)[0],
             taskQueue,
             payer: provider.wallet.publicKey,
             systemProgram: SystemProgram.programId,
@@ -115,12 +124,12 @@ export async function run(args: any = process.argv) {
           .instruction(),
         await program.methods
           .queueRelinquishExpiredProxyVoteMarkerV0({
-            freeTaskId: nextAvailable[0],
+            freeTaskId: task2,
             triggerTs: endTs!,
           })
           .accountsStrict({
             marker: marker.publicKey,
-            task: taskKey(taskQueue, nextAvailable[1])[0],
+            task: taskKey(taskQueue, task2)[0],
             taskQueue,
             payer: provider.wallet.publicKey,
             systemProgram: SystemProgram.programId,
@@ -136,7 +145,7 @@ export async function run(args: any = process.argv) {
     }
   }
 
-  await sendInstructionsWithPriorityFee(provider, instructions, {
-    computeUnitLimit: 500000,
+  await batchParallelInstructionsWithPriorityFee(provider, instructions, {
+    onProgress: console.log,
   });
 }
