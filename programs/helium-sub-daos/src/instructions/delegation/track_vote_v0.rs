@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use proposal::ProposalV0;
-use shared_utils::resize_to_fit;
+use shared_utils::{resize_to_fit, resize_to_fit_pda};
 use voter_stake_registry::{
   state::{PositionV0, Registrar, VoteMarkerV0},
   VoterStakeRegistry,
@@ -93,11 +93,19 @@ pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
       "Proposals are now {:?}",
       ctx.accounts.delegated_position.recent_proposals
     );
-    resize_to_fit(
-      &ctx.accounts.payer,
-      &ctx.accounts.system_program.to_account_info(),
-      &ctx.accounts.delegated_position,
-    )?;
+    // If greater than 0.5 SOL, registrar can pay
+    if ctx.accounts.registrar.to_account_info().lamports() > 500000000 {
+      resize_to_fit_pda(
+        &ctx.accounts.dao.to_account_info(),
+        &ctx.accounts.delegated_position,
+      )?;
+    } else {
+      resize_to_fit(
+        &ctx.accounts.payer,
+        &ctx.accounts.system_program.to_account_info(),
+        &ctx.accounts.delegated_position,
+      )?;
+    }
   } else {
     ctx
       .accounts

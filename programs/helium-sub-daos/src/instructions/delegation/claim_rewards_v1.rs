@@ -9,6 +9,7 @@ use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
   CircuitBreaker, TransferArgsV0,
 };
+use shared_utils::resize_to_fit_pda;
 use voter_stake_registry::{
   state::{PositionV0, Registrar},
   VoterStakeRegistry,
@@ -44,6 +45,7 @@ pub struct ClaimRewardsV1<'info> {
   pub position_authority: Signer<'info>,
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
+    mut,
     has_one = registrar,
     has_one = hnt_mint,
     has_one = delegator_pool,
@@ -219,6 +221,13 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
       ctx.accounts.dao.recent_proposals
     );
     burn(ctx.accounts.burn_ctx(), amount)?;
+  }
+
+  if ctx.accounts.dao.to_account_info().lamports() > 500000000 {
+    resize_to_fit_pda(
+      &ctx.accounts.dao.to_account_info(),
+      &ctx.accounts.delegated_position,
+    )?;
   }
 
   Ok(())
