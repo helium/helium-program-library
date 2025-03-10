@@ -337,17 +337,16 @@ export const useVote = (proposalKey: PublicKey) => {
           )
         )
           .filter(truthy)
-          .flat();
 
         if (onInstructions) {
           await onInstructions([
-            ...proxyVoteInstructions,
+            proxyVoteInstructions,
             ...normalVoteInstructions,
           ]);
         } else {
           await batchParallelInstructions({
             provider,
-            instructions: [...proxyVoteInstructions, ...normalVoteInstructions],
+            instructions: [proxyVoteInstructions, ...normalVoteInstructions],
             onProgress,
             triesRemaining: 10,
             extraSigners: [],
