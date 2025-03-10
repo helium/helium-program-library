@@ -40,6 +40,7 @@
     "@helium/hpl-crons-sdk": "^0.10.0-alpha.13",
     "@helium/modular-governance-hooks": "^0.0.15",
     "@helium/modular-governance-idls": "^0.0.15",
+    "@helium/organization-sdk": "^0.1.4",
     "@helium/spl-utils": "^0.9.30",
     "@helium/tuktuk-sdk": "^0.0.4",
     "@helium/voter-stake-registry-sdk": "^0.9.30",
