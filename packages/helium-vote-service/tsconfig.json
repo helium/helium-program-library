@@ -8,7 +8,16 @@
       "path": "../account-fetch-cache"
     },
     {
+      "path": "../helium-sub-daos-sdk"
+    },
+    {
+      "path": "../idls"
+    },
+    {
       "path": "../spl-utils"
+    },
+    {
+      "path": "../no-emit-sdk"
     },
     {
       "path": "./tsconfig.cjs.json"

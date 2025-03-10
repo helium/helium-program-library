@@ -31,7 +31,9 @@ export const keypair = Keypair.fromSecretKey(
   )
 );
 
+// @ts-ignore
 export let voterStakeRegistryProgram: Program<VoterStakeRegistry>;
+// @ts-ignore
 export let heliumSubDaosProgram: Program<HeliumSubDaos>;
 export let tuktukProgram: any;
 export let hplCronsProgram: any;

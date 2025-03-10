@@ -19,4 +19,22 @@ pub enum ErrorCode {
 
   #[msg("This recipient uses a custom destination. Use distribute_custom_destination_v0")]
   CustomDestination,
+
+  #[msg("Invalid oracle")]
+  InvalidOracle,
+
+  #[msg("Invalid lazy distributor")]
+  InvalidLazyDistributor,
+
+  #[msg("Invalid current rewards")]
+  InvalidCurrentRewards,
+
+  #[msg("Invalid discriminator")]
+  InvalidDiscriminator,
+
+  #[msg("Signature verification failed")]
+  SigVerificationFailed,
+
+  #[msg("Don't use the dummy instruction")]
+  DummyInstruction,
 }

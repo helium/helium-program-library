@@ -110,6 +110,23 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | ------------------------------- | ---- |
 | args | UpdateMintWindowedBreakerArgsV0 |      |
 
+### removeMintAuthorityV0
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| rentRefund     | mut        | no     |      |
+| mint           | mut        | no     |      |
+| authority      | immut      | yes    |      |
+| circuitBreaker | mut        | no     |      |
+| tokenProgram   | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ## Accounts
 
 ### MintWindowedCircuitBreakerV0

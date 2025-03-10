@@ -1,14 +1,20 @@
-use crate::{error::ErrorCode, DeviceTypeV0};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{burn, Burn, Mint, Token, TokenAccount},
+  token::{Mint, Token, TokenAccount},
+};
+use data_credits::{
+  cpi::{
+    accounts::{BurnCommonV0, BurnWithoutTrackingV0},
+    burn_without_tracking_v0,
+  },
+  program::DataCredits,
+  BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
 use mobile_entity_manager::CarrierV0;
-use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 use shared_utils::resize_to_fit;
 
-use crate::{BoostConfigV0, BoostedHexV1};
+use crate::{error::ErrorCode, BoostConfigV0, BoostedHexV1, DeviceTypeV0};
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
@@ -43,10 +49,7 @@ pub struct BoostV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
-    has_one = payment_mint,
-    has_one = price_oracle,
-    seeds = ["boost_config".as_bytes(), payment_mint.key().as_ref()],
-    bump = boost_config.bump_seed,
+    has_one = dc_mint,
   )]
   pub boost_config: Box<Account<'info, BoostConfigV0>>,
   #[account(
@@ -57,15 +60,21 @@ pub struct BoostV0<'info> {
   pub carrier: Box<Account<'info, CarrierV0>>,
   pub hexboost_authority: Signer<'info>,
   #[account(
-    constraint = price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceFeedStale,
+    seeds=[
+      "dc".as_bytes(),
+      dc_mint.key().as_ref(),
+    ],
+    seeds::program = data_credits_program.key(),
+    bump = data_credits.data_credits_bump,
+    has_one = dc_mint
   )]
-  pub price_oracle: Account<'info, PriceUpdateV2>,
+  pub data_credits: Box<Account<'info, DataCreditsV0>>,
   #[account(mut)]
-  pub payment_mint: Box<Account<'info, Mint>>,
+  pub dc_mint: Box<Account<'info, Mint>>,
   #[account(
     mut,
     associated_token::authority = payer,
-    associated_token::mint = payment_mint,
+    associated_token::mint = dc_mint,
   )]
   pub payment_account: Box<Account<'info, TokenAccount>>,
   #[account(
@@ -80,6 +89,7 @@ pub struct BoostV0<'info> {
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
+  pub data_credits_program: Program<'info, DataCredits>,
 }
 
 pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
@@ -165,52 +175,28 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
     }
   }
 
-  let total_fee: u64 = args
+  let dc_fee: u64 = args
     .amounts
     .iter()
     .map(|amount| (amount.amount as u64 * ctx.accounts.boost_config.boost_price))
     .sum::<u64>();
-  let mobile_price_oracle = &ctx.accounts.price_oracle;
-  let message = mobile_price_oracle.price_message;
-  let mobile_price = message.ema_price;
-  require_gt!(mobile_price, 0);
-  let current_time = Clock::get()?.unix_timestamp;
-  require_gte!(
-    message
-      .publish_time
-      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
-    current_time,
-    ErrorCode::PythPriceNotFound
-  );
 
-  // Remove the confidence from the price to use the most conservative price
-  // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
-  let mobile_price_with_conf = mobile_price
-    .checked_sub(i64::try_from(message.ema_conf.checked_mul(2).unwrap()).unwrap())
-    .unwrap();
-  // Exponent is a negative number, likely -8
-  // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
-  // by the exponent
-  let exponent_dec = 10_u64
-    .checked_pow(u32::try_from(-message.exponent).unwrap())
-    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
-
-  let dnt_fee = total_fee
-    .checked_mul(exponent_dec)
-    .unwrap()
-    .checked_div(mobile_price_with_conf.try_into().unwrap())
-    .unwrap();
-
-  burn(
+  burn_without_tracking_v0(
     CpiContext::new(
-      ctx.accounts.token_program.to_account_info(),
-      Burn {
-        mint: ctx.accounts.payment_mint.to_account_info(),
-        from: ctx.accounts.payment_account.to_account_info(),
-        authority: ctx.accounts.payer.to_account_info(),
+      ctx.accounts.data_credits_program.to_account_info(),
+      BurnWithoutTrackingV0 {
+        burn_accounts: BurnCommonV0 {
+          data_credits: ctx.accounts.data_credits.to_account_info(),
+          owner: ctx.accounts.payer.to_account_info(),
+          dc_mint: ctx.accounts.dc_mint.to_account_info(),
+          burner: ctx.accounts.payment_account.to_account_info(),
+          associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
+          token_program: ctx.accounts.token_program.to_account_info(),
+          system_program: ctx.accounts.system_program.to_account_info(),
+        },
       },
     ),
-    dnt_fee,
+    BurnWithoutTrackingArgsV0 { amount: dc_fee },
   )?;
 
   resize_to_fit(

@@ -6,7 +6,7 @@ import {
 } from "@helium/anchor-resolvers";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
 import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 import BN from "bn.js";
 import { recipientKey } from "./pdas";
 
@@ -41,6 +41,8 @@ export const lazyDistributorResolvers = combineResolvers(
         return new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
       case "logWrapper":
         return new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+      case "sysvarInstructions":
+        return SYSVAR_INSTRUCTIONS_PUBKEY;
       default:
         return;
     }

@@ -27,6 +27,7 @@ export async function initTestDao(
   dao: PublicKey;
   rewardsEscrow: PublicKey;
   delegatorPool: PublicKey;
+  dcMint: PublicKey;
 }> {
   const me = provider.wallet.publicKey;
   if (!mint) {
@@ -97,6 +98,7 @@ export async function initTestDao(
     dao: dao!,
     rewardsEscrow,
     delegatorPool: delegatorPool!,
+    dcMint: dcMint!,
   };
 }
 

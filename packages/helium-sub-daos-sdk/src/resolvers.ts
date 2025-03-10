@@ -2,16 +2,22 @@ import {
   ataResolver,
   combineResolvers,
   get,
-  heliumCommonResolver, resolveIndividual
+  heliumCommonResolver,
+  resolveIndividual,
 } from "@helium/anchor-resolvers";
 import { treasuryManagementResolvers } from "@helium/treasury-management-sdk";
-import { init, PROGRAM_ID as VSR_PROGRAM_ID, vsrResolvers } from "@helium/voter-stake-registry-sdk";
+import {
+  init,
+  PROGRAM_ID as VSR_PROGRAM_ID,
+  vsrResolvers,
+} from "@helium/voter-stake-registry-sdk";
 import { AnchorProvider, BN, Provider } from "@coral-xyz/anchor";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import { init as initHsd } from "./init";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
+import { notEmittedCounterKey } from "@helium/no-emit-sdk";
 import { min } from "bn.js";
 
 const THREAD_PID = new PublicKey(
@@ -52,6 +58,15 @@ export const daoEpochInfoResolver = resolveIndividual(
         return key;
       }
     }
+    if (path[path.length - 1] == "prevDaoEpochInfo" && accounts.dao) {
+      return daoEpochInfoKey(
+        accounts.dao as PublicKey,
+        (args[0].epoch.toNumber() - 1) * EPOCH_LENGTH
+      )[0];
+    }
+    if (path[path.length - 1] === "notEmittedCounter" && accounts.hnt_mint) {
+      return notEmittedCounterKey(accounts.hnt_mint as PublicKey)[0];
+    }
   }
 );
 
@@ -61,19 +76,23 @@ export const subDaoEpochInfoResolver = resolveIndividual(
       const vsr = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
       let registrar;
       try {
-        registrar = await vsr.account.registrar.fetch(accounts.registrar as PublicKey);
+        registrar = await vsr.account.registrar.fetch(
+          accounts.registrar as PublicKey
+        );
       } catch (e: any) {
         // ignore. It's fine, we just won't use time offset which is only used in testing cases
-        console.error(e)
+        console.error(e);
       }
       const clock = await provider.connection.getAccountInfo(
         SYSVAR_CLOCK_PUBKEY
       );
       let unixTime;
       if (args && args[0] && args[0].epoch) {
-        unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH
+        unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH;
       } else {
-        unixTime = Number(clock!.data.readBigInt64LE(8 * 4)) + (registrar?.timeOffset.toNumber() || 0);
+        unixTime =
+          Number(clock!.data.readBigInt64LE(8 * 4)) +
+          (registrar?.timeOffset.toNumber() || 0);
       }
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
@@ -112,12 +131,21 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         "subDao",
       ]) as PublicKey;
       if (subDao) {
-        const [key] = await subDaoEpochInfoKey(subDao, unixTime - EPOCH_LENGTH, PROGRAM_ID);
+        const [key] = await subDaoEpochInfoKey(
+          subDao,
+          unixTime - EPOCH_LENGTH,
+          PROGRAM_ID
+        );
 
         return key;
       }
     }
-    if (path[path.length - 1] === "prevSubDaoEpochInfo" && args && args[0] && args[0].epoch) {
+    if (
+      path[path.length - 1] === "prevSubDaoEpochInfo" &&
+      args &&
+      args[0] &&
+      args[0].epoch
+    ) {
       const unixTime = args[0].epoch.toNumber() * EPOCH_LENGTH;
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
@@ -139,10 +167,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
 export const closingTimeEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts }) => {
     if (path[path.length - 1] === "closingTimeSubDaoEpochInfo") {
-      const program = await init(
-        provider as AnchorProvider,
-        VSR_PROGRAM_ID,
-      );
+      const program = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
       const hsdProgram = await initHsd(provider as AnchorProvider);
       const nftProxyProgram = await initNftProxy(provider as AnchorProvider);
 
@@ -162,11 +187,16 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
         ...path.slice(0, path.length - 1),
         "delegatedPosition",
       ]) as PublicKey;
-      const positionAcc = position && await program.account.positionV0.fetch(
-        position
-      );
-      const delegatedPositionAcc = delegatedPosition && await hsdProgram.account.delegatedPositionV0.fetchNullable(delegatedPosition);
-      const proxyConfigAcc = proxyConfig && await nftProxyProgram.account.proxyConfigV0.fetch(proxyConfig);
+      const positionAcc =
+        position && (await program.account.positionV0.fetch(position));
+      const delegatedPositionAcc =
+        delegatedPosition &&
+        (await hsdProgram.account.delegatedPositionV0.fetchNullable(
+          delegatedPosition
+        ));
+      const proxyConfigAcc =
+        proxyConfig &&
+        (await nftProxyProgram.account.proxyConfigV0.fetch(proxyConfig));
       const now = await getSolanaUnixTimestamp(provider);
       if (positionAcc && (proxyConfigAcc || delegatedPositionAcc)) {
         const expirationTs =
@@ -199,7 +229,6 @@ async function getSolanaUnixTimestamp(provider: Provider): Promise<bigint> {
   return unixTime;
 }
 
-
 export const genesisEndEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts }) => {
     if (path[path.length - 1] === "genesisEndSubDaoEpochInfo") {
@@ -219,8 +248,10 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
         ...path.slice(0, path.length - 1),
         "registrar",
       ]) as PublicKey;
-      const positionAcc = position && await program.account.positionV0.fetch(position);
-      const registrarAcc = registrar && await program.account.registrar.fetch(registrar);
+      const positionAcc =
+        position && (await program.account.positionV0.fetch(position));
+      const registrarAcc =
+        registrar && (await program.account.registrar.fetch(registrar));
       const proxyConfig = get(accounts, [
         ...path.slice(0, path.length - 1),
         "proxyConfig",
@@ -234,7 +265,9 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
         (await hsdProgram.account.delegatedPositionV0.fetchNullable(
           delegatedPosition
         ));
-      const proxyConfigAcc = proxyConfig && await nftProxyProgram.account.proxyConfigV0.fetch(proxyConfig);
+      const proxyConfigAcc =
+        proxyConfig &&
+        (await nftProxyProgram.account.proxyConfigV0.fetch(proxyConfig));
       if (positionAcc && registrarAcc) {
         const now =
           Number(await getSolanaUnixTimestamp(provider)) +
@@ -318,14 +351,9 @@ export const heliumSubDaosResolvers = combineResolvers(
     mint: "mint",
     owner: "authority",
   }),
-  resolveIndividual(async ({ args, path, accounts }) => {
+  resolveIndividual(async ({ path }) => {
     if (path[path.length - 1] == "clockwork") {
       return THREAD_PID;
-    } else if (path[path.length - 1] == "prevDaoEpochInfo" && accounts.dao) {
-      return daoEpochInfoKey(
-        accounts.dao as PublicKey,
-        (args[0].epoch.toNumber() - 1) * EPOCH_LENGTH
-      )[0];
     }
   }),
   vsrResolvers
@@ -333,4 +361,3 @@ export const heliumSubDaosResolvers = combineResolvers(
 function bnMin(a: BN, b: BN): BN {
   return a.lt(b) ? a : b;
 }
-

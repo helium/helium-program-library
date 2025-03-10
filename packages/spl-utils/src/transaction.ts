@@ -676,10 +676,12 @@ export async function batchParallelInstructions({
   triesRemaining = 10,
   extraSigners = [],
   maxSignatureBatch = TX_BATCH_SIZE,
+  maxTxSize = 1232,
   addressLookupTableAddresses = [],
 }: {
   provider: AnchorProvider;
   instructions: TransactionInstruction[];
+  maxTxSize?: number;
   onProgress?: (status: Status) => void;
   triesRemaining?: number; // Number of blockhashes to try resending txs with before giving up
   extraSigners?: Keypair[];
@@ -705,7 +707,7 @@ export async function batchParallelInstructions({
       addressLookupTables,
     });
     try {
-      if (tx.serialize().length + 64 * tx.signatures.length > 1232) {
+      if (tx.serialize().length + 64 * tx.signatures.length > maxTxSize) {
         throw new Error("encoding overruns Uint8Array");
       }
     } catch (e: any) {
@@ -783,11 +785,14 @@ export async function batchInstructionsToTxsWithPriorityFee(
     basePriorityFee,
     addressLookupTableAddresses,
     computeScaleUp,
+    maxTxSize = 1232,
     extraSigners = [],
     useFirstEstimateForAll = false,
   }: {
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
+    // Manually specify max tx size, useful to leave room for multisigs
+    maxTxSize?: number;
     // Multiplier to increase compute to account for changes in runtime vs simulation
     computeScaleUp?: number;
     basePriorityFee?: number;
@@ -828,7 +833,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
       addressLookupTables,
     });
     try {
-      if (tx.serialize().length + 64 * tx.signatures.length > 1232) {
+      if (tx.serialize().length + 64 * tx.signatures.length > maxTxSize) {
         throw new Error("encoding overruns Uint8Array");
       }
     } catch (e: any) {

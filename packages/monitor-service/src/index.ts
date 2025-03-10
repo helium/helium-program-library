@@ -243,6 +243,12 @@ async function run() {
     mobileRewardsEscrow,
     "mobile_rewards_escrow"
   );
+  const delegatorPool = dao.delegatorPool;
+  await monitorAccountCircuitBreaker(
+    cbProgram,
+    delegatorPool,
+    "delegator_pool"
+  );
 }
 
 run().catch((e) => {
