@@ -70,7 +70,11 @@ pub fn handler(ctx: Context<AddEntityToCronV0>, args: AddEntityToCronArgsV0) -> 
     AddCronTransactionArgsV0 {
       index: args.index,
       transaction_source: TransactionSourceV0::RemoteV0 {
-        url: format!("{}/v1/tuktuk/{}", BASE_URL, ctx.accounts.key_to_asset.key()),
+        url: format!(
+          "{}/v1/tuktuk/kta/{}",
+          BASE_URL,
+          ctx.accounts.key_to_asset.key()
+        ),
         signer: ORACLE_SIGNER,
       },
     },

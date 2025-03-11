@@ -1,12 +1,12 @@
-import dotenv from "dotenv";
-dotenv.config();
 import {
   compileTransaction,
   customSignerKey,
   init as initTuktuk,
   RemoteTaskTransactionV0,
 } from "@helium/tuktuk-sdk";
+import dotenv from "dotenv";
 import { sign } from "tweetnacl";
+dotenv.config();
 // @ts-ignore
 import {
   AnchorProvider,
@@ -17,16 +17,17 @@ import {
   Program,
   setProvider,
 } from "@coral-xyz/anchor";
+import cors from "@fastify/cors";
+import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {
   decodeEntityKey,
-  entityCreatorKey,
   init as initHeliumEntityManager,
   keyToAssetKey,
-  keyToAssetForAsset,
 } from "@helium/helium-entity-manager-sdk";
-import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { init as initHplCrons } from "@helium/hpl-crons-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import {
   distributeCompressionRewards,
   init as initLazy,
@@ -38,156 +39,29 @@ import {
   init as initRewards,
   PROGRAM_ID as RO_PID,
 } from "@helium/rewards-oracle-sdk";
+import { toNumber } from "@helium/spl-utils";
+import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
+import { createMemoInstruction } from "@solana/spl-memo";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
-  Asset,
-  getAsset,
-  HNT_MINT,
-  IOT_MINT,
-  toNumber,
-} from "@helium/spl-utils";
-import { AccountFetchCache } from "@helium/account-fetch-cache";
-import {
+  AddressLookupTableAccount,
+  ComputeBudgetProgram,
   Keypair,
+  MessageCompiledInstruction,
   PublicKey,
   TransactionInstruction,
-  ComputeBudgetProgram,
   VersionedTransaction,
-  AddressLookupTableAccount,
-  MessageCompiledInstruction,
 } from "@solana/web3.js";
-import { Op } from "sequelize";
-import fs from "fs";
-import { Reward, sequelize } from "./model";
 import Fastify, {
   FastifyInstance,
-  FastifyRequest,
   FastifyReply,
+  FastifyRequest,
 } from "fastify";
-import cors from "@fastify/cors";
-import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
-import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
+import fs from "fs";
+import { DAO, DNT, MAX_CLAIMS_PER_TX } from "./constants";
+import { Database, DeviceType } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-
-const HNT = process.env.HNT_MINT
-  ? new PublicKey(process.env.HNT_MINT)
-  : HNT_MINT;
-const DNT = process.env.DNT_MINT
-  ? new PublicKey(process.env.DNT_MINT)
-  : IOT_MINT;
-const DAO = daoKey(HNT)[0];
-const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
-
-enum DeviceType {
-  IOT = "iot",
-  MOBILE = "mobile",
-}
-
-const getRewardTypeForDevice = (deviceType: DeviceType): string =>
-  `${deviceType.toString().toLowerCase()}_gateway`;
-
-export interface Database {
-  getTotalRewards(): Promise<string>;
-  getCurrentRewardsByEntity: (entityKey: string) => Promise<string>;
-  getCurrentRewards: (asset: PublicKey) => Promise<string>;
-  getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
-  getActiveDevices(type?: DeviceType): Promise<number>;
-}
-
-export class PgDatabase implements Database {
-  constructor(
-    readonly issuanceProgram: Program<HeliumEntityManager>,
-    readonly getAssetFn: (
-      url: string,
-      asset: PublicKey
-    ) => Promise<Asset | undefined> = getAsset
-  ) {}
-
-  async getTotalRewards(): Promise<string> {
-    const totalRewards = (
-      await Reward.findAll({
-        attributes: [
-          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
-        ],
-      })
-    )[0].rewards;
-    return totalRewards;
-  }
-
-  getActiveDevices(type?: DeviceType): Promise<number> {
-    const rewardTypes = type
-      ? [getRewardTypeForDevice(type)]
-      : Object.values(DeviceType)
-          .filter((value) => isNaN(Number(value))) // Filter out numeric enum keys
-          .map((deviceType) =>
-            getRewardTypeForDevice(deviceType as DeviceType)
-          );
-
-    return Reward.count({
-      where: {
-        lastReward: {
-          [Op.gte]: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30), // Active within the last 30 days
-        },
-        rewardType: {
-          [Op.in]: rewardTypes,
-        },
-      },
-    });
-  }
-
-  async getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
-    const rewards = await Reward.findAll({
-      where: {
-        address: {
-          [Op.in]: entityKeys,
-        },
-      },
-    });
-
-    return rewards
-      .map((rew) => [rew.address, rew.rewards])
-      .reduce((acc, [key, val]) => {
-        acc[key] = new BN(val).toString();
-        return acc;
-      }, {} as Record<string, string>);
-  }
-
-  async getCurrentRewards(assetId: PublicKey) {
-    const asset = await this.getAssetFn(
-      process.env.ASSET_API_URL ||
-        this.issuanceProgram.provider.connection.rpcEndpoint,
-      assetId
-    );
-    if (!asset) {
-      console.error("No asset found", assetId.toBase58());
-      return "0";
-    }
-    const keyToAssetKey = keyToAssetForAsset(asset, DAO);
-    const keyToAsset = await this.issuanceProgram.account.keyToAssetV0.fetch(
-      keyToAssetKey
-    );
-    const entityKey = decodeEntityKey(
-      keyToAsset.entityKey,
-      keyToAsset.keySerialization
-    )!;
-    // Verify the creator is our entity creator, otherwise they could just
-    // pass in any NFT with this ecc compact to collect rewards
-    if (
-      !asset.creators[0].verified ||
-      !new PublicKey(asset.creators[0].address).equals(ENTITY_CREATOR)
-    ) {
-      throw new Error("Not a valid rewardable entity");
-    }
-
-    return this.getCurrentRewardsByEntity(entityKey);
-  }
-
-  async getCurrentRewardsByEntity(entityKeyStr: string) {
-    const reward = (await Reward.findByPk(entityKeyStr)) as Reward;
-
-    return new BN(reward?.rewards).toString() || "0";
-  }
-}
+import { PgDatabase } from "./pgDatabase";
 
 export class OracleServer {
   app: FastifyInstance;
@@ -200,6 +74,7 @@ export class OracleServer {
     public ldProgram: Program<LazyDistributor>,
     public roProgram: Program<RewardsOracle>,
     public hemProgram: Program<HeliumEntityManager>,
+    public hplCronsProgram: any,
     private oracle: Keypair,
     public db: Database,
     readonly lazyDistributor: PublicKey,
@@ -277,7 +152,14 @@ export class OracleServer {
     }>("/", this.getCurrentRewardsHandler.bind(this));
     this.app.post("/", this.signTransactionHandler.bind(this));
     this.app.post("/bulk-sign", this.signBulkTransactionsHandler.bind(this));
-    this.app.post("/v1/tuktuk/:keyToAssetKey", this.tuktukHandler.bind(this));
+    this.app.post(
+      "/v1/tuktuk/kta/:keyToAssetKey",
+      this.tuktukKtaHandler.bind(this)
+    );
+    this.app.post(
+      "/v1/tuktuk/wallet/:wallet",
+      this.tuktukWalletHandler.bind(this)
+    );
     this.app.post("/v1/sign/:keyToAssetKey", this.signHandler.bind(this));
   }
 
@@ -728,7 +610,7 @@ export class OracleServer {
     }
   }
 
-  private async tuktukHandler(
+  private async tuktukKtaHandler(
     request: FastifyRequest<{
       Params: { keyToAssetKey: string };
       Body: { task_queue: string; task: string; task_queued_at: number };
@@ -848,6 +730,147 @@ export class OracleServer {
     }
   }
 
+  private async tuktukWalletHandler(
+    request: FastifyRequest<{
+      Params: { wallet: string; isRequeue?: boolean };
+      Body: { task_queue: string; task: string; task_queued_at: number };
+    }>,
+    reply: FastifyReply
+  ) {
+    const wallet = request.params.wallet;
+    const isRequeue = request.params.isRequeue;
+    const taskQueue = new PublicKey(request.body.task_queue);
+    const task = new PublicKey(request.body.task);
+    const taskQueuedAt = new BN(request.body.task_queued_at);
+    try {
+      const [customSignerWallet, bump] = customSignerKey(taskQueue, [
+        Buffer.from("claim_payer"),
+        new PublicKey(wallet).toBuffer(),
+      ]);
+      const bumpBuffer = Buffer.alloc(1);
+      bumpBuffer.writeUint8(bump);
+
+      const entities = await this.db.getRewardableEntities(
+        new PublicKey(wallet),
+        MAX_CLAIMS_PER_TX,
+        isRequeue
+      );
+
+      const instructions: TransactionInstruction[] = [];
+      for (const entity of entities) {
+        let distributeIx;
+        if (
+          entity.recipient.destination &&
+          !entity.recipient.destination.equals(PublicKey.default)
+        ) {
+          const destination = entity.recipient.destination;
+          distributeIx = await this.ldProgram.methods
+            .distributeCustomDestinationV0()
+            .accounts({
+              common: {
+                payer: customSignerWallet,
+                recipient: entity.recipient.address,
+                lazyDistributor: this.lazyDistributor,
+                rewardsMint: DNT,
+                owner: destination,
+                destinationAccount: getAssociatedTokenAddressSync(
+                  DNT,
+                  destination,
+                  true
+                ),
+              },
+            })
+            .instruction();
+        } else {
+          distributeIx = await (
+            await distributeCompressionRewards({
+              program: this.ldProgram,
+              assetId: entity.keyToAsset.asset,
+              lazyDistributor: this.lazyDistributor,
+              rewardsMint: DNT,
+              payer: customSignerWallet,
+            })
+          ).instruction();
+        }
+
+        instructions.push(
+          await this.roProgram.methods
+            .setCurrentRewardsWrapperV2({
+              currentRewards: new BN(entity.lifetimeReward),
+              oracleIndex: process.env.ORACLE_INDEX
+                ? parseInt(process.env.ORACLE_INDEX)
+                : 0,
+            })
+            .accounts({
+              lazyDistributor: this.lazyDistributor,
+              recipient: entity.recipient.address,
+              payer: customSignerWallet,
+              keyToAsset: entity.keyToAsset.address,
+            })
+            .instruction(),
+          distributeIx
+        );
+      }
+
+      if (entities.length == MAX_CLAIMS_PER_TX) {
+        instructions.push(
+          await this.hplCronsProgram.methods
+            .requeueWalletClaim()
+            .accounts({
+              wallet: new PublicKey(wallet),
+            })
+            .instruction()
+        );
+      } else {
+        instructions.push(
+          createMemoInstruction("Finished claiming rewards", [
+            customSignerWallet,
+          ])
+        );
+      }
+      const { transaction, remainingAccounts } = await compileTransaction(
+        instructions,
+        [
+          [
+            Buffer.from("claim_payer"),
+            new PublicKey(wallet).toBuffer(),
+            bumpBuffer,
+          ],
+        ]
+      );
+      const remoteTx = new RemoteTaskTransactionV0({
+        task,
+        taskQueuedAt,
+        transaction: {
+          ...transaction,
+          accounts: remainingAccounts.map((acc) => acc.pubkey),
+        },
+      });
+      const serialized = await RemoteTaskTransactionV0.serialize(
+        this.tuktukProgram.coder.accounts,
+        remoteTx
+      );
+      const resp = {
+        transaction: serialized.toString("base64"),
+        signature: Buffer.from(
+          sign.detached(Uint8Array.from(serialized), this.oracle.secretKey)
+        ).toString("base64"),
+        remaining_accounts: remainingAccounts.map((acc) => ({
+          pubkey: acc.pubkey.toBase58(),
+          is_signer: acc.isSigner,
+          is_writable: acc.isWritable,
+        })),
+      };
+      console.log(resp);
+      reply.status(200).send(resp);
+    } catch (err) {
+      console.error(err);
+      reply.status(500).send({
+        message: "Request failed",
+      });
+    }
+  }
+
   private async signBulkTransactionsHandler(
     req: FastifyRequest<{ Body: { transactions: number[][] } }>,
     res: FastifyReply
@@ -927,6 +950,7 @@ export class OracleServer {
     const ldProgram = await initLazy(provider);
     const roProgram = await initRewards(provider);
     const hemProgram = await initHeliumEntityManager(provider);
+    const hplCronsProgram = await initHplCrons(provider);
 
     const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
     const server = new OracleServer(
@@ -934,8 +958,9 @@ export class OracleServer {
       ldProgram,
       roProgram,
       hemProgram,
+      hplCronsProgram,
       oracleKeypair,
-      new PgDatabase(hemProgram),
+      new PgDatabase(hemProgram, ldProgram),
       LAZY_DISTRIBUTOR
     );
     // For performance

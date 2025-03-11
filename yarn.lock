@@ -839,6 +839,7 @@ __metadata:
     "@helium/address": ^4.10.2
     "@helium/helium-entity-manager-sdk": ^0.9.30
     "@helium/helium-sub-daos-sdk": ^0.9.30
+    "@helium/hpl-crons-sdk": ^0.10.0-alpha.13
     "@helium/idls": ^0.9.30
     "@helium/lazy-distributor-sdk": ^0.9.30
     "@helium/rewards-oracle-sdk": ^0.9.30

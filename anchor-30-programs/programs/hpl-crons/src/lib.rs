@@ -113,4 +113,11 @@ pub mod hpl_crons {
   ) -> Result<()> {
     queue_relinquish_expired_proxy_vote_marker_v0::handler(ctx, args)
   }
+
+  pub fn queue_wallet_claim_v0(
+    ctx: Context<QueueWalletClaimV0>,
+    args: QueueWalletClaimArgsV0,
+  ) -> Result<()> {
+    queue_wallet_claim_v0::handler(ctx, args)
+  }
 }
