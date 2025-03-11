@@ -9,10 +9,7 @@ use bubblegum_cpi::{
 };
 use helium_sub_daos::DaoV0;
 
-use crate::{
-  constants::ENTITY_METADATA_URL, error::ErrorCode, key_to_asset_seeds, state::*,
-  IOT_OPERATIONS_FUND, NOT_EMITTED,
-};
+use crate::{constants::ENTITY_METADATA_URL, error::ErrorCode, key_to_asset_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueProgramEntityArgsV0 {
