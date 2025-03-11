@@ -17,8 +17,11 @@ export interface Database {
   getRewardableEntities(
     wallet: PublicKey,
     limit: number,
-    isRequeue?: boolean
-  ): Promise<RewardableEntity[]>;
+    batchNumber?: number
+  ): Promise<{
+    entities: RewardableEntity[]
+    nextBatchNumber: number
+  }>;
 }
 
 export type KeyToAssetV0 = anchor.IdlAccounts<HeliumEntityManager>["keyToAssetV0"] & {

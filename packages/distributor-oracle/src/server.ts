@@ -30,6 +30,7 @@ import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { RewardsOracle } from "@helium/idls/lib/types/rewards_oracle";
 import {
   distributeCompressionRewards,
+  initializeCompressionRecipient,
   init as initLazy,
   lazyDistributorKey,
   PROGRAM_ID as LD_PID,
@@ -39,7 +40,7 @@ import {
   init as initRewards,
   PROGRAM_ID as RO_PID,
 } from "@helium/rewards-oracle-sdk";
-import { toNumber } from "@helium/spl-utils";
+import { getAsset, toNumber } from "@helium/spl-utils";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { createMemoInstruction } from "@solana/spl-memo";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
@@ -49,6 +50,7 @@ import {
   Keypair,
   MessageCompiledInstruction,
   PublicKey,
+  SystemProgram,
   TransactionInstruction,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -62,6 +64,7 @@ import { DAO, DNT, MAX_CLAIMS_PER_TX } from "./constants";
 import { Database, DeviceType } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
 import { PgDatabase } from "./pgDatabase";
+import { Reward, WalletClaimJob } from "./model";
 
 export class OracleServer {
   app: FastifyInstance;
@@ -621,23 +624,29 @@ export class OracleServer {
     const task = new PublicKey(request.body.task);
     const taskQueuedAt = new BN(request.body.task_queued_at);
     try {
-      const [wallet, bump] = customSignerKey(taskQueue, [
-        Buffer.from("oracle"),
-      ]);
-      const bumpBuffer = Buffer.alloc(1);
-      bumpBuffer.writeUint8(bump);
       let keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
         new PublicKey(request.params.keyToAssetKey)
       );
+      const asset = await getAsset(
+        process.env.ASSET_API_URL ||
+          this.ldProgram.provider.connection.rpcEndpoint,
+        keyToAsset.asset
+      );
+      const [wallet, bump] = customSignerKey(taskQueue, [
+        Buffer.from("claim_payer"),
+        asset!.ownership.owner.toBuffer(),
+      ]);
+      const bumpBuffer = Buffer.alloc(1);
+      bumpBuffer.writeUint8(bump);
       const recipient = recipientKey(this.lazyDistributor, keyToAsset.asset)[0];
-      let recipientAcc = await this.ldProgram.account.recipientV0.fetch(
+      let recipientAcc = await this.ldProgram.account.recipientV0.fetchNullable(
         recipient
       );
 
       let distributeIx;
       if (
-        recipientAcc.destination &&
-        !recipientAcc.destination.equals(PublicKey.default)
+        recipientAcc?.destination &&
+        !recipientAcc?.destination.equals(PublicKey.default)
       ) {
         const destination = recipientAcc.destination;
         distributeIx = await this.ldProgram.methods
@@ -674,7 +683,22 @@ export class OracleServer {
         keyToAsset.keySerialization
       )!;
 
-      const instructions: TransactionInstruction[] = [
+      const instructions: TransactionInstruction[] = [];
+      if (!recipientAcc) {
+        instructions.push(
+          await (
+            await initializeCompressionRecipient({
+              program: this.ldProgram,
+              assetId: keyToAsset.asset,
+              lazyDistributor: this.lazyDistributor,
+              owner: wallet,
+              // Temporarily set oracle as the payer to subsidize new HNT wallets.
+              payer: wallet,
+            })
+          ).instruction()
+        );
+      }
+      instructions.push(
         await this.roProgram.methods
           .setCurrentRewardsWrapperV2({
             currentRewards: new BN(
@@ -690,12 +714,19 @@ export class OracleServer {
             payer: wallet,
             keyToAsset: new PublicKey(request.params.keyToAssetKey),
           })
-          .instruction(),
-        distributeIx,
-      ];
+          .instruction()
+      );
+
+      instructions.push(distributeIx);
       const { transaction, remainingAccounts } = await compileTransaction(
         instructions,
-        [[Buffer.from("oracle"), bumpBuffer]]
+        [
+          [
+            Buffer.from("claim_payer"),
+            asset!.ownership.owner.toBuffer(),
+            bumpBuffer,
+          ],
+        ]
       );
       const remoteTx = new RemoteTaskTransactionV0({
         task,
@@ -720,7 +751,6 @@ export class OracleServer {
           is_writable: acc.isWritable,
         })),
       };
-      console.log(resp);
       reply.status(200).send(resp);
     } catch (err) {
       console.error(err);
@@ -732,13 +762,14 @@ export class OracleServer {
 
   private async tuktukWalletHandler(
     request: FastifyRequest<{
-      Params: { wallet: string; isRequeue?: boolean };
+      Params: { wallet: string };
+      Querystring: { batchNumber?: number };
       Body: { task_queue: string; task: string; task_queued_at: number };
     }>,
     reply: FastifyReply
   ) {
     const wallet = request.params.wallet;
-    const isRequeue = request.params.isRequeue;
+    const batchNumber = request.query.batchNumber;
     const taskQueue = new PublicKey(request.body.task_queue);
     const task = new PublicKey(request.body.task);
     const taskQueuedAt = new BN(request.body.task_queued_at);
@@ -750,72 +781,40 @@ export class OracleServer {
       const bumpBuffer = Buffer.alloc(1);
       bumpBuffer.writeUint8(bump);
 
-      const entities = await this.db.getRewardableEntities(
+      const { entities, nextBatchNumber } = await this.db.getRewardableEntities(
         new PublicKey(wallet),
         MAX_CLAIMS_PER_TX,
-        isRequeue
+        Number(batchNumber || 0)
       );
 
-      const instructions: TransactionInstruction[] = [];
+      const taskQueueAcc = await this.tuktukProgram.account.taskQueueV0.fetch(
+        taskQueue
+      );
+      const instructions: TransactionInstruction[] = [
+        SystemProgram.transfer({
+          fromPubkey: customSignerWallet,
+          toPubkey: task,
+          lamports:
+            taskQueueAcc.minCrankReward.toNumber() * (entities.length + 1),
+        }),
+      ];
       for (const entity of entities) {
-        let distributeIx;
-        if (
-          entity.recipient.destination &&
-          !entity.recipient.destination.equals(PublicKey.default)
-        ) {
-          const destination = entity.recipient.destination;
-          distributeIx = await this.ldProgram.methods
-            .distributeCustomDestinationV0()
-            .accounts({
-              common: {
-                payer: customSignerWallet,
-                recipient: entity.recipient.address,
-                lazyDistributor: this.lazyDistributor,
-                rewardsMint: DNT,
-                owner: destination,
-                destinationAccount: getAssociatedTokenAddressSync(
-                  DNT,
-                  destination,
-                  true
-                ),
-              },
-            })
-            .instruction();
-        } else {
-          distributeIx = await (
-            await distributeCompressionRewards({
-              program: this.ldProgram,
-              assetId: entity.keyToAsset.asset,
-              lazyDistributor: this.lazyDistributor,
-              rewardsMint: DNT,
-              payer: customSignerWallet,
-            })
-          ).instruction();
-        }
-
         instructions.push(
-          await this.roProgram.methods
-            .setCurrentRewardsWrapperV2({
-              currentRewards: new BN(entity.lifetimeReward),
-              oracleIndex: process.env.ORACLE_INDEX
-                ? parseInt(process.env.ORACLE_INDEX)
-                : 0,
-            })
+          await this.hplCronsProgram.methods
+            .requeueEntityClaimV0()
             .accounts({
-              lazyDistributor: this.lazyDistributor,
-              recipient: entity.recipient.address,
-              payer: customSignerWallet,
               keyToAsset: entity.keyToAsset.address,
             })
-            .instruction(),
-          distributeIx
+            .instruction()
         );
       }
 
-      if (entities.length == MAX_CLAIMS_PER_TX) {
+      if (entities.length > 0) {
         instructions.push(
           await this.hplCronsProgram.methods
-            .requeueWalletClaim()
+            .requeueWalletClaimV0({
+              batchNumber: nextBatchNumber,
+            })
             .accounts({
               wallet: new PublicKey(wallet),
             })
@@ -861,7 +860,6 @@ export class OracleServer {
           is_writable: acc.isWritable,
         })),
       };
-      console.log(resp);
       reply.status(200).send(resp);
     } catch (err) {
       console.error(err);
@@ -951,6 +949,9 @@ export class OracleServer {
     const roProgram = await initRewards(provider);
     const hemProgram = await initHeliumEntityManager(provider);
     const hplCronsProgram = await initHplCrons(provider);
+
+    WalletClaimJob.sync();
+    Reward.sync();
 
     const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
     const server = new OracleServer(

@@ -11,22 +11,23 @@ use tuktuk_program::{
   TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
 
-use crate::voter_stake_registry::accounts::ProxyMarkerV0;
-
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct QueueWalletClaimArgsV0 {
   pub free_task_id: u16,
 }
 
 #[cfg(feature = "devnet")]
-pub const ORACLE_URL: &str = "https://helium-vote-service.web.test-helium.com";
+// pub const ORACLE_URL: &str = "https://hnt-rewards.oracle.helium.io";
+pub const ORACLE_URL: &str = "http://localhost:8080";
 #[cfg(feature = "devnet")]
-pub const ORACLE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
+pub const ORACLE_SIGNER: Pubkey = pubkey!("dor5y9KAG6mVGFquXr8ipmm7GVLZefiNiCjvER58kPB");
 
 #[cfg(not(feature = "devnet"))]
-pub const ORACLE_URL: &str = "https://helium-vote-service.web.helium.io";
+pub const ORACLE_URL: &str = "https://hnt-rewards.oracle.helium.io";
 #[cfg(not(feature = "devnet"))]
-pub const ORACLE_SIGNER: Pubkey = pubkey!("vtedYdD9pKu9seuWwePQYTWLa2aUc5SWsDv1crmNJit");
+pub const ORACLE_SIGNER: Pubkey = pubkey!("orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q");
+
+pub const NUM_QUEUED_PER_BATCH: u8 = 5;
 
 #[derive(Accounts)]
 pub struct QueueWalletClaimV0<'info> {
@@ -84,7 +85,7 @@ pub fn handler(ctx: Context<QueueWalletClaimV0>, args: QueueWalletClaimArgsV0) -
   // Queue authority pays for the task rent if it can, since we know it'll come back
   // This makes claim tasks cheaper for users.
   let mut payer = ctx.accounts.payer.to_account_info();
-  let description = "ld rewards claim".to_string();
+  let description = "ld wallet claim".to_string();
   let len = 8 + std::mem::size_of::<TaskV0>() + 60 + description.len();
   let rent_needed = Rent::get()?.minimum_balance(len);
   if ctx.accounts.queue_authority.lamports() > rent_needed {
@@ -126,7 +127,7 @@ pub fn handler(ctx: Context<QueueWalletClaimV0>, args: QueueWalletClaimArgsV0) -
         signer: ORACLE_SIGNER,
       },
       crank_reward: None,
-      free_tasks: 1,
+      free_tasks: NUM_QUEUED_PER_BATCH + 1,
       id: args.free_task_id,
       description,
     },

@@ -5,19 +5,18 @@ import {
   entityCreatorKey,
   keyToAssetForAsset,
 } from "@helium/helium-entity-manager-sdk";
-import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
+import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
+import { lazyDistributorKey, recipientKey } from "@helium/lazy-distributor-sdk";
 import {
   Asset,
   getAsset,
   HNT_MINT,
   searchAssets,
   SearchAssetsOpts,
-  truthy,
 } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import { Op } from "sequelize";
-import { Reward, sequelize, WalletClaimJob } from "./model";
 import { DAO } from "./constants";
 import {
   Database,
@@ -26,8 +25,7 @@ import {
   RecipientV0,
   RewardableEntity,
 } from "./database";
-import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { recipientKey, lazyDistributorKey } from "@helium/lazy-distributor-sdk";
+import { Reward, sequelize, WalletClaimJob } from "./model";
 
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
@@ -49,11 +47,14 @@ export class PgDatabase implements Database {
     ) => Promise<Asset[]> = searchAssets
   ) {}
 
-  private async getOrCreateWalletClaimJob(wallet: PublicKey, isRequeue: boolean = false) {
-    if (!isRequeue) {
+  private async getOrCreateWalletClaimJob(
+    wallet: PublicKey,
+    batchNumber?: number
+  ) {
+    if (!batchNumber) {
       await WalletClaimJob.destroy({
         where: { wallet: wallet.toBase58() },
-      })
+      });
     }
     const job = await WalletClaimJob.findOne({
       where: { wallet: wallet.toBase58() },
@@ -87,10 +88,12 @@ export class PgDatabase implements Database {
 
         page++;
       }
-      return new WalletClaimJob({
+      const job = await WalletClaimJob.create({
         wallet: wallet.toBase58(),
         remainingKtas: allKtas,
       });
+      await job.save();
+      return job;
     }
     return job;
   }
@@ -98,13 +101,21 @@ export class PgDatabase implements Database {
   async getRewardableEntities(
     wallet: PublicKey,
     limit: number,
-    isRequeue: boolean = false
-  ): Promise<RewardableEntity[]> {
-    const job = await this.getOrCreateWalletClaimJob(wallet, isRequeue);
+    batchNumber: number = 0
+  ): Promise<{
+    entities: RewardableEntity[];
+    nextBatchNumber: number;
+  }> {
+    const job = await this.getOrCreateWalletClaimJob(wallet, batchNumber);
     const entities: RewardableEntity[] = [];
-    while (entities.length < limit) {
-      const remainingKtas = job.remainingKtas.slice(0, limit);
+    let nextBatchNumber = batchNumber || 0;
+    while (entities.length == 0) {
+      const remainingKtas = job.remainingKtas.slice(
+        nextBatchNumber * limit,
+        (nextBatchNumber + 1) * limit
+      );
       if (remainingKtas.length === 0) {
+        nextBatchNumber++;
         break;
       }
       const ktas = (
@@ -140,12 +151,7 @@ export class PgDatabase implements Database {
         const pendingRewards = new BN(lifetimeReward).sub(
           recipient?.totalRewards || new BN("0")
         );
-        if (pendingRewards.isZero()) {
-          // No pending rewards, remove from job
-          job.remainingKtas = job.remainingKtas.filter(
-            (remainingKta) => remainingKta != kta.address.toBase58()
-          );
-        } else {
+        if (!pendingRewards.lte(new BN("0"))) {
           entities.push({
             keyToAsset: kta,
             lifetimeReward: lifetimeReward,
@@ -154,12 +160,13 @@ export class PgDatabase implements Database {
           });
         }
       }
+      nextBatchNumber++;
     }
 
-    job.set("remainingKtas", job.remainingKtas);
-    await job.save();
-
-    return entities;
+    return {
+      entities,
+      nextBatchNumber,
+    };
   }
 
   async getTotalRewards(): Promise<string> {

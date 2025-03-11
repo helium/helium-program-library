@@ -1,15 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
-import { organizationKey } from "@helium/organization-sdk";
-import { init as initProposal } from "@helium/proposal-sdk";
 import { batchParallelInstructionsWithPriorityFee } from "@helium/spl-utils";
-import { init as initStateController } from "@helium/state-controller-sdk";
 import {
   customSignerKey,
   init as initTuktuk,
   taskKey,
   taskQueueAuthorityKey,
 } from "@helium/tuktuk-sdk";
-import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import {
   PublicKey,
   SystemProgram,

@@ -12,4 +12,4 @@ export const DAO = daoKey(HNT)[0];
 
 export const MAX_CLAIMS_PER_TX = process.env.MAX_CLAIMS_PER_TX
   ? parseInt(process.env.MAX_CLAIMS_PER_TX)
-  : 2;
+  : 5;

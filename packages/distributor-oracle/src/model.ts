@@ -1,4 +1,4 @@
-import { Sequelize, STRING, BIGINT, Model, DATE } from "sequelize";
+import { Sequelize, STRING, BIGINT, Model, DATE, ARRAY } from "sequelize";
 import AWS from "aws-sdk";
 import * as pg from "pg";
 
