@@ -65,6 +65,8 @@ import { Database, DeviceType } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
 import { PgDatabase } from "./pgDatabase";
 import { Reward, WalletClaimJob } from "./model";
+export * from "./database";
+
 
 export class OracleServer {
   app: FastifyInstance;
