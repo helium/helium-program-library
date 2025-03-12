@@ -114,7 +114,7 @@ impl<'info> ClaimRewardsV1<'info> {
 
   fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
     let cpi_accounts = Burn {
-      mint: self.mint.to_account_info(),
+      mint: self.hnt_mint.to_account_info(),
       authority: self.position_authority.to_account_info(),
       from: self.delegator_ata.to_account_info(),
     };
