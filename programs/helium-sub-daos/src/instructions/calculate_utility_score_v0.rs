@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
+use no_emit::{NoEmit, NotEmittedCounterV0};
 use shared_utils::precise_number::PreciseNumber;
 use voter_stake_registry::state::Registrar;
 
@@ -67,7 +68,17 @@ pub struct CalculateUtilityScoreV0<'info> {
     bump,
   )]
   pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  #[account(
+    seeds = [b"not_emitted_counter", hnt_mint.key().as_ref()],
+    seeds::program = no_emit_program.key(),
+    bump
+  )]
+  /// CHECK: May not have ever been initialized
+  pub not_emitted_counter: UncheckedAccount<'info>,
+  pub no_emit_program: Program<'info, NoEmit>,
 }
+
+const SMOOTHING_FACTOR: u64 = 7;
 
 pub fn handler(
   ctx: Context<CalculateUtilityScoreV0>,
@@ -81,6 +92,10 @@ pub fn handler(
   let curr_supply = ctx.accounts.hnt_mint.supply;
   let mut prev_supply = curr_supply;
   let mut prev_total_utility_score = 0;
+  let mut prev_cumulative_not_emitted = 0;
+  let mut cumulative_not_emitted = 0;
+  let mut not_emitted = 0;
+
   if ctx.accounts.prev_dao_epoch_info.lamports() > 0
     && !ctx
       .accounts
@@ -91,6 +106,47 @@ pub fn handler(
     let info: Account<DaoEpochInfoV0> = Account::try_from(&ctx.accounts.prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
     prev_total_utility_score = info.total_utility_score;
+    prev_cumulative_not_emitted = info.cumulative_not_emitted;
+  }
+
+  if ctx.accounts.not_emitted_counter.lamports() > 0
+    && !ctx
+      .accounts
+      .not_emitted_counter
+      .to_account_info()
+      .data_is_empty()
+  {
+    let info: Account<NotEmittedCounterV0> = Account::try_from(&ctx.accounts.not_emitted_counter)?;
+    cumulative_not_emitted = info.amount_not_emitted;
+    not_emitted = info
+      .amount_not_emitted
+      .saturating_sub(prev_cumulative_not_emitted);
+  };
+
+  // Set smoothed hnt burned to 300 if it's not already set
+  if ctx.accounts.dao_epoch_info.smoothed_hnt_burned == 0 {
+    ctx.accounts.dao_epoch_info.smoothed_hnt_burned = 300;
+  }
+
+  let total_hnt_burned = prev_supply
+    .saturating_sub(curr_supply)
+    .saturating_sub(not_emitted);
+  ctx.accounts.dao_epoch_info.smoothed_hnt_burned = (SMOOTHING_FACTOR
+    .checked_sub(1)
+    .unwrap()
+    .checked_mul(ctx.accounts.dao_epoch_info.smoothed_hnt_burned)
+    .unwrap()
+    .checked_div(SMOOTHING_FACTOR)
+    .unwrap())
+  .checked_add(total_hnt_burned.checked_div(SMOOTHING_FACTOR).unwrap())
+  .unwrap();
+
+  if ctx.accounts.dao_epoch_info.not_emitted == 0 {
+    ctx.accounts.dao_epoch_info.not_emitted = not_emitted;
+  }
+
+  if ctx.accounts.dao_epoch_info.cumulative_not_emitted == 0 {
+    ctx.accounts.dao_epoch_info.cumulative_not_emitted = cumulative_not_emitted;
   }
 
   ctx.accounts.dao_epoch_info.total_rewards = ctx
@@ -100,13 +156,10 @@ pub fn handler(
     .get_emissions_at(end_of_epoch_ts)
     .unwrap()
     .checked_add(std::cmp::min(
-      prev_supply.saturating_sub(curr_supply),
+      ctx.accounts.dao_epoch_info.smoothed_hnt_burned,
       ctx.accounts.dao.net_emissions_cap,
     ))
     .unwrap();
-
-  ctx.accounts.dao_epoch_info.vehnt_at_epoch_start +=
-    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start;
 
   ctx.accounts.dao_epoch_info.epoch = args.epoch;
 
@@ -147,6 +200,9 @@ pub fn handler(
     &mut ctx.accounts.sub_dao_epoch_info,
     epoch_end_ts,
   )?;
+
+  ctx.accounts.dao_epoch_info.vehnt_at_epoch_start +=
+    ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start;
 
   ctx.accounts.dao_epoch_info.dao = ctx.accounts.dao.key();
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();

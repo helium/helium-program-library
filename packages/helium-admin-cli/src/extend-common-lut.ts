@@ -59,18 +59,13 @@ export async function run(args: any = process.argv) {
   }
 
   const accounts = [
-    // Proposal config
-    "7Tp4CsSw5b62vdtUFiS9F3MMYdturt5q9ZuZpt9vwgby",
-    // State controller
-    "3tAi3bF6zHF4FsqFhh4JFQfnjkx9qNBKNsH6cLvK9pT8",
-    // Task queue
-    "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7",
-    // Task Queue Authority
-    "31ZbFYvxvjMkW8efhKPxuqnKMuu9G8a9w7UsLJ3nNBCk",
-    // HPL Crons
-    "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu",
-    // Tuktuk
-    "tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA",
+    // HNT lazy distributor
+    // "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq",
+    // HNT Circuit Breaker
+    "73zsmmqCXjvHHhNSib26Y8p3jYiH3UUuyKv71RJDnctW",
+    // HNT Rewards pool
+    "BDs6RPnpJNzmuMNv1z8cDh9cxKFgCxEVDaCfoHZWyvqJ",
+
   ].map((a) => {
     return new PublicKey(a);
   });

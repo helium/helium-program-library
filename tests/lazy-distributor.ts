@@ -9,8 +9,9 @@ import {
   sendInstructions,
 } from "@helium/spl-utils";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Ed25519Program, Keypair, PublicKey } from "@solana/web3.js";
 import { assert, expect } from "chai";
+import { sign } from "tweetnacl";
 import {
   distributeCompressionRewards,
   init,
@@ -22,6 +23,7 @@ import { LazyDistributor } from "../target/types/lazy_distributor";
 import { createCompressionNft } from "./utils/compression";
 import { ensureLDIdl } from "./utils/fixtures";
 import { MerkleTree, MerkleTreeProof } from "@solana/spl-account-compression";
+import { loadKeypair } from "./utils/solana";
 
 describe("lazy-distributor", () => {
   // Configure the client to use the local cluster.
@@ -30,6 +32,7 @@ describe("lazy-distributor", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
   let program: Program<LazyDistributor>;
+  let wallet: Keypair;
   let rewardsMint: PublicKey;
 
   beforeEach(async () => {
@@ -38,6 +41,8 @@ describe("lazy-distributor", () => {
       PROGRAM_ID,
       anchor.workspace.LazyDistributor.idl
     );
+
+    wallet = await loadKeypair(process.env.ANCHOR_WALLET!);
 
     rewardsMint = await createMint(provider, 6, me, me);
 
@@ -241,6 +246,43 @@ describe("lazy-distributor", () => {
 
         // @ts-ignore
         expect(recipientAcc?.currentRewards[0].toNumber()).to.eq(5000000);
+      });
+
+      it("allows the oracle to set current rewards with a SetCurrentRewardsTransactionV0", async () => {
+        const coder = program.coder.accounts;
+        const setCurrentRewardsTransaction = {
+          lazyDistributor,
+          asset,
+          currentRewards: new anchor.BN("5000000"),
+          oracleIndex: 0,
+        };
+        const setCurrentRewardsTransactionBytes = await coder.encode(
+          "SetCurrentRewardsTransactionV0",
+          setCurrentRewardsTransaction
+        );
+        const signature = Buffer.from(
+          sign.detached(
+            Uint8Array.from(setCurrentRewardsTransactionBytes),
+            wallet.secretKey
+          )
+        );
+        const method = program.methods
+          .setCurrentRewardsV1({
+            currentRewards: new anchor.BN("5000000"),
+            oracleIndex: 0,
+          })
+          .preInstructions(
+            [Ed25519Program.createInstructionWithPublicKey({
+              publicKey: me.toBytes(),
+              message: setCurrentRewardsTransactionBytes,
+              signature,
+            })]
+          )
+          .accounts({
+            lazyDistributor,
+            recipient,
+          });
+        await method.rpc({ skipPreflight: true });
       });
 
       it("allows distributing current rewards", async () => {

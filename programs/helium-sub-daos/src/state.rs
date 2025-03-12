@@ -114,6 +114,13 @@ macro_rules! dao_seeds {
   };
 }
 
+#[macro_export]
+macro_rules! sub_dao_seeds {
+  ( $s:expr ) => {
+    &[b"sub_dao".as_ref(), $s.dnt_mint.as_ref(), &[$s.bump_seed]]
+  };
+}
+
 impl DaoV0 {
   pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
     // Don't add the same proposal twice
@@ -163,6 +170,9 @@ pub struct DaoEpochInfoV0 {
   // The number of delegation rewards issued this epoch, so that delegators can claim their share of the rewards
   pub delegation_rewards_issued: u64,
   pub vehnt_at_epoch_start: u64,
+  pub cumulative_not_emitted: u64,
+  pub not_emitted: u64,
+  pub smoothed_hnt_burned: u64,
 }
 
 #[derive(Debug, InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Default)]
@@ -219,7 +229,7 @@ impl DelegatedPositionV0 {
       Err(error!(ErrorCode::InvalidClaimEpoch))
     } else {
       let bit_index = (epoch - self.last_claimed_epoch - 1) as u128;
-      Ok(self.claimed_epochs_bitmap >> (127_u128 - bit_index) & 1 == 1)
+      Ok((self.claimed_epochs_bitmap >> (127_u128 - bit_index)) & 1 == 1)
     }
   }
 

@@ -47,9 +47,13 @@ export async function run(args: any = process.argv) {
     const key = marker.account.voter.toBase58();
     const proxyChoices = acc[proposal][key];
     if (proxyChoices && !arrayEquals(proxyChoices, marker.account.choices)) {
-      throw new Error(
+      console.log(
         `Proxy marker choice mismatch ${key} ${proxyChoices} ${marker.account.choices}`
       );
+      acc[proposal][key] =
+        marker.account.choices.length > proxyChoices.length
+          ? marker.account.choices
+          : proxyChoices;
     } else {
       acc[proposal][key] = marker.account.choices;
     }
@@ -66,11 +70,11 @@ export async function run(args: any = process.argv) {
         new PublicKey(proposal),
         hvsrProgram.programId
       )[0];
-      const markerAccount = await hvsrProgram.account.proxyMarkerV0.fetch(
+      const markerAccount = await hvsrProgram.account.proxyMarkerV0.fetchNullable(
         proxyMarker
       );
       for (const choice of choices) {
-        if (!markerAccount.choices.includes(choice)) {
+        if (!markerAccount?.choices.includes(choice)) {
           instructions.push(
             await hvsrProgram.methods
               .tempBackfillProxyMarker({ choice })

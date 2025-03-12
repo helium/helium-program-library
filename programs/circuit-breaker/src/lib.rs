@@ -76,4 +76,8 @@ pub mod circuit_breaker {
   ) -> Result<()> {
     instructions::update_mint_windowed_breaker_v0::handler(ctx, args)
   }
+
+  pub fn remove_mint_authority_v0(ctx: Context<RemoveMintAuthorityV0>) -> Result<()> {
+    instructions::remove_mint_authority_v0::handler(ctx)
+  }
 }

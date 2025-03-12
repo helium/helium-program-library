@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { organizationKey } from "@helium/organization-sdk";
+import { createMemoInstruction } from "@solana/spl-memo";
 import {
   createAtaAndTransferInstructions,
   HNT_MINT,
@@ -441,7 +442,10 @@ server.get<{
 const HNT_REGISTRAR = new PublicKey(
   "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
 );
-const MAX_VOTES_PER_TASK = 2;
+const HELIUM_PROXY_CONFIG = new PublicKey(
+  "ADWefNt1foP9YJamZFjcUwuMUanw29bEhtsHBEbfKpWZ"
+);
+const MAX_VOTES_PER_TASK = 1;
 const MARKERS_TO_CHECK = 10;
 
 server.post<{
@@ -468,14 +472,21 @@ server.post<{
               pa.address as proxy_assignment,
               dp.address as delegated_position
             FROM proxy_assignments pa
+            JOIN positions p ON p.mint = pa.asset AND p.registrar = '${HNT_REGISTRAR.toBase58()}'
             LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset AND (
               vm.registrar = '${HNT_REGISTRAR.toBase58()}' AND vm.proposal = '${proposal.toBase58()}'
-              AND vm.choices IS NOT DISTINCT FROM ARRAY[${choices.join(
-                ","
-              )}]::integer[]
             )
-            LEFT OUTER JOIN delegated_positions dp ON dp.position = pa.asset
-            WHERE pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND vm is NULL
+            LEFT OUTER JOIN delegated_positions dp ON dp.mint = pa.asset
+            WHERE pa.proxy_config = '${HELIUM_PROXY_CONFIG.toBase58()}' AND pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND (
+              vm is NULL
+              OR (
+                vm.proxy_index >= pa.index AND
+                (
+                  NOT vm.choices <@ ARRAY[${choices.join(",")}]::integer[] OR
+                  NOT vm.choices @> ARRAY[${choices.join(",")}]::integer[]
+                )
+              )
+            )
             LIMIT ${MARKERS_TO_CHECK}
           `)
     )[0].map(deepCamelCaseKeys);
@@ -512,16 +523,13 @@ server.post<{
     const bumpBuffer = Buffer.alloc(1);
     bumpBuffer.writeUint8(bump);
     let instructions: TransactionInstruction[] = [];
-    // Done, refund the pda wallet and end the task chain.
+    // Done end the task chain.
     if (needsVote.length === 0) {
-      const pdaWalletBalance =
-        (await provider.connection.getAccountInfo(pdaWallet))?.lamports || 0;
       instructions.push(
-        SystemProgram.transfer({
-          fromPubkey: pdaWallet,
-          toPubkey: wallet,
-          lamports: pdaWalletBalance,
-        })
+        createMemoInstruction(
+          `Voting done for voter ${wallet.toBase58()} proposal ${proposal.toBase58()}`,
+          [pdaWallet]
+        )
       );
     } else {
       instructions.push(
@@ -550,17 +558,28 @@ server.post<{
                 .instruction();
               instructions.push(countIx);
               if (vote.delegatedPosition) {
-                const delegatedCountIx = await heliumSubDaosProgram.methods
-                  .trackVoteV0()
-                  .accounts({
-                    payer: pdaWallet,
-                    delegatedPosition: new PublicKey(vote.delegatedPosition),
-                    registrar: HNT_REGISTRAR,
-                    position: positionKey(new PublicKey(vote.asset))[0],
-                    proposal,
-                  })
-                  .instruction();
-                instructions.push(delegatedCountIx);
+                const delegatedPosition =
+                  await provider.connection.getAccountInfo(
+                    new PublicKey(vote.delegatedPosition)
+                  );
+                if (delegatedPosition) {
+                  const delegatedCountIx = await heliumSubDaosProgram.methods
+                    .trackVoteV0()
+                    .accounts({
+                      payer: pdaWallet,
+                      delegatedPosition: new PublicKey(vote.delegatedPosition),
+                      registrar: HNT_REGISTRAR,
+                      position: positionKey(new PublicKey(vote.asset))[0],
+                      proposal,
+                      mint: new PublicKey(vote.asset),
+                      marker: voteMarkerKey(
+                        new PublicKey(vote.asset),
+                        proposal
+                      )[0],
+                    })
+                    .instruction();
+                  instructions.push(delegatedCountIx);
+                }
               }
               return instructions;
             })
@@ -668,10 +687,18 @@ const start = async () => {
 };
 
 start();
+
 function arrayEquals(choices: number[], choices1: number[]) {
   if (choices.length !== choices1.length) return false;
-  for (let i = 0; i < choices.length; i++) {
-    if (choices[i] !== choices1[i]) return false;
+
+  // Sort both arrays to normalize order
+  const sorted1 = [...choices].sort((a, b) => a - b);
+  const sorted2 = [...choices1].sort((a, b) => a - b);
+
+  // Compare sorted arrays
+  for (let i = 0; i < sorted1.length; i++) {
+    if (sorted1[i] !== sorted2[i]) return false;
   }
+
   return true;
 }

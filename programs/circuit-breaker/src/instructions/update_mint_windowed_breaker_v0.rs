@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{MintWindowedCircuitBreakerV0, WindowedCircuitBreakerConfigV0};
+use crate::{errors::ErrorCode, MintWindowedCircuitBreakerV0, WindowedCircuitBreakerConfigV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateMintWindowedBreakerArgsV0 {
@@ -26,8 +26,9 @@ pub fn handler(
   if args.new_authority.is_some() {
     circuit_breaker.authority = args.new_authority.unwrap();
   }
-  if args.config.is_some() {
-    circuit_breaker.config = args.config.unwrap();
+  if let Some(config) = args.config {
+    require!(config.is_valid(), ErrorCode::InvalidConfig);
+    circuit_breaker.config = config;
   }
 
   Ok(())

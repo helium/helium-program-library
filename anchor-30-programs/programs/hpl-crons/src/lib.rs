@@ -113,4 +113,31 @@ pub mod hpl_crons {
   ) -> Result<()> {
     queue_relinquish_expired_proxy_vote_marker_v0::handler(ctx, args)
   }
+
+  pub fn queue_wallet_claim_v0(
+    ctx: Context<QueueWalletClaimV0>,
+    args: QueueWalletClaimArgsV0,
+  ) -> Result<()> {
+    queue_wallet_claim_v0::handler(ctx, args)
+  }
+
+  pub fn requeue_wallet_claim_v0(
+    ctx: Context<RequeueWalletClaimV0>,
+    args: RequeueWalletClaimArgsV0,
+  ) -> Result<tuktuk_program::RunTaskReturnV0> {
+    requeue_wallet_claim_v0::handler(ctx, args)
+  }
+
+  pub fn requeue_entity_claim_v0(
+    ctx: Context<RequeueEntityClaimV0>,
+  ) -> Result<tuktuk_program::RunTaskReturnV0> {
+    requeue_entity_claim_v0::handler(ctx)
+  }
+
+  pub fn add_wallet_to_entity_cron_v0(
+    ctx: Context<AddWalletToEntityCronV0>,
+    args: AddWalletToEntityCronArgsV0,
+  ) -> Result<()> {
+    add_wallet_to_entity_cron_v0::handler(ctx, args)
+  }
 }

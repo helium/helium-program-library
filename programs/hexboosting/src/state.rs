@@ -18,6 +18,7 @@ pub struct BoostConfigV0 {
   pub bump_seed: u8,
   /// Authority to start the hex
   pub start_authority: Pubkey,
+  pub dc_mint: Pubkey,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq)]
