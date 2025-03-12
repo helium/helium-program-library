@@ -47,6 +47,7 @@
     "@helium/spl-utils": "^0.9.30",
     "@helium/tuktuk-sdk": "^0.0.4",
     "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
+    "@solana/spl-memo": "^0.2.5",
     "@solana/spl-token": "^0.3.8",
     "@types/sequelize": "^4.28.14",
     "aws-sdk": "^2.1344.0",

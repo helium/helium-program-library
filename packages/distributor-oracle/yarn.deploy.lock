@@ -268,6 +268,7 @@ __metadata:
     "@helium/spl-utils": ^0.9.30
     "@helium/tuktuk-sdk": ^0.0.4
     "@metaplex-foundation/mpl-bubblegum": ^0.7.0
+    "@solana/spl-memo": ^0.2.5
     "@solana/spl-token": ^0.3.8
     "@types/bs58": ^4.0.1
     "@types/cors": ^2.8.12
@@ -749,6 +750,17 @@ __metadata:
   peerDependencies:
     "@solana/web3.js": ^1.50.1
   checksum: 99bd851933c46a068dbd13484770edd7ae12488b1474ee2e9d7dfd114087f3f9f813745795f91278142fbeb09aec1024f74ef2d2c8be2b47f1df319d37f0af11
+  languageName: node
+  linkType: hard
+
+"@solana/spl-memo@npm:^0.2.5":
+  version: 0.2.5
+  resolution: "@solana/spl-memo@npm:0.2.5"
+  dependencies:
+    buffer: ^6.0.3
+  peerDependencies:
+    "@solana/web3.js": ^1.91.6
+  checksum: 2a66ca1e7e8951f4a1f7ec6f953be0d81bb8b981da19f148fd3dcd8990e0d4bc62bb2600d3b0e47480cf0baffa8c710fcb50aabf9a12ef03574ba61140e5c68d
   languageName: node
   linkType: hard
 
