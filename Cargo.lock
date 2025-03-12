@@ -1336,7 +1336,7 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1943,7 +1943,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.12"
+version = "0.2.13"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1964,7 +1964,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.16"
+version = "0.2.17"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2310,7 +2310,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -2533,7 +2533,7 @@ dependencies = [
 
 [[package]]
 name = "mobile-entity-manager"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -3426,7 +3426,7 @@ dependencies = [
 
 [[package]]
 name = "rewards-oracle"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anchor-lang",
  "default-env",
