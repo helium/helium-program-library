@@ -1,6 +1,7 @@
 import { BN } from "@coral-xyz/anchor";
+import { min } from "bn.js";
 import { sendInstructions } from "@helium/spl-utils";
-import { getRegistrarKey, positionKey } from "@helium/voter-stake-registry-sdk";
+import { positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
   TOKEN_PROGRAM_ID,
@@ -72,9 +73,13 @@ export const useCreatePosition = () => {
         );
         const registrar = (mySubDao?.registrar || myDao?.registrar)!;
         const registarAcc = await vsrProgram.account.registrar.fetch(registrar);
-        const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(registarAcc.proxyConfig);
+        const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
+          registarAcc.proxyConfig
+        );
         const mintKeypair = Keypair.generate();
         const position = positionKey(mintKeypair.publicKey)[0];
+        const isConstant =
+          (Object.keys(lockupKind)[0] as string) === "constant";
         const instructions: TransactionInstruction[] = [];
         const delegateInstructions: TransactionInstruction[] = [];
         const mintRent =
@@ -138,11 +143,19 @@ export const useCreatePosition = () => {
             registrar
           );
           const currTs = Number(unixTime) + registrarAcc.timeOffset.toNumber();
-          const endTs = proxyConfig.seasons.reverse().find(season => new BN(currTs).gte(season.start))?.end || (currTs + lockupPeriodsInDays * SECS_PER_DAY);
+          const endTs = new BN(currTs + lockupPeriodsInDays * SECS_PER_DAY);
+          const effectiveEndTs = isConstant
+            ? new BN("9223372036854775807")
+            : endTs;
+
+          const seasonEnd = proxyConfig.seasons
+            .reverse()
+            .find((season) => new BN(currTs).gte(season.start))?.end;
+
           const [subDaoEpochInfo] = subDaoEpochInfoKey(subDao.pubkey, currTs);
           const [endSubDaoEpochInfoKey] = subDaoEpochInfoKey(
             subDao.pubkey,
-            endTs
+            min(effectiveEndTs, seasonEnd || endTs)
           );
 
           delegateInstructions.push(
