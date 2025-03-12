@@ -70,6 +70,7 @@ pub struct ClaimRewardsV1<'info> {
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
 
+  #[account(mut)]
   pub hnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
