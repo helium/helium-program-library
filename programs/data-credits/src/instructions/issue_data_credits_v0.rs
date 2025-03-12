@@ -1,10 +1,10 @@
-use crate::errors::DataCreditsErrors;
-use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{freeze_account, transfer, FreezeAccount, Mint, Token, TokenAccount, Transfer},
 };
+
+use crate::{errors::DataCreditsErrors, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct IssueDataCreditsArgsV0 {
@@ -31,7 +31,8 @@ pub struct IssueDataCreditsV0<'info> {
     init_if_needed,
     payer = from,
     associated_token::authority = from,
-    associated_token::mint = dc_mint
+    associated_token::mint = dc_mint,
+    constraint = from_account.key() != to_account.key()
   )]
   pub from_account: Account<'info, TokenAccount>,
   #[account(
