@@ -10,23 +10,24 @@ use super::{ORACLE_SIGNER, ORACLE_URL};
 use crate::helium_entity_manager::accounts::KeyToAssetV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct AddEntityToCronArgsV0 {
+pub struct AddWalletToEntityCronArgsV0 {
   pub index: u32,
 }
 
 #[derive(Accounts)]
-#[instruction(args: AddEntityToCronArgsV0)]
-pub struct AddEntityToCronV0<'info> {
+#[instruction(args: AddWalletToEntityCronArgsV0)]
+pub struct AddWalletToEntityCronV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   pub user_authority: Signer<'info>,
+  /// CHECK: None needed
+  pub wallet: AccountInfo<'info>,
   #[account(
     seeds = [b"entity_cron_authority", user_authority.key().as_ref()],
     bump,
   )]
   /// CHECK: By seeds
   pub authority: AccountInfo<'info>,
-  pub key_to_asset: Account<'info, KeyToAssetV0>,
   #[account(mut, has_one = authority)]
   pub cron_job: Box<Account<'info, CronJobV0>>,
   #[account(
@@ -41,7 +42,10 @@ pub struct AddEntityToCronV0<'info> {
   pub cron_program: Program<'info, Cron>,
 }
 
-pub fn handler(ctx: Context<AddEntityToCronV0>, args: AddEntityToCronArgsV0) -> Result<()> {
+pub fn handler(
+  ctx: Context<AddWalletToEntityCronV0>,
+  args: AddWalletToEntityCronArgsV0,
+) -> Result<()> {
   add_cron_transaction_v0(
     CpiContext::new_with_signer(
       ctx.accounts.cron_program.to_account_info(),
@@ -62,9 +66,9 @@ pub fn handler(ctx: Context<AddEntityToCronV0>, args: AddEntityToCronArgsV0) -> 
       index: args.index,
       transaction_source: TransactionSourceV0::RemoteV0 {
         url: format!(
-          "{}/v1/tuktuk/kta/{}",
+          "{}/v1/tuktuk/wallet/{}",
           ORACLE_URL,
-          ctx.accounts.key_to_asset.key()
+          ctx.accounts.wallet.key()
         ),
         signer: ORACLE_SIGNER,
       },

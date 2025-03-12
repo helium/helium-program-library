@@ -43,6 +43,7 @@ import * as client from "../packages/distributor-oracle/src/client";
 import {
   Database,
   OracleServer,
+  RewardableEntity,
 } from "../packages/distributor-oracle/src/server";
 import {
   decodeEntityKey,
@@ -106,6 +107,10 @@ export class DatabaseMock implements Database {
       lifetimeRewards: 0,
       byHotspot: {},
     };
+  }
+
+  getRewardableEntities(wallet: anchor.web3.PublicKey, limit: number, batchNumber?: number): Promise<{ entities: RewardableEntity[]; nextBatchNumber: number; }> {
+    throw new Error("Method not implemented.");
   }
 
   async getTotalRewards() {
@@ -400,6 +405,7 @@ describe("distributor-oracle", () => {
       ldProgram,
       rewardsProgram,
       hemProgram,
+      null,
       oracle,
       db,
       lazyDistributor,
