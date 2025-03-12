@@ -155,7 +155,7 @@ export const useCreatePosition = () => {
           const [subDaoEpochInfo] = subDaoEpochInfoKey(subDao.pubkey, currTs);
           const [endSubDaoEpochInfoKey] = subDaoEpochInfoKey(
             subDao.pubkey,
-            min(effectiveEndTs, seasonEnd || endTs)
+            min(effectiveEndTs, seasonEnd || effectiveEndTs)
           );
 
           delegateInstructions.push(
