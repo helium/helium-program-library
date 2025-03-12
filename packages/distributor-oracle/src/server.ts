@@ -666,7 +666,7 @@ export class OracleServer {
             },
           })
           .instruction();
-      } else {
+      } else if (asset?.compression.compressed) {
         distributeIx = await (
           await distributeCompressionRewards({
             program: this.ldProgram,
@@ -676,6 +676,29 @@ export class OracleServer {
             payer: wallet,
           })
         ).instruction();
+      } else {
+        distributeIx = await this.ldProgram.methods
+          .distributeRewardsV0()
+          .accounts({
+            common: {
+              payer: wallet,
+              recipient: recipient,
+              lazyDistributor: this.lazyDistributor,
+              rewardsMint: DNT,
+              owner: asset!.ownership.owner,
+              destinationAccount: getAssociatedTokenAddressSync(
+                DNT,
+                asset!.ownership.owner,
+                true
+              ),
+            },
+            recipientMintAccount: getAssociatedTokenAddressSync(
+              keyToAsset.asset,
+              asset!.ownership.owner,
+              true
+            ),
+          })
+          .instruction();
       }
 
       const entityKey = decodeEntityKey(
@@ -685,19 +708,34 @@ export class OracleServer {
 
       const instructions: TransactionInstruction[] = [];
       if (!recipientAcc) {
-        instructions.push(
-          await (
-            await initializeCompressionRecipient({
-              program: this.ldProgram,
-              assetId: keyToAsset.asset,
-              lazyDistributor: this.lazyDistributor,
-              owner: wallet,
-              // Temporarily set oracle as the payer to subsidize new HNT wallets.
-              payer: wallet,
-            })
-          ).instruction()
-        );
+        if (asset?.compression.compressed) {
+          instructions.push(
+            await (
+              await initializeCompressionRecipient({
+                program: this.ldProgram,
+                assetId: keyToAsset.asset,
+                lazyDistributor: this.lazyDistributor,
+                owner: wallet,
+                // Temporarily set oracle as the payer to subsidize new HNT wallets.
+                payer: wallet,
+              })
+            ).instruction()
+          );
+        } else {
+          instructions.push(
+            await this.ldProgram.methods
+              .initializeRecipientV0()
+              .accounts({
+                recipient: recipient,
+                lazyDistributor: this.lazyDistributor,
+                payer: wallet,
+                mint: keyToAsset.asset,
+              })
+              .instruction()
+          );
+        }
       }
+
       instructions.push(
         await this.roProgram.methods
           .setCurrentRewardsWrapperV2({
