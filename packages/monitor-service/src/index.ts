@@ -1,13 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { accountPayerKey } from "@helium/data-credits-sdk";
-import {
-  init as hemInit
-} from "@helium/helium-entity-manager-sdk";
+import { init as hemInit } from "@helium/helium-entity-manager-sdk";
 import {
   daoKey,
   init as hsdInit,
-  subDaoKey
+  subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
@@ -23,10 +21,7 @@ import { BN } from "bn.js";
 import fastify from "fastify";
 import { underscore } from "inflection";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "./env";
-import {
-  register,
-  totalRewardsGauge
-} from "./metrics";
+import { register, totalRewardsGauge } from "./metrics";
 import { Recipient, sequelize } from "./model";
 import {
   monitiorAssociatedTokenBalance,
@@ -119,8 +114,6 @@ async function run() {
   await monitorSupply(mobileMint, "mobile");
   await monitorMintCircuitBreaker(cbProgram, hntMint, "hnt_mint");
   await monitorMintCircuitBreaker(cbProgram, dcMint, "dc_mint");
-  await monitorMintCircuitBreaker(cbProgram, iotMint, "iot_mint");
-  await monitorMintCircuitBreaker(cbProgram, mobileMint, "mobile_mint");
 
   await monitorTokenBalance(iotTreasury, "iot_treasury");
   await monitorTokenBalance(mobileTreasury, "mobile_treasury");
@@ -148,7 +141,11 @@ async function run() {
     }
   );
   await monitorTokenBalance(
-    getAssociatedTokenAddressSync(hntMint, lazyDistributorKey(hntMint)[0], true),
+    getAssociatedTokenAddressSync(
+      hntMint,
+      lazyDistributorKey(hntMint)[0],
+      true
+    ),
     "hnt_rewards_escrow",
     false,
     async () => {
@@ -170,6 +167,19 @@ async function run() {
   await monitorSolBalance(
     mobile.activeDeviceAuthority,
     "mobile_active_device_oracle_sol"
+  );
+  await monitorSolBalance(
+    new PublicKey(
+      process.env.DAO_KEY || "BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie"
+    ),
+    "hnt_dao"
+  );
+  await monitorSolBalance(
+    new PublicKey(
+      process.env.HNT_REGISTRAR ||
+        "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
+    ),
+    "hnt_registrar"
   );
 
   for (const maker of makers) {
