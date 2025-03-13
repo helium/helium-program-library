@@ -22,7 +22,7 @@ pub fn handler(ctx: Context<RequeueEntityClaimV0>) -> Result<RunTaskReturnV0> {
         ),
         signer: ORACLE_SIGNER,
       },
-      crank_reward: None,
+      crank_reward: Some(20000),
       free_tasks: 0,
       description,
     }],
