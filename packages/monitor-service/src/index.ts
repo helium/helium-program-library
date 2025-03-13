@@ -172,14 +172,14 @@ async function run() {
     new PublicKey(
       process.env.DAO_KEY || "BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie"
     ),
-    "dao"
+    "hnt_dao"
   );
   await monitorSolBalance(
     new PublicKey(
       process.env.HNT_REGISTRAR ||
         "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
     ),
-    "dao"
+    "hnt_registrar"
   );
 
   for (const maker of makers) {
