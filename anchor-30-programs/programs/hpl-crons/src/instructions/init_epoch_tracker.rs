@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{current_epoch, helium_sub_daos::helium_sub_daos::accounts::DaoV0, EpochTrackerV0};
+use crate::{current_epoch, helium_sub_daos::accounts::DaoV0, EpochTrackerV0};
 
 #[derive(Accounts)]
 pub struct InitEpochTracker<'info> {

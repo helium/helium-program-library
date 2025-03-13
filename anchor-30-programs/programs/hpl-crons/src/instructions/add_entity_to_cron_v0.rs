@@ -1,27 +1,18 @@
 use anchor_lang::prelude::*;
-use tuktuk_program::cron::cron::{
+use tuktuk_program::cron::{
   accounts::CronJobV0,
   cpi::{accounts::AddCronTransactionV0, add_cron_transaction_v0},
   program::Cron,
   types::{AddCronTransactionArgsV0, TransactionSourceV0},
 };
 
-use crate::helium_entity_manager::helium_entity_manager::accounts::KeyToAssetV0;
+use super::{ORACLE_SIGNER, ORACLE_URL};
+use crate::helium_entity_manager::accounts::KeyToAssetV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct AddEntityToCronArgsV0 {
   pub index: u32,
 }
-
-#[cfg(feature = "devnet")]
-const BASE_URL: &str = "https://hnt-rewards.oracle.test-helium.com";
-#[cfg(feature = "devnet")]
-const ORACLE_SIGNER: Pubkey = pubkey!("dor5y9KAG6mVGFquXr8ipmm7GVLZefiNiCjvER58kPB");
-
-#[cfg(not(feature = "devnet"))]
-const BASE_URL: &str = "https://hnt-rewards.oracle.helium.io";
-#[cfg(not(feature = "devnet"))]
-const ORACLE_SIGNER: Pubkey = pubkey!("orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q");
 
 #[derive(Accounts)]
 #[instruction(args: AddEntityToCronArgsV0)]
@@ -70,7 +61,11 @@ pub fn handler(ctx: Context<AddEntityToCronV0>, args: AddEntityToCronArgsV0) -> 
     AddCronTransactionArgsV0 {
       index: args.index,
       transaction_source: TransactionSourceV0::RemoteV0 {
-        url: format!("{}/v1/tuktuk/{}", BASE_URL, ctx.accounts.key_to_asset.key()),
+        url: format!(
+          "{}/v1/tuktuk/kta/{}",
+          ORACLE_URL,
+          ctx.accounts.key_to_asset.key()
+        ),
         signer: ORACLE_SIGNER,
       },
     },

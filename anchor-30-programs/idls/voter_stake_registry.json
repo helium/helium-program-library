@@ -1665,6 +1665,405 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "relinquish_expired_proxy_vote_v0",
+      "discriminator": [
+        171,
+        115,
+        190,
+        138,
+        152,
+        254,
+        238,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "rent_refund",
+          "writable": true
+        },
+        {
+          "name": "marker",
+          "writable": true,
+          "relations": [
+            "proposal",
+            "rent_refund"
+          ]
+        },
+        {
+          "name": "proposal"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "count_proxy_vote_v0",
+      "discriminator": [
+        82,
+        172,
+        157,
+        8,
+        73,
+        214,
+        168,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "marker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114,
+                  34
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.mint",
+                "account": "PositionV0"
+              },
+              {
+                "kind": "account",
+                "path": "proposal",
+                "account": "ProposalV0"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registrar",
+          "writable": true
+        },
+        {
+          "name": "voter"
+        },
+        {
+          "name": "proxy_marker",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114,
+                  34
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "path": "proposal",
+                "account": "ProposalV0"
+              }
+            ]
+          },
+          "relations": [
+            "voter",
+            "proposal"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "relations": [
+            "registrar"
+          ]
+        },
+        {
+          "name": "proxy_assignment",
+          "relations": [
+            "voter"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "relations": [
+            "proposal_config"
+          ]
+        },
+        {
+          "name": "proposal_config",
+          "relations": [
+            "on_vote_hook",
+            "state_controller"
+          ]
+        },
+        {
+          "name": "state_controller",
+          "writable": true
+        },
+        {
+          "name": "on_vote_hook"
+        },
+        {
+          "name": "proposal_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "proxied_vote_v1",
+      "discriminator": [
+        190,
+        176,
+        85,
+        200,
+        29,
+        248,
+        0,
+        127
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "marker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114,
+                  34
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "path": "proposal",
+                "account": "ProposalV0"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter",
+          "signer": true
+        },
+        {
+          "name": "proposal"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "VoteArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "proxied_relinquish_vote_v1",
+      "discriminator": [
+        68,
+        205,
+        48,
+        30,
+        164,
+        62,
+        0,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "marker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114,
+                  34
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "path": "proposal",
+                "account": "ProposalV0"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter",
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "VoteArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "temp_backfill_proxy_marker",
+      "discriminator": [
+        18,
+        0,
+        202,
+        42,
+        187,
+        32,
+        97,
+        76
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "marker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  34,
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114,
+                  34
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "path": "proposal",
+                "account": "ProposalV0"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "proposal"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "VoteArgsV0"
+            }
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1679,6 +2078,19 @@
         234,
         43,
         70
+      ]
+    },
+    {
+      "name": "ProxyMarkerV0",
+      "discriminator": [
+        83,
+        225,
+        185,
+        120,
+        185,
+        31,
+        200,
+        178
       ]
     },
     {
@@ -2006,6 +2418,11 @@
     {
       "code": 6059,
       "name": "NoVoteForThisChoice"
+    },
+    {
+      "code": 6060,
+      "name": "NoChangesToCount",
+      "msg": "No changes to count"
     }
   ],
   "types": [
@@ -2290,6 +2707,40 @@
           {
             "name": "proxy_index",
             "type": "u16"
+          },
+          {
+            "name": "rent_refund",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProxyMarkerV0",
+      "docs": [
+        "Marker to indicate that a proxy intends to vote this way on a proposal,",
+        "all votes of proxies are permissionless based on this marker"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "choices",
+            "type": {
+              "vec": "u16"
+            }
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
           },
           {
             "name": "rent_refund",

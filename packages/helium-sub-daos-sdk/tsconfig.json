@@ -20,6 +20,9 @@
       "path": "../treasury-management-sdk"
     },
     {
+      "path": "../no-emit-sdk"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {

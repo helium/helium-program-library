@@ -1,0 +1,93 @@
+name: Manual Devnet Program Deploy
+
+env:
+  SOLANA_CLI_VERSION: 1.18.15
+  NODE_VERSION: 18.12.1
+
+on:
+  workflow_dispatch:
+    inputs:
+      program:
+        description: 'Program to deploy (e.g. helium-sub-daos)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to deploy from'
+        required: true
+        default: 'develop'
+        type: string
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Set devnet lazy signer
+        run: |
+          find programs -type f -name '*.rs' -exec sed -i "s/b\"nJWGUMOK\"/b\"devnethelium5\"/g" {} \;
+
+      - uses: actions/cache@v4
+        name: Cache Toml Cli
+        id: cache-toml-cli
+        with:
+          path: |
+            ~/.cargo/bin/toml
+          key: toml-cli-${{ runner.os }}-v0002
+          
+      - run: (cargo install toml-cli || true)
+        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
+        shell: bash
+
+      - name: Set program information
+        run: |
+          PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
+          PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          echo "Program: $PROGRAM_ID"
+          echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
+          echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
+        env:
+          PROGRAM: ${{ inputs.program }}
+
+      # Build the program with anchor so we get the IDL
+      - uses: ./.github/actions/build-anchor/
+        id: build-anchor
+        with:
+          testing: false
+          devnet: true
+          program: ${{ env.PROGRAM_NAME }}
+
+      - uses: ./.github/actions/build-verified/
+        id: build-verified
+        with:
+          devnet: true
+          program: ${{ env.PROGRAM_NAME }}
+          program-id: ${{ env.PROGRAM_ID }}
+
+      - uses: ./.github/actions/setup-anchor/
+
+      - uses: ./.github/actions/buffer-deploy/
+        id: buffer-deploy
+        with:
+          devnet: true
+          network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
+          program: ${{ env.PROGRAM_NAME }}
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+
+      - name: Squads program upgrade
+        uses: helium/squads-program-upgrade@v0.3.3
+        with:
+          network-url: "https://api.devnet.solana.com"
+          program-multisig: ${{ secrets.DEVNET_MULTISIG }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
+          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
+          spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
+          authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          name: "Deploy ${{ inputs.program }}"
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }} 

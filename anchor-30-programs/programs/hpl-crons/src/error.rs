@@ -4,4 +4,6 @@ use anchor_lang::prelude::*;
 pub enum ErrorCode {
   #[msg("Task already exists")]
   TaskAlreadyExists,
+  #[msg("Cron job not removed from queue")]
+  CronJobNotRemovedFromQueue,
 }

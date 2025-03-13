@@ -1,46 +1,38 @@
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { init as hsdInit } from "@helium/helium-sub-daos-sdk";
 import { useProposal } from "@helium/modular-governance-hooks";
-import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
-  Status,
-  batchParallelInstructions,
-  truthy
-} from "@helium/spl-utils";
-import { init, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
+  init as hplCronsInit,
+  TASK_QUEUE_ID,
+} from "@helium/hpl-crons-sdk";
+import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import {
-  PublicKey,
-  TransactionInstruction
-} from "@solana/web3.js";
+  init,
+  proxyVoteMarkerKey,
+  voteMarkerKey,
+} from "@helium/voter-stake-registry-sdk";
+import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
+import { customSignerKey, taskKey, taskQueueAuthorityKey,nextAvailableTaskIds,  init as tuktukInit } from "@helium/tuktuk-sdk";
 import { useVoteMarkers } from "./useVoteMarkers";
+import { useProposalEndTs } from "./useProposalEndTs";
+import { useProxyVoteMarker } from "./useProxyVoteMarker";
+import { useSortedPositions } from "./useSortedPositions";
 
 export const useVote = (proposalKey: PublicKey) => {
   const { info: proposal } = useProposal(proposalKey);
-  const { positions, provider, registrar } = useHeliumVsrState();
+  const { provider, registrar } = useHeliumVsrState();
   const unixNow = useSolanaUnixNow();
-  const sortedPositions = useMemo(() => {
-    return (
-      unixNow &&
-      positions?.sort((a, b) => {
-        return -calcPositionVotingPower({
-          position: a,
-          registrar: registrar || null,
-          unixNow: new BN(unixNow),
-        }).cmp(
-          calcPositionVotingPower({
-            position: b,
-            registrar: registrar || null,
-            unixNow: new BN(unixNow),
-          })
-        );
-      })
-    );
-  }, [positions, unixNow]);
+  const proxyVoteMarkerK = useMemo(() => {
+    if (!provider?.wallet?.publicKey) return null;
+    return proxyVoteMarkerKey(provider.wallet.publicKey, proposalKey)[0];
+  }, [provider?.wallet?.publicKey, proposalKey]);
+  const { info: proxyVoteMarker } = useProxyVoteMarker(proxyVoteMarkerK);
+  const sortedPositions = useSortedPositions()
   const voteMarkerKeys = useMemo(() => {
     return sortedPositions
       ? sortedPositions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
@@ -65,6 +57,28 @@ export const useVote = (proposalKey: PublicKey) => {
       }, new Array(proposal?.choices.length));
     }
   }, [proposal, markers, sortedPositions]);
+  const didVote: boolean[] | undefined = useMemo(() => {
+    if (proposal && markers) {
+      const rawVoteWeights = markers.reduce((acc, marker, idx) => {
+        const position = sortedPositions?.[idx];
+        marker.info?.choices.forEach((choice) => {
+          // Only count my own and down the line vote weights
+          if (
+            (marker?.info?.proxyIndex || 0) >= (position?.proxy?.index || 0)
+          ) {
+            acc[choice] = (acc[choice] || marker.info && !marker.info.weight.isZero())
+          }
+        });
+        return acc;
+      }, new Array(proposal?.choices.length));
+
+      for (const choice of proxyVoteMarker?.choices || []) {
+        rawVoteWeights[choice] = true;
+      }
+
+      return rawVoteWeights;
+    }
+  }, [proposal, markers, sortedPositions, proxyVoteMarker]);
   const voters: PublicKey[][] | undefined = useMemo(() => {
     if (proposal && markers) {
       const nonUniqueResult = markers.reduce((acc, marker, idx) => {
@@ -89,6 +103,8 @@ export const useVote = (proposalKey: PublicKey) => {
       );
     }
   }, [markers, sortedPositions]);
+
+  const endTs = useProposalEndTs(proposalKey);
   const canPositionVote = useCallback(
     (index: number, choice: number) => {
       const position = sortedPositions?.[index];
@@ -129,10 +145,15 @@ export const useVote = (proposalKey: PublicKey) => {
   );
   const canVote = useCallback(
     (choice: number) => {
-      if (!markers) return false;
-      return markers.some((_, index) => canPositionVote(index, choice));
+      if (!markers || !proposal) return false;
+      const myPositions = sortedPositions.filter((p) => !p.isProxiedToMe);
+      const myPositionsCanVote = myPositions.some((p) => canPositionVote(p.index, choice));
+      const hasProxies = sortedPositions.some((p) => p.isProxiedToMe);
+      const hasNeverProxyVoted = hasProxies && !proxyVoteMarker;
+      const hasProxyVotedButCanVote = proxyVoteMarker && proxyVoteMarker.choices.length < proposal.maxChoicesPerVoter && !proxyVoteMarker.choices.includes(choice);
+      return myPositionsCanVote || hasNeverProxyVoted || hasProxyVotedButCanVote;
     },
-    [markers, canPositionVote]
+    [markers, canPositionVote, proxyVoteMarker]
   );
   const { error, loading, execute } = useAsyncCallback(
     async ({
@@ -158,84 +179,174 @@ export const useVote = (proposalKey: PublicKey) => {
       } else {
         const vsrProgram = await init(provider);
         const hsdProgram = await hsdInit(provider);
-        const instructions = (
+        const hplCronsProgram = await hplCronsInit(provider);
+        const tuktukProgram = await tuktukInit(provider);
+        const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
+          TASK_QUEUE_ID
+        );
+        const hasProxies = sortedPositions.some((p) => p.isProxiedToMe);
+        const votingPositions = sortedPositions.filter(
+          (p) => !p.isProxiedToMe && canPositionVote(p.index, choice)
+        );
+        const nextAvailable = nextAvailableTaskIds(
+          taskQueue.taskBitmap,
+          (hasProxies ? 2 : 0) + votingPositions.length
+        );
+
+        const proxyVoteInstructions: TransactionInstruction[] = [];
+        if (hasProxies) {
+          const proxyVoteMarker = proxyVoteMarkerKey(
+            provider.wallet.publicKey,
+            proposalKey
+          )[0];
+          const proxyVoteMarkerInfo =
+            await vsrProgram.account.proxyMarkerV0.fetchNullable(
+              proxyVoteMarker
+            );
+          if (!proxyVoteMarkerInfo?.choices.includes(choice)) {
+            proxyVoteInstructions.push(
+              await vsrProgram.methods
+                .proxiedVoteV1({
+                  choice,
+                })
+                .accounts({
+                  proposal: proposalKey,
+                  voter: provider.wallet.publicKey,
+                  marker: proxyVoteMarker,
+                })
+                .instruction()
+            );
+            const task1 = nextAvailable.pop()!;
+            const task2 = nextAvailable.pop()!;
+            const taskQueue = TASK_QUEUE_ID;
+            const queueAuthority = PublicKey.findProgramAddressSync(
+              [Buffer.from("queue_authority")],
+              hplCronsProgram.programId
+            )[0];
+            proxyVoteInstructions.push(
+              await hplCronsProgram.methods
+              // @ts-ignore
+                .queueProxyVoteV0({
+                  freeTaskId: task1,
+                })
+                .accounts({
+                  marker: proxyVoteMarker,
+                  task: taskKey(taskQueue, task1)[0],
+                  taskQueue,
+                  payer: provider.wallet.publicKey,
+                  systemProgram: SystemProgram.programId,
+                  queueAuthority,
+                  tuktukProgram: tuktukProgram.programId,
+                  voter: provider.wallet.publicKey,
+                  pdaWallet: customSignerKey(taskQueue, [
+                    Buffer.from("vote_payer"),
+                    provider.wallet.publicKey.toBuffer(),
+                  ])[0],
+                  taskQueueAuthority: taskQueueAuthorityKey(
+                    taskQueue,
+                    queueAuthority
+                  )[0],
+                })
+                .instruction()
+            );
+            // First time voting? Queue the relinquish
+            if (!proxyVoteMarkerInfo) {
+              proxyVoteInstructions.push(
+                await hplCronsProgram.methods
+                  // @ts-ignore
+                  .queueRelinquishExpiredProxyVoteMarkerV0({
+                    freeTaskId: task2,
+                    triggerTs: endTs!,
+                  })
+                  .accounts({
+                    marker: proxyVoteMarker,
+                    task: taskKey(taskQueue, task2)[0],
+                    taskQueue,
+                    payer: provider.wallet.publicKey,
+                    systemProgram: SystemProgram.programId,
+                    queueAuthority,
+                    tuktukProgram: tuktukProgram.programId,
+                    taskQueueAuthority: taskQueueAuthorityKey(
+                      taskQueue,
+                      queueAuthority
+                    )[0],
+                  })
+                  .instruction()
+              );
+            }
+          }
+        }
+
+        const normalVoteInstructions = (
           await Promise.all(
             // vote with bigger positions first.
-            sortedPositions.map(async (position, index) => {
-              const marker = markers?.[index]?.info;
+            votingPositions.map(async (position) => {
               const markerK = voteMarkerKey(position.mint, proposalKey)[0];
 
-              const canVote = canPositionVote(index, choice);
-              if (canVote) {
-                const instructions: TransactionInstruction[] = [];
+              const instructions: TransactionInstruction[] = [];
+              instructions.push(
+                await vsrProgram.methods
+                  .voteV0({
+                    choice,
+                  })
+                  .accounts({
+                    proposal: proposalKey,
+                    voter: provider.wallet.publicKey,
+                    position: position.pubkey,
+                    marker: voteMarkerKey(position.mint, proposalKey)[0],
+                  })
+                  .instruction()
+              );
 
-                if (position.isProxiedToMe) {
-                  if (
-                    marker &&
-                    (marker.proxyIndex < (position.proxy?.index || 0) ||
-                      marker.choices.includes(choice))
-                  ) {
-                    // Do not vote with a position that has been delegated to us, but voting overidden
-                    // Also ignore voting for the same choice twice
-                    return;
-                  }
-
-                  instructions.push(
-                    await vsrProgram.methods
-                      .proxiedVoteV0({
-                        choice,
-                      })
-                      .accounts({
-                        proposal: proposalKey,
-                        voter: provider.wallet.publicKey,
-                        position: position.pubkey,
-                        registrar: registrar?.pubkey,
-                        marker: voteMarkerKey(position.mint, proposalKey)[0],
-                        proxyAssignment: proxyAssignmentKey(
-                          registrar!.proxyConfig,
-                          position.mint,
-                          provider.wallet.publicKey
-                        )[0],
-                      })
-                      .instruction()
-                  );
-                }
+              if (position.isDelegated) {
                 instructions.push(
-                  await vsrProgram.methods
-                    .voteV0({
-                      choice,
-                    })
+                  await hsdProgram.methods
+                    .trackVoteV0()
                     .accounts({
                       proposal: proposalKey,
-                      voter: provider.wallet.publicKey,
+                      marker: markerK,
                       position: position.pubkey,
-                      marker: voteMarkerKey(position.mint, proposalKey)[0],
                     })
                     .instruction()
                 );
               }
 
-              instructions.push(
-                await hsdProgram.methods
-                  .trackVoteV0()
-                  .accounts({
-                    proposal: proposalKey,
-                    marker: markerK,
-                    position: position.pubkey,
-                  })
-                  .instruction()
-              );
+              const marker = markers?.[position.index];
+
+              // First time voting? Queue the relinquish
+              if (!marker?.account) {
+                let freeTaskId = nextAvailable.pop();
+                instructions.push(
+                  await hplCronsProgram.methods
+                    .queueRelinquishExpiredVoteMarkerV0({
+                      freeTaskId: freeTaskId!,
+                      triggerTs: endTs!,
+                    })
+                    .accounts({
+                      marker: markerK,
+                      position: position.pubkey,
+                      task: taskKey(TASK_QUEUE_ID, freeTaskId!)[0],
+                      taskQueue: TASK_QUEUE_ID,
+                    })
+                    .instruction()
+                );
+              }
+
               return instructions;
             })
           )
-        ).filter(truthy).flat();
+        )
+          .filter(truthy)
 
         if (onInstructions) {
-          await onInstructions(instructions);
+          await onInstructions([
+            proxyVoteInstructions,
+            ...normalVoteInstructions,
+          ]);
         } else {
           await batchParallelInstructions({
             provider,
-            instructions,
+            instructions: [proxyVoteInstructions, ...normalVoteInstructions],
             onProgress,
             triesRemaining: 10,
             extraSigners: [],
@@ -254,5 +365,6 @@ export const useVote = (proposalKey: PublicKey) => {
     voteWeights,
     canVote,
     voters,
+    didVote,
   };
 };

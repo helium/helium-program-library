@@ -25,7 +25,13 @@ import {
   getAssociatedTokenAddress,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import {
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import chai, { expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import {
@@ -475,8 +481,10 @@ describe("voter-stake-registry", () => {
       let proxyAssignment: PublicKey;
 
       beforeEach(async () => {
-        ({ position, mint, } = await createAndDeposit(10000, 200));
-        const { pubkeys: { nextProxyAssignment: proxyAssignmentK } } = await proxyProgram.methods
+        ({ position, mint } = await createAndDeposit(10000, 200));
+        const {
+          pubkeys: { nextProxyAssignment: proxyAssignmentK },
+        } = await proxyProgram.methods
           .assignProxyV0({
             expirationTime: new anchor.BN(new Date().valueOf() / 1000 + 10000),
           })
@@ -487,10 +495,10 @@ describe("voter-stake-registry", () => {
           })
           .rpcAndKeys({ skipPreflight: true });
 
-        proxyAssignment = proxyAssignmentK!
+        proxyAssignment = proxyAssignmentK!;
       });
 
-      it("allows voting on and relinquishing votes on the proposal", async () => {
+      it("(v0) allows voting on and relinquishing votes on the proposal", async () => {
         const {
           pubkeys: { marker },
         } = await program.methods
@@ -535,18 +543,17 @@ describe("voter-stake-registry", () => {
         expect(markerA?.choices).to.be.empty;
       });
 
-      it("allows pays the rent for the marker from registrar if possible", async () => {
-        await sendInstructions(
-          provider,
-          [
-            SystemProgram.transfer({
-              fromPubkey: me,
-              toPubkey: registrar,
-              lamports: LAMPORTS_PER_SOL,
-            })
-          ]
-        )
-        const registrarBalance = await provider.connection.getBalance(registrar)
+      it("(v0) allows pays the rent for the marker from registrar if possible", async () => {
+        await sendInstructions(provider, [
+          SystemProgram.transfer({
+            fromPubkey: me,
+            toPubkey: registrar,
+            lamports: LAMPORTS_PER_SOL,
+          }),
+        ]);
+        const registrarBalance = await provider.connection.getBalance(
+          registrar
+        );
         const {
           pubkeys: { marker },
         } = await program.methods
@@ -568,25 +575,144 @@ describe("voter-stake-registry", () => {
           marker! as PublicKey
         );
         expect(markerA?.rentRefund?.toBase58()).to.eq(registrar.toBase58());
-        const registrarBalance2 = await provider.connection.getBalance(registrar);
-        const spentLamports = (await provider.connection.getAccountInfo(marker! as PublicKey))?.lamports || 0;
+        const registrarBalance2 = await provider.connection.getBalance(
+          registrar
+        );
+        const spentLamports =
+          (await provider.connection.getAccountInfo(marker! as PublicKey))
+            ?.lamports || 0;
         expect(registrarBalance2).to.eq(registrarBalance - spentLamports);
       });
 
-      it("allows earlier proxies to change the vote", async () => {
+      it("(v1) allows voting on and relinquishing votes on the proposal", async () => {
+        await program.methods
+          .proxiedVoteV1({
+            choice: 0,
+          })
+          .accounts({
+            proposal,
+            voter: delegatee.publicKey,
+          })
+          .signers([delegatee])
+          .rpc({ skipPreflight: true });
+
         const {
           pubkeys: { marker },
         } = await program.methods
-          .proxiedVoteV0({
-            choice: 0,
-          })
+          .countProxyVoteV0()
           .accounts({
             proposal,
             position,
             voter: delegatee.publicKey,
             proxyAssignment,
           })
+          .rpcAndKeys({ skipPreflight: true });
+
+        let acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[0].weight.toNumber()).to.be.gt(0);
+        let markerA = await program.account.voteMarkerV0.fetchNullable(
+          marker! as PublicKey
+        );
+        expect(markerA?.choices).to.deep.eq([0]);
+
+        await program.methods
+          .proxiedRelinquishVoteV1({
+            choice: 0,
+          })
+          .accounts({
+            proposal,
+            voter: delegatee.publicKey,
+          })
           .signers([delegatee])
+          .rpc({ skipPreflight: true });
+
+        await program.methods
+          .countProxyVoteV0()
+          .accounts({
+            proposal,
+            position,
+            voter: delegatee.publicKey,
+            proxyAssignment,
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[0].weight.toNumber()).to.eq(0);
+        markerA = await program.account.voteMarkerV0.fetchNullable(
+          marker! as PublicKey
+        );
+        expect(markerA?.choices).to.be.empty;
+      });
+
+      it("(v1) allows pays the rent for the marker from registrar if possible", async () => {
+        await sendInstructions(provider, [
+          SystemProgram.transfer({
+            fromPubkey: me,
+            toPubkey: registrar,
+            lamports: LAMPORTS_PER_SOL,
+          }),
+        ]);
+        const registrarBalance = await provider.connection.getBalance(
+          registrar
+        );
+        await program.methods
+          .proxiedVoteV1({
+            choice: 0,
+          })
+          .accounts({
+            proposal,
+            voter: delegatee.publicKey,
+          })
+          .signers([delegatee])
+          .rpc({ skipPreflight: true });
+        const {
+          pubkeys: { marker },
+        } = await program.methods
+          .countProxyVoteV0()
+          .accounts({
+            proposal,
+            position,
+            voter: delegatee.publicKey,
+            proxyAssignment,
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        let acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[0].weight.toNumber()).to.be.gt(0);
+        let markerA = await program.account.voteMarkerV0.fetchNullable(
+          marker! as PublicKey
+        );
+        expect(markerA?.rentRefund?.toBase58()).to.eq(registrar.toBase58());
+        const registrarBalance2 = await provider.connection.getBalance(
+          registrar
+        );
+        const spentLamports =
+          (await provider.connection.getAccountInfo(marker! as PublicKey))
+            ?.lamports || 0;
+        expect(registrarBalance2).to.eq(registrarBalance - spentLamports);
+      });
+
+      it("allows earlier proxies to change the vote", async () => {
+        await program.methods
+          .proxiedVoteV1({
+            choice: 0,
+          })
+          .accounts({
+            proposal,
+            voter: delegatee.publicKey,
+          })
+          .signers([delegatee])
+          .rpc({ skipPreflight: true });
+        const {
+          pubkeys: { marker },
+        } = await program.methods
+          .countProxyVoteV0()
+          .accounts({
+            proposal,
+            position,
+            voter: delegatee.publicKey,
+            proxyAssignment,
+          })
           .rpcAndKeys({ skipPreflight: true });
 
         let acct = await proposalProgram.account.proposalV0.fetch(proposal!);
@@ -598,13 +724,22 @@ describe("voter-stake-registry", () => {
         expect(markerA?.proxyIndex).to.eq(1);
 
         await program.methods
-          .relinquishVoteV1({
+          .proxiedRelinquishVoteV1({
             choice: 0,
           })
           .accounts({
-            mint,
+            proposal,
+            voter: delegatee.publicKey,
+          })
+          .signers([delegatee])
+          .rpc({ skipPreflight: true });
+        await program.methods
+          .countProxyVoteV0()
+          .accounts({
             proposal,
             position,
+            voter: delegatee.publicKey,
+            proxyAssignment,
           })
           .rpc({ skipPreflight: true });
 
@@ -636,8 +771,16 @@ describe("voter-stake-registry", () => {
       });
 
       it("allows the original owner to undelegate", async () => {
-        const toUnProxy = proxyAssignmentKey(proxyConfig!, mint, delegatee.publicKey)[0];
-        const myProxy = proxyAssignmentKey(proxyConfig!, mint, PublicKey.default)[0];
+        const toUnProxy = proxyAssignmentKey(
+          proxyConfig!,
+          mint,
+          delegatee.publicKey
+        )[0];
+        const myProxy = proxyAssignmentKey(
+          proxyConfig!,
+          mint,
+          PublicKey.default
+        )[0];
         await proxyProgram.methods
           .unassignProxyV0()
           .accounts({
@@ -652,8 +795,9 @@ describe("voter-stake-registry", () => {
             await proxyProgram.account.proxyAssignmentV0.fetch(myProxy)
           ).nextVoter.toBase58()
         ).to.eq(PublicKey.default.toBase58());
-        expect(await proxyProgram.account.proxyAssignmentV0.fetchNullable(toUnProxy)).to
-          .be.null;
+        expect(
+          await proxyProgram.account.proxyAssignmentV0.fetchNullable(toUnProxy)
+        ).to.be.null;
       });
     });
 

@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
-import { currentEpoch, PROGRAM_ID } from "./constants";
+import { PROGRAM_ID } from "./constants";
+import { currentEpoch } from "./utils";
 
 export function subDaoEpochInfoKey(
   subDao: PublicKey,
@@ -54,13 +55,15 @@ export function delegatedPositionKey(
   position: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync([
-    Buffer.from("delegated_position", "utf-8"), position.toBuffer()], 
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("delegated_position", "utf-8"), position.toBuffer()],
     programId
   );
 }
 
-const CLOCKWORK_PID = new PublicKey("CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh");
+const CLOCKWORK_PID = new PublicKey(
+  "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
+);
 export function threadKey(
   authority: PublicKey,
   threadId: "calculate" | "issue" | "issue_hst",
@@ -73,5 +76,5 @@ export function threadKey(
       Buffer.from(threadId, "utf8"),
     ],
     programId
-  )
+  );
 }

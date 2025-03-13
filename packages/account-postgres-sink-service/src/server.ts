@@ -64,7 +64,16 @@ if (PG_POOL_SIZE < 5) {
           onTick: async (server: any) => {
             try {
               console.log(`Running custom job: ${type}`);
-              await server.inject(`/${type}?program=${programId}`);
+
+              const queryParams = new URLSearchParams({
+                program: programId,
+              });
+
+              if (type === "refresh-accounts") {
+                queryParams.append("password", REFRESH_PASSWORD);
+              }
+
+              await server.inject(`/${type}?${queryParams.toString()}`);
             } catch (err) {
               console.error(err);
             }

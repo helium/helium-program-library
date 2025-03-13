@@ -25,6 +25,17 @@ export const voteMarkerKey = (
     [Buffer.from("marker", "utf-8"), mint.toBuffer(), proposal.toBuffer()],
     programId
   );
+
+export const proxyVoteMarkerKey = (
+  voter: PublicKey,
+  proposal: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+) =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("proxy_marker", "utf-8"), voter.toBuffer(), proposal.toBuffer()],
+    programId
+  );
+
 export const registrarCollectionKey = (
   registrar: PublicKey,
   programId: PublicKey = PROGRAM_ID

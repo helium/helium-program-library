@@ -27,10 +27,12 @@ pub fn check_ed25519_data(data: &[u8], pubkey: &[u8]) -> Result<Vec<u8>> {
   let signature_instruction_index = &data[4..=5]; // Bytes 4,5
   let public_key_offset = &data[6..=7]; // Bytes 6,7
   let public_key_instruction_index = &data[8..=9]; // Bytes 8,9
+  let message_data_offset = u16::from_le_bytes(data[10..=11].try_into().unwrap()) as usize;
+  let message_data_size = u16::from_le_bytes(data[12..=13].try_into().unwrap()) as usize;
   let message_instruction_index = &data[14..=15]; // Bytes 14,15
 
   let data_pubkey = &data[16..16 + 32]; // Bytes 16..16+32
-  let data_msg = &data[112..]; // Bytes 112..end
+  let data_msg = &data[message_data_offset..(message_data_offset + message_data_size)];
 
   let exp_public_key_offset: u16 = 16; // 2*u8 + 7*u16
   let exp_signature_offset: u16 = exp_public_key_offset + pubkey.len() as u16;

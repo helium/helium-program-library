@@ -3,8 +3,8 @@ use anchor_spl::token::{Mint, TokenAccount};
 use tuktuk_program::TaskQueueV0;
 
 use crate::{
-  helium_sub_daos::helium_sub_daos::accounts::DelegatedPositionV0,
-  voter_stake_registry::voter_stake_registry::accounts::PositionV0, DelegationClaimBotV0,
+  helium_sub_daos::accounts::DelegatedPositionV0, voter_stake_registry::accounts::PositionV0,
+  DelegationClaimBotV0,
 };
 
 #[derive(Accounts)]

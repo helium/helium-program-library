@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use tuktuk_program::{
-  cron::cron::{
+  cron::{
     cpi::{accounts::InitializeCronJobV0, initialize_cron_job_v0},
     program::Cron,
     types::InitializeCronJobArgsV0,
