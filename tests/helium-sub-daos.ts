@@ -1068,6 +1068,15 @@ describe("helium-sub-daos", () => {
                   })
                   .signers([positionAuthorityKp])
                   .rpcAndKeys({ skipPreflight: true });
+
+                // Ensure dao pays resize
+                await sendInstructions(provider, [
+                  SystemProgram.transfer({
+                    fromPubkey: me,
+                    toPubkey: dao,
+                    lamports: 1000000000,
+                  }),
+                ]);
                 console.log(
                   "track",
                   await program.methods

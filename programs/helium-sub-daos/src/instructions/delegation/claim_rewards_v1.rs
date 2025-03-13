@@ -9,6 +9,7 @@ use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
   CircuitBreaker, TransferArgsV0,
 };
+use shared_utils::resize_to_fit_pda;
 use voter_stake_registry::{
   state::{PositionV0, Registrar},
   VoterStakeRegistry,
@@ -49,6 +50,7 @@ pub struct ClaimRewardsV1<'info> {
   pub position_authority: AccountInfo<'info>,
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
+    mut,
     has_one = registrar,
     has_one = hnt_mint,
     has_one = delegator_pool,
@@ -68,6 +70,7 @@ pub struct ClaimRewardsV1<'info> {
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
 
+  #[account(mut)]
   pub hnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
@@ -121,7 +124,7 @@ impl<'info> ClaimRewardsV1<'info> {
 
   fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
     let cpi_accounts = Burn {
-      mint: self.mint.to_account_info(),
+      mint: self.hnt_mint.to_account_info(),
       authority: self.position_authority.to_account_info(),
       from: self.delegator_ata.to_account_info(),
     };
@@ -228,6 +231,13 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
       ctx.accounts.dao.recent_proposals
     );
     burn(ctx.accounts.burn_ctx(), amount)?;
+  }
+
+  if ctx.accounts.dao.to_account_info().lamports() > 500000000 {
+    resize_to_fit_pda(
+      &ctx.accounts.dao.to_account_info(),
+      &ctx.accounts.delegated_position,
+    )?;
   }
 
   Ok(())
