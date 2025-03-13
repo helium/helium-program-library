@@ -18,6 +18,7 @@ import {
   PublicKey,
   TransactionInstruction,
   ComputeBudgetProgram,
+  SystemProgram,
 } from "@solana/web3.js";
 import { positionKey } from "../../packages/voter-stake-registry-sdk/src";
 import { random } from "./string";
@@ -35,7 +36,7 @@ export async function initVsr(
   genesisVotePowerMultiplierExpirationTs = 1,
   genesisVotePowerMultiplier = 0,
   // Default is to set proxy season to end so far ahead it isn't relevant
-  proxySeasonEnd = new BN(new Date().valueOf() / 1000 + (24 * 60 * 60 * 5 * 365)),
+  proxySeasonEnd = new BN(new Date().valueOf() / 1000 + 24 * 60 * 60 * 5 * 365)
 ) {
   const programVersion = await getGovernanceProgramVersion(
     program.provider.connection,
@@ -84,10 +85,18 @@ export async function initVsr(
     .accounts({
       realm: realmPk,
       realmGoverningTokenMint: hntMint,
-      proxyConfig
+      proxyConfig,
     });
   instructions.push(await createRegistrar.instruction());
   const registrar = (await createRegistrar.pubkeys()).registrar as PublicKey;
+  instructions.push(
+    SystemProgram.transfer({
+      fromPubkey: me,
+      toPubkey: registrar,
+      // For rent payments of recent proposals
+      lamports: BigInt(1000000000),
+    })
+  );
 
   // Configure voting mint
   instructions.push(
