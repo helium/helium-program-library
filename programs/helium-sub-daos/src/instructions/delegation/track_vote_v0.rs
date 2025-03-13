@@ -73,7 +73,6 @@ pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
   let data = ctx.accounts.marker.data.try_borrow().unwrap();
   let has_data = !data.is_empty();
   drop(data);
-  let mut voted = has_data;
   if has_data {
     let marker: Account<VoteMarkerV0> = Account::try_from(&ctx.accounts.marker.to_account_info())?;
     require_eq!(
@@ -81,7 +80,6 @@ pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
       ctx.accounts.position.registrar,
       ErrorCode::InvalidMarker
     );
-    voted = !marker.choices.is_empty();
   }
 
   Ok(())
