@@ -20,12 +20,12 @@ import { HeliumVsrClient } from "../sdk/client";
 import { SubDaoWithMeta } from "../sdk/types";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-
 import {
   daoKey,
   init as initHsd,
   subDaoEpochInfoKey,
   subDaoKey,
+  getLockupEffectiveEndTs,
 } from "@helium/helium-sub-daos-sdk";
 import { useQueryClient } from "@tanstack/react-query";
 import { INDEXER_WAIT } from "../constants";
@@ -78,8 +78,6 @@ export const useCreatePosition = () => {
         );
         const mintKeypair = Keypair.generate();
         const position = positionKey(mintKeypair.publicKey)[0];
-        const isConstant =
-          (Object.keys(lockupKind)[0] as string) === "constant";
         const instructions: TransactionInstruction[] = [];
         const delegateInstructions: TransactionInstruction[] = [];
         const mintRent =
@@ -144,18 +142,21 @@ export const useCreatePosition = () => {
           );
           const currTs = Number(unixTime) + registrarAcc.timeOffset.toNumber();
           const endTs = new BN(currTs + lockupPeriodsInDays * SECS_PER_DAY);
-          const effectiveEndTs = isConstant
-            ? new BN("9223372036854775807")
-            : endTs;
-
-          const seasonEnd = proxyConfig.seasons
-            .reverse()
-            .find((season) => new BN(currTs).gte(season.start))?.end;
+          const expirationTs =
+            proxyConfig.seasons
+              .reverse()
+              .find((season) => new BN(currTs).gte(season.start))?.end || endTs;
 
           const [subDaoEpochInfo] = subDaoEpochInfoKey(subDao.pubkey, currTs);
           const [endSubDaoEpochInfoKey] = subDaoEpochInfoKey(
             subDao.pubkey,
-            min(effectiveEndTs, seasonEnd || effectiveEndTs)
+            min(
+              getLockupEffectiveEndTs({
+                kind: lockupKind,
+                endTs,
+              }),
+              expirationTs
+            )
           );
 
           delegateInstructions.push(
