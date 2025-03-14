@@ -17,8 +17,7 @@ pub struct QueueWalletClaimArgsV0 {
 }
 
 #[cfg(feature = "devnet")]
-// pub const ORACLE_URL: &str = "https://hnt-rewards.oracle.helium.io";
-pub const ORACLE_URL: &str = "http://localhost:8080";
+pub const ORACLE_URL: &str = "https://hnt-rewards.oracle.helium.io";
 #[cfg(feature = "devnet")]
 pub const ORACLE_SIGNER: Pubkey = pubkey!("dor5y9KAG6mVGFquXr8ipmm7GVLZefiNiCjvER58kPB");
 
