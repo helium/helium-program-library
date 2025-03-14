@@ -1,7 +1,9 @@
+use std::cmp::min;
+
+use anchor_lang::prelude::*;
+
 use super::{Lockup, LockupKind, VotingMintConfigV0};
 use crate::error::*;
-use anchor_lang::prelude::*;
-use std::cmp::min;
 
 pub const PRECISION_FACTOR: u128 = 1_000_000_000_000;
 
@@ -27,6 +29,21 @@ pub struct PositionV0 {
   pub genesis_end: i64,
   pub bump_seed: u8,
   pub vote_controller: Pubkey,
+  pub registrar_paid_rent: u64,
+  pub recent_proposals: Vec<RecentProposal>,
+}
+
+#[derive(Debug, InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Default)]
+pub struct RecentProposal {
+  pub proposal: Pubkey,
+  pub ts: i64,
+}
+
+const ONE_WEEK: i64 = 60 * 60 * 24 * 7;
+impl RecentProposal {
+  pub fn is_in_progress(&self, curr_ts: i64) -> bool {
+    self.ts + ONE_WEEK > curr_ts
+  }
 }
 
 impl PositionV0 {
@@ -147,6 +164,31 @@ impl PositionV0 {
       .amount_deposited_native
       .checked_sub(self.amount_unlocked(curr_ts))
       .unwrap()
+  }
+
+  // Add a proposal to the recent proposals list
+  pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
+    if self.recent_proposals.iter().any(|p| p.proposal == proposal) {
+      return;
+    }
+
+    let new_proposal = RecentProposal { proposal, ts };
+    // Find the insertion point to maintain descending order by timestamp
+    let insert_index = self
+      .recent_proposals
+      .iter()
+      .position(|p| p.ts <= ts)
+      .unwrap_or(self.recent_proposals.len());
+    // Insert the new proposal
+    self.recent_proposals.insert(insert_index, new_proposal);
+  }
+  pub fn remove_recent_proposal(&mut self, proposal: Pubkey) {
+    self.recent_proposals.retain(|p| p.proposal != proposal);
+  }
+
+  // Remove proposals older than the given timestamp
+  pub fn remove_proposals_older_than(&mut self, ts: i64) {
+    self.recent_proposals.retain(|p| p.ts >= ts);
   }
 }
 
