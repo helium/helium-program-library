@@ -1,7 +1,13 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal";
+import {
+  PROGRAM_ID as DEL_PID,
+  init as initNftProxy,
+  proxyAssignmentKey,
+} from "@helium/nft-proxy-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
 import {
   createAtaAndMint,
@@ -38,19 +44,12 @@ import {
   PROGRAM_ID,
   init,
   positionKey,
-  voteMarkerKey,
 } from "../packages/voter-stake-registry-sdk/src";
 import { expectBnAccuracy } from "./utils/expectBnAccuracy";
+import { ensureVSRIdl } from "./utils/fixtures";
 import { getUnixTimestamp, loadKeypair } from "./utils/solana";
 import { random } from "./utils/string";
 import { SPL_GOVERNANCE_PID } from "./utils/vsr";
-import {
-  PROGRAM_ID as DEL_PID,
-  init as initNftProxy,
-  proxyAssignmentKey,
-} from "@helium/nft-proxy-sdk";
-import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
-import { ensureVSRIdl } from "./utils/fixtures";
 
 chai.use(chaiAsPromised);
 
@@ -164,7 +163,14 @@ describe("voter-stake-registry", () => {
       .prepare();
     registrar = rkey!;
     collection = ckey!;
-    instructions.push(createRegistrar);
+    instructions.push(
+      createRegistrar,
+      SystemProgram.transfer({
+        fromPubkey: me,
+        toPubkey: rkey!,
+        lamports: LAMPORTS_PER_SOL,
+      })
+    );
 
     // Configure voting mint
     oneWeekFromNow =
@@ -554,6 +560,8 @@ describe("voter-stake-registry", () => {
         const registrarBalance = await provider.connection.getBalance(
           registrar
         );
+        const positionLamports =
+          (await provider.connection.getAccountInfo(position))?.lamports || 0;
         const {
           pubkeys: { marker },
         } = await program.methods
@@ -578,9 +586,12 @@ describe("voter-stake-registry", () => {
         const registrarBalance2 = await provider.connection.getBalance(
           registrar
         );
+        const positionLamportsNew =
+          (await provider.connection.getAccountInfo(position))?.lamports || 0;
         const spentLamports =
-          (await provider.connection.getAccountInfo(marker! as PublicKey))
-            ?.lamports || 0;
+          ((await provider.connection.getAccountInfo(marker! as PublicKey))
+            ?.lamports || 0) +
+          (positionLamportsNew - positionLamports);
         expect(registrarBalance2).to.eq(registrarBalance - spentLamports);
       });
 

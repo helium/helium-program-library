@@ -1,9 +1,9 @@
-use crate::{error::VsrError, VoteArgsV0};
 use anchor_lang::prelude::*;
 use nft_proxy::ProxyAssignmentV0;
-
-use crate::{registrar_seeds, state::*};
 use proposal::{ProposalConfigV0, ProposalV0};
+use shared_utils::resize_to_fit_pda;
+
+use crate::{error::VsrError, registrar_seeds, state::*, VoteArgsV0};
 
 #[derive(Accounts)]
 pub struct ProxiedVoteV0<'info> {
@@ -133,6 +133,19 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
       weight,
     },
   )?;
+
+  ctx.accounts.position.add_recent_proposal(
+    ctx.accounts.proposal.key(),
+    ctx.accounts.proposal.created_at,
+  );
+  ctx.accounts.position.registrar_paid_rent = u64::try_from(
+    i64::try_from(ctx.accounts.position.registrar_paid_rent).unwrap()
+      + resize_to_fit_pda(
+        &ctx.accounts.registrar.to_account_info(),
+        &ctx.accounts.position,
+      )?,
+  )
+  .unwrap();
 
   Ok(())
 }

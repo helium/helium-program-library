@@ -9,10 +9,10 @@ use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
   CircuitBreaker, TransferArgsV0,
 };
-use shared_utils::resize_to_fit_pda;
 use voter_stake_registry::{
+  cpi::{accounts::ClearRecentProposalsV0, clear_recent_proposals_v0},
   state::{PositionV0, Registrar},
-  VoterStakeRegistry,
+  ClearRecentProposalsArgsV0, VoterStakeRegistry,
 };
 
 use crate::{current_epoch, dao_seeds, error::ErrorCode, state::*, TESTING};
@@ -28,6 +28,7 @@ const TUKTUK_SIGNER_KEY: Pubkey = pubkey!("8m6iyXwcu8obaXdqKwzBqHE5HM2tRZZfSXV5q
 #[instruction(args: ClaimRewardsArgsV0)]
 pub struct ClaimRewardsV1<'info> {
   #[account(
+    mut,
     seeds = [b"position".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
     bump = position.bump_seed,
@@ -45,9 +46,10 @@ pub struct ClaimRewardsV1<'info> {
   pub position_token_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: By constraint
   #[account(
-    constraint = position_authority.is_signer && (position_authority.key() == payer.key()) || payer.key() == TUKTUK_SIGNER_KEY
+    constraint = (position_authority.is_signer && position_authority.key() == payer.key()) || payer.key() == TUKTUK_SIGNER_KEY
   )]
   pub position_authority: AccountInfo<'info>,
+  #[account(mut)]
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
     mut,
@@ -178,14 +180,25 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   delegated_position.set_claimed(args.epoch)?;
 
   let first_ts = ctx.accounts.dao.recent_proposals.last().unwrap().ts;
+  clear_recent_proposals_v0(
+    CpiContext::new_with_signer(
+      ctx.accounts.vsr_program.to_account_info(),
+      ClearRecentProposalsV0 {
+        position: ctx.accounts.position.to_account_info(),
+        registrar: ctx.accounts.registrar.to_account_info(),
+        dao: ctx.accounts.dao.to_account_info(),
+      },
+      &[dao_seeds!(ctx.accounts.dao)],
+    ),
+    ClearRecentProposalsArgsV0 {
+      ts: first_ts,
+      dao_bump: ctx.accounts.dao.bump_seed,
+    },
+  )?;
   let last_ts = ctx.accounts.dao.recent_proposals.first().unwrap().ts;
-  ctx
-    .accounts
-    .delegated_position
-    .remove_proposals_older_than(first_ts - 1);
   let proposal_set = ctx
     .accounts
-    .delegated_position
+    .position
     .recent_proposals
     .iter()
     .filter(|p| p.ts <= last_ts)
@@ -227,17 +240,10 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   if !not_four_proposals && eligible_count < 2 {
     msg!(
       "Position is not eligible, burning rewards. Position proposals {:?}, recent proposals {:?}",
-      ctx.accounts.delegated_position.recent_proposals,
+      ctx.accounts.position.recent_proposals,
       ctx.accounts.dao.recent_proposals
     );
     burn(ctx.accounts.burn_ctx(), amount)?;
-  }
-
-  if ctx.accounts.dao.to_account_info().lamports() > 500000000 {
-    resize_to_fit_pda(
-      &ctx.accounts.dao.to_account_info(),
-      &ctx.accounts.delegated_position,
-    )?;
   }
 
   Ok(())

@@ -54,10 +54,11 @@ pub fn resize_to_fit<'info, T: AccountSerialize + AccountDeserialize + Owner + C
   Ok(())
 }
 
+// Returns the lamports difference
 pub fn resize_to_fit_pda<'info, T: AccountSerialize + AccountDeserialize + Owner + Clone>(
   payer: &AccountInfo<'info>,
   account: &Account<'info, T>,
-) -> Result<()> {
+) -> Result<i64> {
   let rent = Rent::get()?;
   let writer = &mut IgnoreWriter { total: 0 };
   account.try_serialize(writer)?;
@@ -68,6 +69,7 @@ pub fn resize_to_fit_pda<'info, T: AccountSerialize + AccountDeserialize + Owner
   if new_size > old_size && (new_size - old_size) > MAX_PERMITTED_DATA_INCREASE {
     return Err(error!(ErrorCode::InvalidDataIncrease));
   }
+  let total_change;
   if new_size > old_size {
     let lamports_diff = new_minimum_balance.saturating_sub(account.to_account_info().lamports());
     msg!("Resizing to {} with lamports {}", new_size, lamports_diff);
@@ -79,6 +81,7 @@ pub fn resize_to_fit_pda<'info, T: AccountSerialize + AccountDeserialize + Owner
       .to_account_info()
       .lamports()
       .saturating_add(lamports_diff);
+    total_change = lamports_diff as i64;
   } else {
     let lamports_diff = new_minimum_balance.saturating_sub(account.to_account_info().lamports());
     msg!(
@@ -94,9 +97,10 @@ pub fn resize_to_fit_pda<'info, T: AccountSerialize + AccountDeserialize + Owner
       .to_account_info()
       .lamports()
       .saturating_sub(lamports_diff);
+    total_change = -(lamports_diff as i64);
   }
 
   account.to_account_info().realloc(new_size, false)?;
 
-  Ok(())
+  Ok(total_change)
 }

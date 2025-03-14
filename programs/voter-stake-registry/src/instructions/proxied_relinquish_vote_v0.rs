@@ -1,10 +1,10 @@
-use crate::{error::VsrError, RelinquishVoteArgsV1};
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use nft_proxy::ProxyAssignmentV0;
 use proposal::{ProposalConfigV0, ProposalV0};
+use shared_utils::resize_to_fit_pda;
 
-use crate::{registrar_seeds, state::*};
+use crate::{error::VsrError, registrar_seeds, state::*, RelinquishVoteArgsV1};
 
 #[derive(Accounts)]
 pub struct ProxiedRelinquishVoteV0<'info> {
@@ -20,6 +20,7 @@ pub struct ProxiedRelinquishVoteV0<'info> {
     has_one = rent_refund,
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
+  #[account(mut)]
   pub registrar: Box<Account<'info, Registrar>>,
   pub voter: Signer<'info>,
   #[account(
@@ -102,6 +103,22 @@ pub fn handler(ctx: Context<ProxiedRelinquishVoteV0>, args: RelinquishVoteArgsV1
       weight: marker.weight,
     },
   )?;
+
+  if marker.choices.is_empty() {
+    marker.weight = 0;
+    ctx
+      .accounts
+      .position
+      .remove_recent_proposal(ctx.accounts.proposal.key());
+    ctx.accounts.position.registrar_paid_rent = u64::try_from(
+      i64::try_from(ctx.accounts.position.registrar_paid_rent).unwrap()
+        + resize_to_fit_pda(
+          &ctx.accounts.registrar.to_account_info(),
+          &ctx.accounts.position,
+        )?,
+    )
+    .unwrap()
+  }
 
   Ok(())
 }
