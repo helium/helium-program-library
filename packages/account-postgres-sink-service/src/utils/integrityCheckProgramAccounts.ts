@@ -257,7 +257,6 @@ export const integrityCheckProgramAccounts = async ({
 
                   const sanitizedClean = _omit(sanitized, OMIT_KEYS);
                   const hasChanges = !deepEqual(sanitizedClean, existingClean);
-
                   if (hasChanges && !wasRefreshedDuringThisRun) {
                     const changedFields = existing
                       ? Object.entries(sanitizedClean)
@@ -268,7 +267,7 @@ export const integrityCheckProgramAccounts = async ({
                           .map(([key]) => key)
                       : Object.keys(sanitizedClean);
 
-                    corrections.push({
+                    const changeRecord = {
                       type: accName,
                       accountId: c.pubkey,
                       txSignatures: txIdsByAccountId[c.pubkey] || [],
@@ -285,7 +284,9 @@ export const integrityCheckProgramAccounts = async ({
                         (obj, key) => ({ ...obj, [key]: sanitized[key] }),
                         {}
                       ),
-                    });
+                    };
+
+                    corrections.push(changeRecord);
 
                     await model.upsert({ ...sanitized }, { transaction: t });
                   }
