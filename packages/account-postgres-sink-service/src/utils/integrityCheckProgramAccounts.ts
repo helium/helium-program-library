@@ -220,7 +220,11 @@ export const integrityCheckProgramAccounts = async ({
                     c.data as Buffer
                   );
 
-                  let sanitized = {
+                  let sanitized: {
+                    refreshed_at: string;
+                    address: string;
+                    [key: string]: any;
+                  } = {
                     refreshed_at: new Date().toISOString(),
                     address: c.pubkey,
                     ...sanitizeAccount(decodedAcc),
@@ -267,7 +271,7 @@ export const integrityCheckProgramAccounts = async ({
                           .map(([key]) => key)
                       : Object.keys(sanitizedClean);
 
-                    const changeRecord = {
+                    corrections.push({
                       type: accName,
                       accountId: c.pubkey,
                       txSignatures: txIdsByAccountId[c.pubkey] || [],
@@ -284,9 +288,7 @@ export const integrityCheckProgramAccounts = async ({
                         (obj, key) => ({ ...obj, [key]: sanitized[key] }),
                         {}
                       ),
-                    };
-
-                    corrections.push(changeRecord);
+                    });
 
                     await model.upsert({ ...sanitized }, { transaction: t });
                   }
