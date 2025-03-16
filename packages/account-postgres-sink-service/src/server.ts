@@ -16,7 +16,7 @@ import {
   KAFKA_USER,
   PG_POOL_SIZE,
   PROGRAM_ACCOUNT_CONFIGS,
-  REFRESH_PASSWORD,
+  ADMIN_PASSWORD,
   USE_HELIUS_WEBHOOK,
   USE_KAFKA,
   USE_SUBSTREAM,
@@ -69,8 +69,8 @@ if (PG_POOL_SIZE < 5) {
                 program: programId,
               });
 
-              if (type === "refresh-accounts") {
-                queryParams.append("password", REFRESH_PASSWORD);
+              if (["refresh-accounts", "integrity-check"].includes(type)) {
+                queryParams.append("password", ADMIN_PASSWORD);
               }
 
               await server.inject(`/${type}?${queryParams.toString()}`);
@@ -141,12 +141,13 @@ if (PG_POOL_SIZE < 5) {
         return;
       }
 
-      if (password !== REFRESH_PASSWORD) {
+      if (password !== ADMIN_PASSWORD) {
         res.code(StatusCodes.FORBIDDEN).send({
           message: "Invalid password",
         });
         return;
       }
+
       let prevRefreshing = refreshing;
       eventHandler.emit("refresh-accounts", programId);
       if (prevRefreshing) {
@@ -159,14 +160,30 @@ if (PG_POOL_SIZE < 5) {
     });
 
     server.get("/integrity-check", async (req, res) => {
-      const programId = (req.query as any).program;
+      const { program: programId, password } = req.query as any;
+      if (password !== ADMIN_PASSWORD) {
+        res.code(StatusCodes.FORBIDDEN).send({
+          message: "Invalid password",
+        });
+        return;
+      }
 
       try {
-        if (!programId) throw new Error("program not provided");
-        if (configs) {
-          const config = configs.find((c) => c.programId === programId);
-          if (!config)
-            throw new Error(`no config for program: ${programId} found`);
+        const programsToCheck = programId
+          ? [programId]
+          : configs
+              .filter(({ crons = [] }) =>
+                crons.some((cron) => cron.type === "integrity-check")
+              )
+              .map(({ programId }) => programId);
+
+        for (const progId of programsToCheck) {
+          const config = configs.find((c) => c.programId === progId);
+
+          if (!config) {
+            console.error(`No config for program: ${progId} found`);
+            continue;
+          }
 
           try {
             await integrityCheckProgramAccounts({
@@ -174,10 +191,16 @@ if (PG_POOL_SIZE < 5) {
               programId: new PublicKey(config.programId),
               accounts: config.accounts,
             });
+
+            console.log(`Integrity check completed for program: ${progId}`);
           } catch (err) {
-            throw err;
+            console.error(
+              `Integrity check failed for program: ${progId}:`,
+              err
+            );
           }
         }
+
         res.code(StatusCodes.OK).send(ReasonPhrases.OK);
       } catch (err) {
         res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);

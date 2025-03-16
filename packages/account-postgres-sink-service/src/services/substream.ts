@@ -145,7 +145,7 @@ export const setupSubstream = async (
     configs
   );
 
-  const connect = async (attemptCount = 0) => {
+  const connect = async (attemptCount = 1) => {
     if (attemptCount >= MAX_RECONNECT_ATTEMPTS) {
       console.error(
         `Substream failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts.`
