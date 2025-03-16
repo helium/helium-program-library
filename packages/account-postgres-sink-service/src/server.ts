@@ -191,8 +191,6 @@ if (PG_POOL_SIZE < 5) {
               programId: new PublicKey(config.programId),
               accounts: config.accounts,
             });
-
-            console.log(`Integrity check completed for program: ${progId}`);
           } catch (err) {
             console.error(
               `Integrity check failed for program: ${progId}:`,
