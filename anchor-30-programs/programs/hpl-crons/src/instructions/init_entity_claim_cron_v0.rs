@@ -58,6 +58,7 @@ pub struct InitEntityClaimCronV0<'info> {
   pub task: AccountInfo<'info>,
   /// CHECK: Used to write return data
   #[account(
+    mut,
     seeds = [b"task_return_account_1", cron_job.key().as_ref()],
     bump,
     seeds::program = cron_program.key()
@@ -65,6 +66,7 @@ pub struct InitEntityClaimCronV0<'info> {
   pub task_return_account_1: AccountInfo<'info>,
   /// CHECK: Used to write return data
   #[account(
+    mut,
     seeds = [b"task_return_account_2", cron_job.key().as_ref()],
     bump,
     seeds::program = cron_program.key()

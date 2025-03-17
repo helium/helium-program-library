@@ -165,7 +165,7 @@ export class OracleServer {
       "/v1/tuktuk/wallet/:wallet",
       this.tuktukWalletHandler.bind(this)
     );
-    this.app.post("/v1/sign/:keyToAssetKey", this.signHandler.bind(this));
+    this.app.post("/v1/sign", this.signHandler.bind(this));
   }
 
   private async getActiveIotDevicesHandler(
@@ -569,42 +569,57 @@ export class OracleServer {
 
   private async signHandler(
     request: FastifyRequest<{
-      Params: { keyToAssetKey: string };
+      Body: { keyToAssetKeys: string[] };
     }>,
     reply: FastifyReply
   ) {
     try {
-      let keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
-        new PublicKey(request.params.keyToAssetKey)
+      const keyToAssetKeys = request.body.keyToAssetKeys;
+      const keyToAssets = await this.hemProgram.account.keyToAssetV0.fetchMultiple(
+        keyToAssetKeys.map((key) => new PublicKey(key))
       );
-      const entityKey = decodeEntityKey(
-        keyToAsset.entityKey,
-        keyToAsset.keySerialization
-      )!;
+      if (keyToAssets.some((keyToAsset) => !keyToAsset)) {
+        reply.status(404).send({
+          message: "Key to asset not found",
+        });
+        return;
+      }
+      const entityKeys = keyToAssets.map((keyToAsset) =>
+        decodeEntityKey(
+          keyToAsset!.entityKey,
+          keyToAsset!.keySerialization
+        )!
+      );
 
-      const message = {
+      const rewards = await this.db.getBulkRewards(entityKeys);
+      const messages = keyToAssets.map((keyToAsset, index) => ({
         lazyDistributor: this.lazyDistributor,
         oracleIndex: process.env.ORACLE_INDEX
           ? parseInt(process.env.ORACLE_INDEX)
           : 0,
-        currentRewards: new BN(
-          await this.db.getCurrentRewardsByEntity(entityKey)
-        ),
-        asset: keyToAsset.asset,
-      };
-      const serializedMessage = await this.ldProgram.coder.accounts.encode(
-        "SetCurrentRewardsTransactionV0",
-        message
+        currentRewards: new BN(rewards[entityKeys[index]]),
+        asset: keyToAsset!.asset,
+      }));
+      const serializedMessages = await Promise.all(
+        messages.map(async (message) =>
+          this.ldProgram.coder.accounts.encode(
+            "SetCurrentRewardsTransactionV0",
+            message
+          )
+        )
       );
       const resp = {
-        message,
-        serialiedMessage: serializedMessage.toString("base64"),
-        signature: Buffer.from(
-          sign.detached(
-            Uint8Array.from(serializedMessage),
-            this.oracle.secretKey
-          )
-        ).toString("base64"),
+        oracle: this.oracle.publicKey.toBase58(),
+        messages: serializedMessages.map((m, index) => ({
+          serialized: m.toString("base64"),
+          message: messages[index],
+          signature: Buffer.from(
+            sign.detached(
+              Uint8Array.from(m),
+              this.oracle.secretKey
+            )
+          ).toString("base64"),
+        })),
       };
       reply.status(200).send(resp);
     } catch (err) {
