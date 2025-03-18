@@ -562,7 +562,6 @@ describe("distributor-oracle", () => {
       .post("/v1/sign")
       .send({ keyToAssetKeys: [keyToAsset.toBase58()] });
 
-      console.log(JSON.stringify(res.body, null, 2))
     assert.hasAllKeys(res.body, ["messages", "oracle"]);
     const { messages, oracle } = res.body;
     await rewardsProgram.methods
