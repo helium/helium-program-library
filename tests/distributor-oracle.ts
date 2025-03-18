@@ -559,9 +559,10 @@ describe("distributor-oracle", () => {
     const keyToAsset = keyToAssetKey(daoK, ecc)[0];
     const res = await chai
       .request(oracleServer.server)
-      .post("/v1/sign/")
+      .post("/v1/sign")
       .send({ keyToAssetKeys: [keyToAsset.toBase58()] });
 
+      console.log(JSON.stringify(res.body, null, 2))
     assert.hasAllKeys(res.body, ["messages", "oracle"]);
     const { messages, oracle } = res.body;
     await rewardsProgram.methods
@@ -579,7 +580,7 @@ describe("distributor-oracle", () => {
       })
       .preInstructions([
         Ed25519Program.createInstructionWithPublicKey({
-          publicKey: oracle.publicKey.toBytes(),
+          publicKey: new PublicKey(oracle).toBytes(),
           message: Buffer.from(messages[0].serialized, "base64"),
           signature: Buffer.from(messages[0].signature, "base64"),
         }),
