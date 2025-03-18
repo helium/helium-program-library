@@ -1,6 +1,6 @@
 [package]
 name = "data-credits"
-version = "0.2.2"
+version = "0.2.3"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -24,6 +24,7 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
+solana-zk-sdk = { workspace = true }
 helium-sub-daos = { workspace = true }
 circuit-breaker = { workspace = true }
 pyth-solana-receiver-sdk = { workspace = true }

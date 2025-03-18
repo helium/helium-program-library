@@ -17,6 +17,12 @@ use tuktuk_program::{
 };
 use voter_stake_registry::state::{PositionV0, VoteMarkerV0};
 
+use crate::voter_stake_registry::{
+  self,
+  accounts::{PositionV0, VoteMarkerV0},
+  client::args::RelinquishExpiredVoteV0,
+};
+
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct QueueRelinquishExpiredVoteMarkerArgsV0 {
   pub free_task_id: u16,

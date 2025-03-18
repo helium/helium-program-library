@@ -1,6 +1,6 @@
 [package]
 name = "mobile-entity-manager"
-version = "0.2.0"
+version = "0.2.1"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -25,6 +25,7 @@ overflow-checks = true
 bs58 = "0.3.1"
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
+solana-zk-sdk = { workspace = true }
 bytemuck = "1.12.3"
 angry-purple-tiger = "0.1.0"
 mpl-token-metadata = { workspace = true }

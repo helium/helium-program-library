@@ -23,11 +23,14 @@ pub fn get_genesis_end_epoch_bytes(
     // do not change it.
     if position.genesis_end <= registrar.clock_unix_timestamp() {
       min(
-        position.lockup.end_ts,
+        position.lockup.effective_end_ts(),
         if delegated_position.expiration_ts == 0 {
-          position.lockup.end_ts
+          position.lockup.effective_end_ts()
         } else {
-          min(position.lockup.end_ts, delegated_position.expiration_ts)
+          min(
+            position.lockup.effective_end_ts(),
+            delegated_position.expiration_ts,
+          )
         },
       )
     } else {
@@ -42,11 +45,14 @@ pub fn get_closing_epoch_bytes(
   delegated_position: &DelegatedPositionV0,
 ) -> [u8; 8] {
   current_epoch(min(
-    position.lockup.end_ts,
+    position.lockup.effective_end_ts(),
     if delegated_position.expiration_ts == 0 {
-      position.lockup.end_ts
+      position.lockup.effective_end_ts()
     } else {
-      min(position.lockup.end_ts, delegated_position.expiration_ts)
+      min(
+        position.lockup.effective_end_ts(),
+        delegated_position.expiration_ts,
+      )
     },
   ))
   .to_le_bytes()

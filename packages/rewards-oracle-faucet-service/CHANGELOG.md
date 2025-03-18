@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-# [0.10.0-alpha.13](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.13) (2025-02-25)
+## [0.9.31](https://github.com/helium/helium-program-libary/compare/v0.9.30...v0.9.31) (2025-03-13)
 
 **Note:** Version bump only for package @helium/rewards-oracle-faucet-service
 
@@ -11,7 +11,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 
 
-# [0.10.0-alpha.12](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.12) (2025-02-25)
+## [0.9.30](https://github.com/helium/helium-program-libary/compare/v0.9.29...v0.9.30) (2025-03-06)
 
 **Note:** Version bump only for package @helium/rewards-oracle-faucet-service
 
@@ -19,7 +19,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 
 
-# [0.10.0-alpha.11](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.11) (2025-02-25)
+## [0.9.29](https://github.com/helium/helium-program-libary/compare/v0.9.28...v0.9.29) (2025-03-05)
 
 **Note:** Version bump only for package @helium/rewards-oracle-faucet-service
 
@@ -27,7 +27,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 
 
-# [0.10.0-alpha.10](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.10) (2025-02-25)
+## [0.9.28](https://github.com/helium/helium-program-libary/compare/v0.9.27...v0.9.28) (2025-03-05)
 
 **Note:** Version bump only for package @helium/rewards-oracle-faucet-service
 
@@ -35,7 +35,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 
 
-# [0.10.0-alpha.9](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.9) (2025-02-25)
+## [0.9.27](https://github.com/helium/helium-program-libary/compare/v0.9.26...v0.9.27) (2025-03-04)
 
 **Note:** Version bump only for package @helium/rewards-oracle-faucet-service
 
@@ -43,7 +43,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 
 
-# [0.10.0-alpha.8](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.8) (2025-02-25)
+## [0.9.26](https://github.com/helium/helium-program-libary/compare/v0.9.25...v0.9.26) (2025-03-03)
 
 **Note:** Version bump only for package @helium/rewards-oracle-faucet-service
 
@@ -51,7 +51,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 
 
-# [0.10.0-alpha.7](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.7) (2025-02-24)
+## [0.9.25](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.9.25) (2025-02-28)
 
 **Note:** Version bump only for package @helium/rewards-oracle-faucet-service
 
@@ -59,63 +59,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 
 
-# [0.10.0-alpha.6](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.6) (2025-02-24)
-
-**Note:** Version bump only for package @helium/rewards-oracle-faucet-service
-
-
-
-
-
-# [0.10.0-alpha.5](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.5) (2025-02-24)
-
-**Note:** Version bump only for package @helium/rewards-oracle-faucet-service
-
-
-
-
-
-# [0.10.0-alpha.4](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.4) (2025-02-24)
-
-**Note:** Version bump only for package @helium/rewards-oracle-faucet-service
-
-
-
-
-
-# [0.10.0-alpha.3](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.3) (2025-02-24)
-
-**Note:** Version bump only for package @helium/rewards-oracle-faucet-service
-
-
-
-
-
-# [0.10.0-alpha.2](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.2) (2025-02-24)
-
-**Note:** Version bump only for package @helium/rewards-oracle-faucet-service
-
-
-
-
-
-# [0.10.0-alpha.1](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.1) (2025-02-21)
-
-**Note:** Version bump only for package @helium/rewards-oracle-faucet-service
-
-
-
-
-
-# [0.10.0-alpha.0](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.0) (2025-02-14)
-
-**Note:** Version bump only for package @helium/rewards-oracle-faucet-service
-
-
-
-
-
-## [0.9.24-alpha.1](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.9.24-alpha.1) (2025-02-14)
+## [0.9.24](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.9.24) (2025-02-26)
 
 **Note:** Version bump only for package @helium/rewards-oracle-faucet-service
 

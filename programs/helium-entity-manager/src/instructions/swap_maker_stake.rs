@@ -18,11 +18,8 @@ pub struct SwapMakerStake<'info> {
   )]
   pub maker: Box<Account<'info, MakerV0>>,
   #[account(
-    init,
-    payer = payer,
-    space = 8 + 60 + std::mem::size_of::<MakerApprovalV0>(),
     seeds = ["maker_approval".as_bytes(), rewardable_entity_config.key().as_ref(), maker.key().as_ref()],
-    bump,
+    bump = maker_approval.bump_seed,
   )]
   pub maker_approval: Box<Account<'info, MakerApprovalV0>>,
   #[account(

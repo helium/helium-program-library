@@ -1,7 +1,5 @@
 use std::ops::Div;
 
-use crate::errors::*;
-use crate::DataCreditsV0;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -11,8 +9,9 @@ use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
-use pyth_solana_receiver_sdk::price_update::VerificationLevel;
+use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
+
+use crate::{errors::*, DataCreditsV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MintDataCreditsArgsV0 {

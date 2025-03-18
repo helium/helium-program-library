@@ -342,9 +342,9 @@ pub fn caclulate_vhnt_info(
     position.voting_power_precise(voting_mint_config, curr_ts)?
   };
   let delegation_end_ts = if expiration_ts == 0 {
-    position.lockup.end_ts
+    position.lockup.effective_end_ts()
   } else {
-    min(expiration_ts, position.lockup.end_ts)
+    min(expiration_ts, position.lockup.effective_end_ts())
   };
   let vehnt_at_delegation_end =
     position.voting_power_precise(voting_mint_config, delegation_end_ts)?;

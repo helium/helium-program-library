@@ -25,7 +25,7 @@ pub fn get_closing_epoch_bytes(
   registrar: &Registrar,
 ) -> [u8; 8] {
   current_epoch(min(
-    position.lockup.end_ts,
+    position.lockup.effective_end_ts(),
     proxy_config
       .get_current_season(registrar.clock_unix_timestamp())
       .unwrap()
@@ -44,7 +44,7 @@ pub fn get_genesis_end_epoch_bytes(
     // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
     if position.genesis_end <= registrar.clock_unix_timestamp() {
       min(
-        position.lockup.end_ts,
+        position.lockup.effective_end_ts(),
         proxy_config
           .get_current_season(registrar.clock_unix_timestamp())
           .unwrap()
@@ -166,7 +166,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
       .get_current_season(curr_ts)
       .unwrap()
       .end,
-    position.lockup.end_ts,
+    position.lockup.effective_end_ts(),
   );
 
   let vehnt_info = caclulate_vhnt_info(curr_ts, position, voting_mint_config, expiration_ts)?;

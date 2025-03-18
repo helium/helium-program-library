@@ -87,7 +87,7 @@ pub struct InitializeRegistrarV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub proxy_config: Option<Account<'info, ProxyConfigV0>>,
+  pub proxy_config: Option<Box<Account<'info, ProxyConfigV0>>>,
 }
 
 impl<'info> InitializeRegistrarV0<'info> {

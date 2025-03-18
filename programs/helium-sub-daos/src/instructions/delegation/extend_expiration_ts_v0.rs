@@ -15,18 +15,23 @@ pub fn get_genesis_end_epoch_bytes(
   registrar: &Registrar,
   proxy_config: &ProxyConfigV0,
 ) -> [u8; 8] {
-  let ts = if position.genesis_end <= registrar.clock_unix_timestamp() {
-    min(
-      proxy_config
-        .get_current_season(registrar.clock_unix_timestamp())
-        .unwrap()
-        .end,
-      position.lockup.end_ts,
-    )
-  } else {
-    position.genesis_end
-  };
-  current_epoch(ts).to_le_bytes()
+  current_epoch(
+    // If the genesis piece is no longer in effect (has been purged),
+    // no need to pass an extra account here. Just pass the closing time sdei and
+    // do not change it.
+    if position.genesis_end <= registrar.clock_unix_timestamp() {
+      min(
+        proxy_config
+          .get_current_season(registrar.clock_unix_timestamp())
+          .unwrap()
+          .end,
+        position.lockup.effective_end_ts(),
+      )
+    } else {
+      position.genesis_end
+    },
+  )
+  .to_le_bytes()
 }
 
 fn get_old_closing_epoch_bytes(
@@ -34,9 +39,12 @@ fn get_old_closing_epoch_bytes(
   delegated_position: &DelegatedPositionV0,
 ) -> [u8; 8] {
   current_epoch(if delegated_position.expiration_ts == 0 {
-    position.lockup.end_ts
+    position.lockup.effective_end_ts()
   } else {
-    min(position.lockup.end_ts, delegated_position.expiration_ts)
+    min(
+      position.lockup.effective_end_ts(),
+      delegated_position.expiration_ts,
+    )
   })
   .to_le_bytes()
 }
@@ -51,7 +59,7 @@ fn get_new_closing_epoch_bytes(
       .get_current_season(registrar.clock_unix_timestamp())
       .unwrap()
       .end,
-    position.lockup.end_ts,
+    position.lockup.effective_end_ts(),
   ))
   .to_le_bytes()
 }
@@ -137,7 +145,7 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
       .get_current_season(registrar.clock_unix_timestamp())
       .unwrap()
       .end,
-    position.lockup.end_ts,
+    position.lockup.effective_end_ts(),
   );
   let epoch = current_epoch(registrar.clock_unix_timestamp());
 

@@ -1,6 +1,6 @@
 use std::{cmp::min, str::FromStr};
 
-use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
+use account_compression_cpi::Noop;
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use angry_purple_tiger::AnimalName;
@@ -108,7 +108,8 @@ pub struct IssueEntityV0<'info> {
   pub token_metadata_program: AccountInfo<'info>,
   pub log_wrapper: Program<'info, Noop>,
   pub bubblegum_program: Program<'info, Bubblegum>,
-  pub compression_program: Program<'info, SplAccountCompression>,
+  pub compression_program:
+    Program<'info, account_compression_cpi::account_compression::program::SplAccountCompression>,
   pub system_program: Program<'info, System>,
 }
 

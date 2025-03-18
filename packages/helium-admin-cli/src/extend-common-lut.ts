@@ -59,24 +59,13 @@ export async function run(args: any = process.argv) {
   }
 
   const accounts = [
-    // HNT Proposal Config
-    "22SWTDZVj1L81SXfwbEeUmdZBFj23MFmER3Gv8BmxbBS",
-    // HNT state controller
-    "7Vrme34DXPH8ow4HEAatZKwZF9AR5vq8MZhA3CanMEbr",
-    // IOT proposal config
-    "7cvYwyj6k4NEPNoaCTUufDdGJqqB6ZBRf4t3TrSSUGrc",
-    // IOT State controller
-    "3eEnmZBiJems6ipPtdQS2UkJYfPqzvnDzhWQuTTN2ou5",
-    // IOT Registrar
-    "7ZZopN1mx6ECcb3YCG8dbxeLpA44xq4gzA1ETEiaLoeL",
-    // State controller program
-    "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM",
-    // Mobile proposal config
-    "5c9JxRCj4CwhZwaUyjvpb4JJbKW7xpvEFq3Rb2upkytc",
-    // Mobile registrar
-    "C4DWaps9bLiqy4e81wJ7VTQ6QR7C4MWvwsei3ZjsaDuW",
-    // Mobile state controller
-    "r11HAkEaPqkFHwDVewcmWSfRrMaLYcBLGquC2RBn3Xp",
+    // HNT lazy distributor
+    // "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq",
+    // HNT Circuit Breaker
+    "73zsmmqCXjvHHhNSib26Y8p3jYiH3UUuyKv71RJDnctW",
+    // HNT Rewards pool
+    "BDs6RPnpJNzmuMNv1z8cDh9cxKFgCxEVDaCfoHZWyvqJ",
+
   ].map((a) => {
     return new PublicKey(a);
   });

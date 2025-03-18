@@ -37,8 +37,8 @@ import {
 } from "../packages/helium-entity-manager-sdk/src";
 import {
   currentEpoch,
-  heliumSubDaosResolvers,
   subDaoEpochInfoKey,
+  init as initHSD,
 } from "../packages/helium-sub-daos-sdk/src";
 import { init as vsrInit } from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
@@ -91,15 +91,7 @@ describe("helium-sub-daos", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
-  const program = new Program<HeliumSubDaos>(
-    anchor.workspace.HeliumSubDaos.idl,
-    anchor.workspace.HeliumSubDaos.provider,
-    anchor.workspace.HeliumSubDaos.coder,
-    () => {
-      return heliumSubDaosResolvers;
-    }
-  );
-
+  let program: Program<HeliumSubDaos>
   let dcProgram: Program<DataCredits>;
   let noEmitProgram: Program<NoEmit>;
   let hemProgram: Program<HeliumEntityManager>;
@@ -118,6 +110,11 @@ describe("helium-sub-daos", () => {
   const me = provider.wallet.publicKey;
 
   before(async () => {
+    program = await initHSD(
+      provider,
+      anchor.workspace.HeliumSubDaos.programId,
+      anchor.workspace.HeliumSubDaos.idl
+    );
     dcProgram = await dcInit(
       provider,
       anchor.workspace.DataCredits.programId,
@@ -1072,6 +1069,15 @@ describe("helium-sub-daos", () => {
                   })
                   .signers([positionAuthorityKp])
                   .rpcAndKeys({ skipPreflight: true });
+
+                // Ensure dao pays resize
+                await sendInstructions(provider, [
+                  SystemProgram.transfer({
+                    fromPubkey: me,
+                    toPubkey: dao,
+                    lamports: 1000000000,
+                  }),
+                ]);
                 console.log(
                   "track",
                   await program.methods

@@ -118,6 +118,38 @@ export async function run(args: any = process.argv) {
     "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz",
     // Data credits
     "D1LbvrJQ9K2WbGPMbM3Fnrf5PSsDH1TDpjqJdHuvs81n",
+    // HNT Proposal Config
+    "22SWTDZVj1L81SXfwbEeUmdZBFj23MFmER3Gv8BmxbBS",
+    // HNT state controller
+    "7Vrme34DXPH8ow4HEAatZKwZF9AR5vq8MZhA3CanMEbr",
+    // IOT proposal config
+    "7cvYwyj6k4NEPNoaCTUufDdGJqqB6ZBRf4t3TrSSUGrc",
+    // IOT State controller
+    "3eEnmZBiJems6ipPtdQS2UkJYfPqzvnDzhWQuTTN2ou5",
+    // IOT Registrar
+    "7ZZopN1mx6ECcb3YCG8dbxeLpA44xq4gzA1ETEiaLoeL",
+    // State controller program
+    "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM",
+    // Mobile proposal config
+    "5c9JxRCj4CwhZwaUyjvpb4JJbKW7xpvEFq3Rb2upkytc",
+    // Mobile registrar
+    "C4DWaps9bLiqy4e81wJ7VTQ6QR7C4MWvwsei3ZjsaDuW",
+    // Mobile state controller
+    "r11HAkEaPqkFHwDVewcmWSfRrMaLYcBLGquC2RBn3Xp",
+    // Proposal config
+    "22SWTDZVj1L81SXfwbEeUmdZBFj23MFmER3Gv8BmxbBS",
+    // Vote controller
+    "7Vrme34DXPH8ow4HEAatZKwZF9AR5vq8MZhA3CanMEbr",
+    // State controller
+    "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM",
+    // Task queue
+    "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7",
+    // Task Queue Authority
+    "31ZbFYvxvjMkW8efhKPxuqnKMuu9G8a9w7UsLJ3nNBCk",
+    // HPL Crons
+    "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu",
+    // Tuktuk
+    "tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA",
   ].map((a) => {
     return new PublicKey(a);
   });

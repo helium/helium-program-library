@@ -174,6 +174,8 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
     genesis_end,
     num_active_votes: 0,
     vote_controller: Pubkey::default(),
+    recent_proposals: vec![],
+    registrar_paid_rent: 0,
   });
 
   let signer_seeds: &[&[&[u8]]] = &[position_seeds!(ctx.accounts.position)];

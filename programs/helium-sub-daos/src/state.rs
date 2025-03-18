@@ -107,6 +107,19 @@ pub struct DaoV0 {
   pub recent_proposals: [RecentProposal; 4],
 }
 
+#[derive(Debug, InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Default)]
+pub struct RecentProposal {
+  pub proposal: Pubkey,
+  pub ts: i64,
+}
+
+const ONE_WEEK: i64 = 60 * 60 * 24 * 7;
+impl RecentProposal {
+  pub fn is_in_progress(&self, curr_ts: i64) -> bool {
+    self.ts + ONE_WEEK > curr_ts
+  }
+}
+
 #[macro_export]
 macro_rules! dao_seeds {
   ( $s:expr ) => {
@@ -123,6 +136,11 @@ macro_rules! sub_dao_seeds {
 
 impl DaoV0 {
   pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
+    // Don't add the same proposal twice
+    if self.recent_proposals.iter().any(|p| p.proposal == proposal) {
+      return;
+    }
+
     let new_proposal = RecentProposal { proposal, ts };
     // Find the insertion point to maintain descending order by timestamp
     let insert_index = self
@@ -170,12 +188,6 @@ pub struct DaoEpochInfoV0 {
   pub smoothed_hnt_burned: u64,
 }
 
-#[derive(Debug, InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Default)]
-pub struct RecentProposal {
-  pub proposal: Pubkey,
-  pub ts: i64,
-}
-
 impl DaoEpochInfoV0 {
   pub fn size() -> usize {
     60 + 8 + std::mem::size_of::<DaoEpochInfoV0>()
@@ -206,7 +218,7 @@ pub struct DelegatedPositionV0 {
   // This allows for claiming ~128 epochs worth of rewards in parallel.
   pub claimed_epochs_bitmap: u128,
   pub expiration_ts: i64,
-  pub recent_proposals: Vec<RecentProposal>,
+  pub _deprecated_recent_proposals: Vec<RecentProposal>,
 }
 
 impl DelegatedPositionV0 {
@@ -217,7 +229,7 @@ impl DelegatedPositionV0 {
       Err(error!(ErrorCode::InvalidClaimEpoch))
     } else {
       let bit_index = (epoch - self.last_claimed_epoch - 1) as u128;
-      Ok(self.claimed_epochs_bitmap >> (127_u128 - bit_index) & 1 == 1)
+      Ok((self.claimed_epochs_bitmap >> (127_u128 - bit_index)) & 1 == 1)
     }
   }
 
@@ -254,26 +266,6 @@ impl DelegatedPositionV0 {
     // Clear the bit at bit_index
     self.claimed_epochs_bitmap &= !(1_u128 << (127_u128 - bit_index));
     Ok(())
-  }
-
-  // Add a proposal to the recent proposals list
-  pub fn add_recent_proposal(&mut self, proposal: Pubkey, ts: i64) {
-    let new_proposal = RecentProposal { proposal, ts };
-    // Find the insertion point to maintain descending order by timestamp
-    let insert_index = self
-      .recent_proposals
-      .iter()
-      .position(|p| p.ts <= ts)
-      .unwrap_or(self.recent_proposals.len());
-    // Insert the new proposal
-    self.recent_proposals.insert(insert_index, new_proposal);
-  }
-  pub fn remove_recent_proposal(&mut self, proposal: Pubkey) {
-    self.recent_proposals.retain(|p| p.proposal != proposal);
-  }
-  // Remove proposals older than the given timestamp
-  pub fn remove_proposals_older_than(&mut self, ts: i64) {
-    self.recent_proposals.retain(|p| p.ts >= ts);
   }
 }
 

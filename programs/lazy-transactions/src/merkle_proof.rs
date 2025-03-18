@@ -7,7 +7,7 @@ pub type Node = [u8; 32];
 pub fn recompute(leaf: Node, proof: &[Node], index: u32) -> Node {
   let mut current_node = leaf;
   for (depth, sibling) in proof.iter().enumerate() {
-    hash_to_parent(&mut current_node, sibling, index >> depth & 1 == 0);
+    hash_to_parent(&mut current_node, sibling, (index >> depth) & 1 == 0);
   }
   current_node
 }

@@ -1,6 +1,6 @@
 [package]
 name = "lazy-distributor"
-version = "0.2.2"
+version = "0.3.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -24,6 +24,7 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
+solana-zk-sdk = { workspace = true }
 mpl-token-metadata = { workspace = true }
 bubblegum-cpi = { workspace = true }
 circuit-breaker = { workspace = true }

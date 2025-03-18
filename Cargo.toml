@@ -21,15 +21,16 @@ exclude = [
   "utils/active-hotspot-oracle",
   "utils/backfill-onboarding-fees",
   "utils/standardize-hotspot-metadata",
+  "utils/pyth_solana_receiver_sdk",
 ]
 
 [workspace.dependencies]
-anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
-anchor-spl = { version = "0.30.1", features = ["mint", "token", "metadata"] }
-mpl-token-metadata = { version = "3.2.0" }
-account-compression-cpi = { rev = "2e22607", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi", "no-entrypoint"]}
-solana-program = "1.18"
-bubblegum-cpi = { rev = "2e22607", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi", "no-entrypoint"]}
+anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
+anchor-spl = { version = "0.31.0", features = ["mint", "token", "metadata"] }
+mpl-token-metadata = { version = "5.1.0" }
+account-compression-cpi = { rev = "1584d8e", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi", "no-entrypoint"]}
+solana-program = "2.2.1"
+bubblegum-cpi = { rev = "1584d8e", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi", "no-entrypoint"]}
 solana-security-txt = "1.1.1"
 default-env = { path = "./utils/default-env" }
 shared-utils = { path = "./utils/shared-utils" }
@@ -43,8 +44,9 @@ no-emit = { path = "./programs/no-emit", features = ["cpi", "no-entrypoint"] }
 voter-stake-registry = { path = "./programs/voter-stake-registry", features = ["cpi", "no-entrypoint"] }
 time = "0.3.36"
 data-credits = { path = "./programs/data-credits" }
-pyth-solana-receiver-sdk = "=0.3.2"
+pyth-solana-receiver-sdk = { path = "./utils/pyth_solana_receiver_sdk" }
 pythnet-sdk = "=2.3.1"
-tuktuk-sdk = { version = "0.2.0" }
-tuktuk-program = { version = "0.2.0" }
+tuktuk-sdk = { version = "0.3.1" }
+tuktuk-program = { version = "0.3.0" }
 modular-governance = { path = "./utils/modular-governance" }
+solana-zk-sdk = "2.2.3"

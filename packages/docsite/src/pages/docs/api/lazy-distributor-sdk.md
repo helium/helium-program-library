@@ -49,181 +49,20 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
-### dummy_ix
+### tempUpdateMatchingDestination
 
 #### Accounts
 
-| Name    | Mutability | Signer | Docs |
-| ------- | ---------- | ------ | ---- |
-| dummy   | immut      | no     |      |
-| dummy_2 | immut      | no     |      |
+| Name              | Mutability | Signer | Docs |
+| ----------------- | ---------- | ------ | ---- |
+| authority         | immut      | yes    |      |
+| originalRecipient | immut      | no     |      |
+| recipient         | mut        | no     |      |
 
 #### Args
 
 | Name | Type | Docs |
 | ---- | ---- | ---- |
-
-### initialize_compression_recipient_v0
-
-#### Accounts
-
-| Name                | Mutability | Signer | Docs |
-| ------------------- | ---------- | ------ | ---- |
-| payer               | immut      | no     |      |
-| lazy_distributor    | immut      | no     |      |
-| recipient           | immut      | no     |      |
-| merkle_tree         | immut      | no     |      |
-| owner               | immut      | no     |      |
-| delegate            | immut      | no     |      |
-| compression_program | immut      | no     |      |
-| system_program      | immut      | no     |      |
-
-#### Args
-
-| Name | Type            | Docs |
-| ---- | --------------- | ---- |
-| args | [object Object] |      |
-
-### initialize_lazy_distributor_v0
-
-#### Accounts
-
-| Name                     | Mutability | Signer | Docs |
-| ------------------------ | ---------- | ------ | ---- |
-| payer                    | immut      | no     |      |
-| lazy_distributor         | immut      | no     |      |
-| rewards_mint             | immut      | no     |      |
-| rewards_escrow           | immut      | no     |      |
-| circuit_breaker          | immut      | no     |      |
-| system_program           | immut      | no     |      |
-| associated_token_program | immut      | no     |      |
-| circuit_breaker_program  | immut      | no     |      |
-| token_program            | immut      | no     |      |
-
-#### Args
-
-| Name | Type            | Docs |
-| ---- | --------------- | ---- |
-| args | [object Object] |      |
-
-### initialize_recipient_v0
-
-#### Accounts
-
-| Name             | Mutability | Signer | Docs |
-| ---------------- | ---------- | ------ | ---- |
-| payer            | immut      | no     |      |
-| lazy_distributor | immut      | no     |      |
-| recipient        | immut      | no     |      |
-| mint             | immut      | no     |      |
-| target_metadata  | immut      | no     |      |
-| system_program   | immut      | no     |      |
-
-#### Args
-
-| Name | Type | Docs |
-| ---- | ---- | ---- |
-
-### set_current_rewards_v0
-
-#### Accounts
-
-| Name             | Mutability | Signer | Docs |
-| ---------------- | ---------- | ------ | ---- |
-| payer            | immut      | no     |      |
-| lazy_distributor | immut      | no     |      |
-| recipient        | immut      | no     |      |
-| oracle           | immut      | no     |      |
-| system_program   | immut      | no     |      |
-
-#### Args
-
-| Name | Type            | Docs |
-| ---- | --------------- | ---- |
-| args | [object Object] |      |
-
-### set_current_rewards_v1
-
-#### Accounts
-
-| Name                | Mutability | Signer | Docs                                                                                                                                                   |
-| ------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| payer               | immut      | no     |                                                                                                                                                        |
-| lazy_distributor    | immut      | no     |                                                                                                                                                        |
-| recipient           | immut      | no     |                                                                                                                                                        |
-| sysvar_instructions | immut      | no     | the supplied Sysvar could be anything else. The Instruction Sysvar has not been implemented in the Anchor framework yet, so this is the safe approach. |
-| system_program      | immut      | no     |                                                                                                                                                        |
-
-#### Args
-
-| Name | Type            | Docs |
-| ---- | --------------- | ---- |
-| args | [object Object] |      |
-
-### temp_update_matching_destination
-
-#### Accounts
-
-| Name               | Mutability | Signer | Docs |
-| ------------------ | ---------- | ------ | ---- |
-| authority          | immut      | no     |      |
-| original_recipient | immut      | no     |      |
-| recipient          | immut      | no     |      |
-
-#### Args
-
-| Name | Type | Docs |
-| ---- | ---- | ---- |
-
-### update_compression_destination_v0
-
-#### Accounts
-
-| Name                | Mutability | Signer | Docs |
-| ------------------- | ---------- | ------ | ---- |
-| recipient           | immut      | no     |      |
-| owner               | immut      | no     |      |
-| destination         | immut      | no     |      |
-| merkle_tree         | immut      | no     |      |
-| compression_program | immut      | no     |      |
-
-#### Args
-
-| Name | Type            | Docs |
-| ---- | --------------- | ---- |
-| args | [object Object] |      |
-
-### update_destination_v0
-
-#### Accounts
-
-| Name                   | Mutability | Signer | Docs |
-| ---------------------- | ---------- | ------ | ---- |
-| recipient              | immut      | no     |      |
-| owner                  | immut      | no     |      |
-| destination            | immut      | no     |      |
-| recipient_mint_account | immut      | no     |      |
-
-#### Args
-
-| Name | Type | Docs |
-| ---- | ---- | ---- |
-
-### update_lazy_distributor_v0
-
-#### Accounts
-
-| Name             | Mutability | Signer | Docs |
-| ---------------- | ---------- | ------ | ---- |
-| lazy_distributor | immut      | no     |      |
-| rewards_mint     | immut      | no     |      |
-| authority        | immut      | no     |      |
-
-#### Args
-
-| Name | Type            | Docs |
-| ---- | --------------- | ---- |
-| args | [object Object] |      |
 
 ## Accounts
 

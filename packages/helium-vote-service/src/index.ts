@@ -1,8 +1,20 @@
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { organizationKey } from "@helium/organization-sdk";
-import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
-import { getPositionKeysForOwner } from "@helium/voter-stake-registry-sdk";
+import { createMemoInstruction } from "@solana/spl-memo";
+import {
+  createAtaAndTransferInstructions,
+  HNT_MINT,
+  IOT_MINT,
+  MOBILE_MINT,
+} from "@helium/spl-utils";
+import {
+  getPositionKeysForOwner,
+  init,
+  positionKey,
+  proxyVoteMarkerKey,
+  voteMarkerKey,
+} from "@helium/voter-stake-registry-sdk";
 import Fastify, { FastifyInstance } from "fastify";
 import fs from "fs";
 import { camelCase, isPlainObject, mapKeys } from "lodash";
@@ -20,8 +32,25 @@ import {
   setRelations,
 } from "./model";
 import { cloneRepo, readProxiesAndUpsert } from "./repo";
-import { Connection, PublicKey } from "@solana/web3.js";
-import NodeCache from 'node-cache';
+import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  compileTransaction,
+  customSignerKey,
+  RemoteTaskTransactionV0,
+} from "@helium/tuktuk-sdk";
+import { sign } from "tweetnacl";
+import {
+  getPrograms,
+  provider,
+  tuktukProgram,
+  voterStakeRegistryProgram,
+  keypair,
+  heliumSubDaosProgram,
+  hplCronsProgram,
+} from "./solana";
+import NodeCache from "node-cache";
+import BN from "bn.js";
+import { SystemProgram } from "@solana/web3.js";
 
 const ORG_IDS = {
   [HNT_MINT.toBase58()]: organizationKey("Helium")[0].toBase58(),
@@ -156,11 +185,11 @@ server.get<{
   const page = Number(request.query.page || 1);
   const offset = Number((request.query.page || 1) - 1) * limit;
   const registrar = request.params.registrar;
-  const query = request.query.query || '';
-  
+  const query = request.query.query || "";
+
   // Create cache key from all params
   const cacheKey = `proxies:${registrar}:${limit}:${page}:${query}`;
-  
+
   // Try to get from cache first
   const cachedResult = proxyCache.get(cacheKey);
   if (cachedResult) {
@@ -168,7 +197,7 @@ server.get<{
   }
 
   const escapedRegistrar = sequelize.escape(registrar);
-  
+
   const proxies = await sequelize.query(`
 WITH
   positions_with_proxy_assignments AS (
@@ -235,10 +264,10 @@ OFFSET ${offset}
 LIMIT ${limit};
       `);
   const result = proxies[0];
-  
+
   // Store in cache before returning
   proxyCache.set(cacheKey, result);
-  
+
   return result;
 });
 
@@ -410,6 +439,198 @@ server.get<{
   )[0].map(deepCamelCaseKeys);
 });
 
+const HNT_REGISTRAR = new PublicKey(
+  "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
+);
+const HELIUM_PROXY_CONFIG = new PublicKey(
+  "ADWefNt1foP9YJamZFjcUwuMUanw29bEhtsHBEbfKpWZ"
+);
+const MAX_VOTES_PER_TASK = 1;
+const MARKERS_TO_CHECK = 10;
+
+server.post<{
+  Params: { proposal: string; wallet: string };
+  Body: { task_queue: string; task: string; task_queued_at: number };
+}>("/v1/proposals/:proposal/proxy-vote/:wallet", async (request, reply) => {
+  const proposal = new PublicKey(request.params.proposal);
+  const wallet = new PublicKey(request.params.wallet);
+  await getPrograms();
+
+  const taskQueue = new PublicKey(request.body.task_queue);
+  const task = new PublicKey(request.body.task);
+  const taskQueuedAt = new BN(request.body.task_queued_at);
+  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+  const proxyVoteMarker = proxyVoteMarkerKey(wallet, proposal)[0];
+  const choices = (
+    await voterStakeRegistryProgram.account.proxyMarkerV0.fetch(proxyVoteMarker)
+  ).choices;
+  try {
+    const needsVoteRaw = (
+      await sequelize.query(`
+            SELECT
+              pa.asset,
+              pa.address as proxy_assignment,
+              dp.address as delegated_position
+            FROM proxy_assignments pa
+            JOIN positions p ON p.mint = pa.asset AND p.registrar = '${HNT_REGISTRAR.toBase58()}'
+            LEFT OUTER JOIN vote_markers vm ON vm.mint = pa.asset AND (
+              vm.registrar = '${HNT_REGISTRAR.toBase58()}' AND vm.proposal = '${proposal.toBase58()}'
+            )
+            LEFT OUTER JOIN delegated_positions dp ON dp.mint = pa.asset
+            WHERE pa.proxy_config = '${HELIUM_PROXY_CONFIG.toBase58()}' AND pa.voter = '${wallet.toBase58()}' AND pa.index > 0 AND (
+              vm is NULL
+              OR (
+                vm.proxy_index >= pa.index AND
+                (
+                  NOT vm.choices <@ ARRAY[${choices.join(",")}]::integer[] OR
+                  NOT vm.choices @> ARRAY[${choices.join(",")}]::integer[]
+                )
+              )
+            )
+            LIMIT ${MARKERS_TO_CHECK}
+          `)
+    )[0].map(deepCamelCaseKeys);
+
+    // Check against the RPC as it's more up-to-date
+    let needsVote: any[] = [];
+    for (const vote of needsVoteRaw) {
+      if (needsVote.length >= MAX_VOTES_PER_TASK) {
+        break;
+      }
+      const marker = voteMarkerKey(new PublicKey(vote.asset), proposal)[0];
+      const markerAccount =
+        await voterStakeRegistryProgram.account.voteMarkerV0.fetchNullable(
+          marker
+        );
+      if (!markerAccount || !arrayEquals(markerAccount.choices, choices)) {
+        needsVote.push(vote);
+      }
+    }
+
+    if (needsVote.length === 0 && needsVoteRaw.length === MARKERS_TO_CHECK) {
+      reply.code(503).send({
+        error: "Service Unavailable",
+        message:
+          "Indexer is still processing recent transactions, please retry later",
+      });
+      return;
+    }
+
+    const [pdaWallet, bump] = customSignerKey(taskQueue, [
+      Buffer.from("vote_payer"),
+      wallet.toBuffer(),
+    ]);
+    const bumpBuffer = Buffer.alloc(1);
+    bumpBuffer.writeUint8(bump);
+    let instructions: TransactionInstruction[] = [];
+    // Done end the task chain.
+    if (needsVote.length === 0) {
+      instructions.push(
+        createMemoInstruction(
+          `Voting done for voter ${wallet.toBase58()} proposal ${proposal.toBase58()}`,
+          [pdaWallet]
+        )
+      );
+    } else {
+      instructions.push(
+        // Fund the next crank turn
+        SystemProgram.transfer({
+          fromPubkey: pdaWallet,
+          toPubkey: task,
+          lamports: taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
+        }),
+        // Count as many votes as possible
+        ...(
+          await Promise.all(
+            needsVote.map(async (vote) => {
+              const instructions: TransactionInstruction[] = [];
+              const countIx = await voterStakeRegistryProgram.methods
+                .countProxyVoteV0()
+                .accounts({
+                  payer: pdaWallet,
+                  proxyMarker: proxyVoteMarker,
+                  voter: wallet,
+                  proxyAssignment: new PublicKey(vote.proxyAssignment),
+                  registrar: HNT_REGISTRAR,
+                  position: positionKey(new PublicKey(vote.asset))[0],
+                  proposal,
+                })
+                .instruction();
+              instructions.push(countIx);
+              if (vote.delegatedPosition) {
+                const delegatedPosition =
+                  await provider.connection.getAccountInfo(
+                    new PublicKey(vote.delegatedPosition)
+                  );
+                if (delegatedPosition) {
+                  const delegatedCountIx = await heliumSubDaosProgram.methods
+                    .trackVoteV0()
+                    .accounts({
+                      payer: pdaWallet,
+                      delegatedPosition: new PublicKey(vote.delegatedPosition),
+                      registrar: HNT_REGISTRAR,
+                      position: positionKey(new PublicKey(vote.asset))[0],
+                      proposal,
+                      mint: new PublicKey(vote.asset),
+                      marker: voteMarkerKey(
+                        new PublicKey(vote.asset),
+                        proposal
+                      )[0],
+                    })
+                    .instruction();
+                  instructions.push(delegatedCountIx);
+                }
+              }
+              return instructions;
+            })
+          )
+        ).flat(),
+        // Requeue ourselves
+        await hplCronsProgram.methods
+          .requeueProxyVoteV0()
+          .accounts({
+            marker: proxyVoteMarker,
+          })
+          .instruction()
+      );
+    }
+
+    const { transaction, remainingAccounts } = await compileTransaction(
+      instructions,
+      [[Buffer.from("vote_payer"), wallet.toBuffer(), bumpBuffer]]
+    );
+    const remoteTx = new RemoteTaskTransactionV0({
+      task,
+      taskQueuedAt,
+      transaction: {
+        ...transaction,
+        accounts: remainingAccounts.map((acc) => acc.pubkey),
+      },
+    });
+    const serialized = await RemoteTaskTransactionV0.serialize(
+      tuktukProgram.coder.accounts,
+      remoteTx
+    );
+    const resp = {
+      transaction: serialized.toString("base64"),
+      signature: Buffer.from(
+        sign.detached(Uint8Array.from(serialized), keypair.secretKey)
+      ).toString("base64"),
+      remaining_accounts: remainingAccounts.map((acc) => ({
+        pubkey: acc.pubkey.toBase58(),
+        is_signer: acc.isSigner,
+        is_writable: acc.isWritable,
+      })),
+    };
+    reply.status(200).send(resp);
+  } catch (err) {
+    console.error(err);
+    reply.status(500).send({
+      message: "Request failed",
+    });
+  }
+});
+
 function deepCamelCaseKeys(obj: any): any {
   if (Array.isArray(obj)) {
     return obj.map(deepCamelCaseKeys);
@@ -466,3 +687,18 @@ const start = async () => {
 };
 
 start();
+
+function arrayEquals(choices: number[], choices1: number[]) {
+  if (choices.length !== choices1.length) return false;
+
+  // Sort both arrays to normalize order
+  const sorted1 = [...choices].sort((a, b) => a - b);
+  const sorted2 = [...choices1].sort((a, b) => a - b);
+
+  // Compare sorted arrays
+  for (let i = 0; i < sorted1.length; i++) {
+    if (sorted1[i] !== sorted2[i]) return false;
+  }
+
+  return true;
+}

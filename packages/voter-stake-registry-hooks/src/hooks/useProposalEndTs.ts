@@ -2,21 +2,21 @@ import { useProposal, useProposalConfig, useResolutionSettings } from "@helium/m
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 
-export const useProposalEndTs = (proposalKey: PublicKey) => {
+export function useProposalEndTs(proposalKey?: PublicKey) {
   const { info: proposal } = useProposal(proposalKey);
   const { info: proposalConfig } = useProposalConfig(proposal?.proposalConfig);
   const { info: resolution } = useResolutionSettings(
     proposalConfig?.stateController
   );
-  const endTs =
-    resolution &&
+  return resolution &&
+    // @ts-ignore
     (proposal?.state.resolved
-      ? proposal?.state.resolved.endTs
-      : proposal?.state.voting?.startTs.add(
+      ? // @ts-ignore
+        new BN(proposal?.state.resolved.endTs)
+      : // @ts-ignore
+        new BN(proposal?.state.voting?.startTs).add(
           resolution.settings.nodes.find(
             (node) => typeof node.offsetFromStartTs !== "undefined"
           )?.offsetFromStartTs?.offset ?? new BN(0)
         ));
-
-  return endTs;
-};
+}

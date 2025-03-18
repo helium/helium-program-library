@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use modular_governance::proposal::accounts::{ProposalConfigV0, ProposalV0};
+use shared_utils::resize_to_fit_pda;
 
 use crate::{error::VsrError, registrar_seeds, state::*};
 
@@ -20,6 +21,7 @@ pub struct RelinquishVoteV1<'info> {
     has_one = rent_refund,
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
+  #[account(mut)]
   pub registrar: Box<Account<'info, Registrar>>,
   pub voter: Signer<'info>,
   #[account(
@@ -103,6 +105,18 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
 
   if marker.choices.is_empty() {
     marker.weight = 0;
+    ctx
+      .accounts
+      .position
+      .remove_recent_proposal(ctx.accounts.proposal.key());
+    ctx.accounts.position.registrar_paid_rent = u64::try_from(
+      i64::try_from(ctx.accounts.position.registrar_paid_rent).unwrap()
+        + resize_to_fit_pda(
+          &ctx.accounts.registrar.to_account_info(),
+          &ctx.accounts.position,
+        )?,
+    )
+    .unwrap()
   }
 
   Ok(())

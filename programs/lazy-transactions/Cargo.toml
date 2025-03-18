@@ -24,7 +24,8 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
-spl-concurrent-merkle-tree = "0.2.0"
+solana-zk-sdk = { workspace = true }
+spl-concurrent-merkle-tree = "0.4.0"
 bytemuck = "1.13.0"
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }

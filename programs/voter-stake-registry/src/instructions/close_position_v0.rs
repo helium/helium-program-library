@@ -75,5 +75,16 @@ pub fn handler(ctx: Context<ClosePositionV0>) -> Result<()> {
     },
   ))?;
 
+  let registrar = &mut ctx.accounts.registrar;
+  let position = &mut ctx.accounts.position;
+  **registrar.to_account_info().lamports.borrow_mut() = registrar
+    .to_account_info()
+    .lamports()
+    .saturating_add(position.registrar_paid_rent);
+  **position.to_account_info().lamports.borrow_mut() = position
+    .to_account_info()
+    .lamports()
+    .saturating_sub(position.registrar_paid_rent);
+
   Ok(())
 }

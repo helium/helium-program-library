@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use modular_governance::proposal::accounts::ProposalV0;
-use shared_utils::resize_to_fit;
 use voter_stake_registry::{
   state::{PositionV0, Registrar, VoteMarkerV0},
   VoterStakeRegistry,
@@ -51,11 +50,15 @@ pub struct TrackVoteV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = DaoEpochInfoV0::size(),
+    space = if dao_epoch_info.data_len() > 0 {
+        dao_epoch_info.data_len()
+    } else {
+        DaoEpochInfoV0::size()
+    },
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &get_sub_dao_epoch_info_seed(&registrar)],
     bump,
   )]
-  pub dao_epoch_info: Account<'info, DaoEpochInfoV0>,
+  pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
 }
@@ -71,7 +74,6 @@ pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
   let data = ctx.accounts.marker.data.try_borrow().unwrap();
   let has_data = !data.is_empty();
   drop(data);
-  let mut voted = has_data;
   if has_data {
     let marker: Account<VoteMarkerV0> = try_from!(Account<VoteMarkerV0>, &ctx.accounts.marker)?;
     require_eq!(
@@ -79,27 +81,7 @@ pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
       ctx.accounts.position.registrar,
       ErrorCode::InvalidMarker
     );
-    voted = !marker.choices.is_empty();
   }
-  if voted {
-    ctx.accounts.delegated_position.add_recent_proposal(
-      ctx.accounts.proposal.key(),
-      ctx.accounts.proposal.created_at,
-    );
-    msg!(
-      "Proposals are now {:?}",
-      ctx.accounts.delegated_position.recent_proposals
-    );
-    resize_to_fit(
-      &ctx.accounts.payer,
-      &ctx.accounts.system_program.to_account_info(),
-      &ctx.accounts.delegated_position,
-    )?;
-  } else {
-    ctx
-      .accounts
-      .delegated_position
-      .remove_recent_proposal(ctx.accounts.proposal.key());
-  }
+
   Ok(())
 }

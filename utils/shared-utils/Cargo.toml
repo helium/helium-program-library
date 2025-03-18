@@ -24,6 +24,7 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
+solana-zk-sdk = { workspace = true }
 account-compression-cpi = { workspace = true }
 uint = "0.9"
 mpl-token-metadata = { workspace = true }

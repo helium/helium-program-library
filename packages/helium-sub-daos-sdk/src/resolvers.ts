@@ -19,6 +19,7 @@ import { init as initHsd } from "./init";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
 import { notEmittedCounterKey } from "@helium/no-emit-sdk";
 import { min } from "bn.js";
+import { getLockupEffectiveEndTs } from "./utils";
 
 const THREAD_PID = new PublicKey(
   "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
@@ -99,7 +100,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         "subDao",
       ]) as PublicKey;
       if (subDao) {
-        const [key] = await subDaoEpochInfoKey(subDao, unixTime, PROGRAM_ID);
+        const [key] = subDaoEpochInfoKey(subDao, unixTime, PROGRAM_ID);
 
         return key;
       }
@@ -131,7 +132,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         "subDao",
       ]) as PublicKey;
       if (subDao) {
-        const [key] = await subDaoEpochInfoKey(
+        const [key] = subDaoEpochInfoKey(
           subDao,
           unixTime - EPOCH_LENGTH,
           PROGRAM_ID
@@ -152,7 +153,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         "subDao",
       ]) as PublicKey;
       if (subDao) {
-        const [key] = await subDaoEpochInfoKey(
+        const [key] = subDaoEpochInfoKey(
           subDao,
           unixTime - EPOCH_LENGTH,
           PROGRAM_ID
@@ -204,11 +205,11 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
             ? proxyConfigAcc?.seasons
                 ?.reverse()
                 .find((s) => new BN(now.toString()).gte(s.start))?.end ||
-              positionAcc.lockup.endTs
+              getLockupEffectiveEndTs(positionAcc.lockup)
             : delegatedPositionAcc.expirationTs;
-        const [key] = await subDaoEpochInfoKey(
+        const [key] = subDaoEpochInfoKey(
           subDao,
-          bnMin(positionAcc.lockup.endTs, expirationTs)
+          bnMin(getLockupEffectiveEndTs(positionAcc.lockup), expirationTs)
         );
 
         return key;
@@ -271,12 +272,12 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
           .find((s) => new BN(now.toString()).gte(s.start))?.end;
         const expirationTs =
           !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
-            ? seasonEnd || positionAcc.lockup.endTs
+            ? seasonEnd || getLockupEffectiveEndTs(positionAcc.lockup)
             : delegatedPositionAcc.expirationTs;
         const epochTs = positionAcc.genesisEnd.lte(new BN(now))
-          ? min(positionAcc.lockup.endTs, expirationTs)
+          ? min(getLockupEffectiveEndTs(positionAcc.lockup), expirationTs)
           : positionAcc.genesisEnd;
-        const [key] = await subDaoEpochInfoKey(subDao, epochTs);
+        const [key] = subDaoEpochInfoKey(subDao, epochTs);
 
         return key;
       }

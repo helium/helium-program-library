@@ -132,4 +132,46 @@ pub mod voter_stake_registry {
   pub fn temp_release_position_v0(ctx: Context<TempReleasePositionV0>) -> Result<()> {
     instructions::temp_release_position_v0::handler(ctx)
   }
+
+  pub fn relinquish_expired_proxy_vote_v0(
+    ctx: Context<RelinquishExpiredProxyVoteV0>,
+  ) -> Result<()> {
+    instructions::relinquish_expired_proxy_vote_v0::handler(ctx)
+  }
+
+  pub fn count_proxy_vote_v0(ctx: Context<CountProxyVoteV0>) -> Result<()> {
+    instructions::count_proxy_vote_v0::handler(ctx)
+  }
+
+  pub fn proxied_vote_v1(ctx: Context<ProxiedVoteV1>, args: VoteArgsV0) -> Result<()> {
+    instructions::proxied_vote_v1::handler(ctx, args)
+  }
+
+  pub fn proxied_relinquish_vote_v1(
+    ctx: Context<ProxiedRelinquishVoteV1>,
+    args: VoteArgsV0,
+  ) -> Result<()> {
+    instructions::proxied_relinquish_vote_v1::handler(ctx, args)
+  }
+
+  pub fn temp_backfill_proxy_marker(
+    ctx: Context<TempBackfillProxyMarker>,
+    args: VoteArgsV0,
+  ) -> Result<()> {
+    instructions::temp_backfill_proxy_marker::handler(ctx, args)
+  }
+
+  pub fn clear_recent_proposals_v0(
+    ctx: Context<ClearRecentProposalsV0>,
+    args: ClearRecentProposalsArgsV0,
+  ) -> Result<()> {
+    instructions::clear_recent_proposals_v0::handler(ctx, args)
+  }
+
+  pub fn temp_backfill_recent_proposals(
+    ctx: Context<TempBackfillRecentProposals>,
+    args: TempBackfillRecentProposalsArgs,
+  ) -> Result<()> {
+    instructions::temp_backfill_recent_proposals::handler(ctx, args)
+  }
 }

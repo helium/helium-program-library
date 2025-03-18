@@ -43,6 +43,7 @@ import * as client from "../packages/distributor-oracle/src/client";
 import {
   Database,
   OracleServer,
+  RewardableEntity,
 } from "../packages/distributor-oracle/src/server";
 import {
   decodeEntityKey,
@@ -106,6 +107,10 @@ export class DatabaseMock implements Database {
       lifetimeRewards: 0,
       byHotspot: {},
     };
+  }
+
+  getRewardableEntities(wallet: anchor.web3.PublicKey, limit: number, batchNumber?: number): Promise<{ entities: RewardableEntity[]; nextBatchNumber: number; }> {
+    throw new Error("Method not implemented.");
   }
 
   async getTotalRewards() {
@@ -400,6 +405,7 @@ describe("distributor-oracle", () => {
       ldProgram,
       rewardsProgram,
       hemProgram,
+      null,
       oracle,
       db,
       lazyDistributor,
@@ -553,11 +559,11 @@ describe("distributor-oracle", () => {
     const keyToAsset = keyToAssetKey(daoK, ecc)[0];
     const res = await chai
       .request(oracleServer.server)
-      .post(`/v1/sign/${keyToAsset.toBase58()}`)
-      .send({ });
+      .post("/v1/sign")
+      .send({ keyToAssetKeys: [keyToAsset.toBase58()] });
 
-    assert.hasAllKeys(res.body, ["message", "signature", "serialiedMessage"]);
-    const { signature, serialiedMessage } = res.body;
+    assert.hasAllKeys(res.body, ["messages", "oracle"]);
+    const { messages, oracle } = res.body;
     await rewardsProgram.methods
       .setCurrentRewardsWrapperV2({
         currentRewards: new anchor.BN("100000000"),
@@ -573,9 +579,9 @@ describe("distributor-oracle", () => {
       })
       .preInstructions([
         Ed25519Program.createInstructionWithPublicKey({
-          publicKey: oracle.publicKey.toBytes(),
-          message: Buffer.from(serialiedMessage, "base64"),
-          signature: Buffer.from(signature, "base64"),
+          publicKey: new PublicKey(oracle).toBytes(),
+          message: Buffer.from(messages[0].serialized, "base64"),
+          signature: Buffer.from(messages[0].signature, "base64"),
         }),
       ])
       .rpc({ skipPreflight: true });

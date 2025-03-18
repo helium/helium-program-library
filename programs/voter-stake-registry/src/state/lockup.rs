@@ -1,6 +1,8 @@
-use crate::error::*;
-use anchor_lang::prelude::*;
 use std::convert::TryFrom;
+
+use anchor_lang::prelude::*;
+
+use crate::error::*;
 
 // Seconds in one day.
 pub const SECS_PER_DAY: u64 = 86_400;
@@ -93,6 +95,13 @@ impl Lockup {
       0
     } else {
       (self.end_ts - curr_ts) as u64
+    }
+  }
+
+  pub fn effective_end_ts(&self) -> i64 {
+    match self.kind {
+      LockupKind::Constant => i64::MAX,
+      _ => self.end_ts,
     }
   }
 
