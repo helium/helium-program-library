@@ -3,7 +3,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   metadata::{
     create_master_edition_v3, create_metadata_accounts_v3,
-    mpl_token_metadata::types::{CollectionDetails, Creator, DataV2},
+    mpl_token_metadata::types::{Creator, DataV2},
     CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
   },
   token::{self, Mint, MintTo, Token, TokenAccount},

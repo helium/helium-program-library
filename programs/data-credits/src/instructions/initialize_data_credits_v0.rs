@@ -8,7 +8,7 @@ use circuit_breaker::{
 };
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-use crate::{circuit_breaker::*, errors::*, state::*};
+use crate::{circuit_breaker::*, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsArgsV0 {

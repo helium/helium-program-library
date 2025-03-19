@@ -49,9 +49,15 @@ pub struct UpdateCarrierTreeV0<'info> {
 
 #[macro_export]
 macro_rules! try_from {
-  ($ty: ty, $acc: expr) => {
-    <$ty>::try_from(unsafe { core::mem::transmute::<_, &AccountInfo<'_>>($acc.as_ref()) })
-  };
+  ($ty: ty, $acc: expr) => {{
+    let account_info = $acc.as_ref();
+    <$ty>::try_from(unsafe {
+      core::mem::transmute::<
+        &anchor_lang::prelude::AccountInfo<'_>,
+        &anchor_lang::prelude::AccountInfo<'_>,
+      >(account_info)
+    })
+  }};
 }
 
 pub fn handler(ctx: Context<UpdateCarrierTreeV0>, args: UpdateCarrierTreeArgsV0) -> Result<()> {
