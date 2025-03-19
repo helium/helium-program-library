@@ -12,9 +12,15 @@ use crate::{error::ErrorCode, state::*, TESTING};
 
 #[macro_export]
 macro_rules! try_from {
-  ($ty: ty, $acc: expr) => {
-    <$ty>::try_from(unsafe { core::mem::transmute::<_, &AccountInfo<'_>>($acc.as_ref()) })
-  };
+  ($ty: ty, $acc: expr) => {{
+    let account_info = $acc.as_ref();
+    <$ty>::try_from(unsafe {
+      core::mem::transmute::<
+        &anchor_lang::prelude::AccountInfo<'_>,
+        &anchor_lang::prelude::AccountInfo<'_>,
+      >(account_info)
+    })
+  }};
 }
 
 pub fn get_sub_dao_epoch_info_seed(registrar: &Registrar) -> [u8; 8] {
