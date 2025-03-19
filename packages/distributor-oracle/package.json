@@ -40,7 +40,7 @@
     "@helium/address": "^4.10.2",
     "@helium/helium-entity-manager-sdk": "^0.9.31",
     "@helium/helium-sub-daos-sdk": "^0.9.31",
-    "@helium/hpl-crons-sdk": "^0.10.0-alpha.13",
+    "@helium/hpl-crons-sdk": "^0.9.31",
     "@helium/idls": "^0.9.31",
     "@helium/lazy-distributor-sdk": "^0.9.31",
     "@helium/rewards-oracle-sdk": "^0.9.31",

@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use tuktuk_program::{RunTaskReturnV0, TaskReturnV0, TransactionSourceV0, TriggerV0};
+use voter_stake_registry::state::ProxyMarkerV0;
 
 use super::{VOTE_SERVICE_SIGNER, VOTE_SERVICE_URL};
-use crate::voter_stake_registry::accounts::ProxyMarkerV0;
 
 #[derive(Accounts)]
 pub struct RequeueProxyVoteV0<'info> {

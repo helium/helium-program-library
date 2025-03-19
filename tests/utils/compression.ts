@@ -58,6 +58,8 @@ export async function createCompressionNft({
             return new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
           case "logWrapper":
             return new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+          case "systemProgram":
+            return new PublicKey("11111111111111111111111111111111");
           default:
             return;
         }

@@ -128,7 +128,7 @@ export async function getRecipients(
       account,
       info: hemProgram.coder.accounts.decode<
         IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
-      >("KeyToAssetV0", account.data),
+      >("keyToAssetV0", account.data),
     }),
     true,
     false
@@ -150,7 +150,7 @@ export async function getRecipients(
       account,
       info: program.coder.accounts.decode<
         IdlAccounts<LazyDistributor>["recipientV0"]
-      >("RecipientV0", account.data),
+      >("recipientV0", account.data),
     }),
     false,
     forceRequery
@@ -339,7 +339,7 @@ export async function formBulkTransactions({
       account,
       info: lazyDistributorProgram.coder.accounts.decode<
         IdlAccounts<LazyDistributor>["recipientV0"]
-      >("RecipientV0", account.data),
+      >("recipientV0", account.data),
     }))
   ).map((x) => x?.info);
   const assetProofsById = await getAssetProofBatchFn(
@@ -387,7 +387,7 @@ export async function formBulkTransactions({
       account,
       info: heliumEntityManagerProgram!.coder.accounts.decode<
         IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
-      >("KeyToAssetV0", account.data),
+      >("keyToAssetV0", account.data),
     }),
     true,
     false

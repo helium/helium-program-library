@@ -1,3 +1,5 @@
+import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
+
 /**
  * Program IDL in camelCase format in order to be used in JS/TS.
  *
@@ -293,7 +295,7 @@ export type PythSolanaReceiver = {
     },
     {
       name: "priceUpdateV2";
-      discriminator: [70, 9, 59, 15, 151, 95, 3, 234];
+      discriminator: [34, 241, 35, 99, 157, 126, 244, 205];
     }
   ];
   errors: [
@@ -629,7 +631,7 @@ export type PythSolanaReceiver = {
   ];
 };
 
-export const IDL = {
+export const IDL = convertIdlToCamelCase({
   address: "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ",
   metadata: {
     name: "pyth_solana_receiver",
@@ -918,7 +920,7 @@ export const IDL = {
     },
     {
       name: "priceUpdateV2",
-      discriminator: [70, 9, 59, 15, 151, 95, 3, 234],
+      discriminator: [34, 241, 35, 99, 157, 126, 244, 205],
     },
   ],
   errors: [
@@ -1252,4 +1254,4 @@ export const IDL = {
       },
     },
   ],
-};
+});

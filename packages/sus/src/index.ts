@@ -35,6 +35,7 @@ import {
 } from "@solana/web3.js";
 import axios from "axios";
 import { inflate } from "pako";
+import { convertLegacyIdl } from "./convertLegacyIdl";
 
 const BUBBLEGUM_PROGRAM_ID = new PublicKey(
   "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
@@ -343,7 +344,7 @@ export async function sus({
       if (acc) {
         return {
           program: programKeys[index],
-          idl: decodeIdl(acc),
+          idl: decodeIdl(acc, programKeys[index].toBase58()),
         };
       }
     })
@@ -737,11 +738,15 @@ function getIdlKey(programId: PublicKey): PublicKey {
   return new PublicKey(publicKeyBytes);
 }
 
-function decodeIdl(account: AccountInfo<Buffer>): Idl | undefined {
+function decodeIdl(account: AccountInfo<Buffer>, programAddress?: string): Idl | undefined {
   try {
     const idlData = decodeIdlAccount(Buffer.from(account.data.subarray(8)));
     const inflatedIdl = inflate(idlData.data);
-    return JSON.parse(utf8.decode(inflatedIdl));
+    let json = JSON.parse(utf8.decode(inflatedIdl));
+    if (json && !json.address) {
+      json = convertLegacyIdl(json, programAddress);
+    }
+    return convertIdlToCamelCase(json);
   } catch (e: any) {
     // Ignore, not a valid IDL
   }
@@ -899,7 +904,7 @@ function decodeIdlStruct(
     if (type) {
       return {
         type,
-        parsed: coder.decode(type, account.data),
+        parsed: coder.decode(lowercaseFirst(type), account.data),
       };
     }
   } catch (e: any) {
@@ -1050,3 +1055,8 @@ const HELIUM_ENTITY_CREATOR = PublicKey.findProgramAddressSync(
   [Buffer.from("entity_creator", "utf-8"), DAO.toBuffer()],
   new PublicKey("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8")
 )[0];
+
+function lowercaseFirst(type: string): string {
+  return type.charAt(0).toLowerCase() + type.slice(1);
+}
+

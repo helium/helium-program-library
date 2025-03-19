@@ -141,7 +141,7 @@ pub struct SubDaoEpochInfoV0WithDescriminator {
 
 impl BorshSerialize for SubDaoEpochInfoV0WithDescriminator {
   fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-    SubDaoEpochInfoV0::DISCRIMINATOR.serialize(writer)?;
+    writer.write_all(SubDaoEpochInfoV0::DISCRIMINATOR)?;
     self.sub_dao_epoch_info.serialize(writer)
   }
 }

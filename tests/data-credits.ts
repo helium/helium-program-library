@@ -48,6 +48,7 @@ export async function burnDataCredits({
   amount: number;
   subDao: PublicKey;
 }): Promise<{ subDaoEpochInfo: PublicKey }> {
+  console.log("start delegate")
   const useData = await program.methods
     .delegateDataCreditsV0({
       amount: toBN(amount, 0),
@@ -56,8 +57,10 @@ export async function burnDataCredits({
     .accountsPartial({
       subDao,
     });
+
   const delegatedDataCredits = (await useData.pubkeys()).delegatedDataCredits!;
   await useData.rpc({ skipPreflight: true });
+  console.log("end delegate");
   const burn = program.methods
     .burnDelegatedDataCreditsV0({
       amount: toBN(amount, 0),
@@ -68,6 +71,7 @@ export async function burnDataCredits({
 
   await burn.rpc({ skipPreflight: true });
 
+  console.log("end burn");
   return {
     subDaoEpochInfo: (await burn.pubkeys()).subDaoEpochInfo!,
   };

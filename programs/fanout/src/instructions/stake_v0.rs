@@ -257,7 +257,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       },
       verify_signer_seeds,
     ),
-    Some(ctx.accounts.fanout.key()),
+    None,
   )?;
 
   Ok(())

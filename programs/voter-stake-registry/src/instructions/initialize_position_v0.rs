@@ -246,7 +246,7 @@ pub fn handler(ctx: Context<InitializePositionV0>, args: InitializePositionArgsV
       },
       verify_signer_seeds,
     ),
-    Some(ctx.accounts.registrar.key()),
+    None,
   )?;
 
   Ok(())

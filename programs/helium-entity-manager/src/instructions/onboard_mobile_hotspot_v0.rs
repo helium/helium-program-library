@@ -71,8 +71,6 @@ pub struct OnboardMobileHotspotV0<'info> {
   #[account(
     seeds = ["maker_approval".as_bytes(), rewardable_entity_config.key().as_ref(), maker.key().as_ref()],
     bump = maker_approval.bump_seed,
-    has_one = maker,
-    has_one = rewardable_entity_config,
   )]
   pub maker_approval: Box<Account<'info, MakerApprovalV0>>,
   #[account(

@@ -7,6 +7,7 @@ use anchor_spl::{
   },
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
+use mpl_token_metadata::types::CollectionDetails;
 
 use crate::FanoutV0;
 
@@ -127,7 +128,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
     },
     true,
     true,
-    None,
+    Some(CollectionDetails::V2 { padding: [0; 8] }),
   )?;
 
   create_master_edition_v3(

@@ -60,7 +60,6 @@ pub struct IssueDataOnlyEntityV0<'info> {
     bump,
     has_one = collection,
     has_one = merkle_tree,
-    has_one = dao,
   )]
   pub data_only_config: Box<Account<'info, DataOnlyConfigV0>>,
   /// CHECK: Signs as a verified creator to make searching easier

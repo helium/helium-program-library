@@ -1,3 +1,5 @@
+import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
+
 /**
  * Program IDL in camelCase format in order to be used in JS/TS.
  *
@@ -1878,7 +1880,7 @@ export type Bubblegum = {
   ];
 };
 
-export const IDL = {
+export const IDL = convertIdlToCamelCase({
   address: "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY",
   metadata: {
     name: "bubblegum",
@@ -3694,4 +3696,4 @@ export const IDL = {
       },
     },
   ],
-};
+});

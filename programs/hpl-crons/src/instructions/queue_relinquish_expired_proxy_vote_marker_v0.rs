@@ -13,7 +13,7 @@ use tuktuk_program::{
   types::QueueTaskArgsV0,
   TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
-use voter_stake_registry::{instruction::RelinquishExpiredProxyVoteV0, state::ProxyMarkerV0};
+use voter_stake_registry::{accounts::RelinquishExpiredProxyVoteV0, state::ProxyMarkerV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct QueueRelinquishExpiredProxyVoteMarkerArgsV0 {
@@ -55,7 +55,7 @@ pub fn handler(
   let (compiled_tx, _) = compile_transaction(
     vec![Instruction {
       program_id: voter_stake_registry::ID,
-      accounts: voter_stake_registry::client::accounts::RelinquishExpiredProxyVoteV0 {
+      accounts: RelinquishExpiredProxyVoteV0 {
         marker: ctx.accounts.marker.key(),
         proposal: ctx.accounts.marker.proposal.key(),
         system_program: system_program::ID,
@@ -63,7 +63,7 @@ pub fn handler(
       }
       .to_account_metas(None)
       .to_vec(),
-      data: RelinquishExpiredProxyVoteV0 {}.data(),
+      data: voter_stake_registry::instruction::RelinquishExpiredProxyVoteV0 {}.data(),
     }],
     vec![],
   )

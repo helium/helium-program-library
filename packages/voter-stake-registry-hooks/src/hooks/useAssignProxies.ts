@@ -235,7 +235,7 @@ export const useAssignProxies = () => {
               subInstructions.push(
                 await vsrProgram.methods
                   .countProxyVoteV0()
-                  .accounts({
+                  .accountsPartial({
                     payer: provider.wallet.publicKey,
                     proxyMarker: proxyMarker.pubkey,
                     marker: voteMarkerK,

@@ -17,7 +17,6 @@ pub struct RelinquishVoteV1<'info> {
     seeds = [b"marker", mint.key().as_ref(), proposal.key().as_ref()],
     bump = marker.bump_seed,
     has_one = registrar,
-    has_one = mint,
     has_one = rent_refund,
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,

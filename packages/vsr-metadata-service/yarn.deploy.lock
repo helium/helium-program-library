@@ -23,10 +23,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@coral-xyz/anchor-errors@npm:^0.30.1":
-  version: 0.30.1
-  resolution: "@coral-xyz/anchor-errors@npm:0.30.1"
-  checksum: 52efca5a9c83824295360185865082eae39b375905df2c9f7aab0a094071168d34a23a2277ba0c9c947cb6c4574b947ced4634b25857995029aab6c3d030caff
+"@coral-xyz/anchor-errors@npm:^0.31.0":
+  version: 0.31.0
+  resolution: "@coral-xyz/anchor-errors@npm:0.31.0"
+  checksum: beb42facd19f2c8f32478eed76e2fa20c3cee8be6a2790b4c8cb8eeaca88b5f1da1a2b14d38ac662f23788fcb3bd9573a90285397425621b740a4b422e4e214b
   languageName: node
   linkType: hard
 
@@ -53,26 +53,24 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@coral-xyz/anchor@npm:^0.30.1":
-  version: 0.30.1
-  resolution: "@coral-xyz/anchor@npm:0.30.1"
+"@coral-xyz/anchor@npm:^0.31.0":
+  version: 0.31.0
+  resolution: "@coral-xyz/anchor@npm:0.31.0"
   dependencies:
-    "@coral-xyz/anchor-errors": ^0.30.1
-    "@coral-xyz/borsh": ^0.30.1
+    "@coral-xyz/anchor-errors": ^0.31.0
+    "@coral-xyz/borsh": ^0.31.0
     "@noble/hashes": ^1.3.1
-    "@solana/web3.js": ^1.68.0
+    "@solana/web3.js": ^1.69.0
     bn.js: ^5.1.2
     bs58: ^4.0.1
     buffer-layout: ^1.2.2
     camelcase: ^6.3.0
     cross-fetch: ^3.1.5
-    crypto-hash: ^1.3.0
     eventemitter3: ^4.0.7
     pako: ^2.0.3
-    snake-case: ^3.0.4
     superstruct: ^0.15.4
     toml: ^3.0.0
-  checksum: eb23f65c81127a09545f2e25f6409a175610a5113a523849702feff23c57d98fc89da0c23e7851ca21672fc54b2936455b5116c7de71a3924c94facd21dfe614
+  checksum: b74942b4066567640ad224de3a1d7d49f6d1e246f10508ed6e765981d3b0766a73ab0fd2ec6f21f3c3baacdf776eb569fc73bd9a3690790c20bdc8f6d237bad4
   languageName: node
   linkType: hard
 
@@ -88,15 +86,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@coral-xyz/borsh@npm:^0.30.1":
-  version: 0.30.1
-  resolution: "@coral-xyz/borsh@npm:0.30.1"
+"@coral-xyz/borsh@npm:^0.31.0":
+  version: 0.31.0
+  resolution: "@coral-xyz/borsh@npm:0.31.0"
   dependencies:
     bn.js: ^5.1.2
     buffer-layout: ^1.2.0
   peerDependencies:
-    "@solana/web3.js": ^1.68.0
-  checksum: eefe1aebc416f111fd19bed3515096db4492d725f9dad3a45064871812d1627ec6454189b9035bd77c4e7885bf58541792acf074b2242039cdbc247fb2698674
+    "@solana/web3.js": ^1.69.0
+  checksum: 73d6d838662182c39f2230366d9bfbb5bb8120cc31fa6141ddf6dd445a6c719a920dd40d475c64ecaa953eda7e0516a05fc134c08e344350d4a284374a4edb94
   languageName: node
   linkType: hard
 
@@ -185,19 +183,19 @@ __metadata:
     ts-loader: ^9.2.3
     typescript: ^5.2.2
   peerDependencies:
-    "@coral-xyz/anchor": ^0.30.1
+    "@coral-xyz/anchor": ^0.31.0
   languageName: unknown
   linkType: soft
 
-"@helium/anchor-resolvers@npm:^0.2.17":
-  version: 0.2.21
-  resolution: "@helium/anchor-resolvers@npm:0.2.21"
+"@helium/anchor-resolvers@npm:^0.10.0-alpha.6":
+  version: 0.10.0-alpha.13
+  resolution: "@helium/anchor-resolvers@npm:0.10.0-alpha.13"
   dependencies:
-    "@solana/spl-token": ^0.3.6
-    "@solana/web3.js": ^1.43.4
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.91.1
   peerDependencies:
-    "@coral-xyz/anchor": ^0.26.0
-  checksum: b8639d000c7a95f47810e62b31e3fd5795ba2152310a0047dc80e09191cd8b56a949eea223f00902c2fcabe47f17090fa2b49b8386d90cd98dded6612992443f
+    "@coral-xyz/anchor": ^0.30.1
+  checksum: 3632aa2af404dc91366ac147ca648f6db5cbcd6b15f7e56d2913c025c1eb24ab6f91618198a3cfcddefe3cffc471ab8537cd91faba174a5c9091fcafde14ed36
   languageName: node
   linkType: hard
 
@@ -205,7 +203,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
-    "@coral-xyz/anchor": ^0.30.1
+    "@coral-xyz/anchor": ^0.31.0
     "@solana/web3.js": ^1.91.1
     bn.js: ^5.2.0
     borsh: ^0.7.0
@@ -225,15 +223,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/nft-proxy-sdk@npm:^0.1.2":
-  version: 0.1.2
-  resolution: "@helium/nft-proxy-sdk@npm:0.1.2"
+"@helium/nft-proxy-sdk@npm:^0.1.5-alpha.0":
+  version: 0.1.5-alpha.0
+  resolution: "@helium/nft-proxy-sdk@npm:0.1.5-alpha.0"
   dependencies:
-    "@coral-xyz/anchor": ^0.30.1
-    "@helium/anchor-resolvers": ^0.2.17
+    "@coral-xyz/anchor": ^0.31.0
+    "@helium/anchor-resolvers": ^0.10.0-alpha.6
     "@helium/modular-governance-idls": ^0.0.10
     "@solana/spl-token": ^0.3.8
-  checksum: 1dd7cb64ddbcafd8d8f3dbfcd485190152bbcf75242bc8bdefe3e2a416a76332138ea0a8cf95cf243b8c37c2c9bd0d52b99e2881723bb648ea883e8c9568166a
+  checksum: aff794ddf89ae1205e3fa5307e9caa0b379878c6a9fa249cfe69e876b3f2cfccc52ed84d76f1b69027d10001ac5463a4b09820bd8d4d19082629261860d5348e
   languageName: node
   linkType: hard
 
@@ -241,7 +239,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.31.0
     "@helium/account-fetch-cache": ^0.9.31
     "@helium/address": ^4.10.2
     "@helium/anchor-resolvers": ^0.9.31
@@ -263,10 +261,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
-    "@coral-xyz/anchor": ^0.28.0
+    "@coral-xyz/anchor": ^0.31.0
     "@helium/anchor-resolvers": ^0.9.31
     "@helium/idls": ^0.9.31
-    "@helium/nft-proxy-sdk": ^0.0.15
+    "@helium/nft-proxy-sdk": ^0.1.5-alpha.0
     "@helium/spl-utils": ^0.9.31
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
@@ -283,7 +281,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/vsr-metadata-service@workspace:."
   dependencies:
-    "@coral-xyz/anchor": ^0.30.1
+    "@coral-xyz/anchor": ^0.31.0
     "@fastify/cors": ^8.1.1
     "@helium/account-fetch-cache": ^0.9.31
     "@helium/address": ^4.10.2
@@ -494,7 +492,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.43.4, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0, @solana/web3.js@npm:^1.78.4":
+"@solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0, @solana/web3.js@npm:^1.78.4":
   version: 1.78.4
   resolution: "@solana/web3.js@npm:1.78.4"
   dependencies:
@@ -517,7 +515,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/web3.js@npm:^1.91.1":
+"@solana/web3.js@npm:^1.69.0, @solana/web3.js@npm:^1.91.1":
   version: 1.98.0
   resolution: "@solana/web3.js@npm:1.98.0"
   dependencies:

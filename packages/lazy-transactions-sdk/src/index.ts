@@ -100,12 +100,12 @@ export type CompiledTransaction = {
 
 const CompiledInstructionDef: any = {
   typeDef: {
-    name: "CompiledInstruction",
+    name: "compiledInstruction",
     type: {
       kind: "struct",
       fields: [
         {
-          name: "program_id_index",
+          name: "programIdIndex",
           docs: [
             "Index into the transaction keys array indicating the program account that executes this instruction.",
           ],

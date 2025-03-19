@@ -31,7 +31,6 @@ pub struct MintDataCreditsV0<'info> {
     ],
     bump = data_credits.data_credits_bump,
     has_one = hnt_mint,
-    has_one = dc_mint,
     has_one = hnt_price_oracle
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,

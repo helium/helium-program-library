@@ -603,7 +603,7 @@ export class OracleServer {
       const serializedMessages = await Promise.all(
         messages.map(async (message) =>
           this.ldProgram.coder.accounts.encode(
-            "SetCurrentRewardsTransactionV0",
+            "setCurrentRewardsTransactionV0",
             message
           )
         )
@@ -696,7 +696,7 @@ export class OracleServer {
       } else {
         distributeIx = await this.ldProgram.methods
           .distributeRewardsV0()
-          .accounts({
+          .accountsPartial({
             common: {
               payer: wallet,
               recipient: recipient,
@@ -742,7 +742,7 @@ export class OracleServer {
           instructions.push(
             await this.ldProgram.methods
               .initializeRecipientV0()
-              .accounts({
+              .accountsPartial({
                 recipient: recipient,
                 lazyDistributor: this.lazyDistributor,
                 payer: wallet,

@@ -1066,10 +1066,12 @@ describe("helium-sub-daos", () => {
                     position,
                     proposal: proposal as PublicKey,
                     voter: positionAuthorityKp.publicKey,
+                    proposalConfig,
+                    stateController: me,
+                    onVoteHook: PublicKey.default,
                   })
                   .signers([positionAuthorityKp])
                   .rpcAndKeys({ skipPreflight: true });
-
                 // Ensure dao pays resize
                 await sendInstructions(provider, [
                   SystemProgram.transfer({

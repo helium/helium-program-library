@@ -13,8 +13,8 @@ import {
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { HplCrons } from "../../target/types/hpl_crons";
-import { nextAvailableTaskIds } from "./queue-hotspot-claims";
+import { HplCrons } from "@helium/idls/lib/types/hpl_crons";
+import { nextAvailableTaskIds } from "@helium/tuktuk-sdk";
 
 const PROGRAM_ID = new PublicKey("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 

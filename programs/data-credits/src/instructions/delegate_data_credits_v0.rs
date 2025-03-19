@@ -36,7 +36,6 @@ pub struct DelegateDataCreditsV0<'info> {
   )]
   pub delegated_data_credits: Box<Account<'info, DelegatedDataCreditsV0>>,
   #[account(
-    has_one = dc_mint,
     seeds = ["dc".as_bytes(), dc_mint.key().as_ref()],
     bump = data_credits.data_credits_bump
   )]

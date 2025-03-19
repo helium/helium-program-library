@@ -7,11 +7,6 @@ import {
   truthy,
 } from "@helium/spl-utils";
 import { AnchorProvider, BN, Program, web3 } from "@coral-xyz/anchor";
-import {
-  getGovernanceProgramVersion,
-  MintMaxVoteWeightSource,
-  withCreateRealm,
-} from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   Keypair,
@@ -38,27 +33,14 @@ export async function initVsr(
   // Default is to set proxy season to end so far ahead it isn't relevant
   proxySeasonEnd = new BN(new Date().valueOf() / 1000 + 24 * 60 * 60 * 5 * 365)
 ) {
-  const programVersion = await getGovernanceProgramVersion(
-    program.provider.connection,
-    SPL_GOVERNANCE_PID
-  );
   // Create Realm
   const name = `Realm-${new Keypair().publicKey.toBase58().slice(0, 6)}`;
-  const realmAuthorityPk = me;
   let instructions: TransactionInstruction[] = [];
   let signers: Keypair[] = [];
-  const realmPk = await withCreateRealm(
-    instructions,
-    SPL_GOVERNANCE_PID,
-    programVersion,
-    name,
-    realmAuthorityPk,
-    hntMint,
-    me,
-    undefined,
-    MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
-    new BN(1)
-  );
+  const realmPk = await PublicKey.findProgramAddressSync(
+    [Buffer.from("governance", "utf-8"), Buffer.from(name, "utf-8")],
+    SPL_GOVERNANCE_PID
+  )[0];
 
   const {
     pubkeys: { proxyConfig },
