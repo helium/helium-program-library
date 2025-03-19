@@ -10,8 +10,7 @@ use tuktuk_program::{
   types::QueueTaskArgsV0,
   TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
-
-use crate::voter_stake_registry::accounts::ProxyMarkerV0;
+use voter_stake_registry::state::ProxyMarkerV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct QueueProxyVoteArgsV0 {

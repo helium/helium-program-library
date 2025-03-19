@@ -8,7 +8,6 @@ use tuktuk_program::cron::{
 };
 
 use super::{ORACLE_SIGNER, ORACLE_URL};
-use crate::helium_entity_manager::accounts::KeyToAssetV0;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct AddEntityToCronArgsV0 {

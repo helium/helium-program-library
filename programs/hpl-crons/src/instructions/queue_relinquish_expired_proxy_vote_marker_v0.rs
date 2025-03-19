@@ -13,10 +13,7 @@ use tuktuk_program::{
   types::QueueTaskArgsV0,
   TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
-
-use crate::voter_stake_registry::{
-  self, accounts::ProxyMarkerV0, client::args::RelinquishExpiredProxyVoteV0,
-};
+use voter_stake_registry::{instruction::RelinquishExpiredProxyVoteV0, state::ProxyMarkerV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct QueueRelinquishExpiredProxyVoteMarkerArgsV0 {
