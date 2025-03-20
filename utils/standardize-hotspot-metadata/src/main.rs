@@ -158,7 +158,7 @@ async fn main() -> Result<()> {
     TpuClientConfig::default(),
   )
   .unwrap();
-  let makers = helium_entity_program.accounts::<MakerV0>(vec![]).await?;
+  let makers = helium_entity_program.accounts::<MakerV0>(vec![])?;
   let makers_by_collection: HashMap<_, _> = makers
     .iter()
     .map(|(k, maker)| (maker.collection, (k, maker)))
@@ -273,7 +273,7 @@ async fn main() -> Result<()> {
               },
             },
           })
-          .accountsPartial(TempStandardizeEntity {
+          .accounts(TempStandardizeEntity {
             key_to_asset,
             merkle_tree,
             maker: maker_opt.map(|m| *m.0),

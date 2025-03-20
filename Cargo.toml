@@ -16,10 +16,7 @@ exclude = [
   "utils/vehnt",
   "utils/default-env",
   "utils/hpl-utils",
-  "utils/bulk-claim-rewards",
   "utils/generate-test-gateway-txn",
-  "utils/active-hotspot-oracle",
-  "utils/backfill-onboarding-fees",
   "utils/standardize-hotspot-metadata",
   "utils/pyth_solana_receiver_sdk",
 ]

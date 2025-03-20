@@ -1,18 +1,27 @@
 use std::{
-  collections::HashMap, env, thread::sleep, time::{Duration, Instant}
+  collections::HashMap,
+  env,
+  thread::sleep,
+  time::{Duration, Instant},
 };
 
+use anyhow::{anyhow, Context};
 use indicatif::{ProgressBar, ProgressStyle};
 use solana_client::{
   rpc_client::RpcClient,
   rpc_config::RpcSendTransactionConfig,
   tpu_client::{TpuClient, TpuSenderError},
 };
-use anyhow::{anyhow, Context};
 use solana_connection_cache::connection_cache::{
   ConnectionManager, ConnectionPool, NewConnectionConfig,
 };
-use solana_sdk::{compute_budget::ComputeBudgetInstruction, instruction::Instruction, signature::{Keypair, Signature}, signer::Signer, transaction::{Transaction, TransactionError, VersionedTransaction}};
+use solana_sdk::{
+  compute_budget::ComputeBudgetInstruction,
+  instruction::Instruction,
+  signature::{Keypair, Signature},
+  signer::Signer,
+  transaction::{Transaction, TransactionError, VersionedTransaction},
+};
 
 pub mod dao;
 pub mod program;
@@ -25,7 +34,7 @@ pub const SEND_TRANSACTION_INTERVAL: Duration = Duration::from_millis(10);
 pub struct SendResult {
   pub failure_count: i32,
   pub failures: Vec<Option<TransactionError>>,
-  pub confirmed_signatures: Vec<Option<Signature>>
+  pub confirmed_signatures: Vec<Option<Signature>>,
 }
 
 // This is based on tpu_client but rewritten to work with raw versioned txs
@@ -42,7 +51,7 @@ pub fn send_and_confirm_messages_with_spinner<
     return Ok(SendResult {
       failure_count: 0,
       failures: vec![],
-      confirmed_signatures: vec![]
+      confirmed_signatures: vec![],
     });
   }
   let mut failed_tx_count: i32 = 0;
@@ -86,20 +95,20 @@ pub fn send_and_confirm_messages_with_spinner<
       for (index, (_i, transaction, deser)) in pending_transactions.values().enumerate() {
         // Disabling TPU client because it doesn't work with SWQoS
         // if !tpu_client.send_wire_transaction(transaction.clone()) {
-          if let Err(err) = rpc_client.send_transaction_with_config(
-            deser,
-            RpcSendTransactionConfig {
-              skip_preflight: true,
-              ..RpcSendTransactionConfig::default()
-            },
-          ) {
-            confirmed_transactions += 1;
-            failed_tx_count += 1;
-            progress_bar.println(format!(
-              "Failed transaction: {} {:?}",
-              deser.signatures[0], err
-            ));
-          }
+        if let Err(err) = rpc_client.send_transaction_with_config(
+          deser,
+          RpcSendTransactionConfig {
+            skip_preflight: true,
+            ..RpcSendTransactionConfig::default()
+          },
+        ) {
+          confirmed_transactions += 1;
+          failed_tx_count += 1;
+          progress_bar.println(format!(
+            "Failed transaction: {} {:?}",
+            deser.signatures[0], err
+          ));
+        }
         // }
         set_message_for_confirmed_transactions(
           &progress_bar,
@@ -167,12 +176,10 @@ pub fn send_and_confirm_messages_with_spinner<
     }
   }
 
-
-
   Ok(SendResult {
     failure_count: failed_tx_count,
     failures: transaction_errors,
-    confirmed_signatures
+    confirmed_signatures,
   })
 }
 
