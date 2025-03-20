@@ -9,6 +9,7 @@ overflow-checks = true
 [dependencies]
 clap = { version = "4.0.32", features = ["derive"] }
 solana-client = "2.2.3"
+solana-program = "2.2.1"
 serde_json = "1.0"
 reqwest = { version = "0.11.13", features = ["blocking", "json"]  }
 serde = "1.0.152"

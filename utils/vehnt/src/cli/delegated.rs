@@ -423,7 +423,7 @@ impl Delegated {
                         epoch: *inner_key,
                       },
                     })
-                    .accountsPartial(TempUpdateSubDaoEpochInfo {
+                    .accounts(TempUpdateSubDaoEpochInfo {
                       sub_dao_epoch_info: new_sub_dao_epoch_info.0,
                       authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
                         .unwrap(),
