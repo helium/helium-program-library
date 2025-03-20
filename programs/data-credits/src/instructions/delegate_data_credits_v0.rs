@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, solana_program::hash::hash};
+use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{
@@ -8,16 +8,12 @@ use anchor_spl::{
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
 
-use crate::state::*;
+use crate::{hash_name, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct DelegateDataCreditsArgsV0 {
   pub amount: u64,
   pub router_key: String,
-}
-
-pub fn hash_name(name: &str) -> [u8; 32] {
-  hash(name.as_bytes()).to_bytes()
 }
 
 #[derive(Accounts)]

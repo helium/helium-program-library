@@ -17,7 +17,7 @@ import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
 import { OMIT_KEYS } from "../constants";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
-import { lowerFirstChar } from "./handleAccountWebhook";
+import { lowerFirstChar } from "@helium/spl-utils";
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;

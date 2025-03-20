@@ -10,6 +10,7 @@ import database, { limit } from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
 import { OMIT_KEYS } from "../constants";
+import { lowerFirstChar } from "@helium/spl-utils";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
@@ -133,7 +134,3 @@ export const handleAccountWebhook = async ({
     }
   });
 };
-
-export function lowerFirstChar(accName: string): string {
-  return accName.charAt(0).toLowerCase() + accName.slice(1);
-}

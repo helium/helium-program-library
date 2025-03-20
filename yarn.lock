@@ -161,12 +161,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@coral-xyz/anchor-cli@npm:^0.31.2":
-  version: 0.31.2
-  resolution: "@coral-xyz/anchor-cli@npm:0.31.2"
+"@coral-xyz/anchor-cli@npm:0.31.0":
+  version: 0.31.0
+  resolution: "@coral-xyz/anchor-cli@npm:0.31.0"
   bin:
     anchor: anchor.js
-  checksum: 55f2fefaacf4f68ec4a544aeae30738b10003e95c847099b161b7a5dfad1f31266fffba3a6e15cd3d0d02e60f249c48dd0ae29cc16db6b122fa81aab1682a478
+  checksum: dfeb04237b50d1dfe079d70e0139ba1dc3625c1f767f8dbefe18dc7c47fb83208bcdff119a9b367e14752dc11495c8a58a22207435d3cc3f2e915c2e2905c887
   languageName: node
   linkType: hard
 
@@ -13496,7 +13496,7 @@ __metadata:
   resolution: "root-workspace-0b6124@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@coral-xyz/anchor-cli": ^0.31.2
+    "@coral-xyz/anchor-cli": 0.31.0
     "@coral-xyz/borsh": ^0.2.6
     "@helium/crypto": ^4.10.2
     "@helium/modular-governance-idls": ^0.1.5-alpha.0

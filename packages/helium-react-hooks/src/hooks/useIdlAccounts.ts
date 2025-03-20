@@ -6,11 +6,9 @@ import {
   UseAccountsState,
   useAccounts,
 } from "@helium/account-fetch-cache-hooks";
+import { lowerFirstChar } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
-
-export const lowerFirstChar = (str) =>
-  str.charAt(0).toLowerCase() + str.substring(1);
 
 export function useIdlAccounts<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
   keys: PublicKey[] | undefined,

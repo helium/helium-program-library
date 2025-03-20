@@ -4,7 +4,7 @@ import { TypedAccountParser } from "@helium/account-fetch-cache";
 import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
-import { lowerFirstChar } from "./useIdlAccounts";
+import { lowerFirstChar } from "@helium/spl-utils";
 import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
 
 // Cache parsers per key/type combination to avoid re-creating them on re-render.

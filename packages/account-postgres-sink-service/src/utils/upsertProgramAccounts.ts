@@ -11,7 +11,7 @@ import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
-import { lowerFirstChar } from "./handleAccountWebhook";
+import { lowerFirstChar } from "@helium/spl-utils";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
