@@ -27,6 +27,27 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### add_wallet_to_entity_cron_v0
+
+#### Accounts
+
+| Name                 | Mutability | Signer | Docs |
+| -------------------- | ---------- | ------ | ---- |
+| payer                | immut      | no     |      |
+| user_authority       | immut      | no     |      |
+| wallet               | immut      | no     |      |
+| authority            | immut      | no     |      |
+| cron_job             | immut      | no     |      |
+| cron_job_transaction | immut      | no     |      |
+| system_program       | immut      | no     |      |
+| cron_program         | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### close_delegation_claim_bot_v0
 
 #### Accounts
@@ -162,6 +183,50 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### queue_proxy_vote_v0
+
+#### Accounts
+
+| Name                 | Mutability | Signer | Docs |
+| -------------------- | ---------- | ------ | ---- |
+| payer                | immut      | no     |      |
+| voter                | immut      | no     |      |
+| marker               | immut      | no     |      |
+| pda_wallet           | immut      | no     |      |
+| queue_authority      | immut      | no     |      |
+| task_queue           | immut      | no     |      |
+| task_queue_authority | immut      | no     |      |
+| task                 | immut      | no     |      |
+| tuktuk_program       | immut      | no     |      |
+| system_program       | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
+### queue_relinquish_expired_proxy_vote_marker_v0
+
+#### Accounts
+
+| Name                 | Mutability | Signer | Docs |
+| -------------------- | ---------- | ------ | ---- |
+| payer                | immut      | no     |      |
+| marker               | immut      | no     |      |
+| queue_authority      | immut      | no     |      |
+| task_queue           | immut      | no     |      |
+| task_queue_authority | immut      | no     |      |
+| task                 | immut      | no     |      |
+| tuktuk_program       | immut      | no     |      |
+| system_program       | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### queue_relinquish_expired_vote_marker_v0
 
 #### Accounts
@@ -196,6 +261,28 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | proposal             | immut      | no     |      |
 | proposal_config      | immut      | no     |      |
 | state_controller     | immut      | no     |      |
+| queue_authority      | immut      | no     |      |
+| task_queue           | immut      | no     |      |
+| task_queue_authority | immut      | no     |      |
+| task                 | immut      | no     |      |
+| tuktuk_program       | immut      | no     |      |
+| system_program       | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
+### queue_wallet_claim_v0
+
+#### Accounts
+
+| Name                 | Mutability | Signer | Docs |
+| -------------------- | ---------- | ------ | ---- |
+| payer                | immut      | no     |      |
+| wallet               | immut      | no     |      |
+| pda_wallet           | immut      | no     |      |
 | queue_authority      | immut      | no     |      |
 | task_queue           | immut      | no     |      |
 | task_queue_authority | immut      | no     |      |
@@ -255,6 +342,46 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 | Name | Type | Docs |
 | ---- | ---- | ---- |
+
+### requeue_entity_claim_v0
+
+#### Accounts
+
+| Name         | Mutability | Signer | Docs |
+| ------------ | ---------- | ------ | ---- |
+| key_to_asset | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
+### requeue_proxy_vote_v0
+
+#### Accounts
+
+| Name   | Mutability | Signer | Docs |
+| ------ | ---------- | ------ | ---- |
+| marker | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
+### requeue_wallet_claim_v0
+
+#### Accounts
+
+| Name   | Mutability | Signer | Docs |
+| ------ | ---------- | ------ | ---- |
+| wallet | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
 
 ### start_delegation_claim_bot_v0
 
@@ -342,6 +469,10 @@ undefined
 
 undefined
 
+### ProxyMarkerV0
+
+undefined
+
 ### ResolutionSettingsV0
 
 undefined
@@ -365,6 +496,12 @@ undefined
 ## Types
 
 ### AddEntityToCronArgsV0
+
+| Field | Type |
+| ----- | ---- |
+| index | u32  |
+
+### AddWalletToEntityCronArgsV0
 
 | Field | Type |
 | ----- | ---- |
@@ -438,19 +575,19 @@ undefined
 
 ### DelegatedPositionV0
 
-| Field                 | Type            |
-| --------------------- | --------------- |
-| mint                  | pubkey          |
-| position              | pubkey          |
-| hnt_amount            | u64             |
-| sub_dao               | pubkey          |
-| last_claimed_epoch    | u64             |
-| start_ts              | i64             |
-| purged                | bool            |
-| bump_seed             | u8              |
-| claimed_epochs_bitmap | u128            |
-| expiration_ts         | i64             |
-| recent_proposals      | [object Object] |
+| Field                         | Type            |
+| ----------------------------- | --------------- |
+| mint                          | pubkey          |
+| position                      | pubkey          |
+| hnt_amount                    | u64             |
+| sub_dao                       | pubkey          |
+| last_claimed_epoch            | u64             |
+| start_ts                      | i64             |
+| purged                        | bool            |
+| bump_seed                     | u8              |
+| claimed_epochs_bitmap         | u128            |
+| expiration_ts                 | i64             |
+| \_deprecated_recent_proposals | [object Object] |
 
 ### DelegationClaimBotV0
 
@@ -550,6 +687,8 @@ undefined
 | genesis_end             | i64             |
 | bump_seed               | u8              |
 | vote_controller         | pubkey          |
+| registrar_paid_rent     | u64             |
+| recent_proposals        | [object Object] |
 
 ### ProposalConfigV0
 
@@ -588,6 +727,29 @@ undefined
 | choices               | [object Object] |
 | bump_seed             | u8              |
 
+### ProxyMarkerV0
+
+| Field       | Type   |
+| ----------- | ------ |
+| voter       | pubkey |
+| proposal    | pubkey |
+| choices     | u16    |
+| bump_seed   | u8     |
+| rent_refund | pubkey |
+
+### QueueProxyVoteArgsV0
+
+| Field        | Type |
+| ------------ | ---- |
+| free_task_id | u16  |
+
+### QueueRelinquishExpiredProxyVoteMarkerArgsV0
+
+| Field        | Type |
+| ------------ | ---- |
+| free_task_id | u16  |
+| trigger_ts   | i64  |
+
 ### QueueRelinquishExpiredVoteMarkerArgsV0
 
 | Field        | Type |
@@ -601,18 +763,23 @@ undefined
 | ------------ | ---- |
 | free_task_id | u16  |
 
-### RecentProposal
+### QueueWalletClaimArgsV0
 
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |
+| Field        | Type |
+| ------------ | ---- |
+| free_task_id | u16  |
 
 ### RemoveEntityFromCronArgsV0
 
 | Field | Type |
 | ----- | ---- |
 | index | u32  |
+
+### RequeueWalletClaimArgsV0
+
+| Field        | Type |
+| ------------ | ---- |
+| batch_number | u16  |
 
 ### ResolutionNode
 
@@ -755,3 +922,17 @@ undefined
 | \_deprecated_relinquished | bool   |
 | proxy_index               | u16    |
 | rent_refund               | pubkey |
+
+### helium_sub_daos::state::RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |
+
+### voter_stake_registry::state::position::RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |

@@ -6,6 +6,22 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 ## Instructions
 
+### clear_recent_proposals_v0
+
+#### Accounts
+
+| Name      | Mutability | Signer | Docs |
+| --------- | ---------- | ------ | ---- |
+| registrar | immut      | no     |      |
+| position  | immut      | no     |      |
+| dao       | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### close_position_v0
 
 #### Accounts
@@ -43,6 +59,31 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type            | Docs |
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
+
+### count_proxy_vote_v0
+
+#### Accounts
+
+| Name             | Mutability | Signer | Docs |
+| ---------------- | ---------- | ------ | ---- |
+| payer            | immut      | no     |      |
+| marker           | immut      | no     |      |
+| registrar        | immut      | no     |      |
+| voter            | immut      | no     |      |
+| proxy_marker     | immut      | no     |      |
+| position         | immut      | no     |      |
+| proxy_assignment | immut      | no     |      |
+| proposal         | immut      | no     |      |
+| proposal_config  | immut      | no     |      |
+| state_controller | immut      | no     |      |
+| on_vote_hook     | immut      | no     |      |
+| proposal_program | immut      | no     |      |
+| system_program   | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
 
 ### deposit_v0
 
@@ -171,6 +212,23 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### proxied_relinquish_vote_v1
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| marker         | immut      | no     |      |
+| voter          | immut      | no     |      |
+| proposal       | immut      | no     |      |
+| system_program | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### proxied_vote_v0
 
 #### Accounts
@@ -195,6 +253,40 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type            | Docs |
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
+
+### proxied_vote_v1
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| payer          | immut      | no     |      |
+| marker         | immut      | no     |      |
+| voter          | immut      | no     |      |
+| proposal       | immut      | no     |      |
+| system_program | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
+### relinquish_expired_proxy_vote_v0
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| rent_refund    | immut      | no     |      |
+| marker         | immut      | no     |      |
+| proposal       | immut      | no     |      |
+| system_program | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
 
 ### relinquish_expired_vote_v0
 
@@ -272,6 +364,42 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name        | Type      | Docs |
 | ----------- | --------- | ---- |
 | time_offset | undefined |      |
+
+### temp_backfill_proxy_marker
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| payer          | immut      | no     |      |
+| marker         | immut      | no     |      |
+| voter          | immut      | no     |      |
+| authority      | immut      | no     |      |
+| proposal       | immut      | no     |      |
+| system_program | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
+### temp_backfill_recent_proposals
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| authority      | immut      | no     |      |
+| registrar      | immut      | no     |      |
+| position       | immut      | no     |      |
+| system_program | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
 
 ### temp_release_position_v0
 
@@ -414,6 +542,10 @@ undefined
 
 undefined
 
+### ProxyMarkerV0
+
+undefined
+
 ### Registrar
 
 undefined
@@ -431,6 +563,13 @@ undefined
 | weight | u128   |
 | name   | string |
 | uri    | string |
+
+### ClearRecentProposalsArgsV0
+
+| Field    | Type |
+| -------- | ---- |
+| ts       | i64  |
+| dao_bump | u8   |
 
 ### ConfigureVotingMintArgsV0
 
@@ -491,6 +630,8 @@ undefined
 | genesis_end             | i64             |
 | bump_seed               | u8              |
 | vote_controller         | pubkey          |
+| registrar_paid_rent     | u64             |
+| recent_proposals        | [object Object] |
 
 ### ProposalConfigV0
 
@@ -551,6 +692,23 @@ undefined
 | max_proxy_time | i64             |
 | seasons        | [object Object] |
 
+### ProxyMarkerV0
+
+| Field       | Type   |
+| ----------- | ------ |
+| voter       | pubkey |
+| proposal    | pubkey |
+| choices     | u16    |
+| bump_seed   | u8     |
+| rent_refund | pubkey |
+
+### RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |
+
 ### Registrar
 
 | Field                      | Type            |
@@ -588,6 +746,12 @@ undefined
 | ----- | ---- |
 | start | i64  |
 | end   | i64  |
+
+### TempBackfillRecentProposalsArgs
+
+| Field            | Type            |
+| ---------------- | --------------- |
+| recent_proposals | [object Object] |
 
 ### TransferArgsV0
 

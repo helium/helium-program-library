@@ -659,19 +659,19 @@ undefined
 
 ### DelegatedPositionV0
 
-| Field                 | Type            |
-| --------------------- | --------------- |
-| mint                  | pubkey          |
-| position              | pubkey          |
-| hnt_amount            | u64             |
-| sub_dao               | pubkey          |
-| last_claimed_epoch    | u64             |
-| start_ts              | i64             |
-| purged                | bool            |
-| bump_seed             | u8              |
-| claimed_epochs_bitmap | u128            |
-| expiration_ts         | i64             |
-| recent_proposals      | [object Object] |
+| Field                         | Type            |
+| ----------------------------- | --------------- |
+| mint                          | pubkey          |
+| position                      | pubkey          |
+| hnt_amount                    | u64             |
+| sub_dao                       | pubkey          |
+| last_claimed_epoch            | u64             |
+| start_ts                      | i64             |
+| purged                        | bool            |
+| bump_seed                     | u8              |
+| claimed_epochs_bitmap         | u128            |
+| expiration_ts                 | i64             |
+| \_deprecated_recent_proposals | [object Object] |
 
 ### EmissionScheduleItem
 
@@ -750,6 +750,8 @@ undefined
 | genesis_end             | i64             |
 | bump_seed               | u8              |
 | vote_controller         | pubkey          |
+| registrar_paid_rent     | u64             |
+| recent_proposals        | [object Object] |
 
 ### ProposalState
 
@@ -786,13 +788,6 @@ undefined
 | name           | string          |
 | max_proxy_time | i64             |
 | seasons        | [object Object] |
-
-### RecentProposal
-
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |
 
 ### Registrar
 
@@ -973,6 +968,13 @@ undefined
 | Cliff    |        |
 | Constant |        |
 
+### helium_sub_daos::state::RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |
+
 ### voter_stake_registry::state::lockup::LockupKind
 
 | Variant  | Fields |
@@ -980,3 +982,10 @@ undefined
 | None     |        |
 | Cliff    |        |
 | Constant |        |
+
+### voter_stake_registry::state::position::RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |

@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.10.0](https://github.com/helium/helium-program-libary/compare/v0.9.30...v0.10.0) (2025-03-20)
+
+**Note:** Version bump only for package @helium/hpl-crons-sdk
+
+
+
+
+
 # [0.10.0-alpha.13](https://github.com/helium/helium-program-libary/compare/v0.9.23...v0.10.0-alpha.13) (2025-02-25)
 
 **Note:** Version bump only for package @helium/hpl-crons-sdk
