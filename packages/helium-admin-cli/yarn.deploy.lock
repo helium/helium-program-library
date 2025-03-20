@@ -420,6 +420,7 @@ __metadata:
     "@helium/proposal-sdk": ^0.1.5-alpha.0
     "@helium/spl-utils": ^0.9.31
     "@helium/treasury-management-sdk": ^0.9.31
+    "@helium/tuktuk-sdk": ^0.0.4
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-governance": ^0.3.18
     "@solana/spl-token": ^0.3.8

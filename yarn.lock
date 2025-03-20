@@ -161,7 +161,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@coral-xyz/anchor-cli@npm:^0.31.0":
+"@coral-xyz/anchor-cli@npm:^0.31.2":
   version: 0.31.2
   resolution: "@coral-xyz/anchor-cli@npm:0.31.2"
   bin:
@@ -13496,7 +13496,7 @@ __metadata:
   resolution: "root-workspace-0b6124@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@coral-xyz/anchor-cli": ^0.31.0
+    "@coral-xyz/anchor-cli": ^0.31.2
     "@coral-xyz/borsh": ^0.2.6
     "@helium/crypto": ^4.10.2
     "@helium/modular-governance-idls": ^0.1.5-alpha.0
