@@ -66,7 +66,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .swapMakerStake()
-      .accounts({
+      .accountsPartial({
         maker,
         updateAuthority: authority,
         newStakeSource: getAssociatedTokenAddressSync(HNT_MINT, authority),

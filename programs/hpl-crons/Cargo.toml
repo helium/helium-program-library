@@ -1,0 +1,31 @@
+[package]
+name = "hpl-crons"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "hpl_crons"
+
+[features]
+devnet = []
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true }
+tuktuk-program = { workspace = true }
+spl-token = { version = "7.0.0", features = ["no-entrypoint"] }
+spl-associated-token-account = { version = "6.0.0", features = ["no-entrypoint"] }
+helium-entity-manager = { workspace = true }
+helium-sub-daos = { workspace = true }
+no-emit = { workspace = true }
+voter-stake-registry = { workspace = true }
+modular-governance = { workspace = true }
+

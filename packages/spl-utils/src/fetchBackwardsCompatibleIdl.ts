@@ -1,4 +1,4 @@
-import { Provider } from "@coral-xyz/anchor";
+import { Idl, Provider } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { Program } from "@coral-xyz/anchor";
 import circuitBreakerIdl from "./idl/circuit_breaker.json";
@@ -15,15 +15,25 @@ import priceOracleIdl from "./idl/price_oracle.json";
 import rewardsOracleIdl from "./idl/rewards_oracle.json";
 import treasuryManagementIdl from "./idl/treasury_management.json";
 import voterStakeRegistryIdl from "./idl/voter_stake_registry.json";
+import proposalIdl from "./idl/proposal.json";
+import stateControllerIdl from "./idl/state_controller.json";
+import nftProxyIdl from "./idl/nft_proxy.json";
+import orgIdl from "./idl/organization.json";
 
 export async function fetchBackwardsCompatibleIdl(
   programId: PublicKey,
   provider: Provider
 ) {
   const idl = await Program.fetchIdl(programId, provider);
+  return useBackwardsCompatibleIdl(programId, idl);
+}
+
+export function useBackwardsCompatibleIdl(
+  programId: PublicKey,
+  idl: Idl | null | undefined
+) {
   // This is an Anchor 0.30+ IDL. Return the old IDLs
-  // @ts-ignore
-  if (!idl || idl?.address) {
+  if (!idl || !idl?.address) {
     return IDLS_BY_PROGRAM[programId.toBase58()] || idl;
   }
 
@@ -45,4 +55,8 @@ const IDLS_BY_PROGRAM: Record<string, any> = {
   memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr: mobileEntityManagerIdl,
   hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ: hexboostingIdl,
   noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv: noEmitIdl,
+  propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs: proposalIdl,
+  stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM: stateControllerIdl,
+  nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p: nftProxyIdl,
+  orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f: orgIdl,
 };

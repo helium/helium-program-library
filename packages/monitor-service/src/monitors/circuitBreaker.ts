@@ -53,7 +53,7 @@ export async function monitorAccountCircuitBreaker(cbProgram: Program<CircuitBre
   const [cb] = await accountWindowedBreakerKey(account);
   watch(cb, async (acc) => {
     const cbAccount = cbProgram.coder.accounts.decode(
-      "AccountWindowedCircuitBreakerV0",
+      "accountWindowedCircuitBreakerV0",
       acc!.data
     );
     const tokenAccount = await getAccount(provider.connection, account);
@@ -76,7 +76,7 @@ export async function monitorMintCircuitBreaker(
   const [cb] = await mintWindowedBreakerKey(mint);
   watch(cb, async (acc) => {
     const account = cbProgram.coder.accounts.decode(
-      "MintWindowedCircuitBreakerV0",
+      "mintWindowedCircuitBreakerV0",
       acc!.data
     );
     const mintAcc = await getMint(provider.connection, mint);

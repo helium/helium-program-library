@@ -1,8 +1,10 @@
-use crate::errors::ErrorCode;
-use crate::{AccountWindowedCircuitBreakerV0, WindowV0, WindowedCircuitBreakerConfigV0};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{
   set_authority, spl_token::instruction::AuthorityType, SetAuthority, Token, TokenAccount,
+};
+
+use crate::{
+  errors::ErrorCode, AccountWindowedCircuitBreakerV0, WindowV0, WindowedCircuitBreakerConfigV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -53,7 +55,7 @@ pub fn handler(
         last_aggregated_value: 0,
         last_unix_timestamp: 0,
       },
-      bump_seed: ctx.bumps["circuit_breaker"],
+      bump_seed: ctx.bumps.circuit_breaker,
     });
 
   set_authority(

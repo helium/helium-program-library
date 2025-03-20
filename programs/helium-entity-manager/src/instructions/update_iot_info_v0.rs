@@ -1,12 +1,13 @@
-use crate::state::*;
-use account_compression_cpi::program::SplAccountCompression;
+use account_compression_cpi::account_compression::program::SplAccountCompression;
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token},
 };
-use bubblegum_cpi::get_asset_id;
-use bubblegum_cpi::{program::Bubblegum, TreeConfig};
+use bubblegum_cpi::{
+  bubblegum::{accounts::TreeConfig, program::Bubblegum},
+  get_asset_id,
+};
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnWithoutTrackingV0},
@@ -16,6 +17,8 @@ use data_credits::{
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
 use shared_utils::*;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateIotInfoArgsV0 {

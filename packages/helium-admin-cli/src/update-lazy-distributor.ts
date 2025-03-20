@@ -89,7 +89,7 @@ export async function run(args: any = process.argv) {
           : null,
       approver: argv.newApprover ? new PublicKey(argv.newApprover) : null,
     })
-    .accounts({
+    .accountsPartial({
       rewardsMint: subdaoMint,
       authority: lazyDistAcc.authority,
     })

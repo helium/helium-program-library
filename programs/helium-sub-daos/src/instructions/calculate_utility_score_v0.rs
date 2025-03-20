@@ -5,7 +5,9 @@ use no_emit::{NoEmit, NotEmittedCounterV0};
 use shared_utils::precise_number::PreciseNumber;
 use voter_stake_registry::state::Registrar;
 
-use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH};
+use crate::{
+  current_epoch, error::ErrorCode, state::*, try_from, update_subdao_vehnt, EPOCH_LENGTH,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CalculateUtilityScoreArgsV0 {
@@ -96,14 +98,10 @@ pub fn handler(
   let mut cumulative_not_emitted = 0;
   let mut not_emitted = 0;
 
-  if ctx.accounts.prev_dao_epoch_info.lamports() > 0
-    && !ctx
-      .accounts
-      .prev_dao_epoch_info
-      .to_account_info()
-      .data_is_empty()
-  {
-    let info: Account<DaoEpochInfoV0> = Account::try_from(&ctx.accounts.prev_dao_epoch_info)?;
+  let prev_dao_epoch_info = &mut ctx.accounts.prev_dao_epoch_info;
+
+  if prev_dao_epoch_info.lamports() > 0 && !prev_dao_epoch_info.to_account_info().data_is_empty() {
+    let info: Account<DaoEpochInfoV0> = try_from!(Account<DaoEpochInfoV0>, prev_dao_epoch_info)?;
     prev_supply = info.current_hnt_supply;
     prev_total_utility_score = info.total_utility_score;
     prev_cumulative_not_emitted = info.cumulative_not_emitted;
@@ -116,7 +114,10 @@ pub fn handler(
       .to_account_info()
       .data_is_empty()
   {
-    let info: Account<NotEmittedCounterV0> = Account::try_from(&ctx.accounts.not_emitted_counter)?;
+    let info: Account<NotEmittedCounterV0> = try_from!(
+      Account<NotEmittedCounterV0>,
+      ctx.accounts.not_emitted_counter
+    )?;
     cumulative_not_emitted = info.amount_not_emitted;
     not_emitted = info
       .amount_not_emitted
@@ -206,13 +207,12 @@ pub fn handler(
 
   ctx.accounts.dao_epoch_info.dao = ctx.accounts.dao.key();
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
-  ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
+  ctx.accounts.sub_dao_epoch_info.bump_seed = ctx.bumps.sub_dao_epoch_info;
   ctx.accounts.sub_dao_epoch_info.initialized = true;
   ctx.accounts.prev_sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
-  ctx.accounts.prev_sub_dao_epoch_info.bump_seed =
-    *ctx.bumps.get("prev_sub_dao_epoch_info").unwrap();
+  ctx.accounts.prev_sub_dao_epoch_info.bump_seed = ctx.bumps.prev_sub_dao_epoch_info;
   ctx.accounts.prev_sub_dao_epoch_info.epoch = args.epoch - 1;
-  ctx.accounts.dao_epoch_info.bump_seed = *ctx.bumps.get("dao_epoch_info").unwrap();
+  ctx.accounts.dao_epoch_info.bump_seed = ctx.bumps.dao_epoch_info;
 
   // Calculate utility score
   // utility score = V = veHNT_dnp

@@ -17,6 +17,7 @@ import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
 import { OMIT_KEYS } from "../constants";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
+import { lowerFirstChar } from "@helium/spl-utils";
 
 interface IntegrityCheckProgramAccountsArgs {
   fastify: FastifyInstance;
@@ -69,7 +70,7 @@ export const integrityCheckProgramAccounts = async ({
     });
 
     try {
-      const program = new anchor.Program(idl, programId, provider);
+      const program = new anchor.Program(idl, provider);
       const currentSlot = await connection.getSlot();
       let blockTime24HoursAgo: number | null = null;
       let attemptSlot = currentSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
@@ -188,7 +189,7 @@ export const integrityCheckProgramAccounts = async ({
       const discriminatorsByType = new Map(
         accounts.map(({ type }) => [
           type,
-          anchor.BorshAccountsCoder.accountDiscriminator(type),
+          (program.coder.accounts as anchor.BorshAccountsCoder).accountDiscriminator(type),
         ])
       );
 
@@ -216,7 +217,7 @@ export const integrityCheckProgramAccounts = async ({
               await Promise.all(
                 accounts.map(async (c) => {
                   const decodedAcc = program.coder.accounts.decode(
-                    accName,
+                    lowerFirstChar(accName),
                     c.data as Buffer
                   );
 

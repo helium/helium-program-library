@@ -85,6 +85,11 @@ export const navigation = [
     links: [
       // DOCS NAVIGATION START
       {
+        title: "Voter stake registry",
+        href: "/docs/api/voter-stake-registry-sdk",
+      },
+
+      {
         title: "Treasury management",
         href: "/docs/api/treasury-management-sdk",
       },
@@ -93,11 +98,27 @@ export const navigation = [
 
       { title: "Price oracle", href: "/docs/api/price-oracle-sdk" },
 
+      { title: "No emit", href: "/docs/api/no-emit-sdk" },
+
+      {
+        title: "Mobile entity manager",
+        href: "/docs/api/mobile-entity-manager-sdk",
+      },
+
       { title: "Lazy transactions", href: "/docs/api/lazy-transactions-sdk" },
 
       { title: "Lazy distributor", href: "/docs/api/lazy-distributor-sdk" },
 
+      { title: "Hpl crons", href: "/docs/api/hpl-crons-sdk" },
+
       { title: "Hexboosting", href: "/docs/api/hexboosting-sdk" },
+
+      { title: "Helium sub daos", href: "/docs/api/helium-sub-daos-sdk" },
+
+      {
+        title: "Helium entity manager",
+        href: "/docs/api/helium-entity-manager-sdk",
+      },
 
       { title: "Fanout", href: "/docs/api/fanout-sdk" },
 

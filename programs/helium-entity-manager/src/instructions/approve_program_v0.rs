@@ -1,6 +1,7 @@
-use crate::state::*;
 use anchor_lang::prelude::*;
 use helium_sub_daos::DaoV0;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ApproveProgramArgsV0 {
@@ -34,7 +35,7 @@ pub fn handler(ctx: Context<ApproveProgramV0>, args: ApproveProgramArgsV0) -> Re
   ctx.accounts.program_approval.set_inner(ProgramApprovalV0 {
     dao: ctx.accounts.dao.key(),
     program_id: args.program_id,
-    bump_seed: ctx.bumps["program_approval"],
+    bump_seed: ctx.bumps.program_approval,
   });
 
   Ok(())

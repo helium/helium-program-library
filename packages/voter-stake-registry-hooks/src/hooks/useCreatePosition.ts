@@ -110,7 +110,7 @@ export const useCreatePosition = () => {
               kind: { [lockupKind]: {} },
               periods: lockupPeriodsInDays,
             } as any)
-            .accounts({
+            .accountsPartial({
               registrar,
               mint: mintKeypair.publicKey,
               depositMint: mint,
@@ -124,7 +124,7 @@ export const useCreatePosition = () => {
             .depositV0({
               amount,
             })
-            .accounts({
+            .accountsPartial({
               registrar,
               position,
               mint,
@@ -162,7 +162,7 @@ export const useCreatePosition = () => {
           delegateInstructions.push(
             await hsdProgram.methods
               .delegateV0()
-              .accounts({
+              .accountsPartial({
                 position,
                 mint: mintKeypair.publicKey,
                 registrar,

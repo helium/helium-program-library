@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "mobile_entity_manager"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -24,6 +25,7 @@ overflow-checks = true
 bs58 = "0.3.1"
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
+solana-zk-sdk = { workspace = true }
 bytemuck = "1.12.3"
 angry-purple-tiger = "0.1.0"
 mpl-token-metadata = { workspace = true }

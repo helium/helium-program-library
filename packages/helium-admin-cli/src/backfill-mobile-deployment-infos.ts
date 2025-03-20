@@ -180,7 +180,7 @@ export async function run(args: any = process.argv) {
           } = {};
 
           const decodedAcc: MobileHotspotInfo = hem.coder.accounts.decode(
-            "MobileHotspotInfoV0",
+            "mobileHotspotInfoV0",
             acc.data as Buffer
           );
 
@@ -258,7 +258,7 @@ export async function run(args: any = process.argv) {
                 location: correction.location || null,
                 deploymentInfo: correction.deploymentInfo || null,
               })
-              .accounts({
+              .accountsPartial({
                 payer: wallet.publicKey,
                 mobileInfo: acc.pubkey,
               })

@@ -71,7 +71,7 @@ export async function run(args: any = process.argv) {
           ? new PublicKey(argv.updateAuthority)
           : null,
       })
-      .accounts({
+      .accountsPartial({
         maker,
         updateAuthority: carrierAcc.updateAuthority,
       })

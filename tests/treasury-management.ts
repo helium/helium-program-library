@@ -48,7 +48,7 @@ describe("treasury-management", () => {
           threshold: new BN(1000000000),
         },
       })
-      .accounts({
+      .accountsPartial({
         treasuryMint,
         supplyMint,
       });
@@ -88,7 +88,7 @@ describe("treasury-management", () => {
             threshold: new BN(1000000000),
           },
         })
-        .accounts({
+        .accountsPartial({
           treasuryMint,
           supplyMint,
         });
@@ -111,7 +111,7 @@ describe("treasury-management", () => {
             },
           } as any,
         })
-        .accounts({
+        .accountsPartial({
           treasuryManagement,
         })
         .rpc({ skipPreflight: true });
@@ -145,7 +145,7 @@ describe("treasury-management", () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
         ])
-        .accounts({
+        .accountsPartial({
           treasuryManagement,
         })
         .rpc({ skipPreflight: true });

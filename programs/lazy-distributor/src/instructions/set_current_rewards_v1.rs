@@ -102,7 +102,7 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
   let data = verify_ed25519_ix(&ix, signer.to_bytes().as_slice())?;
   let discriminator: [u8; 8] = data[..8].try_into().unwrap();
 
-  if discriminator == SetCurrentRewardsTransactionV0::discriminator() {
+  if discriminator == SetCurrentRewardsTransactionV0::DISCRIMINATOR {
     let sign_args = SetCurrentRewardsTransactionV0::try_deserialize(&mut &data[..])?;
     require_eq!(
       sign_args.oracle_index,
@@ -124,7 +124,7 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
       ctx.accounts.lazy_distributor.key(),
       ErrorCode::InvalidLazyDistributor
     );
-  } else if discriminator == RemoteTaskTransactionV0::discriminator() {
+  } else if discriminator == RemoteTaskTransactionV0::DISCRIMINATOR {
     let run_task_ix: Instruction =
       load_instruction_at_checked(ix_index as usize, &ctx.accounts.sysvar_instructions)?;
     require_eq!(run_task_ix.program_id, TUKTUK_PID);

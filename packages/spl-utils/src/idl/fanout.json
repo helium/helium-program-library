@@ -1,319 +1,1071 @@
 {
-  "version": "0.1.1",
-  "name": "fanout",
+  "address": "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6",
+  "metadata": {
+    "name": "fanout",
+    "version": "0.1.1",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initializeFanoutV0",
+      "name": "distribute_v0",
+      "discriminator": [
+        109,
+        230,
+        224,
+        47,
+        40,
+        70,
+        90,
+        148
+      ],
       "accounts": [
         {
           "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": false
+          "writable": true,
+          "signer": true
         },
         {
           "name": "fanout",
-          "isMut": true,
-          "isSigner": false,
+          "writable": true,
+          "relations": [
+            "voucher"
+          ]
+        },
+        {
+          "name": "fanout_mint",
+          "relations": [
+            "fanout"
+          ]
+        },
+        {
+          "name": "token_account",
+          "writable": true,
+          "relations": [
+            "fanout"
+          ]
+        },
+        {
+          "name": "owner"
+        },
+        {
+          "name": "to_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fanout_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "voucher",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "fanout"
+                "value": [
+                  102,
+                  97,
+                  110,
+                  111,
+                  117,
+                  116,
+                  95,
+                  118,
+                  111,
+                  117,
+                  99,
+                  104,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "voucher"
+          ]
+        },
+        {
+          "name": "receipt_account",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_fanout_v0",
+      "discriminator": [
+        244,
+        155,
+        154,
+        165,
+        235,
+        127,
+        44,
+        187
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority"
+        },
+        {
+          "name": "fanout",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  97,
+                  110,
+                  111,
+                  117,
+                  116
+                ]
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "InitializeFanoutArgsV0"
-                },
                 "path": "args.name"
               }
             ]
           }
         },
         {
-          "name": "tokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "fanout"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fanout_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
         },
         {
-          "name": "fanoutMint",
-          "isMut": false,
-          "isSigner": false
+          "name": "fanout_mint"
         },
         {
           "name": "collection",
-          "isMut": true,
-          "isSigner": false,
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "collection"
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  101,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "FanoutV0",
                 "path": "fanout"
               }
             ]
           }
         },
         {
-          "name": "collectionAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "collection_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "collection"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
         },
         {
-          "name": "membershipMint",
-          "isMut": false,
-          "isSigner": false
+          "name": "membership_mint"
         },
         {
           "name": "metadata",
-          "isMut": true,
-          "isSigner": false,
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "metadata"
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
                 "path": "token_metadata_program"
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "collection"
               }
             ],
-            "programId": {
+            "program": {
               "kind": "account",
-              "type": "publicKey",
               "path": "token_metadata_program"
             }
           }
         },
         {
-          "name": "masterEdition",
-          "isMut": true,
-          "isSigner": false,
+          "name": "master_edition",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "metadata"
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
                 "path": "token_metadata_program"
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "collection"
               },
               {
                 "kind": "const",
-                "type": "string",
-                "value": "edition"
+                "value": [
+                  101,
+                  100,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
               }
             ],
-            "programId": {
+            "program": {
               "kind": "account",
-              "type": "publicKey",
               "path": "token_metadata_program"
             }
           }
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "tokenMetadataProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_metadata_program",
+          "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
         },
         {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         },
         {
           "name": "rent",
-          "isMut": false,
-          "isSigner": false
+          "address": "SysvarRent111111111111111111111111111111111"
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "InitializeFanoutArgsV0"
+            "defined": {
+              "name": "InitializeFanoutArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "stakeV0",
+      "name": "stake_v0",
+      "discriminator": [
+        4,
+        205,
+        52,
+        239,
+        223,
+        167,
+        17,
+        211
+      ],
       "accounts": [
         {
           "name": "payer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
           "name": "staker",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         },
         {
-          "name": "recipient",
-          "isMut": false,
-          "isSigner": false
+          "name": "recipient"
         },
         {
           "name": "fanout",
-          "isMut": true,
-          "isSigner": false,
+          "writable": true
+        },
+        {
+          "name": "membership_mint",
           "relations": [
-            "membership_mint",
-            "token_account",
-            "membership_collection"
+            "fanout"
           ]
         },
         {
-          "name": "membershipMint",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_account",
+          "relations": [
+            "fanout"
+          ]
         },
         {
-          "name": "tokenAccount",
-          "isMut": false,
-          "isSigner": false
+          "name": "membership_collection",
+          "relations": [
+            "fanout"
+          ]
         },
         {
-          "name": "membershipCollection",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "collectionMetadata",
-          "isMut": true,
-          "isSigner": false,
+          "name": "collection_metadata",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "metadata"
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
                 "path": "token_metadata_program"
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "membership_collection"
               }
             ],
-            "programId": {
+            "program": {
               "kind": "account",
-              "type": "publicKey",
               "path": "token_metadata_program"
             }
           }
         },
         {
-          "name": "collectionMasterEdition",
-          "isMut": false,
-          "isSigner": false,
+          "name": "collection_master_edition",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "metadata"
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
                 "path": "token_metadata_program"
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "membership_collection"
               },
               {
                 "kind": "const",
-                "type": "string",
-                "value": "edition"
+                "value": [
+                  101,
+                  100,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
               }
             ],
-            "programId": {
+            "program": {
               "kind": "account",
-              "type": "publicKey",
               "path": "token_metadata_program"
             }
           }
         },
         {
-          "name": "fromAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "from_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "staker"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "membership_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
         },
         {
-          "name": "stakeAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "stake_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "voucher"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "membership_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
         },
         {
-          "name": "receiptAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "receipt_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "recipient"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
         },
         {
           "name": "voucher",
-          "isMut": true,
-          "isSigner": false,
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "fanout_voucher"
+                "value": [
+                  102,
+                  97,
+                  110,
+                  111,
+                  117,
+                  116,
+                  95,
+                  118,
+                  111,
+                  117,
+                  99,
+                  104,
+                  101,
+                  114
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "mint"
               }
             ]
@@ -321,283 +1073,303 @@
         },
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "metadata",
-          "isMut": true,
-          "isSigner": false,
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "metadata"
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
                 "path": "token_metadata_program"
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "mint"
               }
             ],
-            "programId": {
+            "program": {
               "kind": "account",
-              "type": "publicKey",
               "path": "token_metadata_program"
             }
           }
         },
         {
-          "name": "masterEdition",
-          "isMut": true,
-          "isSigner": false,
+          "name": "master_edition",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "metadata"
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
                 "path": "token_metadata_program"
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "mint"
               },
               {
                 "kind": "const",
-                "type": "string",
-                "value": "edition"
+                "value": [
+                  101,
+                  100,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
               }
             ],
-            "programId": {
+            "program": {
               "kind": "account",
-              "type": "publicKey",
               "path": "token_metadata_program"
             }
           }
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         },
         {
-          "name": "tokenMetadataProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_metadata_program",
+          "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "StakeArgsV0"
+            "defined": {
+              "name": "StakeArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "unstakeV0",
-      "accounts": [
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "solDestination",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "voucher",
-          "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "fanout_voucher"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          },
-          "relations": [
-            "mint",
-            "fanout",
-            "stake_account"
-          ]
-        },
-        {
-          "name": "mint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "fanout",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "membership_mint"
-          ]
-        },
-        {
-          "name": "membershipMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "receiptAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "voucherAuthority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "toAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "stakeAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
+      "name": "unstake_v0",
+      "discriminator": [
+        199,
+        43,
+        120,
+        81,
+        103,
+        7,
+        104,
+        112
       ],
-      "args": []
-    },
-    {
-      "name": "distributeV0",
       "accounts": [
         {
           "name": "payer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "fanout",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "token_account",
-            "fanout_mint"
-          ]
-        },
-        {
-          "name": "fanoutMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "toAccount",
-          "isMut": true,
-          "isSigner": false
+          "name": "sol_destination",
+          "writable": true
         },
         {
           "name": "voucher",
-          "isMut": true,
-          "isSigner": false,
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "fanout_voucher"
+                "value": [
+                  102,
+                  97,
+                  110,
+                  111,
+                  117,
+                  116,
+                  95,
+                  118,
+                  111,
+                  117,
+                  99,
+                  104,
+                  101,
+                  114
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "mint"
               }
             ]
-          },
-          "relations": [
-            "fanout",
-            "mint"
-          ]
+          }
         },
         {
           "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "writable": true,
+          "relations": [
+            "voucher"
+          ]
         },
         {
-          "name": "receiptAccount",
-          "isMut": false,
-          "isSigner": false
+          "name": "fanout",
+          "writable": true,
+          "relations": [
+            "voucher"
+          ]
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "membership_mint",
+          "relations": [
+            "fanout"
+          ]
         },
         {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "receipt_account",
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "voucher_authority",
+          "signer": true
+        },
+        {
+          "name": "to_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "voucher_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "membership_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "stake_account",
+          "writable": true,
+          "relations": [
+            "voucher"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -606,43 +1378,78 @@
   "accounts": [
     {
       "name": "FanoutV0",
+      "discriminator": [
+        168,
+        206,
+        132,
+        204,
+        8,
+        34,
+        176,
+        119
+      ]
+    },
+    {
+      "name": "FanoutVoucherV0",
+      "discriminator": [
+        16,
+        13,
+        55,
+        98,
+        63,
+        3,
+        194,
+        216
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ArithmeticError",
+      "msg": "Error in arithmetic"
+    }
+  ],
+  "types": [
+    {
+      "name": "FanoutV0",
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "authority",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
-            "name": "tokenAccount",
-            "type": "publicKey"
+            "name": "token_account",
+            "type": "pubkey"
           },
           {
-            "name": "fanoutMint",
-            "type": "publicKey"
+            "name": "fanout_mint",
+            "type": "pubkey"
           },
           {
-            "name": "membershipMint",
-            "type": "publicKey"
+            "name": "membership_mint",
+            "type": "pubkey"
           },
           {
-            "name": "totalShares",
+            "name": "total_shares",
             "type": "u64"
           },
           {
-            "name": "totalStakedShares",
+            "name": "total_staked_shares",
             "type": "u64"
           },
           {
-            "name": "membershipCollection",
-            "type": "publicKey"
+            "name": "membership_collection",
+            "type": "pubkey"
           },
           {
-            "name": "totalInflow",
+            "name": "total_inflow",
             "type": "u64"
           },
           {
-            "name": "lastSnapshotAmount",
+            "name": "last_snapshot_amount",
             "type": "u64"
           },
           {
@@ -650,7 +1457,7 @@
             "type": "string"
           },
           {
-            "name": "bumpSeed",
+            "name": "bump_seed",
             "type": "u8"
           }
         ]
@@ -663,41 +1470,39 @@
         "fields": [
           {
             "name": "fanout",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "mint",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
-            "name": "stakeAccount",
-            "type": "publicKey"
+            "name": "stake_account",
+            "type": "pubkey"
           },
           {
             "name": "shares",
             "type": "u64"
           },
           {
-            "name": "totalInflow",
+            "name": "total_inflow",
             "type": "u64"
           },
           {
-            "name": "totalDistributed",
+            "name": "total_distributed",
             "type": "u64"
           },
           {
-            "name": "totalDust",
+            "name": "total_dust",
             "type": "u64"
           },
           {
-            "name": "bumpSeed",
+            "name": "bump_seed",
             "type": "u8"
           }
         ]
       }
-    }
-  ],
-  "types": [
+    },
     {
       "name": "InitializeFanoutArgsV0",
       "type": {
@@ -722,15 +1527,5 @@
         ]
       }
     }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "ArithmeticError",
-      "msg": "Error in arithmetic"
-    }
-  ],
-  "metadata": {
-    "address": "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6"
-  }
+  ]
 }

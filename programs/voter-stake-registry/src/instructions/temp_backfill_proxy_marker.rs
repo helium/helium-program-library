@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use proposal::ProposalV0;
+use modular_governance::proposal::accounts::ProposalV0;
 use solana_program::pubkey;
 
 use crate::{error::VsrError, state::*, VoteArgsV0};
@@ -32,7 +32,7 @@ pub fn handler(ctx: Context<TempBackfillProxyMarker>, args: VoteArgsV0) -> Resul
   let marker = &mut ctx.accounts.marker;
   marker.rent_refund = ctx.accounts.payer.key();
   marker.proposal = ctx.accounts.proposal.key();
-  marker.bump_seed = ctx.bumps["marker"];
+  marker.bump_seed = ctx.bumps.marker;
   marker.voter = ctx.accounts.voter.key();
 
   // Don't allow voting for the same choice twice.

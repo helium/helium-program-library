@@ -148,7 +148,7 @@ export const useAssignProxies = () => {
                   undelegated.push(...toUndelegate);
                   return nftProxyProgram.methods
                     .unassignProxyV0()
-                    .accounts({
+                    .accountsPartial({
                       asset: position.mint,
                       prevProxyAssignment,
                       currentProxyAssignment,
@@ -183,7 +183,7 @@ export const useAssignProxies = () => {
             .assignProxyV0({
               expirationTime,
             })
-            .accounts({
+            .accountsPartial({
               asset: position.mint,
               recipient,
               proxyConfig: registrar.proxyConfig,
@@ -235,7 +235,7 @@ export const useAssignProxies = () => {
               subInstructions.push(
                 await vsrProgram.methods
                   .countProxyVoteV0()
-                  .accounts({
+                  .accountsPartial({
                     payer: provider.wallet.publicKey,
                     proxyMarker: proxyMarker.pubkey,
                     marker: voteMarkerK,

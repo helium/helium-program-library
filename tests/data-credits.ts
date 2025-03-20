@@ -4,9 +4,9 @@ import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import {
-  PythSolanaReceiverProgram,
+  PythSolanaReceiver,
   pythSolanaReceiverIdl,
-} from "@pythnetwork/pyth-solana-receiver";
+} from "@helium/currency-utils";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAccount,
@@ -48,26 +48,30 @@ export async function burnDataCredits({
   amount: number;
   subDao: PublicKey;
 }): Promise<{ subDaoEpochInfo: PublicKey }> {
+  console.log("start delegate")
   const useData = await program.methods
     .delegateDataCreditsV0({
       amount: toBN(amount, 0),
       routerKey: (await HeliumKeypair.makeRandom()).address.b58,
     })
-    .accounts({
+    .accountsPartial({
       subDao,
     });
+
   const delegatedDataCredits = (await useData.pubkeys()).delegatedDataCredits!;
   await useData.rpc({ skipPreflight: true });
+  console.log("end delegate");
   const burn = program.methods
     .burnDelegatedDataCreditsV0({
       amount: toBN(amount, 0),
     })
-    .accounts({
+    .accountsPartial({
       delegatedDataCredits,
     });
 
   await burn.rpc({ skipPreflight: true });
 
+  console.log("end burn");
   return {
     subDaoEpochInfo: (await burn.pubkeys()).subDaoEpochInfo!,
   };
@@ -80,7 +84,7 @@ describe("data-credits", () => {
   let hsdProgram: Program<HeliumSubDaos>;
   let vsrProgram: Program<VoterStakeRegistry>;
   let nftProxyProgram: Program<NftProxy>;
-  let pythProgram: Program<PythSolanaReceiverProgram>;
+  let pythProgram: Program<PythSolanaReceiver>;
   let dcKey: PublicKey;
   let hntMint: PublicKey;
   let dcMint: PublicKey;
@@ -93,8 +97,7 @@ describe("data-credits", () => {
 
   beforeEach(async () => {
     pythProgram = new Program(
-      pythSolanaReceiverIdl,
-      new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
+      pythSolanaReceiverIdl as any,
     );
     program = await init(
       provider,
@@ -138,7 +141,7 @@ describe("data-credits", () => {
           threshold: new BN("10000000000000000000"),
         },
       })
-      .accounts({
+      .accountsPartial({
         hntMint,
         dcMint,
         payer: me,
@@ -208,7 +211,7 @@ describe("data-credits", () => {
             hntMint
           ),
         ])
-        .accounts({
+        .accountsPartial({
           dcMint,
           rewardsEscrow,
           hntMint,
@@ -235,7 +238,7 @@ describe("data-credits", () => {
           hntAmount: new BN(1 * 10 ** 8),
           dcAmount: null,
         })
-        .accounts({ dcMint })
+        .accountsPartial({ dcMint })
         .rpc({ skipPreflight: true });
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
@@ -272,7 +275,7 @@ describe("data-credits", () => {
           hntAmount: null,
           dcAmount: new BN(dcAmount),
         })
-        .accounts({ dcMint })
+        .accountsPartial({ dcMint })
         .rpc({ skipPreflight: true });
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
@@ -337,7 +340,7 @@ describe("data-credits", () => {
           newAuthority: PublicKey.default,
           hntPriceOracle: null,
         })
-        .accounts({
+        .accountsPartial({
           dcMint,
         })
         .rpc();
@@ -363,7 +366,7 @@ describe("data-credits", () => {
           amount: toBN(amount, 0),
           routerKey,
         })
-        .accounts({
+        .accountsPartial({
           subDao,
         });
       const sourceDelegatedDataCredits = (await methodA.pubkeys())
@@ -380,7 +383,7 @@ describe("data-credits", () => {
           amount: toBN(amount, 0),
           routerKey,
         })
-        .accounts({
+        .accountsPartial({
           delegatedDataCredits: sourceDelegatedDataCredits,
           destinationDelegatedDataCredits,
           subDao,

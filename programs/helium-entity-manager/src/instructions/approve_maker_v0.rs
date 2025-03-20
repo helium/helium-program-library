@@ -57,7 +57,7 @@ pub fn handler(ctx: Context<ApproveMakerV0>) -> Result<()> {
   ctx.accounts.maker_approval.set_inner(MakerApprovalV0 {
     rewardable_entity_config: ctx.accounts.rewardable_entity_config.key(),
     maker: ctx.accounts.maker.key(),
-    bump_seed: ctx.bumps["maker_approval"],
+    bump_seed: ctx.bumps.maker_approval,
   });
 
   Ok(())

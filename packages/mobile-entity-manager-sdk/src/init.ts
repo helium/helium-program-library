@@ -16,7 +16,6 @@ export const init = async (
 
   const mobileEntityManager = new Program<MobileEntityManager>(
     idl as MobileEntityManager,
-    programId,
     provider,
     undefined,
     () => mobileEntityManagerResolvers

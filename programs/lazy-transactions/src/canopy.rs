@@ -16,10 +16,11 @@
 //! The canopy will be updated everytime the concurrent merkle tree is modified. No additional work
 //! needed.
 
+use std::mem::size_of;
+
 use anchor_lang::prelude::*;
 use bytemuck::cast_slice;
 use spl_concurrent_merkle_tree::node::{empty_node_cached, Node, EMPTY};
-use std::mem::size_of;
 
 use crate::error::ErrorCode;
 
@@ -73,7 +74,7 @@ pub fn fill_in_proof_from_canopy(
   proof: &mut Vec<Node>,
 ) -> Result<()> {
   // 30 is hard coded as it is the current max depth that SPL Compression supports
-  let mut empty_node_cache = Box::new([EMPTY; 30]);
+  let empty_node_cache = Box::new([EMPTY; 30]);
   check_canopy_bytes(canopy_bytes)?;
   let canopy = cast_slice::<u8, Node>(canopy_bytes);
   let path_len = get_cached_path_length(canopy, max_depth)?;
@@ -92,7 +93,7 @@ pub fn fill_in_proof_from_canopy(
     };
     if canopy[cached_idx] == EMPTY {
       let level = max_depth - (31 - node_idx.leading_zeros());
-      let empty_node = empty_node_cached::<30>(level, &mut empty_node_cache);
+      let empty_node = empty_node_cached::<30>(level, &empty_node_cache);
       inferred_nodes.push(empty_node);
     } else {
       inferred_nodes.push(canopy[cached_idx]);

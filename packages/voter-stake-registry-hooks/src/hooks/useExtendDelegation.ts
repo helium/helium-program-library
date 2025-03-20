@@ -72,7 +72,7 @@ export const useExtendDelegation = () => {
         instructions.push(
           await hsdProgram.methods
             .extendExpirationTsV0()
-            .accounts({
+            .accountsPartial({
               position: position.pubkey,
               subDao: delegatedPosAcc.subDao,
               oldClosingTimeSubDaoEpochInfo: oldSubDaoEpochInfo,

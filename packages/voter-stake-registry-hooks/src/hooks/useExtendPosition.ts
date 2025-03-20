@@ -48,7 +48,7 @@ export const useExtendPosition = () => {
                 kind: position.lockup.kind,
                 periods: lockupPeriodsInDays,
               } as any)
-              .accounts({
+              .accountsPartial({
                 position: position.pubkey,
                 dao: dao,
               })
@@ -61,7 +61,7 @@ export const useExtendPosition = () => {
                 kind: position.lockup.kind,
                 periods: lockupPeriodsInDays,
               } as any)
-              .accounts({
+              .accountsPartial({
                 position: position.pubkey,
               })
               .instruction()

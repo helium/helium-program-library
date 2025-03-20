@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-
 #[cfg(not(feature = "no-entrypoint"))]
 use {default_env::default_env, solana_security_txt::security_txt};
 
@@ -80,7 +79,7 @@ pub mod no_emit {
   use super::*;
 
   pub fn no_emit_v0(ctx: Context<NoEmitV0>) -> Result<()> {
-    ctx.accounts.not_emitted_counter.bump_seed = ctx.bumps["not_emitted_counter"];
+    ctx.accounts.not_emitted_counter.bump_seed = ctx.bumps.not_emitted_counter;
     ctx.accounts.not_emitted_counter.amount_not_emitted = ctx
       .accounts
       .not_emitted_counter
@@ -95,7 +94,7 @@ pub mod no_emit {
           from: ctx.accounts.token_account.to_account_info(),
           authority: ctx.accounts.no_emit_wallet.to_account_info(),
         },
-        &[&[b"not_emitted", &[ctx.bumps["no_emit_wallet"]]]],
+        &[&[b"not_emitted", &[ctx.bumps.no_emit_wallet]]],
       ),
       ctx.accounts.token_account.amount,
     )?;

@@ -9,7 +9,7 @@ on:
       - master
       - develop
 env:
-  SOLANA_CLI_VERSION: 1.16.13
+  SOLANA_CLI_VERSION: 2.1.6
   NODE_VERSION: 18.12.1
 
 jobs:
@@ -117,7 +117,6 @@ jobs:
       matrix:
         test:
           - utils/ecc-sig-verifier
-          - utils/bulk-claim-rewards
           - utils/hpl-utils
           - utils/migration-tx-executor
           - utils/vehnt

@@ -149,7 +149,7 @@ export async function run(args: any = process.argv) {
           metadataUrl:
             'https://shdw-drive.genesysgo.net/H8b1gZmA2aBqDYxicxawGpznCaNbFSEJ3YnJuawGQ2EQ/data-only.json',
         })
-        .accounts({
+        .accountsPartial({
           dao,
           authority,
           merkleTree: merkle.publicKey,

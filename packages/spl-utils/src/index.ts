@@ -6,7 +6,7 @@ export * from "./utils";
 export * from "./token";
 export * from "./constants";
 export * from "./draft";
-export { fetchBackwardsCompatibleIdl } from "./fetchBackwardsCompatibleIdl";
+export { fetchBackwardsCompatibleIdl, useBackwardsCompatibleIdl } from "./fetchBackwardsCompatibleIdl";
 
 export type {
   AssetProof,

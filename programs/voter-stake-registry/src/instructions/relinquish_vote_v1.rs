@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use proposal::{ProposalConfigV0, ProposalV0};
+use modular_governance::proposal::accounts::{ProposalConfigV0, ProposalV0};
 use shared_utils::resize_to_fit_pda;
 
 use crate::{error::VsrError, registrar_seeds, state::*};
@@ -17,7 +17,6 @@ pub struct RelinquishVoteV1<'info> {
     seeds = [b"marker", mint.key().as_ref(), proposal.key().as_ref()],
     bump = marker.bump_seed,
     has_one = registrar,
-    has_one = mint,
     has_one = rent_refund,
   )]
   pub marker: Box<Account<'info, VoteMarkerV0>>,
@@ -83,10 +82,10 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
     .filter(|c| *c != args.choice)
     .collect::<Vec<_>>();
 
-  proposal::cpi::vote_v0(
+  modular_governance::proposal::cpi::vote_v0(
     CpiContext::new_with_signer(
       ctx.accounts.proposal_program.to_account_info(),
-      proposal::cpi::accounts::VoteV0 {
+      modular_governance::proposal::cpi::accounts::VoteV0 {
         voter: ctx.accounts.voter.to_account_info(),
         vote_controller: ctx.accounts.registrar.to_account_info(),
         state_controller: ctx.accounts.state_controller.to_account_info(),
@@ -96,20 +95,11 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
       },
       &[registrar_seeds!(ctx.accounts.registrar)],
     ),
-    proposal::VoteArgsV0 {
+    modular_governance::proposal::types::VoteArgsV0 {
       remove_vote: true,
       choice: args.choice,
       weight: marker.weight,
     },
-  )?;
-
-  ctx
-    .accounts
-    .position
-    .remove_recent_proposal(ctx.accounts.proposal.key());
-  resize_to_fit_pda(
-    &ctx.accounts.registrar.to_account_info(),
-    &ctx.accounts.position,
   )?;
 
   if marker.choices.is_empty() {

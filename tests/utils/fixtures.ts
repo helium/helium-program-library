@@ -67,7 +67,7 @@ export const initTestDataCredits = async (
         threshold: new anchor.BN("10000000000000000000"),
       },
     })
-    .accounts({
+    .accountsPartial({
       hntMint,
       dcMint,
       hntPriceOracle: new PublicKey(
@@ -103,7 +103,7 @@ export const initTestRewardableEntityConfig = async (
       // Require 10 staked tokens
       stakingRequirement: MAKER_STAKING_FEE,
     })
-    .accounts({
+    .accountsPartial({
       subDao,
     });
 
@@ -154,7 +154,7 @@ export const initTestMaker = async (
       name,
       metadataUrl: DEFAULT_METADATA_URL,
     })
-    .accounts({
+    .accountsPartial({
       dao,
     })
     .prepare();
@@ -166,7 +166,7 @@ export const initTestMaker = async (
       maxDepth: 3,
       maxBufferSize: 8,
     })
-    .accounts({
+    .accountsPartial({
       maker,
       merkleTree: merkle.publicKey,
       updateAuthority: makerKeypair.publicKey,
@@ -181,7 +181,7 @@ export const initTestMaker = async (
     pubkeys: { hntMint },
   } = await program.methods
     .approveMakerV0()
-    .accounts({
+    .accountsPartial({
       rewardableEntityConfig,
       maker,
     })

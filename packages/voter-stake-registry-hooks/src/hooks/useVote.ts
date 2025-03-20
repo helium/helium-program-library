@@ -164,7 +164,7 @@ export const useVote = (proposalKey: PublicKey) => {
     }: {
       choice: number; // Instead of sending the transaction, let the caller decide
       onInstructions?: (
-        instructions: TransactionInstruction[]
+        instructions: TransactionInstruction[][]
       ) => Promise<void>;
       onProgress?: (status: Status) => void;
       maxSignatureBatch?: number;
@@ -209,7 +209,7 @@ export const useVote = (proposalKey: PublicKey) => {
                 .proxiedVoteV1({
                   choice,
                 })
-                .accounts({
+                .accountsPartial({
                   proposal: proposalKey,
                   voter: provider.wallet.publicKey,
                   marker: proxyVoteMarker,
@@ -229,7 +229,7 @@ export const useVote = (proposalKey: PublicKey) => {
                 .queueProxyVoteV0({
                   freeTaskId: task1,
                 })
-                .accounts({
+                .accountsPartial({
                   marker: proxyVoteMarker,
                   task: taskKey(taskQueue, task1)[0],
                   taskQueue,
@@ -258,7 +258,7 @@ export const useVote = (proposalKey: PublicKey) => {
                     freeTaskId: task2,
                     triggerTs: endTs!,
                   })
-                  .accounts({
+                  .accountsPartial({
                     marker: proxyVoteMarker,
                     task: taskKey(taskQueue, task2)[0],
                     taskQueue,
@@ -289,7 +289,7 @@ export const useVote = (proposalKey: PublicKey) => {
                   .voteV0({
                     choice,
                   })
-                  .accounts({
+                  .accountsPartial({
                     proposal: proposalKey,
                     voter: provider.wallet.publicKey,
                     position: position.pubkey,
@@ -302,7 +302,7 @@ export const useVote = (proposalKey: PublicKey) => {
                 instructions.push(
                   await hsdProgram.methods
                     .trackVoteV0()
-                    .accounts({
+                    .accountsPartial({
                       proposal: proposalKey,
                       marker: markerK,
                       position: position.pubkey,
@@ -322,7 +322,7 @@ export const useVote = (proposalKey: PublicKey) => {
                       freeTaskId: freeTaskId!,
                       triggerTs: endTs!,
                     })
-                    .accounts({
+                    .accountsPartial({
                       marker: markerK,
                       position: position.pubkey,
                       task: taskKey(TASK_QUEUE_ID, freeTaskId!)[0],

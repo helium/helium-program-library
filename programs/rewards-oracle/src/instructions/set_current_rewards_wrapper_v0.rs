@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use helium_entity_manager::state::*;
-use lazy_distributor::program::LazyDistributor;
-use lazy_distributor::state::*;
 use lazy_distributor::{
   cpi::{accounts::SetCurrentRewardsV0, set_current_rewards_v0},
+  program::LazyDistributor,
+  state::*,
   SetCurrentRewardsArgsV0,
 };
 
@@ -57,10 +57,7 @@ pub fn handler(
     system_program: ctx.accounts.system_program.to_account_info(),
   };
 
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    "oracle_signer".as_bytes(),
-    &[*ctx.bumps.get("oracle_signer").unwrap()],
-  ]];
+  let signer_seeds: &[&[&[u8]]] = &[&["oracle_signer".as_bytes(), &[ctx.bumps.oracle_signer]]];
   set_current_rewards_v0(
     CpiContext::new_with_signer(
       ctx.accounts.lazy_distributor_program.to_account_info(),

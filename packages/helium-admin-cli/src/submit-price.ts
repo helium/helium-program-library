@@ -125,7 +125,7 @@ export async function run(args: any = process.argv) {
       oracleIndex,
       price: decimalShiftedPrice,
     })
-    .accounts({
+    .accountsPartial({
       priceOracle,
       oracle: provider.wallet.publicKey,
     })

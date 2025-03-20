@@ -7,11 +7,6 @@ import {
   truthy,
 } from "@helium/spl-utils";
 import { AnchorProvider, BN, Program, web3 } from "@coral-xyz/anchor";
-import {
-  getGovernanceProgramVersion,
-  MintMaxVoteWeightSource,
-  withCreateRealm,
-} from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   Keypair,
@@ -38,27 +33,14 @@ export async function initVsr(
   // Default is to set proxy season to end so far ahead it isn't relevant
   proxySeasonEnd = new BN(new Date().valueOf() / 1000 + 24 * 60 * 60 * 5 * 365)
 ) {
-  const programVersion = await getGovernanceProgramVersion(
-    program.provider.connection,
-    SPL_GOVERNANCE_PID
-  );
   // Create Realm
   const name = `Realm-${new Keypair().publicKey.toBase58().slice(0, 6)}`;
-  const realmAuthorityPk = me;
   let instructions: TransactionInstruction[] = [];
   let signers: Keypair[] = [];
-  const realmPk = await withCreateRealm(
-    instructions,
-    SPL_GOVERNANCE_PID,
-    programVersion,
-    name,
-    realmAuthorityPk,
-    hntMint,
-    me,
-    undefined,
-    MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
-    new BN(1)
-  );
+  const realmPk = await PublicKey.findProgramAddressSync(
+    [Buffer.from("governance", "utf-8"), Buffer.from(name, "utf-8")],
+    SPL_GOVERNANCE_PID
+  )[0];
 
   const {
     pubkeys: { proxyConfig },
@@ -73,7 +55,7 @@ export async function initVsr(
         },
       ],
     })
-    .accounts({
+    .accountsPartial({
       authority: me,
     })
     .rpcAndKeys();
@@ -82,11 +64,12 @@ export async function initVsr(
     .initializeRegistrarV0({
       positionUpdateAuthority,
     })
-    .accounts({
+    .accountsPartial({
       realm: realmPk,
       realmGoverningTokenMint: hntMint,
       proxyConfig,
     });
+  console.log("vsr", (await createRegistrar.instruction()).keys);
   instructions.push(await createRegistrar.instruction());
   const registrar = (await createRegistrar.pubkeys()).registrar as PublicKey;
   instructions.push(
@@ -111,7 +94,7 @@ export async function initVsr(
         ),
         lockupSaturationSecs: new BN(86400 * 365 * 4), // 4 years
       })
-      .accounts({
+      .accountsPartial({
         registrar,
         mint: hntMint,
       })
@@ -164,7 +147,7 @@ export async function createPosition(
         kind: typeof options.kind == "undefined" ? { cliff: {} } : options.kind,
         periods: options.lockupPeriods,
       })
-      .accounts({
+      .accountsPartial({
         registrar,
         mint: mintKeypair.publicKey,
         depositMint: hntMint,
@@ -177,7 +160,7 @@ export async function createPosition(
   instructions.push(
     await program.methods
       .depositV0({ amount: toBN(options.lockupAmount, 8) })
-      .accounts({
+      .accountsPartial({
         registrar,
         position,
         mint: hntMint,

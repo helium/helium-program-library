@@ -1,17 +1,21 @@
-use crate::constants::ENTITY_METADATA_URL;
-use crate::{key_to_asset_seeds, state::*};
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
-use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount};
-use helium_sub_daos::DaoV0;
-use mpl_token_metadata::instructions::{VerifyCreatorV1Cpi, VerifyCreatorV1CpiAccounts};
-use mpl_token_metadata::types::{Creator, DataV2};
-use no_emit::program::NoEmit;
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  metadata::{
+    create_master_edition_v3, create_metadata_accounts_v3,
+    mpl_token_metadata::{
+      instructions::{VerifyCreatorV1Cpi, VerifyCreatorV1CpiAccounts},
+      types::{Creator, DataV2},
+    },
+    CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+  },
+  token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use shared_utils::{create_metadata_accounts_v3, Metadata};
+use helium_sub_daos::DaoV0;
+use no_emit::program::NoEmit;
+
+use super::hash_entity_key;
+use crate::{constants::ENTITY_METADATA_URL, key_to_asset_seeds, state::*};
 
 pub const NOT_EMITTED: &str = "not_emitted";
 
@@ -34,7 +38,7 @@ pub struct IssueNotEmittedEntityV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(&String::from(NOT_EMITTED).into_bytes()).to_bytes()
+      &hash_entity_key(&String::from(NOT_EMITTED).into_bytes()),
     ],
     bump
   )]
@@ -108,7 +112,7 @@ pub fn handler(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
   let entity_creator_seeds: &[&[u8]] = &[
     b"entity_creator",
     ctx.accounts.dao.to_account_info().key.as_ref(),
-    &[ctx.bumps["entity_creator"]],
+    &[ctx.bumps.entity_creator],
   ];
   let mut update_auth = ctx.accounts.entity_creator.to_account_info().clone();
   update_auth.is_signer = true;
@@ -128,7 +132,11 @@ pub fn handler(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: update_auth.clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -157,6 +165,7 @@ pub fn handler(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
       collection: None,
     },
     true,
+    true,
     None,
   )?;
 
@@ -176,7 +185,11 @@ pub fn handler(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -187,7 +200,7 @@ pub fn handler(ctx: Context<IssueNotEmittedEntityV0>) -> Result<()> {
     asset: asset_id,
     dao: ctx.accounts.dao.key(),
     entity_key: String::from(NOT_EMITTED).into_bytes(),
-    bump_seed: ctx.bumps["key_to_asset"],
+    bump_seed: ctx.bumps.key_to_asset,
     key_serialization: KeySerialization::UTF8,
   });
 

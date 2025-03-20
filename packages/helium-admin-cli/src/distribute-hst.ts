@@ -52,7 +52,7 @@ export async function run(args: any = process.argv) {
 
     await hydraProgram.methods
       .distributeV0()
-      .accounts({
+      .accountsPartial({
         payer: provider.wallet.publicKey,
         fanout: fanoutK,
         owner,

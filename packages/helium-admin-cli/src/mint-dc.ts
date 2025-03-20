@@ -71,7 +71,7 @@ export async function run(args: any = process.argv) {
         dcKey
       )
     ])
-    .accounts({
+    .accountsPartial({
       dcMint: dcKey,
       recipient: destination,
     })

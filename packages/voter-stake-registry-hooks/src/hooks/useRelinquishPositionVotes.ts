@@ -89,7 +89,7 @@ export const useRelinquishPositionVotes = () => {
                       .relinquishVoteV1({
                         choice,
                       })
-                      .accounts({
+                      .accountsPartial({
                         proposal: marker.proposal,
                         voter: provider.wallet.publicKey,
                         position: position.pubkey,

@@ -142,7 +142,7 @@ export async function run(args: any = process.argv) {
         // Temp, since we need to set maker tree
         updateAuthority: provider.wallet.publicKey,
       })
-      .accounts({
+      .accountsPartial({
         maker,
         payer: daoPayer,
         dao: daoK,
@@ -154,7 +154,7 @@ export async function run(args: any = process.argv) {
         maxDepth: size,
         maxBufferSize: buffer,
       })
-      .accounts({
+      .accountsPartial({
         maker,
         merkleTree: merkle.publicKey,
         payer: daoPayer,
@@ -188,7 +188,7 @@ export async function run(args: any = process.argv) {
             issuingAuthority,
             updateAuthority,
           })
-          .accounts({ maker, updateAuthority: provider.wallet.publicKey })
+          .accountsPartial({ maker, updateAuthority: provider.wallet.publicKey })
           .instruction()
       );
     }
@@ -200,7 +200,7 @@ export async function run(args: any = process.argv) {
           issuingAuthority,
           updateAuthority,
         })
-        .accounts({ maker, updateAuthority: makerAcc.updateAuthority })
+        .accountsPartial({ maker, updateAuthority: makerAcc.updateAuthority })
         .instruction()
     );
 
@@ -210,7 +210,7 @@ export async function run(args: any = process.argv) {
           maxDepth: size,
           maxBufferSize: buffer,
         })
-        .accounts({
+        .accountsPartial({
           maker,
           merkleTree: merkle.publicKey,
           payer: daoPayer,

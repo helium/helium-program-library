@@ -294,7 +294,7 @@ describe("distributor-oracle", () => {
         },
         approver: oracleSignerKey()[0],
       })
-      .accounts({
+      .accountsPartial({
         rewardsMint,
       });
     await method.rpc({ skipPreflight: true });
@@ -366,7 +366,7 @@ describe("distributor-oracle", () => {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ])
-      .accounts({
+      .accountsPartial({
         maker,
         recipient: hotspotOwner.publicKey,
         issuingAuthority: makerKeypair.publicKey,
@@ -433,7 +433,7 @@ describe("distributor-oracle", () => {
         currentRewards: new anchor.BN("5000000"),
         oracleIndex: 0,
       })
-      .accounts({
+      .accountsPartial({
         lazyDistributor,
         recipient,
         keyToAsset,
@@ -569,7 +569,7 @@ describe("distributor-oracle", () => {
         currentRewards: new anchor.BN("100000000"),
         oracleIndex: 0,
       })
-      .accounts({
+      .accountsPartial({
         lazyDistributor,
         recipient,
         keyToAsset,
@@ -602,7 +602,7 @@ describe("distributor-oracle", () => {
           ),
           oracleIndex: 0,
         })
-        .accounts({
+        .accountsPartial({
           lazyDistributor,
           recipient,
           oracle: oracle.publicKey,
@@ -637,7 +637,7 @@ describe("distributor-oracle", () => {
           ),
           oracleIndex: 0,
         })
-        .accounts({
+        .accountsPartial({
           lazyDistributor,
           recipient,
           oracle: oracle.publicKey,
@@ -679,7 +679,7 @@ describe("distributor-oracle", () => {
           ),
           oracleIndex: 0,
         })
-        .accounts({
+        .accountsPartial({
           lazyDistributor,
           recipient,
           oracle: oracle.publicKey,

@@ -41,7 +41,7 @@ export async function distributeCompressionRewards<IDL extends Idl>({
     .distributeCompressionRewardsV0({
       ...args,
     })
-    .accounts({
+    .accountsPartial({
       ...accounts,
       common: {
         payer,

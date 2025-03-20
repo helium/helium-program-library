@@ -170,6 +170,13 @@ async function run() {
   );
   await monitorSolBalance(
     new PublicKey(
+      process.env.HPL_CRONS_QUEUE_AUTHORITY_KEY ||
+        "2dbtp4u3axsLSXqgV6uhhsuTXEitveVdYu2GTdKgc1X8"
+    ),
+    "hpl_crons_queue_authority"
+  );
+  await monitorSolBalance(
+    new PublicKey(
       process.env.DAO_KEY || "BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie"
     ),
     "hnt_dao"

@@ -57,7 +57,7 @@ export async function findCoingeckoPrice(token: string): Promise<number> {
         oracleIndex,
         price: decimalShiftedPrice,
       })
-      .accounts({
+      .accountsPartial({
         priceOracle,
         oracle: provider.wallet.publicKey,
       })

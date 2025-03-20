@@ -1,0 +1,17 @@
+[package]
+name = "default-env"
+version = "0.1.1"
+edition = "2018"
+description = "The `env!` macro but with a default value."
+readme = "README.md"
+repository = "https://github.com/helium/helium-program-library"
+license = "MIT"
+
+[lib]
+proc-macro = true
+name = "default_env"
+
+[dependencies]
+proc-macro2 = "1.0.93"
+quote = "1.0.29"
+syn = "2.0.98"

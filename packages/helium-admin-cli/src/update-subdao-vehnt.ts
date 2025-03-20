@@ -245,7 +245,7 @@ export async function run(args: any = process.argv) {
         vehntLastCalculatedTs: new BN(row.current_ts),
         vehntFallRate: new BN(row.real_fall_rate.split('.')[0]),
       })
-      .accounts({
+      .accountsPartial({
         subDao,
         authority: subDaoAcc.authority,
       })

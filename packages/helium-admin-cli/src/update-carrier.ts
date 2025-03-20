@@ -91,7 +91,7 @@ export async function run(args: any = process.argv) {
           : null,
         incentiveEscrowFundBps: typeof argv.incentiveEscrowFundBps === "number" ? argv.incentiveEscrowFundBps : null,
       })
-      .accounts({
+      .accountsPartial({
         carrier,
         updateAuthority: carrierAcc.updateAuthority,
       })
