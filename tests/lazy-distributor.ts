@@ -96,7 +96,6 @@ describe("lazy-distributor", () => {
     beforeEach(async () => {
       merkle = Keypair.generate();
       const { mintKey } = await createNft(provider, me);
-      console.log("1");
 
       mint = mintKey;
 
@@ -106,7 +105,6 @@ describe("lazy-distributor", () => {
           recipient: me,
           merkle,
         }));
-      console.log("2");
 
       const method = await program.methods
         .initializeLazyDistributorV0({
@@ -128,7 +126,6 @@ describe("lazy-distributor", () => {
           rewardsMint,
         });
       await method.rpc({ skipPreflight: true });
-      console.log("3");
       const pubkeys = await method.pubkeys();
       lazyDistributor = pubkeys.lazyDistributor!;
       await createAtaAndMint(
@@ -137,7 +134,6 @@ describe("lazy-distributor", () => {
         1000000000000,
         pubkeys.lazyDistributor
       );
-      console.log("4");
     });
 
     it("initializes a recipient", async () => {

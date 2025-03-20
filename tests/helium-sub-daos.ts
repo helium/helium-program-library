@@ -144,7 +144,6 @@ describe("helium-sub-daos", () => {
       anchor.workspace.VoterStakeRegistry.programId,
       anchor.workspace.VoterStakeRegistry.idl
     );
-    console.log(JSON.stringify(anchor.workspace.VoterStakeRegistry.idl.types[7], null, 2));
     ensureVSRIdl(vsrProgram);
 
     proposalProgram = await initProposal(provider);
