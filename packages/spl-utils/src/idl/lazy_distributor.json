@@ -2,7 +2,7 @@
   "address": "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w",
   "metadata": {
     "name": "lazy_distributor",
-    "version": "0.2.2",
+    "version": "0.3.0",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },

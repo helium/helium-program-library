@@ -2,7 +2,7 @@
   "address": "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8",
   "metadata": {
     "name": "helium_entity_manager",
-    "version": "0.2.12",
+    "version": "0.2.13",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
@@ -969,8 +969,7 @@
         },
         {
           "name": "ecc_verifier",
-          "signer": true,
-          "address": "eccCd1PHAPSTNLUtDzihhPmFPTqGPQn7kgLyjf6dYTS"
+          "signer": true
         },
         {
           "name": "collection",
@@ -1119,10 +1118,7 @@
           }
         },
         {
-          "name": "dao",
-          "relations": [
-            "data_only_config"
-          ]
+          "name": "dao"
         },
         {
           "name": "key_to_asset",
@@ -1269,8 +1265,7 @@
         },
         {
           "name": "ecc_verifier",
-          "signer": true,
-          "address": "eccCd1PHAPSTNLUtDzihhPmFPTqGPQn7kgLyjf6dYTS"
+          "signer": true
         },
         {
           "name": "issuing_authority",
@@ -2435,7 +2430,6 @@
         {
           "name": "dao",
           "relations": [
-            "data_only_config",
             "key_to_asset",
             "sub_dao"
           ]
@@ -2600,7 +2594,6 @@
         {
           "name": "dao",
           "relations": [
-            "data_only_config",
             "key_to_asset",
             "sub_dao"
           ]
@@ -2631,8 +2624,7 @@
           ]
         },
         {
-          "name": "dnt_price",
-          "address": "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx"
+          "name": "dnt_price"
         },
         {
           "name": "dc",
@@ -2925,10 +2917,7 @@
           "writable": true
         },
         {
-          "name": "rewardable_entity_config",
-          "relations": [
-            "maker_approval"
-          ]
+          "name": "rewardable_entity_config"
         },
         {
           "name": "maker_approval",
@@ -2965,10 +2954,7 @@
           }
         },
         {
-          "name": "maker",
-          "relations": [
-            "maker_approval"
-          ]
+          "name": "maker"
         },
         {
           "name": "dao",
@@ -3004,8 +2990,7 @@
           ]
         },
         {
-          "name": "dnt_price",
-          "address": "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx"
+          "name": "dnt_price"
         },
         {
           "name": "dc",
@@ -3376,7 +3361,6 @@
         },
         {
           "name": "maker_approval",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -3832,8 +3816,7 @@
         {
           "name": "payer",
           "writable": true,
-          "signer": true,
-          "address": "hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW"
+          "signer": true
         },
         {
           "name": "mobile_info",
@@ -4085,8 +4068,7 @@
         },
         {
           "name": "authority",
-          "signer": true,
-          "address": "up8dLZtZFdPCqmnRTeQm3eGAyPq4kEvUrivMWyQNaxH"
+          "signer": true
         },
         {
           "name": "collection"
