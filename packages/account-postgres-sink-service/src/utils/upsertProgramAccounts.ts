@@ -120,7 +120,7 @@ export const upsertProgramAccounts = async ({
     try {
       const model = sequelize.models[type];
       const plugins = await initPlugins(rest.plugins);
-      const filter = program.coder.accounts.memcmp(type, undefined);
+      const filter = program.coder.accounts.memcmp(lowerFirstChar(type), undefined);
       const coderFilters: GetProgramAccountsFilter[] = [];
 
       if (filter?.offset != undefined && filter?.bytes != undefined) {

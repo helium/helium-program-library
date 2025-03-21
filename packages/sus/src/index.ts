@@ -12,6 +12,7 @@ import {
   Metadata,
 } from "@metaplex-foundation/mpl-token-metadata";
 import { sha256 } from "@noble/hashes/sha256";
+import { lowerFirstChar } from "@helium/spl-utils";
 import {
   NATIVE_MINT,
   TOKEN_2022_PROGRAM_ID,
@@ -897,7 +898,7 @@ function decodeIdlStruct(
     const coder = new BorshAccountsCoder(convertIdlToCamelCase(idl));
     const descriminator = account.data.slice(0, 8);
     const type = idl.accounts?.find((account) =>
-      new BorshAccountsCoder(idl).accountDiscriminator(account.name).equals(
+      new BorshAccountsCoder(idl).accountDiscriminator(lowerFirstChar(account.name)).equals(
         descriminator
       )
     )?.name;

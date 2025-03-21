@@ -189,7 +189,7 @@ export const integrityCheckProgramAccounts = async ({
       const discriminatorsByType = new Map(
         accounts.map(({ type }) => [
           type,
-          (program.coder.accounts as anchor.BorshAccountsCoder).accountDiscriminator(type),
+          (program.coder.accounts as anchor.BorshAccountsCoder).accountDiscriminator(lowerFirstChar(type)),
         ])
       );
 
