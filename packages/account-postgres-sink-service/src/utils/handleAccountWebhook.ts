@@ -64,7 +64,7 @@ export const handleAccountWebhook = async ({
         return (
           data &&
           (program.coder.accounts as anchor.BorshAccountsCoder)
-            .accountDiscriminator(type)
+            .accountDiscriminator(lowerFirstChar(type))
             .equals(data.subarray(0, 8))
         );
       })?.type;
