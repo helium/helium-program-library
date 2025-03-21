@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
+  metadata::{
+    create_master_edition_v3, create_metadata_accounts_v3,
+    mpl_token_metadata::types::{Collection, DataV2},
+    verify_sized_collection_item, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+    VerifySizedCollectionItem,
+  },
   token::{self, Mint, MintTo, Token, TokenAccount, Transfer},
-};
-use mpl_token_metadata::types::{Collection, DataV2};
-use shared_utils::create_metadata_accounts_v3;
-use shared_utils::token_metadata::{
-  create_master_edition_v3, verify_collection_item, CreateMasterEditionV3,
-  CreateMetadataAccountsV3, Metadata, VerifyCollectionItem,
 };
 
 use crate::{fanout_seeds, voucher_seeds, FanoutV0, FanoutVoucherV0};
@@ -152,7 +152,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     stake_account: ctx.accounts.stake_account.key(),
     total_inflow: ctx.accounts.token_account.amount,
     total_dust: 0,
-    bump_seed: ctx.bumps["voucher"],
+    bump_seed: ctx.bumps.voucher,
   });
   ctx.accounts.fanout.total_staked_shares = ctx
     .accounts
@@ -182,7 +182,11 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: ctx.accounts.voucher.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -198,6 +202,7 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
       }),
       uses: None,
     },
+    true,
     true,
     None,
   )?;
@@ -218,7 +223,11 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -227,27 +236,29 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
 
   let verify_signer_seeds: &[&[&[u8]]] = &[fanout_seeds!(ctx.accounts.fanout)];
 
-  verify_collection_item(CpiContext::new_with_signer(
-    ctx
-      .accounts
-      .token_metadata_program
-      .to_account_info()
-      .clone(),
-    VerifyCollectionItem {
-      payer: ctx.accounts.payer.to_account_info().clone(),
-      metadata: ctx.accounts.metadata.to_account_info().clone(),
-      collection_authority: ctx.accounts.fanout.to_account_info().clone(),
-      collection_mint: ctx.accounts.membership_collection.to_account_info().clone(),
-      collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
-      collection_master_edition: ctx
+  verify_sized_collection_item(
+    CpiContext::new_with_signer(
+      ctx
         .accounts
-        .collection_master_edition
+        .token_metadata_program
         .to_account_info()
         .clone(),
-      token_metadata_program: ctx.accounts.token_metadata_program.clone(),
-    },
-    verify_signer_seeds,
-  ))?;
+      VerifySizedCollectionItem {
+        payer: ctx.accounts.payer.to_account_info().clone(),
+        metadata: ctx.accounts.metadata.to_account_info().clone(),
+        collection_authority: ctx.accounts.fanout.to_account_info().clone(),
+        collection_mint: ctx.accounts.membership_collection.to_account_info().clone(),
+        collection_metadata: ctx.accounts.collection_metadata.to_account_info().clone(),
+        collection_master_edition: ctx
+          .accounts
+          .collection_master_edition
+          .to_account_info()
+          .clone(),
+      },
+      verify_signer_seeds,
+    ),
+    None,
+  )?;
 
   Ok(())
 }

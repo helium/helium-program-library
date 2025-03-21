@@ -1,9 +1,9 @@
-use crate::error::ErrorCode;
-use crate::state::*;
-use account_compression_cpi::program::SplAccountCompression;
+use account_compression_cpi::account_compression::program::SplAccountCompression;
 use anchor_lang::prelude::*;
 use bubblegum_cpi::get_asset_id;
 use shared_utils::{verify_compressed_nft, VerifyCompressedNftArgs};
+
+use crate::{error::ErrorCode, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateCompressionDestinationArgsV0 {

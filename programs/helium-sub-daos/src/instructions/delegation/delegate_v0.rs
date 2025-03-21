@@ -2,7 +2,7 @@ use std::cmp::min;
 
 use anchor_lang::{prelude::*, Discriminator};
 use anchor_spl::token::{Mint, TokenAccount};
-use nft_proxy::ProxyConfigV0;
+use modular_governance::nft_proxy::accounts::ProxyConfigV0;
 use voter_stake_registry::{
   state::{LockupKind, PositionV0, Registrar},
   VoterStakeRegistry,
@@ -15,8 +15,47 @@ use crate::{
   error::ErrorCode,
   id,
   state::*,
+  try_from,
   utils::*,
 };
+
+pub fn get_closing_epoch_bytes(
+  position: &PositionV0,
+  proxy_config: &ProxyConfigV0,
+  registrar: &Registrar,
+) -> [u8; 8] {
+  current_epoch(min(
+    position.lockup.effective_end_ts(),
+    proxy_config
+      .get_current_season(registrar.clock_unix_timestamp())
+      .unwrap()
+      .end,
+  ))
+  .to_le_bytes()
+}
+
+pub fn get_genesis_end_epoch_bytes(
+  position: &PositionV0,
+  proxy_config: &ProxyConfigV0,
+  registrar: &Registrar,
+) -> [u8; 8] {
+  current_epoch(
+    // Avoid passing an extra account if the end is 0 (no genesis on this position).
+    // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
+    if position.genesis_end <= registrar.clock_unix_timestamp() {
+      min(
+        position.lockup.effective_end_ts(),
+        proxy_config
+          .get_current_season(registrar.clock_unix_timestamp())
+          .unwrap()
+          .end,
+      )
+    } else {
+      position.genesis_end
+    },
+  )
+  .to_le_bytes()
+}
 
 #[derive(Accounts)]
 pub struct DelegateV0<'info> {
@@ -57,7 +96,7 @@ pub struct DelegateV0<'info> {
     init_if_needed,
     payer = payer,
     space = SubDaoEpochInfoV0::SIZE,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &get_sub_dao_epoch_info_seed(&registrar)],
     bump,
     constraint = sub_dao_epoch_info.key() != closing_time_sub_dao_epoch_info.key() @ ErrorCode::NoDelegateEndingPosition
   )]
@@ -66,9 +105,7 @@ pub struct DelegateV0<'info> {
     init_if_needed,
     payer = payer,
     space = SubDaoEpochInfoV0::SIZE,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &current_epoch(
-        min(position.lockup.effective_end_ts(), proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end)
-    ).to_le_bytes()],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &get_closing_epoch_bytes(&position, &proxy_config, &registrar)],
     bump,
   )]
   pub closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -77,15 +114,7 @@ pub struct DelegateV0<'info> {
     seeds = [
       "sub_dao_epoch_info".as_bytes(), 
       sub_dao.key().as_ref(),
-      &current_epoch(
-        // Avoid passing an extra account if the end is 0 (no genesis on this position).
-        // Pass instead closing time epoch info, txn account deduplication will reduce the overall tx size
-        if position.genesis_end <= registrar.clock_unix_timestamp() {
-          min(position.lockup.effective_end_ts(), proxy_config.get_current_season(registrar.clock_unix_timestamp()).unwrap().end)
-        } else {
-          position.genesis_end
-        }
-      ).to_le_bytes()
+      &get_genesis_end_epoch_bytes(&position, &proxy_config, &registrar)
     ],
     bump,
   )]
@@ -112,7 +141,7 @@ pub struct SubDaoEpochInfoV0WithDescriminator {
 
 impl BorshSerialize for SubDaoEpochInfoV0WithDescriminator {
   fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-    SubDaoEpochInfoV0::DISCRIMINATOR.serialize(writer)?;
+    writer.write_all(SubDaoEpochInfoV0::DISCRIMINATOR)?;
     self.sub_dao_epoch_info.serialize(writer)
   }
 }
@@ -205,8 +234,9 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   ctx.accounts.closing_time_sub_dao_epoch_info.sub_dao = sub_dao.key();
   ctx.accounts.closing_time_sub_dao_epoch_info.epoch = current_epoch(expiration_ts);
   ctx.accounts.closing_time_sub_dao_epoch_info.bump_seed =
-    ctx.bumps["closing_time_sub_dao_epoch_info"];
+    ctx.bumps.closing_time_sub_dao_epoch_info;
 
+  let mut parsed: Account<SubDaoEpochInfoV0>;
   let genesis_end_is_closing = ctx.accounts.genesis_end_sub_dao_epoch_info.key()
     == ctx.accounts.closing_time_sub_dao_epoch_info.key();
   // If the end account doesn't exist, init it. Otherwise just set the correcitons
@@ -224,7 +254,7 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
       &SubDaoEpochInfoV0WithDescriminator {
         sub_dao_epoch_info: SubDaoEpochInfoV0 {
           epoch: genesis_end_epoch,
-          bump_seed: ctx.bumps["genesis_end_sub_dao_epoch_info"],
+          bump_seed: ctx.bumps.genesis_end_sub_dao_epoch_info,
           sub_dao: sub_dao.key(),
           previous_percentage: 0,
           dc_burned: 0,
@@ -251,16 +281,13 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
     )?;
   } else {
     // closing can be the same account as genesis end. Make sure to use the proper account
-    let mut parsed: Account<SubDaoEpochInfoV0>;
     let genesis_end_sub_dao_epoch_info: &mut Account<SubDaoEpochInfoV0> = if genesis_end_is_closing
     {
       &mut ctx.accounts.closing_time_sub_dao_epoch_info
     } else {
-      parsed = Account::try_from(
-        &ctx
-          .accounts
-          .genesis_end_sub_dao_epoch_info
-          .to_account_info(),
+      parsed = try_from!(
+        Account<SubDaoEpochInfoV0>,
+        &ctx.accounts.genesis_end_sub_dao_epoch_info
       )?;
       &mut parsed
     };
@@ -296,11 +323,11 @@ pub fn handler(ctx: Context<DelegateV0>) -> Result<()> {
   delegated_position.sub_dao = ctx.accounts.sub_dao.key();
   delegated_position.mint = ctx.accounts.mint.key();
   delegated_position.position = ctx.accounts.position.key();
-  delegated_position.bump_seed = ctx.bumps["delegated_position"];
+  delegated_position.bump_seed = ctx.bumps.delegated_position;
   delegated_position.expiration_ts = expiration_ts;
 
   ctx.accounts.sub_dao_epoch_info.sub_dao = ctx.accounts.sub_dao.key();
-  ctx.accounts.sub_dao_epoch_info.bump_seed = *ctx.bumps.get("sub_dao_epoch_info").unwrap();
+  ctx.accounts.sub_dao_epoch_info.bump_seed = ctx.bumps.sub_dao_epoch_info;
   ctx.accounts.sub_dao_epoch_info.initialized = true;
 
   Ok(())

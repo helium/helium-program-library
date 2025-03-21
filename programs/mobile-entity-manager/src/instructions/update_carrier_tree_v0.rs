@@ -1,12 +1,12 @@
-use crate::error::ErrorCode;
-use crate::{carrier_seeds, state::*};
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
-use bubblegum_cpi::{
+use bubblegum_cpi::bubblegum::{
+  accounts::TreeConfig,
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
-  TreeConfig,
 };
+
+use crate::{carrier_seeds, error::ErrorCode, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateCarrierTreeArgsV0 {
@@ -47,12 +47,26 @@ pub struct UpdateCarrierTreeV0<'info> {
   pub compression_program: Program<'info, SplAccountCompression>,
 }
 
+#[macro_export]
+macro_rules! try_from {
+  ($ty: ty, $acc: expr) => {{
+    let account_info = $acc.as_ref();
+    <$ty>::try_from(unsafe {
+      core::mem::transmute::<
+        &anchor_lang::prelude::AccountInfo<'_>,
+        &anchor_lang::prelude::AccountInfo<'_>,
+      >(account_info)
+    })
+  }};
+}
+
 pub fn handler(ctx: Context<UpdateCarrierTreeV0>, args: UpdateCarrierTreeArgsV0) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[carrier_seeds!(ctx.accounts.carrier)];
 
   // Only permissionlessly swapping trees when we're within 3 of full
   if !ctx.accounts.tree_config.data_is_empty() {
-    let tree_config: Account<TreeConfig> = Account::try_from(&ctx.accounts.tree_config)?;
+    let tree_config: Account<TreeConfig> =
+      try_from!(Account<TreeConfig>, &ctx.accounts.tree_config)?;
     require_gt!(
       tree_config.num_minted,
       tree_config.total_mint_capacity - 3,

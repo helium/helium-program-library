@@ -57,7 +57,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .tempRemoveMintAndFreezeAuthorities()
-      .accounts({
+      .accountsPartial({
         authority: daoAcc.authority,
         dao,
         mobileMint: MOBILE_MINT,
@@ -73,7 +73,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await cbProgram.methods
       .removeMintAuthorityV0()
-      .accounts({
+      .accountsPartial({
         mint: MOBILE_MINT,
         circuitBreaker: mobileCB,
         rentRefund: mobileCBAcc.authority,
@@ -87,7 +87,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await cbProgram.methods
       .removeMintAuthorityV0()
-      .accounts({
+      .accountsPartial({
         mint: IOT_MINT,
         circuitBreaker: iotCB,
         rentRefund: iotCBAcc.authority,

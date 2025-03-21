@@ -100,7 +100,7 @@ pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Resu
     num_sub_daos: 0,
     emission_schedule: args.emission_schedule.clone(),
     registrar: args.registrar,
-    bump_seed: ctx.bumps["dao"],
+    bump_seed: ctx.bumps.dao,
     net_emissions_cap: args.net_emissions_cap,
     hst_pool: ctx.accounts.hst_pool.key(),
     delegator_pool: ctx.accounts.delegator_pool.key(),

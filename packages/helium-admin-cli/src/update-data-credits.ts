@@ -72,7 +72,7 @@ export async function run(args: any = process.argv) {
           ? new PublicKey(argv.hntPriceOracle)
           : null,
       })
-      .accounts({
+      .accountsPartial({
         dataCredits,
         dcMint: new PublicKey(argv.dcMint),
         authority: dataCreditsAcc.authority,

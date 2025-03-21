@@ -77,7 +77,7 @@ export async function run(args: any = process.argv) {
       seasons,
       name: "Helium V1",
     })
-    .accounts({
+    .accountsPartial({
       authority,
     })
     .prepare();
@@ -93,7 +93,7 @@ export async function run(args: any = process.argv) {
     instructions: [
       await vsrProgram.methods
         .updateRegistrarV0()
-        .accounts({
+        .accountsPartial({
           proxyConfig,
           registrar,
           realmAuthority: authority,

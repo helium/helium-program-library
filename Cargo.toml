@@ -1,8 +1,10 @@
+[profile.release]
+overflow-checks = true
+
 [workspace]
 members = [
   "programs/*",
-  "utils/proposal",
-  "utils/nft-proxy",
+  "utils/modular-governance",
 ]
 
 exclude = [
@@ -12,30 +14,36 @@ exclude = [
   "utils/ecc-sig-verifier",
   "utils/migration-tx-executor",
   "utils/vehnt",
+  "utils/default-env",
   "utils/hpl-utils",
-  "utils/bulk-claim-rewards",
   "utils/generate-test-gateway-txn",
-  "utils/active-hotspot-oracle",
-  "utils/backfill-onboarding-fees",
   "utils/standardize-hotspot-metadata",
+  "utils/pyth_solana_receiver_sdk",
 ]
 
 [workspace.dependencies]
-anchor-lang = { version = "0.28.0", features = ["init-if-needed"] }
-anchor-spl = { version = "0.28.0", features = ["mint", "token"] }
-mpl-token-metadata = { version = "3.2.0" }
-account-compression-cpi = { rev = "a499196", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
-solana-program = "1.16"
-bubblegum-cpi = { rev = "a499196", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi"]}
+anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
+anchor-spl = { version = "0.31.0", features = ["mint", "token", "metadata"] }
+mpl-token-metadata = { version = "5.1.0" }
+account-compression-cpi = { rev = "1584d8e", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi", "no-entrypoint"]}
+solana-program = "2.2.1"
+bubblegum-cpi = { rev = "1584d8e", git = "https://github.com/helium/account-compression-anchor-gen.git", features = ["cpi", "no-entrypoint"]}
 solana-security-txt = "1.1.1"
-default-env = "0.1.1"
+default-env = { path = "./utils/default-env" }
 shared-utils = { path = "./utils/shared-utils" }
-circuit-breaker = { path = "./programs/circuit-breaker", features = ["cpi"] }
-helium-sub-daos = { path = "./programs/helium-sub-daos", features = ["cpi"] }
-helium-entity-manager = { path = "./programs/helium-entity-manager", features = ["cpi"] }
-lazy-distributor = { path = "./programs/lazy-distributor", features = ["cpi"] }
-mobile-entity-manager = { path = "./programs/mobile-entity-manager", features = ["cpi"] }
-price-oracle = { path = "./programs/price-oracle", features = ["cpi"] }
-no-emit = { path = "./programs/no-emit", features = ["cpi"] }
+circuit-breaker = { path = "./programs/circuit-breaker", features = ["cpi", "no-entrypoint"] }
+helium-sub-daos = { path = "./programs/helium-sub-daos", features = ["cpi", "no-entrypoint"] }
+helium-entity-manager = { path = "./programs/helium-entity-manager", features = ["cpi", "no-entrypoint"] }
+lazy-distributor = { path = "./programs/lazy-distributor", features = ["cpi", "no-entrypoint"] }
+mobile-entity-manager = { path = "./programs/mobile-entity-manager", features = ["cpi", "no-entrypoint"] }
+price-oracle = { path = "./programs/price-oracle", features = ["cpi", "no-entrypoint"] }
+no-emit = { path = "./programs/no-emit", features = ["cpi", "no-entrypoint"] }
+voter-stake-registry = { path = "./programs/voter-stake-registry", features = ["cpi", "no-entrypoint"] }
 time = "0.3.36"
 data-credits = { path = "./programs/data-credits" }
+pyth-solana-receiver-sdk = { path = "./utils/pyth_solana_receiver_sdk" }
+pythnet-sdk = "=2.3.1"
+tuktuk-sdk = { version = "0.3.1" }
+tuktuk-program = { version = "0.3.0" }
+modular-governance = { path = "./utils/modular-governance" }
+solana-zk-sdk = "2.2.3"

@@ -1,9 +1,12 @@
-use crate::{error::VsrError, VoteArgsV0};
 use anchor_lang::prelude::*;
-use nft_proxy::ProxyAssignmentV0;
+use modular_governance::{
+  nft_proxy::accounts::ProxyAssignmentV0,
+  proposal::accounts::{ProposalConfigV0, ProposalV0},
+};
+use shared_utils::resize_to_fit_pda;
 
-use crate::{registrar_seeds, state::*};
-use proposal::{ProposalConfigV0, ProposalV0};
+use super::VoteArgsV0;
+use crate::{error::VsrError, registrar_seeds, state::*};
 
 #[derive(Accounts)]
 pub struct ProxiedVoteV0<'info> {
@@ -78,7 +81,7 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
     }
   }
   marker.proposal = ctx.accounts.proposal.key();
-  marker.bump_seed = ctx.bumps["marker"];
+  marker.bump_seed = ctx.bumps.marker;
   marker.voter = ctx.accounts.voter.key();
   marker.mint = ctx.accounts.position.mint;
   marker.registrar = ctx.accounts.registrar.key();
@@ -114,10 +117,10 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
   };
   marker.weight = weight;
 
-  proposal::cpi::vote_v0(
+  modular_governance::proposal::cpi::vote_v0(
     CpiContext::new_with_signer(
       ctx.accounts.proposal_program.to_account_info(),
-      proposal::cpi::accounts::VoteV0 {
+      modular_governance::proposal::cpi::accounts::VoteV0 {
         voter: ctx.accounts.voter.to_account_info(),
         vote_controller: ctx.accounts.registrar.to_account_info(),
         state_controller: ctx.accounts.state_controller.to_account_info(),
@@ -127,12 +130,25 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
       },
       &[registrar_seeds!(ctx.accounts.registrar)],
     ),
-    proposal::VoteArgsV0 {
+    modular_governance::proposal::types::VoteArgsV0 {
       remove_vote: false,
       choice: args.choice,
       weight,
     },
   )?;
+
+  ctx.accounts.position.add_recent_proposal(
+    ctx.accounts.proposal.key(),
+    ctx.accounts.proposal.created_at,
+  );
+  ctx.accounts.position.registrar_paid_rent = u64::try_from(
+    i64::try_from(ctx.accounts.position.registrar_paid_rent).unwrap()
+      + resize_to_fit_pda(
+        &ctx.accounts.registrar.to_account_info(),
+        &ctx.accounts.position,
+      )?,
+  )
+  .unwrap();
 
   Ok(())
 }

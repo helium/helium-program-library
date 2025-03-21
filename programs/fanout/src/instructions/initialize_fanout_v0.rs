@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
+  metadata::{
+    create_master_edition_v3, create_metadata_accounts_v3, mpl_token_metadata::types::DataV2,
+    CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+  },
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_token_metadata::types::DataV2;
-use shared_utils::create_metadata_accounts_v3;
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
-};
+use mpl_token_metadata::types::CollectionDetails;
 
 use crate::FanoutV0;
 
@@ -82,7 +82,7 @@ pub struct InitializeFanoutV0<'info> {
 }
 
 pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -> Result<()> {
-  let signer_seeds: &[&[&[u8]]] = &[&[b"fanout", args.name.as_bytes(), &[ctx.bumps["fanout"]]]];
+  let signer_seeds: &[&[&[u8]]] = &[&[b"fanout", args.name.as_bytes(), &[ctx.bumps.fanout]]];
 
   token::mint_to(
     CpiContext::new_with_signer(
@@ -111,7 +111,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: ctx.accounts.fanout.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx.accounts.rent.to_account_info().clone(),
       },
       signer_seeds,
     ),
@@ -127,7 +127,8 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
       uses: None,
     },
     true,
-    None,
+    true,
+    Some(CollectionDetails::V2 { padding: [0; 8] }),
   )?;
 
   create_master_edition_v3(
@@ -146,7 +147,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx.accounts.rent.to_account_info().clone(),
       },
       signer_seeds,
     ),
@@ -164,7 +165,7 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
     total_staked_shares: 0,
     last_snapshot_amount: ctx.accounts.token_account.amount,
     total_inflow: ctx.accounts.token_account.amount,
-    bump_seed: ctx.bumps["fanout"],
+    bump_seed: ctx.bumps.fanout,
   });
 
   Ok(())

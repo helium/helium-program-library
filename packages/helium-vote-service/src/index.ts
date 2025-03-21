@@ -546,7 +546,7 @@ server.post<{
               const instructions: TransactionInstruction[] = [];
               const countIx = await voterStakeRegistryProgram.methods
                 .countProxyVoteV0()
-                .accounts({
+                .accountsPartial({
                   payer: pdaWallet,
                   proxyMarker: proxyVoteMarker,
                   voter: wallet,
@@ -565,7 +565,7 @@ server.post<{
                 if (delegatedPosition) {
                   const delegatedCountIx = await heliumSubDaosProgram.methods
                     .trackVoteV0()
-                    .accounts({
+                    .accountsPartial({
                       payer: pdaWallet,
                       delegatedPosition: new PublicKey(vote.delegatedPosition),
                       registrar: HNT_REGISTRAR,
@@ -588,7 +588,7 @@ server.post<{
         // Requeue ourselves
         await hplCronsProgram.methods
           .requeueProxyVoteV0()
-          .accounts({
+          .accountsPartial({
             marker: proxyVoteMarker,
           })
           .instruction()

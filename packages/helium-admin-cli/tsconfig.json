@@ -14,6 +14,9 @@
       "path": "../distributor-oracle"
     },
     {
+      "path": "../hpl-crons-sdk"
+    },
+    {
       "path": "../data-credits-sdk"
     },
     {

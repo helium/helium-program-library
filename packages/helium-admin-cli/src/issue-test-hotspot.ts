@@ -53,7 +53,7 @@ export async function run(args: any = process.argv) {
   // uncomment when data only hotspots are supported
   // const method = await hemProgram.methods.issueDataOnlyEntityV0({
   //   entityKey: Buffer.from(bs58.decode(ecc)),
-  // }).accounts({
+  // }).accountsPartial({
   //   recipient: provider.wallet.publicKey,
   //   dao: daoKey(HNT_MINT)[0],
   //   eccVerifier: eccVerifier.publicKey,
@@ -79,7 +79,7 @@ export async function run(args: any = process.argv) {
   //     location: null,
   //     elevation: null,
   //     gain: null,
-  // }).accounts({
+  // }).accountsPartial({
   //   rewardableEntityConfig,
   //   hotspotOwner: provider.wallet.publicKey,
   //   keyToAsset,

@@ -1,0 +1,19 @@
+[package]
+name = "modular-governance"
+version = "0.1.0"
+description = "Modular Governance cpi wrappers"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "modular_governance"
+
+[features]
+default = ["cpi"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+
+[dependencies]
+anchor-lang = { workspace = true }

@@ -311,7 +311,7 @@ export async function run(args: any = process.argv) {
       seasons,
       name: "Helium V1",
     })
-    .accounts({
+    .accountsPartial({
       authority,
     })
     .prepare();
@@ -370,7 +370,7 @@ export async function run(args: any = process.argv) {
         .initializeRegistrarV0({
           positionUpdateAuthority: (await daoKey(hntKeypair.publicKey))[0],
         })
-        .accounts({
+        .accountsPartial({
           realm,
           realmGoverningTokenMint: hntKeypair.publicKey,
           proxyConfig,
@@ -393,7 +393,7 @@ export async function run(args: any = process.argv) {
         genesisVotePowerMultiplierExpirationTs: new anchor.BN("1682726399"),
         lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
       })
-      .accounts({
+      .accountsPartial({
         registrar,
         mint: hntKeypair.publicKey,
       })
@@ -439,7 +439,7 @@ export async function run(args: any = process.argv) {
           threshold: new anchor.BN("1000000000000"),
         },
       })
-      .accounts({
+      .accountsPartial({
         hntMint: hntKeypair.publicKey,
         dcMint: dcKeypair.publicKey,
         hntPriceOracle: new PublicKey(argv.hntPriceOracle),
@@ -495,7 +495,7 @@ export async function run(args: any = process.argv) {
       },
       approver: oracleSignerKey()[0],
     })
-    .accounts({
+    .accountsPartial({
       payer: authority,
       rewardsMint: hntKeypair.publicKey,
     })
@@ -522,7 +522,7 @@ export async function run(args: any = process.argv) {
           hntKeypair.publicKey
         ),
       ])
-      .accounts({
+      .accountsPartial({
         dcMint: dcKeypair.publicKey,
         hntMint: hntKeypair.publicKey,
         hstPool,
@@ -544,7 +544,7 @@ export async function run(args: any = process.argv) {
             delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
             rewardsEscrow: rewardsEscrow ? rewardsEscrow : null,
           })
-          .accounts({
+          .accountsPartial({
             dao,
             authority: authority,
           })
@@ -606,7 +606,7 @@ export async function run(args: any = process.argv) {
             metadataUrl:
               "https://shdw-drive.genesysgo.net/H8b1gZmA2aBqDYxicxawGpznCaNbFSEJ3YnJuawGQ2EQ/data-only.json",
           })
-          .accounts({
+          .accountsPartial({
             dao,
             authority,
             merkleTree: merkle.publicKey,

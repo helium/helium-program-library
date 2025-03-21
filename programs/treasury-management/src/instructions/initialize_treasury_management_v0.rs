@@ -1,13 +1,14 @@
-use crate::circuit_breaker::WindowedCircuitBreakerConfigV0;
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::TokenAccount;
-use anchor_spl::token::{Mint, Token};
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{Mint, Token, TokenAccount},
+};
 use circuit_breaker::{
   cpi::{accounts::InitializeAccountWindowedBreakerV0, initialize_account_windowed_breaker_v0},
   CircuitBreaker, InitializeAccountWindowedBreakerArgsV0,
 };
+
+use crate::{circuit_breaker::WindowedCircuitBreakerConfigV0, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeTreasuryManagementArgsV0 {
@@ -77,7 +78,7 @@ pub fn handler(
       &[&[
         b"treasury_management",
         ctx.accounts.supply_mint.key().as_ref(),
-        &[ctx.bumps["treasury_management"]],
+        &[ctx.bumps.treasury_management],
       ]],
     ),
     InitializeAccountWindowedBreakerArgsV0 {
@@ -96,7 +97,7 @@ pub fn handler(
       treasury: ctx.accounts.treasury.key(),
       curve: args.curve,
       freeze_unix_time: args.freeze_unix_time,
-      bump_seed: ctx.bumps["treasury_management"],
+      bump_seed: ctx.bumps.treasury_management,
     });
 
   Ok(())

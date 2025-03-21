@@ -1,9 +1,10 @@
-use account_compression_cpi::{program::SplAccountCompression, Noop};
-use anchor_lang::{prelude::*, solana_program::hash::hash};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
+use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use bubblegum_cpi::{program::Bubblegum, TreeConfig};
+use bubblegum_cpi::bubblegum::{accounts::TreeConfig, program::Bubblegum};
 use helium_entity_manager::{
   cpi::{accounts::IssueProgramEntityV0, issue_program_entity_v0},
+  hash_entity_key,
   program::HeliumEntityManager,
   IssueProgramEntityArgsV0, KeySerialization, ProgramApprovalV0,
 };
@@ -73,7 +74,7 @@ pub struct InitializeIncentiveProgramV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(args.name.as_bytes()).to_bytes()
+      &hash_entity_key(args.name.as_bytes())
     ],
     seeds::program = helium_entity_manager_program.key(),
     bump
@@ -83,7 +84,7 @@ pub struct InitializeIncentiveProgramV0<'info> {
   #[account(
     init,
     payer = payer,
-    seeds = ["incentive_escrow_program".as_bytes(), carrier.key().as_ref(), &hash(args.name.as_bytes()).to_bytes()],
+    seeds = ["incentive_escrow_program".as_bytes(), carrier.key().as_ref(), &hash_entity_key(args.name.as_bytes())],
     bump,
     space = 8 + 60 + std::mem::size_of::<IncentiveEscrowProgramV0>() + args.name.len(),
   )]
@@ -170,7 +171,7 @@ pub fn handler(
       shares: args.shares,
       carrier: ctx.accounts.carrier.key(),
       name: args.name,
-      bump_seed: ctx.bumps["incentive_escrow_program"],
+      bump_seed: ctx.bumps.incentive_escrow_program,
     });
 
   Ok(())

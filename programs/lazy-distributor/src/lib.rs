@@ -9,7 +9,6 @@ pub mod ed25519;
 pub mod error;
 pub mod instructions;
 pub mod state;
-pub mod token_metadata;
 
 pub use instructions::*;
 pub use state::*;

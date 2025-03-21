@@ -1,6 +1,6 @@
-use crate::state::*;
 use anchor_lang::prelude::*;
-use std::str::FromStr;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TrackDcOnboardingFeesArgsV0 {
@@ -9,7 +9,7 @@ pub struct TrackDcOnboardingFeesArgsV0 {
   pub symbol: String,
 }
 
-pub const HEM_KEY: &str = "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8";
+pub const HEM_ID: Pubkey = pubkey!("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8");
 
 #[derive(Accounts)]
 #[instruction(args: TrackDcOnboardingFeesArgsV0)]
@@ -21,7 +21,7 @@ pub struct TrackDcOnboardingFeesV0<'info> {
       args.symbol.as_bytes()
     ],
     bump,
-    seeds::program = Pubkey::from_str(HEM_KEY).unwrap()
+    seeds::program = HEM_ID,
   )]
   pub hem_auth: Signer<'info>,
   #[account(mut)]

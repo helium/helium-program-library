@@ -57,7 +57,7 @@ export const useTransferPosition = () => {
               .transferV0({
                 amount: amountToTransfer,
               })
-              .accounts({
+              .accountsPartial({
                 sourcePosition: sourcePosition.pubkey,
                 targetPosition: targetPosition.pubkey,
                 depositMint: mint,
@@ -71,7 +71,7 @@ export const useTransferPosition = () => {
               .transferV0({
                 amount: amountToTransfer,
               })
-              .accounts({
+              .accountsPartial({
                 sourcePosition: sourcePosition.pubkey,
                 targetPosition: targetPosition.pubkey,
                 depositMint: mint,
@@ -84,7 +84,7 @@ export const useTransferPosition = () => {
           instructions.push(
             await vsrProgram.methods
               .closePositionV0()
-              .accounts({
+              .accountsPartial({
                 position: sourcePosition.pubkey,
               })
               .instruction()

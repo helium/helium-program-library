@@ -1,20 +1,20 @@
-use account_compression_cpi::{program::SplAccountCompression, Noop};
-use anchor_lang::{
-  prelude::*,
-  solana_program::{hash::hash, program::invoke, system_instruction},
-};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
+use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use bubblegum_cpi::{
-  cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
+  bubblegum::{
+    accounts::TreeConfig,
+    cpi::{accounts::MintToCollectionV1, mint_to_collection_v1},
+    program::Bubblegum,
+    types::{Collection, Creator, MetadataArgs, TokenProgramVersion, TokenStandard},
+  },
   get_asset_id,
-  program::Bubblegum,
-  Collection, Creator, MetadataArgs, TokenProgramVersion, TokenStandard, TreeConfig,
 };
 use helium_sub_daos::DaoV0;
 
 use crate::{
-  constants::ENTITY_METADATA_URL, error::ErrorCode, key_to_asset_seeds, shared_merkle_seeds,
-  state::*,
+  constants::ENTITY_METADATA_URL, error::ErrorCode, hash_entity_key, key_to_asset_seeds,
+  shared_merkle_seeds, state::*,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -39,7 +39,7 @@ pub struct IssueProgramEntityV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   #[account(
-    address = program_address(args.approver_seeds, &program_approval.program_id)?
+    constraint = program_address(args.approver_seeds, &program_approval.program_id)? == program_approver.key()
   )]
   pub program_approver: Signer<'info>,
   #[account(
@@ -77,7 +77,7 @@ pub struct IssueProgramEntityV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(&args.entity_key[..]).to_bytes()
+      &hash_entity_key(&args.entity_key[..])
     ],
     bump
   )]
@@ -155,7 +155,7 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
     asset: asset_id,
     dao: ctx.accounts.dao.key(),
     entity_key: args.entity_key,
-    bump_seed: ctx.bumps["key_to_asset"],
+    bump_seed: ctx.bumps.key_to_asset,
     key_serialization: args.key_serialization,
   });
 
@@ -209,7 +209,7 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
   let entity_creator_seeds: &[&[&[u8]]] = &[&[
     b"entity_creator",
     ctx.accounts.dao.to_account_info().key.as_ref(),
-    &[ctx.bumps["entity_creator"]],
+    &[ctx.bumps.entity_creator],
   ]];
 
   let mut creator = ctx.accounts.entity_creator.to_account_info();

@@ -1,7 +1,5 @@
-use crate::state::*;
+use account_compression_cpi::account_compression::program::SplAccountCompression;
 use anchor_lang::{prelude::*, solana_program::hash::hash};
-
-use account_compression_cpi::program::SplAccountCompression;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
@@ -18,6 +16,8 @@ use data_credits::{
 use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
 use shared_utils::*;
 
+use crate::state::*;
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct OnboardDataOnlyIotHotspotArgsV0 {
   pub data_hash: [u8; 32],
@@ -27,6 +27,10 @@ pub struct OnboardDataOnlyIotHotspotArgsV0 {
   pub location: Option<u64>,
   pub elevation: Option<i32>,
   pub gain: Option<i32>,
+}
+
+pub fn hash_entity_key(name: &[u8]) -> [u8; 32] {
+  hash(name).to_bytes()
 }
 
 #[derive(Accounts)]
@@ -43,7 +47,7 @@ pub struct OnboardDataOnlyIotHotspotV0<'info> {
     seeds = [
       b"iot_info", 
       rewardable_entity_config.key().as_ref(),
-      &hash(&key_to_asset.entity_key[..]).to_bytes()
+      &hash_entity_key(&key_to_asset.entity_key[..])
     ],
     bump,
   )]
@@ -69,7 +73,6 @@ pub struct OnboardDataOnlyIotHotspotV0<'info> {
     seeds = ["data_only_config".as_bytes(), dao.key().as_ref()],
     bump,
     has_one = merkle_tree,
-    has_one = dao,
   )]
   pub data_only_config: Box<Account<'info, DataOnlyConfigV0>>,
   #[account(
@@ -146,7 +149,7 @@ pub fn handler<'info>(
   let mut dc_fee = ctx.accounts.sub_dao.onboarding_data_only_dc_fee;
   ctx.accounts.iot_info.set_inner(IotHotspotInfoV0 {
     asset: asset_id,
-    bump_seed: ctx.bumps["iot_info"],
+    bump_seed: ctx.bumps.iot_info,
     location: None,
     elevation: args.elevation,
     gain: args.gain,

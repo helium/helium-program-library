@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.9.31",
+  "version": "0.10.1",
   "description": "React hooks for helium voter stake registry",
   "repository": {
     "type": "git",
@@ -31,19 +31,19 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.28.0",
-    "@helium/account-fetch-cache": "^0.9.31",
-    "@helium/account-fetch-cache-hooks": "^0.9.31",
-    "@helium/circuit-breaker-sdk": "^0.9.31",
-    "@helium/helium-react-hooks": "^0.9.31",
-    "@helium/helium-sub-daos-sdk": "^0.9.31",
-    "@helium/hpl-crons-sdk": "^0.10.0-alpha.13",
-    "@helium/modular-governance-hooks": "^0.0.15",
-    "@helium/modular-governance-idls": "^0.0.15",
-    "@helium/organization-sdk": "^0.1.4",
-    "@helium/spl-utils": "^0.9.31",
+    "@coral-xyz/anchor": "^0.31.0",
+    "@helium/account-fetch-cache": "^0.10.1",
+    "@helium/account-fetch-cache-hooks": "^0.10.1",
+    "@helium/circuit-breaker-sdk": "^0.10.1",
+    "@helium/helium-react-hooks": "^0.10.1",
+    "@helium/helium-sub-daos-sdk": "^0.10.1",
+    "@helium/hpl-crons-sdk": "^0.10.1",
+    "@helium/modular-governance-hooks": "^0.1.5-alpha.0",
+    "@helium/modular-governance-idls": "^0.1.5-alpha.0",
+    "@helium/organization-sdk": "^0.1.5-alpha.0",
+    "@helium/spl-utils": "^0.10.1",
     "@helium/tuktuk-sdk": "^0.0.4",
-    "@helium/voter-stake-registry-sdk": "^0.9.31",
+    "@helium/voter-stake-registry-sdk": "^0.10.1",
     "@solana/wallet-adapter-base": "^0.9.22",
     "@solana/web3.js": "^1.91.1",
     "@tanstack/react-query": "^5.45.0",
@@ -63,5 +63,5 @@
   },
   "keywords": [],
   "author": "",
-  "gitHead": "5a8bf0b7b88e5934ef8d774e686f7c95804fbb8d"
+  "gitHead": "fc5dab2875863281ec468cf4a5a416c9696d102f"
 }

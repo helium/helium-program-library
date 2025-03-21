@@ -15,7 +15,6 @@ export const init = async (
 
   const heliumEntityManager = new Program<HeliumEntityManager>(
     idl as HeliumEntityManager,
-    programId,
     provider,
     undefined,
     () => heliumEntityManagerResolvers

@@ -53,7 +53,7 @@ export async function updateMobileMetadata({
       deploymentInfo: deploymentInfo as any,
       ...args,
     })
-    .accounts({
+    .accountsPartial({
       // hotspot: assetId,
       ...accounts,
       dcFeePayer,

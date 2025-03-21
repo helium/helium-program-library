@@ -4,7 +4,7 @@ import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
 import {
   AccountMeta,
   PublicKey,
-  TransactionInstruction
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { keccak_256 } from "js-sha3";
 import { PROGRAM_ID } from "./constants";
@@ -19,7 +19,7 @@ export * from "./constants";
 export * from "./pdas";
 export { MerkleTree };
 
-type CompiledInstruction = IdlTypes<LazyTransactions>["CompiledInstruction"];
+type CompiledInstruction = IdlTypes<LazyTransactions>["compiledInstruction"];
 
 export async function init(
   provider: AnchorProvider,
@@ -31,7 +31,6 @@ export async function init(
   }
   const lazyTransactions = new Program<LazyTransactions>(
     idl as LazyTransactions,
-    programId,
     provider
   ) as Program<LazyTransactions>;
   return lazyTransactions;
@@ -100,24 +99,34 @@ export type CompiledTransaction = {
 };
 
 const CompiledInstructionDef: any = {
-  name: "CompiledInstruction",
-  type: {
-    kind: "struct",
-    fields: [
-      {
-        name: "programIdIndex",
-        type: "u8",
-      },
-      {
-        name: "accounts",
-        type: "bytes",
-      },
-      {
-        name: "data",
-        type: "bytes",
-      },
-    ],
+  typeDef: {
+    name: "compiledInstruction",
+    type: {
+      kind: "struct",
+      fields: [
+        {
+          name: "programIdIndex",
+          docs: [
+            "Index into the transaction keys array indicating the program account that executes this instruction.",
+          ],
+          type: "u8",
+        },
+        {
+          name: "accounts",
+          docs: [
+            "Ordered indices into the transaction keys array indicating which accounts to pass to the program.",
+          ],
+          type: "bytes",
+        },
+        {
+          name: "data",
+          docs: ["The program input data."],
+          type: "bytes",
+        },
+      ],
+    },
   },
+  types: [],
 };
 export const compiledIxLayout: Layout = IdlCoder.typeDefLayout(
   CompiledInstructionDef
@@ -208,7 +217,7 @@ export function getCanopy({
   }
   canopy.shift(); // remove root
   return canopy;
-};
+}
 
 export async function fillCanopy({
   program,
@@ -291,7 +300,11 @@ export function compile(
   merkleTree: MerkleTree;
   compiledTransactions: CompiledTransaction[];
 } {
-  const compiledTransactions = compileNoMerkle(lazySigner, transactions, programId)
+  const compiledTransactions = compileNoMerkle(
+    lazySigner,
+    transactions,
+    programId
+  );
   const merkleTree = new MerkleTree(compiledTransactions.map(toLeaf));
 
   return {
@@ -322,13 +335,10 @@ export function compileNoMerkle(
     };
   });
 
-  return compiledTransactions
+  return compiledTransactions;
 }
 
-export function isExecuted(
-  executed: Buffer,
-  index: number,
-): boolean {
+export function isExecuted(executed: Buffer, index: number): boolean {
   const byteIndex = Math.floor(index / 8);
   const bitIndex = index % 8;
   const byte = executed[byteIndex];

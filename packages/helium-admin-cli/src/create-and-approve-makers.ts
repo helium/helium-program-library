@@ -218,7 +218,7 @@ export async function run(args: any = process.argv) {
           issuingAuthority: makerAuthority,
           updateAuthority,
         })
-        .accounts({
+        .accountsPartial({
           maker,
           payer: daoPayer,
           dao: subdaoAcc.dao,
@@ -230,7 +230,7 @@ export async function run(args: any = process.argv) {
           maxDepth: size,
           maxBufferSize: buffer,
         })
-        .accounts({
+        .accountsPartial({
           maker,
           merkleTree: merkle.publicKey,
           payer: daoPayer,
@@ -265,7 +265,7 @@ export async function run(args: any = process.argv) {
             issuingAuthority: makerAuthority,
             updateAuthority,
           })
-          .accounts({ maker, updateAuthority: makerAcc.updateAuthority })
+          .accountsPartial({ maker, updateAuthority: makerAcc.updateAuthority })
           .instruction()
       );
 
@@ -275,7 +275,7 @@ export async function run(args: any = process.argv) {
             maxDepth: size,
             maxBufferSize: buffer,
           })
-          .accounts({
+          .accountsPartial({
             maker,
             merkleTree: merkle.publicKey,
             payer: daoPayer,
@@ -316,7 +316,7 @@ export async function run(args: any = process.argv) {
       ).authority;
       approve = await hemProgram.methods
         .approveMakerV0()
-        .accounts({
+        .accountsPartial({
           maker,
           rewardableEntityConfig: entityConfigKey,
           authority,

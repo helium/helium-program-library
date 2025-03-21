@@ -90,7 +90,7 @@ export async function run(args: any = process.argv) {
         boostPrice: argv.boostPrice ? new anchor.BN(argv.boostPrice) : null,
         dcMint: null,
       })
-      .accounts({
+      .accountsPartial({
         boostConfig: boostConfigKey(dntMint)[0],
         authority: subDao.authority,
       })

@@ -1,6 +1,11 @@
 use anchor_lang::prelude::*;
-use nft_proxy::ProxyAssignmentV0;
-use proposal::{ProposalConfigV0, ProposalV0};
+use modular_governance::{
+  nft_proxy::accounts::ProxyAssignmentV0,
+  proposal::{
+    self,
+    accounts::{ProposalConfigV0, ProposalV0},
+  },
+};
 
 use crate::{error::VsrError, registrar_seeds, state::*};
 
@@ -71,7 +76,7 @@ pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
   let marker = &mut ctx.accounts.marker;
 
   marker.proposal = ctx.accounts.proposal.key();
-  marker.bump_seed = ctx.bumps["marker"];
+  marker.bump_seed = ctx.bumps.marker;
   marker.voter = ctx.accounts.voter.key();
   marker.mint = ctx.accounts.position.mint;
   marker.registrar = ctx.accounts.registrar.key();
@@ -131,7 +136,7 @@ pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
         },
         &[registrar_seeds!(ctx.accounts.registrar)],
       ),
-      proposal::VoteArgsV0 {
+      modular_governance::proposal::types::VoteArgsV0 {
         remove_vote: true,
         choice,
         weight,
@@ -154,7 +159,7 @@ pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
         },
         &[registrar_seeds!(ctx.accounts.registrar)],
       ),
-      proposal::VoteArgsV0 {
+      modular_governance::proposal::types::VoteArgsV0 {
         remove_vote: false,
         choice,
         weight,

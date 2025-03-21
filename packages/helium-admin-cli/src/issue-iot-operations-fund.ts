@@ -76,7 +76,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await hemProgram.methods
       .issueIotOperationsFundV0()
-      .accounts({
+      .accountsPartial({
         dao,
         recipient: new PublicKey(argv.recipient),
         mint: mint.publicKey,

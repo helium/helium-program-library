@@ -56,7 +56,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .closeCanopyV0()
-      .accounts({
+      .accountsPartial({
         lazyTransactions,
         refund: provider.wallet.publicKey,
       })

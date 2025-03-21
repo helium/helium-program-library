@@ -114,3 +114,7 @@ export const heliumAddressFromSolAddress = (solAddress: string) => {
     return "";
   }
 };
+
+export function lowerFirstChar(accName: string): string {
+  return accName.charAt(0).toLowerCase() + accName.slice(1);
+}

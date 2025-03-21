@@ -294,7 +294,7 @@ describe("distributor-oracle", () => {
         },
         approver: oracleSignerKey()[0],
       })
-      .accounts({
+      .accountsPartial({
         rewardsMint,
       });
     await method.rpc({ skipPreflight: true });
@@ -366,7 +366,7 @@ describe("distributor-oracle", () => {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ])
-      .accounts({
+      .accountsPartial({
         maker,
         recipient: hotspotOwner.publicKey,
         issuingAuthority: makerKeypair.publicKey,
@@ -433,7 +433,7 @@ describe("distributor-oracle", () => {
         currentRewards: new anchor.BN("5000000"),
         oracleIndex: 0,
       })
-      .accounts({
+      .accountsPartial({
         lazyDistributor,
         recipient,
         keyToAsset,
@@ -559,17 +559,17 @@ describe("distributor-oracle", () => {
     const keyToAsset = keyToAssetKey(daoK, ecc)[0];
     const res = await chai
       .request(oracleServer.server)
-      .post(`/v1/sign/${keyToAsset.toBase58()}`)
-      .send({ });
+      .post("/v1/sign")
+      .send({ keyToAssetKeys: [keyToAsset.toBase58()] });
 
-    assert.hasAllKeys(res.body, ["message", "signature", "serialiedMessage"]);
-    const { signature, serialiedMessage } = res.body;
+    assert.hasAllKeys(res.body, ["messages", "oracle"]);
+    const { messages, oracle } = res.body;
     await rewardsProgram.methods
       .setCurrentRewardsWrapperV2({
         currentRewards: new anchor.BN("100000000"),
         oracleIndex: 0,
       })
-      .accounts({
+      .accountsPartial({
         lazyDistributor,
         recipient,
         keyToAsset,
@@ -579,9 +579,9 @@ describe("distributor-oracle", () => {
       })
       .preInstructions([
         Ed25519Program.createInstructionWithPublicKey({
-          publicKey: oracle.publicKey.toBytes(),
-          message: Buffer.from(serialiedMessage, "base64"),
-          signature: Buffer.from(signature, "base64"),
+          publicKey: new PublicKey(oracle).toBytes(),
+          message: Buffer.from(messages[0].serialized, "base64"),
+          signature: Buffer.from(messages[0].signature, "base64"),
         }),
       ])
       .rpc({ skipPreflight: true });
@@ -602,7 +602,7 @@ describe("distributor-oracle", () => {
           ),
           oracleIndex: 0,
         })
-        .accounts({
+        .accountsPartial({
           lazyDistributor,
           recipient,
           oracle: oracle.publicKey,
@@ -637,7 +637,7 @@ describe("distributor-oracle", () => {
           ),
           oracleIndex: 0,
         })
-        .accounts({
+        .accountsPartial({
           lazyDistributor,
           recipient,
           oracle: oracle.publicKey,
@@ -679,7 +679,7 @@ describe("distributor-oracle", () => {
           ),
           oracleIndex: 0,
         })
-        .accounts({
+        .accountsPartial({
           lazyDistributor,
           recipient,
           oracle: oracle.publicKey,

@@ -211,7 +211,7 @@ describe("helium-sub-daos", () => {
           hntAmount: toBN(amount, 8),
           dcAmount: null,
         })
-        .accounts({ dcMint })
+        .accountsPartial({ dcMint })
         .rpc({ skipPreflight: true });
 
       await sendInstructions(provider, [
@@ -291,7 +291,7 @@ describe("helium-sub-daos", () => {
           delegatorRewardsPercent: null,
           rewardsEscrow: null,
         })
-        .accounts({
+        .accountsPartial({
           dao,
         })
         .rpc({ skipPreflight: true });
@@ -312,7 +312,7 @@ describe("helium-sub-daos", () => {
           registrar: null,
           activeDeviceAuthority: null,
         })
-        .accounts({
+        .accountsPartial({
           subDao,
         })
         .rpc({ skipPreflight: true });
@@ -338,7 +338,7 @@ describe("helium-sub-daos", () => {
         .preInstructions(
           await createMintInstructions(provider, 0, me, me, mint)
         )
-        .accounts({
+        .accountsPartial({
           dao,
           mint: mint.publicKey,
         })
@@ -370,7 +370,7 @@ describe("helium-sub-daos", () => {
 
         const method = program.methods
           .calculateUtilityScoreV0({ epoch })
-          .accounts({ subDao, dao });
+          .accountsPartial({ subDao, dao });
 
         const { daoEpochInfo } = await method.pubkeys();
         await method.rpc({ skipPreflight: true });
@@ -428,7 +428,7 @@ describe("helium-sub-daos", () => {
 
         await vsrProgram.methods
           .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
-          .accounts({ registrar })
+          .accountsPartial({ registrar })
           .rpc({ skipPreflight: true });
         await program.methods
           .calculateUtilityScoreV0({
@@ -437,7 +437,7 @@ describe("helium-sub-daos", () => {
           .preInstructions([
             ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
           ])
-          .accounts({
+          .accountsPartial({
             subDao,
             dao,
           })
@@ -524,7 +524,7 @@ describe("helium-sub-daos", () => {
           const lockupAmount = toBN(options.lockupAmount, 8);
           const method = program.methods
             .delegateV0()
-            .accounts({
+            .accountsPartial({
               position,
               subDao,
               positionAuthority: positionAuthorityKp.publicKey,
@@ -591,7 +591,7 @@ describe("helium-sub-daos", () => {
             .preInstructions([
               ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
             ])
-            .accounts({
+            .accountsPartial({
               maker,
               recipient: hotspotOwner.publicKey,
               issuingAuthority: makerKeypair.publicKey,
@@ -607,7 +607,7 @@ describe("helium-sub-daos", () => {
               dcAmount: toBN(60, 5),
               hntAmount: null,
             })
-            .accounts({ dcMint })
+            .accountsPartial({ dcMint })
             .rpc({ skipPreflight: true });
 
           const method = (
@@ -633,7 +633,7 @@ describe("helium-sub-daos", () => {
               isActive: true,
               entityKey: Buffer.from(bs58.decode(ecc)),
             })
-            .accounts({
+            .accountsPartial({
               activeDeviceAuthority: me,
               rewardableEntityConfig,
               info: infoKey! as PublicKey,
@@ -648,7 +648,7 @@ describe("helium-sub-daos", () => {
           // delegate some vehnt
           await program.methods
             .delegateV0()
-            .accounts({
+            .accountsPartial({
               position,
               subDao,
               positionAuthority: positionAuthorityKp.publicKey,
@@ -663,7 +663,7 @@ describe("helium-sub-daos", () => {
             .preInstructions([
               ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
             ])
-            .accounts({
+            .accountsPartial({
               subDao,
               dao,
             });
@@ -716,7 +716,7 @@ describe("helium-sub-daos", () => {
           );
           await program.methods
             .transferV0({ amount: toBN(10, 8) })
-            .accounts({
+            .accountsPartial({
               sourcePosition: position,
               targetPosition: newPos,
               depositMint: hntMint,
@@ -732,7 +732,7 @@ describe("helium-sub-daos", () => {
               kind: { constant: {} },
               periods: 365 * 4,
             })
-            .accounts({
+            .accountsPartial({
               dao,
               position: position,
               positionAuthority: positionAuthorityKp.publicKey,
@@ -745,7 +745,7 @@ describe("helium-sub-daos", () => {
           beforeEach(async () => {
             await program.methods
               .delegateV0()
-              .accounts({
+              .accountsPartial({
                 position,
                 subDao,
                 positionAuthority: positionAuthorityKp.publicKey,
@@ -766,7 +766,7 @@ describe("helium-sub-daos", () => {
             await expect(
               program.methods
                 .transferV0({ amount: toBN(10, 8) })
-                .accounts({
+                .accountsPartial({
                   sourcePosition: position,
                   targetPosition: newPos,
                   depositMint: hntMint,
@@ -786,7 +786,7 @@ describe("helium-sub-daos", () => {
                   kind: { constant: {} },
                   periods: 182 * 4,
                 })
-                .accounts({
+                .accountsPartial({
                   dao,
                   position: position,
                   positionAuthority: positionAuthorityKp.publicKey,
@@ -802,7 +802,7 @@ describe("helium-sub-daos", () => {
             await sleep(options.delay);
             const method = program.methods
               .closeDelegationV0()
-              .accounts({
+              .accountsPartial({
                 position,
                 subDao,
                 positionAuthority: positionAuthorityKp.publicKey,
@@ -846,7 +846,7 @@ describe("helium-sub-daos", () => {
 
               await program.methods
                 .delegateV0()
-                .accounts({
+                .accountsPartial({
                   position: basePosition,
                   subDao,
                   positionAuthority: positionAuthorityKp.publicKey,
@@ -873,7 +873,7 @@ describe("helium-sub-daos", () => {
             it("allows closing delegate", async () => {
               const method = program.methods
                 .closeDelegationV0()
-                .accounts({
+                .accountsPartial({
                   position: basePosition,
                   subDao,
                   positionAuthority: positionAuthorityKp.publicKey,
@@ -932,7 +932,7 @@ describe("helium-sub-daos", () => {
             beforeEach(async () => {
               await vsrProgram.methods
                 .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
-                .accounts({ registrar })
+                .accountsPartial({ registrar })
                 .rpc({ skipPreflight: true });
 
               ({ subDaoEpochInfo } = await burnDc(1600000));
@@ -947,7 +947,7 @@ describe("helium-sub-daos", () => {
                 .preInstructions([
                   ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
                 ])
-                .accounts({
+                .accountsPartial({
                   subDao,
                   dao,
                 })
@@ -970,7 +970,7 @@ describe("helium-sub-daos", () => {
                 .issueRewardsV0({
                   epoch,
                 })
-                .accounts({
+                .accountsPartial({
                   subDao,
                 })
                 .rpcAndKeys({ skipPreflight: true });
@@ -1043,7 +1043,7 @@ describe("helium-sub-daos", () => {
                     ],
                     tags: ["test"],
                   })
-                  .accounts({ proposalConfig })
+                  .accountsPartial({ proposalConfig })
                   .rpcAndKeys({ skipPreflight: true });
                 await proposalProgram.methods
                   .updateStateV0({
@@ -1053,7 +1053,7 @@ describe("helium-sub-daos", () => {
                       } as any,
                     },
                   })
-                  .accounts({ proposal })
+                  .accountsPartial({ proposal })
                   .rpc({ skipPreflight: true });
                 const {
                   pubkeys: { marker },
@@ -1061,18 +1061,29 @@ describe("helium-sub-daos", () => {
                   .voteV0({
                     choice: 0,
                   })
-                  .accounts({
+                  .accountsPartial({
                     position,
                     proposal: proposal as PublicKey,
                     voter: positionAuthorityKp.publicKey,
+                    proposalConfig,
+                    stateController: me,
+                    onVoteHook: PublicKey.default,
                   })
                   .signers([positionAuthorityKp])
                   .rpcAndKeys({ skipPreflight: true });
+                // Ensure dao pays resize
+                await sendInstructions(provider, [
+                  SystemProgram.transfer({
+                    fromPubkey: me,
+                    toPubkey: dao,
+                    lamports: 1000000000,
+                  }),
+                ]);
                 console.log(
                   "track",
                   await program.methods
                     .trackVoteV0()
-                    .accounts({
+                    .accountsPartial({
                       marker: marker as PublicKey,
                       dao,
                       subDao,
@@ -1088,7 +1099,7 @@ describe("helium-sub-daos", () => {
                   .issueRewardsV0({
                     epoch,
                   })
-                  .accounts({
+                  .accountsPartial({
                     subDao,
                   })
                   .instruction(),
@@ -1098,7 +1109,7 @@ describe("helium-sub-daos", () => {
                 .claimRewardsV1({
                   epoch,
                 })
-                .accounts({
+                .accountsPartial({
                   position,
                   subDao,
                   payer: positionAuthorityKp.publicKey,
@@ -1152,7 +1163,7 @@ describe("helium-sub-daos", () => {
         ));
         await program.methods
           .delegateV0()
-          .accounts({
+          .accountsPartial({
             position,
             subDao,
             positionAuthority: positionAuthorityKp.publicKey,
@@ -1175,7 +1186,7 @@ describe("helium-sub-daos", () => {
           offset = amount;
           await vsrProgram.methods
             .setTimeOffsetV0(new BN(offset))
-            .accounts({ registrar })
+            .accountsPartial({ registrar })
             .rpc({ skipPreflight: true });
         }
 
@@ -1195,7 +1206,7 @@ describe("helium-sub-daos", () => {
           pubkeys: { genesisEndSubDaoEpochInfo },
         } = await program.methods
           .closeDelegationV0()
-          .accounts({
+          .accountsPartial({
             position,
             subDao,
             positionAuthority: positionAuthorityKp.publicKey,
@@ -1207,7 +1218,7 @@ describe("helium-sub-daos", () => {
             kind: { cliff: {} },
             periods: 1460,
           })
-          .accounts({
+          .accountsPartial({
             dao,
             position: position,
             positionAuthority: positionAuthorityKp.publicKey,
@@ -1231,7 +1242,7 @@ describe("helium-sub-daos", () => {
           },
         } = await program.methods
           .delegateV0()
-          .accounts({
+          .accountsPartial({
             position,
             subDao,
             positionAuthority: positionAuthorityKp.publicKey,
@@ -1357,7 +1368,7 @@ describe("helium-sub-daos", () => {
           pubkeys: { closingTimeSubDaoEpochInfo, genesisEndSubDaoEpochInfo },
         } = await program.methods
           .delegateV0()
-          .accounts({
+          .accountsPartial({
             position,
             subDao,
             positionAuthority: positionAuthorityKp.publicKey,
@@ -1377,7 +1388,7 @@ describe("helium-sub-daos", () => {
               },
             ],
           })
-          .accounts({
+          .accountsPartial({
             proxyConfig,
             authority: me,
           })
@@ -1396,7 +1407,7 @@ describe("helium-sub-daos", () => {
 
         await program.methods
           .extendExpirationTsV0()
-          .accounts({
+          .accountsPartial({
             position,
             subDao,
             oldClosingTimeSubDaoEpochInfo: closingTimeSubDaoEpochInfo,
@@ -1460,7 +1471,7 @@ describe("helium-sub-daos", () => {
           ));
           await program.methods
             .delegateV0()
-            .accounts({
+            .accountsPartial({
               position,
               subDao,
               positionAuthority: positionAuthorityKp.publicKey,
@@ -1483,7 +1494,7 @@ describe("helium-sub-daos", () => {
             offset = amount;
             await vsrProgram.methods
               .setTimeOffsetV0(new BN(offset))
-              .accounts({ registrar })
+              .accountsPartial({ registrar })
               .rpc({ skipPreflight: true });
           }
 
@@ -1505,7 +1516,7 @@ describe("helium-sub-daos", () => {
             pubkeys: { genesisEndSubDaoEpochInfo },
           } = await program.methods
             .closeDelegationV0()
-            .accounts({
+            .accountsPartial({
               position,
               subDao,
               positionAuthority: positionAuthorityKp.publicKey,
@@ -1517,7 +1528,7 @@ describe("helium-sub-daos", () => {
               kind: { cliff: {} },
               periods: 1460,
             })
-            .accounts({
+            .accountsPartial({
               dao,
               position: position,
               positionAuthority: positionAuthorityKp.publicKey,
@@ -1543,7 +1554,7 @@ describe("helium-sub-daos", () => {
             },
           } = await program.methods
             .delegateV0()
-            .accounts({
+            .accountsPartial({
               position,
               subDao,
               positionAuthority: positionAuthorityKp.publicKey,

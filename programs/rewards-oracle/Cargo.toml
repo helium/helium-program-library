@@ -1,6 +1,6 @@
 [package]
 name = "rewards-oracle"
-version = "0.2.2"
+version = "0.2.3"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "rewards_oracle"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "lazy-distributor/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []

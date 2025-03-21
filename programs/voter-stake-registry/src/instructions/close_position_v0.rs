@@ -1,7 +1,10 @@
-use crate::{position_seeds, state::*};
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Burn, CloseAccount, Mint, ThawAccount, Token, TokenAccount};
-use shared_utils::token_metadata::Metadata;
+use anchor_spl::{
+  metadata::Metadata,
+  token::{self, Burn, CloseAccount, Mint, ThawAccount, Token, TokenAccount},
+};
+
+use crate::{position_seeds, state::*};
 
 #[derive(Accounts)]
 pub struct ClosePositionV0<'info> {
@@ -71,6 +74,17 @@ pub fn handler(ctx: Context<ClosePositionV0>) -> Result<()> {
       authority: ctx.accounts.position_authority.to_account_info(),
     },
   ))?;
+
+  let registrar = &mut ctx.accounts.registrar;
+  let position = &mut ctx.accounts.position;
+  **registrar.to_account_info().lamports.borrow_mut() = registrar
+    .to_account_info()
+    .lamports()
+    .saturating_add(position.registrar_paid_rent);
+  **position.to_account_info().lamports.borrow_mut() = position
+    .to_account_info()
+    .lamports()
+    .saturating_sub(position.registrar_paid_rent);
 
   Ok(())
 }

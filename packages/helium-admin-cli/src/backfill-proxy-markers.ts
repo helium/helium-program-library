@@ -78,7 +78,7 @@ export async function run(args: any = process.argv) {
           instructions.push(
             await hvsrProgram.methods
               .tempBackfillProxyMarker({ choice })
-              .accounts({
+              .accountsPartial({
                 voter: new PublicKey(voter),
                 proposal: new PublicKey(proposal),
                 marker: proxyMarker,

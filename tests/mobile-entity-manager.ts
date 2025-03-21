@@ -104,7 +104,7 @@ describe('mobile-entity-manager', () => {
       .approveProgramV0({
         programId: memProgram.programId,
       })
-      .accounts({ dao });
+      .accountsPartial({ dao });
 
     programApproval = (await approve.pubkeys()).programApproval!;
     await approve.rpc({ skipPreflight: true });
@@ -126,7 +126,7 @@ describe('mobile-entity-manager', () => {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ])
-      .accounts({
+      .accountsPartial({
         subDao,
       })
       .rpcAndKeys({ skipPreflight: true });
@@ -162,7 +162,7 @@ describe('mobile-entity-manager', () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
-        .accounts({
+        .accountsPartial({
           subDao,
         })
         .rpcAndKeys({ skipPreflight: true });
@@ -184,7 +184,7 @@ describe('mobile-entity-manager', () => {
           maxDepth: 3,
           maxBufferSize: 8,
         })
-        .accounts({ carrier, newMerkleTree: merkle.publicKey })
+        .accountsPartial({ carrier, newMerkleTree: merkle.publicKey })
         .preInstructions([createMerkle])
         .signers([merkle])
         .rpc({ skipPreflight: true });
@@ -193,14 +193,14 @@ describe('mobile-entity-manager', () => {
     it('allows the subdao to approve and revoke the carrier', async () => {
       await memProgram.methods
         .approveCarrierV0()
-        .accounts({ carrier })
+        .accountsPartial({ carrier })
         .rpc({ skipPreflight: true });
       let carrierAcc = await memProgram.account.carrierV0.fetch(carrier!);
       expect(carrierAcc.approved).to.be.true;
 
       await memProgram.methods
         .revokeCarrierV0()
-        .accounts({ carrier })
+        .accountsPartial({ carrier })
         .rpc({ skipPreflight: true });
       carrierAcc = await memProgram.account.carrierV0.fetch(carrier!);
       expect(carrierAcc.approved).to.be.false;
@@ -214,7 +214,7 @@ describe('mobile-entity-manager', () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
-        .accounts({ carrier })
+        .accountsPartial({ carrier })
         .rpc({ skipPreflight: true });
       // No further assertions since we don't have the digital asset api in testing
     });
@@ -223,7 +223,7 @@ describe('mobile-entity-manager', () => {
       beforeEach(async () => {
         await memProgram.methods
           .approveCarrierV0()
-          .accounts({ carrier })
+          .accountsPartial({ carrier })
           .rpc({ skipPreflight: true });
       });
 
@@ -238,7 +238,7 @@ describe('mobile-entity-manager', () => {
           .preInstructions([
             ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
           ])
-          .accounts({ carrier, recipient: me })
+          .accountsPartial({ carrier, recipient: me })
           .rpc({ skipPreflight: true });
       });
 
@@ -255,7 +255,7 @@ describe('mobile-entity-manager', () => {
           .preInstructions([
             ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
           ])
-          .accounts({
+          .accountsPartial({
             carrier,
             recipient: me,
             keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
@@ -274,7 +274,7 @@ describe('mobile-entity-manager', () => {
             startTs: new BN(10),
             stopTs: new BN(15),
             shares: 200,
-          }).accounts({ incentiveEscrowProgram }).rpc({ skipPreflight: true });
+          }).accountsPartial({ incentiveEscrowProgram }).rpc({ skipPreflight: true });
           const incentiveEscrowProgramAcc2 =
             await memProgram.account.incentiveEscrowProgramV0.fetch(
               incentiveEscrowProgram!
@@ -299,7 +299,7 @@ describe('mobile-entity-manager', () => {
               .preInstructions([
                 ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
               ])
-              .accounts({ carrier, recipient: me })
+              .accountsPartial({ carrier, recipient: me })
               .rpc({ skipPreflight: true });
           } catch (err) {
             console.error(err);
@@ -323,7 +323,7 @@ describe('mobile-entity-manager', () => {
             maxDepth: 3,
             maxBufferSize: 8,
           })
-          .accounts({ carrier, newMerkleTree: newMerkle.publicKey })
+          .accountsPartial({ carrier, newMerkleTree: newMerkle.publicKey })
           .preInstructions([createMerkle])
           .signers([newMerkle])
           .rpc();

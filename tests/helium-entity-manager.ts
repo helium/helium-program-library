@@ -145,7 +145,7 @@ describe("helium-entity-manager", () => {
     await hemProgram.methods
       .issueIotOperationsFundV0()
       .preInstructions(await createMintInstructions(provider, 0, me, me, mint))
-      .accounts({
+      .accountsPartial({
         dao,
         recipient: me,
         mint: mint.publicKey,
@@ -163,7 +163,7 @@ describe("helium-entity-manager", () => {
     await hemProgram.methods
       .issueNotEmittedEntityV0()
       .preInstructions(await createMintInstructions(provider, 0, me, me, mint))
-      .accounts({
+      .accountsPartial({
         dao,
         mint: mint.publicKey,
       })
@@ -187,7 +187,7 @@ describe("helium-entity-manager", () => {
     );
     await noEmitProgram.methods
       .noEmitV0()
-      .accounts({
+      .accountsPartial({
         mint: tokenMint,
       })
       .rpc({ skipPreflight: true });
@@ -243,7 +243,7 @@ describe("helium-entity-manager", () => {
         name: "DATAONLY",
         metadataUrl: "test",
       })
-      .accounts({
+      .accountsPartial({
         dao,
         merkleTree: merkle.publicKey,
       })
@@ -305,7 +305,7 @@ describe("helium-entity-manager", () => {
           name: "DATAONLY",
           metadataUrl: "test",
         })
-        .accounts({
+        .accountsPartial({
           dao,
           merkleTree: merkle.publicKey,
         })
@@ -331,7 +331,7 @@ describe("helium-entity-manager", () => {
           hntAmount: toBN(startDcBal, 8),
           dcAmount: null,
         })
-        .accounts({ dcMint })
+        .accountsPartial({ dcMint })
         .rpc({ skipPreflight: true });
     });
     it("issues and onboards an iot data only hotspot", async () => {
@@ -343,7 +343,7 @@ describe("helium-entity-manager", () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
-        .accounts({
+        .accountsPartial({
           recipient: hotspotOwner.publicKey,
           dao,
           eccVerifier: eccVerifier.publicKey,
@@ -372,7 +372,7 @@ describe("helium-entity-manager", () => {
           elevation: 50,
           gain: 100,
         })
-        .accounts({
+        .accountsPartial({
           rewardableEntityConfig,
           hotspotOwner: hotspotOwner.publicKey,
           keyToAsset,
@@ -389,7 +389,7 @@ describe("helium-entity-manager", () => {
           isActive: true,
           entityKey: Buffer.from(bs58.decode(ecc)),
         })
-        .accounts({
+        .accountsPartial({
           activeDeviceAuthority: activeDeviceAuthority.publicKey,
           rewardableEntityConfig,
           info: iotInfo!,
@@ -422,7 +422,7 @@ describe("helium-entity-manager", () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
-        .accounts({
+        .accountsPartial({
           recipient: hotspotOwner.publicKey,
           dao,
           eccVerifier: eccVerifier.publicKey,
@@ -487,7 +487,7 @@ describe("helium-entity-manager", () => {
           ...args,
           location: null,
         })
-        .accounts({
+        .accountsPartial({
           rewardableEntityConfig,
           hotspotOwner: hotspotOwner.publicKey,
           keyToAsset,
@@ -504,7 +504,7 @@ describe("helium-entity-manager", () => {
           isActive: true,
           entityKey: Buffer.from(bs58.decode(ecc)),
         })
-        .accounts({
+        .accountsPartial({
           activeDeviceAuthority: activeDeviceAuthority.publicKey,
           rewardableEntityConfig,
           info: mobileInfo!,
@@ -540,7 +540,7 @@ describe("helium-entity-manager", () => {
             .preInstructions([
               ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
             ])
-            .accounts({
+            .accountsPartial({
               recipient: hotspotOwner.publicKey,
               dao,
               eccVerifier: eccVerifier.publicKey,
@@ -572,7 +572,7 @@ describe("helium-entity-manager", () => {
       );
       await hemProgram.methods
         .updateDataOnlyTreeV0()
-        .accounts({
+        .accountsPartial({
           dataOnlyConfig: dataOnlyConfigKey(dao)[0],
           newMerkleTree: newMerkle.publicKey,
         })
@@ -621,7 +621,7 @@ describe("helium-entity-manager", () => {
       pubkeys: { makerApproval },
     } = await hemProgram.methods
       .revokeMakerV0()
-      .accounts({
+      .accountsPartial({
         maker,
         rewardableEntityConfig,
       })
@@ -641,7 +641,7 @@ describe("helium-entity-manager", () => {
       .approveProgramV0({
         programId: keypair.publicKey,
       })
-      .accounts({
+      .accountsPartial({
         dao,
       })
       .rpcAndKeys();
@@ -654,7 +654,7 @@ describe("helium-entity-manager", () => {
       .revokeProgramV0({
         programId: keypair.publicKey,
       })
-      .accounts({
+      .accountsPartial({
         dao,
       })
       .rpc();
@@ -738,7 +738,7 @@ describe("helium-entity-manager", () => {
           hntAmount: toBN(startDcBal, 8),
           dcAmount: null,
         })
-        .accounts({ dcMint })
+        .accountsPartial({ dcMint })
         .rpc({ skipPreflight: true });
 
       maker = makerConf.maker;
@@ -774,7 +774,7 @@ describe("helium-entity-manager", () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
         ])
-        .accounts({
+        .accountsPartial({
           maker,
           recipient: hotspotOwner.publicKey,
           issuingAuthority: makerKeypair.publicKey,
@@ -815,7 +815,7 @@ describe("helium-entity-manager", () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
-        .accounts({
+        .accountsPartial({
           maker,
           recipient: hotspotOwner.publicKey,
           issuingAuthority: makerKeypair.publicKey,
@@ -847,7 +847,7 @@ describe("helium-entity-manager", () => {
           isActive: true,
           entityKey: Buffer.from(bs58.decode(ecc)),
         })
-        .accounts({
+        .accountsPartial({
           activeDeviceAuthority: activeDeviceAuthority.publicKey,
           rewardableEntityConfig,
           info: mobileInfo! as PublicKey,
@@ -873,7 +873,7 @@ describe("helium-entity-manager", () => {
           .preInstructions([
             ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
           ])
-          .accounts({
+          .accountsPartial({
             maker,
             dao,
             recipient: hotspotOwner.publicKey,
@@ -893,7 +893,7 @@ describe("helium-entity-manager", () => {
             registrar: null,
             activeDeviceAuthority: null,
           })
-          .accounts({
+          .accountsPartial({
             subDao,
           })
           .rpc({ skipPreflight: true });
@@ -921,14 +921,14 @@ describe("helium-entity-manager", () => {
             hntAmount: toBN(startDcBal, 8),
             dcAmount: null,
           })
-          .accounts({ dcMint, recipient: hotspotOwner.publicKey })
+          .accountsPartial({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();
       });
 
       it("onboarding fees be backpaid with DC when subdao fees are raised", async () => {
         const method = hemProgram.methods
           .tempPayMobileOnboardingFeeV0()
-          .accounts({
+          .accountsPartial({
             rewardableEntityConfig,
             subDao,
             dao,
@@ -986,7 +986,7 @@ describe("helium-entity-manager", () => {
             newAuthority: null,
             stakingRequirement: MAKER_STAKING_FEE,
           })
-          .accounts({ rewardableEntityConfig })
+          .accountsPartial({ rewardableEntityConfig })
           .rpc({ skipPreflight: true });
 
         await method.rpc({ skipPreflight: true });
@@ -1045,7 +1045,7 @@ describe("helium-entity-manager", () => {
             isActive: false,
             entityKey: Buffer.from(bs58.decode(ecc)),
           })
-          .accounts({
+          .accountsPartial({
             activeDeviceAuthority: activeDeviceAuthority.publicKey,
             rewardableEntityConfig,
             info: infoKey!,
@@ -1105,7 +1105,7 @@ describe("helium-entity-manager", () => {
           hntAmount: toBN(startDcBal, 8),
           dcAmount: null,
         })
-        .accounts({ dcMint: dcMint })
+        .accountsPartial({ dcMint: dcMint })
         .rpc({ skipPreflight: true });
 
       maker = makerConf.maker;
@@ -1129,7 +1129,7 @@ describe("helium-entity-manager", () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
         ])
-        .accounts({
+        .accountsPartial({
           maker,
           dao,
           recipient: hotspotOwner.publicKey,
@@ -1175,7 +1175,7 @@ describe("helium-entity-manager", () => {
           settings: null,
           stakingRequirement: null,
         })
-        .accounts({
+        .accountsPartial({
           rewardableEntityConfig,
         })
         .rpc();
@@ -1196,7 +1196,7 @@ describe("helium-entity-manager", () => {
           .preInstructions([
             ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
           ])
-          .accounts({
+          .accountsPartial({
             maker,
             dao,
             recipient: hotspotOwner.publicKey,
@@ -1227,7 +1227,7 @@ describe("helium-entity-manager", () => {
             hntAmount: toBN(startDcBal, 8),
             dcAmount: null,
           })
-          .accounts({ dcMint, recipient: hotspotOwner.publicKey })
+          .accountsPartial({ dcMint, recipient: hotspotOwner.publicKey })
           .rpc();
       });
 
@@ -1237,7 +1237,7 @@ describe("helium-entity-manager", () => {
             isActive: false,
             entityKey: Buffer.from(bs58.decode(ecc)),
           })
-          .accounts({
+          .accountsPartial({
             activeDeviceAuthority: activeDeviceAuthority.publicKey,
             rewardableEntityConfig,
             info: infoKey!,
@@ -1289,7 +1289,7 @@ describe("helium-entity-manager", () => {
             updateAuthority: PublicKey.default,
             issuingAuthority: PublicKey.default,
           })
-          .accounts({
+          .accountsPartial({
             maker,
             updateAuthority: makerKeypair.publicKey,
           })

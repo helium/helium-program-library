@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "price_oracle"
 
 [features]
+idl-build = ["anchor-lang/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []

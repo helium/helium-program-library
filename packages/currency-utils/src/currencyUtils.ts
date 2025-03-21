@@ -6,6 +6,9 @@ import {
 } from "./pyth";
 import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
 
+export type { PythSolanaReceiver } from "./pyth";
+export { pythSolanaReceiverIdl };
+
 export const getBalance = async ({
   pubKey,
   mint,
@@ -35,8 +38,7 @@ export const getOraclePrice = async ({
   connection: Connection;
 }) => {
   const pythProgram: Program<PythSolanaReceiver> = new Program(
-    pythSolanaReceiverIdl,
-    new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"),
+    pythSolanaReceiverIdl as any,
     new AnchorProvider(connection, {} as Wallet, {
       skipPreflight: true,
     })

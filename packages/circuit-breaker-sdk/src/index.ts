@@ -32,7 +32,6 @@ export async function init(
 
   const circuitBreaker = new Program<CircuitBreaker>(
     idl as CircuitBreaker,
-    programId,
     provider,
     undefined,
     () => circuitBreakerResolvers

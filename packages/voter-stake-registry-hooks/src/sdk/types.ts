@@ -4,9 +4,9 @@ import { VoterStakeRegistry as HeliumVoterStakeRegistry } from '@helium/idls/lib
 import { NftProxy } from '@helium/modular-governance-idls/lib/types/nft_proxy'
 import { PublicKey } from '@solana/web3.js'
 
-export type VotingMintConfig = IdlTypes<HeliumVoterStakeRegistry>['VotingMintConfigV0']
+export type VotingMintConfig = IdlTypes<HeliumVoterStakeRegistry>['votingMintConfigV0']
 type RegistrarV0 = IdlAccounts<HeliumVoterStakeRegistry>['registrar']
-export type Lockup = IdlTypes<HeliumVoterStakeRegistry>['Lockup']
+export type Lockup = IdlTypes<HeliumVoterStakeRegistry>['lockup']
 export type PositionV0 = IdlAccounts<HeliumVoterStakeRegistry>['positionV0']
 export type DelegatedPositionV0 = IdlAccounts<HeliumSubDaos>['delegatedPositionV0']
 export type ProxyAssignmentV0 =
@@ -30,7 +30,7 @@ export interface PositionWithMeta extends Position {
   votingMint: VotingMintConfig
   proxy: Proxy | null
 }
-export type LockupKind = IdlTypes<HeliumVoterStakeRegistry>['LockupKind']
+export type LockupKind = IdlTypes<HeliumVoterStakeRegistry>['lockupKind']
 /* export type InitializePositionV0Args = IdlTypes<HeliumVoterStakeRegistry>['InitializePositionArgsV0']
  */
 export type SubDao = IdlAccounts<HeliumSubDaos>['subDaoV0']

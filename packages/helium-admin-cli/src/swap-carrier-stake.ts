@@ -81,7 +81,7 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .swapCarrierStake()
-      .accounts({
+      .accountsPartial({
         carrier,
         updateAuthority: carrierAcc.updateAuthority,
         newStakeSource: getAssociatedTokenAddressSync(

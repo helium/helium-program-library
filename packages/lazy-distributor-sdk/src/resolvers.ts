@@ -2,6 +2,7 @@ import { Accounts } from "@coral-xyz/anchor";
 import {
   ataResolver,
   combineResolvers,
+  heliumCommonResolver,
   resolveIndividual,
 } from "@helium/anchor-resolvers";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
@@ -31,6 +32,7 @@ const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
 );
 
 export const lazyDistributorResolvers = combineResolvers(
+  heliumCommonResolver,
   resolveIndividual(async ({ path }) => {
     switch (path[path.length - 1]) {
       case "tokenMetadataProgram":

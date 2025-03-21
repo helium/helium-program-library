@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.9.31",
+  "version": "0.10.1",
   "description": "CLI to bootstrap the network",
   "repository": {
     "type": "git",
@@ -38,24 +38,25 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.28.0",
+    "@coral-xyz/anchor": "^0.31.0",
     "@helium/address": "^4.10.2",
-    "@helium/circuit-breaker-sdk": "^0.9.31",
+    "@helium/circuit-breaker-sdk": "^0.10.1",
     "@helium/crypto": "^4.10.2",
-    "@helium/data-credits-sdk": "^0.9.31",
-    "@helium/distributor-oracle": "^0.9.31",
-    "@helium/fanout-sdk": "^0.9.31",
-    "@helium/helium-entity-manager-sdk": "^0.9.31",
-    "@helium/helium-sub-daos-sdk": "^0.9.31",
-    "@helium/iot-routing-manager-sdk": "^0.9.31",
-    "@helium/lazy-distributor-sdk": "^0.9.31",
-    "@helium/mobile-entity-manager-sdk": "^0.9.31",
-    "@helium/nft-proxy-sdk": "^0.0.15",
-    "@helium/organization-sdk": "^0.0.13",
-    "@helium/price-oracle-sdk": "^0.9.31",
-    "@helium/proposal-sdk": "^0.0.15",
-    "@helium/spl-utils": "^0.9.31",
-    "@helium/treasury-management-sdk": "^0.9.31",
+    "@helium/data-credits-sdk": "^0.10.1",
+    "@helium/distributor-oracle": "^0.10.1",
+    "@helium/fanout-sdk": "^0.10.1",
+    "@helium/helium-entity-manager-sdk": "^0.10.1",
+    "@helium/helium-sub-daos-sdk": "^0.10.1",
+    "@helium/iot-routing-manager-sdk": "^0.10.1",
+    "@helium/lazy-distributor-sdk": "^0.10.1",
+    "@helium/mobile-entity-manager-sdk": "^0.10.1",
+    "@helium/nft-proxy-sdk": "^0.1.5-alpha.0",
+    "@helium/organization-sdk": "^0.1.5-alpha.0",
+    "@helium/price-oracle-sdk": "^0.10.1",
+    "@helium/proposal-sdk": "^0.1.5-alpha.0",
+    "@helium/spl-utils": "^0.10.1",
+    "@helium/treasury-management-sdk": "^0.10.1",
+    "@helium/tuktuk-sdk": "^0.0.4",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-governance": "^0.3.18",
     "@solana/spl-token": "^0.3.8",
@@ -76,5 +77,5 @@
     "typescript": "^5.2.2"
   },
   "author": "",
-  "gitHead": "5a8bf0b7b88e5934ef8d774e686f7c95804fbb8d"
+  "gitHead": "fc5dab2875863281ec468cf4a5a416c9696d102f"
 }

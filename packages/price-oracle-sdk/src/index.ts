@@ -17,7 +17,6 @@ export async function init(
 
   const program = new Program<PriceOracle>(
     idl as PriceOracle,
-    programId,
     provider,
     undefined,
   ) as Program<PriceOracle>;

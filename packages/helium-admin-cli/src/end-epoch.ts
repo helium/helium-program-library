@@ -137,7 +137,7 @@ export async function run(args: any = process.argv) {
                 [
                   await heliumSubDaosProgram.methods
                     .calculateUtilityScoreV0({ epoch })
-                    .accounts({ subDao: subDao.publicKey })
+                    .accountsPartial({ subDao: subDao.publicKey })
                     .instruction(),
                 ],
                 {
@@ -183,7 +183,7 @@ export async function run(args: any = process.argv) {
                 [
                   await heliumSubDaosProgram.methods
                     .issueRewardsV0({ epoch })
-                    .accounts({ subDao: subDao.publicKey })
+                    .accountsPartial({ subDao: subDao.publicKey })
                     .instruction(),
                 ],
                 {
@@ -214,7 +214,7 @@ export async function run(args: any = process.argv) {
 
       const [recipient] = recipientKey(lazyDistributor, assetId);
       if (!(await provider.connection.getAccountInfo(recipient))) {
-        const method = lazyProgram.methods.initializeRecipientV0().accounts({
+        const method = lazyProgram.methods.initializeRecipientV0().accountsPartial({
           lazyDistributor,
           mint: assetId,
         });
@@ -294,7 +294,7 @@ export async function run(args: any = process.argv) {
               )),
               await hemProgram.methods
                 .issueNotEmittedEntityV0()
-                .accounts({
+                .accountsPartial({
                   dao,
                   mint: mint.publicKey,
                 })
@@ -312,7 +312,7 @@ export async function run(args: any = process.argv) {
           if (!(await provider.connection.getAccountInfo(recipient))) {
             const method = lazyProgram.methods
               .initializeRecipientV0()
-              .accounts({
+              .accountsPartial({
                 lazyDistributor,
                 mint: assetId,
               });
@@ -357,7 +357,7 @@ export async function run(args: any = process.argv) {
         await sendInstructions(provider, [
           await noEmitProgram.methods
             .noEmitV0()
-            .accounts({
+            .accountsPartial({
               mint: hntMint,
             })
             .instruction(),

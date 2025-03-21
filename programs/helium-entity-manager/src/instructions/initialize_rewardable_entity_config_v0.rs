@@ -1,8 +1,8 @@
-use crate::error::ErrorCode;
-use crate::{state::*, TESTING};
 use anchor_lang::prelude::*;
 use helium_sub_daos::SubDaoV0;
 use shared_utils::resize_to_fit;
+
+use crate::{error::ErrorCode, state::*, TESTING};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeRewardableEntityConfigArgsV0 {
@@ -51,7 +51,7 @@ pub fn handler(
       sub_dao: ctx.accounts.sub_dao.key(),
       symbol: args.symbol.clone(),
       authority: ctx.accounts.authority.key(),
-      bump_seed: ctx.bumps["rewardable_entity_config"],
+      bump_seed: ctx.bumps.rewardable_entity_config,
       settings: args.settings,
       staking_requirement: args.staking_requirement,
     });

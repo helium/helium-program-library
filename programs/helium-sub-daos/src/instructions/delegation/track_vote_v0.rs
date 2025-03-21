@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
-use proposal::ProposalV0;
-use shared_utils::resize_to_fit;
+use modular_governance::proposal::accounts::ProposalV0;
 use voter_stake_registry::{
   state::{PositionV0, Registrar, VoteMarkerV0},
   VoterStakeRegistry,
@@ -10,8 +9,9 @@ use voter_stake_registry::{
 use crate::{
   current_epoch,
   error::ErrorCode,
+  get_sub_dao_epoch_info_seed,
   state::{DaoEpochInfoV0, DaoV0, DelegatedPositionV0},
-  SubDaoV0,
+  try_from, SubDaoV0,
 };
 #[derive(Accounts)]
 pub struct TrackVoteV0<'info> {
@@ -34,7 +34,7 @@ pub struct TrackVoteV0<'info> {
   #[account(
     seeds = [b"marker", mint.key().as_ref(), proposal.key().as_ref()],
     bump,
-    seeds::program = vsr_program
+    seeds::program = voter_stake_registry::ID
   )]
   pub marker: UncheckedAccount<'info>,
   #[account(mut)]
@@ -55,7 +55,7 @@ pub struct TrackVoteV0<'info> {
     } else {
         DaoEpochInfoV0::size()
     },
-    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()],
+    seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &get_sub_dao_epoch_info_seed(&registrar)],
     bump,
   )]
   pub dao_epoch_info: Box<Account<'info, DaoEpochInfoV0>>,
@@ -65,7 +65,7 @@ pub struct TrackVoteV0<'info> {
 pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
   ctx.accounts.dao_epoch_info.epoch = current_epoch(ctx.accounts.registrar.clock_unix_timestamp());
   ctx.accounts.dao_epoch_info.dao = ctx.accounts.dao.key();
-  ctx.accounts.dao_epoch_info.bump_seed = *ctx.bumps.get("dao_epoch_info").unwrap();
+  ctx.accounts.dao_epoch_info.bump_seed = ctx.bumps.dao_epoch_info;
   ctx.accounts.dao.add_recent_proposal(
     ctx.accounts.proposal.key(),
     ctx.accounts.proposal.created_at,
@@ -74,35 +74,14 @@ pub fn handler(ctx: Context<TrackVoteV0>) -> Result<()> {
   let data = ctx.accounts.marker.data.try_borrow().unwrap();
   let has_data = !data.is_empty();
   drop(data);
-  let mut voted = has_data;
   if has_data {
-    let marker: Account<VoteMarkerV0> = Account::try_from(&ctx.accounts.marker.to_account_info())?;
+    let marker: Account<VoteMarkerV0> = try_from!(Account<VoteMarkerV0>, &ctx.accounts.marker)?;
     require_eq!(
       marker.registrar,
       ctx.accounts.position.registrar,
       ErrorCode::InvalidMarker
     );
-    voted = !marker.choices.is_empty();
   }
-  if voted {
-    ctx.accounts.delegated_position.add_recent_proposal(
-      ctx.accounts.proposal.key(),
-      ctx.accounts.proposal.created_at,
-    );
-    msg!(
-      "Proposals are now {:?}",
-      ctx.accounts.delegated_position.recent_proposals
-    );
-    resize_to_fit(
-      &ctx.accounts.payer,
-      &ctx.accounts.system_program.to_account_info(),
-      &ctx.accounts.delegated_position,
-    )?;
-  } else {
-    ctx
-      .accounts
-      .delegated_position
-      .remove_recent_proposal(ctx.accounts.proposal.key());
-  }
+
   Ok(())
 }

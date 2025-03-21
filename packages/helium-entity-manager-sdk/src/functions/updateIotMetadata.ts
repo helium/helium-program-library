@@ -57,7 +57,7 @@ export async function updateIotMetadata({
       gain,
       ...args,
     })
-    .accounts({
+    .accountsPartial({
       // hotspot: assetId,
       ...accounts,
       dcFeePayer,

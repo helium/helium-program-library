@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.9.31",
+  "version": "0.10.1",
   "description": "Interface to the lazy-distributor smart contract",
   "repository": {
     "type": "git",
@@ -31,10 +31,10 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.28.0",
-    "@helium/anchor-resolvers": "^0.9.31",
-    "@helium/circuit-breaker-sdk": "^0.9.31",
-    "@helium/spl-utils": "^0.9.31",
+    "@coral-xyz/anchor": "^0.31.0",
+    "@helium/anchor-resolvers": "^0.10.1",
+    "@helium/circuit-breaker-sdk": "^0.10.1",
+    "@helium/spl-utils": "^0.10.1",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
@@ -44,5 +44,5 @@
     "ts-node": "^10.9.1",
     "typescript": "^5.2.2"
   },
-  "gitHead": "5a8bf0b7b88e5934ef8d774e686f7c95804fbb8d"
+  "gitHead": "fc5dab2875863281ec468cf4a5a416c9696d102f"
 }

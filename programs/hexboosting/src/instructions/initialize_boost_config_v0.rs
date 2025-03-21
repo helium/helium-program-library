@@ -63,7 +63,7 @@ pub fn handler(
     period_length: args.period_length,
     minimum_periods: args.minimum_periods,
     rent_reclaim_authority: ctx.accounts.rent_reclaim_authority.key(),
-    bump_seed: ctx.bumps["boost_config"],
+    bump_seed: ctx.bumps.boost_config,
     start_authority: ctx.accounts.start_authority.key(),
     dc_mint: ctx.accounts.dc_mint.key(),
   });

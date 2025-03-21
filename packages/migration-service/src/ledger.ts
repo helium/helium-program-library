@@ -156,7 +156,7 @@ export async function getMigrateTransactions(
         return [
           await vsrProgram.methods
             .ledgerTransferPositionV0()
-            .accounts({
+            .accountsPartial({
               to,
               from,
               payer: provider.wallet.publicKey,

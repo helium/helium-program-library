@@ -11,6 +11,7 @@ import database from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
+import { lowerFirstChar } from "@helium/spl-utils";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
@@ -46,7 +47,7 @@ export const upsertProgramAccounts = async ({
     throw new Error("idl does not have every account type");
   }
 
-  const program = new anchor.Program(idl, programId, provider);
+  const program = new anchor.Program(idl, provider);
 
   try {
     await sequelize.authenticate();
@@ -119,7 +120,7 @@ export const upsertProgramAccounts = async ({
     try {
       const model = sequelize.models[type];
       const plugins = await initPlugins(rest.plugins);
-      const filter = program.coder.accounts.memcmp(type, undefined);
+      const filter = program.coder.accounts.memcmp(lowerFirstChar(type), undefined);
       const coderFilters: GetProgramAccountsFilter[] = [];
 
       if (filter?.offset != undefined && filter?.bytes != undefined) {
@@ -144,7 +145,7 @@ export const upsertProgramAccounts = async ({
             .map(({ pubkey, account }) => {
               try {
                 const decodedAcc = program.coder.accounts.decode(
-                  type,
+                  lowerFirstChar(type),
                   account.data
                 );
                 return {

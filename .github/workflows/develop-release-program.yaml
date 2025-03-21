@@ -1,7 +1,7 @@
 name: Deploy Programs to devnet
 
 env:
-  SOLANA_CLI_VERSION: 1.18.15
+  SOLANA_CLI_VERSION: 2.1.6
   NODE_VERSION: 18.12.1
 
 on:

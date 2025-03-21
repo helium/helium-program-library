@@ -1,6 +1,6 @@
 [package]
 name = "helium-entity-manager"
-version = "0.2.12"
+version = "0.2.13"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "helium_entity_manager"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -24,6 +25,7 @@ overflow-checks = true
 bs58 = "0.3.1"
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
+solana-zk-sdk = { workspace = true }
 bytemuck = "1.12.3"
 angry-purple-tiger = "0.1.0"
 mpl-token-metadata = { workspace = true }
@@ -33,6 +35,7 @@ shared-utils = { workspace = true }
 data-credits = { workspace = true, features = ["cpi"] }
 helium-sub-daos = { workspace = true }
 solana-security-txt = { workspace = true }
-default-env = { workspace = true }
 no-emit = { workspace = true }
-pyth-solana-receiver-sdk = "0.3.0"
+pyth-solana-receiver-sdk = { workspace = true }
+pythnet-sdk = { workspace = true }
+default-env = { workspace = true }

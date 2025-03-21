@@ -18,6 +18,7 @@ mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
 hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
 no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
 iot_routing_manager = "irtjLnjCMmyowq2m3KWqpuFB3M9gdNA9A4t4d6VWmzB"
+hpl_crons = "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu"
 
 [workspace]
 members = [
@@ -36,10 +37,11 @@ members = [
   "programs/hexboosting",
   "programs/no-emit",
   "programs/iot-routing-manager",
+  "programs/hpl-crons",
 ]
 
 [registry]
-url = "https://anchor.projectserum.com"
+url = "https://api.apr.dev"
 
 [provider]
 cluster = "localnet"
