@@ -217,6 +217,7 @@ export async function run(args: any = process.argv) {
       ],
       {
         signers: [merkle],
+        computeUnitLimit: 500000,
       }
     );
   }
