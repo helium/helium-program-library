@@ -1,4 +1,4 @@
-FROM node:16-alpine AS BUILD_IMAGE
+FROM node:18-alpine AS BUILD_IMAGE
 
 WORKDIR /usr/src/app
 
@@ -12,7 +12,7 @@ COPY tsconfig.build.json tsconfig.json
 RUN yarn run build
 RUN npm prune --production
 
-FROM node:16-alpine
+FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
