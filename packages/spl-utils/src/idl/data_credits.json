@@ -2,7 +2,7 @@
   "address": "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT",
   "metadata": {
     "name": "data_credits",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
@@ -354,7 +354,6 @@
         {
           "name": "dc_mint",
           "relations": [
-            "data_credits",
             "dao"
           ]
         },
@@ -501,7 +500,6 @@
         {
           "name": "dc_mint",
           "relations": [
-            "data_credits",
             "dao"
           ]
         },
@@ -1446,10 +1444,7 @@
         },
         {
           "name": "dc_mint",
-          "writable": true,
-          "relations": [
-            "data_credits"
-          ]
+          "writable": true
         },
         {
           "name": "circuit_breaker",

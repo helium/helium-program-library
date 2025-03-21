@@ -2,7 +2,7 @@
   "address": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
   "metadata": {
     "name": "helium_sub_daos",
-    "version": "0.2.9",
+    "version": "0.2.19",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
@@ -229,6 +229,49 @@
         {
           "name": "prev_sub_dao_epoch_info",
           "writable": true
+        },
+        {
+          "name": "not_emitted_counter",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  116,
+                  95,
+                  101,
+                  109,
+                  105,
+                  116,
+                  116,
+                  101,
+                  100,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hnt_mint"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "no_emit_program"
+            }
+          }
+        },
+        {
+          "name": "no_emit_program",
+          "address": "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
         }
       ],
       "args": [
@@ -585,6 +628,7 @@
       "accounts": [
         {
           "name": "position",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -626,6 +670,7 @@
         },
         {
           "name": "registrar",
+          "writable": true,
           "relations": [
             "position",
             "dao"
@@ -633,6 +678,7 @@
         },
         {
           "name": "dao",
+          "writable": true,
           "relations": [
             "sub_dao"
           ]
@@ -681,6 +727,7 @@
         },
         {
           "name": "hnt_mint",
+          "writable": true,
           "relations": [
             "dao"
           ]
@@ -2379,8 +2426,7 @@
         },
         {
           "name": "mobile_mint",
-          "writable": true,
-          "address": "mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6"
+          "writable": true
         },
         {
           "name": "ops_fund_hnt",
@@ -2544,6 +2590,63 @@
       "args": []
     },
     {
+      "name": "temp_remove_mint_and_freeze_authorities",
+      "discriminator": [
+        199,
+        134,
+        0,
+        70,
+        74,
+        144,
+        169,
+        251
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "dao",
+          "relations": [
+            "iot_sub_dao",
+            "mobile_sub_dao"
+          ]
+        },
+        {
+          "name": "hnt_mint",
+          "writable": true,
+          "relations": [
+            "dao"
+          ]
+        },
+        {
+          "name": "iot_sub_dao"
+        },
+        {
+          "name": "mobile_sub_dao"
+        },
+        {
+          "name": "mobile_mint",
+          "writable": true,
+          "address": "mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6"
+        },
+        {
+          "name": "iot_mint",
+          "writable": true,
+          "address": "iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "temp_update_sub_dao_epoch_info",
       "discriminator": [
         63,
@@ -2601,8 +2704,7 @@
         {
           "name": "authority",
           "writable": true,
-          "signer": true,
-          "address": "hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW"
+          "signer": true
         },
         {
           "name": "system_program",
@@ -3001,6 +3103,10 @@
         {
           "name": "dao_epoch_info",
           "writable": true
+        },
+        {
+          "name": "vsr_program",
+          "address": "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8"
         },
         {
           "name": "system_program",
@@ -3930,7 +4036,7 @@
               "array": [
                 {
                   "defined": {
-                    "name": "RecentProposal"
+                    "name": "helium_sub_daos::state::RecentProposal"
                   }
                 },
                 4
@@ -3943,6 +4049,18 @@
           },
           {
             "name": "vehnt_at_epoch_start",
+            "type": "u64"
+          },
+          {
+            "name": "cumulative_not_emitted",
+            "type": "u64"
+          },
+          {
+            "name": "not_emitted",
+            "type": "u64"
+          },
+          {
+            "name": "smoothed_hnt_burned",
             "type": "u64"
           }
         ]
@@ -4027,7 +4145,7 @@
               "array": [
                 {
                   "defined": {
-                    "name": "RecentProposal"
+                    "name": "helium_sub_daos::state::RecentProposal"
                   }
                 },
                 4
@@ -4083,11 +4201,11 @@
             "type": "i64"
           },
           {
-            "name": "recent_proposals",
+            "name": "_deprecated_recent_proposals",
             "type": {
               "vec": {
                 "defined": {
-                  "name": "RecentProposal"
+                  "name": "helium_sub_daos::state::RecentProposal"
                 }
               }
             }
@@ -4348,6 +4466,20 @@
           {
             "name": "vote_controller",
             "type": "pubkey"
+          },
+          {
+            "name": "registrar_paid_rent",
+            "type": "u64"
+          },
+          {
+            "name": "recent_proposals",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "voter_stake_registry::state::position::RecentProposal"
+                }
+              }
+            }
           }
         ]
       }
@@ -4497,22 +4629,6 @@
                 }
               }
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "RecentProposal",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "proposal",
-            "type": "pubkey"
-          },
-          {
-            "name": "ts",
-            "type": "i64"
           }
         ]
       }
@@ -5148,6 +5264,22 @@
       }
     },
     {
+      "name": "helium_sub_daos::state::RecentProposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "voter_stake_registry::state::lockup::LockupKind",
       "repr": {
         "kind": "rust"
@@ -5163,6 +5295,22 @@
           },
           {
             "name": "Constant"
+          }
+        ]
+      }
+    },
+    {
+      "name": "voter_stake_registry::state::position::RecentProposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
           }
         ]
       }

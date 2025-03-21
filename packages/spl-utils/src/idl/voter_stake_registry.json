@@ -2,11 +2,105 @@
   "address": "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8",
   "metadata": {
     "name": "voter_stake_registry",
-    "version": "0.3.6",
+    "version": "0.4.1",
     "spec": "0.1.0",
     "description": "Heliums voter weight plugin for spl-governance"
   },
   "instructions": [
+    {
+      "name": "clear_recent_proposals_v0",
+      "discriminator": [
+        149,
+        201,
+        192,
+        200,
+        184,
+        142,
+        146,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "registrar",
+          "writable": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "dao",
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  97,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registrar.realm_governing_token_mint",
+                "account": "Registrar"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                10,
+                104,
+                152,
+                190,
+                21,
+                252,
+                131,
+                38,
+                148,
+                54,
+                47,
+                241,
+                62,
+                209,
+                226,
+                156,
+                55,
+                230,
+                135,
+                33,
+                39,
+                214,
+                182,
+                249,
+                212,
+                26,
+                40,
+                238,
+                129,
+                125,
+                204,
+                154
+              ]
+            }
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ClearRecentProposalsArgsV0"
+            }
+          }
+        }
+      ]
+    },
     {
       "name": "close_position_v0",
       "discriminator": [
@@ -131,6 +225,141 @@
           }
         }
       ]
+    },
+    {
+      "name": "count_proxy_vote_v0",
+      "discriminator": [
+        82,
+        172,
+        157,
+        8,
+        73,
+        214,
+        168,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "marker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.mint",
+                "account": "PositionV0"
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registrar",
+          "writable": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "voter",
+          "relations": [
+            "proxy_marker",
+            "proxy_assignment"
+          ]
+        },
+        {
+          "name": "proxy_marker",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "proxy_assignment"
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "relations": [
+            "proxy_marker"
+          ]
+        },
+        {
+          "name": "proposal_config",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "state_controller",
+          "writable": true,
+          "relations": [
+            "proposal_config"
+          ]
+        },
+        {
+          "name": "on_vote_hook",
+          "relations": [
+            "proposal_config"
+          ]
+        },
+        {
+          "name": "proposal_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "deposit_v0",
@@ -1245,8 +1474,7 @@
         },
         {
           "name": "approver",
-          "signer": true,
-          "address": "mgrV3eMgfw7ocu38dSfLBjAjs4QqZtzLeaMKnTZ7QBa"
+          "signer": true
         },
         {
           "name": "system_program",
@@ -1312,6 +1540,7 @@
         },
         {
           "name": "registrar",
+          "writable": true,
           "relations": [
             "marker",
             "position"
@@ -1375,6 +1604,76 @@
           "type": {
             "defined": {
               "name": "RelinquishVoteArgsV1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "proxied_relinquish_vote_v1",
+      "discriminator": [
+        68,
+        205,
+        48,
+        30,
+        164,
+        62,
+        0,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "marker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter",
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "VoteArgsV0"
             }
           }
         }
@@ -1490,6 +1789,117 @@
       ]
     },
     {
+      "name": "proxied_vote_v1",
+      "discriminator": [
+        190,
+        176,
+        85,
+        200,
+        29,
+        248,
+        0,
+        127
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "marker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter",
+          "signer": true
+        },
+        {
+          "name": "proposal"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "VoteArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "relinquish_expired_proxy_vote_v0",
+      "discriminator": [
+        171,
+        115,
+        190,
+        138,
+        152,
+        254,
+        238,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "rent_refund",
+          "writable": true,
+          "relations": [
+            "marker"
+          ]
+        },
+        {
+          "name": "marker",
+          "writable": true
+        },
+        {
+          "name": "proposal",
+          "relations": [
+            "marker"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "relinquish_expired_vote_v0",
       "discriminator": [
         202,
@@ -1596,6 +2006,7 @@
         },
         {
           "name": "registrar",
+          "writable": true,
           "relations": [
             "marker",
             "position"
@@ -1612,7 +2023,6 @@
         {
           "name": "mint",
           "relations": [
-            "marker",
             "position"
           ]
         },
@@ -1856,6 +2266,129 @@
         {
           "name": "time_offset",
           "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "temp_backfill_proxy_marker",
+      "discriminator": [
+        18,
+        0,
+        202,
+        42,
+        187,
+        32,
+        97,
+        76
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "marker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  120,
+                  121,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter"
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "address": "hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW"
+        },
+        {
+          "name": "proposal"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "VoteArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "temp_backfill_recent_proposals",
+      "discriminator": [
+        248,
+        23,
+        82,
+        43,
+        69,
+        233,
+        74,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "address": "hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW"
+        },
+        {
+          "name": "registrar",
+          "writable": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "TempBackfillRecentProposalsArgs"
+            }
+          }
         }
       ]
     },
@@ -2267,6 +2800,7 @@
         },
         {
           "name": "registrar",
+          "writable": true,
           "relations": [
             "position"
           ]
@@ -2836,6 +3370,19 @@
       ]
     },
     {
+      "name": "ProxyMarkerV0",
+      "discriminator": [
+        83,
+        225,
+        185,
+        120,
+        185,
+        31,
+        200,
+        178
+      ]
+    },
+    {
       "name": "Registrar",
       "discriminator": [
         193,
@@ -3160,6 +3707,11 @@
     {
       "code": 6059,
       "name": "NoVoteForThisChoice"
+    },
+    {
+      "code": 6060,
+      "name": "NoChangesToCount",
+      "msg": "No changes to count"
     }
   ],
   "types": [
@@ -3181,6 +3733,22 @@
             "type": {
               "option": "string"
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClearRecentProposalsArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ts",
+            "type": "i64"
+          },
+          {
+            "name": "dao_bump",
+            "type": "u8"
           }
         ]
       }
@@ -3351,6 +3919,20 @@
           {
             "name": "vote_controller",
             "type": "pubkey"
+          },
+          {
+            "name": "registrar_paid_rent",
+            "type": "u64"
+          },
+          {
+            "name": "recent_proposals",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RecentProposal"
+                }
+              }
+            }
           }
         ]
       }
@@ -3573,6 +4155,56 @@
       }
     },
     {
+      "name": "ProxyMarkerV0",
+      "docs": [
+        "Marker to indicate that a proxy intends to vote this way on a proposal,",
+        "all votes of proxies are permissionless based on this marker"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "choices",
+            "type": {
+              "vec": "u16"
+            }
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          },
+          {
+            "name": "rent_refund",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RecentProposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "Registrar",
       "type": {
         "kind": "struct",
@@ -3694,6 +4326,24 @@
           {
             "name": "end",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TempBackfillRecentProposalsArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "recent_proposals",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RecentProposal"
+                }
+              }
+            }
           }
         ]
       }

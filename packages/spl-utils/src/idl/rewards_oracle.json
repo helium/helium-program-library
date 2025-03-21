@@ -2,7 +2,7 @@
   "address": "rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF",
   "metadata": {
     "name": "rewards_oracle",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },

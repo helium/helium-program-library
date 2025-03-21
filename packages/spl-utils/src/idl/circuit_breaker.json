@@ -2,7 +2,7 @@
   "address": "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g",
   "metadata": {
     "name": "circuit_breaker",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
@@ -265,6 +265,48 @@
           }
         }
       ]
+    },
+    {
+      "name": "remove_mint_authority_v0",
+      "discriminator": [
+        194,
+        209,
+        168,
+        3,
+        101,
+        176,
+        105,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "rent_refund",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "writable": true,
+          "relations": [
+            "circuit_breaker"
+          ]
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "circuit_breaker"
+          ]
+        },
+        {
+          "name": "circuit_breaker",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
     },
     {
       "name": "transfer_v0",
