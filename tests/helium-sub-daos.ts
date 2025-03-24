@@ -1087,8 +1087,8 @@ describe("helium-sub-daos", () => {
                 await program.methods
                   .addRecentProposalToDaoV0()
                   .accountsStrict({
-                    dao,
-                    proposal,
+                    dao: dao!,
+                    proposal: proposal!,
                   })
                   .rpc({ skipPreflight: true });
               }
