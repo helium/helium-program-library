@@ -313,7 +313,7 @@ __metadata:
     "@helium/lazy-distributor-sdk": ^0.10.1
     "@helium/rewards-oracle-sdk": ^0.10.1
     "@helium/spl-utils": ^0.10.1
-    "@helium/tuktuk-sdk": ^0.0.4
+    "@helium/tuktuk-sdk": ^0.0.6
     "@metaplex-foundation/mpl-bubblegum": ^0.7.0
     "@solana/spl-memo": ^0.2.5
     "@solana/spl-token": ^0.3.8
@@ -414,7 +414,7 @@ __metadata:
     "@helium/proposal-sdk": ^0.1.5-alpha.0
     "@helium/spl-utils": ^0.10.1
     "@helium/state-controller-sdk": ^0.1.5-alpha.0
-    "@helium/tuktuk-sdk": ^0.0.4
+    "@helium/tuktuk-sdk": ^0.0.6
     "@helium/voter-stake-registry-sdk": ^0.10.1
     "@solana/web3.js": ^1.91.1
     axios: ^1.3.6
@@ -643,15 +643,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/tuktuk-sdk@npm:^0.0.4":
-  version: 0.0.4
-  resolution: "@helium/tuktuk-sdk@npm:0.0.4"
+"@helium/tuktuk-idls@npm:^0.0.6":
+  version: 0.0.6
+  resolution: "@helium/tuktuk-idls@npm:0.0.6"
   dependencies:
-    "@coral-xyz/anchor": ^0.30.1
-    "@helium/anchor-resolvers": ^0.10.0-alpha.4
-    "@helium/tuktuk-idls": ^0.0.4
+    "@coral-xyz/anchor": ^0.31.0
+    "@solana/web3.js": ^1.95.2
+  checksum: 0fe305ca56808a0be1ccdc40fbd138e1fecf1d0bf6eaf67d974690f53d7b23e8b4dd7797a903566ca582ead13adf3d4e9ef968047f09abab94579960660c3af7
+  languageName: node
+  linkType: hard
+
+"@helium/tuktuk-sdk@npm:^0.0.6":
+  version: 0.0.6
+  resolution: "@helium/tuktuk-sdk@npm:0.0.6"
+  dependencies:
+    "@coral-xyz/anchor": ^0.31.0
+    "@helium/anchor-resolvers": ^0.10.1
+    "@helium/tuktuk-idls": ^0.0.6
     js-sha256: ^0.11.0
-  checksum: dbadbcac8d8cbb9cd404a5b5d8ef24bb4ef1655f60df9f09f17a99aa4f86814aceab0fa000cb49da31413a5e5c301821ac6d969d81b3f7dc85fdd7e82f0fa4cd
+  checksum: 32b6097215f82cb846faa0549e11d8d50bfe5679375b5e43da15a12c649c3561b4c3633f233ac3e241e6137d887f50ba2d821fe86b49f8800774fd89ab9e53a4
   languageName: node
   linkType: hard
 

@@ -5,9 +5,14 @@ import { init } from "@helium/voter-stake-registry-sdk";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
+import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
+import { HplCrons } from "@helium/idls/lib/types/hpl_crons";
+
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { init as initHplCrons } from "@helium/hpl-crons-sdk";
+import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal";
+import { init as initProposal } from "@helium/proposal-sdk";
 import fs from "fs";
 import { Program } from "@coral-xyz/anchor";
 
@@ -31,12 +36,11 @@ export const keypair = Keypair.fromSecretKey(
   )
 );
 
-// @ts-ignore
 export let voterStakeRegistryProgram: Program<VoterStakeRegistry>;
-// @ts-ignore
 export let heliumSubDaosProgram: Program<HeliumSubDaos>;
-export let tuktukProgram: any;
-export let hplCronsProgram: any;
+export let tuktukProgram: Program<Tuktuk>;
+export let hplCronsProgram: Program<HplCrons>;
+export let proposalProgram: Program<Proposal>;
 
 export async function getPrograms() {
   if (!voterStakeRegistryProgram) {
@@ -51,5 +55,7 @@ export async function getPrograms() {
   if (!hplCronsProgram) {
     hplCronsProgram = await initHplCrons(provider);
   }
+  if (!proposalProgram) {
+    proposalProgram = await initProposal(provider);
+  }
 }
-
