@@ -144,9 +144,9 @@ pub mod helium_sub_daos {
     track_vote_v0::handler(ctx)
   }
 
-  pub fn temp_remove_mint_and_freeze_authorities(
-    ctx: Context<RemoveMintAndFreezeAuthorities>,
+  pub fn temp_backfill_dao_recent_proposals(
+    ctx: Context<TempBackfillDaoRecentProposals>,
   ) -> Result<()> {
-    temp_remove_mint_and_freeze_authorities::handler(ctx)
+    instructions::temp_backfill_dao_recent_proposals::handler(ctx)
   }
 }

@@ -154,24 +154,10 @@ pub mod voter_stake_registry {
     instructions::proxied_relinquish_vote_v1::handler(ctx, args)
   }
 
-  pub fn temp_backfill_proxy_marker(
-    ctx: Context<TempBackfillProxyMarker>,
-    args: VoteArgsV0,
-  ) -> Result<()> {
-    instructions::temp_backfill_proxy_marker::handler(ctx, args)
-  }
-
   pub fn clear_recent_proposals_v0(
     ctx: Context<ClearRecentProposalsV0>,
     args: ClearRecentProposalsArgsV0,
   ) -> Result<()> {
     instructions::clear_recent_proposals_v0::handler(ctx, args)
-  }
-
-  pub fn temp_backfill_recent_proposals(
-    ctx: Context<TempBackfillRecentProposals>,
-    args: TempBackfillRecentProposalsArgs,
-  ) -> Result<()> {
-    instructions::temp_backfill_recent_proposals::handler(ctx, args)
   }
 }
