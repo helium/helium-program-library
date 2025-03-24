@@ -2,7 +2,11 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-import { daoKey, delegatorRewardsPercent, EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
+import {
+  daoKey,
+  delegatorRewardsPercent,
+  EPOCH_LENGTH,
+} from "@helium/helium-sub-daos-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
@@ -75,7 +79,8 @@ const THREAD_PID = new PublicKey(
 );
 
 const EPOCH_REWARDS = 100000000;
-const EPOCH_REWARDS_PLUS_NET_EMISSIONS = EPOCH_REWARDS + Math.floor(6 / 7 * 300);
+const EPOCH_REWARDS_PLUS_NET_EMISSIONS =
+  EPOCH_REWARDS + Math.floor((6 / 7) * 300);
 const SUB_DAO_EPOCH_REWARDS = 10000000;
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
@@ -91,7 +96,7 @@ describe("helium-sub-daos", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
-  let program: Program<HeliumSubDaos>
+  let program: Program<HeliumSubDaos>;
   let dcProgram: Program<DataCredits>;
   let noEmitProgram: Program<NoEmit>;
   let hemProgram: Program<HeliumEntityManager>;
@@ -690,7 +695,9 @@ describe("helium-sub-daos", () => {
             EPOCH_REWARDS_PLUS_NET_EMISSIONS.toString()
           );
           expect(daoInfo.currentHntSupply.toString()).to.eq(
-            new BN(supply.toString()).add(new BN(EPOCH_REWARDS_PLUS_NET_EMISSIONS)).toString()
+            new BN(supply.toString())
+              .add(new BN(EPOCH_REWARDS_PLUS_NET_EMISSIONS))
+              .toString()
           );
 
           expectBnAccuracy(
@@ -1077,19 +1084,13 @@ describe("helium-sub-daos", () => {
                     lamports: 1000000000,
                   }),
                 ]);
-                console.log(
-                  "track",
-                  await program.methods
-                    .trackVoteV0()
-                    .accounts({
-                      marker: marker as PublicKey,
-                      dao,
-                      subDao,
-                      proposal: proposal as PublicKey,
-                      position,
-                    })
-                    .rpc({ skipPreflight: true })
-                );
+                await program.methods
+                  .addRecentProposalToDaoV0()
+                  .accountsStrict({
+                    dao: dao!,
+                    proposal: proposal!,
+                  })
+                  .rpc({ skipPreflight: true });
               }
               // issue rewards
               await sendInstructions(provider, [

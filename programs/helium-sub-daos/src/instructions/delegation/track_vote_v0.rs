@@ -1,3 +1,5 @@
+// DEPRECATED: Do not use
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use proposal::ProposalV0;

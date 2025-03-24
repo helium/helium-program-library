@@ -169,18 +169,6 @@ export const useRelinquishVote = (proposal: PublicKey) => {
                     })
                     .instruction()
                 );
-                if (position.isDelegated) {
-                  instructions.push(
-                    await hsdProgram.methods
-                      .trackVoteV0()
-                      .accounts({
-                        proposal,
-                        marker: markerK,
-                        position: position.pubkey,
-                      })
-                      .instruction()
-                  );
-                }
               }
 
               return instructions;

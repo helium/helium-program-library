@@ -139,7 +139,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   // load the vehnt information
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;
-  let curr_ts = registrar.clock_unix_timestamp();
+  let dao_epoch_info_ts = ctx.accounts.dao_epoch_info.start_ts();
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
 
   let delegated_position = &mut ctx.accounts.delegated_position;
@@ -179,7 +179,13 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
 
   delegated_position.set_claimed(args.epoch)?;
 
-  let first_ts = ctx.accounts.dao.recent_proposals.last().unwrap().ts;
+  let first_ts = ctx
+    .accounts
+    .dao_epoch_info
+    .recent_proposals
+    .last()
+    .unwrap()
+    .ts;
   clear_recent_proposals_v0(
     CpiContext::new_with_signer(
       ctx.accounts.vsr_program.to_account_info(),
@@ -195,7 +201,13 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
       dao_bump: ctx.accounts.dao.bump_seed,
     },
   )?;
-  let last_ts = ctx.accounts.dao.recent_proposals.first().unwrap().ts;
+  let last_ts = ctx
+    .accounts
+    .dao_epoch_info
+    .recent_proposals
+    .first()
+    .unwrap()
+    .ts;
   let proposal_set = ctx
     .accounts
     .position
@@ -208,14 +220,14 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   // Check eligibility based on recent proposals
   let eligible_count = ctx
     .accounts
-    .dao
+    .dao_epoch_info
     .recent_proposals
     .iter()
     .filter(|&proposal| {
-      proposal_set.contains(&proposal.proposal) || proposal.is_in_progress(curr_ts)
+      proposal_set.contains(&proposal.proposal) || proposal.is_in_progress(dao_epoch_info_ts)
     })
     .count();
-  let not_four_proposals = ctx.accounts.dao.recent_proposals.len() < 4
+  let not_four_proposals = ctx.accounts.dao_epoch_info.recent_proposals.len() < 4
     || ctx
       .accounts
       .dao
@@ -241,7 +253,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     msg!(
       "Position is not eligible, burning rewards. Position proposals {:?}, recent proposals {:?}",
       ctx.accounts.position.recent_proposals,
-      ctx.accounts.dao.recent_proposals
+      ctx.accounts.dao_epoch_info.recent_proposals
     );
     burn(ctx.accounts.burn_ctx(), amount)?;
   }
