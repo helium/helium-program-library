@@ -6,6 +6,20 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 ## Instructions
 
+### add_recent_proposal_to_dao_v0
+
+#### Accounts
+
+| Name     | Mutability | Signer | Docs |
+| -------- | ---------- | ------ | ---- |
+| proposal | immut      | no     |      |
+| dao      | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### admin_set_dc_onboarding_fees_paid
 
 #### Accounts
@@ -359,7 +373,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
-### temp_remove_mint_and_freeze_authorities
+### temp_backfill_dao_recent_proposals
 
 #### Accounts
 
@@ -367,12 +381,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | -------------- | ---------- | ------ | ---- |
 | authority      | immut      | no     |      |
 | dao            | immut      | no     |      |
-| hnt_mint       | immut      | no     |      |
-| iot_sub_dao    | immut      | no     |      |
-| mobile_sub_dao | immut      | no     |      |
-| mobile_mint    | immut      | no     |      |
-| iot_mint       | immut      | no     |      |
-| token_program  | immut      | no     |      |
+| dao_epoch_info | immut      | no     |      |
 
 #### Args
 
