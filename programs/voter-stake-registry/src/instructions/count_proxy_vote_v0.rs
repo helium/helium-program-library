@@ -167,6 +167,18 @@ pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
     )?;
   }
 
+  if marker.choices.is_empty() {
+    ctx
+      .accounts
+      .position
+      .remove_recent_proposal(ctx.accounts.proposal.key());
+  } else {
+    ctx.accounts.position.add_recent_proposal(
+      ctx.accounts.proposal.key(),
+      ctx.accounts.proposal.created_at,
+    );
+  }
+
   // Marker has not been allocated yet, need to handle rent payment
   if marker.rent_refund == Pubkey::default() {
     let rent = Rent::get()?;

@@ -1,18 +1,15 @@
 import * as anchor from "@coral-xyz/anchor";
 import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {
-  delegatedPositionKey,
-  init as initHsd,
+  daoKey,
+  EPOCH_LENGTH,
+  init as initHsd
 } from "@helium/helium-sub-daos-sdk";
-import { batchParallelInstructionsWithPriorityFee } from "@helium/spl-utils";
-import { init as initVsr } from "@helium/voter-stake-registry-sdk";
+import { batchParallelInstructionsWithPriorityFee, HNT_MINT } from "@helium/spl-utils";
 import {
-  PublicKey,
-  SystemProgram,
-  TransactionInstruction,
+  TransactionInstruction
 } from "@solana/web3.js";
 import { BN } from "bn.js";
-import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
 
@@ -28,17 +25,9 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    recentProposalsFile: {
-      alias: "m",
-      describe: "The mistake file",
-      default: "mistake.json",
-    },
   });
 
   const argv = await yarg.argv;
-  const recentProposals = JSON.parse(
-    fs.readFileSync(argv.recentProposalsFile, "utf8")
-  );
   process.env.ANCHOR_WALLET = argv.wallet;
   process.env.ANCHOR_PROVIDER_URL = argv.url;
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
@@ -50,52 +39,28 @@ export async function run(args: any = process.argv) {
     extendConnection: true,
   });
   const hsdProgram = await initHsd(provider);
-  const vsrProgram = await initVsr(provider)
+  const daoK = daoKey(HNT_MINT)[0];
+  const dao = await hsdProgram.account.daoV0.fetch(daoK);
+  const oldestProposal = dao.recentProposals[3].ts;
+  const daoEpochInfos = await hsdProgram.account.daoEpochInfoV0.all();
+  const affectedDaoEpochInfos = daoEpochInfos.filter(
+    (e) => e.account.epoch.mul(new BN(EPOCH_LENGTH)).gt(oldestProposal)
+  );
 
   let instructions: TransactionInstruction[] = [];
-  let delIndex = 0;
   let i = 0;
-  const delegationKeys = recentProposals.map(
-    ({ position }) => delegatedPositionKey(new PublicKey(position))[0]
-  );
-  const delegations =
-    await hsdProgram.account.delegatedPositionV0.fetchMultiple(delegationKeys);
-  for (const { position, proposals } of recentProposals) {
-    const delegation = delegations[delIndex];
-
-    if (delegation?.deprecatedRecentProposals) {
-      const deprecatedProposals = delegation.deprecatedRecentProposals.map(
-        (p) => p.proposal.toBase58()
-      );
-      const currentProposals = proposals.map((p) => p.proposal);
-
-      if (!arrayEquals(deprecatedProposals, currentProposals)) {
-        throw new Error(
-          `Deprecated recent proposals mismatch for delegation ${delegation.position.toBase58()}:\n` +
-            `Deprecated: ${deprecatedProposals.join(", ")}\n` +
-            `Current: ${currentProposals.join(", ")}`
-        );
-      }
-    }
-
+  for (const daoEpochInfo of affectedDaoEpochInfos) {
     instructions.push(
-      await vsrProgram.methods
-        .tempBackfillRecentProposals({
-          recentProposals: proposals.map(({ proposal, ts }) => ({
-            proposal: new PublicKey(proposal),
-            ts: new BN(ts),
-          })),
-        })
+      await hsdProgram.methods
+        .tempBackfillDaoRecentProposals()
         .accountsStrict({
           authority: provider.wallet.publicKey,
-          registrar: new PublicKey(
-            "BMnWRWZrWqb6JMKznaDqNxWaWAHoaTzVabM6Qwyh3WKz"
-          ),
-          position: new PublicKey(position),
-          systemProgram: SystemProgram.programId,
+          dao: daoK,
+          daoEpochInfo: daoEpochInfo.publicKey,
         })
         .instruction()
     );
+
     if (i > 20) {
       await batchParallelInstructionsWithPriorityFee(provider, instructions, {
         onProgress: console.log,
@@ -105,7 +70,6 @@ export async function run(args: any = process.argv) {
       instructions = [];
     }
     i++;
-    delIndex++;
   }
   await batchParallelInstructionsWithPriorityFee(provider, instructions, {
     onProgress: console.log,

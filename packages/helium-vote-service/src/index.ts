@@ -43,6 +43,7 @@ import {
   getPrograms,
   provider,
   tuktukProgram,
+  proposalProgram,
   voterStakeRegistryProgram,
   keypair,
   heliumSubDaosProgram,
@@ -464,6 +465,12 @@ server.post<{
   const choices = (
     await voterStakeRegistryProgram.account.proxyMarkerV0.fetch(proxyVoteMarker)
   ).choices;
+  const proposalAccount = await proposalProgram.account.proposalV0.fetch(
+    proposal
+  );
+  const proposalConfig = await proposalProgram.account.proposalConfigV0.fetch(
+    proposalAccount.proposalConfig
+  );
   try {
     const needsVoteRaw = (
       await sequelize.query(`
@@ -554,33 +561,12 @@ server.post<{
                   registrar: HNT_REGISTRAR,
                   position: positionKey(new PublicKey(vote.asset))[0],
                   proposal,
+                  proposalConfig: proposalAccount.proposalConfig,
+                  stateController: proposalConfig.stateController,
+                  onVoteHook: proposalConfig.onVoteHook,
                 })
                 .instruction();
               instructions.push(countIx);
-              if (vote.delegatedPosition) {
-                const delegatedPosition =
-                  await provider.connection.getAccountInfo(
-                    new PublicKey(vote.delegatedPosition)
-                  );
-                if (delegatedPosition) {
-                  const delegatedCountIx = await heliumSubDaosProgram.methods
-                    .trackVoteV0()
-                    .accountsPartial({
-                      payer: pdaWallet,
-                      delegatedPosition: new PublicKey(vote.delegatedPosition),
-                      registrar: HNT_REGISTRAR,
-                      position: positionKey(new PublicKey(vote.asset))[0],
-                      proposal,
-                      mint: new PublicKey(vote.asset),
-                      marker: voteMarkerKey(
-                        new PublicKey(vote.asset),
-                        proposal
-                      )[0],
-                    })
-                    .instruction();
-                  instructions.push(delegatedCountIx);
-                }
-              }
               return instructions;
             })
           )

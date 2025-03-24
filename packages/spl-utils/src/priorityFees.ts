@@ -122,7 +122,7 @@ export const estimateComputeUnits = async (
 
   // Default to 2m compute if it failed
   if (sim.err) {
-    return Math.max(sim.unitsConsumed || 0, 2000000);
+    return Math.max(sim.unitsConsumed || 0, 1400000);
   }
 
   return sim.unitsConsumed;
@@ -175,7 +175,7 @@ export async function withPriorityFees({
     ) {
       ixWithComputeUnits = [
         ComputeBudgetProgram.setComputeUnitLimit({
-          units: 2000000,
+          units: 1400000,
         }),
         ComputeBudgetProgram.setComputeUnitPrice({
           microLamports: 1,
@@ -188,7 +188,10 @@ export async function withPriorityFees({
       toVersionedTx({ ...tx, instructions: ixWithComputeUnits })
     );
     if (estimatedFee) {
-      computeUnits = Math.ceil(estimatedFee * (computeScaleUp || 1.1));
+      computeUnits = Math.min(
+        1400000,
+        Math.ceil(estimatedFee * (computeScaleUp || 1.1))
+      );
     } else {
       computeUnits = 200000;
     }

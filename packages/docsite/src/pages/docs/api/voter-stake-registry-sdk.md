@@ -365,42 +365,6 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ----------- | --------- | ---- |
 | time_offset | undefined |      |
 
-### temp_backfill_proxy_marker
-
-#### Accounts
-
-| Name           | Mutability | Signer | Docs |
-| -------------- | ---------- | ------ | ---- |
-| payer          | immut      | no     |      |
-| marker         | immut      | no     |      |
-| voter          | immut      | no     |      |
-| authority      | immut      | no     |      |
-| proposal       | immut      | no     |      |
-| system_program | immut      | no     |      |
-
-#### Args
-
-| Name | Type            | Docs |
-| ---- | --------------- | ---- |
-| args | [object Object] |      |
-
-### temp_backfill_recent_proposals
-
-#### Accounts
-
-| Name           | Mutability | Signer | Docs |
-| -------------- | ---------- | ------ | ---- |
-| authority      | immut      | no     |      |
-| registrar      | immut      | no     |      |
-| position       | immut      | no     |      |
-| system_program | immut      | no     |      |
-
-#### Args
-
-| Name | Type            | Docs |
-| ---- | --------------- | ---- |
-| args | [object Object] |      |
-
 ### temp_release_position_v0
 
 #### Accounts
@@ -746,12 +710,6 @@ undefined
 | ----- | ---- |
 | start | i64  |
 | end   | i64  |
-
-### TempBackfillRecentProposalsArgs
-
-| Field            | Type            |
-| ---------------- | --------------- |
-| recent_proposals | [object Object] |
 
 ### TransferArgsV0
 
