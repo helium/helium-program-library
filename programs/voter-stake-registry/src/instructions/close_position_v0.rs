@@ -24,6 +24,7 @@ pub struct ClosePositionV0<'info> {
     constraint = position.num_active_votes == 0,
   )]
   pub position: Box<Account<'info, PositionV0>>,
+  #[account(mut)]
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(mut)]
   pub mint: Box<Account<'info, Mint>>,
