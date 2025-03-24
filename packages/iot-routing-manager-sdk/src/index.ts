@@ -2,7 +2,7 @@ import { IotRoutingManager } from "@helium/idls/lib/types/iot_routing_manager";
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
-import { lazyDistributorResolvers } from "./resolvers";
+import { iotRoutingManagerResolvers } from "./resolvers";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export * from "./constants";
@@ -20,12 +20,9 @@ export async function init(
 
   const iotRoutingManager = new Program<IotRoutingManager>(
     idl as IotRoutingManager,
-    programId,
     provider,
     undefined,
-    () => {
-      return lazyDistributorResolvers;
-    }
+    () => iotRoutingManagerResolvers
   ) as Program<IotRoutingManager>;
 
   return iotRoutingManager;

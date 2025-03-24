@@ -1,5 +1,8 @@
 use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
-use anchor_lang::prelude::*;
+use anchor_lang::{
+  prelude::*,
+  solana_program::{program::invoke, system_instruction},
+};
 use anchor_spl::token::Mint;
 use bubblegum_cpi::{
   bubblegum::{
@@ -207,7 +210,7 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
   };
 
   let entity_creator_seeds: &[&[&[u8]]] = &[&[
-    b"entity_creator",
+    "entity_creator".as_bytes(),
     ctx.accounts.dao.to_account_info().key.as_ref(),
     &[ctx.bumps.entity_creator],
   ]];

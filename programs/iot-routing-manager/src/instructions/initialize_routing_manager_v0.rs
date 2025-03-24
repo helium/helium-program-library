@@ -3,15 +3,14 @@ use crate::{routing_manager_seeds, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
+  metadata::{
+    create_master_edition_v3, create_metadata_accounts_v3,
+    mpl_token_metadata::types::CollectionDetails, mpl_token_metadata::types::DataV2,
+    CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata as MetadataProgram,
+  },
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
-use mpl_token_metadata::types::{CollectionDetails, DataV2};
-use shared_utils::create_metadata_accounts_v3;
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
-  Metadata as MetadataProgram,
-};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeRoutingManagerArgsV0 {
@@ -115,7 +114,7 @@ pub fn handler(
     net_id_authority: ctx.accounts.net_id_authority.key(),
     collection: ctx.accounts.collection.key(),
     // Initialized via set_carrier_tree
-    bump_seed: ctx.bumps["routing_manager"],
+    bump_seed: ctx.bumps.routing_manager,
     dc_mint: ctx.accounts.dc_mint.key(),
     sub_dao: ctx.accounts.sub_dao.key(),
     devaddr_fee_usd: args.devaddr_fee_usd,
@@ -140,7 +139,11 @@ pub fn handler(
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: ctx.accounts.routing_manager.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -153,6 +156,7 @@ pub fn handler(
       collection: None,
       uses: None,
     },
+    true,
     true,
     Some(CollectionDetails::V1 { size: 0 }),
   )?;
@@ -173,7 +177,11 @@ pub fn handler(
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),

@@ -24,7 +24,6 @@ import {
 const { expect } = chai;
 import chaiAsPromised from "chai-as-promised";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
-import { IOT_PRICE_FEED } from "@helium/spl-utils";
 
 chai.use(chaiAsPromised);
 
@@ -106,7 +105,7 @@ describe("iot-routing-manager", () => {
       .approveProgramV0({
         programId: irmProgram.programId,
       })
-      .accounts({ dao });
+      .accountsPartial({ dao });
 
     programApproval = (await approve.pubkeys()).programApproval!;
     await approve.rpc({ skipPreflight: true });
@@ -126,7 +125,7 @@ describe("iot-routing-manager", () => {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ])
-      .accounts({
+      .accountsPartial({
         updateAuthority: me,
         netIdAuthority: me,
         dcMint: dcMint,
@@ -157,7 +156,7 @@ describe("iot-routing-manager", () => {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
-        .accounts({
+        .accountsPartial({
           updateAuthority: me,
           netIdAuthority: me,
           subDao,
@@ -174,7 +173,7 @@ describe("iot-routing-manager", () => {
         .initializeNetIdV0({
           netId: 1,
         })
-        .accounts({
+        .accountsPartial({
           authority: me,
           routingManager,
         })
@@ -194,7 +193,7 @@ describe("iot-routing-manager", () => {
           .initializeNetIdV0({
             netId: 1,
           })
-          .accounts({
+          .accountsPartial({
             authority: me,
             routingManager,
           })
@@ -210,7 +209,7 @@ describe("iot-routing-manager", () => {
           .preInstructions([
             ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
           ])
-          .accounts({
+          .accountsPartial({
             authority: me,
             netId,
           })
@@ -233,7 +232,7 @@ describe("iot-routing-manager", () => {
           .updateNetIdV0({
             authority: PublicKey.default,
           })
-          .accounts({ netId })
+          .accountsPartial({ netId })
           .rpc();
 
         const netIdAcc = await irmProgram.account.netIdV0.fetch(netId);
@@ -252,7 +251,7 @@ describe("iot-routing-manager", () => {
             .preInstructions([
               ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
             ])
-            .accounts({
+            .accountsPartial({
               authority: me,
               netId,
             })
@@ -262,7 +261,7 @@ describe("iot-routing-manager", () => {
 
           await irmProgram.methods
             .approveOrganizationV0()
-            .accounts({
+            .accountsPartial({
               organization,
             })
             .rpc({ skipPreflight: true });
@@ -275,7 +274,7 @@ describe("iot-routing-manager", () => {
             .initializeDevaddrConstraintV0({
               numBlocks: 2,
             })
-            .accounts({
+            .accountsPartial({
               organization,
             })
             .rpcAndKeys({ skipPreflight: true });
@@ -291,7 +290,7 @@ describe("iot-routing-manager", () => {
             .updateOrganizationV0({
               authority: PublicKey.default,
             })
-            .accounts({ organization })
+            .accountsPartial({ organization })
             .rpc();
 
           const orgAcc = await irmProgram.account.netIdV0.fetch(netId);
@@ -310,7 +309,7 @@ describe("iot-routing-manager", () => {
           devaddrFeeUsd: new anchor.BN(100_000000),
           ouiFeeUsd: new anchor.BN(100_000000),
         })
-        .accounts({
+        .accountsPartial({
           routingManager,
         })
         .rpc();

@@ -1,13 +1,10 @@
-use crate::{error::ErrorCode, net_id_seeds, routing_manager_seeds, state::*};
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
 };
-use bubblegum_cpi::program::Bubblegum;
-use bubblegum_cpi::TreeConfig;
+use bubblegum_cpi::bubblegum::{accounts::TreeConfig, program::Bubblegum};
 use data_credits::{
   cpi::{
     accounts::{BurnCommonV0, BurnWithoutTrackingV0},
@@ -16,18 +13,16 @@ use data_credits::{
   program::DataCredits,
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
-use helium_entity_manager::program::HeliumEntityManager;
 use helium_entity_manager::{
-  cpi::accounts::IssueProgramEntityV0, cpi::issue_program_entity_v0, ProgramApprovalV0,
+  constants::ENTITY_METADATA_URL,
+  cpi::{accounts::IssueProgramEntityV0, issue_program_entity_v0},
+  hash_entity_key,
+  program::HeliumEntityManager,
+  IssueProgramEntityArgsV0, KeySerialization, ProgramApprovalV0, SharedMerkleV0,
 };
-use helium_entity_manager::{IssueProgramEntityArgsV0, KeySerialization, SharedMerkleV0};
 use helium_sub_daos::{DaoV0, SubDaoV0};
 
-#[cfg(feature = "devnet")]
-pub const ENTITY_METADATA_URL: &str = "https://entities.nft.test-helium.com";
-
-#[cfg(not(feature = "devnet"))]
-pub const ENTITY_METADATA_URL: &str = "https://entities.nft.helium.io";
+use crate::{error::ErrorCode, net_id_seeds, routing_manager_seeds, state::*};
 
 #[derive(Accounts)]
 pub struct InitializeOrganizationV0<'info> {
@@ -111,7 +106,7 @@ pub struct InitializeOrganizationV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(format!("OUI_{}", &routing_manager.next_oui_id).as_bytes()).to_bytes()
+      &hash_entity_key(format!("OUI_{}", &routing_manager.next_oui_id).as_bytes())
     ],
     seeds::program = helium_entity_manager_program.key(),
     bump
@@ -172,7 +167,7 @@ pub fn handler(ctx: Context<InitializeOrganizationV0>) -> Result<()> {
     routing_manager: ctx.accounts.routing_manager.key(),
     authority: ctx.accounts.authority.key(),
     escrow_key,
-    bump_seed: ctx.bumps["organization"],
+    bump_seed: ctx.bumps.organization,
     net_id: ctx.accounts.net_id.key(),
     approved: false,
   });

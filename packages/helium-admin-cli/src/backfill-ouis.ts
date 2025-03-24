@@ -191,7 +191,7 @@ export async function run(args: any = process.argv) {
         .approveProgramV0({
           programId: irm.programId,
         })
-        .accounts({ dao })
+        .accountsPartial({ dao })
         .instruction(),
     ]);
   }
@@ -212,7 +212,7 @@ export async function run(args: any = process.argv) {
         }),
         await hem.methods
           .initializeSharedMerkleV0({ proofSize: 3 })
-          .accounts({ merkleTree: merkle.publicKey })
+          .accountsPartial({ merkleTree: merkle.publicKey })
           .instruction(),
       ],
       {
@@ -233,7 +233,7 @@ export async function run(args: any = process.argv) {
             devaddrFeeUsd: new anchor.BN(100_000000),
             ouiFeeUsd: new anchor.BN(100_000000),
           })
-          .accounts({
+          .accountsPartial({
             updateAuthority: wallet.publicKey,
             netIdAuthority: wallet.publicKey,
             dcMint: DC_MINT,
@@ -258,7 +258,7 @@ export async function run(args: any = process.argv) {
             .initializeNetIdV0({
               netId,
             })
-            .accounts({
+            .accountsPartial({
               authority: wallet.publicKey,
               routingManager,
             })
@@ -292,7 +292,7 @@ export async function run(args: any = process.argv) {
               oui: new anchor.BN(org.oui),
               escrowKeyOverride: org.payer_pubkey,
             })
-            .accounts({
+            .accountsPartial({
               authority: ownerSolAddr,
               netId: netIdK,
             })
@@ -315,7 +315,7 @@ export async function run(args: any = process.argv) {
         ) {
           return await irm.methods
             .approveOrganizationV0()
-            .accounts({ organization: orgK })
+            .accountsPartial({ organization: orgK })
             .instruction();
         }
       })
@@ -349,7 +349,7 @@ export async function run(args: any = process.argv) {
           if (!(await exists(conn, orgDelegateK))) {
             return await irm.methods
               .tempBackfillOrganizationDelegate()
-              .accounts({
+              .accountsPartial({
                 payer: wallet.publicKey,
                 organization: orgK,
                 delegate: delegateSolAddr,
@@ -390,7 +390,7 @@ export async function run(args: any = process.argv) {
               startAddr: startAddrBn,
               numBlocks: numBlocksBn.toNumber(),
             })
-            .accounts({
+            .accountsPartial({
               organization: orgK,
             })
             .instruction();
@@ -417,7 +417,7 @@ export async function run(args: any = process.argv) {
           devaddrFeeUsd: null,
           ouiFeeUsd: null,
         })
-        .accounts({
+        .accountsPartial({
           updateAuthority: wallet.publicKey,
           routingManager,
         })
@@ -437,7 +437,7 @@ export async function run(args: any = process.argv) {
             .updateNetIdV0({
               authority: ouiWallet,
             })
-            .accounts({
+            .accountsPartial({
               authority: wallet.publicKey,
               netId: netIdK,
             })

@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 name = "iot_routing_manager"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []

@@ -15,7 +15,7 @@ pub struct TempBackfillOrganizationDelegate<'info> {
     init,
     payer = payer,
     space = 8 + OrganizationDelegateV0::INIT_SPACE + 32,
-    seeds = [b"organization_delegate", organization.key().as_ref(), delegate.key().as_ref()],
+    seeds = ["organization_delegate".as_bytes(), organization.key().as_ref(), delegate.key().as_ref()],
     bump,
   )]
   pub organization_delegate: Account<'info, OrganizationDelegateV0>,
@@ -31,7 +31,7 @@ pub fn handler(ctx: Context<TempBackfillOrganizationDelegate>) -> Result<()> {
     .set_inner(OrganizationDelegateV0 {
       organization: ctx.accounts.organization.key(),
       delegate: ctx.accounts.delegate.key(),
-      bump_seed: ctx.bumps["organization_delegate"],
+      bump_seed: ctx.bumps.organization_delegate,
     });
   Ok(())
 }

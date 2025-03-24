@@ -1,7 +1,9 @@
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
-use bubblegum_cpi::cpi::{accounts::CreateTree, create_tree};
-use bubblegum_cpi::program::Bubblegum;
+use bubblegum_cpi::bubblegum::{
+  cpi::{accounts::CreateTree, create_tree},
+  program::Bubblegum,
+};
 
 use crate::{shared_merkle_seeds, state::SharedMerkleV0};
 
@@ -17,7 +19,7 @@ pub struct InitializeSharedMerkleV0<'info> {
   pub payer: Signer<'info>,
   #[account(
     init,
-    seeds = [b"shared_merkle", &args.proof_size.to_le_bytes()[..]],
+    seeds = ["shared_merkle".as_bytes(), &args.proof_size.to_le_bytes()[..]],
     bump,
     payer = payer,
     space = 8 + SharedMerkleV0::INIT_SPACE + 32,
@@ -59,7 +61,7 @@ pub fn handler(
     proof_size: args.proof_size,
     price_per_mint: div_ceil(total_lamports, 2u64.pow(depth) - 3), // because we can swap with 3 left
     merkle_tree: ctx.accounts.merkle_tree.key(),
-    bump_seed: ctx.bumps["shared_merkle"],
+    bump_seed: ctx.bumps.shared_merkle,
   });
   let signer_seeds = shared_merkle_seeds!(ctx.accounts.shared_merkle);
   create_tree(

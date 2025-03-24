@@ -36,7 +36,7 @@ pub struct TempBackfillDevaddrConstraint<'info> {
   #[account(
     init,
     payer = payer,
-    seeds = [b"devaddr_constraint", organization.key().as_ref(), &args.start_addr.to_le_bytes()[..]],
+    seeds = ["devaddr_constraint".as_bytes(), organization.key().as_ref(), &args.start_addr.to_le_bytes()[..]],
     bump,
     space = 8 + DevaddrConstraintV0::INIT_SPACE + 60
   )]
@@ -67,7 +67,7 @@ pub fn handler(
       organization: ctx.accounts.organization.key(),
       start_addr,
       end_addr,
-      bump_seed: ctx.bumps["devaddr_constraint"],
+      bump_seed: ctx.bumps.devaddr_constraint,
     });
   Ok(())
 }

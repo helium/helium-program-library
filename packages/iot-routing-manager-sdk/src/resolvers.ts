@@ -1,4 +1,4 @@
-import { BorshAccountsCoder, Program, Provider } from "@coral-xyz/anchor";
+import { BorshAccountsCoder, Provider } from "@coral-xyz/anchor";
 import { heliumCommonResolver } from "@helium/anchor-resolvers";
 import {
   ataResolver,
@@ -16,7 +16,7 @@ import {
 } from "@helium/helium-entity-manager-sdk";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
-export const lazyDistributorResolvers = combineResolvers(
+export const iotRoutingManagerResolvers = combineResolvers(
   heliumCommonResolver,
   heliumEntityManagerResolvers,
   ataResolver({
@@ -70,8 +70,7 @@ export const lazyDistributorResolvers = combineResolvers(
       return (
         await keyToAssetKey(
           accounts.dao as PublicKey,
-          `OUI_${args[args.length - 1].oui}`,
-          "utf-8"
+          Buffer.from(`OUI_${args[args.length - 1].oui}`, "utf-8")
         )
       )[0];
     } else if (path[path.length - 1] === "sharedMerkle") {

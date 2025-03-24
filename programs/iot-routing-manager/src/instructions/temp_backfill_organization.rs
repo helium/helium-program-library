@@ -1,24 +1,18 @@
-use crate::{net_id_seeds, routing_manager_seeds, state::*};
-use account_compression_cpi::{program::SplAccountCompression, Noop};
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
-use anchor_spl::token::{Mint, Token};
-use bubblegum_cpi::program::Bubblegum;
-use bubblegum_cpi::TreeConfig;
-use helium_entity_manager::program::HeliumEntityManager;
-use helium_entity_manager::{
-  cpi::accounts::IssueProgramEntityV0, cpi::issue_program_entity_v0, ProgramApprovalV0,
-};
-use helium_entity_manager::{IssueProgramEntityArgsV0, KeySerialization, SharedMerkleV0};
-use helium_sub_daos::{DaoV0, SubDaoV0};
 use std::cmp::max;
 use std::str::FromStr;
 
-#[cfg(feature = "devnet")]
-pub const ENTITY_METADATA_URL: &str = "https://entities.nft.test-helium.com";
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token};
+use bubblegum_cpi::bubblegum::{accounts::TreeConfig, program::Bubblegum};
+use helium_entity_manager::{
+  constants::ENTITY_METADATA_URL, cpi::accounts::IssueProgramEntityV0,
+  cpi::issue_program_entity_v0, hash_entity_key, program::HeliumEntityManager,
+  IssueProgramEntityArgsV0, KeySerialization, ProgramApprovalV0, SharedMerkleV0,
+};
+use helium_sub_daos::{DaoV0, SubDaoV0};
 
-#[cfg(not(feature = "devnet"))]
-pub const ENTITY_METADATA_URL: &str = "https://entities.nft.helium.io";
+use crate::{net_id_seeds, routing_manager_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TempBackfillOrganizationArgs {
@@ -96,7 +90,7 @@ pub struct TempBackfillOrganization<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(format!("OUI_{}", args.oui).as_bytes()).to_bytes()
+      &hash_entity_key(format!("OUI_{}", args.oui).as_bytes())
     ],
     seeds::program = helium_entity_manager_program.key(),
     bump
@@ -157,7 +151,7 @@ pub fn handler(
     routing_manager: ctx.accounts.routing_manager.key(),
     authority: ctx.accounts.authority.key(),
     escrow_key: args.escrow_key_override,
-    bump_seed: ctx.bumps["organization"],
+    bump_seed: ctx.bumps.organization,
     net_id: ctx.accounts.net_id.key(),
     approved: false,
   });

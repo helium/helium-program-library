@@ -23,7 +23,7 @@ pub struct InitializeNetIdV0<'info> {
     init,
     payer = payer,
     space = 8 + NetIdV0::INIT_SPACE + 60,
-    seeds = [b"net_id", routing_manager.key().as_ref(), &args.net_id.to_le_bytes()[..]],
+    seeds = ["net_id".as_bytes(), routing_manager.key().as_ref(), &args.net_id.to_le_bytes()[..]],
     bump,
   )]
   pub net_id: Account<'info, NetIdV0>,
@@ -36,7 +36,7 @@ pub fn handler(ctx: Context<InitializeNetIdV0>, args: InitializeNetIdArgsV0) -> 
     routing_manager: ctx.accounts.routing_manager.key(),
     authority: ctx.accounts.authority.key(),
     current_addr_offset: 0,
-    bump_seed: ctx.bumps["net_id"],
+    bump_seed: ctx.bumps.net_id,
   });
   Ok(())
 }

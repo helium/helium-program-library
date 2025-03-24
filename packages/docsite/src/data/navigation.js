@@ -109,6 +109,11 @@ export const navigation = [
 
       { title: "Lazy distributor", href: "/docs/api/lazy-distributor-sdk" },
 
+      {
+        title: "Iot routing manager",
+        href: "/docs/api/iot-routing-manager-sdk",
+      },
+
       { title: "Hpl crons", href: "/docs/api/hpl-crons-sdk" },
 
       { title: "Hexboosting", href: "/docs/api/hexboosting-sdk" },

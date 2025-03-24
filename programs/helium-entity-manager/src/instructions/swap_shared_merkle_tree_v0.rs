@@ -1,10 +1,10 @@
 use crate::{shared_merkle_seeds, state::*, BUFFER_SIZE, STARTING_DEPTH};
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
-use bubblegum_cpi::{
+use bubblegum_cpi::bubblegum::{
+  accounts::TreeConfig,
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
-  TreeConfig,
 };
 
 #[derive(Accounts)]
