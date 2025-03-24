@@ -5,8 +5,6 @@ use crate::state::DaoV0;
 
 #[derive(Accounts)]
 pub struct AddRecentProposalToDaoV0<'info> {
-  #[account(mut)]
-  pub payer: Signer<'info>,
   #[account(
     constraint = proposal.namespace == dao.proposal_namespace,
     constraint = matches!(proposal.state, ProposalState::Voting { .. })
