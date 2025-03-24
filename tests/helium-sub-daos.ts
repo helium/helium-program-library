@@ -1085,13 +1085,10 @@ describe("helium-sub-daos", () => {
                   }),
                 ]);
                 await program.methods
-                  .trackVoteV0()
-                  .accounts({
-                    marker: marker as PublicKey,
+                  .addRecentProposalToDaoV0()
+                  .accountsStrict({
                     dao,
-                    subDao,
-                    proposal: proposal as PublicKey,
-                    position,
+                    proposal,
                   })
                   .rpc({ skipPreflight: true });
               }

@@ -149,4 +149,8 @@ pub mod helium_sub_daos {
   ) -> Result<()> {
     instructions::temp_backfill_dao_recent_proposals::handler(ctx)
   }
+
+  pub fn add_recent_proposal_to_dao_v0(ctx: Context<AddRecentProposalToDaoV0>) -> Result<()> {
+    add_recent_proposal_to_dao_v0::handler(ctx)
+  }
 }
