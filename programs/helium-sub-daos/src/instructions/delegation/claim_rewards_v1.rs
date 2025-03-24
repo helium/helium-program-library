@@ -139,7 +139,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   // load the vehnt information
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;
-  let curr_ts = registrar.clock_unix_timestamp();
+  let dao_epoch_info_ts = ctx.accounts.dao_epoch_info.start_ts();
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
 
   let delegated_position = &mut ctx.accounts.delegated_position;
@@ -224,7 +224,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     .recent_proposals
     .iter()
     .filter(|&proposal| {
-      proposal_set.contains(&proposal.proposal) || proposal.is_in_progress(curr_ts)
+      proposal_set.contains(&proposal.proposal) || proposal.is_in_progress(dao_epoch_info_ts)
     })
     .count();
   let not_four_proposals = ctx.accounts.dao_epoch_info.recent_proposals.len() < 4
