@@ -29,7 +29,9 @@ export async function estimatePrioritizationFee(
   maxPriorityFee: number = MAX_PRIO_FEE,
   priorityFeeOptions: any = {}
 ): Promise<number> {
-  const accounts = ixs.map((x) => x.keys.filter(k => k.isWritable).map((k) => k.pubkey)).flat();
+  const accounts = ixs
+    .map((x) => x.keys.filter((k) => k.isWritable).map((k) => k.pubkey))
+    .flat();
   const uniqueAccounts = [...new Set(accounts.map((x) => x.toBase58()))]
     .map((a) => new PublicKey(a))
     .slice(0, MAX_RECENT_PRIORITY_FEE_ACCOUNTS);
@@ -51,7 +53,10 @@ export async function estimatePrioritizationFee(
         },
       ])
     );
-    return Math.min(maxPriorityFee, Math.max(basePriorityFee || 1, Math.ceil(priorityFeeEstimate)));
+    return Math.min(
+      maxPriorityFee,
+      Math.max(basePriorityFee || 1, Math.ceil(priorityFeeEstimate))
+    );
   } catch (e: any) {
     console.error(
       "Failed to use getPriorityFeeEstimate, falling back to getRecentPrioritizationFees",
@@ -106,17 +111,21 @@ export const estimateComputeUnits = async (
   retries: number = 5
 ): Promise<number | undefined> => {
   const sim = (await connection.simulateTransaction(tx)).value;
-  if (sim.err && sim.err.toString().includes("BlockhashNotFound") && retries > 0) {
-    await sleep(500)
-    return estimateComputeUnits(connection, tx, retries - 1)
+  if (
+    sim.err &&
+    sim.err.toString().includes("BlockhashNotFound") &&
+    retries > 0
+  ) {
+    await sleep(500);
+    return estimateComputeUnits(connection, tx, retries - 1);
   }
 
   // Default to 1m compute if it failed
   if (sim.err) {
-    return Math.max(sim.unitsConsumed || 0, 1000000)
+    return Math.max(sim.unitsConsumed || 0, 1400000);
   }
 
-  return sim.unitsConsumed
+  return sim.unitsConsumed;
 };
 
 async function sleep(ms: number): Promise<void> {
@@ -149,7 +158,7 @@ export async function withPriorityFees({
     instructions,
     basePriorityFee,
     maxPriorityFee,
-    priorityFeeOptions,
+    priorityFeeOptions
   );
   if (!computeUnits) {
     const temp = {
@@ -166,7 +175,7 @@ export async function withPriorityFees({
     ) {
       ixWithComputeUnits = [
         ComputeBudgetProgram.setComputeUnitLimit({
-          units: 1000000,
+          units: 1400000,
         }),
         ComputeBudgetProgram.setComputeUnitPrice({
           microLamports: 1,
@@ -174,9 +183,15 @@ export async function withPriorityFees({
         ...tx.instructions,
       ];
     }
-    const estimatedFee = await estimateComputeUnits(connection, toVersionedTx({ ...tx, instructions: ixWithComputeUnits }));
+    const estimatedFee = await estimateComputeUnits(
+      connection,
+      toVersionedTx({ ...tx, instructions: ixWithComputeUnits })
+    );
     if (estimatedFee) {
-      computeUnits = Math.ceil(estimatedFee * (computeScaleUp || 1.1));
+      computeUnits = Math.min(
+        1400000,
+        Math.ceil(estimatedFee * (computeScaleUp || 1.1))
+      );
     } else {
       computeUnits = 200000;
     }
