@@ -122,7 +122,7 @@ export const estimateComputeUnits = async (
 
   // Default to 1m compute if it failed
   if (sim.err) {
-    return Math.max(sim.unitsConsumed || 0, 1000000);
+    return Math.max(sim.unitsConsumed || 0, 1400000);
   }
 
   return sim.unitsConsumed;
