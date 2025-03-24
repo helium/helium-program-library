@@ -1,5 +1,3 @@
-// DEPRECATED: Do not use
-
 use anchor_lang::prelude::*;
 use proposal::{ProposalState, ProposalV0};
 
