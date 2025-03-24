@@ -68,7 +68,7 @@ pub struct ClaimRewardsV1<'info> {
     mut,
     has_one = sub_dao,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
-    bump,
+    bump = delegated_position.bump_seed,
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
 
@@ -77,7 +77,7 @@ pub struct ClaimRewardsV1<'info> {
 
   #[account(
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
-    bump,
+    bump = dao_epoch_info.bump_seed,
     // Ensure that a pre HIP-138 claim can't accidentally be done.
     constraint = dao_epoch_info.delegation_rewards_issued > 0,
     constraint = dao_epoch_info.done_issuing_rewards @ ErrorCode::EpochNotClosed
