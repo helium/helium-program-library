@@ -7,7 +7,7 @@ use anchor_spl::{
 };
 use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
-  CircuitBreaker, TransferArgsV0,
+  AccountWindowedCircuitBreakerV0, CircuitBreaker, TransferArgsV0,
 };
 use voter_stake_registry::{
   cpi::{accounts::ClearRecentProposalsV0, clear_recent_proposals_v0},
@@ -98,9 +98,9 @@ pub struct ClaimRewardsV1<'info> {
     mut,
     seeds = ["account_windowed_breaker".as_bytes(), delegator_pool.key().as_ref()],
     seeds::program = circuit_breaker_program.key(),
-    bump
+    bump = delegator_pool_circuit_breaker.bump_seed,
   )]
-  pub delegator_pool_circuit_breaker: AccountInfo<'info>,
+  pub delegator_pool_circuit_breaker: Box<Account<'info, AccountWindowedCircuitBreakerV0>>,
 
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
