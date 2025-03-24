@@ -298,19 +298,6 @@ export const useVote = (proposalKey: PublicKey) => {
                   .instruction()
               );
 
-              if (position.isDelegated) {
-                instructions.push(
-                  await hsdProgram.methods
-                    .trackVoteV0()
-                    .accountsPartial({
-                      proposal: proposalKey,
-                      marker: markerK,
-                      position: position.pubkey,
-                    })
-                    .instruction()
-                );
-              }
-
               const marker = markers?.[position.index];
 
               // First time voting? Queue the relinquish

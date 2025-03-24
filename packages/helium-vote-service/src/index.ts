@@ -567,30 +567,6 @@ server.post<{
                 })
                 .instruction();
               instructions.push(countIx);
-              if (vote.delegatedPosition) {
-                const delegatedPosition =
-                  await provider.connection.getAccountInfo(
-                    new PublicKey(vote.delegatedPosition)
-                  );
-                if (delegatedPosition) {
-                  const delegatedCountIx = await heliumSubDaosProgram.methods
-                    .trackVoteV0()
-                    .accountsPartial({
-                      payer: pdaWallet,
-                      delegatedPosition: new PublicKey(vote.delegatedPosition),
-                      registrar: HNT_REGISTRAR,
-                      position: positionKey(new PublicKey(vote.asset))[0],
-                      proposal,
-                      mint: new PublicKey(vote.asset),
-                      marker: voteMarkerKey(
-                        new PublicKey(vote.asset),
-                        proposal
-                      )[0],
-                    })
-                    .instruction();
-                  instructions.push(delegatedCountIx);
-                }
-              }
               return instructions;
             })
           )
