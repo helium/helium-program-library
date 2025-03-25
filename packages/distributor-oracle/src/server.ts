@@ -48,6 +48,7 @@ import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
   Keypair,
+  LAMPORTS_PER_SOL,
   MessageCompiledInstruction,
   PublicKey,
   SystemProgram,
@@ -66,7 +67,6 @@ import { register, totalRewardsGauge } from "./metrics";
 import { PgDatabase } from "./pgDatabase";
 import { Reward, WalletClaimJob } from "./model";
 export * from "./database";
-
 
 export class OracleServer {
   app: FastifyInstance;
@@ -575,20 +575,19 @@ export class OracleServer {
   ) {
     try {
       const keyToAssetKeys = request.body.keyToAssetKeys;
-      const keyToAssets = await this.hemProgram.account.keyToAssetV0.fetchMultiple(
-        keyToAssetKeys.map((key) => new PublicKey(key))
-      );
+      const keyToAssets =
+        await this.hemProgram.account.keyToAssetV0.fetchMultiple(
+          keyToAssetKeys.map((key) => new PublicKey(key))
+        );
       if (keyToAssets.some((keyToAsset) => !keyToAsset)) {
         reply.status(404).send({
           message: "Key to asset not found",
         });
         return;
       }
-      const entityKeys = keyToAssets.map((keyToAsset) =>
-        decodeEntityKey(
-          keyToAsset!.entityKey,
-          keyToAsset!.keySerialization
-        )!
+      const entityKeys = keyToAssets.map(
+        (keyToAsset) =>
+          decodeEntityKey(keyToAsset!.entityKey, keyToAsset!.keySerialization)!
       );
 
       const rewards = await this.db.getBulkRewards(entityKeys);
@@ -614,10 +613,7 @@ export class OracleServer {
           serialized: m.toString("base64"),
           message: messages[index],
           signature: Buffer.from(
-            sign.detached(
-              Uint8Array.from(m),
-              this.oracle.secretKey
-            )
+            sign.detached(Uint8Array.from(m), this.oracle.secretKey)
           ).toString("base64"),
         })),
       };
@@ -845,43 +841,62 @@ export class OracleServer {
       const taskQueueAcc = await this.tuktukProgram.account.taskQueueV0.fetch(
         taskQueue
       );
-      const instructions: TransactionInstruction[] = [
-        SystemProgram.transfer({
-          fromPubkey: customSignerWallet,
-          toPubkey: task,
-          lamports:
-            taskQueueAcc.minCrankReward.toNumber() * (entities.length + 1),
-        }),
-      ];
-      for (const entity of entities) {
+      const balance =
+        (
+          await this.ldProgram.provider.connection.getAccountInfo(
+            customSignerWallet
+          )
+        )?.lamports || 0;
+      const fees =
+        taskQueueAcc.minCrankReward.toNumber() * (entities.length + 1);
+      const neededBalance = 0.00089088 * LAMPORTS_PER_SOL + fees;
+      const instructions: TransactionInstruction[] = [];
+      if (balance < neededBalance) {
         instructions.push(
-          await this.hplCronsProgram.methods
-            .requeueEntityClaimV0()
-            .accounts({
-              keyToAsset: entity.keyToAsset.address,
-            })
-            .instruction()
-        );
-      }
-
-      if (entities.length > 0) {
-        instructions.push(
-          await this.hplCronsProgram.methods
-            .requeueWalletClaimV0({
-              batchNumber: nextBatchNumber,
-            })
-            .accounts({
-              wallet: new PublicKey(wallet),
-            })
-            .instruction()
+          createMemoInstruction(
+            "Finished claiming rewards due to insufficient balance",
+            [customSignerWallet]
+          )
         );
       } else {
         instructions.push(
-          createMemoInstruction("Finished claiming rewards", [
-            customSignerWallet,
-          ])
+          SystemProgram.transfer({
+            fromPubkey: customSignerWallet,
+            toPubkey: task,
+            lamports: fees,
+          })
         );
+        for (const entity of entities) {
+          instructions.push(
+            await this.hplCronsProgram.methods
+              .requeueEntityClaimV0()
+              .accounts({
+                keyToAsset: entity.keyToAsset.address,
+              })
+              .instruction()
+          );
+        }
+
+        if (entities.length > 0) {
+          instructions.push(
+            await this.hplCronsProgram.methods
+              .requeueWalletClaimV0({
+                batchNumber: nextBatchNumber,
+              })
+              .accounts({
+                wallet: new PublicKey(wallet),
+              })
+              .instruction()
+          );
+        } else {
+          instructions.push(
+            createMemoInstruction("Finished claiming rewards", [
+              customSignerWallet,
+            ])
+          );
+        }
       }
+
       const { transaction, remainingAccounts } = await compileTransaction(
         instructions,
         [
