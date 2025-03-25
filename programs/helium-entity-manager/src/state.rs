@@ -254,12 +254,12 @@ pub enum MobileDeploymentInfoV0 {
     antenna: u32,
     // the height of the hotspot above ground level in whole meters
     elevation: i32,
-    // integer representation of a 2-point precision decimal
+    // the azimuht of the hotspot in rounded number of degrees
     azimuth: u16,
-    // integer representation of a 2-point precision decimal
-    mechanical_down_tilt: u16,
-    // integer representation of a 2-point precision decimal
-    electrical_down_tilt: u16,
+    // deprecated: integer representation of a 2-point precision decimal
+    _deprecated_mechanical_down_tilt: u16,
+    // deprecated: integer representation of a 2-point precision decimal
+    _deprecated_electrical_down_tilt: u16,
   },
   CbrsInfoV0 {
     radio_infos: Vec<RadioInfoV0>,
