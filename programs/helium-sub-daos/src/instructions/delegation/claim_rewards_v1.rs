@@ -230,7 +230,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   let not_four_proposals = ctx.accounts.dao_epoch_info.recent_proposals.len() < 4
     || ctx
       .accounts
-      .dao
+      .dao_epoch_info
       .recent_proposals
       .iter()
       .filter(|p| p.proposal != Pubkey::default())
