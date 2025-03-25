@@ -37,6 +37,11 @@ export async function run(args: any = process.argv) {
       describe: "The task queue to queue",
       default: "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7",
     },
+    walletToClaim: {
+      type: "string",
+      alias: "w",
+      describe: "The wallet to claim",
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -57,30 +62,30 @@ export async function run(args: any = process.argv) {
     [Buffer.from("queue_authority")],
     PROGRAM_ID
   )[0];
+  const walletToClaim = argv.walletToClaim
+    ? new PublicKey(argv.walletToClaim)
+    : provider.wallet.publicKey;
   instructions.push(
     await program.methods
       .queueWalletClaimV0({
         freeTaskId: task1,
       })
-          .accountsStrict({
-            task: taskKey(taskQueue, task1)[0],
-            wallet: provider.wallet.publicKey,
-            taskQueue,
-            payer: provider.wallet.publicKey,
-            systemProgram: SystemProgram.programId,
-            queueAuthority,
-            tuktukProgram: tuktukProgram.programId,
-            pdaWallet: customSignerKey(taskQueue, [
-              Buffer.from("claim_payer"),
-              provider.wallet.publicKey.toBuffer(),
-            ])[0],
-            taskQueueAuthority: taskQueueAuthorityKey(
-              taskQueue,
-              queueAuthority
-            )[0],
-          })
-          .instruction()
-      );
+      .accountsStrict({
+        task: taskKey(taskQueue, task1)[0],
+        wallet: walletToClaim,
+        taskQueue,
+        payer: provider.wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+        queueAuthority,
+        tuktukProgram: tuktukProgram.programId,
+        pdaWallet: customSignerKey(taskQueue, [
+          Buffer.from("claim_payer"),
+          walletToClaim.toBuffer(),
+        ])[0],
+        taskQueueAuthority: taskQueueAuthorityKey(taskQueue, queueAuthority)[0],
+      })
+      .instruction()
+  );
 
   await batchParallelInstructionsWithPriorityFee(provider, instructions, {
     onProgress: console.log,
