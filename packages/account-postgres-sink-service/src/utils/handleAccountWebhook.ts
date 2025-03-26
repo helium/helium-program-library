@@ -71,7 +71,6 @@ export const handleAccountWebhook = async ({
           }
         );
 
-        console.log({ modelsToDelete });
         const deletePromises = modelsToDelete.map((modelName) => {
           return sequelize.models[modelName].destroy({
             where: { address: account.pubkey },
