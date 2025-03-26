@@ -181,7 +181,7 @@ export const claimHotspotReward = async ({
 
   const recipientK = recipientKey(lazyDistributor, asset)
 
-  const recipientAcc = await lazyDistributorProgram.account.recipientV0.fetch(
+  const recipientAcc = await lazyDistributorProgram.account.recipientV0.fetchNullable(
     recipientK[0]
   )
 
