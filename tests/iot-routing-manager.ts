@@ -28,10 +28,17 @@ import {
 const { expect } = chai;
 import chaiAsPromised from "chai-as-promised";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
+import { Keypair } from "@solana/web3.js";
 
 chai.use(chaiAsPromised);
 
 describe("iot-routing-manager", () => {
+  const TEST_URL = "https://some/url";
+  const DEFAULT_COMPUTE_UNITS = 500000;
+  const DEFAULT_FEE_USD = new anchor.BN(100_000000);
+  const DEFAULT_DC_AMOUNT = new anchor.BN("10000000000");
+  const DEFAULT_NET_ID = 1;
+
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
   let dcProgram: Program<DataCredits>;
@@ -47,13 +54,12 @@ describe("iot-routing-manager", () => {
   let merkle: PublicKey;
   let sharedMerkle: PublicKey;
 
-  beforeEach(async () => {
+  const initializePrograms = async () => {
     dcProgram = await initDataCredits(
       provider,
       anchor.workspace.DataCredits.programId,
       anchor.workspace.DataCredits.idl
     );
-
     ensureDCIdl(dcProgram);
 
     hsdProgram = await initHeliumSubDaos(
@@ -61,7 +67,6 @@ describe("iot-routing-manager", () => {
       anchor.workspace.HeliumSubDaos.programId,
       anchor.workspace.HeliumSubDaos.idl
     );
-
     ensureHSDIdl(hsdProgram);
 
     hemProgram = await initHeliumEntityManager(
@@ -77,12 +82,16 @@ describe("iot-routing-manager", () => {
       anchor.workspace.IotRoutingManager.idl
     );
     ensureIrmIdl(irmProgram);
+  };
+
+  const setupDataCredits = async () => {
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     const hntMint = dataCredits.hntMint;
     dcMint = dataCredits.dcMint;
+
     await dcProgram.methods
       .mintDataCreditsV0({
-        dcAmount: new anchor.BN("10000000000"),
+        dcAmount: DEFAULT_DC_AMOUNT,
         hntAmount: null,
       })
       .accountsPartial({
@@ -91,12 +100,16 @@ describe("iot-routing-manager", () => {
       })
       .rpc({ skipPreflight: true });
 
+    return { hntMint };
+  };
+
+  const setupDaoStructure = async (hntMint: PublicKey) => {
     ({ dao } = await initTestDao(
       hsdProgram,
       provider,
       100,
       me,
-      dataCredits.dcMint,
+      dcMint,
       hntMint
     ));
 
@@ -106,7 +119,91 @@ describe("iot-routing-manager", () => {
       authority: me,
       dao,
     }));
+  };
 
+  const initializeRoutingManager = async () => {
+    const {
+      pubkeys: { routingManager },
+    } = await irmProgram.methods
+      .initializeRoutingManagerV0({
+        metadataUrl: TEST_URL,
+        devaddrFeeUsd: DEFAULT_FEE_USD,
+        ouiFeeUsd: DEFAULT_FEE_USD,
+      })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: DEFAULT_COMPUTE_UNITS,
+        }),
+      ])
+      .accountsPartial({
+        updateAuthority: me,
+        netIdAuthority: me,
+        dcMint: dcMint,
+        subDao,
+        dao,
+      })
+      .rpcAndKeys({ skipPreflight: true });
+
+    return routingManager!;
+  };
+
+  const initializeNetId = async (
+    routingManager: PublicKey,
+    id = DEFAULT_NET_ID
+  ) => {
+    const {
+      pubkeys: { netId },
+    } = await irmProgram.methods
+      .initializeNetIdV0({
+        netId: id,
+      })
+      .accountsPartial({
+        authority: me,
+        routingManager,
+      })
+      .rpcAndKeys({ skipPreflight: true });
+
+    return netId!;
+  };
+
+  const initializeOrganization = async (
+    routingManager: PublicKey,
+    netId: PublicKey
+  ) => {
+    const routingManagerAcc =
+      await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
+    const nextOuiId = routingManagerAcc.nextOuiId;
+    const [organization] = organizationKey(routingManager, nextOuiId);
+    const [keyToAsset] = keyToAssetKey(
+      dao,
+      Buffer.from(`OUI_${nextOuiId.toNumber()}`, "utf-8")
+    );
+
+    await irmProgram.methods
+      .initializeOrganizationV0()
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({
+          units: DEFAULT_COMPUTE_UNITS,
+        }),
+      ])
+      .accountsPartial({
+        authority: me,
+        netId,
+        dao,
+        merkleTree: merkle,
+        sharedMerkle,
+        organization,
+        keyToAsset,
+      })
+      .rpc({ skipPreflight: true });
+
+    return organization;
+  };
+
+  beforeEach(async () => {
+    await initializePrograms();
+    const { hntMint } = await setupDataCredits();
+    await setupDaoStructure(hntMint);
     const approve = await hemProgram.methods
       .approveProgramV0({
         programId: irmProgram.programId,
@@ -118,92 +215,65 @@ describe("iot-routing-manager", () => {
   });
 
   it("should initialize a routing manager", async () => {
-    const {
-      pubkeys: { routingManager },
-    } = await irmProgram.methods
-      .initializeRoutingManagerV0({
-        metadataUrl: "https://some/url",
-        devaddrFeeUsd: new anchor.BN(100_000000),
-        ouiFeeUsd: new anchor.BN(100_000000),
-      })
-      .preInstructions([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-      ])
-      .accountsPartial({
-        updateAuthority: me,
-        netIdAuthority: me,
-        dcMint: dcMint,
-        subDao,
-        dao,
-      })
-      .rpcAndKeys({ skipPreflight: true });
-
+    const routingManager = await initializeRoutingManager();
     const routingManagerAcc =
-      await irmProgram.account.iotRoutingManagerV0.fetch(routingManager!);
+      await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
 
     expect(routingManagerAcc.updateAuthority.toBase58()).to.eq(me.toBase58());
     expect(routingManagerAcc.netIdAuthority.toBase58()).to.eq(me.toBase58());
+  });
+
+  it("should update the routing manager", async () => {
+    const routingManager = await initializeRoutingManager();
+    await irmProgram.methods
+      .updateRoutingManagerV0({
+        updateAuthority: PublicKey.default,
+        netIdAuthority: PublicKey.default,
+        devaddrFeeUsd: DEFAULT_FEE_USD,
+        ouiFeeUsd: DEFAULT_FEE_USD,
+      })
+      .accountsPartial({
+        routingManager,
+      })
+      .rpc();
+
+    const routingManagerAcc =
+      await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
+
+    expect(routingManagerAcc.updateAuthority.toBase58()).to.eq(
+      PublicKey.default.toBase58()
+    );
+    expect(routingManagerAcc.netIdAuthority.toBase58()).to.eq(
+      PublicKey.default.toBase58()
+    );
+    expect(routingManagerAcc.devaddrFeeUsd.toNumber()).to.eq(
+      DEFAULT_FEE_USD.toNumber()
+    );
+    expect(routingManagerAcc.ouiFeeUsd.toNumber()).to.eq(
+      DEFAULT_FEE_USD.toNumber()
+    );
   });
 
   describe("with a routing manager", async () => {
     let routingManager: PublicKey;
 
     beforeEach(async () => {
-      const {
-        pubkeys: { routingManager: routingManagerK },
-      } = await irmProgram.methods
-        .initializeRoutingManagerV0({
-          metadataUrl: "https://some/url",
-          devaddrFeeUsd: new anchor.BN(100_000000),
-          ouiFeeUsd: new anchor.BN(100_000000),
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-        ])
-        .accountsPartial({
-          updateAuthority: me,
-          netIdAuthority: me,
-          dcMint: dcMint,
-          subDao,
-          dao,
-        })
-        .rpcAndKeys({ skipPreflight: true });
-      routingManager = routingManagerK!;
+      routingManager = await initializeRoutingManager();
     });
 
     it("should initialize a net id", async () => {
-      const {
-        pubkeys: { netId },
-      } = await irmProgram.methods
-        .initializeNetIdV0({
-          netId: 1,
-        })
-        .accountsPartial({
-          authority: me,
-          routingManager,
-        })
-        .rpcAndKeys({ skipPreflight: true });
+      const netId = await initializeNetId(routingManager);
+      const netIdAcc = await irmProgram.account.netIdV0.fetch(netId);
 
-      const netIdAcc = await irmProgram.account.netIdV0.fetch(netId!);
       expect(netIdAcc.authority.toBase58()).to.eq(me.toBase58());
-      expect(netIdAcc.id).to.eq(1);
+      expect(netIdAcc.id).to.eq(DEFAULT_NET_ID);
     });
 
     describe("with net id", async () => {
       let netId: PublicKey;
+
       beforeEach(async () => {
-        const {
-          pubkeys: { netId: netIdK },
-        } = await irmProgram.methods
-          .initializeNetIdV0({
-            netId: 1,
-          })
-          .accountsPartial({
-            authority: me,
-            routingManager,
-          })
-          .rpcAndKeys({ skipPreflight: true });
-        netId = netIdK!;
+        netId = await initializeNetId(routingManager);
       });
 
       it("should initialize an organization", async () => {
@@ -211,34 +281,12 @@ describe("iot-routing-manager", () => {
           await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
         let nextOuiId = routingManagerAcc.nextOuiId;
 
-        const [organization] = organizationKey(
+        const organization = await initializeOrganization(
           routingManager,
-          routingManagerAcc.nextOuiId
+          netId
         );
-
-        const [keyToAsset] = keyToAssetKey(
-          dao,
-          Buffer.from(`OUI_${nextOuiId.toNumber()}`, "utf-8")
-        );
-
-        await irmProgram.methods
-          .initializeOrganizationV0()
-          .preInstructions([
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-          ])
-          .accountsPartial({
-            authority: me,
-            netId,
-            dao,
-            merkleTree: merkle,
-            sharedMerkle,
-            organization,
-            keyToAsset,
-          })
-          .rpc({ skipPreflight: true });
-
         const organizationAcc = await irmProgram.account.organizationV0.fetch(
-          organization!
+          organization
         );
 
         routingManagerAcc = await irmProgram.account.iotRoutingManagerV0.fetch(
@@ -273,38 +321,9 @@ describe("iot-routing-manager", () => {
 
       describe("with an organization", () => {
         let organization: PublicKey;
+
         beforeEach(async () => {
-          const routingManagerAcc =
-            await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
-
-          organization = organizationKey(
-            routingManager,
-            routingManagerAcc.nextOuiId
-          )[0];
-
-          const [keyToAsset] = keyToAssetKey(
-            dao,
-            Buffer.from(
-              `OUI_${routingManagerAcc.nextOuiId.toNumber()}`,
-              "utf-8"
-            )
-          );
-
-          await irmProgram.methods
-            .initializeOrganizationV0()
-            .preInstructions([
-              ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-            ])
-            .accountsPartial({
-              authority: me,
-              netId,
-              dao,
-              merkleTree: merkle,
-              sharedMerkle,
-              organization,
-              keyToAsset,
-            })
-            .rpc({ skipPreflight: true });
+          organization = await initializeOrganization(routingManager, netId);
 
           await irmProgram.methods
             .approveOrganizationV0()
@@ -336,14 +355,40 @@ describe("iot-routing-manager", () => {
             .rpc({ skipPreflight: true });
 
           const devaddrAcc = await irmProgram.account.devaddrConstraintV0.fetch(
-            devaddrConstraint!
+            devaddrConstraint
           );
-
           netIdAcc = await irmProgram.account.netIdV0.fetch(netId);
+
           expect(devaddrAcc.startAddr.toNumber()).to.eq(0);
           expect(devaddrAcc.endAddr.toNumber()).to.eq(16);
           expect(netIdAcc.currentAddrOffset.toNumber()).to.eq(
-            currAddrOffset.addn(16 + 1).toNumber() // 1 is added on avoid overlap
+            currAddrOffset.addn(16 + 1).toNumber() // 1 is added to avoid overlap
+          );
+        });
+
+        it("should initialize a delegate", async () => {
+          const delegate = Keypair.generate();
+
+          const {
+            pubkeys: { organizationDelegate },
+          } = await irmProgram.methods
+            .initializeOrganizationDelegateV0()
+            .accountsPartial({
+              organization,
+              delegate: delegate.publicKey,
+            })
+            .rpcAndKeys({ skipPreflight: true });
+
+          const delegateAcc =
+            await irmProgram.account.organizationDelegateV0.fetch(
+              organizationDelegate
+            );
+
+          expect(delegateAcc.delegate.toBase58()).to.eq(
+            delegate.publicKey.toBase58()
+          );
+          expect(delegateAcc.organization.toBase58()).to.eq(
+            organization.toBase58()
           );
         });
 
@@ -363,36 +408,6 @@ describe("iot-routing-manager", () => {
           );
         });
       });
-    });
-
-    it("should update the routing manager", async () => {
-      await irmProgram.methods
-        .updateRoutingManagerV0({
-          updateAuthority: PublicKey.default,
-          netIdAuthority: PublicKey.default,
-          devaddrFeeUsd: new anchor.BN(100_000000),
-          ouiFeeUsd: new anchor.BN(100_000000),
-        })
-        .accountsPartial({
-          routingManager,
-        })
-        .rpc();
-
-      const routingManagerAcc =
-        await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
-
-      expect(routingManagerAcc.updateAuthority.toBase58()).to.eq(
-        PublicKey.default.toBase58()
-      );
-      expect(routingManagerAcc.netIdAuthority.toBase58()).to.eq(
-        PublicKey.default.toBase58()
-      );
-      expect(routingManagerAcc.devaddrFeeUsd.toNumber()).to.eq(
-        new anchor.BN(100_000000).toNumber()
-      );
-      expect(routingManagerAcc.ouiFeeUsd.toNumber()).to.eq(
-        new anchor.BN(100_000000).toNumber()
-      );
     });
   });
 });
