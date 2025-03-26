@@ -156,7 +156,11 @@ export const heliumEntityManagerResolvers = combineResolvers(
     }
   }),
   resolveIndividual(async ({ path, args }) => {
-    if (path[path.length - 1] === "sharedMerkle" && args[0].proofSize) {
+    if (
+      path[path.length - 1] === "sharedMerkle" &&
+      args[0] &&
+      args[0].proofSize
+    ) {
       return sharedMerkleKey(args[0].proofSize)[0];
     }
   }),

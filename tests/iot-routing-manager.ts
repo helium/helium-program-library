@@ -4,19 +4,23 @@ import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { PublicKey, ComputeBudgetProgram } from "@solana/web3.js";
 import chai from "chai";
-import { init as initIotRoutingManager } from "../packages/iot-routing-manager-sdk/src";
-import { init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src";
-import { init as initVsr } from "../packages/voter-stake-registry-sdk/src";
+import {
+  devaddrConstraintKey,
+  init as initIotRoutingManager,
+  organizationKey,
+} from "../packages/iot-routing-manager-sdk/src";
+import {
+  init as initHeliumEntityManager,
+  keyToAssetKey,
+} from "../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { IotRoutingManager } from "../target/types/iot_routing_manager";
-import { VoterStakeRegistry } from "../target/types/voter_stake_registry";
 import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
   ensureIrmIdl,
   ensureDCIdl,
   ensureHSDIdl,
-  ensureVSRIdl,
   initTestDataCredits,
   initSharedMerkle,
   ensureHEMIdl,
@@ -34,15 +38,14 @@ describe("iot-routing-manager", () => {
   let hsdProgram: Program<HeliumSubDaos>;
   let hemProgram: Program<HeliumEntityManager>;
   let irmProgram: Program<IotRoutingManager>;
-  let vsrProgram: Program<VoterStakeRegistry>;
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
   let dao: PublicKey;
   let subDao: PublicKey;
-  let iotMint: PublicKey | undefined;
   let dcMint: PublicKey;
-  let programApproval: PublicKey;
+  let merkle: PublicKey;
+  let sharedMerkle: PublicKey;
 
   beforeEach(async () => {
     dcProgram = await initDataCredits(
@@ -74,31 +77,34 @@ describe("iot-routing-manager", () => {
       anchor.workspace.IotRoutingManager.idl
     );
     ensureIrmIdl(irmProgram);
-
-    vsrProgram = await initVsr(
-      provider,
-      anchor.workspace.VoterStakeRegistry.programId,
-      anchor.workspace.VoterStakeRegistry.idl
-    );
-    ensureVSRIdl(vsrProgram);
-
     const dataCredits = await initTestDataCredits(dcProgram, provider);
+    const hntMint = dataCredits.hntMint;
     dcMint = dataCredits.dcMint;
+    await dcProgram.methods
+      .mintDataCreditsV0({
+        dcAmount: new anchor.BN("10000000000"),
+        hntAmount: null,
+      })
+      .accountsPartial({
+        dcMint,
+        recipient: me,
+      })
+      .rpc({ skipPreflight: true });
+
     ({ dao } = await initTestDao(
       hsdProgram,
       provider,
       100,
       me,
-      dataCredits.dcMint
+      dataCredits.dcMint,
+      hntMint
     ));
 
-    ({ subDao, mint: iotMint } = await initTestSubdao({
+    ({ subDao } = await initTestSubdao({
       hsdProgram,
-      vsrProgram,
       provider,
       authority: me,
       dao,
-      numTokens: new anchor.BN("500000000000000"),
     }));
 
     const approve = await hemProgram.methods
@@ -107,10 +113,8 @@ describe("iot-routing-manager", () => {
       })
       .accountsPartial({ dao });
 
-    programApproval = (await approve.pubkeys()).programApproval!;
     await approve.rpc({ skipPreflight: true });
-
-    await initSharedMerkle(hemProgram);
+    ({ merkle, sharedMerkle } = await initSharedMerkle(hemProgram));
   });
 
   it("should initialize a routing manager", async () => {
@@ -159,6 +163,7 @@ describe("iot-routing-manager", () => {
         .accountsPartial({
           updateAuthority: me,
           netIdAuthority: me,
+          dcMint: dcMint,
           subDao,
           dao,
         })
@@ -202,9 +207,21 @@ describe("iot-routing-manager", () => {
       });
 
       it("should initialize an organization", async () => {
-        const {
-          pubkeys: { organization },
-        } = await irmProgram.methods
+        let routingManagerAcc =
+          await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
+        let nextOuiId = routingManagerAcc.nextOuiId;
+
+        const [organization] = organizationKey(
+          routingManager,
+          routingManagerAcc.nextOuiId
+        );
+
+        const [keyToAsset] = keyToAssetKey(
+          dao,
+          Buffer.from(`OUI_${nextOuiId.toNumber()}`, "utf-8")
+        );
+
+        await irmProgram.methods
           .initializeOrganizationV0()
           .preInstructions([
             ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -212,18 +229,31 @@ describe("iot-routing-manager", () => {
           .accountsPartial({
             authority: me,
             netId,
+            dao,
+            merkleTree: merkle,
+            sharedMerkle,
+            organization,
+            keyToAsset,
           })
-          .rpcAndKeys({ skipPreflight: true });
+          .rpc({ skipPreflight: true });
 
         const organizationAcc = await irmProgram.account.organizationV0.fetch(
           organization!
         );
+
+        routingManagerAcc = await irmProgram.account.iotRoutingManagerV0.fetch(
+          routingManager
+        );
+
         expect(organizationAcc.authority.toBase58()).to.eq(me.toBase58());
         expect(organizationAcc.oui.toNumber()).to.eq(1);
         expect(organizationAcc.escrowKey.toString()).to.eq("OUI_1");
         expect(organizationAcc.netId.toBase58()).to.eq(netId.toBase58());
         expect(organizationAcc.routingManager.toBase58()).to.eq(
           routingManager.toBase58()
+        );
+        expect(routingManagerAcc.nextOuiId.toNumber()).to.eq(
+          nextOuiId.addn(1).toNumber()
         );
       });
 
@@ -244,9 +274,23 @@ describe("iot-routing-manager", () => {
       describe("with an organization", () => {
         let organization: PublicKey;
         beforeEach(async () => {
-          const {
-            pubkeys: { organization: organizationK },
-          } = await irmProgram.methods
+          const routingManagerAcc =
+            await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
+
+          organization = organizationKey(
+            routingManager,
+            routingManagerAcc.nextOuiId
+          )[0];
+
+          const [keyToAsset] = keyToAssetKey(
+            dao,
+            Buffer.from(
+              `OUI_${routingManagerAcc.nextOuiId.toNumber()}`,
+              "utf-8"
+            )
+          );
+
+          await irmProgram.methods
             .initializeOrganizationV0()
             .preInstructions([
               ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
@@ -254,10 +298,13 @@ describe("iot-routing-manager", () => {
             .accountsPartial({
               authority: me,
               netId,
+              dao,
+              merkleTree: merkle,
+              sharedMerkle,
+              organization,
+              keyToAsset,
             })
-            .rpcAndKeys({ skipPreflight: true });
-
-          organization = organizationK!;
+            .rpc({ skipPreflight: true });
 
           await irmProgram.methods
             .approveOrganizationV0()
@@ -268,21 +315,36 @@ describe("iot-routing-manager", () => {
         });
 
         it("should initialize a devaddr constraint", async () => {
-          const {
-            pubkeys: { devaddrConstraint },
-          } = await irmProgram.methods
+          let netIdAcc = await irmProgram.account.netIdV0.fetch(netId);
+          let currAddrOffset = netIdAcc.currentAddrOffset;
+
+          const [devaddrConstraint] = devaddrConstraintKey(
+            organization,
+            currAddrOffset
+          );
+
+          await irmProgram.methods
             .initializeDevaddrConstraintV0({
               numBlocks: 2,
             })
             .accountsPartial({
               organization,
+              devaddrConstraint,
+              netId,
+              routingManager,
             })
-            .rpcAndKeys({ skipPreflight: true });
-          const devaddr = await irmProgram.account.devaddrConstraintV0.fetch(
+            .rpc({ skipPreflight: true });
+
+          const devaddrAcc = await irmProgram.account.devaddrConstraintV0.fetch(
             devaddrConstraint!
           );
-          expect(devaddr.startAddr.toNumber()).to.eq(0);
-          expect(devaddr.endAddr.toNumber()).to.eq(16);
+
+          netIdAcc = await irmProgram.account.netIdV0.fetch(netId);
+          expect(devaddrAcc.startAddr.toNumber()).to.eq(0);
+          expect(devaddrAcc.endAddr.toNumber()).to.eq(16);
+          expect(netIdAcc.currentAddrOffset.toNumber()).to.eq(
+            currAddrOffset.addn(16 + 1).toNumber() // 1 is added on avoid overlap
+          );
         });
 
         it("should update the organization", async () => {
@@ -293,7 +355,9 @@ describe("iot-routing-manager", () => {
             .accountsPartial({ organization })
             .rpc();
 
-          const orgAcc = await irmProgram.account.netIdV0.fetch(netId);
+          const orgAcc = await irmProgram.account.organizationV0.fetch(
+            organization
+          );
           expect(orgAcc.authority.toBase58()).to.eq(
             PublicKey.default.toBase58()
           );
@@ -316,10 +380,11 @@ describe("iot-routing-manager", () => {
 
       const routingManagerAcc =
         await irmProgram.account.iotRoutingManagerV0.fetch(routingManager);
-      expect(routingManagerAcc.updateAuthority.toBase58).to.eq(
+
+      expect(routingManagerAcc.updateAuthority.toBase58()).to.eq(
         PublicKey.default.toBase58()
       );
-      expect(routingManagerAcc.netIdAuthority.toBase58).to.eq(
+      expect(routingManagerAcc.netIdAuthority.toBase58()).to.eq(
         PublicKey.default.toBase58()
       );
       expect(routingManagerAcc.devaddrFeeUsd.toNumber()).to.eq(

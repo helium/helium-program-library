@@ -13,7 +13,12 @@ import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
 } from "@solana/spl-account-compression";
-import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  ComputeBudgetProgram,
+} from "@solana/web3.js";
 import { execSync } from "child_process";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
 import {
@@ -121,37 +126,58 @@ export const initTestRewardableEntityConfig = async (
 
 export const initSharedMerkle = async (
   program: Program<HeliumEntityManager>
-) => {
+): Promise<{
+  merkle: PublicKey;
+  sharedMerkle: PublicKey;
+}> => {
   const sharedMerkle = sharedMerkleKey(3)[0];
-  const exists = !!(await program.provider.connection.getAccountInfo(
+  const accountInfo = await program.provider.connection.getAccountInfo(
     sharedMerkle
-  ));
+  );
+  const exists = !!accountInfo;
+
   if (exists) {
-    return sharedMerkle;
+    try {
+      const acc = await program.account.sharedMerkleV0.fetch(sharedMerkle);
+      return { merkle: acc.merkleTree, sharedMerkle };
+    } catch (error) {
+      throw error;
+    }
   }
+
   const merkle = Keypair.generate();
   const space = getConcurrentMerkleTreeAccountSize(20, 64, 17);
+  const lamports = await (
+    program.provider as anchor.AnchorProvider
+  ).connection.getMinimumBalanceForRentExemption(space);
+
   const createMerkle = SystemProgram.createAccount({
     fromPubkey: (program.provider as anchor.AnchorProvider).wallet.publicKey,
     newAccountPubkey: merkle.publicKey,
-    lamports: await (
-      program.provider as anchor.AnchorProvider
-    ).connection.getMinimumBalanceForRentExemption(space),
-    space: space,
+    lamports,
+    space,
     programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   });
-  await program.methods
-    .initializeSharedMerkleV0({
-      proofSize: 3,
-    })
-    .preInstructions([createMerkle])
-    .signers([merkle])
-    .accountsPartial({
-      merkleTree: merkle.publicKey,
-    })
-    .rpc({ skipPreflight: true });
 
-  return sharedMerkle;
+  try {
+    await program.methods
+      .initializeSharedMerkleV0({
+        proofSize: 3,
+      })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        createMerkle,
+      ])
+      .signers([merkle])
+      .accountsPartial({
+        merkleTree: merkle.publicKey,
+      })
+      .rpc({ skipPreflight: true });
+  } catch (error) {
+    throw error;
+  }
+
+  return { merkle: merkle.publicKey, sharedMerkle };
 };
 
 export const initTestMaker = async (

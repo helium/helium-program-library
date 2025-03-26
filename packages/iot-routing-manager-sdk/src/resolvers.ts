@@ -14,7 +14,6 @@ import {
   programApprovalKey,
   sharedMerkleKey,
 } from "@helium/helium-entity-manager-sdk";
-import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 export const iotRoutingManagerResolvers = combineResolvers(
   heliumCommonResolver,
@@ -24,11 +23,6 @@ export const iotRoutingManagerResolvers = combineResolvers(
     account: "tokenAccount",
     mint: "collection",
     owner: "routingManager",
-  }),
-  ataResolver({
-    account: "payerIotAccount",
-    mint: "iotMint",
-    owner: "payer",
   }),
   resolveIndividual(async ({ args, path, accounts, provider }) => {
     if (
@@ -47,17 +41,6 @@ export const iotRoutingManagerResolvers = combineResolvers(
       return organizationKey(
         accounts.routingManager as PublicKey,
         args[0].oui
-      )[0];
-    } else if (
-      path[path.length - 1] === "devaddrConstraint" &&
-      accounts.organization &&
-      accounts.netId
-    ) {
-      return devaddrConstraintKey(
-        accounts.organization as PublicKey,
-        (args[0] && args[0].startAddr) ??
-          (await getNetId(provider, accounts.netId as PublicKey))
-            .currentAddrOffset
       )[0];
     } else if (path[path.length - 1] == "programApproval" && accounts.dao) {
       return programApprovalKey(accounts.dao as PublicKey, PROGRAM_ID)[0];
@@ -78,13 +61,3 @@ export const iotRoutingManagerResolvers = combineResolvers(
     }
   })
 );
-
-async function getNetId(provider: Provider, netId: PublicKey) {
-  const idl = await fetchBackwardsCompatibleIdl(PROGRAM_ID, provider);
-  const netIdAccount = await provider.connection.getAccountInfo(netId);
-  if (!netIdAccount) {
-    throw new Error("NetId account not found");
-  }
-  const coder = new BorshAccountsCoder(idl!);
-  return coder.decode("NetIdV0", netIdAccount.data);
-}
