@@ -56,9 +56,38 @@ export const handleAccountWebhook = async ({
     });
 
     try {
+      if (isDelete) {
+        const modelsToDelete = Object.keys(sequelize.models).filter(
+          (modelName) => {
+            const hasAddressAttribute =
+              !!sequelize.models[modelName].getAttributes().address;
+
+            const accountConfig = accounts.find(
+              (acc) => acc.type === modelName
+            );
+
+            const ignoreDeletes = accountConfig?.ignore_deletes || false;
+            return hasAddressAttribute && !ignoreDeletes;
+          }
+        );
+
+        console.log({ modelsToDelete });
+        const deletePromises = modelsToDelete.map((modelName) => {
+          return sequelize.models[modelName].destroy({
+            where: { address: account.pubkey },
+            transaction: t,
+          });
+        });
+
+        await Promise.all(deletePromises);
+        await t.commit();
+        // @ts-ignore
+        fastify.customMetrics.accountWebhookCounter.inc();
+        return;
+      }
+
       const program = new anchor.Program(idl, programId, provider);
       const data = Buffer.from(account.data[0], account.data[1]);
-
       const accName = accounts.find(({ type }) => {
         return (
           data &&
@@ -96,31 +125,19 @@ export const handleAccountWebhook = async ({
         }
       }
 
-      if (isDelete) {
-        let ignoreDelete = accounts.find(
-          (acc) => acc.type == accName
-        )?.ignore_deletes;
-        if (!ignoreDelete) {
-          await model.destroy({
-            where: { address: account.pubkey },
-            transaction: t,
-          });
-        }
-      } else {
-        sanitized = {
-          refreshed_at: new Date().toISOString(),
-          address: account.pubkey,
-          ...sanitized,
-        };
+      sanitized = {
+        refreshed_at: new Date().toISOString(),
+        address: account.pubkey,
+        ...sanitized,
+      };
 
-        const shouldUpdate = !deepEqual(
-          _omit(sanitized, OMIT_KEYS),
-          _omit(existing?.dataValues, OMIT_KEYS)
-        );
+      const shouldUpdate = !deepEqual(
+        _omit(sanitized, OMIT_KEYS),
+        _omit(existing?.dataValues, OMIT_KEYS)
+      );
 
-        if (shouldUpdate) {
-          await model.upsert({ ...sanitized }, { transaction: t });
-        }
+      if (shouldUpdate) {
+        await model.upsert({ ...sanitized }, { transaction: t });
       }
 
       await t.commit();
