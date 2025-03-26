@@ -1,5 +1,8 @@
 use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
-use anchor_lang::prelude::*;
+use anchor_lang::{
+  prelude::*,
+  solana_program::{program::invoke, system_instruction},
+};
 use anchor_spl::token::Mint;
 use bubblegum_cpi::{
   bubblegum::{
@@ -13,7 +16,8 @@ use bubblegum_cpi::{
 use helium_sub_daos::DaoV0;
 
 use crate::{
-  constants::ENTITY_METADATA_URL, error::ErrorCode, hash_entity_key, key_to_asset_seeds, state::*,
+  constants::ENTITY_METADATA_URL, error::ErrorCode, hash_entity_key, key_to_asset_seeds,
+  shared_merkle_seeds, state::*,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -107,6 +111,11 @@ pub struct IssueProgramEntityV0<'info> {
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,
+  #[account(
+    mut,
+    has_one = merkle_tree
+  )]
+  pub shared_merkle: Option<Account<'info, SharedMerkleV0>>,
 }
 
 impl<'info> IssueProgramEntityV0<'info> {
@@ -117,7 +126,11 @@ impl<'info> IssueProgramEntityV0<'info> {
       leaf_owner: self.recipient.to_account_info(),
       merkle_tree: self.merkle_tree.to_account_info(),
       payer: self.payer.to_account_info(),
-      tree_delegate: self.program_approver.to_account_info(),
+      tree_delegate: self
+        .shared_merkle
+        .as_ref()
+        .map(|m| m.to_account_info())
+        .unwrap_or(self.program_approver.to_account_info()),
       log_wrapper: self.log_wrapper.to_account_info(),
       compression_program: self.compression_program.to_account_info(),
       system_program: self.system_program.to_account_info(),
@@ -197,7 +210,7 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
   };
 
   let entity_creator_seeds: &[&[&[u8]]] = &[&[
-    b"entity_creator",
+    "entity_creator".as_bytes(),
     ctx.accounts.dao.to_account_info().key.as_ref(),
     &[ctx.bumps.entity_creator],
   ]];
@@ -207,14 +220,43 @@ pub fn handler(ctx: Context<IssueProgramEntityV0>, args: IssueProgramEntityArgsV
   let mut key_to_asset_creator = ctx.accounts.key_to_asset.to_account_info();
   key_to_asset_creator.is_signer = true;
   let key_to_asset_signer: &[&[u8]] = key_to_asset_seeds!(ctx.accounts.key_to_asset);
-  mint_to_collection_v1(
-    ctx
-      .accounts
-      .mint_to_collection_ctx()
-      .with_remaining_accounts(vec![creator, key_to_asset_creator])
-      .with_signer(&[entity_creator_seeds[0], key_to_asset_signer]),
-    metadata,
-  )?;
+  if let Some(shared_merkle) = ctx.accounts.shared_merkle.as_ref() {
+    let shared_merkle_seeds = shared_merkle_seeds!(shared_merkle);
+    let transfer_instruction = system_instruction::transfer(
+      &ctx.accounts.payer.key(),
+      &shared_merkle.to_account_info().key(),
+      shared_merkle.price_per_mint,
+    );
+    invoke(
+      &transfer_instruction,
+      &[
+        ctx.accounts.payer.to_account_info(),
+        shared_merkle.to_account_info(),
+        ctx.accounts.system_program.to_account_info(),
+      ],
+    )?;
+    mint_to_collection_v1(
+      ctx
+        .accounts
+        .mint_to_collection_ctx()
+        .with_remaining_accounts(vec![creator, key_to_asset_creator])
+        .with_signer(&[
+          entity_creator_seeds[0],
+          key_to_asset_signer,
+          shared_merkle_seeds,
+        ]),
+      metadata,
+    )?;
+  } else {
+    mint_to_collection_v1(
+      ctx
+        .accounts
+        .mint_to_collection_ctx()
+        .with_remaining_accounts(vec![creator, key_to_asset_creator])
+        .with_signer(&[entity_creator_seeds[0], key_to_asset_signer]),
+      metadata,
+    )?;
+  }
 
   Ok(())
 }

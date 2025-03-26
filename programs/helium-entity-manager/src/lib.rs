@@ -31,6 +31,17 @@ security_txt! {
 pub mod helium_entity_manager {
   use super::*;
 
+  pub fn swap_shared_merkle_tree_v0(ctx: Context<SwapSharedMerkleTreeV0>) -> Result<()> {
+    swap_shared_merkle_tree_v0::handler(ctx)
+  }
+
+  pub fn initialize_shared_merkle_v0(
+    ctx: Context<InitializeSharedMerkleV0>,
+    args: InitializeSharedMerkleArgsV0,
+  ) -> Result<()> {
+    initialize_shared_merkle_v0::handler(ctx, args)
+  }
+
   pub fn initialize_rewardable_entity_config_v0(
     ctx: Context<InitializeRewardableEntityConfigV0>,
     args: InitializeRewardableEntityConfigArgsV0,
