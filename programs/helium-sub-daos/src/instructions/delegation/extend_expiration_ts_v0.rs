@@ -205,7 +205,7 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
       )?;
       &mut parsed
     };
-    if genesis_end_sdei.epoch > epoch {
+    if genesis_end_sdei.epoch > epoch && position.genesis_end > registrar.clock_unix_timestamp() {
       msg!(
         "Subtracting vehnt info from genesis end sdei {:?}",
         vehnt_info_old
