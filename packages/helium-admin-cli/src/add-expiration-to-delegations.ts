@@ -48,7 +48,7 @@ export async function run(args: any = process.argv) {
 
   const instructions: TransactionInstruction[] = [];
   const delegations = await hsdProgram.account.delegatedPositionV0.all();
-  const needsMigration = delegations.filter(d => d.account.expirationTs.isZero());
+  const needsMigration = delegations;
   const positionKeys = needsMigration.map((d) => d.account.position);
   const coder = vsrProgram.coder.accounts;
   const positionAccs = (
@@ -77,10 +77,11 @@ export async function run(args: any = process.argv) {
     
     await Promise.all(batch.map(async (delegation, j) => {
       const position = batchPositions[j];
-      if (!position) {
-        console.log(`Position not found for ${delegation.account.position.toBase58()}`);
+      if (!position || position.lockup.kind.constant || position.lockup.endTs.gte(delegation.account.expirationTs)) {
         return;
       }
+
+      console.log(`Doing it to ${position?.lockup?.endTs?.toNumber()} < ${delegation.account.expirationTs.toNumber()}`);
 
       const subDao = delegation.account.subDao;
       const positionTokenAccount = (

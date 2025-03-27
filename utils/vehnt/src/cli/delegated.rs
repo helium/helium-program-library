@@ -171,6 +171,14 @@ impl Delegated {
     pda_to_epoch.insert(Pubkey::from_str(MOBILE_SUBDAO).unwrap(), HashMap::new());
 
     let curr_epoch = current_epoch(curr_ts as i64);
+    let mut new_epoch_infos_by_subdao_and_epoch: HashMap<
+      Pubkey,
+      HashMap<u64, (Pubkey, SubDaoEpochInfoV0)>,
+    > = HashMap::new();
+    new_epoch_infos_by_subdao_and_epoch
+      .insert(Pubkey::from_str(IOT_SUBDAO).unwrap(), HashMap::new());
+    new_epoch_infos_by_subdao_and_epoch
+      .insert(Pubkey::from_str(MOBILE_SUBDAO).unwrap(), HashMap::new());
     for sub_dao in [IOT_SUBDAO, MOBILE_SUBDAO].iter() {
       let sub_dao_pubkey = Pubkey::from_str(sub_dao).unwrap();
       for epoch in (curr_epoch - 730)..(curr_epoch + 1500) {
@@ -187,6 +195,20 @@ impl Delegated {
           .get_mut(&sub_dao_pubkey)
           .unwrap()
           .insert(pda, epoch);
+        new_epoch_infos_by_subdao_and_epoch
+          .get_mut(&sub_dao_pubkey)
+          .unwrap()
+          .insert(
+            epoch,
+            (
+              pda,
+              SubDaoEpochInfoV0 {
+                epoch,
+                sub_dao: sub_dao_pubkey,
+                ..SubDaoEpochInfoV0::default()
+              },
+            ),
+          );
       }
     }
 
@@ -216,14 +238,6 @@ impl Delegated {
           .insert(epoch, info);
       }
     }
-    let mut new_epoch_infos_by_subdao_and_epoch: HashMap<
-      Pubkey,
-      HashMap<u64, (Pubkey, SubDaoEpochInfoV0)>,
-    > = HashMap::new();
-    new_epoch_infos_by_subdao_and_epoch
-      .insert(Pubkey::from_str(IOT_SUBDAO).unwrap(), HashMap::new());
-    new_epoch_infos_by_subdao_and_epoch
-      .insert(Pubkey::from_str(MOBILE_SUBDAO).unwrap(), HashMap::new());
 
     println!("Total accounts {}", positions_with_delegations.len());
     for position in positions_with_delegations {
@@ -233,6 +247,11 @@ impl Delegated {
         &voting_mint_config,
         position.delegated_position.expiration_ts,
       )?;
+      if position.position_key.clone()
+        == Pubkey::from_str("C2Ebx6FZS895nCW4W5WRqfx4tijxmBbTvGipXXHtrAhY").unwrap()
+      {
+        println!("Vehnt info {:?}", vehnt_info);
+      }
       let vehnt = position
         .position
         .voting_power(&voting_mint_config, curr_ts)?;
@@ -245,7 +264,7 @@ impl Delegated {
         .get_mut(&position.delegated_position.sub_dao)
         .unwrap();
       let end_epoch = current_epoch(std::cmp::min(
-        position.position.lockup.end_ts,
+        position.position.lockup.effective_end_ts(),
         position.delegated_position.expiration_ts,
       ));
       let genesis_end_epoch = current_epoch(position.position.genesis_end - 1);
@@ -312,13 +331,15 @@ impl Delegated {
 
       // Apply corrections
       {
-        let mut new_end_epoch_info = new_epoch_infos_by_epoch.get_mut(&end_epoch).unwrap();
-        new_end_epoch_info.1.fall_rates_from_closing_positions +=
-          vehnt_info.end_fall_rate_correction;
-        new_end_epoch_info.1.vehnt_in_closing_positions += vehnt_info.end_vehnt_correction;
+        if end_epoch > current_epoch(curr_ts) {
+          let mut new_end_epoch_info = new_epoch_infos_by_epoch.get_mut(&end_epoch).unwrap();
+          new_end_epoch_info.1.fall_rates_from_closing_positions +=
+            vehnt_info.end_fall_rate_correction;
+          new_end_epoch_info.1.vehnt_in_closing_positions += vehnt_info.end_vehnt_correction;
+        }
       }
       {
-        if genesis_end_epoch > 0 {
+        if genesis_end_epoch > 0 && genesis_end_epoch > current_epoch(curr_ts) {
           let mut new_genesis_end_epoch_info = new_epoch_infos_by_epoch
             .get_mut(&genesis_end_epoch)
             .unwrap();
@@ -374,18 +395,16 @@ impl Delegated {
     for (key, value) in epoch_infos_by_subdao_and_epoch.iter() {
       if let Some(new_value) = new_epoch_infos_by_subdao_and_epoch.get(key) {
         for (inner_key, sub_dao_epoch_info) in value.iter() {
-          // Don't bother correcting old epochs
-          if *inner_key > current_epoch(curr_ts) {
-            if let Some(new_sub_dao_epoch_info) = new_value.get(inner_key) {
-              let has_fall_rate_diff = sub_dao_epoch_info.1.fall_rates_from_closing_positions
-                != new_sub_dao_epoch_info.1.fall_rates_from_closing_positions;
-              let has_vehnt_diff = sub_dao_epoch_info.1.vehnt_in_closing_positions
-                != new_sub_dao_epoch_info.1.vehnt_in_closing_positions;
-              let has_epoch_diff = sub_dao_epoch_info.1.epoch != new_sub_dao_epoch_info.1.epoch
-                || *inner_key != sub_dao_epoch_info.1.epoch;
-              if has_fall_rate_diff || has_vehnt_diff || has_epoch_diff {
-                println!(
-                  "Entry for key {:?},
+          if let Some(new_sub_dao_epoch_info) = new_value.get(inner_key) {
+            let has_fall_rate_diff = sub_dao_epoch_info.1.fall_rates_from_closing_positions
+              != new_sub_dao_epoch_info.1.fall_rates_from_closing_positions;
+            let has_vehnt_diff = sub_dao_epoch_info.1.vehnt_in_closing_positions
+              != new_sub_dao_epoch_info.1.vehnt_in_closing_positions;
+            let has_epoch_diff = sub_dao_epoch_info.1.epoch != new_sub_dao_epoch_info.1.epoch
+              || *inner_key != sub_dao_epoch_info.1.epoch;
+            if has_fall_rate_diff || has_vehnt_diff || has_epoch_diff {
+              println!(
+                "Entry for key {:?},
                   Fall Rates: {}
                               {}
                   VeHNT:      {}
@@ -394,74 +413,73 @@ impl Delegated {
                   New Epoch:  {}
                   Watching epoch: {}
                 ",
-                  sub_dao_epoch_info.0,
-                  sub_dao_epoch_info.1.fall_rates_from_closing_positions,
-                  new_sub_dao_epoch_info.1.fall_rates_from_closing_positions,
-                  sub_dao_epoch_info.1.vehnt_in_closing_positions,
-                  new_sub_dao_epoch_info.1.vehnt_in_closing_positions,
-                  sub_dao_epoch_info.1.epoch,
-                  new_sub_dao_epoch_info.1.epoch,
-                  inner_key
+                sub_dao_epoch_info.0,
+                sub_dao_epoch_info.1.fall_rates_from_closing_positions,
+                new_sub_dao_epoch_info.1.fall_rates_from_closing_positions,
+                sub_dao_epoch_info.1.vehnt_in_closing_positions,
+                new_sub_dao_epoch_info.1.vehnt_in_closing_positions,
+                sub_dao_epoch_info.1.epoch,
+                new_sub_dao_epoch_info.1.epoch,
+                inner_key
+              );
+              // Uncomment if endpoint added back and needed.
+              loop {
+                println!("Correcting...");
+                let update_instructions = program
+                  .request()
+                  .args(helium_sub_daos::instruction::TempUpdateSubDaoEpochInfo {
+                    args: TempUpdateSubDaoEpochInfoArgs {
+                      fall_rates_from_closing_positions: if has_fall_rate_diff {
+                        Some(new_sub_dao_epoch_info.1.fall_rates_from_closing_positions)
+                      } else {
+                        None
+                      },
+                      vehnt_in_closing_positions: if has_vehnt_diff {
+                        Some(new_sub_dao_epoch_info.1.vehnt_in_closing_positions)
+                      } else {
+                        None
+                      },
+                      epoch: *inner_key,
+                    },
+                  })
+                  .accounts(TempUpdateSubDaoEpochInfo {
+                    sub_dao_epoch_info: new_sub_dao_epoch_info.0,
+                    authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
+                      .unwrap(),
+                    sub_dao: new_sub_dao_epoch_info.1.sub_dao,
+                    system_program: system_program::id(),
+                  })
+                  .instructions()
+                  .unwrap();
+                let blockhash = rpc_client.get_latest_blockhash().await?;
+                let mut instructions = vec![
+                  ComputeBudgetInstruction::set_compute_unit_limit(200000),
+                  ComputeBudgetInstruction::set_compute_unit_price(
+                    (f64::from(5000) / (600000_f64 * 0.000001_f64)).ceil() as u64,
+                  ),
+                ];
+                instructions.push(update_instructions[0].clone());
+                let transaction = Transaction::new_signed_with_payer(
+                  &instructions,
+                  Some(&signer.pubkey()),
+                  &[&signer],
+                  blockhash,
                 );
-                // Uncomment if endpoint added back and needed.
-                loop {
-                  println!("Correcting...");
-                  let update_instructions = program
-                    .request()
-                    .args(helium_sub_daos::instruction::TempUpdateSubDaoEpochInfo {
-                      args: TempUpdateSubDaoEpochInfoArgs {
-                        fall_rates_from_closing_positions: if has_fall_rate_diff {
-                          Some(new_sub_dao_epoch_info.1.fall_rates_from_closing_positions)
-                        } else {
-                          None
-                        },
-                        vehnt_in_closing_positions: if has_vehnt_diff {
-                          Some(new_sub_dao_epoch_info.1.vehnt_in_closing_positions)
-                        } else {
-                          None
-                        },
-                        epoch: *inner_key,
-                      },
-                    })
-                    .accounts(TempUpdateSubDaoEpochInfo {
-                      sub_dao_epoch_info: new_sub_dao_epoch_info.0,
-                      authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
-                        .unwrap(),
-                      sub_dao: new_sub_dao_epoch_info.1.sub_dao,
-                      system_program: system_program::id(),
-                    })
-                    .instructions()
-                    .unwrap();
-                  let blockhash = rpc_client.get_latest_blockhash().await?;
-                  let mut instructions = vec![
-                    ComputeBudgetInstruction::set_compute_unit_limit(200000),
-                    ComputeBudgetInstruction::set_compute_unit_price(
-                      (f64::from(5000) / (600000_f64 * 0.000001_f64)).ceil() as u64,
-                    ),
-                  ];
-                  instructions.push(update_instructions[0].clone());
-                  let transaction = Transaction::new_signed_with_payer(
-                    &instructions,
-                    Some(&signer.pubkey()),
-                    &[&signer],
-                    blockhash,
-                  );
-                  let res = rpc_client
-                    .send_and_confirm_transaction_with_spinner_and_config(
-                      &transaction,
-                      CommitmentConfig::confirmed(),
-                      RpcSendTransactionConfig {
-                        skip_preflight: true,
-                        ..RpcSendTransactionConfig::default()
-                      },
-                    )
-                    .await;
-                  if res.is_ok() {
-                    println!("Success {}", res.unwrap());
-                    break;
-                  } else {
-                    println!("Err {}", res.err().unwrap());
-                  }
+                let res = rpc_client
+                  .send_and_confirm_transaction_with_spinner_and_config(
+                    &transaction,
+                    CommitmentConfig::confirmed(),
+                    RpcSendTransactionConfig {
+                      skip_preflight: true,
+                      ..RpcSendTransactionConfig::default()
+                    },
+                  )
+                  .await;
+                if res.is_ok() {
+                  println!("Success {}", res.unwrap());
+                  break;
+                } else {
+                  println!("Err {}", res.err().unwrap());
                 }
               }
             }
