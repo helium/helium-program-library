@@ -40,7 +40,7 @@ async fn get_stake_accounts_incremental(
 ) -> MyResult<Vec<(Pubkey, solana_sdk::account::Account)>> {
   let mut prefix = [251, 212, 32, 100, 102, 1, 247, 81, 0];
   let mut accounts = Vec::new();
-  for i in 0..255 {
+  for i in 0..=255 {
     prefix[8] = i;
     accounts.extend(get_accounts_with_prefix(&rpc_client, &prefix).await?);
   }
@@ -62,7 +62,7 @@ async fn get_accounts_with_prefix(
   let helium_dao_id = Pubkey::from_str(HELIUM_DAO_ID)?;
   let mut config = RpcProgramAccountsConfig::default();
   let memcmp = RpcFilterType::Memcmp(Memcmp::new_base58_encoded(0, &input));
-  config.filters = Some(vec![RpcFilterType::DataSize(196), memcmp]);
+  config.filters = Some(vec![memcmp]);
   config.account_config.encoding = Some(UiAccountEncoding::Base64);
   let accounts = rpc_client
     .get_program_accounts_with_config(&helium_dao_id, config)
@@ -88,6 +88,7 @@ impl Delegated {
     let mut mobile_fall_rate = 0_u128;
 
     let accounts = get_stake_accounts(&rpc_client).await?;
+    println!("Accounts {:?}", accounts.len());
     let delegated_positions = accounts
       .iter()
       .map(|(pubkey, account)| {
@@ -248,7 +249,7 @@ impl Delegated {
         position.delegated_position.expiration_ts,
       )?;
       if position.position_key.clone()
-        == Pubkey::from_str("C2Ebx6FZS895nCW4W5WRqfx4tijxmBbTvGipXXHtrAhY").unwrap()
+        == Pubkey::from_str("9aHf9LvXRH1YS7uYX5tJXwLPWM84i6HqGrGoKPyXdKYU").unwrap()
       {
         println!("Vehnt info {:?}", vehnt_info);
       }
@@ -336,6 +337,16 @@ impl Delegated {
           new_end_epoch_info.1.fall_rates_from_closing_positions +=
             vehnt_info.end_fall_rate_correction;
           new_end_epoch_info.1.vehnt_in_closing_positions += vehnt_info.end_vehnt_correction;
+          if position.position_key.clone()
+            == Pubkey::from_str("9aHf9LvXRH1YS7uYX5tJXwLPWM84i6HqGrGoKPyXdKYU").unwrap()
+          {
+            println!(
+              "End epoch info {:?}, {:?}, {:?}",
+              new_end_epoch_info.0,
+              new_end_epoch_info.1.fall_rates_from_closing_positions,
+              new_end_epoch_info.1.vehnt_in_closing_positions
+            );
+          }
         }
       }
       {
