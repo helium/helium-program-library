@@ -57,19 +57,14 @@ export const handleAccountWebhook = async ({
 
     try {
       if (isDelete) {
-        const modelsToDelete = Object.keys(sequelize.models).filter(
-          (modelName) => {
+        const modelsToDelete = accounts
+          .filter((accountConfig) => !accountConfig.ignore_deletes)
+          .map((accountConfig) => accountConfig.type)
+          .filter((modelName) => {
             const hasAddressAttribute =
-              !!sequelize.models[modelName].getAttributes().address;
-
-            const accountConfig = accounts.find(
-              (acc) => acc.type === modelName
-            );
-
-            const ignoreDeletes = accountConfig?.ignore_deletes || false;
-            return hasAddressAttribute && !ignoreDeletes;
-          }
-        );
+              !!sequelize.models[modelName]?.getAttributes().address;
+            return hasAddressAttribute;
+          });
 
         const deletePromises = modelsToDelete.map((modelName) => {
           return sequelize.models[modelName].destroy({
