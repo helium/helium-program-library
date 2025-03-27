@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use nft_proxy::ProxyAssignmentV0;
 use proposal::{ProposalConfigV0, ProposalV0};
+use shared_utils::resize_to_fit_pda;
 
 use crate::{error::VsrError, registrar_seeds, state::*};
 
@@ -173,6 +174,15 @@ pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
       ctx.accounts.proposal.created_at,
     );
   }
+
+  ctx.accounts.position.registrar_paid_rent = u64::try_from(
+    i64::try_from(ctx.accounts.position.registrar_paid_rent).unwrap()
+      + resize_to_fit_pda(
+        &ctx.accounts.registrar.to_account_info(),
+        &ctx.accounts.position,
+      )?,
+  )
+  .unwrap();
 
   // Marker has not been allocated yet, need to handle rent payment
   if marker.rent_refund == Pubkey::default() {
