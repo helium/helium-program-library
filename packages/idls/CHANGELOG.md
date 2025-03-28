@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.32](https://github.com/helium/helium-program-library/compare/v0.9.31...v0.9.32) (2025-03-28)
+
+**Note:** Version bump only for package @helium/idls
+
+
+
+
+
 ## [0.9.31](https://github.com/helium/helium-program-library/compare/v0.9.30...v0.9.31) (2025-03-13)
 
 **Note:** Version bump only for package @helium/idls
