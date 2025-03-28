@@ -23,7 +23,11 @@ import {
 import { TransactionCompletionQueue } from "@helium/account-fetch-cache";
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
-import { estimatePrioritizationFee, MAX_PRIO_FEE, withPriorityFees } from "./priorityFees";
+import {
+  estimatePrioritizationFee,
+  MAX_PRIO_FEE,
+  withPriorityFees,
+} from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
@@ -788,6 +792,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     maxTxSize = 1232,
     extraSigners = [],
     useFirstEstimateForAll = false,
+    maxInstructionsPerTx,
   }: {
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
@@ -801,6 +806,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
     // Instead of populating priority fee and compute per tx, just use the same prio fee and compute
     // for all txs. Only use this if all instructions are roughly the same.
     useFirstEstimateForAll?: boolean;
+    // Optional parameter to limit number of instructions per transaction
+    maxInstructionsPerTx?: number;
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
@@ -814,6 +821,49 @@ export async function batchInstructionsToTxsWithPriorityFee(
   let firstTxComputeAndPrio: TransactionInstruction[] | null = null;
   for (const instruction of instructions) {
     const instrArr = Array.isArray(instruction) ? instruction : [instruction];
+
+    if (
+      maxInstructionsPerTx !== undefined &&
+      currentTxInstructions.length + instrArr.length > maxInstructionsPerTx
+    ) {
+      // Current batch would exceed instruction limit, commit current batch and start new one
+      if (currentTxInstructions.length > 0) {
+        let ixs: TransactionInstruction[] = [];
+        if (firstTxComputeAndPrio && useFirstEstimateForAll) {
+          ixs = [...firstTxComputeAndPrio, ...currentTxInstructions];
+        } else {
+          ixs = await withPriorityFees({
+            connection: provider.connection,
+            instructions: currentTxInstructions,
+            computeUnits: computeUnitLimit,
+            computeScaleUp,
+            basePriorityFee,
+            addressLookupTables,
+            feePayer: provider.wallet.publicKey,
+          });
+          if (useFirstEstimateForAll) {
+            firstTxComputeAndPrio = ixs.slice(0, 2);
+          }
+        }
+
+        transactions.push({
+          instructions: ixs,
+          addressLookupTableAddresses: addressLookupTableAddresses || [],
+          feePayer: provider.wallet.publicKey,
+          recentBlockhash: blockhash,
+          addressLookupTables,
+          signers: extraSigners.filter((s) =>
+            currentTxInstructions.some((ix) =>
+              ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
+            )
+          ),
+        });
+      }
+
+      currentTxInstructions = instrArr;
+      continue;
+    }
+
     const prevLen = currentTxInstructions.length;
     currentTxInstructions.push(...instrArr);
     const tx = await toVersionedTx({
