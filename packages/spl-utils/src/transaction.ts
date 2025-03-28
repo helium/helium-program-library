@@ -821,49 +821,6 @@ export async function batchInstructionsToTxsWithPriorityFee(
   let firstTxComputeAndPrio: TransactionInstruction[] | null = null;
   for (const instruction of instructions) {
     const instrArr = Array.isArray(instruction) ? instruction : [instruction];
-
-    if (
-      maxInstructionsPerTx !== undefined &&
-      currentTxInstructions.length + instrArr.length > maxInstructionsPerTx
-    ) {
-      // Current batch would exceed instruction limit, commit current batch and start new one
-      if (currentTxInstructions.length > 0) {
-        let ixs: TransactionInstruction[] = [];
-        if (firstTxComputeAndPrio && useFirstEstimateForAll) {
-          ixs = [...firstTxComputeAndPrio, ...currentTxInstructions];
-        } else {
-          ixs = await withPriorityFees({
-            connection: provider.connection,
-            instructions: currentTxInstructions,
-            computeUnits: computeUnitLimit,
-            computeScaleUp,
-            basePriorityFee,
-            addressLookupTables,
-            feePayer: provider.wallet.publicKey,
-          });
-          if (useFirstEstimateForAll) {
-            firstTxComputeAndPrio = ixs.slice(0, 2);
-          }
-        }
-
-        transactions.push({
-          instructions: ixs,
-          addressLookupTableAddresses: addressLookupTableAddresses || [],
-          feePayer: provider.wallet.publicKey,
-          recentBlockhash: blockhash,
-          addressLookupTables,
-          signers: extraSigners.filter((s) =>
-            currentTxInstructions.some((ix) =>
-              ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
-            )
-          ),
-        });
-      }
-
-      currentTxInstructions = instrArr;
-      continue;
-    }
-
     const prevLen = currentTxInstructions.length;
     currentTxInstructions.push(...instrArr);
     const tx = await toVersionedTx({
@@ -883,7 +840,11 @@ export async function batchInstructionsToTxsWithPriorityFee(
       addressLookupTables,
     });
     try {
-      if (tx.serialize().length + 64 * tx.signatures.length > maxTxSize) {
+      if (
+        tx.serialize().length + 64 * tx.signatures.length > maxTxSize ||
+        (maxInstructionsPerTx &&
+          currentTxInstructions.length > maxInstructionsPerTx)
+      ) {
         throw new Error("encoding overruns Uint8Array");
       }
     } catch (e: any) {
