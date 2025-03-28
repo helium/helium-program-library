@@ -231,7 +231,7 @@ export const useAssignProxies = () => {
               proxyMarker.account!.proposal
             )[0];
             const voteMarker = myVoteMarkerAccounts[voteMarkerK.toBase58()];
-            if (position.isDelegated && !voteMarker && proxyMarker.account?.choices?.length > 0) {
+            if (position.isDelegated && !voteMarker && (proxyMarker.account?.choices?.length || 0) > 0) {
               subInstructions.push(
                 await vsrProgram.methods
                   .countProxyVoteV0()
