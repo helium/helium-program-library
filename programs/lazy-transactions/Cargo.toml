@@ -1,6 +1,7 @@
 [package]
 name = "lazy-transactions"
 version = "0.2.0"
+# Trigger deployment - timestamp: 03-31-2025
 description = "Created with Anchor"
 edition = "2021"
 
