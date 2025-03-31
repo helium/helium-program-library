@@ -78,13 +78,10 @@ runs:
       id: buffer-deploy-store
       run: |
         echo "BUFFER=$(cat buffer.out | sed 's/Buffer: //g' | xargs echo -n)" >> $GITHUB_OUTPUT
-        echo "IDL_BUFFER=$(cat idl-buffer.out | sed 's/Idl buffer created: //g' | xargs echo -n)" >> $GITHUB_OUTPUT
-        echo "IDL_BUFFER_ADDRESS=$(IDL_BUFFER | grep -oE '[1-9A-HJ-NP-Za-km-z]{32,44}$')" >> $GITHUB_OUTPUT
+        echo "IDL_BUFFER=$(cat idl-buffer.out | grep -oE '[1-9A-HJ-NP-Za-km-z]{32,44}$' | xargs echo -n)" >> $GITHUB_OUTPUT
     - run: echo "The buffer is ${{ steps.buffer-deploy-store.outputs.BUFFER }}"
       shell: bash
     - run: echo "the idl buffer is ${{ steps.buffer-deploy-store.outputs.IDL_BUFFER }}"
-      shell: bash
-    - run: echo "the idl buffer address is ${{ steps.deploy-store.outputs.IDL_BUFFER_ADDRESS }}"
       shell: bash
     - run: echo "the idl is $(cat ./target/idl/$PROGRAM.json)"
       shell: bash
