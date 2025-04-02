@@ -165,9 +165,7 @@ export async function run(args: any = process.argv) {
   const recipients = (
     await Promise.all(
       assets.map(async (asset) => {
-        const keyToAsset = keyToAssetForAsset(asset);
-        const ktaAcc = await hemProgram.account.keyToAssetV0.fetch(keyToAsset);
-        const assetKey = ktaAcc.asset;
+        const assetId = asset.id;
         const checkResults = await Promise.all(
           mintsToUpdate.map(async (mint, i) => {
             const lazyKey = lazyDistributorKey(mint)[0];
@@ -176,11 +174,11 @@ export async function run(args: any = process.argv) {
               : mint.equals(MOBILE_MINT)
               ? "mobile"
               : "hnt";
-            const recipient = recipientKey(lazyKey, assetKey)[0];
+            const recipient = recipientKey(lazyKey, assetId)[0];
             const doesExist = await exists(provider, recipient);
 
             if (doesExist) {
-              return { mintName, recipient, assetKey };
+              return { mintName, recipient, assetId };
             }
             return null;
           })
@@ -192,27 +190,24 @@ export async function run(args: any = process.argv) {
           ): result is {
             mintName: string;
             recipient: PublicKey;
-            assetKey: PublicKey;
+            assetId: PublicKey;
           } => !!result
         );
       })
     )
   ).flat();
 
-  /*   for (const { mintName, recipient, assetKey } of recipients) {
-    console.log("WTF 1");
+  for (const { mintName, recipient, assetId } of recipients) {
     if (!recipientsToUpdate[mintName]) {
       recipientsToUpdate[mintName] = [];
     }
 
     const recipientAcc = await lazyProgram.account.recipientV0.fetch(recipient);
 
-    console.log("WTF 2 ");
     if (recipientAcc.destination.toBase58() !== destination.toBase58()) {
-      console.log("WTF 3");
-      recipientsToUpdate[mintName].push({ recipient, asset: assetKey });
+      recipientsToUpdate[mintName].push({ recipient, asset: assetId });
     }
-  } */
+  }
 
   for (const [mintName, recipients] of Object.entries(recipientsToUpdate)) {
     if (argv.commit) {
