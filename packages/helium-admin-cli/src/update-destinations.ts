@@ -14,7 +14,7 @@ import {
   bulkSendTransactions,
   proofArgsAndAccounts,
 } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
 
@@ -60,11 +60,6 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    ownerWallet: {
-      type: "string",
-      describe: "Public key of wallet owner to check for hotspots",
-      required: false,
-    },
     mint: {
       type: "string",
       describe: "Token mint type to update recipients for",
@@ -75,7 +70,6 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Destination address to update recipients to",
       required: false,
-      default: PublicKey.default,
     },
     commit: {
       type: "boolean",
@@ -92,10 +86,10 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const lazyProgram = await initLazy(provider);
-  const ownerWallet = argv.ownerWallet
-    ? new PublicKey(argv.ownerWallet)
-    : new PublicKey(argv.wallet);
-  const destination = new PublicKey(argv.destination);
+  const ownerWallet = provider.publicKey;
+  const destination = argv.destination
+    ? new PublicKey(argv.destination)
+    : PublicKey.default;
   const destinationExists = await exists(provider, destination);
   if (!destinationExists) {
     console.log("Destination doesn't exist");
@@ -140,7 +134,6 @@ export async function run(args: any = process.argv) {
     });
   }
 
-  console.log(`Found ${assets.length} hotspots`);
   const mintMap = {
     iot: IOT_MINT,
     mobile: MOBILE_MINT,
@@ -191,6 +184,15 @@ export async function run(args: any = process.argv) {
     });
 
   await Promise.all(recipientChecks);
+
+  console.log("\nSummary:");
+  for (const [mintName, recipients] of Object.entries(recipientsToUpdate)) {
+    console.log(
+      `- ${mintName.toUpperCase()}: ${
+        recipients.length
+      } recipients to destination ${destination.toBase58()}`
+    );
+  }
 
   if (argv.commit) {
     try {
@@ -245,15 +247,6 @@ export async function run(args: any = process.argv) {
       process.exit(1);
     }
   } else {
-    console.log("\nSummary:");
-    for (const [mintName, recipients] of Object.entries(recipientsToUpdate)) {
-      console.log(
-        `- ${mintName.toUpperCase()}: ${
-          recipients.length
-        } recipients to destination ${destination.toBase58()}`
-      );
-    }
-
     console.log(
       "\nDry run completed. Use --commit flag to execute the updates."
     );
