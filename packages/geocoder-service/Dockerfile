@@ -1,6 +1,5 @@
 FROM openjdk:11-jre
 
-# Install pbzip2 for parallel extraction
 RUN apt-get update \
     && apt-get -y install \
         pbzip2 \
