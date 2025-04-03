@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-PHOTON_DATA_DIR="/photon/photon_data"
+DATA_DIR="/geocoder_service/data"
 
 # Download elasticsearch index
-if [ ! -d "${PHOTON_DATA_DIR}/elasticsearch" ]; then
+if [ ! -d "${DATA_DIR}/elasticsearch" ]; then
     # Let graphhopper know where the traffic is coming from
     USER_AGENT="docker: helium/geocoder-service"
     echo "Downloading search index..."
@@ -12,9 +12,9 @@ if [ ! -d "${PHOTON_DATA_DIR}/elasticsearch" ]; then
 fi
 
 # Start photon if elastic index exists
-if [ -d "/photon/photon_data/elasticsearch" ]; then
-    echo "Starting photon service..."
+if [ -d "${DATA_DIR}/elasticsearch" ]; then
+    echo "Starting service..."
     java -jar photon.jar $@
 else
-    echo "Could not start photon, the search index could not be found"
+    echo "Could not start service, the search index could not be found"
 fi
