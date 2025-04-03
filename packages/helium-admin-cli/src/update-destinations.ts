@@ -1,9 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
 import {
-  keyToAssetForAsset,
-  init as initHem,
-} from "@helium/helium-entity-manager-sdk";
-import {
   lazyDistributorKey,
   recipientKey,
   init as initLazy,
@@ -96,7 +92,6 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const lazyProgram = await initLazy(provider);
-  const hemProgram = await initHem(provider);
   const ownerWallet = argv.ownerWallet
     ? new PublicKey(argv.ownerWallet)
     : new PublicKey(argv.wallet);
@@ -162,72 +157,60 @@ export async function run(args: any = process.argv) {
     { recipient: PublicKey; asset: PublicKey }[]
   > = {};
 
-  const recipients = (
-    await Promise.all(
-      assets.map(async (asset) => {
-        const assetId = asset.id;
-        const checkResults = await Promise.all(
-          mintsToUpdate.map(async (mint, i) => {
-            const lazyKey = lazyDistributorKey(mint)[0];
-            const mintName = mint.equals(IOT_MINT)
-              ? "iot"
-              : mint.equals(MOBILE_MINT)
-              ? "mobile"
-              : "hnt";
-            const recipient = recipientKey(lazyKey, assetId)[0];
-            const doesExist = await exists(provider, recipient);
+  mintsToUpdate.forEach((mint) => {
+    const mintName = mint.equals(IOT_MINT)
+      ? "iot"
+      : mint.equals(MOBILE_MINT)
+      ? "mobile"
+      : "hnt";
+    recipientsToUpdate[mintName] = [];
+  });
 
-            if (doesExist) {
-              return { mintName, recipient, assetId };
-            }
-            return null;
-          })
-        );
-
-        return checkResults.filter(
-          (
-            result
-          ): result is {
-            mintName: string;
-            recipient: PublicKey;
-            assetId: PublicKey;
-          } => !!result
-        );
-      })
+  const recipientChecks = assets
+    .flatMap((asset) =>
+      mintsToUpdate.map((mint) => ({
+        mint,
+        assetId: asset.id,
+        lazyKey: lazyDistributorKey(mint)[0],
+        mintName: mint.equals(IOT_MINT)
+          ? "iot"
+          : mint.equals(MOBILE_MINT)
+          ? "mobile"
+          : "hnt",
+      }))
     )
-  ).flat();
+    .map(async ({ assetId, lazyKey, mintName }) => {
+      const recipient = recipientKey(lazyKey, assetId)[0];
+      const acc = await lazyProgram.account.recipientV0.fetchNullable(
+        recipient
+      );
 
-  for (const { mintName, recipient, assetId } of recipients) {
-    if (!recipientsToUpdate[mintName]) {
-      recipientsToUpdate[mintName] = [];
-    }
+      if (acc && acc.destination.toBase58() !== destination.toBase58()) {
+        recipientsToUpdate[mintName].push({ recipient, asset: assetId });
+      }
+    });
 
-    const recipientAcc = await lazyProgram.account.recipientV0.fetch(recipient);
+  await Promise.all(recipientChecks);
 
-    if (recipientAcc.destination.toBase58() !== destination.toBase58()) {
-      recipientsToUpdate[mintName].push({ recipient, asset: assetId });
-    }
-  }
+  if (argv.commit) {
+    try {
+      const instructions = await Promise.all(
+        Object.values(recipientsToUpdate)
+          .flat()
+          .map(async ({ recipient, asset }) => {
+            const {
+              asset: {
+                ownership: { owner },
+              },
+              args,
+              accounts,
+              remainingAccounts,
+            } = await proofArgsAndAccounts({
+              connection: provider.connection,
+              assetId: asset,
+            });
 
-  for (const [mintName, recipients] of Object.entries(recipientsToUpdate)) {
-    if (argv.commit) {
-      try {
-        const instructions: TransactionInstruction[] = [];
-        for (const { recipient, asset } of recipients) {
-          const {
-            asset: {
-              ownership: { owner },
-            },
-            args,
-            accounts,
-            remainingAccounts,
-          } = await proofArgsAndAccounts({
-            connection: provider.connection,
-            assetId: asset,
-          });
-
-          instructions.push(
-            await lazyProgram.methods
+            return lazyProgram.methods
               .updateCompressionDestinationV0({
                 ...args,
               })
@@ -239,50 +222,40 @@ export async function run(args: any = process.argv) {
                   destination == null ? PublicKey.default : destination,
               })
               .remainingAccounts(remainingAccounts)
-              .instruction()
-          );
-        }
-
-        const transactions = await batchInstructionsToTxsWithPriorityFee(
-          provider,
-          instructions,
-          { useFirstEstimateForAll: true }
-        );
-
-        await bulkSendTransactions(
-          provider,
-          transactions,
-          console.log,
-          10,
-          [],
-          100
-        );
-      } catch (e) {
-        console.log("Failed to update recipients", e);
-        process.exit(1);
-      }
-    } else {
-      console.log(
-        `Would update ${
-          recipients.length
-        } recipients for ${mintName.toUpperCase()} to destination ${destination.toBase58()}`
+              .instruction();
+          })
       );
+
+      const transactions = await batchInstructionsToTxsWithPriorityFee(
+        provider,
+        instructions,
+        { useFirstEstimateForAll: true }
+      );
+
+      await bulkSendTransactions(
+        provider,
+        transactions,
+        console.log,
+        10,
+        [],
+        100
+      );
+    } catch (e) {
+      console.log("Failed to update recipients", e);
+      process.exit(1);
     }
-
-    console.log(`Finished processing ${mintName.toUpperCase()} recipients`);
-  }
-
-  if (!argv.commit) {
+  } else {
     console.log("\nSummary:");
     for (const [mintName, recipients] of Object.entries(recipientsToUpdate)) {
       console.log(
-        `- ${mintName.toUpperCase()}: ${recipients.length} recipients`
+        `- ${mintName.toUpperCase()}: ${
+          recipients.length
+        } recipients to destination ${destination.toBase58()}`
       );
     }
+
     console.log(
       "\nDry run completed. Use --commit flag to execute the updates."
     );
-  } else {
-    console.log("\nUpdates committed to chain.");
   }
 }
