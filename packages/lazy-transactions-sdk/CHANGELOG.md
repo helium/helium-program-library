@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.34](https://github.com/helium/helium-program-libary/compare/v0.9.33...v0.9.34) (2025-04-03)
+
+**Note:** Version bump only for package @helium/lazy-transactions-sdk
+
+
+
+
+
 ## [0.9.33](https://github.com/helium/helium-program-libary/compare/v0.9.32...v0.9.33) (2025-03-28)
 
 **Note:** Version bump only for package @helium/lazy-transactions-sdk
