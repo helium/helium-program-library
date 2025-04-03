@@ -2,19 +2,30 @@
 set -e
 
 DATA_DIR="/geocoder_service/data"
+ES_INDEX_DIR="${DATA_DIR}/elasticsearch"
+USER_AGENT="docker: helium/geocoder-service"
+DOWNLOAD_URL="http://download1.graphhopper.com/public/photon-db-latest.tar.bz2"
 
 # Download elasticsearch index
-if [ ! -d "${DATA_DIR}/elasticsearch" ]; then
-    # Let graphhopper know where the traffic is coming from
-    USER_AGENT="docker: helium/geocoder-service"
+if [ ! -d "${ES_INDEX_DIR}" ]; then
     echo "Downloading search index..."
-    wget --user-agent="$USER_AGENT" -O - http://download1.graphhopper.com/public/photon-db-latest.tar.bz2 | pbzip2 -cd | tar x
+    if ! wget -q --show-progress --user-agent="${USER_AGENT}" -O - "${DOWNLOAD_URL}" | pbzip2 -cd | tar x; then
+        echo "Error: Failed to download or extract the search index."
+        exit 1
+    fi
+
+    # Verify the index was extracted properly
+    if [ ! -d "${ES_INDEX_DIR}" ]; then
+        echo "Error: Search index extraction failed."
+        exit 1
+    fi
 fi
 
-# Start photon if elastic index exists
-if [ -d "${DATA_DIR}/elasticsearch" ]; then
+# Start service if elastic index exists
+if [ -d "${ES_INDEX_DIR}" ]; then
     echo "Starting service..."
-    java -jar photon.jar $@
+    exec java -jar photon.jar "$@"
 else
     echo "Could not start service, the search index could not be found"
+    exit 1
 fi
