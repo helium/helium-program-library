@@ -25,4 +25,3 @@ lazy-distributor = { workspace = true, features = ["cpi"] }
 helium-entity-manager = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
-
