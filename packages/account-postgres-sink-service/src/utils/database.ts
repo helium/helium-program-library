@@ -71,6 +71,9 @@ Cursor.init(
       type: STRING,
       primaryKey: true,
     },
+    blockHeight: {
+      type: STRING,
+    },
   },
   {
     sequelize: database,

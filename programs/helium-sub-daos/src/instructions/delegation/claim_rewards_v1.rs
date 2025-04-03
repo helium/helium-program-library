@@ -7,11 +7,12 @@ use anchor_spl::{
 };
 use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
-  CircuitBreaker, TransferArgsV0,
+  AccountWindowedCircuitBreakerV0, CircuitBreaker, TransferArgsV0,
 };
 use voter_stake_registry::{
+  cpi::{accounts::ClearRecentProposalsV0, clear_recent_proposals_v0},
   state::{PositionV0, Registrar},
-  VoterStakeRegistry,
+  ClearRecentProposalsArgsV0, VoterStakeRegistry,
 };
 
 use crate::{current_epoch, dao_seeds, error::ErrorCode, state::*, TESTING};
@@ -27,6 +28,7 @@ const TUKTUK_SIGNER_KEY: Pubkey = pubkey!("8m6iyXwcu8obaXdqKwzBqHE5HM2tRZZfSXV5q
 #[instruction(args: ClaimRewardsArgsV0)]
 pub struct ClaimRewardsV1<'info> {
   #[account(
+    mut,
     seeds = [b"position".as_ref(), mint.key().as_ref()],
     seeds::program = vsr_program.key(),
     bump = position.bump_seed,
@@ -44,11 +46,13 @@ pub struct ClaimRewardsV1<'info> {
   pub position_token_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: By constraint
   #[account(
-    constraint = position_authority.is_signer && (position_authority.key() == payer.key()) || payer.key() == TUKTUK_SIGNER_KEY
+    constraint = (position_authority.is_signer && position_authority.key() == payer.key()) || payer.key() == TUKTUK_SIGNER_KEY
   )]
   pub position_authority: AccountInfo<'info>,
+  #[account(mut)]
   pub registrar: Box<Account<'info, Registrar>>,
   #[account(
+    mut,
     has_one = registrar,
     has_one = hnt_mint,
     has_one = delegator_pool,
@@ -64,15 +68,16 @@ pub struct ClaimRewardsV1<'info> {
     mut,
     has_one = sub_dao,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
-    bump,
+    bump = delegated_position.bump_seed,
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
 
+  #[account(mut)]
   pub hnt_mint: Box<Account<'info, Mint>>,
 
   #[account(
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
-    bump,
+    bump = dao_epoch_info.bump_seed,
     // Ensure that a pre HIP-138 claim can't accidentally be done.
     constraint = dao_epoch_info.delegation_rewards_issued > 0,
     constraint = dao_epoch_info.done_issuing_rewards @ ErrorCode::EpochNotClosed
@@ -93,9 +98,9 @@ pub struct ClaimRewardsV1<'info> {
     mut,
     seeds = ["account_windowed_breaker".as_bytes(), delegator_pool.key().as_ref()],
     seeds::program = circuit_breaker_program.key(),
-    bump
+    bump = delegator_pool_circuit_breaker.bump_seed,
   )]
-  pub delegator_pool_circuit_breaker: AccountInfo<'info>,
+  pub delegator_pool_circuit_breaker: Box<Account<'info, AccountWindowedCircuitBreakerV0>>,
 
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
@@ -121,7 +126,7 @@ impl<'info> ClaimRewardsV1<'info> {
 
   fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
     let cpi_accounts = Burn {
-      mint: self.mint.to_account_info(),
+      mint: self.hnt_mint.to_account_info(),
       authority: self.position_authority.to_account_info(),
       from: self.delegator_ata.to_account_info(),
     };
@@ -134,7 +139,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   // load the vehnt information
   let position = &mut ctx.accounts.position;
   let registrar = &ctx.accounts.registrar;
-  let curr_ts = registrar.clock_unix_timestamp();
+  let dao_epoch_info_ts = ctx.accounts.dao_epoch_info.start_ts();
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
 
   let delegated_position = &mut ctx.accounts.delegated_position;
@@ -174,15 +179,38 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
 
   delegated_position.set_claimed(args.epoch)?;
 
-  let first_ts = ctx.accounts.dao.recent_proposals.last().unwrap().ts;
-  let last_ts = ctx.accounts.dao.recent_proposals.first().unwrap().ts;
-  ctx
+  let first_ts = ctx
     .accounts
-    .delegated_position
-    .remove_proposals_older_than(first_ts - 1);
+    .dao_epoch_info
+    .recent_proposals
+    .last()
+    .unwrap()
+    .ts;
+  clear_recent_proposals_v0(
+    CpiContext::new_with_signer(
+      ctx.accounts.vsr_program.to_account_info(),
+      ClearRecentProposalsV0 {
+        position: ctx.accounts.position.to_account_info(),
+        registrar: ctx.accounts.registrar.to_account_info(),
+        dao: ctx.accounts.dao.to_account_info(),
+      },
+      &[dao_seeds!(ctx.accounts.dao)],
+    ),
+    ClearRecentProposalsArgsV0 {
+      ts: first_ts,
+      dao_bump: ctx.accounts.dao.bump_seed,
+    },
+  )?;
+  let last_ts = ctx
+    .accounts
+    .dao_epoch_info
+    .recent_proposals
+    .first()
+    .unwrap()
+    .ts;
   let proposal_set = ctx
     .accounts
-    .delegated_position
+    .position
     .recent_proposals
     .iter()
     .filter(|p| p.ts <= last_ts)
@@ -192,17 +220,17 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   // Check eligibility based on recent proposals
   let eligible_count = ctx
     .accounts
-    .dao
+    .dao_epoch_info
     .recent_proposals
     .iter()
     .filter(|&proposal| {
-      proposal_set.contains(&proposal.proposal) || proposal.is_in_progress(curr_ts)
+      proposal_set.contains(&proposal.proposal) || proposal.is_in_progress(dao_epoch_info_ts)
     })
     .count();
-  let not_four_proposals = ctx.accounts.dao.recent_proposals.len() < 4
+  let not_four_proposals = ctx.accounts.dao_epoch_info.recent_proposals.len() < 4
     || ctx
       .accounts
-      .dao
+      .dao_epoch_info
       .recent_proposals
       .iter()
       .filter(|p| p.proposal != Pubkey::default())
@@ -224,8 +252,8 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   if !not_four_proposals && eligible_count < 2 {
     msg!(
       "Position is not eligible, burning rewards. Position proposals {:?}, recent proposals {:?}",
-      ctx.accounts.delegated_position.recent_proposals,
-      ctx.accounts.dao.recent_proposals
+      ctx.accounts.position.recent_proposals,
+      ctx.accounts.dao_epoch_info.recent_proposals
     );
     burn(ctx.accounts.burn_ctx(), amount)?;
   }

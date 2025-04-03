@@ -86,6 +86,7 @@ pub fn handler(
 ) -> Result<()> {
   let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
   let curr_epoch = current_epoch(Clock::get()?.unix_timestamp);
+  ctx.accounts.dao_epoch_info.recent_proposals = ctx.accounts.dao.recent_proposals.clone();
 
   // Set total rewards, accounting for net emmissions by counting
   // burned hnt since last supply setting.
