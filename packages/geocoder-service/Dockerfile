@@ -12,7 +12,7 @@ ADD https://github.com/komoot/photon/releases/download/0.6.2/photon-0.6.2.jar /p
 COPY entrypoint.sh ./entrypoint.sh
 
 VOLUME /photon/photon_data
-EXPOSE 2322
+EXPOSE 8000
 
 RUN chmod +x /photon/entrypoint.sh
 ENTRYPOINT ["/photon/entrypoint.sh"]
