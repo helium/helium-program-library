@@ -6,7 +6,7 @@ PHOTON_DATA_DIR="/photon/photon_data"
 # Download elasticsearch index
 if [ ! -d "${PHOTON_DATA_DIR}/elasticsearch" ]; then
     # Let graphhopper know where the traffic is coming from
-    USER_AGENT="docker: helium/photon-geocoder"
+    USER_AGENT="docker: helium/geocoder-service"
     echo "Downloading search index..."
     wget --user-agent="$USER_AGENT" -O - http://download1.graphhopper.com/public/photon-db-latest.tar.bz2 | pbzip2 -cd | tar x
 fi
