@@ -1,7 +1,7 @@
 ## Search
 
 ```
-http://localhost:2322/api?q=berlin
+http://localhost:8000/api?q=berlin
 ```
 
 _For more details on the API check the photon [github repository](https://github.com/komoot/photon)._
