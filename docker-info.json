@@ -13,7 +13,8 @@
     "account-postgres-sink-service": "./packages/account-postgres-sink-service",
     "crons": "./packages/crons",
     "rewards-oracle-faucet-service": "./packages/rewards-oracle-faucet-service",
-    "entity-invalidator": "./packages/entity-invalidator"
+    "entity-invalidator": "./packages/entity-invalidator",
+    "geocoder-service": "./packages/geocoder-service"
   },
   "oracle": {
     "distributor-oracle": "./packages/distributor-oracle"
