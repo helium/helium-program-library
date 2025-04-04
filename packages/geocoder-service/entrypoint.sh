@@ -18,7 +18,7 @@ fi
 # Start service if elastic index exists
 if [ -d "${ES_INDEX_DIR}" ]; then
     echo "Starting service..."
-    exec java -jar photon.jar -data-dir="${DATA_DIR}" "$@"
+    exec java -jar photon.jar -listen-port=8000 -data-dir="${DATA_DIR}" "$@"
 else
     echo "Could not start service, the search index could not be found"
     exit 1
