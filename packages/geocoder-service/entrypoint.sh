@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DATA_DIR="/geocoder_service/data"
+DATA_DIR="/usr/src/app/photon_data"
 ES_INDEX_DIR="${DATA_DIR}/elasticsearch"
 USER_AGENT="docker: helium/geocoder-service"
 DOWNLOAD_URL="http://download1.graphhopper.com/public/photon-db-latest.tar.bz2"

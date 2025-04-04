@@ -6,12 +6,12 @@ RUN apt-get update \
         wget \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /photon
-ADD https://github.com/komoot/photon/releases/download/0.6.2/photon-0.6.2.jar /photon/photon.jar
-COPY entrypoint.sh ./entrypoint.sh
+WORKDIR /usr/src/app
+ADD https://github.com/komoot/photon/releases/download/0.6.2/photon-0.6.2.jar /usr/src/app/photon.jar
+COPY entrypoint.sh /usr/src/app/entrypoint.sh
 
-VOLUME /photon/photon_data
+VOLUME /usr/src/app/photon_data
 EXPOSE 8000
 
-RUN chmod +x /photon/entrypoint.sh
-ENTRYPOINT ["/photon/entrypoint.sh"]
+RUN chmod +x /usr/src/app/entrypoint.sh
+ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
