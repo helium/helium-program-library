@@ -13,12 +13,6 @@ if [ ! -d "${ES_INDEX_DIR}" ]; then
         echo "Error: Failed to download or extract the search index."
         exit 1
     fi
-
-    # Verify the index was extracted properly
-    if [ ! -d "${ES_INDEX_DIR}" ]; then
-        echo "Error: Search index extraction failed."
-        exit 1
-    fi
 fi
 
 # Start service if elastic index exists
