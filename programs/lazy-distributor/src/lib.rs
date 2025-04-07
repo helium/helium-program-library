@@ -112,6 +112,12 @@ pub mod lazy_distributor {
   ) -> Result<()> {
     temp_update_matching_destination::handler(ctx)
   }
+
+  pub fn temp_update_free_subscriber_recipient(
+    ctx: Context<TempUpdateFreeSubscriberRecipient>,
+  ) -> Result<()> {
+    temp_update_free_subscriber_recipient::handler(ctx)
+  }
 }
 
 #[derive(Accounts)]
