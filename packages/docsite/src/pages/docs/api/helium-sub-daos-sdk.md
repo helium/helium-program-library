@@ -544,6 +544,10 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 ## Accounts
 
+### AccountWindowedCircuitBreakerV0
+
+undefined
+
 ### DaoEpochInfoV0
 
 undefined
@@ -585,6 +589,17 @@ undefined
 undefined
 
 ## Types
+
+### AccountWindowedCircuitBreakerV0
+
+| Field         | Type            |
+| ------------- | --------------- |
+| token_account | pubkey          |
+| authority     | pubkey          |
+| owner         | pubkey          |
+| config        | [object Object] |
+| last_window   | [object Object] |
+| bump_seed     | u8              |
 
 ### AdminSetDcOnboardingFeesPaidArgs
 

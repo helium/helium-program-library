@@ -216,7 +216,7 @@ export async function run(args: any = process.argv) {
               .updateCompressionDestinationV0({
                 ...args,
               })
-              .accounts({
+              .accountsPartial({
                 ...accounts,
                 owner,
                 recipient,
