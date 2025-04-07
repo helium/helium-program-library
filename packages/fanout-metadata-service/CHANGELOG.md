@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.4](https://github.com/helium/helium-program-libary/compare/v0.10.3...v0.10.4) (2025-04-07)
+
+**Note:** Version bump only for package @helium/fanout-metadata-service
+
+
+
+
+
 ## [0.10.3](https://github.com/helium/helium-program-libary/compare/v0.10.2...v0.10.3) (2025-03-25)
 
 **Note:** Version bump only for package @helium/fanout-metadata-service
