@@ -8,6 +8,7 @@ declare module "fastify" {
       integrityCheckCounter: Counter;
       accountWebhookCounter: Counter;
       transactionWebhookCounter: Counter;
+      staleCursorCounter: Counter;
     };
   }
 }
@@ -30,9 +31,15 @@ export const metrics = fp(async (fastify, _opts) => {
     help: "Number of times transaction-webhook was hit",
   });
 
+  const staleCursorCounter = new fastify.metrics.client.Counter({
+    name: "stale_cursor_count",
+    help: "Number of times a cursor has been stale",
+  });
+
   fastify.customMetrics = {
     integrityCheckCounter,
     accountWebhookCounter,
     transactionWebhookCounter,
+    staleCursorCounter,
   };
 });

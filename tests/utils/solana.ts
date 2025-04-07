@@ -1,5 +1,10 @@
 import { Provider } from "@coral-xyz/anchor";
-import { SYSVAR_CLOCK_PUBKEY, Keypair, Connection, PublicKey } from "@solana/web3.js";
+import {
+  SYSVAR_CLOCK_PUBKEY,
+  Keypair,
+  Connection,
+  PublicKey,
+} from "@solana/web3.js";
 import fs from "fs";
 
 export async function getUnixTimestamp(provider: Provider): Promise<bigint> {

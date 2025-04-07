@@ -23,7 +23,11 @@ import {
 import { TransactionCompletionQueue } from "@helium/account-fetch-cache";
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
-import { estimatePrioritizationFee, MAX_PRIO_FEE, withPriorityFees } from "./priorityFees";
+import {
+  estimatePrioritizationFee,
+  MAX_PRIO_FEE,
+  withPriorityFees,
+} from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
@@ -796,6 +800,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     maxTxSize = 1232,
     extraSigners = [],
     useFirstEstimateForAll = false,
+    maxInstructionsPerTx,
   }: {
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
@@ -809,6 +814,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
     // Instead of populating priority fee and compute per tx, just use the same prio fee and compute
     // for all txs. Only use this if all instructions are roughly the same.
     useFirstEstimateForAll?: boolean;
+    // Optional parameter to limit number of instructions per transaction
+    maxInstructionsPerTx?: number;
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
@@ -841,7 +848,11 @@ export async function batchInstructionsToTxsWithPriorityFee(
       addressLookupTables,
     });
     try {
-      if (tx.serialize().length + 64 * tx.signatures.length > maxTxSize) {
+      if (
+        tx.serialize().length + 64 * tx.signatures.length > maxTxSize ||
+        (maxInstructionsPerTx &&
+          currentTxInstructions.length > maxInstructionsPerTx)
+      ) {
         throw new Error("encoding overruns Uint8Array");
       }
     } catch (e: any) {

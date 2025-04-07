@@ -1,7 +1,6 @@
 [package]
 name = "helium-sub-daos"
-version = "0.2.20"
-# Trigger deployment - timestamp: 03-31-2025 #3
+version = "0.2.25"
 description = "Created with Anchor"
 edition = "2021"
 
