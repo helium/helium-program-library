@@ -21,7 +21,7 @@ import {
 import animalHash from "angry-purple-tiger";
 import axios from "axios";
 import bs58 from "bs58";
-import Fastify, { FastifyInstance } from "fastify";
+import Fastify, { FastifyInstance, FastifyRequest } from "fastify";
 import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo } from "./model";
 import { provider } from "./solana";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
@@ -44,12 +44,15 @@ const MODEL_MAP: any = {
   "mobile": [MobileHotspotInfo, "mobile_hotspot_info"],
 }
 
-function generateAssetJson(record: KeyToAsset, keyStr: string) {
+function generateAssetJson(record: KeyToAsset, keyStr: string, request: FastifyRequest) {
   const digest = animalHash(keyStr);
   // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
   // In the future, we need to put different symbols on different types of hotspots
   const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
-  const image = `/v2/assets/${hotspotType.toLowerCase()}-hotspot.png`;
+  const origin = request.headers['x-forwarded-proto'] ?
+    `${request.headers['x-forwarded-proto']}://${request.headers.host}` :
+    `${request.protocol}://${request.headers.host}`;
+  const image = `${origin}/v2/assets/${hotspotType.toLowerCase()}-hotspot.png`;
 
   return {
     name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
@@ -127,7 +130,7 @@ async function getHotspotByKeyToAsset(request, reply) {
   const { entity_key: entityKey, key_serialization: keySerialization } = record;
   const keyStr = decodeEntityKey(entityKey, { [keySerialization]: {} });
 
-  const assetJson = generateAssetJson(record, keyStr!);
+  const assetJson = generateAssetJson(record, keyStr!, request);
 
   // Needed to make Cloudflare to cache for longer than 1 day
   reply.header("Cloudflare-CDN-Cache-Control", "max-age=31536000");  // 1 year in seconds
@@ -417,7 +420,7 @@ server.get<{ Params: { wallet: string } }>(
       const keyStr = decodeEntityKey(record.entity_key, {
         [record.key_serialization]: {},
       });
-      return generateAssetJson(record, keyStr!);
+      return generateAssetJson(record, keyStr!, request);
     });
 
     const tokens = [HNT_MINT, MOBILE_MINT, IOT_MINT, DC_MINT];
@@ -622,7 +625,7 @@ server.get<{ Params: { eccCompact: string } }>(
       return reply.code(404).send(error);
     }
 
-    const assetJson = generateAssetJson(record, eccCompact);
+    const assetJson = generateAssetJson(record, eccCompact, request);
 
     // Needed to make Cloudflare to cache for longer than 1 day
     reply.header("Cloudflare-CDN-Cache-Control", "max-age=31536000");  // 1 year in seconds
