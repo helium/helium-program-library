@@ -28,7 +28,7 @@
   "scripts": {
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
-    "copy-assets": "mkdir -p lib/esm/src/assets && cp -r src/assets/* lib/esm/src/assets/ && mkdir -p lib/cjs/assets && cp -r src/assets/* lib/cjs/assets/",
+    "copy-assets": "mkdir -p lib/esm/src/assets && cp -r src/assets/* lib/esm/src/assets/ && mkdir -p lib/cjs/assets && cp -r src/assets/* lib/cjs/assets/ && mkdir -p lib/src/assets && cp -r src/assets/* lib/src/assets/",
     "build": "tsc -p tsconfig.json && npm run copy-assets",
     "start": "node lib/esm/index.js",
     "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts"
