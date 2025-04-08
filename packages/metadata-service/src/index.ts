@@ -52,7 +52,7 @@ function generateAssetJson(record: KeyToAsset, keyStr: string, request: FastifyR
   const origin = request.headers['x-forwarded-proto'] ?
     `${request.headers['x-forwarded-proto']}://${request.headers.host}` :
     `${request.protocol}://${request.headers.host}`;
-  const image = `${origin}/v2/assets/${hotspotType.toLowerCase()}-hotspot.png`;
+  const image = `${origin}/v2/assets/hotspot-${hotspotType.toLowerCase()}.png`;
 
   return {
     name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
