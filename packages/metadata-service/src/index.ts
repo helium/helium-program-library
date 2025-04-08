@@ -44,15 +44,22 @@ const MODEL_MAP: any = {
   "mobile": [MobileHotspotInfo, "mobile_hotspot_info"],
 }
 
+export function getOrigin(request: FastifyRequest): string {
+  const host = request.headers['x-forwarded-host'] || request.hostname;
+  const protocol = request.headers['x-forwarded-proto'] || request.protocol || 'https';
+  return `${protocol}://${host}`;
+}
+
+export function getAssetUrl(request: FastifyRequest, assetName: string): string {
+  return `${getOrigin(request)}/v2/assets/${assetName}`;
+}
+
 function generateAssetJson(record: KeyToAsset, keyStr: string, request: FastifyRequest) {
   const digest = animalHash(keyStr);
   // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
   // In the future, we need to put different symbols on different types of hotspots
   const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
-  const origin = request.headers['x-forwarded-proto'] ?
-    `${request.headers['x-forwarded-proto']}://${request.headers.host}` :
-    `${request.protocol}://${request.headers.host}`;
-  const image = `${origin}/v2/assets/hotspot-${hotspotType.toLowerCase()}.png`;
+  const image = getAssetUrl(request, `hotspot-${hotspotType.toLowerCase()}.png`);
 
   return {
     name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
@@ -220,6 +227,42 @@ server.register(fastifyStatic, {
 server.get("/health", async () => {
   return { ok: true };
 });
+
+server.get("/v2/tokens/hnt", async (request) => {
+  return {
+    "name": "Helium Network Token",
+    "symbol": "HNT",
+    "description": "https://helium.com",
+    "image": getAssetUrl(request, "hnt.png")
+  }
+})
+
+server.get("/v2/tokens/mobile", async (request) => {
+  return {
+    "name": "Helium MOBILE",
+    "symbol": "MOBILE",
+    "description": "https://helium.com",
+    "image": getAssetUrl(request, "mobile.png")
+  }
+})
+
+server.get("/v2/tokens/iot", async (request) => {
+  return {
+    "name": "Helium IOT",
+    "symbol": "IOT",
+    "description": "https://helium.com",
+    "image": getAssetUrl(request, "iot.png")
+  }
+})
+
+server.get("/v2/tokens/dc", async (request) => {
+  return {
+    "name": "Helium Data Credits",
+    "symbol": "DC",
+    "description": "https://helium.com",
+    "image": getAssetUrl(request, "dc.png")
+  }
+})
 
 server.get("/v2/merkles", async () => {
   return {
