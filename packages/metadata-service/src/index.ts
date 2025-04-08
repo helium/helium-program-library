@@ -1,5 +1,6 @@
 import { BN, Program } from "@coral-xyz/anchor";
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
 import Address from "@helium/address/build/Address";
 import {
   decodeEntityKey,
@@ -20,8 +21,7 @@ import {
 import animalHash from "angry-purple-tiger";
 import axios from "axios";
 import bs58 from "bs58";
-import Fastify, { FastifyInstance } from "fastify";
-import { SHDW_DRIVE_URL } from "./constants";
+import Fastify, { FastifyInstance, FastifyRequest } from "fastify";
 import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo } from "./model";
 import { provider } from "./solana";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
@@ -44,20 +44,15 @@ const MODEL_MAP: any = {
   "mobile": [MobileHotspotInfo, "mobile_hotspot_info"],
 }
 
-function generateAssetJson(record: KeyToAsset, keyStr: string) {
+function generateAssetJson(record: KeyToAsset, keyStr: string, request: FastifyRequest) {
   const digest = animalHash(keyStr);
   // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
   // In the future, we need to put different symbols on different types of hotspots
   const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
-  const image = `${SHDW_DRIVE_URL}/${
-    hotspotType === "MOBILE"
-      ? record?.mobile_hotspot_info?.is_active
-        ? "mobile-hotspot-active.png"
-        : "mobile-hotspot.png"
-      : record?.iot_hotspot_info?.is_active
-      ? "hotspot-active.png"
-      : "hotspot.png"
-  }`;
+  const origin = request.headers['x-forwarded-proto'] ?
+    `${request.headers['x-forwarded-proto']}://${request.headers.host}` :
+    `${request.protocol}://${request.headers.host}`;
+  const image = `${origin}/v2/assets/${hotspotType.toLowerCase()}-hotspot.png`;
 
   return {
     name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
@@ -115,7 +110,7 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
 async function getHotspotByKeyToAsset(request, reply) {
   program = program || (await init(provider));
   const { keyToAssetKey } = request.params;
-  
+
   const record = await KeyToAsset.findOne({
     where: {
       address: keyToAssetKey,
@@ -135,7 +130,7 @@ async function getHotspotByKeyToAsset(request, reply) {
   const { entity_key: entityKey, key_serialization: keySerialization } = record;
   const keyStr = decodeEntityKey(entityKey, { [keySerialization]: {} });
 
-  const assetJson = generateAssetJson(record, keyStr!);
+  const assetJson = generateAssetJson(record, keyStr!, request);
 
   // Needed to make Cloudflare to cache for longer than 1 day
   reply.header("Cloudflare-CDN-Cache-Control", "max-age=31536000");  // 1 year in seconds
@@ -218,8 +213,66 @@ const server: FastifyInstance = Fastify({
 server.register(cors, {
   origin: "*",
 });
+server.register(fastifyStatic, {
+  root: __dirname + "/assets",
+  prefix: "/v2/assets/",
+});
 server.get("/health", async () => {
   return { ok: true };
+});
+
+server.get("/v2/merkles", async () => {
+  return {
+    "2Jwd1qm2LMSrG8bxQ4ikXzvmgm74mZnrBVvq8DSMVUUU": 13,
+    "EBxGnvhdHnL8U3fKh1JmKNADCiupgwaHHGRjZwExnope": 11,
+    "GHYFhNyiqSPxu3q2a5ENs42iV1zRCfcjCiE7TmzNxni3": 14,
+    "BUnvyMc6oi8iqmyYtyhwEDfyd1i28v77jDjJBfap1UV3": 13,
+    "GtXtQrbFNinhizKuP3QByoAv4jRHWvgBRZVHHbHGgwN2": 12,
+    "4XXCnN2d1kzmhnX7j5w9nAH68oJyA2XjEGVrLHd459tu": 0,
+    "E7JbdYSZLvVmqvw6XfEwNQCEAybTF6E1mnrHUXw8hXDV": 15,
+    "C9UKRDvtRhXnkqHK1Ba2fpzK2Cwu94JzSdhHLBy8Je1i": 11,
+    "8wKvdzBu2kEG5T3maJBX8m2gLs4XFavXzCKiZcGVeS8T": 11,
+    "EMoaRr4VozEnY6WKA14Jmhkp5bkPEDJhxYFY4ZCwgRWm": 15,
+    "H1AsZuvhDZyqWu8PZtaWMcKnvMEuSiBXocKh8avXdmAj": 12,
+    "8ESPyS65YfWXt79cSWUvCkwQaNALRKv7cKWXczC2oiB5": 11,
+    "Buto1H4vq8bnxfq8Va5N1krr3wAXSfA4UZ3wk76R7muC": 16,
+    "9FfEgLMXRH8aQn77bBZ4v9HbTKg1dcLVzHvhXVyE1jZ3": 11,
+    "FMMeuTgrSLTpnscdp5Sh7wtsf84X6RQzrAyUwdyViWBG": 14,
+    "AuJT6Vw2YHAYRWV7wwYuYwQWnhHjzv973cgZR1LC36cp": 14,
+    "EQ92UMxgeCcbJ4VQ9uSmZ28FK9S4q1KxwwuKcXohrNtJ": 11,
+    "C23NdwvbYs1Q4WCjPrjvTzzFSCeVENqkEj8BXJd6rZD1": 14,
+    "5woUW7E5paakGqS5NfitiW3T8VdPuHxeiKrwKqv6wNDM": 13,
+    "BqbVsb1wNpH9CtMM9xRsbKC11hMTWZBSyvdW5rK3Mq1L": 0,
+    "4kYR34KvQsx7qTio4cTwFvbAo6WhuaCKnM4Bf9Dfaqo6": 11,
+    "C9gqeeZZFMUFQBZ2X6MoFVn1sUhphkwQ4BKwGqktu9RR": 17,
+    "73vVondUFfaGUYBTBXHYrqus65yBH7rdwVYCnek8zTCp": 11,
+    "6LFMZiVPkUnc9EVta3sgL8XzE1qdzzavbnTytMCooLzX": 11,
+    "9Yn32WbXK8JTVFpx5CGFrPKqbeQ7LE1UZi5bG7k9P4Rv": 14,
+    "3vMhiyqFZsBEzTBCWgg1cHwysoVySG3GZ92E97U8RppG": 13,
+    "8UhsYMot5TtpDdYjQdaNG7rTjVLZ3S4wM687mn3Vgj9W": 11,
+    "F9JbUcxPbe7UzEPvsFCkgcvMXnD6JDt9kYLiXRzEwyJY": 12,
+    "8VVgKpqJvNFZRMD3Jnv4QQUH8vVe8FLmNoP37hs45iBy": 2,
+    "BPUkacznTsDJQVpGZxoU13SXmpfxA7jnHm7CjHRwc85d": 11,
+    "89YtRsRDvzbFYho7XjRU88fpHbaXqzZQSXpcbbBQ8pJv": 11,
+    "Di82cwgeGPAPoP8mLjnWSWB7XJpw9fmNir47McqXeVi6": 12,
+    "9kcHNYioRNWC1SzSL5NuJHNQrVPcqhHDmrecy7Z1wbKV": 12,
+    "8nyQLJWp3nyF73fqmKvonLaZSW4sqDnuqepjQp4vYYxi": 16,
+    "FvQWyPz6LnxpvKSqj4dJuPfYRvtz1x8aWg6bCW7zmRWH": 11,
+    "6MTM2BF6dGgq56xC3MChJwboP6SkXZdPi1BDkatTjL8D": 15,
+    "FtCvpg3mgCfoBZtcoEswUAcHApFnHeoRspc7RPvTZBmL": 11,
+    "2s1TWjRJLjDsJanC5KfRkSoh9gri9REcE5ZkdGxfcb7m": 11,
+    "2EeAouaXGsbgKVj9ictoePhe2hd416wjM2AWFaXAAzzE": 11,
+    "2QJyU5LHWfYxWm9cs28Nu4xB6Pc7jR9DNm3qQMKsJARa": 11,
+    "AkWgEecGzLfc55vB9mHSNoeHbfJcmALEDbBR3mrr5yez": 11,
+    "3ipgGZz1bWq9pY5eUpfyBVLJQwWjFBsWJxpykXJF3CyM": 11,
+    "97puk7SuvRavuVNVn6p9d5kekQGf8qmPmNexuxiXY9Yx": 14,
+    "6HHTCDfdgq7YguEf7cff4dGHzqgaq8Q3QhVppv1jy6Zz": 12,
+    "3eF7v7My6zNSyU8ctcUXBbY15fsTEdPPgZ38ib6ijZBV": 14,
+    "6LvYRfeLm5pZaYqC8jqvcvySg7nXUEdmUXxVXSg8YF3G": 12,
+    "EziNojucYkoN5AXPAMXhmUUHiLsUp1nL3BM9gPqsFBRU": 11,
+    "9YgvHbCTrRCvBd6ZEMsMAFBmk2SkWkySdYPK98y34F9S": 17,
+    "J53f1jfy6QGU8U3qty2MwyNPk68AoybUkigeukDTj356": 11
+  }
 });
 
 server.get<{ Params: { oui: string } }>(
@@ -228,7 +281,7 @@ server.get<{ Params: { oui: string } }>(
     try {
       const client = new orgClient(RPC_HOST, credentials.createSsl());
       const rpcReq = new org_list_req_v1();
-  
+
       client.list(rpcReq, (err, resp) => {
         if (err) {
           const errMessage = {
@@ -242,7 +295,7 @@ server.get<{ Params: { oui: string } }>(
           try {
             const orgList = resp.getOrgsList();
             const orgListJson = orgList.map((org) => processOrg(org));
-    
+
             reply.header("Cloudflare-CDN-Cache-Control", "max-age=3600"); // 1 hour
             reply.send({ orgs: orgListJson });
           } catch (error: any) {
@@ -302,7 +355,7 @@ server.get<{ Params: { oui: string } }>(
           try {
             const org = resp.getOrg() as org_v1;
             const orgJson = processOrg(org);
-    
+
             reply.header("Cloudflare-CDN-Cache-Control", "max-age=3600"); // 1 hour
             reply.send(orgJson);
           } catch (error: any) {
@@ -367,7 +420,7 @@ server.get<{ Params: { wallet: string } }>(
       const keyStr = decodeEntityKey(record.entity_key, {
         [record.key_serialization]: {},
       });
-      return generateAssetJson(record, keyStr!);
+      return generateAssetJson(record, keyStr!, request);
     });
 
     const tokens = [HNT_MINT, MOBILE_MINT, IOT_MINT, DC_MINT];
@@ -498,8 +551,8 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
     const lastItemAsset = lastItem[lastItemTable]?.asset;
     const lastItemDate = lastItem[lastItemTable]?.created_at.toISOString();
     const isLastPage = ktas.length < PAGE_SIZE;
-    const nextCursor = isLastPage 
-      ? null 
+    const nextCursor = isLastPage
+      ? null
       : `${lastItemAsset}|${lastItemDate}`;
 
     let result = {
@@ -523,7 +576,7 @@ server.get<{ Querystring: { subnetwork: string; cursor?: string; } }>(
       reply.header("Cloudflare-CDN-Cache-Control", "max-age=86400");  // 1 day in seconds
 
     }
-    
+
     return result;
   }
 );
@@ -572,7 +625,7 @@ server.get<{ Params: { eccCompact: string } }>(
       return reply.code(404).send(error);
     }
 
-    const assetJson = generateAssetJson(record, eccCompact);
+    const assetJson = generateAssetJson(record, eccCompact, request);
 
     // Needed to make Cloudflare to cache for longer than 1 day
     reply.header("Cloudflare-CDN-Cache-Control", "max-age=31536000");  // 1 year in seconds
