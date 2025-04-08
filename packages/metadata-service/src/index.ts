@@ -1,5 +1,6 @@
 import { BN, Program } from "@coral-xyz/anchor";
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
 import Address from "@helium/address/build/Address";
 import {
   decodeEntityKey,
@@ -21,7 +22,6 @@ import animalHash from "angry-purple-tiger";
 import axios from "axios";
 import bs58 from "bs58";
 import Fastify, { FastifyInstance } from "fastify";
-import { SHDW_DRIVE_URL } from "./constants";
 import { IotHotspotInfo, KeyToAsset, MobileHotspotInfo } from "./model";
 import { provider } from "./solana";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
@@ -49,14 +49,7 @@ function generateAssetJson(record: KeyToAsset, keyStr: string) {
   // HACK: If it has a long key, it's an RSA key, and this is a mobile hotspot.
   // In the future, we need to put different symbols on different types of hotspots
   const hotspotType = keyStr.length > 100 ? "MOBILE" : "IOT";
-  const image = `${SHDW_DRIVE_URL}/${hotspotType === "MOBILE"
-      ? record?.mobile_hotspot_info?.is_active
-        ? "mobile-hotspot-active.png"
-        : "mobile-hotspot.png"
-      : record?.iot_hotspot_info?.is_active
-        ? "hotspot-active.png"
-        : "hotspot.png"
-    }`;
+  const image = `/v2/assets/${hotspotType.toLowerCase()}-hotspot.png`;
 
   return {
     name: keyStr === "iot_operations_fund" ? "IOT Operations Fund" : digest,
@@ -216,6 +209,10 @@ const server: FastifyInstance = Fastify({
 });
 server.register(cors, {
   origin: "*",
+});
+server.register(fastifyStatic, {
+  root: __dirname + "/assets",
+  prefix: "/v2/assets/",
 });
 server.get("/health", async () => {
   return { ok: true };
