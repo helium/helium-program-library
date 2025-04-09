@@ -56,6 +56,7 @@
     "@helium/spl-utils": "^0.10.6",
     "@helium/treasury-management-sdk": "^0.10.6",
     "@helium/tuktuk-sdk": "^0.0.6",
+    "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-governance": "^0.3.18",
     "@solana/spl-token": "^0.3.8",
