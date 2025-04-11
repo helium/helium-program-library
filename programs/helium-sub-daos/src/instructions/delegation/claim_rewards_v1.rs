@@ -63,7 +63,7 @@ pub struct ClaimRewardsV1<'info> {
     mut,
     has_one = dao,
   )]
-  pub sub_dao: LazyAccount<'info, SubDaoV0>,
+  pub sub_dao: Account<'info, SubDaoV0>,
   #[account(
     mut,
     has_one = sub_dao,

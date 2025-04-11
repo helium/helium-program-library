@@ -22,7 +22,7 @@ default = []
 overflow-checks = true
 
 [dependencies]
-anchor-lang = { workspace = true, features = ["lazy-account"] }
+anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 solana-zk-sdk = { workspace = true }
 mpl-token-metadata = { workspace = true }
