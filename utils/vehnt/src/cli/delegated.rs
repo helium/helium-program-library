@@ -62,7 +62,7 @@ async fn get_accounts_with_prefix(
   let helium_dao_id = Pubkey::from_str(HELIUM_DAO_ID)?;
   let mut config = RpcProgramAccountsConfig::default();
   let memcmp = RpcFilterType::Memcmp(Memcmp::new_base58_encoded(0, &input));
-  config.filters = Some(vec![RpcFilterType::DataSize(196), memcmp]);
+  config.filters = Some(vec![memcmp]);
   config.account_config.encoding = Some(UiAccountEncoding::Base64);
   let accounts = rpc_client
     .get_program_accounts_with_config(&helium_dao_id, config)
