@@ -63,7 +63,7 @@ pub struct ClaimRewardsV1<'info> {
     mut,
     has_one = dao,
   )]
-  pub sub_dao: Account<'info, SubDaoV0>,
+  pub sub_dao: LazyAccount<'info, SubDaoV0>,
   #[account(
     mut,
     has_one = sub_dao,
@@ -186,21 +186,36 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     .last()
     .unwrap()
     .ts;
-  clear_recent_proposals_v0(
-    CpiContext::new_with_signer(
-      ctx.accounts.vsr_program.to_account_info(),
-      ClearRecentProposalsV0 {
-        position: ctx.accounts.position.to_account_info(),
-        registrar: ctx.accounts.registrar.to_account_info(),
-        dao: ctx.accounts.dao.to_account_info(),
-      },
-      &[dao_seeds!(ctx.accounts.dao)],
-    ),
-    ClearRecentProposalsArgsV0 {
-      ts: first_ts,
-      dao_bump: ctx.accounts.dao.bump_seed,
-    },
-  )?;
+
+  // Only clear when we're claiming the most recent epoch. We don't want to clear proposals when we're
+  // claiming later in the bitmap but earlier claims haven't gone through yet.
+  if epoch == ctx.accounts.delegated_position.last_claimed_epoch {
+    // Only clear if there are old proposals that should be cleared.
+    if ctx
+      .accounts
+      .position
+      .recent_proposals
+      .iter()
+      .any(|p| p.ts < first_ts)
+    {
+      clear_recent_proposals_v0(
+        CpiContext::new_with_signer(
+          ctx.accounts.vsr_program.to_account_info(),
+          ClearRecentProposalsV0 {
+            position: ctx.accounts.position.to_account_info(),
+            registrar: ctx.accounts.registrar.to_account_info(),
+            dao: ctx.accounts.dao.to_account_info(),
+          },
+          &[dao_seeds!(ctx.accounts.dao)],
+        ),
+        ClearRecentProposalsArgsV0 {
+          ts: first_ts,
+          dao_bump: ctx.accounts.dao.bump_seed,
+        },
+      )?;
+    }
+  }
+
   let last_ts = ctx
     .accounts
     .dao_epoch_info
@@ -213,7 +228,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     .position
     .recent_proposals
     .iter()
-    .filter(|p| p.ts <= last_ts)
+    .filter(|p| p.ts <= last_ts && p.ts >= first_ts)
     .map(|rp| rp.proposal)
     .collect::<HashSet<_>>();
 
@@ -250,11 +265,6 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   )?;
 
   if !not_four_proposals && eligible_count < 2 {
-    msg!(
-      "Position is not eligible, burning rewards. Position proposals {:?}, recent proposals {:?}",
-      ctx.accounts.position.recent_proposals,
-      ctx.accounts.dao_epoch_info.recent_proposals
-    );
     burn(ctx.accounts.burn_ctx(), amount)?;
   }
 
