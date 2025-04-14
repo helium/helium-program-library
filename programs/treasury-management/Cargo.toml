@@ -1,6 +1,7 @@
 [package]
 name = "treasury-management"
 version = "0.2.1"
+# Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
 
@@ -9,6 +10,7 @@ crate-type = ["cdylib", "lib"]
 name = "treasury_management"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []

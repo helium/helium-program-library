@@ -128,7 +128,7 @@ export async function getRecipients(
       account,
       info: hemProgram.coder.accounts.decode<
         IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
-      >("KeyToAssetV0", account.data),
+      >("keyToAssetV0", account.data),
     }),
     true,
     false
@@ -150,7 +150,7 @@ export async function getRecipients(
       account,
       info: program.coder.accounts.decode<
         IdlAccounts<LazyDistributor>["recipientV0"]
-      >("RecipientV0", account.data),
+      >("recipientV0", account.data),
     }),
     false,
     forceRequery
@@ -339,7 +339,7 @@ export async function formBulkTransactions({
       account,
       info: lazyDistributorProgram.coder.accounts.decode<
         IdlAccounts<LazyDistributor>["recipientV0"]
-      >("RecipientV0", account.data),
+      >("recipientV0", account.data),
     }))
   ).map((x) => x?.info);
   const assetProofsById = await getAssetProofBatchFn(
@@ -387,7 +387,7 @@ export async function formBulkTransactions({
       account,
       info: heliumEntityManagerProgram!.coder.accounts.decode<
         IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
-      >("KeyToAssetV0", account.data),
+      >("keyToAssetV0", account.data),
     }),
     true,
     false
@@ -416,7 +416,7 @@ export async function formBulkTransactions({
                 currentRewards: new BN(bulkRewards.currentRewards[entityKey]),
                 oracleIndex: oracleIdx,
               })
-              .accounts({
+              .accountsPartial({
                 lazyDistributor,
                 recipient: recipientKeys[idx],
                 keyToAsset: keyToAssetK,
@@ -438,7 +438,7 @@ export async function formBulkTransactions({
         const destination = recipientAccs[idx]!.destination;
         distributeIx = await lazyDistributorProgram.methods
           .distributeCustomDestinationV0()
-          .accounts({
+          .accountsPartial({
             common: {
               payer,
               recipient: recipientKeys[idx],
@@ -615,7 +615,7 @@ export async function formTransaction({
     } else {
       initRecipientIx = await lazyDistributorProgram.methods
         .initializeRecipientV0()
-        .accounts({
+        .accountsPartial({
           lazyDistributor,
           mint: asset,
         })
@@ -631,7 +631,7 @@ export async function formTransaction({
         currentRewards: new BN(x.currentRewards),
         oracleIndex: idx,
       })
-      .accounts({
+      .accountsPartial({
         lazyDistributor,
         recipient,
         keyToAsset,
@@ -651,7 +651,7 @@ export async function formTransaction({
     instructions.push(
       await lazyDistributorProgram.methods
         .distributeCustomDestinationV0()
-        .accounts({
+        .accountsPartial({
           // @ts-ignore
           common: {
             payer,
@@ -684,7 +684,7 @@ export async function formTransaction({
   } else {
     const distributeIx = await lazyDistributorProgram.methods
       .distributeRewardsV0()
-      .accounts({
+      .accountsPartial({
         // @ts-ignore
         common: {
           payer,

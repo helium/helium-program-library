@@ -8,7 +8,7 @@ import {
   init as initNftProxy,
   proxyAssignmentKey,
 } from "@helium/nft-proxy-sdk";
-import { init as initProposal } from "@helium/proposal-sdk";
+import { init as initProposal, proposalKey } from "@helium/proposal-sdk";
 import {
   createAtaAndMint,
   createMint,
@@ -17,14 +17,6 @@ import {
   toBN,
   truthy,
 } from "@helium/spl-utils";
-import {
-  GoverningTokenConfigAccountArgs,
-  GoverningTokenType,
-  MintMaxVoteWeightSource,
-  getGovernanceProgramVersion,
-  withCreateRealm,
-  withSetRealmConfig,
-} from "@solana/spl-governance";
 import {
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
@@ -60,7 +52,7 @@ const BASELINE = 0;
 const SCALE = 100;
 const GENESIS_MULTIPLIER = 3;
 type VotingMintConfig =
-  anchor.IdlTypes<VoterStakeRegistry>["VotingMintConfigV0"];
+  anchor.IdlTypes<VoterStakeRegistry>["votingMintConfigV0"];
 
 describe("voter-stake-registry", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -73,7 +65,6 @@ describe("voter-stake-registry", () => {
   let hntMint: PublicKey;
   let realm: PublicKey;
   let proxyConfig: PublicKey | undefined;
-  let programVersion: number;
   let oneWeekFromNow: number;
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
@@ -91,45 +82,13 @@ describe("voter-stake-registry", () => {
     hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, toBN(223_000_000, 8));
 
-    programVersion = await getGovernanceProgramVersion(
-      program.provider.connection,
-      SPL_GOVERNANCE_PID
-    );
     // Create Realm
     const name = `Realm-${new Keypair().publicKey.toBase58().slice(0, 6)}`;
-    const realmAuthorityPk = me;
     let instructions: TransactionInstruction[] = [];
-    realm = await withCreateRealm(
-      instructions,
-      SPL_GOVERNANCE_PID,
-      programVersion,
-      name,
-      realmAuthorityPk,
-      hntMint,
-      me,
-      undefined,
-      MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
-      new anchor.BN(1)
-    );
-
-    await withSetRealmConfig(
-      instructions,
-      SPL_GOVERNANCE_PID,
-      programVersion,
-      realm,
-      me,
-      undefined,
-      MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
-      new anchor.BN(1),
-      new GoverningTokenConfigAccountArgs({
-        voterWeightAddin: program.programId,
-        maxVoterWeightAddin: undefined,
-        tokenType: GoverningTokenType.Liquid,
-      }),
-      undefined,
-      me
-    );
-
+    realm = await PublicKey.findProgramAddressSync(
+      [Buffer.from("governance", "utf-8"), Buffer.from(name, "utf-8")],
+      new PublicKey("hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S")
+    )[0];
     ({
       pubkeys: { proxyConfig },
     } = await proxyProgram.methods
@@ -143,7 +102,7 @@ describe("voter-stake-registry", () => {
           },
         ],
       })
-      .accounts({
+      .accountsPartial({
         authority: me,
       })
       .rpcAndKeys());
@@ -155,7 +114,7 @@ describe("voter-stake-registry", () => {
       .initializeRegistrarV0({
         positionUpdateAuthority: null,
       })
-      .accounts({
+      .accountsPartial({
         realm: realm,
         realmGoverningTokenMint: hntMint,
         proxyConfig,
@@ -185,7 +144,7 @@ describe("voter-stake-registry", () => {
           genesisVotePowerMultiplierExpirationTs: new anchor.BN(oneWeekFromNow),
           lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
         })
-        .accounts({
+        .accountsPartial({
           registrar,
           mint: hntMint,
         })
@@ -226,7 +185,7 @@ describe("voter-stake-registry", () => {
           kind,
           periods,
         })
-        .accounts({
+        .accountsPartial({
           // lock for 6 months
           collection,
           registrar,
@@ -241,7 +200,7 @@ describe("voter-stake-registry", () => {
     instructions.push(
       await program.methods
         .depositV0({ amount: toBN(lockupAmount, 8) })
-        .accounts({
+        .accountsPartial({
           registrar,
           position,
           mint: hntMint,
@@ -320,9 +279,8 @@ describe("voter-stake-registry", () => {
         })
         .rpcAndKeys();
       proposalConfig = proposalConfigK as PublicKey;
-      const {
-        pubkeys: { proposal: proposalK },
-      } = await proposalProgram.methods
+      const proposalK = proposalKey(me, Buffer.from(name, "utf-8"))[0];
+      await proposalProgram.methods
         .initializeProposalV0({
           seed: Buffer.from(name, "utf-8"),
           maxChoicesPerVoter: 1,
@@ -340,7 +298,10 @@ describe("voter-stake-registry", () => {
           ],
           tags: ["test", "tags"],
         })
-        .accounts({ proposalConfig })
+        .accountsPartial({
+          proposal: proposalK,
+          proposalConfig,
+        })
         .rpcAndKeys();
       proposal = proposalK as PublicKey;
 
@@ -352,7 +313,7 @@ describe("voter-stake-registry", () => {
             } as any,
           },
         })
-        .accounts({ proposal })
+        .accountsPartial({ proposal, proposalConfig })
         .rpc({ skipPreflight: true });
     });
 
@@ -427,7 +388,7 @@ describe("voter-stake-registry", () => {
       it("should allow me to vote with " + testCase.name, async () => {
         await program.methods
           .setTimeOffsetV0(new anchor.BN(testCase.delay * SECS_PER_DAY))
-          .accounts({ registrar })
+          .accountsPartial({ registrar })
           .rpc();
 
         const instructions: TransactionInstruction[] = [];
@@ -449,7 +410,7 @@ describe("voter-stake-registry", () => {
               (testCase.delay + testCase.fastForward) * SECS_PER_DAY
             )
           )
-          .accounts({ registrar })
+          .accountsPartial({ registrar })
           .rpc();
 
         const voteIxs = await Promise.all(
@@ -459,11 +420,14 @@ describe("voter-stake-registry", () => {
                 .voteV0({
                   choice: 0,
                 })
-                .accounts({
+                .accountsPartial({
                   registrar,
                   proposal,
+                  proposalConfig,
                   voter: depositor.publicKey,
                   position: position.position,
+                  stateController: me,
+                  onVoteHook: PublicKey.default,
                 })
                 .instruction()
           )
@@ -494,7 +458,7 @@ describe("voter-stake-registry", () => {
           .assignProxyV0({
             expirationTime: new anchor.BN(new Date().valueOf() / 1000 + 10000),
           })
-          .accounts({
+          .accountsPartial({
             proxyConfig,
             asset: mint,
             recipient: delegatee.publicKey,
@@ -511,11 +475,14 @@ describe("voter-stake-registry", () => {
           .proxiedVoteV0({
             choice: 0,
           })
-          .accounts({
+          .accountsPartial({
             proposal,
             position,
             voter: delegatee.publicKey,
             proxyAssignment,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .signers([delegatee])
           .rpcAndKeys({ skipPreflight: true });
@@ -531,12 +498,15 @@ describe("voter-stake-registry", () => {
           .proxiedRelinquishVoteV0({
             choice: 0,
           })
-          .accounts({
+          .accountsPartial({
             mint,
             proposal,
             position,
             voter: delegatee.publicKey,
             proxyAssignment,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .signers([delegatee])
           .rpc({ skipPreflight: true });
@@ -568,11 +538,14 @@ describe("voter-stake-registry", () => {
           .proxiedVoteV0({
             choice: 0,
           })
-          .accounts({
+          .accountsPartial({
             proposal,
             position,
             voter: delegatee.publicKey,
             proxyAssignment,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .signers([delegatee])
           .rpcAndKeys({ skipPreflight: true });
@@ -600,7 +573,7 @@ describe("voter-stake-registry", () => {
           .proxiedVoteV1({
             choice: 0,
           })
-          .accounts({
+          .accountsPartial({
             proposal,
             voter: delegatee.publicKey,
           })
@@ -611,11 +584,14 @@ describe("voter-stake-registry", () => {
           pubkeys: { marker },
         } = await program.methods
           .countProxyVoteV0()
-          .accounts({
+          .accountsPartial({
             proposal,
             position,
             voter: delegatee.publicKey,
             proxyAssignment,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .rpcAndKeys({ skipPreflight: true });
 
@@ -630,7 +606,7 @@ describe("voter-stake-registry", () => {
           .proxiedRelinquishVoteV1({
             choice: 0,
           })
-          .accounts({
+          .accountsPartial({
             proposal,
             voter: delegatee.publicKey,
           })
@@ -639,11 +615,14 @@ describe("voter-stake-registry", () => {
 
         await program.methods
           .countProxyVoteV0()
-          .accounts({
+          .accountsPartial({
             proposal,
             position,
             voter: delegatee.publicKey,
             proxyAssignment,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .rpcAndKeys({ skipPreflight: true });
 
@@ -666,11 +645,12 @@ describe("voter-stake-registry", () => {
         const registrarBalance = await provider.connection.getBalance(
           registrar
         );
+        const positionBalance = await provider.connection.getBalance(position);
         await program.methods
           .proxiedVoteV1({
             choice: 0,
           })
-          .accounts({
+          .accountsPartial({
             proposal,
             voter: delegatee.publicKey,
           })
@@ -680,11 +660,14 @@ describe("voter-stake-registry", () => {
           pubkeys: { marker },
         } = await program.methods
           .countProxyVoteV0()
-          .accounts({
+          .accountsPartial({
             proposal,
             position,
             voter: delegatee.publicKey,
             proxyAssignment,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .rpcAndKeys({ skipPreflight: true });
 
@@ -697,9 +680,10 @@ describe("voter-stake-registry", () => {
         const registrarBalance2 = await provider.connection.getBalance(
           registrar
         );
+        const positionBalance2 = await provider.connection.getBalance(position);
         const spentLamports =
-          (await provider.connection.getAccountInfo(marker! as PublicKey))
-            ?.lamports || 0;
+          ((await provider.connection.getAccountInfo(marker! as PublicKey))
+            ?.lamports || 0) + (positionBalance2 - positionBalance);
         expect(registrarBalance2).to.eq(registrarBalance - spentLamports);
       });
 
@@ -708,7 +692,7 @@ describe("voter-stake-registry", () => {
           .proxiedVoteV1({
             choice: 0,
           })
-          .accounts({
+          .accountsPartial({
             proposal,
             voter: delegatee.publicKey,
           })
@@ -718,11 +702,14 @@ describe("voter-stake-registry", () => {
           pubkeys: { marker },
         } = await program.methods
           .countProxyVoteV0()
-          .accounts({
+          .accountsPartial({
             proposal,
             position,
             voter: delegatee.publicKey,
             proxyAssignment,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .rpcAndKeys({ skipPreflight: true });
 
@@ -738,7 +725,7 @@ describe("voter-stake-registry", () => {
           .proxiedRelinquishVoteV1({
             choice: 0,
           })
-          .accounts({
+          .accountsPartial({
             proposal,
             voter: delegatee.publicKey,
           })
@@ -746,11 +733,14 @@ describe("voter-stake-registry", () => {
           .rpc({ skipPreflight: true });
         await program.methods
           .countProxyVoteV0()
-          .accounts({
+          .accountsPartial({
             proposal,
             position,
             voter: delegatee.publicKey,
             proxyAssignment,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .rpc({ skipPreflight: true });
 
@@ -765,10 +755,13 @@ describe("voter-stake-registry", () => {
           .voteV0({
             choice: 1,
           })
-          .accounts({
+          .accountsPartial({
             mint,
             proposal,
+            proposalConfig,
             position,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .rpcAndKeys({ skipPreflight: true });
 
@@ -794,7 +787,7 @@ describe("voter-stake-registry", () => {
         )[0];
         await proxyProgram.methods
           .unassignProxyV0()
-          .accounts({
+          .accountsPartial({
             proxyAssignment: toUnProxy,
             prevProxyAssignment: myProxy,
             currentProxyAssignment: myProxy,
@@ -826,10 +819,13 @@ describe("voter-stake-registry", () => {
           .voteV0({
             choice: 0,
           })
-          .accounts({
+          .accountsPartial({
             registrar,
             proposal,
             position,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
           })
           .rpc({ skipPreflight: true });
       });
@@ -840,10 +836,13 @@ describe("voter-stake-registry", () => {
             .voteV0({
               choice: 0,
             })
-            .accounts({
+            .accountsPartial({
               registrar,
               proposal,
+              proposalConfig,
               position,
+              stateController: me,
+              onVoteHook: PublicKey.default,
             })
             .rpc({ skipPreflight: true });
         } catch (e: any) {
@@ -884,9 +883,13 @@ describe("voter-stake-registry", () => {
             .relinquishVoteV1({
               choice: 0,
             })
-            .accounts({
+            .accountsPartial({
               proposal,
               position,
+              stateController: me,
+              onVoteHook: PublicKey.default,
+              proposalConfig,
+              registrar,
             })
             .instruction()
         );
@@ -900,7 +903,7 @@ describe("voter-stake-registry", () => {
         await expect(
           program.methods
             .transferV0({ amount: toBN(10, 8) })
-            .accounts({
+            .accountsPartial({
               sourcePosition: position,
               targetPosition: newPos,
               depositMint: hntMint,
@@ -923,18 +926,21 @@ describe("voter-stake-registry", () => {
     it("should allow me to withdraw and close a position after lockup", async () => {
       await program.methods
         .setTimeOffsetV0(new anchor.BN(185 * SECS_PER_DAY))
-        .accounts({ registrar })
+        .accountsPartial({ registrar })
         .rpc({ skipPreflight: true });
 
       await program.methods
         .withdrawV0({ amount: toBN(100, 8) })
-        .accounts({ position, depositMint: hntMint })
+        .accountsPartial({ position, depositMint: hntMint })
         .rpc({ skipPreflight: true });
 
       const positionAccount = await program.account.positionV0.fetch(position);
       expect(positionAccount.amountDepositedNative.toNumber()).to.equal(0);
 
-      await program.methods.closePositionV0().accounts({ position }).rpc();
+      await program.methods
+        .closePositionV0()
+        .accountsPartial({ position })
+        .rpc();
       expect(await program.account.positionV0.fetchNullable(position)).to.be
         .null;
     });
@@ -948,7 +954,7 @@ describe("voter-stake-registry", () => {
 
       await program.methods
         .ledgerTransferPositionV0()
-        .accounts({
+        .accountsPartial({
           to: to.publicKey,
           position,
           mint,
@@ -967,7 +973,7 @@ describe("voter-stake-registry", () => {
       await expect(
         program.methods
           .withdrawV0({ amount: toBN(100, 8) })
-          .accounts({ position, depositMint: hntMint })
+          .accountsPartial({ position, depositMint: hntMint })
           .rpc()
       ).to.be.rejected;
     });
@@ -978,7 +984,7 @@ describe("voter-stake-registry", () => {
           kind: { constant: {} },
           periods: 185,
         })
-        .accounts({
+        .accountsPartial({
           position,
         })
         .rpc({ skipPreflight: true });
@@ -994,7 +1000,7 @@ describe("voter-stake-registry", () => {
       const { position: newPos } = await createAndDeposit(10, 185);
       await program.methods
         .transferV0({ amount: toBN(10, 8) })
-        .accounts({
+        .accountsPartial({
           sourcePosition: position,
           targetPosition: newPos,
           depositMint: hntMint,

@@ -65,7 +65,7 @@ export async function run(args: any = process.argv) {
       .approveProgramV0({
         programId,
       })
-      .accounts({
+      .accountsPartial({
         dao,
         authority,
         payer: authority,

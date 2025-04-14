@@ -4,7 +4,8 @@ import { TypedAccountParser } from "@helium/account-fetch-cache";
 import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
-import { capitalizeFirstChar } from "./useIdlAccounts";
+import { lowerFirstChar } from "@helium/spl-utils";
+import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
 
 // Cache parsers per key/type combination to avoid re-creating them on re-render.
 // This makes it so we get fewer rerenders using effectively the same parser
@@ -23,8 +24,8 @@ export function useIdlAccount<IDL extends Idl, A extends keyof AllAccountsMap<ID
     const cacheKey = `${key?.toBase58()}-${type}`;
     if (!parserCache[cacheKey]) {
       if (idl) {
-        const coder = new BorshAccountsCoder(idl);
-        const tpe = capitalizeFirstChar(type);
+        const coder = new BorshAccountsCoder(convertIdlToCamelCase(idl));
+        const tpe = lowerFirstChar(type);
         parserCache[cacheKey] = (pubkey, data) => {
           try {
             if (data.data.length === 0) return;

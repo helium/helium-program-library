@@ -18,7 +18,6 @@ export async function init(
 
   const program = new Program<RewardsOracle>(
     idl as RewardsOracle,
-    programId,
     provider,
     undefined,
     () => {

@@ -1,17 +1,18 @@
-use crate::state::*;
+use std::mem::size_of;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
+  metadata::{
+    create_master_edition_v3, create_metadata_accounts_v3,
+    mpl_token_metadata::types::{CollectionDetails, DataV2},
+    CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+  },
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use mpl_token_metadata::types::CollectionDetails;
-use mpl_token_metadata::types::DataV2;
-use nft_proxy::ProxyConfigV0;
-use shared_utils::create_metadata_accounts_v3;
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
-};
-use std::mem::size_of;
+use modular_governance::nft_proxy::accounts::ProxyConfigV0;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Default, Clone)]
 pub struct InitializeRegistrarArgsV0 {
@@ -86,7 +87,7 @@ pub struct InitializeRegistrarV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
-  pub proxy_config: Option<Account<'info, ProxyConfigV0>>,
+  pub proxy_config: Option<Box<Account<'info, ProxyConfigV0>>>,
 }
 
 impl<'info> InitializeRegistrarV0<'info> {
@@ -117,7 +118,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
       .to_account_info()
       .key
       .as_ref(),
-    &[ctx.bumps["registrar"]],
+    &[ctx.bumps.registrar],
   ]];
 
   token::mint_to(ctx.accounts.mint_ctx().with_signer(signer_seeds), 1)?;
@@ -136,7 +137,11 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
         payer: ctx.accounts.payer.to_account_info().clone(),
         update_authority: ctx.accounts.registrar.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -150,6 +155,7 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
       collection: None,
       uses: None,
     },
+    true,
     true,
     Some(CollectionDetails::V1 { size: 0 }),
   )?;
@@ -170,7 +176,11 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
         payer: ctx.accounts.payer.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -185,8 +195,8 @@ pub fn handler(ctx: Context<InitializeRegistrarV0>, args: InitializeRegistrarArg
     time_offset: 0,
     position_update_authority: args.position_update_authority,
     governance_program_id: ctx.accounts.governance_program_id.key(),
-    bump_seed: ctx.bumps["registrar"],
-    collection_bump_seed: ctx.bumps["collection"],
+    bump_seed: ctx.bumps.registrar,
+    collection_bump_seed: ctx.bumps.collection,
     reserved1: [0; 4],
     reserved2: [0; 3],
     voting_mints: Vec::new(),

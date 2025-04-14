@@ -315,7 +315,7 @@ macro_rules! iot_info_seeds {
     &[
       "iot_info".as_bytes(),
       $rewardable_entity_config.key().as_ref(),
-      &hash(&$entity_key).to_bytes(),
+      &anchor_lang::solana_program::hash::hash(&$entity_key).to_bytes(),
       &[$iot_info.bump_seed],
     ]
   };
@@ -327,7 +327,7 @@ macro_rules! mobile_info_seeds {
     &[
       "mobile_info".as_bytes(),
       $rewardable_entity_config.key().as_ref(),
-      &hash(&$entity_key).to_bytes(),
+      &anchor_lang::solana_program::hash::hash(&$entity_key).to_bytes(),
       &[$mobile_info.bump_seed],
     ]
   };

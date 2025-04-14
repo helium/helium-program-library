@@ -39,7 +39,7 @@ describe("price-oracle", () => {
       oracles,
       decimals: 8,
       authority: me
-    }).accounts({
+    }).accountsPartial({
       priceOracle: kp.publicKey,
       payer: me,
     }).signers([kp])
@@ -74,7 +74,7 @@ describe("price-oracle", () => {
         }),
         decimals: 8,
         authority: me,
-      }).accounts({
+      }).accountsPartial({
         priceOracle: kp.publicKey,
         payer: me,
       }).signers([kp])
@@ -101,7 +101,7 @@ describe("price-oracle", () => {
           }).slice(0, 1),
           authority: me,
         })
-        .accounts({
+        .accountsPartial({
           priceOracle,
         })
         .rpc({ skipPreflight: true });
@@ -121,7 +121,7 @@ describe("price-oracle", () => {
       await program.methods.submitPriceV0({
         oracleIndex: 0,
         price,
-      }).accounts({
+      }).accountsPartial({
         priceOracle,
         oracle: oracles[0].publicKey
       }).signers([oracles[0]]).rpc({skipPreflight: true});
@@ -139,7 +139,7 @@ describe("price-oracle", () => {
         await program.methods.submitPriceV0({
           oracleIndex: 0,
           price: new BN(1000),
-        }).accounts({
+        }).accountsPartial({
           priceOracle,
           oracle: oracles[0].publicKey
         }).rpc({skipPreflight: true});
@@ -155,7 +155,7 @@ describe("price-oracle", () => {
         return program.methods.submitPriceV0({
           oracleIndex: i,
           price,
-        }).accounts({
+        }).accountsPartial({
           priceOracle,
           oracle: x.publicKey
         }).signers([x]).instruction();

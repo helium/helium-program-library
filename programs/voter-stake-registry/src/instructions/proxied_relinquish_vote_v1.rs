@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use proposal::ProposalV0;
+use modular_governance::proposal::accounts::ProposalV0;
 
 use crate::{state::*, VoteArgsV0};
 

@@ -3,8 +3,9 @@ use anchor_spl::token::{
   set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token,
 };
 
-use crate::errors::ErrorCode;
-use crate::{MintWindowedCircuitBreakerV0, WindowV0, WindowedCircuitBreakerConfigV0};
+use crate::{
+  errors::ErrorCode, MintWindowedCircuitBreakerV0, WindowV0, WindowedCircuitBreakerConfigV0,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeMintWindowedBreakerArgsV0 {
@@ -51,7 +52,7 @@ pub fn handler(
         last_aggregated_value: 0,
         last_unix_timestamp: 0,
       },
-      bump_seed: ctx.bumps["circuit_breaker"],
+      bump_seed: ctx.bumps.circuit_breaker,
     });
 
   set_authority(

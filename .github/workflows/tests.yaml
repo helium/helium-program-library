@@ -9,7 +9,7 @@ on:
       - master
       - develop
 env:
-  SOLANA_CLI_VERSION: 1.16.13
+  SOLANA_CLI_VERSION: 2.1.6
   NODE_VERSION: 18.12.1
 
 jobs:
@@ -102,6 +102,7 @@ jobs:
           - packages/rewards-oracle-faucet-service
           - packages/vsr-metadata-service
           - packages/crons
+          - packages/geocoder-service
     steps:
       - uses: actions/checkout@v3
       - run: cd $DOCKER_PATH && docker build .
@@ -117,7 +118,6 @@ jobs:
       matrix:
         test:
           - utils/ecc-sig-verifier
-          - utils/bulk-claim-rewards
           - utils/hpl-utils
           - utils/migration-tx-executor
           - utils/vehnt

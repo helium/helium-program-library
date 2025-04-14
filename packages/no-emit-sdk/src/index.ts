@@ -24,7 +24,6 @@ export async function init(
 
   const program = new Program<NoEmit>(
     idl as NoEmit,
-    programId,
     provider,
     undefined,
     () => {

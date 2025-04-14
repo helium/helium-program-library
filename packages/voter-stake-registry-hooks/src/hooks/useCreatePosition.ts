@@ -1,6 +1,7 @@
 import { BN } from "@coral-xyz/anchor";
+import { min } from "bn.js";
 import { sendInstructions } from "@helium/spl-utils";
-import { getRegistrarKey, positionKey } from "@helium/voter-stake-registry-sdk";
+import { positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
   TOKEN_PROGRAM_ID,
@@ -19,12 +20,12 @@ import { HeliumVsrClient } from "../sdk/client";
 import { SubDaoWithMeta } from "../sdk/types";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-
 import {
   daoKey,
   init as initHsd,
   subDaoEpochInfoKey,
   subDaoKey,
+  getLockupEffectiveEndTs,
 } from "@helium/helium-sub-daos-sdk";
 import { useQueryClient } from "@tanstack/react-query";
 import { INDEXER_WAIT } from "../constants";
@@ -72,7 +73,9 @@ export const useCreatePosition = () => {
         );
         const registrar = (mySubDao?.registrar || myDao?.registrar)!;
         const registarAcc = await vsrProgram.account.registrar.fetch(registrar);
-        const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(registarAcc.proxyConfig);
+        const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
+          registarAcc.proxyConfig
+        );
         const mintKeypair = Keypair.generate();
         const position = positionKey(mintKeypair.publicKey)[0];
         const instructions: TransactionInstruction[] = [];
@@ -107,7 +110,7 @@ export const useCreatePosition = () => {
               kind: { [lockupKind]: {} },
               periods: lockupPeriodsInDays,
             } as any)
-            .accounts({
+            .accountsPartial({
               registrar,
               mint: mintKeypair.publicKey,
               depositMint: mint,
@@ -121,7 +124,7 @@ export const useCreatePosition = () => {
             .depositV0({
               amount,
             })
-            .accounts({
+            .accountsPartial({
               registrar,
               position,
               mint,
@@ -138,17 +141,28 @@ export const useCreatePosition = () => {
             registrar
           );
           const currTs = Number(unixTime) + registrarAcc.timeOffset.toNumber();
-          const endTs = proxyConfig.seasons.reverse().find(season => new BN(currTs).gte(season.start))?.end || (currTs + lockupPeriodsInDays * SECS_PER_DAY);
+          const endTs = new BN(currTs + lockupPeriodsInDays * SECS_PER_DAY);
+          const expirationTs =
+            proxyConfig.seasons
+              .reverse()
+              .find((season) => new BN(currTs).gte(season.start))?.end || endTs;
+
           const [subDaoEpochInfo] = subDaoEpochInfoKey(subDao.pubkey, currTs);
           const [endSubDaoEpochInfoKey] = subDaoEpochInfoKey(
             subDao.pubkey,
-            endTs
+            min(
+              getLockupEffectiveEndTs({
+                kind: lockupKind,
+                endTs,
+              }),
+              expirationTs
+            )
           );
 
           delegateInstructions.push(
             await hsdProgram.methods
               .delegateV0()
-              .accounts({
+              .accountsPartial({
                 position,
                 mint: mintKeypair.publicKey,
                 registrar,

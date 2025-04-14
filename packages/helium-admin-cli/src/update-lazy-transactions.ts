@@ -65,7 +65,7 @@ export async function run(args: any = process.argv) {
         : lazyTrAcc.authority,
       root: null,
     })
-    .accounts({
+    .accountsPartial({
       lazyTransactions,
       authority: lazyTrAcc.authority,
       canopy: lazyTrAcc.canopy,

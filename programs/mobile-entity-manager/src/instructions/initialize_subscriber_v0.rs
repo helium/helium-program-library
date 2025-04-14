@@ -1,16 +1,16 @@
-use crate::{carrier_seeds, error::ErrorCode, state::*};
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
 use anchor_spl::token::Mint;
-use bubblegum_cpi::program::Bubblegum;
-use bubblegum_cpi::TreeConfig;
-use helium_entity_manager::program::HeliumEntityManager;
+use bubblegum_cpi::bubblegum::{accounts::TreeConfig, program::Bubblegum};
 use helium_entity_manager::{
-  cpi::accounts::IssueProgramEntityV0, cpi::issue_program_entity_v0, ProgramApprovalV0,
+  cpi::{accounts::IssueProgramEntityV0, issue_program_entity_v0},
+  hash_entity_key,
+  program::HeliumEntityManager,
+  IssueProgramEntityArgsV0, KeySerialization, ProgramApprovalV0,
 };
-use helium_entity_manager::{IssueProgramEntityArgsV0, KeySerialization};
 use helium_sub_daos::{DaoV0, SubDaoV0};
+
+use crate::{carrier_seeds, error::ErrorCode, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeSubscriberArgsV0 {
@@ -72,7 +72,7 @@ pub struct InitializeSubscriberV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash(&args.entity_key[..]).to_bytes()
+      &hash_entity_key(&args.entity_key[..])
     ],
     seeds::program = helium_entity_manager_program.key(),
     bump

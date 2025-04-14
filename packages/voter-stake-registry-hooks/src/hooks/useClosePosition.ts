@@ -55,7 +55,7 @@ export const useClosePosition = () => {
             .withdrawV0({
               amount: position.amountDepositedNative,
             })
-            .accounts({
+            .accountsPartial({
               position: position.pubkey,
               depositMint:
                 registrar.votingMints[position.votingMintConfigIdx].mint,
@@ -79,7 +79,7 @@ export const useClosePosition = () => {
         instructions.push(
           await client.program.methods
             .closePositionV0()
-            .accounts({
+            .accountsPartial({
               position: position.pubkey,
             })
             .instruction()

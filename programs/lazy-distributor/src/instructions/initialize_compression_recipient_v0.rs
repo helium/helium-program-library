@@ -1,8 +1,9 @@
-use crate::state::*;
-use account_compression_cpi::program::SplAccountCompression;
+use account_compression_cpi::account_compression::program::SplAccountCompression;
 use anchor_lang::prelude::*;
 use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeCompressionRecipientArgsV0 {
@@ -10,6 +11,10 @@ pub struct InitializeCompressionRecipientArgsV0 {
   pub creator_hash: [u8; 32],
   pub root: [u8; 32],
   pub index: u32,
+}
+
+pub fn local_get_asset_id(tree_id: Pubkey, nonce: u32) -> [u8; 32] {
+  get_asset_id(&tree_id, nonce.into()).to_bytes()
 }
 
 #[derive(Accounts)]
@@ -29,9 +34,9 @@ pub struct InitializeCompressionRecipientV0<'info> {
     payer = payer,
     space = 8 + 60 + std::mem::size_of::<RecipientV0>() + 8 * lazy_distributor.oracles.len(),
     seeds = [
-      "recipient".as_bytes(), 
+      "recipient".as_bytes(),
       lazy_distributor.key().as_ref(),
-      get_asset_id(&merkle_tree.key(), args.index.into()).as_ref()
+      &local_get_asset_id(merkle_tree.key(), args.index)
     ],
     bump,
   )]
@@ -69,7 +74,7 @@ pub fn handler<'info>(
     current_config_version: 0,
     current_rewards: vec![None; ctx.accounts.lazy_distributor.oracles.len()],
     lazy_distributor: ctx.accounts.lazy_distributor.key(),
-    bump_seed: ctx.bumps["recipient"],
+    bump_seed: ctx.bumps.recipient,
     destination: Pubkey::default(),
     reserved: 0,
   });

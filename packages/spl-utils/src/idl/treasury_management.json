@@ -1,238 +1,419 @@
 {
-  "version": "0.2.1",
-  "name": "treasury_management",
+  "address": "treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5",
+  "metadata": {
+    "name": "treasury_management",
+    "version": "0.2.1",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initializeTreasuryManagementV0",
+      "name": "initialize_treasury_management_v0",
+      "discriminator": [
+        149,
+        3,
+        201,
+        108,
+        130,
+        56,
+        56,
+        210
+      ],
       "accounts": [
         {
           "name": "payer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "treasuryManagement",
-          "isMut": true,
-          "isSigner": false,
+          "name": "treasury_management",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "treasury_management"
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  109,
+                  97,
+                  110,
+                  97,
+                  103,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "supply_mint"
               }
             ]
           }
         },
         {
-          "name": "treasuryMint",
-          "isMut": false,
-          "isSigner": false
+          "name": "treasury_mint"
         },
         {
-          "name": "supplyMint",
-          "isMut": false,
-          "isSigner": false
+          "name": "supply_mint"
         },
         {
-          "name": "mintAuthority",
-          "isMut": false,
-          "isSigner": true
+          "name": "mint_authority",
+          "signer": true
         },
         {
-          "name": "circuitBreaker",
-          "isMut": true,
-          "isSigner": false,
+          "name": "circuit_breaker",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "account_windowed_breaker"
+                "value": [
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  95,
+                  119,
+                  105,
+                  110,
+                  100,
+                  111,
+                  119,
+                  101,
+                  100,
+                  95,
+                  98,
+                  114,
+                  101,
+                  97,
+                  107,
+                  101,
+                  114
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "TokenAccount",
                 "path": "treasury"
               }
             ],
-            "programId": {
+            "program": {
               "kind": "account",
-              "type": "publicKey",
               "path": "circuit_breaker_program"
             }
           }
         },
         {
           "name": "treasury",
-          "isMut": true,
-          "isSigner": false
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "treasury_management"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "treasury_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         },
         {
-          "name": "circuitBreakerProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "circuit_breaker_program",
+          "address": "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g"
         },
         {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "InitializeTreasuryManagementArgsV0"
+            "defined": {
+              "name": "InitializeTreasuryManagementArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "updateTreasuryManagementV0",
-      "accounts": [
-        {
-          "name": "treasuryManagement",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "authority"
-          ]
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        }
+      "name": "redeem_v0",
+      "discriminator": [
+        235,
+        127,
+        171,
+        139,
+        119,
+        77,
+        235,
+        118
       ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": "UpdateTreasuryManagementArgsV0"
-          }
-        }
-      ]
-    },
-    {
-      "name": "redeemV0",
       "accounts": [
         {
-          "name": "treasuryManagement",
-          "isMut": false,
-          "isSigner": false,
+          "name": "treasury_management",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "treasury_management"
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  109,
+                  97,
+                  110,
+                  97,
+                  103,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
                 "path": "supply_mint"
               }
             ]
-          },
+          }
+        },
+        {
+          "name": "treasury_mint",
           "relations": [
-            "treasury",
-            "supply_mint",
-            "treasury_mint"
+            "treasury_management"
           ]
         },
         {
-          "name": "treasuryMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "supplyMint",
-          "isMut": true,
-          "isSigner": false
+          "name": "supply_mint",
+          "writable": true,
+          "relations": [
+            "treasury_management"
+          ]
         },
         {
           "name": "treasury",
-          "isMut": true,
-          "isSigner": false
+          "writable": true,
+          "relations": [
+            "treasury_management"
+          ]
         },
         {
-          "name": "circuitBreaker",
-          "isMut": true,
-          "isSigner": false,
+          "name": "circuit_breaker",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "account_windowed_breaker"
+                "value": [
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  95,
+                  119,
+                  105,
+                  110,
+                  100,
+                  111,
+                  119,
+                  101,
+                  100,
+                  95,
+                  98,
+                  114,
+                  101,
+                  97,
+                  107,
+                  101,
+                  114
+                ]
               },
               {
                 "kind": "account",
-                "type": "publicKey",
-                "account": "TokenAccount",
                 "path": "treasury"
               }
             ],
-            "programId": {
+            "program": {
               "kind": "account",
-              "type": "publicKey",
               "path": "circuit_breaker_program"
             }
           }
         },
         {
           "name": "from",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "owner"
-          ]
+          "writable": true
         },
         {
           "name": "to",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "owner",
-          "isMut": false,
-          "isSigner": true
+          "signer": true,
+          "relations": [
+            "from"
+          ]
         },
         {
-          "name": "circuitBreakerProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "circuit_breaker_program",
+          "address": "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g"
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "RedeemArgsV0"
+            "defined": {
+              "name": "RedeemArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_treasury_management_v0",
+      "discriminator": [
+        209,
+        139,
+        90,
+        226,
+        249,
+        149,
+        89,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "treasury_management",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "treasury_management"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpdateTreasuryManagementArgsV0"
+            }
           }
         }
       ]
@@ -240,149 +421,81 @@
   ],
   "accounts": [
     {
+      "name": "AccountWindowedCircuitBreakerV0",
+      "discriminator": [
+        134,
+        11,
+        69,
+        100,
+        90,
+        132,
+        174,
+        187
+      ]
+    },
+    {
       "name": "TreasuryManagementV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "treasuryMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "supplyMint",
-            "type": "publicKey"
-          },
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "treasury",
-            "type": "publicKey"
-          },
-          {
-            "name": "curve",
-            "docs": [
-              "The bonding curve to use"
-            ],
-            "type": {
-              "defined": "Curve"
-            }
-          },
-          {
-            "name": "freezeUnixTime",
-            "docs": [
-              "Freeze this curve at this time."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "bumpSeed",
-            "type": "u8"
-          }
-        ]
-      }
+      "discriminator": [
+        68,
+        111,
+        120,
+        209,
+        16,
+        110,
+        215,
+        59
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Frozen",
+      "msg": "Treasury management is currently frozen"
+    },
+    {
+      "code": 6001,
+      "name": "ArithmeticError",
+      "msg": "Error in arithmetic"
     }
   ],
   "types": [
     {
-      "name": "WindowedCircuitBreakerConfigV0",
+      "name": "AccountWindowedCircuitBreakerV0",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "windowSizeSeconds",
-            "type": "u64"
+            "name": "token_account",
+            "type": "pubkey"
           },
-          {
-            "name": "thresholdType",
-            "type": {
-              "defined": "ThresholdType"
-            }
-          },
-          {
-            "name": "threshold",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "InitializeTreasuryManagementArgsV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
           {
             "name": "authority",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
-            "name": "curve",
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
             "type": {
-              "defined": "Curve"
+              "defined": {
+                "name": "circuit_breaker::state::WindowedCircuitBreakerConfigV0"
+              }
             }
           },
           {
-            "name": "freezeUnixTime",
-            "type": "i64"
-          },
-          {
-            "name": "windowConfig",
+            "name": "last_window",
             "type": {
-              "defined": "WindowedCircuitBreakerConfigV0"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "RedeemArgsV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "expectedOutputAmount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UpdateTreasuryManagementArgsV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "curve",
-            "type": {
-              "defined": "Curve"
+              "defined": {
+                "name": "WindowV0"
+              }
             }
           },
           {
-            "name": "freezeUnixTime",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ThresholdType",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Percent"
-          },
-          {
-            "name": "Absolute"
+            "name": "bump_seed",
+            "type": "u8"
           }
         ]
       }
@@ -403,21 +516,216 @@
           }
         ]
       }
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "Frozen",
-      "msg": "Treasury management is currently frozen"
     },
     {
-      "code": 6001,
-      "name": "ArithmeticError",
-      "msg": "Error in arithmetic"
+      "name": "InitializeTreasuryManagementArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "curve",
+            "type": {
+              "defined": {
+                "name": "Curve"
+              }
+            }
+          },
+          {
+            "name": "freeze_unix_time",
+            "type": "i64"
+          },
+          {
+            "name": "window_config",
+            "type": {
+              "defined": {
+                "name": "treasury_management::circuit_breaker::WindowedCircuitBreakerConfigV0"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RedeemArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "expected_output_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryManagementV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "treasury_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "supply_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "curve",
+            "docs": [
+              "The bonding curve to use"
+            ],
+            "type": {
+              "defined": {
+                "name": "Curve"
+              }
+            }
+          },
+          {
+            "name": "freeze_unix_time",
+            "docs": [
+              "Freeze this curve at this time."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateTreasuryManagementArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "curve",
+            "type": {
+              "defined": {
+                "name": "Curve"
+              }
+            }
+          },
+          {
+            "name": "freeze_unix_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WindowV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "last_aggregated_value",
+            "type": "u64"
+          },
+          {
+            "name": "last_unix_timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "circuit_breaker::state::ThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Percent"
+          },
+          {
+            "name": "Absolute"
+          }
+        ]
+      }
+    },
+    {
+      "name": "circuit_breaker::state::WindowedCircuitBreakerConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "window_size_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "threshold_type",
+            "type": {
+              "defined": {
+                "name": "circuit_breaker::state::ThresholdType"
+              }
+            }
+          },
+          {
+            "name": "threshold",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "treasury_management::circuit_breaker::ThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Percent"
+          },
+          {
+            "name": "Absolute"
+          }
+        ]
+      }
+    },
+    {
+      "name": "treasury_management::circuit_breaker::WindowedCircuitBreakerConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "window_size_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "threshold_type",
+            "type": {
+              "defined": {
+                "name": "treasury_management::circuit_breaker::ThresholdType"
+              }
+            }
+          },
+          {
+            "name": "threshold",
+            "type": "u64"
+          }
+        ]
+      }
     }
-  ],
-  "metadata": {
-    "address": "treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5"
-  }
+  ]
 }

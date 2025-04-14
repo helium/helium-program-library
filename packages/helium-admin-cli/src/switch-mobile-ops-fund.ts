@@ -52,7 +52,7 @@ export async function run(args: any = process.argv) {
   const instructions = [
     await hsdProgram.methods
       .switchMobileOpsFund()
-      .accounts({
+      .accountsPartial({
         authority: daoAuth,
         payer: daoAuth,
         opsFundHnt: getAssociatedTokenAddressSync(

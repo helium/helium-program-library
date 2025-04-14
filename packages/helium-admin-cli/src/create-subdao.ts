@@ -301,7 +301,7 @@ export async function run(args: any = process.argv) {
       seasons,
       name: "Helium V1",
     })
-    .accounts({
+    .accountsPartial({
       authority,
     })
     .prepare();
@@ -356,7 +356,7 @@ export async function run(args: any = process.argv) {
         .initializeRegistrarV0({
           positionUpdateAuthority: null,
         })
-        .accounts({
+        .accountsPartial({
           realm,
           realmGoverningTokenMint: subdaoKeypair.publicKey,
           proxyConfig,
@@ -376,7 +376,7 @@ export async function run(args: any = process.argv) {
           ),
           lockupSaturationSecs: new anchor.BN(MAX_LOCKUP),
         })
-        .accounts({
+        .accountsPartial({
           registrar,
           mint: subdaoKeypair.publicKey,
         })
@@ -432,7 +432,7 @@ export async function run(args: any = process.argv) {
         },
         approver: oracleSignerKey()[0],
       })
-      .accounts({
+      .accountsPartial({
         rewardsMint: subdaoKeypair.publicKey,
         rewardsEscrow,
       })
@@ -465,7 +465,7 @@ export async function run(args: any = process.argv) {
           ? new PublicKey(argv.activeDeviceAuthority)
           : authority,
       })
-      .accounts({
+      .accountsPartial({
         dao,
         dntMint: subdaoKeypair.publicKey,
         hntMint: new PublicKey(argv.hntPubkey!),
@@ -509,7 +509,7 @@ export async function run(args: any = process.argv) {
             registrar: null,
             activeDeviceAuthority: null,
           })
-          .accounts({
+          .accountsPartial({
             subDao,
             authority,
             payer: authority,
@@ -580,7 +580,7 @@ export async function run(args: any = process.argv) {
           settings,
           stakingRequirement: toBN(0, 0),
         })
-        .accounts({
+        .accountsPartial({
           subDao: subdao,
           payer: me,
           authority,

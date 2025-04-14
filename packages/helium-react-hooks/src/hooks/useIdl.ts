@@ -11,6 +11,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { inflate } from "pako";
 import { useMemo, useState } from "react";
+import { useBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 const parserCache = new Map<string, TypedAccountParser<any>>();
 
@@ -43,7 +44,8 @@ export function useIdl<IDL extends Idl>(
               Buffer.from(data.data.subarray(8))
             );
             const inflatedIdl = inflate(idlData.data);
-            return JSON.parse(utf8.decode(inflatedIdl));
+            const json = JSON.parse(utf8.decode(inflatedIdl));
+            return useBackwardsCompatibleIdl(programId, json);
           } catch (e: any) {
             if (cache.enableLogging) {
               console.error(e);

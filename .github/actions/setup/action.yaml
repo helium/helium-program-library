@@ -9,7 +9,7 @@ runs:
         shell: bash
         # TODO: We're on anchor latest because of https://github.com/coral-xyz/anchor/issues/2568
         # On anchor 0.28.1 we can probably stop using 0 as the source
-      - run: echo "ANCHOR_VERSION=0" >> $GITHUB_ENV
+      - run: echo "ANCHOR_VERSION=0.31.0" >> $GITHUB_ENV
         shell: bash
       - run: echo "ANCHOR_SHA=3e8bc76d72e2bfdb3962868b5066" >> $GITHUB_ENV
         shell: bash

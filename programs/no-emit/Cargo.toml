@@ -1,6 +1,7 @@
 [package]
 name = "no-emit"
 version = "0.0.1"
+# Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
 
@@ -9,6 +10,7 @@ crate-type = ["cdylib", "lib"]
 name = "no_emit"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -23,6 +25,7 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
+solana-zk-sdk = { workspace = true }
 shared-utils = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }

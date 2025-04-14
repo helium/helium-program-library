@@ -115,7 +115,7 @@ describe("lazy-transactions", () => {
         authority: me,
         maxDepth: merkleTree.depth - 1,
       })
-      .accounts({
+      .accountsPartial({
         canopy: canopy.publicKey,
         executedTransactions: executedTransactions.publicKey,
       })
@@ -171,7 +171,7 @@ describe("lazy-transactions", () => {
           index: badTransactions[0].index,
           signerSeeds: badTransactions[0].signerSeeds,
         })
-        .accounts({ lazyTransactions })
+        .accountsPartial({ lazyTransactions })
         .remainingAccounts(accounts)
         .rpc({ skipPreflight: true });
 
@@ -187,7 +187,7 @@ describe("lazy-transactions", () => {
         index: compiledTransactions[0].index,
         signerSeeds: compiledTransactions[0].signerSeeds,
       })
-      .accounts({ lazyTransactions })
+      .accountsPartial({ lazyTransactions })
       .remainingAccounts(accounts)
       .rpc({ skipPreflight: true });
 
@@ -199,7 +199,7 @@ describe("lazy-transactions", () => {
         index: compiledTransactions[2].index,
         signerSeeds: compiledTransactions[2].signerSeeds,
       })
-      .accounts({ lazyTransactions })
+      .accountsPartial({ lazyTransactions })
       .remainingAccounts(compiledTransactions[2].accounts)
       .rpc({ skipPreflight: true });
 
@@ -211,7 +211,7 @@ describe("lazy-transactions", () => {
           index: compiledTransactions[0].index,
           signerSeeds: compiledTransactions[0].signerSeeds,
         })
-        .accounts({ lazyTransactions })
+        .accountsPartial({ lazyTransactions })
         .remainingAccounts(accounts)
         .rpc();
 
@@ -224,7 +224,7 @@ describe("lazy-transactions", () => {
     /// Attempt to close the canopy
     console.log("Closing canopy")
     await program.methods.closeCanopyV0()
-      .accounts({ lazyTransactions, refund: provider.wallet.publicKey })
+      .accountsPartial({ lazyTransactions, refund: provider.wallet.publicKey })
       .rpc({ skipPreflight: true });
   });
 });

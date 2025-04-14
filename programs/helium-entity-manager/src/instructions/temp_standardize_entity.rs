@@ -1,17 +1,22 @@
 use std::str::FromStr;
 
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::{prelude::*, solana_program::keccak};
 use anchor_spl::token::Mint;
 use bubblegum_cpi::{
-  cpi::{
-    accounts::{UpdateMetadata, VerifyCreator},
-    update_metadata, verify_creator,
+  bubblegum::{
+    accounts::TreeConfig,
+    cpi::{
+      accounts::{UpdateMetadata, VerifyCreator},
+      update_metadata, verify_creator,
+    },
+    program::Bubblegum,
+    types::{
+      Collection, Creator as BCreator, MetadataArgs as BMetadataArgs, TokenProgramVersion,
+      TokenStandard, UpdateArgs,
+    },
   },
   get_asset_id,
-  program::Bubblegum,
-  Collection, Creator as BCreator, MetadataArgs as BMetadataArgs, TokenProgramVersion,
-  TokenStandard, TreeConfig, UpdateArgs,
 };
 
 use crate::{
@@ -174,9 +179,9 @@ pub fn handler<'info>(
           || ctx.accounts.data_only_config.to_account_info(),
           |f| f.to_account_info(),
         ),
-        collection_mint: ctx.accounts.collection.to_account_info(),
-        collection_metadata: ctx.accounts.collection_metadata.to_account_info(),
-        collection_authority_record_pda: ctx.accounts.bubblegum_program.to_account_info(),
+        collection_mint: Some(ctx.accounts.collection.to_account_info()),
+        collection_metadata: Some(ctx.accounts.collection_metadata.to_account_info()),
+        collection_authority_record_pda: None,
         leaf_owner: ctx.accounts.leaf_owner.to_account_info(),
         leaf_delegate: ctx.accounts.leaf_owner.to_account_info(),
         payer: ctx.accounts.payer.to_account_info(),

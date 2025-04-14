@@ -86,7 +86,7 @@ export async function run(args: any = process.argv) {
       amount: new BN(argv.amount),
       routerKey: argv.routerKey,
     })
-    .accounts({
+    .accountsPartial({
       delegatedDataCredits: sourceDelegatedDataCredits,
       destinationDelegatedDataCredits,
       subDao: sourceSubDao,

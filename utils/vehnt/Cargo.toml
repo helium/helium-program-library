@@ -6,18 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anchor-lang = "0.28.0"
-anchor-client = "0.28.0"
+anchor-lang = "0.31.0"
+anchor-client = "0.31.0"
 clap = { version = "4", features = ["derive"]}
 reqwest = "0"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 json = "*"
 lazy_static = "1"
-solana-account-decoder = "*"
-solana-client = "*"
-solana-sdk = "*"
-solana-program = "*"
+solana-account-decoder = "2.2.3"
+solana-client = "2.2.3"
+solana-sdk = "2.2.1"
+solana-program = "2.2.1"
 tokio = "1"
 thiserror = "1"
 rust_decimal = "1"

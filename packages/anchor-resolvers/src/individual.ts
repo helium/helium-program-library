@@ -1,7 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import {
-  IdlAccountItem,
-  IdlAccounts,
+  IdlInstructionAccountItem,
 } from "@coral-xyz/anchor/dist/cjs/idl";
 import { CustomAccountResolver } from "@coral-xyz/anchor/dist/cjs/program/accounts-resolver";
 import { AllInstructions } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
@@ -28,7 +27,7 @@ async function resolveIndividualImpl({
   resolver,
   idlIx,
 }: {
-  idlAccounts: IdlAccountItem;
+  idlAccounts: IdlInstructionAccountItem;
   provider: anchor.Provider;
   programId: PublicKey;
   args: Array<any>;
@@ -38,11 +37,11 @@ async function resolveIndividualImpl({
   idlIx: AllInstructions<anchor.Idl>;
 }): Promise<number> {
   const newPath = [...path, camelCase(idlAccounts.name)];
-  
+
   try {
-    if ((idlAccounts as IdlAccounts).accounts) {
+    if ((idlAccounts as any).accounts) {
       let resolved = 0;
-      const subAccounts = (idlAccounts as IdlAccounts).accounts;
+      const subAccounts = (idlAccounts as any).accounts;
       for (let k = 0; k < subAccounts.length; k += 1) {
         const subAccount = subAccounts[k];
 

@@ -5,10 +5,11 @@ import { initPlugins } from "../plugins";
 import { IAccountConfig, IConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import { provider } from "./solana";
+import { IdlField, IdlTypeDef, IdlTypeDefTyStruct } from "@coral-xyz/anchor/dist/cjs/idl";
 
 const TypeMap = new Map<string, any>([
   ["string", DataTypes.STRING],
-  ["publicKey", DataTypes.STRING],
+  ["pubkey", DataTypes.STRING],
   ["i16", DataTypes.INTEGER],
   ["u8", DataTypes.INTEGER.UNSIGNED],
   ["i16", DataTypes.INTEGER],
@@ -29,6 +30,11 @@ const determineType = (type: string | object): any => {
   }
 
   if (typeof type === "object") {
+    // @ts-ignore
+    if (type.option) {
+      // @ts-ignore
+      return determineType(type.option);
+    }
     const [key, value] = Object.entries(type)[0];
 
     if (key === "array" && Array.isArray(value)) {
@@ -56,15 +62,19 @@ export const defineIdlModels = async ({
   accounts: IAccountConfig[];
   sequelize: Sequelize;
 }) => {
-  for (const acc of idl.accounts!) {
+  for (const acc of idl.accounts || []) {
+    const typeDef = idl.types?.find((tdef) => tdef.name === acc.name);
     const accConfig = accounts.find(({ type }) => type === acc.name);
     if (accConfig) {
       let schema: { [key: string]: any } = {};
-      for (const field of acc.type.fields) {
-        schema[acc.name] = {
-          ...schema[acc.name],
-          [field.name]: determineType(field.type),
-        };
+      for (const field of ((typeDef as any as IdlTypeDef).type as IdlTypeDefTyStruct).fields || []) {
+        if (typeof field != "string") {
+          const fieldAsField = field as IdlField;
+          schema[acc.name] = {
+            ...schema[acc.name],
+            [camelize(fieldAsField.name, true)]: determineType(fieldAsField.type),
+          };
+        }
       }
 
       (await initPlugins(accConfig?.plugins)).map(
@@ -144,13 +154,17 @@ export const defineAllIdlModels = async ({
 
     if (
       !config.accounts.every(({ type }) =>
-        idl.accounts!.some(({ name }) => name === type)
+        idl.types!.some(
+          ({ name, type: tdef }) =>
+            (tdef as any as IdlTypeDefTyStruct).kind === "struct" &&
+            name === type
+        )
       )
     ) {
       throw new Error(
         `idl does not have every account type ${
           config.accounts.find(
-            ({ type }) => !idl.accounts!.some(({ name }) => name === type)
+            ({ type }) => !idl.types!.some(({ name }) => name === type)
           )?.type
         }`
       );

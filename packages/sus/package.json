@@ -1,6 +1,6 @@
 {
   "name": "@helium/sus",
-  "version": "0.9.30",
+  "version": "0.10.6",
   "description": "Transaction simulation sus checker",
   "publishConfig": {
     "access": "public",
@@ -31,7 +31,7 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.28.0",
+    "@coral-xyz/anchor": "^0.31.0",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
@@ -44,5 +44,5 @@
     "ts-loader": "^9.2.3",
     "typescript": "^5.2.2"
   },
-  "gitHead": "5a8bf0b7b88e5934ef8d774e686f7c95804fbb8d"
+  "gitHead": "fc5dab2875863281ec468cf4a5a416c9696d102f"
 }

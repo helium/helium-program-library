@@ -58,10 +58,7 @@ pub fn handler(
     sysvar_instructions: ctx.accounts.sysvar_instructions.to_account_info(),
   };
 
-  let signer_seeds: &[&[&[u8]]] = &[&[
-    "oracle_signer".as_bytes(),
-    &[*ctx.bumps.get("oracle_signer").unwrap()],
-  ]];
+  let signer_seeds: &[&[&[u8]]] = &[&["oracle_signer".as_bytes(), &[ctx.bumps.oracle_signer]]];
   set_current_rewards_v1(
     CpiContext::new_with_signer(
       ctx.accounts.lazy_distributor_program.to_account_info(),

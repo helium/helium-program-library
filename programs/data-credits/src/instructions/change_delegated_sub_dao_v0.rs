@@ -1,11 +1,11 @@
-use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::hash::hash;
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{transfer, Mint, Token, TokenAccount, Transfer},
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
+
+use crate::{hash_name, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ChangeDelegatedSubDaoArgsV0 {
@@ -23,7 +23,7 @@ pub struct ChangeDelegatedSubDaoV0<'info> {
     seeds = [
       "delegated_data_credits".as_bytes(),
       sub_dao.key().as_ref(),
-      &hash(args.router_key.as_bytes()).to_bytes()
+      &hash_name(&args.router_key)
     ],
     bump,
   )]
@@ -35,13 +35,12 @@ pub struct ChangeDelegatedSubDaoV0<'info> {
     seeds = [
       "delegated_data_credits".as_bytes(),
       destination_sub_dao.key().as_ref(),
-      &hash(args.router_key.as_bytes()).to_bytes()
+      &hash_name(&args.router_key)
     ],
     bump,
   )]
   pub destination_delegated_data_credits: Box<Account<'info, DelegatedDataCreditsV0>>,
   #[account(
-    has_one = dc_mint,
     seeds = ["dc".as_bytes(), dc_mint.key().as_ref()],
     bump = data_credits.data_credits_bump
   )]
@@ -97,7 +96,7 @@ pub fn handler(
       router_key: args.router_key.clone(),
       sub_dao: ctx.accounts.destination_sub_dao.key(),
       escrow_account: ctx.accounts.destination_escrow_account.key(),
-      bump: ctx.bumps["destination_delegated_data_credits"],
+      bump: ctx.bumps.destination_delegated_data_credits,
     });
 
   transfer(
@@ -111,7 +110,7 @@ pub fn handler(
       &[&[
         b"delegated_data_credits",
         ctx.accounts.sub_dao.key().as_ref(),
-        &hash(args.router_key.as_bytes()).to_bytes(),
+        &hash_name(&args.router_key),
         &[ctx.accounts.delegated_data_credits.bump],
       ]],
     ),

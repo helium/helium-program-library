@@ -1,6 +1,6 @@
 {
   "name": "@helium/account-fetch-cache",
-  "version": "0.9.30",
+  "version": "0.10.6",
   "description": "Solana account fetch cache to eliminate reduntant fetching, and batch fetches",
   "publishConfig": {
     "access": "public",
@@ -38,5 +38,5 @@
     "ts-loader": "^9.2.3",
     "typescript": "^5.2.2"
   },
-  "gitHead": "5a8bf0b7b88e5934ef8d774e686f7c95804fbb8d"
+  "gitHead": "fc5dab2875863281ec468cf4a5a416c9696d102f"
 }

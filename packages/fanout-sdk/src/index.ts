@@ -2,7 +2,7 @@ import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { fanoutResolvers } from "./resolvers";
-import { Fanout, IDL } from "@helium/idls/lib/types/fanout";
+import { Fanout } from "@helium/idls/lib/types/fanout";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 export async function init(
   provider: AnchorProvider,
@@ -14,7 +14,6 @@ export async function init(
   }
   const program = new Program<Fanout>(
     idl as Fanout,
-    programId ?? PROGRAM_ID,
     provider,
     undefined,
     () => {

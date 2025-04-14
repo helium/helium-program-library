@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Burn, CloseAccount, Mint, ThawAccount, Token, TokenAccount};
-use shared_utils::token_metadata::Metadata;
+use anchor_spl::{
+  metadata::Metadata,
+  token::{self, Burn, CloseAccount, Mint, ThawAccount, Token, TokenAccount},
+};
 
 use crate::{position_seeds, state::*};
 

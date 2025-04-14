@@ -19,6 +19,7 @@ import { init as initHsd } from "./init";
 import { daoEpochInfoKey, subDaoEpochInfoKey } from "./pdas";
 import { notEmittedCounterKey } from "@helium/no-emit-sdk";
 import { min } from "bn.js";
+import { getLockupEffectiveEndTs } from "./utils";
 
 const THREAD_PID = new PublicKey(
   "CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh"
@@ -99,7 +100,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         "subDao",
       ]) as PublicKey;
       if (subDao) {
-        const [key] = await subDaoEpochInfoKey(subDao, unixTime, PROGRAM_ID);
+        const [key] = subDaoEpochInfoKey(subDao, unixTime, PROGRAM_ID);
 
         return key;
       }
@@ -131,7 +132,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         "subDao",
       ]) as PublicKey;
       if (subDao) {
-        const [key] = await subDaoEpochInfoKey(
+        const [key] = subDaoEpochInfoKey(
           subDao,
           unixTime - EPOCH_LENGTH,
           PROGRAM_ID
@@ -152,7 +153,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
         "subDao",
       ]) as PublicKey;
       if (subDao) {
-        const [key] = await subDaoEpochInfoKey(
+        const [key] = subDaoEpochInfoKey(
           subDao,
           unixTime - EPOCH_LENGTH,
           PROGRAM_ID
@@ -201,13 +202,14 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
       if (positionAcc && (proxyConfigAcc || delegatedPositionAcc)) {
         const expirationTs =
           !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
-            ? proxyConfigAcc?.seasons?.reverse().find((s) =>
-                new BN(now.toString()).gte(s.start)
-              )?.end || getEffectiveEndTs(positionAcc.lockup)
+            ? proxyConfigAcc?.seasons
+                ?.reverse()
+                .find((s) => new BN(now.toString()).gte(s.start))?.end ||
+              getLockupEffectiveEndTs(positionAcc.lockup)
             : delegatedPositionAcc.expirationTs;
-        const [key] = await subDaoEpochInfoKey(
+        const [key] = subDaoEpochInfoKey(
           subDao,
-          bnMin(getEffectiveEndTs(positionAcc.lockup), expirationTs)
+          bnMin(getLockupEffectiveEndTs(positionAcc.lockup), expirationTs)
         );
 
         return key;
@@ -215,13 +217,6 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
     }
   }
 );
-
-function getEffectiveEndTs(lockup: { kind: any, endTs: BN }): BN {
-  if (!!lockup.kind.cliff) {
-    return lockup.endTs;
-  }
-  return new BN("9223372036854775807");
-}
 
 async function getSolanaUnixTimestamp(provider: Provider): Promise<bigint> {
   const clock = await provider.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
@@ -277,13 +272,12 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
           .find((s) => new BN(now.toString()).gte(s.start))?.end;
         const expirationTs =
           !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
-            ? seasonEnd || getEffectiveEndTs(positionAcc.lockup)
+            ? seasonEnd || getLockupEffectiveEndTs(positionAcc.lockup)
             : delegatedPositionAcc.expirationTs;
-        const epochTs = positionAcc.genesisEnd.lte(new BN(now)) ? min(getEffectiveEndTs(positionAcc.lockup), expirationTs) : positionAcc.genesisEnd;
-        const [key] = await subDaoEpochInfoKey(
-          subDao,
-          epochTs
-        );
+        const epochTs = positionAcc.genesisEnd.lte(new BN(now))
+          ? min(getLockupEffectiveEndTs(positionAcc.lockup), expirationTs)
+          : positionAcc.genesisEnd;
+        const [key] = subDaoEpochInfoKey(subDao, epochTs);
 
         return key;
       }

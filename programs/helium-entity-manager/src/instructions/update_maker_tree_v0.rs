@@ -1,11 +1,12 @@
-use crate::state::*;
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
-use bubblegum_cpi::{
+use bubblegum_cpi::bubblegum::{
+  accounts::TreeConfig,
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
-  TreeConfig,
 };
+
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateMakerTreeArgsV0 {

@@ -1,5 +1,6 @@
-use crate::{canopy::check_canopy_bytes, id, state::*, util::get_bitmap_len};
 use anchor_lang::prelude::*;
+
+use crate::{canopy::check_canopy_bytes, id, state::*, util::get_bitmap_len};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeLazyTransactionsArgsV0 {
@@ -60,7 +61,7 @@ pub fn handler(
       authority: args.authority,
       canopy: ctx.accounts.canopy.key(),
       max_depth: args.max_depth,
-      bump_seed: ctx.bumps["lazy_transactions"],
+      bump_seed: ctx.bumps.lazy_transactions,
       executed_transactions: ctx.accounts.executed_transactions.key(),
     });
 

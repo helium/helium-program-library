@@ -100,7 +100,7 @@ export async function run(args: any = process.argv) {
         periodLength: argv.periodLength,
         minimumPeriods: argv.minimumPeriods,
       })
-      .accounts({
+      .accountsPartial({
         dcMint: dao.dcMint,
         priceOracle: new PublicKey(argv.priceOracle),
         rentReclaimAuthority: new PublicKey(argv.rentReclaimAuthority),

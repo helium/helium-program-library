@@ -66,7 +66,7 @@ describe("lazy-distributor", () => {
         },
         approver: null,
       })
-      .accounts({
+      .accountsPartial({
         rewardsMint,
       });
 
@@ -96,6 +96,7 @@ describe("lazy-distributor", () => {
     beforeEach(async () => {
       merkle = Keypair.generate();
       const { mintKey } = await createNft(provider, me);
+
       mint = mintKey;
 
       ({ asset, merkleTree, creatorHash, dataHash } =
@@ -121,7 +122,7 @@ describe("lazy-distributor", () => {
           },
           approver: null,
         })
-        .accounts({
+        .accountsPartial({
           rewardsMint,
         });
       await method.rpc({ skipPreflight: true });
@@ -136,7 +137,7 @@ describe("lazy-distributor", () => {
     });
 
     it("initializes a recipient", async () => {
-      const method = await program.methods.initializeRecipientV0().accounts({
+      const method = await program.methods.initializeRecipientV0().accountsPartial({
         lazyDistributor,
         mint,
       });
@@ -235,7 +236,7 @@ describe("lazy-distributor", () => {
             currentRewards: new anchor.BN("5000000"),
             oracleIndex: 0,
           })
-          .accounts({
+          .accountsPartial({
             lazyDistributor,
             recipient,
           })
@@ -257,7 +258,7 @@ describe("lazy-distributor", () => {
           oracleIndex: 0,
         };
         const setCurrentRewardsTransactionBytes = await coder.encode(
-          "SetCurrentRewardsTransactionV0",
+          "setCurrentRewardsTransactionV0",
           setCurrentRewardsTransaction
         );
         const signature = Buffer.from(
@@ -278,7 +279,7 @@ describe("lazy-distributor", () => {
               signature,
             })]
           )
-          .accounts({
+          .accountsPartial({
             lazyDistributor,
             recipient,
           });
@@ -291,7 +292,7 @@ describe("lazy-distributor", () => {
             currentRewards: new anchor.BN("5000000"),
             oracleIndex: 0,
           })
-          .accounts({
+          .accountsPartial({
             lazyDistributor,
             recipient,
           })
@@ -335,7 +336,7 @@ describe("lazy-distributor", () => {
             currentRewards: new anchor.BN("5000000"),
             oracleIndex: 0,
           })
-          .accounts({
+          .accountsPartial({
             lazyDistributor,
             recipient,
           })
@@ -394,7 +395,7 @@ describe("lazy-distributor", () => {
               currentRewards: new anchor.BN("5000000"),
               oracleIndex: 0,
             })
-            .accounts({
+            .accountsPartial({
               lazyDistributor,
               recipient,
             })
@@ -402,7 +403,7 @@ describe("lazy-distributor", () => {
 
           const method = await program.methods
             .distributeCustomDestinationV0()
-            .accounts({
+            .accountsPartial({
               common: {
                 recipient,
                 lazyDistributor,
@@ -428,14 +429,14 @@ describe("lazy-distributor", () => {
               currentRewards: new anchor.BN("5000000"),
               oracleIndex: 0,
             })
-            .accounts({
+            .accountsPartial({
               lazyDistributor,
               recipient,
             })
             .rpc({ skipPreflight: true });
           await program.methods
             .distributeCustomDestinationV0()
-            .accounts({
+            .accountsPartial({
               common: {
                 recipient,
                 lazyDistributor,
@@ -455,7 +456,7 @@ describe("lazy-distributor", () => {
     describe("with recipient", () => {
       let recipient: PublicKey;
       beforeEach(async () => {
-        const method = await program.methods.initializeRecipientV0().accounts({
+        const method = await program.methods.initializeRecipientV0().accountsPartial({
           lazyDistributor,
           mint,
         });
@@ -470,7 +471,7 @@ describe("lazy-distributor", () => {
             currentRewards: new anchor.BN("5000000"),
             oracleIndex: 0,
           })
-          .accounts({
+          .accountsPartial({
             lazyDistributor,
             recipient,
           })
@@ -489,12 +490,12 @@ describe("lazy-distributor", () => {
             currentRewards: new anchor.BN("5000000"),
             oracleIndex: 0,
           })
-          .accounts({
+          .accountsPartial({
             lazyDistributor,
             recipient,
           })
           .rpc({ skipPreflight: true });
-        const method = await program.methods.distributeRewardsV0().accounts({
+        const method = await program.methods.distributeRewardsV0().accountsPartial({
           common: { recipient, lazyDistributor, rewardsMint },
         });
         await method.rpc({ skipPreflight: true });
@@ -512,14 +513,14 @@ describe("lazy-distributor", () => {
             currentRewards: new anchor.BN("5000000"),
             oracleIndex: 0,
           })
-          .accounts({
+          .accountsPartial({
             lazyDistributor,
             recipient,
           })
           .rpc({ skipPreflight: true });
         await program.methods
           .distributeRewardsV0()
-          .accounts({
+          .accountsPartial({
             common: { recipient, lazyDistributor, rewardsMint },
           })
           .rpc({ skipPreflight: true });
@@ -534,7 +535,7 @@ describe("lazy-distributor", () => {
         beforeEach(async () => {
           await program.methods
             .updateDestinationV0()
-            .accounts({
+            .accountsPartial({
               recipient,
               destination: destinationWallet.publicKey,
             })
@@ -547,14 +548,14 @@ describe("lazy-distributor", () => {
               currentRewards: new anchor.BN("5000000"),
               oracleIndex: 0,
             })
-            .accounts({
+            .accountsPartial({
               lazyDistributor,
               recipient,
             })
             .rpc({ skipPreflight: true });
           const method = await program.methods
             .distributeCustomDestinationV0()
-            .accounts({
+            .accountsPartial({
               common: {
                 recipient,
                 lazyDistributor,
@@ -580,14 +581,14 @@ describe("lazy-distributor", () => {
               currentRewards: new anchor.BN("5000000"),
               oracleIndex: 0,
             })
-            .accounts({
+            .accountsPartial({
               lazyDistributor,
               recipient,
             })
             .rpc({ skipPreflight: true });
           await program.methods
             .distributeCustomDestinationV0()
-            .accounts({
+            .accountsPartial({
               common: {
                 recipient,
                 lazyDistributor,
@@ -616,7 +617,7 @@ describe("lazy-distributor", () => {
           ],
           approver: null,
         })
-        .accounts({
+        .accountsPartial({
           rewardsMint,
         })
         .rpc();
@@ -665,7 +666,7 @@ describe("lazy-distributor", () => {
           },
           approver: null,
         })
-        .accounts({
+        .accountsPartial({
           rewardsMint,
         });
 
@@ -679,7 +680,7 @@ describe("lazy-distributor", () => {
         pubkeys.lazyDistributor
       );
 
-      const method2 = await program.methods.initializeRecipientV0().accounts({
+      const method2 = await program.methods.initializeRecipientV0().accountsPartial({
         lazyDistributor,
         mint,
       });
@@ -697,7 +698,7 @@ describe("lazy-distributor", () => {
                 currentRewards: new anchor.BN(index * 1000000),
                 oracleIndex: index,
               })
-              .accounts({
+              .accountsPartial({
                 lazyDistributor,
                 recipient,
                 oracle: oracle.publicKey,
@@ -713,7 +714,7 @@ describe("lazy-distributor", () => {
         pubkeys: { common },
       } = await program.methods
         .distributeRewardsV0()
-        .accounts({
+        .accountsPartial({
           common: { recipient, lazyDistributor, rewardsMint },
         })
         .prepare();

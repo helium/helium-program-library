@@ -6,9 +6,26 @@ use std::{
 use anchor_lang::prelude::*;
 use shared_utils::{precise_number::PreciseNumber, signed_precise_number::SignedPreciseNumber};
 use time::{Duration, OffsetDateTime};
-use voter_stake_registry::state::{LockupKind, PositionV0, VotingMintConfigV0};
+use voter_stake_registry::state::{LockupKind, PositionV0, Registrar, VotingMintConfigV0};
 
 use crate::{error::ErrorCode, state::*, TESTING};
+
+#[macro_export]
+macro_rules! try_from {
+  ($ty: ty, $acc: expr) => {{
+    let account_info = $acc.as_ref();
+    <$ty>::try_from(unsafe {
+      core::mem::transmute::<
+        &anchor_lang::prelude::AccountInfo<'_>,
+        &anchor_lang::prelude::AccountInfo<'_>,
+      >(account_info)
+    })
+  }};
+}
+
+pub fn get_sub_dao_epoch_info_seed(registrar: &Registrar) -> [u8; 8] {
+  current_epoch(registrar.clock_unix_timestamp()).to_le_bytes()
+}
 
 pub trait OrArithError<T> {
   fn or_arith_error(self) -> Result<T>;

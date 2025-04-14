@@ -79,7 +79,7 @@ export async function run(args: any = process.argv) {
             : circuitBreaker.config.threshold,
         },
       })
-      .accounts({
+      .accountsPartial({
         circuitBreaker: circuitBreakerKey,
         authority: circuitBreaker.authority,
       })

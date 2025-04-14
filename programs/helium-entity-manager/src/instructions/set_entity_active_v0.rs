@@ -1,12 +1,13 @@
-use crate::{
-  error::ErrorCode, iot_info_seeds, mobile_info_seeds, rewardable_entity_config_seeds, state::*,
-  TESTING,
-};
-use anchor_lang::{prelude::*, solana_program::hash::hash};
+use anchor_lang::prelude::*;
 use helium_sub_daos::{
   cpi::{accounts::TrackDcOnboardingFeesV0, track_dc_onboarding_fees_v0},
   program::HeliumSubDaos,
   SubDaoV0, TrackDcOnboardingFeesArgsV0,
+};
+
+use crate::{
+  error::ErrorCode, iot_info_seeds, mobile_info_seeds, rewardable_entity_config_seeds, state::*,
+  TESTING,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]

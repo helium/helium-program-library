@@ -1,21 +1,21 @@
-use crate::error::ErrorCode;
-use crate::{data_only_config_seeds, state::*};
-use account_compression_cpi::{program::SplAccountCompression, Noop};
+use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
+  metadata::{
+    create_master_edition_v3, create_metadata_accounts_v3,
+    mpl_token_metadata::types::{CollectionDetails, DataV2},
+    CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
+  },
   token::{self, Mint, MintTo, Token, TokenAccount},
 };
-use bubblegum_cpi::{
+use bubblegum_cpi::bubblegum::{
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
 };
 use helium_sub_daos::DaoV0;
-use mpl_token_metadata::types::{CollectionDetails, DataV2};
-use shared_utils::token_metadata::{
-  create_master_edition_v3, CreateMasterEditionV3, CreateMetadataAccountsV3,
-};
-use shared_utils::{create_metadata_accounts_v3, Metadata};
+
+use crate::{data_only_config_seeds, error::ErrorCode, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataOnlyArgsV0 {
@@ -111,8 +111,8 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
     authority: args.authority,
     collection: ctx.accounts.collection.key(),
     merkle_tree: Pubkey::default(),
-    bump_seed: ctx.bumps["data_only_config"],
-    collection_bump_seed: ctx.bumps["collection"],
+    bump_seed: ctx.bumps.data_only_config,
+    collection_bump_seed: ctx.bumps.collection,
     dao,
     new_tree_depth: args.new_tree_depth,
     new_tree_buffer_size: args.new_tree_buffer_size,
@@ -148,7 +148,11 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
         payer: ctx.accounts.authority.to_account_info().clone(),
         update_authority: ctx.accounts.data_only_config.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),
@@ -161,6 +165,7 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
       collection: None,
       uses: None,
     },
+    true,
     true,
     Some(CollectionDetails::V1 { size: 0 }),
   )?;
@@ -181,7 +186,11 @@ pub fn handler(ctx: Context<InitializeDataOnlyV0>, args: InitializeDataOnlyArgsV
         payer: ctx.accounts.authority.to_account_info().clone(),
         token_program: ctx.accounts.token_program.to_account_info().clone(),
         system_program: ctx.accounts.system_program.to_account_info().clone(),
-        token_metadata_program: ctx.accounts.token_metadata_program.clone(),
+        rent: ctx
+          .accounts
+          .token_metadata_program
+          .to_account_info()
+          .clone(),
       },
       signer_seeds,
     ),

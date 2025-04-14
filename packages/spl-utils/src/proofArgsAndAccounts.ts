@@ -19,7 +19,7 @@ export type ProofArgsAndAccountsArgs = {
 };
 
 const WELL_KNOWN_CANOPY_URL =
-  "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/merkles.json";
+  "https://entities.nft.helium.io/v2/merkles";
 let wellKnownCanopyCache: Record<string, number>;
 const canopyCache: Record<string, Promise<number>> = {};
 export async function proofArgsAndAccounts({

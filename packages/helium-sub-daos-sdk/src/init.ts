@@ -15,7 +15,6 @@ export async function init(
   }
   const program = new Program<HeliumSubDaos>(
     idl as HeliumSubDaos,
-    programId ?? PROGRAM_ID,
     provider,
     undefined,
     () => {

@@ -71,7 +71,6 @@ export const init = async (
 
   const treasuryManagement = new Program<TreasuryManagement>(
     idl as TreasuryManagement,
-    programId,
     provider,
     undefined,
     () => treasuryManagementResolvers

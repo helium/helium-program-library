@@ -71,7 +71,7 @@ export async function run(args: any = process.argv) {
       .adminSetDcOnboardingFeesPaidEpochInfo({
         dcOnboardingFeesPaid: new anchor.BN(argv.dcOnboardingFeesPaid),
       })
-      .accounts({
+      .accountsPartial({
         subDaoEpochInfo: new PublicKey(argv.subDaoEpochInfo),
         authority: subDaoAcc.authority,
       })

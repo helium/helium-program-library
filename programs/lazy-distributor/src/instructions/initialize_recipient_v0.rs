@@ -1,7 +1,7 @@
-use crate::state::*;
-use crate::token_metadata::Metadata;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Mint;
+use anchor_spl::{metadata::MetadataAccount, token::Mint};
+
+use crate::state::*;
 
 #[derive(Accounts)]
 pub struct InitializeRecipientV0<'info> {
@@ -30,7 +30,7 @@ pub struct InitializeRecipientV0<'info> {
     bump,
     has_one = mint
   )]
-  pub target_metadata: Box<Account<'info, Metadata>>,
+  pub target_metadata: Box<Account<'info, MetadataAccount>>,
   pub system_program: Program<'info, System>,
 }
 
@@ -41,7 +41,7 @@ pub fn handler(ctx: Context<InitializeRecipientV0>) -> Result<()> {
     current_config_version: 0,
     current_rewards: vec![None; ctx.accounts.lazy_distributor.oracles.len()],
     lazy_distributor: ctx.accounts.lazy_distributor.key(),
-    bump_seed: ctx.bumps["recipient"],
+    bump_seed: ctx.bumps.recipient,
     destination: Pubkey::default(),
     reserved: 0,
   });

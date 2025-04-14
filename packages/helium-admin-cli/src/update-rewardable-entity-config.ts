@@ -162,7 +162,7 @@ export async function run(args: any = process.argv) {
           ? toBN(argv.stakingRequirement, dntMintAcc.decimals)
           : new BN(0),
       })
-      .accounts({
+      .accountsPartial({
         rewardableEntityConfig: rewardableConfigKey,
         authority: rewardableConfigAcc.authority,
         payer: rewardableConfigAcc.authority,

@@ -140,7 +140,7 @@ export async function run(args: any = process.argv) {
           settings: null,
           stakingRequirement: null
         })
-        .accounts({
+        .accountsPartial({
           rewardableEntityConfig: config,
           authority: configAcc.authority,
         })
@@ -158,7 +158,7 @@ export async function run(args: any = process.argv) {
           newAuthority: new PublicKey(argv.newAuthority),
           config: null,
         })
-        .accounts({
+        .accountsPartial({
           circuitBreaker: dntCircuitBreaker,
           authority: dntCbAcc.authority,
         })
@@ -179,7 +179,7 @@ export async function run(args: any = process.argv) {
           newAuthority: new PublicKey(argv.newAuthority),
           config: null,
         })
-        .accounts({
+        .accountsPartial({
           circuitBreaker: treasuryCircuitBreaker,
           authority: treasuryCbAcc.authority,
         })
@@ -208,7 +208,7 @@ export async function run(args: any = process.argv) {
           ? new PublicKey(argv.activeDeviceAuthority)
           : null,
       })
-      .accounts({
+      .accountsPartial({
         subDao,
         authority: subDaoAcc.authority,
         payer: subDaoAcc.authority,

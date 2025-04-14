@@ -104,8 +104,8 @@ export async function run(args: any = process.argv) {
     port: Number(argv.pgPort),
     ssl: argv.noSsl
       ? {
-          rejectUnauthorized: false,
-        }
+        rejectUnauthorized: false,
+      }
       : false,
   });
   await client.connect();
@@ -119,7 +119,7 @@ export async function run(args: any = process.argv) {
       CASE WHEN p.genesis_end > current_ts THEN cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'genesisVotePowerMultiplier' as numeric) ELSE 1 END as genesis_multiplier,
       GREATEST(
         cast(
-          p.end_ts -
+          p.end_ts - 
           CASE WHEN lockup_kind = 'constant' THEN start_ts ELSE current_ts END
           as numeric
         ),
@@ -133,7 +133,7 @@ export async function run(args: any = process.argv) {
         cast(lockup->>'startTs' as numeric) as start_ts,
         -- 1683727980 as current_ts
         FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)) as current_ts
-      FROM positions
+      FROM positions 
     ) p
     JOIN registrars r on p.registrar = r.address
   ),
@@ -149,9 +149,9 @@ export async function run(args: any = process.argv) {
       amount_deposited_native,
       ve_tokens,
       initial_ve_tokens,
-      CASE WHEN lockup_kind = 'constant' THEN
+      CASE WHEN lockup_kind = 'constant' THEN 
         0
-      ELSE
+      ELSE 
         CASE WHEN current_ts < genesis_end THEN
           -- genesis
           (ve_tokens - (
@@ -167,7 +167,7 @@ export async function run(args: any = process.argv) {
           ) / (genesis_end - current_ts)
         ELSE
           -- normal
-          ve_tokens / (end_ts - current_ts)
+          ve_tokens / (end_ts - current_ts) 
         END
       END as fall_rate,
       start_ts,
@@ -214,21 +214,29 @@ export async function run(args: any = process.argv) {
     FROM positions_with_vehnt p
     JOIN delegated_positions d on d.position = p.address
     JOIN sub_daos s on s.address = d.sub_dao
-    -- Remove positions getting purged this epoch
-    WHERE (lockup_kind = 'constant' or end_ts > (floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)) + 60 * 60 * 24)
+    -- Remove positions getting purged this epoch or expired this epoch
+    WHERE
+      (
+        lockup_kind = 'constant'
+        or end_ts > (
+          floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)
+        ) + 60 * 60 * 24
+      )
+      AND d.expiration_ts > (floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)) + 60 * 60 * 24
     GROUP BY s.dnt_mint, s.vehnt_fall_rate, s.vehnt_delegated, s.vehnt_last_calculated_ts, s.vehnt_last_calculated_ts
   )
-  SELECT
-    mint,
-    current_ts,
-    delegations,
+SELECT 
+  mint,
+  delegations,
+  current_ts,
     real_ve_tokens * 1000000000000 as real_ve_tokens,
     approx_ve_tokens * 1000000000000 as approx_ve_tokens,
     real_fall_rate * 1000000000000 as real_fall_rate,
     approx_fall_rate * 1000000000000 as approx_fall_rate,
-    approx_fall_rate - real_fall_rate as fall_rate_diff,
-    approx_ve_tokens - real_ve_tokens as ve_tokens_diff
-  FROM subdao_delegations`)
+  approx_fall_rate - real_fall_rate as fall_rate_diff,
+  approx_ve_tokens - real_ve_tokens as ve_tokens_diff
+FROM subdao_delegations;
+`)
   ).rows;
   const row = response.find((x) => x.mint == argv.dntMint);
 
@@ -238,6 +246,12 @@ export async function run(args: any = process.argv) {
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
   console.log('Subdao', subDao.toBase58());
 
+  console.log("updating: ", {
+    vehntDelegated: new BN(row.real_ve_tokens.split('.')[0]).toString(),
+    vehntLastCalculatedTs: new BN(row.current_ts).toString(),
+    vehntFallRate: new BN(row.real_fall_rate.split('.')[0]).toString(),
+  })
+
   instructions.push(
     await program.methods
       .updateSubDaoVehntV0({
@@ -245,7 +259,7 @@ export async function run(args: any = process.argv) {
         vehntLastCalculatedTs: new BN(row.current_ts),
         vehntFallRate: new BN(row.real_fall_rate.split('.')[0]),
       })
-      .accounts({
+      .accountsPartial({
         subDao,
         authority: subDaoAcc.authority,
       })

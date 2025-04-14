@@ -66,7 +66,7 @@ export const useFlipPositionLockupKind = () => {
                 kind,
                 periods: positionLockupPeriodInDays,
               } as any)
-              .accounts({
+              .accountsPartial({
                 position: position.pubkey,
                 dao,
               })
@@ -79,7 +79,7 @@ export const useFlipPositionLockupKind = () => {
                 kind,
                 periods: positionLockupPeriodInDays,
               } as any)
-              .accounts({
+              .accountsPartial({
                 position: position.pubkey,
               })
               .instruction()

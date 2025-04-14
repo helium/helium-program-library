@@ -1,31 +1,275 @@
 {
-  "version": "0.2.0",
-  "name": "lazy_transactions",
+  "address": "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h",
+  "metadata": {
+    "name": "lazy_transactions",
+    "version": "0.2.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
   "instructions": [
     {
-      "name": "initializeLazyTransactionsV0",
+      "name": "close_canopy_v0",
+      "discriminator": [
+        92,
+        189,
+        176,
+        245,
+        129,
+        173,
+        166,
+        169
+      ],
       "accounts": [
         {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
+          "name": "refund",
+          "writable": true
         },
         {
-          "name": "lazyTransactions",
-          "isMut": true,
-          "isSigner": false,
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "lazy_transactions"
+          ]
+        },
+        {
+          "name": "lazy_transactions",
+          "writable": true
+        },
+        {
+          "name": "canopy",
+          "writable": true,
+          "relations": [
+            "lazy_transactions"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_marker_v0",
+      "discriminator": [
+        202,
+        88,
+        149,
+        144,
+        81,
+        215,
+        1,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "refund",
+          "writable": true
+        },
+        {
+          "name": "lazy_transactions",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "lazy_transactions"
+          ]
+        },
+        {
+          "name": "block",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "type": "string",
-                "value": "lazy_transactions"
+                "value": [
+                  98,
+                  108,
+                  111,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lazy_transactions"
               },
               {
                 "kind": "arg",
-                "type": {
-                  "defined": "InitializeLazyTransactionsArgsV0"
-                },
+                "path": "args.index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "executed_transactions",
+          "writable": true,
+          "relations": [
+            "lazy_transactions"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CloseMarkerArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "execute_transaction_v0",
+      "discriminator": [
+        217,
+        93,
+        174,
+        97,
+        130,
+        183,
+        126,
+        44
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "lazy_transactions",
+          "writable": true
+        },
+        {
+          "name": "canopy",
+          "relations": [
+            "lazy_transactions"
+          ]
+        },
+        {
+          "name": "lazy_signer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  121,
+                  95,
+                  115,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lazy_transactions.name",
+                "account": "LazyTransactionsV0"
+              }
+            ]
+          }
+        },
+        {
+          "name": "block",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  108,
+                  111,
+                  99,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lazy_transactions"
+              },
+              {
+                "kind": "arg",
+                "path": "args.index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "executed_transactions",
+          "writable": true,
+          "relations": [
+            "lazy_transactions"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ExecuteTransactionArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_lazy_transactions_v0",
+      "discriminator": [
+        32,
+        227,
+        207,
+        127,
+        112,
+        50,
+        31,
+        157
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "lazy_transactions",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  97,
+                  122,
+                  121,
+                  95,
+                  116,
+                  114,
+                  97,
+                  110,
+                  115,
+                  97,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  115
+                ]
+              },
+              {
+                "kind": "arg",
                 "path": "args.name"
               }
             ]
@@ -33,276 +277,111 @@
         },
         {
           "name": "canopy",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "executedTransactions",
-          "isMut": true,
-          "isSigner": false
+          "name": "executed_transactions",
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "InitializeLazyTransactionsArgsV0"
+            "defined": {
+              "name": "InitializeLazyTransactionsArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "executeTransactionV0",
+      "name": "set_canopy_v0",
+      "discriminator": [
+        25,
+        86,
+        129,
+        124,
+        184,
+        195,
+        134,
+        89
+      ],
       "accounts": [
         {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "lazyTransactions",
-          "isMut": true,
-          "isSigner": false,
+          "name": "authority",
+          "signer": true,
           "relations": [
-            "canopy",
-            "executed_transactions"
+            "lazy_transactions"
           ]
         },
         {
+          "name": "lazy_transactions",
+          "writable": true
+        },
+        {
           "name": "canopy",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "lazySigner",
-          "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "lazy_signer"
-              },
-              {
-                "kind": "account",
-                "type": "string",
-                "account": "LazyTransactionsV0",
-                "path": "lazy_transactions.name"
-              }
-            ]
-          }
-        },
-        {
-          "name": "block",
-          "isMut": false,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "block"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "LazyTransactionsV0",
-                "path": "lazy_transactions"
-              },
-              {
-                "kind": "arg",
-                "type": {
-                  "defined": "ExecuteTransactionArgsV0"
-                },
-                "path": "args.index"
-              }
-            ]
-          }
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "executedTransactions",
-          "isMut": true,
-          "isSigner": false
+          "writable": true,
+          "relations": [
+            "lazy_transactions"
+          ]
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "ExecuteTransactionArgsV0"
+            "defined": {
+              "name": "SetCanopyArgsV0"
+            }
           }
         }
       ]
     },
     {
-      "name": "closeMarkerV0",
+      "name": "update_lazy_transactions_v0",
+      "discriminator": [
+        56,
+        223,
+        165,
+        245,
+        150,
+        236,
+        173,
+        37
+      ],
       "accounts": [
         {
-          "name": "refund",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "lazyTransactions",
-          "isMut": true,
-          "isSigner": false,
+          "name": "authority",
+          "signer": true,
           "relations": [
-            "authority",
-            "executed_transactions"
+            "lazy_transactions"
           ]
         },
         {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "name": "lazy_transactions",
+          "writable": true
         },
         {
-          "name": "block",
-          "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "block"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "LazyTransactionsV0",
-                "path": "lazy_transactions"
-              },
-              {
-                "kind": "arg",
-                "type": {
-                  "defined": "CloseMarkerArgsV0"
-                },
-                "path": "args.index"
-              }
-            ]
-          }
+          "name": "canopy",
+          "writable": true
         },
         {
-          "name": "executedTransactions",
-          "isMut": true,
-          "isSigner": false
+          "name": "executed_transactions",
+          "writable": true
         }
       ],
       "args": [
         {
           "name": "args",
           "type": {
-            "defined": "CloseMarkerArgsV0"
-          }
-        }
-      ]
-    },
-    {
-      "name": "closeCanopyV0",
-      "accounts": [
-        {
-          "name": "refund",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "lazyTransactions",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "authority",
-            "canopy"
-          ]
-        },
-        {
-          "name": "canopy",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "updateLazyTransactionsV0",
-      "accounts": [
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "lazyTransactions",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "authority"
-          ]
-        },
-        {
-          "name": "canopy",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "executedTransactions",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": "UpdateLazyTransactionsArgsV0"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setCanopyV0",
-      "accounts": [
-        {
-          "name": "authority",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "lazyTransactions",
-          "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "authority",
-            "canopy"
-          ]
-        },
-        {
-          "name": "canopy",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": "SetCanopyArgsV0"
+            "defined": {
+              "name": "UpdateLazyTransactionsArgsV0"
+            }
           }
         }
       ]
@@ -310,55 +389,67 @@
   ],
   "accounts": [
     {
-      "name": "LazyTransactionsV0",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "name",
-            "type": "string"
-          },
-          {
-            "name": "maxDepth",
-            "type": "u32"
-          },
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "canopy",
-            "type": "publicKey"
-          },
-          {
-            "name": "bumpSeed",
-            "type": "u8"
-          },
-          {
-            "name": "executedTransactions",
-            "type": "publicKey"
-          }
-        ]
-      }
+      "name": "Block",
+      "discriminator": [
+        12,
+        72,
+        207,
+        108,
+        1,
+        228,
+        167,
+        221
+      ]
     },
+    {
+      "name": "LazyTransactionsV0",
+      "discriminator": [
+        51,
+        89,
+        224,
+        39,
+        73,
+        173,
+        229,
+        141
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidData",
+      "msg": "The data did not match the root verification"
+    },
+    {
+      "code": 6001,
+      "name": "InstructionSerializeFailed",
+      "msg": "Failed to serialize instruction"
+    },
+    {
+      "code": 6002,
+      "name": "ToCreateSerializeFailed",
+      "msg": "Failed to serialize ToCreate"
+    },
+    {
+      "code": 6003,
+      "name": "CanopyLengthMismatch",
+      "msg": "Invalid canopy length"
+    },
+    {
+      "code": 6004,
+      "name": "TransactionAlreadyExecuted",
+      "msg": "Transaction has already been executed"
+    }
+  ],
+  "types": [
     {
       "name": "Block",
       "type": {
         "kind": "struct",
         "fields": []
       }
-    }
-  ],
-  "types": [
+    },
     {
       "name": "CloseMarkerArgsV0",
       "type": {
@@ -377,7 +468,7 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "programIdIndex",
+            "name": "program_id_index",
             "docs": [
               "Index into the transaction keys array indicating the program account that executes this instruction."
             ],
@@ -409,12 +500,14 @@
             "name": "instructions",
             "type": {
               "vec": {
-                "defined": "CompiledInstruction"
+                "defined": {
+                  "name": "CompiledInstruction"
+                }
               }
             }
           },
           {
-            "name": "signerSeeds",
+            "name": "signer_seeds",
             "docs": [
               "Additional signer seeds. Should include bump",
               "Note that these seeds will be prefixed with \"user\", lazy_transactions.name",
@@ -454,11 +547,52 @@
           },
           {
             "name": "authority",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
-            "name": "maxDepth",
+            "name": "max_depth",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LazyTransactionsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "max_depth",
+            "type": "u32"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "canopy",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          },
+          {
+            "name": "executed_transactions",
+            "type": "pubkey"
           }
         ]
       }
@@ -498,41 +632,11 @@
           {
             "name": "authority",
             "type": {
-              "option": "publicKey"
+              "option": "pubkey"
             }
           }
         ]
       }
     }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "InvalidData",
-      "msg": "The data did not match the root verification"
-    },
-    {
-      "code": 6001,
-      "name": "InstructionSerializeFailed",
-      "msg": "Failed to serialize instruction"
-    },
-    {
-      "code": 6002,
-      "name": "ToCreateSerializeFailed",
-      "msg": "Failed to serialize ToCreate"
-    },
-    {
-      "code": 6003,
-      "name": "CanopyLengthMismatch",
-      "msg": "Invalid canopy length"
-    },
-    {
-      "code": 6004,
-      "name": "TransactionAlreadyExecuted",
-      "msg": "Transaction has already been executed"
-    }
-  ],
-  "metadata": {
-    "address": "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h"
-  }
+  ]
 }

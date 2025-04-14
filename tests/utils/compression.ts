@@ -47,7 +47,6 @@ export async function createCompressionNft({
 }> {
   const bubblegum = new Program<MplBubblegum>(
     BubblegumIdl as MplBubblegum,
-    new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"),
     provider,
     undefined,
     () => {
@@ -59,6 +58,8 @@ export async function createCompressionNft({
             return new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
           case "logWrapper":
             return new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
+          case "systemProgram":
+            return new PublicKey("11111111111111111111111111111111");
           default:
             return;
         }
@@ -80,7 +81,7 @@ export async function createCompressionNft({
           programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
         }),
       ])
-      .accounts({
+      .accountsPartial({
         merkleTree: merkle.publicKey,
       })
       .signers([merkle])
@@ -129,7 +130,7 @@ export async function createCompressionNft({
         tokenStandard: { nonFungible: {} },
         tokenProgramVersion: { original: {} },
       })
-      .accounts({
+      .accountsPartial({
         merkleTree: merkle.publicKey,
         leafOwner: recipient,
         leafDelegate: recipient,
@@ -147,7 +148,7 @@ export async function createCompressionNft({
         tokenStandard: { nonFungible: {} },
         tokenProgramVersion: { original: {} },
       })
-      .accounts({
+      .accountsPartial({
         merkleTree: merkle.publicKey,
         leafOwner: recipient,
         leafDelegate: recipient,

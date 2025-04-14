@@ -1,6 +1,7 @@
 [package]
 name = "data-credits"
 version = "0.2.3"
+# Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
 
@@ -9,6 +10,7 @@ crate-type = ["cdylib", "lib"]
 name = "data_credits"
 
 [features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build", "circuit-breaker/idl-build", "lazy-transactions/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -23,9 +25,11 @@ overflow-checks = true
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
+solana-zk-sdk = { workspace = true }
 helium-sub-daos = { workspace = true }
 circuit-breaker = { workspace = true }
-pyth-solana-receiver-sdk = "0.3.0"
+pyth-solana-receiver-sdk = { workspace = true }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
 solana-security-txt = { workspace = true }
+pythnet-sdk = { workspace = true }
 default-env = { workspace = true }

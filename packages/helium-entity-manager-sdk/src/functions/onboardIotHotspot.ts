@@ -59,7 +59,7 @@ export async function onboardIotHotspot({
       elevation: typeof elevation == "undefined" ? null : elevation,
       gain: typeof gain == "undefined" ? null : gain,
     })
-    .accounts({
+    .accountsPartial({
       // hotspot: assetId,
       ...accounts,
       dcFeePayer,

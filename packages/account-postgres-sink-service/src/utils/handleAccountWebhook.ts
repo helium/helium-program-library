@@ -10,6 +10,7 @@ import database, { limit } from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
 import { OMIT_KEYS } from "../constants";
+import { lowerFirstChar } from "@helium/spl-utils";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
@@ -80,14 +81,14 @@ export const handleAccountWebhook = async ({
         return;
       }
 
-      const program = new anchor.Program(idl, programId, provider);
+      const program = new anchor.Program(idl, provider);
       const data = Buffer.from(account.data[0], account.data[1]);
       const accName = accounts.find(({ type }) => {
         return (
           data &&
-          anchor.BorshAccountsCoder.accountDiscriminator(type).equals(
-            data.subarray(0, 8)
-          )
+          (program.coder.accounts as anchor.BorshAccountsCoder)
+            .accountDiscriminator(lowerFirstChar(type))
+            .equals(data.subarray(0, 8))
         );
       })?.type;
 
@@ -96,7 +97,7 @@ export const handleAccountWebhook = async ({
         return;
       }
 
-      const decodedAcc = program.coder.accounts.decode(accName, data as Buffer);
+      const decodedAcc = program.coder.accounts.decode(lowerFirstChar(accName), data as Buffer);
       const model = sequelize.models[accName];
       const existing = await model.findByPk(account.pubkey, {
         transaction: t,

@@ -56,7 +56,7 @@ export async function run(args: any = process.argv) {
       connection: provider.connection,
       keys: positionKeys,
     })
-  ).map((a) => a ? coder.decode("PositionV0", a.data) : null);
+  ).map((a) => a ? coder.decode("positionV0", a.data) : null);
 
   const currTs = await getSolanaUnixTimestamp(provider);
   const currTsBN = new anchor.BN(currTs.toString());

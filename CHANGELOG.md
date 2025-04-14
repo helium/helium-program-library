@@ -3,6 +3,86 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.6](https://github.com/helium/helium-program-library/compare/v0.10.5...v0.10.6) (2025-04-08)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.5](https://github.com/helium/helium-program-library/compare/v0.10.4...v0.10.5) (2025-04-07)
+
+
+
+## [0.9.34](https://github.com/helium/helium-program-library/compare/v0.9.33...v0.9.34) (2025-04-03)
+
+
+
+## [0.9.33](https://github.com/helium/helium-program-library/compare/v0.9.32...v0.9.33) (2025-03-28)
+
+
+
+## [0.9.32](https://github.com/helium/helium-program-library/compare/v0.10.3...v0.9.32) (2025-03-28)
+
+
+
+## [0.9.31](https://github.com/helium/helium-program-library/compare/v0.9.30...v0.9.31) (2025-03-13)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.4](https://github.com/helium/helium-program-library/compare/v0.10.3...v0.10.4) (2025-04-07)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.3](https://github.com/helium/helium-program-library/compare/v0.10.2...v0.10.3) (2025-03-25)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.2](https://github.com/helium/helium-program-library/compare/v0.10.1...v0.10.2) (2025-03-24)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.1](https://github.com/helium/helium-program-library/compare/v0.10.0...v0.10.1) (2025-03-21)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+# [0.10.0](https://github.com/helium/helium-program-library/compare/v0.9.30...v0.10.0) (2025-03-20)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.9.31](https://github.com/helium/helium-program-library/compare/v0.9.30...v0.9.31) (2025-03-13)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
 ## [0.9.30](https://github.com/helium/helium-program-library/compare/v0.9.29...v0.9.30) (2025-03-06)
 
 **Note:** Version bump only for package helium-program-library

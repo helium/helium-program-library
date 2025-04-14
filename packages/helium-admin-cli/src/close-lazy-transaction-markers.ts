@@ -62,7 +62,7 @@ export async function run(args: any = process.argv) {
           programId: lazyProgram.programId,
         }),
       ])
-      .accounts({
+      .accountsPartial({
         lazyTransactions: ltKey,
         executedTransactions: executedTransactions.publicKey,
         canopy: lt.canopy,

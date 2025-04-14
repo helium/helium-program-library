@@ -1,14 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { dataCreditsKey, init as initDataCredits } from "@helium/data-credits-sdk";
+import { init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
 import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
 import { createAtaAndMint, createMint, toBN } from "@helium/spl-utils";
-import {
-  PythSolanaReceiverProgram,
-  pythSolanaReceiverIdl,
-} from "@pythnetwork/pyth-solana-receiver";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
@@ -57,7 +53,6 @@ describe("hexboosting", () => {
   let hemProgram: Program<HeliumEntityManager>;
   let hsdProgram: Program<HeliumSubDaos>;
   let dcProgram: Program<DataCredits>;
-  let pythProgram: Program<PythSolanaReceiverProgram>;
   let memProgram: Program<MobileEntityManager>;
   let carrier: PublicKey;
   let merkle: Keypair;
@@ -69,10 +64,6 @@ describe("hexboosting", () => {
       provider,
       anchor.workspace.Hexboosting.programId,
       anchor.workspace.Hexboosting.idl
-    );
-    pythProgram = new Program(
-      pythSolanaReceiverIdl,
-      new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ")
     );
     dcProgram = await initDataCredits(
       provider,
@@ -109,7 +100,7 @@ describe("hexboosting", () => {
         dcAmount: new BN("10000000000"),
         hntAmount: null,
       })
-      .accounts({
+      .accountsPartial({
         dcMint: dataCredits.dcMint,
         recipient: me,
       })
@@ -145,7 +136,7 @@ describe("hexboosting", () => {
       .preInstructions([
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
       ])
-      .accounts({
+      .accountsPartial({
         subDao,
       })
       .rpcAndKeys({ skipPreflight: true });
@@ -167,13 +158,13 @@ describe("hexboosting", () => {
         maxDepth: 3,
         maxBufferSize: 8,
       })
-      .accounts({ carrier, newMerkleTree: merkle.publicKey })
+      .accountsPartial({ carrier, newMerkleTree: merkle.publicKey })
       .preInstructions([createMerkle])
       .signers([merkle])
       .rpc({ skipPreflight: true });
     await memProgram.methods
       .approveCarrierV0()
-      .accounts({ carrier })
+      .accountsPartial({ carrier })
       .rpc({ skipPreflight: true });
   });
 
@@ -186,7 +177,7 @@ describe("hexboosting", () => {
         periodLength,
         minimumPeriods: 6,
       })
-      .accounts({
+      .accountsPartial({
         startAuthority: me,
         dcMint: mint,
         priceOracle,
@@ -215,7 +206,7 @@ describe("hexboosting", () => {
           periodLength: 60 * 60 * 24 * 30, // roughly one month,
           minimumPeriods: 6,
         })
-        .accounts({
+        .accountsPartial({
           startAuthority: me,
           dcMint: mint,
           priceOracle,
@@ -237,7 +228,7 @@ describe("hexboosting", () => {
           priceOracle: PublicKey.default,
           dcMint: mint,
         })
-        .accounts({
+        .accountsPartial({
           boostConfig,
         })
         .rpcAndKeys({ skipPreflight: true });
@@ -297,7 +288,7 @@ describe("hexboosting", () => {
             },
           ],
         })
-        .accounts({
+        .accountsPartial({
           dcMint: mint,
           carrier,
           boostConfig,
@@ -361,7 +352,7 @@ describe("hexboosting", () => {
               },
             ],
           })
-          .accounts({
+          .accountsPartial({
             dcMint: mint,
             carrier,
             boostConfig,
@@ -394,7 +385,7 @@ describe("hexboosting", () => {
               },
             ],
           })
-          .accounts({
+          .accountsPartial({
             dcMint: mint,
             carrier,
             boostConfig,
@@ -432,7 +423,7 @@ describe("hexboosting", () => {
           .startBoostV1({
             startTs: new BN(1),
           })
-          .accounts({
+          .accountsPartial({
             boostedHex,
           })
           .rpc({ skipPreflight: true });
@@ -456,7 +447,7 @@ describe("hexboosting", () => {
             .startBoostV1({
               startTs: new BN(1),
             })
-            .accounts({
+            .accountsPartial({
               boostedHex,
             })
             .rpc({ skipPreflight: true });
@@ -475,7 +466,7 @@ describe("hexboosting", () => {
 
           await program.methods
             .closeBoostV0()
-            .accounts({
+            .accountsPartial({
               boostedHex,
             })
             .rpc({ skipPreflight: true });
