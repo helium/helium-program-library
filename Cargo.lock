@@ -538,7 +538,7 @@ dependencies = [
 
 [[package]]
 name = "circuit-breaker"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -640,7 +640,7 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -712,7 +712,7 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
 name = "fanout"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -825,7 +825,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -848,7 +848,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.25"
+version = "0.2.26"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -878,7 +878,7 @@ dependencies = [
 
 [[package]]
 name = "hexboosting"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -987,7 +987,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1004,7 +1004,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-transactions"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1125,7 +1125,7 @@ dependencies = [
 
 [[package]]
 name = "mobile-entity-manager"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1165,7 +1165,7 @@ dependencies = [
 
 [[package]]
 name = "no-emit"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1376,7 +1376,7 @@ dependencies = [
 
 [[package]]
 name = "price-oracle"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -1570,7 +1570,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "rewards-oracle"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -3127,7 +3127,7 @@ dependencies = [
 
 [[package]]
 name = "treasury-management"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3204,7 +3204,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
