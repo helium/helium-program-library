@@ -645,6 +645,7 @@ describe("voter-stake-registry", () => {
         const registrarBalance = await provider.connection.getBalance(
           registrar
         );
+        const positionBalance = await provider.connection.getBalance(position);
         await program.methods
           .proxiedVoteV1({
             choice: 0,
@@ -679,9 +680,10 @@ describe("voter-stake-registry", () => {
         const registrarBalance2 = await provider.connection.getBalance(
           registrar
         );
+        const positionBalance2 = await provider.connection.getBalance(position);
         const spentLamports =
-          (await provider.connection.getAccountInfo(marker! as PublicKey))
-            ?.lamports || 0;
+          ((await provider.connection.getAccountInfo(marker! as PublicKey))
+            ?.lamports || 0) + (positionBalance2 - positionBalance);
         expect(registrarBalance2).to.eq(registrarBalance - spentLamports);
       });
 
