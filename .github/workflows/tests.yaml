@@ -103,6 +103,7 @@ jobs:
           - packages/vsr-metadata-service
           - packages/crons
           - packages/geocoder-service
+          - packages/recent-helium-transactions-service
     steps:
       - uses: actions/checkout@v3
       - run: cd $DOCKER_PATH && docker build .
