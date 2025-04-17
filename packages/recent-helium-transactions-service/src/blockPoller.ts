@@ -19,7 +19,7 @@ export async function poll({ url, pollIntervalMs }: PollerConfig): Promise<void>
       if (newBlock) {
         currentBlock = newBlock
       }
-      response.data.forEach(tx => {
+      response.data.forEach((tx: any) => {
         console.log(JSON.stringify(tx, null, 2))
       })
 
