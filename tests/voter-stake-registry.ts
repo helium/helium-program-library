@@ -69,13 +69,17 @@ describe("voter-stake-registry", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
+  before(async () => {
+    await ensureVSRIdl();
+  });
+
   beforeEach(async () => {
     program = await init(
       provider,
       PROGRAM_ID,
       anchor.workspace.VoterStakeRegistry.idl
     );
-    ensureVSRIdl(program);
+    ensureVSRIdl();
     // @ts-ignore
     proposalProgram = await initProposal(provider as any);
     proxyProgram = await initNftProxy(provider, DEL_PID);

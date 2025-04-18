@@ -5,10 +5,10 @@ use anchor_spl::{
 };
 use circuit_breaker::{
   cpi::{accounts::InitializeAccountWindowedBreakerV0, initialize_account_windowed_breaker_v0},
-  CircuitBreaker, InitializeAccountWindowedBreakerArgsV0,
+  CircuitBreaker, InitializeAccountWindowedBreakerArgsV0, WindowedCircuitBreakerConfigV0,
 };
 
-use crate::{circuit_breaker::WindowedCircuitBreakerConfigV0, state::*};
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeTreasuryManagementArgsV0 {

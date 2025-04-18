@@ -4,11 +4,11 @@ use anchor_spl::token::{
 };
 use circuit_breaker::{
   cpi::{accounts::InitializeMintWindowedBreakerV0, initialize_mint_windowed_breaker_v0},
-  CircuitBreaker, InitializeMintWindowedBreakerArgsV0,
+  CircuitBreaker, InitializeMintWindowedBreakerArgsV0, WindowedCircuitBreakerConfigV0,
 };
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
-use crate::{circuit_breaker::*, state::*};
+use crate::state::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeDataCreditsArgsV0 {
