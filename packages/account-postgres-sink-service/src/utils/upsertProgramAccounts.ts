@@ -79,7 +79,7 @@ export const upsertProgramAccounts = async ({
       async () => {
         return await connection.getProgramAccounts(programId, {
           filters,
-          commitment: connection.commitment,
+          commitment: "confirmed",
         });
       },
       {
@@ -120,7 +120,10 @@ export const upsertProgramAccounts = async ({
     try {
       const model = sequelize.models[type];
       const plugins = await initPlugins(rest.plugins);
-      const filter = program.coder.accounts.memcmp(lowerFirstChar(type), undefined);
+      const filter = program.coder.accounts.memcmp(
+        lowerFirstChar(type),
+        undefined
+      );
       const coderFilters: GetProgramAccountsFilter[] = [];
 
       if (filter?.offset != undefined && filter?.bytes != undefined) {

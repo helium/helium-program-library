@@ -14,7 +14,8 @@
     "crons": "./packages/crons",
     "rewards-oracle-faucet-service": "./packages/rewards-oracle-faucet-service",
     "entity-invalidator": "./packages/entity-invalidator",
-    "geocoder-service": "./packages/geocoder-service"
+    "geocoder-service": "./packages/geocoder-service",
+    "recent-helium-transactions-service": "./packages/recent-helium-transactions-service"
   },
   "oracle": {
     "distributor-oracle": "./packages/distributor-oracle"
