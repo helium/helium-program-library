@@ -79,7 +79,6 @@ describe("voter-stake-registry", () => {
       PROGRAM_ID,
       anchor.workspace.VoterStakeRegistry.idl
     );
-    ensureVSRIdl();
     // @ts-ignore
     proposalProgram = await initProposal(provider as any);
     proxyProgram = await initNftProxy(provider, DEL_PID);
