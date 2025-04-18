@@ -5,7 +5,11 @@ import { initPlugins } from "../plugins";
 import { IAccountConfig, IConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import { provider } from "./solana";
-import { IdlField, IdlTypeDef, IdlTypeDefTyStruct } from "@coral-xyz/anchor/dist/cjs/idl";
+import {
+  IdlField,
+  IdlTypeDef,
+  IdlTypeDefTyStruct,
+} from "@coral-xyz/anchor/dist/cjs/idl";
 
 const TypeMap = new Map<string, any>([
   ["string", DataTypes.STRING],
@@ -67,12 +71,15 @@ export const defineIdlModels = async ({
     const accConfig = accounts.find(({ type }) => type === acc.name);
     if (accConfig) {
       let schema: { [key: string]: any } = {};
-      for (const field of ((typeDef as any as IdlTypeDef).type as IdlTypeDefTyStruct).fields || []) {
+      for (const field of (
+        (typeDef as any as IdlTypeDef).type as IdlTypeDefTyStruct
+      ).fields || []) {
         if (typeof field != "string") {
           const fieldAsField = field as IdlField;
+          const prunedFieldName = fieldAsField.name.replace(/^_+/, "");
           schema[acc.name] = {
             ...schema[acc.name],
-            [camelize(fieldAsField.name, true)]: determineType(fieldAsField.type),
+            [camelize(prunedFieldName, true)]: determineType(fieldAsField.type),
           };
         }
       }
