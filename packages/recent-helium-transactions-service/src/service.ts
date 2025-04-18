@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js'
 import { TransactionParser } from './parser'
 import { TransactionBufferManager } from './buffer'
-import { ServiceConfig, ParsedTransaction, TransactionDefinition } from './types'
+import { ServiceConfig, ParsedTransaction, TransactionDefinition, GetTransactionsArgs } from './types'
 import logger from './logger'
 import { TransactionCache } from './transactionCache'
 
@@ -18,7 +18,8 @@ export class RecentTransactionsService {
     private connection: Connection,
     private config: ServiceConfig,
     private pollingIntervalMs: number,
-    private maxBufferSize: number = 100
+    private maxBufferSize: number = 1000,
+    private maxLookbackSize: number = 100
   ) {
     this.parser = new TransactionParser(connection)
     this.bufferManager = new TransactionBufferManager(maxBufferSize)
@@ -94,7 +95,7 @@ export class RecentTransactionsService {
         const signatures = await this.connection.getSignaturesForAddress(
           new PublicKey(programId),
           {
-            limit: this.maxBufferSize,
+            limit: this.maxLookbackSize,
             until: lastSignature
           },
           'confirmed'
@@ -103,13 +104,13 @@ export class RecentTransactionsService {
         if (signatures.length > 0) {
           // Update the last signature for this program
           this.lastSignatureByProgram.set(programId, signatures[0].signature)
-        }
-
-        if (signatures.length > 0) {
+          
           logger.debug({
             message: 'Found signatures',
             programId,
-            count: signatures.length
+            count: signatures.length,
+            maxLookbackSize: this.maxLookbackSize,
+            maxBufferSize: this.maxBufferSize
           })
         }
 
@@ -187,7 +188,11 @@ export class RecentTransactionsService {
     }
   }
 
-  getTransactions(route: string, untilBlock?: number, limit?: number): ParsedTransaction[] {
-    return this.bufferManager.getTransactions(route, untilBlock, limit)
+  getTransactions(route: string, args: GetTransactionsArgs = {}): ParsedTransaction[] {
+    const transactions = this.bufferManager.getTransactions(route, args.untilBlock, args.limit)
+    if (args.types && args.types.length > 0) {
+      return transactions.filter(tx => !args.types || args.types.includes(tx.name))
+    }
+    return transactions
   }
 } 

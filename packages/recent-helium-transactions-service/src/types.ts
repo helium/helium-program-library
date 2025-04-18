@@ -67,4 +67,16 @@ export interface ParsedTransaction {
 export interface TransactionBuffer {
   transactions: ParsedTransaction[]
   maxSize: number
+}
+
+export interface TransactionQueryParams {
+  until?: string
+  limit?: string
+  types?: string[]
+}
+
+export interface GetTransactionsArgs {
+  untilBlock?: number
+  limit?: number
+  types?: string[]
 } 
