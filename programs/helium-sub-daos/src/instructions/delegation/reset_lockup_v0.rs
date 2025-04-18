@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use voter_stake_registry::{
   cpi::{accounts::ResetLockupV0 as VsrResetLockupV0, reset_lockup_v0},
-  state::{LockupKind as VsrLockupKind, PositionV0, Registrar},
+  state::{LockupKind, PositionV0, Registrar},
   ResetLockupArgsV0 as VsrResetLockupArgsV0, VoterStakeRegistry,
 };
 
@@ -42,31 +42,6 @@ pub struct ResetLockupV0<'info> {
   pub vsr_program: Program<'info, VoterStakeRegistry>,
 }
 
-#[repr(u8)]
-#[derive(Default, AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LockupKind {
-  /// No lockup, tokens can be withdrawn as long as not engaged in a proposal.
-  #[default]
-  None,
-
-  /// Lock up for a number of days
-  Cliff,
-
-  /// Lock up permanently. The number of days specified becomes the minimum
-  /// unlock period when the deposit (or a part of it) is changed to Cliff.
-  Constant,
-}
-
-impl From<LockupKind> for VsrLockupKind {
-  fn from(kind: LockupKind) -> Self {
-    match kind {
-      LockupKind::None => VsrLockupKind::None,
-      LockupKind::Cliff => VsrLockupKind::Cliff,
-      LockupKind::Constant => VsrLockupKind::Constant,
-    }
-  }
-}
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ResetLockupArgsV0 {
   pub kind: LockupKind,
@@ -96,10 +71,7 @@ pub fn handler(ctx: Context<ResetLockupV0>, args: ResetLockupArgsV0) -> Result<(
         &[ctx.accounts.dao.bump_seed],
       ]],
     ),
-    VsrResetLockupArgsV0 {
-      kind: kind.into(),
-      periods,
-    },
+    VsrResetLockupArgsV0 { kind, periods },
   )?;
 
   Ok(())

@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use voter_stake_registry::state::RecentProposal;
 
 use crate::{error::ErrorCode, EPOCH_LENGTH};
 
@@ -105,19 +106,6 @@ pub struct DaoV0 {
   pub delegator_rewards_percent: u64, // number between 0 - (100_u64 * 100_000_000). The % of DNT rewards delegators receive with 8 decimal places of accuracy
   pub proposal_namespace: Pubkey,
   pub recent_proposals: [RecentProposal; 4],
-}
-
-#[derive(Debug, InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Default)]
-pub struct RecentProposal {
-  pub proposal: Pubkey,
-  pub ts: i64,
-}
-
-const ONE_WEEK: i64 = 60 * 60 * 24 * 7;
-impl RecentProposal {
-  pub fn is_in_progress(&self, curr_ts: i64) -> bool {
-    self.ts + ONE_WEEK > curr_ts
-  }
 }
 
 #[macro_export]

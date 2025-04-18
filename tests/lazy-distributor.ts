@@ -35,6 +35,10 @@ describe("lazy-distributor", () => {
   let wallet: Keypair;
   let rewardsMint: PublicKey;
 
+  before(async () => {
+    await ensureLDIdl();
+  });
+
   beforeEach(async () => {
     program = await init(
       provider,
@@ -45,8 +49,6 @@ describe("lazy-distributor", () => {
     wallet = await loadKeypair(process.env.ANCHOR_WALLET!);
 
     rewardsMint = await createMint(provider, 6, me, me);
-
-    await ensureLDIdl(program);
   });
 
   it("initializes a lazy distributor", async () => {

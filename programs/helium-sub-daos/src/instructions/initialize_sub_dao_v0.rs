@@ -3,14 +3,10 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{set_authority, spl_token::instruction::AuthorityType, Mint, SetAuthority, Token},
 };
-use circuit_breaker::CircuitBreaker;
+use circuit_breaker::{CircuitBreaker, ThresholdType, WindowedCircuitBreakerConfigV0};
 use shared_utils::resize_to_fit;
 use time::OffsetDateTime;
 use treasury_management::{
-  circuit_breaker::{
-    ThresholdType as TMThresholdType,
-    WindowedCircuitBreakerConfigV0 as TMWindowedCircuitBreakerConfigV0,
-  },
   cpi::{accounts::InitializeTreasuryManagementV0, initialize_treasury_management_v0},
   Curve as TreasuryCurve, InitializeTreasuryManagementArgsV0, TreasuryManagement,
 };
@@ -133,9 +129,9 @@ pub fn handler(ctx: Context<InitializeSubDaoV0>, args: InitializeSubDaoArgsV0) -
       authority: ctx.accounts.sub_dao.key(),
       curve: args.treasury_curve.into(),
       freeze_unix_time: i64::MAX,
-      window_config: TMWindowedCircuitBreakerConfigV0 {
+      window_config: WindowedCircuitBreakerConfigV0 {
         window_size_seconds: u64::try_from(24 * 60 * 60).unwrap(),
-        threshold_type: TMThresholdType::Percent,
+        threshold_type: ThresholdType::Percent,
         threshold: u64::MAX.checked_div(5_u64).unwrap(), // 20%
       },
     },

@@ -33,7 +33,7 @@ import { DataCredits } from "../target/types/data_credits";
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { initTestSubdao } from "./utils/daos";
-import { ensureHSDIdl, ensureVSRIdl } from "./utils/fixtures";
+import { ensureHSDIdl, ensureIdl, ensureVSRIdl } from "./utils/fixtures";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import { initVsr } from "./utils/vsr";
 
@@ -95,7 +95,7 @@ describe("data-credits", () => {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
 
-  beforeEach(async () => {
+  before(async () => {
     pythProgram = new Program(
       pythSolanaReceiverIdl as any,
     );
@@ -115,8 +115,11 @@ describe("data-credits", () => {
       anchor.workspace.VoterStakeRegistry.idl
     );
     nftProxyProgram = await initNftProxy(provider);
-    ensureVSRIdl(vsrProgram);
-    // fresh start
+    await ensureVSRIdl();
+    await ensureHSDIdl();
+  })
+
+  beforeEach(async () => {
     hntMint = await createMint(provider, hntDecimals, me, me);
     dcMint = await createMint(provider, dcDecimals, me, me);
     await createAtaAndMint(
@@ -217,7 +220,6 @@ describe("data-credits", () => {
           hntMint,
           hstPool: await getAssociatedTokenAddress(hntMint, me),
         });
-      ensureHSDIdl(hsdProgram);
 
       dao = (await method.pubkeys()).dao!;
       if (!(await provider.connection.getAccountInfo(dao))) {
@@ -258,8 +260,8 @@ describe("data-credits", () => {
           price.priceMessage.emaPrice
             .sub(price.priceMessage.emaConf.mul(new BN(2)))
             .toNumber() *
-            10 ** price.priceMessage.exponent *
-            10 ** 5
+          10 ** price.priceMessage.exponent *
+          10 ** 5
         );
       expect(dcBal.value.uiAmount).to.be.within(
         approxEndBal - 1,
@@ -299,7 +301,7 @@ describe("data-credits", () => {
         (Math.floor(dcAmount * 10 ** (hntDecimals - 5)) / hntEmaPrice) *
         10 ** -hntDecimals;
 
-        const approxEndBal = startHntBal - hntAmount;
+      const approxEndBal = startHntBal - hntAmount;
       expect(hntBal.value.uiAmount).to.be.within(
         approxEndBal * 0.999,
         approxEndBal * 1.001

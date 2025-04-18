@@ -16,6 +16,7 @@ use circuit_breaker::{
   ThresholdType, ThresholdType as CBThresholdType, WindowedCircuitBreakerConfigV0,
   WindowedCircuitBreakerConfigV0 as CBWindowedCircuitBreakerConfigV0,
 };
+use voter_stake_registry::state::RecentProposal;
 
 use crate::{dao_seeds, state::*, EPOCH_LENGTH};
 

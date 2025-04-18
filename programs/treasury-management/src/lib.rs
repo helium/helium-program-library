@@ -4,7 +4,6 @@ use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5");
 
-pub mod circuit_breaker;
 pub mod curve;
 pub mod error;
 pub mod instructions;

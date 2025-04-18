@@ -1,7 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
-import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import {
   createAtaAndMint,
   createAtaAndTransfer,
@@ -23,6 +21,12 @@ import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { LazyDistributor } from "../../target/types/lazy_distributor";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
+import { PROGRAM_ID as DC_ID } from "@helium/data-credits-sdk";
+import { PROGRAM_ID as MEM_ID } from "@helium/mobile-entity-manager-sdk";
+import { PROGRAM_ID as VSR_ID } from "@helium/voter-stake-registry-sdk";
+import { PROGRAM_ID as HEM_ID } from "@helium/helium-entity-manager-sdk";
+import { PROGRAM_ID as HSD_ID } from "@helium/helium-sub-daos-sdk";
+import { PROGRAM_ID as LD_ID } from "@helium/lazy-distributor-sdk";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -215,88 +219,42 @@ export const initTestMaker = async (
 
 const ANCHOR_PATH = process.env.ANCHOR_PATH || "anchor";
 
-export async function ensureDCIdl(dcProgram: Program<DataCredits>) {
+export async function ensureIdl(path: string, programId: PublicKey) {
   try {
     execSync(
-      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
+      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/${path}.json ${programId.toBase58()}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   } catch {
     execSync(
-      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/data_credits.json ${dcProgram.programId}`,
+      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/${path}.json ${programId.toBase58()}`,
       { stdio: "inherit", shell: "/bin/bash" }
     );
   }
 }
 
-export async function ensureMemIdl(memProgram: Program<MobileEntityManager>) {
-  try {
-    execSync(
-      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/mobile_entity_manager.json ${memProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  } catch {
-    execSync(
-      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/mobile_entity_manager.json ${memProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  }
+export async function ensureDCIdl() {
+  await ensureIdl("data_credits", DC_ID);
 }
 
-export async function ensureLDIdl(ldProgram: Program<LazyDistributor>) {
-  try {
-    execSync(
-      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  } catch {
-    execSync(
-      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/lazy_distributor.json ${ldProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  }
+export async function ensureMemIdl() {
+  await ensureIdl("mobile_entity_manager", MEM_ID);
 }
 
-export async function ensureHEMIdl(hemProgram: Program<HeliumEntityManager>) {
-  try {
-    execSync(
-      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/helium_entity_manager.json ${hemProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  } catch {
-    execSync(
-      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/helium_entity_manager.json ${hemProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  }
+export async function ensureLDIdl() {
+  await ensureIdl("lazy_distributor", LD_ID);
 }
 
-export async function ensureHSDIdl(hsdProgram: Program<HeliumSubDaos>) {
-  try {
-    execSync(
-      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  } catch {
-    execSync(
-      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/helium_sub_daos.json ${hsdProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  }
+export async function ensureHEMIdl() {
+  await ensureIdl("helium_entity_manager", HEM_ID);
 }
 
-export async function ensureVSRIdl(vsrProgram: Program<VoterStakeRegistry>) {
-  try {
-    execSync(
-      `${ANCHOR_PATH} idl init --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  } catch {
-    execSync(
-      `${ANCHOR_PATH} idl upgrade --filepath ${__dirname}/../../target/idl/voter_stake_registry.json ${vsrProgram.programId}`,
-      { stdio: "inherit", shell: "/bin/bash" }
-    );
-  }
+export async function ensureHSDIdl() {
+  await ensureIdl("helium_sub_daos", HSD_ID);
+}
+
+export async function ensureVSRIdl() {
+  await ensureIdl("voter_stake_registry", VSR_ID);
 }
 
 export const initWorld = async (

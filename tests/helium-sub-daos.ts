@@ -135,8 +135,8 @@ describe("helium-sub-daos", () => {
       anchor.workspace.CircuitBreaker.programId,
       anchor.workspace.CircuitBreaker.idl
     );
-    ensureDCIdl(dcProgram);
-    ensureHSDIdl(program);
+    ensureDCIdl();
+    ensureHSDIdl();
     hemProgram = await issuerInit(
       provider,
       anchor.workspace.HeliumEntityManager.programId,
@@ -149,7 +149,7 @@ describe("helium-sub-daos", () => {
       anchor.workspace.VoterStakeRegistry.programId,
       anchor.workspace.VoterStakeRegistry.idl
     );
-    ensureVSRIdl(vsrProgram);
+    ensureVSRIdl();
 
     proposalProgram = await initProposal(provider);
   });
