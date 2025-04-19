@@ -26,7 +26,7 @@
   },
   "scripts": {
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "precommit": "np¸ git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
+    "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "build": "tsc -p tsconfig.json",
     "start": "node lib/esm/index.js",
     "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts"
