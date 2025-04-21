@@ -2,7 +2,7 @@ import express from "express"
 import cors from "cors"
 import { Connection, ConnectionConfig } from "@solana/web3.js"
 import { RecentTransactionsService } from "./service"
-import { ServiceConfig } from "./types"
+import { ServiceConfig, TransactionQueryParams } from "./types"
 import * as fs from "fs"
 import * as path from "path"
 import logger from "./logger"
@@ -20,6 +20,7 @@ const RPC_URL = process.env.RPC_URL || "https://api.mainnet-beta.solana.com"
 const PORT = process.env.PORT || 3000
 const POLLING_INTERVAL = parseInt(process.env.POLLING_INTERVAL || "5000")
 const MAX_BUFFER_SIZE = parseInt(process.env.MAX_BUFFER_SIZE || "100")
+const MAX_LOOKBACK_SIZE = parseInt(process.env.MAX_LOOKBACK_SIZE || "100")
 
 // Load config
 const config: ServiceConfig = JSON.parse(
@@ -36,15 +37,22 @@ const service = new RecentTransactionsService(
   connection,
   config,
   POLLING_INTERVAL,
-  MAX_BUFFER_SIZE
+  MAX_BUFFER_SIZE,
+  MAX_LOOKBACK_SIZE
 )
 
 // Set up routes
 config.definitions.forEach(def => {
-  app.get(`/v1${def.subRoute}`, (req, res) => {
-    const untilBlock = req.query.until ? parseInt(req.query.until as string) : undefined
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined
-    const transactions = service.getTransactions(def.subRoute, untilBlock, limit)
+  app.get<{}, {}, {}, TransactionQueryParams>(`/v1${def.subRoute}`, (req, res) => {
+    const untilBlock = req.query.until ? parseInt(req.query.until) : undefined
+    const limit = req.query.limit ? parseInt(req.query.limit) : undefined
+    const types = Array.isArray(req.query.types) ? req.query.types : req.query.types ? [req.query.types] : undefined
+    
+    const transactions = service.getTransactions(def.subRoute, {
+      untilBlock,
+      limit,
+      types
+    })
     res.json(transactions)
   })
 })
@@ -64,6 +72,7 @@ async function start() {
       logger.info(`Config loaded from: ${CONFIG_PATH}`)
       logger.info(`Polling interval: ${POLLING_INTERVAL}ms`)
       logger.info(`Max buffer size: ${MAX_BUFFER_SIZE}`)
+      logger.info(`Max lookback size: ${MAX_LOOKBACK_SIZE}`)
     })
   } catch (error) {
     logger.error("Failed to start service:", error)
