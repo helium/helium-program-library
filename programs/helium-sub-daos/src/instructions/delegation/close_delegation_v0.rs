@@ -152,7 +152,6 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     genesis_end_vehnt_correction,
     end_fall_rate_correction,
     end_vehnt_correction,
-    has_genesis,
     ..
   } = vehnt_info;
 
