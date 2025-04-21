@@ -12,6 +12,7 @@ use tuktuk_program::{
 pub struct CloseEntityClaimCronV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
+  /// CHECK: Just receiving funds.
   #[account(mut)]
   pub rent_refund: AccountInfo<'info>,
   pub user_authority: Signer<'info>,
