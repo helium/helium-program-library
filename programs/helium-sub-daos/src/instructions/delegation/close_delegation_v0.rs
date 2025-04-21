@@ -220,10 +220,12 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
     genesis_end_sub_dao_epoch_info.vehnt_in_closing_positions = genesis_end_sub_dao_epoch_info
       .vehnt_in_closing_positions
       .saturating_sub(genesis_end_vehnt_correction);
-
-    genesis_end_sub_dao_epoch_info.exit(&id())?;
-    ctx.accounts.genesis_end_sub_dao_epoch_info.reload()?;
   }
+
+  // Exit and reload that way the instruction exiting doesn't overwrite our changes
+  // if these two are the same account.
+  genesis_end_sub_dao_epoch_info.exit(&id())?;
+  ctx.accounts.genesis_end_sub_dao_epoch_info.reload()?;
 
   // Only subtract from the stake if the position ends after the end of this epoch. Otherwise,
   // the position was already purged due to the sub_dao_epoch_info closing info logic.
@@ -299,5 +301,6 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
       .genesis_end_sub_dao_epoch_info
       .fall_rates_from_closing_positions = 0;
   }
+
   Ok(())
 }
