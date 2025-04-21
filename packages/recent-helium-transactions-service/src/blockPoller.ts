@@ -39,7 +39,7 @@ export async function poll({ url, pollIntervalMs }: PollerConfig): Promise<void>
 if (require.main === module) {
   const config: PollerConfig = {
     url: process.env.BLOCK_API_URL!,
-    pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || '1000'),
+    pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || '500'),
   }
 
   if (!config.url) {
