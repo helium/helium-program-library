@@ -69,6 +69,28 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### close_entity_claim_cron_v0
+
+#### Accounts
+
+| Name                  | Mutability | Signer | Docs |
+| --------------------- | ---------- | ------ | ---- |
+| payer                 | immut      | no     |      |
+| rent_refund           | immut      | no     |      |
+| user_authority        | immut      | no     |      |
+| authority             | immut      | no     |      |
+| user_cron_jobs        | immut      | no     |      |
+| cron_job              | immut      | no     |      |
+| cron_job_name_mapping | immut      | no     |      |
+| system_program        | immut      | no     |      |
+| tuktuk_program        | immut      | no     |      |
+| cron_program          | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### init_delegation_claim_bot_v0
 
 #### Accounts
