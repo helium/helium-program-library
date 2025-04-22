@@ -2,6 +2,7 @@
   "name": "@helium/recent-helium-transactions-service",
   "version": "0.10.7",
   "description": "Service to track and provide recent Helium transactions",
+  "private": true,
   "main": "lib/cjs/index.js",
   "module": "lib/esm/index.js",
   "types": "lib/types/index.d.ts",
