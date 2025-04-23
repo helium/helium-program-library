@@ -60,7 +60,7 @@ WITH
       CASE WHEN lockup_kind = 'constant' THEN 
         0
       ELSE 
-        CASE WHEN current_ts < genesis_end THEN
+        CASE WHEN current_ts < floor(genesis_end / (60 * 60 * 24)) * (60 * 60 * 24) THEN
           -- genesis
           (ve_tokens - (
               amount_deposited_native * (
