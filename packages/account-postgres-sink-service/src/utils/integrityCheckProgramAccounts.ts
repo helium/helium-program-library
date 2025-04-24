@@ -117,6 +117,7 @@ export const integrityCheckProgramAccounts = async ({
         throw new Error("Unable to get blocktime from 24 hours ago");
       }
 
+      const limiter = pLimit(25);
       const parsedTransactions = (
         await Promise.all(
           chunks(
@@ -125,9 +126,9 @@ export const integrityCheckProgramAccounts = async ({
               blockTime: blockTime24HoursAgo,
               provider,
             }),
-            25
+            75
           ).map((chunk) =>
-            pLimit(5)(async () => {
+            limiter(async () => {
               await new Promise((resolve) => setTimeout(resolve, 250));
               return retry(
                 () =>
