@@ -125,16 +125,19 @@ export const integrityCheckProgramAccounts = async ({
               blockTime: blockTime24HoursAgo,
               provider,
             }),
-            100
+            25
           ).map((chunk) =>
-            retry(
-              () =>
-                connection.getParsedTransactions(chunk, {
-                  commitment: "finalized",
-                  maxSupportedTransactionVersion: 0,
-                }),
-              retryOptions
-            )
+            pLimit(5)(async () => {
+              await new Promise((resolve) => setTimeout(resolve, 250));
+              return retry(
+                () =>
+                  connection.getParsedTransactions(chunk, {
+                    commitment: "finalized",
+                    maxSupportedTransactionVersion: 0,
+                  }),
+                retryOptions
+              );
+            })
           )
         )
       ).flat();
@@ -189,7 +192,9 @@ export const integrityCheckProgramAccounts = async ({
       const discriminatorsByType = new Map(
         accounts.map(({ type }) => [
           type,
-          (program.coder.accounts as anchor.BorshAccountsCoder).accountDiscriminator(lowerFirstChar(type)),
+          (
+            program.coder.accounts as anchor.BorshAccountsCoder
+          ).accountDiscriminator(lowerFirstChar(type)),
         ])
       );
 
