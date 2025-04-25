@@ -95,6 +95,7 @@ async function run() {
 
   const mobile = await hsdProgram.account.subDaoV0.fetch(mobileKey);
   const iot = await hsdProgram.account.subDaoV0.fetch(iotKey);
+  const hnt = await hsdProgram.account.daoV0.fetch(daoKey(HNT_MINT)[0]);
   const makers = await hemProgram.account.makerV0.all();
 
   const hntMint = dao.hntMint;
@@ -102,6 +103,7 @@ async function run() {
   const iotMint = iot.dntMint;
   const iotTreasury = iot.treasury;
   const iotRewardsEscrow = iot.rewardsEscrow;
+  const hntRewardsEscrow = hnt.rewardsEscrow;
   const mobileMint = mobile.dntMint;
   const mobileTreasury = mobile.treasury;
   const mobileRewardsEscrow = mobile.rewardsEscrow;
@@ -259,6 +261,11 @@ async function run() {
     cbProgram,
     mobileRewardsEscrow,
     "mobile_rewards_escrow"
+  );
+  await monitorAccountCircuitBreaker(
+    cbProgram,
+    hntRewardsEscrow,
+    "hnt_rewards_escrow"
   );
   const delegatorPool = dao.delegatorPool;
   await monitorAccountCircuitBreaker(
