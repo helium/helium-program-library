@@ -1,6 +1,7 @@
 pub mod add_entity_to_cron_v0;
 pub mod add_wallet_to_entity_cron_v0;
 pub mod close_delegation_claim_bot_v0;
+pub mod close_entity_claim_cron_v0;
 pub mod init_delegation_claim_bot_v0;
 pub mod init_entity_claim_cron_v0;
 pub mod init_epoch_tracker;
@@ -22,6 +23,7 @@ pub mod update_epoch_tracker;
 pub use add_entity_to_cron_v0::*;
 pub use add_wallet_to_entity_cron_v0::*;
 pub use close_delegation_claim_bot_v0::*;
+pub use close_entity_claim_cron_v0::*;
 pub use init_delegation_claim_bot_v0::*;
 pub use init_entity_claim_cron_v0::*;
 pub use init_epoch_tracker::*;

@@ -116,7 +116,8 @@ export async function run(args: any = process.argv) {
       r.realm_governing_token_mint,
       cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'lockupSaturationSecs' as numeric) as lockup_saturation_seconds,
       cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'maxExtraLockupVoteWeightScaledFactor' as numeric) / 1000000000 as max_extra_lockup_vote_weight_scaled_factor,
-      CASE WHEN p.genesis_end > current_ts THEN cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'genesisVotePowerMultiplier' as numeric) ELSE 1 END as genesis_multiplier,
+      -- Exclude genesis multiplers for the current epoch since those will have been purged.
+      CASE WHEN (floor(p.genesis_end / (60 * 60 * 24)) * (60 * 60 * 24) + 60 * 60 * 24) > current_ts THEN cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'genesisVotePowerMultiplier' as numeric) ELSE 1 END as genesis_multiplier,
       GREATEST(
         cast(
           p.end_ts - 
@@ -152,7 +153,7 @@ export async function run(args: any = process.argv) {
       CASE WHEN lockup_kind = 'constant' THEN 
         0
       ELSE 
-        CASE WHEN current_ts < genesis_end THEN
+        CASE WHEN current_ts < floor(genesis_end / (60 * 60 * 24)) * (60 * 60 * 24) THEN
           -- genesis
           (ve_tokens - (
               amount_deposited_native * (

@@ -117,6 +117,7 @@ export const integrityCheckProgramAccounts = async ({
         throw new Error("Unable to get blocktime from 24 hours ago");
       }
 
+      const limiter = pLimit(25);
       const parsedTransactions = (
         await Promise.all(
           chunks(
@@ -125,16 +126,19 @@ export const integrityCheckProgramAccounts = async ({
               blockTime: blockTime24HoursAgo,
               provider,
             }),
-            100
+            75
           ).map((chunk) =>
-            retry(
-              () =>
-                connection.getParsedTransactions(chunk, {
-                  commitment: "finalized",
-                  maxSupportedTransactionVersion: 0,
-                }),
-              retryOptions
-            )
+            limiter(async () => {
+              await new Promise((resolve) => setTimeout(resolve, 250));
+              return retry(
+                () =>
+                  connection.getParsedTransactions(chunk, {
+                    commitment: "finalized",
+                    maxSupportedTransactionVersion: 0,
+                  }),
+                retryOptions
+              );
+            })
           )
         )
       ).flat();
@@ -189,7 +193,9 @@ export const integrityCheckProgramAccounts = async ({
       const discriminatorsByType = new Map(
         accounts.map(({ type }) => [
           type,
-          (program.coder.accounts as anchor.BorshAccountsCoder).accountDiscriminator(lowerFirstChar(type)),
+          (
+            program.coder.accounts as anchor.BorshAccountsCoder
+          ).accountDiscriminator(lowerFirstChar(type)),
         ])
       );
 

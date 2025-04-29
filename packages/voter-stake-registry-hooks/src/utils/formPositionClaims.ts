@@ -45,7 +45,10 @@ export const formPositionClaims = async ({
   hsdProgramId: PublicKey;
 }): Promise<TransactionInstruction[][]> => {
   const instructions: TransactionInstruction[][] = [];
-  const hsdIdl = await fetchBackwardsCompatibleIdl(hsdProgramId, provider as any);
+  const hsdIdl = await fetchBackwardsCompatibleIdl(
+    hsdProgramId,
+    provider as any
+  );
   const hsdProgram = await init(provider as any, hsdProgramId, hsdIdl);
   const connNoCache = new Connection(provider.connection.rpcEndpoint);
   const clock = await connNoCache.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
@@ -90,7 +93,9 @@ export const formPositionClaims = async ({
       }
       return acc;
     }, {} as Record<string, SubDao>);
-    const daoAcc = await hsdProgram.account.daoV0.fetch(Object.values(subDaos)[0].dao);
+    const daoAcc = await hsdProgram.account.daoV0.fetch(
+      Object.values(subDaos)[0].dao
+    );
 
     for (const [idx, position] of positions.entries()) {
       bucketedEpochsByPosition[position.pubkey.toBase58()] =
@@ -129,8 +134,9 @@ export const formPositionClaims = async ({
 
         // Chunk size is 128 because we want each chunk to correspond to the 128 bits in bitmap
         for (const chunk of chunks(epochsToClaim, 128)) {
-          const daoEpochInfoKeys = chunk.map((epoch) =>
-            daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
+          const daoEpochInfoKeys = chunk.map(
+            (epoch) =>
+              daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
           );
           const daoEpochInfoAccounts = await getMultipleAccounts({
             connection: connNoCache,
@@ -164,7 +170,10 @@ export const formPositionClaims = async ({
                       subDao: delegatedPosition.account!.subDao,
                       delegatedPosition: delegatedPosition.key,
                       hntMint: daoAcc.hntMint,
-                      daoEpochInfo: daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0],
+                      daoEpochInfo: daoEpochInfoKey(
+                        subDaoAcc.dao,
+                        epoch.mul(new BN(EPOCH_LENGTH))
+                      )[0],
                       delegatorPool: daoAcc.delegatorPool,
                       delegatorAta: getAssociatedTokenAddressSync(
                         daoAcc.hntMint,
@@ -181,41 +190,41 @@ export const formPositionClaims = async ({
                     })
                     .instruction();
                 } else {
-                return hsdProgram.methods
-                  .claimRewardsV0({
-                    epoch,
-                  })
-                  .accountsStrict({
-                    position: position.pubkey,
-                    mint: position.mint,
-                    positionTokenAccount: getAssociatedTokenAddressSync(
-                      position.mint,
-                      provider.wallet.publicKey
-                    ),
-                    positionAuthority: provider.wallet.publicKey,
-                    registrar: position.registrar,
-                    dao: DAO,
-                    subDao: delegatedPosition.account!.subDao,
-                    delegatedPosition: delegatedPosition.key,
-                    dntMint: subDaoAcc.dntMint,
-                    subDaoEpochInfo: subDaoEpochInfoKey(
-                      subDao,
-                      epoch.mul(new BN(EPOCH_LENGTH))
-                    )[0],
-                    delegatorPool: subDaoAcc.delegatorPool,
-                    delegatorAta: getAssociatedTokenAddressSync(
-                      subDaoAcc.dntMint,
-                      provider.wallet.publicKey
-                    ),
-                    delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
-                      subDaoAcc.delegatorPool
-                    )[0],
-                    vsrProgram: VSR_PROGRAM_ID,
-                    systemProgram: SystemProgram.programId,
-                    circuitBreakerProgram: CIRCUIT_BREAKER_PROGRAM_ID,
-                    associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-                    tokenProgram: TOKEN_PROGRAM_ID,
-                  })
+                  return hsdProgram.methods
+                    .claimRewardsV0({
+                      epoch,
+                    })
+                    .accountsStrict({
+                      position: position.pubkey,
+                      mint: position.mint,
+                      positionTokenAccount: getAssociatedTokenAddressSync(
+                        position.mint,
+                        provider.wallet.publicKey
+                      ),
+                      positionAuthority: provider.wallet.publicKey,
+                      registrar: position.registrar,
+                      dao: DAO,
+                      subDao: delegatedPosition.account!.subDao,
+                      delegatedPosition: delegatedPosition.key,
+                      dntMint: subDaoAcc.dntMint,
+                      subDaoEpochInfo: subDaoEpochInfoKey(
+                        subDao,
+                        epoch.mul(new BN(EPOCH_LENGTH))
+                      )[0],
+                      delegatorPool: subDaoAcc.delegatorPool,
+                      delegatorAta: getAssociatedTokenAddressSync(
+                        subDaoAcc.dntMint,
+                        provider.wallet.publicKey
+                      ),
+                      delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
+                        subDaoAcc.delegatorPool
+                      )[0],
+                      vsrProgram: VSR_PROGRAM_ID,
+                      systemProgram: SystemProgram.programId,
+                      circuitBreakerProgram: CIRCUIT_BREAKER_PROGRAM_ID,
+                      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+                      tokenProgram: TOKEN_PROGRAM_ID,
+                    })
                     .instruction();
                 }
               })
@@ -239,7 +248,7 @@ export const formPositionClaims = async ({
     );
   }
 
-  return instructions;
+  return instructions.filter(truthy);
 };
 
 async function getMultipleAccounts({

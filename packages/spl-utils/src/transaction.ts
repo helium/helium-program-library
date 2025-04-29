@@ -828,6 +828,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
 
   let firstTxComputeAndPrio: TransactionInstruction[] | null = null;
   for (const instruction of instructions) {
+    if (!instruction) continue;
     const instrArr = Array.isArray(instruction) ? instruction : [instruction];
     const prevLen = currentTxInstructions.length;
     currentTxInstructions.push(...instrArr);
