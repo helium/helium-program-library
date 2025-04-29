@@ -131,17 +131,19 @@ export const useAutomateHotspotClaims = ({
   schedule,
   duration,
   totalHotspots,
+  wallet,
 }: {
   schedule: Schedule,
   duration: number,
   totalHotspots: number,
+  wallet?: PublicKey,
 }) => {
   const provider = useAnchorProvider()
 
   const authority = useMemo(() => {
-    if (!provider?.wallet.publicKey) return undefined
-    return entityCronAuthorityKey(provider.wallet.publicKey)[0]
-  }, [provider?.wallet.publicKey])
+    if (!wallet) return undefined
+    return entityCronAuthorityKey(wallet)[0]
+  }, [wallet])
 
   const cronJob = useMemo(() => {
     if (!authority) return undefined
@@ -149,7 +151,7 @@ export const useAutomateHotspotClaims = ({
   }, [authority])
 
   const { amount: userSol, loading: loadingSol } = useSolOwnedAmount(
-    provider?.wallet.publicKey,
+    wallet,
   )
 
   const { info: cronJobAccount, account: cronJobSolanaAccount } =
@@ -172,7 +174,7 @@ export const useAutomateHotspotClaims = ({
     async (params: {
       onInstructions?: (instructions: TransactionInstruction[]) => Promise<void>
     }) => {
-      if (!provider || !authority || !cronJob) {
+      if (!provider || !authority || !cronJob || !wallet) {
         throw new Error('Missing required parameters')
       }
       const hplCronsProgram = await initHplCrons(provider)
@@ -210,7 +212,7 @@ export const useAutomateHotspotClaims = ({
                   })
                   .accounts({
                     cronJob,
-                    rentRefund: provider.wallet.publicKey,
+                    rentRefund: wallet,
                     cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
                   })
                   .instruction(),
@@ -220,7 +222,7 @@ export const useAutomateHotspotClaims = ({
               .closeEntityClaimCronV0()
               .accounts({
                 cronJob,
-                rentRefund: provider.wallet.publicKey,
+                rentRefund: wallet,
                 cronJobNameMapping: cronJobNameMappingKey(
                   authority,
                   'entity_claim',
@@ -269,7 +271,7 @@ export const useAutomateHotspotClaims = ({
       if (solFee > 0) {
         instructions.push(
           SystemProgram.transfer({
-            fromPubkey: provider.wallet.publicKey,
+            fromPubkey: wallet,
             toPubkey: cronJob,
             lamports: solFee,
           }),
@@ -283,7 +285,7 @@ export const useAutomateHotspotClaims = ({
             index: 0,
           })
           .accounts({
-            wallet: provider.wallet.publicKey,
+            wallet,
             cronJob,
             cronJobTransaction: cronJobTransactionKey(cronJob, 0)[0],
           })
@@ -310,7 +312,7 @@ export const useAutomateHotspotClaims = ({
     async (params: {
       onInstructions?: (instructions: any) => Promise<void>
     }) => {
-      if (!provider || !cronJob || !authority) {
+      if (!provider || !cronJob || !authority || !wallet) {
         throw new Error('Missing required parameters')
       }
       const hplCronsProgram = await initHplCrons(provider)
@@ -326,7 +328,7 @@ export const useAutomateHotspotClaims = ({
               })
               .accounts({
                 cronJob,
-                rentRefund: provider.wallet.publicKey,
+                rentRefund: wallet,
                 cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
               })
               .instruction(),
@@ -336,7 +338,7 @@ export const useAutomateHotspotClaims = ({
           .closeEntityClaimCronV0()
           .accounts({
             cronJob,
-            rentRefund: provider.wallet.publicKey,
+            rentRefund: wallet,
             cronJobNameMapping: cronJobNameMappingKey(
               authority,
               'entity_claim',
