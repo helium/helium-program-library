@@ -256,6 +256,12 @@ describe("distributor-oracle", () => {
   let getAssetFn: () => Promise<Asset | undefined>;
   let getAssetProofFn: () => Promise<AssetProof | undefined>;
 
+  before(async () => {
+    await ensureLDIdl();
+    await ensureHEMIdl();
+    await ensureHSDIdl();
+  });
+
   beforeEach(async () => {
     tuktukProgram = await initTuktuk(provider);
     ldProgram = await initLazy(
@@ -334,10 +340,6 @@ describe("distributor-oracle", () => {
       1,
       3
     );
-
-    await ensureLDIdl(ldProgram);
-    await ensureHEMIdl(hemProgram);
-    await ensureHSDIdl(hsdProgram);
 
     const {
       dao: { dao },
