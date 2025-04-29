@@ -42,7 +42,7 @@
     "@helium/modular-governance-idls": "^0.1.5-alpha.0",
     "@helium/organization-sdk": "^0.1.5-alpha.0",
     "@helium/spl-utils": "^0.10.7",
-    "@helium/tuktuk-sdk": "^0.0.6",
+    "@helium/tuktuk-sdk": "^0.0.8",
     "@helium/voter-stake-registry-sdk": "^0.10.7",
     "@solana/wallet-adapter-base": "^0.9.22",
     "@solana/web3.js": "^1.91.1",
