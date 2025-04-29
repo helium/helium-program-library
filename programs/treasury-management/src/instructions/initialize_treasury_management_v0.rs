@@ -83,7 +83,7 @@ pub fn handler(
     ),
     InitializeAccountWindowedBreakerArgsV0 {
       authority: args.authority,
-      config: args.window_config.into(),
+      config: args.window_config,
       owner: ctx.accounts.treasury_management.key(),
     },
   )?;

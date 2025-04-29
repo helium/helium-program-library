@@ -78,7 +78,7 @@ pub fn handler(
     ),
     InitializeAccountWindowedBreakerArgsV0 {
       authority: args.authority,
-      config: args.window_config.into(),
+      config: args.window_config,
       owner: ctx.accounts.lazy_distributor.key(),
     },
   )?;
