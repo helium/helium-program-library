@@ -245,7 +245,7 @@ impl Delegated {
         .get_mut(&position.delegated_position.sub_dao)
         .unwrap();
       let end_epoch = current_epoch(std::cmp::min(
-        position.position.lockup.end_ts,
+        position.position.lockup.effective_end_ts(),
         position.delegated_position.expiration_ts,
       ));
 
