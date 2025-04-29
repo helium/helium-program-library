@@ -24,6 +24,7 @@ import { useMemo } from 'react'
 import { useAsyncCallback } from 'react-async-hook'
 import { useCronJob } from './useCronJob'
 import { useTaskQueue } from './useTaskQueue'
+import { AnchorProvider } from '@coral-xyz/anchor'
 
 type Schedule = 'daily' | 'weekly' | 'monthly'
 
@@ -132,13 +133,16 @@ export const useAutomateHotspotClaims = ({
   duration,
   totalHotspots,
   wallet,
+  provider: providerRaw
 }: {
   schedule: Schedule,
   duration: number,
   totalHotspots: number,
   wallet?: PublicKey,
+  provider?: AnchorProvider;
 }) => {
-  const provider = useAnchorProvider()
+  const providerFromHook = useAnchorProvider()
+  const provider = providerRaw || providerFromHook
 
   const authority = useMemo(() => {
     if (!wallet) return undefined
