@@ -88,7 +88,7 @@ pub fn handler(
     ),
     InitializeMintWindowedBreakerArgsV0 {
       authority: args.authority,
-      config: args.config.into(),
+      config: args.config,
       mint_authority: ctx.accounts.data_credits.key(),
     },
   )?;
