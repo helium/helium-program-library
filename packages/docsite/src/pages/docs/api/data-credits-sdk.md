@@ -412,6 +412,13 @@ undefined
 | dc_onboarding_fees_paid                | u64             |
 | active_device_authority                | pubkey          |
 
+### ThresholdType
+
+| Variant  | Fields |
+| -------- | ------ |
+| Percent  |        |
+| Absolute |        |
+
 ### UpdateDataCreditsArgsV0
 
 | Field            | Type   |
@@ -433,29 +440,7 @@ undefined
 | last_aggregated_value | u64  |
 | last_unix_timestamp   | i64  |
 
-### circuit_breaker::state::ThresholdType
-
-| Variant  | Fields |
-| -------- | ------ |
-| Percent  |        |
-| Absolute |        |
-
-### circuit_breaker::state::WindowedCircuitBreakerConfigV0
-
-| Field               | Type            |
-| ------------------- | --------------- |
-| window_size_seconds | u64             |
-| threshold_type      | [object Object] |
-| threshold           | u64             |
-
-### data_credits::circuit_breaker::ThresholdType
-
-| Variant  | Fields |
-| -------- | ------ |
-| Percent  |        |
-| Absolute |        |
-
-### data_credits::circuit_breaker::WindowedCircuitBreakerConfigV0
+### WindowedCircuitBreakerConfigV0
 
 | Field               | Type            |
 | ------------------- | --------------- |

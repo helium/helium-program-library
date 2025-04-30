@@ -113,6 +113,13 @@ undefined
 | amount                 | u64  |
 | expected_output_amount | u64  |
 
+### ThresholdType
+
+| Variant  | Fields |
+| -------- | ------ |
+| Percent  |        |
+| Absolute |        |
+
 ### TreasuryManagementV0
 
 | Field            | Type            |
@@ -140,29 +147,7 @@ undefined
 | last_aggregated_value | u64  |
 | last_unix_timestamp   | i64  |
 
-### circuit_breaker::state::ThresholdType
-
-| Variant  | Fields |
-| -------- | ------ |
-| Percent  |        |
-| Absolute |        |
-
-### circuit_breaker::state::WindowedCircuitBreakerConfigV0
-
-| Field               | Type            |
-| ------------------- | --------------- |
-| window_size_seconds | u64             |
-| threshold_type      | [object Object] |
-| threshold           | u64             |
-
-### treasury_management::circuit_breaker::ThresholdType
-
-| Variant  | Fields |
-| -------- | ------ |
-| Percent  |        |
-| Absolute |        |
-
-### treasury_management::circuit_breaker::WindowedCircuitBreakerConfigV0
+### WindowedCircuitBreakerConfigV0
 
 | Field               | Type            |
 | ------------------- | --------------- |

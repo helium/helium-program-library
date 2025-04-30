@@ -743,6 +743,14 @@ undefined
 | end_ts   | i64             |
 | kind     | [object Object] |
 
+### LockupKind
+
+| Variant  | Fields |
+| -------- | ------ |
+| None     |        |
+| Cliff    |        |
+| Constant |        |
+
 ### MintWindowedCircuitBreakerV0
 
 | Field          | Type            |
@@ -812,6 +820,13 @@ undefined
 | name           | string          |
 | max_proxy_time | i64             |
 | seasons        | [object Object] |
+
+### RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |
 
 ### Registrar
 
@@ -983,33 +998,3 @@ undefined
 | window_size_seconds | u64             |
 | threshold_type      | [object Object] |
 | threshold           | u64             |
-
-### helium_sub_daos::instructions::delegation::reset_lockup_v0::LockupKind
-
-| Variant  | Fields |
-| -------- | ------ |
-| None     |        |
-| Cliff    |        |
-| Constant |        |
-
-### helium_sub_daos::state::RecentProposal
-
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |
-
-### voter_stake_registry::state::lockup::LockupKind
-
-| Variant  | Fields |
-| -------- | ------ |
-| None     |        |
-| Cliff    |        |
-| Constant |        |
-
-### voter_stake_registry::state::position::RecentProposal
-
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |

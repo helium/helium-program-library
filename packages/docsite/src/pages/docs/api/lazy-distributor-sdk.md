@@ -361,6 +361,13 @@ undefined
 | current_rewards  | u64    |
 | asset            | pubkey |
 
+### ThresholdType
+
+| Variant  | Fields |
+| -------- | ------ |
+| Percent  |        |
+| Absolute |        |
+
 ### UpdateCompressionDestinationArgsV0
 
 | Field        | Type            |
@@ -385,29 +392,7 @@ undefined
 | last_aggregated_value | u64  |
 | last_unix_timestamp   | i64  |
 
-### circuit_breaker::state::ThresholdType
-
-| Variant  | Fields |
-| -------- | ------ |
-| Percent  |        |
-| Absolute |        |
-
-### circuit_breaker::state::WindowedCircuitBreakerConfigV0
-
-| Field               | Type            |
-| ------------------- | --------------- |
-| window_size_seconds | u64             |
-| threshold_type      | [object Object] |
-| threshold           | u64             |
-
-### lazy_distributor::circuit_breaker::ThresholdType
-
-| Variant  | Fields |
-| -------- | ------ |
-| Percent  |        |
-| Absolute |        |
-
-### lazy_distributor::circuit_breaker::WindowedCircuitBreakerConfigV0
+### WindowedCircuitBreakerConfigV0
 
 | Field               | Type            |
 | ------------------- | --------------- |
