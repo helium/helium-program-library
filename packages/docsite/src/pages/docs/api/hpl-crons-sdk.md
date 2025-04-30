@@ -791,6 +791,13 @@ undefined
 | ------------ | ---- |
 | free_task_id | u16  |
 
+### RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |
+
 ### RemoveEntityFromCronArgsV0
 
 | Field | Type |
@@ -944,17 +951,3 @@ undefined
 | \_deprecated_relinquished | bool   |
 | proxy_index               | u16    |
 | rent_refund               | pubkey |
-
-### helium_sub_daos::state::RecentProposal
-
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |
-
-### voter_stake_registry::state::position::RecentProposal
-
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |
