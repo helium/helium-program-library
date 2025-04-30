@@ -126,8 +126,10 @@ export const interpretCronString = (
   }
 }
 
-const BASE_AUTOMATION_RENT = 0.012588199
+const BASE_AUTOMATION_RENT = 0.02098095
 const TASK_RETURN_ACCOUNT_SIZE = 0.01
+const MIN_RENT = 0.00089088
+const EST_TX_FEE = 0.000001
 
 export const useAutomateHotspotClaims = ({
   schedule,
@@ -167,8 +169,10 @@ export const useAutomateHotspotClaims = ({
   const totalFundingNeeded = useMemo(() => {
     const minCrankReward = taskQueue?.minCrankReward?.toNumber() || 10000
     return (
+      // Actual claim txs
       duration * (minCrankReward + 5000) * (totalHotspots || 1) +
-      duration * minCrankReward
+      // Requeue transactions (5 queues per tx)
+      duration * minCrankReward * Math.ceil((totalHotspots || 1) / 5)
     )
   }, [duration, totalHotspots, taskQueue])
   const solFee = useMemo(() => {
@@ -362,6 +366,8 @@ export const useAutomateHotspotClaims = ({
     },
   )
 
+  const rentFee = cronJobAccount ? 0 : BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE;
+
   return {
     loading: loading || removing,
     error: error || removeError,
@@ -372,9 +378,9 @@ export const useAutomateHotspotClaims = ({
     currentSchedule: cronJobAccount?.schedule
       ? interpretCronString(cronJobAccount.schedule)
       : undefined,
-    rentFee: cronJobAccount ? 0 : BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE,
+    rentFee,
     solFee: solFee / LAMPORTS_PER_SOL,
-    insufficientSol: !loadingSol && solFee > (userSol || 0),
+    insufficientSol: !loadingSol && (solFee / LAMPORTS_PER_SOL + rentFee) > ((Number(userSol || 0) / LAMPORTS_PER_SOL) - MIN_RENT - EST_TX_FEE),
     isOutOfSol: cronJobAccount?.removedFromQueue || false,
   }
 }
