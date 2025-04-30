@@ -127,6 +127,7 @@ export const interpretCronString = (
 }
 
 const BASE_AUTOMATION_RENT = 0.012588199
+const TASK_RETURN_ACCOUNT_SIZE = 0.01
 
 export const useAutomateHotspotClaims = ({
   schedule,
@@ -277,7 +278,7 @@ export const useAutomateHotspotClaims = ({
           SystemProgram.transfer({
             fromPubkey: wallet,
             toPubkey: cronJob,
-            lamports: solFee,
+            lamports: solFee + (cronJobAccount ? 0 : TASK_RETURN_ACCOUNT_SIZE),
           }),
         )
       }
@@ -371,7 +372,7 @@ export const useAutomateHotspotClaims = ({
     currentSchedule: cronJobAccount?.schedule
       ? interpretCronString(cronJobAccount.schedule)
       : undefined,
-    rentFee: cronJobAccount ? 0 : BASE_AUTOMATION_RENT,
+    rentFee: cronJobAccount ? 0 : BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE,
     solFee: solFee / LAMPORTS_PER_SOL,
     insufficientSol: !loadingSol && solFee > (userSol || 0),
     isOutOfSol: cronJobAccount?.removedFromQueue || false,
