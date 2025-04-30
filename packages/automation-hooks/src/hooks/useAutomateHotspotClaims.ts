@@ -278,7 +278,7 @@ export const useAutomateHotspotClaims = ({
           SystemProgram.transfer({
             fromPubkey: wallet,
             toPubkey: cronJob,
-            lamports: solFee + (cronJobAccount ? 0 : TASK_RETURN_ACCOUNT_SIZE),
+            lamports: solFee + (cronJobAccount ? 0 : TASK_RETURN_ACCOUNT_SIZE * LAMPORTS_PER_SOL),
           }),
         )
       }
