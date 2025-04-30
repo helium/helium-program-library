@@ -10,6 +10,7 @@ import {
 } from '@helium/hpl-crons-sdk'
 import { sendInstructionsWithPriorityFee } from '@helium/spl-utils'
 import {
+  customSignerKey,
   init as initTuktuk,
   nextAvailableTaskIds,
   taskKey,
@@ -130,17 +131,20 @@ const BASE_AUTOMATION_RENT = 0.02098095
 const TASK_RETURN_ACCOUNT_SIZE = 0.01
 const MIN_RENT = 0.00089088
 const EST_TX_FEE = 0.000001
+const RECIPIENT_RENT = 0.00242208
 
 export const useAutomateHotspotClaims = ({
   schedule,
   duration,
   totalHotspots,
+  hotspotsNeedingRecipient = 0,
   wallet,
   provider: providerRaw
 }: {
   schedule: Schedule,
   duration: number,
   totalHotspots: number,
+  hotspotsNeedingRecipient?: number,
   wallet?: PublicKey,
   provider?: AnchorProvider;
 }) => {
@@ -166,18 +170,39 @@ export const useAutomateHotspotClaims = ({
 
   const { info: taskQueue } = useTaskQueue(TASK_QUEUE)
 
-  const totalFundingNeeded = useMemo(() => {
+  const pdaWallet = useMemo(() => {
+    if (!wallet) return undefined
+    return customSignerKey(TASK_QUEUE, [
+      Buffer.from("claim_payer"),
+      wallet.toBuffer(),
+    ])[0]
+  }, [wallet])
+  const { amount: pdaWalletSol } = useSolOwnedAmount(
+    pdaWallet,
+  )
+
+  const crankFundingNeeded = useMemo(() => {
     const minCrankReward = taskQueue?.minCrankReward?.toNumber() || 10000
     return (
+      duration * minCrankReward
+    )
+  }, [duration, totalHotspots, taskQueue])
+  const pdaWalletFundingNeeded = useMemo(() => {
+    const minCrankReward = taskQueue?.minCrankReward?.toNumber() || 10000
+    return (
+      (MIN_RENT * LAMPORTS_PER_SOL) +
       // Actual claim txs
       duration * (minCrankReward + 5000) * (totalHotspots || 1) +
       // Requeue transactions (5 queues per tx)
       duration * minCrankReward * Math.ceil((totalHotspots || 1) / 5)
     )
   }, [duration, totalHotspots, taskQueue])
-  const solFee = useMemo(() => {
-    return totalFundingNeeded - (cronJobSolanaAccount?.lamports || 0)
-  }, [totalFundingNeeded, cronJobSolanaAccount])
+  const crankSolFee = useMemo(() => {
+    return crankFundingNeeded - (cronJobSolanaAccount?.lamports || 0)
+  }, [crankFundingNeeded, cronJobSolanaAccount])
+  const pdaWalletSolFee = useMemo(() => {
+    return pdaWalletFundingNeeded - Number(pdaWalletSol?.toString() || 0)
+  }, [pdaWalletFundingNeeded, pdaWalletSol])
 
   const { loading, error, execute } = useAsyncCallback(
     async (params: {
@@ -277,12 +302,22 @@ export const useAutomateHotspotClaims = ({
       }
 
       // Add SOL if needed
-      if (solFee > 0) {
+      if (crankSolFee > 0) {
         instructions.push(
           SystemProgram.transfer({
             fromPubkey: wallet,
             toPubkey: cronJob,
-            lamports: solFee + (cronJobAccount ? 0 : TASK_RETURN_ACCOUNT_SIZE * LAMPORTS_PER_SOL),
+            lamports: crankSolFee + (cronJobAccount ? 0 : TASK_RETURN_ACCOUNT_SIZE * LAMPORTS_PER_SOL),
+          }),
+        )
+      }
+
+      if (pdaWalletSolFee > 0) {
+        instructions.push(
+          SystemProgram.transfer({
+            fromPubkey: wallet,
+            toPubkey: pdaWallet,
+            lamports: pdaWalletSolFee + (hotspotsNeedingRecipient * RECIPIENT_RENT * LAMPORTS_PER_SOL),
           }),
         )
       }
@@ -366,7 +401,13 @@ export const useAutomateHotspotClaims = ({
     },
   )
 
-  const rentFee = cronJobAccount ? 0 : BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE;
+  const rentFee = cronJobAccount ? 0 : BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE
+
+  const recipientFee = hotspotsNeedingRecipient * RECIPIENT_RENT
+  const totalSolNeeded = (crankSolFee + pdaWalletSolFee) / LAMPORTS_PER_SOL + rentFee + recipientFee
+  const userSolBalance = Number(userSol || 0) / LAMPORTS_PER_SOL
+  const minimumRequiredBalance = MIN_RENT + EST_TX_FEE
+  const availableUserBalance = userSolBalance - minimumRequiredBalance
 
   return {
     loading: loading || removing,
@@ -379,8 +420,9 @@ export const useAutomateHotspotClaims = ({
       ? interpretCronString(cronJobAccount.schedule)
       : undefined,
     rentFee,
-    solFee: solFee / LAMPORTS_PER_SOL,
-    insufficientSol: !loadingSol && (solFee / LAMPORTS_PER_SOL + rentFee) > ((Number(userSol || 0) / LAMPORTS_PER_SOL) - MIN_RENT - EST_TX_FEE),
+    recipientFee,
+    solFee: (crankSolFee + pdaWalletSolFee) / LAMPORTS_PER_SOL,
+    insufficientSol: !loadingSol && totalSolNeeded > availableUserBalance,
     isOutOfSol: cronJobAccount?.removedFromQueue || false,
   }
 }

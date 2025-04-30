@@ -108,7 +108,7 @@ pub fn handler(ctx: Context<InitEntityClaimCronV0>, args: InitEntityClaimCronArg
     InitializeCronJobArgsV0 {
       schedule: args.schedule,
       name: "entity_claim".to_string(),
-      free_tasks_per_transaction: 0,
+      free_tasks_per_transaction: 6,
       num_tasks_per_queue_call: 8,
     },
   )?;
