@@ -85,6 +85,8 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | system_program        | immut      | no     |      |
 | tuktuk_program        | immut      | no     |      |
 | cron_program          | immut      | no     |      |
+| task_return_account_1 | immut      | no     |      |
+| task_return_account_2 | immut      | no     |      |
 
 #### Args
 
