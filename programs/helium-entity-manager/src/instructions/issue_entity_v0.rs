@@ -103,7 +103,7 @@ pub struct IssueEntityV0<'info> {
   /// CHECK: Used in cpi
   pub bubblegum_signer: UncheckedAccount<'info>,
 
-  /// CHECK: Verified by constraint  
+  /// CHECK: Verified by constraint
   #[account(address = mpl_token_metadata::ID)]
   pub token_metadata_program: AccountInfo<'info>,
   pub log_wrapper: Program<'info, Noop>,

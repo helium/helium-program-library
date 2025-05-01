@@ -20,6 +20,9 @@
       "path": "./packages/lazy-transactions-sdk"
     },
     {
+      "path": "./packages/iot-routing-manager-sdk"
+    },
+    {
       "path": "./packages/helium-react-hooks"
     },
     {
