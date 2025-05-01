@@ -29,6 +29,8 @@ export interface HeliumVsrState {
   positions?: PositionWithMeta[];
   provider?: AnchorProvider;
   votingPower?: BN;
+  myVotingPower?: BN;
+  proxiedVotingPower?: BN;
   registrar?: Registrar & { pubkey?: PublicKey };
   unixNow?: number;
 
@@ -43,6 +45,8 @@ const defaultState: HeliumVsrState = {
   positions: [],
   provider: undefined,
   votingPower: new BN(0),
+  myVotingPower: new BN(0),
+  proxiedVotingPower: new BN(0),
   voteService: undefined,
   registrar: undefined,
 
@@ -163,97 +167,110 @@ export const HeliumVsrStateProvider: React.FC<{
     return Array.from(uniquePositions.values());
   }, [myPositions, proxiedPositions]);
 
-  const { amountLocked, votingPower, positionsWithMeta, amountProxyLocked } =
-    useMemo(() => {
-      if (positions && registrar && delegatedAccounts && now) {
-        let amountLocked = new BN(0);
-        let amountProxyLocked = new BN(0);
-        let votingPower = new BN(0);
-        const mintCfgs = registrar?.votingMints;
-        const positionsWithMeta = positions
-          .map((position, idx) => {
-            if (position && position.info) {
-              const { lockup } = position.info;
-              const lockupKind = Object.keys(lockup.kind)[0] as string;
-              const isConstant = lockupKind === "constant";
-              const isDecayed = !isConstant && lockup.endTs.lte(new BN(now));
-              const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
-              const currentEpoch = new BN(now).div(new BN(EPOCH_LENGTH));
-              const isDelegated = !!delegatedAccounts?.[idx]?.info;
-              const proxy =
-                proxyAccountsByAsset?.[position.info.mint.toBase58()];
+  const {
+    amountLocked,
+    votingPower,
+    myVotingPower,
+    proxiedVotingPower,
+    positionsWithMeta,
+    amountProxyLocked,
+  } = useMemo(() => {
+    if (positions && registrar && delegatedAccounts && now) {
+      let amountLocked = new BN(0);
+      let amountProxyLocked = new BN(0);
+      let votingPower = new BN(0);
+      let myVotingPower = new BN(0);
+      let proxiedVotingPower = new BN(0);
+      const mintCfgs = registrar?.votingMints;
+      const positionsWithMeta = positions
+        .map((position, idx) => {
+          if (position && position.info) {
+            const { lockup } = position.info;
+            const lockupKind = Object.keys(lockup.kind)[0] as string;
+            const isConstant = lockupKind === "constant";
+            const isDecayed = !isConstant && lockup.endTs.lte(new BN(now));
+            const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
+            const currentEpoch = new BN(now).div(new BN(EPOCH_LENGTH));
+            const isDelegated = !!delegatedAccounts?.[idx]?.info;
+            const proxy = proxyAccountsByAsset?.[position.info.mint.toBase58()];
 
-              let hasRewards = false;
-              const delegatedSubDao = isDelegated
-                ? delegatedAccounts[idx]?.info?.subDao
-                : null;
+            let hasRewards = false;
+            const delegatedSubDao = isDelegated
+              ? delegatedAccounts[idx]?.info?.subDao
+              : null;
 
-              if (isDelegated) {
-                const epoch = delegatedAccounts[
-                  idx
-                ]!.info!.lastClaimedEpoch.add(new BN(1));
+            if (isDelegated) {
+              const epoch = delegatedAccounts[idx]!.info!.lastClaimedEpoch.add(
+                new BN(1)
+              );
 
-                const epochsCount = isDecayed
-                  ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
-                  : currentEpoch.sub(epoch).toNumber();
+              const epochsCount = isDecayed
+                ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
+                : currentEpoch.sub(epoch).toNumber();
 
-                hasRewards =
-                  epochsCount > 0 &&
-                  !(isDecayed && decayedEpoch.eq(currentEpoch));
-              }
-
-              const posVotingPower = calcPositionVotingPower({
-                position: position?.info || null,
-                registrar,
-                unixNow: new BN(now),
-              });
-
-              const isProxiedToMe = idx >= (myOwnedPositionsEndIdx || 0);
-              if (isProxiedToMe) {
-                amountProxyLocked = amountProxyLocked.add(
-                  position.info.amountDepositedNative
-                );
-              } else {
-                amountLocked = amountLocked.add(
-                  position.info.amountDepositedNative
-                );
-              }
-
-              votingPower = votingPower.add(posVotingPower);
-
-              return {
-                ...position.info,
-                pubkey: position?.publicKey,
-                isDelegated,
-                delegatedSubDao,
-                hasRewards,
-                hasGenesisMultiplier: position.info.genesisEnd.gt(new BN(now)),
-                votingPower: posVotingPower,
-                votingMint: mintCfgs[position.info.votingMintConfigIdx],
-                isProxiedToMe,
-                proxy,
-              } as PositionWithMeta;
+              hasRewards =
+                epochsCount > 0 &&
+                !(isDecayed && decayedEpoch.eq(currentEpoch));
             }
-          })
-          .filter(truthy);
 
-        return {
-          positionsWithMeta,
-          amountLocked,
-          votingPower,
-          amountProxyLocked,
-          proxyAccountsByAsset,
-        };
-      }
+            const posVotingPower = calcPositionVotingPower({
+              position: position?.info || null,
+              registrar,
+              unixNow: new BN(now),
+            });
 
-      return {};
-    }, [
-      myOwnedPositionsEndIdx,
-      positions,
-      registrar,
-      delegatedAccounts,
-      proxyAccounts,
-    ]);
+            const isProxiedToMe = idx >= (myOwnedPositionsEndIdx || 0);
+            if (isProxiedToMe) {
+              amountProxyLocked = amountProxyLocked.add(
+                position.info.amountDepositedNative
+              );
+
+              proxiedVotingPower = proxiedVotingPower.add(posVotingPower);
+            } else {
+              amountLocked = amountLocked.add(
+                position.info.amountDepositedNative
+              );
+
+              myVotingPower = myVotingPower.add(posVotingPower);
+            }
+
+            votingPower = votingPower.add(posVotingPower);
+
+            return {
+              ...position.info,
+              pubkey: position?.publicKey,
+              isDelegated,
+              delegatedSubDao,
+              hasRewards,
+              hasGenesisMultiplier: position.info.genesisEnd.gt(new BN(now)),
+              votingPower: posVotingPower,
+              votingMint: mintCfgs[position.info.votingMintConfigIdx],
+              isProxiedToMe,
+              proxy,
+            } as PositionWithMeta;
+          }
+        })
+        .filter(truthy);
+
+      return {
+        positionsWithMeta,
+        amountLocked,
+        amountProxyLocked,
+        votingPower,
+        myVotingPower,
+        proxiedVotingPower,
+        proxyAccountsByAsset,
+      };
+    }
+
+    return {};
+  }, [
+    myOwnedPositionsEndIdx,
+    positions,
+    registrar,
+    delegatedAccounts,
+    proxyAccounts,
+  ]);
 
   const sortedPositions = useMemo(
     () =>
@@ -281,6 +298,8 @@ export const HeliumVsrStateProvider: React.FC<{
       provider,
       refetch,
       votingPower,
+      myVotingPower,
+      proxiedVotingPower,
       registrar: registrar
         ? {
             ...registrar,
@@ -302,6 +321,8 @@ export const HeliumVsrStateProvider: React.FC<{
       provider,
       refetch,
       votingPower,
+      myVotingPower,
+      proxiedVotingPower,
       registrar,
       voteService,
       now,

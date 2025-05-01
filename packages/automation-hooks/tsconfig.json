@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.root.json",
+  "references": [
+    {
+      "path": "../account-fetch-cache"
+    },
+    {
+      "path": "../account-fetch-cache-hooks"
+    },
+    {
+      "path": "../idls"
+    },
+    {
+      "path": "../helium-react-hooks"
+    },
+    {
+      "path": "../hpl-crons-sdk"
+    },
+    {
+      "path": "./tsconfig.cjs.json"
+    },
+    {
+      "path": "./tsconfig.esm.json"
+    }
+  ]
+}

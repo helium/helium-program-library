@@ -7,7 +7,7 @@ use anchor_spl::{
 };
 use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
-  CircuitBreaker, TransferArgsV0,
+  AccountWindowedCircuitBreakerV0, CircuitBreaker, TransferArgsV0,
 };
 use voter_stake_registry::{
   cpi::{accounts::ClearRecentProposalsV0, clear_recent_proposals_v0},
@@ -68,7 +68,7 @@ pub struct ClaimRewardsV1<'info> {
     mut,
     has_one = sub_dao,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
-    bump,
+    bump = delegated_position.bump_seed,
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
 
@@ -77,7 +77,7 @@ pub struct ClaimRewardsV1<'info> {
 
   #[account(
     seeds = ["dao_epoch_info".as_bytes(), dao.key().as_ref(), &args.epoch.to_le_bytes()],
-    bump,
+    bump = dao_epoch_info.bump_seed,
     // Ensure that a pre HIP-138 claim can't accidentally be done.
     constraint = dao_epoch_info.delegation_rewards_issued > 0,
     constraint = dao_epoch_info.done_issuing_rewards @ ErrorCode::EpochNotClosed
@@ -98,9 +98,9 @@ pub struct ClaimRewardsV1<'info> {
     mut,
     seeds = ["account_windowed_breaker".as_bytes(), delegator_pool.key().as_ref()],
     seeds::program = circuit_breaker_program.key(),
-    bump
+    bump = delegator_pool_circuit_breaker.bump_seed,
   )]
-  pub delegator_pool_circuit_breaker: AccountInfo<'info>,
+  pub delegator_pool_circuit_breaker: Box<Account<'info, AccountWindowedCircuitBreakerV0>>,
 
   pub vsr_program: Program<'info, VoterStakeRegistry>,
   pub system_program: Program<'info, System>,
@@ -186,21 +186,36 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     .last()
     .unwrap()
     .ts;
-  clear_recent_proposals_v0(
-    CpiContext::new_with_signer(
-      ctx.accounts.vsr_program.to_account_info(),
-      ClearRecentProposalsV0 {
-        position: ctx.accounts.position.to_account_info(),
-        registrar: ctx.accounts.registrar.to_account_info(),
-        dao: ctx.accounts.dao.to_account_info(),
-      },
-      &[dao_seeds!(ctx.accounts.dao)],
-    ),
-    ClearRecentProposalsArgsV0 {
-      ts: first_ts,
-      dao_bump: ctx.accounts.dao.bump_seed,
-    },
-  )?;
+
+  // Only clear when we're claiming the most recent epoch. We don't want to clear proposals when we're
+  // claiming later in the bitmap but earlier claims haven't gone through yet.
+  if epoch == ctx.accounts.delegated_position.last_claimed_epoch {
+    // Only clear if there are old proposals that should be cleared.
+    if ctx
+      .accounts
+      .position
+      .recent_proposals
+      .iter()
+      .any(|p| p.ts < first_ts)
+    {
+      clear_recent_proposals_v0(
+        CpiContext::new_with_signer(
+          ctx.accounts.vsr_program.to_account_info(),
+          ClearRecentProposalsV0 {
+            position: ctx.accounts.position.to_account_info(),
+            registrar: ctx.accounts.registrar.to_account_info(),
+            dao: ctx.accounts.dao.to_account_info(),
+          },
+          &[dao_seeds!(ctx.accounts.dao)],
+        ),
+        ClearRecentProposalsArgsV0 {
+          ts: first_ts,
+          dao_bump: ctx.accounts.dao.bump_seed,
+        },
+      )?;
+    }
+  }
+
   let last_ts = ctx
     .accounts
     .dao_epoch_info
@@ -213,7 +228,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
     .position
     .recent_proposals
     .iter()
-    .filter(|p| p.ts <= last_ts)
+    .filter(|p| p.ts <= last_ts && p.ts >= first_ts)
     .map(|rp| rp.proposal)
     .collect::<HashSet<_>>();
 
@@ -230,7 +245,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   let not_four_proposals = ctx.accounts.dao_epoch_info.recent_proposals.len() < 4
     || ctx
       .accounts
-      .dao
+      .dao_epoch_info
       .recent_proposals
       .iter()
       .filter(|p| p.proposal != Pubkey::default())
@@ -250,11 +265,6 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   )?;
 
   if !not_four_proposals && eligible_count < 2 {
-    msg!(
-      "Position is not eligible, burning rewards. Position proposals {:?}, recent proposals {:?}",
-      ctx.accounts.position.recent_proposals,
-      ctx.accounts.dao_epoch_info.recent_proposals
-    );
     burn(ctx.accounts.burn_ctx(), amount)?;
   }
 

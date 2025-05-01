@@ -1,5 +1,3 @@
-use crate::error::ErrorCode;
-use crate::{LazyDistributorV0, RecipientV0};
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
@@ -9,6 +7,8 @@ use circuit_breaker::{
   cpi::{accounts::TransferV0, transfer_v0},
   AccountWindowedCircuitBreakerV0, CircuitBreaker, TransferArgsV0,
 };
+
+use crate::{error::ErrorCode, LazyDistributorV0, RecipientV0};
 
 #[derive(Accounts)]
 pub struct DistributeRewardsCommonV0<'info> {
@@ -22,7 +22,7 @@ pub struct DistributeRewardsCommonV0<'info> {
   #[account(
     mut,
     has_one = lazy_distributor,
-    constraint = recipient.current_rewards.iter().flatten().count() >= ((lazy_distributor.oracles.len() + 1) / 2),
+    constraint = recipient.current_rewards.iter().flatten().count() >= lazy_distributor.oracles.len().div_ceil(2),
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
   pub rewards_mint: Box<Account<'info, Mint>>,

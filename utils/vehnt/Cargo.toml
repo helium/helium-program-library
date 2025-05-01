@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anchor-lang = "0.31.0"
+anchor-lang = "0.31.1"
 anchor-client = "0.31.0"
 clap = { version = "4", features = ["derive"]}
 reqwest = "0"

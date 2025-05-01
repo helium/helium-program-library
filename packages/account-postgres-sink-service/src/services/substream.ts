@@ -36,9 +36,15 @@ interface IOutputAccount {
   deleted: boolean;
 }
 
-export const CursorManager = (stalenessThreshold: number) => {
+export const CursorManager = (
+  stalenessThreshold: number,
+  onStale?: () => void
+) => {
+  const CURSOR_UPDATE_INTERVAL = 30_000;
   let checkInterval: NodeJS.Timeout | undefined;
-  let isReconnecting = false;
+  let lastReceivedBlock: number = Date.now();
+  let pendingCursor: { cursor: string; blockHeight: string } | null = null;
+  let lastCursorUpdate = 0;
 
   const formatStaleness = (staleness: number): string => {
     const stalenessInHours = staleness / 3600000;
@@ -50,45 +56,58 @@ export const CursorManager = (stalenessThreshold: number) => {
   const getLatestCursor = async (): Promise<Cursor | null> =>
     await Cursor.findOne({ order: [["createdAt", "DESC"]] });
 
-  const updateCursor = async (cursor: string): Promise<void> => {
-    await database.transaction(async (t) => {
-      await Cursor.upsert({ cursor }, { transaction: t });
-      await Cursor.destroy({
-        where: {
-          cursor: { [Op.ne]: cursor },
-        },
-        transaction: t,
-      });
-    });
+  const recordBlockReceived = (): void => {
+    lastReceivedBlock = Date.now();
   };
 
-  const checkStaleness = async (
-    onStale?: () => void
-  ): Promise<string | undefined> => {
-    if (isReconnecting) return undefined;
+  const updateCursor = async ({
+    cursor,
+    blockHeight,
+    force = false,
+  }: {
+    cursor: string;
+    blockHeight: string;
+    force?: boolean;
+  }): Promise<void> => {
+    const now = Date.now();
+    recordBlockReceived();
+    pendingCursor = { cursor, blockHeight };
 
-    const cursor = await getLatestCursor();
-    if (!cursor) return undefined;
+    if (force || now - lastCursorUpdate >= CURSOR_UPDATE_INTERVAL) {
+      if (pendingCursor) {
+        await database.transaction(async (t) => {
+          await Cursor.upsert(pendingCursor!, { transaction: t });
+          await Cursor.destroy({
+            where: {
+              cursor: { [Op.ne]: pendingCursor!.cursor },
+            },
+            transaction: t,
+          });
+        });
+        lastCursorUpdate = now;
+        pendingCursor = null;
+      }
+    }
+  };
 
-    const staleness =
-      Date.now() - new Date(cursor.dataValues.createdAt).getTime();
-    if (staleness >= stalenessThreshold) {
+  const checkStaleness = async (): Promise<string | undefined> => {
+    const connectionStaleness = Date.now() - lastReceivedBlock;
+    if (connectionStaleness >= stalenessThreshold) {
       console.log(
-        `Cursor is stale (${formatStaleness(
-          staleness
-        )} old), connecting from current block`
+        `Connection is stale (${formatStaleness(
+          connectionStaleness
+        )} since last block)`
       );
-      isReconnecting = true;
       onStale && onStale();
-      return undefined;
     }
 
-    return cursor.cursor;
+    const cursor = await getLatestCursor();
+    return cursor ? cursor.cursor : undefined;
   };
 
-  const startStalenessCheck = (onStale: () => void): void => {
+  const startStalenessCheck = (): void => {
     if (checkInterval) clearInterval(checkInterval);
-    checkInterval = setInterval(() => checkStaleness(onStale), 30_000);
+    checkInterval = setInterval(() => checkStaleness(), 30_000);
   };
 
   const stopStalenessCheck = (): void => {
@@ -98,17 +117,13 @@ export const CursorManager = (stalenessThreshold: number) => {
     }
   };
 
-  const resetReconnecting = (): void => {
-    isReconnecting = false;
-  };
-
   return {
     getLatestCursor,
     updateCursor,
     checkStaleness,
     startStalenessCheck,
     stopStalenessCheck,
-    resetReconnecting,
+    recordBlockReceived,
   };
 };
 
@@ -140,12 +155,15 @@ export const setupSubstream = async (
   );
 
   let isConnecting = false;
-  const cursorManager = CursorManager(SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS);
+  const cursorManager = CursorManager(
+    SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
+    () => server.customMetrics.staleCursorCounter.inc()
+  );
   const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
     configs
   );
 
-  const connect = async (attemptCount = 0) => {
+  const connect = async (attemptCount = 1) => {
     if (attemptCount >= MAX_RECONNECT_ATTEMPTS) {
       console.error(
         `Substream failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts.`
@@ -159,10 +177,7 @@ export const setupSubstream = async (
     try {
       await Cursor.sync({ alter: true });
       const cursor = await cursorManager.checkStaleness();
-
-      cursorManager.startStalenessCheck(() => {
-        handleReconnect(0);
-      });
+      cursorManager.startStalenessCheck();
 
       console.log("Connected to Substream");
       const currentBlock = await provider.connection.getSlot("finalized");
@@ -182,7 +197,6 @@ export const setupSubstream = async (
 
       attemptCount = 0;
       isConnecting = false;
-      cursorManager.resetReconnecting();
 
       for await (const response of streamBlocks(transport, request)) {
         const message = response.message;
@@ -195,7 +209,21 @@ export const setupSubstream = async (
         if (message.case === "blockScopedData") {
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
-          if (output !== undefined && !isEmptyMessage(output)) {
+          const blockHeight =
+            message.value.finalBlockHeight?.toString() || "unknown";
+
+          const hasAccountChanges =
+            output !== undefined &&
+            !isEmptyMessage(output) &&
+            (output as any).accounts.length > 0;
+
+          await cursorManager.updateCursor({
+            cursor,
+            blockHeight,
+            force: hasAccountChanges,
+          });
+
+          if (hasAccountChanges) {
             const accountPromises = (output as any).accounts
               .map(async (account: IOutputAccount) => {
                 const { owner, address, data, deleted } = account;
@@ -206,7 +234,6 @@ export const setupSubstream = async (
                 );
 
                 if (!config) return null;
-
                 return handleAccountWebhook({
                   fastify: server,
                   programId: ownerKey,
@@ -223,7 +250,6 @@ export const setupSubstream = async (
               .filter(Boolean);
 
             await Promise.all(accountPromises);
-            await cursorManager.updateCursor(cursor);
           }
         }
       }
@@ -231,18 +257,21 @@ export const setupSubstream = async (
       cursorManager.stopStalenessCheck();
       console.log("Substream connection error:", err);
       isConnecting = false;
-      cursorManager.resetReconnecting();
       handleReconnect(attemptCount + 1);
     }
   };
 
   const handleReconnect = async (nextAttempt: number) => {
-    console.log(
-      `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
-    );
+    const baseDelay = 1000;
+    const delay =
+      nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
 
-    const delay = nextAttempt === 1 ? 0 : 1000;
-    setTimeout(() => connect(nextAttempt), delay);
+    setTimeout(() => {
+      console.log(
+        `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
+      );
+      connect(nextAttempt);
+    }, delay);
   };
 
   await connect();

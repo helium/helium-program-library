@@ -1,6 +1,6 @@
 {
   "name": "hpl-docs",
-  "version": "0.10.3",
+  "version": "0.10.11",
   "private": true,
   "scripts": {
     "dev": "next dev",

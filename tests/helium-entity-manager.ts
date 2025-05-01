@@ -87,14 +87,18 @@ describe("helium-entity-manager", () => {
   let dcMint: PublicKey;
   let activeDeviceAuthority: Keypair;
 
+  before(async () => {
+    await ensureDCIdl();
+    await ensureHSDIdl();
+    await ensureHEMIdl();
+  });
+
   beforeEach(async () => {
     dcProgram = await initDataCredits(
       provider,
       anchor.workspace.DataCredits.programId,
       anchor.workspace.DataCredits.idl
     );
-
-    await ensureDCIdl(dcProgram);
 
     noEmitProgram = await initBurn(
       provider,
@@ -108,14 +112,11 @@ describe("helium-entity-manager", () => {
       anchor.workspace.HeliumSubDaos.idl
     );
 
-    await ensureHSDIdl(hsdProgram);
-
     hemProgram = await initHeliumEntityManager(
       provider,
       anchor.workspace.HeliumEntityManager.programId,
       anchor.workspace.HeliumEntityManager.idl
     );
-    await ensureHEMIdl(hemProgram);
 
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     const hntMint = dataCredits.hntMint;

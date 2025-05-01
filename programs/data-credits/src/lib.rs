@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 #[cfg(not(feature = "no-entrypoint"))]
 use {default_env::default_env, solana_security_txt::security_txt};
 
-pub mod circuit_breaker;
 pub mod errors;
 pub mod instructions;
 pub mod state;

@@ -88,26 +88,29 @@ if (PG_POOL_SIZE < 5) {
   await server.register(metrics);
   const eventHandler = new EventEmitter();
   let refreshing: Promise<void> | undefined = undefined;
-  eventHandler.on("refresh-accounts", (programId) => {
+  eventHandler.on("refresh-accounts", (programId, accountType) => {
     if (!refreshing) {
       refreshing = (async () => {
         try {
           if (configs) {
             for (const config of configs) {
-              if ((programId && programId == config.programId) || !programId) {
-                console.log(
-                  `Refreshing accounts for program: ${config.programId}`
-                );
+              if (programId && programId == config.programId) {
+                const refreshTarget = accountType
+                  ? `account type '${accountType}' for program: ${config.programId}`
+                  : `all accounts for program: ${config.programId}`;
+                console.log(`Refreshing ${refreshTarget}`);
 
                 try {
                   await upsertProgramAccounts({
                     programId: new PublicKey(config.programId),
-                    accounts: config.accounts,
+                    accounts: accountType
+                      ? config.accounts.filter(
+                          (acc) => acc.type === accountType
+                        )
+                      : config.accounts,
                   });
 
-                  console.log(
-                    `Accounts refreshed for program: ${config.programId}`
-                  );
+                  console.log(`Accounts refreshed for ${refreshTarget}`);
                 } catch (err) {
                   throw err;
                 }
@@ -132,7 +135,7 @@ if (PG_POOL_SIZE < 5) {
       await getPluginsByAccountTypeByProgram(configs);
 
     server.get("/refresh-accounts", async (req, res) => {
-      const { program: programId, password } = req.query as any;
+      const { program: programId, accountType, password } = req.query as any;
 
       if (!programId) {
         res.code(StatusCodes.BAD_REQUEST).send({
@@ -147,8 +150,30 @@ if (PG_POOL_SIZE < 5) {
         });
         return;
       }
+
+      if (accountType) {
+        const config = configs.find((c) => c.programId === programId);
+        if (!config) {
+          res.code(StatusCodes.BAD_REQUEST).send({
+            message: `No config found for program: ${programId}`,
+          });
+          return;
+        }
+
+        const accountExists = config.accounts.some(
+          (acc) => acc.type === accountType
+        );
+
+        if (!accountExists) {
+          res.code(StatusCodes.BAD_REQUEST).send({
+            message: `Account '${accountType}' not found in configs for program: ${programId}`,
+          });
+          return;
+        }
+      }
+
       let prevRefreshing = refreshing;
-      eventHandler.emit("refresh-accounts", programId);
+      eventHandler.emit("refresh-accounts", programId, accountType);
       if (prevRefreshing) {
         res
           .code(StatusCodes.TOO_MANY_REQUESTS)

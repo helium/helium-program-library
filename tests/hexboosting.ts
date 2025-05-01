@@ -59,6 +59,14 @@ describe("hexboosting", () => {
   let subDao: PublicKey;
 
   let program: Program<Hexboosting>;
+
+  before(async () => {
+    await ensureDCIdl();
+    await ensureMemIdl();
+    await ensureHSDIdl();
+    await ensureHEMIdl();
+  });
+
   beforeEach(async () => {
     program = await init(
       provider,
@@ -70,28 +78,24 @@ describe("hexboosting", () => {
       anchor.workspace.DataCredits.programId,
       anchor.workspace.DataCredits.idl
     );
-    await ensureDCIdl(dcProgram);
 
     memProgram = await initMobileEntityManager(
       provider,
       anchor.workspace.MobileEntityManager.programId,
       anchor.workspace.MobileEntityManager.idl
     );
-    ensureMemIdl(memProgram);
 
     hsdProgram = await initHeliumSubDaos(
       provider,
       anchor.workspace.HeliumSubDaos.programId,
       anchor.workspace.HeliumSubDaos.idl
     );
-    await ensureHSDIdl(hsdProgram);
 
     hemProgram = await initHeliumEntityManager(
       provider,
       anchor.workspace.HeliumEntityManager.programId,
       anchor.workspace.HeliumEntityManager.idl
     );
-    await ensureHEMIdl(hemProgram);
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     const hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, new BN("100000000000000"), me);

@@ -370,7 +370,7 @@ pub fn caclulate_vhnt_info(
 
   let mut genesis_end_vehnt_correction = 0;
   let mut genesis_end_fall_rate_correction = 0;
-  if has_genesis && position.genesis_end < expiration_ts {
+  if has_genesis && position.genesis_end < delegation_end_ts {
     let genesis_end_epoch_start_ts =
       i64::try_from(current_epoch(position.genesis_end)).unwrap() * EPOCH_LENGTH;
 

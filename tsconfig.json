@@ -29,6 +29,9 @@
       "path": "./packages/currency-utils"
     },
     {
+      "path": "./packages/automation-hooks"
+    },
+    {
       "path": "./packages/voter-stake-registry-sdk"
     },
     {

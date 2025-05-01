@@ -5,11 +5,15 @@ import { initPlugins } from "../plugins";
 import { IAccountConfig, IConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import { provider } from "./solana";
-import { IdlField, IdlTypeDefTyStruct } from "@coral-xyz/anchor/dist/cjs/idl";
+import {
+  IdlField,
+  IdlTypeDef,
+  IdlTypeDefTyStruct,
+} from "@coral-xyz/anchor/dist/cjs/idl";
 
 const TypeMap = new Map<string, any>([
   ["string", DataTypes.STRING],
-  ["publicKey", DataTypes.STRING],
+  ["pubkey", DataTypes.STRING],
   ["i16", DataTypes.INTEGER],
   ["u8", DataTypes.INTEGER.UNSIGNED],
   ["i16", DataTypes.INTEGER],
@@ -30,6 +34,11 @@ const determineType = (type: string | object): any => {
   }
 
   if (typeof type === "object") {
+    // @ts-ignore
+    if (type.option) {
+      // @ts-ignore
+      return determineType(type.option);
+    }
     const [key, value] = Object.entries(type)[0];
 
     if (key === "array" && Array.isArray(value)) {
@@ -62,12 +71,15 @@ export const defineIdlModels = async ({
     const accConfig = accounts.find(({ type }) => type === acc.name);
     if (accConfig) {
       let schema: { [key: string]: any } = {};
-      for (const field of (typeDef as any as IdlTypeDefTyStruct).fields || []) {
+      for (const field of (
+        (typeDef as any as IdlTypeDef).type as IdlTypeDefTyStruct
+      ).fields || []) {
         if (typeof field != "string") {
           const fieldAsField = field as IdlField;
+          const prunedFieldName = fieldAsField.name.replace(/^_+/, "");
           schema[acc.name] = {
             ...schema[acc.name],
-            [fieldAsField.name]: determineType(fieldAsField.type),
+            [camelize(prunedFieldName, true)]: determineType(fieldAsField.type),
           };
         }
       }

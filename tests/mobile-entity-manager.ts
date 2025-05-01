@@ -50,6 +50,12 @@ describe('mobile-entity-manager', () => {
   let dcMint: PublicKey;
   let programApproval: PublicKey;
 
+  before(async () => {
+    await ensureDCIdl();
+    await ensureHSDIdl();
+    await ensureMemIdl();
+  });
+
   beforeEach(async () => {
     dcProgram = await initDataCredits(
       provider,
@@ -57,15 +63,11 @@ describe('mobile-entity-manager', () => {
       anchor.workspace.DataCredits.idl
     );
 
-    ensureDCIdl(dcProgram);
-
     hsdProgram = await initHeliumSubDaos(
       provider,
       anchor.workspace.HeliumSubDaos.programId,
       anchor.workspace.HeliumSubDaos.idl
     );
-
-    ensureHSDIdl(hsdProgram);
 
     hemProgram = await initHeliumEntityManager(
       provider,
@@ -78,7 +80,6 @@ describe('mobile-entity-manager', () => {
       anchor.workspace.MobileEntityManager.programId,
       anchor.workspace.MobileEntityManager.idl
     );
-    ensureMemIdl(memProgram);
 
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
