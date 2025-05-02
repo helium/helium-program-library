@@ -69,7 +69,7 @@ export const useDelegatePosition = ({
         const instructions: TransactionInstruction[] = [];
 
         if (subDao) {
-          if (position.isDelegated && delegatedPositionAcc) {
+          if (position.isDelegated && delegatedPositionAcc && !delegatedPositionAcc.subDao.equals(subDao.pubkey)) {
             instructions.push(
               await hsdProgram.methods
                 .changeDelegationV0()
@@ -80,7 +80,7 @@ export const useDelegatePosition = ({
                 })
                 .instruction()
             );
-          } else {
+          } else if (!position.isDelegated) {
             instructions.push(
               await hsdProgram.methods
                 .delegateV0()
