@@ -1,7 +1,7 @@
 import { Model, STRING, Sequelize } from "sequelize";
 import AWS from "aws-sdk";
 import * as pg from "pg";
-import { PG_POOL_SIZE } from "./env";
+import { PG_POOL_SIZE } from "../env";
 import pLimit from "p-limit";
 
 const host = process.env.PGHOST || "localhost";
@@ -60,6 +60,30 @@ export const database = new Sequelize({
     },
   },
 });
+
+export class AssetOwner extends Model {
+  declare asset: string;
+  declare owner: string;
+}
+
+AssetOwner.init(
+  {
+    asset: {
+      type: STRING,
+      primaryKey: true,
+    },
+    owner: {
+      type: STRING,
+    },
+  },
+  {
+    sequelize: database,
+    modelName: "assetOwner",
+    tableName: "asset_owners",
+    underscored: true,
+    timestamps: true,
+  }
+);
 
 export class Cursor extends Model {
   declare cursor: string;

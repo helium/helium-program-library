@@ -1,24 +1,66 @@
 import cors from "@fastify/cors";
-import { AccountInfo, PublicKey, TransactionResponse } from "@solana/web3.js";
+import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
-import fs from "fs";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
-import { PG_POOL_SIZE } from "./env";
-// import { ensureEnv } from "./utils/ensureEnv";
-import { provider } from "./solana";
+import { PG_POOL_SIZE, ADMIN_PASSWORD } from "./env";
+import { ensureTables } from "./utils/ensureTables";
 // import { setupSubstream } from "./services/substream";
-import database from "./database";
+import database from "./utils/database";
+import { upsertOwners } from "./utils/upsertOwners";
 
 if (PG_POOL_SIZE < 5) {
   throw new Error("PG_POOL_SIZE must be minimum of 5");
 }
 
 (async () => {
-  const server: FastifyInstance = Fastify({ logger: false });
-  await server.register(cors, { origin: "*" });
+  let server: FastifyInstance | undefined;
+  const eventHandler = new EventEmitter();
+  let refreshing: Promise<void> | undefined = undefined;
+  eventHandler.on("refresh-owners", () => {
+    if (!refreshing) {
+      refreshing = (async () => {
+        try {
+          try {
+            await upsertOwners({ sequelize: database });
+            console.log(`Owners Refreshed`);
+          } catch (err) {
+            throw err;
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          refreshing = undefined;
+        }
+      })();
+    }
+  });
 
   try {
+    server = Fastify({ logger: false });
+    await server.register(cors, { origin: "*" });
+    await ensureTables({ sequelize: database });
     await database.sync();
+
+    server.get("/refresh-owners", async (req, res) => {
+      const { password } = req.query as any;
+      if (password !== ADMIN_PASSWORD) {
+        res.code(StatusCodes.FORBIDDEN).send({
+          message: "Invalid password",
+        });
+        return;
+      }
+
+      let prevRefreshing = refreshing;
+      eventHandler.emit("refresh-owners");
+      if (prevRefreshing) {
+        res
+          .code(StatusCodes.TOO_MANY_REQUESTS)
+          .send(ReasonPhrases.TOO_MANY_REQUESTS);
+      } else {
+        res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+      }
+    });
+
     await server.listen({
       port: Number(process.env.PORT || "3000"),
       host: "0.0.0.0",
