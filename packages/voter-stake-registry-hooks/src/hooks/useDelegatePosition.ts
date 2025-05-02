@@ -11,7 +11,9 @@ import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta, SubDaoWithMeta } from "../sdk/types";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
-export const useDelegatePosition = () => {
+export const useDelegatePosition = ({
+  automationEnabled = false
+}) => {
   const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
     async ({

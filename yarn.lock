@@ -367,6 +367,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@duneanalytics/client-sdk@npm:^0.2.5":
+  version: 0.2.5
+  resolution: "@duneanalytics/client-sdk@npm:0.2.5"
+  dependencies:
+    deprecated: ^0.0.2
+    loglevel: ^1.8.0
+  checksum: 30babbfba9638943c65461d78003aede526ed63874fe4d5989fea3844997f0f3f1089dc3ccc19f2f2bfe73e6f8a21dba6d8d4753a91f1862e0a11fa9817f1926
+  languageName: node
+  linkType: hard
+
 "@eslint-community/eslint-utils@npm:^4.2.0, @eslint-community/eslint-utils@npm:^4.4.0":
   version: 4.6.1
   resolution: "@eslint-community/eslint-utils@npm:4.6.1"
@@ -1236,6 +1246,7 @@ __metadata:
   resolution: "@helium/helium-vote-service@workspace:packages/helium-vote-service"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
+    "@duneanalytics/client-sdk": ^0.2.5
     "@fastify/cors": ^8.1.1
     "@fastify/static": ^6
     "@helium/account-fetch-cache": ^0.10.11
@@ -7396,6 +7407,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"deprecated@npm:^0.0.2":
+  version: 0.0.2
+  resolution: "deprecated@npm:0.0.2"
+  checksum: e8e03bcb9de4d2625b5b2fbdc4cf985a53355e3366c16fe8ae4a44004733d75c916648fe32a7a61535b1d06bfe5ddd1346dd8d44903cecc5b9db587a66b839af
+  languageName: node
+  linkType: hard
+
 "deprecation@npm:^2.0.0":
   version: 2.3.1
   resolution: "deprecation@npm:2.3.1"
@@ -11256,6 +11274,13 @@ __metadata:
     safe-stable-stringify: ^2.3.1
     triple-beam: ^1.3.0
   checksum: a202d10897254735ead75a640f889998f9b91a0c36be9cac3f5471fa740d36bc2fbbcf9d113dcdadec4ddf09e257393ff800e6aab80019bdc7456363d6ea21f6
+  languageName: node
+  linkType: hard
+
+"loglevel@npm:^1.8.0":
+  version: 1.9.2
+  resolution: "loglevel@npm:1.9.2"
+  checksum: 896c67b90a507bfcfc1e9a4daa7bf789a441dd70d95cd13b998d6dd46233a3bfadfb8fadb07250432bbfb53bf61e95f2520f9b11f9d3175cc460e5c251eca0af
   languageName: node
   linkType: hard
 
