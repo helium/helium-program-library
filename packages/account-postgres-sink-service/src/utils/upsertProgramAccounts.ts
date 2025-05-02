@@ -7,11 +7,12 @@ import { initPlugins } from "../plugins";
 import { IAccountConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import { chunks } from "./chunks";
-import database from "./database";
+import database, { limit } from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
 import { lowerFirstChar } from "@helium/spl-utils";
+import axios from "axios";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
@@ -77,10 +78,21 @@ export const upsertProgramAccounts = async ({
 
     const accounts = await retry(
       async () => {
-        return await connection.getProgramAccounts(programId, {
-          filters,
-          commitment: "confirmed",
+        const result = await axios.post(SOLANA_URL, {
+          jsonrpc: "2.0",
+          id: `refresh-accounts-${programId.toBase58()}-${accountType}`,
+          method: "getProgramAccounts",
+          params: [
+            programId.toBase58(),
+            {
+              commitment: "confirmed",
+              encoding: "base64",
+              filters,
+            },
+          ],
         });
+
+        return result.data.result as anchor.web3.GetProgramAccountsResponse;
       },
       {
         retries: 5,
@@ -95,24 +107,28 @@ export const upsertProgramAccounts = async ({
       }
     );
 
-    for (const chunk of chunks(accounts, batchSize)) {
-      try {
-        const t = await sequelize.transaction({
-          isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-        });
-        await processChunk(chunk, t);
-        await t.commit();
-        processedCount += chunk.length;
-        console.log(`Processed ${processedCount} ${accountType} accounts`);
-      } catch (err) {
-        console.error(`Error processing chunk:`, err);
-        throw err;
-      }
-    }
+    await Promise.all(
+      chunks(accounts, batchSize).map((chunk) =>
+        limit(async () => {
+          try {
+            const t = await sequelize.transaction({
+              isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+            });
+            await processChunk(chunk, t);
+            await t.commit();
+            processedCount += chunk.length;
+            console.log(`Processing ${chunk.length} ${accountType} accounts`);
+          } catch (err) {
+            console.error(`Error processing chunk:`, err);
+            throw err;
+          }
+        })
+      )
+    );
 
     const duration = (Date.now() - startTime) / 1000;
     console.log(
-      `Finished processing ${accountType} accounts in ${duration} seconds`
+      `Finished processing ${processedCount} ${accountType} accounts in ${duration} seconds`
     );
   };
 
@@ -128,7 +144,10 @@ export const upsertProgramAccounts = async ({
 
       if (filter?.offset != undefined && filter?.bytes != undefined) {
         coderFilters.push({
-          memcmp: { offset: filter.offset, bytes: filter.bytes },
+          memcmp: {
+            offset: filter.offset,
+            bytes: filter.bytes,
+          },
         });
       }
 
@@ -147,16 +166,22 @@ export const upsertProgramAccounts = async ({
           const accs = chunk
             .map(({ pubkey, account }) => {
               try {
+                const data =
+                  Array.isArray(account.data) && account.data[1] === "base64"
+                    ? Buffer.from(account.data[0], "base64")
+                    : account.data;
+
                 const decodedAcc = program.coder.accounts.decode(
                   lowerFirstChar(type),
-                  account.data
+                  data
                 );
+
                 return {
                   publicKey: pubkey,
                   account: decodedAcc,
                 };
               } catch (_e) {
-                console.error(`Decode error ${pubkey.toBase58()}`, _e);
+                console.error(`Decode error ${pubkey}`, _e);
                 return null;
               }
             })
@@ -184,7 +209,7 @@ export const upsertProgramAccounts = async ({
               }
 
               return {
-                address: publicKey.toBase58(),
+                address: publicKey,
                 refreshed_at: now,
                 ...sanitizedAccount,
               };

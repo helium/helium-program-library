@@ -227,7 +227,11 @@ export const integrityCheckProgramAccounts = async ({
                     c.data as Buffer
                   );
 
-                  let sanitized = {
+                  let sanitized: {
+                    refreshed_at: string;
+                    address: string;
+                    [key: string]: any;
+                  } = {
                     refreshed_at: new Date().toISOString(),
                     address: c.pubkey,
                     ...sanitizeAccount(decodedAcc),
@@ -252,25 +256,47 @@ export const integrityCheckProgramAccounts = async ({
                     transaction: t,
                   });
 
-                  const shouldUpdate =
-                    !deepEqual(
-                      _omit(sanitized, OMIT_KEYS),
-                      _omit(existing?.dataValues, OMIT_KEYS)
-                    ) &&
-                    !(
-                      existing?.dataValues.refreshed_at &&
-                      new Date(existing.dataValues.refreshed_at) >= startTime &&
-                      new Date(existing.dataValues.refreshed_at) <= new Date()
-                    );
+                  const existingData = existing?.dataValues;
+                  const wasRefreshedDuringThisRun =
+                    existingData?.refreshed_at &&
+                    new Date(existingData.refreshed_at) >= startTime &&
+                    new Date(existingData.refreshed_at) <= new Date();
 
-                  if (shouldUpdate) {
+                  const existingClean = existingData
+                    ? _omit(existingData, OMIT_KEYS)
+                    : {};
+
+                  const sanitizedClean = _omit(sanitized, OMIT_KEYS);
+                  const hasChanges = !deepEqual(sanitizedClean, existingClean);
+                  if (hasChanges && !wasRefreshedDuringThisRun) {
+                    const changedFields = existing
+                      ? Object.entries(sanitizedClean)
+                          .filter(
+                            ([key, value]) =>
+                              !deepEqual(value, existingData[key])
+                          )
+                          .map(([key]) => key)
+                      : Object.keys(sanitizedClean);
+
                     corrections.push({
                       type: accName,
                       accountId: c.pubkey,
-                      txSignatures: txIdsByAccountId[c.pubkey],
-                      currentValues: existing ? existing.dataValues : null,
-                      newValues: sanitized,
+                      txSignatures: txIdsByAccountId[c.pubkey] || [],
+                      currentValues: existing
+                        ? changedFields.reduce(
+                            (obj, key) => ({
+                              ...obj,
+                              [key]: existingData[key],
+                            }),
+                            {}
+                          )
+                        : null,
+                      newValues: changedFields.reduce(
+                        (obj, key) => ({ ...obj, [key]: sanitized[key] }),
+                        {}
+                      ),
                     });
+
                     await model.upsert({ ...sanitized }, { transaction: t });
                   }
                 })
