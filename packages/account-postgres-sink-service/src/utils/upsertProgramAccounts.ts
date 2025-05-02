@@ -75,6 +75,7 @@ export const upsertProgramAccounts = async ({
   ) => {
     const startTime = Date.now();
     let processedCount = 0;
+    console.log(`Processing ${accountType} accounts`);
 
     const accounts = await retry(
       async () => {
