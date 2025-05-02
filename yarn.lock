@@ -837,7 +837,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/automation-hooks@workspace:packages/automation-hooks":
+"@helium/automation-hooks@^0.10.11, @helium/automation-hooks@workspace:packages/automation-hooks":
   version: 0.0.0-use.local
   resolution: "@helium/automation-hooks@workspace:packages/automation-hooks"
   dependencies:
@@ -1882,6 +1882,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.31.0
     "@helium/account-fetch-cache": ^0.10.11
     "@helium/account-fetch-cache-hooks": ^0.10.11
+    "@helium/automation-hooks": ^0.10.11
     "@helium/circuit-breaker-sdk": ^0.10.11
     "@helium/helium-react-hooks": ^0.10.11
     "@helium/helium-sub-daos-sdk": ^0.10.11

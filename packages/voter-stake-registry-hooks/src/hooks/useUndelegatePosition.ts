@@ -12,18 +12,27 @@ import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
 import { formPositionClaims } from "../utils/formPositionClaims";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
+import { TASK_QUEUE, useDelegationClaimBot } from "@helium/automation-hooks";
+import { useMemo } from "react";
+import { delegationClaimBotKey } from "@helium/hpl-crons-sdk";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { init as initHplCrons } from "@helium/hpl-crons-sdk";
 
-export const useUndelegatePosition = () => {
+export const useUndelegatePosition = ({
+  position,
+}: {
+  position: PositionWithMeta;
+}) => {
   const { provider, unixNow } = useHeliumVsrState();
+  const delegationClaimBotK = useMemo(() => delegationClaimBotKey(TASK_QUEUE, position.pubkey)[0]);
+  const { info: delegationClaimBot } = useDelegationClaimBot(delegationClaimBotK);
   const { error, loading, execute } = useAsyncCallback(
     async ({
-      position,
       programId = PROGRAM_ID,
       onInstructions,
       onProgress,
       maxSignatureBatch = MAX_TRANSACTIONS_PER_SIGNATURE_BATCH,
     }: {
-      position: PositionWithMeta;
       programId?: PublicKey;
       // Instead of sending the transaction, let the caller decide
       onInstructions?: (
@@ -35,7 +44,7 @@ export const useUndelegatePosition = () => {
       const isInvalid = !unixNow || !provider || !position.isDelegated;
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
-
+      const hplCronsProgram = await initHplCrons(provider as any);
       if (loading) return;
 
       if (isInvalid || !hsdProgram) {
@@ -64,6 +73,14 @@ export const useUndelegatePosition = () => {
               subDao: delegatedPosAcc.subDao,
             })
             .instruction(),
+          ...(delegationClaimBot ? [
+            await hplCronsProgram.methods.closeDelegationClaimBotV0().accountsPartial({
+              delegationClaimBot: delegationClaimBotK,
+              taskQueue: TASK_QUEUE,
+              position: position.pubkey,
+              positionTokenAccount: getAssociatedTokenAddressSync(position.mint, provider.wallet.publicKey, true),
+            }).instruction()
+          ] : [])
         ]);
 
         if (onInstructions) {

@@ -34,6 +34,7 @@
     "@coral-xyz/anchor": "^0.31.0",
     "@helium/account-fetch-cache": "^0.10.11",
     "@helium/account-fetch-cache-hooks": "^0.10.11",
+    "@helium/automation-hooks": "^0.10.11",
     "@helium/circuit-breaker-sdk": "^0.10.11",
     "@helium/helium-react-hooks": "^0.10.11",
     "@helium/helium-sub-daos-sdk": "^0.10.11",

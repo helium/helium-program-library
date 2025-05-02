@@ -1,29 +1,54 @@
-import { Program } from "@coral-xyz/anchor";
+import { BN, Program } from "@coral-xyz/anchor";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
+  EPOCH_LENGTH,
   PROGRAM_ID,
   delegatedPositionKey,
   init,
 } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { init as initHplCrons } from "@helium/hpl-crons-sdk";
+import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta, SubDaoWithMeta } from "../sdk/types";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
+import { useMemo } from "react";
+import { delegationClaimBotKey } from "@helium/hpl-crons-sdk";
+import { TASK_QUEUE, useDelegationClaimBot, useTaskQueue } from "@helium/automation-hooks";
+import { useDelegatedPosition } from "./useDelegatedPosition";
+import { useSolOwnedAmount } from "@helium/helium-react-hooks";
+
+const PREPAID_TX_FEES = 0.01;
 
 export const useDelegatePosition = ({
-  automationEnabled = false
+  automationEnabled = false,
+  position,
+  subDao,
+}: {
+  automationEnabled?: boolean;
+  position: PositionWithMeta;
+  subDao?: SubDaoWithMeta;
 }) => {
   const { provider } = useHeliumVsrState();
+  const delegationClaimBotK = useMemo(() => delegationClaimBotKey(TASK_QUEUE, position.pubkey)[0]);
+  const { info: delegationClaimBot } = useDelegationClaimBot(delegationClaimBotK);
+  const delegatedPosKey = useMemo(() => delegatedPositionKey(position.pubkey)[0], [position.pubkey]);
+  const { info: delegatedPositionAcc } = useDelegatedPosition(delegatedPosKey);
+
+  const { amount: userLamports } = useSolOwnedAmount(provider?.wallet.publicKey);
+
+  const rentFee = useMemo(() => {
+    const botFee = automationEnabled && !delegationClaimBot ? 0.00210192 : 0;
+    const delegationFee = position.isDelegated ? 0 : 0.00258912
+    return botFee + delegationFee;
+  }, [delegationClaimBot, delegatedPositionAcc, automationEnabled]);
+
   const { error, loading, execute } = useAsyncCallback(
     async ({
-      position,
-      subDao,
       programId = PROGRAM_ID,
       onInstructions,
     }: {
-      position: PositionWithMeta;
-      subDao?: SubDaoWithMeta;
       programId?: PublicKey;
       // Instead of sending the transaction, let the caller decide
       onInstructions?: (
@@ -34,6 +59,7 @@ export const useDelegatePosition = ({
         !provider || !provider.wallet || (!position.isDelegated && !subDao);
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
+      const hplCronsProgram = await initHplCrons(provider as any);
 
       if (loading) return;
 
@@ -42,31 +68,56 @@ export const useDelegatePosition = ({
       } else {
         const instructions: TransactionInstruction[] = [];
 
-        if (position.isDelegated) {
-          const delegatedPosKey = delegatedPositionKey(position.pubkey)[0];
-          const delegatedPosAcc =
-            await hsdProgram.account.delegatedPositionV0.fetch(delegatedPosKey);
+        if (subDao) {
+          if (position.isDelegated && delegatedPositionAcc) {
+            instructions.push(
+              await hsdProgram.methods
+                .changeDelegationV0()
+                .accountsPartial({
+                  position: position.pubkey,
+                  subDao: subDao.pubkey,
+                  oldSubDao: delegatedPositionAcc.subDao,
+                })
+                .instruction()
+            );
+          } else {
+            instructions.push(
+              await hsdProgram.methods
+                .delegateV0()
+                .accountsPartial({
+                  position: position.pubkey,
+                  subDao: subDao.pubkey,
+                })
+                .instruction()
+            );
+          }
+        }
 
+        if (automationEnabled) {
           instructions.push(
-            await hsdProgram.methods
-              .closeDelegationV0()
+            await hplCronsProgram.methods
+              .initDelegationClaimBotV0()
               .accountsPartial({
+                delegatedPosition: delegatedPosKey,
                 position: position.pubkey,
-                subDao: delegatedPosAcc.subDao,
+                taskQueue: TASK_QUEUE,
+                mint: position.mint,
+                positionTokenAccount: getAssociatedTokenAddressSync(position.mint, provider.wallet.publicKey, true),
               })
               .instruction()
           );
-        }
-
-        if (subDao) {
+          // @ts-ignore
+          const endEpoch = (delegatedPositionAcc.expirationTs as BN).div(
+            new BN(EPOCH_LENGTH)
+          );
           instructions.push(
-            await hsdProgram.methods
-              .delegateV0()
-              .accountsPartial({
-                position: position.pubkey,
-                subDao: subDao.pubkey,
-              })
-              .instruction()
+            SystemProgram.transfer({
+              fromPubkey: provider.wallet.publicKey,
+              toPubkey: delegationClaimBotK,
+              lamports: BigInt(
+                PREPAID_TX_FEES * LAMPORTS_PER_SOL
+              ),
+            })
           );
         }
 
@@ -82,6 +133,9 @@ export const useDelegatePosition = ({
   return {
     error,
     loading,
+    rentFee,
+    prepaidTxFees: automationEnabled ? PREPAID_TX_FEES : 0,
+    insufficientBalance: userLamports && userLamports < ((rentFee + PREPAID_TX_FEES) * LAMPORTS_PER_SOL),
     delegatePosition: execute,
   };
 };

@@ -11,6 +11,9 @@
       "path": "../helium-react-hooks"
     },
     {
+      "path": "../automation-hooks"
+    },
+    {
       "path": "../voter-stake-registry-sdk"
     },
     {

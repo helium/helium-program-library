@@ -26,10 +26,9 @@ import { useAsyncCallback } from 'react-async-hook'
 import { useCronJob } from './useCronJob'
 import { useTaskQueue } from './useTaskQueue'
 import { AnchorProvider } from '@coral-xyz/anchor'
+import { TASK_QUEUE } from '../constants'
 
 type Schedule = 'daily' | 'weekly' | 'monthly'
-
-const TASK_QUEUE = new PublicKey('H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7')
 
 const getScheduleCronString = (schedule: Schedule) => {
   // Get current time and add 1 minute
