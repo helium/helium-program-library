@@ -9,7 +9,7 @@ use voter_stake_registry::{
 use super::{
   close_delegation_v0,
   delegate_v0::{self, get_closing_epoch_bytes, get_genesis_end_epoch_bytes},
-  CloseDelegationAccounts, CloseDelegationV0, DelegationAccounts, DelegationBumps,
+  CloseDelegationAccounts, DelegationAccounts, DelegationBumps,
 };
 use crate::{error::ErrorCode, get_sub_dao_epoch_info_seed, state::*};
 

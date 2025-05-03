@@ -9,7 +9,7 @@ pub mod track_vote_v0;
 pub mod transfer_v0;
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, TokenAccount};
+use anchor_spl::token::Mint;
 pub use change_delegation_v0::*;
 pub use claim_rewards_v0::*;
 pub use claim_rewards_v1::*;
@@ -20,14 +20,11 @@ use modular_governance::nft_proxy::accounts::ProxyConfigV0;
 pub use reset_lockup_v0::*;
 pub use track_vote_v0::*;
 pub use transfer_v0::*;
-use voter_stake_registry::{
-  state::{LockupKind, PositionV0, Registrar},
-  VoterStakeRegistry,
-};
+use voter_stake_registry::state::{PositionV0, Registrar};
 
-use crate::{error::ErrorCode, get_sub_dao_epoch_info_seed, state::*};
+use crate::state::*;
 
-struct DelegationBumps {
+pub struct DelegationBumps {
   pub sub_dao_epoch_info: u8,
   pub closing_time_sub_dao_epoch_info: u8,
   pub genesis_end_sub_dao_epoch_info: u8,

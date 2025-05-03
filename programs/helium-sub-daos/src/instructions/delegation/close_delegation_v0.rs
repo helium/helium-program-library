@@ -7,7 +7,7 @@ use voter_stake_registry::{
   VoterStakeRegistry,
 };
 
-use super::{CloseDelegationAccounts, DelegationAccounts};
+use super::CloseDelegationAccounts;
 use crate::{
   caclulate_vhnt_info, current_epoch, get_sub_dao_epoch_info_seed, id, state::*,
   update_subdao_vehnt, PrecisePosition, VehntInfo, TESTING,

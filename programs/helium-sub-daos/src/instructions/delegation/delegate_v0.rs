@@ -194,7 +194,7 @@ pub fn raw_handler(accounts: &mut DelegationAccounts, bumps: &DelegationBumps) -
 
   // Update the veHnt at start of epoch
   accounts.sub_dao_epoch_info.epoch = current_epoch(curr_ts);
-  update_subdao_vehnt(sub_dao, &mut accounts.sub_dao_epoch_info, curr_ts)?;
+  update_subdao_vehnt(sub_dao, accounts.sub_dao_epoch_info, curr_ts)?;
 
   sub_dao.vehnt_delegated = sub_dao
     .vehnt_delegated
@@ -275,7 +275,7 @@ pub fn raw_handler(accounts: &mut DelegationAccounts, bumps: &DelegationBumps) -
     // closing can be the same account as genesis end. Make sure to use the proper account
     let genesis_end_sub_dao_epoch_info: &mut Account<SubDaoEpochInfoV0> = if genesis_end_is_closing
     {
-      &mut accounts.closing_time_sub_dao_epoch_info
+      accounts.closing_time_sub_dao_epoch_info
     } else {
       parsed = try_from!(
         Account<SubDaoEpochInfoV0>,
