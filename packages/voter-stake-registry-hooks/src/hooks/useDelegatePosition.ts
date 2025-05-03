@@ -6,7 +6,7 @@ import {
   delegatedPositionKey,
   init,
 } from "@helium/helium-sub-daos-sdk";
-import { sendInstructions } from "@helium/spl-utils";
+import { HNT_MINT, sendInstructions } from "@helium/spl-utils";
 import { init as initHplCrons } from "@helium/hpl-crons-sdk";
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
@@ -18,6 +18,7 @@ import { delegationClaimBotKey } from "@helium/hpl-crons-sdk";
 import { TASK_QUEUE, useDelegationClaimBot, useTaskQueue } from "@helium/automation-hooks";
 import { useDelegatedPosition } from "./useDelegatedPosition";
 import { useSolOwnedAmount } from "@helium/helium-react-hooks";
+import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
 
 const PREPAID_TX_FEES = 0.01;
 
@@ -31,10 +32,11 @@ export const useDelegatePosition = ({
   subDao?: SubDaoWithMeta;
 }) => {
   const { provider } = useHeliumVsrState();
-  const delegationClaimBotK = useMemo(() => delegationClaimBotKey(TASK_QUEUE, position.pubkey)[0]);
-  const { info: delegationClaimBot } = useDelegationClaimBot(delegationClaimBotK);
   const delegatedPosKey = useMemo(() => delegatedPositionKey(position.pubkey)[0], [position.pubkey]);
+  const delegationClaimBotK = useMemo(() => delegationClaimBotKey(TASK_QUEUE, delegatedPosKey)[0]);
+  const { info: delegationClaimBot } = useDelegationClaimBot(delegationClaimBotK);
   const { info: delegatedPositionAcc } = useDelegatedPosition(delegatedPosKey);
+  const { info: taskQueue } = useTaskQueue(TASK_QUEUE);
 
   const { amount: userLamports } = useSolOwnedAmount(provider?.wallet.publicKey);
 
@@ -93,7 +95,8 @@ export const useDelegatePosition = ({
           }
         }
 
-        if (automationEnabled) {
+        if (automationEnabled && !delegationClaimBot) {
+          console.log("initDelegationClaimBotV0", delegatedPosKey, position.pubkey, TASK_QUEUE, position.mint);
           instructions.push(
             await hplCronsProgram.methods
               .initDelegationClaimBotV0()
@@ -106,10 +109,6 @@ export const useDelegatePosition = ({
               })
               .instruction()
           );
-          // @ts-ignore
-          const endEpoch = (delegatedPositionAcc.expirationTs as BN).div(
-            new BN(EPOCH_LENGTH)
-          );
           instructions.push(
             SystemProgram.transfer({
               fromPubkey: provider.wallet.publicKey,
@@ -118,6 +117,33 @@ export const useDelegatePosition = ({
                 PREPAID_TX_FEES * LAMPORTS_PER_SOL
               ),
             })
+          );
+        }
+
+        if (automationEnabled && (!delegationClaimBot || !delegationClaimBot.queued) && subDao) {
+          const nextAvailable = await nextAvailableTaskIds(taskQueue!.taskBitmap, 1)[0];
+          instructions.push(
+            await hplCronsProgram.methods
+              .startDelegationClaimBotV0({
+                taskId: nextAvailable,
+              })
+              .accountsPartial({
+                delegationClaimBot: delegationClaimBotK,
+                subDao: subDao.pubkey,
+                mint: position.mint,
+                hntMint: HNT_MINT,
+                positionAuthority: provider.wallet.publicKey,
+                positionTokenAccount: getAssociatedTokenAddressSync(position.mint, provider.wallet.publicKey, true),
+                taskQueue: TASK_QUEUE,
+                delegatedPosition: delegatedPosKey,
+                systemProgram: SystemProgram.programId,
+                delegatorAta: getAssociatedTokenAddressSync(
+                  HNT_MINT,
+                  provider.wallet.publicKey
+                ),
+                task: taskKey(TASK_QUEUE, nextAvailable)[0],
+              })
+              .instruction()
           );
         }
 

@@ -24,7 +24,8 @@ export const useUndelegatePosition = ({
   position: PositionWithMeta;
 }) => {
   const { provider, unixNow } = useHeliumVsrState();
-  const delegationClaimBotK = useMemo(() => delegationClaimBotKey(TASK_QUEUE, position.pubkey)[0]);
+  const delegatedPosKey = useMemo(() => delegatedPositionKey(position.pubkey)[0], [position.pubkey]);
+  const delegationClaimBotK = useMemo(() => delegationClaimBotKey(TASK_QUEUE, delegatedPosKey)[0]);
   const { info: delegationClaimBot } = useDelegationClaimBot(delegationClaimBotK);
   const { error, loading, execute } = useAsyncCallback(
     async ({
