@@ -3,11 +3,14 @@ use std::collections::HashSet;
 use anchor_lang::{prelude::*, solana_program::pubkey};
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{burn, Burn, Mint, Token, TokenAccount},
+  token::{Mint, Token, TokenAccount},
 };
 use circuit_breaker::{
-  cpi::{accounts::TransferV0, transfer_v0},
-  AccountWindowedCircuitBreakerV0, CircuitBreaker, TransferArgsV0,
+  cpi::{
+    accounts::{BurnV0, TransferV0},
+    burn_v0, transfer_v0,
+  },
+  AccountWindowedCircuitBreakerV0, BurnArgsV0, CircuitBreaker, TransferArgsV0,
 };
 use voter_stake_registry::{
   cpi::{accounts::ClearRecentProposalsV0, clear_recent_proposals_v0},
@@ -124,14 +127,16 @@ impl<'info> ClaimRewardsV1<'info> {
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
 
-  fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Burn<'info>> {
-    let cpi_accounts = Burn {
+  fn burn_ctx(&self) -> CpiContext<'_, '_, '_, 'info, BurnV0<'info>> {
+    let cpi_accounts = BurnV0 {
       mint: self.hnt_mint.to_account_info(),
-      authority: self.position_authority.to_account_info(),
       from: self.delegator_ata.to_account_info(),
+      circuit_breaker: self.delegator_pool_circuit_breaker.to_account_info(),
+      token_program: self.token_program.to_account_info(),
+      owner: self.dao.to_account_info(),
     };
 
-    CpiContext::new(self.token_program.to_account_info(), cpi_accounts)
+    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
   }
 }
 
@@ -254,18 +259,19 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
 
   let amount_left = ctx.accounts.delegator_pool.amount;
   let amount = std::cmp::min(rewards, amount_left);
-  transfer_v0(
-    ctx
-      .accounts
-      .transfer_ctx()
-      .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
-    // Due to rounding down of vehnt fall rates it's possible the vehnt on the dao does not exactly match the
-    // vehnt remaining. It could be off by a little bit of dust.
-    TransferArgsV0 { amount },
-  )?;
 
   if !not_four_proposals && eligible_count < 2 {
-    burn(ctx.accounts.burn_ctx(), amount)?;
+    burn_v0(ctx.accounts.burn_ctx(), BurnArgsV0 { amount })?;
+  } else {
+    transfer_v0(
+      ctx
+        .accounts
+        .transfer_ctx()
+        .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
+      // Due to rounding down of vehnt fall rates it's possible the vehnt on the dao does not exactly match the
+      // vehnt remaining. It could be off by a little bit of dust.
+      TransferArgsV0 { amount },
+    )?;
   }
 
   Ok(())
