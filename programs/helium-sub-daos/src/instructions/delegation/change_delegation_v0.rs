@@ -11,7 +11,7 @@ use super::{
   delegate_v0::{self, get_closing_epoch_bytes, get_genesis_end_epoch_bytes},
   CloseDelegationAccounts, DelegationAccounts, DelegationBumps,
 };
-use crate::{error::ErrorCode, get_sub_dao_epoch_info_seed, state::*};
+use crate::{current_epoch, error::ErrorCode, get_sub_dao_epoch_info_seed, state::*};
 
 #[derive(Accounts)]
 pub struct ChangeDelegationV0<'info> {
@@ -128,6 +128,16 @@ pub fn handler(ctx: Context<ChangeDelegationV0>) -> Result<()> {
   let old_last_claimed_epoch = ctx.accounts.delegated_position.last_claimed_epoch;
   let old_claimed_epochs_bitmap = ctx.accounts.delegated_position.claimed_epochs_bitmap;
   let old_start_ts = ctx.accounts.delegated_position.start_ts;
+  let curr_ts = ctx.accounts.registrar.clock_unix_timestamp();
+  let curr_epoch = current_epoch(curr_ts);
+  let to_claim_to_epoch = if ctx.accounts.position.lockup.end_ts < curr_ts
+    && ctx.accounts.position.lockup.kind == LockupKind::Cliff
+  {
+    current_epoch(ctx.accounts.position.lockup.end_ts) - 1
+  } else {
+    curr_epoch - 1
+  };
+  ctx.accounts.delegated_position.last_claimed_epoch = to_claim_to_epoch;
 
   // Close the old delegation
   close_delegation_v0::raw_handler(
