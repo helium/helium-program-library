@@ -261,7 +261,13 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   let amount = std::cmp::min(rewards, amount_left);
 
   if !not_four_proposals && eligible_count < 2 {
-    burn_v0(ctx.accounts.burn_ctx(), BurnArgsV0 { amount })?;
+    burn_v0(
+      ctx
+        .accounts
+        .burn_ctx()
+        .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
+      BurnArgsV0 { amount },
+    )?;
   } else {
     transfer_v0(
       ctx
