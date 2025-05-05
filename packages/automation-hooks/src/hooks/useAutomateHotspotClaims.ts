@@ -191,7 +191,7 @@ export const useAutomateHotspotClaims = ({
     return (
       (MIN_RENT * LAMPORTS_PER_SOL) +
       // Actual claim txs
-      duration * (minCrankReward + 5000) * (totalHotspots || 1) +
+      duration * 20000 * (totalHotspots || 1) +
       // Requeue transactions (5 queues per tx)
       duration * minCrankReward * Math.ceil((totalHotspots || 1) / 5)
     )
