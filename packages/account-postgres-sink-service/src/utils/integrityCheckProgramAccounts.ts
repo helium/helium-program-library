@@ -64,12 +64,13 @@ export const integrityCheckProgramAccounts = async ({
   }
 
   const performIntegrityCheck = async () => {
-    const startTime = new Date();
+    const snapshotTime = new Date();
     const t = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
     });
 
     try {
+      let limiter: pLimit.Limit;
       const program = new anchor.Program(idl, provider);
       const currentSlot = await connection.getSlot();
       let blockTime24HoursAgo: number | null = null;
@@ -117,7 +118,7 @@ export const integrityCheckProgramAccounts = async ({
         throw new Error("Unable to get blocktime from 24 hours ago");
       }
 
-      const limiter = pLimit(25);
+      limiter = pLimit(10);
       const parsedTransactions = (
         await Promise.all(
           chunks(
@@ -126,7 +127,7 @@ export const integrityCheckProgramAccounts = async ({
               blockTime: blockTime24HoursAgo,
               provider,
             }),
-            75
+            100
           ).map((chunk) =>
             limiter(async () => {
               await new Promise((resolve) => setTimeout(resolve, 250));
@@ -144,39 +145,20 @@ export const integrityCheckProgramAccounts = async ({
       ).flat();
 
       const uniqueWritableAccounts = new Set<string>();
-      for (const parsed of parsedTransactions) {
-        parsed?.transaction.message.accountKeys
-          .filter((acc) => acc.writable)
-          .map((acc) => {
-            uniqueWritableAccounts.add(acc.pubkey.toBase58());
-            txIdsByAccountId[acc.pubkey.toBase58()] = [
-              ...parsed.transaction.signatures,
-              ...(txIdsByAccountId[acc.pubkey.toBase58()] || []),
+      parsedTransactions.forEach((parsed) => {
+        if (!parsed) return;
+        const signatures = parsed.transaction.signatures;
+        parsed.transaction.message.accountKeys.forEach((acc) => {
+          if (acc.writable) {
+            const pubkey = acc.pubkey.toBase58();
+            uniqueWritableAccounts.add(pubkey);
+            txIdsByAccountId[pubkey] = [
+              ...signatures,
+              ...(txIdsByAccountId[pubkey] || []),
             ];
-          });
-      }
-
-      const accountInfosWithPk = (
-        await Promise.all(
-          chunks([...uniqueWritableAccounts.values()], 100).map((chunk) =>
-            pLimit(100)(() =>
-              retry(
-                () =>
-                  connection.getMultipleAccountsInfo(
-                    chunk.map((c) => new PublicKey(c)),
-                    "confirmed"
-                  ),
-                retryOptions
-              )
-            )
-          )
-        )
-      )
-        .flat()
-        .map((accountInfo, idx) => ({
-          pubkey: [...uniqueWritableAccounts.values()][idx],
-          ...accountInfo,
-        }));
+          }
+        });
+      });
 
       const pluginsByAccountType = (
         await Promise.all(
@@ -199,10 +181,28 @@ export const integrityCheckProgramAccounts = async ({
         ])
       );
 
+      limiter = pLimit(100);
+      const uniqueWritableAccountsArray = [...uniqueWritableAccounts.values()];
       await Promise.all(
-        chunks(accountInfosWithPk, 1000).map(async (chunk) => {
-          const accountsByType: Record<string, typeof accountInfosWithPk> = {};
-          chunk.forEach((accountInfo) => {
+        chunks(uniqueWritableAccountsArray, 100).map(async (chunk) => {
+          const accountInfos = await limiter(() =>
+            retry(
+              () =>
+                connection.getMultipleAccountsInfo(
+                  chunk.map((c) => new PublicKey(c)),
+                  "confirmed"
+                ),
+              retryOptions
+            )
+          );
+
+          const accountInfosWithPk = accountInfos.map((accountInfo, idx) => ({
+            pubkey: chunk[idx],
+            ...accountInfo,
+          }));
+
+          const accsByType: Record<string, typeof accountInfosWithPk> = {};
+          accountInfosWithPk.forEach((accountInfo) => {
             const accName = accounts.find(
               ({ type }) =>
                 accountInfo.data &&
@@ -212,24 +212,34 @@ export const integrityCheckProgramAccounts = async ({
             )?.type;
 
             if (accName) {
-              accountsByType[accName] = accountsByType[accName] || [];
-              accountsByType[accName].push(accountInfo);
+              accsByType[accName] = accsByType[accName] || [];
+              accsByType[accName].push(accountInfo);
             }
           });
 
           await Promise.all(
-            Object.entries(accountsByType).map(async ([accName, accounts]) => {
+            Object.entries(accsByType).map(async ([accName, accounts]) => {
               const model = sequelize.models[accName];
+              const pubkeys = accounts.map((c) => c.pubkey);
+              const existingAccs = await model.findAll({
+                where: { address: pubkeys },
+                transaction: t,
+              });
+
+              const existingAccMap = new Map(
+                existingAccs.map((acc) => [acc.get("address"), acc])
+              );
+
               await Promise.all(
-                accounts.map(async (c) => {
+                accounts.map(async (acc) => {
                   const decodedAcc = program.coder.accounts.decode(
                     lowerFirstChar(accName),
-                    c.data as Buffer
+                    acc.data as Buffer
                   );
 
                   let sanitized = {
                     refreshed_at: new Date().toISOString(),
-                    address: c.pubkey,
+                    address: acc.pubkey,
                     ...sanitizeAccount(decodedAcc),
                   };
 
@@ -239,35 +249,31 @@ export const integrityCheckProgramAccounts = async ({
                         sanitized = await plugin.processAccount(sanitized, t);
                       } catch (err) {
                         console.log(
-                          `Plugin processing failed for account ${c.pubkey}`,
+                          `Plugin processing failed for account ${acc.pubkey}`,
                           err
                         );
-                        // Continue with unmodified sanitized data instead of failing
                         continue;
                       }
                     }
                   }
 
-                  const existing = await model.findByPk(c.pubkey, {
-                    transaction: t,
-                  });
+                  const existing = existingAccMap.get(acc.pubkey);
+                  const refreshedAt = existing?.dataValues.refreshed_at
+                    ? new Date(existing.dataValues.refreshed_at)
+                    : null;
 
                   const shouldUpdate =
                     !deepEqual(
                       _omit(sanitized, OMIT_KEYS),
                       _omit(existing?.dataValues, OMIT_KEYS)
                     ) &&
-                    !(
-                      existing?.dataValues.refreshed_at &&
-                      new Date(existing.dataValues.refreshed_at) >= startTime &&
-                      new Date(existing.dataValues.refreshed_at) <= new Date()
-                    );
+                    (!refreshedAt || refreshedAt < snapshotTime);
 
                   if (shouldUpdate) {
                     corrections.push({
                       type: accName,
-                      accountId: c.pubkey,
-                      txSignatures: txIdsByAccountId[c.pubkey],
+                      accountId: acc.pubkey,
+                      txSignatures: txIdsByAccountId[acc.pubkey],
                       currentValues: existing ? existing.dataValues : null,
                       newValues: sanitized,
                     });
