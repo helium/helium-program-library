@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import { organizationKey } from "@helium/organization-sdk";
 import { createMemoInstruction } from "@solana/spl-memo";
+import { DuneClient } from "@duneanalytics/client-sdk";
 import {
   createAtaAndTransferInstructions,
   HNT_MINT,
@@ -52,6 +53,7 @@ import {
 import NodeCache from "node-cache";
 import BN from "bn.js";
 import { SystemProgram } from "@solana/web3.js";
+import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 
 const ORG_IDS = {
   [HNT_MINT.toBase58()]: organizationKey("Helium")[0].toBase58(),
@@ -85,6 +87,54 @@ server.get("/v1/sync", async () => {
   await cloneRepo();
   await readProxiesAndUpsert();
 });
+
+// Save for one day
+const CACHE_TIME = 1000 * 60 * 60 * 24
+let cachedDataBurn: any | null = null
+let lastCacheUpdate: Date | null = null
+server.get("/v1/data-burn", async (request, reply) => {
+  if (cachedDataBurn && lastCacheUpdate && lastCacheUpdate.getTime() > Date.now() - CACHE_TIME) {
+    return cachedDataBurn
+  }
+
+  const client = new DuneClient(process.env.DUNE_API_KEY || "")
+  const result = await client.getLatestResult({ queryId: 5069123 })
+  cachedDataBurn = result.result?.rows.reduce((acc, row: any) => {
+    acc[row.subdao] = row.dc_burned
+    return acc
+  }, {} as Record<string, number>)
+  lastCacheUpdate = new Date()
+  return cachedDataBurn
+});
+
+let cachedDataSubDaoDelegations: any | null = null
+let lastCacheUpdateSubDaoDelegations: Date | null = null
+server.get("/v1/subdao-delegations", async (request, reply) => {
+  if (cachedDataSubDaoDelegations && lastCacheUpdateSubDaoDelegations && lastCacheUpdateSubDaoDelegations.getTime() > Date.now() - CACHE_TIME) {
+    return cachedDataSubDaoDelegations
+  }
+
+  const vetokens = await sequelize.query(`
+SELECT
+  sum(ve_tokens) as "totalVeTokens",
+  sub_dao as "subDao"
+FROM positions_with_vetokens p
+JOIN delegated_positions d on d.position = p.address
+GROUP BY sub_dao
+      `);
+  const result = vetokens[0];
+
+  const data = result.reduce((acc: Record<string, number>, row: any) => {
+    const subDaoStr = row.subDao == subDaoKey(MOBILE_MINT)[0].toBase58() ? "mobile" : row.subDao == subDaoKey(IOT_MINT)[0].toBase58() ? "iot" : null;
+    if (subDaoStr) {
+      acc[subDaoStr] = row.totalVeTokens.split(".")[0];
+    }
+    return acc;
+  }, {} as Record<string, number>);
+  cachedDataSubDaoDelegations = data
+  lastCacheUpdateSubDaoDelegations = new Date()
+  return data
+})
 
 server.get<{
   Params: { registrar: string };
@@ -148,25 +198,25 @@ server.get<{
     limit,
     include: position
       ? [
-          {
-            model: Position,
-            where: {
-              address: position,
-            },
-            attributes: [],
-            required: true,
+        {
+          model: Position,
+          where: {
+            address: position,
           },
-        ]
+          attributes: [],
+          required: true,
+        },
+      ]
       : [
-          {
-            model: Position,
-            where: {
-              registrar: registrar,
-            },
-            attributes: [],
-            required: true,
+        {
+          model: Position,
+          where: {
+            registrar: registrar,
           },
-        ],
+          attributes: [],
+          required: true,
+        },
+      ],
     order: [["index", "DESC"]],
   });
 });
@@ -237,15 +287,14 @@ WITH
     JOIN proxy_registrars pr ON pr.wallet = proxies.wallet
     LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
     WHERE pr.registrar = ${escapedRegistrar}
-          ${
-            request.query.query
-              ? `AND (proxies.name ILIKE ${sequelize.escape(
-                  `%${request.query.query}%`
-                )} OR proxies.wallet ILIKE ${sequelize.escape(
-                  `%${request.query.query}%`
-                )})`
-              : ""
-          }
+          ${request.query.query
+      ? `AND (proxies.name ILIKE ${sequelize.escape(
+        `%${request.query.query}%`
+      )} OR proxies.wallet ILIKE ${sequelize.escape(
+        `%${request.query.query}%`
+      )})`
+      : ""
+    }
     GROUP BY
       name,
       image,

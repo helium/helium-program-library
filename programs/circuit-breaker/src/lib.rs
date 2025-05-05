@@ -63,6 +63,10 @@ pub mod circuit_breaker {
     instructions::transfer_v0::handler(ctx, args)
   }
 
+  pub fn burn_v0(ctx: Context<BurnV0>, args: BurnArgsV0) -> Result<()> {
+    instructions::burn_v0::handler(ctx, args)
+  }
+
   pub fn update_account_windowed_breaker_v0(
     ctx: Context<UpdateAccountWindowedBreakerV0>,
     args: UpdateAccountWindowedBreakerArgsV0,

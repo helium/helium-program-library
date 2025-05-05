@@ -107,6 +107,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@duneanalytics/client-sdk@npm:^0.2.5":
+  version: 0.2.5
+  resolution: "@duneanalytics/client-sdk@npm:0.2.5"
+  dependencies:
+    deprecated: ^0.0.2
+    loglevel: ^1.8.0
+  checksum: 30babbfba9638943c65461d78003aede526ed63874fe4d5989fea3844997f0f3f1089dc3ccc19f2f2bfe73e6f8a21dba6d8d4753a91f1862e0a11fa9817f1926
+  languageName: node
+  linkType: hard
+
 "@fastify/accept-negotiator@npm:^1.0.0":
   version: 1.1.0
   resolution: "@fastify/accept-negotiator@npm:1.1.0"
@@ -285,6 +295,7 @@ __metadata:
   resolution: "@helium/helium-vote-service@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
+    "@duneanalytics/client-sdk": ^0.2.5
     "@fastify/cors": ^8.1.1
     "@fastify/static": ^6
     "@helium/account-fetch-cache": ^0.10.11
@@ -1636,6 +1647,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"deprecated@npm:^0.0.2":
+  version: 0.0.2
+  resolution: "deprecated@npm:0.0.2"
+  checksum: e8e03bcb9de4d2625b5b2fbdc4cf985a53355e3366c16fe8ae4a44004733d75c916648fe32a7a61535b1d06bfe5ddd1346dd8d44903cecc5b9db587a66b839af
+  languageName: node
+  linkType: hard
+
 "diff@npm:^4.0.1":
   version: 4.0.2
   resolution: "diff@npm:4.0.2"
@@ -2551,6 +2569,13 @@ __metadata:
   version: 4.17.21
   resolution: "lodash@npm:4.17.21"
   checksum: eb835a2e51d381e561e508ce932ea50a8e5a68f4ebdd771ea240d3048244a8d13658acbd502cd4829768c56f2e16bdd4340b9ea141297d472517b83868e677f7
+  languageName: node
+  linkType: hard
+
+"loglevel@npm:^1.8.0":
+  version: 1.9.2
+  resolution: "loglevel@npm:1.9.2"
+  checksum: 896c67b90a507bfcfc1e9a4daa7bf789a441dd70d95cd13b998d6dd46233a3bfadfb8fadb07250432bbfb53bf61e95f2520f9b11f9d3175cc460e5c251eca0af
   languageName: node
   linkType: hard
 

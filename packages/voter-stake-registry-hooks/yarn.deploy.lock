@@ -168,6 +168,31 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@helium/automation-hooks@^0.10.11":
+  version: 0.0.0-use.local
+  resolution: "@helium/automation-hooks@workspace:packages/automation-hooks"
+  dependencies:
+    "@coral-xyz/anchor": ^0.31.0
+    "@helium/account-fetch-cache": ^0.10.11
+    "@helium/account-fetch-cache-hooks": ^0.10.11
+    "@helium/hpl-crons-sdk": ^0.10.11
+    "@helium/spl-utils": ^0.10.11
+    "@helium/tuktuk-sdk": ^0.0.8
+    "@solana/wallet-adapter-base": ^0.9.22
+    "@solana/web3.js": ^1.91.1
+    axios: ^1.3.6
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    react-async-hook: ^4.0.0
+    ts-loader: ^9.2.3
+    typescript: ^5.2.2
+  peerDependencies:
+    "@solana/wallet-adapter-react": ^0.15.32
+    react: ^16.8 || ^17 || ^18
+    react-dom: ^16.8 || ^17 || ^18
+  languageName: unknown
+  linkType: soft
+
 "@helium/circuit-breaker-sdk@^0.10.11":
   version: 0.0.0-use.local
   resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
@@ -432,6 +457,7 @@ __metadata:
     "@coral-xyz/anchor": ^0.31.0
     "@helium/account-fetch-cache": ^0.10.11
     "@helium/account-fetch-cache-hooks": ^0.10.11
+    "@helium/automation-hooks": ^0.10.11
     "@helium/circuit-breaker-sdk": ^0.10.11
     "@helium/helium-react-hooks": ^0.10.11
     "@helium/helium-sub-daos-sdk": ^0.10.11

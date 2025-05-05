@@ -44,3 +44,5 @@ export { proxyAssignmentsForWalletQuery } from "./queries/proxyAssignmentsForWal
 export { proxyQuery } from "./queries/proxyQuery";
 export { votesForProposalQuery } from "./queries/votesForProposalQuery";
 export { votesForWalletQuery } from "./queries/votesForWalletQuery";
+export { subDaoDelegationSplitQuery, useSubDaoDelegationSplit } from "./hooks/useSubDaoDelegationSplit";
+export { dataBurnSplitQuery, useDataBurnSplit } from "./hooks/useDataBurnSplit";
