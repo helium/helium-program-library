@@ -118,7 +118,7 @@ export const integrityCheckProgramAccounts = async ({
         throw new Error("Unable to get blocktime from 24 hours ago");
       }
 
-      limiter = pLimit(25);
+      limiter = pLimit(10);
       const parsedTransactions = (
         await Promise.all(
           chunks(
@@ -183,32 +183,26 @@ export const integrityCheckProgramAccounts = async ({
 
       limiter = pLimit(100);
       const uniqueWritableAccountsArray = [...uniqueWritableAccounts.values()];
-      const accountInfosWithPk = (
-        await Promise.all(
-          chunks(uniqueWritableAccountsArray, 100).map((chunk) =>
-            limiter(() =>
-              retry(
-                () =>
-                  connection.getMultipleAccountsInfo(
-                    chunk.map((c) => new PublicKey(c)),
-                    "confirmed"
-                  ),
-                retryOptions
-              )
-            )
-          )
-        )
-      )
-        .flat()
-        .map((accountInfo, idx) => ({
-          pubkey: [...uniqueWritableAccounts.values()][idx],
-          ...accountInfo,
-        }));
-
       await Promise.all(
-        chunks(accountInfosWithPk, 50000).map(async (chunk) => {
+        chunks(uniqueWritableAccountsArray, 100).map(async (chunk) => {
+          const accountInfos = await limiter(() =>
+            retry(
+              () =>
+                connection.getMultipleAccountsInfo(
+                  chunk.map((c) => new PublicKey(c)),
+                  "confirmed"
+                ),
+              retryOptions
+            )
+          );
+
+          const accountInfosWithPk = accountInfos.map((accountInfo, idx) => ({
+            pubkey: chunk[idx],
+            ...accountInfo,
+          }));
+
           const accsByType: Record<string, typeof accountInfosWithPk> = {};
-          chunk.forEach((accountInfo) => {
+          accountInfosWithPk.forEach((accountInfo) => {
             const accName = accounts.find(
               ({ type }) =>
                 accountInfo.data &&
