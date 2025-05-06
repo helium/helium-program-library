@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import { humanReadable } from "@helium/spl-utils";
 import { init, positionKey } from "@helium/voter-stake-registry-sdk";
-import { getMint } from "@solana/spl-token";
+import { AccountLayout, getMint, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { provider } from "./solana";
@@ -35,12 +35,35 @@ server.get<{ Params: { mintKey: string } }>("/:mintKey", async (request, reply) 
     kind === "constant" ? "" : `, ${lockEndDate}`
   }`;
 
+  const accounts = await provider.connection.getProgramAccounts(TOKEN_PROGRAM_ID, {
+    filters: [
+      {
+        dataSize: AccountLayout.span,
+      },
+      {
+        memcmp: {
+          offset: 0,
+          bytes: mint.toBase58(),
+        },
+      },
+    ]});
+
+  let owner: string | undefined = undefined;
+  for (const account of accounts) {
+    const accountData = AccountLayout.decode(account.account.data);
+    if (accountData.amount.toString() === '1') {
+      owner = accountData.owner.toBase58();
+      break;
+    }
+  }
+
   return {
     name,
     description: `Voting Escrow Token Position of ${uiAmount} tokens${kind === 'constant' ? '.' : ` locked until ${lockEndDate} with kind ${kind}`}`,
     image:
       "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/vsr.png",
     attributes: [
+      { trait_type: "owner", owner },
       { trait_type: "registrar", value: positionAcc.registrar.toBase58() },
       { trait_type: "amount_deposited_native", value: positionAcc.amountDepositedNative.toString() },
       { trait_type: "amount_deposited", value: uiAmount },
