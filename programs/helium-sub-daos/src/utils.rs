@@ -318,15 +318,15 @@ pub fn caclulate_vhnt_info(
   } else {
     0
   };
+  let delegation_end_ts = if expiration_ts == 0 {
+    position.lockup.effective_end_ts()
+  } else {
+    min(expiration_ts, position.lockup.effective_end_ts())
+  };
   let seconds_from_genesis_to_end = if has_genesis {
-    u64::try_from(
-      position
-        .lockup
-        .end_ts
-        .checked_sub(position.genesis_end)
-        .unwrap(),
-    )
-    .unwrap()
+    u64::try_from(delegation_end_ts)
+      .unwrap()
+      .saturating_sub(u64::try_from(position.genesis_end).unwrap())
   } else if expiration_ts == 0 {
     position.lockup.seconds_left(curr_ts)
   } else {
@@ -347,11 +347,7 @@ pub fn caclulate_vhnt_info(
   } else {
     position.voting_power_precise(voting_mint_config, curr_ts)?
   };
-  let delegation_end_ts = if expiration_ts == 0 {
-    position.lockup.effective_end_ts()
-  } else {
-    min(expiration_ts, position.lockup.effective_end_ts())
-  };
+
   let vehnt_at_delegation_end =
     position.voting_power_precise(voting_mint_config, delegation_end_ts)?;
 
