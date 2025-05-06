@@ -219,6 +219,14 @@ WITH
     WHERE
       registrar = ${escapedRegistrar}
   ),
+  vote_counts as (
+    SELECT
+      voter,
+      COUNT(DISTINCT proposal) AS numProposalsVoted,
+      MAX(created_at) AS lastVotedAt
+    FROM vote_markers
+    GROUP BY voter
+  ),
   proxies_with_assignments AS (
     SELECT
       name,
@@ -255,11 +263,10 @@ WITH
   )
 SELECT
   pa.*,
-  COUNT(distinct vm.proposal) as "numProposalsVoted",
-  MAX(vm.created_at) as "lastVotedAt"
+  COALESCE(vc.numProposalsVoted, 0) AS "numProposalsVoted",
+  vc.lastVotedAt
 FROM proxies_with_assignments pa
-LEFT OUTER JOIN vote_markers vm ON vm.voter = pa.wallet
-GROUP BY pa.name, pa.image, pa.wallet, pa.description, pa.detail, pa."numAssignments", pa."proxiedVeTokens", pa.percent
+LEFT JOIN vote_counts vc ON vc.voter = pa.wallet
 ORDER BY "proxiedVeTokens" DESC NULLS LAST
 OFFSET ${offset}
 LIMIT ${limit};
