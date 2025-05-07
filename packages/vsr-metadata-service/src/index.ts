@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import { humanReadable } from "@helium/spl-utils";
 import { init, positionKey } from "@helium/voter-stake-registry-sdk";
-import { AccountLayout, getMint, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { getAccount, getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { provider } from "./solana";
@@ -35,27 +35,10 @@ server.get<{ Params: { mintKey: string } }>("/:mintKey", async (request, reply) 
     kind === "constant" ? "" : `, ${lockEndDate}`
   }`;
 
-  const accounts = await provider.connection.getProgramAccounts(TOKEN_PROGRAM_ID, {
-    filters: [
-      {
-        dataSize: AccountLayout.span,
-      },
-      {
-        memcmp: {
-          offset: 0,
-          bytes: mint.toBase58(),
-        },
-      },
-    ]});
-
-  let owner: string | undefined = undefined;
-  for (const account of accounts) {
-    const accountData = AccountLayout.decode(account.account.data);
-    if (accountData.amount.toString() === '1') {
-      owner = accountData.owner.toBase58();
-      break;
-    }
-  }
+  const owners = await provider.connection.getTokenLargestAccounts(mint);
+  const owner = (
+    await getAccount(provider.connection, owners.value[0].address)
+  ).owner;
 
   return {
     name,
