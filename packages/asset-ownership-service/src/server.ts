@@ -4,7 +4,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
 import { PG_POOL_SIZE, ADMIN_PASSWORD } from "./env";
 import { ensureTables } from "./utils/ensureTables";
-// import { setupSubstream } from "./services/substream";
+import { setupSubstream } from "./services/substream";
 import database from "./utils/database";
 import { upsertOwners } from "./utils/upsertOwners";
 
@@ -20,12 +20,9 @@ if (PG_POOL_SIZE < 5) {
     if (!refreshing) {
       refreshing = (async () => {
         try {
-          try {
-            await upsertOwners({ sequelize: database });
-            console.log(`Owners Refreshed`);
-          } catch (err) {
-            throw err;
-          }
+          console.log("Refreshing owners");
+          await upsertOwners({ sequelize: database });
+          console.log(`Owners Refreshed`);
         } catch (err) {
           console.error(err);
         } finally {
@@ -40,6 +37,9 @@ if (PG_POOL_SIZE < 5) {
     await server.register(cors, { origin: "*" });
     await ensureTables({ sequelize: database });
     await database.sync();
+    await database.query(
+      "CREATE INDEX IF NOT EXISTS idx_assest_owner_asset ON asset_owners(asset);"
+    );
 
     server.get("/refresh-owners", async (req, res) => {
       const { password } = req.query as any;
@@ -69,10 +69,10 @@ if (PG_POOL_SIZE < 5) {
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
-    // await setupSubstream(server, configs).catch((err: any) => {
-    //   console.error("Fatal error in Substream connection:", err);
-    //   process.exit(1);
-    // });
+    await setupSubstream(server).catch((err: any) => {
+      console.error("Fatal error in Substream connection:", err);
+      process.exit(1);
+    });
   } catch (err) {
     console.error(err);
     process.exit(1);
