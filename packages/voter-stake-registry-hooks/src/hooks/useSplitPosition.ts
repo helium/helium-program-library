@@ -1,12 +1,10 @@
-import { Program } from "@coral-xyz/anchor";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import {
   batchInstructionsToTxsWithPriorityFee,
+  fetchBackwardsCompatibleIdl,
   sendAndConfirmWithRetry,
-  sendInstructions,
-  sendInstructionsWithPriorityFee,
   toBN,
-  toVersionedTx,
+  toVersionedTx
 } from "@helium/spl-utils";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
@@ -24,7 +22,6 @@ import {
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta } from "../sdk/types";
-import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 export const useSplitPosition = () => {
   const { provider } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
