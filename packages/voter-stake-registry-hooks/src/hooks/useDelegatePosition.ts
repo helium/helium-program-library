@@ -18,9 +18,7 @@ import { delegationClaimBotKey } from "@helium/hpl-crons-sdk";
 import { TASK_QUEUE, useDelegationClaimBot, useTaskQueue } from "@helium/automation-hooks";
 import { useDelegatedPosition } from "./useDelegatedPosition";
 import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
-import { usePositionFees } from "./usePositionFees";
-
-export const PREPAID_TX_FEES = 0.01;
+import { PREPAID_TX_FEES, usePositionFees } from "./usePositionFees";
 
 export const useDelegatePosition = ({
   automationEnabled = false,

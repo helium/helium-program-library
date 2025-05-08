@@ -2,9 +2,9 @@ import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js"
 import { useSolOwnedAmount } from "@helium/helium-react-hooks"
 import { useMemo } from "react"
 
-const PREPAID_TX_FEES = 0.01
-const AUTOMATION_BOT_FEE = 0.00210192
-const DELEGATION_FEE = 0.00258912
+export const PREPAID_TX_FEES = 0.01
+export const AUTOMATION_BOT_FEE = 0.00210192
+export const DELEGATION_FEE = 0.00258912
 
 export interface UsePositionFeesProps {
   automationEnabled?: boolean

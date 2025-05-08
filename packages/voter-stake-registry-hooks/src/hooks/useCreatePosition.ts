@@ -1,8 +1,18 @@
 import { BN } from "@coral-xyz/anchor";
-import { min } from "bn.js";
-import { HNT_MINT, sendInstructions } from "@helium/spl-utils";
-import { positionKey } from "@helium/voter-stake-registry-sdk";
+import { TASK_QUEUE, useTaskQueue } from "@helium/automation-hooks";
+import {
+  daoKey,
+  delegatedPositionKey,
+  getLockupEffectiveEndTs,
+  init as initHsd,
+  subDaoEpochInfoKey,
+  subDaoKey,
+} from "@helium/helium-sub-daos-sdk";
 import { delegationClaimBotKey, init as initHplCrons } from "@helium/hpl-crons-sdk";
+import { init as initProxy } from "@helium/nft-proxy-sdk";
+import { HNT_MINT, sendInstructions } from "@helium/spl-utils";
+import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
+import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
   TOKEN_PROGRAM_ID,
@@ -17,26 +27,14 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
+import { useQueryClient } from "@tanstack/react-query";
+import { min } from "bn.js";
 import { useAsync, useAsyncCallback } from "react-async-hook";
+import { INDEXER_WAIT } from "../constants";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { HeliumVsrClient } from "../sdk/client";
 import { SubDaoWithMeta } from "../sdk/types";
-import { init as initProxy } from "@helium/nft-proxy-sdk";
-import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import {
-  daoKey,
-  init as initHsd,
-  subDaoEpochInfoKey,
-  subDaoKey,
-  getLockupEffectiveEndTs,
-  delegatedPositionKey,
-} from "@helium/helium-sub-daos-sdk";
-import { useQueryClient } from "@tanstack/react-query";
-import { INDEXER_WAIT } from "../constants";
-import { usePositionFees } from "./usePositionFees";
-import { TASK_QUEUE, useTaskQueue } from "@helium/automation-hooks";
-import { PREPAID_TX_FEES } from "./useDelegatePosition";
-import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
+import { PREPAID_TX_FEES, usePositionFees } from "./usePositionFees";
 
 const SECS_PER_DAY = 86400;
 export const useCreatePosition = ({
