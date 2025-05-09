@@ -1,3 +1,4 @@
+import { getAssociatedTokenAddressSync } from '@solana/spl-token'
 import {
   cronJobKey,
   cronJobNameMappingKey,
@@ -8,7 +9,7 @@ import {
   entityCronAuthorityKey,
   init as initHplCrons,
 } from '@helium/hpl-crons-sdk'
-import { sendInstructionsWithPriorityFee } from '@helium/spl-utils'
+import { HNT_MINT, sendInstructionsWithPriorityFee } from '@helium/spl-utils'
 import {
   customSignerKey,
   init as initTuktuk,
@@ -27,6 +28,7 @@ import { useCronJob } from './useCronJob'
 import { useTaskQueue } from './useTaskQueue'
 import { AnchorProvider } from '@coral-xyz/anchor'
 import { TASK_QUEUE } from '../constants'
+import { useAccount } from '@helium/account-fetch-cache-hooks'
 
 type Schedule = 'daily' | 'weekly' | 'monthly'
 
@@ -131,6 +133,7 @@ const TASK_RETURN_ACCOUNT_SIZE = 0.01
 const MIN_RENT = 0.00089088
 const EST_TX_FEE = 0.000001
 const RECIPIENT_RENT = 0.00242208
+const ATA_RENT = 0.002039 * LAMPORTS_PER_SOL;
 
 export const useAutomateHotspotClaims = ({
   schedule,
@@ -179,6 +182,14 @@ export const useAutomateHotspotClaims = ({
   const { amount: pdaWalletSol } = useSolOwnedAmount(
     pdaWallet,
   )
+  const ata = useMemo(() => {
+    if (!wallet) return undefined
+    return getAssociatedTokenAddressSync(
+      HNT_MINT,
+      wallet,
+      true
+    )
+  }, [wallet])
 
   const crankFundingNeeded = useMemo(() => {
     const minCrankReward = taskQueue?.minCrankReward?.toNumber() || 10000
@@ -186,10 +197,12 @@ export const useAutomateHotspotClaims = ({
       duration * minCrankReward
     )
   }, [duration, totalHotspots, taskQueue])
+  const { account } = useAccount(ata)
   const pdaWalletFundingNeeded = useMemo(() => {
     const minCrankReward = taskQueue?.minCrankReward?.toNumber() || 10000
     return (
       (MIN_RENT * LAMPORTS_PER_SOL) +
+      (account ? 0 : ATA_RENT) +
       // Actual claim txs
       duration * 20000 * (totalHotspots || 1) +
       // Requeue transactions (5 queues per tx)

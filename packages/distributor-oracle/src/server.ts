@@ -40,7 +40,7 @@ import {
   init as initRewards,
   PROGRAM_ID as RO_PID,
 } from "@helium/rewards-oracle-sdk";
-import { getAsset, toNumber } from "@helium/spl-utils";
+import { getAsset, HNT_MINT, toNumber } from "@helium/spl-utils";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { createMemoInstruction } from "@solana/spl-memo";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
@@ -61,7 +61,7 @@ import Fastify, {
   FastifyRequest,
 } from "fastify";
 import fs from "fs";
-import { DAO, DNT, MAX_CLAIMS_PER_TX, RECIPIENT_RENT } from "./constants";
+import { ATA_RENT, DAO, DNT, MAX_CLAIMS_PER_TX, RECIPIENT_RENT } from "./constants";
 import { Database, DeviceType } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
 import { PgDatabase } from "./pgDatabase";
@@ -659,8 +659,16 @@ export class OracleServer {
         (await this.ldProgram.provider.connection.getAccountInfo(wallet))
           ?.lamports || 0;
 
+      const ata = getAssociatedTokenAddressSync(
+        HNT_MINT,
+        wallet,
+        true
+      );
+      const ataExists = !!(await this.ldProgram.provider.connection.getAccountInfo(
+        ata
+      ));
       const neededBalance =
-        0.00089088 * LAMPORTS_PER_SOL + (recipientAcc ? 0 : RECIPIENT_RENT);
+        0.00089088 * LAMPORTS_PER_SOL + (recipientAcc ? 0 : RECIPIENT_RENT) + (ataExists ? 0 : ATA_RENT);
 
       const instructions: TransactionInstruction[] = [];
       if (balance < neededBalance) {
