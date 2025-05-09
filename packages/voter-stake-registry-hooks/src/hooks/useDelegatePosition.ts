@@ -17,10 +17,8 @@ import { useMemo } from "react";
 import { delegationClaimBotKey } from "@helium/hpl-crons-sdk";
 import { TASK_QUEUE, useDelegationClaimBot, useTaskQueue } from "@helium/automation-hooks";
 import { useDelegatedPosition } from "./useDelegatedPosition";
-import { useSolOwnedAmount } from "@helium/helium-react-hooks";
 import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
-
-const PREPAID_TX_FEES = 0.01;
+import { PREPAID_TX_FEES, usePositionFees } from "./usePositionFees";
 
 export const useDelegatePosition = ({
   automationEnabled = false,
@@ -38,13 +36,12 @@ export const useDelegatePosition = ({
   const { info: delegatedPositionAcc } = useDelegatedPosition(delegatedPosKey);
   const { info: taskQueue } = useTaskQueue(TASK_QUEUE);
 
-  const { amount: userLamports } = useSolOwnedAmount(provider?.wallet.publicKey);
-
-  const rentFee = useMemo(() => {
-    const botFee = automationEnabled && !delegationClaimBot ? 0.00210192 : 0;
-    const delegationFee = position.isDelegated ? 0 : 0.00258912
-    return botFee + delegationFee;
-  }, [delegationClaimBot, delegatedPositionAcc, automationEnabled]);
+  const { rentFee, prepaidTxFees, insufficientBalance } = usePositionFees({
+    automationEnabled,
+    isDelegated: position.isDelegated,
+    hasDelegationClaimBot: !!delegationClaimBot,
+    wallet: provider?.wallet?.publicKey
+  });
 
   const { error, loading, execute } = useAsyncCallback(
     async ({
@@ -96,7 +93,6 @@ export const useDelegatePosition = ({
         }
 
         if (automationEnabled && !delegationClaimBot) {
-          console.log("initDelegationClaimBotV0", delegatedPosKey, position.pubkey, TASK_QUEUE, position.mint);
           instructions.push(
             await hplCronsProgram.methods
               .initDelegationClaimBotV0()
@@ -132,7 +128,7 @@ export const useDelegatePosition = ({
                 subDao: subDao.pubkey,
                 mint: position.mint,
                 hntMint: HNT_MINT,
-                positionAuthority: provider.wallet.publicKey,
+                positionAuthority: provider.wallet!.publicKey!,
                 positionTokenAccount: getAssociatedTokenAddressSync(position.mint, provider.wallet.publicKey, true),
                 taskQueue: TASK_QUEUE,
                 delegatedPosition: delegatedPosKey,
@@ -160,8 +156,8 @@ export const useDelegatePosition = ({
     error,
     loading,
     rentFee,
-    prepaidTxFees: automationEnabled ? PREPAID_TX_FEES : 0,
-    insufficientBalance: userLamports && userLamports < ((rentFee + PREPAID_TX_FEES) * LAMPORTS_PER_SOL),
+    prepaidTxFees,
+    insufficientBalance,
     delegatePosition: execute,
   };
 };

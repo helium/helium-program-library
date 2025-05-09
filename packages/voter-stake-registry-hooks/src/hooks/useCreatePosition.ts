@@ -1,43 +1,62 @@
 import { BN } from "@coral-xyz/anchor";
-import { min } from "bn.js";
-import { sendInstructions } from "@helium/spl-utils";
-import { positionKey } from "@helium/voter-stake-registry-sdk";
+import { TASK_QUEUE, useTaskQueue } from "@helium/automation-hooks";
+import {
+  daoKey,
+  delegatedPositionKey,
+  getLockupEffectiveEndTs,
+  init as initHsd,
+  subDaoEpochInfoKey,
+  subDaoKey,
+} from "@helium/helium-sub-daos-sdk";
+import { delegationClaimBotKey, init as initHplCrons } from "@helium/hpl-crons-sdk";
+import { init as initProxy } from "@helium/nft-proxy-sdk";
+import { HNT_MINT, sendInstructions } from "@helium/spl-utils";
+import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
+import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
   TOKEN_PROGRAM_ID,
   createInitializeMintInstruction,
+  getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import {
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SYSVAR_CLOCK_PUBKEY,
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
+import { useQueryClient } from "@tanstack/react-query";
+import { min } from "bn.js";
 import { useAsync, useAsyncCallback } from "react-async-hook";
+import { INDEXER_WAIT } from "../constants";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { HeliumVsrClient } from "../sdk/client";
 import { SubDaoWithMeta } from "../sdk/types";
-import { init as initProxy } from "@helium/nft-proxy-sdk";
-import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import {
-  daoKey,
-  init as initHsd,
-  subDaoEpochInfoKey,
-  subDaoKey,
-  getLockupEffectiveEndTs,
-} from "@helium/helium-sub-daos-sdk";
-import { useQueryClient } from "@tanstack/react-query";
-import { INDEXER_WAIT } from "../constants";
+import { PREPAID_TX_FEES, usePositionFees } from "./usePositionFees";
 
 const SECS_PER_DAY = 86400;
-export const useCreatePosition = () => {
+export const useCreatePosition = ({
+  automationEnabled = false,
+}: {
+  automationEnabled?: boolean;
+}) => {
   const { provider } = useHeliumVsrState();
   const { result: client } = useAsync(
     (provider) => HeliumVsrClient.connect(provider),
     [provider]
   );
   const queryClient = useQueryClient();
+
+  const { rentFee, prepaidTxFees, insufficientBalance } = usePositionFees({
+    automationEnabled,
+    isDelegated: false,
+    hasDelegationClaimBot: false,
+    wallet: provider?.wallet?.publicKey
+  });
+  const { info: taskQueue } = useTaskQueue(TASK_QUEUE);
+
   const { error, loading, execute } = useAsyncCallback(
     async ({
       amount,
@@ -65,6 +84,7 @@ export const useCreatePosition = () => {
         const hsdProgram = await initHsd(provider);
         const proxyProgram = await initProxy(provider);
         const vsrProgram = await initVsr(provider);
+        const hplCronsProgram = await initHplCrons(provider as any);
         const [daoK] = daoKey(mint);
         const [subDaoK] = subDaoKey(mint);
         const myDao = await hsdProgram.account.daoV0.fetchNullable(daoK);
@@ -174,6 +194,56 @@ export const useCreatePosition = () => {
               })
               .instruction()
           );
+
+          if (automationEnabled) {
+            const delegatedPosKey = delegatedPositionKey(position)[0];
+            delegateInstructions.push(
+              await hplCronsProgram.methods
+                .initDelegationClaimBotV0()
+                .accountsPartial({
+                  delegatedPosition: delegatedPosKey,
+                  position: position,
+                  taskQueue: TASK_QUEUE,
+                  mint: mintKeypair.publicKey,
+                  positionTokenAccount: getAssociatedTokenAddressSync(mintKeypair.publicKey, provider.wallet.publicKey, true),
+                })
+                .instruction()
+            );
+            const delegationClaimBotK = delegationClaimBotKey(TASK_QUEUE, delegatedPosKey)[0];
+            delegateInstructions.push(
+              SystemProgram.transfer({
+                fromPubkey: provider.wallet.publicKey,
+                toPubkey: delegationClaimBotK,
+                lamports: BigInt(
+                  PREPAID_TX_FEES * LAMPORTS_PER_SOL
+                ),
+              })
+            );
+            const nextAvailable = await nextAvailableTaskIds(taskQueue!.taskBitmap, 1)[0];
+            delegateInstructions.push(
+              await hplCronsProgram.methods
+                .startDelegationClaimBotV0({
+                  taskId: nextAvailable,
+                })
+                .accountsPartial({
+                  delegationClaimBot: delegationClaimBotK,
+                  subDao: subDao.pubkey,
+                  mint: mintKeypair.publicKey,
+                  hntMint: HNT_MINT,
+                  positionAuthority: provider.wallet!.publicKey!,
+                  positionTokenAccount: getAssociatedTokenAddressSync(mintKeypair.publicKey, provider.wallet.publicKey, true),
+                  taskQueue: TASK_QUEUE,
+                  delegatedPosition: delegatedPosKey,
+                  systemProgram: SystemProgram.programId,
+                  delegatorAta: getAssociatedTokenAddressSync(
+                    HNT_MINT,
+                    provider.wallet.publicKey
+                  ),
+                  task: taskKey(TASK_QUEUE, nextAvailable)[0],
+                })
+                .instruction()
+            );
+          }
         }
 
         if (onInstructions) {
@@ -205,6 +275,9 @@ export const useCreatePosition = () => {
   return {
     error,
     loading,
+    rentFee,
+    prepaidTxFees,
+    insufficientBalance,
     createPosition: execute,
   };
 };
