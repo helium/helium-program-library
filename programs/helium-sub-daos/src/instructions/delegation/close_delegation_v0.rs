@@ -133,7 +133,7 @@ pub struct CloseDelegationV0<'info> {
 
 pub fn raw_handler(accounts: &mut CloseDelegationAccounts, sde_bump: u8) -> Result<()> {
   // load the vehnt information
-  let position = &mut accounts.position;
+  let position = &accounts.position;
   let registrar = &accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
@@ -221,7 +221,9 @@ pub fn raw_handler(accounts: &mut CloseDelegationAccounts, sde_bump: u8) -> Resu
   // Exit and reload that way the instruction exiting doesn't overwrite our changes
   // if these two are the same account.
   genesis_end_sub_dao_epoch_info.exit(&id())?;
-  accounts.genesis_end_sub_dao_epoch_info.reload()?;
+  if end_and_genesis_same {
+    accounts.genesis_end_sub_dao_epoch_info.reload()?;
+  }
 
   // Only subtract from the stake if the position ends after the end of this epoch. Otherwise,
   // the position was already purged due to the sub_dao_epoch_info closing info logic.
@@ -281,6 +283,12 @@ pub fn raw_handler(accounts: &mut CloseDelegationAccounts, sde_bump: u8) -> Resu
     accounts
       .closing_time_sub_dao_epoch_info
       .fall_rates_from_closing_positions = 0;
+    accounts
+      .closing_time_sub_dao_epoch_info
+      .dc_onboarding_fees_paid = accounts.sub_dao_epoch_info.dc_onboarding_fees_paid;
+    accounts
+      .closing_time_sub_dao_epoch_info
+      .vehnt_at_epoch_start = accounts.sub_dao_epoch_info.vehnt_at_epoch_start;
   }
 
   if accounts.genesis_end_sub_dao_epoch_info.key() == accounts.sub_dao_epoch_info.key() {
@@ -290,6 +298,11 @@ pub fn raw_handler(accounts: &mut CloseDelegationAccounts, sde_bump: u8) -> Resu
     accounts
       .genesis_end_sub_dao_epoch_info
       .fall_rates_from_closing_positions = 0;
+    accounts
+      .genesis_end_sub_dao_epoch_info
+      .dc_onboarding_fees_paid = accounts.sub_dao_epoch_info.dc_onboarding_fees_paid;
+    accounts.genesis_end_sub_dao_epoch_info.vehnt_at_epoch_start =
+      accounts.sub_dao_epoch_info.vehnt_at_epoch_start;
   }
   Ok(())
 }
