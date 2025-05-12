@@ -93,7 +93,8 @@ pub struct UpdateIotInfoV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
   #[account(
-    constraint = session.is_valid()
+    constraint = session.is_valid(),
+    constraint = session.permissions.contains(&"AssertLocation".to_string())
   )]
   pub session: Option<Account<'info, SessionV0>>,
 }
