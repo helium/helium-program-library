@@ -17,6 +17,7 @@ export async function updateIotMetadata({
   gain,
   dcFeePayer,
   payer,
+  session,
   dao = HELIUM_DAO,
   ...rest
 }: {
@@ -28,6 +29,7 @@ export async function updateIotMetadata({
   gain: number | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
+  session?: PublicKey;
   dao?: PublicKey
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const {
@@ -60,6 +62,7 @@ export async function updateIotMetadata({
     .accountsPartial({
       // hotspot: assetId,
       ...accounts,
+      session,
       dcFeePayer,
       payer,
       rewardableEntityConfig,

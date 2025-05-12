@@ -16,6 +16,7 @@ use data_credits::{
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
 use helium_sub_daos::{DaoV0, SubDaoV0};
+use sessions::SessionV0;
 use shared_utils::*;
 
 use crate::{error::ErrorCode, state::*};
@@ -89,6 +90,10 @@ pub struct UpdateMobileInfoV0<'info> {
   pub token_program: Program<'info, Token>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub system_program: Program<'info, System>,
+  #[account(
+    constraint = session.is_valid()
+  )]
+  pub session: Option<Account<'info, SessionV0>>,
 }
 
 impl<'info> UpdateMobileInfoV0<'info> {
@@ -113,6 +118,15 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, UpdateMobileInfoV0<'info>>,
   args: UpdateMobileInfoArgsV0,
 ) -> Result<()> {
+  let hotspot_owner = if let Some(session) = &ctx.accounts.session {
+    require_eq!(
+      session.temporary_authority,
+      ctx.accounts.hotspot_owner.key()
+    );
+    session.wallet
+  } else {
+    ctx.accounts.hotspot_owner.key()
+  };
   verify_compressed_nft(VerifyCompressedNftArgs {
     data_hash: args.data_hash,
     creator_hash: args.creator_hash,
@@ -120,8 +134,8 @@ pub fn handler<'info>(
     index: args.index,
     compression_program: ctx.accounts.compression_program.to_account_info(),
     merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
-    owner: ctx.accounts.hotspot_owner.key(),
-    delegate: ctx.accounts.hotspot_owner.key(),
+    owner: hotspot_owner,
+    delegate: hotspot_owner,
     proof_accounts: ctx.remaining_accounts.to_vec(),
   })?;
 

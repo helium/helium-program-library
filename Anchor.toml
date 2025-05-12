@@ -18,6 +18,7 @@ mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
 hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
 no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
 hpl_crons = "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu"
+sessions = "sesD2P1SxjDDo6Z9wGrymwmkx3Z1EZdyL9H5tk7iaNg"
 
 [workspace]
 members = [
@@ -36,6 +37,7 @@ members = [
   "programs/hexboosting",
   "programs/no-emit",
   "programs/hpl-crons",
+  "programs/sessions",
 ]
 
 [registry]

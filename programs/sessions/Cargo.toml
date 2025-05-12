@@ -1,13 +1,12 @@
 [package]
-name = "helium-entity-manager"
-version = "0.2.14"
-# Trigger deployment - timestamp: 03-31-2025 #3
+name = "sessions"
+version = "0.0.1"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "helium_entity_manager"
+name = "sessions"
 
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
@@ -23,21 +22,10 @@ default = []
 overflow-checks = true
 
 [dependencies]
-bs58 = "0.3.1"
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 solana-zk-sdk = { workspace = true }
-bytemuck = "1.12.3"
-angry-purple-tiger = "0.1.0"
-mpl-token-metadata = { workspace = true }
-bubblegum-cpi = { workspace = true }
-account-compression-cpi = { workspace = true }
 shared-utils = { workspace = true }
-data-credits = { workspace = true, features = ["cpi"] }
-helium-sub-daos = { workspace = true }
 solana-security-txt = { workspace = true }
-no-emit = { workspace = true }
-pyth-solana-receiver-sdk = { workspace = true }
-pythnet-sdk = { workspace = true }
 default-env = { workspace = true }
-sessions = { workspace = true }
+tuktuk-program = { workspace = true }

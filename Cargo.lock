@@ -841,6 +841,7 @@ dependencies = [
  "no-emit",
  "pyth-solana-receiver-sdk",
  "pythnet-sdk",
+ "sessions",
  "shared-utils",
  "solana-security-txt",
  "solana-zk-sdk",
@@ -1671,6 +1672,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87607cb1398ed59d48732e575a4c28a7a8ebf2454b964fe3f224f2afc07909e1"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "sessions"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "shared-utils",
+ "solana-security-txt",
+ "solana-zk-sdk",
+ "tuktuk-program",
 ]
 
 [[package]]

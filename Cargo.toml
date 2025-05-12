@@ -31,6 +31,7 @@ bubblegum-cpi = { rev = "1584d8e", git = "https://github.com/helium/account-comp
 solana-security-txt = "1.1.1"
 default-env = { path = "./utils/default-env" }
 shared-utils = { path = "./utils/shared-utils" }
+sessions = { path = "./programs/sessions", features = ["cpi", "no-entrypoint"] }
 circuit-breaker = { path = "./programs/circuit-breaker", features = ["cpi", "no-entrypoint"] }
 helium-sub-daos = { path = "./programs/helium-sub-daos", features = ["cpi", "no-entrypoint"] }
 helium-entity-manager = { path = "./programs/helium-entity-manager", features = ["cpi", "no-entrypoint"] }

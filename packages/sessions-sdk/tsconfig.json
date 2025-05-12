@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.root.json",
+  "references": [
+    {
+      "path": "../idls"
+    },
+    {
+      "path": "../spl-utils"
+    },
+    {
+      "path": "../anchor-resolvers"
+    },
+    {
+      "path": "./tsconfig.cjs.json"
+    },
+    {
+      "path": "./tsconfig.esm.json"
+    }
+  ]
+} 

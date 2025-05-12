@@ -18,6 +18,7 @@ export async function updateMobileMetadata({
   payer,
   dao = HELIUM_DAO,
   deploymentInfo,
+  session,
   ...rest
 }: {
   program: Program<HeliumEntityManager>;
@@ -28,6 +29,7 @@ export async function updateMobileMetadata({
   rewardableEntityConfig: PublicKey;
   deploymentInfo?: MobileDeploymentInfoV0 | null;
   dao?: PublicKey;
+  session?: PublicKey;
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
   const { asset, args, accounts, remainingAccounts } =
     await proofArgsAndAccounts({
@@ -57,6 +59,7 @@ export async function updateMobileMetadata({
       // hotspot: assetId,
       ...accounts,
       dcFeePayer,
+      session,
       payer,
       rewardableEntityConfig,
       hotspotOwner: owner,
