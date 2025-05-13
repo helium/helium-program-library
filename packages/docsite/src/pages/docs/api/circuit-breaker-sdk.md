@@ -6,6 +6,24 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 ## Instructions
 
+### burn_v0
+
+#### Accounts
+
+| Name            | Mutability | Signer | Docs |
+| --------------- | ---------- | ------ | ---- |
+| from            | immut      | no     |      |
+| owner           | immut      | no     |      |
+| mint            | immut      | no     |      |
+| circuit_breaker | immut      | no     |      |
+| token_program   | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### initialize_account_windowed_breaker_v0
 
 #### Accounts
@@ -149,6 +167,12 @@ undefined
 | config        | [object Object] |
 | last_window   | [object Object] |
 | bump_seed     | u8              |
+
+### BurnArgsV0
+
+| Field  | Type |
+| ------ | ---- |
+| amount | u64  |
 
 ### InitializeAccountWindowedBreakerArgsV0
 

@@ -72,6 +72,16 @@ export type Vote = {
   choiceName: string;
 };
 
+export type SubDaoDelegationSplit = {
+  mobile: number;
+  iot: number;
+};
+
+export type DataBurnSplit = {
+  mobile: number;
+  iot: number;
+};
+
 export class VoteService {
   private client: AxiosInstance | undefined;
   private program: Program<VoterStakeRegistry> | undefined;
@@ -115,6 +125,22 @@ export class VoteService {
 
   assetUrl(url: string) {
     return url.replace("./", `${this.client!.getUri()}/helium-vote-proxies/`);
+  }
+
+  async getSubDaoDelegationSplit(): Promise<SubDaoDelegationSplit> {
+    if (this.client) {
+      return (await this.client.get(`/v1/subdao-delegations`)).data;
+    } else {
+      throw new Error("This is not supported without an indexer");
+    }
+  }
+
+  async getDataBurnSplit(): Promise<DataBurnSplit> {
+    if (this.client) {
+      return (await this.client.get(`/v1/data-burn`)).data;
+    } else {
+      throw new Error("This is not supported without an indexer");
+    }
   }
 
   async getVotesForWallet({

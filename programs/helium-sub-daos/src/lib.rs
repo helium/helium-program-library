@@ -4,7 +4,6 @@ use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
-pub mod circuit_breaker;
 pub mod create_account;
 pub mod error;
 pub mod instructions;
@@ -154,5 +153,9 @@ pub mod helium_sub_daos {
 
   pub fn add_recent_proposal_to_dao_v0(ctx: Context<AddRecentProposalToDaoV0>) -> Result<()> {
     add_recent_proposal_to_dao_v0::handler(ctx)
+  }
+
+  pub fn change_delegation_v0(ctx: Context<ChangeDelegationV0>) -> Result<()> {
+    change_delegation_v0::handler(ctx)
   }
 }

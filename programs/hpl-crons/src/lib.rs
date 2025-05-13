@@ -65,6 +65,10 @@ pub mod hpl_crons {
     init_entity_claim_cron_v0::handler(ctx, args)
   }
 
+  pub fn close_entity_claim_cron_v0(ctx: Context<CloseEntityClaimCronV0>) -> Result<()> {
+    close_entity_claim_cron_v0::handler(ctx)
+  }
+
   pub fn add_entity_to_cron_v0(
     ctx: Context<AddEntityToCronV0>,
     args: AddEntityToCronArgsV0,

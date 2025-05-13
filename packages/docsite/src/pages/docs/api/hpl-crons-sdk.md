@@ -69,6 +69,30 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### close_entity_claim_cron_v0
+
+#### Accounts
+
+| Name                  | Mutability | Signer | Docs |
+| --------------------- | ---------- | ------ | ---- |
+| payer                 | immut      | no     |      |
+| rent_refund           | immut      | no     |      |
+| user_authority        | immut      | no     |      |
+| authority             | immut      | no     |      |
+| user_cron_jobs        | immut      | no     |      |
+| cron_job              | immut      | no     |      |
+| cron_job_name_mapping | immut      | no     |      |
+| system_program        | immut      | no     |      |
+| tuktuk_program        | immut      | no     |      |
+| cron_program          | immut      | no     |      |
+| task_return_account_1 | immut      | no     |      |
+| task_return_account_2 | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### init_delegation_claim_bot_v0
 
 #### Accounts
@@ -769,6 +793,13 @@ undefined
 | ------------ | ---- |
 | free_task_id | u16  |
 
+### RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |
+
 ### RemoveEntityFromCronArgsV0
 
 | Field | Type |
@@ -922,17 +953,3 @@ undefined
 | \_deprecated_relinquished | bool   |
 | proxy_index               | u16    |
 | rent_refund               | pubkey |
-
-### helium_sub_daos::state::RecentProposal
-
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |
-
-### voter_stake_registry::state::position::RecentProposal
-
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |

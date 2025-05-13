@@ -80,6 +80,37 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### change_delegation_v0
+
+#### Accounts
+
+| Name                                | Mutability | Signer | Docs |
+| ----------------------------------- | ---------- | ------ | ---- |
+| payer                               | immut      | no     |      |
+| position                            | immut      | no     |      |
+| mint                                | immut      | no     |      |
+| position_token_account              | immut      | no     |      |
+| position_authority                  | immut      | no     |      |
+| registrar                           | immut      | no     |      |
+| dao                                 | immut      | no     |      |
+| old_sub_dao                         | immut      | no     |      |
+| old_sub_dao_epoch_info              | immut      | no     |      |
+| old_closing_time_sub_dao_epoch_info | immut      | no     |      |
+| old_genesis_end_sub_dao_epoch_info  | immut      | no     |      |
+| sub_dao                             | immut      | no     |      |
+| sub_dao_epoch_info                  | immut      | no     |      |
+| closing_time_sub_dao_epoch_info     | immut      | no     |      |
+| genesis_end_sub_dao_epoch_info      | immut      | no     |      |
+| delegated_position                  | immut      | no     |      |
+| vsr_program                         | immut      | no     |      |
+| system_program                      | immut      | no     |      |
+| proxy_config                        | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### claim_rewards_v0
 
 #### Accounts
@@ -743,6 +774,14 @@ undefined
 | end_ts   | i64             |
 | kind     | [object Object] |
 
+### LockupKind
+
+| Variant  | Fields |
+| -------- | ------ |
+| None     |        |
+| Cliff    |        |
+| Constant |        |
+
 ### MintWindowedCircuitBreakerV0
 
 | Field          | Type            |
@@ -812,6 +851,13 @@ undefined
 | name           | string          |
 | max_proxy_time | i64             |
 | seasons        | [object Object] |
+
+### RecentProposal
+
+| Field    | Type   |
+| -------- | ------ |
+| proposal | pubkey |
+| ts       | i64    |
 
 ### Registrar
 
@@ -983,33 +1029,3 @@ undefined
 | window_size_seconds | u64             |
 | threshold_type      | [object Object] |
 | threshold           | u64             |
-
-### helium_sub_daos::instructions::delegation::reset_lockup_v0::LockupKind
-
-| Variant  | Fields |
-| -------- | ------ |
-| None     |        |
-| Cliff    |        |
-| Constant |        |
-
-### helium_sub_daos::state::RecentProposal
-
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |
-
-### voter_stake_registry::state::lockup::LockupKind
-
-| Variant  | Fields |
-| -------- | ------ |
-| None     |        |
-| Cliff    |        |
-| Constant |        |
-
-### voter_stake_registry::state::position::RecentProposal
-
-| Field    | Type   |
-| -------- | ------ |
-| proposal | pubkey |
-| ts       | i64    |
