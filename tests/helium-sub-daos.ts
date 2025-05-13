@@ -1405,6 +1405,104 @@ describe("helium-sub-daos", () => {
         );
       });
 
+      it("correctly adjusts total vehnt at epoch start with unchanging genesis positions", async () => {
+        ({ position, vault } = await createPosition(
+          vsrProgram,
+          provider,
+          registrar,
+          hntMint,
+          // max lockup
+          {
+            lockupPeriods: 1460,
+            lockupAmount: 100,
+            kind: { cliff: {} },
+          },
+          positionAuthorityKp
+        ));
+        await program.methods
+          .delegateV0()
+          .accountsPartial({
+            position,
+            subDao,
+            positionAuthority: positionAuthorityKp.publicKey,
+          })
+          .signers([positionAuthorityKp])
+          .rpc({ skipPreflight: true });
+
+        // Burn dc to cause an update to subdao epoch info
+        await burnDc(1);
+
+        let offset = 0;
+        async function getCurrEpochInfo() {
+          const unixTime = Number(await getUnixTimestamp(provider)) + offset;
+          return await program.account.subDaoEpochInfoV0.fetch(
+            subDaoEpochInfoKey(subDao, unixTime)[0]
+          );
+        }
+
+        async function ffwd(amount: number) {
+          offset = amount;
+          await vsrProgram.methods
+            .setTimeOffsetV0(new BN(offset))
+            .accountsPartial({ registrar })
+            .rpc({ skipPreflight: true });
+        }
+
+        // Start off the epoch with 0 vehnt since we staked at the start of the epoch
+        let subDaoEpochInfo = await getCurrEpochInfo();
+        expect(subDaoEpochInfo.vehntAtEpochStart.toNumber()).to.eq(0);
+
+        // Fast forward to a later epoch before genesis end
+        console.log("Checking before genesis end");
+        await ffwd(EPOCH_LENGTH * 10);
+        // Burn dc to cause an update to subdao epoch info
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        let positionAcc = await vsrProgram.account.positionV0.fetch(position);
+        const stakeTime = positionAcc.lockup.startTs;
+        let currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        let timeStaked = currTime - stakeTime.toNumber();
+        let expected = roundToDecimals(
+          3 *
+          100 *
+          100 *
+          ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
+          8
+        );
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
+        );
+
+
+        console.log("Checking genesis end");
+        await ffwd(EPOCH_LENGTH * 1460);
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        timeStaked = currTime - stakeTime.toNumber();
+        expected = roundToDecimals(
+          3 *
+          100 *
+          100 *
+          ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
+          8
+        );
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
+        );
+
+        console.log("Checking after genesis end");
+        await ffwd(EPOCH_LENGTH * 1461);
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        timeStaked = currTime - stakeTime.toNumber();
+        expected = 0;
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.eq(0)
+      });
+
       it("allows adding expiration ts", async () => {
         const registrarAcc = await vsrProgram.account.registrar.fetch(
           registrar

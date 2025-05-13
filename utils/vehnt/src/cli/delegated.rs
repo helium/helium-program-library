@@ -29,8 +29,8 @@ pub struct Delegated {
 
 use anchor_lang::prelude::*;
 use helium_sub_daos::{
-  accounts::TempUpdateSubDaoEpochInfo, caclulate_vhnt_info, current_epoch, DelegatedPositionV0,
-  SubDaoEpochInfoV0, SubDaoV0, TempUpdateSubDaoEpochInfoArgs,
+  accounts::TempUpdateSubDaoEpochInfo, apply_fall_rate_factor, caclulate_vhnt_info, current_epoch,
+  DelegatedPositionV0, SubDaoEpochInfoV0, SubDaoV0, TempUpdateSubDaoEpochInfoArgs,
 };
 
 #[allow(unused)]
@@ -245,10 +245,16 @@ impl Delegated {
         .get_mut(&position.delegated_position.sub_dao)
         .unwrap();
       let end_epoch = current_epoch(std::cmp::min(
-        position.position.lockup.end_ts,
+        position.position.lockup.effective_end_ts(),
         position.delegated_position.expiration_ts,
       ));
-      let genesis_end_epoch = current_epoch(position.position.genesis_end - 1);
+
+      let genesis_end_epoch =
+        if position.delegated_position.expiration_ts > position.position.genesis_end {
+          current_epoch(position.position.genesis_end - 1)
+        } else {
+          0
+        };
 
       // Initialize a new epoch info from the existing one if it hasn't been already
       {
@@ -331,9 +337,7 @@ impl Delegated {
         }
       }
 
-      if position.position.lockup.kind == LockupKind::Constant
-        || current_epoch(position.delegated_position.expiration_ts) > current_epoch(curr_ts)
-      {
+      if current_epoch(position.delegated_position.expiration_ts) > current_epoch(curr_ts) {
         match SubDao::try_from(position.delegated_position.sub_dao).unwrap() {
           SubDao::Mobile => {
             mobile_vehnt += vehnt;
@@ -477,13 +481,19 @@ impl Delegated {
       total_hnt, iot_sub_dao.vehnt_last_calculated_ts
     );
 
-    let mobile_vehnt_est = mobile_sub_dao.vehnt_delegated
-      - mobile_sub_dao.vehnt_fall_rate
-        * u128::try_from(curr_ts - mobile_sub_dao.vehnt_last_calculated_ts).unwrap();
+    let mobile_vehnt_est = apply_fall_rate_factor(
+      mobile_sub_dao.vehnt_delegated
+        - mobile_sub_dao.vehnt_fall_rate
+          * u128::try_from(curr_ts - mobile_sub_dao.vehnt_last_calculated_ts).unwrap(),
+    )
+    .unwrap();
 
-    let iot_vehnt_est = iot_sub_dao.vehnt_delegated
-      - (iot_sub_dao.vehnt_fall_rate
-        * u128::try_from(curr_ts - iot_sub_dao.vehnt_last_calculated_ts).unwrap());
+    let iot_vehnt_est = apply_fall_rate_factor(
+      iot_sub_dao.vehnt_delegated
+        - iot_sub_dao.vehnt_fall_rate
+          * u128::try_from(curr_ts - iot_sub_dao.vehnt_last_calculated_ts).unwrap(),
+    )
+    .unwrap();
 
     println!("Total MOBILE veHNT : {}", mobile_vehnt);
     println!("Est MOBILE veHNT   : {}", mobile_vehnt_est);

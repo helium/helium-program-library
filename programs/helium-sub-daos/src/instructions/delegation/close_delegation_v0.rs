@@ -240,7 +240,7 @@ pub fn raw_handler(accounts: &mut CloseDelegationAccounts, sde_bump: u8) -> Resu
 
     sub_dao.vehnt_fall_rate = sub_dao
       .vehnt_fall_rate
-      .checked_sub(if curr_ts >= position.genesis_end {
+      .checked_sub(if curr_epoch >= current_epoch(position.genesis_end) {
         post_genesis_end_fall_rate
       } else {
         pre_genesis_end_fall_rate

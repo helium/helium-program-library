@@ -318,15 +318,15 @@ pub fn caclulate_vhnt_info(
   } else {
     0
   };
+  let delegation_end_ts = if expiration_ts == 0 {
+    position.lockup.effective_end_ts()
+  } else {
+    min(expiration_ts, position.lockup.effective_end_ts())
+  };
   let seconds_from_genesis_to_end = if has_genesis {
-    u64::try_from(
-      position
-        .lockup
-        .end_ts
-        .checked_sub(position.genesis_end)
-        .unwrap(),
-    )
-    .unwrap()
+    u64::try_from(delegation_end_ts)
+      .unwrap()
+      .saturating_sub(u64::try_from(position.genesis_end).unwrap())
   } else if expiration_ts == 0 {
     position.lockup.seconds_left(curr_ts)
   } else {
@@ -347,11 +347,7 @@ pub fn caclulate_vhnt_info(
   } else {
     position.voting_power_precise(voting_mint_config, curr_ts)?
   };
-  let delegation_end_ts = if expiration_ts == 0 {
-    position.lockup.effective_end_ts()
-  } else {
-    min(expiration_ts, position.lockup.effective_end_ts())
-  };
+
   let vehnt_at_delegation_end =
     position.voting_power_precise(voting_mint_config, delegation_end_ts)?;
 
@@ -374,61 +370,37 @@ pub fn caclulate_vhnt_info(
     let genesis_end_epoch_start_ts =
       i64::try_from(current_epoch(position.genesis_end)).unwrap() * EPOCH_LENGTH;
 
-    if position.lockup.kind == LockupKind::Cliff {
+    if position.lockup.kind == LockupKind::Cliff && position.genesis_end != delegation_end_ts {
       genesis_end_fall_rate_correction = pre_genesis_end_fall_rate
         .checked_sub(post_genesis_end_fall_rate)
         .unwrap();
     }
 
-    // Subtract the genesis bonus from the vehnt.
-    // When we do this, we're overcorrecting because the fall rate (corrected to post-genesis)
-    // is also taking off vehnt for the time period between closing info start and genesis end.
-    // So add that fall rate back in.
-    // Only do this if the genesis end epoch isn't the same as the position end epoch.
-    // If these are the same, then the full vehnt at epoch start is already being taken off.
     if position.lockup.kind == LockupKind::Constant
-      || current_epoch(position.genesis_end) != current_epoch(delegation_end_ts)
+      || current_epoch(position.genesis_end) <= current_epoch(delegation_end_ts)
     {
-      // edge case, if the genesis end is _exactly_ the start of the epoch, getting the voting power at the epoch start
-      // will not include the genesis. When this happens, we'll miss a vehnt correction
-      if genesis_end_epoch_start_ts == position.genesis_end {
-        genesis_end_vehnt_correction = position
-          .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts - 1)?
-          .checked_sub(vehnt_at_genesis_end_exact)
-          .unwrap();
-      } else {
-        genesis_end_vehnt_correction = position
-          .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts)?
-          .checked_sub(vehnt_at_genesis_end_exact)
-          .unwrap()
-          // Correction factor
-          .checked_sub(
-            post_genesis_end_fall_rate
-              .checked_mul(
-                u128::try_from(
-                  position
-                    .genesis_end
-                    .checked_sub(genesis_end_epoch_start_ts)
-                    .unwrap(),
-                )
-                .unwrap(),
-              )
-              .unwrap(),
-          )
-          .unwrap();
-      }
+      // When the epoch boundary hits, we pretend the landrush doesn't exist anymore,
+      // so we subtract out the difference between the genesis vehnt value and the non-genesis value
+      // at the start of the epch.
+      genesis_end_vehnt_correction = position
+        .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts)?
+        .checked_sub(
+          PositionV0 {
+            genesis_end: 0,
+            ..position.clone()
+          }
+          .voting_power_precise(voting_mint_config, genesis_end_epoch_start_ts)?,
+        )
+        .unwrap();
     }
   }
 
   let mut end_fall_rate_correction = 0;
-  let mut end_vehnt_correction = 0;
+  let end_epoch_start_ts = i64::try_from(current_epoch(delegation_end_ts)).unwrap() * EPOCH_LENGTH;
+  let vehnt_at_closing_epoch_start =
+    position.voting_power_precise(voting_mint_config, end_epoch_start_ts)?;
+  let end_vehnt_correction = vehnt_at_closing_epoch_start;
   if position.lockup.kind == LockupKind::Cliff {
-    let end_epoch_start_ts =
-      i64::try_from(current_epoch(delegation_end_ts)).unwrap() * EPOCH_LENGTH;
-    let vehnt_at_closing_epoch_start =
-      position.voting_power_precise(voting_mint_config, end_epoch_start_ts)?;
-
-    end_vehnt_correction = vehnt_at_closing_epoch_start;
     if position.genesis_end < delegation_end_ts {
       end_fall_rate_correction = post_genesis_end_fall_rate;
     } else {
