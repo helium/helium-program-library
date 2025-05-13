@@ -71,6 +71,10 @@ Cursor.init(
       type: STRING,
       primaryKey: true,
     },
+    service: {
+      type: STRING,
+      unique: true,
+    },
     blockHeight: {
       type: STRING,
     },

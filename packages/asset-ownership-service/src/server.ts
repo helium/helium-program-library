@@ -7,6 +7,7 @@ import { ensureTables } from "./utils/ensureTables";
 import { setupSubstream } from "./services/substream";
 import database from "./utils/database";
 import { upsertOwners } from "./utils/upsertOwners";
+import { metrics } from "./plugins/metrics";
 
 if (PG_POOL_SIZE < 5) {
   throw new Error("PG_POOL_SIZE must be minimum of 5");
@@ -35,6 +36,7 @@ if (PG_POOL_SIZE < 5) {
   try {
     server = Fastify({ logger: false });
     await server.register(cors, { origin: "*" });
+    await server.register(metrics);
     await ensureTables({ sequelize: database });
     await database.sync();
     await database.query(
