@@ -108,7 +108,7 @@ export const CursorManager = (
           await Cursor.destroy({
             where: {
               service,
-              cursor: { [Op.ne]: pendingCursor!.cursor },
+              cursor: { [Op.ne]: cursor },
             },
             transaction: t,
           });
