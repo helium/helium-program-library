@@ -39,7 +39,7 @@
     "@helium/spl-utils": "^0.10.13",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1",
-    "crypto-js": "^4.1.1"
+    "crypto-js": "^4.2.0"
   },
   "devDependencies": {
     "@types/crypto-js": "^4.1.1",
