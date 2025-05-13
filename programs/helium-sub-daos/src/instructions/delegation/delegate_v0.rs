@@ -286,6 +286,10 @@ pub fn raw_handler(accounts: &mut DelegationAccounts, bumps: &DelegationBumps) -
 
     // EDGE CASE: The genesis end could be this epoch. Do not override what was done with update_subdao_vehnt
     if genesis_end_sub_dao_epoch_info.key() == accounts.sub_dao_epoch_info.key() {
+      genesis_end_sub_dao_epoch_info.vehnt_at_epoch_start =
+        accounts.sub_dao_epoch_info.vehnt_at_epoch_start;
+      genesis_end_sub_dao_epoch_info.dc_onboarding_fees_paid =
+        accounts.sub_dao_epoch_info.dc_onboarding_fees_paid;
       genesis_end_sub_dao_epoch_info.fall_rates_from_closing_positions = accounts
         .sub_dao_epoch_info
         .fall_rates_from_closing_positions;
