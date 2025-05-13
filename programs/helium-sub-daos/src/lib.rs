@@ -154,4 +154,8 @@ pub mod helium_sub_daos {
   pub fn add_recent_proposal_to_dao_v0(ctx: Context<AddRecentProposalToDaoV0>) -> Result<()> {
     add_recent_proposal_to_dao_v0::handler(ctx)
   }
+
+  pub fn change_delegation_v0(ctx: Context<ChangeDelegationV0>) -> Result<()> {
+    change_delegation_v0::handler(ctx)
+  }
 }
