@@ -16,6 +16,7 @@ import { FastifyInstance } from "fastify";
 import { Op, QueryTypes, Transaction } from "sequelize";
 import {
   PG_MAKER_TABLE,
+  PG_CARRIER_TABLE,
   PRODUCTION,
   SUBSTREAM,
   SUBSTREAM_API_KEY,
@@ -29,6 +30,7 @@ import {
   PROGRAM_ID as HEM_PROGRAM_ID,
   init as initHem,
 } from "@helium/helium-entity-manager-sdk";
+import { PROGRAM_ID as MEM_PROGRAM_ID } from "@helium/mobile-entity-manager-sdk";
 import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
 import { BubblegumIdl } from "../bubblegum";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
@@ -172,9 +174,17 @@ export const setupSubstream = async (server: FastifyInstance) => {
     jsonOptions: { typeRegistry: registry },
   });
 
-  let merkleTrees: Set<string> = new Set(
+  let makerMerkleTrees: Set<string> = new Set(
     (
       (await database.query(`SELECT merkle_tree FROM ${PG_MAKER_TABLE};`, {
+        type: QueryTypes.SELECT,
+      })) as { merkle_tree: string }[]
+    ).map((row) => row.merkle_tree)
+  );
+
+  let carrierMerkleTrees: Set<string> = new Set(
+    (
+      (await database.query(`SELECT merkle_tree from ${PG_CARRIER_TABLE};`, {
         type: QueryTypes.SELECT,
       })) as { merkle_tree: string }[]
     ).map((row) => row.merkle_tree)
@@ -197,6 +207,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
     [HEM_PROGRAM_ID.toBase58()]: new anchor.BorshInstructionCoder(
       await fetchBackwardsCompatibleIdl(HEM_PROGRAM_ID, provider)
     ),
+    [MEM_PROGRAM_ID.toBase58()]: new anchor.BorshInstructionCoder(
+      await fetchBackwardsCompatibleIdl(MEM_PROGRAM_ID, provider)
+    ),
     [BUBBLEGUM_PROGRAM_ID.toBase58()]: new anchor.BorshInstructionCoder(
       BubblegumIdl
     ),
@@ -211,7 +224,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
     applyParams(
       [
-        `${MODULE}=${[...merkleTrees]
+        `${MODULE}=${[...makerMerkleTrees, ...carrierMerkleTrees]
           .map(
             (merkleTree) =>
               `program:${BUBBLEGUM_PROGRAM_ID} && account:${merkleTree}`
@@ -386,30 +399,44 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
                       switch (decodedInstruction.name) {
                         case "update_maker_tree_v0":
-                          const makerAccount = accountMap["Maker"]?.pubkey;
+                        case "update_carrier_tree_v0": {
+                          const isMaker =
+                            decodedInstruction.name === "update_maker_tree_v0";
+                          const accountKey = isMaker ? "Maker" : "Carrier";
+                          const tableName = isMaker
+                            ? PG_MAKER_TABLE
+                            : PG_CARRIER_TABLE;
+                          const merkleTreeSet = isMaker
+                            ? makerMerkleTrees
+                            : carrierMerkleTrees;
+                          const failureCounter = isMaker
+                            ? server.customMetrics.makerTreeFailureCounter
+                            : server.customMetrics.carrierTreeFailureCounter;
+
+                          const entityAccount = accountMap[accountKey]?.pubkey;
                           const newTreeAccount =
                             accountMap["New_merkle_tree"]?.pubkey;
 
                           if (
-                            makerAccount &&
+                            entityAccount &&
                             newTreeAccount &&
-                            !merkleTrees.has(newTreeAccount)
+                            !merkleTreeSet.has(newTreeAccount)
                           ) {
                             try {
                               await database.query(
-                                `INSERT INTO ${PG_MAKER_TABLE} (address, merkle_tree)
-                               VALUES (:address, :merkle_tree)
-                               ON CONFLICT (address) DO UPDATE SET merkle_tree = EXCLUDED.merkle_tree;`,
+                                `INSERT INTO ${tableName} (address, merkle_tree)
+                                 VALUES (:address, :merkle_tree)
+                                 ON CONFLICT (address) DO UPDATE SET merkle_tree = EXCLUDED.merkle_tree;`,
                                 {
                                   replacements: {
-                                    address: makerAccount.toBase58(),
+                                    address: entityAccount.toBase58(),
                                     merkle_tree: newTreeAccount.toBase58(),
                                   },
                                   type: QueryTypes.INSERT,
                                 }
                               );
 
-                              merkleTrees.add(newTreeAccount);
+                              merkleTreeSet.add(newTreeAccount);
                               shouldRestart = true;
                               restartCursor = cursor;
 
@@ -419,15 +446,17 @@ export const setupSubstream = async (server: FastifyInstance) => {
                                 force: true,
                               });
                             } catch (err) {
-                              server.customMetrics.makerTreeFailureCounter.inc();
+                              failureCounter.inc();
                               throw err;
                             }
 
                             return;
                           }
                           break;
+                        }
 
-                        case "issue_entity_v0": {
+                        case "issue_entity_v0":
+                        case "initialize_subscriber_v0": {
                           const recipientAccount =
                             accountMap["Recipient"]?.pubkey;
                           const keyToAssetAccount =

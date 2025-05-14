@@ -53,39 +53,105 @@ export async function convertSubstreamTransaction(
   ).toString("hex");
 
   const accountKeys = message.accountKeys.map(decodeBase64ToPublicKey);
-  const instructions = message.instructions.map((instr: any) => {
-    const accountIndices: number[] = [];
-    if (instr.accounts) {
-      const buf = decodeBase64ToBuffer(instr.accounts);
-      for (let i = 0; i < buf.length; i++) {
-        accountIndices.push(buf[i]);
-      }
+  accountKeys.forEach((key, idx) => {
+    if (!key) {
+      throw new Error(`accountKeys[${idx}] is undefined or invalide`);
     }
-
-    const keys: AccountMeta[] = accountIndices.map(
-      (accIndex: number, i: number) => ({
-        pubkey: accountKeys[accIndex],
-        isSigner: i < message.header.numRequiredSignatures,
-        isWritable: i < message.header.numReadonlySignedAccounts,
-      })
-    );
-
-    return new TransactionInstruction({
-      keys,
-      programId: accountKeys[instr.programIdIndex],
-      data: decodeBase64ToBuffer(instr.data),
-    });
   });
 
   let addressLookupTableAccounts: AddressLookupTableAccount[] = [];
+  let lookupTableAddresses: string[] = [];
   if (message.addressTableLookups && message.addressTableLookups.length > 0) {
-    const lookupTableAddresses = message.addressTableLookups.map(
-      (lookup: any) => decodeBase64ToPublicKey(lookup.accountKey).toBase58()
+    lookupTableAddresses = message.addressTableLookups.map((lookup: any) =>
+      decodeBase64ToPublicKey(lookup.accountKey).toBase58()
     );
     addressLookupTableAccounts = await getAdressLookupTableAccounts(
       lookupTableAddresses
     );
   }
+
+  let extendedAccountKeys = [...accountKeys];
+  if (message.addressTableLookups && message.addressTableLookups.length > 0) {
+    message.addressTableLookups.forEach((lookup: any, i: number) => {
+      const table = addressLookupTableAccounts[i];
+      if (!table) {
+        throw new Error(`Missing lookup table for index ${i}`);
+      }
+      const writableIndexes = Array.from(
+        decodeBase64ToBuffer(lookup.writableIndexes)
+      );
+      const readonlyIndexes = Array.from(
+        decodeBase64ToBuffer(lookup.readonlyIndexes)
+      );
+      writableIndexes.forEach((idx) => {
+        const addr = table.state.addresses[idx];
+        if (!addr)
+          throw new Error(
+            `No address at writable index ${idx} in lookup table ${i}`
+          );
+        extendedAccountKeys.push(addr);
+      });
+      readonlyIndexes.forEach((idx) => {
+        const addr = table.state.addresses[idx];
+        if (!addr)
+          throw new Error(
+            `No address at readonly index ${idx} in lookup table ${i}`
+          );
+        extendedAccountKeys.push(addr);
+      });
+    });
+  }
+
+  const instructions = message.instructions.map(
+    (instr: any, instrIdx: number) => {
+      const accountIndices: number[] = [];
+      if (instr.accounts) {
+        const buf = decodeBase64ToBuffer(instr.accounts);
+        for (let i = 0; i < buf.length; i++) {
+          accountIndices.push(buf[i]);
+        }
+      }
+
+      const keys: AccountMeta[] = accountIndices.map(
+        (accIndex: number, i: number) => {
+          if (accIndex < 0 || accIndex >= extendedAccountKeys.length) {
+            console.error(
+              `Instruction[${instrIdx}] accIndex ${accIndex} out of bounds (extendedAccountKeys.length=${extendedAccountKeys.length})`,
+              { accountIndices, extendedAccountKeys, instr }
+            );
+            throw new Error(
+              `Instruction[${instrIdx}] AccountMeta accIndex ${accIndex} out of bounds (extendedAccountKeys.length=${extendedAccountKeys.length})`
+            );
+          }
+          const pubkey = extendedAccountKeys[accIndex];
+          if (!pubkey) {
+            throw new Error(
+              `Instruction[${instrIdx}] AccountMeta pubkey is undefined for accIdx ${accIndex}`
+            );
+          }
+
+          return {
+            pubkey: pubkey,
+            isSigner: i < message.header.numRequiredSignatures,
+            isWritable: i < message.header.numReadonlySignedAccounts,
+          };
+        }
+      );
+
+      const programId = extendedAccountKeys[instr.programIdIndex];
+      if (!programId) {
+        throw new Error(
+          `Instruction[${instrIdx}] programId is undefined for programIdIndex ${instr.programIdIndex}`
+        );
+      }
+
+      return new TransactionInstruction({
+        keys,
+        programId,
+        data: decodeBase64ToBuffer(instr.data),
+      });
+    }
+  );
 
   const tx = new VersionedTransaction(
     new TransactionMessage({
