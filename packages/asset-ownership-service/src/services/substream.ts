@@ -385,22 +385,44 @@ export const setupSubstream = async (server: FastifyInstance) => {
                       );
 
                       switch (decodedInstruction.name) {
-                        case "create_tree":
+                        case "update_maker_tree_v0":
+                          const makerAccount = accountMap["Maker"]?.pubkey;
                           const newTreeAccount =
-                            accountMap["Merkle_tree"]?.pubkey?.toBase58();
+                            accountMap["New_merkle_tree"]?.pubkey;
 
                           if (
+                            makerAccount &&
                             newTreeAccount &&
                             !merkleTrees.has(newTreeAccount)
                           ) {
-                            merkleTrees.add(newTreeAccount);
-                            shouldRestart = true;
-                            restartCursor = cursor;
-                            await cursorManager.updateCursor({
-                              cursor,
-                              blockHeight,
-                              force: true,
-                            });
+                            try {
+                              await database.query(
+                                `INSERT INTO ${PG_MAKER_TABLE} (address, merkle_tree)
+                               VALUES (:address, :merkle_tree)
+                               ON CONFLICT (address) DO UPDATE SET merkle_tree = EXCLUDED.merkle_tree;`,
+                                {
+                                  replacements: {
+                                    address: makerAccount.toBase58(),
+                                    merkle_tree: newTreeAccount.toBase58(),
+                                  },
+                                  type: QueryTypes.INSERT,
+                                }
+                              );
+
+                              merkleTrees.add(newTreeAccount);
+                              shouldRestart = true;
+                              restartCursor = cursor;
+
+                              await cursorManager.updateCursor({
+                                cursor,
+                                blockHeight,
+                                force: true,
+                              });
+                            } catch (err) {
+                              server.customMetrics.makerTreeFailureCounter.inc();
+                              throw err;
+                            }
+
                             return;
                           }
                           break;
@@ -477,6 +499,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
             await cursorManager.updateCursor({
               cursor,
               blockHeight,
+              force: hasTransactions,
             });
           } catch (blockErr) {
             await t.rollback();

@@ -88,6 +88,7 @@ export const CursorManager = (
             conflictFields: ["service"],
             transaction: t,
           });
+
           await Cursor.destroy({
             where: {
               service,

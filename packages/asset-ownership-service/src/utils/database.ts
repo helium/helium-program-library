@@ -58,6 +58,35 @@ export const database = new Sequelize({
       }
       config.password = password;
     },
+    afterConnect: async (connection: any) => {
+      const pkInfo = await connection.query(`
+        SELECT
+          c.conname,
+          array_agg(a.attname ORDER BY x.n) AS columns
+        FROM
+          pg_constraint c
+          JOIN unnest(c.conkey) WITH ORDINALITY AS x(attnum, n) ON TRUE
+          JOIN pg_attribute a ON a.attnum = x.attnum AND a.attrelid = c.conrelid
+        WHERE
+          c.conrelid = 'cursors'::regclass
+          AND c.contype = 'p'
+        GROUP BY c.conname
+      `);
+
+      if (
+        pkInfo.rows.length > 0 &&
+        (pkInfo.rows[0].columns.length !== 1 ||
+          pkInfo.rows[0].columns[0] !== "service")
+      ) {
+        const constraintName = pkInfo.rows[0].conname;
+        await connection.query(
+          `ALTER TABLE "cursors" DROP CONSTRAINT "${constraintName}";`
+        );
+        await connection.query(
+          `ALTER TABLE "cursors" ADD PRIMARY KEY ("service");`
+        );
+      }
+    },
   },
 });
 
@@ -71,9 +100,11 @@ AssetOwner.init(
     asset: {
       type: STRING,
       primaryKey: true,
+      allowNull: false,
     },
     owner: {
       type: STRING,
+      allowNull: false,
     },
   },
   {
@@ -93,10 +124,10 @@ Cursor.init(
   {
     cursor: {
       type: STRING,
-      primaryKey: true,
     },
     service: {
       type: STRING,
+      primaryKey: true,
       unique: true,
     },
     blockHeight: {

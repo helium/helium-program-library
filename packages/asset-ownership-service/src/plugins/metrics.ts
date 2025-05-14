@@ -6,6 +6,7 @@ declare module "fastify" {
   interface FastifyInstance {
     customMetrics: {
       staleCursorCounter: Counter;
+      makerTreeFailureCounter: Counter;
     };
   }
 }
@@ -17,7 +18,13 @@ export const metrics = fp(async (fastify, _opts) => {
     help: "Number of times a cursor has been stale",
   });
 
+  const makerTreeFailureCounter = new fastify.metrics.client.Counter({
+    name: "maker_tree_failure_counter",
+    help: "Number of times we failed to track a new maker tree",
+  });
+
   fastify.customMetrics = {
     staleCursorCounter,
+    makerTreeFailureCounter,
   };
 });
