@@ -5,7 +5,6 @@ interface GetTransactionSignaturesUptoBlockTimeArgs {
   programId: PublicKey;
   blockTime: number;
   provider: anchor.Provider;
-  maxBlockTime?: number;
 }
 
 export const getTransactionSignaturesUptoBlockTime = async ({

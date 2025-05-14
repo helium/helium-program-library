@@ -11,7 +11,7 @@ export const ensureTables = async ({ sequelize }: { sequelize: Sequelize }) => {
       tableNames.includes(requiredTable)
     )
   ) {
-    throw new Error("Required tables dont exist in the databse");
+    throw new Error("Required tables dont exist in the database");
   }
 
   const assetTableDescription = await sequelize
