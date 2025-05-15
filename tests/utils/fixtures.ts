@@ -1,32 +1,42 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { PROGRAM_ID as DC_ID } from "@helium/data-credits-sdk";
+import { PROGRAM_ID as HEM_ID } from "@helium/helium-entity-manager-sdk";
+import { PROGRAM_ID as HSD_ID } from "@helium/helium-sub-daos-sdk";
+import { PROGRAM_ID as IRM_ID } from '@helium/iot-routing-manager-sdk';
+import { PROGRAM_ID as LD_ID } from "@helium/lazy-distributor-sdk";
+import { PROGRAM_ID as MEM_ID } from "@helium/mobile-entity-manager-sdk";
 import {
   createAtaAndMint,
   createAtaAndTransfer,
   createMint,
   sendMultipleInstructions,
-  toBN
+  toBN,
 } from "@helium/spl-utils";
+import { PROGRAM_ID as VSR_ID } from "@helium/voter-stake-registry-sdk";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
 } from "@solana/spl-account-compression";
-import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
 import { execSync } from "child_process";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
-import { makerKey } from "../../packages/helium-entity-manager-sdk/src";
+import {
+  makerKey,
+  sharedMerkleKey,
+} from "../../packages/helium-entity-manager-sdk/src";
 import { DataCredits } from "../../target/types/data_credits";
 import { HeliumEntityManager } from "../../target/types/helium_entity_manager";
 import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
+import { IotRoutingManager } from "../../target/types/iot_routing_manager";
 import { LazyDistributor } from "../../target/types/lazy_distributor";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
-import { PROGRAM_ID as DC_ID } from "@helium/data-credits-sdk";
-import { PROGRAM_ID as MEM_ID } from "@helium/mobile-entity-manager-sdk";
-import { PROGRAM_ID as VSR_ID } from "@helium/voter-stake-registry-sdk";
-import { PROGRAM_ID as HEM_ID } from "@helium/helium-entity-manager-sdk";
-import { PROGRAM_ID as HSD_ID } from "@helium/helium-sub-daos-sdk";
-import { PROGRAM_ID as LD_ID } from "@helium/lazy-distributor-sdk";
 
 // TODO: replace this with helium default uri once uploaded
 const DEFAULT_METADATA_URL =
@@ -117,6 +127,62 @@ export const initTestRewardableEntityConfig = async (
   return {
     rewardableEntityConfig: rewardableEntityConfig!,
   };
+};
+
+export const initSharedMerkle = async (
+  program: Program<HeliumEntityManager>
+): Promise<{
+  merkle: PublicKey;
+  sharedMerkle: PublicKey;
+}> => {
+  const sharedMerkle = sharedMerkleKey(3)[0];
+  const accountInfo = await program.provider.connection.getAccountInfo(
+    sharedMerkle
+  );
+  const exists = !!accountInfo;
+
+  if (exists) {
+    try {
+      const acc = await program.account.sharedMerkleV0.fetch(sharedMerkle);
+      return { merkle: acc.merkleTree, sharedMerkle };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  const merkle = Keypair.generate();
+  const space = getConcurrentMerkleTreeAccountSize(20, 64, 17);
+  const lamports = await (
+    program.provider as anchor.AnchorProvider
+  ).connection.getMinimumBalanceForRentExemption(space);
+
+  const createMerkle = SystemProgram.createAccount({
+    fromPubkey: (program.provider as anchor.AnchorProvider).wallet.publicKey,
+    newAccountPubkey: merkle.publicKey,
+    lamports,
+    space,
+    programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  });
+
+  try {
+    await program.methods
+      .initializeSharedMerkleV0({
+        proofSize: 3,
+      })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        createMerkle,
+      ])
+      .signers([merkle])
+      .accountsPartial({
+        merkleTree: merkle.publicKey,
+      })
+      .rpc({ skipPreflight: true });
+  } catch (error) {
+    throw error;
+  }
+
+  return { merkle: merkle.publicKey, sharedMerkle };
 };
 
 export const initTestMaker = async (
@@ -239,6 +305,10 @@ export async function ensureDCIdl() {
 
 export async function ensureMemIdl() {
   await ensureIdl("mobile_entity_manager", MEM_ID);
+}
+
+export async function ensure IRMIdl() {
+  await ensureIdl("iot_routing_manager", IRM_ID);
 }
 
 export async function ensureLDIdl() {

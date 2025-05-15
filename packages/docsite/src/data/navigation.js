@@ -94,8 +94,6 @@ export const navigation = [
         href: "/docs/api/treasury-management-sdk",
       },
 
-      { title: "Sessions", href: "/docs/api/sessions-sdk" },
-
       { title: "Rewards oracle", href: "/docs/api/rewards-oracle-sdk" },
 
       { title: "Price oracle", href: "/docs/api/price-oracle-sdk" },
@@ -110,6 +108,11 @@ export const navigation = [
       { title: "Lazy transactions", href: "/docs/api/lazy-transactions-sdk" },
 
       { title: "Lazy distributor", href: "/docs/api/lazy-distributor-sdk" },
+
+      {
+        title: "Iot routing manager",
+        href: "/docs/api/iot-routing-manager-sdk",
+      },
 
       { title: "Hpl crons", href: "/docs/api/hpl-crons-sdk" },
 
