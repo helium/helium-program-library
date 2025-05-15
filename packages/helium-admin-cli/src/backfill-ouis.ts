@@ -392,6 +392,7 @@ export async function run(args: any = process.argv) {
             })
             .accountsPartial({
               organization: orgK,
+              devaddrConstraint: devaddrConstraintK,
             })
             .instruction();
         }
