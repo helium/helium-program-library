@@ -711,7 +711,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/account-fetch-cache@^0.10.11, @helium/account-fetch-cache@^0.10.13, @helium/account-fetch-cache@workspace:packages/account-fetch-cache":
+"@helium/account-fetch-cache@^0.10.13, @helium/account-fetch-cache@workspace:packages/account-fetch-cache":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -846,8 +846,8 @@ __metadata:
     "@connectrpc/connect-node": ^1.4.0
     "@coral-xyz/anchor": ^0.31.0
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.10.11
-    "@helium/spl-utils": ^0.10.11
+    "@helium/account-fetch-cache": ^0.10.13
+    "@helium/spl-utils": ^0.10.13
     "@solana/web3.js": ^1.91.1
     "@substreams/core": ^0.16.0
     "@types/async-retry": ^1.4.8
@@ -1792,7 +1792,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/spl-utils@^0.10.11, @helium/spl-utils@^0.10.13, @helium/spl-utils@workspace:packages/spl-utils":
+"@helium/spl-utils@^0.10.13, @helium/spl-utils@workspace:packages/spl-utils":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
