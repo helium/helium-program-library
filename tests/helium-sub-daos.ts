@@ -551,7 +551,7 @@ describe("helium-sub-daos", () => {
             typeof positionAcc.lockup.kind.cliff === "undefined"
               ? 1
               : (endTs - sdAcc.vehntLastCalculatedTs.toNumber()) /
-                (endTs - startTs);
+              (endTs - startTs);
 
           const expectedVeHnt =
             options.lockupAmount * options.expectedMultiplier * multiplier;
@@ -761,6 +761,65 @@ describe("helium-sub-daos", () => {
               .rpc({ skipPreflight: true });
           });
 
+          it("allows changing delegation", async () => {
+            const newSubDaoInfo = await initTestSubdao({
+              hsdProgram: program,
+              provider,
+              authority: provider.wallet.publicKey,
+              dao: dao,
+              epochRewards: 100,
+              numTokens: new BN(0),
+            })
+            await vsrProgram.methods
+              .setTimeOffsetV0(new BN(EPOCH_LENGTH * 5))
+              .accountsPartial({ registrar })
+              .rpc({ skipPreflight: true });
+            const method = await program.methods
+              .changeDelegationV0()
+              .accountsPartial({
+                position,
+                oldSubDao: subDao,
+                subDao: newSubDaoInfo.subDao,
+                positionAuthority: positionAuthorityKp.publicKey,
+              })
+              .signers([positionAuthorityKp]);
+
+            const { delegatedPosition, oldSubDao } =
+              await method.pubkeys();
+            const oldDelegatedPositionAcc = await program.account.delegatedPositionV0.fetch(delegatedPosition!);
+            await method.rpc({ skipPreflight: true });
+
+            const newDelegatedPositionAcc = await program.account.delegatedPositionV0.fetch(delegatedPosition!);
+            expect(oldDelegatedPositionAcc.lastClaimedEpoch.toNumber()).to.eq(newDelegatedPositionAcc.lastClaimedEpoch.toNumber());
+            expect(oldDelegatedPositionAcc.claimedEpochsBitmap.toString()).to.eq(newDelegatedPositionAcc.claimedEpochsBitmap.toString());
+
+            const oldSdAcc = await program.account.subDaoV0.fetch(oldSubDao!);
+
+            expect(oldSdAcc.vehntFallRate.toNumber()).to.eq(0);
+            expect(oldSdAcc.vehntDelegated.toNumber() / 1000000000000).to.be.closeTo(0, 15);
+
+            const newSdAcc = await program.account.subDaoV0.fetch(newSubDaoInfo.subDao);
+            const positionAcc = await vsrProgram.account.positionV0.fetch(
+              position
+            );
+            const endTs = positionAcc.lockup.endTs.toNumber();
+            const startTs = positionAcc.lockup.startTs.toNumber();
+            const multiplier =
+              typeof positionAcc.lockup.kind.cliff === "undefined"
+                ? 1
+                : (endTs - oldSdAcc.vehntLastCalculatedTs.toNumber()) /
+                (endTs - startTs);
+
+            const expectedVeHnt =
+              options.lockupAmount * options.expectedMultiplier * multiplier;
+
+            expectBnAccuracy(
+              toBN(expectedVeHnt, 8).mul(new BN("1000000000000")),
+              newSdAcc.vehntDelegated,
+              typeof options.kind?.constant !== "undefined" ? 0 : 0.00000000001
+            );
+          });
+
           it("does not allow transfers", async () => {
             const { position: newPos } = await createPosition(
               vsrProgram,
@@ -868,7 +927,7 @@ describe("helium-sub-daos", () => {
               const expectedVehnt =
                 options.lockupAmount * options.expectedMultiplier +
                 basePositionOptions.lockupAmount *
-                  basePositionOptions.expectedMultiplier;
+                basePositionOptions.expectedMultiplier;
 
               expectBnAccuracy(
                 toBN(expectedVehnt, 8).mul(new BN("1000000000000")),
@@ -906,7 +965,7 @@ describe("helium-sub-daos", () => {
                 typeof positionAcc.lockup.kind.cliff === "undefined"
                   ? 1
                   : (endTs - sdAcc.vehntLastCalculatedTs.toNumber()) /
-                    (endTs - startTs);
+                  (endTs - startTs);
 
               const expectedVehnt =
                 options.lockupAmount * options.expectedMultiplier * multiplier;
@@ -920,8 +979,8 @@ describe("helium-sub-daos", () => {
               expect(sdAcc.vehntFallRate.toNumber()).to.be.closeTo(
                 typeof positionAcc.lockup.kind.cliff !== "undefined"
                   ? ((options.lockupAmount * options.expectedMultiplier) /
-                      (endTs - startTs)) *
-                      100000000000000000000
+                    (endTs - startTs)) *
+                  100000000000000000000
                   : 0,
                 1
               );
@@ -1130,11 +1189,11 @@ describe("helium-sub-daos", () => {
                 Number(postAtaBalance) - Number(preAtaBalance)
               ).to.be.within(
                 EPOCH_REWARDS_PLUS_NET_EMISSIONS *
-                  (delegatorRewardsPercent(6).toNumber() / 10_000000000) -
-                  5,
+                (delegatorRewardsPercent(6).toNumber() / 10_000000000) -
+                5,
                 EPOCH_REWARDS_PLUS_NET_EMISSIONS *
-                  (delegatorRewardsPercent(6).toNumber() / 10_000000000) +
-                  5
+                (delegatorRewardsPercent(6).toNumber() / 10_000000000) +
+                5
               );
             });
           });
@@ -1265,9 +1324,9 @@ describe("helium-sub-daos", () => {
         let timeStaked = currTime - stakeTime.toNumber();
         let expected = roundToDecimals(
           3 *
-            100 *
-            100 *
-            ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
+          100 *
+          100 *
+          ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
           8
         );
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
@@ -1286,9 +1345,9 @@ describe("helium-sub-daos", () => {
         timeStaked = currTime - stakeTime.toNumber();
         expected = roundToDecimals(
           3 *
-            100 *
-            100 *
-            ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
+          100 *
+          100 *
+          ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
           8
         );
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
@@ -1304,8 +1363,8 @@ describe("helium-sub-daos", () => {
         timeStaked = currTime - stakeTime.toNumber();
         expected = roundToDecimals(
           100 *
-            100 *
-            ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
+          100 *
+          ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
           8
         );
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
@@ -1324,8 +1383,8 @@ describe("helium-sub-daos", () => {
         timeStaked = currTime - stakeTime.toNumber();
         expected = roundToDecimals(
           100 *
-            100 *
-            ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
+          100 *
+          ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
           8
         );
         expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
@@ -1344,6 +1403,104 @@ describe("helium-sub-daos", () => {
           0,
           0.0000001
         );
+      });
+
+      it("correctly adjusts total vehnt at epoch start with unchanging genesis positions", async () => {
+        ({ position, vault } = await createPosition(
+          vsrProgram,
+          provider,
+          registrar,
+          hntMint,
+          // max lockup
+          {
+            lockupPeriods: 1460,
+            lockupAmount: 100,
+            kind: { cliff: {} },
+          },
+          positionAuthorityKp
+        ));
+        await program.methods
+          .delegateV0()
+          .accountsPartial({
+            position,
+            subDao,
+            positionAuthority: positionAuthorityKp.publicKey,
+          })
+          .signers([positionAuthorityKp])
+          .rpc({ skipPreflight: true });
+
+        // Burn dc to cause an update to subdao epoch info
+        await burnDc(1);
+
+        let offset = 0;
+        async function getCurrEpochInfo() {
+          const unixTime = Number(await getUnixTimestamp(provider)) + offset;
+          return await program.account.subDaoEpochInfoV0.fetch(
+            subDaoEpochInfoKey(subDao, unixTime)[0]
+          );
+        }
+
+        async function ffwd(amount: number) {
+          offset = amount;
+          await vsrProgram.methods
+            .setTimeOffsetV0(new BN(offset))
+            .accountsPartial({ registrar })
+            .rpc({ skipPreflight: true });
+        }
+
+        // Start off the epoch with 0 vehnt since we staked at the start of the epoch
+        let subDaoEpochInfo = await getCurrEpochInfo();
+        expect(subDaoEpochInfo.vehntAtEpochStart.toNumber()).to.eq(0);
+
+        // Fast forward to a later epoch before genesis end
+        console.log("Checking before genesis end");
+        await ffwd(EPOCH_LENGTH * 10);
+        // Burn dc to cause an update to subdao epoch info
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        let positionAcc = await vsrProgram.account.positionV0.fetch(position);
+        const stakeTime = positionAcc.lockup.startTs;
+        let currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        let timeStaked = currTime - stakeTime.toNumber();
+        let expected = roundToDecimals(
+          3 *
+          100 *
+          100 *
+          ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
+          8
+        );
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
+        );
+
+
+        console.log("Checking genesis end");
+        await ffwd(EPOCH_LENGTH * 1460);
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        timeStaked = currTime - stakeTime.toNumber();
+        expected = roundToDecimals(
+          3 *
+          100 *
+          100 *
+          ((1460 * EPOCH_LENGTH - timeStaked) / (1460 * EPOCH_LENGTH)),
+          8
+        );
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.be.closeTo(
+          expected,
+          0.0000001
+        );
+
+        console.log("Checking after genesis end");
+        await ffwd(EPOCH_LENGTH * 1461);
+        await burnDc(1);
+        subDaoEpochInfo = await getCurrEpochInfo();
+        currTime = subDaoEpochInfo.epoch.toNumber() * EPOCH_LENGTH;
+        timeStaked = currTime - stakeTime.toNumber();
+        expected = 0;
+        expect(toNumber(subDaoEpochInfo.vehntAtEpochStart, 8)).to.eq(0)
       });
 
       it("allows adding expiration ts", async () => {

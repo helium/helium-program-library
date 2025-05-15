@@ -15,3 +15,4 @@ export const MAX_CLAIMS_PER_TX = process.env.MAX_CLAIMS_PER_TX
   : 5;
 
 export const RECIPIENT_RENT = 0.00228288 * LAMPORTS_PER_SOL;
+export const ATA_RENT = 0.002039 * LAMPORTS_PER_SOL;

@@ -55,4 +55,7 @@ pub enum ErrorCode {
 
   #[msg("Invalid vote marker")]
   InvalidMarker,
+
+  #[msg("Must change delegation to a different sub dao")]
+  InvalidChangeDelegationSubDao,
 }

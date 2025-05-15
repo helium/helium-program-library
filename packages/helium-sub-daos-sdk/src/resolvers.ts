@@ -73,7 +73,9 @@ export const daoEpochInfoResolver = resolveIndividual(
 
 export const subDaoEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts, args }) => {
-    if (path[path.length - 1] === "subDaoEpochInfo" && accounts.registrar) {
+    const isOld = path[path.length - 1] === "oldSubDaoEpochInfo";
+    const isNew = path[path.length - 1] === "subDaoEpochInfo";
+    if ((isOld || isNew) && accounts.registrar) {
       const vsr = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
       let registrar;
       try {
@@ -97,7 +99,7 @@ export const subDaoEpochInfoResolver = resolveIndividual(
       }
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
-        "subDao",
+        isNew ? "subDao" : "oldSubDao",
       ]) as PublicKey;
       if (subDao) {
         const [key] = subDaoEpochInfoKey(subDao, unixTime, PROGRAM_ID);
@@ -167,14 +169,16 @@ export const subDaoEpochInfoResolver = resolveIndividual(
 
 export const closingTimeEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts }) => {
-    if (path[path.length - 1] === "closingTimeSubDaoEpochInfo") {
+    const isNew = path[path.length - 1] === "closingTimeSubDaoEpochInfo";
+    const isOld = path[path.length - 1] === "oldClosingTimeSubDaoEpochInfo";
+    if (isNew || isOld) {
       const program = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
       const hsdProgram = await initHsd(provider as AnchorProvider);
       const nftProxyProgram = await initNftProxy(provider as AnchorProvider);
 
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
-        "subDao",
+        isNew ? "subDao" : "oldSubDao",
       ]) as PublicKey;
       const position = get(accounts, [
         ...path.slice(0, path.length - 1),
@@ -203,9 +207,9 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
         const expirationTs =
           !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
             ? proxyConfigAcc?.seasons
-                ?.reverse()
-                .find((s) => new BN(now.toString()).gte(s.start))?.end ||
-              getLockupEffectiveEndTs(positionAcc.lockup)
+              ?.reverse()
+              .find((s) => new BN(now.toString()).gte(s.start))?.end ||
+            getLockupEffectiveEndTs(positionAcc.lockup)
             : delegatedPositionAcc.expirationTs;
         const [key] = subDaoEpochInfoKey(
           subDao,
@@ -226,14 +230,16 @@ async function getSolanaUnixTimestamp(provider: Provider): Promise<bigint> {
 
 export const genesisEndEpochInfoResolver = resolveIndividual(
   async ({ provider, path, accounts }) => {
-    if (path[path.length - 1] === "genesisEndSubDaoEpochInfo") {
+    const isNew = path[path.length - 1] === "genesisEndSubDaoEpochInfo";
+    const isOld = path[path.length - 1] === "oldGenesisEndSubDaoEpochInfo";
+    if (isNew || isOld) {
       const program = await init(provider as AnchorProvider, VSR_PROGRAM_ID);
       const hsdProgram = await initHsd(provider as AnchorProvider);
       const nftProxyProgram = await initNftProxy(provider as AnchorProvider);
 
       const subDao = get(accounts, [
         ...path.slice(0, path.length - 1),
-        "subDao",
+        isNew ? "subDao" : "oldSubDao",
       ]) as PublicKey;
       const position = get(accounts, [
         ...path.slice(0, path.length - 1),

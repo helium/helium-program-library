@@ -217,12 +217,6 @@ export const setupSubstream = async (
             !isEmptyMessage(output) &&
             (output as any).accounts.length > 0;
 
-          await cursorManager.updateCursor({
-            cursor,
-            blockHeight,
-            force: hasAccountChanges,
-          });
-
           if (hasAccountChanges) {
             const accountPromises = (output as any).accounts
               .map(async (account: IOutputAccount) => {
@@ -251,6 +245,12 @@ export const setupSubstream = async (
 
             await Promise.all(accountPromises);
           }
+
+          await cursorManager.updateCursor({
+            cursor,
+            blockHeight,
+            force: hasAccountChanges,
+          });
         }
       }
     } catch (err) {
