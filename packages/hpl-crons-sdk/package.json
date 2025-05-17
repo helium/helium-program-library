@@ -41,7 +41,7 @@
     "@helium/tuktuk-sdk": "^0.0.8",
     "@helium/voter-stake-registry-sdk": "^0.10.13",
     "@solana/web3.js": "^1.91.1",
-    "axios": "^1.3.6",
+    "axios": "^1.8.4",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },

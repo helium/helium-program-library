@@ -35,7 +35,7 @@
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
-    "axios": "^1.6.5",
+    "axios": "^1.8.4",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
