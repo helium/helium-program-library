@@ -1,6 +1,13 @@
-import * as anchor from "@coral-xyz/anchor";
 import { createGrpcTransport } from "@connectrpc/connect-node";
-import { AddressLookupTableAccount, PublicKey } from "@solana/web3.js";
+import * as anchor from "@coral-xyz/anchor";
+import {
+  PROGRAM_ID as HEM_PROGRAM_ID,
+  init as initHem,
+} from "@helium/helium-entity-manager-sdk";
+import { PROGRAM_ID as MEM_PROGRAM_ID } from "@helium/mobile-entity-manager-sdk";
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
+import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
+import { PublicKey } from "@solana/web3.js";
 import {
   applyParams,
   authIssue,
@@ -13,27 +20,21 @@ import {
   unpackMapOutput,
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
-import { Op, QueryTypes, Transaction } from "sequelize";
+import { Op, QueryTypes, Sequelize, Transaction } from "sequelize";
+import { BubblegumIdl } from "../bubblegum";
 import {
-  PG_MAKER_TABLE,
   PG_CARRIER_TABLE,
+  PG_DATA_ONLY_TABLE,
+  PG_MAKER_TABLE,
   PRODUCTION,
   SUBSTREAM,
   SUBSTREAM_API_KEY,
   SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
   SUBSTREAM_URL,
 } from "../env";
+import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
 import { AssetOwner, Cursor, database } from "../utils/database";
 import { provider } from "../utils/solana";
-import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
-import {
-  PROGRAM_ID as HEM_PROGRAM_ID,
-  init as initHem,
-} from "@helium/helium-entity-manager-sdk";
-import { PROGRAM_ID as MEM_PROGRAM_ID } from "@helium/mobile-entity-manager-sdk";
-import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
-import { BubblegumIdl } from "../bubblegum";
-import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
 const MODULE = "transactions_by_programid_and_account_without_votes";
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -174,21 +175,19 @@ export const setupSubstream = async (server: FastifyInstance) => {
     jsonOptions: { typeRegistry: registry },
   });
 
-  let makerMerkleTrees: Set<string> = new Set(
-    (
-      (await database.query(`SELECT merkle_tree FROM ${PG_MAKER_TABLE};`, {
-        type: QueryTypes.SELECT,
-      })) as { merkle_tree: string }[]
-    ).map((row) => row.merkle_tree)
-  );
+  const getMerkleTreeSet = async (tableName: string) => {
+    return new Set(
+      (
+        (await database.query(`SELECT merkle_tree FROM ${tableName};`, {
+          type: QueryTypes.SELECT,
+        })) as { merkle_tree: string }[]
+      ).map((row) => row.merkle_tree)
+    );
+  };
 
-  let carrierMerkleTrees: Set<string> = new Set(
-    (
-      (await database.query(`SELECT merkle_tree from ${PG_CARRIER_TABLE};`, {
-        type: QueryTypes.SELECT,
-      })) as { merkle_tree: string }[]
-    ).map((row) => row.merkle_tree)
-  );
+  const makerTrees = await getMerkleTreeSet(PG_MAKER_TABLE!);
+  const dataOnlyTrees = await getMerkleTreeSet(PG_DATA_ONLY_TABLE!);
+  const carrierTrees = await getMerkleTreeSet(PG_CARRIER_TABLE!);
 
   let isConnecting = false;
   let shouldRestart = false;
@@ -215,6 +214,85 @@ export const setupSubstream = async (server: FastifyInstance) => {
     ),
   };
 
+  const treeUpdateConfig = {
+    update_maker_tree_v0: {
+      accountKey: "Maker",
+      tableName: PG_MAKER_TABLE,
+      merkleTrees: makerTrees,
+    },
+    update_carrier_tree_v0: {
+      accountKey: "Carrier",
+      tableName: PG_CARRIER_TABLE,
+      merkleTrees: carrierTrees,
+    },
+    update_data_only_tree_v0: {
+      accountKey: "Data_only_config",
+      tableName: PG_DATA_ONLY_TABLE,
+      merkleTrees: dataOnlyTrees,
+    },
+  };
+
+  const handleTreeUpdateInstruction = async ({
+    instructionName,
+    accountMap,
+    cursor,
+    blockHeight,
+    server,
+    cursorManager,
+    database,
+  }: {
+    instructionName: string;
+    accountMap: Record<string, any>;
+    cursor: string;
+    blockHeight: string;
+    server: FastifyInstance;
+    cursorManager: ReturnType<typeof CursorManager>;
+    database: Sequelize;
+  }) => {
+    const config = treeUpdateConfig[instructionName];
+    if (!config) return;
+
+    const { accountKey, tableName, merkleTrees } = config;
+    const failureCounter = server.customMetrics.treeFailureCounter;
+    const entityAccount = accountMap[accountKey]?.pubkey;
+    const newTreeAccount = accountMap["New_merkle_tree"]?.pubkey;
+
+    if (
+      entityAccount &&
+      newTreeAccount &&
+      merkleTrees &&
+      !merkleTrees.has(newTreeAccount)
+    ) {
+      try {
+        await database.query(
+          `INSERT INTO ${tableName} (address, merkle_tree)
+         VALUES (:address, :merkle_tree)
+         ON CONFLICT (address) DO UPDATE SET merkle_tree = EXCLUDED.merkle_tree;`,
+          {
+            replacements: {
+              address: entityAccount.toBase58(),
+              merkle_tree: newTreeAccount.toBase58(),
+            },
+            type: QueryTypes.INSERT,
+          }
+        );
+
+        merkleTrees.add(newTreeAccount);
+        shouldRestart = true;
+        restartCursor = cursor;
+
+        await cursorManager.updateCursor({
+          cursor,
+          blockHeight,
+          force: true,
+        });
+      } catch (err) {
+        failureCounter && failureCounter.inc();
+        throw err;
+      }
+    }
+  };
+
   const connect = async (attemptCount = 1, overrideCursor?: string) => {
     if (currentAbortController) {
       currentAbortController.abort();
@@ -224,7 +302,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
     applyParams(
       [
-        `${MODULE}=${[...makerMerkleTrees, ...carrierMerkleTrees]
+        `${MODULE}=${[...makerTrees, ...dataOnlyTrees, ...carrierTrees]
           .map(
             (merkleTree) =>
               `program:${BUBBLEGUM_PROGRAM_ID} && account:${merkleTree}`
@@ -312,39 +390,15 @@ export const setupSubstream = async (server: FastifyInstance) => {
               );
 
               if (filteredTransactions.length > 0) {
-                const lookupTableCache: Record<
-                  string,
-                  AddressLookupTableAccount
-                > = {};
-
                 await Promise.all(
                   filteredTransactions.map(async (transactionInfo) => {
-                    const transaction = await convertSubstreamTransaction(
+                    const converted = await convertSubstreamTransaction(
                       transactionInfo
                     );
+                    if (!converted) return;
 
-                    if (!transaction) return;
-                    const { message } = transaction;
-                    const { addressTableLookups } = message;
-                    const addressLookupTableAccounts: AddressLookupTableAccount[] =
-                      [];
-
-                    for (const addressTableLookup of addressTableLookups) {
-                      const key = addressTableLookup.accountKey.toBase58();
-                      if (!lookupTableCache[key]) {
-                        const lookupTableResult =
-                          await provider.connection?.getAddressLookupTable(
-                            addressTableLookup.accountKey
-                          );
-                        if (lookupTableResult?.value) {
-                          lookupTableCache[key] = lookupTableResult.value;
-                        }
-                      }
-                      if (lookupTableCache[key]) {
-                        addressLookupTableAccounts.push(lookupTableCache[key]);
-                      }
-                    }
-
+                    const { tx, addressLookupTableAccounts } = converted;
+                    const { message } = tx;
                     const { staticAccountKeys, accountKeysFromLookups } =
                       message.getAccountKeys({
                         addressLookupTableAccounts,
@@ -399,63 +453,22 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
                       switch (decodedInstruction.name) {
                         case "update_maker_tree_v0":
-                        case "update_carrier_tree_v0": {
-                          const isMaker =
-                            decodedInstruction.name === "update_maker_tree_v0";
-                          const accountKey = isMaker ? "Maker" : "Carrier";
-                          const tableName = isMaker
-                            ? PG_MAKER_TABLE
-                            : PG_CARRIER_TABLE;
-                          const merkleTreeSet = isMaker
-                            ? makerMerkleTrees
-                            : carrierMerkleTrees;
-                          const failureCounter = isMaker
-                            ? server.customMetrics.makerTreeFailureCounter
-                            : server.customMetrics.carrierTreeFailureCounter;
-
-                          const entityAccount = accountMap[accountKey]?.pubkey;
-                          const newTreeAccount =
-                            accountMap["New_merkle_tree"]?.pubkey;
-
-                          if (
-                            entityAccount &&
-                            newTreeAccount &&
-                            !merkleTreeSet.has(newTreeAccount)
-                          ) {
-                            try {
-                              await database.query(
-                                `INSERT INTO ${tableName} (address, merkle_tree)
-                                 VALUES (:address, :merkle_tree)
-                                 ON CONFLICT (address) DO UPDATE SET merkle_tree = EXCLUDED.merkle_tree;`,
-                                {
-                                  replacements: {
-                                    address: entityAccount.toBase58(),
-                                    merkle_tree: newTreeAccount.toBase58(),
-                                  },
-                                  type: QueryTypes.INSERT,
-                                }
-                              );
-
-                              merkleTreeSet.add(newTreeAccount);
-                              shouldRestart = true;
-                              restartCursor = cursor;
-
-                              await cursorManager.updateCursor({
-                                cursor,
-                                blockHeight,
-                                force: true,
-                              });
-                            } catch (err) {
-                              failureCounter.inc();
-                              throw err;
-                            }
-
-                            return;
-                          }
-                          break;
+                        case "update_carrier_tree_v0":
+                        case "update_data_only_tree_v0": {
+                          await handleTreeUpdateInstruction({
+                            instructionName: decodedInstruction.name,
+                            accountMap,
+                            cursor,
+                            blockHeight,
+                            server,
+                            cursorManager,
+                            database,
+                          });
+                          return;
                         }
 
                         case "issue_entity_v0":
+                        case "issue_data_only_entity_v0":
                         case "initialize_subscriber_v0": {
                           const recipientAccount =
                             accountMap["Recipient"]?.pubkey;
@@ -478,7 +491,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
                               );
                             }
                           }
-                          break;
+                          return;
                         }
 
                         case "transfer": {
@@ -515,7 +528,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
                               { transaction: t }
                             );
                           }
-                          break;
+                          return;
                         }
                       }
                     }

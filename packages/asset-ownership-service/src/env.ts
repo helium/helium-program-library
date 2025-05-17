@@ -11,6 +11,7 @@ export const SOLANA_URL = process.env.SOLANA_URL || "http://127.0.0.1:8899";
 export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 export const PG_POOL_SIZE = Number(process.env.PG_POOL_SIZE) || 20;
 export const PG_MAKER_TABLE = process.env.PG_MAKER_TABLE;
+export const PG_DATA_ONLY_TABLE = process.env.PG_DATA_ONLY_TABLE;
 export const PG_ASSET_TABLE = process.env.PG_ASSET_TABLE;
 export const PG_CARRIER_TABLE = process.env.PG_CARRIER_TABLE;
 export const SUBSTREAM_API_KEY = process.env.SUBSTREAM_API_KEY;

@@ -40,6 +40,7 @@
     "@helium/account-fetch-cache": "^0.10.13",
     "@helium/spl-utils": "^0.10.13",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
+    "@mongodb-js/zstd": "^2.0.1",
     "@solana/web3.js": "^1.91.1",
     "@substreams/core": "^0.16.0",
     "@triton-one/yellowstone-grpc": "^0.4.0",

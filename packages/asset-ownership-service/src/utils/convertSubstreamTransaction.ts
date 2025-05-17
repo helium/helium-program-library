@@ -39,9 +39,13 @@ const getAdressLookupTableAccounts = async (
   }, new Array<AddressLookupTableAccount>());
 };
 
-export async function convertSubstreamTransaction(
-  txInfo: any
-): Promise<VersionedTransaction | undefined> {
+export async function convertSubstreamTransaction(txInfo: any): Promise<
+  | {
+      tx: VersionedTransaction;
+      addressLookupTableAccounts: AddressLookupTableAccount[];
+    }
+  | undefined
+> {
   if (!txInfo || !txInfo.transaction || !txInfo.transaction.message) {
     return undefined;
   }
@@ -162,5 +166,5 @@ export async function convertSubstreamTransaction(
   );
 
   tx.signatures = sigs;
-  return tx;
+  return { tx, addressLookupTableAccounts };
 }

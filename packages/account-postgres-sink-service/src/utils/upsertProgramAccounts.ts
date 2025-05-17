@@ -12,6 +12,7 @@ import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
 import { lowerFirstChar } from "@helium/spl-utils";
+import { decompress } from "@mongodb-js/zstd";
 import axios from "axios";
 
 interface UpsertProgramAccountsArgs {
@@ -87,7 +88,7 @@ export const upsertProgramAccounts = async ({
             programId.toBase58(),
             {
               commitment: "confirmed",
-              encoding: "base64",
+              encoding: "base64+zstd",
               filters,
             },
           ],
@@ -107,6 +108,11 @@ export const upsertProgramAccounts = async ({
         },
       }
     );
+
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      console.log(`No accounts found for ${accountType}`);
+      return;
+    }
 
     await Promise.all(
       chunks(accounts, batchSize).map((chunk) =>
@@ -164,29 +170,35 @@ export const upsertProgramAccounts = async ({
         coderFilters,
         batchSize,
         async (chunk, transaction) => {
-          const accs = chunk
-            .map(({ pubkey, account }) => {
-              try {
-                const data =
-                  Array.isArray(account.data) && account.data[1] === "base64"
-                    ? Buffer.from(account.data[0], "base64")
-                    : account.data;
+          const accs = (
+            await Promise.all(
+              chunk.map(async ({ pubkey, account }) => {
+                try {
+                  const data =
+                    Array.isArray(account.data) &&
+                    account.data[1] === "base64+zstd"
+                      ? await decompress(Buffer.from(account.data[0], "base64"))
+                      : Array.isArray(account.data) &&
+                        account.data[1] === "base64"
+                      ? Buffer.from(account.data[0], "base64")
+                      : account.data;
 
-                const decodedAcc = program.coder.accounts.decode(
-                  lowerFirstChar(type),
-                  data
-                );
+                  const decodedAcc = program.coder.accounts.decode(
+                    lowerFirstChar(type),
+                    data
+                  );
 
-                return {
-                  publicKey: pubkey,
-                  account: decodedAcc,
-                };
-              } catch (_e) {
-                console.error(`Decode error ${pubkey}`, _e);
-                return null;
-              }
-            })
-            .filter(truthy);
+                  return {
+                    publicKey: pubkey,
+                    account: decodedAcc,
+                  };
+                } catch (_e) {
+                  console.error(`Decode error ${pubkey}`, _e);
+                  return null;
+                }
+              })
+            )
+          ).filter(truthy);
 
           const updateOnDuplicateFields: string[] = [
             ...Object.keys(accs[0].account),

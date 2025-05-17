@@ -1,46 +1,51 @@
 import { Sequelize } from "sequelize";
-import { PG_ASSET_TABLE, PG_CARRIER_TABLE, PG_MAKER_TABLE } from "../env";
+import {
+  PG_ASSET_TABLE,
+  PG_CARRIER_TABLE,
+  PG_DATA_ONLY_TABLE,
+  PG_MAKER_TABLE,
+} from "../env";
+
+const REQUIRED_TABLES: { name: string | undefined; requiredColumn: string }[] =
+  [
+    { name: PG_MAKER_TABLE, requiredColumn: "merkle_tree" },
+    { name: PG_DATA_ONLY_TABLE, requiredColumn: "merkle_tree" },
+    { name: PG_CARRIER_TABLE, requiredColumn: "merkle_tree" },
+    { name: PG_ASSET_TABLE, requiredColumn: "asset" },
+  ];
+
+const assertEnvVarsDefined = () => {
+  for (const [idx, { name }] of REQUIRED_TABLES.entries()) {
+    if (!name)
+      throw new Error(`Table env var undefined: REQUIRED_TABLES index ${idx}`);
+  }
+};
+
+const assertTablesExist = async (sequelize: Sequelize) => {
+  const tableNames = await sequelize.getQueryInterface().showAllTables();
+  for (const { name } of REQUIRED_TABLES) {
+    if (name && !tableNames.includes(name)) {
+      throw new Error(`Required table missing: ${name}`);
+    }
+  }
+};
+
+const assertRequiredColumns = async (sequelize: Sequelize) => {
+  for (const { name, requiredColumn } of REQUIRED_TABLES) {
+    if (!name) continue;
+    const tableDescription = await sequelize
+      .getQueryInterface()
+      .describeTable(name);
+    if (!tableDescription[requiredColumn]) {
+      throw new Error(
+        `Table ${name} must have a column labeled '${requiredColumn}'`
+      );
+    }
+  }
+};
 
 export const ensureTables = async ({ sequelize }: { sequelize: Sequelize }) => {
-  if (!PG_MAKER_TABLE) throw new Error("PG_MAKER_TABLE undefined");
-  if (!PG_CARRIER_TABLE) throw new Error("PG_CARRIER_TABLE undefined");
-  if (!PG_ASSET_TABLE) throw new Error("PG_ASSET_TABLE undefined");
-  const tableNames = await sequelize.getQueryInterface().showAllTables();
-  if (
-    ![PG_MAKER_TABLE, PG_CARRIER_TABLE, PG_ASSET_TABLE].every((requiredTable) =>
-      tableNames.includes(requiredTable)
-    )
-  ) {
-    throw new Error("Required tables dont exist in the database");
-  }
-
-  const assetTableDescription = await sequelize
-    .getQueryInterface()
-    .describeTable(PG_ASSET_TABLE);
-
-  if (!assetTableDescription.asset) {
-    throw new Error(
-      `Table ${PG_ASSET_TABLE} must have a column labeled 'asset'`
-    );
-  }
-
-  const makerTableDescription = await sequelize
-    .getQueryInterface()
-    .describeTable(PG_MAKER_TABLE);
-
-  if (!makerTableDescription.merkle_tree) {
-    throw new Error(
-      `Table ${PG_MAKER_TABLE} must have a column labeled 'merkle_tree'`
-    );
-  }
-
-  const carrierTableDescription = await sequelize
-    .getQueryInterface()
-    .describeTable(PG_CARRIER_TABLE);
-
-  if (!carrierTableDescription.merkle_tree) {
-    throw new Error(
-      `Table ${PG_CARRIER_TABLE} must have a column labeled 'merkle_tree'`
-    );
-  }
+  assertEnvVarsDefined();
+  await assertTablesExist(sequelize);
+  await assertRequiredColumns(sequelize);
 };
