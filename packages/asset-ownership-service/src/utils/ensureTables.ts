@@ -6,28 +6,28 @@ import {
   PG_MAKER_TABLE,
 } from "../env";
 
-const REQUIRED_TABLES: { name: string | undefined; requiredColumn: string }[] =
-  [
-    { name: PG_MAKER_TABLE, requiredColumn: "merkle_tree" },
-    { name: PG_DATA_ONLY_TABLE, requiredColumn: "merkle_tree" },
-    { name: PG_CARRIER_TABLE, requiredColumn: "merkle_tree" },
-    { name: PG_ASSET_TABLE, requiredColumn: "asset" },
-  ];
+const REQUIRED_TABLES = [
+  { name: PG_MAKER_TABLE, requiredColumn: "merkle_tree" },
+  { name: PG_DATA_ONLY_TABLE, requiredColumn: "merkle_tree" },
+  { name: PG_CARRIER_TABLE, requiredColumn: "merkle_tree" },
+  { name: PG_ASSET_TABLE, requiredColumn: "asset" },
+];
 
 const assertEnvVarsDefined = () => {
-  for (const [idx, { name }] of REQUIRED_TABLES.entries()) {
-    if (!name)
+  REQUIRED_TABLES.forEach(({ name }, idx) => {
+    if (!name) {
       throw new Error(`Table env var undefined: REQUIRED_TABLES index ${idx}`);
-  }
+    }
+  });
 };
 
 const assertTablesExist = async (sequelize: Sequelize) => {
   const tableNames = await sequelize.getQueryInterface().showAllTables();
-  for (const { name } of REQUIRED_TABLES) {
+  REQUIRED_TABLES.forEach(({ name }) => {
     if (name && !tableNames.includes(name)) {
       throw new Error(`Required table missing: ${name}`);
     }
-  }
+  });
 };
 
 const assertRequiredColumns = async (sequelize: Sequelize) => {
@@ -36,6 +36,7 @@ const assertRequiredColumns = async (sequelize: Sequelize) => {
     const tableDescription = await sequelize
       .getQueryInterface()
       .describeTable(name);
+
     if (!tableDescription[requiredColumn]) {
       throw new Error(
         `Table ${name} must have a column labeled '${requiredColumn}'`
