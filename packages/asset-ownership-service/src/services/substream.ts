@@ -20,7 +20,7 @@ import {
   unpackMapOutput,
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
-import { Op, QueryTypes, Sequelize, Transaction } from "sequelize";
+import { QueryTypes, Sequelize, Transaction } from "sequelize";
 import { BubblegumIdl } from "../bubblegum";
 import {
   PG_CARRIER_TABLE,
@@ -35,10 +35,15 @@ import {
 import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
 import { AssetOwner, Cursor, database } from "../utils/database";
 import { provider } from "../utils/solana";
+import { CursorManager } from "../utils/cursor";
 
 const MODULE = "transactions_by_programid_and_account_without_votes";
 const MAX_RECONNECT_ATTEMPTS = 5;
-const RELEVENT_INSTRUCTIONS = ["MintToCollectionV1", "Transfer", "CreateTree"];
+const RELEVANT_INSTRUCTIONS = ["MintToCollectionV1", "Transfer", "CreateTree"];
+const RELEVANT_INSTRUCTIONS_REGEX = new RegExp(
+  RELEVANT_INSTRUCTIONS.join("|"),
+  "i"
+);
 
 interface IOutputTransaction {
   message: {
@@ -54,110 +59,6 @@ interface IOutputTransaction {
     logMessages: string[];
   };
 }
-
-export const CursorManager = (
-  service: string,
-  stalenessThreshold: number,
-  onStale?: () => void
-) => {
-  const CURSOR_UPDATE_INTERVAL = 30_000;
-  let checkInterval: NodeJS.Timeout | undefined;
-  let lastReceivedBlock: number = Date.now();
-  let pendingCursor: {
-    cursor: string;
-    blockHeight: string;
-    service: string;
-  } | null = null;
-  let lastCursorUpdate = 0;
-
-  const formatStaleness = (staleness: number): string => {
-    const stalenessInHours = staleness / 3600000;
-    return stalenessInHours >= 1
-      ? `${stalenessInHours.toFixed(1)}h`
-      : `${(staleness / 60000).toFixed(1)}m`;
-  };
-
-  const getLatestCursor = async (): Promise<Cursor | null> =>
-    await Cursor.findOne({
-      where: { service },
-      order: [["createdAt", "DESC"]],
-    });
-
-  const recordBlockReceived = (): void => {
-    lastReceivedBlock = Date.now();
-  };
-
-  const updateCursor = async ({
-    cursor,
-    blockHeight,
-    force = false,
-  }: {
-    cursor: string;
-    blockHeight: string;
-    force?: boolean;
-  }): Promise<void> => {
-    const now = Date.now();
-    recordBlockReceived();
-    pendingCursor = { cursor, blockHeight, service };
-
-    if (force || now - lastCursorUpdate >= CURSOR_UPDATE_INTERVAL) {
-      if (pendingCursor) {
-        await database.transaction(async (t) => {
-          await Cursor.upsert(pendingCursor!, {
-            conflictFields: ["service"],
-            transaction: t,
-          });
-
-          await Cursor.destroy({
-            where: {
-              service,
-              cursor: { [Op.ne]: cursor },
-            },
-            transaction: t,
-          });
-        });
-        lastCursorUpdate = now;
-        pendingCursor = null;
-      }
-    }
-  };
-
-  const checkStaleness = async (): Promise<string | undefined> => {
-    const connectionStaleness = Date.now() - lastReceivedBlock;
-    if (connectionStaleness >= stalenessThreshold) {
-      console.log(
-        `Connection is stale (${formatStaleness(
-          connectionStaleness
-        )} since last block)`
-      );
-      onStale && onStale();
-    }
-
-    const cursor = await getLatestCursor();
-    return cursor ? cursor.cursor : undefined;
-  };
-
-  const startStalenessCheck = (): void => {
-    if (checkInterval) clearInterval(checkInterval);
-    checkInterval = setInterval(() => checkStaleness(), 30_000);
-  };
-
-  const stopStalenessCheck = (): void => {
-    if (checkInterval) {
-      clearInterval(checkInterval);
-      checkInterval = undefined;
-    }
-  };
-
-  return {
-    getLatestCursor,
-    updateCursor,
-    checkStaleness,
-    startStalenessCheck,
-    stopStalenessCheck,
-    recordBlockReceived,
-  };
-};
 
 export const setupSubstream = async (server: FastifyInstance) => {
   if (!SUBSTREAM_API_KEY) throw new Error("SUBSTREAM_API_KEY undefined");
@@ -230,67 +131,6 @@ export const setupSubstream = async (server: FastifyInstance) => {
       tableName: PG_DATA_ONLY_TABLE,
       merkleTrees: dataOnlyTrees,
     },
-  };
-
-  const handleTreeUpdateInstruction = async ({
-    instructionName,
-    accountMap,
-    cursor,
-    blockHeight,
-    server,
-    cursorManager,
-    database,
-  }: {
-    instructionName: string;
-    accountMap: Record<string, any>;
-    cursor: string;
-    blockHeight: string;
-    server: FastifyInstance;
-    cursorManager: ReturnType<typeof CursorManager>;
-    database: Sequelize;
-  }) => {
-    const config = treeUpdateConfig[instructionName];
-    if (!config) return;
-
-    const { accountKey, tableName, merkleTrees } = config;
-    const failureCounter = server.customMetrics.treeFailureCounter;
-    const entityAccount = accountMap[accountKey]?.pubkey;
-    const newTreeAccount = accountMap["New_merkle_tree"]?.pubkey;
-
-    if (
-      entityAccount &&
-      newTreeAccount &&
-      merkleTrees &&
-      !merkleTrees.has(newTreeAccount)
-    ) {
-      try {
-        await database.query(
-          `INSERT INTO ${tableName} (address, merkle_tree)
-         VALUES (:address, :merkle_tree)
-         ON CONFLICT (address) DO UPDATE SET merkle_tree = EXCLUDED.merkle_tree;`,
-          {
-            replacements: {
-              address: entityAccount.toBase58(),
-              merkle_tree: newTreeAccount.toBase58(),
-            },
-            type: QueryTypes.INSERT,
-          }
-        );
-
-        merkleTrees.add(newTreeAccount);
-        shouldRestart = true;
-        restartCursor = cursor;
-
-        await cursorManager.updateCursor({
-          cursor,
-          blockHeight,
-          force: true,
-        });
-      } catch (err) {
-        failureCounter && failureCounter.inc();
-        throw err;
-      }
-    }
   };
 
   const connect = async (attemptCount = 1, overrideCursor?: string) => {
@@ -385,7 +225,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
               const filteredTransactions = outputTransactions.filter((tx) =>
                 tx.meta.logMessages.some((log) =>
-                  RELEVENT_INSTRUCTIONS.some((instr) => log.includes(instr))
+                  RELEVANT_INSTRUCTIONS_REGEX.test(log)
                 )
               );
 
@@ -559,6 +399,67 @@ export const setupSubstream = async (server: FastifyInstance) => {
       console.log("Substream connection error:", err);
       isConnecting = false;
       handleReconnect(attemptCount + 1);
+    }
+  };
+
+  const handleTreeUpdateInstruction = async ({
+    instructionName,
+    accountMap,
+    cursor,
+    blockHeight,
+    server,
+    cursorManager,
+    database,
+  }: {
+    instructionName: string;
+    accountMap: Record<string, any>;
+    cursor: string;
+    blockHeight: string;
+    server: FastifyInstance;
+    cursorManager: ReturnType<typeof CursorManager>;
+    database: Sequelize;
+  }) => {
+    const config = treeUpdateConfig[instructionName];
+    if (!config) return;
+
+    const { accountKey, tableName, merkleTrees } = config;
+    const failureCounter = server.customMetrics.treeFailureCounter;
+    const entityAccount = accountMap[accountKey]?.pubkey;
+    const newTreeAccount = accountMap["New_merkle_tree"]?.pubkey;
+
+    if (
+      entityAccount &&
+      newTreeAccount &&
+      merkleTrees &&
+      !merkleTrees.has(newTreeAccount)
+    ) {
+      try {
+        await database.query(
+          `INSERT INTO ${tableName} (address, merkle_tree)
+         VALUES (:address, :merkle_tree)
+         ON CONFLICT (address) DO UPDATE SET merkle_tree = EXCLUDED.merkle_tree;`,
+          {
+            replacements: {
+              address: entityAccount.toBase58(),
+              merkle_tree: newTreeAccount.toBase58(),
+            },
+            type: QueryTypes.INSERT,
+          }
+        );
+
+        merkleTrees.add(newTreeAccount);
+        shouldRestart = true;
+        restartCursor = cursor;
+
+        await cursorManager.updateCursor({
+          cursor,
+          blockHeight,
+          force: true,
+        });
+      } catch (err) {
+        failureCounter && failureCounter.inc();
+        throw err;
+      }
     }
   };
 

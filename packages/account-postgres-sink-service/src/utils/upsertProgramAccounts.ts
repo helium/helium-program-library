@@ -78,23 +78,34 @@ export const upsertProgramAccounts = async ({
     let processedCount = 0;
     console.log(`Processing ${accountType} accounts`);
 
-    const accounts = await retry(
+    let accounts = await retry(
       async () => {
-        const result = await axios.post(SOLANA_URL, {
-          jsonrpc: "2.0",
-          id: `refresh-accounts-${programId.toBase58()}-${accountType}`,
-          method: "getProgramAccounts",
-          params: [
-            programId.toBase58(),
+        try {
+          const result = await axios.post(
+            SOLANA_URL,
             {
-              commitment: "confirmed",
-              encoding: "base64+zstd",
-              filters,
+              jsonrpc: "2.0",
+              id: `refresh-accounts-${programId.toBase58()}-${accountType}`,
+              method: "getProgramAccounts",
+              params: [
+                programId.toBase58(),
+                {
+                  commitment: "confirmed",
+                  encoding: "base64+zstd",
+                  filters,
+                },
+              ],
             },
-          ],
-        });
+            {
+              timeout: 60000,
+            }
+          );
 
-        return result.data.result as anchor.web3.GetProgramAccountsResponse;
+          return result.data.result as anchor.web3.GetProgramAccountsResponse;
+        } catch (err: any) {
+          console.error(`RPC call error for ${accountType}:`, err.message);
+          throw err;
+        }
       },
       {
         retries: 5,
