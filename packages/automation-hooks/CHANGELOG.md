@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.14](https://github.com/helium/helium-program-libary/compare/v0.9.34...v0.10.14) (2025-05-20)
+
+**Note:** Version bump only for package @helium/automation-hooks
+
+
+
+
+
 ## [0.10.13](https://github.com/helium/helium-program-libary/compare/v0.10.12...v0.10.13) (2025-05-12)
 
 **Note:** Version bump only for package @helium/automation-hooks
