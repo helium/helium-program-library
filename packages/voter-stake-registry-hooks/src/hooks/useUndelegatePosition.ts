@@ -1,4 +1,3 @@
-import { Program } from "@coral-xyz/anchor";
 import {
   PROGRAM_ID,
   delegatedPositionKey,
@@ -24,9 +23,15 @@ export const useUndelegatePosition = ({
   position: PositionWithMeta;
 }) => {
   const { provider, unixNow } = useHeliumVsrState();
-  const delegatedPosKey = useMemo(() => delegatedPositionKey(position.pubkey)[0], [position.pubkey]);
-  const delegationClaimBotK = useMemo(() => delegationClaimBotKey(TASK_QUEUE, delegatedPosKey)[0]);
-  const { info: delegationClaimBot } = useDelegationClaimBot(delegationClaimBotK);
+  const delegatedPosKey = useMemo(
+    () => delegatedPositionKey(position.pubkey)[0],
+    [position.pubkey]
+  );
+  const delegationClaimBotK = useMemo(
+    () => delegationClaimBotKey(TASK_QUEUE, delegatedPosKey)[0]
+  );
+  const { info: delegationClaimBot } =
+    useDelegationClaimBot(delegationClaimBotK);
   const { error, loading, execute } = useAsyncCallback(
     async ({
       programId = PROGRAM_ID,
@@ -67,6 +72,24 @@ export const useUndelegatePosition = ({
         }
 
         instructions.push([
+          ...(delegationClaimBot
+            ? [
+                await hplCronsProgram.methods
+                  .closeDelegationClaimBotV0()
+                  .accountsPartial({
+                    delegationClaimBot: delegationClaimBotK,
+                    taskQueue: TASK_QUEUE,
+                    position: position.pubkey,
+                    delegatedPosition: delegatedPosKey,
+                    positionTokenAccount: getAssociatedTokenAddressSync(
+                      position.mint,
+                      provider.wallet.publicKey,
+                      true
+                    ),
+                  })
+                  .instruction(),
+              ]
+            : []),
           await hsdProgram.methods
             .closeDelegationV0()
             .accountsPartial({
@@ -74,14 +97,6 @@ export const useUndelegatePosition = ({
               subDao: delegatedPosAcc.subDao,
             })
             .instruction(),
-          ...(delegationClaimBot ? [
-            await hplCronsProgram.methods.closeDelegationClaimBotV0().accountsPartial({
-              delegationClaimBot: delegationClaimBotK,
-              taskQueue: TASK_QUEUE,
-              position: position.pubkey,
-              positionTokenAccount: getAssociatedTokenAddressSync(position.mint, provider.wallet.publicKey, true),
-            }).instruction()
-          ] : [])
         ]);
 
         if (onInstructions) {
