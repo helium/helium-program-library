@@ -29,3 +29,4 @@ packages/helium-vote-service/helium-vote-proxies/
 !packages/docsite/src/data
 .yalc
 yalc.lock
+.cursor/*

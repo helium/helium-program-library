@@ -237,7 +237,11 @@ export const integrityCheckProgramAccounts = async ({
                     acc.data as Buffer
                   );
 
-                  let sanitized = {
+                  let sanitized: {
+                    refreshed_at: string;
+                    address: string;
+                    [key: string]: any;
+                  } = {
                     refreshed_at: new Date().toISOString(),
                     address: acc.pubkey,
                     ...sanitizeAccount(decodedAcc),
@@ -262,21 +266,42 @@ export const integrityCheckProgramAccounts = async ({
                     ? new Date(existing.dataValues.refreshed_at)
                     : null;
 
+                  const existingData = existing?.dataValues;
+                  const existingClean = _omit(existingData || {}, OMIT_KEYS);
+                  const sanitizedClean = _omit(sanitized, OMIT_KEYS);
                   const shouldUpdate =
-                    !deepEqual(
-                      _omit(sanitized, OMIT_KEYS),
-                      _omit(existing?.dataValues, OMIT_KEYS)
-                    ) &&
+                    !deepEqual(sanitizedClean, existingClean) &&
                     (!refreshedAt || refreshedAt < snapshotTime);
 
                   if (shouldUpdate) {
+                    const changedFields = existing
+                      ? Object.entries(sanitizedClean)
+                          .filter(
+                            ([key, value]) =>
+                              !deepEqual(value, existingData[key])
+                          )
+                          .map(([key]) => key)
+                      : Object.keys(sanitizedClean);
+
                     corrections.push({
                       type: accName,
                       accountId: acc.pubkey,
-                      txSignatures: txIdsByAccountId[acc.pubkey],
-                      currentValues: existing ? existing.dataValues : null,
-                      newValues: sanitized,
+                      txSignatures: txIdsByAccountId[acc.pubkey] || [],
+                      currentValues: existing
+                        ? changedFields.reduce(
+                            (obj, key) => ({
+                              ...obj,
+                              [key]: existingData[key],
+                            }),
+                            {}
+                          )
+                        : null,
+                      newValues: changedFields.reduce(
+                        (obj, key) => ({ ...obj, [key]: sanitized[key] }),
+                        {}
+                      ),
                     });
+
                     await model.upsert({ ...sanitized }, { transaction: t });
                   }
                 })
