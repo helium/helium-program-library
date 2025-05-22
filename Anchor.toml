@@ -17,6 +17,7 @@ fanout = "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6"
 mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
 hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
 no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
+iot_routing_manager = "irtjLnjCMmyowq2m3KWqpuFB3M9gdNA9A4t4d6VWmzB"
 hpl_crons = "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu"
 
 [workspace]
@@ -35,6 +36,7 @@ members = [
   "programs/mobile-entity-manager",
   "programs/hexboosting",
   "programs/no-emit",
+  "programs/iot-routing-manager",
   "programs/hpl-crons",
 ]
 
@@ -79,7 +81,7 @@ address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK" # account compression
 address = "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S" # spl governance program
 
 [[test.validator.clone]]
-address = "ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk" # required by spl governance 
+address = "ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk" # required by spl governance
 
 [[test.validator.clone]]
 address = "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs" # Proposal
@@ -107,6 +109,9 @@ address = "GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E" # State controller IDL
 
 [[test.validator.clone]]
 address = "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx" # Mobile price oracle
+
+[[test.validator.clone]]
+address = "8UYEn5Weq7toHwgcmctvcAxaNJo3SJxXEayM57rpoXr9" # IOT price oracle
 
 # Pyth price oracle
 [[test.validator.clone]]

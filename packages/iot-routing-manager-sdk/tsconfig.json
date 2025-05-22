@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.root.json",
+  "references": [
+    {
+      "path": "../idls"
+    },
+    {
+      "path": "../anchor-resolvers"
+    },
+    {
+      "path": "../helium-entity-manager-sdk"
+    },
+    {
+      "path": "../circuit-breaker-sdk"
+    },
+    {
+      "path": "./tsconfig.cjs.json"
+    },
+    {
+      "path": "./tsconfig.esm.json"
+    }
+  ]
+}

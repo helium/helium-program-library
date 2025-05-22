@@ -943,6 +943,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "iot-routing-manager"
+version = "0.1.2"
+dependencies = [
+ "account-compression-cpi",
+ "anchor-lang",
+ "anchor-spl",
+ "angry-purple-tiger",
+ "bs58 0.3.1",
+ "bubblegum-cpi",
+ "bytemuck",
+ "data-credits",
+ "default-env",
+ "helium-entity-manager",
+ "helium-sub-daos",
+ "mpl-token-metadata",
+ "shared-utils",
+ "solana-program",
+ "solana-security-txt",
+]
+
+[[package]]
 name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
