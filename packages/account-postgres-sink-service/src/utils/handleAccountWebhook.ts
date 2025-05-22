@@ -97,7 +97,10 @@ export const handleAccountWebhook = async ({
         return;
       }
 
-      const decodedAcc = program.coder.accounts.decode(lowerFirstChar(accName), data as Buffer);
+      const decodedAcc = program.coder.accounts.decode(
+        lowerFirstChar(accName),
+        data as Buffer
+      );
       const model = sequelize.models[accName];
       const existing = await model.findByPk(account.pubkey, {
         transaction: t,

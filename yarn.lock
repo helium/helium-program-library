@@ -711,7 +711,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/account-fetch-cache@^0.10.14, @helium/account-fetch-cache@workspace:packages/account-fetch-cache":
+"@helium/account-fetch-cache@^0.10.13, @helium/account-fetch-cache@^0.10.14, @helium/account-fetch-cache@workspace:packages/account-fetch-cache":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -743,6 +743,7 @@ __metadata:
     "@helium/account-fetch-cache": ^0.10.14
     "@helium/spl-utils": ^0.10.14
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
+    "@mongodb-js/zstd": ^2.0.1
     "@solana/web3.js": ^1.91.1
     "@substreams/core": ^0.16.0
     "@triton-one/yellowstone-grpc": ^0.4.0
@@ -756,7 +757,7 @@ __metadata:
     "@types/yargs": ^17.0.24
     async-retry: ^1.3.3
     aws-sdk: ^2.1344.0
-    axios: ^1.3.6
+    axios: ^1.8.4
     axios-retry: ^3.8.0
     bloom-filters: ^3.0.1
     bn.js: ^5.2.0
@@ -837,6 +838,51 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@helium/asset-ownership-service@workspace:packages/asset-ownership-service":
+  version: 0.0.0-use.local
+  resolution: "@helium/asset-ownership-service@workspace:packages/asset-ownership-service"
+  dependencies:
+    "@bufbuild/protobuf": ^1.10.0
+    "@connectrpc/connect": ^1.4.0
+    "@connectrpc/connect-node": ^1.4.0
+    "@coral-xyz/anchor": ^0.31.0
+    "@fastify/cors": ^8.1.1
+    "@helium/account-fetch-cache": ^0.10.13
+    "@helium/spl-utils": ^0.10.13
+    "@solana/web3.js": ^1.91.1
+    "@substreams/core": ^0.16.0
+    "@types/async-retry": ^1.4.8
+    "@types/bn.js": ^5.1.1
+    "@types/deep-equal": ^1.0.4
+    "@types/lodash": ^4.14.195
+    "@types/node": ^18.11.11
+    "@types/pg": ^8.6.6
+    async-retry: ^1.3.3
+    aws-sdk: ^2.1344.0
+    axios: ^1.8.4
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+    deep-equal: ^2.2.3
+    dotenv: ^16.3.1
+    fastify: ^4.13.0
+    fastify-cron: ^1.3.1
+    fastify-metrics: ^10.3.0
+    fastify-plugin: ^4.5.1
+    git-format-staged: ^2.1.3
+    http-status-codes: ^2.2.0
+    inflection: ^3.0.0
+    lodash: ^4.17.21
+    p-limit: 3.1.0
+    pg: ^8.9.0
+    prom-client: ^14.2.0
+    sequelize: ^6.28.0
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    ts-node-dev: ^2.0.0
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
+
 "@helium/automation-hooks@^0.10.14, @helium/automation-hooks@workspace:packages/automation-hooks":
   version: 0.0.0-use.local
   resolution: "@helium/automation-hooks@workspace:packages/automation-hooks"
@@ -849,7 +895,7 @@ __metadata:
     "@helium/tuktuk-sdk": ^0.0.8
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/web3.js": ^1.91.1
-    axios: ^1.3.6
+    axios: ^1.8.4
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
     react-async-hook: ^4.0.0
@@ -920,7 +966,7 @@ __metadata:
     "@types/bn.js": ^5.1.0
     "@types/bs58": ^4.0.1
     "@types/yargs": ^17.0.24
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -1009,7 +1055,7 @@ __metadata:
     "@types/pg": ^8.6.6
     "@types/sequelize": ^4.28.14
     aws-sdk: ^2.1344.0
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     cors: ^2.8.5
@@ -1075,7 +1121,7 @@ __metadata:
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
     "@types/bn.js": ^5.1.1
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     fastify: ^4.13.0
@@ -1117,7 +1163,7 @@ __metadata:
     "@solana/web3.js": ^1.91.1
     "@types/bn.js": ^5.1.1
     angry-purple-tiger: ^1.0.5
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     fastify: ^4.13.0
@@ -1160,7 +1206,7 @@ __metadata:
     "@solana/web3.js": ^1.91.1
     "@sqds/sdk": 2.0.4
     "@types/yargs": ^17.0.24
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     fast-deep-equal: ^3.1.3
@@ -1327,7 +1373,7 @@ __metadata:
     "@helium/tuktuk-sdk": ^0.0.8
     "@helium/voter-stake-registry-sdk": ^0.10.14
     "@solana/web3.js": ^1.91.1
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -1408,7 +1454,7 @@ __metadata:
     "@types/bs58": ^4.0.2
     angry-purple-tiger: ^1.0.5
     aws-sdk: ^2.1469.0
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     dotenv: ^16.3.1
@@ -1458,7 +1504,7 @@ __metadata:
     "@types/pg-format": ^1.0.2
     "@types/yargs": ^17.0.24
     aws-sdk: ^2.1344.0
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     cli-progress: ^3.12.0
@@ -1565,7 +1611,7 @@ __metadata:
     "@types/bn.js": ^5.1.1
     "@types/pg": ^8.10.9
     aws-sdk: ^2.1516.0
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     cli-progress: ^3.12.0
@@ -1747,7 +1793,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/spl-utils@^0.10.14, @helium/spl-utils@workspace:packages/spl-utils":
+"@helium/spl-utils@^0.10.13, @helium/spl-utils@^0.10.14, @helium/spl-utils@workspace:packages/spl-utils":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
@@ -1759,7 +1805,7 @@ __metadata:
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
-    axios: ^1.5.0
+    axios: ^1.8.4
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
@@ -1788,7 +1834,7 @@ __metadata:
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
-    axios: ^1.6.5
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -1810,7 +1856,7 @@ __metadata:
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
     "@types/node": ^20.8.6
-    axios: ^1.3.6
+    axios: ^1.8.4
     fastify: ^4.13.0
     git-format-staged: ^2.1.3
     ts-loader: ^9.2.3
@@ -1896,7 +1942,7 @@ __metadata:
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/web3.js": ^1.91.1
     "@tanstack/react-query": ^5.45.0
-    axios: ^1.3.6
+    axios: ^1.8.4
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
     react-async-hook: ^4.0.0
@@ -1944,7 +1990,7 @@ __metadata:
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
     "@types/bn.js": ^5.1.1
-    axios: ^1.3.6
+    axios: ^1.8.4
     bn.js: ^5.2.0
     bs58: ^4.0.1
     fastify: ^4.13.0
@@ -3024,6 +3070,17 @@ __metadata:
     bn.js: "npm:^5.2.0"
     debug: "npm:^4.3.4"
   checksum: 89f82980f435ac45d961e6ab03859c7e4ab9809ad2d9f84aca91bcf50fdc60e210d0596d8856adf63e474ca69d971c51a4c27d0fe4dab115fcef64d57f3be611
+  languageName: node
+  linkType: hard
+
+"@mongodb-js/zstd@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "@mongodb-js/zstd@npm:2.0.1"
+  dependencies:
+    node-addon-api: ^4.3.0
+    node-gyp: latest
+    prebuild-install: ^7.1.3
+  checksum: 705587d80146d2457a8b2f5b818236515c04095f981c098b2191dcba3f2628c30a95c6f3875fd9056c42070572711c85559a3a13fc95305c322615f526e79ed3
   languageName: node
   linkType: hard
 
@@ -5786,7 +5843,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"axios@npm:^1.0.0, axios@npm:^1.1.3, axios@npm:^1.3.6, axios@npm:^1.5.0":
+"axios@npm:^1.0.0, axios@npm:^1.1.3":
   version: 1.5.0
   resolution: "axios@npm:1.5.0"
   dependencies:
@@ -5794,17 +5851,6 @@ __metadata:
     form-data: "npm:^4.0.0"
     proxy-from-env: "npm:^1.1.0"
   checksum: e7405a5dbbea97760d0e6cd58fecba311b0401ddb4a8efbc4108f5537da9b3f278bde566deb777935a960beec4fa18e7b8353881f2f465e4f2c0e949fead35be
-  languageName: node
-  linkType: hard
-
-"axios@npm:^1.6.5":
-  version: 1.6.5
-  resolution: "axios@npm:1.6.5"
-  dependencies:
-    follow-redirects: ^1.15.4
-    form-data: ^4.0.0
-    proxy-from-env: ^1.1.0
-  checksum: e28d67b2d9134cb4608c44d8068b0678cfdccc652742e619006f27264a30c7aba13b2cd19c6f1f52ae195b5232734925928fb192d5c85feea7edd2f273df206d
   languageName: node
   linkType: hard
 
@@ -8874,16 +8920,6 @@ __metadata:
     debug:
       optional: true
   checksum: faa66059b66358ba65c234c2f2a37fcec029dc22775f35d9ad6abac56003268baf41e55f9ee645957b32c7d9f62baf1f0b906e68267276f54ec4b4c597c2b190
-  languageName: node
-  linkType: hard
-
-"follow-redirects@npm:^1.15.4":
-  version: 1.15.5
-  resolution: "follow-redirects@npm:1.15.5"
-  peerDependenciesMeta:
-    debug:
-      optional: true
-  checksum: 5ca49b5ce6f44338cbfc3546823357e7a70813cecc9b7b768158a1d32c1e62e7407c944402a918ea8c38ae2e78266312d617dc68783fac502cbb55e1047b34ec
   languageName: node
   linkType: hard
 
@@ -12019,6 +12055,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"napi-build-utils@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "napi-build-utils@npm:2.0.0"
+  checksum: 532121efd2dd2272595580bca48859e404bdd4ed455a72a28432ba44868c38d0e64fac3026a8f82bf8563d2a18b32eb9a1d59e601a9da4e84ba4d45b922297f5
+  languageName: node
+  linkType: hard
+
 "natural-compare@npm:^1.4.0":
   version: 1.4.0
   resolution: "natural-compare@npm:1.4.0"
@@ -12126,6 +12169,15 @@ __metadata:
   dependencies:
     node-gyp: "npm:latest"
   checksum: 2369986bb0881ccd9ef6bacdf39550e07e089a9c8ede1cbc5fc7712d8e2faa4d50da0e487e333d4125f8c7a616c730131d1091676c9d499af1d74560756b4a18
+  languageName: node
+  linkType: hard
+
+"node-addon-api@npm:^4.3.0":
+  version: 4.3.0
+  resolution: "node-addon-api@npm:4.3.0"
+  dependencies:
+    node-gyp: latest
+  checksum: 3de396e23cc209f539c704583e8e99c148850226f6e389a641b92e8967953713228109f919765abc1f4355e801e8f41842f96210b8d61c7dcc10a477002dcf00
   languageName: node
   linkType: hard
 
@@ -13609,6 +13661,28 @@ __metadata:
   bin:
     prebuild-install: bin.js
   checksum: 543dadf8c60e004ae9529e6013ca0cbeac8ef38b5f5ba5518cb0b622fe7f8758b34e4b5cb1a791db3cdc9d2281766302df6088bd1a225f206925d6fee17d6c5c
+  languageName: node
+  linkType: hard
+
+"prebuild-install@npm:^7.1.3":
+  version: 7.1.3
+  resolution: "prebuild-install@npm:7.1.3"
+  dependencies:
+    detect-libc: ^2.0.0
+    expand-template: ^2.0.3
+    github-from-package: 0.0.0
+    minimist: ^1.2.3
+    mkdirp-classic: ^0.5.3
+    napi-build-utils: ^2.0.0
+    node-abi: ^3.3.0
+    pump: ^3.0.0
+    rc: ^1.2.7
+    simple-get: ^4.0.0
+    tar-fs: ^2.0.0
+    tunnel-agent: ^0.6.0
+  bin:
+    prebuild-install: bin.js
+  checksum: 300740ca415e9ddbf2bd363f1a6d2673cc11dd0665c5ec431bbb5bf024c2f13c56791fb939ce2b2a2c12f2d2a09c91316169e8063a80eb4482a44b8fe5b265e1
   languageName: node
   linkType: hard
 
