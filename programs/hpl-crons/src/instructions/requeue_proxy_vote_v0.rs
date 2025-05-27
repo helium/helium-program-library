@@ -22,7 +22,7 @@ pub fn handler(ctx: Context<RequeueProxyVoteV0>) -> Result<RunTaskReturnV0> {
         signer: VOTE_SERVICE_SIGNER,
       },
       crank_reward: None,
-      free_tasks: 1,
+      free_tasks: 2,
       description,
     }],
     accounts: vec![],

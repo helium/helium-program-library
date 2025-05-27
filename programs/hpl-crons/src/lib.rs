@@ -147,4 +147,11 @@ pub mod hpl_crons {
   ) -> Result<()> {
     add_wallet_to_entity_cron_v0::handler(ctx, args)
   }
+
+  pub fn requeue_relinquish_expired_vote_marker_v0(
+    ctx: Context<RequeueRelinquishExpiredVoteMarkerV0>,
+    args: RequeueRelinquishExpiredVoteMarkerArgsV0,
+  ) -> Result<tuktuk_program::RunTaskReturnV0> {
+    requeue_relinquish_expired_vote_marker_v0::handler(ctx, args)
+  }
 }

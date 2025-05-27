@@ -128,7 +128,7 @@ pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Re
         signer: VOTE_SERVICE_SIGNER,
       },
       crank_reward: None,
-      free_tasks: 1,
+      free_tasks: 2,
       id: args.free_task_id,
       description,
     },

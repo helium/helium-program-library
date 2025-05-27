@@ -15,6 +15,8 @@ import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal";
 import { init as initProposal } from "@helium/proposal-sdk";
 import fs from "fs";
 import { Program } from "@coral-xyz/anchor";
+import { StateController } from "@helium/modular-governance-idls/lib/types/state_controller";
+import { init as initStateController } from "@helium/state-controller-sdk";
 
 anchor.setProvider(anchor.AnchorProvider.local(SOLANA_URL));
 
@@ -41,7 +43,7 @@ export let heliumSubDaosProgram: Program<HeliumSubDaos>;
 export let tuktukProgram: Program<Tuktuk>;
 export let hplCronsProgram: Program<HplCrons>;
 export let proposalProgram: Program<Proposal>;
-
+export let stateControllerProgram: Program<StateController>;
 export async function getPrograms() {
   if (!voterStakeRegistryProgram) {
     voterStakeRegistryProgram = await init(provider);
@@ -57,5 +59,8 @@ export async function getPrograms() {
   }
   if (!proposalProgram) {
     proposalProgram = await initProposal(provider);
+  }
+  if (!stateControllerProgram) {
+    stateControllerProgram = await initStateController(provider);
   }
 }
