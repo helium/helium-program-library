@@ -522,12 +522,12 @@ server.post<{
     proposalAccount.proposalConfig
   );
   const resolutionSettingsAccount = await stateControllerProgram.account.resolutionSettingsV0.fetch(proposalConfig.stateController);
-  const endTs = // @ts-ignore
-    (proposal?.state.resolved
-      ? // @ts-ignore
-      new BN(proposal?.state.resolved.endTs)
-      : // @ts-ignore
-      new BN(proposal?.state.voting?.startTs).add(
+  const endTs =
+    (proposalAccount.state.resolved
+      ?
+      new BN(proposalAccount.state.resolved.endTs)
+      :
+      new BN(proposalAccount.state.voting!.startTs).add(
         resolutionSettingsAccount.settings.nodes.find(
           (node) => typeof node.offsetFromStartTs !== "undefined"
         )?.offsetFromStartTs?.offset ?? new BN(0)
