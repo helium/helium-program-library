@@ -44,6 +44,7 @@
     "@helium/organization-sdk": "^0.1.5",
     "@helium/proposal-sdk": "^0.1.5",
     "@helium/spl-utils": "^0.10.14",
+    "@helium/state-controller-sdk": "^0.1.5",
     "@helium/tuktuk-idls": "^0.0.8",
     "@helium/tuktuk-sdk": "^0.0.8",
     "@helium/voter-stake-registry-sdk": "^0.10.14",

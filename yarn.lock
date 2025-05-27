@@ -1303,6 +1303,7 @@ __metadata:
     "@helium/organization-sdk": ^0.1.5
     "@helium/proposal-sdk": ^0.1.5
     "@helium/spl-utils": ^0.10.14
+    "@helium/state-controller-sdk": ^0.1.5
     "@helium/tuktuk-idls": ^0.0.8
     "@helium/tuktuk-sdk": ^0.0.8
     "@helium/voter-stake-registry-sdk": ^0.10.14
@@ -1814,6 +1815,17 @@ __metadata:
     typescript: ^5.2.2
   languageName: unknown
   linkType: soft
+
+"@helium/state-controller-sdk@npm:^0.1.5":
+  version: 0.1.5
+  resolution: "@helium/state-controller-sdk@npm:0.1.5"
+  dependencies:
+    "@coral-xyz/anchor": ^0.31.0
+    "@helium/anchor-resolvers": ^0.10.0-alpha.6
+    "@helium/modular-governance-idls": ^0.1.5
+  checksum: e478caaea3898dbc971ad2455181255a6714d4e5a2c00c5c003fdcec5aa5d3381fdf282bf88d75e512a6b5e0d17486bd97fadd5371f2314c968b553c14291750
+  languageName: node
+  linkType: hard
 
 "@helium/state-controller-sdk@npm:^0.1.5-alpha.0":
   version: 0.1.5-alpha.0
