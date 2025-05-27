@@ -605,7 +605,7 @@ server.post<{
         SystemProgram.transfer({
           fromPubkey: pdaWallet,
           toPubkey: task,
-          lamports: taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
+          lamports: 2 * taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
         }),
         // Count as many votes as possible
         ...(
