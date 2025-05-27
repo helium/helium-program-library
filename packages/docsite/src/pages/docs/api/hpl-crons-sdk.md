@@ -393,6 +393,21 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### requeue_relinquish_expired_vote_marker_v0
+
+#### Accounts
+
+| Name     | Mutability | Signer | Docs |
+| -------- | ---------- | ------ | ---- |
+| marker   | immut      | no     |      |
+| position | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### requeue_wallet_claim_v0
 
 #### Accounts
@@ -805,6 +820,12 @@ undefined
 | Field | Type |
 | ----- | ---- |
 | index | u32  |
+
+### RequeueRelinquishExpiredVoteMarkerArgsV0
+
+| Field      | Type |
+| ---------- | ---- |
+| trigger_ts | i64  |
 
 ### RequeueWalletClaimArgsV0
 
