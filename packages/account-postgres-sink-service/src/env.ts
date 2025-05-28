@@ -39,3 +39,6 @@ export const KAFKA_PASSWORD = process.env.KAFKA_PASSWORD?.replace(
   /(\r\n|\n|\r)/gm,
   ""
 );
+
+export const INTEGRITY_CHECK_REFRESH_THRESHOLD_MS =
+  Number(process.env.INTEGRITY_CHECK_RERUN_THRESHOLD_MS) || 5 * 60 * 1000; // 5 minutes default

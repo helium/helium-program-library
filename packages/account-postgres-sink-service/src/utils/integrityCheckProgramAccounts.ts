@@ -6,7 +6,7 @@ import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
 import pLimit from "p-limit";
 import { Sequelize, Transaction } from "sequelize";
-import { SOLANA_URL } from "../env";
+import { SOLANA_URL, INTEGRITY_CHECK_REFRESH_THRESHOLD_MS } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import { chunks } from "./chunks";
@@ -65,6 +65,9 @@ export const integrityCheckProgramAccounts = async ({
 
   const performIntegrityCheck = async () => {
     const snapshotTime = new Date();
+    const refreshThreshold = new Date(
+      snapshotTime.getTime() - INTEGRITY_CHECK_REFRESH_THRESHOLD_MS
+    );
     const t = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
     });
@@ -113,10 +116,6 @@ export const integrityCheckProgramAccounts = async ({
         currentValues: null | { [key: string]: any };
         newValues: { [key: string]: any };
       }[] = [];
-
-      if (!blockTime24HoursAgo) {
-        throw new Error("Unable to get blocktime from 24 hours ago");
-      }
 
       limiter = pLimit(10);
       const parsedTransactions = (
@@ -266,6 +265,10 @@ export const integrityCheckProgramAccounts = async ({
                     ? new Date(existing.dataValues.refreshed_at)
                     : null;
 
+                  if (refreshedAt && refreshedAt > refreshThreshold) {
+                    return;
+                  }
+
                   const existingData = existing?.dataValues;
                   const existingClean = _omit(existingData || {}, OMIT_KEYS);
                   const sanitizedClean = _omit(sanitized, OMIT_KEYS);
@@ -274,6 +277,23 @@ export const integrityCheckProgramAccounts = async ({
                     (!refreshedAt || refreshedAt < snapshotTime);
 
                   if (shouldUpdate) {
+                    const currentRecord = await model.findOne({
+                      where: { address: acc.pubkey },
+                      transaction: t,
+                    });
+
+                    const currentRefreshedAt = currentRecord?.dataValues
+                      .refreshed_at
+                      ? new Date(currentRecord.dataValues.refreshed_at)
+                      : null;
+
+                    if (
+                      currentRefreshedAt &&
+                      currentRefreshedAt > snapshotTime
+                    ) {
+                      return;
+                    }
+
                     const changedFields = existing
                       ? Object.entries(sanitizedClean)
                           .filter(
