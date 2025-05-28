@@ -119,27 +119,6 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
-### initialize_shared_merkle_v0
-
-#### Accounts
-
-| Name                | Mutability | Signer | Docs |
-| ------------------- | ---------- | ------ | ---- |
-| payer               | immut      | no     |      |
-| shared_merkle       | immut      | no     |      |
-| tree_authority      | immut      | no     |      |
-| merkle_tree         | immut      | no     |      |
-| system_program      | immut      | no     |      |
-| log_wrapper         | immut      | no     |      |
-| bubblegum_program   | immut      | no     |      |
-| compression_program | immut      | no     |      |
-
-#### Args
-
-| Name | Type            | Docs |
-| ---- | --------------- | ---- |
-| args | [object Object] |      |
-
 ### issue_data_only_entity_v0
 
 #### Accounts
@@ -283,7 +262,6 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | bubblegum_program         | immut      | no     |      |
 | compression_program       | immut      | no     |      |
 | system_program            | immut      | no     |      |
-| shared_merkle             | immut      | no     |      |
 
 #### Args
 
@@ -528,27 +506,6 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | system_program             | immut      | no     |      |
 | token_program              | immut      | no     |      |
 | rent                       | immut      | no     |      |
-
-#### Args
-
-| Name | Type | Docs |
-| ---- | ---- | ---- |
-
-### swap_shared_merkle_tree_v0
-
-#### Accounts
-
-| Name                | Mutability | Signer | Docs |
-| ------------------- | ---------- | ------ | ---- |
-| payer               | immut      | no     |      |
-| shared_merkle       | immut      | no     |      |
-| tree_authority      | immut      | no     |      |
-| new_tree_authority  | immut      | no     |      |
-| new_merkle_tree     | immut      | no     |      |
-| log_wrapper         | immut      | no     |      |
-| system_program      | immut      | no     |      |
-| bubblegum_program   | immut      | no     |      |
-| compression_program | immut      | no     |      |
 
 #### Args
 
@@ -809,10 +766,6 @@ undefined
 
 undefined
 
-### SharedMerkleV0
-
-undefined
-
 ### SubDaoV0
 
 undefined
@@ -953,12 +906,6 @@ undefined
 | symbol              | string          |
 | settings            | [object Object] |
 | staking_requirement | u64             |
-
-### InitializeSharedMerkleArgsV0
-
-| Field      | Type |
-| ---------- | ---- |
-| proof_size | u8   |
 
 ### IotHotspotInfoV0
 
@@ -1201,15 +1148,6 @@ undefined
 | --------------- | ---- |
 | max_depth       | u32  |
 | max_buffer_size | u32  |
-
-### SharedMerkleV0
-
-| Field          | Type   |
-| -------------- | ------ |
-| proof_size     | u8     |
-| price_per_mint | u64    |
-| merkle_tree    | pubkey |
-| bump_seed      | u8     |
 
 ### SubDaoV0
 
