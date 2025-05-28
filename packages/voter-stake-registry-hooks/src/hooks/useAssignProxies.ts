@@ -127,7 +127,9 @@ export const useAssignProxies = () => {
           const subInstructions: TransactionInstruction[] = [];
           if (
             proxyAssignment &&
-            !proxyAssignment.nextVoter?.equals(PublicKey.default)
+            !proxyAssignment.nextVoter?.equals(PublicKey.default) &&
+            // Only unassign if the proxy is actually changing
+            !proxyAssignment.nextVoter.equals(recipient)
           ) {
             const toUndelegate =
               await voteService.getProxyAssignmentsForPosition(

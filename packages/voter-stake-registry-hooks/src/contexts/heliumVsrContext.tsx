@@ -5,7 +5,7 @@ import {
   delegatedPositionKey,
 } from "@helium/helium-sub-daos-sdk";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
-import { init as initNftProxy } from "@helium/nft-proxy-sdk";
+import { init as initNftProxy, proxyConfigKey } from "@helium/nft-proxy-sdk";
 import { truthy } from "@helium/spl-utils";
 import { VoteService, init } from "@helium/voter-stake-registry-sdk";
 import { Connection, PublicKey } from "@solana/web3.js";
@@ -18,6 +18,7 @@ import { useRegistrar } from "../hooks/useRegistrar";
 import { PositionWithMeta, ProxyAssignmentV0 } from "../sdk/types";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
 import { useRegistrarForMint } from "../hooks/useRegistrarForMint";
+import { useProxyConfig } from "../hooks/useProxyConfig";
 
 type Registrar = IdlAccounts<VoterStakeRegistry>["registrar"];
 
@@ -138,6 +139,8 @@ export const HeliumVsrStateProvider: React.FC<{
   const { accounts: delegatedAccounts, loading: loadingDel } =
     useDelegatedPositions(delegatedPositionKeys);
 
+  const { info: proxyConfig } = useProxyConfig(registrar?.proxyConfig);
+
   const proxyAccountsByAsset = useMemo(() => {
     return proxyAccounts?.reduce((acc, prox) => {
       acc[prox.asset.toBase58()] = prox;
@@ -236,6 +239,22 @@ export const HeliumVsrStateProvider: React.FC<{
 
             votingPower = votingPower.add(posVotingPower);
 
+            const proxyExpiration = proxy?.expirationTs;
+            const delegationExpiration = delegatedAccounts?.[
+              idx
+            ]?.info?.expirationTs;
+            const isProxyExpired = proxyExpiration?.lt(new BN(now));
+            const isDelegationExpired = delegationExpiration?.lt(new BN(now));
+            const currentSeason = proxyConfig?.seasons
+              ?.reverse()
+              ?.find((season) => season.start.lte(new BN(now)));
+
+            const isProxyRenewable =
+              proxyExpiration && currentSeason?.end.gt(proxyExpiration);
+            const isDelegationRenewable =
+              delegationExpiration &&
+              currentSeason?.end.gt(delegationExpiration);
+
             return {
               ...position.info,
               pubkey: position?.publicKey,
@@ -247,6 +266,10 @@ export const HeliumVsrStateProvider: React.FC<{
               votingMint: mintCfgs[position.info.votingMintConfigIdx],
               isProxiedToMe,
               proxy,
+              isProxyExpired,
+              isDelegationExpired,
+              isProxyRenewable,
+              isDelegationRenewable,
             } as PositionWithMeta;
           }
         })
