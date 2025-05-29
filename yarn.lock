@@ -754,6 +754,7 @@ __metadata:
     "@types/lodash": ^4.14.195
     "@types/node": ^18.11.11
     "@types/pg": ^8.6.6
+    "@types/stream-json": ^1.7.8
     "@types/yargs": ^17.0.24
     async-retry: ^1.3.3
     aws-sdk: ^2.1344.0
@@ -779,6 +780,7 @@ __metadata:
     pg: ^8.9.0
     prom-client: ^14.2.0
     sequelize: ^6.28.0
+    stream-json: ^1.9.1
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
     ts-node-dev: ^2.0.0
@@ -4794,6 +4796,25 @@ __metadata:
     "@types/mime": "npm:*"
     "@types/node": "npm:*"
   checksum: 15c261dbfc57890f7cc17c04d5b22b418dfa0330c912b46c5d8ae2064da5d6f844ef7f41b63c7f4bbf07675e97ebe6ac804b032635ec742ae45d6f1274259b3e
+  languageName: node
+  linkType: hard
+
+"@types/stream-chain@npm:*":
+  version: 2.1.0
+  resolution: "@types/stream-chain@npm:2.1.0"
+  dependencies:
+    "@types/node": "*"
+  checksum: 0cc764e01abb0d86725081206751f1dd1c52ba147c2d15b03698aa373ad06ff0085afd577b92927347d288539803af78166314a4f50c2d17d275cb911ee92a29
+  languageName: node
+  linkType: hard
+
+"@types/stream-json@npm:^1.7.8":
+  version: 1.7.8
+  resolution: "@types/stream-json@npm:1.7.8"
+  dependencies:
+    "@types/node": "*"
+    "@types/stream-chain": "*"
+  checksum: c36bb76343199bdbc290ca99afa951da0a970b42f2020ec0f1de2224f723f0324e6edbfc156e9b27eb5c60c1153849f8ce5a942979588b7a78401832a48a061d
   languageName: node
   linkType: hard
 
@@ -15587,6 +15608,22 @@ __metadata:
     es-errors: ^1.3.0
     internal-slot: ^1.1.0
   checksum: be944489d8829fb3bdec1a1cc4a2142c6b6eb317305eeace1ece978d286d6997778afa1ae8cb3bd70e2b274b9aa8c69f93febb1e15b94b1359b11058f9d3c3a1
+  languageName: node
+  linkType: hard
+
+"stream-chain@npm:^2.2.5":
+  version: 2.2.5
+  resolution: "stream-chain@npm:2.2.5"
+  checksum: c83cbf504bd11e2bcbe761a92801295b3decac7ffa4092ceffca2eb1b5d0763bcc511fa22cd8044e8a18c21ca66794fd10c8d9cd1292a3e6c0d83a4194c6b8ed
+  languageName: node
+  linkType: hard
+
+"stream-json@npm:^1.9.1":
+  version: 1.9.1
+  resolution: "stream-json@npm:1.9.1"
+  dependencies:
+    stream-chain: ^2.2.5
+  checksum: 2ebf0648f9ed82ee79727a9a47805231a70d5032e0c21cee3e05cd3c449d3ce49c72b371555447eeef55904bae22ac64be8ae6086fc6cce0b83b3aa617736b64
   languageName: node
   linkType: hard
 

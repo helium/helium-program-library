@@ -6,14 +6,16 @@ import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
-import { chunks } from "./chunks";
-import database, { limit } from "./database";
+import { database, limit } from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
 import { lowerFirstChar } from "@helium/spl-utils";
 import { decompress } from "@mongodb-js/zstd";
 import axios from "axios";
+import { parser } from "stream-json";
+import { pick } from "stream-json/filters/Pick";
+import { streamArray } from "stream-json/streamers/StreamArray";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
@@ -63,6 +65,31 @@ export const upsertProgramAccounts = async ({
     throw e;
   }
 
+  const streamAccounts = async (
+    stream: NodeJS.ReadableStream,
+    onAccount: (account: any) => Promise<void>
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      const pipeline = stream
+        .pipe(parser())
+        .pipe(pick({ filter: "result" }))
+        .pipe(streamArray());
+
+      pipeline.on("data", async ({ value }) => {
+        pipeline.pause();
+        try {
+          await onAccount(value);
+          pipeline.resume();
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      pipeline.on("end", () => resolve());
+      pipeline.on("error", (err: any) => reject(err));
+    });
+  };
+
   const processProgramAccounts = async (
     connection: anchor.web3.Connection,
     programId: anchor.web3.PublicKey,
@@ -78,7 +105,7 @@ export const upsertProgramAccounts = async ({
     let processedCount = 0;
     console.log(`Processing ${accountType} accounts`);
 
-    let accounts = await retry(
+    await retry(
       async () => {
         try {
           const result = await axios.post(
@@ -97,11 +124,51 @@ export const upsertProgramAccounts = async ({
               ],
             },
             {
-              timeout: 60000,
+              responseType: "stream",
             }
           );
 
-          return result.data.result as anchor.web3.GetProgramAccountsResponse;
+          let batch: any[] = [];
+          const batchPromises: Promise<void>[] = [];
+
+          await streamAccounts(result.data, async (account) => {
+            batch.push(account);
+            if (batch.length >= batchSize) {
+              const currentBatch = batch;
+              batch = [];
+              batchPromises.push(
+                limit(async () => {
+                  const t = await sequelize.transaction({
+                    isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+                  });
+                  await processChunk(currentBatch, t);
+                  await t.commit();
+                  processedCount += currentBatch.length;
+                  console.log(
+                    `Processing ${currentBatch.length} ${accountType} accounts`
+                  );
+                })
+              );
+            }
+          });
+
+          if (batch.length > 0) {
+            batchPromises.push(
+              limit(async () => {
+                const t = await sequelize.transaction({
+                  isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+                });
+                await processChunk(batch, t);
+                await t.commit();
+                processedCount += batch.length;
+                console.log(
+                  `Processing ${batch.length} ${accountType} accounts`
+                );
+              })
+            );
+          }
+
+          await Promise.all(batchPromises);
         } catch (err: any) {
           console.error(`RPC call error for ${accountType}:`, err.message);
           throw err;
@@ -118,30 +185,6 @@ export const upsertProgramAccounts = async ({
           );
         },
       }
-    );
-
-    if (!Array.isArray(accounts) || accounts.length === 0) {
-      console.log(`No accounts found for ${accountType}`);
-      return;
-    }
-
-    await Promise.all(
-      chunks(accounts, batchSize).map((chunk) =>
-        limit(async () => {
-          try {
-            const t = await sequelize.transaction({
-              isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-            });
-            await processChunk(chunk, t);
-            await t.commit();
-            processedCount += chunk.length;
-            console.log(`Processing ${chunk.length} ${accountType} accounts`);
-          } catch (err) {
-            console.error(`Error processing chunk:`, err);
-            throw err;
-          }
-        })
-      )
     );
 
     const duration = (Date.now() - startTime) / 1000;
