@@ -250,9 +250,10 @@ export const HeliumVsrStateProvider: React.FC<{
               ?.find((season) => season.start.lte(new BN(now)));
 
             const isProxyRenewable =
-              proxyExpiration && currentSeason?.end.gt(proxyExpiration);
+              proxyExpiration && !isProxyExpired && currentSeason?.end.gt(proxyExpiration);
             const isDelegationRenewable =
               delegationExpiration &&
+              !isDelegationExpired &&
               currentSeason?.end.gt(delegationExpiration);
 
             return {
@@ -266,8 +267,8 @@ export const HeliumVsrStateProvider: React.FC<{
               votingMint: mintCfgs[position.info.votingMintConfigIdx],
               isProxiedToMe,
               proxy,
-              isProxyExpired,
-              isDelegationExpired,
+              isProxyExpired: true,
+              isDelegationExpired: true,
               isProxyRenewable,
               isDelegationRenewable,
             } as PositionWithMeta;
