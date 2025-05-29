@@ -125,6 +125,7 @@ export const upsertProgramAccounts = async ({
             },
             {
               responseType: "stream",
+              timeout: 60000,
             }
           );
 
