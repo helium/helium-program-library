@@ -661,7 +661,7 @@ export class OracleServer {
 
       const ata = getAssociatedTokenAddressSync(
         HNT_MINT,
-        recipientAcc?.destination || asset!.ownership.owner,
+        !recipientAcc || recipientAcc.destination.equals(PublicKey.default) ? asset!.ownership.owner : recipientAcc?.destination,
         true
       );
       const ataExists = !!(await this.ldProgram.provider.connection.getAccountInfo(
