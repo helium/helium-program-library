@@ -267,8 +267,8 @@ export const HeliumVsrStateProvider: React.FC<{
               votingMint: mintCfgs[position.info.votingMintConfigIdx],
               isProxiedToMe,
               proxy,
-              isProxyExpired: true,
-              isDelegationExpired: true,
+              isProxyExpired,
+              isDelegationExpired,
               isProxyRenewable,
               isDelegationRenewable,
             } as PositionWithMeta;
