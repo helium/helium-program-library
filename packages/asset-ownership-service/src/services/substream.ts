@@ -45,6 +45,11 @@ const RELEVANT_INSTRUCTIONS_REGEX = new RegExp(
   "i"
 );
 
+type TreeUpdateInstructionName =
+  | "update_maker_tree_v0"
+  | "update_carrier_tree_v0"
+  | "update_data_only_tree_v0";
+
 interface IOutputTransaction {
   message: {
     accountKeys: string[];
@@ -296,7 +301,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
                         case "update_carrier_tree_v0":
                         case "update_data_only_tree_v0": {
                           await handleTreeUpdateInstruction({
-                            instructionName: decodedInstruction.name,
+                            instructionName:
+                              decodedInstruction.name as TreeUpdateInstructionName,
                             accountMap,
                             cursor,
                             blockHeight,
@@ -411,7 +417,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
     cursorManager,
     database,
   }: {
-    instructionName: string;
+    instructionName: TreeUpdateInstructionName;
     accountMap: Record<string, any>;
     cursor: string;
     blockHeight: string;
