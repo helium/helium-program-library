@@ -57,9 +57,9 @@ export async function convertSubstreamTransaction(txInfo: any): Promise<
   ).toString("hex");
 
   const accountKeys = message.accountKeys.map(decodeBase64ToPublicKey);
-  accountKeys.forEach((key, idx) => {
+  accountKeys.forEach((key: PublicKey, idx: number) => {
     if (!key) {
-      throw new Error(`accountKeys[${idx}] is undefined or invalide`);
+      throw new Error(`accountKeys[${idx}] is undefined or invalid`);
     }
   });
 
