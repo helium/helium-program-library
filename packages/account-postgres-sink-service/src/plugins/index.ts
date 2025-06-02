@@ -1,8 +1,9 @@
 import { IConfig, IInitedPlugin, IPluginConfig } from "../types";
 import { truthy } from "../utils/truthy";
 import { ExtractHexLocationPlugin } from "./extractHexLocation";
+import { EncodeEntityKeyPlugin } from "./encodeEntityKey";
 
-export const Plugins = [ExtractHexLocationPlugin];
+export const Plugins = [ExtractHexLocationPlugin, EncodeEntityKeyPlugin];
 
 export const initPlugins = async (pluginConfigs: IPluginConfig[] = []) =>
   (
