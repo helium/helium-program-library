@@ -1,6 +1,6 @@
 import { Transaction } from "sequelize";
 
-type Plugins = "ExtractHexLocation";
+type Plugins = "ExtractHexLocation" | "EncodeEntityKey";
 type Crons = "refresh-accounts" | "integrity-check";
 
 export interface IPluginConfig {
@@ -34,6 +34,7 @@ export interface IConfig {
 export interface IInitedPlugin {
   updateOnDuplicateFields?: string[];
   addFields?: (schema: { [key: string]: any }, accountName: string) => void;
+  addIndexes?: (schema: { [key: string]: any }, accountName: string) => void;
   processAccount: (account: any, t?: Transaction) => Promise<any>;
 }
 

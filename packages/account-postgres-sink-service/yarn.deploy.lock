@@ -222,6 +222,7 @@ __metadata:
     "@triton-one/yellowstone-grpc": ^0.4.0
     "@types/async-retry": ^1.4.8
     "@types/bn.js": ^5.1.1
+    "@types/bs58": ^4.0.1
     "@types/cron": ^2.4.0
     "@types/deep-equal": ^1.0.4
     "@types/lodash": ^4.14.195
@@ -715,6 +716,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/bs58@npm:^4.0.1":
+  version: 4.0.1
+  resolution: "@types/bs58@npm:4.0.1"
+  dependencies:
+    base-x: "npm:^3.0.6"
+  checksum: 5063fed6bb3816f28eef3e689a05f8f85d03ce7c2e3ceefe77c349ed147023999eb024e863bf3fa81ba2bded690e5296efe4d34864c875097bd261614e37f786
+  languageName: node
+  linkType: hard
+
 "@types/connect@npm:^3.4.33":
   version: 3.4.35
   resolution: "@types/connect@npm:3.4.35"
@@ -1176,7 +1186,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"base-x@npm:^3.0.2":
+"base-x@npm:^3.0.2, base-x@npm:^3.0.6":
   version: 3.0.9
   resolution: "base-x@npm:3.0.9"
   dependencies:

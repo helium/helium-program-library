@@ -749,6 +749,7 @@ __metadata:
     "@triton-one/yellowstone-grpc": ^0.4.0
     "@types/async-retry": ^1.4.8
     "@types/bn.js": ^5.1.1
+    "@types/bs58": ^4.0.1
     "@types/cron": ^2.4.0
     "@types/deep-equal": ^1.0.4
     "@types/lodash": ^4.14.195

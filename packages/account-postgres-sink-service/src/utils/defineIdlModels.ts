@@ -10,6 +10,7 @@ import {
   IdlTypeDef,
   IdlTypeDefTyStruct,
 } from "@coral-xyz/anchor/dist/cjs/idl";
+import { omit, pick } from "lodash";
 
 const TypeMap = new Map<string, any>([
   ["string", DataTypes.STRING],
@@ -57,6 +58,11 @@ const determineType = (type: string | object): any => {
   return DataTypes.JSONB;
 };
 
+const shouldEnableCreatedAt = (schema: any, accName: string) => {
+  const accSchema = schema[accName];
+  return !accSchema || (!accSchema.createdAt && !accSchema.created_at);
+};
+
 export const defineIdlModels = async ({
   idl,
   accounts,
@@ -84,9 +90,10 @@ export const defineIdlModels = async ({
         }
       }
 
-      (await initPlugins(accConfig?.plugins)).map(
-        (plugin) => plugin?.addFields && plugin.addFields(schema, acc.name)
-      );
+      (await initPlugins(accConfig?.plugins)).map((plugin) => {
+        if (plugin?.addFields) plugin.addFields(schema, acc.name);
+        if (plugin?.addIndexes) plugin.addIndexes(schema, acc.name);
+      });
 
       if (accConfig.schema) {
         await sequelize.createSchema(accConfig.schema, {});
@@ -99,7 +106,7 @@ export const defineIdlModels = async ({
             type: DataTypes.STRING,
             primaryKey: true,
           },
-          ...schema[acc.name],
+          ...omit(schema[acc.name] || {}, ["indexes"]),
           refreshed_at: {
             type: DataTypes.DATE,
           },
@@ -109,9 +116,8 @@ export const defineIdlModels = async ({
           updatedAt: false,
           schema: underscore(accConfig.schema || "public"),
           tableName: underscore(accConfig.table || acc.name),
-          createdAt:
-            !schema[acc.name] ||
-            (!schema[acc.name].createdAt && !schema[acc.name].created_at),
+          createdAt: shouldEnableCreatedAt(schema, acc.name),
+          ...pick(schema[acc.name], "indexes"),
         }
       );
 
