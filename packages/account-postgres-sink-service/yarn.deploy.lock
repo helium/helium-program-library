@@ -222,7 +222,7 @@ __metadata:
     "@triton-one/yellowstone-grpc": ^0.4.0
     "@types/async-retry": ^1.4.8
     "@types/bn.js": ^5.1.1
-    "@types/bs58": ^5.0.0
+    "@types/bs58": ^4.0.1
     "@types/cron": ^2.4.0
     "@types/deep-equal": ^1.0.4
     "@types/lodash": ^4.14.195
@@ -716,12 +716,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/bs58@npm:^5.0.0":
-  version: 5.0.0
-  resolution: "@types/bs58@npm:5.0.0"
+"@types/bs58@npm:^4.0.1":
+  version: 4.0.1
+  resolution: "@types/bs58@npm:4.0.1"
   dependencies:
-    bs58: "*"
-  checksum: 5b33ed60d8fe5541cfe6263f3e15e1a705c299f6831712b063cb7f0ad5bf1bbbf6db13b88c16b470c84f20b631b8bdd939414101a6a903ad1231b88d62d987b4
+    base-x: "npm:^3.0.6"
+  checksum: 5063fed6bb3816f28eef3e689a05f8f85d03ce7c2e3ceefe77c349ed147023999eb024e863bf3fa81ba2bded690e5296efe4d34864c875097bd261614e37f786
   languageName: node
   linkType: hard
 
@@ -1186,7 +1186,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"base-x@npm:^3.0.2":
+"base-x@npm:^3.0.2, base-x@npm:^3.0.6":
   version: 3.0.9
   resolution: "base-x@npm:3.0.9"
   dependencies:
@@ -1199,13 +1199,6 @@ __metadata:
   version: 4.0.0
   resolution: "base-x@npm:4.0.0"
   checksum: b25db9e07eb1998472a20557c7f00c797dc0595f79df95155ab74274e7fa98b9f2659b3ee547ac8773666b7f69540656793aeb97ad2b1ceccdb6fa5faaf69ac0
-  languageName: node
-  linkType: hard
-
-"base-x@npm:^5.0.0":
-  version: 5.0.1
-  resolution: "base-x@npm:5.0.1"
-  checksum: 6e4f847ef842e0a71c6b6020a6ec482a2a5e727f5a98534dbfd5d5a4e8afbc0d1bdf1fd57174b3f0455d107f10a932c3c7710bec07e2878f80178607f8f605c8
   languageName: node
   linkType: hard
 
@@ -1334,15 +1327,6 @@ __metadata:
   dependencies:
     fill-range: "npm:^7.0.1"
   checksum: e2a8e769a863f3d4ee887b5fe21f63193a891c68b612ddb4b68d82d1b5f3ff9073af066c343e9867a393fe4c2555dcb33e89b937195feb9c1613d259edfcd459
-  languageName: node
-  linkType: hard
-
-"bs58@npm:*":
-  version: 6.0.0
-  resolution: "bs58@npm:6.0.0"
-  dependencies:
-    base-x: ^5.0.0
-  checksum: 820334f9513bba6195136dfc9dfbd1f5aded6c7864639f3ee7b63c2d9d6f9f2813b9949b1f6beb9c161237be2a461097444c2ff587c8c3b824fe18878fa22448
   languageName: node
   linkType: hard
 

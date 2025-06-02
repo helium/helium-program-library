@@ -74,7 +74,7 @@
   "devDependencies": {
     "@types/async-retry": "^1.4.8",
     "@types/bn.js": "^5.1.1",
-    "@types/bs58": "^5.0.0",
+    "@types/bs58": "^4.0.1",
     "@types/cron": "^2.4.0",
     "@types/lodash": "^4.14.195",
     "@types/node": "^18.11.11",
