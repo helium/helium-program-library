@@ -50,7 +50,7 @@ const getScheduleCronString = (schedule: Schedule) => {
       return `${utcSeconds} ${utcMinutes} ${utcHours} * * *`
     case 'weekly':
       // Run at the same hour and minute on the same day of week in UTC
-      return `${utcSeconds} ${utcMinutes} ${utcHours} * * ${utcDayOfWeek}`
+      return `${utcSeconds} ${utcMinutes} ${utcHours} * * ${utcDayOfWeek + 1}`
     case 'monthly':
       // Run at the same hour and minute on the same day of month in UTC
       return `${utcSeconds} ${utcMinutes} ${utcHours} ${utcDayOfMonth} * *`
