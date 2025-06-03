@@ -271,10 +271,20 @@ export class PgDatabase implements Database {
             attributes: [],
             include: [
               {
-                model: AssetOwner,
+                model: Recipient,
                 required: true,
                 attributes: [],
-                where: { owner },
+                where: {
+                  lazyDistributor: HNT_LAZY_DISTRIBUTOR.toBase58(),
+                },
+                include: [
+                  {
+                    model: AssetOwner,
+                    required: true,
+                    attributes: [],
+                    where: { owner },
+                  },
+                ],
               },
             ],
           },
