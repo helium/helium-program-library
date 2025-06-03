@@ -262,53 +262,75 @@ export class PgDatabase implements Database {
   }
 
   async getCurrentRewardsByOwner(owner: string) {
-    const rewards = await Reward.findAll({
-      include: [
-        {
-          model: KeyToAsset,
-          required: true,
-          attributes: [],
-          include: [
-            {
-              model: AssetOwner,
-              required: true,
-              attributes: [],
-              where: { owner },
-            },
-          ],
-        },
-      ],
-      attributes: [[sequelize.fn("SUM", sequelize.col("rewards")), "rewards"]],
-      raw: true,
-    });
+    try {
+      const rewards = await Reward.findAll({
+        include: [
+          {
+            model: KeyToAsset,
+            required: true,
+            attributes: [],
+            include: [
+              {
+                model: AssetOwner,
+                required: true,
+                attributes: [],
+                where: { owner },
+              },
+            ],
+          },
+        ],
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
+        ],
+        raw: true,
+      });
 
-    return rewards[0].rewards?.toString() || "0";
+      return rewards[0].rewards?.toString() || "0";
+    } catch (err: any) {
+      if (err?.parent?.code === "42P01") {
+        console.warn("Table missing for getCurrentRewardsByOwner, returning 0");
+        return "0";
+      }
+      throw err;
+    }
   }
 
   async getCurrentRewardsByDestination(destination: string) {
-    const rewards = await Reward.findAll({
-      include: [
-        {
-          model: KeyToAsset,
-          required: true,
-          attributes: [],
-          include: [
-            {
-              model: Recipient,
-              required: true,
-              attributes: [],
-              where: {
-                destination,
-                lazyDistributor: HNT_LAZY_DISTRIBUTOR.toBase58(),
+    try {
+      const rewards = await Reward.findAll({
+        include: [
+          {
+            model: KeyToAsset,
+            required: true,
+            attributes: [],
+            include: [
+              {
+                model: Recipient,
+                required: true,
+                attributes: [],
+                where: {
+                  destination,
+                  lazyDistributor: HNT_LAZY_DISTRIBUTOR.toBase58(),
+                },
               },
-            },
-          ],
-        },
-      ],
-      attributes: [[sequelize.fn("SUM", sequelize.col("rewards")), "rewards"]],
-      raw: true,
-    });
+            ],
+          },
+        ],
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
+        ],
+        raw: true,
+      });
 
-    return rewards[0].rewards?.toString() || "0";
+      return rewards[0].rewards?.toString() || "0";
+    } catch (err: any) {
+      if (err?.parent?.code === "42P01") {
+        console.warn(
+          "Table missing for getCurrentRewardsByDestination, returning 0"
+        );
+        return "0";
+      }
+      throw err;
+    }
   }
 }
