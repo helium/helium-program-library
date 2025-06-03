@@ -346,14 +346,15 @@ export async function formBulkTransactions({
     assetEndpoint || provider.connection.rpcEndpoint,
     assets
   );
-  const willPay = skipOracleSign || (await axios.get(
-    `${lazyDistributorAcc.oracles[0].url}/will-pay-recipient`
-  )).data.willPay;
+  const willPay =
+    skipOracleSign ||
+    (await axios.get(`${lazyDistributorAcc.oracles[0].url}/will-pay-recipient`))
+      .data.willPay;
   let ixsPerAsset = await Promise.all(
     recipientAccs.map(async (recipientAcc, idx) => {
       if (!recipientAcc) {
         return [
-          await(
+          await (
             await initializeCompressionRecipient({
               program: lazyDistributorProgram,
               assetId: assets![idx],

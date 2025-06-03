@@ -25,7 +25,14 @@ import {
   RecipientV0,
   RewardableEntity,
 } from "./database";
-import { Reward, sequelize, WalletClaimJob } from "./model";
+import {
+  AssetOwner,
+  KeyToAsset,
+  Recipient,
+  Reward,
+  sequelize,
+  WalletClaimJob,
+} from "./model";
 
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
@@ -252,5 +259,56 @@ export class PgDatabase implements Database {
     const reward = (await Reward.findByPk(entityKeyStr)) as Reward;
 
     return new BN(reward?.rewards).toString() || "0";
+  }
+
+  async getCurrentRewardsByOwner(owner: string) {
+    const rewards = await Reward.findAll({
+      include: [
+        {
+          model: KeyToAsset,
+          required: true,
+          attributes: [],
+          include: [
+            {
+              model: AssetOwner,
+              required: true,
+              attributes: [],
+              where: { owner },
+            },
+          ],
+        },
+      ],
+      attributes: [[sequelize.fn("SUM", sequelize.col("rewards")), "rewards"]],
+      raw: true,
+    });
+
+    return rewards[0].rewards?.toString() || "0";
+  }
+
+  async getCurrentRewardsByDestination(destination: string) {
+    const rewards = await Reward.findAll({
+      include: [
+        {
+          model: KeyToAsset,
+          required: true,
+          attributes: [],
+          include: [
+            {
+              model: Recipient,
+              required: true,
+              attributes: [],
+              where: {
+                destination,
+                lazyDistributor: HNT_LAZY_DISTRIBUTOR.toBase58(),
+              },
+            },
+          ],
+        },
+      ],
+      attributes: [[sequelize.fn("SUM", sequelize.col("rewards")), "rewards"]],
+      raw: true,
+    });
+
+    return rewards[0].rewards?.toString() || "0";
   }
 }

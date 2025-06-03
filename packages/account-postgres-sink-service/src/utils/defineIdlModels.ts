@@ -141,7 +141,7 @@ export const defineIdlModels = async ({
         !existingColumns.length ||
         !columns.every((col) => existingColumns.includes(col))
       ) {
-        model.sync({ alter: true });
+        await model.sync({ alter: true });
       }
     }
   }
