@@ -3,6 +3,7 @@ import {
   PROGRAM_ID,
   delegatedPositionKey,
   init,
+  subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { HNT_MINT, sendInstructions } from "@helium/spl-utils";
 import { init as initHplCrons } from "@helium/hpl-crons-sdk";
@@ -26,6 +27,9 @@ import {
 import { useDelegatedPosition } from "./useDelegatedPosition";
 import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
 import { PREPAID_TX_FEES, usePositionFees } from "./usePositionFees";
+import { useRegistrar } from "./useRegistrar";
+import { useProxyConfig } from "./useProxyConfig";
+import { BN } from "@coral-xyz/anchor";
 
 export const useDelegatePosition = ({
   automationEnabled = false,
@@ -48,6 +52,8 @@ export const useDelegatePosition = ({
     useDelegationClaimBot(delegationClaimBotK);
   const { info: delegatedPositionAcc } = useDelegatedPosition(delegatedPosKey);
   const { info: taskQueue } = useTaskQueue(TASK_QUEUE);
+  const { info: registrar } = useRegistrar(position.registrar);
+  const { info: proxyConfig } = useProxyConfig(registrar?.proxyConfig);
 
   const { rentFee, prepaidTxFees, insufficientBalance } = usePositionFees({
     automationEnabled,
@@ -103,6 +109,38 @@ export const useDelegatePosition = ({
                 .accountsPartial({
                   position: position.pubkey,
                   subDao: subDao.pubkey,
+                })
+                .instruction()
+            );
+          } else if (position.isDelegated && position.isDelegationRenewable) {
+            const delegatedPosKey = delegatedPositionKey(position.pubkey)[0];
+            const delegatedPosAcc =
+              await hsdProgram.account.delegatedPositionV0.fetch(delegatedPosKey);
+            const now = new BN(Date.now() / 1000);
+            const newExpirationTs = proxyConfig?.seasons.reverse().find(
+              (season) => now.gte(season.start)
+            )?.end;
+            if (!newExpirationTs) {
+              throw new Error("No new valid expiration ts found");
+            }
+            const oldExpirationTs = delegatedPosAcc.expirationTs;
+
+            const oldSubDaoEpochInfo = subDaoEpochInfoKey(
+              delegatedPosAcc.subDao,
+              oldExpirationTs
+            )[0];
+            const newSubDaoEpochInfo = subDaoEpochInfoKey(
+              delegatedPosAcc.subDao,
+              newExpirationTs
+            )[0];
+            instructions.push(
+              await hsdProgram.methods
+                .extendExpirationTsV0()
+                .accountsPartial({
+                  position: position.pubkey,
+                  subDao: delegatedPosAcc.subDao,
+                  oldClosingTimeSubDaoEpochInfo: oldSubDaoEpochInfo,
+                  closingTimeSubDaoEpochInfo: newSubDaoEpochInfo,
                 })
                 .instruction()
             );
