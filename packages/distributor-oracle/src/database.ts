@@ -13,14 +13,17 @@ export interface Database {
   getCurrentRewardsByEntity: (entityKey: string) => Promise<string>;
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
   getRewardsByOwner: (
+    lazyDistributor: PublicKey,
     owner: string
   ) => Promise<{ lifetime: string; pending: string }>;
   getRewardsByDestination: (
+    lazyDistributor: PublicKey,
     destination: string
   ) => Promise<{ lifetime: string; pending: string }>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
   getActiveDevices(type?: DeviceType): Promise<number>;
   getRewardableEntities(
+    lazyDistributor: PublicKey,
     wallet: PublicKey,
     limit: number,
     batchNumber?: number
