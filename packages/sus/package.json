@@ -1,6 +1,6 @@
 {
   "name": "@helium/sus",
-  "version": "0.10.15",
+  "version": "0.10.16",
   "description": "Transaction simulation sus checker",
   "publishConfig": {
     "access": "public",
