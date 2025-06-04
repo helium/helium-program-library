@@ -12,8 +12,12 @@ export interface Database {
   getTotalRewards(): Promise<string>;
   getCurrentRewardsByEntity: (entityKey: string) => Promise<string>;
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
-  getCurrentRewardsByOwner: (owner: string) => Promise<string>;
-  getCurrentRewardsByDestination: (destination: string) => Promise<string>;
+  getRewardsByOwner: (
+    owner: string
+  ) => Promise<{ lifetime: string; pending: string }>;
+  getRewardsByDestination: (
+    destination: string
+  ) => Promise<{ lifetime: string; pending: string }>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
   getActiveDevices(type?: DeviceType): Promise<number>;
   getRewardableEntities(

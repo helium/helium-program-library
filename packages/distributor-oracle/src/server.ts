@@ -182,12 +182,12 @@ export class OracleServer {
     res: FastifyReply
   ) {
     const { owner, destination } = req.query;
-    let rewards: string | null = null;
+    let rewards: { lifetime: string; pending: string } | null = null;
 
     if (owner) {
-      rewards = await this.db.getCurrentRewardsByOwner(owner);
+      rewards = await this.db.getRewardsByOwner(owner);
     } else if (destination) {
-      rewards = await this.db.getCurrentRewardsByDestination(destination);
+      rewards = await this.db.getRewardsByDestination(destination);
     } else {
       res.status(400).send({ error: "Must provide owner or destination" });
     }

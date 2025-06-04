@@ -261,7 +261,7 @@ export class PgDatabase implements Database {
     return new BN(reward?.rewards).toString() || "0";
   }
 
-  async getCurrentRewardsByOwner(owner: string) {
+  async getRewardsByOwner(owner: string) {
     try {
       const rewards = await Reward.findAll({
         include: [
@@ -295,17 +295,40 @@ export class PgDatabase implements Database {
         raw: true,
       });
 
-      return rewards[0].rewards?.toString() || "0";
+      const lifetime = rewards[0].rewards?.toString() || "0";
+      const recipients = await Recipient.findAll({
+        include: [
+          {
+            model: AssetOwner,
+            required: true,
+            attributes: [],
+            where: { owner },
+          },
+        ],
+        where: {
+          lazyDistributor: HNT_LAZY_DISTRIBUTOR.toBase58(),
+        },
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
+        ],
+        raw: true,
+      });
+
+      console.log("recipients", recipients);
+      const claimed = recipients[0].totalRewards?.toString() || "0";
+      const pending = new BN(lifetime).sub(new BN(claimed)).toString();
+
+      return { lifetime, pending };
     } catch (err: any) {
       if (err?.parent?.code === "42P01") {
         console.warn("Table missing for getCurrentRewardsByOwner, returning 0");
-        return "0";
+        return { lifetime: "0", pending: "0" };
       }
       throw err;
     }
   }
 
-  async getCurrentRewardsByDestination(destination: string) {
+  async getRewardsByDestination(destination: string) {
     try {
       const rewards = await Reward.findAll({
         include: [
@@ -332,13 +355,28 @@ export class PgDatabase implements Database {
         raw: true,
       });
 
-      return rewards[0].rewards?.toString() || "0";
+      const lifetime = rewards[0].rewards?.toString() || "0";
+      const recipients = await Recipient.findAll({
+        where: {
+          destination,
+          lazyDistributor: HNT_LAZY_DISTRIBUTOR.toBase58(),
+        },
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
+        ],
+        raw: true,
+      });
+
+      const claimed = recipients[0].totalRewards?.toString() || "0";
+      const pending = new BN(lifetime).sub(new BN(claimed)).toString();
+
+      return { lifetime, pending };
     } catch (err: any) {
       if (err?.parent?.code === "42P01") {
         console.warn(
           "Table missing for getCurrentRewardsByDestination, returning 0"
         );
-        return "0";
+        return { lifetime: "0", pending: "0" };
       }
       throw err;
     }
