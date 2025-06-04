@@ -185,12 +185,9 @@ export class OracleServer {
     let rewards: { lifetime: string; pending: string } | null = null;
 
     if (owner) {
-      rewards = await this.db.getRewardsByOwner(this.lazyDistributor, owner);
+      rewards = await this.db.getRewardsByOwner(owner);
     } else if (destination) {
-      rewards = await this.db.getRewardsByDestination(
-        this.lazyDistributor,
-        destination
-      );
+      rewards = await this.db.getRewardsByDestination(destination);
     } else {
       res.status(400).send({ error: "Must provide owner or destination" });
     }
@@ -890,7 +887,6 @@ export class OracleServer {
       bumpBuffer.writeUint8(bump);
 
       const { entities, nextBatchNumber } = await this.db.getRewardableEntities(
-        this.lazyDistributor,
         new PublicKey(wallet),
         MAX_CLAIMS_PER_TX,
         Number(batchNumber || 0)
@@ -1089,7 +1085,7 @@ export class OracleServer {
       hemProgram,
       hplCronsProgram,
       oracleKeypair,
-      new PgDatabase(hemProgram, ldProgram),
+      new PgDatabase(hemProgram, ldProgram, LAZY_DISTRIBUTOR),
       LAZY_DISTRIBUTOR
     );
     // For performance

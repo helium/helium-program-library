@@ -11,7 +11,6 @@ import { recipientKey } from "@helium/lazy-distributor-sdk";
 import {
   Asset,
   getAsset,
-  HNT_MINT,
   searchAssets,
   SearchAssetsOpts,
 } from "@helium/spl-utils";
@@ -42,6 +41,7 @@ export class PgDatabase implements Database {
   constructor(
     readonly issuanceProgram: Program<HeliumEntityManager>,
     readonly lazyDistributorProgram: Program<LazyDistributor>,
+    readonly lazyDistributor: PublicKey,
     readonly getAssetFn: (
       url: string,
       asset: PublicKey
@@ -104,7 +104,6 @@ export class PgDatabase implements Database {
   }
 
   async getRewardableEntities(
-    lazyDistributor: PublicKey,
     wallet: PublicKey,
     limit: number,
     batchNumber: number = 0
@@ -134,7 +133,7 @@ export class PgDatabase implements Database {
       }));
       const assets = ktas.map((kta) => kta.asset);
       const recipientKeys = assets.map(
-        (a) => recipientKey(lazyDistributor, a)[0]
+        (a) => recipientKey(this.lazyDistributor, a)[0]
       );
       const recipients = (
         await this.lazyDistributorProgram.account.recipientV0.fetchMultiple(
@@ -260,7 +259,7 @@ export class PgDatabase implements Database {
     return new BN(reward?.rewards).toString() || "0";
   }
 
-  async getRewardsByOwner(lazyDistributor: PublicKey, owner: string) {
+  async getRewardsByOwner(owner: string) {
     try {
       const rewards = await Reward.findAll({
         include: [
@@ -274,7 +273,7 @@ export class PgDatabase implements Database {
                 required: true,
                 attributes: [],
                 where: {
-                  lazyDistributor: lazyDistributor.toBase58(),
+                  lazyDistributor: this.lazyDistributor.toBase58(),
                 },
                 include: [
                   {
@@ -305,7 +304,7 @@ export class PgDatabase implements Database {
           },
         ],
         where: {
-          lazyDistributor: lazyDistributor.toBase58(),
+          lazyDistributor: this.lazyDistributor.toBase58(),
         },
         attributes: [
           [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
@@ -327,10 +326,7 @@ export class PgDatabase implements Database {
     }
   }
 
-  async getRewardsByDestination(
-    lazyDistributor: PublicKey,
-    destination: string
-  ) {
+  async getRewardsByDestination(destination: string) {
     try {
       const rewards = await Reward.findAll({
         include: [
@@ -345,7 +341,7 @@ export class PgDatabase implements Database {
                 attributes: [],
                 where: {
                   destination,
-                  lazyDistributor: lazyDistributor.toBase58(),
+                  lazyDistributor: this.lazyDistributor.toBase58(),
                 },
               },
             ],
@@ -361,7 +357,7 @@ export class PgDatabase implements Database {
       const recipients = await Recipient.findAll({
         where: {
           destination,
-          lazyDistributor: lazyDistributor.toBase58(),
+          lazyDistributor: this.lazyDistributor.toBase58(),
         },
         attributes: [
           [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
