@@ -7,11 +7,10 @@ import {
 } from "@helium/helium-entity-manager-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { lazyDistributorKey, recipientKey } from "@helium/lazy-distributor-sdk";
+import { recipientKey } from "@helium/lazy-distributor-sdk";
 import {
   Asset,
   getAsset,
-  HNT_MINT,
   searchAssets,
   SearchAssetsOpts,
 } from "@helium/spl-utils";
@@ -25,11 +24,16 @@ import {
   RecipientV0,
   RewardableEntity,
 } from "./database";
-import { Reward, sequelize, WalletClaimJob } from "./model";
+import {
+  AssetOwner,
+  KeyToAsset,
+  Recipient,
+  Reward,
+  sequelize,
+  WalletClaimJob,
+} from "./model";
 
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
-
-const HNT_LAZY_DISTRIBUTOR = lazyDistributorKey(HNT_MINT)[0];
 
 const getRewardTypeForDevice = (deviceType: DeviceType): string =>
   `${deviceType.toString().toLowerCase()}_gateway`;
@@ -37,6 +41,7 @@ export class PgDatabase implements Database {
   constructor(
     readonly issuanceProgram: Program<HeliumEntityManager>,
     readonly lazyDistributorProgram: Program<LazyDistributor>,
+    readonly lazyDistributor: PublicKey,
     readonly getAssetFn: (
       url: string,
       asset: PublicKey
@@ -128,7 +133,7 @@ export class PgDatabase implements Database {
       }));
       const assets = ktas.map((kta) => kta.asset);
       const recipientKeys = assets.map(
-        (a) => recipientKey(HNT_LAZY_DISTRIBUTOR, a)[0]
+        (a) => recipientKey(this.lazyDistributor, a)[0]
       );
       const recipients = (
         await this.lazyDistributorProgram.account.recipientV0.fetchMultiple(
@@ -252,5 +257,126 @@ export class PgDatabase implements Database {
     const reward = (await Reward.findByPk(entityKeyStr)) as Reward;
 
     return new BN(reward?.rewards).toString() || "0";
+  }
+
+  async getRewardsByOwner(owner: string) {
+    try {
+      const rewards = await Reward.findAll({
+        include: [
+          {
+            model: KeyToAsset,
+            required: true,
+            attributes: [],
+            include: [
+              {
+                model: Recipient,
+                required: true,
+                attributes: [],
+                where: {
+                  lazyDistributor: this.lazyDistributor.toBase58(),
+                },
+                include: [
+                  {
+                    model: AssetOwner,
+                    required: true,
+                    attributes: [],
+                    where: { owner },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
+        ],
+        raw: true,
+      });
+
+      const lifetime = rewards[0].rewards?.toString() || "0";
+      const recipients = await Recipient.findAll({
+        include: [
+          {
+            model: AssetOwner,
+            required: true,
+            attributes: [],
+            where: { owner },
+          },
+        ],
+        where: {
+          lazyDistributor: this.lazyDistributor.toBase58(),
+        },
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
+        ],
+        raw: true,
+      });
+
+      console.log("recipients", recipients);
+      const claimed = recipients[0].totalRewards?.toString() || "0";
+      const pending = new BN(lifetime).sub(new BN(claimed)).toString();
+
+      return { lifetime, pending };
+    } catch (err: any) {
+      if (err?.parent?.code === "42P01") {
+        console.warn("Table missing for getCurrentRewardsByOwner, returning 0");
+        return { lifetime: "0", pending: "0" };
+      }
+      throw err;
+    }
+  }
+
+  async getRewardsByDestination(destination: string) {
+    try {
+      const rewards = await Reward.findAll({
+        include: [
+          {
+            model: KeyToAsset,
+            required: true,
+            attributes: [],
+            include: [
+              {
+                model: Recipient,
+                required: true,
+                attributes: [],
+                where: {
+                  destination,
+                  lazyDistributor: this.lazyDistributor.toBase58(),
+                },
+              },
+            ],
+          },
+        ],
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
+        ],
+        raw: true,
+      });
+
+      const lifetime = rewards[0].rewards?.toString() || "0";
+      const recipients = await Recipient.findAll({
+        where: {
+          destination,
+          lazyDistributor: this.lazyDistributor.toBase58(),
+        },
+        attributes: [
+          [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
+        ],
+        raw: true,
+      });
+
+      const claimed = recipients[0].totalRewards?.toString() || "0";
+      const pending = new BN(lifetime).sub(new BN(claimed)).toString();
+
+      return { lifetime, pending };
+    } catch (err: any) {
+      if (err?.parent?.code === "42P01") {
+        console.warn(
+          "Table missing for getCurrentRewardsByDestination, returning 0"
+        );
+        return { lifetime: "0", pending: "0" };
+      }
+      throw err;
+    }
   }
 }

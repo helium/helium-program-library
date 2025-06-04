@@ -1,4 +1,4 @@
-import { Sequelize, STRING, BIGINT, Model, DATE, ARRAY } from "sequelize";
+import { Sequelize, STRING, BIGINT, Model, ARRAY } from "sequelize";
 import AWS from "aws-sdk";
 import * as pg from "pg";
 
@@ -16,7 +16,7 @@ export const sequelize = new Sequelize({
     max: 5,
     min: 0,
     acquire: 30000,
-    idle: 10000
+    idle: 10000,
   },
   hooks: {
     beforeConnect: async (config: any) => {
@@ -30,18 +30,20 @@ export const sequelize = new Sequelize({
           port,
           username: process.env.PGUSER,
         });
-        password = await new Promise((resolve, reject) => signer.getAuthToken({}, (err, token) => {
-          if (err) {
-            return reject(err)
-          }
-          resolve(token)
-        }));
+        password = await new Promise((resolve, reject) =>
+          signer.getAuthToken({}, (err, token) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve(token);
+          })
+        );
         config.dialectOptions = {
           ssl: {
             require: false,
             rejectUnauthorized: false,
-          }
-        }
+          },
+        };
       }
       config.password = password;
     },
@@ -52,6 +54,7 @@ export class Reward extends Model {
   declare address: string;
   declare rewards: string;
 }
+
 Reward.init(
   {
     address: {
@@ -62,18 +65,24 @@ Reward.init(
       type: BIGINT,
     },
     lastReward: {
-      type: 'TIMESTAMP',
+      type: "TIMESTAMP",
     },
     rewardType: {
       type: STRING,
-    }
+    },
   },
-  { sequelize, modelName: "reward_index", tableName: "reward_index", underscored: true, timestamps: false }
+  {
+    sequelize,
+    modelName: "reward_index",
+    tableName: "reward_index",
+    underscored: true,
+    timestamps: false,
+  }
 );
 
 export class WalletClaimJob extends Model {
   declare wallet: string;
-  declare remainingKtas: string[]
+  declare remainingKtas: string[];
 }
 WalletClaimJob.init(
   {
@@ -83,7 +92,7 @@ WalletClaimJob.init(
     },
     remainingKtas: {
       type: ARRAY(STRING),
-    }
+    },
   },
   {
     sequelize,
@@ -93,3 +102,136 @@ WalletClaimJob.init(
     timestamps: false,
   }
 );
+
+export class AssetOwner extends Model {
+  declare asset: string;
+  declare owner: string;
+  // declare createdAt: Date;
+  // declare updatedAt: Date;
+}
+AssetOwner.init(
+  {
+    asset: {
+      type: STRING,
+      primaryKey: true,
+    },
+    owner: {
+      type: STRING,
+      allowNull: false,
+    },
+  },
+  {
+    sequelize,
+    modelName: "asset_owners",
+    tableName: "asset_owners",
+    underscored: true,
+    timestamps: false,
+  }
+);
+
+export class KeyToAsset extends Model {
+  declare address: string;
+  declare dao: string | null;
+  declare asset: string | null;
+  declare entityKey: Buffer | null;
+  // declare bumpSeed: number | null;
+  // declare keySerialization: object | null;
+  // declare refreshedAt: Date | null;
+  // declare createdAt: Date;
+  declare encodedEntityKey: string | null;
+}
+KeyToAsset.init(
+  {
+    address: {
+      type: STRING,
+      primaryKey: true,
+    },
+    dao: {
+      type: STRING,
+      allowNull: true,
+    },
+    asset: {
+      type: STRING,
+      allowNull: true,
+    },
+    entityKey: {
+      type: "BYTEA",
+      allowNull: true,
+      field: "entity_key",
+    },
+    encodedEntityKey: {
+      type: "TEXT",
+      allowNull: true,
+      field: "encoded_entity_key",
+    },
+  },
+  {
+    sequelize,
+    modelName: "key_to_assets",
+    tableName: "key_to_assets",
+    underscored: true,
+    timestamps: false,
+  }
+);
+
+export class Recipient extends Model {
+  declare address: string;
+  declare lazyDistributor: string | null;
+  declare asset: string | null;
+  declare totalRewards: string | null;
+  // declare currentConfigVersion: number | null;
+  // declare currentRewards: string[] | null;
+  // declare bumpSeed: number | null;
+  // declare reserved: string | null;
+  declare destination: string | null;
+  // declare refreshedAt: Date | null;
+  // declare createdAt: Date;
+}
+Recipient.init(
+  {
+    address: {
+      type: STRING,
+      primaryKey: true,
+    },
+    lazyDistributor: {
+      type: STRING,
+      allowNull: true,
+      field: "lazy_distributor",
+    },
+    asset: {
+      type: STRING,
+      allowNull: true,
+    },
+    totalRewards: {
+      type: "NUMERIC",
+      allowNull: true,
+      field: "total_rewards",
+    },
+    destination: {
+      type: STRING,
+      allowNull: true,
+    },
+  },
+  {
+    sequelize,
+    modelName: "recipients",
+    tableName: "recipients",
+    underscored: true,
+    timestamps: false,
+  }
+);
+
+KeyToAsset.hasMany(Recipient, { foreignKey: "asset", sourceKey: "asset" });
+Recipient.belongsTo(KeyToAsset, { foreignKey: "asset", targetKey: "asset" });
+KeyToAsset.hasMany(AssetOwner, { foreignKey: "asset", sourceKey: "asset" });
+AssetOwner.belongsTo(KeyToAsset, { foreignKey: "asset", targetKey: "asset" });
+AssetOwner.belongsTo(Recipient, { foreignKey: "asset", targetKey: "asset" });
+Recipient.hasMany(AssetOwner, { foreignKey: "asset", sourceKey: "asset" });
+KeyToAsset.hasMany(Reward, {
+  foreignKey: "address",
+  sourceKey: "encodedEntityKey",
+});
+Reward.belongsTo(KeyToAsset, {
+  foreignKey: "address",
+  targetKey: "encodedEntityKey",
+});
