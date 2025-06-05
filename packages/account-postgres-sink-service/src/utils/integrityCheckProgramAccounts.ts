@@ -68,6 +68,7 @@ export const integrityCheckProgramAccounts = async ({
     const refreshThreshold = new Date(
       snapshotTime.getTime() - INTEGRITY_CHECK_REFRESH_THRESHOLD_MS
     );
+
     const t = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
     });
@@ -229,102 +230,126 @@ export const integrityCheckProgramAccounts = async ({
                 existingAccs.map((acc) => [acc.get("address"), acc])
               );
 
+              limiter = pLimit(50);
               await Promise.all(
-                accounts.map(async (acc) => {
-                  const decodedAcc = program.coder.accounts.decode(
-                    lowerFirstChar(accName),
-                    acc.data as Buffer
-                  );
+                accounts.map((acc) =>
+                  limiter(async () => {
+                    const latestTxSignature = (txIdsByAccountId[acc.pubkey] ||
+                      [])[0];
+                    if (latestTxSignature) {
+                      const latestTx = await connection.getTransaction(
+                        latestTxSignature,
+                        {
+                          commitment: "finalized",
+                          maxSupportedTransactionVersion: 0,
+                        }
+                      );
 
-                  let sanitized: {
-                    refreshed_at: string;
-                    address: string;
-                    [key: string]: any;
-                  } = {
-                    refreshed_at: new Date().toISOString(),
-                    address: acc.pubkey,
-                    ...sanitizeAccount(decodedAcc),
-                  };
-
-                  for (const plugin of pluginsByAccountType[accName] || []) {
-                    if (plugin?.processAccount) {
-                      try {
-                        sanitized = await plugin.processAccount(sanitized, t);
-                      } catch (err) {
-                        console.log(
-                          `Plugin processing failed for account ${acc.pubkey}`,
-                          err
+                      if (latestTx?.blockTime) {
+                        const latestTxDate = new Date(
+                          latestTx.blockTime * 1000
                         );
-                        continue;
+                        if (latestTxDate > snapshotTime) {
+                          return;
+                        }
                       }
                     }
-                  }
 
-                  const existing = existingAccMap.get(acc.pubkey);
-                  const refreshedAt = existing?.dataValues.refreshed_at
-                    ? new Date(existing.dataValues.refreshed_at)
-                    : null;
+                    const decodedAcc = program.coder.accounts.decode(
+                      lowerFirstChar(accName),
+                      acc.data as Buffer
+                    );
 
-                  if (refreshedAt && refreshedAt > refreshThreshold) {
-                    return;
-                  }
+                    let sanitized: {
+                      refreshed_at: string;
+                      address: string;
+                      [key: string]: any;
+                    } = {
+                      refreshed_at: new Date().toISOString(),
+                      address: acc.pubkey,
+                      ...sanitizeAccount(decodedAcc),
+                    };
 
-                  const existingData = existing?.dataValues;
-                  const existingClean = _omit(existingData || {}, OMIT_KEYS);
-                  const sanitizedClean = _omit(sanitized, OMIT_KEYS);
-                  const shouldUpdate =
-                    !deepEqual(sanitizedClean, existingClean) &&
-                    (!refreshedAt || refreshedAt < snapshotTime);
+                    for (const plugin of pluginsByAccountType[accName] || []) {
+                      if (plugin?.processAccount) {
+                        try {
+                          sanitized = await plugin.processAccount(sanitized, t);
+                        } catch (err) {
+                          console.log(
+                            `Plugin processing failed for account ${acc.pubkey}`,
+                            err
+                          );
+                          return;
+                        }
+                      }
+                    }
 
-                  if (shouldUpdate) {
-                    const currentRecord = await model.findOne({
-                      where: { address: acc.pubkey },
-                      transaction: t,
-                    });
-
-                    const currentRefreshedAt = currentRecord?.dataValues
-                      .refreshed_at
-                      ? new Date(currentRecord.dataValues.refreshed_at)
+                    const existing = existingAccMap.get(acc.pubkey);
+                    const refreshedAt = existing?.dataValues.refreshed_at
+                      ? new Date(existing.dataValues.refreshed_at)
                       : null;
 
-                    if (
-                      currentRefreshedAt &&
-                      currentRefreshedAt > snapshotTime
-                    ) {
+                    if (refreshedAt && refreshedAt > refreshThreshold) {
                       return;
                     }
 
-                    const changedFields = existing
-                      ? Object.entries(sanitizedClean)
-                          .filter(
-                            ([key, value]) =>
-                              !deepEqual(value, existingData[key])
-                          )
-                          .map(([key]) => key)
-                      : Object.keys(sanitizedClean);
+                    const existingData = existing?.dataValues;
+                    const existingClean = _omit(existingData || {}, OMIT_KEYS);
+                    const sanitizedClean = _omit(sanitized, OMIT_KEYS);
+                    const shouldUpdate =
+                      !deepEqual(sanitizedClean, existingClean) &&
+                      (!refreshedAt || refreshedAt < snapshotTime);
 
-                    corrections.push({
-                      type: accName,
-                      accountId: acc.pubkey,
-                      txSignatures: txIdsByAccountId[acc.pubkey] || [],
-                      currentValues: existing
-                        ? changedFields.reduce(
-                            (obj, key) => ({
-                              ...obj,
-                              [key]: existingData[key],
-                            }),
-                            {}
-                          )
-                        : null,
-                      newValues: changedFields.reduce(
-                        (obj, key) => ({ ...obj, [key]: sanitized[key] }),
-                        {}
-                      ),
-                    });
+                    if (shouldUpdate) {
+                      const currentRecord = await model.findOne({
+                        where: { address: acc.pubkey },
+                        transaction: t,
+                      });
 
-                    await model.upsert({ ...sanitized }, { transaction: t });
-                  }
-                })
+                      const currentRefreshedAt = currentRecord?.dataValues
+                        .refreshed_at
+                        ? new Date(currentRecord.dataValues.refreshed_at)
+                        : null;
+
+                      if (
+                        currentRefreshedAt &&
+                        currentRefreshedAt > snapshotTime
+                      ) {
+                        return;
+                      }
+
+                      const changedFields = existing
+                        ? Object.entries(sanitizedClean)
+                            .filter(
+                              ([key, value]) =>
+                                !deepEqual(value, existingData[key])
+                            )
+                            .map(([key]) => key)
+                        : Object.keys(sanitizedClean);
+
+                      corrections.push({
+                        type: accName,
+                        accountId: acc.pubkey,
+                        txSignatures: txIdsByAccountId[acc.pubkey] || [],
+                        currentValues: existing
+                          ? changedFields.reduce(
+                              (obj, key) => ({
+                                ...obj,
+                                [key]: existingData[key],
+                              }),
+                              {}
+                            )
+                          : null,
+                        newValues: changedFields.reduce(
+                          (obj, key) => ({ ...obj, [key]: sanitized[key] }),
+                          {}
+                        ),
+                      });
+
+                      await model.upsert({ ...sanitized }, { transaction: t });
+                    }
+                  })
+                )
               );
             })
           );

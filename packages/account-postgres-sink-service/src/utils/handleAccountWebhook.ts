@@ -93,9 +93,6 @@ export const handleAccountWebhook = async ({
       })?.type;
 
       if (!accName) {
-        console.warn(
-          `[handleAccountWebhook] Could not determine account type for pubkey: ${account.pubkey}. Data discriminator did not match any known type.`
-        );
         await t.rollback();
         return;
       }
