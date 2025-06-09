@@ -78,7 +78,7 @@ pub fn handler(ctx: Context<ProxiedRelinquishVoteV0>, args: RelinquishVoteArgsV1
   ctx.accounts.position.num_active_votes -= 1;
 
   require!(
-    marker.choices.iter().any(|choice| *choice == args.choice),
+    marker.choices.contains(&args.choice),
     VsrError::NoVoteForThisChoice
   );
 
