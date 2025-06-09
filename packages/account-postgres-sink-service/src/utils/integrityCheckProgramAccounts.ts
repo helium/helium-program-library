@@ -76,9 +76,9 @@ export const integrityCheckProgramAccounts = async ({
     try {
       let limiter: pLimit.Limit;
       const program = new anchor.Program(idl, provider);
-      const currentSlot = await connection.getSlot();
+      const snapshotSlot = await connection.getSlot("finalized");
       let blockTime24HoursAgo: number | null = null;
-      let attemptSlot = currentSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
+      let attemptSlot = snapshotSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
       const SLOTS_INCREMENT = 2;
 
       for (
@@ -245,12 +245,17 @@ export const integrityCheckProgramAccounts = async ({
                         }
                       );
 
-                      if (latestTx?.blockTime) {
-                        const latestTxDate = new Date(
-                          latestTx.blockTime * 1000
-                        );
-                        if (latestTxDate > snapshotTime) {
+                      if (latestTx) {
+                        if (latestTx.slot >= snapshotSlot) {
                           return;
+                        }
+
+                        if (latestTx.blockTime) {
+                          if (
+                            new Date(latestTx.blockTime * 1000) >= snapshotTime
+                          ) {
+                            return;
+                          }
                         }
                       }
                     }
