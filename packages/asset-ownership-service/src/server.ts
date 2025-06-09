@@ -2,7 +2,7 @@ import cors from "@fastify/cors";
 import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
-import { PG_POOL_SIZE, ADMIN_PASSWORD } from "./env";
+import { PG_POOL_SIZE, ADMIN_PASSWORD, USE_SUBSTREAM } from "./env";
 import { ensureTables } from "./utils/ensureTables";
 import { setupSubstream } from "./services/substream";
 import database from "./utils/database";
@@ -71,10 +71,12 @@ if (PG_POOL_SIZE < 5) {
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
-    await setupSubstream(server).catch((err: any) => {
-      console.error("Fatal error in Substream connection:", err);
-      process.exit(1);
-    });
+    if (USE_SUBSTREAM) {
+      await setupSubstream(server).catch((err: any) => {
+        console.error("Fatal error in Substream connection:", err);
+        process.exit(1);
+      });
+    }
   } catch (err) {
     console.error(err);
     process.exit(1);
