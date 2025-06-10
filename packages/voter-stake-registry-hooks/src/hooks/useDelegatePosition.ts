@@ -139,9 +139,12 @@ export const useDelegatePositions = ({
               );
             } else if (position.isDelegated && position.isDelegationRenewable) {
               const now = new BN(Date.now() / 1000);
-              const newExpirationTs = proxyConfig?.seasons.reverse().find(
-                (season) => now.gte(season.start)
-              )?.end;
+              const newExpirationTs = Math.min(
+                proxyConfig?.seasons.reverse().find(
+                  (season) => now.gte(season.start)
+                )?.end.toNumber() ?? 0,
+                position.lockup.endTs.toNumber()
+              );
               if (!newExpirationTs) {
                 throw new Error("No new valid expiration ts found");
               }
@@ -170,7 +173,7 @@ export const useDelegatePositions = ({
 
             const delegationClaimBot = delegationClaimBots[index];
             const delegationClaimBotK = delegationClaimBots[index].publicKey;
-            if (automationEnabled && !delegationClaimBot) {
+            if (automationEnabled && (!delegationClaimBot || !delegationClaimBot.info)) {
               innerInstructions.push(
                 await hplCronsProgram.methods
                   .initDelegationClaimBotV0()
@@ -198,7 +201,7 @@ export const useDelegatePositions = ({
 
             if (
               automationEnabled &&
-              (!delegationClaimBot || !delegationClaimBot.info!.queued) &&
+              (!delegationClaimBot || !delegationClaimBot.info || !delegationClaimBot.info.queued) &&
               subDao
             ) {
               const nextAvailable = await nextAvailableTaskIds(
