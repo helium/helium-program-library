@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import { IPlugin } from "../types";
 import bs58 from "bs58";
 import { camelize } from "inflection";
+import { database } from "../utils/database";
 
 export const EncodeEntityKeyPlugin = ((): IPlugin => {
   const name = "EncodeEntityKey";
@@ -14,7 +15,12 @@ export const EncodeEntityKeyPlugin = ((): IPlugin => {
       };
     };
 
-    const addIndexes = (
+    const dropIndexes = async () => {
+      // legacy index
+      await database.query(`DROP INDEX IF EXISTS idx_encoded_entity_key;`);
+    };
+
+    const addIndexes = async (
       schema: { [key: string]: any },
       accountName: string
     ) => {
@@ -22,9 +28,9 @@ export const EncodeEntityKeyPlugin = ((): IPlugin => {
         ...schema[accountName],
         indexes: [
           {
-            fields: ["encoded_entity_key"],
-            name: `idx_encoded_entity_key`,
-            unique: false,
+            fields: ["dao", "encoded_entity_key"],
+            name: `idx_dao_encoded_entity_key`,
+            unique: true,
           },
         ],
       };
@@ -55,6 +61,7 @@ export const EncodeEntityKeyPlugin = ((): IPlugin => {
     return {
       updateOnDuplicateFields,
       addFields,
+      dropIndexes,
       addIndexes,
       processAccount,
     };
