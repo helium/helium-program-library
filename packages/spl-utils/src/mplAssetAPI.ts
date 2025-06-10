@@ -95,9 +95,12 @@ export async function getAssetBatch(
     }
 
     const result = response.data.result;
-    if (result) {
-      return result.map(toAsset);
-    }
+
+    return [
+      ...(result
+        ? result.map((x: Asset | undefined) => (x ? toAsset(x) : x))
+        : []),
+    ];
   } catch (error) {
     console.error(error);
     throw error;

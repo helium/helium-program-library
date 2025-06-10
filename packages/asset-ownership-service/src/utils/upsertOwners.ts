@@ -32,10 +32,12 @@ export const upsertOwners = async ({
             getAssetBatch(provider.connection.rpcEndpoint, assetBatch),
           { retries: 5, minTimeout: 1000 }
         )) as { id: PublicKey; ownership: { owner: PublicKey } }[]
-      ).map(({ id, ownership }) => ({
-        asset: id.toBase58(),
-        owner: ownership.owner.toBase58(),
-      }));
+      )
+        .filter(Boolean)
+        .map(({ id, ownership }) => ({
+          asset: id.toBase58(),
+          owner: ownership.owner.toBase58(),
+        }));
 
       const transaction = await sequelize.transaction({
         isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
