@@ -24,7 +24,7 @@ export const EncodeEntityKeyPlugin = ((): IPlugin => {
           {
             fields: ["encoded_entity_key"],
             name: `idx_encoded_entity_key`,
-            unique: true,
+            unique: false,
           },
         ],
       };

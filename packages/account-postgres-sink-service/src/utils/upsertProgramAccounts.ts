@@ -129,9 +129,11 @@ export const upsertProgramAccounts = async ({
             }
           );
 
-          let batch: any[] = [];
+          let batch: {
+            account: anchor.web3.AccountInfo<Buffer>;
+            pubkey: anchor.web3.PublicKey;
+          }[] = [];
           const batchPromises: Promise<void>[] = [];
-
           await streamAccounts(result.data, async (account) => {
             batch.push(account);
             if (batch.length >= batchSize) {
@@ -284,14 +286,7 @@ export const upsertProgramAccounts = async ({
             })
           );
 
-          const dedupedValues = Object.values(
-            values.reduce((acc, curr) => {
-              acc[curr.address.toBase58()] = curr;
-              return acc;
-            }, {} as Record<string, (typeof values)[0]>)
-          );
-
-          await model.bulkCreate(dedupedValues, {
+          await model.bulkCreate(values, {
             transaction,
             updateOnDuplicate: [
               "address",
