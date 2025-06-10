@@ -7,9 +7,10 @@ export const AUTOMATION_BOT_FEE = 0.00210192
 export const DELEGATION_FEE = 0.00258912
 
 export interface UsePositionFeesProps {
+  numPositions: number
   automationEnabled?: boolean
-  isDelegated?: boolean
-  hasDelegationClaimBot?: boolean
+  numDelegatedPositions?: number
+  numDelegationClaimBots?: number
   wallet?: PublicKey
 }
 
@@ -17,17 +18,38 @@ export const usePositionFees = ({
   automationEnabled = false,
   isDelegated = false,
   hasDelegationClaimBot = false,
+  wallet
+}: {
+  automationEnabled?: boolean
+  isDelegated?: boolean
+  hasDelegationClaimBot?: boolean
+  wallet?: PublicKey
+}) => {
+  return usePositionsFees({
+    numPositions: 1,
+    automationEnabled,
+    numDelegatedPositions: isDelegated ? 1 : 0,
+    numDelegationClaimBots: hasDelegationClaimBot ? 1 : 0,
+    wallet
+  })
+}
+
+export const usePositionsFees = ({
+  numPositions,
+  automationEnabled = false,
+  numDelegatedPositions = 0,
+  numDelegationClaimBots = 0,
   wallet: wallet
 }: UsePositionFeesProps) => {
   const { amount: userLamports } = useSolOwnedAmount(wallet)
 
   const rentFee = useMemo(() => {
-    const botFee = automationEnabled && !hasDelegationClaimBot ? AUTOMATION_BOT_FEE : 0
-    const delegationFee = isDelegated ? 0 : DELEGATION_FEE
+    const botFee = automationEnabled && numDelegationClaimBots > 0 ? numDelegationClaimBots * AUTOMATION_BOT_FEE : 0
+    const delegationFee = numDelegatedPositions > 0 ? 0 : numDelegatedPositions * DELEGATION_FEE
     return botFee + delegationFee
-  }, [hasDelegationClaimBot, isDelegated, automationEnabled])
+  }, [numDelegationClaimBots, numDelegatedPositions, automationEnabled])
 
-  const prepaidTxFees = automationEnabled ? PREPAID_TX_FEES : 0
+  const prepaidTxFees = automationEnabled ? (numPositions - numDelegationClaimBots) * PREPAID_TX_FEES : 0
   const totalFees = rentFee + prepaidTxFees
 
   const insufficientBalance = userLamports && userLamports < (totalFees * LAMPORTS_PER_SOL)
@@ -38,4 +60,4 @@ export const usePositionFees = ({
     totalFees,
     insufficientBalance
   }
-} 
+}
