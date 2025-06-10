@@ -284,7 +284,14 @@ export const upsertProgramAccounts = async ({
             })
           );
 
-          await model.bulkCreate(values, {
+          const dedupedValues = Object.values(
+            values.reduce((acc, curr) => {
+              acc[curr.address.toBase58()] = curr;
+              return acc;
+            }, {} as Record<string, (typeof values)[0]>)
+          );
+
+          await model.bulkCreate(dedupedValues, {
             transaction,
             updateOnDuplicate: [
               "address",
