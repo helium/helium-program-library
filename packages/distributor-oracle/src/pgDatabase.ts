@@ -13,6 +13,14 @@ import { PublicKey } from "@solana/web3.js";
 import { Op } from "sequelize";
 import { Database, DeviceType, RewardableEntity } from "./database";
 import { AssetOwner, KeyToAsset, Recipient, Reward, sequelize } from "./model";
+import {
+  decodeEntityKey,
+  entityCreatorKey,
+  keyToAssetForAsset,
+} from "@helium/helium-entity-manager-sdk";
+import { DAO } from "./constants";
+
+const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
 const getRewardTypeForDevice = (deviceType: DeviceType): string =>
   `${deviceType.toString().toLowerCase()}_gateway`;
@@ -137,22 +145,33 @@ export class PgDatabase implements Database {
   }
 
   async getCurrentRewards(assetId: PublicKey) {
-    const kta = await KeyToAsset.findOne({
-      where: { asset: assetId.toBase58() },
-    });
-
-    if (!kta || !kta.encodedEntityKey) {
+    const asset = await this.getAssetFn(
+      process.env.ASSET_API_URL ||
+        this.issuanceProgram.provider.connection.rpcEndpoint,
+      assetId
+    );
+    if (!asset) {
       console.error("No asset found", assetId.toBase58());
       return "0";
     }
-
-    const rewards = await Reward.findByPk(kta.encodedEntityKey);
-
-    if (!rewards) {
+    const keyToAssetKey = keyToAssetForAsset(asset, DAO);
+    const keyToAsset = await this.issuanceProgram.account.keyToAssetV0.fetch(
+      keyToAssetKey
+    );
+    const entityKey = decodeEntityKey(
+      keyToAsset.entityKey,
+      keyToAsset.keySerialization
+    )!;
+    // Verify the creator is our entity creator, otherwise they could just
+    // pass in any NFT with this ecc compact to collect rewards
+    if (
+      !asset.creators[0].verified ||
+      !new PublicKey(asset.creators[0].address).equals(ENTITY_CREATOR)
+    ) {
       throw new Error("Not a valid rewardable entity");
     }
 
-    return this.getCurrentRewardsByEntity(kta.encodedEntityKey);
+    return this.getCurrentRewardsByEntity(entityKey);
   }
 
   async getCurrentRewardsByEntity(entityKeyStr: string) {
