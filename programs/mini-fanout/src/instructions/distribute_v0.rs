@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, solana_program::syscalls};
+use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use tuktuk_program::{RunTaskReturnV0, TaskQueueV0, TaskReturnV0, TransactionSourceV0, TriggerV0};
 
