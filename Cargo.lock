@@ -1202,6 +1202,7 @@ dependencies = [
  "chrono",
  "clockwork-cron",
  "default-env",
+ "shared-utils",
  "solana-security-txt",
  "solana-zk-sdk",
  "tuktuk-program",

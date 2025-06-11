@@ -31,3 +31,4 @@ default-env = { workspace = true }
 tuktuk-program = { version = "0.3.2" }
 clockwork-cron = "2.0.19"
 chrono = "0.4.39"
+shared-utils = { workspace = true }

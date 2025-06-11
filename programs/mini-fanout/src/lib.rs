@@ -6,7 +6,6 @@ declare_id!("mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn");
 
 pub mod errors;
 pub mod instructions;
-pub mod resize_to_fit;
 pub mod state;
 
 pub use instructions::*;

@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use anchor_lang::prelude::*;
 use clockwork_cron::Schedule;
+use shared_utils::resize_to_fit;
 use tuktuk_program::{
   tuktuk::{
     self,
@@ -12,8 +13,8 @@ use tuktuk_program::{
 };
 
 use crate::{
-  errors::ErrorCode, queue_authority_seeds, resize_to_fit::resize_to_fit, schedule_impl,
-  schedule_task_v0::ScheduleTaskV0, state::*, MiniFanoutShareArgV0, ScheduleTaskArgsV0, MAX_SHARES,
+  errors::ErrorCode, queue_authority_seeds, schedule_impl, schedule_task_v0::ScheduleTaskV0,
+  state::*, MiniFanoutShareArgV0, ScheduleTaskArgsV0, MAX_SHARES,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
