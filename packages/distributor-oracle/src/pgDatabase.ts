@@ -1,39 +1,18 @@
 // @ts-ignore
 import { BN, Program } from "@coral-xyz/anchor";
-import {
-  decodeEntityKey,
-  entityCreatorKey,
-  keyToAssetForAsset,
-} from "@helium/helium-entity-manager-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { recipientKey } from "@helium/lazy-distributor-sdk";
 import {
   Asset,
   getAsset,
   searchAssets,
   SearchAssetsOpts,
+  truthy,
 } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import { Op } from "sequelize";
-import { DAO } from "./constants";
-import {
-  Database,
-  DeviceType,
-  KeyToAssetV0,
-  RecipientV0,
-  RewardableEntity,
-} from "./database";
-import {
-  AssetOwner,
-  KeyToAsset,
-  Recipient,
-  Reward,
-  sequelize,
-  WalletClaimJob,
-} from "./model";
-
-const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
+import { Database, DeviceType, RewardableEntity } from "./database";
+import { AssetOwner, KeyToAsset, Recipient, Reward, sequelize } from "./model";
 
 const getRewardTypeForDevice = (deviceType: DeviceType): string =>
   `${deviceType.toString().toLowerCase()}_gateway`;
@@ -52,57 +31,6 @@ export class PgDatabase implements Database {
     ) => Promise<Asset[]> = searchAssets
   ) {}
 
-  private async getOrCreateWalletClaimJob(
-    wallet: PublicKey,
-    batchNumber?: number
-  ) {
-    if (!batchNumber) {
-      await WalletClaimJob.destroy({
-        where: { wallet: wallet.toBase58() },
-      });
-    }
-    const job = await WalletClaimJob.findOne({
-      where: { wallet: wallet.toBase58() },
-    });
-    if (!job) {
-      let page = 1;
-      const limit = 1000;
-      let allKtas: string[] = [];
-
-      while (true) {
-        const assets =
-          (await this.searchAssetsFn(
-            process.env.ASSET_API_URL ||
-              this.issuanceProgram.provider.connection.rpcEndpoint,
-            {
-              ownerAddress: wallet.toBase58(),
-              creatorVerified: true,
-              creatorAddress: ENTITY_CREATOR.toBase58(),
-              page,
-              limit,
-            }
-          )) || [];
-
-        allKtas = allKtas.concat(
-          assets.map((asset) => keyToAssetForAsset(asset, DAO).toBase58())
-        );
-
-        if (assets.length < limit) {
-          break;
-        }
-
-        page++;
-      }
-      const job = await WalletClaimJob.create({
-        wallet: wallet.toBase58(),
-        remainingKtas: allKtas,
-      });
-      await job.save();
-      return job;
-    }
-    return job;
-  }
-
   async getRewardableEntities(
     wallet: PublicKey,
     limit: number,
@@ -111,66 +39,51 @@ export class PgDatabase implements Database {
     entities: RewardableEntity[];
     nextBatchNumber: number;
   }> {
-    const job = await this.getOrCreateWalletClaimJob(wallet, batchNumber);
-    const entities: RewardableEntity[] = [];
-    let nextBatchNumber = batchNumber || 0;
-    while (entities.length == 0) {
-      const remainingKtas = job.remainingKtas.slice(
-        nextBatchNumber * limit,
-        (nextBatchNumber + 1) * limit
-      );
-      if (remainingKtas.length === 0) {
-        nextBatchNumber++;
-        break;
-      }
-      const ktas = (
-        await this.issuanceProgram.account.keyToAssetV0.fetchMultiple(
-          remainingKtas
-        )
-      ).map((kta, index) => ({
-        ...(kta as KeyToAssetV0),
-        address: new PublicKey(remainingKtas[index]),
-      }));
-      const assets = ktas.map((kta) => kta.asset);
-      const recipientKeys = assets.map(
-        (a) => recipientKey(this.lazyDistributor, a)[0]
-      );
-      const recipients = (
-        await this.lazyDistributorProgram.account.recipientV0.fetchMultiple(
-          recipientKeys
-        )
-      ).map((r, index) => ({
-        ...(r as RecipientV0),
-        address: new PublicKey(recipientKeys[index]),
-      }));
-      const entityKeys = ktas.map(
-        (kta) => decodeEntityKey(kta.entityKey, kta.keySerialization)!
-      );
-      const lifetimeRewards = await this.getBulkRewards(entityKeys);
-      for (let i = 0; i < recipients.length; i++) {
-        const entityKey = entityKeys[i];
-        const recipient = recipients[i];
-        const kta = ktas[i];
-        const lifetimeReward = lifetimeRewards[entityKey];
+    const offset = batchNumber * limit;
+    const keyToAssets = await KeyToAsset.findAll({
+      include: [
+        {
+          model: AssetOwner,
+          required: true,
+          where: { owner: wallet.toBase58() },
+        },
+        {
+          model: Recipient,
+          as: "Recipient",
+          required: true,
+          where: { lazyDistributor: this.lazyDistributor.toBase58() },
+        },
+      ],
+      limit,
+      offset,
+    });
 
-        const pendingRewards = new BN(lifetimeReward).sub(
-          recipient?.totalRewards || new BN("0")
-        );
-        if (!pendingRewards.lte(new BN("0"))) {
-          entities.push({
-            keyToAsset: kta,
-            lifetimeReward: lifetimeReward,
-            pendingReward: pendingRewards.toString(),
-            recipient: recipient,
-          });
-        }
+    const entityKeys = keyToAssets
+      .map((kta) => kta.encodedEntityKey)
+      .filter(truthy);
+    const lifetimeRewards = await this.getBulkRewards(entityKeys);
+    const entities: RewardableEntity[] = [];
+    for (const kta of keyToAssets) {
+      const recipient = kta.get("Recipient") as Recipient;
+      const entityKey = kta.encodedEntityKey;
+      if (!entityKey) continue;
+      const lifetimeReward = lifetimeRewards[entityKey] || "0";
+      const pendingRewards = new BN(lifetimeReward).sub(
+        new BN(recipient?.totalRewards || "0")
+      );
+      if (!pendingRewards.lte(new BN("0"))) {
+        entities.push({
+          keyToAsset: new PublicKey(kta.address),
+          lifetimeReward,
+          pendingReward: pendingRewards.toString(),
+          recipient: new PublicKey(recipient.address),
+        });
       }
-      nextBatchNumber++;
     }
 
     return {
       entities,
-      nextBatchNumber,
+      nextBatchNumber: batchNumber + 1,
     };
   }
 
@@ -224,33 +137,22 @@ export class PgDatabase implements Database {
   }
 
   async getCurrentRewards(assetId: PublicKey) {
-    const asset = await this.getAssetFn(
-      process.env.ASSET_API_URL ||
-        this.issuanceProgram.provider.connection.rpcEndpoint,
-      assetId
-    );
-    if (!asset) {
+    const kta = await KeyToAsset.findOne({
+      where: { asset: assetId.toBase58() },
+    });
+
+    if (!kta || !kta.encodedEntityKey) {
       console.error("No asset found", assetId.toBase58());
       return "0";
     }
-    const keyToAssetKey = keyToAssetForAsset(asset, DAO);
-    const keyToAsset = await this.issuanceProgram.account.keyToAssetV0.fetch(
-      keyToAssetKey
-    );
-    const entityKey = decodeEntityKey(
-      keyToAsset.entityKey,
-      keyToAsset.keySerialization
-    )!;
-    // Verify the creator is our entity creator, otherwise they could just
-    // pass in any NFT with this ecc compact to collect rewards
-    if (
-      !asset.creators[0].verified ||
-      !new PublicKey(asset.creators[0].address).equals(ENTITY_CREATOR)
-    ) {
+
+    const rewards = await Reward.findByPk(kta.encodedEntityKey);
+
+    if (!rewards) {
       throw new Error("Not a valid rewardable entity");
     }
 
-    return this.getCurrentRewardsByEntity(entityKey);
+    return this.getCurrentRewardsByEntity(kta.encodedEntityKey);
   }
 
   async getCurrentRewardsByEntity(entityKeyStr: string) {
@@ -312,7 +214,6 @@ export class PgDatabase implements Database {
         raw: true,
       });
 
-      console.log("recipients", recipients);
       const claimed = recipients[0].totalRewards?.toString() || "0";
       const pending = new BN(lifetime).sub(new BN(claimed)).toString();
 

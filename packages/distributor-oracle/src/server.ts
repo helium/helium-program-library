@@ -71,7 +71,7 @@ import {
 import { Database, DeviceType } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
 import { PgDatabase } from "./pgDatabase";
-import { Reward, WalletClaimJob } from "./model";
+import { KeyToAsset, Recipient, Reward } from "./model";
 export * from "./database";
 
 export class OracleServer {
@@ -664,13 +664,18 @@ export class OracleServer {
     const task = new PublicKey(request.body.task);
     const taskQueuedAt = new BN(request.body.task_queued_at);
     try {
-      let keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
-        new PublicKey(request.params.keyToAssetKey)
-      );
+      let keyToAsset = await KeyToAsset.findOne({
+        where: { address: request.params.keyToAssetKey },
+      });
+      if (!keyToAsset || !keyToAsset.asset || !keyToAsset.encodedEntityKey) {
+        reply.status(404).send({ message: "Key to asset not found" });
+        return;
+      }
+
       const asset = await getAsset(
         process.env.ASSET_API_URL ||
           this.ldProgram.provider.connection.rpcEndpoint,
-        keyToAsset.asset
+        new PublicKey(keyToAsset.asset)
       );
       const [wallet, bump] = customSignerKey(taskQueue, [
         Buffer.from("claim_payer"),
@@ -678,26 +683,30 @@ export class OracleServer {
       ]);
       const bumpBuffer = Buffer.alloc(1);
       bumpBuffer.writeUint8(bump);
-      const recipient = recipientKey(this.lazyDistributor, keyToAsset.asset)[0];
-      let recipientAcc = await this.ldProgram.account.recipientV0.fetchNullable(
-        recipient
-      );
+      const recipientPk = recipientKey(
+        this.lazyDistributor,
+        new PublicKey(keyToAsset.asset)
+      )[0];
+      const recipient = await Recipient.findOne({
+        where: { address: recipientPk.toBase58() },
+      });
       const balance =
         (await this.ldProgram.provider.connection.getAccountInfo(wallet))
           ?.lamports || 0;
 
       const ata = getAssociatedTokenAddressSync(
         HNT_MINT,
-        !recipientAcc || recipientAcc.destination.equals(PublicKey.default)
+        !recipient || !recipient.destination
           ? asset!.ownership.owner
-          : recipientAcc?.destination,
+          : new PublicKey(recipient.destination),
         true
       );
+
       const ataExists =
         !!(await this.ldProgram.provider.connection.getAccountInfo(ata));
       const neededBalance =
         0.00089088 * LAMPORTS_PER_SOL +
-        (recipientAcc ? 0 : RECIPIENT_RENT) +
+        (recipient ? 0 : RECIPIENT_RENT) +
         (ataExists ? 0 : ATA_RENT);
 
       const instructions: TransactionInstruction[] = [];
@@ -711,16 +720,16 @@ export class OracleServer {
       } else {
         let distributeIx;
         if (
-          recipientAcc?.destination &&
-          !recipientAcc?.destination.equals(PublicKey.default)
+          recipient?.destination &&
+          !new PublicKey(recipient.destination).equals(PublicKey.default)
         ) {
-          const destination = recipientAcc.destination;
+          const destination = new PublicKey(recipient.destination);
           distributeIx = await this.ldProgram.methods
             .distributeCustomDestinationV0()
             .accountsPartial({
               common: {
                 payer: wallet,
-                recipient: recipient,
+                recipient: recipientPk,
                 lazyDistributor: this.lazyDistributor,
                 rewardsMint: DNT,
                 owner: destination,
@@ -736,7 +745,7 @@ export class OracleServer {
           distributeIx = await (
             await distributeCompressionRewards({
               program: this.ldProgram,
-              assetId: keyToAsset.asset,
+              assetId: new PublicKey(keyToAsset.asset),
               lazyDistributor: this.lazyDistributor,
               rewardsMint: DNT,
               payer: wallet,
@@ -748,7 +757,7 @@ export class OracleServer {
             .accountsPartial({
               common: {
                 payer: wallet,
-                recipient: recipient,
+                recipient: recipientPk,
                 lazyDistributor: this.lazyDistributor,
                 rewardsMint: DNT,
                 owner: asset!.ownership.owner,
@@ -759,7 +768,7 @@ export class OracleServer {
                 ),
               },
               recipientMintAccount: getAssociatedTokenAddressSync(
-                keyToAsset.asset,
+                new PublicKey(keyToAsset.asset),
                 asset!.ownership.owner,
                 true
               ),
@@ -767,18 +776,13 @@ export class OracleServer {
             .instruction();
         }
 
-        const entityKey = decodeEntityKey(
-          keyToAsset.entityKey,
-          keyToAsset.keySerialization
-        )!;
-
-        if (!recipientAcc) {
+        if (!recipient) {
           if (asset?.compression.compressed) {
             instructions.push(
               await (
                 await initializeCompressionRecipient({
                   program: this.ldProgram,
-                  assetId: keyToAsset.asset,
+                  assetId: new PublicKey(keyToAsset.asset),
                   lazyDistributor: this.lazyDistributor,
                   owner: wallet,
                   // Temporarily set oracle as the payer to subsidize new HNT wallets.
@@ -791,7 +795,7 @@ export class OracleServer {
               await this.ldProgram.methods
                 .initializeRecipientV0()
                 .accountsPartial({
-                  recipient: recipient,
+                  recipient: recipientPk,
                   lazyDistributor: this.lazyDistributor,
                   payer: wallet,
                   mint: keyToAsset.asset,
@@ -805,7 +809,9 @@ export class OracleServer {
           await this.roProgram.methods
             .setCurrentRewardsWrapperV2({
               currentRewards: new BN(
-                await this.db.getCurrentRewardsByEntity(entityKey)
+                await this.db.getCurrentRewardsByEntity(
+                  keyToAsset.encodedEntityKey
+                )
               ),
               oracleIndex: process.env.ORACLE_INDEX
                 ? parseInt(process.env.ORACLE_INDEX)
@@ -813,7 +819,7 @@ export class OracleServer {
             })
             .accountsPartial({
               lazyDistributor: this.lazyDistributor,
-              recipient,
+              recipient: recipientPk,
               payer: wallet,
               keyToAsset: new PublicKey(request.params.keyToAssetKey),
             })
@@ -925,7 +931,7 @@ export class OracleServer {
             await this.hplCronsProgram.methods
               .requeueEntityClaimV0()
               .accounts({
-                keyToAsset: entity.keyToAsset.address,
+                keyToAsset: entity.keyToAsset,
               })
               .instruction()
           );
@@ -1074,7 +1080,6 @@ export class OracleServer {
     const hemProgram = await initHeliumEntityManager(provider);
     const hplCronsProgram = await initHplCrons(provider);
 
-    WalletClaimJob.sync();
     Reward.sync();
 
     const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
