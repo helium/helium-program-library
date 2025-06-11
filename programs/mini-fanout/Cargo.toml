@@ -1,0 +1,33 @@
+[package]
+name = "mini-fanout"
+version = "0.1.2"
+# Trigger deployment - timestamp: 03-31-2025 #3
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "mini_fanout"
+
+[features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+devnet = []
+no-genesis = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[profile.release]
+overflow-checks = true
+
+[dependencies]
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
+solana-zk-sdk = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }
+tuktuk-program = { version = "0.3.2" }
+clockwork-cron = "2.0.19"
+chrono = "0.4.39"

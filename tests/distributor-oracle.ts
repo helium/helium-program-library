@@ -108,6 +108,12 @@ export class DatabaseMock implements Database {
       byHotspot: {},
     };
   }
+  async getRewardsByOwner(owner: string): Promise<{ lifetime: string; pending: string; }> {
+    return { lifetime: "0", pending: "0" };
+  }
+  async getRewardsByDestination(destination: string): Promise<{ lifetime: string; pending: string; }> {
+    return { lifetime: "0", pending: "0" };
+  }
 
   getRewardableEntities(wallet: anchor.web3.PublicKey, limit: number, batchNumber?: number): Promise<{ entities: RewardableEntity[]; nextBatchNumber: number; }> {
     throw new Error("Method not implemented.");
