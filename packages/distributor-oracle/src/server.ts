@@ -70,8 +70,8 @@ import {
 } from "./constants";
 import { Database, DeviceType } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
-import { PgDatabase } from "./pgDatabase";
 import { Reward } from "./model";
+import { PgDatabase } from "./pgDatabase";
 export * from "./database";
 
 export class OracleServer {
