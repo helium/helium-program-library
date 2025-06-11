@@ -141,7 +141,7 @@ pub fn handler(
     IssueProgramEntityArgsV0 {
       entity_key: "Helium Mobile Mapping Rewards".as_bytes().to_vec(),
       name: "Helium Mobile Mapping Rewards".to_string(),
-      symbol: String::from("MAPPING_REWARDS"),
+      symbol: String::from("MAPREWARD"),
       approver_seeds: seeds[0].iter().map(|s| s.to_vec()).collect(),
       key_serialization: KeySerialization::UTF8,
       metadata_url: args.metadata_url,
