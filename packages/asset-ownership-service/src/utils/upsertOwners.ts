@@ -3,7 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Sequelize, Transaction, QueryTypes } from "sequelize";
 import { PG_ASSET_TABLE, SOLANA_URL } from "../env";
 import database, { AssetOwner } from "./database";
-import { chunks, getAssetBatch } from "@helium/spl-utils";
+import { chunks, getAssetBatch, truthy } from "@helium/spl-utils";
 import retry from "async-retry";
 import pLimit from "p-limit";
 
@@ -33,7 +33,7 @@ export const upsertOwners = async ({
           { retries: 5, minTimeout: 1000 }
         )) as { id: PublicKey; ownership: { owner: PublicKey } }[]
       )
-        .filter(Boolean)
+        .filter(truthy)
         .map(({ id, ownership }) => ({
           asset: id.toBase58(),
           owner: ownership.owner.toBase58(),
