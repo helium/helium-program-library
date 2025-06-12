@@ -61,7 +61,7 @@ export async function run(args: any = process.argv) {
   const dntMint = new PublicKey(argv.dntMint);
   const subDao = (await subDaoKey(dntMint))[0];
 
-  const carrier = await carrierKey(subDao, name)[0];
+  const carrier = await carrierKey(subDao, argv.name)[0];
   const hntMint = new PublicKey(argv.hntMint);
   const recipient = argv.recipient
     ? new PublicKey(argv.recipient)
@@ -84,7 +84,7 @@ export async function run(args: any = process.argv) {
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ])
-        .accountsPartial({ carrier, recipient })
+        .accountsPartial({ carrier, recipient, keyToAsset: keyToAssetK })
         .rpc({ skipPreflight: true })
     );
   }
