@@ -198,43 +198,17 @@ Recipient.init(
   }
 );
 
-KeyToAsset.hasOne(Recipient, {
-  foreignKey: "asset",
-  sourceKey: "asset",
-  as: "Recipient",
-});
-Recipient.belongsTo(KeyToAsset, {
-  foreignKey: "asset",
-  targetKey: "asset",
-  as: "KeyToAsset",
-});
-KeyToAsset.hasOne(AssetOwner, {
-  foreignKey: "asset",
-  sourceKey: "asset",
-  as: "AssetOwner",
-});
-AssetOwner.belongsTo(KeyToAsset, {
-  foreignKey: "asset",
-  targetKey: "asset",
-  as: "KeyToAsset",
-});
-AssetOwner.belongsTo(Recipient, {
-  foreignKey: "asset",
-  targetKey: "asset",
-  as: "Recipient",
-});
-Recipient.hasOne(AssetOwner, {
-  foreignKey: "asset",
-  sourceKey: "asset",
-  as: "AssetOwner",
-});
+KeyToAsset.hasOne(Recipient, { foreignKey: "asset", sourceKey: "asset" });
+Recipient.belongsTo(KeyToAsset, { foreignKey: "asset", targetKey: "asset" });
+KeyToAsset.hasOne(AssetOwner, { foreignKey: "asset", sourceKey: "asset" });
+AssetOwner.belongsTo(KeyToAsset, { foreignKey: "asset", targetKey: "asset" });
+AssetOwner.belongsTo(Recipient, { foreignKey: "asset", targetKey: "asset" });
+Recipient.hasOne(AssetOwner, { foreignKey: "asset", sourceKey: "asset" });
 KeyToAsset.hasOne(Reward, {
   foreignKey: "address",
   sourceKey: "encodedEntityKey",
-  as: "Reward",
 });
 Reward.belongsTo(KeyToAsset, {
   foreignKey: "address",
   targetKey: "encodedEntityKey",
-  as: "KeyToAsset",
 });

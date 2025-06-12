@@ -12,7 +12,6 @@ import {
   SearchAssetsOpts,
   getAsset,
   searchAssets,
-  truthy,
 } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import { Op } from "sequelize";
@@ -57,25 +56,26 @@ export class PgDatabase implements Database {
         },
         {
           model: Recipient,
-          as: "Recipient",
           required: true,
           where: { lazyDistributor: this.lazyDistributor.toBase58() },
+        },
+        {
+          model: Reward,
+          required: false,
+          attributes: ["rewards"],
         },
       ],
       limit,
       offset,
     });
 
-    const entityKeys = keyToAssets
-      .map((kta) => kta.encodedEntityKey)
-      .filter(truthy);
-    const lifetimeRewards = await this.getBulkRewards(entityKeys);
     const entities: RewardableEntity[] = [];
     for (const kta of keyToAssets) {
-      const recipient = kta.get("Recipient") as Recipient;
+      const recipient = kta.get("recipient") as Recipient;
+      const reward = kta.get("reward") as Reward | null;
       const entityKey = kta.encodedEntityKey;
       if (!entityKey) continue;
-      const lifetimeReward = lifetimeRewards[entityKey] || "0";
+      const lifetimeReward = reward?.rewards?.toString() || "0";
       const pendingRewards = new BN(lifetimeReward).sub(
         new BN(recipient?.totalRewards || "0")
       );
