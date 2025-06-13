@@ -40,8 +40,8 @@ export type RecipientV0 = anchor.IdlAccounts<LazyDistributor>["recipientV0"] & {
 };
 
 export type RewardableEntity = {
-  keyToAsset: KeyToAssetV0;
-  recipient: RecipientV0;
+  keyToAsset: PublicKey;
+  recipient: PublicKey;
   lifetimeReward: string;
   pendingReward: string;
 };

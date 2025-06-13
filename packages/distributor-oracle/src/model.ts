@@ -80,29 +80,6 @@ Reward.init(
   }
 );
 
-export class WalletClaimJob extends Model {
-  declare wallet: string;
-  declare remainingKtas: string[];
-}
-WalletClaimJob.init(
-  {
-    wallet: {
-      type: STRING,
-      primaryKey: true,
-    },
-    remainingKtas: {
-      type: ARRAY(STRING),
-    },
-  },
-  {
-    sequelize,
-    modelName: "wallet_claim_jobs",
-    tableName: "wallet_claim_jobs",
-    underscored: true,
-    timestamps: false,
-  }
-);
-
 export class AssetOwner extends Model {
   declare asset: string;
   declare owner: string;
@@ -113,7 +90,7 @@ AssetOwner.init(
   {
     asset: {
       type: STRING,
-      primaryKey: true,
+      primaryKey: false,
     },
     owner: {
       type: STRING,
@@ -144,19 +121,19 @@ KeyToAsset.init(
   {
     address: {
       type: STRING,
-      primaryKey: true,
+      primaryKey: false,
     },
     dao: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
     },
     asset: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
     },
     entityKey: {
       type: "BYTEA",
-      allowNull: true,
+      allowNull: false,
       field: "entity_key",
     },
     encodedEntityKey: {
@@ -191,25 +168,25 @@ Recipient.init(
   {
     address: {
       type: STRING,
-      primaryKey: true,
+      primaryKey: false,
     },
     lazyDistributor: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
       field: "lazy_distributor",
     },
     asset: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
     },
     totalRewards: {
       type: "NUMERIC",
-      allowNull: true,
+      allowNull: false,
       field: "total_rewards",
     },
     destination: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
     },
   },
   {
@@ -221,13 +198,13 @@ Recipient.init(
   }
 );
 
-KeyToAsset.hasMany(Recipient, { foreignKey: "asset", sourceKey: "asset" });
+KeyToAsset.hasOne(Recipient, { foreignKey: "asset", sourceKey: "asset" });
 Recipient.belongsTo(KeyToAsset, { foreignKey: "asset", targetKey: "asset" });
-KeyToAsset.hasMany(AssetOwner, { foreignKey: "asset", sourceKey: "asset" });
+KeyToAsset.hasOne(AssetOwner, { foreignKey: "asset", sourceKey: "asset" });
 AssetOwner.belongsTo(KeyToAsset, { foreignKey: "asset", targetKey: "asset" });
 AssetOwner.belongsTo(Recipient, { foreignKey: "asset", targetKey: "asset" });
-Recipient.hasMany(AssetOwner, { foreignKey: "asset", sourceKey: "asset" });
-KeyToAsset.hasMany(Reward, {
+Recipient.hasOne(AssetOwner, { foreignKey: "asset", sourceKey: "asset" });
+KeyToAsset.hasOne(Reward, {
   foreignKey: "address",
   sourceKey: "encodedEntityKey",
 });
