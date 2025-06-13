@@ -14,10 +14,10 @@ import {
   searchAssets,
 } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { DAO } from "./constants";
 import { Database, DeviceType, RewardableEntity } from "./database";
-import { AssetOwner, KeyToAsset, Recipient, Reward, sequelize } from "./model";
+import { Reward, sequelize } from "./model";
 
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
@@ -47,44 +47,55 @@ export class PgDatabase implements Database {
     nextBatchNumber: number;
   }> {
     const offset = batchNumber * limit;
-    const keyToAssets = await KeyToAsset.findAll({
-      include: [
-        {
-          model: AssetOwner,
-          required: true,
-          where: { owner: wallet.toBase58() },
+    const results = await sequelize.query<{
+      kta_address: string;
+      entity_key: string;
+      asset: string;
+      lifetime: string;
+      claimed: string;
+      recipient_address: string | null;
+    }>(
+      `
+        SELECT
+          kta.address AS kta_address,
+          kta.encoded_entity_key AS entity_key,
+          kta.asset AS asset,
+          COALESCE(r.rewards, '0') AS lifetime,
+          COALESCE(rec.total_rewards, '0') AS claimed,
+          rec.address AS recipient_address
+        FROM asset_owners ao
+        JOIN key_to_assets kta ON ao.asset = kta.asset
+        LEFT JOIN reward_index r ON kta.encoded_entity_key = r.address
+        LEFT JOIN recipients rec
+          ON kta.asset = rec.asset
+          AND rec.lazy_distributor = :lazyDistributor
+        WHERE ao.owner = :owner
+        LIMIT :limit OFFSET :offset
+      `,
+      {
+        replacements: {
+          owner: wallet.toBase58(),
+          lazyDistributor: this.lazyDistributor.toBase58(),
+          limit,
+          offset,
         },
-        {
-          model: Recipient,
-          required: true,
-          where: { lazyDistributor: this.lazyDistributor.toBase58() },
-        },
-        {
-          model: Reward,
-          required: false,
-          attributes: ["rewards"],
-        },
-      ],
-      limit,
-      offset,
-    });
+        type: QueryTypes.SELECT,
+      }
+    );
 
     const entities: RewardableEntity[] = [];
-    for (const kta of keyToAssets) {
-      const recipient = kta.get("recipient") as Recipient;
-      const reward = kta.get("reward") as Reward | null;
-      const entityKey = kta.encodedEntityKey;
-      if (!entityKey) continue;
-      const lifetimeReward = reward?.rewards?.toString() || "0";
-      const pendingRewards = new BN(lifetimeReward).sub(
-        new BN(recipient?.totalRewards || "0")
-      );
+    for (const row of results) {
+      const lifetimeReward = row.lifetime ?? "0";
+      const claimed = row.claimed ?? "0";
+      const pendingRewards = new BN(lifetimeReward).sub(new BN(claimed));
       if (!pendingRewards.lte(new BN("0"))) {
         entities.push({
-          keyToAsset: new PublicKey(kta.address),
+          keyToAsset: new PublicKey(row.kta_address),
           lifetimeReward,
           pendingReward: pendingRewards.toString(),
-          recipient: new PublicKey(recipient.address),
+          recipient: row.recipient_address
+            ? new PublicKey(row.recipient_address)
+            : new PublicKey(row.asset),
         });
       }
     }
@@ -182,50 +193,39 @@ export class PgDatabase implements Database {
 
   async getRewardsByOwner(owner: string) {
     try {
-      const rewards = await Reward.findAll({
-        include: [
-          {
-            model: KeyToAsset,
-            required: true,
-            attributes: [],
-            include: [
-              {
-                model: AssetOwner,
-                required: true,
-                attributes: [],
-                where: { owner },
-              },
-            ],
+      const [result] = await sequelize.query<{
+        lifetime: string;
+        claimed: string;
+      }>(
+        `
+          SELECT
+            COALESCE((
+              SELECT SUM(r.rewards)
+              FROM reward_index r
+              JOIN key_to_assets kta ON r.address = kta.encoded_entity_key
+              JOIN asset_owners ao ON kta.asset = ao.asset
+              WHERE ao.owner = :owner
+            ), 0) AS lifetime,
+            COALESCE((
+              SELECT SUM(rec.total_rewards)
+              FROM recipients rec
+              JOIN asset_owners ao2 ON rec.asset = ao2.asset
+              WHERE ao2.owner = :owner
+                AND rec.lazy_distributor = :lazyDistributor
+          ), 0) AS claimed
+        `,
+        {
+          replacements: {
+            owner,
+            lazyDistributor: this.lazyDistributor.toBase58(),
           },
-        ],
-        attributes: [
-          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
-        ],
-        raw: true,
-      });
+          type: QueryTypes.SELECT,
+        }
+      );
 
-      const lifetime = rewards[0].rewards?.toString() || "0";
-      const recipients = await Recipient.findAll({
-        include: [
-          {
-            model: AssetOwner,
-            required: true,
-            attributes: [],
-            where: { owner },
-          },
-        ],
-        where: {
-          lazyDistributor: this.lazyDistributor.toBase58(),
-        },
-        attributes: [
-          [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
-        ],
-        raw: true,
-      });
-
-      const claimed = recipients[0].totalRewards?.toString() || "0";
+      const lifetime = result.lifetime ?? "0";
+      const claimed = result.claimed ?? "0";
       const pending = new BN(lifetime).sub(new BN(claimed)).toString();
-
       return { lifetime: claimed, pending };
     } catch (err: any) {
       if (err?.parent?.code === "42P01") {
@@ -238,46 +238,39 @@ export class PgDatabase implements Database {
 
   async getRewardsByDestination(destination: string) {
     try {
-      const rewards = await Reward.findAll({
-        include: [
-          {
-            model: KeyToAsset,
-            required: true,
-            attributes: [],
-            include: [
-              {
-                model: Recipient,
-                required: true,
-                attributes: [],
-                where: {
-                  destination,
-                  lazyDistributor: this.lazyDistributor.toBase58(),
-                },
-              },
-            ],
+      const [result] = await sequelize.query<{
+        lifetime: string;
+        claimed: string;
+      }>(
+        `
+          SELECT
+            COALESCE((
+              SELECT SUM(r.rewards)
+              FROM reward_index r
+              JOIN key_to_assets kta ON r.address = kta.encoded_entity_key
+              JOIN recipients rec ON kta.asset = rec.asset
+              WHERE rec.destination = :destination
+                AND rec.lazy_distributor = :lazyDistributor
+            ), 0) AS lifetime,
+            COALESCE((
+              SELECT SUM(rec2.total_rewards)
+              FROM recipients rec2
+              WHERE rec2.destination = :destination
+                AND rec2.lazy_distributor = :lazyDistributor
+            ), 0) AS claimed
+        `,
+        {
+          replacements: {
+            destination,
+            lazyDistributor: this.lazyDistributor.toBase58(),
           },
-        ],
-        attributes: [
-          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
-        ],
-        raw: true,
-      });
+          type: QueryTypes.SELECT,
+        }
+      );
 
-      const lifetime = rewards[0].rewards?.toString() || "0";
-      const recipients = await Recipient.findAll({
-        where: {
-          destination,
-          lazyDistributor: this.lazyDistributor.toBase58(),
-        },
-        attributes: [
-          [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
-        ],
-        raw: true,
-      });
-
-      const claimed = recipients[0].totalRewards?.toString() || "0";
+      const lifetime = result.lifetime ?? "0";
+      const claimed = result.claimed ?? "0";
       const pending = new BN(lifetime).sub(new BN(claimed)).toString();
-
       return { lifetime, pending };
     } catch (err: any) {
       if (err?.parent?.code === "42P01") {

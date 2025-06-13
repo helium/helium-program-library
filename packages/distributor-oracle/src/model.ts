@@ -90,7 +90,7 @@ AssetOwner.init(
   {
     asset: {
       type: STRING,
-      primaryKey: true,
+      primaryKey: false,
     },
     owner: {
       type: STRING,
@@ -121,19 +121,19 @@ KeyToAsset.init(
   {
     address: {
       type: STRING,
-      primaryKey: true,
+      primaryKey: false,
     },
     dao: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
     },
     asset: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
     },
     entityKey: {
       type: "BYTEA",
-      allowNull: true,
+      allowNull: false,
       field: "entity_key",
     },
     encodedEntityKey: {
@@ -168,25 +168,25 @@ Recipient.init(
   {
     address: {
       type: STRING,
-      primaryKey: true,
+      primaryKey: false,
     },
     lazyDistributor: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
       field: "lazy_distributor",
     },
     asset: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
     },
     totalRewards: {
       type: "NUMERIC",
-      allowNull: true,
+      allowNull: false,
       field: "total_rewards",
     },
     destination: {
       type: STRING,
-      allowNull: true,
+      allowNull: false,
     },
   },
   {
