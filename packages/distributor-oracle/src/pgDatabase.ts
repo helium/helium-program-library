@@ -190,20 +190,10 @@ export class PgDatabase implements Database {
             attributes: [],
             include: [
               {
-                model: Recipient,
+                model: AssetOwner,
                 required: true,
                 attributes: [],
-                where: {
-                  lazyDistributor: this.lazyDistributor.toBase58(),
-                },
-                include: [
-                  {
-                    model: AssetOwner,
-                    required: true,
-                    attributes: [],
-                    where: { owner },
-                  },
-                ],
+                where: { owner },
               },
             ],
           },
@@ -236,7 +226,7 @@ export class PgDatabase implements Database {
       const claimed = recipients[0].totalRewards?.toString() || "0";
       const pending = new BN(lifetime).sub(new BN(claimed)).toString();
 
-      return { lifetime, pending };
+      return { lifetime: claimed, pending };
     } catch (err: any) {
       if (err?.parent?.code === "42P01") {
         console.warn("Table missing for getCurrentRewardsByOwner, returning 0");
