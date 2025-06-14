@@ -127,35 +127,45 @@ export const integrityCheckProgramAccounts = async ({
         100
       );
 
+      limiter = pLimit(10);
+      const parsedTransactions = (
+        await Promise.all(
+          txSignatureChunks.map((chunk) =>
+            limiter(async () => {
+              await new Promise((resolve) => setTimeout(resolve, 250));
+              return retry(
+                () =>
+                  connection.getParsedTransactions(chunk, {
+                    commitment: "finalized",
+                    maxSupportedTransactionVersion: 0,
+                  }),
+                retryOptions
+              );
+            })
+          )
+        )
+      ).flat();
+
       const uniqueWritableAccounts = new Set<string>();
-      for (const chunk of txSignatureChunks) {
-        await new Promise((resolve) => setTimeout(resolve, 250));
-        const parsedChunk = await retry(
-          () =>
-            connection.getParsedTransactions(chunk, {
-              commitment: "finalized",
-              maxSupportedTransactionVersion: 0,
-            }),
-          retryOptions
-        );
-        for (const parsed of parsedChunk) {
-          if (!parsed) continue;
-          const signatures = parsed.transaction.signatures;
-          parsed.transaction.message.accountKeys.forEach((acc) => {
-            if (acc.writable) {
-              const pubkey = acc.pubkey.toBase58();
-              uniqueWritableAccounts.add(pubkey);
-              txIdsByAccountId[pubkey] = [
-                ...signatures,
-                ...(txIdsByAccountId[pubkey] || []),
-              ];
-            }
-          });
-        }
+      for (const parsed of parsedTransactions) {
+        if (!parsed) continue;
+        const signatures = parsed.transaction.signatures;
+        parsed.transaction.message.accountKeys.forEach((acc) => {
+          if (acc.writable) {
+            const pubkey = acc.pubkey.toBase58();
+            uniqueWritableAccounts.add(pubkey);
+            txIdsByAccountId[pubkey] = [
+              ...signatures,
+              ...(txIdsByAccountId[pubkey] || []),
+            ];
+          }
+        });
       }
 
       // Dereference txSignatureChunks after use
       txSignatureChunks.length = 0;
+      // Dereference parsedTransactions after use
+      parsedTransactions.length = 0;
 
       const pluginsByAccountType = (
         await Promise.all(
