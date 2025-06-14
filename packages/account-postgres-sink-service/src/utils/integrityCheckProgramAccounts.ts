@@ -118,47 +118,44 @@ export const integrityCheckProgramAccounts = async ({
         newValues: { [key: string]: any };
       }[] = [];
 
-      limiter = pLimit(10);
-      const parsedTransactions = (
-        await Promise.all(
-          chunks(
-            await getTransactionSignaturesUptoBlockTime({
-              programId,
-              blockTime: blockTime24HoursAgo,
-              provider,
-            }),
-            100
-          ).map((chunk) =>
-            limiter(async () => {
-              await new Promise((resolve) => setTimeout(resolve, 250));
-              return retry(
-                () =>
-                  connection.getParsedTransactions(chunk, {
-                    commitment: "finalized",
-                    maxSupportedTransactionVersion: 0,
-                  }),
-                retryOptions
-              );
-            })
-          )
-        )
-      ).flat();
+      const txSignatureChunks = chunks(
+        await getTransactionSignaturesUptoBlockTime({
+          programId,
+          blockTime: blockTime24HoursAgo,
+          provider,
+        }),
+        100
+      );
 
       const uniqueWritableAccounts = new Set<string>();
-      parsedTransactions.forEach((parsed) => {
-        if (!parsed) return;
-        const signatures = parsed.transaction.signatures;
-        parsed.transaction.message.accountKeys.forEach((acc) => {
-          if (acc.writable) {
-            const pubkey = acc.pubkey.toBase58();
-            uniqueWritableAccounts.add(pubkey);
-            txIdsByAccountId[pubkey] = [
-              ...signatures,
-              ...(txIdsByAccountId[pubkey] || []),
-            ];
-          }
-        });
-      });
+      for (const chunk of txSignatureChunks) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const parsedChunk = await retry(
+          () =>
+            connection.getParsedTransactions(chunk, {
+              commitment: "finalized",
+              maxSupportedTransactionVersion: 0,
+            }),
+          retryOptions
+        );
+        for (const parsed of parsedChunk) {
+          if (!parsed) continue;
+          const signatures = parsed.transaction.signatures;
+          parsed.transaction.message.accountKeys.forEach((acc) => {
+            if (acc.writable) {
+              const pubkey = acc.pubkey.toBase58();
+              uniqueWritableAccounts.add(pubkey);
+              txIdsByAccountId[pubkey] = [
+                ...signatures,
+                ...(txIdsByAccountId[pubkey] || []),
+              ];
+            }
+          });
+        }
+      }
+
+      // Dereference txSignatureChunks after use
+      txSignatureChunks.length = 0;
 
       const pluginsByAccountType = (
         await Promise.all(
@@ -183,6 +180,16 @@ export const integrityCheckProgramAccounts = async ({
 
       limiter = pLimit(100);
       const uniqueWritableAccountsArray = [...uniqueWritableAccounts.values()];
+
+      const delayMs =
+        (process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS
+          ? parseInt(process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS, 10)
+          : 120000) + Math.floor(Math.random() * 30000); // default 2 minutes + 30 second jitter
+
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+
       await Promise.all(
         chunks(uniqueWritableAccountsArray, 100).map(async (chunk) => {
           const accountInfos = await limiter(() =>
@@ -201,6 +208,9 @@ export const integrityCheckProgramAccounts = async ({
             ...accountInfo,
           }));
 
+          // Dereference txSignatureChunks after use
+          accountInfos.length = 0;
+
           const accsByType: Record<string, typeof accountInfosWithPk> = {};
           accountInfosWithPk.forEach((accountInfo) => {
             const accName = accounts.find(
@@ -216,6 +226,9 @@ export const integrityCheckProgramAccounts = async ({
               accsByType[accName].push(accountInfo);
             }
           });
+
+          // Dereference accountInfosWithPk after use
+          accountInfosWithPk.length = 0;
 
           await Promise.all(
             Object.entries(accsByType).map(async ([accName, accounts]) => {
@@ -352,6 +365,28 @@ export const integrityCheckProgramAccounts = async ({
                       });
 
                       await model.upsert({ ...sanitized }, { transaction: t });
+                      fastify.customMetrics.integrityCheckCounter.inc();
+                      console.dir(
+                        {
+                          type: accName,
+                          accountId: acc.pubkey,
+                          txSignatures: txIdsByAccountId[acc.pubkey] || [],
+                          currentValues: existing
+                            ? changedFields.reduce(
+                                (obj, key) => ({
+                                  ...obj,
+                                  [key]: existingData[key],
+                                }),
+                                {}
+                              )
+                            : null,
+                          newValues: changedFields.reduce(
+                            (obj, key) => ({ ...obj, [key]: sanitized[key] }),
+                            {}
+                          ),
+                        },
+                        { depth: null }
+                      );
                     }
                   })
                 )
