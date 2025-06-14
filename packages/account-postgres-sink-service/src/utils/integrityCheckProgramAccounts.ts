@@ -375,28 +375,6 @@ export const integrityCheckProgramAccounts = async ({
                       });
 
                       await model.upsert({ ...sanitized }, { transaction: t });
-                      fastify.customMetrics.integrityCheckCounter.inc();
-                      console.dir(
-                        {
-                          type: accName,
-                          accountId: acc.pubkey,
-                          txSignatures: txIdsByAccountId[acc.pubkey] || [],
-                          currentValues: existing
-                            ? changedFields.reduce(
-                                (obj, key) => ({
-                                  ...obj,
-                                  [key]: existingData[key],
-                                }),
-                                {}
-                              )
-                            : null,
-                          newValues: changedFields.reduce(
-                            (obj, key) => ({ ...obj, [key]: sanitized[key] }),
-                            {}
-                          ),
-                        },
-                        { depth: null }
-                      );
                     }
                   })
                 )
