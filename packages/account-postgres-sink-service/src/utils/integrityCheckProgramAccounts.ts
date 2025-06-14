@@ -218,7 +218,7 @@ export const integrityCheckProgramAccounts = async ({
             ...accountInfo,
           }));
 
-          // Dereference txSignatureChunks after use
+          // Dereference accountInfos after use
           accountInfos.length = 0;
 
           const accsByType: Record<string, typeof accountInfosWithPk> = {};
