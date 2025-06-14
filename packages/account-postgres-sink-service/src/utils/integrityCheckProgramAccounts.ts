@@ -207,7 +207,7 @@ export const integrityCheckProgramAccounts = async ({
               () =>
                 connection.getMultipleAccountsInfo(
                   chunk.map((c) => new PublicKey(c)),
-                  "confirmed"
+                  "finalized"
                 ),
               retryOptions
             )
