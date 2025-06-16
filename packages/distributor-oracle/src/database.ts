@@ -25,7 +25,7 @@ export interface Database {
     limit: number,
     batchNumber?: number
   ): Promise<{
-    entities: RewardableEntity[];
+    entities: Pick<RewardableEntity, "keyToAsset">[];
     nextBatchNumber: number;
   }>;
 }

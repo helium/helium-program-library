@@ -80,6 +80,29 @@ Reward.init(
   }
 );
 
+export class WalletClaimJob extends Model {
+  declare wallet: string;
+  declare remainingKtas: string[];
+}
+WalletClaimJob.init(
+  {
+    wallet: {
+      type: STRING,
+      primaryKey: true,
+    },
+    remainingKtas: {
+      type: ARRAY(STRING),
+    },
+  },
+  {
+    sequelize,
+    modelName: "wallet_claim_jobs",
+    tableName: "wallet_claim_jobs",
+    underscored: true,
+    timestamps: false,
+  }
+);
+
 export class AssetOwner extends Model {
   declare asset: string;
   declare owner: string;

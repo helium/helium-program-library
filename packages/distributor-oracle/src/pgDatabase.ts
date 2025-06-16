@@ -17,7 +17,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Op, QueryTypes } from "sequelize";
 import { DAO } from "./constants";
 import { Database, DeviceType, RewardableEntity } from "./database";
-import { Reward, sequelize } from "./model";
+import { Reward, WalletClaimJob, sequelize } from "./model";
 
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
@@ -38,71 +38,86 @@ export class PgDatabase implements Database {
     ) => Promise<Asset[]> = searchAssets
   ) {}
 
+  private async getOrCreateWalletClaimJob(
+    wallet: PublicKey,
+    batchNumber?: number
+  ) {
+    if (!batchNumber) {
+      await WalletClaimJob.destroy({
+        where: { wallet: wallet.toBase58() },
+      });
+    }
+    let job = await WalletClaimJob.findOne({
+      where: { wallet: wallet.toBase58() },
+    });
+    if (!job) {
+      const results = await sequelize.query<{
+        kta_address: string;
+        lifetime: string;
+        claimed: string;
+      }>(
+        `
+          SELECT
+            kta.address AS kta_address,
+            COALESCE(r.rewards, '0') AS lifetime,
+            COALESCE(rec.total_rewards, '0') AS claimed
+          FROM asset_owners ao
+          JOIN key_to_assets kta ON ao.asset = kta.asset
+          LEFT JOIN reward_index r ON kta.encoded_entity_key = r.address
+          LEFT JOIN recipients rec
+            ON kta.asset = rec.asset
+            AND rec.lazy_distributor = :lazyDistributor
+          WHERE ao.owner = :owner
+        `,
+        {
+          replacements: {
+            owner: wallet.toBase58(),
+            lazyDistributor: this.lazyDistributor.toBase58(),
+          },
+          type: QueryTypes.SELECT,
+        }
+      );
+      const allKtas = results
+        .filter((row) => {
+          const lifetime = row.lifetime ?? "0";
+          const claimed = row.claimed ?? "0";
+          return new BN(lifetime).sub(new BN(claimed)).gt(new BN("0"));
+        })
+        .map((row) => row.kta_address);
+
+      job = await WalletClaimJob.create({
+        wallet: wallet.toBase58(),
+        remainingKtas: allKtas,
+      });
+      await job.save();
+    }
+    return job;
+  }
+
   async getRewardableEntities(
     wallet: PublicKey,
     limit: number,
     batchNumber: number = 0
   ): Promise<{
-    entities: RewardableEntity[];
+    entities: { keyToAsset: PublicKey }[];
     nextBatchNumber: number;
   }> {
-    const offset = batchNumber * limit;
-    const results = await sequelize.query<{
-      kta_address: string;
-      entity_key: string;
-      asset: string;
-      lifetime: string;
-      claimed: string;
-      recipient_address: string | null;
-    }>(
-      `
-        SELECT
-          kta.address AS kta_address,
-          kta.encoded_entity_key AS entity_key,
-          kta.asset AS asset,
-          COALESCE(r.rewards, '0') AS lifetime,
-          COALESCE(rec.total_rewards, '0') AS claimed,
-          rec.address AS recipient_address
-        FROM asset_owners ao
-        JOIN key_to_assets kta ON ao.asset = kta.asset
-        LEFT JOIN reward_index r ON kta.encoded_entity_key = r.address
-        LEFT JOIN recipients rec
-          ON kta.asset = rec.asset
-          AND rec.lazy_distributor = :lazyDistributor
-        WHERE ao.owner = :owner
-        LIMIT :limit OFFSET :offset
-      `,
-      {
-        replacements: {
-          owner: wallet.toBase58(),
-          lazyDistributor: this.lazyDistributor.toBase58(),
-          limit,
-          offset,
-        },
-        type: QueryTypes.SELECT,
-      }
+    const job = await this.getOrCreateWalletClaimJob(wallet, batchNumber);
+    let nextBatchNumber = batchNumber || 0;
+    const remainingKtas = job.remainingKtas.slice(
+      nextBatchNumber * limit,
+      (nextBatchNumber + 1) * limit
     );
 
-    const entities: RewardableEntity[] = [];
-    for (const row of results) {
-      const lifetimeReward = row.lifetime ?? "0";
-      const claimed = row.claimed ?? "0";
-      const pendingRewards = new BN(lifetimeReward).sub(new BN(claimed));
-      if (!pendingRewards.lte(new BN("0"))) {
-        entities.push({
-          keyToAsset: new PublicKey(row.kta_address),
-          lifetimeReward,
-          pendingReward: pendingRewards.toString(),
-          recipient: row.recipient_address
-            ? new PublicKey(row.recipient_address)
-            : new PublicKey(row.asset),
-        });
-      }
-    }
+    const entities = remainingKtas.map((kta: string) => ({
+      keyToAsset: new PublicKey(kta),
+    }));
+
+    nextBatchNumber++;
 
     return {
       entities,
-      nextBatchNumber: batchNumber + 1,
+      nextBatchNumber,
     };
   }
 
