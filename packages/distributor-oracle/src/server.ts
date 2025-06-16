@@ -70,8 +70,8 @@ import {
 } from "./constants";
 import { Database, DeviceType } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
+import { Reward } from "./model";
 import { PgDatabase } from "./pgDatabase";
-import { Reward, WalletClaimJob } from "./model";
 export * from "./database";
 
 export class OracleServer {
@@ -925,7 +925,7 @@ export class OracleServer {
             await this.hplCronsProgram.methods
               .requeueEntityClaimV0()
               .accounts({
-                keyToAsset: entity.keyToAsset.address,
+                keyToAsset: entity.keyToAsset,
               })
               .instruction()
           );
@@ -1074,7 +1074,6 @@ export class OracleServer {
     const hemProgram = await initHeliumEntityManager(provider);
     const hplCronsProgram = await initHplCrons(provider);
 
-    WalletClaimJob.sync();
     Reward.sync();
 
     const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];

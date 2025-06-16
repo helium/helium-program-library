@@ -7,31 +7,17 @@ import {
 } from "@helium/helium-entity-manager-sdk";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
-import { recipientKey } from "@helium/lazy-distributor-sdk";
 import {
   Asset,
+  SearchAssetsOpts,
   getAsset,
   searchAssets,
-  SearchAssetsOpts,
 } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { DAO } from "./constants";
-import {
-  Database,
-  DeviceType,
-  KeyToAssetV0,
-  RecipientV0,
-  RewardableEntity,
-} from "./database";
-import {
-  AssetOwner,
-  KeyToAsset,
-  Recipient,
-  Reward,
-  sequelize,
-  WalletClaimJob,
-} from "./model";
+import { Database, DeviceType, RewardableEntity } from "./database";
+import { Reward, WalletClaimJob, sequelize } from "./model";
 
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
@@ -61,44 +47,49 @@ export class PgDatabase implements Database {
         where: { wallet: wallet.toBase58() },
       });
     }
-    const job = await WalletClaimJob.findOne({
+    let job = await WalletClaimJob.findOne({
       where: { wallet: wallet.toBase58() },
     });
     if (!job) {
-      let page = 1;
-      const limit = 1000;
-      let allKtas: string[] = [];
-
-      while (true) {
-        const assets =
-          (await this.searchAssetsFn(
-            process.env.ASSET_API_URL ||
-              this.issuanceProgram.provider.connection.rpcEndpoint,
-            {
-              ownerAddress: wallet.toBase58(),
-              creatorVerified: true,
-              creatorAddress: ENTITY_CREATOR.toBase58(),
-              page,
-              limit,
-            }
-          )) || [];
-
-        allKtas = allKtas.concat(
-          assets.map((asset) => keyToAssetForAsset(asset, DAO).toBase58())
-        );
-
-        if (assets.length < limit) {
-          break;
+      const results = await sequelize.query<{
+        kta_address: string;
+        lifetime: string;
+        claimed: string;
+      }>(
+        `
+          SELECT
+            kta.address AS kta_address,
+            COALESCE(r.rewards, '0') AS lifetime,
+            COALESCE(rec.total_rewards, '0') AS claimed
+          FROM asset_owners ao
+          JOIN key_to_assets kta ON ao.asset = kta.asset
+          LEFT JOIN reward_index r ON kta.encoded_entity_key = r.address
+          LEFT JOIN recipients rec
+            ON kta.asset = rec.asset
+            AND rec.lazy_distributor = :lazyDistributor
+          WHERE ao.owner = :owner
+        `,
+        {
+          replacements: {
+            owner: wallet.toBase58(),
+            lazyDistributor: this.lazyDistributor.toBase58(),
+          },
+          type: QueryTypes.SELECT,
         }
+      );
+      const allKtas = results
+        .filter((row) => {
+          const lifetime = row.lifetime ?? "0";
+          const claimed = row.claimed ?? "0";
+          return new BN(lifetime).sub(new BN(claimed)).gt(new BN("0"));
+        })
+        .map((row) => row.kta_address);
 
-        page++;
-      }
-      const job = await WalletClaimJob.create({
+      job = await WalletClaimJob.create({
         wallet: wallet.toBase58(),
         remainingKtas: allKtas,
       });
       await job.save();
-      return job;
     }
     return job;
   }
@@ -108,65 +99,21 @@ export class PgDatabase implements Database {
     limit: number,
     batchNumber: number = 0
   ): Promise<{
-    entities: RewardableEntity[];
+    entities: { keyToAsset: PublicKey }[];
     nextBatchNumber: number;
   }> {
     const job = await this.getOrCreateWalletClaimJob(wallet, batchNumber);
-    const entities: RewardableEntity[] = [];
     let nextBatchNumber = batchNumber || 0;
-    while (entities.length == 0) {
-      const remainingKtas = job.remainingKtas.slice(
-        nextBatchNumber * limit,
-        (nextBatchNumber + 1) * limit
-      );
-      if (remainingKtas.length === 0) {
-        nextBatchNumber++;
-        break;
-      }
-      const ktas = (
-        await this.issuanceProgram.account.keyToAssetV0.fetchMultiple(
-          remainingKtas
-        )
-      ).map((kta, index) => ({
-        ...(kta as KeyToAssetV0),
-        address: new PublicKey(remainingKtas[index]),
-      }));
-      const assets = ktas.map((kta) => kta.asset);
-      const recipientKeys = assets.map(
-        (a) => recipientKey(this.lazyDistributor, a)[0]
-      );
-      const recipients = (
-        await this.lazyDistributorProgram.account.recipientV0.fetchMultiple(
-          recipientKeys
-        )
-      ).map((r, index) => ({
-        ...(r as RecipientV0),
-        address: new PublicKey(recipientKeys[index]),
-      }));
-      const entityKeys = ktas.map(
-        (kta) => decodeEntityKey(kta.entityKey, kta.keySerialization)!
-      );
-      const lifetimeRewards = await this.getBulkRewards(entityKeys);
-      for (let i = 0; i < recipients.length; i++) {
-        const entityKey = entityKeys[i];
-        const recipient = recipients[i];
-        const kta = ktas[i];
-        const lifetimeReward = lifetimeRewards[entityKey];
+    const remainingKtas = job.remainingKtas.slice(
+      nextBatchNumber * limit,
+      (nextBatchNumber + 1) * limit
+    );
 
-        const pendingRewards = new BN(lifetimeReward).sub(
-          recipient?.totalRewards || new BN("0")
-        );
-        if (!pendingRewards.lte(new BN("0"))) {
-          entities.push({
-            keyToAsset: kta,
-            lifetimeReward: lifetimeReward,
-            pendingReward: pendingRewards.toString(),
-            recipient: recipient,
-          });
-        }
-      }
-      nextBatchNumber++;
-    }
+    const entities = remainingKtas.map((kta: string) => ({
+      keyToAsset: new PublicKey(kta),
+    }));
+
+    nextBatchNumber++;
 
     return {
       entities,
@@ -261,62 +208,40 @@ export class PgDatabase implements Database {
 
   async getRewardsByOwner(owner: string) {
     try {
-      const rewards = await Reward.findAll({
-        include: [
-          {
-            model: KeyToAsset,
-            required: true,
-            attributes: [],
-            include: [
-              {
-                model: Recipient,
-                required: true,
-                attributes: [],
-                where: {
-                  lazyDistributor: this.lazyDistributor.toBase58(),
-                },
-                include: [
-                  {
-                    model: AssetOwner,
-                    required: true,
-                    attributes: [],
-                    where: { owner },
-                  },
-                ],
-              },
-            ],
+      const [result] = await sequelize.query<{
+        lifetime: string;
+        claimed: string;
+      }>(
+        `
+          SELECT
+            COALESCE((
+              SELECT SUM(r.rewards)
+              FROM reward_index r
+              JOIN key_to_assets kta ON r.address = kta.encoded_entity_key
+              JOIN asset_owners ao ON kta.asset = ao.asset
+              WHERE ao.owner = :owner
+            ), 0) AS lifetime,
+            COALESCE((
+              SELECT SUM(rec.total_rewards)
+              FROM recipients rec
+              JOIN asset_owners ao2 ON rec.asset = ao2.asset
+              WHERE ao2.owner = :owner
+                AND rec.lazy_distributor = :lazyDistributor
+          ), 0) AS claimed
+        `,
+        {
+          replacements: {
+            owner,
+            lazyDistributor: this.lazyDistributor.toBase58(),
           },
-        ],
-        attributes: [
-          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
-        ],
-        raw: true,
-      });
+          type: QueryTypes.SELECT,
+        }
+      );
 
-      const lifetime = rewards[0].rewards?.toString() || "0";
-      const recipients = await Recipient.findAll({
-        include: [
-          {
-            model: AssetOwner,
-            required: true,
-            attributes: [],
-            where: { owner },
-          },
-        ],
-        where: {
-          lazyDistributor: this.lazyDistributor.toBase58(),
-        },
-        attributes: [
-          [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
-        ],
-        raw: true,
-      });
-
-      console.log("recipients", recipients);
-      const claimed = recipients[0].totalRewards?.toString() || "0";
+      const lifetime = result.lifetime ?? "0";
+      const claimed = result.claimed ?? "0";
       const pending = new BN(lifetime).sub(new BN(claimed)).toString();
-
-      return { lifetime, pending };
+      return { lifetime: claimed, pending };
     } catch (err: any) {
       if (err?.parent?.code === "42P01") {
         console.warn("Table missing for getCurrentRewardsByOwner, returning 0");
@@ -328,46 +253,39 @@ export class PgDatabase implements Database {
 
   async getRewardsByDestination(destination: string) {
     try {
-      const rewards = await Reward.findAll({
-        include: [
-          {
-            model: KeyToAsset,
-            required: true,
-            attributes: [],
-            include: [
-              {
-                model: Recipient,
-                required: true,
-                attributes: [],
-                where: {
-                  destination,
-                  lazyDistributor: this.lazyDistributor.toBase58(),
-                },
-              },
-            ],
+      const [result] = await sequelize.query<{
+        lifetime: string;
+        claimed: string;
+      }>(
+        `
+          SELECT
+            COALESCE((
+              SELECT SUM(r.rewards)
+              FROM reward_index r
+              JOIN key_to_assets kta ON r.address = kta.encoded_entity_key
+              JOIN recipients rec ON kta.asset = rec.asset
+              WHERE rec.destination = :destination
+                AND rec.lazy_distributor = :lazyDistributor
+            ), 0) AS lifetime,
+            COALESCE((
+              SELECT SUM(rec2.total_rewards)
+              FROM recipients rec2
+              WHERE rec2.destination = :destination
+                AND rec2.lazy_distributor = :lazyDistributor
+            ), 0) AS claimed
+        `,
+        {
+          replacements: {
+            destination,
+            lazyDistributor: this.lazyDistributor.toBase58(),
           },
-        ],
-        attributes: [
-          [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
-        ],
-        raw: true,
-      });
+          type: QueryTypes.SELECT,
+        }
+      );
 
-      const lifetime = rewards[0].rewards?.toString() || "0";
-      const recipients = await Recipient.findAll({
-        where: {
-          destination,
-          lazyDistributor: this.lazyDistributor.toBase58(),
-        },
-        attributes: [
-          [sequelize.fn("SUM", sequelize.col("total_rewards")), "totalRewards"],
-        ],
-        raw: true,
-      });
-
-      const claimed = recipients[0].totalRewards?.toString() || "0";
+      const lifetime = result.lifetime ?? "0";
+      const claimed = result.claimed ?? "0";
       const pending = new BN(lifetime).sub(new BN(claimed)).toString();
-
       return { lifetime, pending };
     } catch (err: any) {
       if (err?.parent?.code === "42P01") {
