@@ -118,17 +118,19 @@ export const integrityCheckProgramAccounts = async ({
         newValues: { [key: string]: any };
       }[] = [];
 
+      const txSignatureChunks = chunks(
+        await getTransactionSignaturesUptoBlockTime({
+          programId,
+          blockTime: blockTime24HoursAgo,
+          provider,
+        }),
+        100
+      );
+
       limiter = pLimit(10);
       const parsedTransactions = (
         await Promise.all(
-          chunks(
-            await getTransactionSignaturesUptoBlockTime({
-              programId,
-              blockTime: blockTime24HoursAgo,
-              provider,
-            }),
-            100
-          ).map((chunk) =>
+          txSignatureChunks.map((chunk) =>
             limiter(async () => {
               await new Promise((resolve) => setTimeout(resolve, 250));
               return retry(
@@ -145,8 +147,8 @@ export const integrityCheckProgramAccounts = async ({
       ).flat();
 
       const uniqueWritableAccounts = new Set<string>();
-      parsedTransactions.forEach((parsed) => {
-        if (!parsed) return;
+      for (const parsed of parsedTransactions) {
+        if (!parsed) continue;
         const signatures = parsed.transaction.signatures;
         parsed.transaction.message.accountKeys.forEach((acc) => {
           if (acc.writable) {
@@ -158,7 +160,12 @@ export const integrityCheckProgramAccounts = async ({
             ];
           }
         });
-      });
+      }
+
+      // Dereference txSignatureChunks after use
+      txSignatureChunks.length = 0;
+      // Dereference parsedTransactions after use
+      parsedTransactions.length = 0;
 
       const pluginsByAccountType = (
         await Promise.all(
@@ -183,6 +190,16 @@ export const integrityCheckProgramAccounts = async ({
 
       limiter = pLimit(100);
       const uniqueWritableAccountsArray = [...uniqueWritableAccounts.values()];
+
+      const delayMs =
+        (process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS
+          ? parseInt(process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS, 10)
+          : 120000) + Math.floor(Math.random() * 30000); // default 2 minutes + 30 second jitter
+
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+
       await Promise.all(
         chunks(uniqueWritableAccountsArray, 100).map(async (chunk) => {
           const accountInfos = await limiter(() =>
@@ -190,7 +207,7 @@ export const integrityCheckProgramAccounts = async ({
               () =>
                 connection.getMultipleAccountsInfo(
                   chunk.map((c) => new PublicKey(c)),
-                  "confirmed"
+                  "finalized"
                 ),
               retryOptions
             )
@@ -200,6 +217,9 @@ export const integrityCheckProgramAccounts = async ({
             pubkey: chunk[idx],
             ...accountInfo,
           }));
+
+          // Dereference accountInfos after use
+          accountInfos.length = 0;
 
           const accsByType: Record<string, typeof accountInfosWithPk> = {};
           accountInfosWithPk.forEach((accountInfo) => {
@@ -216,6 +236,9 @@ export const integrityCheckProgramAccounts = async ({
               accsByType[accName].push(accountInfo);
             }
           });
+
+          // Dereference accountInfosWithPk after use
+          accountInfosWithPk.length = 0;
 
           await Promise.all(
             Object.entries(accsByType).map(async ([accName, accounts]) => {
