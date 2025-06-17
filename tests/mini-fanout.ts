@@ -131,14 +131,13 @@ describe("mini-fanout", () => {
   it("should initialize a fanout", async () => {
     console.log("Task queue is", taskQueue.toBase58())
     const { pubkeys: { miniFanout } } = await program.methods.initializeMiniFanoutV0({
-      name: fanoutName,
+      seed: Buffer.from(fanoutName, "utf-8"),
       shares,
       schedule: "0 0 * * * *",
     })
       .accounts({
         payer: me,
-        authority: me,
-        miniFanout: miniFanoutKey(fanoutName)[0],
+        owner: me,
         taskQueue,
         rentRefund: me,
         mint,
@@ -147,7 +146,7 @@ describe("mini-fanout", () => {
 
     const miniFanoutAcc = await program.account.miniFanoutV0.fetch(miniFanout)
 
-    expect(miniFanoutAcc.name).to.equal(fanoutName)
+    expect(miniFanoutAcc.seed.toString()).to.equal(fanoutName)
     expect(miniFanoutAcc.shares.length).to.equal(shares.length)
     for (let i = 0; i < shares.length; i++) {
       expect(miniFanoutAcc.shares[i].wallet.toBase58()).to.equal(shares[i].wallet.toBase58())
@@ -175,15 +174,14 @@ describe("mini-fanout", () => {
         nextMinutes = now.getMinutes() + 1
       }
       const { pubkeys: { miniFanout: fanoutK } } = await program.methods.initializeMiniFanoutV0({
-        name: fanoutName,
+        seed: Buffer.from(fanoutName, "utf-8"),
         // Run in 2 seconds
         schedule: `${nextSeconds} ${nextMinutes} * * * *`,
         shares,
       })
         .accounts({
           payer: me,
-          authority: me,
-          miniFanout: miniFanoutKey(fanoutName)[0],
+          owner: me,
           taskQueue,
           rentRefund: me,
           mint,
@@ -340,14 +338,13 @@ describe("mini-fanout", () => {
       }
       console.log("creating fanout")
       const { pubkeys: { miniFanout: fanoutK } } = await program.methods.initializeMiniFanoutV0({
-        name: fanoutName + 'big',
+        seed: Buffer.from(fanoutName + 'big', "utf-8"),
         schedule: `${nextSeconds} ${nextMinutes} * * * *`,
         shares,
       })
         .accounts({
           payer: me,
-          authority: me,
-          miniFanout: miniFanoutKey(fanoutName + 'big')[0],
+          owner: me,
           taskQueue,
           rentRefund: me,
           mint,

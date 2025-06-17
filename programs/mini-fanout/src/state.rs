@@ -14,7 +14,8 @@ pub struct GlobalStateV0 {
 #[derive(Default)]
 pub struct MiniFanoutV0 {
   /// The authority that can modify the fanout configuration
-  pub authority: Pubkey,
+  pub owner: Pubkey,
+  pub namespace: Pubkey,
   pub mint: Pubkey,
   pub token_account: Pubkey,
   pub task_queue: Pubkey,
@@ -23,11 +24,18 @@ pub struct MiniFanoutV0 {
   /// Bump seed for PDA derivation
   pub bump: u8,
   pub schedule: String,
-  /// Name of the fanout for identification
-  pub name: String,
   /// Bump seed for queue authority PDA derivation
   pub queue_authority_bump: u8,
   pub shares: Vec<MiniFanoutShareV0>,
+  pub seed: Vec<u8>,
+}
+
+#[account]
+#[derive(Default)]
+pub struct UserMiniFanoutsV0 {
+  pub next_id: u32,
+  pub owner: Pubkey,
+  pub bump_seed: u8,
 }
 
 #[account]
@@ -58,7 +66,8 @@ macro_rules! fanout_seeds {
   ($fanout:expr) => {
     &[
       b"mini_fanout",
-      &anchor_lang::solana_program::hash::hash(&$fanout.name.as_bytes()).to_bytes()[..],
+      $fanout.namespace.as_ref(),
+      $fanout.seed.as_slice(),
       &[$fanout.bump],
     ]
   };

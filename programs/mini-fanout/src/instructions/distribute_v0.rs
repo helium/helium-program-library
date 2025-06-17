@@ -130,7 +130,13 @@ pub fn handler<'info>(
   let token_account_info = token_account.to_account_info();
   let token_program_info = ctx.accounts.token_program.to_account_info();
   let mini_fanout_info = mini_fanout.to_account_info();
-  let seeds: &[&[&[u8]]] = &[crate::fanout_seeds!(mini_fanout)];
+  // Have to vec/clone the seeds since we're borrowing mini_fanout is mutable to edit the shares
+  let seeds_vec = crate::fanout_seeds!(mini_fanout)
+    .iter()
+    .map(|s| s.to_vec())
+    .collect::<Vec<_>>();
+  let seeds_refs: Vec<&[u8]> = seeds_vec.iter().map(|v| v.as_slice()).collect();
+  let seeds_slice: &[&[u8]] = &seeds_refs;
   for (i, share) in mini_fanout.shares.iter_mut().enumerate() {
     let to_token_account = &mut ctx.remaining_accounts[i].to_account_info();
     if payouts[i] > 0 {
@@ -145,7 +151,7 @@ pub fn handler<'info>(
             authority: mini_fanout_info.clone(),
           },
         );
-        token::transfer(cpi_ctx.with_signer(seeds), payouts[i])?;
+        token::transfer(cpi_ctx.with_signer(&[seeds_slice]), payouts[i])?;
       }
     }
     share.total_dust = new_dusts[i] as u64;
@@ -179,10 +185,7 @@ pub fn handler<'info>(
       transaction: TransactionSourceV0::CompiledV0(compiled_tx),
       crank_reward: None,
       free_tasks: 0,
-      description: format!(
-        "dist {}",
-        &mini_fanout.name.chars().take(32).collect::<String>()
-      ),
+      description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
     }],
     accounts: vec![],
   })

@@ -393,7 +393,7 @@ describe("distributor-oracle", () => {
       dao,
       merkle: merkle,
       ecc,
-      hotspotOwner,
+      hotspotOwner: hotspotOwner.publicKey,
     }));
     const recipientMethod = await initializeCompressionRecipient({
       program: ldProgram,

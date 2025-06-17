@@ -1,0 +1,35 @@
+[package]
+name = "welcome-pack"
+version = "0.0.1"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "welcome_pack"
+
+[features]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+devnet = []
+no-genesis = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[profile.release]
+overflow-checks = true
+
+[dependencies]
+anchor-lang = { workspace = true }
+circuit-breaker = { workspace = true }
+anchor-spl = { workspace = true }
+shared-utils = { workspace = true }
+solana-security-txt = { workspace = true }
+default-env = { workspace = true }
+mini-fanout = { workspace = true }
+brine-ed25519 = "0.1.1"
+bubblegum-cpi = { workspace = true }
+account-compression-cpi = { workspace = true }
+lazy-distributor = { workspace = true }

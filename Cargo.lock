@@ -445,6 +445,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "brine-ed25519"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8081fe05a942df2b5d2c5af19995c84ce2d6f5d3d4b0384aaf40f4d19a119f9"
+dependencies = [
+ "curve25519-dalek",
+ "sha2 0.10.8",
+ "solana-curve25519",
+]
+
+[[package]]
 name = "bs58"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3399,6 +3410,23 @@ checksum = "33b6dd2ef9186f1f2072e409e99cd22a975331a6b3591b12c764e0e55c60d5d2"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "welcome-pack"
+version = "0.0.1"
+dependencies = [
+ "account-compression-cpi",
+ "anchor-lang",
+ "anchor-spl",
+ "brine-ed25519",
+ "bubblegum-cpi",
+ "circuit-breaker",
+ "default-env",
+ "lazy-distributor",
+ "mini-fanout",
+ "shared-utils",
+ "solana-security-txt",
 ]
 
 [[package]]

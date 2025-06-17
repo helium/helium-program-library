@@ -28,12 +28,12 @@ pub struct ScheduleTaskArgsV0 {
 pub struct ScheduleTaskV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub authority: Signer<'info>,
+  pub owner: Signer<'info>,
   #[account(
     mut,
     has_one = next_task,
     has_one = task_queue,
-    has_one = authority,
+    has_one = owner,
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   /// CHECK: Via constraint
@@ -142,10 +142,7 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
       crank_reward: None,
       free_tasks: 1,
       id: args.task_id,
-      description: format!(
-        "dist {}",
-        &mini_fanout.name.chars().take(32).collect::<String>()
-      ),
+      description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
     },
   )?;
 

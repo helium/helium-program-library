@@ -77,6 +77,12 @@
       "path": "./packages/helium-admin-cli"
     },
     {
+      "path": "./packages/mini-fanout-sdk"
+    },
+    {
+      "path": "./packages/welcome-pack-sdk"
+    },
+    {
       "path": "./packages/circuit-breaker-sdk"
     },
     {
