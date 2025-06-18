@@ -45,7 +45,7 @@ export async function closeWelcomePack({
     .accountsStrict({
       welcomePack: welcomePack,
       owner: welcomePackAcc.owner,
-      rentRefund: welcomePackAcc.rentRefund,
+      rentRefund: welcomePackAcc.rentRefund.equals(PublicKey.default) ? welcomePackAcc.owner : welcomePackAcc.rentRefund,
       treeAuthority: PublicKey.findProgramAddressSync([accounts.merkleTree.toBuffer()], BUBBLEGUM_PROGRAM_ID)[0],
       merkleTree: accounts.merkleTree,
       logWrapper: NOOP_PROGRAM_ID,

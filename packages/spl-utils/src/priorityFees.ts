@@ -128,7 +128,7 @@ export const estimateComputeUnits = async (
   return sim.unitsConsumed;
 };
 
-async function sleep(ms: number): Promise<void> {
+export async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 

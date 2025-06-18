@@ -57,7 +57,7 @@ pub struct InitializeMiniFanoutV0<'info> {
   /// CHECK: Via seeds
   #[account(
     seeds = [b"queue_authority"],
-    bump
+    bump = 254,
   )]
   pub queue_authority: UncheckedAccount<'info>,
   pub system_program: Program<'info, System>,
@@ -108,7 +108,6 @@ pub fn handler(
   ctx: Context<InitializeMiniFanoutV0>,
   args: InitializeMiniFanoutArgsV0,
 ) -> Result<()> {
-  msg!("Doing some mini fanout stuff");
   require_gte!(args.shares.len(), 1, ErrorCode::InvalidShares);
   require_gte!(MAX_SHARES, args.shares.len(), ErrorCode::InvalidShares);
   // Validate schedule
@@ -129,7 +128,7 @@ pub fn handler(
     rent_refund: ctx.accounts.payer.key(),
     bump: ctx.bumps.mini_fanout,
     schedule: args.schedule,
-    queue_authority_bump: ctx.bumps.queue_authority,
+    queue_authority_bump: 254,
     shares: args
       .shares
       .into_iter()

@@ -73,6 +73,9 @@ pub struct InitializeWelcomePackV0<'info> {
 
 pub const ATA_SIZE: usize = 165;
 
+// 0.01 SOL.
+pub const FANOUT_FUNDING_AMOUNT: u64 = 10000000;
+
 pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, InitializeWelcomePackV0<'info>>,
   args: InitializeWelcomePackArgsV0,
@@ -115,6 +118,7 @@ pub fn handler<'info>(
   )?;
 
   ctx.accounts.welcome_pack.set_inner(WelcomePackV0 {
+    rewards_mint: ctx.accounts.lazy_distributor.rewards_mint,
     lazy_distributor: ctx.accounts.lazy_distributor.key(),
     id: ctx.accounts.user_welcome_packs.next_id,
     owner: ctx.accounts.owner.key(),
@@ -136,16 +140,20 @@ pub fn handler<'info>(
     });
 
   let rent = Rent::get()?;
+  let mut fanout_cost = 0;
+  if args.rewards_split.len() > 1 {
+    fanout_cost = rent.minimum_balance(MiniFanoutV0::size(&InitializeMiniFanoutArgsV0 {
+      schedule: args.rewards_schedule,
+      shares: args.rewards_split,
+      seed: asset.to_bytes().to_vec(),
+    }))
+      + rent.minimum_balance(ATA_SIZE)
+      + FANOUT_FUNDING_AMOUNT;
+  }
+
   let needed_transfer_amount = args
     .sol_amount
-    .checked_add(
-      rent.minimum_balance(MiniFanoutV0::size(&InitializeMiniFanoutArgsV0 {
-        schedule: args.rewards_schedule,
-        shares: args.rewards_split,
-        seed: asset.to_bytes().to_vec(),
-      }))
-        + rent.minimum_balance(ATA_SIZE),
-    )
+    .checked_add(fanout_cost)
     .unwrap()
     .saturating_sub(ctx.accounts.welcome_pack.get_lamports());
 

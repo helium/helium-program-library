@@ -5,7 +5,7 @@ use anchor_lang::{
 };
 use bubblegum_cpi::bubblegum::program::Bubblegum;
 
-use crate::{welcome_pack_seeds, UserWelcomePacksV0, WelcomePackV0};
+use crate::{error::ErrorCode, welcome_pack_seeds, UserWelcomePacksV0, WelcomePackV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct CloseWelcomePackArgsV0 {
@@ -21,13 +21,15 @@ pub struct CloseWelcomePackV0<'info> {
   #[account(
     mut,
     has_one = owner,
-    has_one = rent_refund,
     close = rent_refund,
   )]
   pub welcome_pack: Account<'info, WelcomePackV0>,
   pub user_welcome_packs: Account<'info, UserWelcomePacksV0>,
   /// CHECK: Rent refund
-  #[account(mut)]
+  #[account(
+    mut,
+    constraint = (welcome_pack.rent_refund == Pubkey::default() && rent_refund.key() == owner.key()) || rent_refund.key() == welcome_pack.rent_refund @ ErrorCode::InvalidRentRefund
+  )]
   pub rent_refund: AccountInfo<'info>,
   /// CHECK: Checked by cpi
   #[account(mut)]

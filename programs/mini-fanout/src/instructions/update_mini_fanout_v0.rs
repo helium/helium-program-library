@@ -108,7 +108,6 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
   schedule_impl(
     &mut ScheduleTaskV0 {
       payer: ctx.accounts.payer.clone(),
-      owner: ctx.accounts.owner.clone(),
       mini_fanout: mini_fanout.clone(),
       next_task: ctx.accounts.next_task.clone(),
       tuktuk_program: ctx.accounts.tuktuk_program.clone(),

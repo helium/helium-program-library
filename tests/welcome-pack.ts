@@ -3,11 +3,11 @@ import { Program } from "@coral-xyz/anchor"
 import { Keypair as HeliumKeypair } from "@helium/crypto"
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk"
 import { init as initMiniFanout } from "@helium/mini-fanout-sdk"
-import { createMint, toBN } from "@helium/spl-utils"
+import { bulkSendTransactions, createMint, sendInstructions, sleep, toBN } from "@helium/spl-utils"
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk"
 import bs58 from "bs58"
 import { init as initTuktuk, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey } from "@helium/tuktuk-sdk"
-import { ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js"
+import { AddressLookupTableProgram, ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js"
 import { BN } from "bn.js"
 import chai from "chai"
 import chaiAsPromised from "chai-as-promised"
@@ -27,6 +27,8 @@ import { initTestDao, initTestSubdao } from "./utils/daos"
 import { ensureHEMIdl, ensureHSDIdl, ensureLDIdl, ensureMFIdl, ensureWPIdl } from "./utils/fixtures"
 import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression"
 import { loadKeypair } from "./utils/solana"
+import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token"
+import { BUBBLEGUM_PROGRAM_ID, NOOP_PROGRAM_ID } from "../packages/welcome-pack-sdk/src/functions/initializeWelcomePack"
 
 chai.use(chaiAsPromised)
 const { expect } = chai
@@ -257,7 +259,7 @@ describe("welcome-pack", () => {
         getAssetFn,
         getAssetProofFn,
         assetReturnAddress: hotspotOwner.publicKey,
-        rentRefund: me,
+        rentRefund: PublicKey.default,
         owner: hotspotOwner.publicKey,
         payer: me,
       }))
@@ -266,13 +268,14 @@ describe("welcome-pack", () => {
       welcomePack = welcomePackPda!
       console.log("Welcome pack initialized")
     })
+
     it("claims a welcome pack", async () => {
       const claimer = Keypair.generate();
       const claimApproval = {
         welcomePack,
         expirationTimestamp: new BN(Math.floor(Date.now() / 1000) + 60),
       }
-      const claimSignature = await claimApprovalSignature(welcomePackProgram, claimApproval, hotspotOwner)
+      const claimSignature = claimApprovalSignature(claimApproval, hotspotOwner)
       const miniFanout = miniFanoutKey(
         welcomePack,
         hotspot.toBuffer()
@@ -287,18 +290,41 @@ describe("welcome-pack", () => {
       })
       getAssetFn = mock.getAssetFn
       getAssetProofFn = mock.getAssetProofFn
-      await (await claimWelcomePack({
-        program: welcomePackProgram,
-        welcomePack,
-        claimApproval,
-        claimApprovalSignature: claimSignature,
-        claimer: claimer.publicKey,
-        taskQueue,
-        getAssetFn,
-        getAssetProofFn,
-      }))
-        .signers([claimer])
-        .rpc({ skipPreflight: true })
+      const ixs = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1000000 }),
+        await (await claimWelcomePack({
+          program: welcomePackProgram,
+          tuktukProgram,
+          welcomePack,
+          claimApproval,
+          claimApprovalSignature: claimSignature,
+          claimer: claimer.publicKey,
+          taskQueue,
+          getAssetFn,
+          getAssetProofFn,
+        }))
+          .instruction()
+      ]
+      const slot = await provider.connection.getSlot();
+      const [lutIx, lut] = AddressLookupTableProgram.createLookupTable({
+        authority: me,
+        payer: me,
+        recentSlot: slot,
+      })
+      await sendInstructions(provider, [lutIx, AddressLookupTableProgram.extendLookupTable({
+        payer: me,
+        authority: me,
+        lookupTable: lut,
+        addresses: [taskQueue, hntMint, ASSOCIATED_PROGRAM_ID, BUBBLEGUM_PROGRAM_ID, NOOP_PROGRAM_ID],
+      })])
+      // Wait for lut to activate
+      await sleep(1000)
+      await bulkSendTransactions(provider, [{
+        instructions: ixs,
+        addressLookupTableAddresses: [lut],
+        feePayer: me,
+        signers: [claimer],
+      }], undefined, 10, [claimer])
 
       // Verify mini fanout was created
       const miniFanoutAccount = await miniFanoutProgram.account.miniFanoutV0.fetch(miniFanout)
@@ -314,7 +340,7 @@ describe("welcome-pack", () => {
       expect(rewardsRecipient.destination.toBase58()).to.equal(miniFanout.toBase58())
     })
 
-    it ("closes a welcome pack", async () => {
+    it("closes a welcome pack", async () => {
       await (await closeWelcomePack({
         program: welcomePackProgram,
         welcomePack,

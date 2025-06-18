@@ -12,4 +12,6 @@ pub enum ErrorCode {
   ClaimApprovalExpired,
   #[msg("Invalid claim approval signature")]
   InvalidClaimApprovalSignature,
+  #[msg("Invalid rent refund")]
+  InvalidRentRefund,
 }

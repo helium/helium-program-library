@@ -3427,6 +3427,7 @@ dependencies = [
  "mini-fanout",
  "shared-utils",
  "solana-security-txt",
+ "tuktuk-program",
 ]
 
 [[package]]

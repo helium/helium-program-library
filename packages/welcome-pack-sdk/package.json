@@ -37,6 +37,7 @@
     "@helium/spl-utils": "^0.10.17",
     "@helium/lazy-distributor-sdk": "^0.10.17",
     "@helium/mini-fanout-sdk": "^0.10.17",
+    "@helium/tuktuk-sdk": "^0.0.9",
     "@solana/spl-token": "^0.4.10",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"

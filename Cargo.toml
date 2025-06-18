@@ -45,6 +45,7 @@ data-credits = { path = "./programs/data-credits" }
 pyth-solana-receiver-sdk = { path = "./utils/pyth_solana_receiver_sdk" }
 pythnet-sdk = "=2.3.1"
 tuktuk-sdk = { version = "0.3.2" }
-tuktuk-program = { version = "0.3.1" }
+tuktuk-program = { version = "0.3.2" }
 modular-governance = { path = "./utils/modular-governance" }
 solana-zk-sdk = "2.2.3"
+tuktuk = "0"

@@ -28,12 +28,10 @@ pub struct ScheduleTaskArgsV0 {
 pub struct ScheduleTaskV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub owner: Signer<'info>,
   #[account(
     mut,
     has_one = next_task,
     has_one = task_queue,
-    has_one = owner,
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   /// CHECK: Via constraint

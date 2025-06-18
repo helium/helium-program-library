@@ -2,7 +2,9 @@ import { IdlTypes, Program } from "@coral-xyz/anchor";
 import { WelcomePack } from "@helium/idls/lib/types/welcome_pack";
 import { PROGRAM_ID, recipientKey } from "@helium/lazy-distributor-sdk";
 import { PROGRAM_ID as MINI_FANOUT_PROGRAM_ID, miniFanoutKey, queueAuthorityKey } from "@helium/mini-fanout-sdk";
-import { Asset, AssetProof, HNT_MINT, proofArgsAndAccounts } from "@helium/spl-utils";
+import { Asset, AssetProof, proofArgsAndAccounts } from "@helium/spl-utils";
+import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
+import { nextAvailableTaskIds, taskKey, taskQueueAuthorityKey } from "@helium/tuktuk-sdk";
 import { SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
@@ -13,7 +15,7 @@ export type RewardSplit = IdlTypes<WelcomePack>["miniFanoutShareArgV0"];
 
 export async function claimWelcomePack({
   program,
-  welcomePack,
+  tuktukProgram,
   assetEndpoint,
   claimApproval,
   claimApprovalSignature,
@@ -24,6 +26,7 @@ export async function claimWelcomePack({
   ...rest
 }: {
   claimer: PublicKey;
+  tuktukProgram: Program<Tuktuk>;
   claimApproval: ClaimApprovalV0;
   claimApprovalSignature: Buffer;
   welcomePack: PublicKey;
@@ -37,7 +40,7 @@ export async function claimWelcomePack({
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
 }) {
-  const welcomePackAcc = await program.account.welcomePackV0.fetch(welcomePack)
+  const welcomePackAcc = await program.account.welcomePackV0.fetch(claimApproval.welcomePack)
   const assetId = welcomePackAcc.asset
   const {
     args,
@@ -49,27 +52,30 @@ export async function claimWelcomePack({
     ...rest,
   });
 
-  const miniFanout = miniFanoutKey(welcomePack, assetId.toBuffer())[0]
+  const miniFanout = miniFanoutKey(claimApproval.welcomePack, assetId.toBuffer())[0]
   const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(welcomePackAcc.lazyDistributor)
+  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
+  const nextTaskId = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)[0]
+  const queueAuthority = queueAuthorityKey()[0]
   return program.methods
     .claimWelcomePackV0({
       ...args,
-      claimApproval,
+      approvalExpirationTimestamp: claimApproval.expirationTimestamp,
       claimSignature: claimApprovalSignature.toJSON().data,
+      taskId: nextTaskId,
     })
     .accountsStrict({
       merkleTree: accounts.merkleTree,
-      welcomePack: welcomePack,
+      welcomePack: claimApproval.welcomePack,
       assetReturnAddress: welcomePackAcc.assetReturnAddress.equals(PublicKey.default) ? claimer : welcomePackAcc.assetReturnAddress,
       recipient: recipientKey(welcomePackAcc.lazyDistributor, assetId)[0],
       rewardsRecipient: welcomePackAcc.rewardsSplit.length > 1 ? miniFanout : welcomePackAcc.rewardsSplit[0].wallet.equals(PublicKey.default) ? claimer : welcomePackAcc.rewardsSplit[0].wallet,
       tokenAccount: getAssociatedTokenAddressSync(lazyDistributorAcc.rewardsMint, miniFanout, true),
-      queueAuthority: queueAuthorityKey()[0],
+      queueAuthority,
       taskQueue,
       rewardsMint: lazyDistributorAcc.rewardsMint,
-      lazyDistributor: welcomePackAcc.lazyDistributor,
       owner: welcomePackAcc.owner,
-      rentRefund: welcomePackAcc.rentRefund,
+      rentRefund: welcomePackAcc.rentRefund.equals(PublicKey.default) ? claimer : welcomePackAcc.rentRefund,
       claimer,
       lazyDistributorProgram: PROGRAM_ID,
       treeAuthority: PublicKey.findProgramAddressSync([accounts.merkleTree.toBuffer()], BUBBLEGUM_PROGRAM_ID)[0],
@@ -79,7 +85,13 @@ export async function claimWelcomePack({
       miniFanoutProgram: MINI_FANOUT_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       tokenProgram: TOKEN_PROGRAM_ID,
-      bubblegumProgram: BUBBLEGUM_PROGRAM_ID
+      bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
+      task: taskKey(taskQueue, nextTaskId)[0],
+      taskQueueAuthority: taskQueueAuthorityKey(
+        taskQueue,
+        queueAuthority
+      )[0],
+      tuktukProgram: tuktukProgram.programId,
     })
     .remainingAccounts(remainingAccounts);
 }

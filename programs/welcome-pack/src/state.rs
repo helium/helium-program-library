@@ -1,8 +1,6 @@
 use anchor_lang::prelude::*;
 use mini_fanout::MiniFanoutShareArgV0;
 
-use crate::welcome_pack;
-
 #[account]
 #[derive(Default)]
 pub struct WelcomePackV0 {
@@ -10,6 +8,7 @@ pub struct WelcomePackV0 {
   pub owner: Pubkey,
   pub asset: Pubkey,
   pub lazy_distributor: Pubkey,
+  pub rewards_mint: Pubkey,
   pub rent_refund: Pubkey,
   pub sol_amount: u64,
   pub rewards_split: Vec<MiniFanoutShareArgV0>,

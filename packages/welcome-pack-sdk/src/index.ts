@@ -1,4 +1,4 @@
-import { AnchorProvider, Idl, IdlAccounts, IdlTypes, Program } from "@coral-xyz/anchor"
+import { AnchorProvider, BN, Idl, IdlAccounts, IdlTypes, Program } from "@coral-xyz/anchor"
 import { Keypair, PublicKey } from "@solana/web3.js"
 import { PROGRAM_ID } from "./constants"
 import { welcomePackResolvers } from "./resolvers"
@@ -7,19 +7,23 @@ import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils"
 import { sha256 } from "js-sha256"
 import { sign } from "tweetnacl"
 
-export type ClaimApprovalV0 = IdlTypes<WelcomePack>["claimApprovalV0"]
+export type ClaimApprovalV0 = {
+  welcomePack: PublicKey,
+  expirationTimestamp: BN,
+}
 
 export { initializeWelcomePack } from "./functions/initializeWelcomePack"
 export { claimWelcomePack } from "./functions/claimWelcomePack"
 export { closeWelcomePack } from "./functions/closeWelcomePack"
 
 export function claimApprovalSignature(
-  welcomePackProgram: Program<WelcomePack>,
   claimApproval: ClaimApprovalV0,
   approver: Keypair,
 ) {
-  const claimApprovalBytes = welcomePackProgram.coder.types.encode("claimApprovalV0", claimApproval)
-  const msgHash = sha256(claimApprovalBytes)
+  const expirationTimestampBuffer = Buffer.alloc(8)
+  expirationTimestampBuffer.writeBigInt64LE(BigInt(claimApproval.expirationTimestamp.toString()))
+  const fullBuffer = Buffer.concat([claimApproval.welcomePack.toBuffer(), expirationTimestampBuffer])
+  const msgHash = sha256(fullBuffer)
   return Buffer.from(
     sign.detached(Uint8Array.from(Buffer.from(msgHash, "hex")), approver.secretKey)
   )
