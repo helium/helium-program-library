@@ -69,6 +69,7 @@ pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransa
     token_account: mini_fanout.token_account,
     token_program: spl_token::ID,
     task_queue: mini_fanout.task_queue,
+    next_task: mini_fanout.next_task,
   }
   .to_account_metas(None);
 

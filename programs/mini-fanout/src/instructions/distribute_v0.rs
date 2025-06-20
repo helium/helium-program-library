@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
-use tuktuk_program::{RunTaskReturnV0, TaskQueueV0, TaskReturnV0, TransactionSourceV0, TriggerV0};
+use tuktuk_program::{
+  RunTaskReturnV0, TaskQueueV0, TaskReturnV0, TaskV0, TransactionSourceV0, TriggerV0,
+};
 
 use crate::{errors::ErrorCode, get_next_time, get_task_ix, state::*};
 
@@ -10,11 +12,19 @@ const DUST_PRECISION: u128 = 1_000_000_000_000;
 pub struct DistributeV0<'info> {
   #[account(
     mut,
-    has_one = task_queue
+    has_one = task_queue,
+    has_one = next_task
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   #[account(mut)]
   pub task_queue: Account<'info, TaskQueueV0>,
+  #[account(
+    constraint = match next_task.trigger {
+      TriggerV0::Now => true,
+      TriggerV0::Timestamp(timestamp) => timestamp <= Clock::get()?.unix_timestamp,
+    } @ ErrorCode::TaskNotDue
+  )]
+  pub next_task: Account<'info, TaskV0>,
   #[account(mut)]
   pub token_account: Box<Account<'info, TokenAccount>>,
   pub token_program: Program<'info, Token>,
