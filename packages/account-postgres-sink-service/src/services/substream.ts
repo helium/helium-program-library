@@ -171,7 +171,10 @@ export const setupSubstream = async (
   const cursorManager = CursorManager(
     "account_sink",
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
-    () => server.customMetrics.staleCursorCounter.inc()
+    () => {
+      server.customMetrics.staleCursorCounter.inc();
+      handleReconnect();
+    }
   );
   const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
     configs
@@ -275,7 +278,7 @@ export const setupSubstream = async (
     }
   };
 
-  const handleReconnect = async (nextAttempt: number) => {
+  const handleReconnect = async (nextAttempt: number = 1) => {
     const baseDelay = 1000;
     const delay =
       nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
