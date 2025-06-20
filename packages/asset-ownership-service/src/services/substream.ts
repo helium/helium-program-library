@@ -105,7 +105,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
     () => {
       server.customMetrics.staleCursorCounter.inc();
-      handleReconnect(1);
+      handleReconnect();
     }
   );
 

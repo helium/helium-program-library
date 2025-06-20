@@ -173,7 +173,7 @@ export const setupSubstream = async (
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
     () => {
       server.customMetrics.staleCursorCounter.inc();
-      handleReconnect(1);
+      handleReconnect();
     }
   );
   const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
@@ -278,7 +278,7 @@ export const setupSubstream = async (
     }
   };
 
-  const handleReconnect = async (nextAttempt: number) => {
+  const handleReconnect = async (nextAttempt: number = 1) => {
     const baseDelay = 1000;
     const delay =
       nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
