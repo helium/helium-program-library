@@ -103,7 +103,10 @@ export const setupSubstream = async (server: FastifyInstance) => {
   const cursorManager = CursorManager(
     "asset_ownership",
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
-    () => server.customMetrics.staleCursorCounter.inc()
+    () => {
+      server.customMetrics.staleCursorCounter.inc();
+      handleReconnect(1);
+    }
   );
 
   const coders: {

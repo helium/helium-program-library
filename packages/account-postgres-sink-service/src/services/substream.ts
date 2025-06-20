@@ -171,7 +171,10 @@ export const setupSubstream = async (
   const cursorManager = CursorManager(
     "account_sink",
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
-    () => server.customMetrics.staleCursorCounter.inc()
+    () => {
+      server.customMetrics.staleCursorCounter.inc();
+      handleReconnect(1);
+    }
   );
   const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
     configs
