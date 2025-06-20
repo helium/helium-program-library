@@ -472,7 +472,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
     }
   };
 
-  const handleReconnect = async (nextAttempt: number) => {
+  const handleReconnect = async (nextAttempt: number = 1) => {
     const baseDelay = 1000;
     const delay =
       nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
