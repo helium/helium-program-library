@@ -46,6 +46,19 @@ impl Share {
   }
 }
 
+#[macro_export]
+macro_rules! try_from {
+  ($ty: ty, $acc: expr) => {{
+    let account_info = $acc.as_ref();
+    <$ty>::try_from(unsafe {
+      core::mem::transmute::<
+        &anchor_lang::prelude::AccountInfo<'_>,
+        &anchor_lang::prelude::AccountInfo<'_>,
+      >(account_info)
+    })
+  }};
+}
+
 pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, DistributeV0<'info>>,
 ) -> Result<RunTaskReturnV0> {
@@ -153,6 +166,14 @@ pub fn handler<'info>(
       if to_token_account.data_is_empty() {
         share.total_owed = payouts[i];
       } else {
+        let parsed_to_token_account: Account<TokenAccount> =
+          try_from!(Account<TokenAccount>, to_token_account)?;
+
+        require_eq!(
+          parsed_to_token_account.owner,
+          share.destination(),
+          ErrorCode::InvalidOwner
+        );
         let cpi_ctx = CpiContext::new(
           token_program_info.clone(),
           Transfer {

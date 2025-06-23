@@ -75,8 +75,10 @@ pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransa
 
   // Append all shareholder token accounts as writable, non-signer
   for share in &mini_fanout.shares {
-    let ata =
-      anchor_spl::associated_token::get_associated_token_address(&share.wallet, &mini_fanout.mint);
+    let ata = anchor_spl::associated_token::get_associated_token_address(
+      &share.destination(),
+      &mini_fanout.mint,
+    );
     distribute_accounts.push(anchor_lang::solana_program::instruction::AccountMeta {
       pubkey: ata,
       is_signer: false,

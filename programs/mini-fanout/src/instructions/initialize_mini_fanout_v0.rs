@@ -91,7 +91,8 @@ impl MiniFanoutShareV0 {
     // shares: u32 (4)
     // total_dust: u64 (8)
     // total_owed: u64 (8)
-    32 + 4 + 8 + 8
+    // delegate: Pubkey (32)
+    32 + 4 + 8 + 8 + 32
   }
 }
 
@@ -135,6 +136,7 @@ pub fn handler(
       .map(|s| MiniFanoutShareV0 {
         wallet: s.wallet,
         share: s.share,
+        delegate: Pubkey::default(),
         total_dust: 0,
         total_owed: 0,
       })

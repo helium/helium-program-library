@@ -242,6 +242,28 @@ describe("mini-fanout", () => {
       expect(miniFanoutAcc.schedule).to.equal("0 0 * * * *")
     })
 
+    it("should allow updating wallet delegates", async () => {
+      const newWallet = Keypair.generate()
+      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
+      const nextTask = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1, false)[0]
+      await program.methods.updateWalletDelegateV0({
+        newTaskId: nextTask,
+        delegate: newWallet.publicKey,
+        index: 0 
+      })
+        .accounts({
+          payer: me,
+          wallet: wallet1.publicKey,
+          miniFanout: fanout,
+          newTask: taskKey(taskQueue, nextTask)[0],
+        })
+        .signers([wallet1])
+        .rpcAndKeys()
+
+      const miniFanoutAcc = await program.account.miniFanoutV0.fetch(fanout)
+      expect(miniFanoutAcc.shares[0].delegate.toBase58()).to.equal(newWallet.publicKey.toBase58())
+    })
+
     async function runAllTasks() {
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
 

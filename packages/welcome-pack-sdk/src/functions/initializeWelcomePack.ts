@@ -56,7 +56,7 @@ export async function initializeWelcomePack({
     ...rest,
   });
 
-  const userWelcomePacksK = userWelcomePacksKey(assetOwner)[0]
+  const userWelcomePacksK = userWelcomePacksKey(owner)[0]
   const userWelcomePacks = await program.account.userWelcomePacksV0.fetchNullable(userWelcomePacksK)
 
   return program.methods

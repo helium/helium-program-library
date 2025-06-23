@@ -1,8 +1,4 @@
-use std::str::FromStr;
-
 use anchor_lang::prelude::*;
-use clockwork_cron::Schedule;
-use shared_utils::resize_to_fit;
 use tuktuk_program::{
   tuktuk::{
     self,
@@ -13,24 +9,30 @@ use tuktuk_program::{
 };
 
 use crate::{
-  errors::ErrorCode, queue_authority_seeds, schedule_impl, schedule_task_v0::ScheduleTaskV0,
-  state::*, MiniFanoutShareArgV0, ScheduleTaskArgsV0, MAX_SHARES,
+  errors::ErrorCode, queue_authority_seeds, schedule_impl, MiniFanoutV0, ScheduleTaskArgsV0,
+  ScheduleTaskV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct UpdateMiniFanoutArgsV0 {
+pub struct UpdateWalletDelegateArgsV0 {
+  pub index: u8,
   pub new_task_id: u16,
-  pub shares: Option<Vec<MiniFanoutShareArgV0>>,
-  pub schedule: Option<String>,
+  pub delegate: Pubkey,
 }
 
 #[derive(Accounts)]
-#[instruction(args: UpdateMiniFanoutArgsV0)]
-pub struct UpdateMiniFanoutV0<'info> {
-  pub owner: Signer<'info>,
+#[instruction(args: UpdateWalletDelegateArgsV0)]
+pub struct UpdateWalletDelegateV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  #[account(mut, has_one = owner, has_one = next_task, has_one = task_queue)]
+  pub wallet: Signer<'info>,
+  #[account(
+    mut,
+    constraint = mini_fanout.shares.len() > args.index as usize @ ErrorCode::InvalidIndex,
+    constraint = mini_fanout.shares[args.index as usize].wallet == wallet.key() @ ErrorCode::InvalidWallet,
+    has_one = next_task,
+    has_one = task_queue,
+  )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   /// CHECK: queue authority
   #[account(
@@ -58,42 +60,12 @@ pub struct UpdateMiniFanoutV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -> Result<()> {
+pub fn handler(
+  ctx: Context<UpdateWalletDelegateV0>,
+  args: UpdateWalletDelegateArgsV0,
+) -> Result<()> {
   let mini_fanout = &mut ctx.accounts.mini_fanout;
-  if let Some(shares) = args.shares {
-    require_gte!(shares.len(), 1, ErrorCode::InvalidShares);
-    require_gte!(MAX_SHARES, shares.len(), ErrorCode::InvalidShares);
-    mini_fanout.shares = shares
-      .into_iter()
-      .map(|s| {
-        let existing_share = mini_fanout
-          .shares
-          .iter()
-          .find(|share| share.wallet == s.wallet);
-        MiniFanoutShareV0 {
-          wallet: s.wallet,
-          share: s.share,
-          delegate: existing_share
-            .map(|s| s.delegate)
-            .unwrap_or(Pubkey::default()),
-          total_dust: existing_share.map(|s| s.total_dust).unwrap_or(0),
-          total_owed: existing_share.map(|s| s.total_owed).unwrap_or(0),
-        }
-      })
-      .collect()
-  }
-  if let Some(schedule) = args.schedule {
-    Schedule::from_str(&schedule).map_err(|e| {
-      msg!("Invalid schedule {}", e);
-      crate::errors::ErrorCode::InvalidSchedule
-    })?;
-    mini_fanout.schedule = schedule;
-  }
-  resize_to_fit(
-    &ctx.accounts.payer.to_account_info(),
-    &ctx.accounts.system_program.to_account_info(),
-    mini_fanout,
-  )?;
+  mini_fanout.shares[args.index as usize].delegate = args.delegate;
   if !ctx.accounts.next_task.data_is_empty() {
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),

@@ -57,4 +57,11 @@ pub mod mini_fanout {
   pub fn close_mini_fanout_v0(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
     instructions::close_mini_fanout_v0::handler(ctx)
   }
+
+  pub fn update_wallet_delegate_v0(
+    ctx: Context<UpdateWalletDelegateV0>,
+    args: UpdateWalletDelegateArgsV0,
+  ) -> Result<()> {
+    instructions::update_wallet_delegate_v0::handler(ctx, args)
+  }
 }

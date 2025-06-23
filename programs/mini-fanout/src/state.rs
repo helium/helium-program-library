@@ -42,11 +42,22 @@ pub struct UserMiniFanoutsV0 {
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct MiniFanoutShareV0 {
   pub wallet: Pubkey,
+  pub delegate: Pubkey,
   pub share: Share,
   // dust is the amount of tokens that are not divisible by the total shares. Taken to 12 additional decimal places, we attempt to add these back in to the mix
   pub total_dust: u64,
   // total owed is the amount we weren't able to transfer due to ATA not existing
   pub total_owed: u64,
+}
+
+impl MiniFanoutShareV0 {
+  pub fn destination(&self) -> Pubkey {
+    if self.delegate == Pubkey::default() {
+      self.wallet
+    } else {
+      self.delegate
+    }
+  }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Eq, PartialEq, Clone)]
