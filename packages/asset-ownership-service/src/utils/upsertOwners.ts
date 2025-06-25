@@ -45,7 +45,7 @@ export const upsertOwners = async ({
 
       await AssetOwner.bulkCreate(assetsWithOwner, {
         transaction,
-        updateOnDuplicate: ["asset"],
+        updateOnDuplicate: ["asset", "owner"],
       });
 
       await transaction.commit();

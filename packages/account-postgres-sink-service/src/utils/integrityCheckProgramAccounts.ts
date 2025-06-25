@@ -242,6 +242,7 @@ export const integrityCheckProgramAccounts = async ({
 
           await Promise.all(
             Object.entries(accsByType).map(async ([accName, accounts]) => {
+              const upserts: any[] = [];
               const model = sequelize.models[accName];
               const pubkeys = accounts.map((c) => c.pubkey);
               const existingAccs = await model.findAll({
@@ -257,8 +258,18 @@ export const integrityCheckProgramAccounts = async ({
               await Promise.all(
                 accounts.map((acc) =>
                   limiter(async () => {
+                    const existing = existingAccMap.get(acc.pubkey);
+                    const refreshedAt = existing?.dataValues.refreshed_at
+                      ? new Date(existing.dataValues.refreshed_at)
+                      : null;
+
+                    if (refreshedAt && refreshedAt > refreshThreshold) {
+                      return;
+                    }
+
                     const latestTxSignature = (txIdsByAccountId[acc.pubkey] ||
                       [])[0];
+
                     if (latestTxSignature) {
                       const latestTx = await connection.getTransaction(
                         latestTxSignature,
@@ -310,15 +321,6 @@ export const integrityCheckProgramAccounts = async ({
                           return;
                         }
                       }
-                    }
-
-                    const existing = existingAccMap.get(acc.pubkey);
-                    const refreshedAt = existing?.dataValues.refreshed_at
-                      ? new Date(existing.dataValues.refreshed_at)
-                      : null;
-
-                    if (refreshedAt && refreshedAt > refreshThreshold) {
-                      return;
                     }
 
                     const existingData = existing?.dataValues;
@@ -374,11 +376,18 @@ export const integrityCheckProgramAccounts = async ({
                         ),
                       });
 
-                      await model.upsert({ ...sanitized }, { transaction: t });
+                      upserts.push(sanitized);
                     }
                   })
                 )
               );
+
+              if (upserts.length > 0) {
+                await model.bulkCreate(upserts, {
+                  updateOnDuplicate: [...Object.keys(upserts[0])],
+                  transaction: t,
+                });
+              }
             })
           );
         })
