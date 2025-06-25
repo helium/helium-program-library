@@ -1,0 +1,124 @@
+{
+  "configs": [
+    {
+      "programId": "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8",
+      "accounts": [
+        {
+          "type": "DataOnlyConfigV0",
+          "table": "data_only_configs",
+          "schema": "public"
+        },
+        { "type": "MakerV0", "table": "makers", "schema": "public" },
+        {
+          "type": "KeyToAssetV0",
+          "table": "key_to_assets",
+          "schema": "public",
+          "plugins": [
+            {
+              "type": "EncodeEntityKey",
+              "config": {
+                "field": "entity_key"
+              }
+            }
+          ]
+        },
+        {
+          "type": "IotHotspotInfoV0",
+          "table": "iot_hotspot_infos",
+          "schema": "public",
+          "plugins": [
+            {
+              "type": "ExtractHexLocation",
+              "config": {
+                "field": "location"
+              }
+            }
+          ]
+        },
+        {
+          "type": "MobileHotspotInfoV0",
+          "table": "mobile_hotspot_infos",
+          "schema": "public",
+          "plugins": [
+            {
+              "type": "ExtractHexLocation",
+              "config": {
+                "field": "location"
+              }
+            }
+          ]
+        }
+      ],
+      "crons": [{ "schedule": "10 0 * * *", "type": "integrity-check" }]
+    },
+    {
+      "programId": "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ",
+      "accounts": [
+        {
+          "type": "BoostConfigV0",
+          "table": "boost_configs",
+          "schema": "public"
+        },
+        { "type": "BoostedHexV0", "table": "boosted_hexes", "schema": "public" }
+      ],
+      "crons": [{ "schedule": "10 0 * * *", "type": "integrity-check" }]
+    },
+    {
+      "programId": "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr",
+      "accounts": [
+        {
+          "type": "CarrierV0",
+          "table": "carriers",
+          "schema": "public"
+        },
+        {
+          "type": "IncentiveEscrowProgramV0",
+          "table": "incentive_escrow_programs",
+          "schema": "public"
+        }
+      ]
+    },
+    {
+      "programId": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
+      "accounts": [
+        {
+          "type": "DaoEpochInfoV0",
+          "table": "dao_epoch_infos",
+          "schema": "public"
+        },
+        {
+          "type": "SubDaoEpochInfoV0",
+          "table": "sub_dao_epoch_infos",
+          "schema": "public"
+        }
+      ],
+      "crons": [{ "schedule": "10 0 * * *", "type": "integrity-check" }]
+    },
+    {
+      "programId": "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w",
+      "accounts": [
+        {
+          "type": "RecipientV0",
+          "table": "recipients",
+          "schema": "public"
+        }
+      ]
+    },
+    {
+      "programId": "we1cGnTxTkDP9Sk49dw1d3T7ik7V2NfnY4qDGCDHXfC",
+      "accounts": [
+        {
+          "type": "WelcomePackV0",
+          "table": "welcome_packs",
+          "schema": "public"
+        }
+      ]
+    }
+  ],
+  "indexConfigs": [
+    "CREATE INDEX IF NOT EXISTS idx_key_to_asset_asset ON key_to_assets(asset);",
+    "CREATE INDEX IF NOT EXISTS idx_recipients_asset_index ON recipients(asset);",
+    "CREATE INDEX IF NOT EXISTS idx_recipients_destination_index ON recipients(destination);",
+    "CREATE INDEX IF NOT EXISTS idx_recipients_lazy_distributor ON recipients(lazy_distributor);"
+  ]
+}
