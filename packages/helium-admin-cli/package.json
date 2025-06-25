@@ -55,7 +55,7 @@
     "@helium/proposal-sdk": "^0.1.5-alpha.0",
     "@helium/spl-utils": "^0.10.18",
     "@helium/treasury-management-sdk": "^0.10.18",
-    "@helium/tuktuk-sdk": "^0.0.8",
+    "@helium/tuktuk-sdk": "^0.0.9",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-governance": "^0.3.18",

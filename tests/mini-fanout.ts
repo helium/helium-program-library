@@ -197,6 +197,9 @@ describe("mini-fanout", () => {
       await program.methods.scheduleTaskV0({
         taskId: nextTask,
       })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
         .accounts({
           payer: me,
           miniFanout: fanoutK,
@@ -249,7 +252,7 @@ describe("mini-fanout", () => {
       await program.methods.updateWalletDelegateV0({
         newTaskId: nextTask,
         delegate: newWallet.publicKey,
-        index: 0 
+        index: 0
       })
         .accounts({
           payer: me,
@@ -334,8 +337,8 @@ describe("mini-fanout", () => {
       ).to.not.be.null
     })
 
-    it("should distribute tokens to 9 wallets in one tx", async () => {
-      const wallets = Array.from({ length: 9 }, () => Keypair.generate())
+    it("should distribute tokens to 8 wallets in one tx", async () => {
+      const wallets = Array.from({ length: 8 }, () => Keypair.generate())
       const shares = wallets.map(w => ({
         wallet: w.publicKey,
         share: { share: { amount: 10 } },
@@ -384,6 +387,9 @@ describe("mini-fanout", () => {
       await program.methods.scheduleTaskV0({
         taskId: nextTask,
       })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
         .accounts({
           payer: me,
           miniFanout: fanoutK,
@@ -391,7 +397,7 @@ describe("mini-fanout", () => {
         })
         .rpc()
 
-      await createAtaAndMint(provider, mint, 900000000, fanoutK)
+      await createAtaAndMint(provider, mint, 800000000, fanoutK)
 
       // Wait for cron and run all tasks
       await new Promise(resolve => setTimeout(resolve, 2000))
@@ -409,7 +415,7 @@ describe("mini-fanout", () => {
           provider.connection,
           getAssociatedTokenAddressSync(mint, w.publicKey)
         )
-        // Each gets 900000000 (1/9th of FANOUT_AMOUNT)
+        // Each gets 800000000 (1/8th of FANOUT_AMOUNT)
         expect(Number(walletTokenAccount.amount)).to.equal(100000000)
       }
     })

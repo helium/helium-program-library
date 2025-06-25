@@ -10,7 +10,7 @@ use tuktuk_program::TaskQueueV0;
 
 use crate::{errors::ErrorCode, state::*};
 
-pub const MAX_SHARES: usize = 9;
+pub const MAX_SHARES: usize = 8;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct InitializeMiniFanoutArgsV0 {

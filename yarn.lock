@@ -898,7 +898,7 @@ __metadata:
     "@helium/account-fetch-cache-hooks": ^0.10.18
     "@helium/hpl-crons-sdk": ^0.10.18
     "@helium/spl-utils": ^0.10.18
-    "@helium/tuktuk-sdk": ^0.0.8
+    "@helium/tuktuk-sdk": ^0.0.9
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/web3.js": ^1.91.1
     axios: ^1.8.4
@@ -931,16 +931,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/cron-sdk@npm:^0.0.8":
-  version: 0.0.8
-  resolution: "@helium/cron-sdk@npm:0.0.8"
+"@helium/cron-sdk@npm:^0.0.9":
+  version: 0.0.9
+  resolution: "@helium/cron-sdk@npm:0.0.9"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@helium/anchor-resolvers": ^0.10.0-alpha.4
-    "@helium/tuktuk-idls": ^0.0.8
-    "@helium/tuktuk-sdk": ^0.0.8
+    "@helium/tuktuk-idls": ^0.0.9
+    "@helium/tuktuk-sdk": ^0.0.9
     js-sha256: ^0.11.0
-  checksum: 3203f7e9887cde3f83bced56e045b0dd1b0d721d0a3eabccbe3bec24424a0adf64fdd8063075af7b945ea338103c2d9c0cf4e546afb055c7fb37914ce7896d67
+  checksum: 2f0a41aea66acc37a163dd100ff7b503450e8e8068a89558eadafad82b42805bda251a1fc290f9433b3f2ec6470ef2688cab4ea97f4801b901b10a1cd4b4eae7
   languageName: node
   linkType: hard
 
@@ -1051,7 +1051,7 @@ __metadata:
     "@helium/lazy-distributor-sdk": ^0.10.18
     "@helium/rewards-oracle-sdk": ^0.10.18
     "@helium/spl-utils": ^0.10.18
-    "@helium/tuktuk-sdk": ^0.0.8
+    "@helium/tuktuk-sdk": ^0.0.9
     "@metaplex-foundation/mpl-bubblegum": ^0.7.0
     "@solana/spl-memo": ^0.2.5
     "@solana/spl-token": ^0.3.8
@@ -1204,7 +1204,7 @@ __metadata:
     "@helium/proposal-sdk": ^0.1.5-alpha.0
     "@helium/spl-utils": ^0.10.18
     "@helium/treasury-management-sdk": ^0.10.18
-    "@helium/tuktuk-sdk": ^0.0.8
+    "@helium/tuktuk-sdk": ^0.0.9
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-governance": ^0.3.18
@@ -1310,8 +1310,8 @@ __metadata:
     "@helium/proposal-sdk": ^0.1.5
     "@helium/spl-utils": ^0.10.18
     "@helium/state-controller-sdk": ^0.1.5
-    "@helium/tuktuk-idls": ^0.0.8
-    "@helium/tuktuk-sdk": ^0.0.8
+    "@helium/tuktuk-idls": ^0.0.9
+    "@helium/tuktuk-sdk": ^0.0.9
     "@helium/voter-stake-registry-sdk": ^0.10.18
     "@solana/spl-memo": ^0.2.5
     "@solana/web3.js": ^1.91.1
@@ -1371,13 +1371,13 @@ __metadata:
   resolution: "@helium/hpl-crons-sdk@workspace:packages/hpl-crons-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/cron-sdk": ^0.0.8
+    "@helium/cron-sdk": ^0.0.9
     "@helium/helium-sub-daos-sdk": ^0.10.18
     "@helium/organization-sdk": ^0.1.5-alpha.0
     "@helium/proposal-sdk": ^0.1.5-alpha.0
     "@helium/spl-utils": ^0.10.18
     "@helium/state-controller-sdk": ^0.1.5-alpha.0
-    "@helium/tuktuk-sdk": ^0.0.8
+    "@helium/tuktuk-sdk": ^0.0.9
     "@helium/voter-stake-registry-sdk": ^0.10.18
     "@solana/web3.js": ^1.91.1
     axios: ^1.8.4
@@ -1934,16 +1934,6 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/tuktuk-idls@npm:^0.0.8":
-  version: 0.0.8
-  resolution: "@helium/tuktuk-idls@npm:0.0.8"
-  dependencies:
-    "@coral-xyz/anchor": ^0.31.0
-    "@solana/web3.js": ^1.95.2
-  checksum: ab186e17e00cfd176bf07943797afc91290cb4a68df0a1b5392a9de596330ca4498734dffa33deb6b15b77f44b0ba8f2a890d4b17978475b1ba290c4ea28f2ca
-  languageName: node
-  linkType: hard
-
 "@helium/tuktuk-idls@npm:^0.0.9":
   version: 0.0.9
   resolution: "@helium/tuktuk-idls@npm:0.0.9"
@@ -1951,18 +1941,6 @@ __metadata:
     "@coral-xyz/anchor": ^0.31.0
     "@solana/web3.js": ^1.95.2
   checksum: 9fdf9cf1ff85c71da3cb361031109381b9d7e219b0bee9e829eaab2be5032af9776bce20f46b2894963de72c1ef06dbe3112d45b3b9b0dc9ac7304dbbc3edcaf
-  languageName: node
-  linkType: hard
-
-"@helium/tuktuk-sdk@npm:^0.0.8":
-  version: 0.0.8
-  resolution: "@helium/tuktuk-sdk@npm:0.0.8"
-  dependencies:
-    "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.10.0-alpha.4
-    "@helium/tuktuk-idls": ^0.0.8
-    js-sha256: ^0.11.0
-  checksum: 33506db28837b620569545b5197577f0646ea879cddf319d9836a2ea14c5a32b3afa4db07e2afdb71f69c78b2b2d120f9d64ca773f03dfa9bd945f8b4de64b1a
   languageName: node
   linkType: hard
 
@@ -1994,7 +1972,7 @@ __metadata:
     "@helium/modular-governance-idls": ^0.1.5-alpha.0
     "@helium/organization-sdk": ^0.1.5-alpha.0
     "@helium/spl-utils": ^0.10.18
-    "@helium/tuktuk-sdk": ^0.0.8
+    "@helium/tuktuk-sdk": ^0.0.9
     "@helium/voter-stake-registry-sdk": ^0.10.18
     "@solana/wallet-adapter-base": ^0.9.22
     "@solana/web3.js": ^1.91.1
@@ -14852,6 +14830,7 @@ __metadata:
     "@helium/nft-proxy-sdk": ^0.1.5-alpha.0
     "@helium/proposal-sdk": ^0.1.5-alpha.0
     "@helium/transactions": ^3.38.0
+    "@helium/tuktuk-idls": ^0.0.9
     "@metaplex-foundation/mpl-bubblegum": ^0.7.0
     "@pythnetwork/client": ^2.8.0
     "@pythnetwork/pyth-solana-receiver": ^0.9.1

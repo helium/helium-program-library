@@ -116,12 +116,13 @@ pub fn get_next_time(mini_fanout: &MiniFanoutV0) -> Result<i64> {
 }
 
 pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Result<()> {
-  let compiled_tx = get_task_ix(&ctx.mini_fanout)?;
   let mini_fanout = &mut ctx.mini_fanout;
   if mini_fanout.next_task != Pubkey::default() {
     return Ok(());
   }
   let next_time = get_next_time(mini_fanout)?;
+  mini_fanout.next_task = ctx.task.key();
+  let compiled_tx = get_task_ix(mini_fanout)?;
 
   // CPI to tuktuk to queue the task
   queue_task_v0(
@@ -147,7 +148,6 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
     },
   )?;
 
-  mini_fanout.next_task = ctx.task.key();
   Ok(())
 }
 

@@ -17,14 +17,14 @@ pub struct DistributeV0<'info> {
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   #[account(mut)]
-  pub task_queue: Account<'info, TaskQueueV0>,
+  pub task_queue: Box<Account<'info, TaskQueueV0>>,
   #[account(
     constraint = match next_task.trigger {
       TriggerV0::Now => true,
       TriggerV0::Timestamp(timestamp) => timestamp <= Clock::get()?.unix_timestamp,
     } @ ErrorCode::TaskNotDue
   )]
-  pub next_task: Account<'info, TaskV0>,
+  pub next_task: Box<Account<'info, TaskV0>>,
   #[account(mut)]
   pub token_account: Box<Account<'info, TokenAccount>>,
   pub token_program: Program<'info, Token>,
