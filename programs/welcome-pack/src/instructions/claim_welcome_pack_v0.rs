@@ -176,6 +176,73 @@ pub fn handler<'info>(
   }
 
   let mut ld_destination = mapped_shares[0].wallet;
+  if needs_fanout {
+    ld_destination = ctx.accounts.rewards_recipient.key();
+  }
+  require_eq!(
+    ctx.accounts.rewards_recipient.key(),
+    ld_destination,
+    ErrorCode::InvalidRewardsRecipient
+  );
+  update_compression_destination_v0(
+    CpiContext::new_with_signer(
+      ctx.accounts.lazy_distributor_program.to_account_info(),
+      UpdateCompressionDestinationV0 {
+        owner: welcome_pack.to_account_info().clone(),
+        destination: ctx.accounts.rewards_recipient.to_account_info(),
+        merkle_tree: ctx.accounts.merkle_tree.clone(),
+        compression_program: ctx.accounts.compression_program.to_account_info(),
+        recipient: ctx.accounts.recipient.to_account_info(),
+      },
+      &[welcome_pack_seeds!(welcome_pack)],
+    )
+    .with_remaining_accounts(ctx.remaining_accounts.to_vec()),
+    UpdateCompressionDestinationArgsV0 {
+      data_hash: args.data_hash,
+      creator_hash: args.creator_hash,
+      root: args.root,
+      index: args.index,
+    },
+  )?;
+
+  let remaining_accounts = ctx.remaining_accounts.to_vec();
+  let transfer_accounts = bubblegum_cpi::bubblegum::cpi::accounts::Transfer {
+    tree_authority: ctx.accounts.tree_authority.clone(),
+    leaf_owner: welcome_pack.to_account_info(),
+    leaf_delegate: welcome_pack.to_account_info(),
+    new_leaf_owner: ctx.accounts.asset_return_address.to_account_info(),
+    merkle_tree: ctx.accounts.merkle_tree.clone(),
+    log_wrapper: ctx.accounts.log_wrapper.to_account_info(),
+    compression_program: ctx.accounts.compression_program.to_account_info(),
+    system_program: ctx.accounts.system_program.to_account_info(),
+  };
+  // Transfer the asset back
+  let mut account_metas = transfer_accounts.to_account_metas(None);
+  account_metas.extend(remaining_accounts.iter().map(|acc| AccountMeta {
+    pubkey: acc.key(),
+    is_signer: false,
+    is_writable: false,
+  }));
+  account_metas[1].is_signer = true;
+
+  // Serialize instruction data: discriminator + args
+  let mut data = vec![163, 52, 200, 231, 140, 3, 69, 186];
+  data.extend_from_slice(&args.root);
+  data.extend_from_slice(&args.data_hash);
+  data.extend_from_slice(&args.creator_hash);
+  data.extend_from_slice(&(args.index as u64).to_le_bytes());
+  data.extend_from_slice(&args.index.to_le_bytes());
+
+  invoke_signed(
+    &Instruction {
+      program_id: ctx.accounts.bubblegum_program.key(),
+      accounts: account_metas,
+      data,
+    },
+    &[transfer_accounts.to_account_infos(), remaining_accounts].concat(),
+    &[welcome_pack_seeds!(welcome_pack)],
+  )?;
+
   welcome_pack.close(ctx.accounts.claimer.to_account_info())?;
 
   if needs_fanout {
@@ -232,70 +299,7 @@ pub fn handler<'info>(
         task_id: args.task_id,
       },
     )?;
-    ld_destination = ctx.accounts.rewards_recipient.key();
   }
-  require_eq!(
-    ctx.accounts.rewards_recipient.key(),
-    ld_destination,
-    ErrorCode::InvalidRewardsRecipient
-  );
-  update_compression_destination_v0(
-    CpiContext::new_with_signer(
-      ctx.accounts.lazy_distributor_program.to_account_info(),
-      UpdateCompressionDestinationV0 {
-        owner: welcome_pack.to_account_info().clone(),
-        destination: ctx.accounts.rewards_recipient.to_account_info(),
-        merkle_tree: ctx.accounts.merkle_tree.clone(),
-        compression_program: ctx.accounts.compression_program.to_account_info(),
-        recipient: ctx.accounts.recipient.to_account_info(),
-      },
-      &[welcome_pack_seeds!(welcome_pack)],
-    ),
-    UpdateCompressionDestinationArgsV0 {
-      data_hash: args.data_hash,
-      creator_hash: args.creator_hash,
-      root: args.root,
-      index: args.index,
-    },
-  )?;
-
-  let remaining_accounts = ctx.remaining_accounts.to_vec();
-  let transfer_accounts = bubblegum_cpi::bubblegum::cpi::accounts::Transfer {
-    tree_authority: ctx.accounts.tree_authority.clone(),
-    leaf_owner: welcome_pack.to_account_info(),
-    leaf_delegate: welcome_pack.to_account_info(),
-    new_leaf_owner: ctx.accounts.asset_return_address.to_account_info(),
-    merkle_tree: ctx.accounts.merkle_tree.clone(),
-    log_wrapper: ctx.accounts.log_wrapper.to_account_info(),
-    compression_program: ctx.accounts.compression_program.to_account_info(),
-    system_program: ctx.accounts.system_program.to_account_info(),
-  };
-  // Transfer the asset back
-  let mut account_metas = transfer_accounts.to_account_metas(None);
-  account_metas.extend(remaining_accounts.iter().map(|acc| AccountMeta {
-    pubkey: acc.key(),
-    is_signer: false,
-    is_writable: false,
-  }));
-  account_metas[1].is_signer = true;
-
-  // Serialize instruction data: discriminator + args
-  let mut data = vec![163, 52, 200, 231, 140, 3, 69, 186];
-  data.extend_from_slice(&args.root);
-  data.extend_from_slice(&args.data_hash);
-  data.extend_from_slice(&args.creator_hash);
-  data.extend_from_slice(&(args.index as u64).to_le_bytes());
-  data.extend_from_slice(&args.index.to_le_bytes());
-
-  invoke_signed(
-    &Instruction {
-      program_id: ctx.accounts.bubblegum_program.key(),
-      accounts: account_metas,
-      data,
-    },
-    &[transfer_accounts.to_account_infos(), remaining_accounts].concat(),
-    &[welcome_pack_seeds!(welcome_pack)],
-  )?;
 
   Ok(())
 }
