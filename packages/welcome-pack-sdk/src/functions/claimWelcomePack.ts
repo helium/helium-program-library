@@ -29,7 +29,6 @@ export async function claimWelcomePack({
   tuktukProgram: Program<Tuktuk>;
   claimApproval: ClaimApprovalV0;
   claimApprovalSignature: Buffer;
-  welcomePack: PublicKey;
   program: Program<WelcomePack>;
   payer?: PublicKey;
   taskQueue: PublicKey;
@@ -53,8 +52,10 @@ export async function claimWelcomePack({
   });
 
   const miniFanout = miniFanoutKey(claimApproval.welcomePack, assetId.toBuffer())[0]
-  const lazyDistributorAcc = await program.account.lazyDistributorV0.fetch(welcomePackAcc.lazyDistributor)
-  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
+  const [lazyDistributorAcc, taskQueueAcc] = await Promise.all([
+    program.account.lazyDistributorV0.fetch(welcomePackAcc.lazyDistributor),
+    tuktukProgram.account.taskQueueV0.fetch(taskQueue)
+  ])
   const nextTaskId = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)[0]
   const queueAuthority = queueAuthorityKey()[0]
   return program.methods
