@@ -84,6 +84,8 @@ export const navigation = [
     ),
     links: [
       // DOCS NAVIGATION START
+      { title: "Welcome pack", href: "/docs/api/welcome-pack-sdk" },
+
       {
         title: "Voter stake registry",
         href: "/docs/api/voter-stake-registry-sdk",
@@ -93,6 +95,8 @@ export const navigation = [
         title: "Treasury management",
         href: "/docs/api/treasury-management-sdk",
       },
+
+      { title: "Sessions", href: "/docs/api/sessions-sdk" },
 
       { title: "Rewards oracle", href: "/docs/api/rewards-oracle-sdk" },
 
@@ -104,6 +108,8 @@ export const navigation = [
         title: "Mobile entity manager",
         href: "/docs/api/mobile-entity-manager-sdk",
       },
+
+      { title: "Mini fanout", href: "/docs/api/mini-fanout-sdk" },
 
       { title: "Lazy transactions", href: "/docs/api/lazy-transactions-sdk" },
 

@@ -591,6 +591,7 @@ undefined
 | next_transaction_id        | u32    |
 | removed_from_queue         | bool   |
 | bump_seed                  | u8     |
+| next_schedule_task         | pubkey |
 
 ### DaoV0
 
