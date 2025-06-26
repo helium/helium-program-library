@@ -7,7 +7,7 @@ import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
 import { execSync } from "child_process";
-import { init, miniFanoutKey, PROGRAM_ID, queueAuthorityKey } from "../packages/mini-fanout-sdk/src";
+import { init, PROGRAM_ID, queueAuthorityKey } from "../packages/mini-fanout-sdk/src";
 import { MiniFanout } from "../target/types/mini_fanout";
 
 export const ANCHOR_PATH = "anchor";

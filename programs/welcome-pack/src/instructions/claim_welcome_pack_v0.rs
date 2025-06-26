@@ -126,11 +126,14 @@ pub fn handler<'info>(
     expiration_timestamp: args.approval_expiration_timestamp,
   }
   .serialize(&mut claim_approval_bytes)?;
-  let msg_hash = solana_program::hash::hash(&claim_approval_bytes);
+  let msg = format!(
+    "Approve invite {} expiring {}",
+    ctx.accounts.welcome_pack.unique_id, args.approval_expiration_timestamp
+  );
   sig_verify(
     &ctx.accounts.welcome_pack.owner.key().to_bytes(),
     &args.claim_signature,
-    &msg_hash.to_bytes(),
+    msg.as_bytes(),
   )
   .map_err(|e| {
     msg!("Invalid claim approval signature: {:?}", e);
@@ -268,17 +271,7 @@ pub fn handler<'info>(
       ),
       fanout_args,
     )?;
-    // Fund the fanout so it can schedule tasks
-    transfer(
-      CpiContext::new(
-        ctx.accounts.system_program.to_account_info(),
-        Transfer {
-          from: ctx.accounts.claimer.to_account_info(),
-          to: ctx.accounts.rewards_recipient.to_account_info(),
-        },
-      ),
-      FANOUT_FUNDING_AMOUNT - ctx.accounts.task.lamports(),
-    )?;
+
     // Schedule the task
     schedule_task_v0(
       CpiContext::new(
@@ -298,6 +291,18 @@ pub fn handler<'info>(
       ScheduleTaskArgsV0 {
         task_id: args.task_id,
       },
+    )?;
+
+    // Fund the fanout so it can schedule tasks
+    transfer(
+      CpiContext::new(
+        ctx.accounts.system_program.to_account_info(),
+        Transfer {
+          from: ctx.accounts.claimer.to_account_info(),
+          to: ctx.accounts.rewards_recipient.to_account_info(),
+        },
+      ),
+      FANOUT_FUNDING_AMOUNT - ctx.accounts.task.lamports(),
     )?;
   }
 
