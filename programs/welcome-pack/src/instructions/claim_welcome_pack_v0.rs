@@ -277,7 +277,7 @@ pub fn handler<'info>(
           to: ctx.accounts.rewards_recipient.to_account_info(),
         },
       ),
-      FANOUT_FUNDING_AMOUNT,
+      FANOUT_FUNDING_AMOUNT - ctx.accounts.task.lamports(),
     )?;
     // Schedule the task
     schedule_task_v0(
