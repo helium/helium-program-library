@@ -45,7 +45,7 @@
     "@helium/lazy-distributor-sdk": "^0.10.18",
     "@helium/rewards-oracle-sdk": "^0.10.18",
     "@helium/spl-utils": "^0.10.18",
-    "@helium/tuktuk-sdk": "^0.0.8",
+    "@helium/tuktuk-sdk": "^0.0.9",
     "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
     "@solana/spl-memo": "^0.2.5",
     "@solana/spl-token": "^0.3.8",

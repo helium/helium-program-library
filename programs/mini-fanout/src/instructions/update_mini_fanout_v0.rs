@@ -27,10 +27,10 @@ pub struct UpdateMiniFanoutArgsV0 {
 #[derive(Accounts)]
 #[instruction(args: UpdateMiniFanoutArgsV0)]
 pub struct UpdateMiniFanoutV0<'info> {
-  pub authority: Signer<'info>,
+  pub owner: Signer<'info>,
   #[account(mut)]
   pub payer: Signer<'info>,
-  #[account(mut, has_one = authority, has_one = next_task, has_one = task_queue)]
+  #[account(mut, has_one = owner, has_one = next_task, has_one = task_queue)]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   /// CHECK: queue authority
   #[account(
@@ -73,6 +73,9 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
         MiniFanoutShareV0 {
           wallet: s.wallet,
           share: s.share,
+          delegate: existing_share
+            .map(|s| s.delegate)
+            .unwrap_or(Pubkey::default()),
           total_dust: existing_share.map(|s| s.total_dust).unwrap_or(0),
           total_owed: existing_share.map(|s| s.total_owed).unwrap_or(0),
         }
@@ -108,7 +111,6 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
   schedule_impl(
     &mut ScheduleTaskV0 {
       payer: ctx.accounts.payer.clone(),
-      authority: ctx.accounts.authority.clone(),
       mini_fanout: mini_fanout.clone(),
       next_task: ctx.accounts.next_task.clone(),
       tuktuk_program: ctx.accounts.tuktuk_program.clone(),

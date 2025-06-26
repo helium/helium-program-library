@@ -14,7 +14,8 @@ pub struct GlobalStateV0 {
 #[derive(Default)]
 pub struct MiniFanoutV0 {
   /// The authority that can modify the fanout configuration
-  pub authority: Pubkey,
+  pub owner: Pubkey,
+  pub namespace: Pubkey,
   pub mint: Pubkey,
   pub token_account: Pubkey,
   pub task_queue: Pubkey,
@@ -23,22 +24,40 @@ pub struct MiniFanoutV0 {
   /// Bump seed for PDA derivation
   pub bump: u8,
   pub schedule: String,
-  /// Name of the fanout for identification
-  pub name: String,
   /// Bump seed for queue authority PDA derivation
   pub queue_authority_bump: u8,
   pub shares: Vec<MiniFanoutShareV0>,
+  pub seed: Vec<u8>,
+}
+
+#[account]
+#[derive(Default)]
+pub struct UserMiniFanoutsV0 {
+  pub next_id: u32,
+  pub owner: Pubkey,
+  pub bump_seed: u8,
 }
 
 #[account]
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct MiniFanoutShareV0 {
   pub wallet: Pubkey,
+  pub delegate: Pubkey,
   pub share: Share,
   // dust is the amount of tokens that are not divisible by the total shares. Taken to 12 additional decimal places, we attempt to add these back in to the mix
   pub total_dust: u64,
   // total owed is the amount we weren't able to transfer due to ATA not existing
   pub total_owed: u64,
+}
+
+impl MiniFanoutShareV0 {
+  pub fn destination(&self) -> Pubkey {
+    if self.delegate == Pubkey::default() {
+      self.wallet
+    } else {
+      self.delegate
+    }
+  }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Eq, PartialEq, Clone)]
@@ -58,7 +77,8 @@ macro_rules! fanout_seeds {
   ($fanout:expr) => {
     &[
       b"mini_fanout",
-      &anchor_lang::solana_program::hash::hash(&$fanout.name.as_bytes()).to_bytes()[..],
+      $fanout.namespace.as_ref(),
+      $fanout.seed.as_slice(),
       &[$fanout.bump],
     ]
   };

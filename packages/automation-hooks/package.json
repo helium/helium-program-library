@@ -36,7 +36,7 @@
     "@helium/account-fetch-cache-hooks": "^0.10.18",
     "@helium/hpl-crons-sdk": "^0.10.18",
     "@helium/spl-utils": "^0.10.18",
-    "@helium/tuktuk-sdk": "^0.0.8",
+    "@helium/tuktuk-sdk": "^0.0.9",
     "@solana/wallet-adapter-base": "^0.9.22",
     "@solana/web3.js": "^1.91.1",
     "axios": "^1.8.4",

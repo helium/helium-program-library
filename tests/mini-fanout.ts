@@ -131,14 +131,13 @@ describe("mini-fanout", () => {
   it("should initialize a fanout", async () => {
     console.log("Task queue is", taskQueue.toBase58())
     const { pubkeys: { miniFanout } } = await program.methods.initializeMiniFanoutV0({
-      name: fanoutName,
+      seed: Buffer.from(fanoutName, "utf-8"),
       shares,
       schedule: "0 0 * * * *",
     })
       .accounts({
         payer: me,
-        authority: me,
-        miniFanout: miniFanoutKey(fanoutName)[0],
+        owner: me,
         taskQueue,
         rentRefund: me,
         mint,
@@ -147,7 +146,7 @@ describe("mini-fanout", () => {
 
     const miniFanoutAcc = await program.account.miniFanoutV0.fetch(miniFanout)
 
-    expect(miniFanoutAcc.name).to.equal(fanoutName)
+    expect(miniFanoutAcc.seed.toString()).to.equal(fanoutName)
     expect(miniFanoutAcc.shares.length).to.equal(shares.length)
     for (let i = 0; i < shares.length; i++) {
       expect(miniFanoutAcc.shares[i].wallet.toBase58()).to.equal(shares[i].wallet.toBase58())
@@ -175,15 +174,14 @@ describe("mini-fanout", () => {
         nextMinutes = now.getMinutes() + 1
       }
       const { pubkeys: { miniFanout: fanoutK } } = await program.methods.initializeMiniFanoutV0({
-        name: fanoutName,
+        seed: Buffer.from(fanoutName, "utf-8"),
         // Run in 2 seconds
         schedule: `${nextSeconds} ${nextMinutes} * * * *`,
         shares,
       })
         .accounts({
           payer: me,
-          authority: me,
-          miniFanout: miniFanoutKey(fanoutName)[0],
+          owner: me,
           taskQueue,
           rentRefund: me,
           mint,
@@ -199,6 +197,9 @@ describe("mini-fanout", () => {
       await program.methods.scheduleTaskV0({
         taskId: nextTask,
       })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
         .accounts({
           payer: me,
           miniFanout: fanoutK,
@@ -242,6 +243,28 @@ describe("mini-fanout", () => {
       expect(miniFanoutAcc.shares[0].totalDust.toString()).to.equal(toBN(0, 8).toString())
       expect(miniFanoutAcc.nextTask.toBase58()).to.equal(taskKey(taskQueue, nextTask)[0].toBase58())
       expect(miniFanoutAcc.schedule).to.equal("0 0 * * * *")
+    })
+
+    it("should allow updating wallet delegates", async () => {
+      const newWallet = Keypair.generate()
+      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
+      const nextTask = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1, false)[0]
+      await program.methods.updateWalletDelegateV0({
+        newTaskId: nextTask,
+        delegate: newWallet.publicKey,
+        index: 0
+      })
+        .accounts({
+          payer: me,
+          wallet: wallet1.publicKey,
+          miniFanout: fanout,
+          newTask: taskKey(taskQueue, nextTask)[0],
+        })
+        .signers([wallet1])
+        .rpcAndKeys()
+
+      const miniFanoutAcc = await program.account.miniFanoutV0.fetch(fanout)
+      expect(miniFanoutAcc.shares[0].delegate.toBase58()).to.equal(newWallet.publicKey.toBase58())
     })
 
     async function runAllTasks() {
@@ -314,8 +337,8 @@ describe("mini-fanout", () => {
       ).to.not.be.null
     })
 
-    it("should distribute tokens to 9 wallets in one tx", async () => {
-      const wallets = Array.from({ length: 9 }, () => Keypair.generate())
+    it("should distribute tokens to 8 wallets in one tx", async () => {
+      const wallets = Array.from({ length: 8 }, () => Keypair.generate())
       const shares = wallets.map(w => ({
         wallet: w.publicKey,
         share: { share: { amount: 10 } },
@@ -340,14 +363,13 @@ describe("mini-fanout", () => {
       }
       console.log("creating fanout")
       const { pubkeys: { miniFanout: fanoutK } } = await program.methods.initializeMiniFanoutV0({
-        name: fanoutName + 'big',
+        seed: Buffer.from(fanoutName + 'big', "utf-8"),
         schedule: `${nextSeconds} ${nextMinutes} * * * *`,
         shares,
       })
         .accounts({
           payer: me,
-          authority: me,
-          miniFanout: miniFanoutKey(fanoutName + 'big')[0],
+          owner: me,
           taskQueue,
           rentRefund: me,
           mint,
@@ -365,6 +387,9 @@ describe("mini-fanout", () => {
       await program.methods.scheduleTaskV0({
         taskId: nextTask,
       })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
         .accounts({
           payer: me,
           miniFanout: fanoutK,
@@ -372,7 +397,7 @@ describe("mini-fanout", () => {
         })
         .rpc()
 
-      await createAtaAndMint(provider, mint, 900000000, fanoutK)
+      await createAtaAndMint(provider, mint, 800000000, fanoutK)
 
       // Wait for cron and run all tasks
       await new Promise(resolve => setTimeout(resolve, 2000))
@@ -390,7 +415,7 @@ describe("mini-fanout", () => {
           provider.connection,
           getAssociatedTokenAddressSync(mint, w.publicKey)
         )
-        // Each gets 900000000 (1/9th of FANOUT_AMOUNT)
+        // Each gets 800000000 (1/8th of FANOUT_AMOUNT)
         expect(Number(walletTokenAccount.amount)).to.equal(100000000)
       }
     })

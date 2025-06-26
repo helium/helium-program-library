@@ -28,12 +28,10 @@ pub struct ScheduleTaskArgsV0 {
 pub struct ScheduleTaskV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
-  pub authority: Signer<'info>,
   #[account(
     mut,
     has_one = next_task,
     has_one = task_queue,
-    has_one = authority,
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   /// CHECK: Via constraint
@@ -71,13 +69,16 @@ pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransa
     token_account: mini_fanout.token_account,
     token_program: spl_token::ID,
     task_queue: mini_fanout.task_queue,
+    next_task: mini_fanout.next_task,
   }
   .to_account_metas(None);
 
   // Append all shareholder token accounts as writable, non-signer
   for share in &mini_fanout.shares {
-    let ata =
-      anchor_spl::associated_token::get_associated_token_address(&share.wallet, &mini_fanout.mint);
+    let ata = anchor_spl::associated_token::get_associated_token_address(
+      &share.destination(),
+      &mini_fanout.mint,
+    );
     distribute_accounts.push(anchor_lang::solana_program::instruction::AccountMeta {
       pubkey: ata,
       is_signer: false,
@@ -115,12 +116,13 @@ pub fn get_next_time(mini_fanout: &MiniFanoutV0) -> Result<i64> {
 }
 
 pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Result<()> {
-  let compiled_tx = get_task_ix(&ctx.mini_fanout)?;
   let mini_fanout = &mut ctx.mini_fanout;
   if mini_fanout.next_task != Pubkey::default() {
     return Ok(());
   }
   let next_time = get_next_time(mini_fanout)?;
+  mini_fanout.next_task = ctx.task.key();
+  let compiled_tx = get_task_ix(mini_fanout)?;
 
   // CPI to tuktuk to queue the task
   queue_task_v0(
@@ -142,14 +144,10 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
       crank_reward: None,
       free_tasks: 1,
       id: args.task_id,
-      description: format!(
-        "dist {}",
-        &mini_fanout.name.chars().take(32).collect::<String>()
-      ),
+      description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
     },
   )?;
 
-  mini_fanout.next_task = ctx.task.key();
   Ok(())
 }
 

@@ -12,4 +12,12 @@ pub enum ErrorCode {
   InvalidSchedule,
   #[msg("Invalid shares")]
   InvalidShares,
+  #[msg("Task not due yet. Fanout can only distribute once per schedule.")]
+  TaskNotDue,
+  #[msg("Invalid wallet")]
+  InvalidWallet,
+  #[msg("Invalid index")]
+  InvalidIndex,
+  #[msg("Invalid token account owner")]
+  InvalidOwner,
 }

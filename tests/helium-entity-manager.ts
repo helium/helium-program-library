@@ -325,7 +325,7 @@ describe("helium-entity-manager", () => {
         dao,
         merkle: merkle.publicKey,
         ecc,
-        hotspotOwner,
+        hotspotOwner: hotspotOwner.publicKey,
       }));
 
       await dcProgram.methods
@@ -751,7 +751,7 @@ describe("helium-entity-manager", () => {
         dao,
         merkle: makerConf.merkle,
         ecc,
-        hotspotOwner,
+        hotspotOwner: hotspotOwner.publicKey,
       }));
     });
 
@@ -1119,7 +1119,7 @@ describe("helium-entity-manager", () => {
         dao,
         merkle: makerConf.merkle,
         ecc,
-        hotspotOwner,
+        hotspotOwner: hotspotOwner.publicKey,
       }));
     });
 

@@ -587,7 +587,7 @@ describe("helium-sub-daos", () => {
               dao,
               merkle,
               ecc,
-              hotspotOwner,
+              hotspotOwner: hotspotOwner.publicKey,
             });
           const issueMethod = hemProgram.methods
             .issueEntityV0({

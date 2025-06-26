@@ -1,13 +1,13 @@
-import { PublicKey } from "@solana/web3.js"
-import { PROGRAM_ID } from "./constants"
-import { sha256 } from "js-sha256";
+import { PublicKey } from "@solana/web3.js";
+import { PROGRAM_ID } from "./constants";
 
 export function miniFanoutKey(
-  name: string,
+  namespace: PublicKey,
+  seed: Buffer,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("mini_fanout", "utf-8"), Buffer.from(sha256(name), "hex")],
+    return PublicKey.findProgramAddressSync(
+    [Buffer.from("mini_fanout", "utf-8"), namespace.toBuffer(), seed],
     programId
   )
 }

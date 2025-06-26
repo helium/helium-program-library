@@ -13,12 +13,12 @@ use crate::{queue_authority_seeds, state::*};
 #[derive(Accounts)]
 pub struct CloseMiniFanoutV0<'info> {
   #[account(mut)]
-  pub authority: Signer<'info>,
+  pub owner: Signer<'info>,
   #[account(
     mut,
     close = rent_refund,
     has_one = rent_refund,
-    has_one = authority,
+    has_one = owner,
     has_one = next_task,
     has_one = task_queue
   )]

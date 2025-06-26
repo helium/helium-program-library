@@ -19,6 +19,7 @@ hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
 no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
 hpl_crons = "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu"
 mini_fanout = "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn"
+welcome_pack = "we1cGnTxTkDP9Sk49dw1d3T7ik7V2NfnY4qDGCDHXfC"
 
 [workspace]
 members = [
@@ -38,6 +39,7 @@ members = [
   "programs/no-emit",
   "programs/hpl-crons",
   "programs/mini-fanout",
+  "programs/welcome-pack"
 ]
 
 [registry]
