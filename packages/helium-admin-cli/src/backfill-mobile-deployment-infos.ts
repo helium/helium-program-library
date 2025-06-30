@@ -30,6 +30,7 @@ type WifiInfoRow = {
   electrical_down_tilt: number;
   lat: string;
   lng: string;
+  serial: string;
 };
 
 type WifiInfo = {
@@ -41,6 +42,7 @@ type WifiInfo = {
     azimuth: number;
     mechanicalDownTilt: number;
     electricalDownTilt: number;
+    serial: string;
   };
 };
 
@@ -53,7 +55,8 @@ const hasDeploymentInfo = (wi: WifiInfo) => {
     wi.deploymentInfo.elevation ||
     wi.deploymentInfo.azimuth ||
     wi.deploymentInfo.mechanicalDownTilt ||
-    wi.deploymentInfo.electricalDownTilt
+    wi.deploymentInfo.electricalDownTilt ||
+    wi.deploymentInfo.serial
   );
 };
 
@@ -132,7 +135,8 @@ export async function run(args: any = process.argv) {
        c.height AS elevation,
        c.azimuth AS azimuth,
        c.mt AS mechanical_down_tilt,
-       c.et AS electrical_down_tilt
+       c.et AS electrical_down_tilt,
+       c.serial AS serial
       FROM radios AS r
       JOIN calculations c ON r.last_success_calculation = c.id
       WHERE r.is_active IS TRUE
@@ -148,6 +152,7 @@ export async function run(args: any = process.argv) {
         azimuth: Number(wifiInfo.azimuth),
         mechanicalDownTilt: Number(wifiInfo.mechanical_down_tilt),
         electricalDownTilt: Number(wifiInfo.electrical_down_tilt),
+        serial: wifiInfo.serial,
       },
     })
   );
@@ -215,6 +220,7 @@ export async function run(args: any = process.argv) {
             // decodedAcc.deploymentInfo?.wifiInfoV0?.electricalDownTilt ||
             // acc.wifiInfo.deploymentInfo.electricalDownTilt ||
             // 0,
+            serial: acc.wifiInfo.deploymentInfo.serial || null,
           };
 
           const deploymentInfoChanged = !deepEqual(

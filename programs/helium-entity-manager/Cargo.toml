@@ -1,6 +1,6 @@
 [package]
 name = "helium-entity-manager"
-version = "0.2.14"
+version = "0.3.0"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"

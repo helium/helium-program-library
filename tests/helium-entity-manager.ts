@@ -1015,6 +1015,7 @@ describe("helium-entity-manager", () => {
           azimuth: 3,
           mechanicalDownTilt: 4,
           electricalDownTilt: 5,
+          serial: "1234567890",
         };
 
         const method = (

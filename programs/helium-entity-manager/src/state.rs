@@ -260,6 +260,8 @@ pub enum MobileDeploymentInfoV0 {
     mechanical_down_tilt: u16,
     // integer representation of a 2-point precision decimal
     electrical_down_tilt: u16,
+    // Serial number of the hotspot
+    serial: Option<String>,
   },
   CbrsInfoV0 {
     radio_infos: Vec<RadioInfoV0>,
