@@ -2,28 +2,26 @@ use std::cmp::max;
 
 use anchor_lang::{prelude::*, InstructionData};
 use anchor_spl::token::{Mint, TokenAccount};
-use helium_sub_daos::{DaoV0, DelegatedPositionV0, SubDaoV0};
+use helium_sub_daos::{try_from, DaoV0, DelegatedPositionV0, SubDaoV0};
 use spl_token::solana_program::instruction::Instruction;
 use tuktuk_program::{
   compile_transaction,
   tuktuk::{
-    cpi::{accounts::QueueTaskV0, queue_task_v0},
+    cpi::{
+      accounts::{DequeueTaskV0, QueueTaskV0},
+      dequeue_task_v0, queue_task_v0,
+    },
     program::Tuktuk,
   },
   types::QueueTaskArgsV0,
-  TaskQueueAuthorityV0, TaskQueueV0, TransactionSourceV0, TriggerV0,
+  TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
 
 use super::TEN_MINUTES;
-use crate::{error::ErrorCode, DelegationClaimBotV0, EPOCH_LENGTH};
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct StartDelegationClaimBotArgsV0 {
-  pub task_id: u16,
-}
+use crate::{DelegationClaimBotV0, StartDelegationClaimBotArgsV0, EPOCH_LENGTH};
 
 #[derive(Accounts)]
-pub struct StartDelegationClaimBotV0<'info> {
+pub struct StartDelegationClaimBotV1<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
   /// CHECK: Via seeds
@@ -36,7 +34,8 @@ pub struct StartDelegationClaimBotV0<'info> {
     mut,
     has_one = task_queue,
     has_one = delegated_position,
-    constraint = !delegation_claim_bot.queued @ ErrorCode::TaskAlreadyExists,
+    has_one = next_task,
+    has_one = rent_refund,
   )]
   pub delegation_claim_bot: Box<Account<'info, DelegationClaimBotV0>>,
   #[account(mut)]
@@ -72,17 +71,44 @@ pub struct StartDelegationClaimBotV0<'info> {
   pub delegator_ata: Box<Account<'info, TokenAccount>>,
   pub system_program: Program<'info, System>,
   pub tuktuk_program: Program<'info, Tuktuk>,
+  /// CHECK: By has_one
+  #[account(mut)]
+  pub next_task: AccountInfo<'info>,
+  /// CHECK: By has_one
+  #[account(mut)]
+  pub rent_refund: AccountInfo<'info>,
 }
 
 pub fn handler(
-  ctx: Context<StartDelegationClaimBotV0>,
+  ctx: Context<StartDelegationClaimBotV1>,
   args: StartDelegationClaimBotArgsV0,
 ) -> Result<()> {
+  if !ctx.accounts.next_task.data_is_empty() {
+    let next_task = ctx.accounts.next_task.to_account_info();
+    let task = try_from!(Account<TaskV0>, next_task)?;
+    let rent_refund_acc = if task.rent_refund == ctx.accounts.task_queue.key() {
+      ctx.accounts.task.to_account_info()
+    } else {
+      ctx.accounts.rent_refund.to_account_info()
+    };
+    dequeue_task_v0(CpiContext::new_with_signer(
+      ctx.accounts.tuktuk_program.to_account_info(),
+      DequeueTaskV0 {
+        task_queue: ctx.accounts.task_queue.to_account_info(),
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
+        task: ctx.accounts.next_task.to_account_info(),
+        queue_authority: ctx.accounts.queue_authority.to_account_info(),
+        rent_refund: rent_refund_acc,
+      },
+      &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
+    ))?;
+  }
   ctx.accounts.delegation_claim_bot.queued = true;
   let (payer, payer_bump) = Pubkey::find_program_address(
     &[b"custom", ctx.accounts.task_queue.key().as_ref(), b"helium"],
     &tuktuk_program::tuktuk::ID,
   );
+  ctx.accounts.delegation_claim_bot.next_task = ctx.accounts.task.key();
   let (position_claim_payer, position_claim_payer_bump) = Pubkey::find_program_address(
     &[
       b"custom",
@@ -130,7 +156,6 @@ pub fn handler(
   ctx.accounts.delegation_claim_bot.last_claimed_epoch =
     ctx.accounts.delegated_position.last_claimed_epoch;
   let trigger_time = ((curr_epoch + 1) * EPOCH_LENGTH) - TEN_MINUTES as u64;
-  ctx.accounts.delegation_claim_bot.next_task = ctx.accounts.task.key();
   queue_task_v0(
     CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),

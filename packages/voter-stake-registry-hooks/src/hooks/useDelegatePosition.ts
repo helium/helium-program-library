@@ -209,7 +209,7 @@ export const useDelegatePositions = ({
               )[0];
               innerInstructions.push(
                 await hplCronsProgram.methods
-                  .startDelegationClaimBotV0({
+                  .startDelegationClaimBotV1({
                     taskId: nextAvailable,
                   })
                   .accountsPartial({

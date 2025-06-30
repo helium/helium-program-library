@@ -19,6 +19,7 @@ pub mod requeue_proxy_vote_v0;
 pub mod requeue_relinquish_expired_vote_marker_v0;
 pub mod requeue_wallet_claim_v0;
 pub mod start_delegation_claim_bot_v0;
+pub mod start_delegation_claim_bot_v1;
 pub mod update_epoch_tracker;
 
 pub use add_entity_to_cron_v0::*;
@@ -42,4 +43,5 @@ pub use requeue_proxy_vote_v0::*;
 pub use requeue_relinquish_expired_vote_marker_v0::*;
 pub use requeue_wallet_claim_v0::*;
 pub use start_delegation_claim_bot_v0::*;
+pub use start_delegation_claim_bot_v1::*;
 pub use update_epoch_tracker::*;
