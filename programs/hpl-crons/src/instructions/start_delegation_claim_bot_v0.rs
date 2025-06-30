@@ -18,7 +18,7 @@ use tuktuk_program::{
 };
 
 use super::TEN_MINUTES;
-use crate::{error::ErrorCode, DelegationClaimBotV0, EPOCH_LENGTH};
+use crate::{DelegationClaimBotV0, EPOCH_LENGTH};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct StartDelegationClaimBotArgsV0 {
