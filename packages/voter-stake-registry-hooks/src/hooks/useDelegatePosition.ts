@@ -201,7 +201,6 @@ export const useDelegatePositions = ({
 
             if (
               automationEnabled &&
-              (!delegationClaimBot || !delegationClaimBot.info || !delegationClaimBot.info.queued) &&
               subDao
             ) {
               const nextAvailable = await nextAvailableTaskIds(
@@ -232,6 +231,8 @@ export const useDelegatePositions = ({
                       provider.wallet.publicKey
                     ),
                     task: taskKey(TASK_QUEUE, nextAvailable)[0],
+                    nextTask: delegationClaimBot.info?.nextTask,
+                    rentRefund: delegationClaimBot.info?.rentRefund,
                   })
                   .instruction()
               );

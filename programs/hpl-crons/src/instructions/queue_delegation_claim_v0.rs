@@ -210,6 +210,9 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
     task_costs,
   )?;
 
+  // First task is the actual claim, second is the reschedule
+  ctx.accounts.delegation_claim_bot.next_task = ctx.remaining_accounts[1].key();
+
   let return_accounts = write_return_tasks(WriteReturnTasksArgs {
     program_id: crate::ID,
     payer_info: PayerInfo::Signer(ctx.accounts.payer.to_account_info()),
