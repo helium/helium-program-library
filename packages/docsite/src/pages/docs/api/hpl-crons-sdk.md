@@ -393,6 +393,21 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### requeue_relinquish_expired_vote_marker_v0
+
+#### Accounts
+
+| Name     | Mutability | Signer | Docs |
+| -------- | ---------- | ------ | ---- |
+| marker   | immut      | no     |      |
+| position | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### requeue_wallet_claim_v0
 
 #### Accounts
@@ -429,6 +444,8 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | delegator_ata          | immut      | no     |      |
 | system_program         | immut      | no     |      |
 | tuktuk_program         | immut      | no     |      |
+| next_task              | immut      | no     |      |
+| rent_refund            | immut      | no     |      |
 
 #### Args
 
@@ -576,6 +593,7 @@ undefined
 | next_transaction_id        | u32    |
 | removed_from_queue         | bool   |
 | bump_seed                  | u8     |
+| next_schedule_task         | pubkey |
 
 ### DaoV0
 
@@ -623,6 +641,7 @@ undefined
 | bump_seed          | u8     |
 | last_claimed_epoch | u64    |
 | queued             | bool   |
+| next_task          | pubkey |
 
 ### EmissionScheduleItem
 
@@ -805,6 +824,12 @@ undefined
 | Field | Type |
 | ----- | ---- |
 | index | u32  |
+
+### RequeueRelinquishExpiredVoteMarkerArgsV0
+
+| Field      | Type |
+| ---------- | ---- |
+| trigger_ts | i64  |
 
 ### RequeueWalletClaimArgsV0
 

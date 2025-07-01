@@ -18,6 +18,8 @@ mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
 hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
 no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
 hpl_crons = "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu"
+mini_fanout = "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn"
+welcome_pack = "we1cGnTxTkDP9Sk49dw1d3T7ik7V2NfnY4qDGCDHXfC"
 
 [workspace]
 members = [
@@ -36,6 +38,8 @@ members = [
   "programs/hexboosting",
   "programs/no-emit",
   "programs/hpl-crons",
+  "programs/mini-fanout",
+  "programs/welcome-pack"
 ]
 
 [registry]
@@ -56,6 +60,9 @@ url = "https://api.mainnet-beta.solana.com"
 
 [[test.validator.clone]]
 address = "tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA" # tuktuk
+
+[[test.validator.clone]]
+address = "HGBovqKte26DbEMBma3T1TvvdmAFYSSgjncRoKECqfXq" # tuktuk config
 
 [[test.validator.clone]]
 address = "GkUxZMcw2RbwZ64VL3MvBtYNV8zim3y7UfzabFTybAUJ" # tuktuk-idl

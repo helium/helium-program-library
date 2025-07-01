@@ -49,6 +49,7 @@ import {
   keypair,
   heliumSubDaosProgram,
   hplCronsProgram,
+  stateControllerProgram,
 } from "./solana";
 import NodeCache from "node-cache";
 import BN from "bn.js";
@@ -520,6 +521,17 @@ server.post<{
   const proposalConfig = await proposalProgram.account.proposalConfigV0.fetch(
     proposalAccount.proposalConfig
   );
+  const resolutionSettingsAccount = await stateControllerProgram.account.resolutionSettingsV0.fetch(proposalConfig.stateController);
+  const endTs =
+    (proposalAccount.state.resolved
+      ?
+      new BN(proposalAccount.state.resolved.endTs)
+      :
+      new BN(proposalAccount.state.voting!.startTs).add(
+        resolutionSettingsAccount.settings.nodes.find(
+          (node) => typeof node.offsetFromStartTs !== "undefined"
+        )?.offsetFromStartTs?.offset ?? new BN(0)
+      ))
   try {
     const needsVoteRaw = (
       await sequelize.query(`
@@ -593,14 +605,14 @@ server.post<{
         SystemProgram.transfer({
           fromPubkey: pdaWallet,
           toPubkey: task,
-          lamports: taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
+          lamports: 2 * taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
         }),
         // Count as many votes as possible
         ...(
           await Promise.all(
             needsVote.map(async (vote) => {
               const instructions: TransactionInstruction[] = [];
-              const countIx = await voterStakeRegistryProgram.methods
+              const { instruction: countIx, pubkeys: { marker, position } } = await voterStakeRegistryProgram.methods
                 .countProxyVoteV0()
                 .accountsPartial({
                   payer: pdaWallet,
@@ -614,8 +626,17 @@ server.post<{
                   stateController: proposalConfig.stateController,
                   onVoteHook: proposalConfig.onVoteHook,
                 })
-                .instruction();
+                .prepare();
               instructions.push(countIx);
+              const closeIx = await hplCronsProgram.methods.requeueRelinquishExpiredVoteMarkerV0({
+                triggerTs: endTs
+              })
+                .accounts({
+                  marker: marker!,
+                  position: position!
+                })
+                .instruction();
+              instructions.push(closeIx)
               return instructions;
             })
           )

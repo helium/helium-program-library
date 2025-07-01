@@ -12,6 +12,12 @@ export interface Database {
   getTotalRewards(): Promise<string>;
   getCurrentRewardsByEntity: (entityKey: string) => Promise<string>;
   getCurrentRewards: (asset: PublicKey) => Promise<string>;
+  getRewardsByOwner: (
+    owner: string
+  ) => Promise<{ lifetime: string; pending: string }>;
+  getRewardsByDestination: (
+    destination: string
+  ) => Promise<{ lifetime: string; pending: string }>;
   getBulkRewards: (entityKeys: string[]) => Promise<Record<string, string>>;
   getActiveDevices(type?: DeviceType): Promise<number>;
   getRewardableEntities(
@@ -19,22 +25,23 @@ export interface Database {
     limit: number,
     batchNumber?: number
   ): Promise<{
-    entities: RewardableEntity[]
-    nextBatchNumber: number
+    entities: Pick<RewardableEntity, "keyToAsset">[];
+    nextBatchNumber: number;
   }>;
 }
 
-export type KeyToAssetV0 = anchor.IdlAccounts<HeliumEntityManager>["keyToAssetV0"] & {
-  address: PublicKey;
-};
-export type RecipientV0 =
-  anchor.IdlAccounts<LazyDistributor>["recipientV0"] & {
+export type KeyToAssetV0 =
+  anchor.IdlAccounts<HeliumEntityManager>["keyToAssetV0"] & {
     address: PublicKey;
   };
+
+export type RecipientV0 = anchor.IdlAccounts<LazyDistributor>["recipientV0"] & {
+  address: PublicKey;
+};
+
 export type RewardableEntity = {
-  keyToAsset: KeyToAssetV0;
-  recipient: RecipientV0
+  keyToAsset: PublicKey;
+  recipient: PublicKey;
   lifetimeReward: string;
   pendingReward: string;
 };
-

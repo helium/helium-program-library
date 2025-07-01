@@ -190,13 +190,13 @@ export async function createMockCompression({
   dao,
   merkle,
   ecc,
-  hotspotOwner = Keypair.generate(),
+  hotspotOwner = Keypair.generate().publicKey,
 } : {
   collection: PublicKey,
   dao: PublicKey,
   ecc: string,
   merkle: PublicKey,
-  hotspotOwner: Keypair,
+  hotspotOwner: PublicKey,
 }) {
   const kta = keyToAssetKey(dao, ecc, "b58")[0];
   const creators = [
@@ -232,8 +232,8 @@ export async function createMockCompression({
 
   const hash = computeCompressedNFTHash(
     hotspot,
-    hotspotOwner.publicKey,
-    hotspotOwner.publicKey,
+    hotspotOwner,
+    hotspotOwner,
     new anchor.BN(0),
     metadata
   );
@@ -262,7 +262,7 @@ export async function createMockCompression({
       grouping: metadata.collection.key,
       uses: metadata.uses,
       creators: metadata.creators,
-      ownership: { owner: hotspotOwner.publicKey },
+      ownership: { owner: hotspotOwner },
       compression: {
         compressed: true,
         eligible: true,

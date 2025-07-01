@@ -94,7 +94,7 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
     const mapbox = MapboxService.getInstance();
     const processAccount = async (account: { [key: string]: any }) => {
       let reverseGeod: ReverseGeoCache | null = null;
-      const location = account[config.field || "location"];
+      const location = account[camelize(config.field || "location", true)];
       if (location) {
         reverseGeod = await ReverseGeoCache.findByPk(location.toString(), {
           attributes: updateOnDuplicateFields,

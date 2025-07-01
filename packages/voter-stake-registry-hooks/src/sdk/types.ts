@@ -29,6 +29,12 @@ export interface PositionWithMeta extends Position {
   votingPower: BN
   votingMint: VotingMintConfig
   proxy: Proxy | null
+  isProxyExpired: boolean,
+  isDelegationExpired: boolean,
+  /// Whether the proxy is within the 30 day renewal period
+  isProxyRenewable: boolean,
+  /// Whether the delegation is within the 30 day renewal period
+  isDelegationRenewable: boolean,
 }
 export type LockupKind = IdlTypes<HeliumVoterStakeRegistry>['lockupKind']
 /* export type InitializePositionV0Args = IdlTypes<HeliumVoterStakeRegistry>['InitializePositionArgsV0']

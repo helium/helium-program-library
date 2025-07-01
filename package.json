@@ -38,6 +38,7 @@
     "@helium/nft-proxy-sdk": "^0.1.5-alpha.0",
     "@helium/proposal-sdk": "^0.1.5-alpha.0",
     "@helium/transactions": "^3.38.0",
+    "@helium/tuktuk-idls": "^0.0.9",
     "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
     "@pythnetwork/client": "^2.8.0",
     "@pythnetwork/pyth-solana-receiver": "^0.9.1",

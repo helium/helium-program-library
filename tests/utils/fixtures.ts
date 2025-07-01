@@ -21,6 +21,8 @@ import { HeliumSubDaos } from "../../target/types/helium_sub_daos";
 import { LazyDistributor } from "../../target/types/lazy_distributor";
 import { initTestDao, initTestSubdao } from "./daos";
 import { random } from "./string";
+import { PROGRAM_ID as MF_ID } from "@helium/mini-fanout-sdk";
+import { PROGRAM_ID as WP_ID } from "@helium/welcome-pack-sdk";
 import { PROGRAM_ID as DC_ID } from "@helium/data-credits-sdk";
 import { PROGRAM_ID as MEM_ID } from "@helium/mobile-entity-manager-sdk";
 import { PROGRAM_ID as VSR_ID } from "@helium/voter-stake-registry-sdk";
@@ -245,12 +247,20 @@ export async function ensureLDIdl() {
   await ensureIdl("lazy_distributor", LD_ID);
 }
 
+export async function ensureWPIdl() {
+  await ensureIdl("welcome_pack", WP_ID);
+}
+
 export async function ensureHEMIdl() {
   await ensureIdl("helium_entity_manager", HEM_ID);
 }
 
 export async function ensureHSDIdl() {
   await ensureIdl("helium_sub_daos", HSD_ID);
+}
+
+export async function ensureMFIdl() {
+  await ensureIdl("mini_fanout", MF_ID);
 }
 
 export async function ensureVSRIdl() {

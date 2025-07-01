@@ -6,7 +6,7 @@ import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
 import pLimit from "p-limit";
 import { Sequelize, Transaction } from "sequelize";
-import { SOLANA_URL } from "../env";
+import { SOLANA_URL, INTEGRITY_CHECK_REFRESH_THRESHOLD_MS } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import { chunks } from "./chunks";
@@ -65,6 +65,10 @@ export const integrityCheckProgramAccounts = async ({
 
   const performIntegrityCheck = async () => {
     const snapshotTime = new Date();
+    const refreshThreshold = new Date(
+      snapshotTime.getTime() - INTEGRITY_CHECK_REFRESH_THRESHOLD_MS
+    );
+
     const t = await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
     });
@@ -72,9 +76,9 @@ export const integrityCheckProgramAccounts = async ({
     try {
       let limiter: pLimit.Limit;
       const program = new anchor.Program(idl, provider);
-      const currentSlot = await connection.getSlot();
+      const snapshotSlot = await connection.getSlot("finalized");
       let blockTime24HoursAgo: number | null = null;
-      let attemptSlot = currentSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
+      let attemptSlot = snapshotSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
       const SLOTS_INCREMENT = 2;
 
       for (
@@ -114,21 +118,19 @@ export const integrityCheckProgramAccounts = async ({
         newValues: { [key: string]: any };
       }[] = [];
 
-      if (!blockTime24HoursAgo) {
-        throw new Error("Unable to get blocktime from 24 hours ago");
-      }
+      const txSignatureChunks = chunks(
+        await getTransactionSignaturesUptoBlockTime({
+          programId,
+          blockTime: blockTime24HoursAgo,
+          provider,
+        }),
+        100
+      );
 
       limiter = pLimit(10);
       const parsedTransactions = (
         await Promise.all(
-          chunks(
-            await getTransactionSignaturesUptoBlockTime({
-              programId,
-              blockTime: blockTime24HoursAgo,
-              provider,
-            }),
-            100
-          ).map((chunk) =>
+          txSignatureChunks.map((chunk) =>
             limiter(async () => {
               await new Promise((resolve) => setTimeout(resolve, 250));
               return retry(
@@ -145,8 +147,8 @@ export const integrityCheckProgramAccounts = async ({
       ).flat();
 
       const uniqueWritableAccounts = new Set<string>();
-      parsedTransactions.forEach((parsed) => {
-        if (!parsed) return;
+      for (const parsed of parsedTransactions) {
+        if (!parsed) continue;
         const signatures = parsed.transaction.signatures;
         parsed.transaction.message.accountKeys.forEach((acc) => {
           if (acc.writable) {
@@ -158,7 +160,12 @@ export const integrityCheckProgramAccounts = async ({
             ];
           }
         });
-      });
+      }
+
+      // Dereference txSignatureChunks after use
+      txSignatureChunks.length = 0;
+      // Dereference parsedTransactions after use
+      parsedTransactions.length = 0;
 
       const pluginsByAccountType = (
         await Promise.all(
@@ -183,6 +190,16 @@ export const integrityCheckProgramAccounts = async ({
 
       limiter = pLimit(100);
       const uniqueWritableAccountsArray = [...uniqueWritableAccounts.values()];
+
+      const delayMs =
+        (process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS
+          ? parseInt(process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS, 10)
+          : 120000) + Math.floor(Math.random() * 30000); // default 2 minutes + 30 second jitter
+
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+
       await Promise.all(
         chunks(uniqueWritableAccountsArray, 100).map(async (chunk) => {
           const accountInfos = await limiter(() =>
@@ -190,7 +207,7 @@ export const integrityCheckProgramAccounts = async ({
               () =>
                 connection.getMultipleAccountsInfo(
                   chunk.map((c) => new PublicKey(c)),
-                  "confirmed"
+                  "finalized"
                 ),
               retryOptions
             )
@@ -200,6 +217,9 @@ export const integrityCheckProgramAccounts = async ({
             pubkey: chunk[idx],
             ...accountInfo,
           }));
+
+          // Dereference accountInfos after use
+          accountInfos.length = 0;
 
           const accsByType: Record<string, typeof accountInfosWithPk> = {};
           accountInfosWithPk.forEach((accountInfo) => {
@@ -217,8 +237,12 @@ export const integrityCheckProgramAccounts = async ({
             }
           });
 
+          // Dereference accountInfosWithPk after use
+          accountInfosWithPk.length = 0;
+
           await Promise.all(
             Object.entries(accsByType).map(async ([accName, accounts]) => {
+              const upserts: any[] = [];
               const model = sequelize.models[accName];
               const pubkeys = accounts.map((c) => c.pubkey);
               const existingAccs = await model.findAll({
@@ -230,57 +254,140 @@ export const integrityCheckProgramAccounts = async ({
                 existingAccs.map((acc) => [acc.get("address"), acc])
               );
 
+              limiter = pLimit(50);
               await Promise.all(
-                accounts.map(async (acc) => {
-                  const decodedAcc = program.coder.accounts.decode(
-                    lowerFirstChar(accName),
-                    acc.data as Buffer
-                  );
+                accounts.map((acc) =>
+                  limiter(async () => {
+                    const existing = existingAccMap.get(acc.pubkey);
+                    const refreshedAt = existing?.dataValues.refreshed_at
+                      ? new Date(existing.dataValues.refreshed_at)
+                      : null;
 
-                  let sanitized = {
-                    refreshed_at: new Date().toISOString(),
-                    address: acc.pubkey,
-                    ...sanitizeAccount(decodedAcc),
-                  };
+                    if (refreshedAt && refreshedAt > refreshThreshold) {
+                      return;
+                    }
 
-                  for (const plugin of pluginsByAccountType[accName] || []) {
-                    if (plugin?.processAccount) {
-                      try {
-                        sanitized = await plugin.processAccount(sanitized, t);
-                      } catch (err) {
-                        console.log(
-                          `Plugin processing failed for account ${acc.pubkey}`,
-                          err
-                        );
-                        continue;
+                    const latestTxSignature = (txIdsByAccountId[acc.pubkey] ||
+                      [])[0];
+
+                    if (latestTxSignature) {
+                      const latestTx = await connection.getTransaction(
+                        latestTxSignature,
+                        {
+                          commitment: "finalized",
+                          maxSupportedTransactionVersion: 0,
+                        }
+                      );
+
+                      if (latestTx) {
+                        if (latestTx.slot >= snapshotSlot) {
+                          return;
+                        }
+
+                        if (latestTx.blockTime) {
+                          if (
+                            new Date(latestTx.blockTime * 1000) >= snapshotTime
+                          ) {
+                            return;
+                          }
+                        }
                       }
                     }
-                  }
 
-                  const existing = existingAccMap.get(acc.pubkey);
-                  const refreshedAt = existing?.dataValues.refreshed_at
-                    ? new Date(existing.dataValues.refreshed_at)
-                    : null;
+                    const decodedAcc = program.coder.accounts.decode(
+                      lowerFirstChar(accName),
+                      acc.data as Buffer
+                    );
 
-                  const shouldUpdate =
-                    !deepEqual(
-                      _omit(sanitized, OMIT_KEYS),
-                      _omit(existing?.dataValues, OMIT_KEYS)
-                    ) &&
-                    (!refreshedAt || refreshedAt < snapshotTime);
+                    let sanitized: {
+                      refreshed_at: string;
+                      address: string;
+                      [key: string]: any;
+                    } = {
+                      refreshed_at: new Date().toISOString(),
+                      address: acc.pubkey,
+                      ...sanitizeAccount(decodedAcc),
+                    };
 
-                  if (shouldUpdate) {
-                    corrections.push({
-                      type: accName,
-                      accountId: acc.pubkey,
-                      txSignatures: txIdsByAccountId[acc.pubkey],
-                      currentValues: existing ? existing.dataValues : null,
-                      newValues: sanitized,
-                    });
-                    await model.upsert({ ...sanitized }, { transaction: t });
-                  }
-                })
+                    for (const plugin of pluginsByAccountType[accName] || []) {
+                      if (plugin?.processAccount) {
+                        try {
+                          sanitized = await plugin.processAccount(sanitized, t);
+                        } catch (err) {
+                          console.log(
+                            `Plugin processing failed for account ${acc.pubkey}`,
+                            err
+                          );
+                          return;
+                        }
+                      }
+                    }
+
+                    const existingData = existing?.dataValues;
+                    const existingClean = _omit(existingData || {}, OMIT_KEYS);
+                    const sanitizedClean = _omit(sanitized, OMIT_KEYS);
+                    const shouldUpdate =
+                      !deepEqual(sanitizedClean, existingClean) &&
+                      (!refreshedAt || refreshedAt < snapshotTime);
+
+                    if (shouldUpdate) {
+                      const currentRecord = await model.findOne({
+                        where: { address: acc.pubkey },
+                        transaction: t,
+                      });
+
+                      const currentRefreshedAt = currentRecord?.dataValues
+                        .refreshed_at
+                        ? new Date(currentRecord.dataValues.refreshed_at)
+                        : null;
+
+                      if (
+                        currentRefreshedAt &&
+                        currentRefreshedAt > snapshotTime
+                      ) {
+                        return;
+                      }
+
+                      const changedFields = existing
+                        ? Object.entries(sanitizedClean)
+                            .filter(
+                              ([key, value]) =>
+                                !deepEqual(value, existingData[key])
+                            )
+                            .map(([key]) => key)
+                        : Object.keys(sanitizedClean);
+
+                      corrections.push({
+                        type: accName,
+                        accountId: acc.pubkey,
+                        txSignatures: txIdsByAccountId[acc.pubkey] || [],
+                        currentValues: existing
+                          ? changedFields.reduce(
+                              (obj, key) => ({
+                                ...obj,
+                                [key]: existingData[key],
+                              }),
+                              {}
+                            )
+                          : null,
+                        newValues: changedFields.reduce(
+                          (obj, key) => ({ ...obj, [key]: sanitized[key] }),
+                          {}
+                        ),
+                      });
+
+                      upserts.push(sanitized);
+                    }
+                  })
+                )
               );
+
+              if (upserts.length > 0) {
+                await model.bulkCreate(upserts, {
+                  updateOnDuplicate: [...Object.keys(upserts[0])],
+                  transaction: t,
+                });
+              }
             })
           );
         })

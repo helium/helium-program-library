@@ -108,6 +108,7 @@ async function getSolanaUnixTimestamp(
       closedProposals.has(m.account.proposal.toBase58())
     );
     const limit = pLimit(100);
+    console.log(`Relinquishing ${markers.length} expired vote markers`);
     const relinquishIxns = await Promise.all(
       markers
         .filter(

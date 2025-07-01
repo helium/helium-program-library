@@ -37,13 +37,18 @@ interface IOutputAccount {
 }
 
 export const CursorManager = (
+  service: string,
   stalenessThreshold: number,
   onStale?: () => void
 ) => {
   const CURSOR_UPDATE_INTERVAL = 30_000;
   let checkInterval: NodeJS.Timeout | undefined;
   let lastReceivedBlock: number = Date.now();
-  let pendingCursor: { cursor: string; blockHeight: string } | null = null;
+  let pendingCursor: {
+    cursor: string;
+    blockHeight: string;
+    service: string;
+  } | null = null;
   let lastCursorUpdate = 0;
 
   const formatStaleness = (staleness: number): string => {
@@ -54,7 +59,10 @@ export const CursorManager = (
   };
 
   const getLatestCursor = async (): Promise<Cursor | null> =>
-    await Cursor.findOne({ order: [["createdAt", "DESC"]] });
+    await Cursor.findOne({
+      where: { service },
+      order: [["createdAt", "DESC"]],
+    });
 
   const recordBlockReceived = (): void => {
     lastReceivedBlock = Date.now();
@@ -71,15 +79,20 @@ export const CursorManager = (
   }): Promise<void> => {
     const now = Date.now();
     recordBlockReceived();
-    pendingCursor = { cursor, blockHeight };
+    pendingCursor = { cursor, blockHeight, service };
 
     if (force || now - lastCursorUpdate >= CURSOR_UPDATE_INTERVAL) {
       if (pendingCursor) {
         await database.transaction(async (t) => {
-          await Cursor.upsert(pendingCursor!, { transaction: t });
+          await Cursor.upsert(pendingCursor!, {
+            conflictFields: ["service"],
+            transaction: t,
+          });
+
           await Cursor.destroy({
             where: {
-              cursor: { [Op.ne]: pendingCursor!.cursor },
+              service,
+              cursor: { [Op.ne]: cursor },
             },
             transaction: t,
           });
@@ -156,8 +169,12 @@ export const setupSubstream = async (
 
   let isConnecting = false;
   const cursorManager = CursorManager(
+    "account_sink",
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
-    () => server.customMetrics.staleCursorCounter.inc()
+    () => {
+      server.customMetrics.staleCursorCounter.inc();
+      handleReconnect();
+    }
   );
   const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
     configs
@@ -217,12 +234,6 @@ export const setupSubstream = async (
             !isEmptyMessage(output) &&
             (output as any).accounts.length > 0;
 
-          await cursorManager.updateCursor({
-            cursor,
-            blockHeight,
-            force: hasAccountChanges,
-          });
-
           if (hasAccountChanges) {
             const accountPromises = (output as any).accounts
               .map(async (account: IOutputAccount) => {
@@ -251,6 +262,12 @@ export const setupSubstream = async (
 
             await Promise.all(accountPromises);
           }
+
+          await cursorManager.updateCursor({
+            cursor,
+            blockHeight,
+            force: hasAccountChanges,
+          });
         }
       }
     } catch (err) {
@@ -261,7 +278,7 @@ export const setupSubstream = async (
     }
   };
 
-  const handleReconnect = async (nextAttempt: number) => {
+  const handleReconnect = async (nextAttempt: number = 1) => {
     const baseDelay = 1000;
     const delay =
       nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);

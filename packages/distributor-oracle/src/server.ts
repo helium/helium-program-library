@@ -61,11 +61,17 @@ import Fastify, {
   FastifyRequest,
 } from "fastify";
 import fs from "fs";
-import { ATA_RENT, DAO, DNT, MAX_CLAIMS_PER_TX, RECIPIENT_RENT } from "./constants";
+import {
+  ATA_RENT,
+  DAO,
+  DNT,
+  MAX_CLAIMS_PER_TX,
+  RECIPIENT_RENT,
+} from "./constants";
 import { Database, DeviceType } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
+import { Reward } from "./model";
 import { PgDatabase } from "./pgDatabase";
-import { Reward, WalletClaimJob } from "./model";
 export * from "./database";
 
 export class OracleServer {
@@ -127,6 +133,7 @@ export class OracleServer {
   }
 
   private addRoutes() {
+    this.app.get("/rewards", this.getRewardsHandler.bind(this));
     this.app.get(
       "/active-iot-devices",
       this.getActiveIotDevicesHandler.bind(this)
@@ -166,6 +173,26 @@ export class OracleServer {
       this.tuktukWalletHandler.bind(this)
     );
     this.app.post("/v1/sign", this.signHandler.bind(this));
+  }
+
+  private async getRewardsHandler(
+    req: FastifyRequest<{
+      Querystring: { owner?: string; destination?: string };
+    }>,
+    res: FastifyReply
+  ) {
+    const { owner, destination } = req.query;
+    let rewards: { lifetime: string; pending: string } | null = null;
+
+    if (owner) {
+      rewards = await this.db.getRewardsByOwner(owner);
+    } else if (destination) {
+      rewards = await this.db.getRewardsByDestination(destination);
+    } else {
+      res.status(400).send({ error: "Must provide owner or destination" });
+    }
+
+    res.send(rewards);
   }
 
   private async getActiveIotDevicesHandler(
@@ -661,14 +688,17 @@ export class OracleServer {
 
       const ata = getAssociatedTokenAddressSync(
         HNT_MINT,
-        wallet,
+        !recipientAcc || recipientAcc.destination.equals(PublicKey.default)
+          ? asset!.ownership.owner
+          : recipientAcc?.destination,
         true
       );
-      const ataExists = !!(await this.ldProgram.provider.connection.getAccountInfo(
-        ata
-      ));
+      const ataExists =
+        !!(await this.ldProgram.provider.connection.getAccountInfo(ata));
       const neededBalance =
-        0.00089088 * LAMPORTS_PER_SOL + (recipientAcc ? 0 : RECIPIENT_RENT) + (ataExists ? 0 : ATA_RENT);
+        0.00089088 * LAMPORTS_PER_SOL +
+        (recipientAcc ? 0 : RECIPIENT_RENT) +
+        (ataExists ? 0 : ATA_RENT);
 
       const instructions: TransactionInstruction[] = [];
       if (balance < neededBalance) {
@@ -895,7 +925,7 @@ export class OracleServer {
             await this.hplCronsProgram.methods
               .requeueEntityClaimV0()
               .accounts({
-                keyToAsset: entity.keyToAsset.address,
+                keyToAsset: entity.keyToAsset,
               })
               .instruction()
           );
@@ -1044,7 +1074,6 @@ export class OracleServer {
     const hemProgram = await initHeliumEntityManager(provider);
     const hplCronsProgram = await initHplCrons(provider);
 
-    WalletClaimJob.sync();
     Reward.sync();
 
     const LAZY_DISTRIBUTOR = lazyDistributorKey(DNT)[0];
@@ -1055,7 +1084,7 @@ export class OracleServer {
       hemProgram,
       hplCronsProgram,
       oracleKeypair,
-      new PgDatabase(hemProgram, ldProgram),
+      new PgDatabase(hemProgram, ldProgram, LAZY_DISTRIBUTOR),
       LAZY_DISTRIBUTOR
     );
     // For performance

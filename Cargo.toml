@@ -35,6 +35,7 @@ circuit-breaker = { path = "./programs/circuit-breaker", features = ["cpi", "no-
 helium-sub-daos = { path = "./programs/helium-sub-daos", features = ["cpi", "no-entrypoint"] }
 helium-entity-manager = { path = "./programs/helium-entity-manager", features = ["cpi", "no-entrypoint"] }
 lazy-distributor = { path = "./programs/lazy-distributor", features = ["cpi", "no-entrypoint"] }
+mini-fanout = { path = "./programs/mini-fanout", features = ["cpi", "no-entrypoint"] }
 mobile-entity-manager = { path = "./programs/mobile-entity-manager", features = ["cpi", "no-entrypoint"] }
 price-oracle = { path = "./programs/price-oracle", features = ["cpi", "no-entrypoint"] }
 no-emit = { path = "./programs/no-emit", features = ["cpi", "no-entrypoint"] }
@@ -44,6 +45,7 @@ data-credits = { path = "./programs/data-credits" }
 pyth-solana-receiver-sdk = { path = "./utils/pyth_solana_receiver_sdk" }
 pythnet-sdk = "=2.3.1"
 tuktuk-sdk = { version = "0.3.2" }
-tuktuk-program = { version = "0.3.1" }
+tuktuk-program = { version = "0.3.2" }
 modular-governance = { path = "./utils/modular-governance" }
 solana-zk-sdk = "2.2.3"
+tuktuk = "0"

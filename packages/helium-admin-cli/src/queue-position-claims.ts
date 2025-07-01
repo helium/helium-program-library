@@ -128,7 +128,7 @@ export async function run(args: any = process.argv) {
   );
   const daoAcc = await hsdProgram.account.daoV0.fetch(subDaoAcc.dao);
   const { instruction, pubkeys } = await program.methods
-    .startDelegationClaimBotV0({
+    .startDelegationClaimBotV1({
       taskId: nextAvailable,
     })
     .accountsPartial({
