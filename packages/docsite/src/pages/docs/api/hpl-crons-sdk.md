@@ -444,6 +444,8 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | delegator_ata          | immut      | no     |      |
 | system_program         | immut      | no     |      |
 | tuktuk_program         | immut      | no     |      |
+| next_task              | immut      | no     |      |
+| rent_refund            | immut      | no     |      |
 
 #### Args
 
@@ -639,6 +641,7 @@ undefined
 | bump_seed          | u8     |
 | last_claimed_epoch | u64    |
 | queued             | bool   |
+| next_task          | pubkey |
 
 ### EmissionScheduleItem
 
