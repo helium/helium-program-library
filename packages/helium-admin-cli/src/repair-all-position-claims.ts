@@ -76,7 +76,7 @@ export async function run(args: any = process.argv) {
           const ataAddr = (await provider.connection.getTokenLargestAccounts(bot.account.delegatedPosition)).value[0].address;
           const ata = await getAccount(provider.connection, ataAddr);
           return await program.methods
-            .startDelegationClaimBotV0({ taskId })
+            .startDelegationClaimBotV1({ taskId })
             .accountsPartial({
               delegationClaimBot: bot.publicKey, task: taskKey(taskQueue, taskId)[0],
               mint: bot.account.delegatedPosition,

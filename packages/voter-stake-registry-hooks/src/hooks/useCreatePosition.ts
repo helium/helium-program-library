@@ -222,7 +222,7 @@ export const useCreatePosition = ({
             const nextAvailable = await nextAvailableTaskIds(taskQueue!.taskBitmap, 1)[0];
             delegateInstructions.push(
               await hplCronsProgram.methods
-                .startDelegationClaimBotV0({
+                .startDelegationClaimBotV1({
                   taskId: nextAvailable,
                 })
                 .accountsPartial({
