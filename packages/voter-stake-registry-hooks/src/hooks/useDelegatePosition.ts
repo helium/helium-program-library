@@ -95,6 +95,7 @@ export const useDelegatePositions = ({
         instructions: TransactionInstruction[][]
       ) => Promise<void>;
     }) => {
+      console.log("useDelegatePositions", positions);
       const isInvalid =
         !provider || !provider.wallet || !subDao || !delegatedPositions || !delegationClaimBots;
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
@@ -159,9 +160,9 @@ export const useDelegatePositions = ({
                 delegatedPositionAcc!.info!.subDao,
                 newExpirationTs
               )[0];
-              const newGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
+              const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                Math.min(position.genesisEnd.toNumber(), newExpirationTs)
+                Math.min(position.genesisEnd.toNumber(), oldExpirationTs.toNumber())
               )[0];
               innerInstructions.push(
                 await hsdProgram.methods
@@ -171,7 +172,7 @@ export const useDelegatePositions = ({
                     subDao: delegatedPositionAcc!.info!.subDao,
                     oldClosingTimeSubDaoEpochInfo: oldSubDaoEpochInfo,
                     closingTimeSubDaoEpochInfo: newSubDaoEpochInfo,
-                    genesisEndSubDaoEpochInfo: newGenesisEndSubDaoEpochInfo,
+                    genesisEndSubDaoEpochInfo: oldGenesisEndSubDaoEpochInfo,
                   })
                   .instruction()
               );
