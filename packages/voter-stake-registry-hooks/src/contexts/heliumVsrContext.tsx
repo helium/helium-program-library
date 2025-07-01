@@ -239,7 +239,7 @@ export const HeliumVsrStateProvider: React.FC<{
 
             votingPower = votingPower.add(posVotingPower);
 
-            const proxyExpiration = proxy?.expirationTs;
+            const proxyExpiration = proxy?.expirationTime;
             const delegationExpiration = delegatedAccounts?.[
               idx
             ]?.info?.expirationTs;
