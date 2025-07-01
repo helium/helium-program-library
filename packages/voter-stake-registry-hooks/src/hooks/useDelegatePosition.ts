@@ -95,7 +95,6 @@ export const useDelegatePositions = ({
         instructions: TransactionInstruction[][]
       ) => Promise<void>;
     }) => {
-      console.log("useDelegatePositions", positions);
       const isInvalid =
         !provider || !provider.wallet || !subDao || !delegatedPositions || !delegationClaimBots;
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
