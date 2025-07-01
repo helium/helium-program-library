@@ -6,6 +6,7 @@ import {
 } from "@helium/automation-hooks";
 import {
   delegatedPositionKey,
+  getLockupEffectiveEndTs,
   init,
   PROGRAM_ID,
   subDaoEpochInfoKey,
@@ -143,7 +144,7 @@ export const useDelegatePositions = ({
                 proxyConfig?.seasons.reverse().find(
                   (season) => now.gte(season.start)
                 )?.end.toNumber() ?? 0,
-                position.lockup.endTs.toNumber()
+                getLockupEffectiveEndTs(position.lockup).toNumber()
               );
               if (!newExpirationTs) {
                 throw new Error("No new valid expiration ts found");
@@ -158,6 +159,10 @@ export const useDelegatePositions = ({
                 delegatedPositionAcc!.info!.subDao,
                 newExpirationTs
               )[0];
+              const newGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
+                delegatedPositionAcc!.info!.subDao,
+                Math.min(position.genesisEnd.toNumber(), newExpirationTs)
+              )[0];
               innerInstructions.push(
                 await hsdProgram.methods
                   .extendExpirationTsV0()
@@ -166,6 +171,7 @@ export const useDelegatePositions = ({
                     subDao: delegatedPositionAcc!.info!.subDao,
                     oldClosingTimeSubDaoEpochInfo: oldSubDaoEpochInfo,
                     closingTimeSubDaoEpochInfo: newSubDaoEpochInfo,
+                    genesisEndSubDaoEpochInfo: newGenesisEndSubDaoEpochInfo,
                   })
                   .instruction()
               );
