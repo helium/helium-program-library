@@ -284,6 +284,7 @@ export const HeliumVsrStateProvider: React.FC<{
         myVotingPower,
         proxiedVotingPower,
         proxyAccountsByAsset,
+        delegatedAccounts,
       };
     }
 
