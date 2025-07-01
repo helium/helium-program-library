@@ -5,6 +5,7 @@ import {
   useTaskQueue,
 } from "@helium/automation-hooks";
 import {
+  currentEpoch,
   delegatedPositionKey,
   getLockupEffectiveEndTs,
   init,
@@ -131,11 +132,11 @@ export const useDelegatePositions = ({
               const oldExpirationTs = delegatedPositionAcc!.info!.expirationTs;
               const oldSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                oldExpirationTs
+                now
               )[0];
               const newSubDaoEpochInfo = subDaoEpochInfoKey(
-                delegatedPositionAcc!.info!.subDao,
-                newExpirationTs
+                subDao.pubkey,
+                now
               )[0];
               const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
@@ -143,9 +144,13 @@ export const useDelegatePositions = ({
                   oldExpirationTs : position.genesisEnd
               )[0];
               const newGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
-                delegatedPositionAcc!.info!.subDao,
+                subDao.pubkey,
                 position.genesisEnd.lt(now) ?
                   newExpirationTs : position.genesisEnd
+              )[0];
+              const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
+                subDao.pubkey,
+                newExpirationTs
               )[0];
               innerInstructions.push(
                 await hsdProgram.methods
@@ -157,6 +162,7 @@ export const useDelegatePositions = ({
                     oldSubDaoEpochInfo,
                     oldGenesisEndSubDaoEpochInfo,
                     subDaoEpochInfo: newSubDaoEpochInfo,
+                    closingTimeSubDaoEpochInfo,
                     genesisEndSubDaoEpochInfo: newGenesisEndSubDaoEpochInfo,
                   })
                   .instruction()
@@ -247,6 +253,7 @@ export const useDelegatePositions = ({
                 taskQueue!.taskBitmap,
                 1
               )[0];
+              const task = taskKey(TASK_QUEUE, nextAvailable)[0]
               innerInstructions.push(
                 await hplCronsProgram.methods
                   .startDelegationClaimBotV1({
@@ -270,8 +277,8 @@ export const useDelegatePositions = ({
                       HNT_MINT,
                       provider.wallet.publicKey
                     ),
-                    task: taskKey(TASK_QUEUE, nextAvailable)[0],
-                    nextTask: delegationClaimBot.info?.nextTask,
+                    task,
+                    nextTask: delegationClaimBot.info?.nextTask?.equals(PublicKey.default) ? task : delegationClaimBot.info?.nextTask,
                     rentRefund: delegationClaimBot.info?.rentRefund,
                   })
                   .instruction()
