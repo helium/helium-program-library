@@ -240,9 +240,8 @@ export const HeliumVsrStateProvider: React.FC<{
             votingPower = votingPower.add(posVotingPower);
 
             const proxyExpiration = proxy?.expirationTime;
-            const delegationExpiration = delegatedAccounts?.[
-              idx
-            ]?.info?.expirationTs;
+            const delegationExpiration =
+              delegatedAccounts?.[idx]?.info?.expirationTs;
             const isProxyExpired = proxyExpiration?.lt(new BN(now));
             const isDelegationExpired = delegationExpiration?.lt(new BN(now));
             const currentSeason = proxyConfig?.seasons
@@ -250,7 +249,10 @@ export const HeliumVsrStateProvider: React.FC<{
               ?.find((season) => season.start.lte(new BN(now)));
 
             const isProxyRenewable =
-              proxyExpiration && !isProxyExpired && currentSeason?.end.gt(proxyExpiration);
+              proxyExpiration &&
+              !isProxyExpired &&
+              // Add one day of wiggle room, as proxies assign by number of days in UI.
+              currentSeason?.end?.sub(new BN(EPOCH_LENGTH)).gt(proxyExpiration);
             const isDelegationRenewable =
               delegationExpiration &&
               !isDelegationExpired &&
@@ -295,6 +297,7 @@ export const HeliumVsrStateProvider: React.FC<{
     registrar,
     delegatedAccounts,
     proxyAccounts,
+    proxyAccountsByAsset,
   ]);
 
   const sortedPositions = useMemo(
