@@ -6,6 +6,7 @@ import {
 } from "@helium/automation-hooks";
 import {
   delegatedPositionKey,
+  getLockupEffectiveEndTs,
   init,
   PROGRAM_ID,
   subDaoEpochInfoKey,
@@ -143,7 +144,7 @@ export const useDelegatePositions = ({
                 proxyConfig?.seasons.reverse().find(
                   (season) => now.gte(season.start)
                 )?.end.toNumber() ?? 0,
-                position.lockup.endTs.toNumber()
+                getLockupEffectiveEndTs(position.lockup).toNumber()
               );
               if (!newExpirationTs) {
                 throw new Error("No new valid expiration ts found");
