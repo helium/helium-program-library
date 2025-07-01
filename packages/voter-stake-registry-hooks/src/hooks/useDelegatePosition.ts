@@ -119,6 +119,35 @@ export const useDelegatePositions = ({
               delegatedPositionAcc &&
               !delegatedPositionAcc.info!.subDao.equals(subDao.pubkey)
             ) {
+              const now = new BN(Date.now() / 1000);
+              const newExpirationTs = Math.min(
+                proxyConfig?.seasons.reverse().find(
+                  (season) => now.gte(season.start)
+                )?.end.toNumber() ?? 0,
+                getLockupEffectiveEndTs(position.lockup).toNumber()
+              );
+              if (!newExpirationTs) {
+                throw new Error("No new valid expiration ts found");
+              }
+              const oldExpirationTs = delegatedPositionAcc!.info!.expirationTs;
+              const oldSubDaoEpochInfo = subDaoEpochInfoKey(
+                delegatedPositionAcc!.info!.subDao,
+                oldExpirationTs
+              )[0];
+              const newSubDaoEpochInfo = subDaoEpochInfoKey(
+                delegatedPositionAcc!.info!.subDao,
+                newExpirationTs
+              )[0];
+              const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
+                delegatedPositionAcc!.info!.subDao,
+                position.genesisEnd.lt(now) ?
+                  oldExpirationTs : position.genesisEnd
+              )[0];
+              const newGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
+                delegatedPositionAcc!.info!.subDao,
+                position.genesisEnd.lt(now) ?
+                  newExpirationTs : position.genesisEnd
+              )[0];
               innerInstructions.push(
                 await hsdProgram.methods
                   .changeDelegationV0()
@@ -126,6 +155,10 @@ export const useDelegatePositions = ({
                     position: position.pubkey,
                     subDao: subDao.pubkey,
                     oldSubDao: delegatedPositionAcc.info!.subDao,
+                    oldSubDaoEpochInfo,
+                    oldGenesisEndSubDaoEpochInfo,
+                    subDaoEpochInfo: newSubDaoEpochInfo,
+                    genesisEndSubDaoEpochInfo: newGenesisEndSubDaoEpochInfo,
                   })
                   .instruction()
               );
@@ -162,7 +195,8 @@ export const useDelegatePositions = ({
               )[0];
               const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                Math.min(position.genesisEnd.toNumber(), oldExpirationTs.toNumber())
+                position.genesisEnd.lt(now) ?
+                  newExpirationTs : position.genesisEnd
               )[0];
               innerInstructions.push(
                 await hsdProgram.methods

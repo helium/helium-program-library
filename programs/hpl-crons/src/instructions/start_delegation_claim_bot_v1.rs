@@ -87,7 +87,7 @@ pub fn handler(
     let next_task = ctx.accounts.next_task.to_account_info();
     let task = try_from!(Account<TaskV0>, next_task)?;
     let rent_refund_acc = if task.rent_refund == ctx.accounts.task_queue.key() {
-      ctx.accounts.task.to_account_info()
+      ctx.accounts.task_queue.to_account_info()
     } else {
       ctx.accounts.rent_refund.to_account_info()
     };
