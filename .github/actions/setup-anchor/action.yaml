@@ -16,7 +16,7 @@ runs:
           ~/.cargo/bin/anchor
         key: anchor-cli-${{ runner.os }}-v0003-${{ env.ANCHOR_VERSION }}-${{ env.ANCHOR_SHA }}
     # if ANCHOR_VERSION is 0, then install the anchor-cli from source
-    - run: if [ $ANCHOR_VERSION -eq 0 ]; then cargo install --git https://github.com/coral-xyz/anchor --rev $ANCHOR_SHA anchor-cli --locked --force; else cargo install --git https://github.com/coral-xyz/anchor --tag "v$ANCHOR_VERSION" anchor-cli --locked; fi
+    - run: if [ $ANCHOR_VERSION -eq 0 ]; then cargo install --git https://github.com/coral-xyz/anchor --rev $ANCHOR_SHA anchor-cli --locked --force; else cargo install --git https://github.com/coral-xyz/anchor --tag "v$ANCHOR_VERSION" anchor-cli --locked --force; fi
       shell: bash
       if: steps.cache-anchor-cli.outputs.cache-hit != 'true'
     - uses: actions/cache@v4

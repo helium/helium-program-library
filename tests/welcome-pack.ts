@@ -295,7 +295,6 @@ describe("welcome-pack", () => {
         await (await claimWelcomePack({
           program: welcomePackProgram,
           tuktukProgram,
-          welcomePack,
           claimApproval,
           claimApprovalSignature: claimSignature,
           claimer: claimer.publicKey,
