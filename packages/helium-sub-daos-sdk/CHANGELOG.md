@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.22](https://github.com/helium/helium-program-libary/compare/v0.10.21...v0.10.22) (2025-07-01)
+
+**Note:** Version bump only for package @helium/helium-sub-daos-sdk
+
+
+
+
+
 ## [0.10.21](https://github.com/helium/helium-program-libary/compare/v0.10.20...v0.10.21) (2025-07-01)
 
 **Note:** Version bump only for package @helium/helium-sub-daos-sdk
