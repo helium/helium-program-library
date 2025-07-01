@@ -61,7 +61,7 @@ export const useDelegatePositions = ({
   positions: PositionWithMeta[];
   subDao?: SubDaoWithMeta;
 }) => {
-  const { provider } = useHeliumVsrState();
+  const { provider, refetch } = useHeliumVsrState();
   const delegatedPosKeys = useMemo(
     () => positions.map((position) => delegatedPositionKey(position.pubkey)[0]),
     [positions]
@@ -302,6 +302,7 @@ export const useDelegatePositions = ({
             }
           );
         }
+        refetch();
       }
     }
   );
