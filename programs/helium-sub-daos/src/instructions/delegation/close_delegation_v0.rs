@@ -227,9 +227,7 @@ pub fn raw_handler(accounts: &mut CloseDelegationAccounts, sde_bump: u8) -> Resu
 
   // Only subtract from the stake if the position ends after the end of this epoch. Otherwise,
   // the position was already purged due to the sub_dao_epoch_info closing info logic.
-  if position.lockup.end_ts >= accounts.sub_dao_epoch_info.end_ts()
-    || position.lockup.kind == LockupKind::Constant
-  {
+  if delegated_position.expiration_ts >= accounts.sub_dao_epoch_info.end_ts() {
     msg!(
       "Current vehnt {}, removing {} from the subdao",
       sub_dao.vehnt_delegated,
