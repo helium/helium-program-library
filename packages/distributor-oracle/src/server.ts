@@ -561,8 +561,8 @@ export class OracleServer {
       // @ts-ignore
       const currentRewards = entityKey
         ? await this.db.getCurrentRewardsByEntity(
-            decodeEntityKey(entityKey, keySerialization)!
-          )
+          decodeEntityKey(entityKey, keySerialization)!
+        )
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.gt(new BN(currentRewards))) {
         return {
@@ -669,7 +669,7 @@ export class OracleServer {
       );
       const asset = await getAsset(
         process.env.ASSET_API_URL ||
-          this.ldProgram.provider.connection.rpcEndpoint,
+        this.ldProgram.provider.connection.rpcEndpoint,
         keyToAsset.asset
       );
       const [wallet, bump] = customSignerKey(taskQueue, [
@@ -705,6 +705,14 @@ export class OracleServer {
         instructions.push(
           createMemoInstruction(
             "Couldn't claim rewards due to insufficient balance",
+            [wallet]
+          )
+        );
+        // @ts-ignore (we can remove this after a package publish)
+      } else if (asset?.burnt) {
+        instructions.push(
+          createMemoInstruction(
+            "Couldn't claim rewards due to burnt hotspot",
             [wallet]
           )
         );
