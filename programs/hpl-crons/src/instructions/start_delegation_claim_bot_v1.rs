@@ -55,7 +55,7 @@ pub struct StartDelegationClaimBotV1<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   pub hnt_mint: Box<Account<'info, Mint>>,
   /// CHECK: The authority of the position
-  pub position_authority: Signer<'info>,
+  pub position_authority: AccountInfo<'info>,
   pub mint: Box<Account<'info, Mint>>,
   #[account(
     token::mint = mint,
