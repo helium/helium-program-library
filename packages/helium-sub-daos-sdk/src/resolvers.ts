@@ -206,7 +206,7 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
       if (positionAcc && (proxyConfigAcc || delegatedPositionAcc)) {
         const expirationTs =
           !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
-            ? proxyConfigAcc?.seasons
+            ? [...(proxyConfigAcc?.seasons || [])]
               ?.reverse()
               .find((s) => new BN(now.toString()).gte(s.start))?.end ||
             getLockupEffectiveEndTs(positionAcc.lockup)
@@ -273,7 +273,7 @@ export const genesisEndEpochInfoResolver = resolveIndividual(
         const now =
           Number(await getSolanaUnixTimestamp(provider)) +
           registrarAcc.timeOffset.toNumber();
-        const seasonEnd = proxyConfigAcc?.seasons
+        const seasonEnd = [...(proxyConfigAcc?.seasons || [])]
           ?.reverse()
           .find((s) => new BN(now.toString()).gte(s.start))?.end;
         const expirationTs =

@@ -13,7 +13,7 @@ import {
   subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { delegationClaimBotKey, init as initHplCrons } from "@helium/hpl-crons-sdk";
-import { batchParallelInstructionsWithPriorityFee, fetchBackwardsCompatibleIdl, HNT_MINT } from "@helium/spl-utils";
+import { batchParallelInstructionsWithPriorityFee, fetchBackwardsCompatibleIdl, HNT_MINT, sleep } from "@helium/spl-utils";
 import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
@@ -110,6 +110,9 @@ export const useDelegatePositions = ({
         const instructions: TransactionInstruction[][] = [];
 
         if (subDao) {
+          if (!proxyConfig) {
+            throw new Error("No proxy config found");
+          }
           for (const [index, position] of positions.entries()) {
             const innerInstructions: TransactionInstruction[] = [];
             const delegatedPosKey = delegatedPositionKey(position.pubkey)[0];
@@ -121,7 +124,7 @@ export const useDelegatePositions = ({
             ) {
               const now = new BN(Date.now() / 1000);
               const newExpirationTs = Math.min(
-                proxyConfig?.seasons.reverse().find(
+                [...proxyConfig.seasons].reverse().find(
                   (season) => now.gte(season.start)
                 )?.end.toNumber() ?? 0,
                 getLockupEffectiveEndTs(position.lockup).toNumber()
@@ -180,7 +183,7 @@ export const useDelegatePositions = ({
             } else if (position.isDelegated && position.isDelegationRenewable) {
               const now = new BN(Date.now() / 1000);
               const newExpirationTs = Math.min(
-                proxyConfig?.seasons.reverse().find(
+                [...proxyConfig.seasons].reverse().find(
                   (season) => now.gte(season.start)
                 )?.end.toNumber() ?? 0,
                 getLockupEffectiveEndTs(position.lockup).toNumber()
@@ -278,8 +281,8 @@ export const useDelegatePositions = ({
                       provider.wallet.publicKey
                     ),
                     task,
-                    nextTask: delegationClaimBot.info?.nextTask?.equals(PublicKey.default) ? task : delegationClaimBot.info?.nextTask,
-                    rentRefund: delegationClaimBot.info?.rentRefund,
+                    nextTask: !delegationClaimBot.info || delegationClaimBot.info.nextTask.equals(PublicKey.default) ? task : delegationClaimBot.info?.nextTask,
+                    rentRefund: delegationClaimBot.info?.rentRefund || provider.wallet.publicKey,
                   })
                   .instruction()
               );
@@ -302,6 +305,7 @@ export const useDelegatePositions = ({
             }
           );
         }
+        await sleep(2000)
         refetch();
       }
     }

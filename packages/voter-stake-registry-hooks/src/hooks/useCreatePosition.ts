@@ -51,7 +51,7 @@ export const useCreatePosition = ({
 
   const { rentFee, prepaidTxFees, insufficientBalance } = usePositionFees({
     automationEnabled,
-    isDelegated: false,
+    isDelegated: true,
     hasDelegationClaimBot: false,
     wallet: provider?.wallet?.publicKey
   });
@@ -163,7 +163,7 @@ export const useCreatePosition = ({
           const currTs = Number(unixTime) + registrarAcc.timeOffset.toNumber();
           const endTs = new BN(currTs + lockupPeriodsInDays * SECS_PER_DAY);
           const expirationTs =
-            proxyConfig.seasons
+            [...(proxyConfig.seasons || [])]
               .reverse()
               .find((season) => new BN(currTs).gte(season.start))?.end || endTs;
 
@@ -172,7 +172,7 @@ export const useCreatePosition = ({
             subDao.pubkey,
             min(
               getLockupEffectiveEndTs({
-                kind: lockupKind,
+                kind: { [lockupKind]: {} },
                 endTs,
               }),
               expirationTs
@@ -220,6 +220,7 @@ export const useCreatePosition = ({
               })
             );
             const nextAvailable = await nextAvailableTaskIds(taskQueue!.taskBitmap, 1)[0];
+            const task = taskKey(TASK_QUEUE, nextAvailable)[0];
             delegateInstructions.push(
               await hplCronsProgram.methods
                 .startDelegationClaimBotV1({
@@ -239,7 +240,9 @@ export const useCreatePosition = ({
                     HNT_MINT,
                     provider.wallet.publicKey
                   ),
-                  task: taskKey(TASK_QUEUE, nextAvailable)[0],
+                  task,
+                  nextTask: task,
+                  rentRefund: provider.wallet.publicKey,
                 })
                 .instruction()
             );
