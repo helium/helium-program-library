@@ -56,7 +56,7 @@ export async function claimWelcomePack({
     program.account.lazyDistributorV0.fetch(welcomePackAcc.lazyDistributor),
     tuktukProgram.account.taskQueueV0.fetch(taskQueue)
   ])
-  const nextTaskId = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)[0]
+  const [nextTaskId, nextPreTaskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2)
   const queueAuthority = queueAuthorityKey()[0]
   return program.methods
     .claimWelcomePackV0({
@@ -64,6 +64,7 @@ export async function claimWelcomePack({
       approvalExpirationTimestamp: claimApproval.expirationTimestamp,
       claimSignature: claimApprovalSignature.toJSON().data,
       taskId: nextTaskId,
+      preTaskId: nextPreTaskId,
     })
     .accountsStrict({
       merkleTree: accounts.merkleTree,
@@ -88,6 +89,7 @@ export async function claimWelcomePack({
       tokenProgram: TOKEN_PROGRAM_ID,
       bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
       task: taskKey(taskQueue, nextTaskId)[0],
+      preTask: taskKey(taskQueue, nextPreTaskId)[0],
       taskQueueAuthority: taskQueueAuthorityKey(
         taskQueue,
         queueAuthority

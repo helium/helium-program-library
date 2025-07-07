@@ -23,7 +23,8 @@ use mini_fanout::{
   program::MiniFanout,
   InitializeMiniFanoutArgsV0, MiniFanoutShareArgV0, MiniFanoutV0, ScheduleTaskArgsV0,
 };
-use tuktuk_program::tuktuk::program::Tuktuk;
+use shared_utils::{ORACLE_SIGNER, ORACLE_URL};
+use tuktuk_program::{tuktuk::program::Tuktuk, TransactionSourceV0};
 
 use crate::{error::ErrorCode, welcome_pack_seeds, WelcomePackV0, ATA_SIZE, FANOUT_FUNDING_AMOUNT};
 
@@ -36,6 +37,7 @@ pub struct ClaimWelcomePackArgsV0 {
   pub approval_expiration_timestamp: i64,
   pub claim_signature: [u8; 64],
   pub task_id: u16,
+  pub pre_task_id: u16,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -95,6 +97,9 @@ pub struct ClaimWelcomePackV0<'info> {
   /// CHECK: Used in CPI into mini fanout program
   #[account(mut)]
   pub task: AccountInfo<'info>,
+  /// CHECK: Used in CPI into mini fanout program
+  #[account(mut)]
+  pub pre_task: AccountInfo<'info>,
   /// CHECK: Checked by cpi
   pub tree_authority: AccountInfo<'info>,
   /// CHECK: Checked by cpi
@@ -151,10 +156,15 @@ pub fn handler<'info>(
       share: f.share.clone(),
     })
     .collect();
+
   let fanout_args = InitializeMiniFanoutArgsV0 {
     seed: asset_id.to_bytes().to_vec(),
     schedule: welcome_pack.rewards_schedule.clone(),
     shares: mapped_shares.clone(),
+    pre_task: Some(TransactionSourceV0::RemoteV0 {
+      url: format!("{}/v1/tuktuk/asset/{}", ORACLE_URL, asset_id.to_string(),),
+      signer: ORACLE_SIGNER,
+    }),
   };
   let rent = Rent::get()?;
   let fanout_cost = rent.minimum_balance(MiniFanoutV0::size(&fanout_args))
@@ -291,12 +301,15 @@ pub fn handler<'info>(
           task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
           task_queue: ctx.accounts.task_queue.to_account_info(),
           task: ctx.accounts.task.to_account_info(),
+          next_pre_task: ctx.accounts.system_program.to_account_info(),
+          pre_task: ctx.accounts.pre_task.to_account_info(),
           tuktuk_program: ctx.accounts.tuktuk_program.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
         },
       ),
       ScheduleTaskArgsV0 {
         task_id: args.task_id,
+        pre_task_id: args.pre_task_id,
       },
     )?;
   }

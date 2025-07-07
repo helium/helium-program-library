@@ -1,12 +1,11 @@
 use anchor_lang::prelude::*;
+use shared_utils::{ORACLE_SIGNER, ORACLE_URL};
 use tuktuk_program::cron::{
   accounts::CronJobV0,
   cpi::{accounts::AddCronTransactionV0, add_cron_transaction_v0},
   program::Cron,
   types::{AddCronTransactionArgsV0, TransactionSourceV0},
 };
-
-use super::{ORACLE_SIGNER, ORACLE_URL};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct AddWalletToEntityCronArgsV0 {
