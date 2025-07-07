@@ -12,6 +12,8 @@ function secsToDays(secs: number): number {
   return secs / (60 * 60 * 24);
 }
 
+const MAX_LOCKUP_PERIOD_IN_DAYS = 1460;
+
 export const useFlipPositionLockupKind = () => {
   const { provider, unixNow } = useHeliumVsrState();
   const { error, loading, execute } = useAsyncCallback(
@@ -52,7 +54,7 @@ export const useFlipPositionLockupKind = () => {
         const kind = isConstant ? { cliff: {} } : { constant: {} };
         const isDao = Boolean(await provider.connection.getAccountInfo(dao));
         // Max 4 years
-        const positionLockupPeriodInDays = Math.min(1460, Math.ceil(
+        const positionLockupPeriodInDays = Math.min(MAX_LOCKUP_PERIOD_IN_DAYS, Math.ceil(
           secsToDays(
             isConstant
               ? position.lockup.endTs.sub(position.lockup.startTs).toNumber()
