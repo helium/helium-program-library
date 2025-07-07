@@ -51,13 +51,14 @@ export const useFlipPositionLockupKind = () => {
         const [dao] = daoKey(mint);
         const kind = isConstant ? { cliff: {} } : { constant: {} };
         const isDao = Boolean(await provider.connection.getAccountInfo(dao));
-        const positionLockupPeriodInDays = Math.ceil(
+        // Max 4 years
+        const positionLockupPeriodInDays = Math.min(1460, Math.ceil(
           secsToDays(
             isConstant
               ? position.lockup.endTs.sub(position.lockup.startTs).toNumber()
               : position.lockup.endTs.sub(new BN(unixNow)).toNumber()
           )
-        );
+        ));
 
         if (isDao) {
           instructions.push(
