@@ -162,7 +162,7 @@ pub fn handler<'info>(
     schedule: welcome_pack.rewards_schedule.clone(),
     shares: mapped_shares.clone(),
     pre_task: Some(TransactionSourceV0::RemoteV0 {
-      url: format!("{}/v1/tuktuk/asset/{}", ORACLE_URL, asset_id.to_string(),),
+      url: format!("{}/v1/tuktuk/asset/{}", ORACLE_URL, asset_id,),
       signer: ORACLE_SIGNER,
     }),
   };

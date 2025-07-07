@@ -149,7 +149,7 @@ pub fn handler<'info>(
       shares: args.rewards_split,
       seed: asset.to_bytes().to_vec(),
       pre_task: Some(TransactionSourceV0::RemoteV0 {
-        url: format!("{}/v1/tuktuk/asset/{}", ORACLE_URL, asset.to_string(),),
+        url: format!("{}/v1/tuktuk/asset/{}", ORACLE_URL, asset,),
         signer: ORACLE_SIGNER,
       }),
     }))
