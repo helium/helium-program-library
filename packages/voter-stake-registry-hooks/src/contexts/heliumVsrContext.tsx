@@ -243,7 +243,9 @@ export const HeliumVsrStateProvider: React.FC<{
             const proxyExpiration = proxy?.expirationTime;
             const delegatedAcc = delegatedAccounts?.[idx]?.info;
             const delegationExpiration = delegatedAcc?.expirationTs;
-            const isProxyExpired = proxyExpiration?.lt(new BN(now));
+            const isProxyExpired =
+              !proxy?.nextVoter?.equals(PublicKey.default) &&
+              proxyExpiration?.lt(new BN(now));
             const isDelegationExpired = delegationExpiration?.lt(new BN(now));
             const currentSeason = [...(proxyConfig?.seasons || [])]
               ?.reverse()
@@ -259,7 +261,9 @@ export const HeliumVsrStateProvider: React.FC<{
               !isDelegationExpired &&
               currentSeason?.end.gt(delegationExpiration) &&
               // The delegation might expire before the season end if the position expires before the season end.
-              !getLockupEffectiveEndTs(position.info.lockup).eq(delegationExpiration);
+              !getLockupEffectiveEndTs(position.info.lockup).eq(
+                delegationExpiration
+              );
 
             return {
               ...position.info,
