@@ -56,7 +56,7 @@ export async function claimWelcomePack({
     program.account.lazyDistributorV0.fetch(welcomePackAcc.lazyDistributor),
     tuktukProgram.account.taskQueueV0.fetch(taskQueue)
   ])
-  const [nextTaskId, nextPreTaskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2)
+  const [nextPreTaskId, nextTaskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2)
   const queueAuthority = queueAuthorityKey()[0]
   return program.methods
     .claimWelcomePackV0({

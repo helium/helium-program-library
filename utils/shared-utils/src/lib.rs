@@ -5,7 +5,6 @@ pub mod resize_to_fit;
 pub mod signed_precise_number;
 pub mod uint;
 
-#[cfg(not(feature = "devnet"))]
 use anchor_lang::{prelude::Pubkey, pubkey};
 pub use compressed_nfts::*;
 pub use error::*;
