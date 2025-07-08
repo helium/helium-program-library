@@ -1,7 +1,7 @@
 use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::{
   prelude::*,
-  solana_program::{self, instruction::Instruction, program::invoke_signed},
+  solana_program::{instruction::Instruction, program::invoke_signed},
   system_program::{transfer, Transfer},
 };
 use anchor_spl::{
