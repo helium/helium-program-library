@@ -144,7 +144,7 @@ KeyToAsset.init(
   {
     address: {
       type: STRING,
-      primaryKey: false,
+      primaryKey: true,
     },
     dao: {
       type: STRING,

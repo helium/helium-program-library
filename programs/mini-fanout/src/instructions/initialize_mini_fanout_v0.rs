@@ -6,20 +6,21 @@ use anchor_spl::{
   token::{Mint, Token, TokenAccount},
 };
 use clockwork_cron::Schedule;
-use tuktuk_program::TaskQueueV0;
+use tuktuk_program::{TaskQueueV0, TransactionSourceV0};
 
 use crate::{errors::ErrorCode, state::*};
 
-pub const MAX_SHARES: usize = 8;
+pub const MAX_SHARES: usize = 7;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitializeMiniFanoutArgsV0 {
   pub schedule: String,
   pub shares: Vec<MiniFanoutShareArgV0>,
   pub seed: Vec<u8>,
+  pub pre_task: Option<TransactionSourceV0>,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Default, Debug, Eq, PartialEq, Clone)]
+#[derive(AnchorSerialize, AnchorDeserialize, Default, Debug, Clone)]
 pub struct MiniFanoutShareArgV0 {
   pub wallet: Pubkey,
   pub share: Share,
@@ -81,6 +82,25 @@ impl MiniFanoutV0 {
     size += 4 + args.shares.len() * MiniFanoutShareV0::size();
     // seed: Vec<u8> (4 bytes len + seed bytes)
     size += 4 + args.seed.len();
+    if let Some(pre_task) = &args.pre_task {
+      match pre_task {
+        TransactionSourceV0::CompiledV0(compiled) => {
+          size += 4
+            + 3
+            + 4
+            + 32 * compiled.instructions.len()
+            + compiled
+              .instructions
+              .iter()
+              .map(|i| i.accounts.len() + i.data.len() + 4)
+              .sum::<usize>()
+            + compiled.signer_seeds.iter().map(|s| s.len()).sum::<usize>();
+        }
+        TransactionSourceV0::RemoteV0 { url, .. } => {
+          size += 4 + 32 + url.len();
+        }
+      }
+    }
     size + 60 // extra space for future fields
   }
 }
@@ -141,6 +161,8 @@ pub fn handler(
         total_owed: 0,
       })
       .collect(),
+    next_pre_task: Pubkey::default(),
+    pre_task: args.pre_task,
   });
 
   Ok(())
