@@ -859,7 +859,7 @@ __metadata:
     "@substreams/core": ^0.16.0
     "@types/async-retry": ^1.4.8
     "@types/bn.js": ^5.1.1
-    "@types/bs58": ^5.0.0
+    "@types/bs58": ^4.0.1
     "@types/deep-equal": ^1.0.4
     "@types/lodash": ^4.14.195
     "@types/node": ^18.11.11
@@ -4541,15 +4541,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/bs58@npm:^5.0.0":
-  version: 5.0.0
-  resolution: "@types/bs58@npm:5.0.0"
-  dependencies:
-    bs58: "*"
-  checksum: 5b33ed60d8fe5541cfe6263f3e15e1a705c299f6831712b063cb7f0ad5bf1bbbf6db13b88c16b470c84f20b631b8bdd939414101a6a903ad1231b88d62d987b4
-  languageName: node
-  linkType: hard
-
 "@types/chai-as-promised@npm:^7.1.5":
   version: 7.1.5
   resolution: "@types/chai-as-promised@npm:7.1.5"
@@ -6154,13 +6145,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"base-x@npm:^5.0.0":
-  version: 5.0.1
-  resolution: "base-x@npm:5.0.1"
-  checksum: 6e4f847ef842e0a71c6b6020a6ec482a2a5e727f5a98534dbfd5d5a4e8afbc0d1bdf1fd57174b3f0455d107f10a932c3c7710bec07e2878f80178607f8f605c8
-  languageName: node
-  linkType: hard
-
 "base64-arraybuffer@npm:^1.0.2":
   version: 1.0.2
   resolution: "base64-arraybuffer@npm:1.0.2"
@@ -6367,15 +6351,6 @@ __metadata:
   bin:
     browserslist: cli.js
   checksum: 436f49e796782ca751ebab7edc010cfc9c29f68536f387666cd70ea22f7105563f04dd62c6ff89cb24cc3254d17cba385f979eeeb3484d43e012412ff7e75def
-  languageName: node
-  linkType: hard
-
-"bs58@npm:*":
-  version: 6.0.0
-  resolution: "bs58@npm:6.0.0"
-  dependencies:
-    base-x: ^5.0.0
-  checksum: 820334f9513bba6195136dfc9dfbd1f5aded6c7864639f3ee7b63c2d9d6f9f2813b9949b1f6beb9c161237be2a461097444c2ff587c8c3b824fe18878fa22448
   languageName: node
   linkType: hard
 
