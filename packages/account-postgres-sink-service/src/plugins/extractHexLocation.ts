@@ -44,7 +44,7 @@ ReverseGeoCache.init(
   }
 );
 
-const locationFetchCache: { [location: string]: Promise<ReverseGeoCache> } = {};
+const locationFetchCache: { [location: string]: Promise<ReverseGeoCache | undefined> } = {};
 export const ExtractHexLocationPlugin = ((): IPlugin => {
   const name = "ExtractHexLocation";
   const init = async (config: { [key: string]: any }) => {
@@ -103,22 +103,27 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
           if (!locationFetchCache[location]) {
             locationFetchCache[location] = (async () => {
               const coords = parseH3BNLocation(new BN(location));
-              const { city, state, country, name, raw } =
-                await mapbox.fetchParsedLocation(coords);
-
-              return await ReverseGeoCache.create({
-                location: location.toString(),
-                street: name,
-                city,
-                state,
-                country,
-                lat: coords[0],
-                long: coords[1],
-                raw,
-              });
+              try {
+                const { city, state, country, name, raw } =
+                  await mapbox.fetchParsedLocation(coords);
+                return await ReverseGeoCache.create({
+                  location: location.toString(),
+                  street: name,
+                  city,
+                  state,
+                  country,
+                  lat: coords[0],
+                  long: coords[1],
+                  raw,
+                });
+              } catch (e) {
+                if (!config.ignoreErrors) {
+                  throw e
+                }
+              }
             })();
           }
-          reverseGeod = await locationFetchCache[location];
+          reverseGeod = await locationFetchCache[location] || null;
           // Once the create call finishes, we can cleanup this promise. Subsequent queries to postgres will discover
           // the account. This helps with memory management
           delete locationFetchCache[location];
