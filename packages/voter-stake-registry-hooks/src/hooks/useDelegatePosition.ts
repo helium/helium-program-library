@@ -246,6 +246,23 @@ export const useDelegatePositions = ({
                   lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
                 })
               );
+            } else if (automationEnabled && delegationClaimBot && delegationClaimBot.info) {
+              innerInstructions.push(
+                await hplCronsProgram.methods
+                  .closeDelegationClaimBotV0()
+                  .accountsPartial({
+                    delegationClaimBot: delegationClaimBotK,
+                    taskQueue: TASK_QUEUE,
+                    position: position.pubkey,
+                    delegatedPosition: delegatedPosKey,
+                    positionTokenAccount: getAssociatedTokenAddressSync(
+                      position.mint,
+                      provider.wallet.publicKey,
+                      true
+                    ),
+                  })
+                  .instruction(),
+              );
             }
 
             if (
