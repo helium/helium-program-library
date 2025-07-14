@@ -54,6 +54,7 @@ pub struct ChangeDelegationV0<'info> {
   #[account(
     mut,
     has_one = dao,
+    constraint = old_sub_dao.key() == delegated_position.sub_dao @ ErrorCode::InvalidChangeDelegationSubDao
   )]
   pub old_sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
