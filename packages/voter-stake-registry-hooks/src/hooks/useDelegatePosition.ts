@@ -31,6 +31,8 @@ import { PREPAID_TX_FEES, usePositionsFees } from "./usePositionFees";
 import { useProxyConfig } from "./useProxyConfig";
 import { useRegistrar } from "./useRegistrar";
 
+const HNT_EPOCH = 20117;
+
 export const useDelegatePosition = ({
   automationEnabled = false,
   position,
@@ -155,6 +157,9 @@ export const useDelegatePositions = ({
                 subDao.pubkey,
                 newExpirationTs
               )[0];
+              if (delegatedPositionAcc.info && delegatedPositionAcc.info.lastClaimedEpoch.toNumber() < HNT_EPOCH) {
+                throw new Error("Must claim IOT/MOBILE rewards before changing delegation")
+              }
               innerInstructions.push(
                 await hsdProgram.methods
                   .changeDelegationV0()
