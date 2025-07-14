@@ -10,7 +10,7 @@ crate-type = ["cdylib", "lib"]
 name = "hpl_crons"
 
 [features]
-devnet = []
+devnet = ["shared-utils/devnet"]
 default = []
 cpi = ["no-entrypoint"]
 no-entrypoint = []
@@ -29,4 +29,5 @@ helium-sub-daos = { workspace = true }
 no-emit = { workspace = true }
 voter-stake-registry = { workspace = true }
 modular-governance = { workspace = true }
+shared-utils = { workspace = true }
 

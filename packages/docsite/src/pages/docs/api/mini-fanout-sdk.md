@@ -36,6 +36,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | mini_fanout   | immut      | no     |      |
 | task_queue    | immut      | no     |      |
 | next_task     | immut      | no     |      |
+| next_pre_task | immut      | no     |      |
 | token_account | immut      | no     |      |
 | token_program | immut      | no     |      |
 
@@ -78,10 +79,12 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | payer                | immut      | no     |                                               |
 | mini_fanout          | immut      | no     |                                               |
 | next_task            | immut      | no     | Only allow one task to be scheduled at a time |
+| next_pre_task        | immut      | no     | Only allow one task to be scheduled at a time |
 | queue_authority      | immut      | no     |                                               |
 | task_queue_authority | immut      | no     |                                               |
 | task_queue           | immut      | no     |                                               |
 | task                 | immut      | no     |                                               |
+| pre_task             | immut      | no     |                                               |
 | tuktuk_program       | immut      | no     |                                               |
 | system_program       | immut      | no     |                                               |
 
@@ -104,7 +107,9 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | task_queue_authority | immut      | no     |      |
 | task_queue           | immut      | no     |      |
 | next_task            | immut      | no     |      |
+| next_pre_task        | immut      | no     |      |
 | new_task             | immut      | no     |      |
+| new_pre_task         | immut      | no     |      |
 | tuktuk_program       | immut      | no     |      |
 | system_program       | immut      | no     |      |
 
@@ -128,6 +133,8 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | task_queue           | immut      | no     |      |
 | next_task            | immut      | no     |      |
 | new_task             | immut      | no     |      |
+| next_pre_task        | immut      | no     |      |
+| new_pre_task         | immut      | no     |      |
 | tuktuk_program       | immut      | no     |      |
 | system_program       | immut      | no     |      |
 
@@ -183,6 +190,7 @@ undefined
 | schedule | string          |
 | shares   | [object Object] |
 | seed     | bytes           |
+| pre_task | [object Object] |
 
 ### MiniFanoutShareArgV0
 
@@ -217,6 +225,8 @@ undefined
 | queue_authority_bump | u8              |
 | shares               | [object Object] |
 | seed                 | bytes           |
+| next_pre_task        | pubkey          |
+| pre_task             | [object Object] |
 
 ### RunTaskReturnV0
 
@@ -227,9 +237,10 @@ undefined
 
 ### ScheduleTaskArgsV0
 
-| Field   | Type |
-| ------- | ---- |
-| task_id | u16  |
+| Field       | Type |
+| ----------- | ---- |
+| task_id     | u16  |
+| pre_task_id | u16  |
 
 ### Share
 
@@ -308,16 +319,18 @@ undefined
 
 ### UpdateMiniFanoutArgsV0
 
-| Field       | Type            |
-| ----------- | --------------- |
-| new_task_id | u16             |
-| shares      | [object Object] |
-| schedule    | string          |
+| Field           | Type            |
+| --------------- | --------------- |
+| new_task_id     | u16             |
+| new_pre_task_id | u16             |
+| shares          | [object Object] |
+| schedule        | string          |
 
 ### UpdateWalletDelegateArgsV0
 
-| Field       | Type   |
-| ----------- | ------ |
-| index       | u8     |
-| new_task_id | u16    |
-| delegate    | pubkey |
+| Field           | Type   |
+| --------------- | ------ |
+| index           | u8     |
+| new_task_id     | u16    |
+| new_pre_task_id | u16    |
+| delegate        | pubkey |

@@ -21,6 +21,7 @@ use crate::{
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ScheduleTaskArgsV0 {
   pub task_id: u16,
+  pub pre_task_id: u16,
 }
 
 #[derive(Accounts)]
@@ -32,6 +33,7 @@ pub struct ScheduleTaskV0<'info> {
     mut,
     has_one = next_task,
     has_one = task_queue,
+    has_one = next_pre_task,
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   /// CHECK: Via constraint
@@ -40,6 +42,12 @@ pub struct ScheduleTaskV0<'info> {
     constraint = next_task.data_is_empty() || next_task.key() == Pubkey::default()
   )]
   pub next_task: UncheckedAccount<'info>,
+  /// CHECK: Via constraint
+  /// Only allow one task to be scheduled at a time
+  #[account(
+    constraint = next_task.data_is_empty() || next_task.key() == Pubkey::default()
+  )]
+  pub next_pre_task: UncheckedAccount<'info>,
   /// CHECK: queue authority
   #[account(
     seeds = [b"queue_authority"],
@@ -58,6 +66,9 @@ pub struct ScheduleTaskV0<'info> {
   /// CHECK: task account to be created
   #[account(mut)]
   pub task: UncheckedAccount<'info>,
+  /// CHECK: task account to be created
+  #[account(mut)]
+  pub pre_task: UncheckedAccount<'info>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub system_program: Program<'info, System>,
 }
@@ -70,6 +81,7 @@ pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransa
     token_program: spl_token::ID,
     task_queue: mini_fanout.task_queue,
     next_task: mini_fanout.next_task,
+    next_pre_task: mini_fanout.next_pre_task,
   }
   .to_account_metas(None);
 
@@ -122,9 +134,38 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
   }
   let next_time = get_next_time(mini_fanout)?;
   mini_fanout.next_task = ctx.task.key();
-  let compiled_tx = get_task_ix(mini_fanout)?;
 
-  // CPI to tuktuk to queue the task
+  // CPI to tuktuk to queue the tasks
+  if let Some(pre_task) = mini_fanout.pre_task.clone() {
+    mini_fanout.next_pre_task = ctx.pre_task.key();
+    queue_task_v0(
+      CpiContext::new_with_signer(
+        ctx.tuktuk_program.to_account_info(),
+        QueueTaskV0 {
+          payer: ctx.payer.to_account_info(),
+          queue_authority: ctx.queue_authority.to_account_info(),
+          task_queue_authority: ctx.task_queue_authority.to_account_info(),
+          task_queue: ctx.task_queue.to_account_info(),
+          task: ctx.pre_task.to_account_info(),
+          system_program: ctx.system_program.to_account_info(),
+        },
+        &[queue_authority_seeds!(mini_fanout)],
+      ),
+      QueueTaskArgsV0 {
+        trigger: TriggerV0::Timestamp(next_time - 1),
+        transaction: pre_task,
+        crank_reward: None,
+        free_tasks: 0,
+        id: args.pre_task_id,
+        description: format!(
+          "pre dist {}",
+          &mini_fanout.key().to_string()[..(32 - 9 - 4)]
+        ),
+      },
+    )?;
+  }
+
+  let compiled_tx = get_task_ix(mini_fanout)?;
   queue_task_v0(
     CpiContext::new_with_signer(
       ctx.tuktuk_program.to_account_info(),
@@ -142,7 +183,7 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
       trigger: TriggerV0::Timestamp(next_time),
       transaction: TransactionSourceV0::CompiledV0(compiled_tx),
       crank_reward: None,
-      free_tasks: 1,
+      free_tasks: 2,
       id: args.task_id,
       description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
     },

@@ -58,4 +58,7 @@ pub enum ErrorCode {
 
   #[msg("Must change delegation to a different sub dao")]
   InvalidChangeDelegationSubDao,
+
+  #[msg("This position has mobile/iot rewards that need to be claimed before changing delegation")]
+  ClaimBeforeChangeDelegation,
 }
