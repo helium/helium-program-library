@@ -21,6 +21,7 @@ export const YELLOWSTONE_URL =
   process.env.YELLOWSTONE_URL || "http://127.0.0.1:8899";
 
 export const USE_HELIUS_WEBHOOK = getEnvBoolean("USE_HELIUS_WEBHOOK");
+export const REFRESH_ON_BOOT = getEnvBoolean("REFRESH_ON_BOOT");
 export const HELIUS_AUTH_SECRET = process.env.HELIUS_AUTH_SECRET;
 
 export const USE_SUBSTREAM = getEnvBoolean("USE_SUBSTREAM");

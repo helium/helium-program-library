@@ -26,7 +26,7 @@ import {
 import { init as initVsr, PROGRAM_ID as VSR_PROGRAM_ID } from "@helium/voter-stake-registry-sdk";
 
 export const useAssignProxies = () => {
-  const { provider, registrar, voteService } = useHeliumVsrState();
+  const { provider, registrar, voteService, refetch } = useHeliumVsrState();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -302,6 +302,7 @@ export const useAssignProxies = () => {
             await queryClient.invalidateQueries({
               queryKey: ["proxy"],
             });
+            await refetch();
           } catch (e: any) {
             console.error("Exception invalidating queries", e);
           }

@@ -17,6 +17,7 @@ export async function claimWelcomePack({
   program,
   tuktukProgram,
   assetEndpoint,
+  welcomePack,
   claimApproval,
   claimApprovalSignature,
   claimer,
@@ -25,6 +26,7 @@ export async function claimWelcomePack({
   payer = program.provider.wallet.publicKey,
   ...rest
 }: {
+  welcomePack: PublicKey;
   claimer: PublicKey;
   tuktukProgram: Program<Tuktuk>;
   claimApproval: ClaimApprovalV0;
@@ -39,7 +41,7 @@ export async function claimWelcomePack({
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
 }) {
-  const welcomePackAcc = await program.account.welcomePackV0.fetch(claimApproval.welcomePack)
+  const welcomePackAcc = await program.account.welcomePackV0.fetch(welcomePack)
   const assetId = welcomePackAcc.asset
   const {
     args,
@@ -51,12 +53,12 @@ export async function claimWelcomePack({
     ...rest,
   });
 
-  const miniFanout = miniFanoutKey(claimApproval.welcomePack, assetId.toBuffer())[0]
+  const miniFanout = miniFanoutKey(welcomePack, assetId.toBuffer())[0]
   const [lazyDistributorAcc, taskQueueAcc] = await Promise.all([
     program.account.lazyDistributorV0.fetch(welcomePackAcc.lazyDistributor),
     tuktukProgram.account.taskQueueV0.fetch(taskQueue)
   ])
-  const nextTaskId = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)[0]
+  const [nextPreTaskId, nextTaskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2)
   const queueAuthority = queueAuthorityKey()[0]
   return program.methods
     .claimWelcomePackV0({
@@ -64,10 +66,11 @@ export async function claimWelcomePack({
       approvalExpirationTimestamp: claimApproval.expirationTimestamp,
       claimSignature: claimApprovalSignature.toJSON().data,
       taskId: nextTaskId,
+      preTaskId: nextPreTaskId,
     })
     .accountsStrict({
       merkleTree: accounts.merkleTree,
-      welcomePack: claimApproval.welcomePack,
+      welcomePack,
       assetReturnAddress: welcomePackAcc.assetReturnAddress.equals(PublicKey.default) ? claimer : welcomePackAcc.assetReturnAddress,
       recipient: recipientKey(welcomePackAcc.lazyDistributor, assetId)[0],
       rewardsRecipient: welcomePackAcc.rewardsSplit.length > 1 ? miniFanout : welcomePackAcc.rewardsSplit[0].wallet.equals(PublicKey.default) ? claimer : welcomePackAcc.rewardsSplit[0].wallet,
@@ -88,6 +91,7 @@ export async function claimWelcomePack({
       tokenProgram: TOKEN_PROGRAM_ID,
       bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
       task: taskKey(taskQueue, nextTaskId)[0],
+      preTask: taskKey(taskQueue, nextPreTaskId)[0],
       taskQueueAuthority: taskQueueAuthorityKey(
         taskQueue,
         queueAuthority

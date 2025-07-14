@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
+use shared_utils::{ORACLE_SIGNER, ORACLE_URL};
 use tuktuk_program::{RunTaskReturnV0, TaskReturnV0, TransactionSourceV0, TriggerV0};
 
-use super::{NUM_QUEUED_PER_BATCH, ORACLE_SIGNER, ORACLE_URL};
+use crate::NUM_QUEUED_PER_BATCH;
 
 #[derive(Accounts)]
 pub struct RequeueWalletClaimV0<'info> {

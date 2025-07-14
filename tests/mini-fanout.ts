@@ -2,12 +2,13 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { createAtaAndMint, createMint, sendInstructions, toBN } from "@helium/spl-utils";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
-import { init as initTuktuk, nextAvailableTaskIds, runTask, taskKey, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey } from "@helium/tuktuk-sdk";
+import { compileTransaction, init as initTuktuk, nextAvailableTaskIds, runTask, taskKey, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey } from "@helium/tuktuk-sdk";
 import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { createMemoInstruction } from "@solana/spl-memo";
 import { ComputeBudgetProgram, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
 import { execSync } from "child_process";
-import { init, miniFanoutKey, PROGRAM_ID, queueAuthorityKey } from "../packages/mini-fanout-sdk/src";
+import { init, PROGRAM_ID, queueAuthorityKey } from "../packages/mini-fanout-sdk/src";
 import { MiniFanout } from "../target/types/mini_fanout";
 
 export const ANCHOR_PATH = "anchor";
@@ -80,6 +81,14 @@ describe("mini-fanout", () => {
   const queueAuthority = queueAuthorityKey()[0]
   const FANOUT_AMOUNT = 1000000000
 
+  const memoPreTask = compileTransaction([
+    createMemoInstruction(
+      "HELLO!",
+      []
+    ),
+  ],
+    [])
+
   let taskQueue: PublicKey;
   before(async () => {
     mint = await createMint(provider, 8, me, me)
@@ -134,6 +143,7 @@ describe("mini-fanout", () => {
       seed: Buffer.from(fanoutName, "utf-8"),
       shares,
       schedule: "0 0 * * * *",
+      preTask: { compiledV0: memoPreTask.transaction as any }
     })
       .accounts({
         payer: me,
@@ -164,7 +174,7 @@ describe("mini-fanout", () => {
     let cronJob: PublicKey;
     beforeEach(async () => {
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const nextTask = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1, false)[0]
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
 
       const now = new Date()
       let nextSeconds = now.getSeconds() + 2
@@ -178,6 +188,7 @@ describe("mini-fanout", () => {
         // Run in 2 seconds
         schedule: `${nextSeconds} ${nextMinutes} * * * *`,
         shares,
+        preTask: { compiledV0: memoPreTask.transaction as any }
       })
         .accounts({
           payer: me,
@@ -196,6 +207,7 @@ describe("mini-fanout", () => {
 
       await program.methods.scheduleTaskV0({
         taskId: nextTask,
+        preTaskId: nextPreTask,
       })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
@@ -204,6 +216,7 @@ describe("mini-fanout", () => {
           payer: me,
           miniFanout: fanoutK,
           task: taskKey(taskQueue, nextTask)[0],
+          preTask: taskKey(taskQueue, nextPreTask)[0],
         })
         .rpc()
 
@@ -214,7 +227,7 @@ describe("mini-fanout", () => {
     it("should allow updating wallets and schedule", async () => {
       const newWallet = Keypair.generate()
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const nextTask = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1, false)[0]
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
       await program.methods.updateMiniFanoutV0({
         shares: [
           {
@@ -227,12 +240,14 @@ describe("mini-fanout", () => {
           }
         ],
         newTaskId: nextTask,
+        newPreTaskId: nextPreTask,
         schedule: "0 0 * * * *",
       })
         .accounts({
           payer: me,
           miniFanout: fanout,
           newTask: taskKey(taskQueue, nextTask)[0],
+          newPreTask: taskKey(taskQueue, nextPreTask)[0],
         })
         .rpcAndKeys()
 
@@ -248,9 +263,10 @@ describe("mini-fanout", () => {
     it("should allow updating wallet delegates", async () => {
       const newWallet = Keypair.generate()
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const nextTask = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1, false)[0]
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
       await program.methods.updateWalletDelegateV0({
         newTaskId: nextTask,
+        newPreTaskId: nextPreTask,
         delegate: newWallet.publicKey,
         index: 0
       })
@@ -259,6 +275,7 @@ describe("mini-fanout", () => {
           wallet: wallet1.publicKey,
           miniFanout: fanout,
           newTask: taskKey(taskQueue, nextTask)[0],
+          newPreTask: taskKey(taskQueue, nextPreTask)[0],
         })
         .signers([wallet1])
         .rpcAndKeys()
@@ -285,7 +302,7 @@ describe("mini-fanout", () => {
       for (const taskId of taskIds) {
         const task = taskKey(taskQueue, taskId)[0]
         const taskAcc = await tuktukProgram.account.taskV0.fetch(task)
-        if ((taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) > (new Date().getTime() / 1000)) {
+        if ((taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) > (new Date().getTime() / 1000) || taskAcc.transaction.remoteV0) {
           continue
         }
         console.log("Running task", taskId)
@@ -337,8 +354,8 @@ describe("mini-fanout", () => {
       ).to.not.be.null
     })
 
-    it("should distribute tokens to 8 wallets in one tx", async () => {
-      const wallets = Array.from({ length: 8 }, () => Keypair.generate())
+    it("should distribute tokens to 7 wallets in one tx", async () => {
+      const wallets = Array.from({ length: 7 }, () => Keypair.generate())
       const shares = wallets.map(w => ({
         wallet: w.publicKey,
         share: { share: { amount: 10 } },
@@ -351,7 +368,7 @@ describe("mini-fanout", () => {
 
       // Get next available task
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const nextTask = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1, false)[0]
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
 
       // Set up a fanout with 10 shares
       const now = new Date()
@@ -366,6 +383,7 @@ describe("mini-fanout", () => {
         seed: Buffer.from(fanoutName + 'big', "utf-8"),
         schedule: `${nextSeconds} ${nextMinutes} * * * *`,
         shares,
+        preTask: { compiledV0: memoPreTask.transaction as any }
       })
         .accounts({
           payer: me,
@@ -386,6 +404,7 @@ describe("mini-fanout", () => {
       console.log("scheduling task")
       await program.methods.scheduleTaskV0({
         taskId: nextTask,
+        preTaskId: nextPreTask,
       })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
@@ -394,10 +413,11 @@ describe("mini-fanout", () => {
           payer: me,
           miniFanout: fanoutK,
           task: taskKey(taskQueue, nextTask)[0],
+          preTask: taskKey(taskQueue, nextPreTask)[0],
         })
         .rpc()
 
-      await createAtaAndMint(provider, mint, 800000000, fanoutK)
+      await createAtaAndMint(provider, mint, 700000000, fanoutK)
 
       // Wait for cron and run all tasks
       await new Promise(resolve => setTimeout(resolve, 2000))

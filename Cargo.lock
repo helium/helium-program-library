@@ -905,7 +905,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.35"
+version = "0.2.36"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -968,6 +968,7 @@ dependencies = [
  "helium-sub-daos",
  "modular-governance",
  "no-emit",
+ "shared-utils",
  "spl-associated-token-account",
  "spl-token",
  "tuktuk-program",

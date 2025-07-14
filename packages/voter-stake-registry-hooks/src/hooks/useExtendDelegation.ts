@@ -53,7 +53,7 @@ export const useExtendDelegation = () => {
         const proxyConfigAcc = await proxyProgram.account.proxyConfigV0.fetch(
           registrarAcc.proxyConfig
         );
-        const newExpirationTs = proxyConfigAcc.seasons.reverse().find(
+        const newExpirationTs = [...(proxyConfigAcc.seasons || [])].reverse().find(
           (season) => new BN(now!).gte(season.start)
         )?.end;
         if (!newExpirationTs) {

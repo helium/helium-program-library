@@ -34,7 +34,6 @@ pub struct StartDelegationClaimBotV1<'info> {
     mut,
     has_one = task_queue,
     has_one = delegated_position,
-    has_one = next_task,
     has_one = rent_refund,
   )]
   pub delegation_claim_bot: Box<Account<'info, DelegationClaimBotV0>>,
@@ -56,7 +55,7 @@ pub struct StartDelegationClaimBotV1<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   pub hnt_mint: Box<Account<'info, Mint>>,
   /// CHECK: The authority of the position
-  pub position_authority: Signer<'info>,
+  pub position_authority: AccountInfo<'info>,
   pub mint: Box<Account<'info, Mint>>,
   #[account(
     token::mint = mint,
@@ -72,7 +71,10 @@ pub struct StartDelegationClaimBotV1<'info> {
   pub system_program: Program<'info, System>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   /// CHECK: By has_one
-  #[account(mut)]
+  #[account(
+    mut,
+    constraint = next_task.key() == delegation_claim_bot.next_task || (delegation_claim_bot.next_task == Pubkey::default() && next_task.key() == task.key()),
+  )]
   pub next_task: AccountInfo<'info>,
   /// CHECK: By has_one
   #[account(mut)]
@@ -83,7 +85,9 @@ pub fn handler(
   ctx: Context<StartDelegationClaimBotV1>,
   args: StartDelegationClaimBotArgsV0,
 ) -> Result<()> {
-  if !ctx.accounts.next_task.data_is_empty() {
+  if !ctx.accounts.next_task.data_is_empty()
+    && ctx.accounts.next_task.key() != ctx.accounts.task.key()
+  {
     let next_task = ctx.accounts.next_task.to_account_info();
     let task = try_from!(Account<TaskV0>, next_task)?;
     let rent_refund_acc = if task.rent_refund == ctx.accounts.task_queue.key() {
