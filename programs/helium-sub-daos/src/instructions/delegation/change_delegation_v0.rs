@@ -17,8 +17,6 @@ use super::{
 };
 use crate::{current_epoch, error::ErrorCode, get_sub_dao_epoch_info_seed, state::*};
 
-const HNT_EPOCH: u64 = 20117;
-
 #[derive(Accounts)]
 pub struct ChangeDelegationV0<'info> {
   #[account(mut)]
@@ -122,7 +120,6 @@ pub struct ChangeDelegationV0<'info> {
     mut,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
     bump = delegated_position.bump_seed,
-    constraint = delegated_position.last_claimed_epoch >= HNT_EPOCH @ ErrorCode::ClaimBeforeChangeDelegation
   )]
   pub delegated_position: Box<Account<'info, DelegatedPositionV0>>,
 

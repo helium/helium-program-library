@@ -20,6 +20,4 @@ pub enum ErrorCode {
   InvalidIndex,
   #[msg("Invalid token account owner")]
   InvalidOwner,
-  #[msg("Pre task not run")]
-  PreTaskNotRun,
 }

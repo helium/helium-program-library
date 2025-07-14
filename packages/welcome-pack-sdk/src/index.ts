@@ -1,29 +1,31 @@
-import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor"
-import { WelcomePack } from "@helium/idls/lib/types/welcome_pack"
-import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils"
+import { AnchorProvider, BN, Idl, IdlAccounts, IdlTypes, Program } from "@coral-xyz/anchor"
 import { Keypair, PublicKey } from "@solana/web3.js"
-import { sign } from "tweetnacl"
 import { PROGRAM_ID } from "./constants"
 import { welcomePackResolvers } from "./resolvers"
+import { WelcomePack } from "@helium/idls/lib/types/welcome_pack"
+import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils"
+import { sha256 } from "js-sha256"
+import { sign } from "tweetnacl"
 
 export type ClaimApprovalV0 = {
-  uniqueId: Number,
+  welcomePack: PublicKey,
   expirationTimestamp: BN,
 }
 
+export { initializeWelcomePack } from "./functions/initializeWelcomePack"
 export { claimWelcomePack } from "./functions/claimWelcomePack"
 export { closeWelcomePack } from "./functions/closeWelcomePack"
-export { initializeWelcomePack } from "./functions/initializeWelcomePack"
 
 export function claimApprovalSignature(
   claimApproval: ClaimApprovalV0,
   approver: Keypair,
 ) {
-  const buf = Buffer.from(
-    `Approve invite ${claimApproval.uniqueId.toString()} expiring ${claimApproval.expirationTimestamp.toString()}`
-  )
+  const expirationTimestampBuffer = Buffer.alloc(8)
+  expirationTimestampBuffer.writeBigInt64LE(BigInt(claimApproval.expirationTimestamp.toString()))
+  const fullBuffer = Buffer.concat([claimApproval.welcomePack.toBuffer(), expirationTimestampBuffer])
+  const msgHash = sha256(fullBuffer)
   return Buffer.from(
-    sign.detached(Uint8Array.from(buf), approver.secretKey)
+    sign.detached(Uint8Array.from(Buffer.from(msgHash, "hex")), approver.secretKey)
   )
 }
 
@@ -49,4 +51,4 @@ export async function init(
 
 export * from "./constants"
 export * from "./pdas"
-export * from "./resolvers"
+export * from "./resolvers" 

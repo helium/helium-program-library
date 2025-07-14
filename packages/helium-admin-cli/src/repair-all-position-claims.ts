@@ -62,31 +62,24 @@ export async function run(args: any = process.argv) {
     (bot) => bot.account.nextTask.toBase58() === PublicKey.default.toBase58()
   );
   const delegatedPositions = await hsdProgram.account.delegatedPositionV0.fetchMultiple(bots.map((bot) => bot.account.delegatedPosition));
-  const positions = await hsdProgram.account.positionV0.fetchMultiple(delegatedPositions.map((dp) => dp?.position || PublicKey.default));
   const nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, bots.length);
   const botsWithDelegatedPositions = bots.map((bot, index) => ({
     ...bot,
-    delegatedPosition: delegatedPositions[index],
-    position: positions[index]
+    delegatedPosition: delegatedPositions[index]
   }));
   console.log("Updating", bots.length, "bots");
-  for (const chunk of chunks(botsWithDelegatedPositions, 2)) {
+  for (const chunk of chunks(botsWithDelegatedPositions, 3)) {
     const instructions = (await Promise.all(
       chunk.map(async (bot) => {
         if (bot.delegatedPosition) {
           const taskId = nextAvailable.pop()!;
-          if (!bot.position) {
-            return null
-          }
-          const ataAddr = (await provider.connection.getTokenLargestAccounts(bot.position.mint)).value[0].address;
+          const ataAddr = (await provider.connection.getTokenLargestAccounts(bot.account.delegatedPosition)).value[0].address;
           const ata = await getAccount(provider.connection, ataAddr);
-          const task = taskKey(taskQueue, taskId)[0];
           return await program.methods
             .startDelegationClaimBotV1({ taskId })
             .accountsPartial({
-              delegationClaimBot: bot.publicKey,
-              task,
-              mint: bot.position.mint,
+              delegationClaimBot: bot.publicKey, task: taskKey(taskQueue, taskId)[0],
+              mint: bot.account.delegatedPosition,
               subDao: bot.delegatedPosition!.subDao,
               positionTokenAccount: ataAddr,
               taskQueue,
@@ -97,8 +90,6 @@ export async function run(args: any = process.argv) {
                 HNT_MINT,
                 ata.owner
               ),
-              nextTask: task,
-              rentRefund: bot.account.rentRefund,
             })
             .instruction();
         }

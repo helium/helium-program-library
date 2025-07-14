@@ -58,6 +58,7 @@ export async function run(args: any = process.argv) {
     },
     delegatorRewardsPercent: {
       type: "number",
+      required: true,
       describe:
         "Percentage of rewards allocated to delegators. Must be between 0-100 and can have 8 decimal places.",
     },

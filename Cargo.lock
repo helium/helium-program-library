@@ -968,7 +968,6 @@ dependencies = [
  "helium-sub-daos",
  "modular-governance",
  "no-emit",
- "shared-utils",
  "spl-associated-token-account",
  "spl-token",
  "tuktuk-program",

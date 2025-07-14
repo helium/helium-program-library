@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use tuktuk_program::TransactionSourceV0;
 
 // ["global_state"]
 #[account]
@@ -29,8 +28,6 @@ pub struct MiniFanoutV0 {
   pub queue_authority_bump: u8,
   pub shares: Vec<MiniFanoutShareV0>,
   pub seed: Vec<u8>,
-  pub next_pre_task: Pubkey,
-  pub pre_task: Option<TransactionSourceV0>,
 }
 
 #[account]
