@@ -210,29 +210,8 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
     task_costs,
   )?;
 
-  // First task is the reschedule, second is the claim
-  ctx.accounts.delegation_claim_bot.next_task = ctx.remaining_accounts[0].key();
-
-  let mut tasks = vec![TaskReturnV0 {
-    trigger: before_epoch_trigger,
-    transaction: TransactionSourceV0::CompiledV0(compiled_reschedule_tx.clone()),
-    crank_reward: None,
-    free_tasks: 2,
-    description: format!("queue delegation epoch {}", curr_epoch + 1),
-  }];
-
-  if !ctx.accounts.delegated_position.is_claimed(curr_epoch)? {
-    tasks.push(
-      // At the end of each epoch, schedule the next epoch end and reschedule the cron
-      TaskReturnV0 {
-        trigger: after_epoch_trigger,
-        transaction: TransactionSourceV0::CompiledV0(compiled_tx.clone()),
-        crank_reward: None,
-        free_tasks: 0,
-        description: format!("delegation epoch {}", curr_epoch),
-      },
-    );
-  }
+  // First task is the actual claim, second is the reschedule
+  ctx.accounts.delegation_claim_bot.next_task = ctx.remaining_accounts[1].key();
 
   let return_accounts = write_return_tasks(WriteReturnTasksArgs {
     program_id: crate::ID,
@@ -245,7 +224,24 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
       ],
     }],
     system_program: ctx.accounts.system_program.to_account_info(),
-    tasks: tasks.into_iter(),
+    tasks: vec![
+      // At the end of each epoch, schedule the next epoch end and reschedule the cron
+      TaskReturnV0 {
+        trigger: after_epoch_trigger,
+        transaction: TransactionSourceV0::CompiledV0(compiled_tx.clone()),
+        crank_reward: None,
+        free_tasks: 0,
+        description: format!("delegation epoch {}", curr_epoch),
+      },
+      TaskReturnV0 {
+        trigger: before_epoch_trigger,
+        transaction: TransactionSourceV0::CompiledV0(compiled_reschedule_tx.clone()),
+        crank_reward: None,
+        free_tasks: 2,
+        description: format!("queue delegation epoch {}", curr_epoch + 1),
+      },
+    ]
+    .into_iter(),
   })?
   .used_accounts;
 

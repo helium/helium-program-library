@@ -272,7 +272,7 @@ describe("welcome-pack", () => {
     it("claims a welcome pack", async () => {
       const claimer = Keypair.generate();
       const claimApproval = {
-        uniqueId: 0,
+        welcomePack,
         expirationTimestamp: new BN(Math.floor(Date.now() / 1000) + 60),
       }
       const claimSignature = claimApprovalSignature(claimApproval, hotspotOwner)

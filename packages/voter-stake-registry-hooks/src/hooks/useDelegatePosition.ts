@@ -5,7 +5,6 @@ import {
   useTaskQueue,
 } from "@helium/automation-hooks";
 import {
-  currentEpoch,
   delegatedPositionKey,
   getLockupEffectiveEndTs,
   init,
@@ -13,7 +12,7 @@ import {
   subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { delegationClaimBotKey, init as initHplCrons } from "@helium/hpl-crons-sdk";
-import { batchParallelInstructionsWithPriorityFee, fetchBackwardsCompatibleIdl, HNT_MINT, sleep } from "@helium/spl-utils";
+import { batchParallelInstructionsWithPriorityFee, fetchBackwardsCompatibleIdl, HNT_MINT } from "@helium/spl-utils";
 import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
@@ -30,8 +29,6 @@ import { useDelegatedPositions } from "./useDelegatedPositions";
 import { PREPAID_TX_FEES, usePositionsFees } from "./usePositionFees";
 import { useProxyConfig } from "./useProxyConfig";
 import { useRegistrar } from "./useRegistrar";
-
-const HNT_EPOCH = 20117;
 
 export const useDelegatePosition = ({
   automationEnabled = false,
@@ -63,7 +60,7 @@ export const useDelegatePositions = ({
   positions: PositionWithMeta[];
   subDao?: SubDaoWithMeta;
 }) => {
-  const { provider, refetch } = useHeliumVsrState();
+  const { provider } = useHeliumVsrState();
   const delegatedPosKeys = useMemo(
     () => positions.map((position) => delegatedPositionKey(position.pubkey)[0]),
     [positions]
@@ -112,9 +109,6 @@ export const useDelegatePositions = ({
         const instructions: TransactionInstruction[][] = [];
 
         if (subDao) {
-          if (!proxyConfig) {
-            throw new Error("No proxy config found");
-          }
           for (const [index, position] of positions.entries()) {
             const innerInstructions: TransactionInstruction[] = [];
             const delegatedPosKey = delegatedPositionKey(position.pubkey)[0];
@@ -126,7 +120,7 @@ export const useDelegatePositions = ({
             ) {
               const now = new BN(Date.now() / 1000);
               const newExpirationTs = Math.min(
-                [...proxyConfig.seasons].reverse().find(
+                proxyConfig?.seasons.reverse().find(
                   (season) => now.gte(season.start)
                 )?.end.toNumber() ?? 0,
                 getLockupEffectiveEndTs(position.lockup).toNumber()
@@ -137,11 +131,11 @@ export const useDelegatePositions = ({
               const oldExpirationTs = delegatedPositionAcc!.info!.expirationTs;
               const oldSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                now
+                oldExpirationTs
               )[0];
               const newSubDaoEpochInfo = subDaoEpochInfoKey(
-                subDao.pubkey,
-                now
+                delegatedPositionAcc!.info!.subDao,
+                newExpirationTs
               )[0];
               const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
@@ -149,17 +143,10 @@ export const useDelegatePositions = ({
                   oldExpirationTs : position.genesisEnd
               )[0];
               const newGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
-                subDao.pubkey,
+                delegatedPositionAcc!.info!.subDao,
                 position.genesisEnd.lt(now) ?
                   newExpirationTs : position.genesisEnd
               )[0];
-              const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
-                subDao.pubkey,
-                newExpirationTs
-              )[0];
-              if (delegatedPositionAcc.info && delegatedPositionAcc.info.lastClaimedEpoch.toNumber() < HNT_EPOCH) {
-                throw new Error("Must claim IOT/MOBILE rewards before changing delegation")
-              }
               innerInstructions.push(
                 await hsdProgram.methods
                   .changeDelegationV0()
@@ -170,7 +157,6 @@ export const useDelegatePositions = ({
                     oldSubDaoEpochInfo,
                     oldGenesisEndSubDaoEpochInfo,
                     subDaoEpochInfo: newSubDaoEpochInfo,
-                    closingTimeSubDaoEpochInfo,
                     genesisEndSubDaoEpochInfo: newGenesisEndSubDaoEpochInfo,
                   })
                   .instruction()
@@ -188,7 +174,7 @@ export const useDelegatePositions = ({
             } else if (position.isDelegated && position.isDelegationRenewable) {
               const now = new BN(Date.now() / 1000);
               const newExpirationTs = Math.min(
-                [...proxyConfig.seasons].reverse().find(
+                proxyConfig?.seasons.reverse().find(
                   (season) => now.gte(season.start)
                 )?.end.toNumber() ?? 0,
                 getLockupEffectiveEndTs(position.lockup).toNumber()
@@ -251,23 +237,6 @@ export const useDelegatePositions = ({
                   lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
                 })
               );
-            } else if (automationEnabled && delegationClaimBot && delegationClaimBot.info) {
-              innerInstructions.push(
-                await hplCronsProgram.methods
-                  .closeDelegationClaimBotV0()
-                  .accountsPartial({
-                    delegationClaimBot: delegationClaimBotK,
-                    taskQueue: TASK_QUEUE,
-                    position: position.pubkey,
-                    delegatedPosition: delegatedPosKey,
-                    positionTokenAccount: getAssociatedTokenAddressSync(
-                      position.mint,
-                      provider.wallet.publicKey,
-                      true
-                    ),
-                  })
-                  .instruction(),
-              );
             }
 
             if (
@@ -278,7 +247,6 @@ export const useDelegatePositions = ({
                 taskQueue!.taskBitmap,
                 1
               )[0];
-              const task = taskKey(TASK_QUEUE, nextAvailable)[0]
               innerInstructions.push(
                 await hplCronsProgram.methods
                   .startDelegationClaimBotV1({
@@ -302,9 +270,9 @@ export const useDelegatePositions = ({
                       HNT_MINT,
                       provider.wallet.publicKey
                     ),
-                    task,
-                    nextTask: !delegationClaimBot.info || delegationClaimBot.info.nextTask.equals(PublicKey.default) ? task : delegationClaimBot.info?.nextTask,
-                    rentRefund: delegationClaimBot.info?.rentRefund || provider.wallet.publicKey,
+                    task: taskKey(TASK_QUEUE, nextAvailable)[0],
+                    nextTask: delegationClaimBot.info?.nextTask,
+                    rentRefund: delegationClaimBot.info?.rentRefund,
                   })
                   .instruction()
               );
@@ -327,8 +295,6 @@ export const useDelegatePositions = ({
             }
           );
         }
-        await sleep(2000)
-        refetch();
       }
     }
   );
