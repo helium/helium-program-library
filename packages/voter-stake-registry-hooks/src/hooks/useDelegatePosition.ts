@@ -251,7 +251,7 @@ export const useDelegatePositions = ({
                   lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
                 })
               );
-            } else if (automationEnabled && delegationClaimBot && delegationClaimBot.info) {
+            } else if (!automationEnabled && delegationClaimBot && delegationClaimBot.info) {
               innerInstructions.push(
                 await hplCronsProgram.methods
                   .closeDelegationClaimBotV0()
