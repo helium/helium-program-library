@@ -241,7 +241,7 @@ export class PgDatabase implements Database {
       const lifetime = result.lifetime ?? "0";
       const claimed = result.claimed ?? "0";
       const pending = new BN(lifetime).sub(new BN(claimed)).toString();
-      return { lifetime: claimed, pending };
+      return { lifetime, pending };
     } catch (err: any) {
       if (err?.parent?.code === "42P01") {
         console.warn("Table missing for getCurrentRewardsByOwner, returning 0");
