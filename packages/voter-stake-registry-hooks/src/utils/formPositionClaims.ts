@@ -55,6 +55,10 @@ export const formPositionClaims = async ({
   const unixNow = Number(clock?.data.readBigInt64LE(8 * 4));
   const isInvalid = !unixNow || !positions.every((pos) => pos.hasRewards);
 
+  if (positions.length === 0) {
+    return [];
+  }
+
   if (isInvalid || !hsdProgram) {
     throw new Error("Unable to form position claims, Invalid params");
   } else {
@@ -79,6 +83,10 @@ export const formPositionClaims = async ({
         .map((p) => p.account?.subDao.toBase58())
         .filter(truthy),
     ]);
+
+    if (subDaoKeys.size === 0) {
+      return [];
+    }
 
     const subDaos = (
       await Promise.all(
