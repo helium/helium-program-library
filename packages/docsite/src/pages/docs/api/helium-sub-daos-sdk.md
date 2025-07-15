@@ -419,6 +419,37 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### temp_claim_buggy_rewards
+
+#### Accounts
+
+| Name                           | Mutability | Signer | Docs |
+| ------------------------------ | ---------- | ------ | ---- |
+| position                       | immut      | no     |      |
+| mint                           | immut      | no     |      |
+| authority                      | immut      | no     |      |
+| position_authority             | immut      | no     |      |
+| registrar                      | immut      | no     |      |
+| dao                            | immut      | no     |      |
+| sub_dao                        | immut      | no     |      |
+| delegated_position             | immut      | no     |      |
+| dnt_mint                       | immut      | no     |      |
+| sub_dao_epoch_info             | immut      | no     |      |
+| delegator_pool                 | immut      | no     |      |
+| delegator_ata                  | immut      | no     |      |
+| delegator_pool_circuit_breaker | immut      | no     |      |
+| vsr_program                    | immut      | no     |      |
+| system_program                 | immut      | no     |      |
+| circuit_breaker_program        | immut      | no     |      |
+| associated_token_program       | immut      | no     |      |
+| token_program                  | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### temp_update_sub_dao_epoch_info
 
 #### Accounts
