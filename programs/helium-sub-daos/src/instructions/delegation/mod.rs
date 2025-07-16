@@ -5,6 +5,7 @@ pub mod close_delegation_v0;
 pub mod delegate_v0;
 pub mod extend_expiration_ts_v0;
 pub mod reset_lockup_v0;
+pub mod temp_claim_buggy_rewards;
 pub mod track_vote_v0;
 pub mod transfer_v0;
 
@@ -18,6 +19,7 @@ pub use delegate_v0::*;
 pub use extend_expiration_ts_v0::*;
 use modular_governance::nft_proxy::accounts::ProxyConfigV0;
 pub use reset_lockup_v0::*;
+pub use temp_claim_buggy_rewards::*;
 pub use track_vote_v0::*;
 pub use transfer_v0::*;
 use voter_stake_registry::state::{PositionV0, Registrar};

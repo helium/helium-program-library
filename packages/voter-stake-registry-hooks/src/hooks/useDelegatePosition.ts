@@ -158,7 +158,7 @@ export const useDelegatePositions = ({
                 newExpirationTs
               )[0];
               if (delegatedPositionAcc.info && delegatedPositionAcc.info.lastClaimedEpoch.toNumber() < HNT_EPOCH) {
-                throw new Error("Must claim IOT/MOBILE rewards before changing delegation")
+                throw new Error("Must claim IOT/MOBILE delegation rewards before changing delegation")
               }
               innerInstructions.push(
                 await hsdProgram.methods
@@ -279,6 +279,9 @@ export const useDelegatePositions = ({
                 1
               )[0];
               const task = taskKey(TASK_QUEUE, nextAvailable)[0]
+              if (delegatedPositionAcc.info && delegatedPositionAcc.info.lastClaimedEpoch.toNumber() < HNT_EPOCH) {
+                throw new Error("Must claim IOT/MOBILE delegation rewards before automating rewards claims")
+              }
               innerInstructions.push(
                 await hplCronsProgram.methods
                   .startDelegationClaimBotV1({

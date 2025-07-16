@@ -18,7 +18,9 @@ use tuktuk_program::{
 };
 
 use super::TEN_MINUTES;
-use crate::{DelegationClaimBotV0, StartDelegationClaimBotArgsV0, EPOCH_LENGTH};
+use crate::{error::ErrorCode, DelegationClaimBotV0, StartDelegationClaimBotArgsV0, EPOCH_LENGTH};
+
+const HNT_EPOCH: u64 = 20117;
 
 #[derive(Accounts)]
 pub struct StartDelegationClaimBotV1<'info> {
@@ -48,6 +50,9 @@ pub struct StartDelegationClaimBotV1<'info> {
   /// CHECK: Being initialize via cpi
   #[account(mut)]
   pub task: AccountInfo<'info>,
+  #[account(
+    constraint = delegated_position.last_claimed_epoch >= HNT_EPOCH @ ErrorCode::UnclaimedIotMobileRewards
+  )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
   #[account(has_one = dao)]
   pub sub_dao: Box<Account<'info, SubDaoV0>>,

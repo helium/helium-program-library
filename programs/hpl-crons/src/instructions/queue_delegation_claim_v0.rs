@@ -71,11 +71,8 @@ pub struct QueueDelegationClaimV0<'info> {
     constraint = position_token_account.amount > 0
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
-  #[account(
-    associated_token::mint = hnt_mint,
-    associated_token::authority = position_authority,
-  )]
-  pub delegator_ata: Box<Account<'info, TokenAccount>>,
+  /// CHECK: Needed for claim, checked via CPI.
+  pub delegator_ata: UncheckedAccount<'info>,
   /// CHECK: We init this when writing
   #[account(
     mut,
@@ -87,6 +84,18 @@ pub struct QueueDelegationClaimV0<'info> {
 }
 
 pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> {
+  if ctx.accounts.delegator_ata.data_is_empty() {
+    msg!("User closed their token account, disabling automation");
+    ctx
+      .accounts
+      .delegation_claim_bot
+      .close(ctx.accounts.rent_refund.to_account_info())?;
+    return Ok(RunTaskReturnV0 {
+      tasks: vec![],
+      accounts: vec![],
+    });
+  }
+
   let curr_epoch = max(
     ctx.accounts.delegated_position.last_claimed_epoch + 1,
     ctx.accounts.delegation_claim_bot.last_claimed_epoch + 1,
