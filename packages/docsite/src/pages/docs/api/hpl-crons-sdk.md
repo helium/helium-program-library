@@ -63,6 +63,10 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | mint                   | immut      | no     |      |
 | position_token_account | immut      | no     |      |
 | system_program         | immut      | no     |      |
+| next_task              | immut      | no     |      |
+| task_queue_authority   | immut      | no     |      |
+| queue_authority        | immut      | no     |      |
+| tuktuk_program         | immut      | no     |      |
 
 #### Args
 
