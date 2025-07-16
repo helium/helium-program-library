@@ -55,6 +55,7 @@ pub struct CloseDelegationClaimBotV0<'info> {
     seeds::program = tuktuk_program.key(),
   )]
   pub task_queue_authority: Box<Account<'info, TaskQueueAuthorityV0>>,
+  /// CHECK: By seeds
   #[account(
     seeds = [b"queue_authority"],
     bump,
