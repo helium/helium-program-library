@@ -47,10 +47,7 @@ pub struct CloseDelegationClaimBotV0<'info> {
   pub position_token_account: Box<Account<'info, TokenAccount>>,
   pub system_program: Program<'info, System>,
   /// CHECK: By has_one
-  #[account(
-    mut,
-    constraint = next_task.key() == delegation_claim_bot.next_task || (delegation_claim_bot.next_task == Pubkey::default() && next_task.key() == task.key()),
-  )]
+  #[account(mut)]
   pub next_task: AccountInfo<'info>,
   #[account(
     seeds = [b"task_queue_authority", task_queue.key().as_ref(), queue_authority.key().as_ref()],
