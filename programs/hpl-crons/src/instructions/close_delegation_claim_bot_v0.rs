@@ -28,6 +28,7 @@ pub struct CloseDelegationClaimBotV0<'info> {
     close = rent_refund
   )]
   pub delegation_claim_bot: Box<Account<'info, DelegationClaimBotV0>>,
+  #[account(mut)]
   pub task_queue: Box<Account<'info, TaskQueueV0>>,
   #[account(
     has_one = position,
