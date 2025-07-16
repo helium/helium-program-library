@@ -16,6 +16,7 @@ import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
   TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
   createInitializeMintInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
@@ -197,6 +198,14 @@ export const useCreatePosition = ({
 
           if (automationEnabled) {
             const delegatedPosKey = delegatedPositionKey(position)[0];
+            delegateInstructions.push(
+              createAssociatedTokenAccountIdempotentInstruction(
+                provider.wallet.publicKey,
+                getAssociatedTokenAddressSync(HNT_MINT, provider.wallet.publicKey, true),
+                provider.wallet.publicKey,
+                HNT_MINT,
+              )
+            )
             delegateInstructions.push(
               await hplCronsProgram.methods
                 .initDelegationClaimBotV0()
