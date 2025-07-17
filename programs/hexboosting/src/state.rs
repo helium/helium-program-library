@@ -64,7 +64,8 @@ pub struct BoostedHexV1 {
 impl BoostedHexV1 {
   pub fn is_expired(&self, boost_config: &BoostConfigV0) -> bool {
     if self.start_ts == 0 {
-      false
+      // After august 1st, can close unstarted hexes.
+      Clock::get().unwrap().unix_timestamp >= 1754006400
     } else {
       let now = Clock::get().unwrap().unix_timestamp;
       let elapsed_time = now - self.start_ts;
