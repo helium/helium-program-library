@@ -71,6 +71,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
   let isConnecting = false;
   let currentAttemptCount = 0;
+  let staleAttemptCount = 0;
   let reconnectTimeoutId: NodeJS.Timeout | null = null;
   let shouldRestart = false;
   let restartCursor: string | undefined = undefined;
@@ -81,8 +82,17 @@ export const setupSubstream = async (server: FastifyInstance) => {
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
     () => {
       server.customMetrics.staleCursorCounter.inc();
+      staleAttemptCount++;
+
+      if (staleAttemptCount > MAX_RECONNECT_ATTEMPTS) {
+        console.error(
+          `Substream failed to recover from stale cursor after ${MAX_RECONNECT_ATTEMPTS} attempts.`
+        );
+        process.exit(1);
+      }
+
       if (!isConnecting && !reconnectTimeoutId) {
-        handleReconnect();
+        handleReconnect(staleAttemptCount);
       }
     }
   );
@@ -148,6 +158,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
         }
 
         if (message.case === "blockScopedData") {
+          staleAttemptCount = 0;
+
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
           const blockHeight =
@@ -157,6 +169,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
             output !== undefined &&
             !isEmptyMessage(output) &&
             (output as any).transactions.length > 0;
+
+          let hasFilteredTransactions = false;
 
           if (hasTransactions) {
             const outputTransactions = (output as any)
@@ -169,6 +183,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
             );
 
             if (filteredTransactions.length > 0) {
+              hasFilteredTransactions = true;
               const processor = await TransactionProcessor.create();
 
               try {
@@ -211,17 +226,18 @@ export const setupSubstream = async (server: FastifyInstance) => {
                 );
 
                 await processor.commit();
-                await cursorManager.updateCursor({
-                  cursor,
-                  blockHeight,
-                  force: true,
-                });
               } catch (err) {
                 await processor.rollback();
                 throw err;
               }
             }
           }
+
+          await cursorManager.updateCursor({
+            cursor,
+            blockHeight,
+            force: hasFilteredTransactions,
+          });
         }
       }
 
