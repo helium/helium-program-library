@@ -65,6 +65,7 @@ export const setupSubstream = async (
 
   let isConnecting = false;
   let currentAttemptCount = 0;
+  let staleAttemptCount = 0;
   let reconnectTimeoutId: NodeJS.Timeout | null = null;
 
   const cursorManager = CursorManager(
@@ -72,8 +73,17 @@ export const setupSubstream = async (
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
     () => {
       server.customMetrics.staleCursorCounter.inc();
+      staleAttemptCount++;
+
+      if (staleAttemptCount > MAX_RECONNECT_ATTEMPTS) {
+        console.error(
+          `Substream failed to recover from stale cursor after ${MAX_RECONNECT_ATTEMPTS} attempts.`
+        );
+        process.exit(1);
+      }
+
       if (!isConnecting && !reconnectTimeoutId) {
-        handleReconnect();
+        handleReconnect(staleAttemptCount);
       }
     }
   );
@@ -127,6 +137,8 @@ export const setupSubstream = async (
         }
 
         if (message.case === "blockScopedData") {
+          staleAttemptCount = 0;
+
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
           const blockHeight =
