@@ -1,6 +1,5 @@
 import { createGrpcTransport } from "@connectrpc/connect-node";
 import {
-  applyParams,
   authIssue,
   createAuthInterceptor,
   createRegistry,
@@ -11,7 +10,6 @@ import {
   unpackMapOutput,
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
-import { Transaction } from "sequelize";
 import {
   PRODUCTION,
   SUBSTREAM,
@@ -20,8 +18,8 @@ import {
   SUBSTREAM_URL,
 } from "../env";
 import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
-import { Cursor } from "../utils/database";
 import { CursorManager } from "../utils/cursor";
+import { Cursor } from "../utils/database";
 import { TransactionProcessor } from "../utils/processTransaction";
 import { provider } from "../utils/solana";
 
@@ -72,6 +70,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
   });
 
   let isConnecting = false;
+  let currentAttemptCount = 0;
+  let reconnectTimeoutId: NodeJS.Timeout | null = null;
   let shouldRestart = false;
   let restartCursor: string | undefined = undefined;
   let currentAbortController: AbortController | null = null;
@@ -81,11 +81,15 @@ export const setupSubstream = async (server: FastifyInstance) => {
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
     () => {
       server.customMetrics.staleCursorCounter.inc();
-      handleReconnect();
+      if (!isConnecting && !reconnectTimeoutId) {
+        handleReconnect();
+      }
     }
   );
 
   const connect = async (attemptCount = 1, overrideCursor?: string) => {
+    currentAttemptCount = attemptCount;
+
     if (currentAbortController) {
       currentAbortController.abort();
     }
@@ -122,7 +126,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
         }`
       );
 
-      attemptCount = 0;
+      currentAttemptCount = 0;
       isConnecting = false;
 
       for await (const response of streamBlocks(transport, request)) {
@@ -191,14 +195,17 @@ export const setupSubstream = async (server: FastifyInstance) => {
                     await processor.processTransaction({
                       accountKeys,
                       instructions: message.compiledInstructions,
-                      innerInstructions: transactionInfo.meta.innerInstructions?.map(inner => ({
-                        index: inner.index,
-                        instructions: inner.instructions.map(ix => ({
-                          programIdIndex: ix.programIdIndex,
-                          accountKeyIndexes: JSON.parse(ix.accounts),
-                          data: Buffer.from(ix.data, 'base64')
-                        }))
-                      }))
+                      innerInstructions:
+                        transactionInfo.meta.innerInstructions?.map(
+                          (inner) => ({
+                            index: inner.index,
+                            instructions: inner.instructions.map((ix) => ({
+                              programIdIndex: ix.programIdIndex,
+                              accountKeyIndexes: JSON.parse(ix.accounts),
+                              data: Buffer.from(ix.data, "base64"),
+                            })),
+                          })
+                        ),
                     });
                   })
                 );
@@ -226,16 +233,23 @@ export const setupSubstream = async (server: FastifyInstance) => {
       cursorManager.stopStalenessCheck();
       console.log("Substream connection error:", err);
       isConnecting = false;
-      handleReconnect(attemptCount + 1);
+      handleReconnect(currentAttemptCount + 1);
     }
   };
 
-  const handleReconnect = async (nextAttempt: number = 1) => {
+  const handleReconnect = async (
+    nextAttempt: number = currentAttemptCount + 1
+  ) => {
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+    }
+
     const baseDelay = 1000;
     const delay =
       nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
 
-    setTimeout(() => {
+    reconnectTimeoutId = setTimeout(() => {
+      reconnectTimeoutId = null;
       console.log(
         `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
       );
