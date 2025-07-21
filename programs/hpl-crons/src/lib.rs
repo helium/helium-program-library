@@ -161,4 +161,11 @@ pub mod hpl_crons {
   ) -> Result<()> {
     start_delegation_claim_bot_v1::handler(ctx, args)
   }
+
+  pub fn requeue_entity_claim_v1(
+    ctx: Context<RequeueEntityClaimV1>,
+    args: RequeueEntityClaimArgsV0,
+  ) -> Result<tuktuk_program::RunTaskReturnV0> {
+    requeue_entity_claim_v1::handler(ctx, args)
+  }
 }

@@ -45,6 +45,9 @@ if (PG_POOL_SIZE < 5) {
     await database.query(
       "CREATE INDEX IF NOT EXISTS idx_assest_owner_asset ON asset_owners(asset);"
     );
+    await database.query(
+      "CREATE INDEX IF NOT EXISTS idx_assest_owner_owner ON asset_owners(owner);"
+    );
 
     server.get("/refresh-owners", async (req, res) => {
       const { password } = req.query as any;
