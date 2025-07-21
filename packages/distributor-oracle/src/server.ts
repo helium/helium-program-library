@@ -994,9 +994,13 @@ export class OracleServer {
           })
         );
         for (const entity of entities) {
+          const walletTrace = `ld entity ${wallet}`.substring(0, 40).replace("ld entity", "");
           instructions.push(
+            // @ts-ignore (we can remove this after a package publish)
             await this.hplCronsProgram.methods
-              .requeueEntityClaimV0()
+              .requeueEntityClaimV1({
+                trace: walletTrace
+              })
               .accounts({
                 keyToAsset: entity.keyToAsset,
               })
