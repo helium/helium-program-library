@@ -133,45 +133,71 @@ export const upsertProgramAccounts = async ({
             account: anchor.web3.AccountInfo<Buffer>;
             pubkey: anchor.web3.PublicKey;
           }[] = [];
-          const batchPromises: Promise<void>[] = [];
+          const concurrentBatchLimit = 5;
+          let activeBatches: Promise<void>[] = [];
+
           await streamAccounts(result.data, async (account) => {
             batch.push(account);
             if (batch.length >= batchSize) {
               const currentBatch = batch;
               batch = [];
-              batchPromises.push(
-                limit(async () => {
-                  const t = await sequelize.transaction({
-                    isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-                  });
+              if (activeBatches.length >= concurrentBatchLimit) {
+                await Promise.race(activeBatches);
+              }
+
+              const batchPromise = limit(async () => {
+                const t = await sequelize.transaction({
+                  isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+                });
+                try {
                   await processChunk(currentBatch, t);
                   await t.commit();
                   processedCount += currentBatch.length;
                   console.log(
                     `Processing ${currentBatch.length} ${accountType} accounts`
                   );
-                })
-              );
+                } catch (err) {
+                  await t.rollback();
+                  throw err;
+                }
+
+                if (global.gc) {
+                  global.gc();
+                }
+              });
+
+              activeBatches.push(batchPromise);
+
+              batchPromise.finally(() => {
+                const index = activeBatches.indexOf(batchPromise);
+                if (index > -1) {
+                  activeBatches.splice(index, 1);
+                }
+              });
             }
           });
 
           if (batch.length > 0) {
-            batchPromises.push(
-              limit(async () => {
-                const t = await sequelize.transaction({
-                  isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-                });
+            const batchPromise = limit(async () => {
+              const t = await sequelize.transaction({
+                isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+              });
+              try {
                 await processChunk(batch, t);
                 await t.commit();
                 processedCount += batch.length;
                 console.log(
                   `Processing ${batch.length} ${accountType} accounts`
                 );
-              })
-            );
+              } catch (err) {
+                await t.rollback();
+                throw err;
+              }
+            });
+            activeBatches.push(batchPromise);
           }
 
-          await Promise.all(batchPromises);
+          await Promise.all(activeBatches);
         } catch (err: any) {
           console.error(`RPC call error for ${accountType}:`, err.message);
           throw err;
