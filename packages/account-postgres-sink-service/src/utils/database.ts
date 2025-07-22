@@ -18,8 +18,8 @@ export const database = new Sequelize({
   pool: {
     max: PG_POOL_SIZE,
     min: 5,
-    acquire: 60000,
-    idle: 10000,
+    acquire: 120000,
+    idle: 30000,
     validate: (client: any) => {
       try {
         client.query("SELECT 1");
@@ -28,6 +28,10 @@ export const database = new Sequelize({
         return false;
       }
     },
+  },
+  dialectOptions: {
+    statement_timeout: 300000,
+    idle_in_transaction_session_timeout: 300000,
   },
   hooks: {
     beforeConnect: async (config: any) => {
@@ -54,6 +58,8 @@ export const database = new Sequelize({
             require: false,
             rejectUnauthorized: false,
           },
+          statement_timeout: 300000,
+          idle_in_transaction_session_timeout: 300000,
         };
       }
       config.password = password;

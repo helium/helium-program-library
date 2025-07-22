@@ -226,6 +226,20 @@ export const upsertProgramAccounts = async ({
     try {
       const model = sequelize.models[type];
       const plugins = await initPlugins(rest.plugins);
+      const hasGeocodingPlugin = rest.plugins?.some(
+        (p) => p.type === "ExtractHexLocation"
+      );
+
+      const effectiveBatchSize = hasGeocodingPlugin
+        ? Math.min(batchSize, 25000)
+        : batchSize;
+
+      console.log(
+        `Using batch size ${effectiveBatchSize} for ${type} accounts${
+          hasGeocodingPlugin ? " (reduced due to geocoding)" : ""
+        }`
+      );
+
       const filter = program.coder.accounts.memcmp(
         lowerFirstChar(type),
         undefined
@@ -251,7 +265,7 @@ export const upsertProgramAccounts = async ({
         programId,
         type,
         coderFilters,
-        batchSize,
+        effectiveBatchSize,
         async (chunk, transaction) => {
           const accs = (
             await Promise.all(
@@ -299,7 +313,8 @@ export const upsertProgramAccounts = async ({
               for (const plugin of plugins) {
                 if (plugin?.processAccount) {
                   sanitizedAccount = await plugin.processAccount(
-                    sanitizedAccount
+                    sanitizedAccount,
+                    transaction
                   );
                 }
               }
