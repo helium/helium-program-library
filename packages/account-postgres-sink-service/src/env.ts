@@ -10,7 +10,7 @@ export const PRODUCTION = process.env.NODE_ENV === "production" || false;
 export const SOLANA_URL = process.env.SOLANA_URL || "http://127.0.0.1:8899";
 
 export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
-export const PG_POOL_SIZE = Number(process.env.PG_POOL_SIZE) || 20;
+export const PG_POOL_SIZE = Number(process.env.PG_POOL_SIZE) || 50;
 export const PROGRAM_ACCOUNT_CONFIGS =
   process.env.PROGRAM_ACCOUNT_CONFIGS ||
   `${__dirname}/../program_account_configs_example.json`;
