@@ -133,8 +133,7 @@ export const upsertProgramAccounts = async ({
             account: anchor.web3.AccountInfo<Buffer>;
             pubkey: anchor.web3.PublicKey;
           }[] = [];
-          // Reduce concurrent batch limit from 5 to 2 to prevent connection exhaustion
-          const concurrentBatchLimit = 2;
+          const concurrentBatchLimit = 5;
           let activeBatches: Promise<void>[] = [];
 
           await streamAccounts(result.data, async (account) => {
