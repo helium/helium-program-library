@@ -164,8 +164,7 @@ pub mod hpl_crons {
 
   pub fn requeue_entity_claim_v1(
     ctx: Context<RequeueEntityClaimV1>,
-    args: RequeueEntityClaimArgsV0,
   ) -> Result<tuktuk_program::RunTaskReturnV0> {
-    requeue_entity_claim_v1::handler(ctx, args)
+    requeue_entity_claim_v1::handler(ctx)
   }
 }
