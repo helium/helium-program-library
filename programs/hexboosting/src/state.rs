@@ -61,10 +61,13 @@ pub struct BoostedHexV1 {
   pub boosts_by_period: Vec<u8>,
 }
 
+const JULY_FIRST_2025: i64 = 1751328000;
+
 impl BoostedHexV1 {
   pub fn is_expired(&self, boost_config: &BoostConfigV0) -> bool {
     if self.start_ts == 0 {
-      false
+      // After july 1st, can close unstarted hexes.
+      Clock::get().unwrap().unix_timestamp >= JULY_FIRST_2025
     } else {
       let now = Clock::get().unwrap().unix_timestamp;
       let elapsed_time = now - self.start_ts;
@@ -74,7 +77,7 @@ impl BoostedHexV1 {
 
       // This is true so long as there are never any 0's appended to the end
       // of boosts_by_period
-      self.boosts_by_period.len() as i64 <= elapsed_periods
+      self.start_ts >= JULY_FIRST_2025 || self.boosts_by_period.len() as i64 <= elapsed_periods
     }
   }
 }
