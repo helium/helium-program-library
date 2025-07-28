@@ -1,5 +1,6 @@
 import { createGrpcTransport } from "@connectrpc/connect-node";
 import {
+  applyParams,
   authIssue,
   createAuthInterceptor,
   createRegistry,
@@ -10,6 +11,7 @@ import {
   unpackMapOutput,
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
+import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import {
   PRODUCTION,
   SUBSTREAM,
@@ -19,7 +21,7 @@ import {
 } from "../env";
 import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
 import { CursorManager } from "../utils/cursor";
-import { Cursor } from "../utils/database";
+import database, { Cursor } from "../utils/database";
 import { TransactionProcessor } from "../utils/processTransaction";
 import { provider } from "../utils/solana";
 
@@ -105,6 +107,21 @@ export const setupSubstream = async (server: FastifyInstance) => {
     }
 
     currentAbortController = new AbortController();
+    const processor = await TransactionProcessor.create();
+
+    console.log("Trees", processor.getTrees());
+
+    applyParams(
+      [
+        `${MODULE}=${[...processor.getTrees()]
+          .map(
+            (merkleTree) =>
+              `program:${BUBBLEGUM_PROGRAM_ID} && account:${merkleTree}`
+          )
+          .join(" || ")}`,
+      ],
+      substream.modules!.modules
+    );
 
     if (attemptCount >= MAX_RECONNECT_ATTEMPTS) {
       console.error(
@@ -184,7 +201,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
             if (filteredTransactions.length > 0) {
               hasFilteredTransactions = true;
-              const processor = await TransactionProcessor.create();
+
+              const dbTx = await database.transaction();
 
               try {
                 await Promise.all(
@@ -207,7 +225,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
                       ...(accountKeysFromLookups?.readonly || []),
                     ];
 
-                    await processor.processTransaction({
+                    const { updatedTrees } = await processor.processTransaction({
                       accountKeys,
                       instructions: message.compiledInstructions,
                       innerInstructions:
@@ -216,18 +234,29 @@ export const setupSubstream = async (server: FastifyInstance) => {
                             index: inner.index,
                             instructions: inner.instructions.map((ix) => ({
                               programIdIndex: ix.programIdIndex,
-                              accountKeyIndexes: JSON.parse(ix.accounts),
+                              accountKeyIndexes: Buffer.from(ix.accounts, "base64").toJSON().data,
                               data: Buffer.from(ix.data, "base64"),
                             })),
                           })
                         ),
-                    });
+                    }, dbTx);
+
+                    if (updatedTrees) {
+                      console.log("Trees updated");
+                      shouldRestart = true;
+                      restartCursor = cursor;
+                      await cursorManager.updateCursor({
+                        cursor,
+                        blockHeight,
+                        force: true,
+                      });
+                    }
                   })
                 );
 
-                await processor.commit();
+                await dbTx.commit();
               } catch (err) {
-                await processor.rollback();
+                await dbTx.rollback();
                 throw err;
               }
             }

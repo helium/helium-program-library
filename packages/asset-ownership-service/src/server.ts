@@ -96,6 +96,7 @@ if (PG_POOL_SIZE < 5) {
         }
 
         const processor = await TransactionProcessor.create();
+        const dbTx = await database.transaction();
         
         try {
           const { message } = tx.transaction;
@@ -116,12 +117,12 @@ if (PG_POOL_SIZE < 5) {
                 data: bs58.decode(ix.data)
               }))
             }))
-          });
+          }, dbTx);
 
-          await processor.commit();
+          await dbTx.commit();
           res.code(StatusCodes.OK).send({ message: "Transaction processed successfully" });
         } catch (err) {
-          await processor.rollback();
+          await dbTx.rollback();
           console.error("Error processing transaction:", err);
           res.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
             message: "Error processing transaction",
