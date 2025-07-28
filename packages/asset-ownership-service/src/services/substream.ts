@@ -1,5 +1,7 @@
 import { createGrpcTransport } from "@connectrpc/connect-node";
+import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import {
+  applyParams,
   authIssue,
   createAuthInterceptor,
   createRegistry,
@@ -10,7 +12,11 @@ import {
   unpackMapOutput,
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
+import { QueryTypes } from "sequelize";
 import {
+  PG_CARRIER_TABLE,
+  PG_DATA_ONLY_TABLE,
+  PG_MAKER_TABLE,
   PRODUCTION,
   SUBSTREAM,
   SUBSTREAM_API_KEY,
@@ -19,7 +25,7 @@ import {
 } from "../env";
 import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
 import { CursorManager } from "../utils/cursor";
-import { Cursor } from "../utils/database";
+import database, { Cursor } from "../utils/database";
 import { TransactionProcessor } from "../utils/processTransaction";
 import { provider } from "../utils/solana";
 
@@ -69,6 +75,20 @@ export const setupSubstream = async (server: FastifyInstance) => {
     jsonOptions: { typeRegistry: registry },
   });
 
+  const getMerkleTreeSet = async (tableName: string) => {
+    return new Set(
+      (
+        (await database.query(`SELECT merkle_tree FROM ${tableName};`, {
+          type: QueryTypes.SELECT,
+        })) as { merkle_tree: string }[]
+      ).map((row) => row.merkle_tree)
+    );
+  };
+
+  const makerTrees = await getMerkleTreeSet(PG_MAKER_TABLE!);
+  const dataOnlyTrees = await getMerkleTreeSet(PG_DATA_ONLY_TABLE!);
+  const carrierTrees = await getMerkleTreeSet(PG_CARRIER_TABLE!);
+
   let isConnecting = false;
   let currentAttemptCount = 0;
   let staleAttemptCount = 0;
@@ -105,6 +125,18 @@ export const setupSubstream = async (server: FastifyInstance) => {
     }
 
     currentAbortController = new AbortController();
+
+    applyParams(
+      [
+        `${MODULE}=${[...makerTrees, ...dataOnlyTrees, ...carrierTrees]
+          .map(
+            (merkleTree) =>
+              `program:${BUBBLEGUM_PROGRAM_ID} && account:${merkleTree}`
+          )
+          .join(" || ")}`,
+      ],
+      substream.modules!.modules
+    );
 
     if (attemptCount >= MAX_RECONNECT_ATTEMPTS) {
       console.error(
@@ -184,7 +216,11 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
             if (filteredTransactions.length > 0) {
               hasFilteredTransactions = true;
-              const processor = await TransactionProcessor.create();
+              const processor = await TransactionProcessor.create(
+                makerTrees,
+                carrierTrees,
+                dataOnlyTrees
+              );
 
               try {
                 await Promise.all(

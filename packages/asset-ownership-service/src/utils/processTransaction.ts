@@ -1,6 +1,13 @@
-import { PublicKey, Transaction as SolanaTransaction, VersionedTransaction } from "@solana/web3.js";
+import {
+  PublicKey,
+  Transaction as SolanaTransaction,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
-import { PROGRAM_ID as HEM_PROGRAM_ID, init as initHem } from "@helium/helium-entity-manager-sdk";
+import {
+  PROGRAM_ID as HEM_PROGRAM_ID,
+  init as initHem,
+} from "@helium/helium-entity-manager-sdk";
 import { PROGRAM_ID as MEM_PROGRAM_ID } from "@helium/mobile-entity-manager-sdk";
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
@@ -56,7 +63,11 @@ export class TransactionProcessor {
     this.transaction = transaction;
   }
 
-  static async create(): Promise<TransactionProcessor> {
+  static async create(
+    makerTrees: Set<string>,
+    carrierTrees: Set<string>,
+    dataOnlyTrees: Set<string>
+  ): Promise<TransactionProcessor> {
     const hemProgram = await initHem(provider);
     const coders = {
       [HEM_PROGRAM_ID.toBase58()]: new anchor.BorshInstructionCoder(
@@ -69,20 +80,6 @@ export class TransactionProcessor {
         BubblegumIdl
       ),
     };
-
-    const getMerkleTreeSet = async (tableName: string) => {
-      return new Set(
-        (
-          (await database.query(`SELECT merkle_tree FROM ${tableName};`, {
-            type: QueryTypes.SELECT,
-          })) as { merkle_tree: string }[]
-        ).map((row) => row.merkle_tree)
-      );
-    };
-
-    const makerTrees = await getMerkleTreeSet(PG_MAKER_TABLE!);
-    const dataOnlyTrees = await getMerkleTreeSet(PG_DATA_ONLY_TABLE!);
-    const carrierTrees = await getMerkleTreeSet(PG_CARRIER_TABLE!);
 
     const treeConfigs: TreeConfigs = {
       update_maker_tree_v0: {
@@ -110,7 +107,10 @@ export class TransactionProcessor {
     );
   }
 
-  private async processInstruction(instruction: ProcessableInstruction, tx: ProcessableTransaction) {
+  private async processInstruction(
+    instruction: ProcessableInstruction,
+    tx: ProcessableTransaction
+  ) {
     const programId = new PublicKey(tx.accountKeys[instruction.programIdIndex]);
     const instructionCoder = this.coders[programId.toBase58()];
 
@@ -134,17 +134,11 @@ export class TransactionProcessor {
     if (!formattedInstruction) return;
 
     const accountMap = Object.fromEntries(
-      (formattedInstruction.accounts || []).map((acc) => [
-        acc.name,
-        acc,
-      ])
+      (formattedInstruction.accounts || []).map((acc) => [acc.name, acc])
     );
 
     const argMap = Object.fromEntries(
-      (formattedInstruction.args || []).map((arg) => [
-        arg.name,
-        arg,
-      ])
+      (formattedInstruction.args || []).map((arg) => [arg.name, arg])
     );
 
     switch (decodedInstruction.name) {
@@ -262,4 +256,4 @@ export class TransactionProcessor {
   async rollback() {
     await this.transaction.rollback();
   }
-} 
+}
