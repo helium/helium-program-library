@@ -283,9 +283,17 @@ pub const MOBILE_HOTSPOT_INFO_SIZE: usize = 8 +
     1 + // is full hotspot
     2 + // num location asserts
     1 + // is active
-    8 + // dc onboarding fee paid
+    8 + // dc onboarding feepaid
+    1 + // device type
+    1 + // deployment info Option discriminant
+    1 + // deployment info
+    // WifiInfoV0 variant (larger than CbrsInfoV0):
+    4 + // antenna
     4 + // elevation
     2 + // azimuth
+    2 + // mechanical down tilt
+    2 + // electrical down tilt
+    1 + 4 + 64 + // serial: Option<String> (Option discriminant + length + content)
     60; // pad
 
 #[macro_export]
