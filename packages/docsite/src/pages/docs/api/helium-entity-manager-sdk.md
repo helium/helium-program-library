@@ -993,10 +993,10 @@ undefined
 
 ### MobileDeploymentInfoV0
 
-| Variant    | Fields                                                                                           |
-| ---------- | ------------------------------------------------------------------------------------------------ |
-| WifiInfoV0 | antenna: u32, elevation: i32, azimuth: u16, mechanical_down_tilt: u16, electrical_down_tilt: u16 |
-| CbrsInfoV0 | radio_infos: [object Object]                                                                     |
+| Variant    | Fields                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| WifiInfoV0 | antenna: u32, elevation: i32, azimuth: u16, mechanical_down_tilt: u16, electrical_down_tilt: u16, serial: [object Object] |
+| CbrsInfoV0 | radio_infos: [object Object]                                                                                              |
 
 ### MobileDeviceTypeV0
 
