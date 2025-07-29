@@ -7,7 +7,7 @@ use anchor_lang::{
 use bubblegum_cpi::{bubblegum::program::Bubblegum, get_asset_id};
 use lazy_distributor::{LazyDistributorV0, RecipientV0};
 use mini_fanout::{InitializeMiniFanoutArgsV0, MiniFanoutShareArgV0, MiniFanoutV0};
-use shared_utils::{ORACLE_SIGNER, ORACLE_URL};
+use shared_utils::{resize_to_fit, ORACLE_SIGNER, ORACLE_URL};
 use tuktuk_program::TransactionSourceV0;
 
 use crate::{error::ErrorCode, UserWelcomePacksV0, WelcomePackV0};
@@ -177,5 +177,12 @@ pub fn handler<'info>(
       needed_transfer_amount,
     )?;
   }
+
+  resize_to_fit(
+    &ctx.accounts.payer.to_account_info(),
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.welcome_pack,
+  )?;
+
   Ok(())
 }
