@@ -62,10 +62,13 @@ export async function run(args: any = process.argv) {
     // HNT lazy distributor
     // "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq",
     // HNT Circuit Breaker
-    "73zsmmqCXjvHHhNSib26Y8p3jYiH3UUuyKv71RJDnctW",
+    // "73zsmmqCXjvHHhNSib26Y8p3jYiH3UUuyKv71RJDnctW",
     // HNT Rewards pool
-    "BDs6RPnpJNzmuMNv1z8cDh9cxKFgCxEVDaCfoHZWyvqJ",
-
+    // "BDs6RPnpJNzmuMNv1z8cDh9cxKFgCxEVDaCfoHZWyvqJ",
+    // TaskQueueAuthorityV0 for welcome-pack
+    "9hLWFGiit1ZpFHmopyacWqiVx8sQX9U86dnKqtDjkjnL",
+    // Queue authority for welcome-pack
+    "3HTSCuJGL8e5zPpf7rMhq42YgA7f3WdF5bm78YQ3HEBK"
   ].map((a) => {
     return new PublicKey(a);
   });

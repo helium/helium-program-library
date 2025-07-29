@@ -222,6 +222,13 @@ async function run() {
   );
   await monitorSolBalance(
     new PublicKey(
+      process.env.TUK_TUK_END_EPOCH_PAYER_KEY ||
+        "HUkLp9NGFuVPtWkjdkuTPGnCtg87JTw2BcZxmUJy5w6L"
+    ),
+    "tuktuk-end-epoch-payer"
+  );
+  await monitorSolBalance(
+    new PublicKey(
       process.env.ORACLE_KEY || "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
     ),
     "oracle"

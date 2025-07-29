@@ -63,6 +63,10 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | mint                   | immut      | no     |      |
 | position_token_account | immut      | no     |      |
 | system_program         | immut      | no     |      |
+| next_task              | immut      | no     |      |
+| task_queue_authority   | immut      | no     |      |
+| queue_authority        | immut      | no     |      |
+| tuktuk_program         | immut      | no     |      |
 
 #### Args
 
@@ -451,6 +455,37 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### start_delegation_claim_bot_v1
+
+#### Accounts
+
+| Name                   | Mutability | Signer | Docs |
+| ---------------------- | ---------- | ------ | ---- |
+| payer                  | immut      | no     |      |
+| queue_authority        | immut      | no     |      |
+| delegation_claim_bot   | immut      | no     |      |
+| task_queue             | immut      | no     |      |
+| task_queue_authority   | immut      | no     |      |
+| task                   | immut      | no     |      |
+| delegated_position     | immut      | no     |      |
+| sub_dao                | immut      | no     |      |
+| dao                    | immut      | no     |      |
+| hnt_mint               | immut      | no     |      |
+| position_authority     | immut      | no     |      |
+| mint                   | immut      | no     |      |
+| position_token_account | immut      | no     |      |
+| delegator_ata          | immut      | no     |      |
+| system_program         | immut      | no     |      |
+| tuktuk_program         | immut      | no     |      |
+| next_task              | immut      | no     |      |
+| rent_refund            | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### update_epoch_tracker
 
 #### Accounts
@@ -639,6 +674,7 @@ undefined
 | bump_seed          | u8     |
 | last_claimed_epoch | u64    |
 | queued             | bool   |
+| next_task          | pubkey |
 
 ### EmissionScheduleItem
 

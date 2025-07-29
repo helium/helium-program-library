@@ -15,6 +15,7 @@ export const PG_DATA_ONLY_TABLE = process.env.PG_DATA_ONLY_TABLE;
 export const PG_ASSET_TABLE = process.env.PG_ASSET_TABLE;
 export const PG_CARRIER_TABLE = process.env.PG_CARRIER_TABLE;
 export const USE_SUBSTREAM = getEnvBoolean("USE_SUBSTREAM");
+export const REFRESH_ON_BOOT = getEnvBoolean("REFRESH_ON_BOOT");
 export const SUBSTREAM_API_KEY = process.env.SUBSTREAM_API_KEY;
 export const SUBSTREAM_URL = process.env.SUBSTREAM_URL;
 export const SUBSTREAM = process.env.SUBSTREAM;

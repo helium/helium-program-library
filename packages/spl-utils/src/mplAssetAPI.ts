@@ -40,6 +40,7 @@ export type Asset = {
   grouping?: { group_key: string; group_value: PublicKey }[];
   uses?: Uses;
   creators: Creator[];
+  burnt: boolean;
 };
 
 export async function getAsset(

@@ -15,5 +15,5 @@ export const getLockupEffectiveEndTs = (lockup: {
 }): BN => {
   const isConstant = (Object.keys(lockup.kind)[0] as string) === "constant";
   // max i64 for constant lockups
-  return isConstant ? new BN("9223372036854775807") : lockup.endTs;
+  return isConstant ? new BN(Number.MAX_SAFE_INTEGER - 1) : lockup.endTs;
 };

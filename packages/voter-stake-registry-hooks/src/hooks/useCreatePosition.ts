@@ -16,6 +16,7 @@ import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
   MintLayout,
   TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
   createInitializeMintInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
@@ -51,7 +52,7 @@ export const useCreatePosition = ({
 
   const { rentFee, prepaidTxFees, insufficientBalance } = usePositionFees({
     automationEnabled,
-    isDelegated: false,
+    isDelegated: true,
     hasDelegationClaimBot: false,
     wallet: provider?.wallet?.publicKey
   });
@@ -163,7 +164,7 @@ export const useCreatePosition = ({
           const currTs = Number(unixTime) + registrarAcc.timeOffset.toNumber();
           const endTs = new BN(currTs + lockupPeriodsInDays * SECS_PER_DAY);
           const expirationTs =
-            proxyConfig.seasons
+            [...(proxyConfig.seasons || [])]
               .reverse()
               .find((season) => new BN(currTs).gte(season.start))?.end || endTs;
 
@@ -172,7 +173,7 @@ export const useCreatePosition = ({
             subDao.pubkey,
             min(
               getLockupEffectiveEndTs({
-                kind: lockupKind,
+                kind: { [lockupKind]: {} },
                 endTs,
               }),
               expirationTs
@@ -198,6 +199,14 @@ export const useCreatePosition = ({
           if (automationEnabled) {
             const delegatedPosKey = delegatedPositionKey(position)[0];
             delegateInstructions.push(
+              createAssociatedTokenAccountIdempotentInstruction(
+                provider.wallet.publicKey,
+                getAssociatedTokenAddressSync(HNT_MINT, provider.wallet.publicKey, true),
+                provider.wallet.publicKey,
+                HNT_MINT,
+              )
+            )
+            delegateInstructions.push(
               await hplCronsProgram.methods
                 .initDelegationClaimBotV0()
                 .accountsPartial({
@@ -220,9 +229,10 @@ export const useCreatePosition = ({
               })
             );
             const nextAvailable = await nextAvailableTaskIds(taskQueue!.taskBitmap, 1)[0];
+            const task = taskKey(TASK_QUEUE, nextAvailable)[0];
             delegateInstructions.push(
               await hplCronsProgram.methods
-                .startDelegationClaimBotV0({
+                .startDelegationClaimBotV1({
                   taskId: nextAvailable,
                 })
                 .accountsPartial({
@@ -239,7 +249,9 @@ export const useCreatePosition = ({
                     HNT_MINT,
                     provider.wallet.publicKey
                   ),
-                  task: taskKey(TASK_QUEUE, nextAvailable)[0],
+                  task,
+                  nextTask: task,
+                  rentRefund: provider.wallet.publicKey,
                 })
                 .instruction()
             );

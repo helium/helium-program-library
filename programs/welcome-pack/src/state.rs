@@ -15,6 +15,7 @@ pub struct WelcomePackV0 {
   pub rewards_schedule: String,
   pub asset_return_address: Pubkey,
   pub bump_seed: u8,
+  pub unique_id: u32,
 }
 
 #[macro_export]
@@ -35,4 +36,5 @@ pub struct UserWelcomePacksV0 {
   pub next_id: u32,
   pub owner: Pubkey,
   pub bump_seed: u8,
+  pub next_unique_id: u32,
 }

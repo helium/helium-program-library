@@ -49,6 +49,7 @@ pub fn handler(ctx: Context<InitDelegationClaimBotV0>) -> Result<()> {
       rent_refund: ctx.accounts.payer.key(),
       last_claimed_epoch: ctx.accounts.delegated_position.last_claimed_epoch,
       queued: false,
+      next_task: Pubkey::default(),
     });
   Ok(())
 }

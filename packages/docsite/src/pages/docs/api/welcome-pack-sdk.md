@@ -25,6 +25,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | task_queue               | immut      | no     |      |
 | task_queue_authority     | immut      | no     |      |
 | task                     | immut      | no     |      |
+| pre_task                 | immut      | no     |      |
 | tree_authority           | immut      | no     |      |
 | merkle_tree              | immut      | no     |      |
 | log_wrapper              | immut      | no     |      |
@@ -125,6 +126,7 @@ undefined
 | approval_expiration_timestamp | i64             |
 | claim_signature               | [object Object] |
 | task_id                       | u16             |
+| pre_task_id                   | u16             |
 
 ### CloseWelcomePackArgsV0
 
@@ -195,11 +197,12 @@ undefined
 
 ### UserWelcomePacksV0
 
-| Field     | Type   |
-| --------- | ------ |
-| next_id   | u32    |
-| owner     | pubkey |
-| bump_seed | u8     |
+| Field          | Type   |
+| -------------- | ------ |
+| next_id        | u32    |
+| owner          | pubkey |
+| bump_seed      | u8     |
+| next_unique_id | u32    |
 
 ### WelcomePackV0
 
@@ -216,3 +219,4 @@ undefined
 | rewards_schedule     | string          |
 | asset_return_address | pubkey          |
 | bump_seed            | u8              |
+| unique_id            | u32             |

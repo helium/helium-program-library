@@ -71,11 +71,8 @@ pub struct QueueDelegationClaimV0<'info> {
     constraint = position_token_account.amount > 0
   )]
   pub position_token_account: Box<Account<'info, TokenAccount>>,
-  #[account(
-    associated_token::mint = hnt_mint,
-    associated_token::authority = position_authority,
-  )]
-  pub delegator_ata: Box<Account<'info, TokenAccount>>,
+  /// CHECK: Needed for claim, checked via CPI.
+  pub delegator_ata: UncheckedAccount<'info>,
   /// CHECK: We init this when writing
   #[account(
     mut,
@@ -87,6 +84,18 @@ pub struct QueueDelegationClaimV0<'info> {
 }
 
 pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> {
+  if ctx.accounts.delegator_ata.data_is_empty() {
+    msg!("User closed their token account, disabling automation");
+    ctx
+      .accounts
+      .delegation_claim_bot
+      .close(ctx.accounts.rent_refund.to_account_info())?;
+    return Ok(RunTaskReturnV0 {
+      tasks: vec![],
+      accounts: vec![],
+    });
+  }
+
   let curr_epoch = max(
     ctx.accounts.delegated_position.last_claimed_epoch + 1,
     ctx.accounts.delegation_claim_bot.last_claimed_epoch + 1,
@@ -210,6 +219,30 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
     task_costs,
   )?;
 
+  // First task is the reschedule, second is the claim
+  ctx.accounts.delegation_claim_bot.next_task = ctx.remaining_accounts[0].key();
+
+  let mut tasks = vec![TaskReturnV0 {
+    trigger: before_epoch_trigger,
+    transaction: TransactionSourceV0::CompiledV0(compiled_reschedule_tx.clone()),
+    crank_reward: None,
+    free_tasks: 2,
+    description: format!("queue delegation epoch {}", curr_epoch + 1),
+  }];
+
+  if !ctx.accounts.delegated_position.is_claimed(curr_epoch)? {
+    tasks.push(
+      // At the end of each epoch, schedule the next epoch end and reschedule the cron
+      TaskReturnV0 {
+        trigger: after_epoch_trigger,
+        transaction: TransactionSourceV0::CompiledV0(compiled_tx.clone()),
+        crank_reward: None,
+        free_tasks: 0,
+        description: format!("delegation epoch {}", curr_epoch),
+      },
+    );
+  }
+
   let return_accounts = write_return_tasks(WriteReturnTasksArgs {
     program_id: crate::ID,
     payer_info: PayerInfo::Signer(ctx.accounts.payer.to_account_info()),
@@ -221,24 +254,7 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
       ],
     }],
     system_program: ctx.accounts.system_program.to_account_info(),
-    tasks: vec![
-      // At the end of each epoch, schedule the next epoch end and reschedule the cron
-      TaskReturnV0 {
-        trigger: after_epoch_trigger,
-        transaction: TransactionSourceV0::CompiledV0(compiled_tx.clone()),
-        crank_reward: None,
-        free_tasks: 0,
-        description: format!("delegation epoch {}", curr_epoch),
-      },
-      TaskReturnV0 {
-        trigger: before_epoch_trigger,
-        transaction: TransactionSourceV0::CompiledV0(compiled_reschedule_tx.clone()),
-        crank_reward: None,
-        free_tasks: 2,
-        description: format!("queue delegation epoch {}", curr_epoch + 1),
-      },
-    ]
-    .into_iter(),
+    tasks: tasks.into_iter(),
   })?
   .used_accounts;
 

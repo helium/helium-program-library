@@ -17,9 +17,10 @@ use crate::{
   state::*, MiniFanoutShareArgV0, ScheduleTaskArgsV0, MAX_SHARES,
 };
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct UpdateMiniFanoutArgsV0 {
   pub new_task_id: u16,
+  pub new_pre_task_id: u16,
   pub shares: Option<Vec<MiniFanoutShareArgV0>>,
   pub schedule: Option<String>,
 }
@@ -30,7 +31,7 @@ pub struct UpdateMiniFanoutV0<'info> {
   pub owner: Signer<'info>,
   #[account(mut)]
   pub payer: Signer<'info>,
-  #[account(mut, has_one = owner, has_one = next_task, has_one = task_queue)]
+  #[account(mut, has_one = owner, has_one = next_task, has_one = task_queue, has_one = next_pre_task)]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   /// CHECK: queue authority
   #[account(
@@ -51,9 +52,15 @@ pub struct UpdateMiniFanoutV0<'info> {
   /// CHECK: current task account
   #[account(mut)]
   pub next_task: UncheckedAccount<'info>,
+  /// CHECK: next pre task account
+  #[account(mut)]
+  pub next_pre_task: UncheckedAccount<'info>,
   /// CHECK: new task account
   #[account(mut)]
   pub new_task: UncheckedAccount<'info>,
+  /// CHECK: new pre task account
+  #[account(mut)]
+  pub new_pre_task: UncheckedAccount<'info>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub system_program: Program<'info, System>,
 }
@@ -107,6 +114,19 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
       &[queue_authority_seeds!(mini_fanout)],
     ))?;
   }
+  if !ctx.accounts.next_pre_task.data_is_empty() {
+    dequeue_task_v0(CpiContext::new_with_signer(
+      ctx.accounts.tuktuk_program.to_account_info(),
+      DequeueTaskV0 {
+        task_queue: ctx.accounts.task_queue.to_account_info(),
+        task: ctx.accounts.next_pre_task.to_account_info(),
+        queue_authority: ctx.accounts.queue_authority.to_account_info(),
+        rent_refund: ctx.accounts.payer.to_account_info(),
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
+      },
+      &[queue_authority_seeds!(mini_fanout)],
+    ))?;
+  }
 
   schedule_impl(
     &mut ScheduleTaskV0 {
@@ -119,9 +139,12 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
       task_queue: ctx.accounts.task_queue.clone(),
       system_program: ctx.accounts.system_program.clone(),
       task: ctx.accounts.new_task.clone(),
+      next_pre_task: ctx.accounts.next_pre_task.clone(),
+      pre_task: ctx.accounts.new_pre_task.clone(),
     },
     ScheduleTaskArgsV0 {
       task_id: args.new_task_id,
+      pre_task_id: args.new_pre_task_id,
     },
   )?;
 

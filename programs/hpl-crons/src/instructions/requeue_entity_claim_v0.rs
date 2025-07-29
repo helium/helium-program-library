@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
 use helium_entity_manager::KeyToAssetV0;
+use shared_utils::{ORACLE_SIGNER, ORACLE_URL};
 use tuktuk_program::{RunTaskReturnV0, TaskReturnV0, TransactionSourceV0, TriggerV0};
-
-use super::{ORACLE_SIGNER, ORACLE_URL};
 
 #[derive(Accounts)]
 pub struct RequeueEntityClaimV0<'info> {

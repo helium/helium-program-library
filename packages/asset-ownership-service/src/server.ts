@@ -2,12 +2,15 @@ import cors from "@fastify/cors";
 import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
 import { ReasonPhrases, StatusCodes } from "http-status-codes";
-import { PG_POOL_SIZE, ADMIN_PASSWORD, USE_SUBSTREAM } from "./env";
+import { PG_POOL_SIZE, ADMIN_PASSWORD, USE_SUBSTREAM, REFRESH_ON_BOOT } from "./env";
 import { ensureTables } from "./utils/ensureTables";
 import { setupSubstream } from "./services/substream";
 import database from "./utils/database";
 import { upsertOwners } from "./utils/upsertOwners";
 import { metrics } from "./plugins/metrics";
+import { provider } from "./utils/solana";
+import { TransactionProcessor } from "./utils/processTransaction";
+import bs58 from "bs58";
 
 if (PG_POOL_SIZE < 5) {
   throw new Error("PG_POOL_SIZE must be minimum of 5");
@@ -63,6 +66,78 @@ if (PG_POOL_SIZE < 5) {
       }
     });
 
+    server.get("/refreshing", async (req, res) => {
+      res.code(StatusCodes.OK).send({
+        refreshing: !!refreshing
+      });
+    });
+
+    server.post<{ Body: { signature: string, password: string } }>("/process-transaction", async (req, res) => {
+      const { signature, password } = req.body
+      if (password !== ADMIN_PASSWORD) {
+        res.code(StatusCodes.FORBIDDEN).send({
+          message: "Invalid password",
+        });
+        return;
+      }
+
+      try {
+        // Fetch transaction
+        const tx = await provider.connection.getTransaction(signature, {
+          maxSupportedTransactionVersion: 0,
+          commitment: "confirmed"
+        });
+
+        if (!tx) {
+          res.code(StatusCodes.NOT_FOUND).send({
+            message: "Transaction not found",
+          });
+          return;
+        }
+
+        const processor = await TransactionProcessor.create();
+        const dbTx = await database.transaction();
+        
+        try {
+          const { message } = tx.transaction;
+          const accountKeys = [
+            ...message.staticAccountKeys,
+            ...(tx.meta?.loadedAddresses?.writable || []),
+            ...(tx.meta?.loadedAddresses?.readonly || []),
+          ];
+
+          await processor.processTransaction({
+            accountKeys,
+            instructions: message.compiledInstructions,
+            innerInstructions: tx.meta?.innerInstructions?.map(inner => ({
+              index: inner.index,
+              instructions: inner.instructions.map(ix => ({
+                programIdIndex: ix.programIdIndex,
+                accountKeyIndexes: ix.accounts,
+                data: bs58.decode(ix.data)
+              }))
+            }))
+          }, dbTx);
+
+          await dbTx.commit();
+          res.code(StatusCodes.OK).send({ message: "Transaction processed successfully" });
+        } catch (err) {
+          await dbTx.rollback();
+          console.error("Error processing transaction:", err);
+          res.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
+            message: "Error processing transaction",
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching transaction:", err);
+        res.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
+          message: "Error fetching transaction",
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    });
+
     await server.listen({
       port: Number(process.env.PORT || "3000"),
       host: "0.0.0.0",
@@ -71,6 +146,12 @@ if (PG_POOL_SIZE < 5) {
     const address = server.server.address();
     const port = typeof address === "string" ? address : address?.port;
     console.log(`Running on 0.0.0.0:${port}`);
+
+    if (REFRESH_ON_BOOT) {
+      console.log("Refreshing owners on boot...");
+      eventHandler.emit("refresh-owners");
+    }
+
     if (USE_SUBSTREAM) {
       await setupSubstream(server).catch((err: any) => {
         console.error("Fatal error in Substream connection:", err);

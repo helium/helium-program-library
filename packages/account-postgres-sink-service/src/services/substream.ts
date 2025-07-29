@@ -12,17 +12,17 @@ import {
   unpackMapOutput,
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
-import { Op } from "sequelize";
 import {
   PRODUCTION,
   SUBSTREAM,
   SUBSTREAM_API_KEY,
-  SUBSTREAM_URL,
   SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
+  SUBSTREAM_URL,
 } from "../env";
 import { getPluginsByAccountTypeByProgram } from "../plugins";
 import { IConfig } from "../types";
-import { Cursor, database } from "../utils/database";
+import { CursorManager } from "../utils/cursor";
+import { Cursor } from "../utils/database";
 import { handleAccountWebhook } from "../utils/handleAccountWebhook";
 import { provider } from "../utils/solana";
 
@@ -35,110 +35,6 @@ interface IOutputAccount {
   data: Buffer;
   deleted: boolean;
 }
-
-export const CursorManager = (
-  service: string,
-  stalenessThreshold: number,
-  onStale?: () => void
-) => {
-  const CURSOR_UPDATE_INTERVAL = 30_000;
-  let checkInterval: NodeJS.Timeout | undefined;
-  let lastReceivedBlock: number = Date.now();
-  let pendingCursor: {
-    cursor: string;
-    blockHeight: string;
-    service: string;
-  } | null = null;
-  let lastCursorUpdate = 0;
-
-  const formatStaleness = (staleness: number): string => {
-    const stalenessInHours = staleness / 3600000;
-    return stalenessInHours >= 1
-      ? `${stalenessInHours.toFixed(1)}h`
-      : `${(staleness / 60000).toFixed(1)}m`;
-  };
-
-  const getLatestCursor = async (): Promise<Cursor | null> =>
-    await Cursor.findOne({
-      where: { service },
-      order: [["createdAt", "DESC"]],
-    });
-
-  const recordBlockReceived = (): void => {
-    lastReceivedBlock = Date.now();
-  };
-
-  const updateCursor = async ({
-    cursor,
-    blockHeight,
-    force = false,
-  }: {
-    cursor: string;
-    blockHeight: string;
-    force?: boolean;
-  }): Promise<void> => {
-    const now = Date.now();
-    recordBlockReceived();
-    pendingCursor = { cursor, blockHeight, service };
-
-    if (force || now - lastCursorUpdate >= CURSOR_UPDATE_INTERVAL) {
-      if (pendingCursor) {
-        await database.transaction(async (t) => {
-          await Cursor.upsert(pendingCursor!, {
-            conflictFields: ["service"],
-            transaction: t,
-          });
-
-          await Cursor.destroy({
-            where: {
-              service,
-              cursor: { [Op.ne]: cursor },
-            },
-            transaction: t,
-          });
-        });
-        lastCursorUpdate = now;
-        pendingCursor = null;
-      }
-    }
-  };
-
-  const checkStaleness = async (): Promise<string | undefined> => {
-    const connectionStaleness = Date.now() - lastReceivedBlock;
-    if (connectionStaleness >= stalenessThreshold) {
-      console.log(
-        `Connection is stale (${formatStaleness(
-          connectionStaleness
-        )} since last block)`
-      );
-      onStale && onStale();
-    }
-
-    const cursor = await getLatestCursor();
-    return cursor ? cursor.cursor : undefined;
-  };
-
-  const startStalenessCheck = (): void => {
-    if (checkInterval) clearInterval(checkInterval);
-    checkInterval = setInterval(() => checkStaleness(), 30_000);
-  };
-
-  const stopStalenessCheck = (): void => {
-    if (checkInterval) {
-      clearInterval(checkInterval);
-      checkInterval = undefined;
-    }
-  };
-
-  return {
-    getLatestCursor,
-    updateCursor,
-    checkStaleness,
-    startStalenessCheck,
-    stopStalenessCheck,
-    recordBlockReceived,
-  };
-};
 
 export const setupSubstream = async (
   server: FastifyInstance,
@@ -168,12 +64,27 @@ export const setupSubstream = async (
   );
 
   let isConnecting = false;
+  let currentAttemptCount = 0;
+  let staleAttemptCount = 0;
+  let reconnectTimeoutId: NodeJS.Timeout | null = null;
+
   const cursorManager = CursorManager(
     "account_sink",
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
     () => {
       server.customMetrics.staleCursorCounter.inc();
-      handleReconnect();
+      staleAttemptCount++;
+
+      if (staleAttemptCount > MAX_RECONNECT_ATTEMPTS) {
+        console.error(
+          `Substream failed to recover from stale cursor after ${MAX_RECONNECT_ATTEMPTS} attempts.`
+        );
+        process.exit(1);
+      }
+
+      if (!isConnecting && !reconnectTimeoutId) {
+        handleReconnect(staleAttemptCount);
+      }
     }
   );
   const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
@@ -181,6 +92,8 @@ export const setupSubstream = async (
   );
 
   const connect = async (attemptCount = 1) => {
+    currentAttemptCount = attemptCount;
+
     if (attemptCount >= MAX_RECONNECT_ATTEMPTS) {
       console.error(
         `Substream failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts.`
@@ -212,7 +125,7 @@ export const setupSubstream = async (
         }`
       );
 
-      attemptCount = 0;
+      currentAttemptCount = 0;
       isConnecting = false;
 
       for await (const response of streamBlocks(transport, request)) {
@@ -224,6 +137,8 @@ export const setupSubstream = async (
         }
 
         if (message.case === "blockScopedData") {
+          staleAttemptCount = 0;
+
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
           const blockHeight =
@@ -274,16 +189,23 @@ export const setupSubstream = async (
       cursorManager.stopStalenessCheck();
       console.log("Substream connection error:", err);
       isConnecting = false;
-      handleReconnect(attemptCount + 1);
+      handleReconnect(currentAttemptCount + 1);
     }
   };
 
-  const handleReconnect = async (nextAttempt: number = 1) => {
+  const handleReconnect = async (
+    nextAttempt: number = currentAttemptCount + 1
+  ) => {
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+    }
+
     const baseDelay = 1000;
     const delay =
       nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
 
-    setTimeout(() => {
+    reconnectTimeoutId = setTimeout(() => {
+      reconnectTimeoutId = null;
       console.log(
         `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
       );

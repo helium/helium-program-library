@@ -13,7 +13,8 @@ pub struct DistributeV0<'info> {
   #[account(
     mut,
     has_one = task_queue,
-    has_one = next_task
+    has_one = next_task,
+    has_one = next_pre_task
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   #[account(mut)]
@@ -25,6 +26,11 @@ pub struct DistributeV0<'info> {
     } @ ErrorCode::TaskNotDue
   )]
   pub next_task: Box<Account<'info, TaskV0>>,
+  /// CHECK: Make sure this is empty, pre task needs to be run before task.
+  #[account(
+    constraint = next_pre_task.data_is_empty() || next_pre_task.key() == Pubkey::default() @ ErrorCode::PreTaskNotRun
+  )]
+  pub next_pre_task: UncheckedAccount<'info>,
   #[account(mut)]
   pub token_account: Box<Account<'info, TokenAccount>>,
   pub token_program: Program<'info, Token>,
@@ -207,17 +213,31 @@ pub fn handler<'info>(
   // Schedule next task via tuktuk CPI if funds available, else set next_task = Pubkey::default()
   let next_time = get_next_time(mini_fanout)?;
   let compiled_tx = get_task_ix(mini_fanout)?;
-
-  mini_fanout.next_task = ctx.remaining_accounts[mini_fanout.shares.len()].key();
-
-  Ok(RunTaskReturnV0 {
-    tasks: vec![TaskReturnV0 {
-      trigger: TriggerV0::Timestamp(next_time),
-      transaction: TransactionSourceV0::CompiledV0(compiled_tx),
+  let mut tasks = vec![TaskReturnV0 {
+    trigger: TriggerV0::Timestamp(next_time),
+    transaction: TransactionSourceV0::CompiledV0(compiled_tx),
+    crank_reward: None,
+    free_tasks: 0,
+    description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
+  }];
+  if let Some(pre_task) = mini_fanout.pre_task.clone() {
+    tasks.push(TaskReturnV0 {
+      trigger: TriggerV0::Timestamp(next_time - 1),
+      transaction: pre_task,
       crank_reward: None,
       free_tasks: 0,
-      description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
-    }],
+      description: format!(
+        "pre dist {}",
+        &mini_fanout.key().to_string()[..(32 - 9 - 4)]
+      ),
+    });
+  }
+
+  mini_fanout.next_task = ctx.remaining_accounts[mini_fanout.shares.len()].key();
+  mini_fanout.next_pre_task = ctx.remaining_accounts[mini_fanout.shares.len() + 1].key();
+
+  Ok(RunTaskReturnV0 {
+    tasks,
     accounts: vec![],
   })
 }

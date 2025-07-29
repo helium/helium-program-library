@@ -1,13 +1,4 @@
 import { createGrpcTransport } from "@connectrpc/connect-node";
-import * as anchor from "@coral-xyz/anchor";
-import {
-  PROGRAM_ID as HEM_PROGRAM_ID,
-  init as initHem,
-} from "@helium/helium-entity-manager-sdk";
-import { PROGRAM_ID as MEM_PROGRAM_ID } from "@helium/mobile-entity-manager-sdk";
-import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
-import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
-import { PublicKey } from "@solana/web3.js";
 import {
   applyParams,
   authIssue,
@@ -20,12 +11,8 @@ import {
   unpackMapOutput,
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
-import { QueryTypes, Sequelize, Transaction } from "sequelize";
-import { BubblegumIdl } from "../bubblegum";
+import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import {
-  PG_CARRIER_TABLE,
-  PG_DATA_ONLY_TABLE,
-  PG_MAKER_TABLE,
   PRODUCTION,
   SUBSTREAM,
   SUBSTREAM_API_KEY,
@@ -33,9 +20,10 @@ import {
   SUBSTREAM_URL,
 } from "../env";
 import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
-import { AssetOwner, Cursor, database } from "../utils/database";
-import { provider } from "../utils/solana";
 import { CursorManager } from "../utils/cursor";
+import database, { Cursor } from "../utils/database";
+import { TransactionProcessor } from "../utils/processTransaction";
+import { provider } from "../utils/solana";
 
 const MODULE = "transactions_by_programid_and_account_without_votes";
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -44,11 +32,6 @@ const RELEVANT_INSTRUCTIONS_REGEX = new RegExp(
   RELEVANT_INSTRUCTIONS.join("|"),
   "i"
 );
-
-type TreeUpdateInstructionName =
-  | "update_maker_tree_v0"
-  | "update_carrier_tree_v0"
-  | "update_data_only_tree_v0";
 
 interface IOutputTransaction {
   message: {
@@ -62,6 +45,14 @@ interface IOutputTransaction {
   };
   meta: {
     logMessages: string[];
+    innerInstructions?: Array<{
+      index: number;
+      instructions: Array<{
+        programIdIndex: number;
+        accounts: string;
+        data: string;
+      }>;
+    }>;
   };
 }
 
@@ -70,7 +61,6 @@ export const setupSubstream = async (server: FastifyInstance) => {
   if (!SUBSTREAM_URL) throw new Error("SUBSTREAM_URL undefined");
   if (!SUBSTREAM) throw new Error("SUBSTREAM undefined");
   const { token } = await authIssue(SUBSTREAM_API_KEY!);
-  const hemProgram = await initHem(provider);
   const substream = await fetchSubstream(SUBSTREAM!);
   const registry = createRegistry(substream);
   const transport = createGrpcTransport({
@@ -81,21 +71,10 @@ export const setupSubstream = async (server: FastifyInstance) => {
     jsonOptions: { typeRegistry: registry },
   });
 
-  const getMerkleTreeSet = async (tableName: string) => {
-    return new Set(
-      (
-        (await database.query(`SELECT merkle_tree FROM ${tableName};`, {
-          type: QueryTypes.SELECT,
-        })) as { merkle_tree: string }[]
-      ).map((row) => row.merkle_tree)
-    );
-  };
-
-  const makerTrees = await getMerkleTreeSet(PG_MAKER_TABLE!);
-  const dataOnlyTrees = await getMerkleTreeSet(PG_DATA_ONLY_TABLE!);
-  const carrierTrees = await getMerkleTreeSet(PG_CARRIER_TABLE!);
-
   let isConnecting = false;
+  let currentAttemptCount = 0;
+  let staleAttemptCount = 0;
+  let reconnectTimeoutId: NodeJS.Timeout | null = null;
   let shouldRestart = false;
   let restartCursor: string | undefined = undefined;
   let currentAbortController: AbortController | null = null;
@@ -105,52 +84,36 @@ export const setupSubstream = async (server: FastifyInstance) => {
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
     () => {
       server.customMetrics.staleCursorCounter.inc();
-      handleReconnect();
+      staleAttemptCount++;
+
+      if (staleAttemptCount > MAX_RECONNECT_ATTEMPTS) {
+        console.error(
+          `Substream failed to recover from stale cursor after ${MAX_RECONNECT_ATTEMPTS} attempts.`
+        );
+        process.exit(1);
+      }
+
+      if (!isConnecting && !reconnectTimeoutId) {
+        handleReconnect(staleAttemptCount);
+      }
     }
   );
 
-  const coders: {
-    [programId: string]: anchor.BorshInstructionCoder;
-  } = {
-    [HEM_PROGRAM_ID.toBase58()]: new anchor.BorshInstructionCoder(
-      await fetchBackwardsCompatibleIdl(HEM_PROGRAM_ID, provider)
-    ),
-    [MEM_PROGRAM_ID.toBase58()]: new anchor.BorshInstructionCoder(
-      await fetchBackwardsCompatibleIdl(MEM_PROGRAM_ID, provider)
-    ),
-    [BUBBLEGUM_PROGRAM_ID.toBase58()]: new anchor.BorshInstructionCoder(
-      BubblegumIdl
-    ),
-  };
-
-  const treeUpdateConfig = {
-    update_maker_tree_v0: {
-      accountKey: "Maker",
-      tableName: PG_MAKER_TABLE,
-      merkleTrees: makerTrees,
-    },
-    update_carrier_tree_v0: {
-      accountKey: "Carrier",
-      tableName: PG_CARRIER_TABLE,
-      merkleTrees: carrierTrees,
-    },
-    update_data_only_tree_v0: {
-      accountKey: "Data_only_config",
-      tableName: PG_DATA_ONLY_TABLE,
-      merkleTrees: dataOnlyTrees,
-    },
-  };
-
   const connect = async (attemptCount = 1, overrideCursor?: string) => {
+    currentAttemptCount = attemptCount;
+
     if (currentAbortController) {
       currentAbortController.abort();
     }
 
     currentAbortController = new AbortController();
+    const processor = await TransactionProcessor.create();
+
+    console.log("Trees", processor.getTrees());
 
     applyParams(
       [
-        `${MODULE}=${[...makerTrees, ...dataOnlyTrees, ...carrierTrees]
+        `${MODULE}=${[...processor.getTrees()]
           .map(
             (merkleTree) =>
               `program:${BUBBLEGUM_PROGRAM_ID} && account:${merkleTree}`
@@ -175,22 +138,22 @@ export const setupSubstream = async (server: FastifyInstance) => {
       const cursor = overrideCursor ?? (await cursorManager.checkStaleness());
       cursorManager.startStalenessCheck();
       console.log("Connected to Substream");
-      const currentBlock = await provider.connection.getSlot("finalized");
+      const startBlock = await provider.connection.getSlot("finalized");
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
         productionMode: PRODUCTION,
-        startBlockNum: cursor ? undefined : currentBlock,
+        startBlockNum: cursor ? undefined : startBlock,
         startCursor: cursor,
       });
 
       console.log(
         `Substream: Streaming from ${
-          cursor ? `cursor ${cursor}` : `block ${currentBlock}`
+          cursor ? `cursor ${cursor}` : `block ${startBlock}`
         }`
       );
 
-      attemptCount = 0;
+      currentAttemptCount = 0;
       isConnecting = false;
 
       for await (const response of streamBlocks(transport, request)) {
@@ -212,6 +175,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
         }
 
         if (message.case === "blockScopedData") {
+          staleAttemptCount = 0;
+
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
           const blockHeight =
@@ -222,22 +187,24 @@ export const setupSubstream = async (server: FastifyInstance) => {
             !isEmptyMessage(output) &&
             (output as any).transactions.length > 0;
 
-          const t = await database.transaction({
-            isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-          });
+          let hasFilteredTransactions = false;
 
-          try {
-            if (hasTransactions) {
-              const outputTransactions = (output as any)
-                .transactions as IOutputTransaction[];
+          if (hasTransactions) {
+            const outputTransactions = (output as any)
+              .transactions as IOutputTransaction[];
 
-              const filteredTransactions = outputTransactions.filter((tx) =>
-                tx.meta.logMessages.some((log) =>
-                  RELEVANT_INSTRUCTIONS_REGEX.test(log)
-                )
-              );
+            const filteredTransactions = outputTransactions.filter((tx) =>
+              tx.meta.logMessages.some((log) =>
+                RELEVANT_INSTRUCTIONS_REGEX.test(log)
+              )
+            );
 
-              if (filteredTransactions.length > 0) {
+            if (filteredTransactions.length > 0) {
+              hasFilteredTransactions = true;
+
+              const dbTx = await database.transaction();
+
+              try {
                 await Promise.all(
                   filteredTransactions.map(async (transactionInfo) => {
                     const converted = await convertSubstreamTransaction(
@@ -258,144 +225,48 @@ export const setupSubstream = async (server: FastifyInstance) => {
                       ...(accountKeysFromLookups?.readonly || []),
                     ];
 
-                    for (const compiledInstruction of message.compiledInstructions) {
-                      const programIdIndex = compiledInstruction.programIdIndex;
-                      const programId = new PublicKey(
-                        accountKeys[programIdIndex]
-                      );
+                    const { updatedTrees } = await processor.processTransaction({
+                      accountKeys,
+                      instructions: message.compiledInstructions,
+                      innerInstructions:
+                        transactionInfo.meta.innerInstructions?.map(
+                          (inner) => ({
+                            index: inner.index,
+                            instructions: inner.instructions.map((ix) => ({
+                              programIdIndex: ix.programIdIndex,
+                              accountKeyIndexes: Buffer.from(ix.accounts, "base64").toJSON().data,
+                              data: Buffer.from(ix.data, "base64"),
+                            })),
+                          })
+                        ),
+                    }, dbTx);
 
-                      const instructionCoder = coders[programId.toBase58()];
-
-                      if (!instructionCoder) continue;
-
-                      const decodedInstruction = instructionCoder.decode(
-                        Buffer.from(compiledInstruction.data)
-                      );
-
-                      if (!decodedInstruction) continue;
-
-                      const formattedInstruction = instructionCoder.format(
-                        decodedInstruction,
-                        compiledInstruction.accountKeyIndexes.map((idx) => ({
-                          pubkey: new PublicKey(accountKeys[idx]),
-                          isSigner: message.isAccountSigner(idx),
-                          isWritable: message.isAccountWritable(idx),
-                        }))
-                      );
-
-                      if (!formattedInstruction) continue;
-
-                      const accountMap = Object.fromEntries(
-                        (formattedInstruction.accounts || []).map((acc) => [
-                          acc.name,
-                          acc,
-                        ])
-                      );
-
-                      const argMap = Object.fromEntries(
-                        (formattedInstruction.args || []).map((arg) => [
-                          arg.name,
-                          arg,
-                        ])
-                      );
-
-                      switch (decodedInstruction.name) {
-                        case "update_maker_tree_v0":
-                        case "update_carrier_tree_v0":
-                        case "update_data_only_tree_v0": {
-                          await handleTreeUpdateInstruction({
-                            instructionName:
-                              decodedInstruction.name as TreeUpdateInstructionName,
-                            accountMap,
-                            cursor,
-                            blockHeight,
-                            server,
-                            cursorManager,
-                            database,
-                          });
-                          return;
-                        }
-
-                        case "issue_entity_v0":
-                        case "issue_data_only_entity_v0":
-                        case "initialize_subscriber_v0": {
-                          const recipientAccount =
-                            accountMap["Recipient"]?.pubkey;
-                          const keyToAssetAccount =
-                            accountMap["Key_to_asset"]?.pubkey;
-
-                          if (recipientAccount && keyToAssetAccount) {
-                            const keyToAsset =
-                              await hemProgram.account.keyToAssetV0.fetch(
-                                keyToAssetAccount
-                              );
-
-                            if (keyToAsset) {
-                              await AssetOwner.upsert(
-                                {
-                                  asset: keyToAsset.asset.toBase58(),
-                                  owner: recipientAccount.toBase58(),
-                                },
-                                { transaction: t }
-                              );
-                            }
-                          }
-                          return;
-                        }
-
-                        case "transfer": {
-                          const newOwnerAccount =
-                            accountMap["New_leaf_owner"]?.pubkey;
-                          const merkleTreeAccount =
-                            accountMap["Merkle_tree"]?.pubkey;
-                          const nonceArg = argMap["nonce"]?.data;
-
-                          if (
-                            newOwnerAccount &&
-                            merkleTreeAccount &&
-                            nonceArg
-                          ) {
-                            const nonceBuffer = Buffer.alloc(8);
-                            nonceBuffer.writeBigUInt64LE(BigInt(nonceArg));
-
-                            const seeds = [
-                              Buffer.from("asset", "utf-8"),
-                              merkleTreeAccount.toBuffer(),
-                              nonceBuffer,
-                            ];
-
-                            const [assetId] = PublicKey.findProgramAddressSync(
-                              seeds,
-                              BUBBLEGUM_PROGRAM_ID
-                            );
-
-                            await AssetOwner.upsert(
-                              {
-                                asset: assetId.toBase58(),
-                                owner: newOwnerAccount.toBase58(),
-                              },
-                              { transaction: t }
-                            );
-                          }
-                          return;
-                        }
-                      }
+                    if (updatedTrees) {
+                      console.log("Trees updated");
+                      shouldRestart = true;
+                      restartCursor = cursor;
+                      await cursorManager.updateCursor({
+                        cursor,
+                        blockHeight,
+                        force: true,
+                      });
                     }
                   })
                 );
+
+                await dbTx.commit();
+              } catch (err) {
+                await dbTx.rollback();
+                throw err;
               }
             }
-
-            await t.commit();
-            await cursorManager.updateCursor({
-              cursor,
-              blockHeight,
-              force: hasTransactions,
-            });
-          } catch (blockErr) {
-            await t.rollback();
-            throw blockErr;
           }
+
+          await cursorManager.updateCursor({
+            cursor,
+            blockHeight,
+            force: hasFilteredTransactions,
+          });
         }
       }
 
@@ -407,77 +278,23 @@ export const setupSubstream = async (server: FastifyInstance) => {
       cursorManager.stopStalenessCheck();
       console.log("Substream connection error:", err);
       isConnecting = false;
-      handleReconnect(attemptCount + 1);
+      handleReconnect(currentAttemptCount + 1);
     }
   };
 
-  const handleTreeUpdateInstruction = async ({
-    instructionName,
-    accountMap,
-    cursor,
-    blockHeight,
-    server,
-    cursorManager,
-    database,
-  }: {
-    instructionName: TreeUpdateInstructionName;
-    accountMap: Record<string, any>;
-    cursor: string;
-    blockHeight: string;
-    server: FastifyInstance;
-    cursorManager: ReturnType<typeof CursorManager>;
-    database: Sequelize;
-  }) => {
-    const config = treeUpdateConfig[instructionName];
-    if (!config) return;
-
-    const { accountKey, tableName, merkleTrees } = config;
-    const failureCounter = server.customMetrics.treeFailureCounter;
-    const entityAccount = accountMap[accountKey]?.pubkey;
-    const newTreeAccount = accountMap["New_merkle_tree"]?.pubkey;
-
-    if (
-      entityAccount &&
-      newTreeAccount &&
-      merkleTrees &&
-      !merkleTrees.has(newTreeAccount)
-    ) {
-      try {
-        await database.query(
-          `INSERT INTO ${tableName} (address, merkle_tree)
-         VALUES (:address, :merkle_tree)
-         ON CONFLICT (address) DO UPDATE SET merkle_tree = EXCLUDED.merkle_tree;`,
-          {
-            replacements: {
-              address: entityAccount.toBase58(),
-              merkle_tree: newTreeAccount.toBase58(),
-            },
-            type: QueryTypes.INSERT,
-          }
-        );
-
-        merkleTrees.add(newTreeAccount);
-        shouldRestart = true;
-        restartCursor = cursor;
-
-        await cursorManager.updateCursor({
-          cursor,
-          blockHeight,
-          force: true,
-        });
-      } catch (err) {
-        failureCounter && failureCounter.inc();
-        throw err;
-      }
+  const handleReconnect = async (
+    nextAttempt: number = currentAttemptCount + 1
+  ) => {
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
     }
-  };
 
-  const handleReconnect = async (nextAttempt: number = 1) => {
     const baseDelay = 1000;
     const delay =
       nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
 
-    setTimeout(() => {
+    reconnectTimeoutId = setTimeout(() => {
+      reconnectTimeoutId = null;
       console.log(
         `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
       );

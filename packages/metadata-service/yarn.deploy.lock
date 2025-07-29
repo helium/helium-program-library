@@ -228,7 +228,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.10.19":
+"@helium/account-fetch-cache@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -250,7 +250,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.10.0-alpha.6, @helium/anchor-resolvers@^0.10.19":
+"@helium/anchor-resolvers@^0.10.0-alpha.6, @helium/anchor-resolvers@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -264,14 +264,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/circuit-breaker-sdk@^0.10.19":
+"@helium/circuit-breaker-sdk@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.10.19
-    "@helium/idls": ^0.10.19
-    "@helium/spl-utils": ^0.10.19
+    "@helium/anchor-resolvers": ^0.10.30
+    "@helium/idls": ^0.10.30
+    "@helium/spl-utils": ^0.10.30
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -281,20 +281,18 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/data-credits-sdk@^0.10.19":
+"@helium/data-credits-sdk@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/data-credits-sdk@workspace:packages/data-credits-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.10.19
-    "@helium/circuit-breaker-sdk": ^0.10.19
-    "@helium/helium-sub-daos-sdk": ^0.10.19
-    "@helium/idls": ^0.10.19
-    "@helium/spl-utils": ^0.10.19
-    "@types/crypto-js": ^4.1.1
+    "@helium/anchor-resolvers": ^0.10.30
+    "@helium/circuit-breaker-sdk": ^0.10.30
+    "@helium/helium-sub-daos-sdk": ^0.10.30
+    "@helium/idls": ^0.10.30
+    "@helium/spl-utils": ^0.10.30
     bn.js: ^5.2.0
     bs58: ^4.0.1
-    crypto-js: ^4.1.1
     git-format-staged: ^2.1.3
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
@@ -302,21 +300,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/helium-entity-manager-sdk@^0.10.19":
+"@helium/helium-entity-manager-sdk@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/helium-entity-manager-sdk@workspace:packages/helium-entity-manager-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@helium/address": ^4.12.0
-    "@helium/anchor-resolvers": ^0.10.19
-    "@helium/helium-sub-daos-sdk": ^0.10.19
-    "@helium/idls": ^0.10.19
-    "@helium/no-emit-sdk": ^0.10.19
-    "@helium/spl-utils": ^0.10.19
-    "@types/crypto-js": ^4.1.1
+    "@helium/anchor-resolvers": ^0.10.30
+    "@helium/helium-sub-daos-sdk": ^0.10.30
+    "@helium/idls": ^0.10.30
+    "@helium/no-emit-sdk": ^0.10.30
+    "@helium/spl-utils": ^0.10.30
     bn.js: ^5.2.0
     bs58: ^4.0.1
-    crypto-js: ^4.1.1
     git-format-staged: ^2.1.3
     js-sha256: ^0.9.0
     ts-loader: ^9.2.3
@@ -325,17 +321,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/helium-sub-daos-sdk@^0.10.19":
+"@helium/helium-sub-daos-sdk@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/helium-sub-daos-sdk@workspace:packages/helium-sub-daos-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.10.19
-    "@helium/circuit-breaker-sdk": ^0.10.19
+    "@helium/anchor-resolvers": ^0.10.30
+    "@helium/circuit-breaker-sdk": ^0.10.30
     "@helium/nft-proxy-sdk": ^0.1.5-alpha.0
-    "@helium/spl-utils": ^0.10.19
-    "@helium/treasury-management-sdk": ^0.10.19
-    "@helium/voter-stake-registry-sdk": ^0.10.19
+    "@helium/spl-utils": ^0.10.30
+    "@helium/treasury-management-sdk": ^0.10.30
+    "@helium/voter-stake-registry-sdk": ^0.10.30
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -345,7 +341,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/idls@^0.10.19":
+"@helium/idls@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
@@ -367,21 +363,21 @@ __metadata:
     "@fastify/cors": ^11.0.1
     "@fastify/static": ^8.1.1
     "@grpc/grpc-js": ^1.10.1
-    "@helium/account-fetch-cache": ^0.10.19
+    "@helium/account-fetch-cache": ^0.10.30
     "@helium/address": ^4.12.0
-    "@helium/data-credits-sdk": ^0.10.19
-    "@helium/helium-entity-manager-sdk": ^0.10.19
-    "@helium/helium-sub-daos-sdk": ^0.10.19
-    "@helium/idls": ^0.10.19
-    "@helium/spl-utils": ^0.10.19
+    "@helium/data-credits-sdk": ^0.10.30
+    "@helium/helium-entity-manager-sdk": ^0.10.30
+    "@helium/helium-sub-daos-sdk": ^0.10.30
+    "@helium/idls": ^0.10.30
+    "@helium/spl-utils": ^0.10.30
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
     "@types/bn.js": ^5.1.1
-    "@types/bs58": ^4.0.2
+    "@types/bs58": ^4.0.4
     angry-purple-tiger: ^1.0.5
     aws-sdk: ^2.1469.0
-    axios: ^1.8.4
+    axios: ^1.9.0
     bn.js: ^5.2.0
     bs58: ^4.0.1
     dotenv: ^16.3.1
@@ -422,14 +418,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/no-emit-sdk@^0.10.19":
+"@helium/no-emit-sdk@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/no-emit-sdk@workspace:packages/no-emit-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.10.19
-    "@helium/idls": ^0.10.19
-    "@helium/spl-utils": ^0.10.19
+    "@helium/anchor-resolvers": ^0.10.30
+    "@helium/idls": ^0.10.30
+    "@helium/spl-utils": ^0.10.30
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -439,19 +435,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/spl-utils@^0.10.19":
+"@helium/spl-utils@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/account-fetch-cache": ^0.10.19
+    "@helium/account-fetch-cache": ^0.10.30
     "@helium/address": ^4.12.0
-    "@helium/anchor-resolvers": ^0.10.19
+    "@helium/anchor-resolvers": ^0.10.30
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
-    axios: ^1.8.4
+    axios: ^1.9.0
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
@@ -461,15 +457,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/treasury-management-sdk@^0.10.19":
+"@helium/treasury-management-sdk@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/treasury-management-sdk@workspace:packages/treasury-management-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.10.19
-    "@helium/circuit-breaker-sdk": ^0.10.19
-    "@helium/idls": ^0.10.19
-    "@helium/spl-utils": ^0.10.19
+    "@helium/anchor-resolvers": ^0.10.30
+    "@helium/circuit-breaker-sdk": ^0.10.30
+    "@helium/idls": ^0.10.30
+    "@helium/spl-utils": ^0.10.30
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -479,15 +475,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/voter-stake-registry-sdk@^0.10.19":
+"@helium/voter-stake-registry-sdk@^0.10.30":
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.10.19
-    "@helium/idls": ^0.10.19
+    "@helium/anchor-resolvers": ^0.10.30
+    "@helium/idls": ^0.10.30
     "@helium/nft-proxy-sdk": ^0.1.5-alpha.0
-    "@helium/spl-utils": ^0.10.19
+    "@helium/spl-utils": ^0.10.30
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0
@@ -885,12 +881,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/bs58@npm:^4.0.2":
-  version: 4.0.2
-  resolution: "@types/bs58@npm:4.0.2"
+"@types/bs58@npm:^4.0.4":
+  version: 4.0.4
+  resolution: "@types/bs58@npm:4.0.4"
   dependencies:
-    base-x: "npm:^3.0.6"
-  checksum: 2d106e63a15431857c881c8c4465b59b6fe5fe2b5a6791a98c0f6bc651e0cea8c3d568acdbd7efe8c46f41661a7554cddbc2b915f730056b64d573b4944ba9f7
+    "@types/node": "*"
+    base-x: ^3.0.6
+  checksum: 9cac5a00343756f887ad906c10c71464620d352af40ff61373dcede434880a769be8b78380b890e9b13506851af4611ab59e7d4b7159af04f445e1fd5c34e3d0
   languageName: node
   linkType: hard
 
@@ -900,13 +897,6 @@ __metadata:
   dependencies:
     "@types/node": "npm:*"
   checksum: fe81351470f2d3165e8b12ce33542eef89ea893e36dd62e8f7d72566dfb7e448376ae962f9f3ea888547ce8b55a40020ca0e01d637fab5d99567673084542641
-  languageName: node
-  linkType: hard
-
-"@types/crypto-js@npm:^4.1.1":
-  version: 4.1.1
-  resolution: "@types/crypto-js@npm:4.1.1"
-  checksum: ea3d6a67b69f88baeb6af96004395903d2367a41bd5cd86306da23a44dd96589749495da50974a9b01bb5163c500764c8a33706831eade036bddae016417e3ea
   languageName: node
   linkType: hard
 
@@ -1242,14 +1232,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"axios@npm:^1.8.4":
-  version: 1.8.4
-  resolution: "axios@npm:1.8.4"
+"axios@npm:^1.9.0":
+  version: 1.9.0
+  resolution: "axios@npm:1.9.0"
   dependencies:
     follow-redirects: ^1.15.6
     form-data: ^4.0.0
     proxy-from-env: ^1.1.0
-  checksum: e901dc1730bdcd769839b3d93ae6d6457a53d79b19a0eb623ebfea333441259ab51e63ca118baa47a5156567401466ac739f31087b4ee5e6770ab2e227484538
+  checksum: 631f02c9c279f2ae90637a4989cc9d75c1c27aefd16b6e8eb90f98a4d0bddaccfd1cb1387be12101d1ab0f9bbf0c47e2451b4de0cf2870462a7d9ed3de8da3f2
   languageName: node
   linkType: hard
 
@@ -1639,13 +1629,6 @@ __metadata:
   version: 1.3.0
   resolution: "crypto-hash@npm:1.3.0"
   checksum: a3a507e0d2b18fbd2da8088a1c62d0c53c009a99bbfa6d851cac069734ffa546922fa51bdd776d006459701cdda873463e5059ece3431aca048fd99e7573d138
-  languageName: node
-  linkType: hard
-
-"crypto-js@npm:^4.1.1":
-  version: 4.1.1
-  resolution: "crypto-js@npm:4.1.1"
-  checksum: b3747c12ee3a7632fab3b3e171ea50f78b182545f0714f6d3e7e2858385f0f4101a15f2517e033802ce9d12ba50a391575ff4638c9de3dd9b2c4bc47768d5425
   languageName: node
   linkType: hard
 

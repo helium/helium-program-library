@@ -8,4 +8,6 @@ pub enum ErrorCode {
   CronJobNotRemovedFromQueue,
   #[msg("Proposal is not in voting state")]
   NotVoting,
+  #[msg("Must claim IOT/MOBILE delegation rewards before enabling automation")]
+  UnclaimedIotMobileRewards,
 }

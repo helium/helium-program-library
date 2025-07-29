@@ -1,6 +1,6 @@
 {
   "name": "@helium/sus",
-  "version": "0.10.19",
+  "version": "0.10.30",
   "description": "Transaction simulation sus checker",
   "publishConfig": {
     "access": "public",
@@ -35,7 +35,7 @@
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
-    "axios": "^1.8.4",
+    "axios": "^1.9.0",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },

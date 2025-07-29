@@ -1,6 +1,6 @@
 [package]
 name = "mobile-entity-manager"
-version = "0.2.2"
+version = "0.2.4"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"

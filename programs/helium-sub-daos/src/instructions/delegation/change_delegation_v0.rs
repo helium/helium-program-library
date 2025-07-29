@@ -8,10 +8,16 @@ use voter_stake_registry::{
 
 use super::{
   close_delegation_v0,
-  delegate_v0::{self, get_closing_epoch_bytes, get_genesis_end_epoch_bytes},
+  close_delegation_v0::{get_closing_epoch_bytes, get_genesis_end_epoch_bytes},
+  delegate_v0::{
+    self, get_closing_epoch_bytes as get_closing_epoch_bytes_delegate,
+    get_genesis_end_epoch_bytes as get_genesis_end_epoch_bytes_delegate,
+  },
   CloseDelegationAccounts, DelegationAccounts, DelegationBumps,
 };
 use crate::{current_epoch, error::ErrorCode, get_sub_dao_epoch_info_seed, state::*};
+
+const HNT_EPOCH: u64 = 20117;
 
 #[derive(Accounts)]
 pub struct ChangeDelegationV0<'info> {
@@ -48,6 +54,7 @@ pub struct ChangeDelegationV0<'info> {
   #[account(
     mut,
     has_one = dao,
+    constraint = old_sub_dao.key() == delegated_position.sub_dao @ ErrorCode::InvalidChangeDelegationSubDao
   )]
   pub old_sub_dao: Box<Account<'info, SubDaoV0>>,
   #[account(
@@ -60,7 +67,7 @@ pub struct ChangeDelegationV0<'info> {
   pub old_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   #[account(
     mut,
-    seeds = ["sub_dao_epoch_info".as_bytes(), old_sub_dao.key().as_ref(), &get_closing_epoch_bytes(&position, &proxy_config, &registrar)],
+    seeds = ["sub_dao_epoch_info".as_bytes(), old_sub_dao.key().as_ref(), &get_closing_epoch_bytes(&position, &delegated_position)],
     bump = old_closing_time_sub_dao_epoch_info.bump_seed,
   )]
   pub old_closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -69,7 +76,7 @@ pub struct ChangeDelegationV0<'info> {
     seeds = [
       "sub_dao_epoch_info".as_bytes(), 
       old_sub_dao.key().as_ref(),
-      &get_genesis_end_epoch_bytes(&position, &proxy_config, &registrar)
+      &get_genesis_end_epoch_bytes(&position, &registrar, &delegated_position)
     ],
     bump = old_genesis_end_sub_dao_epoch_info.bump_seed,
   )]
@@ -95,7 +102,7 @@ pub struct ChangeDelegationV0<'info> {
     init_if_needed,
     payer = payer,
     space = SubDaoEpochInfoV0::SIZE,
-    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &get_closing_epoch_bytes(&position, &proxy_config, &registrar)],
+    seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &get_closing_epoch_bytes_delegate(&position, &proxy_config, &registrar)],
     bump,
   )]
   pub closing_time_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
@@ -104,7 +111,7 @@ pub struct ChangeDelegationV0<'info> {
     seeds = [
       "sub_dao_epoch_info".as_bytes(), 
       sub_dao.key().as_ref(),
-      &get_genesis_end_epoch_bytes(&position, &proxy_config, &registrar)
+      &get_genesis_end_epoch_bytes_delegate(&position, &proxy_config, &registrar)
     ],
     bump,
   )]
@@ -115,6 +122,7 @@ pub struct ChangeDelegationV0<'info> {
     mut,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
     bump = delegated_position.bump_seed,
+    constraint = delegated_position.last_claimed_epoch >= HNT_EPOCH @ ErrorCode::ClaimBeforeChangeDelegation
   )]
   pub delegated_position: Box<Account<'info, DelegatedPositionV0>>,
 

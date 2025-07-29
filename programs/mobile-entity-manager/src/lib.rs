@@ -88,4 +88,11 @@ pub mod mobile_entity_manager {
   pub fn swap_carrier_stake(ctx: Context<SwapCarrierStake>) -> Result<()> {
     swap_carrier_stake::handler(ctx)
   }
+
+  pub fn issue_mapping_rewards_nft_v0(
+    ctx: Context<IssueMappingRewardsNftV0>,
+    args: IssueMappingRewardsNftArgsV0,
+  ) -> Result<()> {
+    issue_mapping_rewards_nft_v0::handler(ctx, args)
+  }
 }

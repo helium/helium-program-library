@@ -905,7 +905,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.32"
+version = "0.2.37"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -968,6 +968,7 @@ dependencies = [
  "helium-sub-daos",
  "modular-governance",
  "no-emit",
+ "shared-utils",
  "spl-associated-token-account",
  "spl-token",
  "tuktuk-program",
@@ -1227,7 +1228,7 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "mobile-entity-manager"
-version = "0.2.2"
+version = "0.2.4"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",

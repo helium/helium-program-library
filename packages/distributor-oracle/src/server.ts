@@ -22,6 +22,7 @@ import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {
   decodeEntityKey,
   init as initHeliumEntityManager,
+  keyToAssetForAsset,
   keyToAssetKey,
 } from "@helium/helium-entity-manager-sdk";
 import { init as initHplCrons } from "@helium/hpl-crons-sdk";
@@ -40,7 +41,7 @@ import {
   init as initRewards,
   PROGRAM_ID as RO_PID,
 } from "@helium/rewards-oracle-sdk";
-import { getAsset, HNT_MINT, toNumber } from "@helium/spl-utils";
+import { Asset, getAsset, HNT_MINT, toNumber } from "@helium/spl-utils";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { createMemoInstruction } from "@solana/spl-memo";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
@@ -70,7 +71,7 @@ import {
 } from "./constants";
 import { Database, DeviceType } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
-import { Reward } from "./model";
+import { KeyToAsset, Reward } from "./model";
 import { PgDatabase } from "./pgDatabase";
 export * from "./database";
 
@@ -164,6 +165,10 @@ export class OracleServer {
     }>("/", this.getCurrentRewardsHandler.bind(this));
     this.app.post("/", this.signTransactionHandler.bind(this));
     this.app.post("/bulk-sign", this.signBulkTransactionsHandler.bind(this));
+    this.app.post(
+      "/v1/tuktuk/asset/:assetId",
+      this.tuktukAssetHandler.bind(this)
+    );
     this.app.post(
       "/v1/tuktuk/kta/:keyToAssetKey",
       this.tuktukKtaHandler.bind(this)
@@ -561,8 +566,8 @@ export class OracleServer {
       // @ts-ignore
       const currentRewards = entityKey
         ? await this.db.getCurrentRewardsByEntity(
-            decodeEntityKey(entityKey, keySerialization)!
-          )
+          decodeEntityKey(entityKey, keySerialization)!
+        )
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.gt(new BN(currentRewards))) {
         return {
@@ -653,6 +658,244 @@ export class OracleServer {
     }
   }
 
+  private async tuktukAssetHandler(
+    request: FastifyRequest<{
+      Params: { assetId: string };
+      Body: { task_queue: string; task: string; task_queued_at: number };
+    }>,
+    reply: FastifyReply
+  ) {
+    const taskQueue = new PublicKey(request.body.task_queue);
+    const task = new PublicKey(request.body.task);
+    const taskQueuedAt = new BN(request.body.task_queued_at);
+    try {
+      const asset = await getAsset(
+        process.env.ASSET_API_URL ||
+        this.ldProgram.provider.connection.rpcEndpoint,
+        new PublicKey(request.params.assetId)
+      );
+      if (!asset) {
+        reply.status(404).send({
+          message: "Asset not found",
+        });
+        return;
+      }
+      const keyToAssetK = await keyToAssetForAsset(asset, this.dao);
+      let keyToAsset = await KeyToAsset.findOne({
+        where: {
+          address: keyToAssetK.toBase58()
+        }
+      });
+      if (!keyToAsset) {
+        reply.status(404).send({
+          message: "Key to asset not found",
+        });
+        return;
+      }
+
+      return this.handleKta(reply, asset, keyToAsset, taskQueue, task, taskQueuedAt);
+    } catch (err) {
+      console.error(err);
+      reply.status(500).send({
+        message: "Request failed",
+      });
+    }
+  }
+
+  private async handleKta(reply: FastifyReply, asset: Asset, keyToAsset: KeyToAsset, taskQueue: PublicKey, task: PublicKey, taskQueuedAt: BN) {
+    const [wallet, bump] = customSignerKey(taskQueue, [
+      Buffer.from("claim_payer"),
+      asset!.ownership.owner.toBuffer(),
+    ]);
+    const bumpBuffer = Buffer.alloc(1);
+    bumpBuffer.writeUint8(bump);
+    const recipient = recipientKey(this.lazyDistributor, new PublicKey(keyToAsset.asset!))[0];
+    let recipientAcc = await this.ldProgram.account.recipientV0.fetchNullable(
+      recipient
+    );
+    const balance =
+      (await this.ldProgram.provider.connection.getAccountInfo(wallet))
+        ?.lamports || 0;
+
+    const ata = getAssociatedTokenAddressSync(
+      HNT_MINT,
+      !recipientAcc || recipientAcc.destination.equals(PublicKey.default)
+        ? asset!.ownership.owner
+        : recipientAcc?.destination,
+      true
+    );
+    const ataExists =
+      !!(await this.ldProgram.provider.connection.getAccountInfo(ata));
+    const neededBalance =
+      0.00089088 * LAMPORTS_PER_SOL +
+      (recipientAcc ? 0 : RECIPIENT_RENT) +
+      (ataExists ? 0 : ATA_RENT);
+
+    const instructions: TransactionInstruction[] = [];
+    if (balance < neededBalance) {
+      instructions.push(
+        createMemoInstruction(
+          "Couldn't claim rewards due to insufficient balance",
+          [wallet]
+        )
+      );
+      // @ts-ignore (we can remove this after a package publish)
+    } else if (asset?.burnt) {
+      instructions.push(
+        createMemoInstruction(
+          "Couldn't claim rewards due to burnt hotspot",
+          [wallet]
+        )
+      );
+    } else {
+      let distributeIx;
+      if (
+        recipientAcc?.destination &&
+        !recipientAcc?.destination.equals(PublicKey.default)
+      ) {
+        const destination = recipientAcc.destination;
+        distributeIx = await this.ldProgram.methods
+          .distributeCustomDestinationV0()
+          .accountsPartial({
+            common: {
+              payer: wallet,
+              recipient: recipient,
+              lazyDistributor: this.lazyDistributor,
+              rewardsMint: DNT,
+              owner: destination,
+              destinationAccount: getAssociatedTokenAddressSync(
+                DNT,
+                destination,
+                true
+              ),
+            },
+          })
+          .instruction();
+      } else if (asset?.compression.compressed) {
+        distributeIx = await (
+          await distributeCompressionRewards({
+            program: this.ldProgram,
+            assetId: new PublicKey(keyToAsset.asset!),
+            lazyDistributor: this.lazyDistributor,
+            rewardsMint: DNT,
+            payer: wallet,
+          })
+        ).instruction();
+      } else {
+        distributeIx = await this.ldProgram.methods
+          .distributeRewardsV0()
+          .accountsPartial({
+            common: {
+              payer: wallet,
+              recipient: recipient,
+              lazyDistributor: this.lazyDistributor,
+              rewardsMint: DNT,
+              owner: asset!.ownership.owner,
+              destinationAccount: getAssociatedTokenAddressSync(
+                DNT,
+                asset!.ownership.owner,
+                true
+              ),
+            },
+            recipientMintAccount: getAssociatedTokenAddressSync(
+              new PublicKey(keyToAsset.asset!),
+              asset!.ownership.owner,
+              true
+            ),
+          })
+          .instruction();
+      }
+
+      const entityKey = keyToAsset.encodedEntityKey!
+
+      if (!recipientAcc) {
+        if (asset?.compression.compressed) {
+          instructions.push(
+            await (
+              await initializeCompressionRecipient({
+                program: this.ldProgram,
+                assetId: new PublicKey(keyToAsset.asset!),
+                lazyDistributor: this.lazyDistributor,
+                owner: wallet,
+                // Temporarily set oracle as the payer to subsidize new HNT wallets.
+                payer: wallet,
+              })
+            ).instruction()
+          );
+        } else {
+          instructions.push(
+            await this.ldProgram.methods
+              .initializeRecipientV0()
+              .accountsPartial({
+                recipient: recipient,
+                lazyDistributor: this.lazyDistributor,
+                payer: wallet,
+                mint: new PublicKey(keyToAsset.asset!),
+              })
+              .instruction()
+          );
+        }
+      }
+
+      instructions.push(
+        await this.roProgram.methods
+          .setCurrentRewardsWrapperV2({
+            currentRewards: new BN(
+              await this.db.getCurrentRewardsByEntity(entityKey)
+            ),
+            oracleIndex: process.env.ORACLE_INDEX
+              ? parseInt(process.env.ORACLE_INDEX)
+              : 0,
+          })
+          .accountsPartial({
+            lazyDistributor: this.lazyDistributor,
+            recipient,
+            payer: wallet,
+            keyToAsset: new PublicKey(keyToAsset.address!),
+          })
+          .instruction()
+      );
+
+      instructions.push(distributeIx);
+    }
+
+    const { transaction, remainingAccounts } = await compileTransaction(
+      instructions,
+      [
+        [
+          Buffer.from("claim_payer"),
+          asset!.ownership.owner.toBuffer(),
+          bumpBuffer,
+        ],
+      ]
+    );
+    const remoteTx = new RemoteTaskTransactionV0({
+      task,
+      taskQueuedAt,
+      transaction: {
+        ...transaction,
+        accounts: remainingAccounts.map((acc) => acc.pubkey),
+      },
+    });
+    const serialized = await RemoteTaskTransactionV0.serialize(
+      this.tuktukProgram.coder.accounts,
+      remoteTx
+    );
+    const resp = {
+      transaction: serialized.toString("base64"),
+      signature: Buffer.from(
+        sign.detached(Uint8Array.from(serialized), this.oracle.secretKey)
+      ).toString("base64"),
+      remaining_accounts: remainingAccounts.map((acc) => ({
+        pubkey: acc.pubkey.toBase58(),
+        is_signer: acc.isSigner,
+        is_writable: acc.isWritable,
+      })),
+    };
+    reply.status(200).send(resp);
+
+  }
+
   private async tuktukKtaHandler(
     request: FastifyRequest<{
       Params: { keyToAssetKey: string };
@@ -664,199 +907,29 @@ export class OracleServer {
     const task = new PublicKey(request.body.task);
     const taskQueuedAt = new BN(request.body.task_queued_at);
     try {
-      let keyToAsset = await this.hemProgram.account.keyToAssetV0.fetch(
-        new PublicKey(request.params.keyToAssetKey)
-      );
+      let keyToAsset = await KeyToAsset.findOne({
+        where: {
+          address: request.params.keyToAssetKey
+        }
+      });
+      if (!keyToAsset) {
+        reply.status(404).send({
+          message: "Key to asset not found",
+        });
+        return;
+      }
       const asset = await getAsset(
         process.env.ASSET_API_URL ||
-          this.ldProgram.provider.connection.rpcEndpoint,
-        keyToAsset.asset
+        this.ldProgram.provider.connection.rpcEndpoint,
+        new PublicKey(keyToAsset.asset!)
       );
-      const [wallet, bump] = customSignerKey(taskQueue, [
-        Buffer.from("claim_payer"),
-        asset!.ownership.owner.toBuffer(),
-      ]);
-      const bumpBuffer = Buffer.alloc(1);
-      bumpBuffer.writeUint8(bump);
-      const recipient = recipientKey(this.lazyDistributor, keyToAsset.asset)[0];
-      let recipientAcc = await this.ldProgram.account.recipientV0.fetchNullable(
-        recipient
-      );
-      const balance =
-        (await this.ldProgram.provider.connection.getAccountInfo(wallet))
-          ?.lamports || 0;
-
-      const ata = getAssociatedTokenAddressSync(
-        HNT_MINT,
-        !recipientAcc || recipientAcc.destination.equals(PublicKey.default)
-          ? asset!.ownership.owner
-          : recipientAcc?.destination,
-        true
-      );
-      const ataExists =
-        !!(await this.ldProgram.provider.connection.getAccountInfo(ata));
-      const neededBalance =
-        0.00089088 * LAMPORTS_PER_SOL +
-        (recipientAcc ? 0 : RECIPIENT_RENT) +
-        (ataExists ? 0 : ATA_RENT);
-
-      const instructions: TransactionInstruction[] = [];
-      if (balance < neededBalance) {
-        instructions.push(
-          createMemoInstruction(
-            "Couldn't claim rewards due to insufficient balance",
-            [wallet]
-          )
-        );
-      } else {
-        let distributeIx;
-        if (
-          recipientAcc?.destination &&
-          !recipientAcc?.destination.equals(PublicKey.default)
-        ) {
-          const destination = recipientAcc.destination;
-          distributeIx = await this.ldProgram.methods
-            .distributeCustomDestinationV0()
-            .accountsPartial({
-              common: {
-                payer: wallet,
-                recipient: recipient,
-                lazyDistributor: this.lazyDistributor,
-                rewardsMint: DNT,
-                owner: destination,
-                destinationAccount: getAssociatedTokenAddressSync(
-                  DNT,
-                  destination,
-                  true
-                ),
-              },
-            })
-            .instruction();
-        } else if (asset?.compression.compressed) {
-          distributeIx = await (
-            await distributeCompressionRewards({
-              program: this.ldProgram,
-              assetId: keyToAsset.asset,
-              lazyDistributor: this.lazyDistributor,
-              rewardsMint: DNT,
-              payer: wallet,
-            })
-          ).instruction();
-        } else {
-          distributeIx = await this.ldProgram.methods
-            .distributeRewardsV0()
-            .accountsPartial({
-              common: {
-                payer: wallet,
-                recipient: recipient,
-                lazyDistributor: this.lazyDistributor,
-                rewardsMint: DNT,
-                owner: asset!.ownership.owner,
-                destinationAccount: getAssociatedTokenAddressSync(
-                  DNT,
-                  asset!.ownership.owner,
-                  true
-                ),
-              },
-              recipientMintAccount: getAssociatedTokenAddressSync(
-                keyToAsset.asset,
-                asset!.ownership.owner,
-                true
-              ),
-            })
-            .instruction();
-        }
-
-        const entityKey = decodeEntityKey(
-          keyToAsset.entityKey,
-          keyToAsset.keySerialization
-        )!;
-
-        if (!recipientAcc) {
-          if (asset?.compression.compressed) {
-            instructions.push(
-              await (
-                await initializeCompressionRecipient({
-                  program: this.ldProgram,
-                  assetId: keyToAsset.asset,
-                  lazyDistributor: this.lazyDistributor,
-                  owner: wallet,
-                  // Temporarily set oracle as the payer to subsidize new HNT wallets.
-                  payer: wallet,
-                })
-              ).instruction()
-            );
-          } else {
-            instructions.push(
-              await this.ldProgram.methods
-                .initializeRecipientV0()
-                .accountsPartial({
-                  recipient: recipient,
-                  lazyDistributor: this.lazyDistributor,
-                  payer: wallet,
-                  mint: keyToAsset.asset,
-                })
-                .instruction()
-            );
-          }
-        }
-
-        instructions.push(
-          await this.roProgram.methods
-            .setCurrentRewardsWrapperV2({
-              currentRewards: new BN(
-                await this.db.getCurrentRewardsByEntity(entityKey)
-              ),
-              oracleIndex: process.env.ORACLE_INDEX
-                ? parseInt(process.env.ORACLE_INDEX)
-                : 0,
-            })
-            .accountsPartial({
-              lazyDistributor: this.lazyDistributor,
-              recipient,
-              payer: wallet,
-              keyToAsset: new PublicKey(request.params.keyToAssetKey),
-            })
-            .instruction()
-        );
-
-        instructions.push(distributeIx);
+      if (!asset) {
+        reply.status(404).send({
+          message: "Asset not found",
+        });
+        return;
       }
-
-      const { transaction, remainingAccounts } = await compileTransaction(
-        instructions,
-        [
-          [
-            Buffer.from("claim_payer"),
-            asset!.ownership.owner.toBuffer(),
-            bumpBuffer,
-          ],
-        ]
-      );
-      const remoteTx = new RemoteTaskTransactionV0({
-        task,
-        taskQueuedAt,
-        transaction: {
-          ...transaction,
-          accounts: remainingAccounts.map((acc) => acc.pubkey),
-        },
-      });
-      const serialized = await RemoteTaskTransactionV0.serialize(
-        this.tuktukProgram.coder.accounts,
-        remoteTx
-      );
-      const resp = {
-        transaction: serialized.toString("base64"),
-        signature: Buffer.from(
-          sign.detached(Uint8Array.from(serialized), this.oracle.secretKey)
-        ).toString("base64"),
-        remaining_accounts: remainingAccounts.map((acc) => ({
-          pubkey: acc.pubkey.toBase58(),
-          is_signer: acc.isSigner,
-          is_writable: acc.isWritable,
-        })),
-      };
-      reply.status(200).send(resp);
+      return this.handleKta(reply, asset, keyToAsset, taskQueue, task, taskQueuedAt);
     } catch (err) {
       console.error(err);
       reply.status(500).send({
@@ -922,10 +995,12 @@ export class OracleServer {
         );
         for (const entity of entities) {
           instructions.push(
+            // @ts-ignore (we can remove this after a package publish)
             await this.hplCronsProgram.methods
-              .requeueEntityClaimV0()
+              .requeueEntityClaimV1()
               .accounts({
                 keyToAsset: entity.keyToAsset,
+                wallet: new PublicKey(wallet),
               })
               .instruction()
           );

@@ -154,4 +154,17 @@ pub mod hpl_crons {
   ) -> Result<tuktuk_program::RunTaskReturnV0> {
     requeue_relinquish_expired_vote_marker_v0::handler(ctx, args)
   }
+
+  pub fn start_delegation_claim_bot_v1(
+    ctx: Context<StartDelegationClaimBotV1>,
+    args: StartDelegationClaimBotArgsV0,
+  ) -> Result<()> {
+    start_delegation_claim_bot_v1::handler(ctx, args)
+  }
+
+  pub fn requeue_entity_claim_v1(
+    ctx: Context<RequeueEntityClaimV1>,
+  ) -> Result<tuktuk_program::RunTaskReturnV0> {
+    requeue_entity_claim_v1::handler(ctx)
+  }
 }

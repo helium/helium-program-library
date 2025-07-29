@@ -158,4 +158,11 @@ pub mod helium_sub_daos {
   pub fn change_delegation_v0(ctx: Context<ChangeDelegationV0>) -> Result<()> {
     change_delegation_v0::handler(ctx)
   }
+
+  pub fn temp_claim_buggy_rewards(
+    ctx: Context<TempClaimBuggyRewards>,
+    args: ClaimRewardsArgsV0,
+  ) -> Result<()> {
+    temp_claim_buggy_rewards::handler(ctx, args)
+  }
 }

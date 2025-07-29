@@ -44,7 +44,7 @@ export const usePositionsFees = ({
   const { amount: userLamports } = useSolOwnedAmount(wallet)
 
   const rentFee = useMemo(() => {
-    const botFee = automationEnabled && numDelegationClaimBots > 0 ? numDelegationClaimBots * AUTOMATION_BOT_FEE : 0
+    const botFee = automationEnabled ? (numPositions - numDelegationClaimBots) * AUTOMATION_BOT_FEE : 0
     const delegationFee = numDelegatedPositions > 0 ? 0 : numDelegatedPositions * DELEGATION_FEE
     return botFee + delegationFee
   }, [numDelegationClaimBots, numDelegatedPositions, automationEnabled])

@@ -97,6 +97,7 @@ pub fn handler(
   let mut prev_total_utility_score = 0;
   let mut prev_cumulative_not_emitted = 0;
   let mut cumulative_not_emitted = 0;
+  let mut prev_smoothed_hnt_burned = 0;
   let mut not_emitted = 0;
 
   let prev_dao_epoch_info = &mut ctx.accounts.prev_dao_epoch_info;
@@ -106,6 +107,7 @@ pub fn handler(
     prev_supply = info.current_hnt_supply;
     prev_total_utility_score = info.total_utility_score;
     prev_cumulative_not_emitted = info.cumulative_not_emitted;
+    prev_smoothed_hnt_burned = info.smoothed_hnt_burned;
   }
 
   if ctx.accounts.not_emitted_counter.lamports() > 0
@@ -129,6 +131,9 @@ pub fn handler(
   if ctx.accounts.dao_epoch_info.smoothed_hnt_burned == 0 {
     ctx.accounts.dao_epoch_info.smoothed_hnt_burned = 300;
   }
+  if prev_smoothed_hnt_burned == 0 {
+    prev_smoothed_hnt_burned = 300;
+  }
 
   let total_hnt_burned = prev_supply
     .saturating_sub(curr_supply)
@@ -136,7 +141,7 @@ pub fn handler(
   ctx.accounts.dao_epoch_info.smoothed_hnt_burned = (SMOOTHING_FACTOR
     .checked_sub(1)
     .unwrap()
-    .checked_mul(ctx.accounts.dao_epoch_info.smoothed_hnt_burned)
+    .checked_mul(prev_smoothed_hnt_burned)
     .unwrap()
     .checked_div(SMOOTHING_FACTOR)
     .unwrap())

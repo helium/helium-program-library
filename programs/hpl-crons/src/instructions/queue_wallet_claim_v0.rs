@@ -2,6 +2,7 @@ use anchor_lang::{
   prelude::*,
   system_program::{transfer, Transfer},
 };
+use shared_utils::{ORACLE_SIGNER, ORACLE_URL};
 use tuktuk_program::{
   tuktuk::{
     cpi::{accounts::QueueTaskV0, queue_task_v0},
@@ -15,16 +16,6 @@ use tuktuk_program::{
 pub struct QueueWalletClaimArgsV0 {
   pub free_task_id: u16,
 }
-
-#[cfg(feature = "devnet")]
-pub const ORACLE_URL: &str = "https://hnt-rewards.oracle.test-helium.com";
-#[cfg(feature = "devnet")]
-pub const ORACLE_SIGNER: Pubkey = pubkey!("dor5y9KAG6mVGFquXr8ipmm7GVLZefiNiCjvER58kPB");
-
-#[cfg(not(feature = "devnet"))]
-pub const ORACLE_URL: &str = "https://hnt-rewards.oracle.helium.io";
-#[cfg(not(feature = "devnet"))]
-pub const ORACLE_SIGNER: Pubkey = pubkey!("orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q");
 
 pub const NUM_QUEUED_PER_BATCH: u8 = 5;
 
@@ -84,7 +75,10 @@ pub fn handler(ctx: Context<QueueWalletClaimV0>, args: QueueWalletClaimArgsV0) -
   // Queue authority pays for the task rent if it can, since we know it'll come back
   // This makes claim tasks cheaper for users.
   let mut payer = ctx.accounts.payer.to_account_info();
-  let description = "ld wallet claim".to_string();
+  let description = format!("ld wallet {}", ctx.accounts.wallet.key())
+    .chars()
+    .take(40)
+    .collect::<String>();
   let len = 8 + std::mem::size_of::<TaskV0>() + 60 + description.len();
   let rent_needed = Rent::get()?.minimum_balance(len);
   if ctx.accounts.queue_authority.lamports() > rent_needed {

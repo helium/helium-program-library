@@ -3,6 +3,7 @@ import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import {
   EPOCH_LENGTH,
   delegatedPositionKey,
+  getLockupEffectiveEndTs,
 } from "@helium/helium-sub-daos-sdk";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { init as initNftProxy, proxyConfigKey } from "@helium/nft-proxy-sdk";
@@ -239,22 +240,30 @@ export const HeliumVsrStateProvider: React.FC<{
 
             votingPower = votingPower.add(posVotingPower);
 
-            const proxyExpiration = proxy?.expirationTs;
-            const delegationExpiration = delegatedAccounts?.[
-              idx
-            ]?.info?.expirationTs;
-            const isProxyExpired = proxyExpiration?.lt(new BN(now));
+            const proxyExpiration = proxy?.expirationTime;
+            const delegatedAcc = delegatedAccounts?.[idx]?.info;
+            const delegationExpiration = delegatedAcc?.expirationTs;
+            const isProxyExpired =
+              !proxy?.nextVoter?.equals(PublicKey.default) &&
+              proxyExpiration?.lt(new BN(now));
             const isDelegationExpired = delegationExpiration?.lt(new BN(now));
-            const currentSeason = proxyConfig?.seasons
+            const currentSeason = [...(proxyConfig?.seasons || [])]
               ?.reverse()
               ?.find((season) => season.start.lte(new BN(now)));
 
             const isProxyRenewable =
-              proxyExpiration && !isProxyExpired && currentSeason?.end.gt(proxyExpiration);
+              proxyExpiration &&
+              !isProxyExpired &&
+              // Add one day of wiggle room, as proxies assign by number of days in UI.
+              currentSeason?.end?.sub(new BN(EPOCH_LENGTH)).gt(proxyExpiration);
             const isDelegationRenewable =
               delegationExpiration &&
               !isDelegationExpired &&
-              currentSeason?.end.gt(delegationExpiration);
+              currentSeason?.end.gt(delegationExpiration) &&
+              // The delegation might expire before the season end if the position expires before the season end.
+              !getLockupEffectiveEndTs(position.info.lockup).eq(
+                delegationExpiration
+              );
 
             return {
               ...position.info,
@@ -284,6 +293,7 @@ export const HeliumVsrStateProvider: React.FC<{
         myVotingPower,
         proxiedVotingPower,
         proxyAccountsByAsset,
+        delegatedAccounts,
       };
     }
 
@@ -294,6 +304,7 @@ export const HeliumVsrStateProvider: React.FC<{
     registrar,
     delegatedAccounts,
     proxyAccounts,
+    proxyAccountsByAsset,
   ]);
 
   const sortedPositions = useMemo(

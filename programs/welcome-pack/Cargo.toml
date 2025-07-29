@@ -10,7 +10,7 @@ name = "welcome_pack"
 
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
-devnet = []
+devnet = ["shared-utils/devnet"]
 no-genesis = []
 no-entrypoint = []
 no-idl = []

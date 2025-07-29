@@ -25,41 +25,13 @@
         {
           "type": "IotHotspotInfoV0",
           "table": "iot_hotspot_infos",
-          "schema": "public",
-          "plugins": [
-            {
-              "type": "ExtractHexLocation",
-              "config": {
-                "field": "location"
-              }
-            }
-          ]
+          "schema": "public"
         },
         {
           "type": "MobileHotspotInfoV0",
           "table": "mobile_hotspot_infos",
-          "schema": "public",
-          "plugins": [
-            {
-              "type": "ExtractHexLocation",
-              "config": {
-                "field": "location"
-              }
-            }
-          ]
-        }
-      ],
-      "crons": [{ "schedule": "10 0 * * *", "type": "integrity-check" }]
-    },
-    {
-      "programId": "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ",
-      "accounts": [
-        {
-          "type": "BoostConfigV0",
-          "table": "boost_configs",
           "schema": "public"
-        },
-        { "type": "BoostedHexV0", "table": "boosted_hexes", "schema": "public" }
+        }
       ],
       "crons": [{ "schedule": "10 0 * * *", "type": "integrity-check" }]
     },
@@ -77,22 +49,6 @@
           "schema": "public"
         }
       ]
-    },
-    {
-      "programId": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
-      "accounts": [
-        {
-          "type": "DaoEpochInfoV0",
-          "table": "dao_epoch_infos",
-          "schema": "public"
-        },
-        {
-          "type": "SubDaoEpochInfoV0",
-          "table": "sub_dao_epoch_infos",
-          "schema": "public"
-        }
-      ],
-      "crons": [{ "schedule": "10 0 * * *", "type": "integrity-check" }]
     },
     {
       "programId": "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w",

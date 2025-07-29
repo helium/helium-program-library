@@ -7,6 +7,8 @@ use anchor_lang::{
 use bubblegum_cpi::{bubblegum::program::Bubblegum, get_asset_id};
 use lazy_distributor::{LazyDistributorV0, RecipientV0};
 use mini_fanout::{InitializeMiniFanoutArgsV0, MiniFanoutShareArgV0, MiniFanoutV0};
+use shared_utils::{resize_to_fit, ORACLE_SIGNER, ORACLE_URL};
+use tuktuk_program::TransactionSourceV0;
 
 use crate::{error::ErrorCode, UserWelcomePacksV0, WelcomePackV0};
 
@@ -40,7 +42,7 @@ pub struct InitializeWelcomePackV0<'info> {
   #[account(
     init_if_needed,
     payer = payer,
-    space = 8 + 60 + std::mem::size_of::<UserWelcomePacksV0>(),
+    space = if user_welcome_packs.data_len() > 0 { user_welcome_packs.data_len() } else { 8 + 60 + std::mem::size_of::<UserWelcomePacksV0>() },
     seeds = [b"user_welcome_packs".as_ref(), owner.key().as_ref()],
     bump,
   )]
@@ -129,6 +131,7 @@ pub fn handler<'info>(
     rewards_schedule: args.rewards_schedule.clone(),
     asset_return_address: ctx.accounts.asset_return_address.key(),
     bump_seed: ctx.bumps.welcome_pack,
+    unique_id: ctx.accounts.user_welcome_packs.next_unique_id,
   });
   ctx
     .accounts
@@ -137,6 +140,7 @@ pub fn handler<'info>(
       next_id: ctx.accounts.user_welcome_packs.next_id + 1,
       owner: ctx.accounts.owner.key(),
       bump_seed: ctx.bumps.user_welcome_packs,
+      next_unique_id: ctx.accounts.user_welcome_packs.next_unique_id + 1,
     });
 
   let rent = Rent::get()?;
@@ -146,6 +150,10 @@ pub fn handler<'info>(
       schedule: args.rewards_schedule,
       shares: args.rewards_split,
       seed: asset.to_bytes().to_vec(),
+      pre_task: Some(TransactionSourceV0::RemoteV0 {
+        url: format!("{}/v1/tuktuk/asset/{}", ORACLE_URL, asset,),
+        signer: ORACLE_SIGNER,
+      }),
     }))
       + rent.minimum_balance(ATA_SIZE)
       + FANOUT_FUNDING_AMOUNT;
@@ -169,5 +177,12 @@ pub fn handler<'info>(
       needed_transfer_amount,
     )?;
   }
+
+  resize_to_fit(
+    &ctx.accounts.payer.to_account_info(),
+    &ctx.accounts.system_program.to_account_info(),
+    &ctx.accounts.welcome_pack,
+  )?;
+
   Ok(())
 }
