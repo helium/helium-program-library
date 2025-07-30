@@ -727,7 +727,7 @@ export class OracleServer {
     const ataExists =
       !!(await this.ldProgram.provider.connection.getAccountInfo(ata));
     const neededBalance =
-      0.00089088 * LAMPORTS_PER_SOL +
+      ((!ataExists || !recipientAcc) ? 0.00089088 * LAMPORTS_PER_SOL : 0) +
       (recipientAcc ? 0 : RECIPIENT_RENT) +
       (ataExists ? 0 : ATA_RENT);
 
