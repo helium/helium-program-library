@@ -59,7 +59,7 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
       task_queue: ctx.accounts.task_queue.to_account_info(),
       task: ctx.accounts.next_task.to_account_info(),
       queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: if ctx.accounts.next_task.key() == ctx.accounts.rent_refund.key() {
+      rent_refund: if ctx.accounts.next_task.rent_refund == ctx.accounts.rent_refund.key() {
         ctx.accounts.rent_refund.to_account_info()
       } else {
         ctx.accounts.task_queue.to_account_info()
@@ -74,7 +74,7 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
       task_queue: ctx.accounts.task_queue.to_account_info(),
       task: ctx.accounts.next_pre_task.to_account_info(),
       queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: if ctx.accounts.next_pre_task.key() == ctx.accounts.rent_refund.key() {
+      rent_refund: if ctx.accounts.next_pre_task.rent_refund == ctx.accounts.rent_refund.key() {
         ctx.accounts.rent_refund.to_account_info()
       } else {
         ctx.accounts.task_queue.to_account_info()
