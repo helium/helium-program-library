@@ -5,7 +5,7 @@ use tuktuk_program::{
     cpi::{accounts::DequeueTaskV0, dequeue_task_v0},
     program::Tuktuk,
   },
-  TaskQueueAuthorityV0,
+  TaskQueueAuthorityV0, TaskV0,
 };
 
 use crate::{queue_authority_seeds, state::*};
@@ -20,6 +20,7 @@ pub struct CloseMiniFanoutV0<'info> {
     has_one = rent_refund,
     has_one = owner,
     has_one = next_task,
+    has_one = next_pre_task,
     has_one = task_queue
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
@@ -43,7 +44,10 @@ pub struct CloseMiniFanoutV0<'info> {
   pub task_queue: UncheckedAccount<'info>,
   /// CHECK: current task account
   #[account(mut)]
-  pub next_task: UncheckedAccount<'info>,
+  pub next_task: Box<Account<'info, TaskV0>>,
+  /// CHECK: current pre-task account
+  #[account(mut)]
+  pub next_pre_task: Box<Account<'info, TaskV0>>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub system_program: Program<'info, System>,
 }
@@ -55,7 +59,26 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
       task_queue: ctx.accounts.task_queue.to_account_info(),
       task: ctx.accounts.next_task.to_account_info(),
       queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: ctx.accounts.rent_refund.to_account_info(),
+      rent_refund: if ctx.accounts.next_task.key() == ctx.accounts.rent_refund.key() {
+        ctx.accounts.rent_refund.to_account_info()
+      } else {
+        ctx.accounts.task_queue.to_account_info()
+      },
+      task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
+    },
+    &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
+  ))?;
+  dequeue_task_v0(CpiContext::new_with_signer(
+    ctx.accounts.tuktuk_program.to_account_info(),
+    DequeueTaskV0 {
+      task_queue: ctx.accounts.task_queue.to_account_info(),
+      task: ctx.accounts.next_pre_task.to_account_info(),
+      queue_authority: ctx.accounts.queue_authority.to_account_info(),
+      rent_refund: if ctx.accounts.next_pre_task.key() == ctx.accounts.rent_refund.key() {
+        ctx.accounts.rent_refund.to_account_info()
+      } else {
+        ctx.accounts.task_queue.to_account_info()
+      },
       task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
     },
     &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
