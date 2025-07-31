@@ -126,11 +126,11 @@ WITH
     WHERE
       (
         lockup_kind = 'constant'
-        or end_ts > (
+        or end_ts >= (
           floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)
         ) + 60 * 60 * 24
       )
-      AND d.expiration_ts > (floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)) + 60 * 60 * 24
+      AND d.expiration_ts >= (floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)) + 60 * 60 * 24
     GROUP BY s.dnt_mint, s.vehnt_fall_rate, s.vehnt_delegated, s.vehnt_last_calculated_ts, s.vehnt_last_calculated_ts
   )
 SELECT 
