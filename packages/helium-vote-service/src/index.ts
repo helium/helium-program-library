@@ -121,6 +121,12 @@ SELECT
   sub_dao as "subDao"
 FROM positions_with_vetokens p
 JOIN delegated_positions d on d.position = p.address
+WHERE d.expiration_ts >= (floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)) + 60 * 60 * 24 AND (
+        lockup_kind = 'constant'
+        or end_ts >= (
+          floor(current_ts / (60 * 60 * 24)) * (60 * 60 * 24)
+        ) + 60 * 60 * 24
+      )
 GROUP BY sub_dao
       `);
   const result = vetokens[0];
