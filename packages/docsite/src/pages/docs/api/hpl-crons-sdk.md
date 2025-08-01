@@ -384,6 +384,20 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### requeue_entity_claim_v1
+
+#### Accounts
+
+| Name         | Mutability | Signer | Docs |
+| ------------ | ---------- | ------ | ---- |
+| key_to_asset | immut      | no     |      |
+| wallet       | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### requeue_proxy_vote_v0
 
 #### Accounts

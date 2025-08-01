@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.10.30",
+  "version": "0.10.31",
   "description": "Interface to the mobile-entity-manager smart contract",
   "repository": {
     "type": "git",
@@ -32,10 +32,10 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
-    "@helium/anchor-resolvers": "^0.10.30",
-    "@helium/helium-entity-manager-sdk": "^0.10.30",
-    "@helium/idls": "^0.10.30",
-    "@helium/spl-utils": "^0.10.30",
+    "@helium/anchor-resolvers": "^0.10.31",
+    "@helium/helium-entity-manager-sdk": "^0.10.31",
+    "@helium/idls": "^0.10.31",
+    "@helium/spl-utils": "^0.10.31",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
