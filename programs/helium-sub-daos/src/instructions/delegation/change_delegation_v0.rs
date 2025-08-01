@@ -122,7 +122,8 @@ pub struct ChangeDelegationV0<'info> {
     mut,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
     bump = delegated_position.bump_seed,
-    constraint = delegated_position.last_claimed_epoch >= HNT_EPOCH @ ErrorCode::ClaimBeforeChangeDelegation
+    constraint = delegated_position.last_claimed_epoch >= HNT_EPOCH @ ErrorCode::ClaimBeforeChangeDelegation,
+    constraint = delegated_position.expiration_ts > registrar.clock_unix_timestamp() @ ErrorCode::CannotExtendExpiredPosition
   )]
   pub delegated_position: Box<Account<'info, DelegatedPositionV0>>,
 
