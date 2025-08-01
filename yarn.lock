@@ -1196,6 +1196,7 @@ __metadata:
     "@helium/helium-entity-manager-sdk": ^0.10.30
     "@helium/helium-sub-daos-sdk": ^0.10.30
     "@helium/lazy-distributor-sdk": ^0.10.30
+    "@helium/mini-fanout-sdk": ^0.10.30
     "@helium/mobile-entity-manager-sdk": ^0.10.30
     "@helium/nft-proxy-sdk": ^0.1.5-alpha.0
     "@helium/organization-sdk": ^0.1.5-alpha.0

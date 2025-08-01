@@ -129,9 +129,6 @@ pub fn get_next_time(mini_fanout: &MiniFanoutV0) -> Result<i64> {
 
 pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Result<()> {
   let mini_fanout = &mut ctx.mini_fanout;
-  if mini_fanout.next_task != Pubkey::default() {
-    return Ok(());
-  }
   let next_time = get_next_time(mini_fanout)?;
   mini_fanout.next_task = ctx.task.key();
 
