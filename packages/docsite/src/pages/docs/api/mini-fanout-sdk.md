@@ -10,17 +10,23 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name                 | Mutability | Signer | Docs |
-| -------------------- | ---------- | ------ | ---- |
-| owner                | immut      | no     |      |
-| mini_fanout          | immut      | no     |      |
-| queue_authority      | immut      | no     |      |
-| task_queue_authority | immut      | no     |      |
-| rent_refund          | immut      | no     |      |
-| task_queue           | immut      | no     |      |
-| next_task            | immut      | no     |      |
-| tuktuk_program       | immut      | no     |      |
-| system_program       | immut      | no     |      |
+| Name                     | Mutability | Signer | Docs |
+| ------------------------ | ---------- | ------ | ---- |
+| owner                    | immut      | no     |      |
+| mini_fanout              | immut      | no     |      |
+| mint                     | immut      | no     |      |
+| queue_authority          | immut      | no     |      |
+| task_queue_authority     | immut      | no     |      |
+| rent_refund              | immut      | no     |      |
+| task_queue               | immut      | no     |      |
+| next_task                | immut      | no     |      |
+| token_account            | immut      | no     |      |
+| owner_token_account      | immut      | no     |      |
+| next_pre_task            | immut      | no     |      |
+| tuktuk_program           | immut      | no     |      |
+| system_program           | immut      | no     |      |
+| token_program            | immut      | no     |      |
+| associated_token_program | immut      | no     |      |
 
 #### Args
 

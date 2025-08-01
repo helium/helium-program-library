@@ -5,7 +5,11 @@ use anchor_lang::{
   system_program::{transfer, Transfer},
 };
 use bubblegum_cpi::{bubblegum::program::Bubblegum, get_asset_id};
-use lazy_distributor::{LazyDistributorV0, RecipientV0};
+use lazy_distributor::{
+  cpi::{accounts::UpdateCompressionDestinationV0, update_compression_destination_v0},
+  program::LazyDistributor,
+  LazyDistributorV0, RecipientV0, UpdateCompressionDestinationArgsV0,
+};
 use mini_fanout::{InitializeMiniFanoutArgsV0, MiniFanoutShareArgV0, MiniFanoutV0};
 use shared_utils::{resize_to_fit, ORACLE_SIGNER, ORACLE_URL};
 use tuktuk_program::TransactionSourceV0;
@@ -33,6 +37,7 @@ pub struct InitializeWelcomePackV0<'info> {
   pub rent_refund: AccountInfo<'info>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
+    mut,
     has_one = lazy_distributor,
     constraint = recipient.asset == get_asset_id(&merkle_tree.key(), args.index as u64) @ ErrorCode::InvalidAsset
   )]
@@ -71,6 +76,7 @@ pub struct InitializeWelcomePackV0<'info> {
   pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,
   pub bubblegum_program: Program<'info, Bubblegum>,
+  pub lazy_distributor_program: Program<'info, LazyDistributor>,
 }
 
 pub const ATA_SIZE: usize = 165;
@@ -83,7 +89,27 @@ pub fn handler<'info>(
   args: InitializeWelcomePackArgsV0,
 ) -> Result<()> {
   let asset = get_asset_id(&ctx.accounts.merkle_tree.key(), args.index as u64);
+  // First, set the custom destination to the owner so claims don't go to the welcome pack
   let remaining_accounts = ctx.remaining_accounts.to_vec();
+  update_compression_destination_v0(
+    CpiContext::new(
+      ctx.accounts.lazy_distributor_program.to_account_info(),
+      UpdateCompressionDestinationV0 {
+        owner: ctx.accounts.owner.to_account_info().clone(),
+        destination: ctx.accounts.owner.to_account_info(),
+        merkle_tree: ctx.accounts.merkle_tree.clone(),
+        compression_program: ctx.accounts.compression_program.to_account_info(),
+        recipient: ctx.accounts.recipient.to_account_info(),
+      },
+    )
+    .with_remaining_accounts(ctx.remaining_accounts.to_vec()),
+    UpdateCompressionDestinationArgsV0 {
+      data_hash: args.data_hash,
+      creator_hash: args.creator_hash,
+      root: args.root,
+      index: args.index,
+    },
+  )?;
   let transfer_accounts = bubblegum_cpi::bubblegum::cpi::accounts::Transfer {
     tree_authority: ctx.accounts.tree_authority.clone(),
     leaf_owner: ctx.accounts.leaf_owner.to_account_info(),
