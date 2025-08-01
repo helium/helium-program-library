@@ -150,16 +150,30 @@ export const setupSubstream = async (
             (output as any).accounts.length > 0;
 
           if (hasAccountChanges) {
-            const accountPromises = (output as any).accounts
-              .map(async (account: IOutputAccount) => {
-                const { owner, address, data, deleted } = account;
-                const ownerKey = new PublicKey(owner);
-                const addressKey = new PublicKey(address);
-                const config = configs.find(
-                  (x) => x.programId === ownerKey.toBase58()
-                );
+            // Group accounts by owner
+            const accountsByOwner = (output as any).accounts.reduce((acc: { [key: string]: IOutputAccount[] }, account: IOutputAccount) => {
+              const ownerKey = new PublicKey(account.owner).toBase58();
+              if (!acc[ownerKey]) {
+                acc[ownerKey] = [];
+              }
+              acc[ownerKey].push(account);
+              return acc;
+            }, {});
 
-                if (!config) return null;
+            // Process each owner's accounts sequentially, but accounts within an owner in parallel
+            // This prevents race conditions in plugins that rely on bidirectional relationships
+            for (const [ownerStr, accounts] of Object.entries(accountsByOwner) as [string, IOutputAccount[]][]) {
+              const ownerKey = new PublicKey(ownerStr);
+              const config = configs.find(
+                (x) => x.programId === ownerStr
+              );
+
+              if (!config) continue;
+
+              const accountPromises = accounts.map(async (account: IOutputAccount) => {
+                const { address, data, deleted } = account;
+                const addressKey = new PublicKey(address);
+                
                 return handleAccountWebhook({
                   fastify: server,
                   programId: ownerKey,
@@ -170,12 +184,12 @@ export const setupSubstream = async (
                   },
                   isDelete: deleted,
                   pluginsByAccountType:
-                    pluginsByAccountTypeByProgram[ownerKey.toBase58()] || {},
+                    pluginsByAccountTypeByProgram[ownerStr] || {},
                 });
-              })
-              .filter(Boolean);
+              });
 
-            await Promise.all(accountPromises);
+              await Promise.all(accountPromises);
+            }
           }
 
           await cursorManager.updateCursor({

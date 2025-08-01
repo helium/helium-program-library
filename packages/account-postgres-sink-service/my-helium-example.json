@@ -69,6 +69,22 @@
           "schema": "public"
         }
       ]
+    },
+    {
+      "programId": "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn",
+      "accounts": [
+        {
+          "type": "MiniFanoutV0",
+          "table": "mini_fanouts",
+          "schema": "public",
+          "plugins": [
+            {
+              "type": "ExplodeMiniFanoutOwnership",
+              "config": {}
+            }
+          ]
+        }
+      ]
     }
   ],
   "indexConfigs": [
