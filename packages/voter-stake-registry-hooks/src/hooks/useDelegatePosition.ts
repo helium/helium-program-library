@@ -13,7 +13,7 @@ import {
   subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { delegationClaimBotKey, init as initHplCrons } from "@helium/hpl-crons-sdk";
-import { batchParallelInstructionsWithPriorityFee, fetchBackwardsCompatibleIdl, HNT_MINT, sleep } from "@helium/spl-utils";
+import { batchParallelInstructionsWithPriorityFee, batchSequentialParallelInstructions, fetchBackwardsCompatibleIdl, HNT_MINT, sleep } from "@helium/spl-utils";
 import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
@@ -96,7 +96,7 @@ export const useDelegatePositions = ({
       programId?: PublicKey;
       // Instead of sending the transaction, let the caller decide
       onInstructions?: (
-        instructions: TransactionInstruction[][]
+        instructions: TransactionInstruction[][] | TransactionInstruction[]
       ) => Promise<void>;
     }) => {
       const isInvalid =
@@ -133,12 +133,18 @@ export const useDelegatePositions = ({
               hsdProgramId: programId,
             })
             if (onInstructions) {
-              await onInstructions(claims);
+              for (const ixs of claims) {
+                await onInstructions(ixs);
+              }
             } else {
-              await batchParallelInstructionsWithPriorityFee(
+              await batchSequentialParallelInstructions({
                 provider,
-                claims,
-              )
+                instructions,
+                onProgress: () => { },
+                triesRemaining: 10,
+                extraSigners: [],
+                maxSignatureBatch: 10,
+              });
             }
             // Close out the expired positions.
             const closeInstructions = await Promise.all(expiredPositions.map(({ position }, index) => {
