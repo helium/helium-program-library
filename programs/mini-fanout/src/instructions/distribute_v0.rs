@@ -210,6 +210,9 @@ pub fn handler<'info>(
     });
   }
 
+  mini_fanout.next_task = ctx.remaining_accounts[mini_fanout.shares.len()].key();
+  mini_fanout.next_pre_task = ctx.remaining_accounts[mini_fanout.shares.len() + 1].key();
+
   // Schedule next task via tuktuk CPI if funds available, else set next_task = Pubkey::default()
   let next_time = get_next_time(mini_fanout)?;
   let compiled_tx = get_task_ix(mini_fanout)?;
@@ -232,9 +235,6 @@ pub fn handler<'info>(
       ),
     });
   }
-
-  mini_fanout.next_task = ctx.remaining_accounts[mini_fanout.shares.len()].key();
-  mini_fanout.next_pre_task = ctx.remaining_accounts[mini_fanout.shares.len() + 1].key();
 
   Ok(RunTaskReturnV0 {
     tasks,
