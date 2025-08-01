@@ -125,10 +125,10 @@ impl<'info> IssueRewardsV0<'info> {
 
 pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result<()> {
   let curr_ts = Clock::get()?.unix_timestamp;
-  let epoch_curr_ts = current_epoch(curr_ts);
+  let curr_ts_epoch = current_epoch(curr_ts);
   let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
 
-  if !TESTING && args.epoch >= epoch_curr_ts {
+  if !TESTING && args.epoch >= curr_ts_epoch {
     return Err(error!(ErrorCode::EpochNotOver));
   }
 
@@ -213,27 +213,6 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
         .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
       MintArgsV0 {
         amount: delegation_rewards_amount, // send some dnt emissions to delegation pool
-      },
-    )?;
-  }
-
-  // Until August 1st, 2025, emit the 2.9M HNT to the treasury.
-  // This contract will be deployed between December 6 and December 7 at UTC midnight.
-  // That means this will emit payment from December 7 to August 1st, 2025 (because epochs are paid in arrears).
-  // This is a total of 237 days. 2.9M HNT / 237 days = 12236.28691983 HNT per day.
-  #[allow(clippy::inconsistent_digit_grouping)]
-  if epoch_curr_ts < 1754006400
-    && ctx.accounts.dnt_mint.key()
-      == Pubkey::from_str("mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6").unwrap()
-  {
-    msg!("Minting HIP-138 HNT to MOBILE treasury");
-    mint_v0(
-      ctx
-        .accounts
-        .mint_treasury_emissions_ctx()
-        .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
-      MintArgsV0 {
-        amount: 12_236_28691983,
       },
     )?;
   }
