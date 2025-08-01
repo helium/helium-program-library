@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.10.31",
+  "version": "0.10.32",
   "description": "Interface to the welcome-pack smart contract",
   "repository": {
     "type": "git",
@@ -32,11 +32,11 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
-    "@helium/anchor-resolvers": "^0.10.31",
-    "@helium/idls": "^0.10.31",
-    "@helium/lazy-distributor-sdk": "^0.10.31",
-    "@helium/mini-fanout-sdk": "^0.10.31",
-    "@helium/spl-utils": "^0.10.31",
+    "@helium/anchor-resolvers": "^0.10.32",
+    "@helium/idls": "^0.10.32",
+    "@helium/lazy-distributor-sdk": "^0.10.32",
+    "@helium/mini-fanout-sdk": "^0.10.32",
+    "@helium/spl-utils": "^0.10.32",
     "@helium/tuktuk-sdk": "^0.0.9",
     "@solana/spl-token": "^0.4.10",
     "bn.js": "^5.2.0",
