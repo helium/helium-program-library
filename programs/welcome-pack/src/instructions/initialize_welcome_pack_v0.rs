@@ -14,7 +14,7 @@ use mini_fanout::{InitializeMiniFanoutArgsV0, MiniFanoutShareArgV0, MiniFanoutV0
 use shared_utils::{resize_to_fit, ORACLE_SIGNER, ORACLE_URL};
 use tuktuk_program::TransactionSourceV0;
 
-use crate::{error::ErrorCode, welcome_pack_seeds, UserWelcomePacksV0, WelcomePackV0};
+use crate::{error::ErrorCode, UserWelcomePacksV0, WelcomePackV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeWelcomePackArgsV0 {
