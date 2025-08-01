@@ -6,8 +6,8 @@ use modular_governance::nft_proxy::accounts::ProxyConfigV0;
 use voter_stake_registry::state::{PositionV0, Registrar};
 
 use crate::{
-  caclulate_vhnt_info, current_epoch, id, try_from, DaoV0, DelegatedPositionV0, SubDaoEpochInfoV0,
-  SubDaoV0,
+  caclulate_vhnt_info, current_epoch, error::ErrorCode, id, try_from, DaoV0, DelegatedPositionV0,
+  SubDaoEpochInfoV0, SubDaoV0,
 };
 
 pub fn get_genesis_end_epoch_bytes(
@@ -102,6 +102,7 @@ pub struct ExtendExpirationTsV0<'info> {
     has_one = position,
     has_one = sub_dao,
     bump = delegated_position.bump_seed,
+    constraint = delegated_position.expiration_ts > registrar.clock_unix_timestamp() @ ErrorCode::CannotExtendExpiredPosition
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
   #[account(

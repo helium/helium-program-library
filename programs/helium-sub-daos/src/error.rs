@@ -61,4 +61,7 @@ pub enum ErrorCode {
 
   #[msg("This position has mobile/iot rewards that need to be claimed before changing delegation")]
   ClaimBeforeChangeDelegation,
+
+  #[msg("Cannot extend an expired position")]
+  CannotExtendExpiredPosition,
 }
