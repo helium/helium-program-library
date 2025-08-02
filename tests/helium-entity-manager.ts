@@ -1013,8 +1013,8 @@ describe("helium-entity-manager", () => {
           antenna: 1,
           elevation: 2,
           azimuth: 3,
-          mechanicalDownTilt: 4,
-          electricalDownTilt: 5,
+          deprecatedMechanicalDownTilt: 4,
+          deprecatedElectricalDownTilt: 5,
         };
 
         const method = (

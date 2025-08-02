@@ -39,8 +39,8 @@ type WifiInfo = {
     antenna: number;
     elevation: number;
     azimuth: number;
-    mechanicalDownTilt: number;
-    electricalDownTilt: number;
+    deprecatedMechanicalDownTilt: number;
+    deprecatedElectricalDownTilt: number;
   };
 };
 
@@ -52,8 +52,8 @@ const hasDeploymentInfo = (wi: WifiInfo) => {
     wi.deploymentInfo.antenna ||
     wi.deploymentInfo.elevation ||
     wi.deploymentInfo.azimuth ||
-    wi.deploymentInfo.mechanicalDownTilt ||
-    wi.deploymentInfo.electricalDownTilt
+    wi.deploymentInfo.deprecatedMechanicalDownTilt ||
+    wi.deploymentInfo.deprecatedElectricalDownTilt
   );
 };
 
@@ -146,8 +146,8 @@ export async function run(args: any = process.argv) {
         antenna: Number(wifiInfo.antenna),
         elevation: Number(wifiInfo.elevation),
         azimuth: Number(wifiInfo.azimuth),
-        mechanicalDownTilt: Number(wifiInfo.mechanical_down_tilt),
-        electricalDownTilt: Number(wifiInfo.electrical_down_tilt),
+        deprecatedMechanicalDownTilt: Number(wifiInfo.mechanical_down_tilt),
+        deprecatedElectricalDownTilt: Number(wifiInfo.electrical_down_tilt),
       },
     })
   );
@@ -203,14 +203,16 @@ export async function run(args: any = process.argv) {
             // decodedAcc.deploymentInfo?.wifiInfoV0?.azimuth ||
             // acc.wifiInfo.deploymentInfo.azimuth ||
             // 0,
-            mechanicalDownTilt:
-              decodedAcc.deploymentInfo?.wifiInfoV0?.mechanicalDownTilt || 0,
+            deprecatedMechanicalDownTilt:
+              decodedAcc.deploymentInfo?.wifiInfoV0
+                ?.deprecatedMechanicalDownTilt || 0,
             // mechanicalDownTilt descrepency was found and backfilled so default to whats on chain
             // decodedAcc.deploymentInfo?.wifiInfoV0?.mechanicalDownTilt ||
             // acc.wifiInfo.deploymentInfo.mechanicalDownTilt ||
             // 0,
-            electricalDownTilt:
-              decodedAcc.deploymentInfo?.wifiInfoV0?.electricalDownTilt || 0,
+            deprecatedElectricalDownTilt:
+              decodedAcc.deploymentInfo?.wifiInfoV0
+                ?.deprecatedElectricalDownTilt || 0,
             // electricalDownTilt descrepency was found and backfilled so default to whats on chain
             // decodedAcc.deploymentInfo?.wifiInfoV0?.electricalDownTilt ||
             // acc.wifiInfo.deploymentInfo.electricalDownTilt ||
