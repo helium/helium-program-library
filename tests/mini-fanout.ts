@@ -243,6 +243,9 @@ describe("mini-fanout", () => {
         newPreTaskId: nextPreTask,
         schedule: "0 0 * * * *",
       })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
         .accounts({
           payer: me,
           miniFanout: fanout,

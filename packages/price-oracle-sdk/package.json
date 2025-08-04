@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.10.30",
+  "version": "0.10.33",
   "description": "Interface to the price oracle smart contract",
   "repository": {
     "type": "git",
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
-    "@helium/idls": "^0.10.30",
-    "@helium/spl-utils": "^0.10.30",
+    "@helium/idls": "^0.10.33",
+    "@helium/spl-utils": "^0.10.33",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
