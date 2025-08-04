@@ -22,7 +22,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
 
         // If destination hasn't changed, nothing to do
         if (prevDestination === newDestination) {
-          return {}
+          return account
         }
 
         // Case 1: Previous destination was a mini fanout, need to clean up old shares
@@ -43,7 +43,8 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
         if (newDestination !== PublicKey.default.toBase58()) {
           const newMiniFanout = await MiniFanout.findByPk(newDestination)
           if (newMiniFanout) {
-            return handleMiniFanout(account.asset, newMiniFanout, transaction)
+            await handleMiniFanout(account.asset, newMiniFanout, transaction)
+            return account
           }
         }
 
@@ -70,7 +71,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
           }, { transaction })
         }
 
-        return {}
+        return account
       } catch (err) {
         console.error("Error exploding recipient destination ownership", err)
         throw err

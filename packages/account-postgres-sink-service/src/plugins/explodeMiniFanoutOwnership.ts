@@ -339,7 +339,7 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
     }
   }
 
-  return {}
+  return account
 }
 
 export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
@@ -378,7 +378,7 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
       try {
         const asset = account.preTask?.remoteV0?.url?.replace("https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/", "").replace("https://hnt-rewards.oracle.test-helium.com/v1/tuktuk/asset/", "")
         if (!asset) {
-          return {}
+          return account
         }
         const recipient = await Recipient.findOne({
           where: {
@@ -388,7 +388,7 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
           }
         })
         if (!recipient) {
-          return {}
+          return account
         }
         return handleMiniFanout(asset, account, transaction)
       } catch (err) {
