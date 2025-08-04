@@ -111,7 +111,7 @@ export const handleAccountWebhook = async ({
       for (const plugin of pluginsByAccountType[accName] || []) {
         if (plugin?.processAccount) {
           try {
-            sanitized = await plugin.processAccount(sanitized, t);
+            sanitized = await plugin.processAccount({ address: account.pubkey, ...sanitized }, t);
           } catch (err) {
             console.log(
               `Plugin processing failed for account ${account.pubkey}`,

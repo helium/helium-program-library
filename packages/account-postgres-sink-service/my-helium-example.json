@@ -56,7 +56,13 @@
         {
           "type": "RecipientV0",
           "table": "recipients",
-          "schema": "public"
+          "schema": "public",
+          "plugins": [
+            {
+              "type": "ExplodeRecipientDestinationOwnership",
+              "config": {}
+            }
+          ]
         }
       ]
     },
@@ -67,6 +73,22 @@
           "type": "WelcomePackV0",
           "table": "welcome_packs",
           "schema": "public"
+        }
+      ]
+    },
+    {
+      "programId": "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn",
+      "accounts": [
+        {
+          "type": "MiniFanoutV0",
+          "table": "mini_fanouts",
+          "schema": "public",
+          "plugins": [
+            {
+              "type": "ExplodeMiniFanoutOwnership",
+              "config": {}
+            }
+          ]
         }
       ]
     }

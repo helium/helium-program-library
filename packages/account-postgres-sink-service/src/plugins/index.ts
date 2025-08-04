@@ -2,8 +2,10 @@ import { IConfig, IInitedPlugin, IPluginConfig } from "../types";
 import { truthy } from "../utils/truthy";
 import { ExtractHexLocationPlugin } from "./extractHexLocation";
 import { EncodeEntityKeyPlugin } from "./encodeEntityKey";
+import { ExplodeMiniFanoutOwnershipPlugin } from "./explodeMiniFanoutOwnership";
+import { ExplodeRecipientDestinationOwnershipPlugin } from "./explodeRecipientDestinationOwnership";
 
-export const Plugins = [ExtractHexLocationPlugin, EncodeEntityKeyPlugin];
+export const Plugins = [ExtractHexLocationPlugin, EncodeEntityKeyPlugin, ExplodeMiniFanoutOwnershipPlugin, ExplodeRecipientDestinationOwnershipPlugin];
 
 export const initPlugins = async (pluginConfigs: IPluginConfig[] = []) =>
   (

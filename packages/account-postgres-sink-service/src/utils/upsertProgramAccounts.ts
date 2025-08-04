@@ -313,7 +313,7 @@ export const upsertProgramAccounts = async ({
               for (const plugin of plugins) {
                 if (plugin?.processAccount) {
                   sanitizedAccount = await plugin.processAccount(
-                    sanitizedAccount,
+                    { ...sanitizedAccount, address: publicKey },
                     transaction
                   );
                 }
