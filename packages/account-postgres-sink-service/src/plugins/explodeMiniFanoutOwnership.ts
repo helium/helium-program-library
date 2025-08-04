@@ -324,19 +324,7 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
       type: 'fanout'
     }
 
-    // If share exists, update it if changed
-    if (oldShare) {
-      const hasChanged =
-        JSON.stringify(oldShare.share) !== JSON.stringify(newShare.share)
-
-      if (hasChanged) {
-        await RewardsRecipient.upsert(toCreate, { transaction })
-      }
-    }
-    // If share is new, add it
-    else {
-      await RewardsRecipient.create(toCreate, { transaction })
-    }
+    await RewardsRecipient.upsert(toCreate, { transaction })
   }
 
   return account
