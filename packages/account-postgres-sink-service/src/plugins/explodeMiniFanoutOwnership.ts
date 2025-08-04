@@ -235,7 +235,7 @@ MiniFanout.init(
       type: DataTypes.INTEGER,
     },
     shares: {
-      type: DataTypes.JSONB,
+      type: DataTypes.ARRAY(DataTypes.JSONB),
     },
     seed: {
       type: DataTypes.BLOB,
