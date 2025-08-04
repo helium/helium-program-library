@@ -882,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
