@@ -7,7 +7,7 @@ import { handleMiniFanout, MiniFanout, RewardsRecipient, Recipient, KeyToAsset }
 export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
   const name = "ExplodeRecipientDestinationOwnership";
   const init = async (config: { [key: string]: any }) => {
-    const updateOnDuplicateFields = [];
+    const updateOnDuplicateFields: string[] = [];
 
     const addFields = () => { };
 

@@ -345,7 +345,7 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
 export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
   const name = "ExplodeMiniFanoutOwnership";
   const init = async (config: { [key: string]: any }) => {
-    const updateOnDuplicateFields = [];
+    const updateOnDuplicateFields: string[] = [];
 
     const existingColumns = (
       await database.query(
