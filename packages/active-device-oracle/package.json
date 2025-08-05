@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.10.33",
+  "version": "0.10.34",
   "description": "Oracle of helium active devices",
   "repository": {
     "type": "git",

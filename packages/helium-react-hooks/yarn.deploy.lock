@@ -63,11 +63,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache-hooks@^0.10.33":
+"@helium/account-fetch-cache-hooks@^0.10.34":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache-hooks@workspace:packages/account-fetch-cache-hooks"
   dependencies:
-    "@helium/account-fetch-cache": ^0.10.33
+    "@helium/account-fetch-cache": ^0.10.34
     "@solana/web3.js": ^1.91.1
     git-format-staged: ^2.1.3
     react-async-hook: ^4.0.0
@@ -79,7 +79,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/account-fetch-cache@^0.10.33":
+"@helium/account-fetch-cache@^0.10.34":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -95,8 +95,8 @@ __metadata:
   resolution: "@helium/helium-react-hooks@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/account-fetch-cache": ^0.10.33
-    "@helium/account-fetch-cache-hooks": ^0.10.33
+    "@helium/account-fetch-cache": ^0.10.34
+    "@helium/account-fetch-cache-hooks": ^0.10.34
     "@solana/spl-token": ^0.3.8
     "@solana/wallet-adapter-react": ^0.15.32
     "@solana/web3.js": ^1.91.1

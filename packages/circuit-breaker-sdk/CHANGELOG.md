@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.34](https://github.com/helium/helium-program-libary/compare/v0.10.33...v0.10.34) (2025-08-05)
+
+**Note:** Version bump only for package @helium/circuit-breaker-sdk
+
+
+
+
+
 ## [0.10.33](https://github.com/helium/helium-program-libary/compare/v0.10.32...v0.10.33) (2025-08-01)
 
 **Note:** Version bump only for package @helium/circuit-breaker-sdk

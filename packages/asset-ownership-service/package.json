@@ -1,7 +1,7 @@
 {
   "name": "@helium/asset-ownership-service",
   "private": true,
-  "version": "0.10.33",
+  "version": "0.10.34",
   "description": "Track asset ownership",
   "repository": {
     "type": "git",
@@ -32,10 +32,10 @@
     "@connectrpc/connect-node": "^1.4.0",
     "@coral-xyz/anchor": "^0.31.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/account-fetch-cache": "^0.10.33",
-    "@helium/helium-entity-manager-sdk": "^0.10.33",
-    "@helium/mobile-entity-manager-sdk": "^0.10.33",
-    "@helium/spl-utils": "^0.10.33",
+    "@helium/account-fetch-cache": "^0.10.34",
+    "@helium/helium-entity-manager-sdk": "^0.10.34",
+    "@helium/mobile-entity-manager-sdk": "^0.10.34",
+    "@helium/spl-utils": "^0.10.34",
     "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
     "@solana/web3.js": "^1.91.1",
     "@substreams/core": "^0.16.0",
