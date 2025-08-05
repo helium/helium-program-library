@@ -265,7 +265,7 @@ MiniFanout.init(
 export const HNT_LAZY_DISTRIBUTOR = "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq"
 
 export async function handleMiniFanout(asset: string, account: { [key: string]: any }, transaction: any) {
-  const prevAccount = await MiniFanout.findByPk(account.address)
+  const prevAccount = await MiniFanout.findByPk(account.address, { transaction })
   const oldShares = prevAccount?.shares || []
   const newShares = (account.shares || []) as MiniFanoutShare[]
 
@@ -302,13 +302,12 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
 
   // Handle updates and additions
   for (const [key, newShare] of newSharesMap) {
-    const oldShare = oldSharesMap.get(key)
-
     const kta = await KeyToAsset.findOne({
       where: {
         dao: 'BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie',
         asset: asset,
-      }
+      },
+      transaction
     })
 
     const toCreate = {
