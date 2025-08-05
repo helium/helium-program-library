@@ -127,24 +127,26 @@ export const useDelegatePositions = ({
           }).filter(({ delegatedPosition }) => delegatedPosition?.info?.expirationTs?.lt(now));
           // Claim and close out expired positions.
           if (expiredPositions.length > 0) {
-            const claims = await formPositionClaims({
-              provider,
-              positions: expiredPositions.map(({ position }) => position),
-              hsdProgramId: programId,
-            })
-            if (onInstructions) {
-              for (const ixs of claims) {
-                await onInstructions(ixs);
-              }
-            } else {
-              await batchSequentialParallelInstructions({
+            if (expiredPositions.some(({ position }) => position.hasRewards)) {
+              const claims = await formPositionClaims({
                 provider,
-                instructions,
-                onProgress: () => { },
-                triesRemaining: 10,
-                extraSigners: [],
-                maxSignatureBatch: 10,
-              });
+                positions: expiredPositions.map(({ position }) => position),
+                hsdProgramId: programId,
+              })
+              if (onInstructions) {
+                for (const ixs of claims) {
+                  await onInstructions(ixs);
+                }
+              } else {
+                await batchSequentialParallelInstructions({
+                  provider,
+                  instructions,
+                  onProgress: () => { },
+                  triesRemaining: 10,
+                  extraSigners: [],
+                  maxSignatureBatch: 10,
+                });
+              }
             }
             // Close out the expired positions.
             const closeInstructions = await Promise.all(expiredPositions.map(({ position }, index) => {
