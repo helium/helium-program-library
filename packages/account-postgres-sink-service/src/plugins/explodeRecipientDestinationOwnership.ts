@@ -16,7 +16,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
       transaction?: any
     ) => {
       try {
-        const prevAccount = await Recipient.findByPk(account.address)
+        const prevAccount = await Recipient.findByPk(account.address, { transaction })
         const prevDestination = prevAccount?.destination || PublicKey.default.toBase58()
         const newDestination = account.destination || PublicKey.default.toBase58()
 
@@ -27,7 +27,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
 
         // Case 1: Previous destination was a mini fanout, need to clean up old shares
         if (prevDestination !== PublicKey.default.toBase58()) {
-          const prevMiniFanout = await MiniFanout.findByPk(prevDestination)
+          const prevMiniFanout = await MiniFanout.findByPk(prevDestination, { transaction })
           if (prevMiniFanout) {
             await RewardsRecipient.destroy({
               where: {
@@ -41,7 +41,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
 
         // Case 2: New destination is a mini fanout
         if (newDestination !== PublicKey.default.toBase58()) {
-          const newMiniFanout = await MiniFanout.findByPk(newDestination)
+          const newMiniFanout = await MiniFanout.findByPk(newDestination, { transaction })
           if (newMiniFanout) {
             await handleMiniFanout(account.asset, newMiniFanout, transaction)
             return account
@@ -54,7 +54,8 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
             where: {
               dao: 'BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie',
               asset: account.asset,
-            }
+            },
+            transaction
           })
 
           await RewardsRecipient.upsert({
