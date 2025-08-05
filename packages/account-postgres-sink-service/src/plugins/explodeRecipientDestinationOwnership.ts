@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import { DataTypes, Model } from "sequelize";
 import { IPlugin, Plugins } from "../types";
 import { database } from "../utils/database";
-import { handleMiniFanout, MiniFanout, RewardsRecipient, Recipient, KeyToAsset } from "./explodeMiniFanoutOwnership";
+import { handleMiniFanout, MiniFanout, RewardsRecipient, Recipient, KeyToAsset, HNT_LAZY_DISTRIBUTOR } from "./explodeMiniFanoutOwnership";
 
 export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
   const name = "ExplodeRecipientDestinationOwnership";
@@ -21,7 +21,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
         const newDestination = account.destination || PublicKey.default.toBase58()
 
         // If destination hasn't changed, nothing to do
-        if (prevDestination === newDestination) {
+        if (prevDestination === newDestination || account.lazyDistributor !== HNT_LAZY_DISTRIBUTOR || (!prevAccount && account.destination === PublicKey.default.toBase58())) {
           return account
         }
 
