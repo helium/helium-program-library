@@ -53,7 +53,7 @@ export const formPositionClaims = async ({
   const connNoCache = new Connection(provider.connection.rpcEndpoint);
   const clock = await connNoCache.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
   const unixNow = Number(clock?.data.readBigInt64LE(8 * 4));
-  const isInvalid = !unixNow || !positions.every((pos) => pos.hasRewards);
+  const isInvalid = !unixNow || !positions.some((pos) => pos.hasRewards);
 
   if (positions.length === 0) {
     return [];
