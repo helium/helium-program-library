@@ -194,7 +194,7 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
 
   // Only clear when we're claiming the most recent epoch. We don't want to clear proposals when we're
   // claiming later in the bitmap but earlier claims haven't gone through yet.
-  if epoch == ctx.accounts.delegated_position.last_claimed_epoch {
+  if epoch == ctx.accounts.delegated_position.last_claimed_epoch + 1 {
     // Only clear if there are old proposals that should be cleared.
     if ctx
       .accounts
