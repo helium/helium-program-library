@@ -71,7 +71,6 @@ export const upsertProgramAccounts = async ({
   ) => {
     return new Promise<void>((resolve, reject) => {
       let hasReceivedData = false;
-      let responseText = "";
       const pipeline = stream
         .pipe(parser())
         .pipe(pick({ filter: "result" }))
@@ -80,7 +79,6 @@ export const upsertProgramAccounts = async ({
       stream.on("data", (chunk) => {
         if (!hasReceivedData) {
           hasReceivedData = true;
-          responseText = chunk.toString();
         }
       });
 
