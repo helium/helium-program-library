@@ -70,10 +70,19 @@ export const upsertProgramAccounts = async ({
     onAccount: (account: any) => Promise<void>
   ) => {
     return new Promise<void>((resolve, reject) => {
+      let hasReceivedData = false;
+      let responseText = "";
       const pipeline = stream
         .pipe(parser())
         .pipe(pick({ filter: "result" }))
         .pipe(streamArray());
+
+      stream.on("data", (chunk) => {
+        if (!hasReceivedData) {
+          hasReceivedData = true;
+          responseText = chunk.toString();
+        }
+      });
 
       pipeline.on("data", async ({ value }) => {
         pipeline.pause();
@@ -85,8 +94,17 @@ export const upsertProgramAccounts = async ({
         }
       });
 
-      pipeline.on("end", () => resolve());
-      pipeline.on("error", (err: any) => reject(err));
+      pipeline.on("end", () => {
+        if (!hasReceivedData) {
+          console.log("Stream ended without receiving any data");
+        }
+        resolve();
+      });
+
+      pipeline.on("error", (err: any) => {
+        console.error("Stream processing error:", err);
+        reject(err);
+      });
     });
   };
 
@@ -108,6 +126,11 @@ export const upsertProgramAccounts = async ({
     await retry(
       async () => {
         try {
+          console.log(
+            `Making RPC call for ${accountType} with filters:`,
+            JSON.stringify(filters, null, 2)
+          );
+
           const result = await axios.post(
             SOLANA_URL,
             {
@@ -128,6 +151,9 @@ export const upsertProgramAccounts = async ({
               timeout: 60000,
             }
           );
+          console.log(
+            `RPC call successful for ${accountType}, processing stream...`
+          );
 
           let batch: {
             account: anchor.web3.AccountInfo<Buffer>;
@@ -136,7 +162,12 @@ export const upsertProgramAccounts = async ({
           const concurrentBatchLimit = 5;
           let activeBatches: Promise<void>[] = [];
 
+          let accountsReceived = 0;
           await streamAccounts(result.data, async (account) => {
+            accountsReceived++;
+            if (accountsReceived === 1) {
+              console.log(`First account received for ${accountType}`);
+            }
             batch.push(account);
             if (batch.length >= batchSize) {
               const currentBatch = batch;
@@ -198,6 +229,9 @@ export const upsertProgramAccounts = async ({
           }
 
           await Promise.all(activeBatches);
+          console.log(
+            `Stream processing complete for ${accountType}. Accounts received: ${accountsReceived}, Accounts processed: ${processedCount}`
+          );
         } catch (err: any) {
           console.error(`RPC call error for ${accountType}:`, err.message);
           throw err;
@@ -220,6 +254,8 @@ export const upsertProgramAccounts = async ({
     console.log(
       `Finished processing ${processedCount} ${accountType} accounts in ${duration} seconds`
     );
+
+    return processedCount;
   };
 
   for (const { type, batchSize = 50000, ...rest } of accounts) {
@@ -260,13 +296,14 @@ export const upsertProgramAccounts = async ({
       }
 
       const now = new Date().toISOString();
-      await processProgramAccounts(
+      const processedCount = await processProgramAccounts(
         connection,
         programId,
         type,
         coderFilters,
         effectiveBatchSize,
         async (chunk, transaction) => {
+          let decodeErrors = 0;
           const accs = (
             await Promise.all(
               chunk.map(async ({ pubkey, account }) => {
@@ -290,12 +327,30 @@ export const upsertProgramAccounts = async ({
                     account: decodedAcc,
                   };
                 } catch (_e) {
-                  console.error(`Decode error ${pubkey}`, _e);
+                  decodeErrors++;
+                  if (decodeErrors <= 3) {
+                    // Only log first 3 decode errors to avoid spam
+                    console.error(`Decode error ${pubkey}:`, _e);
+                  }
                   return null;
                 }
               })
             )
           ).filter(truthy);
+
+          if (decodeErrors > 0) {
+            console.log(
+              `${type} batch: ${accs.length} successful decodes, ${decodeErrors} decode errors out of ${chunk.length} accounts`
+            );
+          }
+
+          // Skip processing if no accounts were successfully decoded
+          if (accs.length === 0) {
+            console.warn(
+              `Skipping batch processing for ${type} - no accounts successfully decoded`
+            );
+            return;
+          }
 
           const updateOnDuplicateFields: string[] = [
             ...Object.keys(accs[0].account),
@@ -338,14 +393,21 @@ export const upsertProgramAccounts = async ({
         }
       );
 
-      if (!rest.ignore_deletes) {
-        await model.destroy({
+      // Only delete old records if we actually processed some accounts
+      if (!rest.ignore_deletes && processedCount > 0) {
+        console.log(`Cleaning up old ${type} records that were not refreshed`);
+        const deletedCount = await model.destroy({
           where: {
             refreshed_at: {
               [Op.lt]: now,
             },
           },
         });
+        console.log(`Deleted ${deletedCount} old ${type} records`);
+      } else if (!rest.ignore_deletes && processedCount === 0) {
+        console.warn(
+          `WARNING: Skipping cleanup for ${type} because no accounts were processed. This may indicate an issue with account fetching.`
+        );
       }
     } catch (err) {
       console.error(`Error processing account type ${type}:`, err);
