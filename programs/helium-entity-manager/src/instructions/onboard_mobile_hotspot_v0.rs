@@ -4,7 +4,7 @@ use account_compression_cpi::account_compression::program::SplAccountCompression
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{burn, Burn, Mint, Token},
+  token::{Burn, Mint, Token},
 };
 use bubblegum_cpi::get_asset_id;
 use data_credits::{
@@ -16,10 +16,9 @@ use data_credits::{
   BurnWithoutTrackingArgsV0, DataCreditsV0,
 };
 use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
-use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 use shared_utils::*;
 
-use crate::{error::ErrorCode, hash_entity_key, state::*, TESTING};
+use crate::{error::ErrorCode, hash_entity_key, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardMobileHotspotArgsV0 {
@@ -98,11 +97,11 @@ pub struct OnboardMobileHotspotV0<'info> {
   pub dc_mint: Box<Account<'info, Mint>>,
   #[account(mut)]
   pub dnt_mint: Box<Account<'info, Mint>>,
+  /// CHECK: Deprecated account, not used anymore.
   #[account(
     address = Pubkey::from_str("DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx").unwrap(),
-    constraint = dnt_price.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceFeedStale,
   )]
-  pub dnt_price: Account<'info, PriceUpdateV2>,
+  pub dnt_price: AccountInfo<'info>,
 
   #[account(
     seeds=[
@@ -207,43 +206,6 @@ pub fn handler<'info>(
     ctx.accounts.burn_ctx(),
     BurnWithoutTrackingArgsV0 { amount: dc_fee },
   )?;
-
-  // Burn the mobile tokens
-  let dnt_fee = fees.mobile_onboarding_fee_usd;
-  let mobile_price_oracle = &ctx.accounts.dnt_price;
-  let message = mobile_price_oracle.price_message;
-  let current_time = Clock::get()?.unix_timestamp;
-  require_gte!(
-    message
-      .publish_time
-      .saturating_add(if TESTING { 6000000 } else { 10 * 60 }.into()),
-    current_time,
-    ErrorCode::PythPriceNotFound
-  );
-  let mobile_price = message.ema_price;
-  require_gt!(mobile_price, 0);
-
-  // Remove the confidence from the price to use the most conservative price
-  // https://docs.pyth.network/price-feeds/solana-price-feeds/best-practices#confidence-intervals
-  let mobile_price_with_conf = mobile_price
-    .checked_sub(i64::try_from(message.ema_conf.checked_mul(2).unwrap()).unwrap())
-    .unwrap();
-  // Exponent is a negative number, likely -8
-  // Since the price is multiplied by an extra 10^8, and we're dividing by that price, need to also multiply
-  // by the exponent
-  let exponent_dec = 10_u64
-    .checked_pow(u32::try_from(-message.exponent).unwrap())
-    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
-
-  require_gt!(mobile_price_with_conf, 0);
-  let mobile_fee = dnt_fee
-    .checked_mul(exponent_dec)
-    .unwrap()
-    .checked_div(mobile_price_with_conf.try_into().unwrap())
-    .unwrap();
-  if mobile_fee > 0 {
-    burn(ctx.accounts.mobile_burn_ctx(), mobile_fee)?;
-  }
 
   resize_to_fit(
     &ctx.accounts.payer,

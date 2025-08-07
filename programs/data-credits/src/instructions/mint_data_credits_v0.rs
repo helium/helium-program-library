@@ -21,6 +21,11 @@ pub struct MintDataCreditsArgsV0 {
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
+pub const HNT_PRICE_FEED_ID: [u8; 32] = [
+  0x64, 0x9f, 0xdd, 0x7e, 0xc0, 0x8e, 0x8e, 0x2a, 0x20, 0xf4, 0x25, 0x72, 0x98, 0x54, 0xe9, 0x02,
+  0x93, 0xdc, 0xbe, 0x23, 0x76, 0xab, 0xc4, 0x71, 0x97, 0xa1, 0x4d, 0xa6, 0xff, 0x33, 0x97, 0x56,
+];
+
 #[derive(Accounts)]
 #[instruction(args: MintDataCreditsArgsV0)]
 pub struct MintDataCreditsV0<'info> {
@@ -31,13 +36,13 @@ pub struct MintDataCreditsV0<'info> {
     ],
     bump = data_credits.data_credits_bump,
     has_one = hnt_mint,
-    has_one = hnt_price_oracle
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
   /// CHECK: Checked by loading with pyth. Also double checked by the has_one on data credits instance.
   #[account(
     constraint = hnt_price_oracle.verification_level == VerificationLevel::Full @ DataCreditsErrors::PythPriceFeedStale,
+    constraint = hnt_price_oracle.price_message.feed_id == HNT_PRICE_FEED_ID,
   )]
   pub hnt_price_oracle: Account<'info, PriceUpdateV2>,
 
