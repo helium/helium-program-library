@@ -1026,6 +1026,8 @@ __metadata:
     "@helium/helium-sub-daos-sdk": ^0.10.34
     "@helium/idls": ^0.10.34
     "@helium/spl-utils": ^0.10.34
+    "@pythnetwork/hermes-client": ^2.0.0
+    "@pythnetwork/pyth-solana-receiver": ^0.10.2
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -3843,12 +3845,36 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@pythnetwork/hermes-client@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@pythnetwork/hermes-client@npm:2.0.0"
+  dependencies:
+    "@zodios/core": ^10.9.6
+    eventsource: ^3.0.5
+    zod: ^3.23.8
+  checksum: d5432c7c83617993a8e32fa4fde578e3b167ea348e5d3e2c681ee7bcf0e311824e00423d5529628f376f3541c888b9a12ed6c04135ea2e2f5872ab638a2dd31c
+  languageName: node
+  linkType: hard
+
 "@pythnetwork/price-service-sdk@npm:1.8.0":
   version: 1.8.0
   resolution: "@pythnetwork/price-service-sdk@npm:1.8.0"
   dependencies:
     bn.js: ^5.2.1
   checksum: e843017db8469bc50c0e77b3db39c9756ff8d1c607a45626797ec4446121b9430770abcddcc15e08be132fa6081a5d872f0f79334cefceb7a1e7455300a1a426
+  languageName: node
+  linkType: hard
+
+"@pythnetwork/pyth-solana-receiver@npm:^0.10.2":
+  version: 0.10.2
+  resolution: "@pythnetwork/pyth-solana-receiver@npm:0.10.2"
+  dependencies:
+    "@coral-xyz/anchor": ^0.29.0
+    "@noble/hashes": ^1.4.0
+    "@pythnetwork/price-service-sdk": 1.8.0
+    "@pythnetwork/solana-utils": 0.4.5
+    "@solana/web3.js": ^1.90.0
+  checksum: 0b4376cb5c927d7571ca1b91216d47251a10aff52faf3d1581b8ac267facdb8214fedea7567e2266b2ba6f31cdb8ae44e6aa2ff7688f368c0582d4d59e89a287
   languageName: node
   linkType: hard
 
@@ -3874,6 +3900,19 @@ __metadata:
     bs58: ^5.0.0
     jito-ts: ^3.0.1
   checksum: 76e9116156d4c620f84e366f300c71a5faee8d01dd708676d71ef8094259550a245d5149322cca07b5a61ebed962470adcea85d66480591c738008f16155fdeb
+  languageName: node
+  linkType: hard
+
+"@pythnetwork/solana-utils@npm:0.4.5":
+  version: 0.4.5
+  resolution: "@pythnetwork/solana-utils@npm:0.4.5"
+  dependencies:
+    "@coral-xyz/anchor": ^0.29.0
+    "@solana/web3.js": ^1.90.0
+    bs58: ^5.0.0
+    jito-ts: ^3.0.1
+    ts-log: ^2.2.7
+  checksum: b877f2147a008403e13939b1b8e8a67d4d19432e46231b28c08d399010408093e9bad553ea2a7d7640496e37f1feac3e9fc01b8895f61c2d2617226a0d92d61e
   languageName: node
   linkType: hard
 
@@ -5325,6 +5364,16 @@ __metadata:
   bin:
     js-yaml: bin/js-yaml.js
   checksum: 51b81597a1d1d79c778b8fae48317eaad78d75223d0b7477ad2b35f47cf63b19504da430bb7a03b326e668b282874242cc123e323e57293be038684cb5e755f8
+  languageName: node
+  linkType: hard
+
+"@zodios/core@npm:^10.9.6":
+  version: 10.9.6
+  resolution: "@zodios/core@npm:10.9.6"
+  peerDependencies:
+    axios: ^0.x || ^1.0.0
+    zod: ^3.x
+  checksum: 482a80bd4da661734f9ed276a92d9275fa1b76011bef26ede4a851e4c495d9103e6c9456074b9e50e4c89ad7e83fcead6ea45ffba615e6ff54b8088433ba47fc
   languageName: node
   linkType: hard
 
@@ -8605,6 +8654,22 @@ __metadata:
   version: 1.1.1
   resolution: "events@npm:1.1.1"
   checksum: 40431eb005cc4c57861b93d44c2981a49e7feb99df84cf551baed299ceea4444edf7744733f6a6667e942af687359b1f4a87ec1ec4f21d5127dac48a782039b9
+  languageName: node
+  linkType: hard
+
+"eventsource-parser@npm:^3.0.1":
+  version: 3.0.3
+  resolution: "eventsource-parser@npm:3.0.3"
+  checksum: a052aaedb89da8744219aea539343dabc54c6e032acc47f182a90fbbb083583208fbe0f786d7bc1182da098c88a391b7881b59a3fc921a73b718f25d1ee37425
+  languageName: node
+  linkType: hard
+
+"eventsource@npm:^3.0.5":
+  version: 3.0.7
+  resolution: "eventsource@npm:3.0.7"
+  dependencies:
+    eventsource-parser: ^3.0.1
+  checksum: cd8cbc3418238b9d751b6652edf442d4b869829fbc3b73444abca1816fe3d23dc707130dd9a990360bc27c281d986f2f62059d870921173425c3ac28d20a8414
   languageName: node
   linkType: hard
 
@@ -16475,6 +16540,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ts-log@npm:^2.2.7":
+  version: 2.2.7
+  resolution: "ts-log@npm:2.2.7"
+  checksum: c423a5eb54abb9471578902953814d3d0c88b3f237db016998f8998ecf982cb0f748bb8ebf93670eeba9b836ff0ce407d8065a340f3ab218ea7b9442c255b3d4
+  languageName: node
+  linkType: hard
+
 "ts-mocha@npm:^10.0.0":
   version: 10.0.0
   resolution: "ts-mocha@npm:10.0.0"
@@ -17709,5 +17781,12 @@ __metadata:
   version: 0.1.0
   resolution: "yocto-queue@npm:0.1.0"
   checksum: f77b3d8d00310def622123df93d4ee654fc6a0096182af8bd60679ddcdfb3474c56c6c7190817c84a2785648cdee9d721c0154eb45698c62176c322fb46fc700
+  languageName: node
+  linkType: hard
+
+"zod@npm:^3.23.8":
+  version: 3.25.76
+  resolution: "zod@npm:3.25.76"
+  checksum: c9a403a62b329188a5f6bd24d5d935d2bba345f7ab8151d1baa1505b5da9f227fb139354b043711490c798e91f3df75991395e40142e6510a4b16409f302b849
   languageName: node
   linkType: hard

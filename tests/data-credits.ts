@@ -23,6 +23,7 @@ import {
   delegatedDataCreditsKey,
   escrowAccountKey,
   init,
+  mintDataCredits,
 } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
@@ -148,9 +149,6 @@ describe("data-credits", () => {
         hntMint,
         dcMint,
         payer: me,
-        hntPriceOracle: new PublicKey(
-          "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
-        ),
       });
     dcKey = (await method.pubkeys()).dataCredits!;
     await method.rpc({
@@ -235,13 +233,14 @@ describe("data-credits", () => {
     });
 
     it("mints some data credits with hnt amount", async () => {
-      await program.methods
-        .mintDataCreditsV0({
-          hntAmount: new BN(1 * 10 ** 8),
-          dcAmount: null,
-        })
-        .accountsPartial({ dcMint })
-        .rpc({ skipPreflight: true });
+      const { txs, priceUpdates } = await mintDataCredits({
+        dcMint,
+        program,
+        hntAmount: new BN(1 * 10 ** 8),
+      });
+      console.log('txs', JSON.stringify(txs, null, 2));
+
+      await provider.sendAll(txs, { skipPreflight: true })
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
@@ -249,18 +248,15 @@ describe("data-credits", () => {
       assert(dcAtaAcc.isFrozen);
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
       const hntBal = await provider.connection.getTokenAccountBalance(hntAta);
-      const price = await pythProgram.account.priceUpdateV2.fetch(
-        new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
-      );
-      console.log(price);
+      const price = priceUpdates.parsed![0];
 
       const approxEndBal =
         startDcBal +
         Math.floor(
-          price.priceMessage.emaPrice
-            .sub(price.priceMessage.emaConf.mul(new BN(2)))
+          new BN(price.ema_price.price)
+            .sub(new BN(price.ema_price.conf).mul(new BN(2)))
             .toNumber() *
-          10 ** price.priceMessage.exponent *
+          10 ** price.ema_price.expo *
           10 ** 5
         );
       expect(dcBal.value.uiAmount).to.be.within(
@@ -272,13 +268,13 @@ describe("data-credits", () => {
 
     it("mints some data credits with dc amount", async () => {
       let dcAmount = 1428 * 10 ** 5;
-      await program.methods
-        .mintDataCreditsV0({
-          hntAmount: null,
-          dcAmount: new BN(dcAmount),
-        })
-        .accountsPartial({ dcMint })
-        .rpc({ skipPreflight: true });
+      const { txs, priceUpdates } = await mintDataCredits({
+        dcMint,
+        program,
+        dcAmount: new BN(dcAmount),
+      });
+
+      await provider.sendAll(txs)
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
@@ -289,14 +285,12 @@ describe("data-credits", () => {
         await getAssociatedTokenAddress(hntMint, me)
       );
 
-      const price = await pythProgram.account.priceUpdateV2.fetch(
-        new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
-      );
+      const price = priceUpdates.parsed![0];
       const hntEmaPrice =
-        price.priceMessage.emaPrice
-          .sub(price.priceMessage.emaConf.mul(new BN(2)))
+        new BN(price.ema_price.price)
+          .sub(new BN(price.ema_price.conf).mul(new BN(2)))
           .toNumber() *
-        10 ** price.priceMessage.exponent;
+        10 ** price.ema_price.expo;
       const hntAmount =
         (Math.floor(dcAmount * 10 ** (hntDecimals - 5)) / hntEmaPrice) *
         10 ** -hntDecimals;
@@ -340,7 +334,6 @@ describe("data-credits", () => {
       await program.methods
         .updateDataCreditsV0({
           newAuthority: PublicKey.default,
-          hntPriceOracle: null,
         })
         .accountsPartial({
           dcMint,

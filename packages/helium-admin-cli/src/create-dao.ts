@@ -170,10 +170,6 @@ export async function run(args: any = process.argv) {
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
-    hntPriceOracle: {
-      type: "string",
-      required: true,
-    },
     rewardsOracleUrl: {
       alias: "ro",
       type: "string",
@@ -442,7 +438,6 @@ export async function run(args: any = process.argv) {
       .accountsPartial({
         hntMint: hntKeypair.publicKey,
         dcMint: dcKeypair.publicKey,
-        hntPriceOracle: new PublicKey(argv.hntPriceOracle),
       })
       .rpc({ skipPreflight: true });
 
