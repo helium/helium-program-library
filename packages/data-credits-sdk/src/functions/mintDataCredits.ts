@@ -14,12 +14,14 @@ export async function mintDataCredits({
   dcMint = DC_MINT,
   dcAmount,
   hntAmount,
-  program
+  program,
+  recipient,
 }: {
   dcMint?: PublicKey,
   dcAmount?: BN,
   hntAmount?: BN,
   program: Program<DataCredits>,
+  recipient?: PublicKey,
 }) {
 
   if (!hntAmount && !dcAmount) {
@@ -62,7 +64,7 @@ export async function mintDataCredits({
             hntAmount: hntAmount ? hntAmount : null,
             dcAmount: dcAmount ? dcAmount : null,
           })
-          .accountsPartial({ dcMint, hntPriceOracle: getPriceUpdateAccount(HNT_PRICE_FEED_ID) })
+          .accountsPartial({ dcMint, hntPriceOracle: getPriceUpdateAccount(HNT_PRICE_FEED_ID), recipient })
           .instruction(),
         signers: [],
       }];

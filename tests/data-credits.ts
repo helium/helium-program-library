@@ -4,10 +4,6 @@ import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
 import {
-  PythSolanaReceiver,
-  pythSolanaReceiverIdl,
-} from "@helium/currency-utils";
-import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAccount,
   getAssociatedTokenAddress,
@@ -85,7 +81,6 @@ describe("data-credits", () => {
   let hsdProgram: Program<HeliumSubDaos>;
   let vsrProgram: Program<VoterStakeRegistry>;
   let nftProxyProgram: Program<NftProxy>;
-  let pythProgram: Program<PythSolanaReceiver>;
   let dcKey: PublicKey;
   let hntMint: PublicKey;
   let dcMint: PublicKey;
@@ -97,9 +92,6 @@ describe("data-credits", () => {
   const me = provider.wallet.publicKey;
 
   before(async () => {
-    pythProgram = new Program(
-      pythSolanaReceiverIdl as any,
-    );
     program = await init(
       provider,
       PROGRAM_ID,
