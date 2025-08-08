@@ -26,16 +26,11 @@ export async function mintDataCredits({
     throw new Error("Either hntAmount or dcAmount must be provided");
   }
 
-  // The URL below is a public Hermes instance operated by the Pyth Data Association.
-  // Hermes is also available from several third-party providers listed here:
-  // https://docs.pyth.network/price-feeds/api-instances-and-providers/hermes
   const priceServiceConnection = new HermesClient(
     PYTH_HERMES_URL,
     {}
   );
 
-  // Hermes provides other methods for retrieving price updates. See
-  // https://hermes.pyth.network/docs for more information.
   const priceUpdates = (
     await priceServiceConnection.getLatestPriceUpdates(
       [HNT_PRICE_FEED_ID],
