@@ -27,16 +27,13 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
 
         // Case 1: Previous destination was a mini fanout, need to clean up old shares
         if (prevDestination !== PublicKey.default.toBase58()) {
-          const prevMiniFanout = await MiniFanout.findByPk(prevDestination, { transaction })
-          if (prevMiniFanout) {
-            await RewardsRecipient.destroy({
-              where: {
-                asset: account.asset,
-                type: 'fanout'
-              },
-              transaction
-            })
-          }
+          await RewardsRecipient.destroy({
+            where: {
+              asset: account.asset,
+              type: 'fanout'
+            },
+            transaction
+          })
         }
 
         // Case 2: New destination is a mini fanout
