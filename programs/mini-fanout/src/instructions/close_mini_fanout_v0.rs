@@ -64,6 +64,9 @@ pub struct CloseMiniFanoutV0<'info> {
   /// CHECK: current pre-task account
   #[account(mut)]
   pub next_pre_task: Box<Account<'info, TaskV0>>,
+  /// CHECK: task rent refund account
+  #[account(mut)]
+  pub task_rent_refund: UncheckedAccount<'info>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -98,11 +101,7 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
       task_queue: ctx.accounts.task_queue.to_account_info(),
       task: ctx.accounts.next_task.to_account_info(),
       queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: if ctx.accounts.next_task.rent_refund == ctx.accounts.rent_refund.key() {
-        ctx.accounts.rent_refund.to_account_info()
-      } else {
-        ctx.accounts.task_queue.to_account_info()
-      },
+      rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
       task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
     },
     &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
@@ -113,11 +112,7 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
       task_queue: ctx.accounts.task_queue.to_account_info(),
       task: ctx.accounts.next_pre_task.to_account_info(),
       queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: if ctx.accounts.next_pre_task.rent_refund == ctx.accounts.rent_refund.key() {
-        ctx.accounts.rent_refund.to_account_info()
-      } else {
-        ctx.accounts.task_queue.to_account_info()
-      },
+      rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
       task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
     },
     &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
