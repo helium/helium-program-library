@@ -1,5 +1,5 @@
-import { init as initDc } from "@helium/data-credits-sdk";
-import { toBN, DC_MINT } from "@helium/spl-utils";
+import { init as initDc, mintDataCredits } from "@helium/data-credits-sdk";
+import { toBN, DC_MINT, sendInstructions } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
 import { createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
@@ -57,25 +57,24 @@ export async function run(args: any = process.argv) {
       throw e;
     }
   }
+
+  await sendInstructions(provider, [
+    await createAssociatedTokenAccountIdempotentInstruction(
+      provider.wallet.publicKey,
+      getAssociatedTokenAddressSync(dcKey, destination, true),
+      destination,
+      dcKey
+    )
+  ])
+  const {txs} = await mintDataCredits({
+    program: dataCreditsProgram,
+    hntAmount: toBN(argv.numHnt, 8),
+    dcMint: dcKey,
+    recipient: destination,
+  })
+
+  await provider.sendAll(txs)
   
-  await dataCreditsProgram.methods
-    .mintDataCreditsV0({
-      hntAmount: toBN(argv.numHnt, 8),
-      dcAmount: null
-    })
-    .preInstructions([
-      await createAssociatedTokenAccountIdempotentInstruction(
-        provider.wallet.publicKey,
-        getAssociatedTokenAddressSync(dcKey, destination, true),
-        destination,
-        dcKey
-      )
-    ])
-    .accountsPartial({
-      dcMint: dcKey,
-      recipient: destination,
-    })
-    .rpc({ skipPreflight: true });
   const postBalance = (
     await provider.connection.getTokenAccountBalance(destAta, "confirmed")
   ).value.uiAmount;

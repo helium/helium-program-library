@@ -76,9 +76,6 @@ export const initTestDataCredits = async (
     .accountsPartial({
       hntMint,
       dcMint,
-      hntPriceOracle: new PublicKey(
-        "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
-      ),
     });
 
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;

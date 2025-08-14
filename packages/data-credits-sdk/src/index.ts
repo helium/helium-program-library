@@ -5,9 +5,10 @@ import { PROGRAM_ID } from "./constants";
 import { dataCreditsResolvers } from "./resolvers";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
-
 export * from "./constants";
 export * from "./pdas";
+
+export { mintDataCredits } from "./functions/mintDataCredits";
 
 export async function init(
   provider: AnchorProvider,

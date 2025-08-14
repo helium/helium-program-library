@@ -34,7 +34,7 @@ import {
 import { BN } from "bn.js";
 import chai, { assert, expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
-import { init as dcInit } from "../packages/data-credits-sdk/src";
+import { init as dcInit, mintDataCredits } from "../packages/data-credits-sdk/src";
 import {
   init as issuerInit,
   onboardIotHotspot,
@@ -211,13 +211,13 @@ describe("helium-sub-daos", () => {
     async function burnDc(
       amount: number
     ): Promise<{ subDaoEpochInfo: PublicKey }> {
-      await dcProgram.methods
-        .mintDataCreditsV0({
+      await provider.sendAll(
+        (await mintDataCredits({
+          program: dcProgram,
           hntAmount: toBN(amount, 8),
-          dcAmount: null,
-        })
-        .accountsPartial({ dcMint })
-        .rpc({ skipPreflight: true });
+          dcMint,
+        })).txs
+      );
 
       await sendInstructions(provider, [
         SystemProgram.transfer({
@@ -606,14 +606,13 @@ describe("helium-sub-daos", () => {
             .signers([makerKeypair, eccVerifier]);
 
           await issueMethod.rpc({ skipPreflight: true });
-          await dcProgram.methods
-            .mintDataCreditsV0({
-              // $50 onboard, $10 location assert
+          await provider.sendAll(
+            (await mintDataCredits({
+              program: dcProgram,
               dcAmount: toBN(60, 5),
-              hntAmount: null,
-            })
-            .accountsPartial({ dcMint })
-            .rpc({ skipPreflight: true });
+              dcMint,
+            })).txs
+          );
 
           const method = (
             await onboardIotHotspot({

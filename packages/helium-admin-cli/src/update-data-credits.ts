@@ -30,9 +30,6 @@ export async function run(args: any = process.argv) {
     newAuthority: {
       type: 'string',
     },
-    hntPriceOracle: {
-      type: 'string',
-    },
     executeTransaction: {
       type: 'boolean',
     },
@@ -67,9 +64,6 @@ export async function run(args: any = process.argv) {
       .updateDataCreditsV0({
         newAuthority: argv.newAuthority
           ? new PublicKey(argv.newAuthority)
-          : null,
-        hntPriceOracle: argv.hntPriceOracle
-          ? new PublicKey(argv.hntPriceOracle)
           : null,
       })
       .accountsPartial({
