@@ -333,11 +333,6 @@ describe("mini-fanout", () => {
         provider.connection,
         getAssociatedTokenAddressSync(mint, wallet1.publicKey)
       );
-      const fanoutTokenAccountBefore = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, fanout, true)
-      );
       const wallet3TokenAccountBefore = await getAccount(
         // @ts-ignore
         provider.connection,
@@ -363,7 +358,7 @@ describe("mini-fanout", () => {
       );
 
       const miniFanoutAcc = await program.account.miniFanoutV0.fetch(fanout);
-      expect(Number(fanoutTokenAccount.amount) - Number(fanoutTokenAccountBefore.amount)).to.equal(450000000);
+      expect(Number(fanoutTokenAccount.amount)).to.equal(450000000);
       expect(Number(wallet1TokenAccount.amount) - Number(wallet1TokenAccountBefore.amount)).to.equal(450000000);
       // There was no ATA for this wallet, so the total owed is the amount we couldn't transfer
       expect(Number(miniFanoutAcc.shares[1].totalOwed.toString())).to.equal(450000000);
