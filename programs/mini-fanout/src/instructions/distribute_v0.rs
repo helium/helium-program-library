@@ -197,13 +197,14 @@ pub fn handler<'info>(
   // Pay min crank reward to task_queue from mini_fanout, if available
   let min_rent_exempt = Rent::get()?.minimum_balance(mini_fanout_info.data_len());
   if mini_fanout_info.lamports() - min_rent_exempt >= ctx.accounts.task_queue.min_crank_reward {
-    mini_fanout.sub_lamports(ctx.accounts.task_queue.min_crank_reward)?;
+    mini_fanout.sub_lamports(ctx.accounts.task_queue.min_crank_reward * 2)?;
     ctx
       .accounts
       .task_queue
-      .add_lamports(ctx.accounts.task_queue.min_crank_reward)?;
+      .add_lamports(ctx.accounts.task_queue.min_crank_reward * 2)?;
   } else {
     mini_fanout.next_task = Pubkey::default();
+    mini_fanout.next_pre_task = Pubkey::default();
     return Ok(RunTaskReturnV0 {
       tasks: vec![],
       accounts: vec![],

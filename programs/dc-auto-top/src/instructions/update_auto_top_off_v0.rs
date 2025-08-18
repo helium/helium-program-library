@@ -13,26 +13,25 @@ use tuktuk_program::{
 };
 
 use crate::{
-  errors::ErrorCode, queue_authority_seeds, schedule_impl, schedule_task_v0::ScheduleTaskV0,
-  state::*, MiniFanoutShareArgV0, ScheduleTaskArgsV0, MAX_SHARES,
+  queue_authority_seeds, schedule_impl, schedule_task_v0::ScheduleTaskV0, state::*,
+  ScheduleTaskArgsV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
-pub struct UpdateMiniFanoutArgsV0 {
+pub struct UpdateAutoTopOffArgsV0 {
   pub new_task_id: u16,
-  pub new_pre_task_id: u16,
-  pub shares: Option<Vec<MiniFanoutShareArgV0>>,
+  pub new_pyth_task_id: u16,
   pub schedule: Option<String>,
 }
 
 #[derive(Accounts)]
-#[instruction(args: UpdateMiniFanoutArgsV0)]
-pub struct UpdateMiniFanoutV0<'info> {
-  pub owner: Signer<'info>,
+#[instruction(args: UpdateAutoTopOffArgsV0)]
+pub struct UpdateAutoTopOffV0<'info> {
+  pub authority: Signer<'info>,
   #[account(mut)]
   pub payer: Signer<'info>,
-  #[account(mut, has_one = owner, has_one = next_task, has_one = task_queue, has_one = next_pre_task)]
-  pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
+  #[account(mut, has_one = authority, has_one = next_task, has_one = task_queue, has_one = next_pyth_task)]
+  pub auto_top_off: Box<Account<'info, AutoTopOffV0>>,
   /// CHECK: queue authority
   #[account(
     seeds = [b"queue_authority"],
@@ -54,52 +53,30 @@ pub struct UpdateMiniFanoutV0<'info> {
   pub next_task: UncheckedAccount<'info>,
   /// CHECK: next pre task account
   #[account(mut)]
-  pub next_pre_task: UncheckedAccount<'info>,
+  pub next_pyth_task: UncheckedAccount<'info>,
   /// CHECK: new task account
   #[account(mut)]
   pub new_task: UncheckedAccount<'info>,
   /// CHECK: new pre task account
   #[account(mut)]
-  pub new_pre_task: UncheckedAccount<'info>,
+  pub new_pyth_task: UncheckedAccount<'info>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -> Result<()> {
-  let mini_fanout = &mut ctx.accounts.mini_fanout;
-  if let Some(shares) = args.shares {
-    require_gte!(shares.len(), 1, ErrorCode::InvalidShares);
-    require_gte!(MAX_SHARES, shares.len(), ErrorCode::InvalidShares);
-    mini_fanout.shares = shares
-      .into_iter()
-      .map(|s| {
-        let existing_share = mini_fanout
-          .shares
-          .iter()
-          .find(|share| share.wallet == s.wallet);
-        MiniFanoutShareV0 {
-          wallet: s.wallet,
-          share: s.share,
-          delegate: existing_share
-            .map(|s| s.delegate)
-            .unwrap_or(Pubkey::default()),
-          total_dust: existing_share.map(|s| s.total_dust).unwrap_or(0),
-          total_owed: existing_share.map(|s| s.total_owed).unwrap_or(0),
-        }
-      })
-      .collect()
-  }
+pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -> Result<()> {
+  let auto_top_off = &mut ctx.accounts.auto_top_off;
   if let Some(schedule) = args.schedule {
     Schedule::from_str(&schedule).map_err(|e| {
       msg!("Invalid schedule {}", e);
       crate::errors::ErrorCode::InvalidSchedule
     })?;
-    mini_fanout.schedule = schedule;
+    auto_top_off.schedule = schedule;
   }
   resize_to_fit(
     &ctx.accounts.payer.to_account_info(),
     &ctx.accounts.system_program.to_account_info(),
-    mini_fanout,
+    auto_top_off,
   )?;
   if !ctx.accounts.next_task.data_is_empty() {
     dequeue_task_v0(CpiContext::new_with_signer(
@@ -111,27 +88,27 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
         rent_refund: ctx.accounts.payer.to_account_info(),
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
-      &[queue_authority_seeds!(mini_fanout)],
+      &[queue_authority_seeds!(auto_top_off)],
     ))?;
   }
-  if !ctx.accounts.next_pre_task.data_is_empty() {
+  if !ctx.accounts.next_pyth_task.data_is_empty() {
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
-        task: ctx.accounts.next_pre_task.to_account_info(),
+        task: ctx.accounts.next_pyth_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
         rent_refund: ctx.accounts.payer.to_account_info(),
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
-      &[queue_authority_seeds!(mini_fanout)],
+      &[queue_authority_seeds!(auto_top_off)],
     ))?;
   }
 
   schedule_impl(
     &mut ScheduleTaskV0 {
       payer: ctx.accounts.payer.clone(),
-      mini_fanout: mini_fanout.clone(),
+      auto_top_off: auto_top_off.clone(),
       next_task: ctx.accounts.next_task.clone(),
       tuktuk_program: ctx.accounts.tuktuk_program.clone(),
       queue_authority: ctx.accounts.queue_authority.clone(),
@@ -139,16 +116,15 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
       task_queue: ctx.accounts.task_queue.clone(),
       system_program: ctx.accounts.system_program.clone(),
       task: ctx.accounts.new_task.clone(),
-      next_pre_task: ctx.accounts.next_pre_task.clone(),
-      pre_task: ctx.accounts.new_pre_task.clone(),
+      pyth_task: ctx.accounts.new_pyth_task.clone(),
     },
     ScheduleTaskArgsV0 {
       task_id: args.new_task_id,
-      pre_task_id: args.new_pre_task_id,
+      pyth_task_id: args.new_pyth_task_id,
     },
   )?;
 
-  mini_fanout.next_task = ctx.accounts.new_task.key();
-  mini_fanout.next_pre_task = ctx.accounts.new_pre_task.key();
+  auto_top_off.next_task = ctx.accounts.new_task.key();
+  auto_top_off.next_pyth_task = ctx.accounts.new_pyth_task.key();
   Ok(())
 }
