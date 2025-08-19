@@ -25,7 +25,6 @@ ENV NODE_ENV=production
 RUN apk add --no-cache git 
 
 COPY --from=BUILD_IMAGE /usr/src/app/lib ./lib
-COPY positions_with_vetokens.sql ./positions_with_vetokens.sql
 COPY --from=BUILD_IMAGE /usr/src/app/.yarn ./.yarn
 COPY --from=BUILD_IMAGE /usr/src/app/node_modules ./node_modules
 

@@ -16,7 +16,8 @@
     "entity-invalidator": "./packages/entity-invalidator",
     "geocoder-service": "./packages/geocoder-service",
     "recent-helium-transactions-service": "./packages/recent-helium-transactions-service",
-    "asset-ownership-service": "./packages/asset-ownership-service"
+    "asset-ownership-service": "./packages/asset-ownership-service",
+    "tuktuk-pyth-service": "./packages/tuktuk-pyth-service"
   },
   "oracle": {
     "distributor-oracle": "./packages/distributor-oracle"
