@@ -15,6 +15,7 @@ pub struct ReturnPythTaskV0<'info> {
   pub task_queue: Account<'info, TaskQueueV0>,
   #[account(has_one = task_queue)]
   pub task: Account<'info, TaskV0>,
+  #[account(mut)]
   pub payer: Signer<'info>,
   pub system_program: Program<'info, System>,
 }
@@ -35,18 +36,16 @@ pub fn handler(
     _ => return Err(ErrorCode::InvalidTaskForPyth.into()),
   };
 
-  if args.free_tasks > 0 {
-    transfer(
-      CpiContext::new(
-        ctx.accounts.system_program.to_account_info(),
-        Transfer {
-          from: ctx.accounts.payer.to_account_info(),
-          to: ctx.accounts.task.to_account_info(),
-        },
-      ),
-      args.free_tasks as u64 * ctx.accounts.task_queue.min_crank_reward,
-    )?;
-  }
+  transfer(
+    CpiContext::new(
+      ctx.accounts.system_program.to_account_info(),
+      Transfer {
+        from: ctx.accounts.payer.to_account_info(),
+        to: ctx.accounts.task.to_account_info(),
+      },
+    ),
+    args.free_tasks as u64 * ctx.accounts.task_queue.min_crank_reward,
+  )?;
   Ok(RunTaskReturnV0 {
     tasks: vec![TaskReturnV0 {
       trigger: TriggerV0::Now {},

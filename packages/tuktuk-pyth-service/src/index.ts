@@ -219,8 +219,10 @@ async function processVaaInstructions(
         index: nextIndex,
         // If next time we're at the last instruction, we don't need to requeue
         freeTasks: (nextIndex + 1) >= allInstructions.length ? 0 : 1,
-      }).accounts({
+      }).accountsPartial({
         task: task,
+        taskQueue: taskQueue,
+        payer: payer,
       }).instruction();
     }
 
@@ -276,8 +278,10 @@ async function processVaaInstructions(
           instruction: await hplCronsProgram.methods.returnPythTaskV0({
             index: currentIndex,
             freeTasks: (currentIndex + 1) >= allInstructions.length ? 0 : 1,
-          }).accounts({
+          }).accountsPartial({
             task: task,
+            taskQueue: taskQueue,
+            payer: payer,
           }).instruction(), accountsSize: 0
         })
       }
