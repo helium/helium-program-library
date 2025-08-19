@@ -33,7 +33,6 @@ pub fn handler(
   let (signer, base_url) = match &ctx.accounts.task.transaction {
     TransactionSourceV0::CompiledV0(_) => return Err(ErrorCode::InvalidTaskForPyth.into()),
     TransactionSourceV0::RemoteV0 { signer, url } => (signer, url.split("?").next().unwrap()),
-    _ => return Err(ErrorCode::InvalidTaskForPyth.into()),
   };
 
   transfer(
