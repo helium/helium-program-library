@@ -67,9 +67,6 @@ describe("mini-fanout", () => {
   let taskQueue: PublicKey;
   before(async () => {
     mint = await createMint(provider, 8, me, me)
-    await createAtaAndMint(provider, mint, 1000000000, me)
-    await createAtaAndMint(provider, mint, 0, wallet1.publicKey)
-    await createAtaAndMint(provider, mint, 0, wallet3.publicKey)
 
     await ensureIdls();
     program = await init(provider, PROGRAM_ID, anchor.workspace.MiniFanout.idl);
@@ -138,6 +135,9 @@ describe("mini-fanout", () => {
         },
       }
     ]
+    await createAtaAndMint(provider, mint, 1000000000, me)
+    await createAtaAndMint(provider, mint, 0, wallet1.publicKey)
+    await createAtaAndMint(provider, mint, 0, wallet3.publicKey)
   })
 
 
