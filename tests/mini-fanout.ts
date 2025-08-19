@@ -44,35 +44,10 @@ describe("mini-fanout", () => {
   const me = provider.wallet.publicKey;
 
   let taskQueueName = `test-${Math.random().toString(36).substring(2, 15)}`;
-  const wallet1 = Keypair.generate()
-  const wallet2 = Keypair.generate()
-  const wallet3 = Keypair.generate()
-  const shares = [
-    {
-      wallet: wallet1.publicKey,
-      share: {
-        share: {
-          amount: 50,
-        }
-      },
-    },
-    {
-      wallet: wallet2.publicKey,
-      share: {
-        share: {
-          amount: 50,
-        }
-      },
-    },
-    {
-      wallet: wallet3.publicKey,
-      share: {
-        fixed: {
-          amount: toBN(1, 8),
-        }
-      },
-    }
-  ]
+  let wallet1: Keypair;
+  let wallet2: Keypair;
+  let wallet3: Keypair;
+  let shares: { wallet: PublicKey, share: { share: { amount: number } } | { fixed: { amount: anchor.BN } } }[] = []
   let program: Program<MiniFanout>;
   let tuktukProgram: Program<Tuktuk>;
   let fanoutName: string;
@@ -134,6 +109,35 @@ describe("mini-fanout", () => {
 
   beforeEach(async () => {
     fanoutName = `test-${Math.random().toString(36).substring(2, 15)}`;
+    wallet1 = Keypair.generate()
+    wallet2 = Keypair.generate()
+    wallet3 = Keypair.generate()
+    shares = [
+      {
+        wallet: wallet1.publicKey,
+        share: {
+          share: {
+            amount: 50,
+          }
+        },
+      },
+      {
+        wallet: wallet2.publicKey,
+        share: {
+          share: {
+            amount: 50,
+          }
+        },
+      },
+      {
+        wallet: wallet3.publicKey,
+        share: {
+          fixed: {
+            amount: toBN(1, 8),
+          }
+        },
+      }
+    ]
   })
 
 
@@ -161,8 +165,10 @@ describe("mini-fanout", () => {
     for (let i = 0; i < shares.length; i++) {
       expect(miniFanoutAcc.shares[i].wallet.toBase58()).to.equal(shares[i].wallet.toBase58())
       if ('share' in shares[i].share) {
+        // @ts-ignore
         expect(miniFanoutAcc.shares[i].share.share!.amount).to.equal(shares[i].share.share!.amount)
       } else {
+        // @ts-ignore
         expect(miniFanoutAcc.shares[i].share.fixed!.amount.toString()).to.equal(shares[i].share.fixed!.amount.toString())
       }
       expect(miniFanoutAcc.shares[i].totalDust.toString()).to.equal("0")
