@@ -251,6 +251,7 @@ describe("mini-fanout", () => {
           miniFanout: fanout,
           newTask: taskKey(taskQueue, nextTask)[0],
           newPreTask: taskKey(taskQueue, nextPreTask)[0],
+          taskRentRefund: me,
         })
         .rpcAndKeys()
 
@@ -273,6 +274,9 @@ describe("mini-fanout", () => {
         delegate: newWallet.publicKey,
         index: 0
       })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
         .accounts({
           payer: me,
           wallet: wallet1.publicKey,
@@ -324,6 +328,16 @@ describe("mini-fanout", () => {
 
     it("should distribute tokens to wallets", async () => {
       await new Promise(resolve => setTimeout(resolve, 2000))
+      const wallet1TokenAccountBefore = await getAccount(
+        // @ts-ignore
+        provider.connection,
+        getAssociatedTokenAddressSync(mint, wallet1.publicKey)
+      );
+      const wallet3TokenAccountBefore = await getAccount(
+        // @ts-ignore
+        provider.connection,
+        getAssociatedTokenAddressSync(mint, wallet3.publicKey)
+      );
       await runAllTasks()
 
       // Verify the claims were processed
@@ -345,10 +359,10 @@ describe("mini-fanout", () => {
 
       const miniFanoutAcc = await program.account.miniFanoutV0.fetch(fanout);
       expect(Number(fanoutTokenAccount.amount)).to.equal(450000000);
-      expect(Number(wallet1TokenAccount.amount)).to.equal(450000000);
+      expect(Number(wallet1TokenAccount.amount) - Number(wallet1TokenAccountBefore.amount)).to.equal(450000000);
       // There was no ATA for this wallet, so the total owed is the amount we couldn't transfer
       expect(Number(miniFanoutAcc.shares[1].totalOwed.toString())).to.equal(450000000);
-      expect(Number(wallet3TokenAccount.amount)).to.equal(100000000);
+      expect(Number(wallet3TokenAccount.amount) - Number(wallet3TokenAccountBefore.amount)).to.equal(100000000);
 
       // Verify vouchers were updated
       const nextTask = miniFanoutAcc.nextTask
@@ -447,6 +461,7 @@ describe("mini-fanout", () => {
       await program.methods.closeMiniFanoutV0()
         .accounts({
           miniFanout: fanout,
+          taskRentRefund: me,
         })
         .rpc({ skipPreflight: true })
     })
