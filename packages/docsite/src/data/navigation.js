@@ -128,6 +128,8 @@ export const navigation = [
 
       { title: "Fanout", href: "/docs/api/fanout-sdk" },
 
+      { title: "Dc auto top", href: "/docs/api/dc-auto-top-sdk" },
+
       { title: "Data credits", href: "/docs/api/data-credits-sdk" },
 
       { title: "Circuit breaker", href: "/docs/api/circuit-breaker-sdk" },

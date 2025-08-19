@@ -754,10 +754,6 @@ undefined
 
 undefined
 
-### PriceUpdateV2
-
-undefined
-
 ### ProgramApprovalV0
 
 undefined
@@ -993,10 +989,10 @@ undefined
 
 ### MobileDeploymentInfoV0
 
-| Variant    | Fields                                                                                           |
-| ---------- | ------------------------------------------------------------------------------------------------ |
-| WifiInfoV0 | antenna: u32, elevation: i32, azimuth: u16, mechanical_down_tilt: u16, electrical_down_tilt: u16 |
-| CbrsInfoV0 | radio_infos: [object Object]                                                                     |
+| Variant    | Fields                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| WifiInfoV0 | antenna: u32, elevation: i32, azimuth: u16, mechanical_down_tilt: u16, electrical_down_tilt: u16, serial: [object Object] |
+| CbrsInfoV0 | radio_infos: [object Object]                                                                                              |
 
 ### MobileDeviceTypeV0
 
@@ -1073,28 +1069,6 @@ undefined
 | --------------- | ---- |
 | start_unix_time | i64  |
 | percent         | u8   |
-
-### PriceFeedMessage
-
-| Field             | Type            |
-| ----------------- | --------------- |
-| feed_id           | [object Object] |
-| price             | i64             |
-| conf              | u64             |
-| exponent          | i32             |
-| publish_time      | i64             |
-| prev_publish_time | i64             |
-| ema_price         | i64             |
-| ema_conf          | u64             |
-
-### PriceUpdateV2
-
-| Field              | Type            |
-| ------------------ | --------------- |
-| write_authority    | pubkey          |
-| verification_level | [object Object] |
-| price_message      | [object Object] |
-| posted_slot        | u64             |
 
 ### ProgramApprovalV0
 
@@ -1243,10 +1217,3 @@ undefined
 | new_authority       | pubkey          |
 | settings            | [object Object] |
 | staking_requirement | u64             |
-
-### VerificationLevel
-
-| Variant | Fields             |
-| ------- | ------------------ |
-| Partial | num_signatures: u8 |
-| Full    |                    |

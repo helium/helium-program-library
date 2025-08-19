@@ -440,6 +440,23 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### return_pyth_task_v0
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| task_queue     | immut      | no     |      |
+| task           | immut      | no     |      |
+| payer          | immut      | no     |      |
+| system_program | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### start_delegation_claim_bot_v0
 
 #### Accounts
@@ -574,6 +591,10 @@ undefined
 undefined
 
 ### TaskQueueV0
+
+undefined
+
+### TaskV0
 
 undefined
 
@@ -915,6 +936,13 @@ undefined
 | ----- | --------------- |
 | nodes | [object Object] |
 
+### ReturnPythTaskArgsV0
+
+| Field      | Type |
+| ---------- | ---- |
+| index      | u8   |
+| free_tasks | u8   |
+
 ### RunTaskReturnV0
 
 | Field    | Type            |
@@ -987,6 +1015,22 @@ undefined
 | trigger      | [object Object] |
 | transaction  | [object Object] |
 | crank_reward | u64             |
+| free_tasks   | u8              |
+| description  | string          |
+
+### TaskV0
+
+| Field        | Type            |
+| ------------ | --------------- |
+| task_queue   | pubkey          |
+| rent_amount  | u64             |
+| crank_reward | u64             |
+| id           | u16             |
+| trigger      | [object Object] |
+| rent_refund  | pubkey          |
+| transaction  | [object Object] |
+| queued_at    | i64             |
+| bump_seed    | u8              |
 | free_tasks   | u8              |
 | description  | string          |
 
