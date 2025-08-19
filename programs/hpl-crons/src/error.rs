@@ -10,4 +10,6 @@ pub enum ErrorCode {
   NotVoting,
   #[msg("Must claim IOT/MOBILE delegation rewards before enabling automation")]
   UnclaimedIotMobileRewards,
+  #[msg("Invalid task for pyth")]
+  InvalidTaskForPyth,
 }

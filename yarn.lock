@@ -1035,6 +1035,23 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@helium/dc-auto-top-sdk@workspace:packages/dc-auto-top-sdk":
+  version: 0.0.0-use.local
+  resolution: "@helium/dc-auto-top-sdk@workspace:packages/dc-auto-top-sdk"
+  dependencies:
+    "@coral-xyz/anchor": ^0.31.0
+    "@helium/anchor-resolvers": ^0.10.34
+    "@helium/idls": ^0.10.34
+    "@helium/spl-utils": ^0.10.34
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
+
 "@helium/distributor-oracle@^0.10.34, @helium/distributor-oracle@workspace:packages/distributor-oracle":
   version: 0.0.0-use.local
   resolution: "@helium/distributor-oracle@workspace:packages/distributor-oracle"
@@ -1941,6 +1958,39 @@ __metadata:
   checksum: 9fdf9cf1ff85c71da3cb361031109381b9d7e219b0bee9e829eaab2be5032af9776bce20f46b2894963de72c1ef06dbe3112d45b3b9b0dc9ac7304dbbc3edcaf
   languageName: node
   linkType: hard
+
+"@helium/tuktuk-pyth-service@workspace:packages/tuktuk-pyth-service":
+  version: 0.0.0-use.local
+  resolution: "@helium/tuktuk-pyth-service@workspace:packages/tuktuk-pyth-service"
+  dependencies:
+    "@coral-xyz/anchor": ^0.31.0
+    "@fastify/cors": ^8.1.1
+    "@fastify/static": ^6
+    "@helium/hpl-crons-sdk": ^0.10.34
+    "@helium/idls": ^0.10.34
+    "@helium/spl-utils": ^0.10.34
+    "@helium/tuktuk-idls": ^0.0.9
+    "@helium/tuktuk-sdk": ^0.0.9
+    "@pythnetwork/hermes-client": ^2.0.0
+    "@pythnetwork/price-service-sdk": ^1.8.0
+    "@pythnetwork/pyth-solana-receiver": ^0.11.0
+    "@solana/web3.js": ^1.91.1
+    "@types/bn.js": ^5.1.1
+    "@types/lodash": ^4.17.6
+    "@types/pg": ^8.15.5
+    aws-sdk: ^2.1692.0
+    dotenv: ^16.0.3
+    fastify: ^4.13.0
+    git-format-staged: ^2.1.3
+    pg: ^8.16.3
+    sequelize: ^6.37.7
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    ts-node-dev: ^2.0.0
+    tweetnacl: ^1.0.3
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
 
 "@helium/tuktuk-sdk@npm:^0.0.9":
   version: 0.0.9
@@ -3843,12 +3893,36 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@pythnetwork/price-service-sdk@npm:1.8.0":
+"@pythnetwork/hermes-client@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@pythnetwork/hermes-client@npm:2.0.0"
+  dependencies:
+    "@zodios/core": ^10.9.6
+    eventsource: ^3.0.5
+    zod: ^3.23.8
+  checksum: d5432c7c83617993a8e32fa4fde578e3b167ea348e5d3e2c681ee7bcf0e311824e00423d5529628f376f3541c888b9a12ed6c04135ea2e2f5872ab638a2dd31c
+  languageName: node
+  linkType: hard
+
+"@pythnetwork/price-service-sdk@npm:1.8.0, @pythnetwork/price-service-sdk@npm:^1.8.0":
   version: 1.8.0
   resolution: "@pythnetwork/price-service-sdk@npm:1.8.0"
   dependencies:
     bn.js: ^5.2.1
   checksum: e843017db8469bc50c0e77b3db39c9756ff8d1c607a45626797ec4446121b9430770abcddcc15e08be132fa6081a5d872f0f79334cefceb7a1e7455300a1a426
+  languageName: node
+  linkType: hard
+
+"@pythnetwork/pyth-solana-receiver@npm:^0.11.0":
+  version: 0.11.0
+  resolution: "@pythnetwork/pyth-solana-receiver@npm:0.11.0"
+  dependencies:
+    "@coral-xyz/anchor": ^0.29.0
+    "@noble/hashes": ^1.4.0
+    "@pythnetwork/price-service-sdk": 1.8.0
+    "@pythnetwork/solana-utils": 0.5.0
+    "@solana/web3.js": ^1.90.0
+  checksum: 85994e15e93c55301bd8fe219cec08fd0876a334dd648cf2d45ae6529df8513b8e179532d91445456366a578a66d500e2e5b0d8099d5b1b2451316ebe6fc1dc3
   languageName: node
   linkType: hard
 
@@ -3874,6 +3948,19 @@ __metadata:
     bs58: ^5.0.0
     jito-ts: ^3.0.1
   checksum: 76e9116156d4c620f84e366f300c71a5faee8d01dd708676d71ef8094259550a245d5149322cca07b5a61ebed962470adcea85d66480591c738008f16155fdeb
+  languageName: node
+  linkType: hard
+
+"@pythnetwork/solana-utils@npm:0.5.0":
+  version: 0.5.0
+  resolution: "@pythnetwork/solana-utils@npm:0.5.0"
+  dependencies:
+    "@coral-xyz/anchor": ^0.29.0
+    "@solana/web3.js": ^1.90.0
+    bs58: ^5.0.0
+    jito-ts: ^3.0.1
+    ts-log: ^2.2.7
+  checksum: 7a75241d079979decacf918785933e669367da74b7f5774328d6fbef83088629e814c9480edb12e67cd9ba7b2fbcf93ed24857bcbb173e326694fde33334c411
   languageName: node
   linkType: hard
 
@@ -4890,6 +4977,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/pg@npm:^8.15.5":
+  version: 8.15.5
+  resolution: "@types/pg@npm:8.15.5"
+  dependencies:
+    "@types/node": "*"
+    pg-protocol: "*"
+    pg-types: ^2.2.0
+  checksum: d6ef0be032663a32ec27f9739cf8813f18b991279391102e37fa604c1ccd0517dd7eadb94ebbfc4ff897f6b4900983745010ee8f5a2cbcb2b9311cb76d24a7d2
+  languageName: node
+  linkType: hard
+
 "@types/pg@npm:^8.6.6":
   version: 8.10.2
   resolution: "@types/pg@npm:8.10.2"
@@ -5325,6 +5423,16 @@ __metadata:
   bin:
     js-yaml: bin/js-yaml.js
   checksum: 51b81597a1d1d79c778b8fae48317eaad78d75223d0b7477ad2b35f47cf63b19504da430bb7a03b326e668b282874242cc123e323e57293be038684cb5e755f8
+  languageName: node
+  linkType: hard
+
+"@zodios/core@npm:^10.9.6":
+  version: 10.9.6
+  resolution: "@zodios/core@npm:10.9.6"
+  peerDependencies:
+    axios: ^0.x || ^1.0.0
+    zod: ^3.x
+  checksum: 482a80bd4da661734f9ed276a92d9275fa1b76011bef26ede4a851e4c495d9103e6c9456074b9e50e4c89ad7e83fcead6ea45ffba615e6ff54b8088433ba47fc
   languageName: node
   linkType: hard
 
@@ -6019,6 +6127,24 @@ __metadata:
     uuid: 8.0.0
     xml2js: 0.6.2
   checksum: 60188893d4bdd81f56a3d4b5dd642e8f2ed80816519166ef68decb009fbfcb57a6b389436429f27ec9fa99450f43f21182c718e9660b8a44174485f9ab1102a6
+  languageName: node
+  linkType: hard
+
+"aws-sdk@npm:^2.1692.0":
+  version: 2.1692.0
+  resolution: "aws-sdk@npm:2.1692.0"
+  dependencies:
+    buffer: 4.9.2
+    events: 1.1.1
+    ieee754: 1.1.13
+    jmespath: 0.16.0
+    querystring: 0.2.0
+    sax: 1.2.1
+    url: 0.10.3
+    util: ^0.12.4
+    uuid: 8.0.0
+    xml2js: 0.6.2
+  checksum: 7b245fab02afebeb731db68feeb63c60475511a28bee3ae763c1199e4816f2b2c12315d873c93d827fef5997271d44e00c412ceab2329ca3079797429467c782
   languageName: node
   linkType: hard
 
@@ -8605,6 +8731,22 @@ __metadata:
   version: 1.1.1
   resolution: "events@npm:1.1.1"
   checksum: 40431eb005cc4c57861b93d44c2981a49e7feb99df84cf551baed299ceea4444edf7744733f6a6667e942af687359b1f4a87ec1ec4f21d5127dac48a782039b9
+  languageName: node
+  linkType: hard
+
+"eventsource-parser@npm:^3.0.1":
+  version: 3.0.3
+  resolution: "eventsource-parser@npm:3.0.3"
+  checksum: a052aaedb89da8744219aea539343dabc54c6e032acc47f182a90fbbb083583208fbe0f786d7bc1182da098c88a391b7881b59a3fc921a73b718f25d1ee37425
+  languageName: node
+  linkType: hard
+
+"eventsource@npm:^3.0.5":
+  version: 3.0.7
+  resolution: "eventsource@npm:3.0.7"
+  dependencies:
+    eventsource-parser: ^3.0.1
+  checksum: cd8cbc3418238b9d751b6652edf442d4b869829fbc3b73444abca1816fe3d23dc707130dd9a990360bc27c281d986f2f62059d870921173425c3ac28d20a8414
   languageName: node
   linkType: hard
 
@@ -13424,6 +13566,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"pg-cloudflare@npm:^1.2.7":
+  version: 1.2.7
+  resolution: "pg-cloudflare@npm:1.2.7"
+  checksum: 8e66fa9aaf3be9da7570d294c6170ead48ae9187e670dcc4219eb381fb598a12823d90c20f301d76d70e49840dbec8c7eb5aa2af0d2698c0325b634c86bbcd18
+  languageName: node
+  linkType: hard
+
 "pg-connection-string@npm:^2.6.0, pg-connection-string@npm:^2.6.1, pg-connection-string@npm:^2.6.2":
   version: 2.6.2
   resolution: "pg-connection-string@npm:2.6.2"
@@ -13435,6 +13584,13 @@ __metadata:
   version: 2.6.4
   resolution: "pg-connection-string@npm:2.6.4"
   checksum: 2c1d2ac1add1f93076f1594d217a0980f79add05dc48de6363e1c550827c78a6ee3e3b5420da9c54858f6b678cdb348aed49732ee68158b6cdb70f1d1c748cf9
+  languageName: node
+  linkType: hard
+
+"pg-connection-string@npm:^2.9.1":
+  version: 2.9.1
+  resolution: "pg-connection-string@npm:2.9.1"
+  checksum: 23e63951f866ea400b227976be596963c5e68b84dc161df0aa3e36fe2dc281f405e5121d71ba9d2f27973e25a46dbb219056fd91080505bcadc9ae98c9663cf3
   languageName: node
   linkType: hard
 
@@ -13456,6 +13612,15 @@ __metadata:
   version: 1.0.2
   resolution: "pg-numeric@npm:1.0.2"
   checksum: 8899f8200caa1744439a8778a9eb3ceefb599d893e40a09eef84ee0d4c151319fd416634a6c0fc7b7db4ac268710042da5be700b80ef0de716fe089b8652c84f
+  languageName: node
+  linkType: hard
+
+"pg-pool@npm:^3.10.1":
+  version: 3.10.1
+  resolution: "pg-pool@npm:3.10.1"
+  peerDependencies:
+    pg: ">=8.0"
+  checksum: 98135a7384be40886bba7100b9ce1a74671ff3877390f68e6db6d50ea56a7f524f7e44e01c02d61efeda97d9dc22d6115d0c66aa7f3cf5b8e892424862d0111a
   languageName: node
   linkType: hard
 
@@ -13484,6 +13649,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"pg-protocol@npm:^1.10.3":
+  version: 1.10.3
+  resolution: "pg-protocol@npm:1.10.3"
+  checksum: 2d8c3b2747526706d37fdf35fc6e87c4a170cf8deb89fac65c562df26b4e0f42b76d62c6d1dbd096725e9a081a8725796f27af874c9e72753499c794472faad7
+  languageName: node
+  linkType: hard
+
 "pg-protocol@npm:^1.6.1":
   version: 1.6.1
   resolution: "pg-protocol@npm:1.6.1"
@@ -13491,7 +13663,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pg-types@npm:^2.1.0":
+"pg-types@npm:2.2.0, pg-types@npm:^2.1.0, pg-types@npm:^2.2.0":
   version: 2.2.0
   resolution: "pg-types@npm:2.2.0"
   dependencies:
@@ -13565,7 +13737,29 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pgpass@npm:1.x":
+"pg@npm:^8.16.3":
+  version: 8.16.3
+  resolution: "pg@npm:8.16.3"
+  dependencies:
+    pg-cloudflare: ^1.2.7
+    pg-connection-string: ^2.9.1
+    pg-pool: ^3.10.1
+    pg-protocol: ^1.10.3
+    pg-types: 2.2.0
+    pgpass: 1.0.5
+  peerDependencies:
+    pg-native: ">=3.0.1"
+  dependenciesMeta:
+    pg-cloudflare:
+      optional: true
+  peerDependenciesMeta:
+    pg-native:
+      optional: true
+  checksum: ebc98c9480a11f8de74fffd205c2c161f14fc7cd8e19b152b38c7464d7202f59ad52fb1facb3a25319c343118c2fff44f7f46302415e730485878ceccf24241a
+  languageName: node
+  linkType: hard
+
+"pgpass@npm:1.0.5, pgpass@npm:1.x":
   version: 1.0.5
   resolution: "pgpass@npm:1.0.5"
   dependencies:
@@ -15292,6 +15486,49 @@ __metadata:
   languageName: node
   linkType: hard
 
+"sequelize@npm:^6.37.7":
+  version: 6.37.7
+  resolution: "sequelize@npm:6.37.7"
+  dependencies:
+    "@types/debug": ^4.1.8
+    "@types/validator": ^13.7.17
+    debug: ^4.3.4
+    dottie: ^2.0.6
+    inflection: ^1.13.4
+    lodash: ^4.17.21
+    moment: ^2.29.4
+    moment-timezone: ^0.5.43
+    pg-connection-string: ^2.6.1
+    retry-as-promised: ^7.0.4
+    semver: ^7.5.4
+    sequelize-pool: ^7.1.0
+    toposort-class: ^1.0.1
+    uuid: ^8.3.2
+    validator: ^13.9.0
+    wkx: ^0.5.0
+  peerDependenciesMeta:
+    ibm_db:
+      optional: true
+    mariadb:
+      optional: true
+    mysql2:
+      optional: true
+    oracledb:
+      optional: true
+    pg:
+      optional: true
+    pg-hstore:
+      optional: true
+    snowflake-sdk:
+      optional: true
+    sqlite3:
+      optional: true
+    tedious:
+      optional: true
+  checksum: fcca0993defbaed7a9727ae72a4dd00c1c8ec72ca0dd7bd9eab16626420f6719169a46bba18036b0d582599465c4e126547794c9b4b7485d1c2574be0d7d1f23
+  languageName: node
+  linkType: hard
+
 "serialize-javascript@npm:6.0.0":
   version: 6.0.0
   resolution: "serialize-javascript@npm:6.0.0"
@@ -16472,6 +16709,13 @@ __metadata:
     typescript: "*"
     webpack: ^5.0.0
   checksum: 8e5e6b839b0edfa40d2156c880d88ccab58226894ea5978221bc48c7db3215e2e856bfd0093f148e925a2befc42d6c94cafa9a994a7da274541efaa916012b63
+  languageName: node
+  linkType: hard
+
+"ts-log@npm:^2.2.7":
+  version: 2.2.7
+  resolution: "ts-log@npm:2.2.7"
+  checksum: c423a5eb54abb9471578902953814d3d0c88b3f237db016998f8998ecf982cb0f748bb8ebf93670eeba9b836ff0ce407d8065a340f3ab218ea7b9442c255b3d4
   languageName: node
   linkType: hard
 
@@ -17709,5 +17953,12 @@ __metadata:
   version: 0.1.0
   resolution: "yocto-queue@npm:0.1.0"
   checksum: f77b3d8d00310def622123df93d4ee654fc6a0096182af8bd60679ddcdfb3474c56c6c7190817c84a2785648cdee9d721c0154eb45698c62176c322fb46fc700
+  languageName: node
+  linkType: hard
+
+"zod@npm:^3.23.8":
+  version: 3.25.76
+  resolution: "zod@npm:3.25.76"
+  checksum: c9a403a62b329188a5f6bd24d5d935d2bba345f7ab8151d1baa1505b5da9f227fb139354b043711490c798e91f3df75991395e40142e6510a4b16409f302b849
   languageName: node
   linkType: hard

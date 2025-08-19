@@ -11,6 +11,9 @@
       "path": "./packages/sus"
     },
     {
+      "path": "./packages/dc-auto-top-sdk"
+    },
+    {
       "path": "./packages/hexboosting-sdk"
     },
     {
