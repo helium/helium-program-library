@@ -251,7 +251,6 @@ describe("mini-fanout", () => {
           miniFanout: fanout,
           newTask: taskKey(taskQueue, nextTask)[0],
           newPreTask: taskKey(taskQueue, nextPreTask)[0],
-          taskRentRefund: me,
         })
         .rpcAndKeys()
 
@@ -448,7 +447,6 @@ describe("mini-fanout", () => {
       await program.methods.closeMiniFanoutV0()
         .accounts({
           miniFanout: fanout,
-          taskRentRefund: me,
         })
         .rpc({ skipPreflight: true })
     })
