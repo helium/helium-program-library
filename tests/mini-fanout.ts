@@ -291,38 +291,47 @@ describe("mini-fanout", () => {
       expect(miniFanoutAcc.shares[0].delegate.toBase58()).to.equal(newWallet.publicKey.toBase58())
     })
 
-    async function runAllTasks() {
-      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    async function runAllTasks(tries = 0) {
+      try {
+        const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
 
-      // Find all task IDs that need to be executed (have a 1 in the bitmap)
-      const taskIds: number[] = [];
-      for (let i = 0; i < taskQueueAcc.taskBitmap.length; i++) {
-        const byte = taskQueueAcc.taskBitmap[i];
-        for (let bit = 0; bit < 8; bit++) {
-          if ((byte & (1 << bit)) !== 0) {
-            taskIds.push(i * 8 + bit);
+        // Find all task IDs that need to be executed (have a 1 in the bitmap)
+        const taskIds: number[] = [];
+        for (let i = 0; i < taskQueueAcc.taskBitmap.length; i++) {
+          const byte = taskQueueAcc.taskBitmap[i];
+          for (let bit = 0; bit < 8; bit++) {
+            if ((byte & (1 << bit)) !== 0) {
+              taskIds.push(i * 8 + bit);
+            }
           }
         }
-      }
 
-      // Execute all tasks in parallel
-      for (const taskId of taskIds) {
-        const task = taskKey(taskQueue, taskId)[0]
-        const taskAcc = await tuktukProgram.account.taskV0.fetch(task)
-        if ((taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) > (new Date().getTime() / 1000) || taskAcc.transaction.remoteV0) {
-          continue
+        // Execute all tasks in parallel
+        for (const taskId of taskIds) {
+          const task = taskKey(taskQueue, taskId)[0]
+          const taskAcc = await tuktukProgram.account.taskV0.fetch(task)
+          if ((taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) > (new Date().getTime() / 1000) || taskAcc.transaction.remoteV0) {
+            continue
+          }
+          console.log("Running task", taskId)
+          await sendInstructions(
+            provider,
+            [
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+              ...await runTask({
+                program: tuktukProgram,
+                task: taskKey(taskQueue, taskId)[0],
+                crankTurner: me,
+              })]
+          );
         }
-        console.log("Running task", taskId)
-        await sendInstructions(
-          provider,
-          [
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-            ...await runTask({
-              program: tuktukProgram,
-              task: taskKey(taskQueue, taskId)[0],
-              crankTurner: me,
-            })]
-        );
+      } catch (e) {
+        if (tries < 2) {
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          await runAllTasks(tries + 1)
+        } else {
+          throw e
+        }
       }
     }
 
