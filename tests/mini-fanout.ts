@@ -174,7 +174,7 @@ describe("mini-fanout", () => {
     let cronJob: PublicKey;
     beforeEach(async () => {
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
 
       const now = new Date()
       let nextSeconds = now.getSeconds() + 2
@@ -227,7 +227,7 @@ describe("mini-fanout", () => {
     it("should allow updating wallets and schedule", async () => {
       const newWallet = Keypair.generate()
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
       await program.methods.updateMiniFanoutV0({
         shares: [
           {
@@ -267,7 +267,7 @@ describe("mini-fanout", () => {
     it("should allow updating wallet delegates", async () => {
       const newWallet = Keypair.generate()
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
       await program.methods.updateWalletDelegateV0({
         newTaskId: nextTask,
         newPreTaskId: nextPreTask,
@@ -394,7 +394,7 @@ describe("mini-fanout", () => {
 
       // Get next available task
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
 
       // Set up a fanout with 10 shares
       const now = new Date()
