@@ -1035,7 +1035,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/dc-auto-top-sdk@workspace:packages/dc-auto-top-sdk":
+"@helium/dc-auto-top-sdk@^0.10.35, @helium/dc-auto-top-sdk@workspace:packages/dc-auto-top-sdk":
   version: 0.0.0-use.local
   resolution: "@helium/dc-auto-top-sdk@workspace:packages/dc-auto-top-sdk"
   dependencies:
@@ -1208,6 +1208,7 @@ __metadata:
     "@helium/circuit-breaker-sdk": ^0.10.35
     "@helium/crypto": ^4.10.2
     "@helium/data-credits-sdk": ^0.10.35
+    "@helium/dc-auto-top-sdk": ^0.10.35
     "@helium/distributor-oracle": ^0.10.35
     "@helium/fanout-sdk": ^0.10.35
     "@helium/helium-entity-manager-sdk": ^0.10.35

@@ -43,6 +43,7 @@
     "@helium/circuit-breaker-sdk": "^0.10.35",
     "@helium/crypto": "^4.10.2",
     "@helium/data-credits-sdk": "^0.10.35",
+    "@helium/dc-auto-top-sdk": "^0.10.35",
     "@helium/distributor-oracle": "^0.10.35",
     "@helium/fanout-sdk": "^0.10.35",
     "@helium/helium-entity-manager-sdk": "^0.10.35",
