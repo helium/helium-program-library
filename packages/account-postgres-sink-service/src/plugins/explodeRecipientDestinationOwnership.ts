@@ -38,6 +38,12 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
 
         // Case 2: New destination is a mini fanout
         if (newDestination !== PublicKey.default.toBase58()) {
+          await RewardsRecipient.destroy({
+            where: {
+              asset: account.asset,
+            },
+            transaction
+          })
           const newMiniFanout = await MiniFanout.findByPk(newDestination, { transaction })
           if (newMiniFanout) {
             await handleMiniFanout(account.asset, newMiniFanout, transaction)
@@ -55,7 +61,14 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
             transaction
           })
 
-          await RewardsRecipient.upsert({
+          await RewardsRecipient.destroy({
+            where: {
+              asset: account.asset,
+            },
+            transaction
+          })
+
+          await RewardsRecipient.create({
             asset: account.asset,
             owner: newDestination,
             destination: newDestination,
