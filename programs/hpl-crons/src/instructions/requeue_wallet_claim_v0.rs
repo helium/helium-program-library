@@ -19,7 +19,10 @@ pub fn handler(
   ctx: Context<RequeueWalletClaimV0>,
   args: RequeueWalletClaimArgsV0,
 ) -> Result<RunTaskReturnV0> {
-  let description = "ld wallet claim".to_string();
+  let description = format!("ld wallet {}", ctx.accounts.wallet.key())
+    .chars()
+    .take(40)
+    .collect::<String>();
   Ok(RunTaskReturnV0 {
     tasks: vec![TaskReturnV0 {
       trigger: TriggerV0::Now,

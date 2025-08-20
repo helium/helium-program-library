@@ -44,35 +44,10 @@ describe("mini-fanout", () => {
   const me = provider.wallet.publicKey;
 
   let taskQueueName = `test-${Math.random().toString(36).substring(2, 15)}`;
-  const wallet1 = Keypair.generate()
-  const wallet2 = Keypair.generate()
-  const wallet3 = Keypair.generate()
-  const shares = [
-    {
-      wallet: wallet1.publicKey,
-      share: {
-        share: {
-          amount: 50,
-        }
-      },
-    },
-    {
-      wallet: wallet2.publicKey,
-      share: {
-        share: {
-          amount: 50,
-        }
-      },
-    },
-    {
-      wallet: wallet3.publicKey,
-      share: {
-        fixed: {
-          amount: toBN(1, 8),
-        }
-      },
-    }
-  ]
+  let wallet1: Keypair;
+  let wallet2: Keypair;
+  let wallet3: Keypair;
+  let shares: { wallet: PublicKey, share: { share: { amount: number } } | { fixed: { amount: anchor.BN } } }[] = []
   let program: Program<MiniFanout>;
   let tuktukProgram: Program<Tuktuk>;
   let fanoutName: string;
@@ -92,9 +67,6 @@ describe("mini-fanout", () => {
   let taskQueue: PublicKey;
   before(async () => {
     mint = await createMint(provider, 8, me, me)
-    await createAtaAndMint(provider, mint, 1000000000, me)
-    await createAtaAndMint(provider, mint, 0, wallet1.publicKey)
-    await createAtaAndMint(provider, mint, 0, wallet3.publicKey)
 
     await ensureIdls();
     program = await init(provider, PROGRAM_ID, anchor.workspace.MiniFanout.idl);
@@ -134,6 +106,38 @@ describe("mini-fanout", () => {
 
   beforeEach(async () => {
     fanoutName = `test-${Math.random().toString(36).substring(2, 15)}`;
+    wallet1 = Keypair.generate()
+    wallet2 = Keypair.generate()
+    wallet3 = Keypair.generate()
+    shares = [
+      {
+        wallet: wallet1.publicKey,
+        share: {
+          share: {
+            amount: 50,
+          }
+        },
+      },
+      {
+        wallet: wallet2.publicKey,
+        share: {
+          share: {
+            amount: 50,
+          }
+        },
+      },
+      {
+        wallet: wallet3.publicKey,
+        share: {
+          fixed: {
+            amount: toBN(1, 8),
+          }
+        },
+      }
+    ]
+    await createAtaAndMint(provider, mint, 1000000000, me)
+    await createAtaAndMint(provider, mint, 0, wallet1.publicKey)
+    await createAtaAndMint(provider, mint, 0, wallet3.publicKey)
   })
 
 
@@ -161,8 +165,10 @@ describe("mini-fanout", () => {
     for (let i = 0; i < shares.length; i++) {
       expect(miniFanoutAcc.shares[i].wallet.toBase58()).to.equal(shares[i].wallet.toBase58())
       if ('share' in shares[i].share) {
+        // @ts-ignore
         expect(miniFanoutAcc.shares[i].share.share!.amount).to.equal(shares[i].share.share!.amount)
       } else {
+        // @ts-ignore
         expect(miniFanoutAcc.shares[i].share.fixed!.amount.toString()).to.equal(shares[i].share.fixed!.amount.toString())
       }
       expect(miniFanoutAcc.shares[i].totalDust.toString()).to.equal("0")
@@ -174,7 +180,7 @@ describe("mini-fanout", () => {
     let cronJob: PublicKey;
     beforeEach(async () => {
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
 
       const now = new Date()
       let nextSeconds = now.getSeconds() + 2
@@ -227,7 +233,7 @@ describe("mini-fanout", () => {
     it("should allow updating wallets and schedule", async () => {
       const newWallet = Keypair.generate()
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
       await program.methods.updateMiniFanoutV0({
         shares: [
           {
@@ -243,11 +249,15 @@ describe("mini-fanout", () => {
         newPreTaskId: nextPreTask,
         schedule: "0 0 * * * *",
       })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
         .accounts({
           payer: me,
           miniFanout: fanout,
           newTask: taskKey(taskQueue, nextTask)[0],
           newPreTask: taskKey(taskQueue, nextPreTask)[0],
+          taskRentRefund: me,
         })
         .rpcAndKeys()
 
@@ -263,13 +273,16 @@ describe("mini-fanout", () => {
     it("should allow updating wallet delegates", async () => {
       const newWallet = Keypair.generate()
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
       await program.methods.updateWalletDelegateV0({
         newTaskId: nextTask,
         newPreTaskId: nextPreTask,
         delegate: newWallet.publicKey,
         index: 0
       })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
         .accounts({
           payer: me,
           wallet: wallet1.publicKey,
@@ -284,43 +297,62 @@ describe("mini-fanout", () => {
       expect(miniFanoutAcc.shares[0].delegate.toBase58()).to.equal(newWallet.publicKey.toBase58())
     })
 
-    async function runAllTasks() {
-      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    async function runAllTasks(tries = 0) {
+      try {
+        const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
 
-      // Find all task IDs that need to be executed (have a 1 in the bitmap)
-      const taskIds: number[] = [];
-      for (let i = 0; i < taskQueueAcc.taskBitmap.length; i++) {
-        const byte = taskQueueAcc.taskBitmap[i];
-        for (let bit = 0; bit < 8; bit++) {
-          if ((byte & (1 << bit)) !== 0) {
-            taskIds.push(i * 8 + bit);
+        // Find all task IDs that need to be executed (have a 1 in the bitmap)
+        const taskIds: number[] = [];
+        for (let i = 0; i < taskQueueAcc.taskBitmap.length; i++) {
+          const byte = taskQueueAcc.taskBitmap[i];
+          for (let bit = 0; bit < 8; bit++) {
+            if ((byte & (1 << bit)) !== 0) {
+              taskIds.push(i * 8 + bit);
+            }
           }
         }
-      }
 
-      // Execute all tasks in parallel
-      for (const taskId of taskIds) {
-        const task = taskKey(taskQueue, taskId)[0]
-        const taskAcc = await tuktukProgram.account.taskV0.fetch(task)
-        if ((taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) > (new Date().getTime() / 1000) || taskAcc.transaction.remoteV0) {
-          continue
+        // Execute all tasks in parallel
+        for (const taskId of taskIds) {
+          const task = taskKey(taskQueue, taskId)[0]
+          const taskAcc = await tuktukProgram.account.taskV0.fetch(task)
+          if ((taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) > (new Date().getTime() / 1000) || taskAcc.transaction.remoteV0) {
+            continue
+          }
+          console.log("Running task", taskId)
+          await sendInstructions(
+            provider,
+            [
+              ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+              ...await runTask({
+                program: tuktukProgram,
+                task: taskKey(taskQueue, taskId)[0],
+                crankTurner: me,
+              })]
+          );
         }
-        console.log("Running task", taskId)
-        await sendInstructions(
-          provider,
-          [
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-            ...await runTask({
-              program: tuktukProgram,
-              task: taskKey(taskQueue, taskId)[0],
-              crankTurner: me,
-            })]
-        );
+      } catch (e) {
+        if (tries < 2) {
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          await runAllTasks(tries + 1)
+        } else {
+          throw e
+        }
       }
     }
 
     it("should distribute tokens to wallets", async () => {
       await new Promise(resolve => setTimeout(resolve, 2000))
+      const wallet1TokenAccountBefore = await getAccount(
+        // @ts-ignore
+        provider.connection,
+        getAssociatedTokenAddressSync(mint, wallet1.publicKey)
+      );
+      const wallet3TokenAccountBefore = await getAccount(
+        // @ts-ignore
+        provider.connection,
+        getAssociatedTokenAddressSync(mint, wallet3.publicKey)
+      );
       await runAllTasks()
 
       // Verify the claims were processed
@@ -342,10 +374,10 @@ describe("mini-fanout", () => {
 
       const miniFanoutAcc = await program.account.miniFanoutV0.fetch(fanout);
       expect(Number(fanoutTokenAccount.amount)).to.equal(450000000);
-      expect(Number(wallet1TokenAccount.amount)).to.equal(450000000);
+      expect(Number(wallet1TokenAccount.amount) - Number(wallet1TokenAccountBefore.amount)).to.equal(450000000);
       // There was no ATA for this wallet, so the total owed is the amount we couldn't transfer
       expect(Number(miniFanoutAcc.shares[1].totalOwed.toString())).to.equal(450000000);
-      expect(Number(wallet3TokenAccount.amount)).to.equal(100000000);
+      expect(Number(wallet3TokenAccount.amount) - Number(wallet3TokenAccountBefore.amount)).to.equal(100000000);
 
       // Verify vouchers were updated
       const nextTask = miniFanoutAcc.nextTask
@@ -368,7 +400,7 @@ describe("mini-fanout", () => {
 
       // Get next available task
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, false)
+      const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
 
       // Set up a fanout with 10 shares
       const now = new Date()
@@ -444,6 +476,7 @@ describe("mini-fanout", () => {
       await program.methods.closeMiniFanoutV0()
         .accounts({
           miniFanout: fanout,
+          taskRentRefund: me,
         })
         .rpc({ skipPreflight: true })
     })

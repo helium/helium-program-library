@@ -37,25 +37,30 @@ export const EncodeEntityKeyPlugin = ((): IPlugin => {
     };
 
     const processAccount = async (account: { [key: string]: any }) => {
-      const entityKey = account[camelize(config.field || "entity_key", true)];
-      const keySerializationRaw = account[camelize("key_serialization", true)];
-      const keySerialization =
-        typeof keySerializationRaw === "string"
-          ? keySerializationRaw.trim().toLowerCase()
-          : String(keySerializationRaw).trim().toLowerCase();
-      let encodedEntityKey: string | null = null;
-      if (entityKey && keySerialization) {
-        if (keySerialization === "utf8") {
-          encodedEntityKey = Buffer.from(entityKey, "utf8").toString("utf8");
-        } else if (keySerialization === "b58" || keySerialization === "bs58") {
-          encodedEntityKey = bs58.encode(entityKey);
+      try {
+        const entityKey = account[camelize(config.field || "entity_key", true)];
+        const keySerializationRaw = account[camelize("key_serialization", true)];
+        const keySerialization =
+          typeof keySerializationRaw === "string"
+            ? keySerializationRaw.trim().toLowerCase()
+            : String(keySerializationRaw).trim().toLowerCase();
+        let encodedEntityKey: string | null = null;
+        if (entityKey && keySerialization) {
+          if (keySerialization === "utf8") {
+            encodedEntityKey = Buffer.from(entityKey, "utf8").toString("utf8");
+          } else if (keySerialization === "b58" || keySerialization === "bs58") {
+            encodedEntityKey = bs58.encode(entityKey);
+          }
         }
-      }
 
-      return {
-        ...account,
-        encoded_entity_key: encodedEntityKey,
-      };
+        return {
+          ...account,
+          encoded_entity_key: encodedEntityKey,
+        };
+      } catch (e) {
+        console.error("Error encoding entity key", e);
+        return account;
+      }
     };
 
     return {

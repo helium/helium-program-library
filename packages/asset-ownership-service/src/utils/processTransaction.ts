@@ -42,18 +42,23 @@ export class TransactionProcessor {
     [programId: string]: anchor.BorshInstructionCoder;
   };
   private readonly treeConfigs: TreeConfigs;
-  private readonly transaction: Transaction;
 
   private constructor(
     hemProgram: Awaited<ReturnType<typeof initHem>>,
     coders: { [programId: string]: anchor.BorshInstructionCoder },
     treeConfigs: TreeConfigs,
-    transaction: Transaction
   ) {
     this.hemProgram = hemProgram;
     this.coders = coders;
     this.treeConfigs = treeConfigs;
-    this.transaction = transaction;
+  }
+
+  getTrees(): Set<string> {
+    return new Set([
+      ...this.treeConfigs.update_maker_tree_v0.merkleTrees,
+      ...this.treeConfigs.update_data_only_tree_v0.merkleTrees,
+      ...this.treeConfigs.update_carrier_tree_v0.merkleTrees
+    ]);
   }
 
   static async create(): Promise<TransactionProcessor> {
@@ -106,21 +111,20 @@ export class TransactionProcessor {
       hemProgram,
       coders,
       treeConfigs,
-      await database.transaction()
     );
   }
 
-  private async processInstruction(instruction: ProcessableInstruction, tx: ProcessableTransaction) {
+  private async processInstruction(instruction: ProcessableInstruction, tx: ProcessableTransaction, transaction: Transaction): Promise<{ updatedTrees: boolean }> {
     const programId = new PublicKey(tx.accountKeys[instruction.programIdIndex]);
     const instructionCoder = this.coders[programId.toBase58()];
 
-    if (!instructionCoder) return;
+    if (!instructionCoder) return { updatedTrees: false };
 
     const decodedInstruction = instructionCoder.decode(
       Buffer.from(instruction.data)
     );
 
-    if (!decodedInstruction) return;
+    if (!decodedInstruction) return { updatedTrees: false };
 
     const formattedInstruction = instructionCoder.format(
       decodedInstruction,
@@ -131,7 +135,7 @@ export class TransactionProcessor {
       }))
     );
 
-    if (!formattedInstruction) return;
+    if (!formattedInstruction) return { updatedTrees: false };
 
     const accountMap = Object.fromEntries(
       (formattedInstruction.accounts || []).map((acc) => [
@@ -152,7 +156,7 @@ export class TransactionProcessor {
       case "update_carrier_tree_v0":
       case "update_data_only_tree_v0": {
         const config = this.treeConfigs[decodedInstruction.name];
-        if (!config) return;
+        if (!config) return { updatedTrees: false };
 
         const entityAccount = accountMap[config.accountKey]?.pubkey;
         const newTreeAccount = accountMap["New_merkle_tree"]?.pubkey;
@@ -173,11 +177,12 @@ export class TransactionProcessor {
                 merkle_tree: newTreeAccount.toBase58(),
               },
               type: QueryTypes.INSERT,
-              transaction: this.transaction,
+              transaction,
             }
           );
 
           config.merkleTrees.add(newTreeAccount);
+          return { updatedTrees: true };
         }
         break;
       }
@@ -199,7 +204,7 @@ export class TransactionProcessor {
                 asset: keyToAsset.asset.toBase58(),
                 owner: recipientAccount.toBase58(),
               },
-              { transaction: this.transaction }
+              { transaction }
             );
           }
         }
@@ -231,35 +236,37 @@ export class TransactionProcessor {
               asset: assetId.toBase58(),
               owner: newOwnerAccount.toBase58(),
             },
-            { transaction: this.transaction }
+            { transaction }
           );
         }
         break;
       }
     }
+
+    return { updatedTrees: false };
   }
 
-  async processTransaction(tx: ProcessableTransaction) {
+  async processTransaction(tx: ProcessableTransaction, transaction: Transaction): Promise<{ updatedTrees: boolean }> {
     // Process main instructions
     for (const instruction of tx.instructions) {
-      await this.processInstruction(instruction, tx);
+      const { updatedTrees } = await this.processInstruction(instruction, tx, transaction);
+      if (updatedTrees) {
+        return { updatedTrees: true };
+      }
     }
 
     // Process inner instructions
     if (tx.innerInstructions) {
       for (const innerSet of tx.innerInstructions) {
         for (const instruction of innerSet.instructions) {
-          await this.processInstruction(instruction, tx);
+          const { updatedTrees } = await this.processInstruction(instruction, tx, transaction);
+          if (updatedTrees) {
+            return { updatedTrees: true };
+          }
         }
       }
     }
-  }
 
-  async commit() {
-    await this.transaction.commit();
-  }
-
-  async rollback() {
-    await this.transaction.rollback();
+    return { updatedTrees: false };
   }
 } 

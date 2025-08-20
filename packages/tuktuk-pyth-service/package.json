@@ -1,0 +1,66 @@
+{
+  "name": "@helium/tuktuk-pyth-service",
+  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "Apache-2.0",
+  "version": "0.10.35",
+  "description": "API for helium vote",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/helium/helium-program-libary"
+  },
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/src/index.js",
+  "types": "./lib/types/src/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "lib"
+  ],
+  "exports": {
+    "import": "./lib/esm/src/index.js",
+    "require": "./lib/cjs/index.js",
+    "types": "./lib/types/src/index.d.ts"
+  },
+  "scripts": {
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
+    "build": "tsc -p tsconfig.json",
+    "start": "node lib/esm/index.js",
+    "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@fastify/cors": "^8.1.1",
+    "@fastify/static": "^6",
+    "@helium/hpl-crons-sdk": "^0.10.35",
+    "@helium/idls": "^0.10.35",
+    "@helium/spl-utils": "^0.10.35",
+    "@helium/tuktuk-idls": "^0.0.9",
+    "@helium/tuktuk-sdk": "^0.0.9",
+    "@pythnetwork/hermes-client": "^2.0.0",
+    "@pythnetwork/price-service-sdk": "^1.8.0",
+    "@pythnetwork/pyth-solana-receiver": "^0.11.0",
+    "@solana/web3.js": "^1.91.1",
+    "aws-sdk": "^2.1692.0",
+    "dotenv": "^16.0.3",
+    "fastify": "^4.13.0",
+    "pg": "^8.16.3",
+    "sequelize": "^6.37.7",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.1",
+    "@types/lodash": "^4.17.6",
+    "@types/pg": "^8.15.5",
+    "git-format-staged": "^2.1.3",
+    "ts-loader": "^9.2.3",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.2.2"
+  },
+  "keywords": [],
+  "author": ""
+}

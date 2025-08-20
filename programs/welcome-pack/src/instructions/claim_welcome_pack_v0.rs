@@ -80,7 +80,7 @@ pub struct ClaimWelcomePackV0<'info> {
     mut,
     constraint = recipient.asset == get_asset_id(&merkle_tree.key(), args.index as u64) @ ErrorCode::InvalidAsset
   )]
-  pub recipient: Account<'info, RecipientV0>,
+  pub recipient: Box<Account<'info, RecipientV0>>,
   /// CHECK: This should either be the fanout wallet or the address if single recipient.
   #[account(mut)]
   pub rewards_recipient: AccountInfo<'info>,

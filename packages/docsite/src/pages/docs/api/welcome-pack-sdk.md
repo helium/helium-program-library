@@ -71,23 +71,24 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name                 | Mutability | Signer | Docs |
-| -------------------- | ---------- | ------ | ---- |
-| owner                | immut      | no     |      |
-| payer                | immut      | no     |      |
-| rent_refund          | immut      | no     |      |
-| lazy_distributor     | immut      | no     |      |
-| recipient            | immut      | no     |      |
-| asset_return_address | immut      | no     |      |
-| user_welcome_packs   | immut      | no     |      |
-| welcome_pack         | immut      | no     |      |
-| tree_authority       | immut      | no     |      |
-| leaf_owner           | immut      | no     |      |
-| merkle_tree          | immut      | no     |      |
-| log_wrapper          | immut      | no     |      |
-| compression_program  | immut      | no     |      |
-| system_program       | immut      | no     |      |
-| bubblegum_program    | immut      | no     |      |
+| Name                     | Mutability | Signer | Docs |
+| ------------------------ | ---------- | ------ | ---- |
+| owner                    | immut      | no     |      |
+| payer                    | immut      | no     |      |
+| rent_refund              | immut      | no     |      |
+| lazy_distributor         | immut      | no     |      |
+| recipient                | immut      | no     |      |
+| asset_return_address     | immut      | no     |      |
+| user_welcome_packs       | immut      | no     |      |
+| welcome_pack             | immut      | no     |      |
+| tree_authority           | immut      | no     |      |
+| leaf_owner               | immut      | no     |      |
+| merkle_tree              | immut      | no     |      |
+| log_wrapper              | immut      | no     |      |
+| compression_program      | immut      | no     |      |
+| system_program           | immut      | no     |      |
+| bubblegum_program        | immut      | no     |      |
+| lazy_distributor_program | immut      | no     |      |
 
 #### Args
 

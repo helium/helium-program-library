@@ -3,6 +3,65 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.35](https://github.com/helium/helium-program-library/compare/v0.10.34...v0.10.35) (2025-08-19)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.34](https://github.com/helium/helium-program-library/compare/v0.10.33...v0.10.34) (2025-08-05)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.33](https://github.com/helium/helium-program-library/compare/v0.10.32...v0.10.33) (2025-08-01)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.32](https://github.com/helium/helium-program-library/compare/v0.10.31...v0.10.32) (2025-08-01)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.31](https://github.com/helium/helium-program-library/compare/v0.10.30...v0.10.31) (2025-08-01)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.30](https://github.com/helium/helium-program-library/compare/v0.10.29...v0.10.30) (2025-07-16)
+
+**Note:** Version bump only for package helium-program-library
+
+
+
+
+
+## [0.10.29](https://github.com/helium/helium-program-library/compare/v0.10.28...v0.10.29) (2025-07-15)
+
+
+### Reverts
+
+* Revert "Develop (#1012)" (#1013) ([405ff10](https://github.com/helium/helium-program-library/commit/405ff10cc718740c4fc05555ea32556447a9cc82)), closes [#1012](https://github.com/helium/helium-program-library/issues/1012) [#1013](https://github.com/helium/helium-program-library/issues/1013)
+
+
+
+
+
 ## [0.10.28](https://github.com/helium/helium-program-library/compare/v0.10.27...v0.10.28) (2025-07-11)
 
 **Note:** Version bump only for package helium-program-library

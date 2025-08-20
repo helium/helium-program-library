@@ -44,7 +44,9 @@ ReverseGeoCache.init(
   }
 );
 
-const locationFetchCache: { [location: string]: Promise<ReverseGeoCache | undefined> } = {};
+const locationFetchCache: {
+  [location: string]: Promise<ReverseGeoCache | undefined>;
+} = {};
 export const ExtractHexLocationPlugin = ((): IPlugin => {
   const name = "ExtractHexLocation";
   const init = async (config: { [key: string]: any }) => {
@@ -92,12 +94,16 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
     };
 
     const mapbox = MapboxService.getInstance();
-    const processAccount = async (account: { [key: string]: any }) => {
+    const processAccount = async (
+      account: { [key: string]: any },
+      transaction?: any
+    ) => {
       let reverseGeod: ReverseGeoCache | null = null;
       const location = account[camelize(config.field || "location", true)];
       if (location) {
         reverseGeod = await ReverseGeoCache.findByPk(location.toString(), {
           attributes: updateOnDuplicateFields,
+          transaction, // Use the passed transaction to reuse the connection
         });
         if (!reverseGeod) {
           if (!locationFetchCache[location]) {
@@ -106,27 +112,44 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
               try {
                 const { city, state, country, name, raw } =
                   await mapbox.fetchParsedLocation(coords);
-                return await ReverseGeoCache.create({
-                  location: location.toString(),
-                  street: name,
-                  city,
-                  state,
-                  country,
-                  lat: coords[0],
-                  long: coords[1],
-                  raw,
-                });
+                return await ReverseGeoCache.create(
+                  {
+                    location: location.toString(),
+                    street: name,
+                    city,
+                    state,
+                    country,
+                    lat: coords[0],
+                    long: coords[1],
+                    raw,
+                  },
+                  {
+                    transaction, // Use the passed transaction here too
+                  }
+                );
               } catch (e) {
+                // Clean up cache on error to prevent memory leaks
+                delete locationFetchCache[location];
                 if (!config.ignoreErrors) {
-                  throw e
+                  throw e;
                 }
+                return undefined;
               }
             })();
           }
-          reverseGeod = await locationFetchCache[location] || null;
-          // Once the create call finishes, we can cleanup this promise. Subsequent queries to postgres will discover
-          // the account. This helps with memory management
-          delete locationFetchCache[location];
+
+          try {
+            reverseGeod = (await locationFetchCache[location]) || null;
+            // Once the create call finishes, we can cleanup this promise. Subsequent queries to postgres will discover
+            // the account. This helps with memory management
+            delete locationFetchCache[location];
+          } catch (e) {
+            // Clean up cache on error
+            delete locationFetchCache[location];
+            if (!config.ignoreErrors) {
+              throw e;
+            }
+          }
         }
       }
       // Remove raw response, format camelcase

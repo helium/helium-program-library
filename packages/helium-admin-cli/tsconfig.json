@@ -14,6 +14,9 @@
       "path": "../distributor-oracle"
     },
     {
+      "path": "../mini-fanout-sdk"
+    },
+    {
       "path": "../hpl-crons-sdk"
     },
     {

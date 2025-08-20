@@ -75,7 +75,10 @@ pub fn handler(ctx: Context<QueueWalletClaimV0>, args: QueueWalletClaimArgsV0) -
   // Queue authority pays for the task rent if it can, since we know it'll come back
   // This makes claim tasks cheaper for users.
   let mut payer = ctx.accounts.payer.to_account_info();
-  let description = "ld wallet claim".to_string();
+  let description = format!("ld wallet {}", ctx.accounts.wallet.key())
+    .chars()
+    .take(40)
+    .collect::<String>();
   let len = 8 + std::mem::size_of::<TaskV0>() + 60 + description.len();
   let rent_needed = Rent::get()?.minimum_balance(len);
   if ctx.accounts.queue_authority.lamports() > rent_needed {

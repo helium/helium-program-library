@@ -1,11 +1,10 @@
 import { BN, IdlTypes, Program } from "@coral-xyz/anchor";
-import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { WelcomePack } from "@helium/idls/lib/types/welcome_pack";
+import { PROGRAM_ID as LAZY_DISTRIBUTOR_PROGRAM_ID, recipientKey } from "@helium/lazy-distributor-sdk";
 import { Asset, AssetProof, proofArgsAndAccounts } from "@helium/spl-utils";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { lazyDistributorKey, recipientKey } from "@helium/lazy-distributor-sdk";
-import { userWelcomePacksKey, welcomePackKey } from "../pdas";
 import { SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { userWelcomePacksKey, welcomePackKey } from "../pdas";
 
 export type RewardSplit = IdlTypes<WelcomePack>["miniFanoutShareArgV0"];
 export const BUBBLEGUM_PROGRAM_ID = new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY");
@@ -81,7 +80,8 @@ export async function initializeWelcomePack({
       compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
-      userWelcomePacks: userWelcomePacksK
+      userWelcomePacks: userWelcomePacksK,
+      lazyDistributorProgram: LAZY_DISTRIBUTOR_PROGRAM_ID
     })
     .remainingAccounts(remainingAccounts);
 }

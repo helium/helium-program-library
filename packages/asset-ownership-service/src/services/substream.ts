@@ -11,7 +11,7 @@ import {
   unpackMapOutput,
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
-import { Transaction } from "sequelize";
+import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import {
   PRODUCTION,
   SUBSTREAM,
@@ -20,8 +20,8 @@ import {
   SUBSTREAM_URL,
 } from "../env";
 import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
-import { Cursor } from "../utils/database";
 import { CursorManager } from "../utils/cursor";
+import database, { Cursor } from "../utils/database";
 import { TransactionProcessor } from "../utils/processTransaction";
 import { provider } from "../utils/solana";
 
@@ -72,6 +72,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
   });
 
   let isConnecting = false;
+  let currentAttemptCount = 0;
+  let staleAttemptCount = 0;
+  let reconnectTimeoutId: NodeJS.Timeout | null = null;
   let shouldRestart = false;
   let restartCursor: string | undefined = undefined;
   let currentAbortController: AbortController | null = null;
@@ -81,16 +84,44 @@ export const setupSubstream = async (server: FastifyInstance) => {
     SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
     () => {
       server.customMetrics.staleCursorCounter.inc();
-      handleReconnect();
+      staleAttemptCount++;
+
+      if (staleAttemptCount > MAX_RECONNECT_ATTEMPTS) {
+        console.error(
+          `Substream failed to recover from stale cursor after ${MAX_RECONNECT_ATTEMPTS} attempts.`
+        );
+        process.exit(1);
+      }
+
+      if (!isConnecting && !reconnectTimeoutId) {
+        handleReconnect(staleAttemptCount);
+      }
     }
   );
 
   const connect = async (attemptCount = 1, overrideCursor?: string) => {
+    currentAttemptCount = attemptCount;
+
     if (currentAbortController) {
       currentAbortController.abort();
     }
 
     currentAbortController = new AbortController();
+    const processor = await TransactionProcessor.create();
+
+    console.log("Trees", processor.getTrees());
+
+    applyParams(
+      [
+        `${MODULE}=${[...processor.getTrees()]
+          .map(
+            (merkleTree) =>
+              `program:${BUBBLEGUM_PROGRAM_ID} && account:${merkleTree}`
+          )
+          .join(" || ")}`,
+      ],
+      substream.modules!.modules
+    );
 
     if (attemptCount >= MAX_RECONNECT_ATTEMPTS) {
       console.error(
@@ -122,7 +153,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
         }`
       );
 
-      attemptCount = 0;
+      currentAttemptCount = 0;
       isConnecting = false;
 
       for await (const response of streamBlocks(transport, request)) {
@@ -144,6 +175,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
         }
 
         if (message.case === "blockScopedData") {
+          staleAttemptCount = 0;
+
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
           const blockHeight =
@@ -153,6 +186,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
             output !== undefined &&
             !isEmptyMessage(output) &&
             (output as any).transactions.length > 0;
+
+          let hasFilteredTransactions = false;
 
           if (hasTransactions) {
             const outputTransactions = (output as any)
@@ -165,7 +200,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
             );
 
             if (filteredTransactions.length > 0) {
-              const processor = await TransactionProcessor.create();
+              hasFilteredTransactions = true;
+
+              const dbTx = await database.transaction();
 
               try {
                 await Promise.all(
@@ -188,33 +225,48 @@ export const setupSubstream = async (server: FastifyInstance) => {
                       ...(accountKeysFromLookups?.readonly || []),
                     ];
 
-                    await processor.processTransaction({
+                    const { updatedTrees } = await processor.processTransaction({
                       accountKeys,
                       instructions: message.compiledInstructions,
-                      innerInstructions: transactionInfo.meta.innerInstructions?.map(inner => ({
-                        index: inner.index,
-                        instructions: inner.instructions.map(ix => ({
-                          programIdIndex: ix.programIdIndex,
-                          accountKeyIndexes: JSON.parse(ix.accounts),
-                          data: Buffer.from(ix.data, 'base64')
-                        }))
-                      }))
-                    });
+                      innerInstructions:
+                        transactionInfo.meta.innerInstructions?.map(
+                          (inner) => ({
+                            index: inner.index,
+                            instructions: inner.instructions.map((ix) => ({
+                              programIdIndex: ix.programIdIndex,
+                              accountKeyIndexes: Buffer.from(ix.accounts, "base64").toJSON().data,
+                              data: Buffer.from(ix.data, "base64"),
+                            })),
+                          })
+                        ),
+                    }, dbTx);
+
+                    if (updatedTrees) {
+                      console.log("Trees updated");
+                      shouldRestart = true;
+                      restartCursor = cursor;
+                      await cursorManager.updateCursor({
+                        cursor,
+                        blockHeight,
+                        force: true,
+                      });
+                    }
                   })
                 );
 
-                await processor.commit();
-                await cursorManager.updateCursor({
-                  cursor,
-                  blockHeight,
-                  force: true,
-                });
+                await dbTx.commit();
               } catch (err) {
-                await processor.rollback();
+                await dbTx.rollback();
                 throw err;
               }
             }
           }
+
+          await cursorManager.updateCursor({
+            cursor,
+            blockHeight,
+            force: hasFilteredTransactions,
+          });
         }
       }
 
@@ -226,16 +278,23 @@ export const setupSubstream = async (server: FastifyInstance) => {
       cursorManager.stopStalenessCheck();
       console.log("Substream connection error:", err);
       isConnecting = false;
-      handleReconnect(attemptCount + 1);
+      handleReconnect(currentAttemptCount + 1);
     }
   };
 
-  const handleReconnect = async (nextAttempt: number = 1) => {
+  const handleReconnect = async (
+    nextAttempt: number = currentAttemptCount + 1
+  ) => {
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+    }
+
     const baseDelay = 1000;
     const delay =
       nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
 
-    setTimeout(() => {
+    reconnectTimeoutId = setTimeout(() => {
+      reconnectTimeoutId = null;
       console.log(
         `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
       );
