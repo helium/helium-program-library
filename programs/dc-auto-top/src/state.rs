@@ -29,8 +29,7 @@ macro_rules! auto_top_off_seeds {
   ( $auto_top_off:expr ) => {
     &[
       b"auto_top_off".as_ref(),
-      $auto_top_off.data_credits.as_ref(),
-      $auto_top_off.sub_dao.as_ref(),
+      $auto_top_off.delegated_data_credits.as_ref(),
       $auto_top_off.authority.as_ref(),
       &[$auto_top_off.bump],
     ]
