@@ -1,0 +1,60 @@
+[database]
+host = "localhost"
+port = 5432
+username = "postgres"
+password = "password"
+database_name = "helium"
+max_connections = 10
+min_connections = 2
+acquire_timeout_seconds = 30
+idle_timeout_seconds = 600
+max_lifetime_seconds = 1800
+
+[ingestor]
+base_url = "http://localhost:8080"
+timeout_seconds = 30
+max_retries = 3
+retry_delay_seconds = 5
+
+[service]
+polling_interval_seconds = 10
+batch_size = 100
+max_concurrent_publishes = 5
+health_check_port = 3000
+
+# Example watched table configuration
+# [[service.watched_tables]]
+# name = "hotspots"
+# change_column = "updated_at"
+# atomic_data_query = """
+#   SELECT
+#     h.id,
+#     h.address,
+#     h.name,
+#     h.location,
+#     h.owner,
+#     h.status,
+#     h.created_at,
+#     h.updated_at,
+#     COALESCE(
+#       json_agg(
+#         json_build_object(
+#           'reward_id', r.id,
+#           'amount', r.amount,
+#           'currency', r.currency,
+#           'timestamp', r.timestamp
+#         )
+#       ) FILTER (WHERE r.id IS NOT NULL),
+#       '[]'::json
+#     ) as rewards
+#   FROM hotspots h
+#   LEFT JOIN rewards r ON h.id = r.hotspot_id
+#     AND r.timestamp >= NOW() - INTERVAL '24 hours'
+#   WHERE h.id = $PRIMARY_KEY
+#   GROUP BY h.id, h.address, h.name, h.location, h.owner, h.status, h.created_at, h.updated_at
+# """
+# publish_endpoint = "/api/v1/hotspots/atomic-data"
+
+[logging]
+level = "info"
+format = "json"

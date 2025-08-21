@@ -19,6 +19,7 @@ exclude = [
   "utils/generate-test-gateway-txn",
   "utils/standardize-hotspot-metadata",
   "utils/pyth_solana_receiver_sdk",
+  "utils/atomic-data-publisher",
 ]
 
 [workspace.dependencies]
