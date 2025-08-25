@@ -82,6 +82,8 @@ The service is designed to work with tables created by `account-postgres-sink-se
 - `iot_hotspot_infos` - IoT hotspot account data
 - `hotspot_infos` - General hotspot account data
 
+**Standard Field**: All tables automatically include a `last_block_height` column that tracks the Solana block height when each record was last updated. The atomic-data-publisher monitors this field for changes.
+
 ### Message Flow
 
 1. **Solana Account Changes** → `account-postgres-sink-service` → **PostgreSQL Tables**

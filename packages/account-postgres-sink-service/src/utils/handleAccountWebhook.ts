@@ -11,6 +11,7 @@ import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
 import { OMIT_KEYS } from "../constants";
 import { lowerFirstChar } from "@helium/spl-utils";
+import retry from "async-retry";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
@@ -111,7 +112,10 @@ export const handleAccountWebhook = async ({
       for (const plugin of pluginsByAccountType[accName] || []) {
         if (plugin?.processAccount) {
           try {
-            sanitized = await plugin.processAccount({ address: account.pubkey, ...sanitized }, t);
+            sanitized = await plugin.processAccount(
+              { address: account.pubkey, ...sanitized },
+              t
+            );
           } catch (err) {
             console.log(
               `Plugin processing failed for account ${account.pubkey}`,
@@ -135,7 +139,29 @@ export const handleAccountWebhook = async ({
       );
 
       if (shouldUpdate) {
-        await model.upsert({ ...sanitized }, { transaction: t });
+        let lastBlockHeight: number | null = null;
+
+        try {
+          lastBlockHeight = await retry(
+            () => provider.connection.getBlockHeight("confirmed"),
+            {
+              retries: 3,
+              factor: 2,
+              minTimeout: 1000,
+              maxTimeout: 5000,
+            }
+          );
+        } catch (error) {
+          console.warn("Failed to fetch block height after retries:", error);
+        }
+
+        await model.upsert(
+          {
+            ...sanitized,
+            last_block_height: lastBlockHeight,
+          },
+          { transaction: t }
+        );
       }
 
       await t.commit();

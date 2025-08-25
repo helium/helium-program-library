@@ -16,6 +16,9 @@ import axios from "axios";
 import { parser } from "stream-json";
 import { pick } from "stream-json/filters/Pick";
 import { streamArray } from "stream-json/streamers/StreamArray";
+import deepEqual from "deep-equal";
+import _omit from "lodash/omit";
+import { OMIT_KEYS } from "../constants";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
@@ -359,6 +362,21 @@ export const upsertProgramAccounts = async ({
             ),
           ];
 
+          // Fetch existing records to compare
+          const addresses = accs.map(({ publicKey }) => publicKey);
+          const existingRecords = await model.findAll({
+            where: { address: addresses },
+            transaction,
+          });
+
+          const existingRecordMap = new Map(
+            existingRecords.map((record) => [record.get("address"), record])
+          );
+
+          // Get current block height with retry - only if we have records that need updating
+          let lastBlockHeight: number | null = null;
+          const recordsToUpdate: string[] = [];
+
           const values = await Promise.all(
             accs.map(async ({ publicKey, account }) => {
               let sanitizedAccount = sanitizeAccount(account);
@@ -372,11 +390,52 @@ export const upsertProgramAccounts = async ({
                 }
               }
 
-              return {
+              const newRecord = {
                 address: publicKey,
                 refreshed_at: now,
                 ...sanitizedAccount,
               };
+
+              const existingRecord = existingRecordMap.get(publicKey);
+              const existingData = existingRecord?.dataValues;
+              const existingClean = _omit(existingData || {}, OMIT_KEYS);
+              const newClean = _omit(newRecord, OMIT_KEYS);
+
+              const shouldUpdate =
+                !existingRecord || !deepEqual(newClean, existingClean);
+
+              if (shouldUpdate) {
+                recordsToUpdate.push(publicKey.toBase58());
+                if (lastBlockHeight === null && recordsToUpdate.length === 1) {
+                  try {
+                    lastBlockHeight = await retry(
+                      () => connection.getBlockHeight("confirmed"),
+                      {
+                        retries: 3,
+                        factor: 2,
+                        minTimeout: 1000,
+                        maxTimeout: 5000,
+                      }
+                    );
+                  } catch (error) {
+                    console.warn(
+                      "Failed to fetch block height after retries:",
+                      error
+                    );
+                  }
+                }
+
+                return {
+                  ...newRecord,
+                  last_block_height: lastBlockHeight,
+                };
+              } else {
+                // Keep existing last_block_height for unchanged records
+                return {
+                  ...newRecord,
+                  last_block_height: existingData?.last_block_height || null,
+                };
+              }
             })
           );
 
@@ -385,6 +444,7 @@ export const upsertProgramAccounts = async ({
             updateOnDuplicate: [
               "address",
               "refreshed_at",
+              "last_block_height",
               ...updateOnDuplicateFields,
             ],
           });

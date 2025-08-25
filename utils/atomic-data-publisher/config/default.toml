@@ -30,11 +30,11 @@ health_check_port = 3000
 # Example watched table configuration for mobile hotspots
 # [[service.watched_tables]]
 # name = "mobile_hotspot_infos"  # Typical table name from account-postgres-sink-service
-# change_column = "updated_at"
+# change_column = "last_block_height"  # Monitor block height changes instead of timestamp
 # hotspot_type = "mobile"
 # atomic_data_query = """
 #   SELECT
-#     0 as block_height,  -- Will be populated by block height when available
+#     last_block_height as block_height,  -- Use the actual block height from the record
 #     EXTRACT(epoch FROM NOW())::bigint as block_time_seconds,
 #     key as pub_key,  -- Helium public key from account data
 #     address as asset,  -- Solana NFT address
@@ -52,11 +52,11 @@ health_check_port = 3000
 # Example watched table configuration for IoT hotspots
 # [[service.watched_tables]]
 # name = "iot_hotspot_infos"  # Typical table name from account-postgres-sink-service
-# change_column = "updated_at"
+# change_column = "last_block_height"  # Monitor block height changes instead of timestamp
 # hotspot_type = "iot"
 # atomic_data_query = """
 #   SELECT
-#     0 as block_height,  -- Will be populated by block height when available
+#     last_block_height as block_height,  -- Use the actual block height from the record
 #     EXTRACT(epoch FROM NOW())::bigint as block_time_seconds,
 #     key as pub_key,  -- Helium public key from account data
 #     address as asset,  -- Solana NFT address
