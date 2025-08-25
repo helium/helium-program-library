@@ -1,8 +1,9 @@
 mod config;
 mod database;
 mod errors;
-mod ingestor;
 mod metrics;
+mod protobuf;
+mod publisher;
 mod service;
 
 use anyhow::Result;
@@ -21,7 +22,7 @@ async fn main() -> Result<()> {
   tracing_subscriber::registry()
     .with(
       tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        format!("atomic_data_publisher={},sqlx=warn,reqwest=info", log_level).into()
+        format!("atomic_data_publisher={},sqlx=warn,tonic=info", log_level).into()
       }),
     )
     .with(tracing_subscriber::fmt::layer().json())
@@ -117,18 +118,18 @@ fn validate_config(settings: &Settings) -> Result<()> {
     ));
   }
 
-  // Validate ingestor configuration
-  if settings.ingestor.base_url.is_empty() {
-    return Err(anyhow::anyhow!("Ingestor base URL cannot be empty"));
-  }
+     // Validate ingestor configuration
+   if settings.ingestor.grpc_endpoint.is_empty() {
+     return Err(anyhow::anyhow!("Ingestor gRPC endpoint cannot be empty"));
+   }
 
-  if !settings.ingestor.base_url.starts_with("http://")
-    && !settings.ingestor.base_url.starts_with("https://")
-  {
-    return Err(anyhow::anyhow!(
-      "Ingestor base URL must start with http:// or https://"
-    ));
-  }
+   if !settings.ingestor.grpc_endpoint.starts_with("http://")
+     && !settings.ingestor.grpc_endpoint.starts_with("https://")
+   {
+     return Err(anyhow::anyhow!(
+       "Ingestor gRPC endpoint must start with http:// or https://"
+     ));
+   }
 
   // Validate service configuration
   if settings.service.polling_interval_seconds == 0 {
@@ -176,12 +177,12 @@ fn validate_config(settings: &Settings) -> Result<()> {
       ));
     }
 
-    if table.publish_endpoint.is_empty() {
-      return Err(anyhow::anyhow!(
-        "Publish endpoint cannot be empty for table: {}",
-        table.name
-      ));
-    }
+         // Validate hotspot type is specified
+     match table.hotspot_type {
+       crate::config::HotspotType::Mobile | crate::config::HotspotType::Iot => {
+         // Valid hotspot types
+       }
+     }
   }
 
   info!("Configuration validation passed");

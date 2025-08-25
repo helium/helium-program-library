@@ -6,6 +6,13 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+#[derive(Debug, Clone, Serialize)]
+pub struct CircuitBreakerStatus {
+  pub is_open: bool,
+  pub failure_count: u32,
+  pub threshold: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceMetrics {
   pub uptime_seconds: u64,
@@ -263,7 +270,7 @@ impl MetricsCollector {
   // Generate metrics snapshot
   pub async fn get_metrics(
     &self,
-    circuit_breaker_status: Option<crate::ingestor::CircuitBreakerStatus>,
+    circuit_breaker_status: Option<CircuitBreakerStatus>,
   ) -> ServiceMetrics {
     let uptime = self.start_time.elapsed().as_secs();
 

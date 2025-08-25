@@ -1,4 +1,6 @@
 use anyhow::Result;
+use helium_crypto::Keypair;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::{interval, sleep};
@@ -7,13 +9,13 @@ use tracing::{debug, error, info, warn};
 use crate::config::Settings;
 use crate::database::{ChangeRecord, DatabaseClient};
 use crate::errors::AtomicDataError;
-use crate::ingestor::IngestorClient;
 use crate::metrics::MetricsCollector;
+use crate::publisher::AtomicDataPublisher as Publisher;
 
 #[derive(Debug)]
 pub struct AtomicDataPublisher {
   database: Arc<DatabaseClient>,
-  ingestor: Arc<IngestorClient>,
+  publisher: Arc<Publisher>,
   metrics: Arc<MetricsCollector>,
   config: Settings,
   shutdown_signal: tokio::sync::watch::Receiver<bool>,
@@ -31,11 +33,30 @@ impl AtomicDataPublisher {
     // Initialize tracking tables and triggers
     database.initialize_tracking().await?;
 
-    // Initialize ingestor client
-    let ingestor = Arc::new(IngestorClient::new(
+    // Load keypair for signing messages
+    let keypair_path = std::env::var("ATOMIC_DATA_PUBLISHER_KEYPAIR_PATH")
+      .unwrap_or_else(|_| "/app/keypair.bin".to_string());
+
+    let keypair = if std::path::Path::new(&keypair_path).exists() {
+      Keypair::from_bytes(&std::fs::read(&keypair_path)?)
+        .map_err(|e| anyhow::anyhow!("Failed to load keypair: {}", e))?
+    } else {
+      warn!("Keypair file not found at {}, generating new keypair", keypair_path);
+      let keypair = Keypair::generate();
+      std::fs::write(&keypair_path, keypair.to_bytes())
+        .map_err(|e| anyhow::anyhow!("Failed to save keypair: {}", e))?;
+      info!("Generated new keypair and saved to {}", keypair_path);
+      keypair
+    };
+
+    info!("Using keypair with public key: {}", keypair.public_key());
+
+    // Initialize publisher client
+    let publisher = Arc::new(Publisher::new(
       config.ingestor.clone(),
       config.service.watched_tables.clone(),
-    )?);
+      keypair,
+    ).await?);
 
     // Initialize metrics collector
     let metrics = Arc::new(MetricsCollector::new());
@@ -45,7 +66,7 @@ impl AtomicDataPublisher {
 
     Ok(Self {
       database,
-      ingestor,
+      publisher,
       metrics,
       config,
       shutdown_signal,
@@ -57,7 +78,7 @@ impl AtomicDataPublisher {
   pub async fn run(&self) -> Result<()> {
     info!("Starting Atomic Data Publisher service");
 
-    // Health check both database and ingestor before starting
+    // Health check both database and publisher before starting
     self.health_check().await?;
 
     let mut handles = Vec::new();
@@ -224,16 +245,16 @@ impl AtomicDataPublisher {
     ));
     let mut tasks = Vec::new();
 
-    for change in changes {
-      let ingestor = self.ingestor.clone();
-      let metrics = self.metrics.clone();
-      let semaphore = semaphore.clone();
+         for change in changes {
+       let publisher = self.publisher.clone();
+       let metrics = self.metrics.clone();
+       let semaphore = semaphore.clone();
 
-      let task = tokio::spawn(async move {
-        let _permit = semaphore.acquire().await.unwrap();
-        let publish_start = Instant::now();
+       let task = tokio::spawn(async move {
+         let _permit = semaphore.acquire().await.unwrap();
+         let publish_start = Instant::now();
 
-        let result = ingestor.publish_changes(vec![change.clone()]).await;
+         let result = publisher.publish_changes(vec![change.clone()]).await;
         let publish_time = publish_start.elapsed();
 
         match result {
@@ -352,9 +373,9 @@ impl AtomicDataPublisher {
       return Err(AtomicDataError::DatabaseError(e.to_string()));
     }
 
-    // Check ingestor service
-    if let Err(e) = self.ingestor.health_check().await {
-      error!("Ingestor health check failed: {}", e);
+    // Check publisher service
+    if let Err(e) = self.publisher.health_check().await {
+      error!("Publisher health check failed: {}", e);
       return Err(e);
     }
 
@@ -364,7 +385,7 @@ impl AtomicDataPublisher {
 
   /// Get current service metrics
   pub async fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
-    let circuit_breaker_status = Some(self.ingestor.circuit_breaker_status());
+    let circuit_breaker_status = None; // No circuit breaker in simplified publisher
     self.metrics.get_metrics(circuit_breaker_status).await
   }
 
@@ -389,7 +410,7 @@ impl Clone for AtomicDataPublisher {
   fn clone(&self) -> Self {
     Self {
       database: self.database.clone(),
-      ingestor: self.ingestor.clone(),
+      publisher: self.publisher.clone(),
       metrics: self.metrics.clone(),
       config: self.config.clone(),
       shutdown_signal: self.shutdown_signal.clone(),

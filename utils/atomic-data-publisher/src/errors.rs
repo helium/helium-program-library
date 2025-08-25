@@ -8,20 +8,8 @@ pub enum AtomicDataError {
   #[error("Configuration error: {0}")]
   ConfigError(String),
 
-  #[error("HTTP client error: {0}")]
-  HttpError(String),
-
   #[error("Serialization error: {0}")]
   SerializationError(String),
-
-  #[error("Ingestor service error: status={status}, message={message}")]
-  IngestorError { status: u16, message: String },
-
-  #[error("Circuit breaker open: {0}")]
-  CircuitBreakerOpen(String),
-
-  #[error("Retry exhausted: {0}")]
-  RetryExhausted(String),
 
   #[error("Service unavailable: {0}")]
   ServiceUnavailable(String),
@@ -39,18 +27,6 @@ pub enum AtomicDataError {
 impl From<sqlx::Error> for AtomicDataError {
   fn from(err: sqlx::Error) -> Self {
     AtomicDataError::DatabaseError(err.to_string())
-  }
-}
-
-impl From<reqwest::Error> for AtomicDataError {
-  fn from(err: reqwest::Error) -> Self {
-    if err.is_timeout() {
-      AtomicDataError::Timeout(err.to_string())
-    } else if err.is_connect() {
-      AtomicDataError::ServiceUnavailable(err.to_string())
-    } else {
-      AtomicDataError::HttpError(err.to_string())
-    }
   }
 }
 

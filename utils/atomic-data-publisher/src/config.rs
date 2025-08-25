@@ -26,10 +26,11 @@ pub struct DatabaseConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IngestorConfig {
-  pub base_url: String,
+  pub grpc_endpoint: String,
   pub timeout_seconds: u64,
   pub max_retries: u32,
   pub retry_delay_seconds: u64,
+  pub tls_enabled: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -46,7 +47,15 @@ pub struct WatchedTable {
   pub name: String,
   pub change_column: String,
   pub atomic_data_query: String,
-  pub publish_endpoint: String,
+  pub hotspot_type: HotspotType,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub enum HotspotType {
+  #[serde(rename = "mobile")]
+  Mobile,
+  #[serde(rename = "iot")]
+  Iot,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -118,10 +127,11 @@ impl Default for Settings {
         max_lifetime_seconds: 1800,
       },
       ingestor: IngestorConfig {
-        base_url: "http://localhost:8080".to_string(),
+        grpc_endpoint: "http://localhost:8080".to_string(),
         timeout_seconds: 30,
         max_retries: 3,
         retry_delay_seconds: 5,
+        tls_enabled: false,
       },
       service: ServiceConfig {
         polling_interval_seconds: 10,

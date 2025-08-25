@@ -4,27 +4,36 @@ A Rust service that monitors PostgreSQL database tables for changes and publishe
 
 ## Overview
 
+The Atomic Data Publisher is a Rust service that monitors PostgreSQL database changes and publishes atomic data updates to the Helium oracles ingestor service. It's designed to work with the Helium blockchain ecosystem, specifically integrating with:
+
+- **Database**: `account-postgres-sink-service` - Monitors Solana accounts and stores hotspot data
+- **Ingestor**: `oracles/ingest/server_chain.rs` - Receives and processes signed protobuf messages
+- **Protobuf**: `helium-proto` - Defines chain rewardable entities messages
+- **Crypto**: `helium-crypto-rs` - Handles message signing and verification
+
 The Atomic Data Publisher:
 
-1. **Monitors Database Changes**: Uses PostgreSQL triggers to detect changes in specified columns
-2. **Constructs Atomic Data**: Executes configurable queries to build rich atomic data payloads
-3. **Publishes to Ingestor**: Sends atomic data to a configurable ingestor service via HTTP
-4. **Provides Observability**: Comprehensive metrics, logging, and health checks
+1. **Monitors Database Changes**: Uses PostgreSQL triggers to detect changes in hotspot tables
+2. **Constructs Atomic Data**: Executes configurable queries to build rich hotspot update payloads
+3. **Signs Messages**: Cryptographically signs messages using Helium keypairs
+4. **Publishes to Oracles**: Connects to Helium oracles ingestor service via gRPC
+5. **Provides Observability**: Comprehensive metrics, logging, and health checks
 
 ## Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   PostgreSQL    │    │  Atomic Data     │    │   Ingestor      │
-│   Database      │───▶│   Publisher      │───▶│   Service       │
-│                 │    │                  │    │                 │
-│ • Tables        │    │ • Change         │    │ • REST API      │
-│ • Triggers      │    │   Detection      │    │ • Data          │
-│ • Tracking      │    │ • Atomic Data    │    │   Processing    │
-│   Tables        │    │   Construction   │    │                 │
-└─────────────────┘    │ • Publishing     │    └─────────────────┘
+│   PostgreSQL    │    │  Atomic Data     │    │   Helium        │
+│  (sink-service) │───▶│   Publisher      │───▶│   Oracles       │
+│                 │    │                  │    │   Ingestor      │
+│ • hotspot_infos │    │ • Change         │    │                 │
+│ • Triggers      │    │   Detection      │    │ • gRPC Server   │
+│ • Tracking      │    │ • Protobuf       │    │ • Signature     │
+│   Tables        │    │   Construction   │    │   Verification  │
+└─────────────────┘    │ • Helium Crypto  │    │ • S3 Storage    │
+                       │   Signing        │    └─────────────────┘
+                       │ • gRPC Client    │
                        │ • Metrics        │
-                       │ • Health Checks  │
                        └──────────────────┘
 ```
 
@@ -44,9 +53,11 @@ The Atomic Data Publisher:
 
 ### 📡 Reliable Publishing
 
-- HTTP client with retry logic and exponential backoff
-- Circuit breaker pattern prevents cascade failures
+- gRPC client connects to Helium oracles ingestor service
+- Cryptographically signed messages using Helium keypairs
+- Automatic retry logic with exponential backoff
 - Configurable concurrency limits and timeouts
+- Direct protobuf message transmission
 
 ### 📊 Observability
 
@@ -60,6 +71,30 @@ The Atomic Data Publisher:
 - Graceful degradation during failures
 - Automatic cleanup of processed changes
 - Circuit breaker protection for downstream services
+
+## Ecosystem Integration
+
+### Database Schema
+
+The service is designed to work with tables created by `account-postgres-sink-service`, typically:
+
+- `mobile_hotspot_infos` - Mobile hotspot account data
+- `iot_hotspot_infos` - IoT hotspot account data
+- `hotspot_infos` - General hotspot account data
+
+### Message Flow
+
+1. **Solana Account Changes** → `account-postgres-sink-service` → **PostgreSQL Tables**
+2. **Table Changes** → **Atomic Data Publisher** → **Signed Protobuf Messages**
+3. **gRPC Requests** → **Oracles Ingestor** → **S3 File Storage**
+
+### Protobuf Messages
+
+Uses `helium-proto` definitions:
+
+- `MobileHotspotChangeReqV1` - Mobile hotspot updates
+- `IotHotspotChangeReqV1` - IoT hotspot updates
+- Includes cryptographic signatures using `helium-crypto`
 
 ## Configuration
 

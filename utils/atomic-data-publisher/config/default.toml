@@ -10,11 +10,16 @@ acquire_timeout_seconds = 30
 idle_timeout_seconds = 600
 max_lifetime_seconds = 1800
 
+# Signing keypair settings
+[signing]
+keypair_path = "/app/keypair.bin"  # Path to Helium keypair file
+
 [ingestor]
-base_url = "http://localhost:8080"
+grpc_endpoint = "http://localhost:8080"
 timeout_seconds = 30
 max_retries = 3
 retry_delay_seconds = 5
+tls_enabled = false
 
 [service]
 polling_interval_seconds = 10
@@ -22,38 +27,48 @@ batch_size = 100
 max_concurrent_publishes = 5
 health_check_port = 3000
 
-# Example watched table configuration
+# Example watched table configuration for mobile hotspots
 # [[service.watched_tables]]
-# name = "hotspots"
+# name = "mobile_hotspot_infos"  # Typical table name from account-postgres-sink-service
 # change_column = "updated_at"
+# hotspot_type = "mobile"
 # atomic_data_query = """
 #   SELECT
-#     h.id,
-#     h.address,
-#     h.name,
-#     h.location,
-#     h.owner,
-#     h.status,
-#     h.created_at,
-#     h.updated_at,
-#     COALESCE(
-#       json_agg(
-#         json_build_object(
-#           'reward_id', r.id,
-#           'amount', r.amount,
-#           'currency', r.currency,
-#           'timestamp', r.timestamp
-#         )
-#       ) FILTER (WHERE r.id IS NOT NULL),
-#       '[]'::json
-#     ) as rewards
-#   FROM hotspots h
-#   LEFT JOIN rewards r ON h.id = r.hotspot_id
-#     AND r.timestamp >= NOW() - INTERVAL '24 hours'
-#   WHERE h.id = $PRIMARY_KEY
-#   GROUP BY h.id, h.address, h.name, h.location, h.owner, h.status, h.created_at, h.updated_at
+#     0 as block_height,  -- Will be populated by block height when available
+#     EXTRACT(epoch FROM NOW())::bigint as block_time_seconds,
+#     key as pub_key,  -- Helium public key from account data
+#     address as asset,  -- Solana NFT address
+#     serial_number,
+#     device_type,
+#     location as asserted_hex,  -- Hex location
+#     azimuth,
+#     owner,  -- Current NFT owner
+#     'direct_owner' as owner_type,  -- Default owner type
+#     rewards_recipient
+#   FROM mobile_hotspot_infos
+#   WHERE address = $PRIMARY_KEY
 # """
-# publish_endpoint = "/api/v1/hotspots/atomic-data"
+
+# Example watched table configuration for IoT hotspots
+# [[service.watched_tables]]
+# name = "iot_hotspot_infos"  # Typical table name from account-postgres-sink-service
+# change_column = "updated_at"
+# hotspot_type = "iot"
+# atomic_data_query = """
+#   SELECT
+#     0 as block_height,  -- Will be populated by block height when available
+#     EXTRACT(epoch FROM NOW())::bigint as block_time_seconds,
+#     key as pub_key,  -- Helium public key from account data
+#     address as asset,  -- Solana NFT address
+#     location as asserted_hex,  -- Hex location
+#     elevation,
+#     false as is_data_only,  -- Default value, adjust based on your schema
+#     owner,  -- Current NFT owner
+#     'direct_owner' as owner_type,  -- Default owner type
+#     rewards_recipient
+#   FROM iot_hotspot_infos
+#   WHERE address = $PRIMARY_KEY
+# """
 
 [logging]
 level = "info"
