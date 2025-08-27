@@ -3,15 +3,14 @@ use bs58;
 use chrono::{DateTime, Utc};
 use helium_crypto::{Keypair, Sign};
 use helium_proto::services::chain_rewardable_entities::{
-  entity_owner_info, entity_owner_type, helium_pub_key, iot_hotspot_metadata,
-  iot_hotspot_update_v1, mobile_hotspot_device_type, mobile_hotspot_metadata,
-  mobile_hotspot_update_v1, rewards_split_v1, solana_pub_key, split_recipient_info_v1,
-  IotHotspotChangeReqV1, MobileHotspotChangeReqV1,
+  iot_hotspot_update_v1, mobile_hotspot_update_v1, split_recipient_info_v1, EntityOwnerInfo,
+  EntityOwnerType, HeliumPubKey, IotHotspotMetadata, IotHotspotUpdateReqV1, IotHotspotUpdateV1,
+  MobileHotspotDeviceType, MobileHotspotMetadata, MobileHotspotUpdateReqV1, MobileHotspotUpdateV1,
+  RewardsSplitV1, SolanaPubKey, SplitRecipientInfoV1,
 };
 use prost::Message;
 use serde_json::Value;
-use std::collections::HashMap;
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 use crate::config::HotspotType;
 use crate::database::ChangeRecord;
@@ -25,7 +24,7 @@ impl ProtobufBuilder {
   pub fn build_mobile_hotspot_update(
     change: &ChangeRecord,
     keypair: &Keypair,
-  ) -> Result<MobileHotspotChangeReqV1, AtomicDataError> {
+  ) -> Result<MobileHotspotUpdateReqV1, AtomicDataError> {
     let atomic_data = change
       .atomic_data
       .as_array()
@@ -37,7 +36,7 @@ impl ProtobufBuilder {
     let update = Self::build_mobile_hotspot_update_v1(atomic_data)?;
 
     // Create the request without signature first
-    let mut request = MobileHotspotChangeReqV1 {
+    let mut request = MobileHotspotUpdateReqV1 {
       update: Some(update),
       signer: keypair.public_key().to_string(),
       signature: vec![],
@@ -54,7 +53,7 @@ impl ProtobufBuilder {
   pub fn build_iot_hotspot_update(
     change: &ChangeRecord,
     keypair: &Keypair,
-  ) -> Result<IotHotspotChangeReqV1, AtomicDataError> {
+  ) -> Result<IotHotspotUpdateReqV1, AtomicDataError> {
     let atomic_data = change
       .atomic_data
       .as_array()
@@ -66,7 +65,7 @@ impl ProtobufBuilder {
     let update = Self::build_iot_hotspot_update_v1(atomic_data)?;
 
     // Create the request without signature first
-    let mut request = IotHotspotChangeReqV1 {
+    let mut request = IotHotspotUpdateReqV1 {
       update: Some(update),
       signer: keypair.public_key().to_string(),
       signature: vec![],
@@ -81,7 +80,7 @@ impl ProtobufBuilder {
 
   fn build_mobile_hotspot_update_v1(
     data: &Value,
-  ) -> Result<mobile_hotspot_update_v1, AtomicDataError> {
+  ) -> Result<MobileHotspotUpdateV1, AtomicDataError> {
     debug!("Building mobile hotspot update from data: {}", data);
 
     let block_height = Self::extract_u64(data, "block_height").unwrap_or(0);
@@ -106,7 +105,7 @@ impl ProtobufBuilder {
       None
     };
 
-    Ok(mobile_hotspot_update_v1 {
+    Ok(MobileHotspotUpdateV1 {
       block_height,
       block_time_seconds,
       pub_key: Some(pub_key),
@@ -117,7 +116,7 @@ impl ProtobufBuilder {
     })
   }
 
-  fn build_iot_hotspot_update_v1(data: &Value) -> Result<iot_hotspot_update_v1, AtomicDataError> {
+  fn build_iot_hotspot_update_v1(data: &Value) -> Result<IotHotspotUpdateV1, AtomicDataError> {
     debug!("Building IoT hotspot update from data: {}", data);
 
     let block_height = Self::extract_u64(data, "block_height").unwrap_or(0);
@@ -146,7 +145,7 @@ impl ProtobufBuilder {
       None
     };
 
-    Ok(iot_hotspot_update_v1 {
+    Ok(IotHotspotUpdateV1 {
       block_height,
       block_time_seconds,
       pub_key: Some(pub_key),
@@ -157,14 +156,12 @@ impl ProtobufBuilder {
     })
   }
 
-  fn build_mobile_hotspot_metadata(
-    data: &Value,
-  ) -> Result<mobile_hotspot_metadata, AtomicDataError> {
+  fn build_mobile_hotspot_metadata(data: &Value) -> Result<MobileHotspotMetadata, AtomicDataError> {
     let serial_number = Self::extract_string(data, "serial_number").unwrap_or_default();
 
     let device_type = Self::extract_string(data, "device_type")
       .and_then(|s| Self::parse_mobile_device_type(&s))
-      .unwrap_or(mobile_hotspot_device_type::MobileHotspotDeviceTypeUnknown);
+      .unwrap_or(MobileHotspotDeviceType::Unknown);
 
     let asserted_hex = Self::extract_string(data, "asserted_hex")
       .or_else(|| Self::extract_string(data, "location"))
@@ -172,7 +169,7 @@ impl ProtobufBuilder {
 
     let azimuth = Self::extract_u32(data, "azimuth").unwrap_or(0);
 
-    Ok(mobile_hotspot_metadata {
+    Ok(MobileHotspotMetadata {
       serial_number,
       device_type: device_type.into(),
       asserted_hex,
@@ -180,7 +177,7 @@ impl ProtobufBuilder {
     })
   }
 
-  fn build_iot_hotspot_metadata(data: &Value) -> Result<iot_hotspot_metadata, AtomicDataError> {
+  fn build_iot_hotspot_metadata(data: &Value) -> Result<IotHotspotMetadata, AtomicDataError> {
     let asserted_hex = Self::extract_string(data, "asserted_hex")
       .or_else(|| Self::extract_string(data, "location"))
       .unwrap_or_default();
@@ -188,27 +185,27 @@ impl ProtobufBuilder {
     let elevation = Self::extract_u32(data, "elevation").unwrap_or(0);
     let is_data_only = Self::extract_bool(data, "is_data_only").unwrap_or(false);
 
-    Ok(iot_hotspot_metadata {
+    Ok(IotHotspotMetadata {
       asserted_hex,
       elevation,
       is_data_only,
     })
   }
 
-  fn build_entity_owner_info(data: &Value) -> Result<entity_owner_info, AtomicDataError> {
+  fn build_entity_owner_info(data: &Value) -> Result<EntityOwnerInfo, AtomicDataError> {
     let wallet = Self::extract_solana_pub_key(data, "owner")?;
 
     let owner_type = Self::extract_string(data, "owner_type")
       .and_then(|s| Self::parse_entity_owner_type(&s))
-      .unwrap_or(entity_owner_type::EntityOwnerTypeDirectOwner);
+      .unwrap_or(EntityOwnerType::DirectOwner);
 
-    Ok(entity_owner_info {
+    Ok(EntityOwnerInfo {
       wallet: Some(wallet),
       r#type: owner_type.into(),
     })
   }
 
-  fn try_build_rewards_split(data: &Value) -> Result<Option<rewards_split_v1>, AtomicDataError> {
+  fn try_build_rewards_split(data: &Value) -> Result<Option<RewardsSplitV1>, AtomicDataError> {
     // Check if rewards split data exists
     if let Some(split_data) = data.get("rewards_split") {
       let pub_key = Self::extract_solana_pub_key(split_data, "pub_key")?;
@@ -225,7 +222,7 @@ impl ProtobufBuilder {
           Vec::new()
         };
 
-      Ok(Some(rewards_split_v1 {
+      Ok(Some(RewardsSplitV1 {
         pub_key: Some(pub_key),
         schedule,
         total_shares,
@@ -236,7 +233,7 @@ impl ProtobufBuilder {
     }
   }
 
-  fn try_build_split_recipient(data: &Value) -> Result<split_recipient_info_v1, AtomicDataError> {
+  fn try_build_split_recipient(data: &Value) -> Result<SplitRecipientInfoV1, AtomicDataError> {
     let authority = Self::extract_solana_pub_key(data, "authority")?;
     let recipient = Self::extract_solana_pub_key(data, "recipient")?;
 
@@ -250,14 +247,14 @@ impl ProtobufBuilder {
       None
     };
 
-    Ok(split_recipient_info_v1 {
+    Ok(SplitRecipientInfoV1 {
       authority: Some(authority),
       recipient: Some(recipient),
       reward_amount,
     })
   }
 
-  fn extract_helium_pub_key(data: &Value, key: &str) -> Result<helium_pub_key, AtomicDataError> {
+  fn extract_helium_pub_key(data: &Value, key: &str) -> Result<HeliumPubKey, AtomicDataError> {
     let key_str = Self::extract_string(data, key)
       .ok_or_else(|| AtomicDataError::InvalidData(format!("Missing helium pub key: {}", key)))?;
 
@@ -265,10 +262,10 @@ impl ProtobufBuilder {
       AtomicDataError::InvalidData(format!("Invalid base58 helium pub key {}: {}", key, e))
     })?;
 
-    Ok(helium_pub_key { value: decoded })
+    Ok(HeliumPubKey { value: decoded })
   }
 
-  fn extract_solana_pub_key(data: &Value, key: &str) -> Result<solana_pub_key, AtomicDataError> {
+  fn extract_solana_pub_key(data: &Value, key: &str) -> Result<SolanaPubKey, AtomicDataError> {
     let key_str = Self::extract_string(data, key)
       .ok_or_else(|| AtomicDataError::InvalidData(format!("Missing solana pub key: {}", key)))?;
 
@@ -276,13 +273,13 @@ impl ProtobufBuilder {
       AtomicDataError::InvalidData(format!("Invalid base58 solana pub key {}: {}", key, e))
     })?;
 
-    Ok(solana_pub_key { value: decoded })
+    Ok(SolanaPubKey { value: decoded })
   }
 
-  fn try_extract_solana_pub_key(data: &Value, key: &str) -> Option<solana_pub_key> {
+  fn try_extract_solana_pub_key(data: &Value, key: &str) -> Option<SolanaPubKey> {
     Self::extract_string(data, key)
       .and_then(|key_str| bs58::decode(&key_str).into_vec().ok())
-      .map(|decoded| solana_pub_key { value: decoded })
+      .map(|decoded| SolanaPubKey { value: decoded })
   }
 
   fn extract_string(data: &Value, key: &str) -> Option<String> {
@@ -333,18 +330,12 @@ impl ProtobufBuilder {
     None
   }
 
-  fn parse_mobile_device_type(device_type_str: &str) -> Option<mobile_hotspot_device_type> {
+  fn parse_mobile_device_type(device_type_str: &str) -> Option<MobileHotspotDeviceType> {
     match device_type_str.to_lowercase().as_str() {
-      "cbrs" => Some(mobile_hotspot_device_type::MobileHotspotDeviceTypeCbrs),
-      "wifi_indoor" | "wifi-indoor" => {
-        Some(mobile_hotspot_device_type::MobileHotspotDeviceTypeWifiIndoor)
-      }
-      "wifi_outdoor" | "wifi-outdoor" => {
-        Some(mobile_hotspot_device_type::MobileHotspotDeviceTypeWifiOutdoor)
-      }
-      "wifi_data_only" | "wifi-data-only" => {
-        Some(mobile_hotspot_device_type::MobileHotspotDeviceTypeWifiDataOnly)
-      }
+      "cbrs" => Some(MobileHotspotDeviceType::Cbrs),
+      "wifi_indoor" | "wifi-indoor" => Some(MobileHotspotDeviceType::WifiIndoor),
+      "wifi_outdoor" | "wifi-outdoor" => Some(MobileHotspotDeviceType::WifiOutdoor),
+      "wifi_data_only" | "wifi-data-only" => Some(MobileHotspotDeviceType::WifiDataOnly),
       _ => {
         warn!("Unknown mobile device type: {}", device_type_str);
         None
@@ -352,12 +343,10 @@ impl ProtobufBuilder {
     }
   }
 
-  fn parse_entity_owner_type(owner_type_str: &str) -> Option<entity_owner_type> {
+  fn parse_entity_owner_type(owner_type_str: &str) -> Option<EntityOwnerType> {
     match owner_type_str.to_lowercase().as_str() {
-      "direct_owner" | "direct-owner" => Some(entity_owner_type::EntityOwnerTypeDirectOwner),
-      "welcome_pack_owner" | "welcome-pack-owner" => {
-        Some(entity_owner_type::EntityOwnerTypeWelcomePackOwner)
-      }
+      "direct_owner" | "direct-owner" => Some(EntityOwnerType::DirectOwner),
+      "welcome_pack_owner" | "welcome-pack-owner" => Some(EntityOwnerType::WelcomePackOwner),
       _ => {
         warn!("Unknown entity owner type: {}", owner_type_str);
         None
@@ -371,7 +360,7 @@ impl ProtobufBuilder {
     T: Message + Clone,
   {
     // Clone the message and clear the signature field
-    let mut unsigned_msg = msg.clone();
+    let unsigned_msg = msg.clone();
     let mut buf = Vec::new();
     unsigned_msg.encode(&mut buf).map_err(|e| {
       AtomicDataError::SerializationError(format!("Failed to encode message: {}", e))
@@ -407,8 +396,8 @@ pub fn build_hotspot_update_request(
 /// Enum to hold either mobile or IoT hotspot update requests
 #[derive(Debug, Clone)]
 pub enum HotspotUpdateRequest {
-  Mobile(MobileHotspotChangeReqV1),
-  Iot(IotHotspotChangeReqV1),
+  Mobile(MobileHotspotUpdateReqV1),
+  Iot(IotHotspotUpdateReqV1),
 }
 
 impl HotspotUpdateRequest {

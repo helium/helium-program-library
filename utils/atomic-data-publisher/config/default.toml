@@ -31,6 +31,7 @@ health_check_port = 3000
 # [[service.watched_tables]]
 # name = "mobile_hotspot_infos"  # Typical table name from account-postgres-sink-service
 # change_column = "last_block_height"  # Monitor block height changes instead of timestamp
+# primary_key_column = "address"  # Primary key column (could be "id", "address", "pubkey", etc.)
 # hotspot_type = "mobile"
 # atomic_data_query = """
 #   SELECT
@@ -53,6 +54,7 @@ health_check_port = 3000
 # [[service.watched_tables]]
 # name = "iot_hotspot_infos"  # Typical table name from account-postgres-sink-service
 # change_column = "last_block_height"  # Monitor block height changes instead of timestamp
+# primary_key_column = "address"  # Primary key column (could be "id", "address", "pubkey", etc.)
 # hotspot_type = "iot"
 # atomic_data_query = """
 #   SELECT

@@ -1,8 +1,8 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, Row, postgres::PgPoolOptions};
-use std::collections::HashMap;
+use sqlx::{PgPool, Row, Column, TypeInfo, postgres::PgPoolOptions};
+
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -18,7 +18,15 @@ pub struct ChangeRecord {
   pub atomic_data: serde_json::Value,
 }
 
+/// Tracks the last known state for polling (now stored in database)
 #[derive(Debug, Clone)]
+pub struct TablePollingState {
+  pub table_name: String,
+  pub last_processed_block_height: i64,
+  pub last_poll_time: DateTime<Utc>,
+}
+
+#[derive(Debug)]
 pub struct DatabaseClient {
   pool: PgPool,
   watched_tables: Vec<WatchedTable>,
@@ -56,102 +64,111 @@ impl DatabaseClient {
     })
   }
 
-  /// Initialize tracking tables for change detection
-  pub async fn initialize_tracking(&self) -> Result<()> {
+    /// Initialize persistent polling state table and load/create state for each watched table
+  pub async fn initialize_polling_state(&self) -> Result<()> {
+    // Create the polling state table if it doesn't exist
+    self.create_polling_state_table().await?;
+
+    // Initialize state for each watched table
     for table in &self.watched_tables {
-      self.create_tracking_table(&table.name).await?;
-      self
-        .create_change_trigger(&table.name, &table.change_column)
-        .await?;
+      self.initialize_table_polling_state(&table.name).await?;
     }
+
+    info!("Initialized polling state for {} tables", self.watched_tables.len());
     Ok(())
   }
 
-  /// Create a tracking table for change detection
-  async fn create_tracking_table(&self, table_name: &str) -> Result<()> {
-    let tracking_table = format!("{}_changes", table_name);
+  /// Create the polling state table
+  async fn create_polling_state_table(&self) -> Result<()> {
+    let create_query = r#"
+      CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
+        table_name VARCHAR(255) PRIMARY KEY,
+        last_processed_block_height BIGINT NOT NULL DEFAULT 0,
+        last_poll_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
 
-    let create_query = format!(
-      r#"
-            CREATE TABLE IF NOT EXISTS {} (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                table_name VARCHAR NOT NULL,
-                primary_key VARCHAR NOT NULL,
-                change_column_value TEXT NOT NULL,
-                changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                processed BOOLEAN DEFAULT FALSE,
-                processed_at TIMESTAMP WITH TIME ZONE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
+      CREATE INDEX IF NOT EXISTS idx_polling_state_updated_at
+      ON atomic_data_polling_state (updated_at);
+    "#;
 
-            CREATE INDEX IF NOT EXISTS idx_{}_processed
-            ON {} (processed, changed_at);
-
-            CREATE INDEX IF NOT EXISTS idx_{}_primary_key
-            ON {} (primary_key);
-            "#,
-      tracking_table, tracking_table, tracking_table, tracking_table, tracking_table
-    );
-
-    sqlx::query(&create_query).execute(&self.pool).await?;
-
-    info!("Created tracking table: {}", tracking_table);
+    sqlx::query(create_query).execute(&self.pool).await?;
+    info!("Created or verified atomic_data_polling_state table");
     Ok(())
   }
 
-  /// Create a trigger to detect changes in the watched column
-  async fn create_change_trigger(&self, table_name: &str, change_column: &str) -> Result<()> {
-    let tracking_table = format!("{}_changes", table_name);
-    let trigger_function = format!("{}_change_trigger", table_name);
-    let trigger_name = format!("{}_change_notify", table_name);
-
-    // Create trigger function
-    let function_query = format!(
+  /// Initialize polling state for a specific table
+  async fn initialize_table_polling_state(&self, table_name: &str) -> Result<()> {
+        // Check if state already exists
+    let existing_state = sqlx::query(
       r#"
-            CREATE OR REPLACE FUNCTION {}()
-            RETURNS TRIGGER AS $$
-            BEGIN
-                -- Only insert if the change column actually changed
-                IF OLD.{} IS DISTINCT FROM NEW.{} THEN
-                    INSERT INTO {} (table_name, primary_key, change_column_value)
-                    VALUES ('{}', NEW.id::TEXT, NEW.{}::TEXT);
-                END IF;
-                RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-            "#,
-      trigger_function, change_column, change_column, tracking_table, table_name, change_column
+      SELECT
+        table_name,
+        last_processed_block_height,
+        last_poll_time
+      FROM atomic_data_polling_state
+      WHERE table_name = $1
+      "#
+    )
+    .bind(table_name)
+    .fetch_optional(&self.pool)
+    .await?;
+
+    if let Some(row) = existing_state {
+      let block_height: i64 = row.get("last_processed_block_height");
+      info!(
+        "Resuming polling for table '{}' from block height {}",
+        table_name, block_height
+      );
+      return Ok(());
+    }
+
+    // No existing state - get current max change column value from the table
+    // Find the WatchedTable config to get the change_column
+    let watched_table = self.watched_tables.iter()
+      .find(|t| t.name == table_name)
+      .ok_or_else(|| anyhow::anyhow!("No configuration found for table: {}", table_name))?;
+
+    let query = format!(
+      "SELECT COALESCE(MAX({}), 0) as max_value FROM {}",
+      watched_table.change_column, table_name
     );
 
-    sqlx::query(&function_query).execute(&self.pool).await?;
+    let max_change_value: i64 = sqlx::query(&query)
+      .fetch_one(&self.pool)
+      .await?
+      .try_get("max_value")
+      .unwrap_or(0);
 
-    // Create trigger
-    let trigger_query = format!(
+        // Insert initial state
+    sqlx::query(
       r#"
-            DROP TRIGGER IF EXISTS {} ON {};
-            CREATE TRIGGER {}
-                AFTER UPDATE ON {}
-                FOR EACH ROW
-                EXECUTE FUNCTION {}();
-            "#,
-      trigger_name, table_name, trigger_name, table_name, trigger_function
-    );
-
-    sqlx::query(&trigger_query).execute(&self.pool).await?;
+      INSERT INTO atomic_data_polling_state
+      (table_name, last_processed_block_height, last_poll_time, updated_at)
+      VALUES ($1, $2, NOW(), NOW())
+      "#
+    )
+    .bind(table_name)
+    .bind(max_change_value)
+    .execute(&self.pool)
+    .await?;
 
     info!(
-      "Created change trigger for table: {} on column: {}",
-      table_name, change_column
+      "Initialized polling state for table '{}': starting from {} = {}",
+      table_name, watched_table.change_column, max_change_value
     );
+
     Ok(())
   }
 
-  /// Get pending changes from all watched tables
+
+
+  /// Get pending changes from all watched tables using direct polling
   pub async fn get_pending_changes(&self, limit: u32) -> Result<Vec<ChangeRecord>> {
     let mut all_changes = Vec::new();
 
     for table in &self.watched_tables {
-      let changes = self.get_table_changes(table, limit).await?;
+      let changes = self.poll_table_changes(table, limit).await?;
       all_changes.extend(changes);
     }
 
@@ -162,38 +179,60 @@ impl DatabaseClient {
     all_changes.truncate(limit as usize);
 
     debug!(
-      "Found {} pending changes across all tables",
+      "Found {} pending changes across all tables via polling",
       all_changes.len()
     );
     Ok(all_changes)
   }
 
-  /// Get pending changes for a specific table
-  async fn get_table_changes(&self, table: &WatchedTable, limit: u32) -> Result<Vec<ChangeRecord>> {
-    let tracking_table = format!("{}_changes", table.name);
+  /// Poll for changes in a specific table using persistent state
+  async fn poll_table_changes(&self, table: &WatchedTable, limit: u32) -> Result<Vec<ChangeRecord>> {
+        // Get current polling state from database
+    let current_state_row = sqlx::query(
+      r#"
+      SELECT
+        table_name,
+        last_processed_block_height,
+        last_poll_time
+      FROM atomic_data_polling_state
+      WHERE table_name = $1
+      "#
+    )
+    .bind(&table.name)
+    .fetch_one(&self.pool)
+    .await?;
 
+    let current_block_height: i64 = current_state_row.get("last_processed_block_height");
+
+    // Query for records with change column greater than last processed
     let query = format!(
       r#"
-            SELECT id, table_name, primary_key, change_column_value, changed_at
-            FROM {}
-            WHERE processed = FALSE
-            ORDER BY changed_at ASC
-            LIMIT $1
-            "#,
-      tracking_table
+      SELECT {}, {}, updated_at
+      FROM {}
+      WHERE {} > $1
+      ORDER BY {} ASC
+      LIMIT $2
+      "#,
+      table.primary_key_column, table.change_column, table.name,
+      table.change_column, table.change_column
     );
 
     let rows = sqlx::query(&query)
+      .bind(current_block_height)
       .bind(limit as i64)
       .fetch_all(&self.pool)
       .await?;
 
     let mut changes = Vec::new();
+    let mut max_block_height = current_block_height;
 
     for row in rows {
-      let primary_key: String = row.get("primary_key");
-      let change_column_value: String = row.get("change_column_value");
-      let changed_at: DateTime<Utc> = row.get("changed_at");
+      let primary_key: String = row.get(table.primary_key_column.as_str());
+      let change_value: i64 = row.get(table.change_column.as_str());
+      let changed_at: DateTime<Utc> = row.try_get("updated_at").unwrap_or_else(|_| Utc::now());
+
+      // Track the maximum change value
+      max_block_height = max_block_height.max(change_value);
 
       // Execute the atomic data query
       let atomic_data = self.execute_atomic_data_query(table, &primary_key).await?;
@@ -201,11 +240,39 @@ impl DatabaseClient {
       changes.push(ChangeRecord {
         table_name: table.name.clone(),
         primary_key,
-        change_column_value,
+        change_column_value: change_value.to_string(),
         changed_at,
         atomic_data,
       });
     }
+
+        // Update polling state with the latest block height (only if we found changes)
+    if !changes.is_empty() && max_block_height > current_block_height {
+      sqlx::query(
+        r#"
+        UPDATE atomic_data_polling_state
+        SET
+          last_processed_block_height = $1,
+          last_poll_time = NOW(),
+          updated_at = NOW()
+        WHERE table_name = $2
+        "#
+      )
+      .bind(max_block_height)
+      .bind(&table.name)
+      .execute(&self.pool)
+      .await?;
+
+      debug!(
+        "Updated polling state for table '{}': {} {} -> {}",
+        table.name, table.change_column, current_block_height, max_block_height
+      );
+    }
+
+    debug!(
+      "Polled table '{}': found {} changes ({} > {})",
+      table.name, changes.len(), table.change_column, current_block_height
+    );
 
     Ok(changes)
   }
@@ -308,43 +375,11 @@ impl DatabaseClient {
     Ok(serde_json::Value::Array(result))
   }
 
-  /// Mark changes as processed
+  /// Mark changes as processed (no-op for polling approach, state is already updated)
   pub async fn mark_changes_processed(&self, changes: &[ChangeRecord]) -> Result<()> {
-    for table in &self.watched_tables {
-      let table_changes: Vec<_> = changes
-        .iter()
-        .filter(|c| c.table_name == table.name)
-        .collect();
-
-      if table_changes.is_empty() {
-        continue;
-      }
-
-      let tracking_table = format!("{}_changes", table.name);
-      let primary_keys: Vec<&String> = table_changes.iter().map(|c| &c.primary_key).collect();
-
-      let query = format!(
-        r#"
-                UPDATE {}
-                SET processed = TRUE, processed_at = NOW()
-                WHERE table_name = $1 AND primary_key = ANY($2) AND processed = FALSE
-                "#,
-        tracking_table
-      );
-
-      let affected = sqlx::query(&query)
-        .bind(&table.name)
-        .bind(&primary_keys)
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
-
-      debug!(
-        "Marked {} changes as processed for table: {}",
-        affected, table.name
-      );
-    }
-
+    // With polling approach, we already updated the state when we fetched the changes
+    // This method is kept for compatibility but doesn't need to do anything
+    debug!("Marked {} changes as processed (polling approach)", changes.len());
     Ok(())
   }
 
@@ -354,33 +389,38 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Clean up old processed changes (for maintenance)
-  pub async fn cleanup_old_changes(&self, older_than_days: u32) -> Result<()> {
-    for table in &self.watched_tables {
-      let tracking_table = format!("{}_changes", table.name);
+  /// Clean up old processed changes (no-op for polling approach)
+  pub async fn cleanup_old_changes(&self, _older_than_days: u32) -> Result<()> {
+    // With polling approach, we don't have tracking tables to clean up
+    // State is maintained in memory and resets on service restart
+    debug!("Cleanup called - no tracking tables to clean with polling approach");
+    Ok(())
+  }
 
-      let query = format!(
-        r#"
-                DELETE FROM {}
-                WHERE processed = TRUE
-                AND processed_at < NOW() - INTERVAL '{} days'
-                "#,
-        tracking_table, older_than_days
-      );
+    /// Get current polling state for all tables (useful for debugging)
+  pub async fn get_polling_state(&self) -> Result<Vec<TablePollingState>> {
+    let rows = sqlx::query(
+      r#"
+      SELECT
+        table_name,
+        last_processed_block_height,
+        last_poll_time
+      FROM atomic_data_polling_state
+      ORDER BY table_name
+      "#
+    )
+    .fetch_all(&self.pool)
+    .await?;
 
-      let affected = sqlx::query(&query)
-        .execute(&self.pool)
-        .await?
-        .rows_affected();
-
-      if affected > 0 {
-        info!(
-          "Cleaned up {} old processed changes from table: {}",
-          affected, tracking_table
-        );
-      }
+    let mut states = Vec::new();
+    for row in rows {
+      states.push(TablePollingState {
+        table_name: row.get("table_name"),
+        last_processed_block_height: row.get("last_processed_block_height"),
+        last_poll_time: row.get("last_poll_time"),
+      });
     }
 
-    Ok(())
+    Ok(states)
   }
 }

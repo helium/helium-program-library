@@ -45,7 +45,8 @@ pub struct ServiceConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct WatchedTable {
   pub name: String,
-  pub change_column: String,
+  pub change_column: String, // The column to monitor for changes (e.g., "last_block_height")
+  pub primary_key_column: String, // The primary key column (e.g., "id", "address", "pubkey")
   pub atomic_data_query: String,
   pub hotspot_type: HotspotType,
 }

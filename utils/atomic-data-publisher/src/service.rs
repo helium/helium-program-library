@@ -1,18 +1,17 @@
 use anyhow::Result;
-use helium_crypto::Keypair;
-use std::str::FromStr;
+use helium_crypto::{Keypair, KeyTag, KeyType, Network};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::{interval, sleep};
 use tracing::{debug, error, info, warn};
 
 use crate::config::Settings;
-use crate::database::{ChangeRecord, DatabaseClient};
+use crate::database::DatabaseClient;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
 use crate::publisher::AtomicDataPublisher as Publisher;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
   database: Arc<DatabaseClient>,
   publisher: Arc<Publisher>,
@@ -30,24 +29,35 @@ impl AtomicDataPublisher {
     let database =
       Arc::new(DatabaseClient::new(&config.database, config.service.watched_tables.clone()).await?);
 
-    // Initialize tracking tables and triggers
-    database.initialize_tracking().await?;
+    // Initialize polling state
+    database.initialize_polling_state().await?;
 
     // Load keypair for signing messages
     let keypair_path = std::env::var("ATOMIC_DATA_PUBLISHER_KEYPAIR_PATH")
       .unwrap_or_else(|_| "/app/keypair.bin".to_string());
 
-    let keypair = if std::path::Path::new(&keypair_path).exists() {
-      Keypair::from_bytes(&std::fs::read(&keypair_path)?)
-        .map_err(|e| anyhow::anyhow!("Failed to load keypair: {}", e))?
-    } else {
-      warn!("Keypair file not found at {}, generating new keypair", keypair_path);
-      let keypair = Keypair::generate();
-      std::fs::write(&keypair_path, keypair.to_bytes())
-        .map_err(|e| anyhow::anyhow!("Failed to save keypair: {}", e))?;
-      info!("Generated new keypair and saved to {}", keypair_path);
-      keypair
+    let key_tag = KeyTag {
+      network: Network::MainNet,
+      key_type: KeyType::Ed25519,
     };
+
+    // For now, always generate a new keypair using entropy
+    // TODO: Implement proper keypair serialization/deserialization
+    let entropy = if std::path::Path::new(&keypair_path).exists() {
+      std::fs::read(&keypair_path)?
+    } else {
+      warn!("Keypair file not found at {}, generating new entropy", keypair_path);
+      let mut entropy = vec![0u8; 32];
+      use rand::RngCore;
+      rand::thread_rng().fill_bytes(&mut entropy);
+      std::fs::write(&keypair_path, &entropy)
+        .map_err(|e| anyhow::anyhow!("Failed to save entropy: {}", e))?;
+      info!("Generated new entropy and saved to {}", keypair_path);
+      entropy
+    };
+
+    let keypair = Keypair::generate_from_entropy(key_tag, &entropy)
+      .map_err(|e| anyhow::anyhow!("Failed to generate keypair from entropy: {}", e))?;
 
     info!("Using keypair with public key: {}", keypair.public_key());
 
@@ -150,8 +160,9 @@ impl AtomicDataPublisher {
     handles.push(health_handle);
 
     // Wait for shutdown signal or any task to complete
+    let mut shutdown_signal = self.shutdown_signal.clone();
     tokio::select! {
-        _ = self.shutdown_signal.changed() => {
+        _ = shutdown_signal.changed() => {
             info!("Shutdown signal received");
         }
         result = futures::future::try_join_all(handles) => {
@@ -406,15 +417,4 @@ impl AtomicDataPublisher {
   }
 }
 
-impl Clone for AtomicDataPublisher {
-  fn clone(&self) -> Self {
-    Self {
-      database: self.database.clone(),
-      publisher: self.publisher.clone(),
-      metrics: self.metrics.clone(),
-      config: self.config.clone(),
-      shutdown_signal: self.shutdown_signal.clone(),
-      shutdown_sender: self.shutdown_sender.clone(),
-    }
-  }
-}
+

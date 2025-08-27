@@ -9,15 +9,16 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chron
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 config = "0.13"
 thiserror = "1.0"
 futures = "0.3"
-helium-proto = { git = "https://github.com/helium/proto", branch = "mj/chain-rewardable-entities" }
+helium-proto = { git = "https://github.com/helium/proto", branch = "mj/chain-rewardable-entities", features = ["services"] }
 helium-crypto = { git = "https://github.com/helium/helium-crypto-rs.git", branch = "main" }
-tonic = "0.10"
+tonic = { version = "0.10", features = ["tls"] }
 prost = "0.12"
 bs58 = "0.5"
+rand = "0.8"

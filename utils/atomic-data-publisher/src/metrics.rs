@@ -170,7 +170,8 @@ impl MetricsCollector {
       times.push(processing_time);
       // Keep only last 1000 measurements
       if times.len() > 1000 {
-        times.drain(0..times.len() - 1000);
+        let len = times.len();
+        times.drain(0..len - 1000);
       }
     }
   }
@@ -214,7 +215,8 @@ impl MetricsCollector {
       times.push(response_time);
       // Keep only last 1000 measurements
       if times.len() > 1000 {
-        times.drain(0..times.len() - 1000);
+        let len = times.len();
+        times.drain(0..len - 1000);
       }
     }
   }
@@ -243,7 +245,8 @@ impl MetricsCollector {
       times.push(query_time);
       // Keep only last 1000 measurements
       if times.len() > 1000 {
-        times.drain(0..times.len() - 1000);
+        let len = times.len();
+        times.drain(0..len - 1000);
       }
     }
   }
@@ -253,18 +256,20 @@ impl MetricsCollector {
     let mut times = self.polling_cycle_times.write().await;
     times.push(cycle_time);
     // Keep only last 100 measurements
-    if times.len() > 100 {
-      times.drain(0..times.len() - 100);
-    }
+          if times.len() > 100 {
+        let len = times.len();
+        times.drain(0..len - 100);
+      }
   }
 
   pub async fn record_batch_processing_time(&self, processing_time: Duration) {
     let mut times = self.batch_processing_times.write().await;
     times.push(processing_time);
     // Keep only last 100 measurements
-    if times.len() > 100 {
-      times.drain(0..times.len() - 100);
-    }
+          if times.len() > 100 {
+        let len = times.len();
+        times.drain(0..len - 100);
+      }
   }
 
   // Generate metrics snapshot

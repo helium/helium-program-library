@@ -13,7 +13,7 @@ The Atomic Data Publisher is a Rust service that monitors PostgreSQL database ch
 
 The Atomic Data Publisher:
 
-1. **Monitors Database Changes**: Uses PostgreSQL triggers to detect changes in hotspot tables
+1. **Monitors Database Changes**: Uses direct polling to detect changes in hotspot tables
 2. **Constructs Atomic Data**: Executes configurable queries to build rich hotspot update payloads
 3. **Signs Messages**: Cryptographically signs messages using Helium keypairs
 4. **Publishes to Oracles**: Connects to Helium oracles ingestor service via gRPC
@@ -26,10 +26,11 @@ The Atomic Data Publisher:
 │   PostgreSQL    │    │  Atomic Data     │    │   Helium        │
 │  (sink-service) │───▶│   Publisher      │───▶│   Oracles       │
 │                 │    │                  │    │   Ingestor      │
-│ • hotspot_infos │    │ • Change         │    │                 │
-│ • Triggers      │    │   Detection      │    │ • gRPC Server   │
-│ • Tracking      │    │ • Protobuf       │    │ • Signature     │
-│   Tables        │    │   Construction   │    │   Verification  │
+│ • hotspot_infos │    │ • Polling-based  │    │                 │
+│ • Change Column │    │   Change         │    │ • gRPC Server   │
+│   (e.g. block   │    │   Detection      │    │ • Signature     │
+│   height)       │    │ • Protobuf       │    │   Verification  │
+│                 │    │   Construction   │    │                 │
 └─────────────────┘    │ • Helium Crypto  │    │ • S3 Storage    │
                        │   Signing        │    └─────────────────┘
                        │ • gRPC Client    │
@@ -41,9 +42,10 @@ The Atomic Data Publisher:
 
 ### 🔍 Change Detection
 
-- PostgreSQL triggers automatically detect changes in watched columns
-- Configurable tracking tables store change events
-- Efficient polling mechanism processes changes in batches
+- Direct polling compares current block heights against last processed values
+- Persistent state tracking ensures crash recovery and reliable restarts
+- Efficient polling mechanism processes changes in batches based on `last_block_height`
+- Configurable polling intervals and batch sizes
 
 ### 🏗️ Atomic Data Construction
 
@@ -158,19 +160,48 @@ publish_endpoint = "/api/v1/hotspots/atomic-data"
 
 ## Database Setup
 
-The service automatically creates the necessary tracking infrastructure:
+The service uses direct polling with persistent state tracking:
 
-1. **Tracking Tables**: One per watched table (e.g., `hotspots_changes`)
-2. **Triggers**: Detect changes in watched columns
-3. **Functions**: Handle change notifications
+1. **Single State Table**: Creates `atomic_data_polling_state` table to track progress
+2. **No Triggers**: No database triggers or functions required on watched tables
+3. **Block Height Polling**: Directly queries watched tables using `last_block_height` column
+4. **Crash Recovery**: Automatically resumes from last processed block height after restarts
 
 ### Required Permissions
 
 The database user needs:
 
 - `SELECT` on watched tables
-- `CREATE` permissions for tracking tables and triggers
-- `INSERT`, `UPDATE`, `DELETE` on tracking tables
+- `CREATE TABLE` and `INSERT/UPDATE/SELECT` on `atomic_data_polling_state` table
+
+### Polling State Table
+
+The service automatically creates this table:
+
+```sql
+CREATE TABLE atomic_data_polling_state (
+    table_name VARCHAR(255) PRIMARY KEY,
+    last_processed_block_height BIGINT NOT NULL DEFAULT 0,
+    last_poll_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### How Polling Works
+
+1. **Initialization**: Service creates/loads state for each watched table, starting from current max `last_block_height`
+2. **Polling Cycle**: Queries `SELECT * FROM table WHERE last_block_height > $last_processed_height`
+3. **State Update**: Updates `atomic_data_polling_state` with the highest block height processed
+4. **Crash Recovery**: On restart, resumes from `last_processed_block_height` in state table
+
+**Example**: If watching `mobile_hotspot_infos` table with `change_column = "last_block_height"`:
+
+- State table shows: `last_processed_block_height = 12345`
+- Poll finds records with `last_block_height > 12345`
+- Process changes and update state to `last_processed_block_height = 12350`
+- If service crashes and restarts, automatically resumes from block height 12350
+
+**Note**: The polling logic uses the configured `change_column` and `primary_key_column` from your watched table configuration, making it flexible for different table schemas.
 
 ## API Endpoints
 

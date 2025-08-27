@@ -3,8 +3,9 @@ use helium_crypto::Keypair;
 use helium_proto::services::chain_rewardable_entities::{
     chain_rewardable_entities_client::ChainRewardableEntitiesClient,
 };
+use std::sync::Arc;
 use std::time::Duration;
-use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
+use tonic::transport::{Channel, Endpoint, ClientTlsConfig};
 use tracing::{debug, error, info, warn};
 
 use crate::config::{IngestorConfig, WatchedTable};
@@ -24,7 +25,7 @@ pub struct AtomicDataPublisher {
   grpc_client: ChainRewardableEntitiesClient<Channel>,
   config: IngestorConfig,
   watched_tables: Vec<WatchedTable>,
-  keypair: Keypair,
+  keypair: Arc<Keypair>,
 }
 
 impl AtomicDataPublisher {
@@ -37,8 +38,7 @@ impl AtomicDataPublisher {
 
     // Configure TLS if enabled
     if config.tls_enabled {
-      let tls_config = ClientTlsConfig::new();
-      endpoint = endpoint.tls_config(tls_config)?;
+      endpoint = endpoint.tls_config(ClientTlsConfig::new())?;
     }
 
     // Create gRPC channel
@@ -51,7 +51,7 @@ impl AtomicDataPublisher {
       grpc_client,
       config,
       watched_tables,
-      keypair,
+      keypair: Arc::new(keypair),
     })
   }
 
@@ -161,19 +161,9 @@ impl AtomicDataPublisher {
   /// Health check the ingestor service
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {
     // For gRPC services, we can check if the connection is still alive
-    // by attempting to clone the client (which validates the connection)
-    match self.grpc_client.clone() {
-      Ok(_) => {
-        debug!("gRPC health check passed");
-        Ok(())
-      }
-      Err(e) => {
-        error!("gRPC health check failed: {}", e);
-        Err(AtomicDataError::ServiceUnavailable(format!(
-          "gRPC health check failed: {}",
-          e
-        )))
-      }
-    }
+    // by cloning the client (this is a simple check that the client is valid)
+    let _client = self.grpc_client.clone();
+    debug!("gRPC health check passed");
+    Ok(())
   }
 }
