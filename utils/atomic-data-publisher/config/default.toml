@@ -27,49 +27,62 @@ batch_size = 100
 max_concurrent_publishes = 5
 health_check_port = 3000
 
-# Example watched table configuration for mobile hotspots
+# Table validation settings
+fail_on_missing_tables = true          # Set to false for graceful degradation
+validation_retry_attempts = 3          # Number of retries before giving up
+validation_retry_delay_seconds = 30    # Delay between validation retries
+
+# Example watched table configuration for mobile hotspots using named query
 # [[service.watched_tables]]
 # name = "mobile_hotspot_infos"  # Typical table name from account-postgres-sink-service
 # change_column = "last_block_height"  # Monitor block height changes instead of timestamp
 # primary_key_column = "address"  # Primary key column (could be "id", "address", "pubkey", etc.)
 # hotspot_type = "mobile"
-# atomic_data_query = """
-#   SELECT
-#     last_block_height as block_height,  -- Use the actual block height from the record
-#     EXTRACT(epoch FROM NOW())::bigint as block_time_seconds,
-#     key as pub_key,  -- Helium public key from account data
-#     address as asset,  -- Solana NFT address
-#     serial_number,
-#     device_type,
-#     location as asserted_hex,  -- Hex location
-#     azimuth,
-#     owner,  -- Current NFT owner
-#     'direct_owner' as owner_type,  -- Default owner type
-#     rewards_recipient
-#   FROM mobile_hotspot_infos
-#   WHERE address = $PRIMARY_KEY
-# """
+# query_name = "construct_atomic_mobile_hotspot"  # Use pre-built query that joins multiple tables
 
-# Example watched table configuration for IoT hotspots
+# Example watched table configuration for IoT hotspots using named query
 # [[service.watched_tables]]
 # name = "iot_hotspot_infos"  # Typical table name from account-postgres-sink-service
 # change_column = "last_block_height"  # Monitor block height changes instead of timestamp
 # primary_key_column = "address"  # Primary key column (could be "id", "address", "pubkey", etc.)
 # hotspot_type = "iot"
+# query_name = "construct_atomic_iot_hotspot"  # Use pre-built query that joins multiple tables
+
+# Alternative: Custom inline query (for special cases)
+# [[service.watched_tables]]
+# name = "asset_owners"  # Watch ownership changes that should trigger hotspot updates
+# change_column = "last_block_height"
+# primary_key_column = "asset"  # Asset address (hotspot NFT)
+# hotspot_type = "mobile"  # Will be determined dynamically from the query result
 # atomic_data_query = """
+#   -- Custom query that determines hotspot type and constructs atomic data
 #   SELECT
-#     last_block_height as block_height,  -- Use the actual block height from the record
-#     EXTRACT(epoch FROM NOW())::bigint as block_time_seconds,
-#     key as pub_key,  -- Helium public key from account data
-#     address as asset,  -- Solana NFT address
-#     location as asserted_hex,  -- Hex location
-#     elevation,
-#     false as is_data_only,  -- Default value, adjust based on your schema
-#     owner,  -- Current NFT owner
-#     'direct_owner' as owner_type,  -- Default owner type
-#     rewards_recipient
-#   FROM iot_hotspot_infos
-#   WHERE address = $PRIMARY_KEY
+#     ao.last_block_height as block_height,
+#     EXTRACT(epoch FROM ao.updated_at)::bigint as block_time_seconds,
+#     COALESCE(mhi.key, ihi.key) as pub_key,
+#     ao.asset,
+#     -- Determine hotspot type dynamically
+#     CASE
+#       WHEN mhi.address IS NOT NULL THEN 'mobile'
+#       WHEN ihi.address IS NOT NULL THEN 'iot'
+#       ELSE 'unknown'
+#     END as hotspot_type,
+#     -- Mobile-specific fields
+#     mhi.serial_number,
+#     mhi.device_type,
+#     COALESCE(mhi.location, ihi.location) as asserted_hex,
+#     -- IoT-specific fields
+#     COALESCE(ihi.elevation, 0) as elevation,
+#     COALESCE(ihi.is_data_only, false) as is_data_only,
+#     -- Common fields
+#     ao.owner,
+#     ao.owner_type,
+#     COALESCE(mhi.rewards_recipient, ihi.rewards_recipient) as rewards_recipient
+#   FROM asset_owners ao
+#   LEFT JOIN mobile_hotspot_infos mhi ON mhi.address = ao.asset
+#   LEFT JOIN iot_hotspot_infos ihi ON ihi.address = ao.asset
+#   WHERE ao.asset = $PRIMARY_KEY
+#     AND (mhi.address IS NOT NULL OR ihi.address IS NOT NULL)  -- Ensure it's a hotspot
 # """
 
 [logging]

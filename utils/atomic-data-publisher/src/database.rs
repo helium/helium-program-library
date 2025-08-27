@@ -10,6 +10,16 @@ use crate::config::{DatabaseConfig, WatchedTable};
 use crate::errors::AtomicDataError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableValidationStatus {
+  pub table_name: String,
+  pub exists: bool,
+  pub has_primary_key_column: bool,
+  pub has_change_column: bool,
+  pub query_valid: bool,
+  pub validation_errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
   pub table_name: String,
   pub primary_key: String,
@@ -69,6 +79,9 @@ impl DatabaseClient {
     // Create the polling state table if it doesn't exist
     self.create_polling_state_table().await?;
 
+    // Validate all watched tables exist and have required columns
+    self.validate_watched_tables().await?;
+
     // Initialize state for each watched table
     for table in &self.watched_tables {
       self.initialize_table_polling_state(&table.name).await?;
@@ -79,7 +92,7 @@ impl DatabaseClient {
   }
 
   /// Create the polling state table
-  async fn create_polling_state_table(&self) -> Result<()> {
+  pub async fn create_polling_state_table(&self) -> Result<()> {
     let create_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
         table_name VARCHAR(255) PRIMARY KEY,
@@ -97,8 +110,152 @@ impl DatabaseClient {
     Ok(())
   }
 
+  /// Validate that all watched tables exist and have required columns
+  async fn validate_watched_tables(&self) -> Result<()> {
+    info!("Validating {} watched tables...", self.watched_tables.len());
+
+    let mut missing_tables = Vec::new();
+    let mut missing_columns = Vec::new();
+    let mut validation_errors = Vec::new();
+
+    for table in &self.watched_tables {
+      // Check if table exists
+      let table_exists = self.check_table_exists(&table.name).await?;
+
+      if !table_exists {
+        missing_tables.push(table.name.clone());
+        error!("Watched table '{}' does not exist in database", table.name);
+        continue;
+      }
+
+      // Check if required columns exist
+      let table_columns = self.get_table_columns(&table.name).await?;
+
+      // Validate primary key column
+      if !table_columns.contains(&table.primary_key_column) {
+        missing_columns.push(format!("{}:{}", table.name, table.primary_key_column));
+        error!(
+          "Primary key column '{}' not found in table '{}'",
+          table.primary_key_column, table.name
+        );
+      }
+
+      // Validate change column
+      if !table_columns.contains(&table.change_column) {
+        missing_columns.push(format!("{}:{}", table.name, table.change_column));
+        error!(
+          "Change column '{}' not found in table '{}'",
+          table.change_column, table.name
+        );
+      }
+
+      // Validate atomic data query syntax (basic check)
+      if let Err(e) = self.validate_atomic_data_query(table).await {
+        validation_errors.push(format!("Table '{}': {}", table.name, e));
+        error!("Atomic data query validation failed for table '{}': {}", table.name, e);
+      }
+
+      info!("✓ Table '{}' validation passed", table.name);
+    }
+
+    // Report validation results
+    if !missing_tables.is_empty() || !missing_columns.is_empty() || !validation_errors.is_empty() {
+      error!("Database validation failed:");
+
+      if !missing_tables.is_empty() {
+        error!("Missing tables: {}", missing_tables.join(", "));
+      }
+
+      if !missing_columns.is_empty() {
+        error!("Missing columns: {}", missing_columns.join(", "));
+      }
+
+      if !validation_errors.is_empty() {
+        for error in &validation_errors {
+          error!("Validation error: {}", error);
+        }
+      }
+
+      return Err(anyhow::anyhow!(
+        "Database validation failed: {} missing tables, {} missing columns, {} query errors",
+        missing_tables.len(),
+        missing_columns.len(),
+        validation_errors.len()
+      ));
+    }
+
+    info!("✅ All watched tables validated successfully");
+    Ok(())
+  }
+
+  /// Check if a table exists in the database
+  async fn check_table_exists(&self, table_name: &str) -> Result<bool> {
+    let query = r#"
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = $1
+      );
+    "#;
+
+    let row = sqlx::query(query)
+      .bind(table_name)
+      .fetch_one(&self.pool)
+      .await?;
+
+    let exists: bool = row.get(0);
+    Ok(exists)
+  }
+
+  /// Get all column names for a table
+  async fn get_table_columns(&self, table_name: &str) -> Result<Vec<String>> {
+    let query = r#"
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = $1
+      ORDER BY ordinal_position;
+    "#;
+
+    let rows = sqlx::query(query)
+      .bind(table_name)
+      .fetch_all(&self.pool)
+      .await?;
+
+    let columns: Vec<String> = rows
+      .iter()
+      .map(|row| row.get::<String, _>("column_name"))
+      .collect();
+
+    Ok(columns)
+  }
+
+    /// Validate atomic data query syntax by doing a dry run
+  async fn validate_atomic_data_query(&self, table: &WatchedTable) -> Result<()> {
+    // First validate the query specification itself
+    table.query_spec.validate_query()
+      .map_err(|e| anyhow::anyhow!("Query specification error: {}", e))?;
+
+    // Get the actual query
+    let query_template = table.query_spec.get_query()
+      .map_err(|e| anyhow::anyhow!("Failed to get query: {}", e))?;
+
+    // Replace $PRIMARY_KEY with a test value to validate query syntax
+    let test_query = query_template.replace("$PRIMARY_KEY", "'__TEST_VALIDATION__'");
+
+    // Add LIMIT 0 to make it a dry run that doesn't return data
+    let validation_query = format!("{} LIMIT 0", test_query);
+
+    sqlx::query(&validation_query)
+      .fetch_all(&self.pool)
+      .await
+      .map_err(|e| anyhow::anyhow!("Query syntax error: {}", e))?;
+
+    Ok(())
+  }
+
   /// Initialize polling state for a specific table
-  async fn initialize_table_polling_state(&self, table_name: &str) -> Result<()> {
+  pub async fn initialize_table_polling_state(&self, table_name: &str) -> Result<()> {
         // Check if state already exists
     let existing_state = sqlx::query(
       r#"
@@ -288,8 +445,12 @@ impl DatabaseClient {
       table.name, primary_key
     );
 
+    // Get the query from the query specification
+    let query_template = table.query_spec.get_query()
+      .map_err(|e| anyhow::anyhow!("Failed to get query for table '{}': {}", table.name, e))?;
+
     // Replace placeholder in query with actual primary key
-    let query = table.atomic_data_query.replace("$PRIMARY_KEY", primary_key);
+    let query = query_template.replace("$PRIMARY_KEY", primary_key);
 
     let rows = sqlx::query(&query)
       .fetch_all(&self.pool)
@@ -422,5 +583,125 @@ impl DatabaseClient {
     }
 
     Ok(states)
+  }
+
+  /// Get validation status for all watched tables (useful for monitoring/debugging)
+  pub async fn get_table_validation_status(&self) -> Vec<TableValidationStatus> {
+    let mut validation_statuses = Vec::new();
+
+    for table in &self.watched_tables {
+      let mut status = TableValidationStatus {
+        table_name: table.name.clone(),
+        exists: false,
+        has_primary_key_column: false,
+        has_change_column: false,
+        query_valid: false,
+        validation_errors: Vec::new(),
+      };
+
+      // Check if table exists
+      match self.check_table_exists(&table.name).await {
+        Ok(exists) => {
+          status.exists = exists;
+          if !exists {
+            status.validation_errors.push("Table does not exist".to_string());
+          }
+        }
+        Err(e) => {
+          status.validation_errors.push(format!("Failed to check table existence: {}", e));
+        }
+      }
+
+      if status.exists {
+        // Check columns
+        match self.get_table_columns(&table.name).await {
+          Ok(columns) => {
+            status.has_primary_key_column = columns.contains(&table.primary_key_column);
+            status.has_change_column = columns.contains(&table.change_column);
+
+            if !status.has_primary_key_column {
+              status.validation_errors.push(format!(
+                "Primary key column '{}' not found",
+                table.primary_key_column
+              ));
+            }
+
+            if !status.has_change_column {
+              status.validation_errors.push(format!(
+                "Change column '{}' not found",
+                table.change_column
+              ));
+            }
+          }
+          Err(e) => {
+            status.validation_errors.push(format!("Failed to get table columns: {}", e));
+          }
+        }
+
+        // Check query validity
+        match self.validate_atomic_data_query(table).await {
+          Ok(_) => status.query_valid = true,
+          Err(e) => {
+            status.validation_errors.push(format!("Query validation failed: {}", e));
+          }
+        }
+      }
+
+      validation_statuses.push(status);
+    }
+
+    validation_statuses
+  }
+
+  /// Validate tables with option for graceful degradation
+  pub async fn validate_watched_tables_with_options(&self, fail_fast: bool) -> Result<Vec<String>> {
+    info!("Validating {} watched tables (fail_fast: {})...", self.watched_tables.len(), fail_fast);
+
+    let validation_statuses = self.get_table_validation_status().await;
+    let mut valid_tables = Vec::new();
+    let mut has_errors = false;
+
+    for status in &validation_statuses {
+      let is_valid = status.exists
+        && status.has_primary_key_column
+        && status.has_change_column
+        && status.query_valid;
+
+      if is_valid {
+        valid_tables.push(status.table_name.clone());
+        info!("✓ Table '{}' validation passed", status.table_name);
+      } else {
+        has_errors = true;
+        error!("✗ Table '{}' validation failed:", status.table_name);
+        for error in &status.validation_errors {
+          error!("  - {}", error);
+        }
+
+        if fail_fast {
+          return Err(anyhow::anyhow!(
+            "Table validation failed for '{}': {}",
+            status.table_name,
+            status.validation_errors.join(", ")
+          ));
+        }
+      }
+    }
+
+    if has_errors {
+      if valid_tables.is_empty() {
+        error!("❌ No valid tables found - service cannot operate");
+        return Err(anyhow::anyhow!("No valid tables found for monitoring"));
+      } else {
+        warn!(
+          "⚠️  Some tables failed validation - continuing with {} valid tables: {}",
+          valid_tables.len(),
+          valid_tables.join(", ")
+        );
+      }
+    } else {
+      info!("✅ All {} watched tables validated successfully", self.watched_tables.len());
+    }
+
+    Ok(valid_tables)
   }
 }

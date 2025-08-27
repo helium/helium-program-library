@@ -4,6 +4,7 @@ mod errors;
 mod metrics;
 mod protobuf;
 mod publisher;
+mod queries;
 mod service;
 
 use anyhow::Result;
@@ -163,17 +164,10 @@ fn validate_config(settings: &Settings) -> Result<()> {
       ));
     }
 
-    if table.atomic_data_query.is_empty() {
+    if let Err(e) = table.query_spec.validate_query() {
       return Err(anyhow::anyhow!(
-        "Atomic data query cannot be empty for table: {}",
-        table.name
-      ));
-    }
-
-    if !table.atomic_data_query.contains("$PRIMARY_KEY") {
-      return Err(anyhow::anyhow!(
-        "Atomic data query must contain $PRIMARY_KEY placeholder for table: {}",
-        table.name
+        "Query validation failed for table '{}': {}",
+        table.name, e
       ));
     }
 

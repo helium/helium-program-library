@@ -40,6 +40,24 @@ pub struct ServiceConfig {
   pub max_concurrent_publishes: u32,
   pub health_check_port: u16,
   pub watched_tables: Vec<WatchedTable>,
+  #[serde(default = "default_fail_on_missing_tables")]
+  pub fail_on_missing_tables: bool,
+  #[serde(default = "default_validation_retry_attempts")]
+  pub validation_retry_attempts: u32,
+  #[serde(default = "default_validation_retry_delay_seconds")]
+  pub validation_retry_delay_seconds: u64,
+}
+
+fn default_fail_on_missing_tables() -> bool {
+  true
+}
+
+fn default_validation_retry_attempts() -> u32 {
+  3
+}
+
+fn default_validation_retry_delay_seconds() -> u64 {
+  30
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -47,8 +65,46 @@ pub struct WatchedTable {
   pub name: String,
   pub change_column: String, // The column to monitor for changes (e.g., "last_block_height")
   pub primary_key_column: String, // The primary key column (e.g., "id", "address", "pubkey")
-  pub atomic_data_query: String,
+
+  // Query specification - can be either a named query or inline SQL
+  #[serde(flatten)]
+  pub query_spec: QuerySpec,
+
   pub hotspot_type: HotspotType,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum QuerySpec {
+  /// Reference to a named query from the queries module
+  Named { query_name: String },
+  /// Inline SQL query (for custom queries)
+  Inline { atomic_data_query: String },
+}
+
+impl QuerySpec {
+  /// Get the actual SQL query string
+  pub fn get_query(&self) -> Result<String, String> {
+    match self {
+      QuerySpec::Named { query_name } => {
+        crate::queries::AtomicHotspotQueries::get_query(query_name)
+          .map(|q| q.to_string())
+          .ok_or_else(|| format!("Unknown query name: {}", query_name))
+      }
+      QuerySpec::Inline { atomic_data_query } => Ok(atomic_data_query.clone()),
+    }
+  }
+
+  /// Check if query contains required placeholder
+  pub fn validate_query(&self) -> Result<(), String> {
+    let query = self.get_query()?;
+
+    if !query.contains("$PRIMARY_KEY") {
+      return Err("Query must contain $PRIMARY_KEY placeholder".to_string());
+    }
+
+    Ok(())
+  }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -140,6 +196,9 @@ impl Default for Settings {
         max_concurrent_publishes: 5,
         health_check_port: 3000,
         watched_tables: vec![],
+        fail_on_missing_tables: true,
+        validation_retry_attempts: 3,
+        validation_retry_delay_seconds: 30,
       },
       logging: LoggingConfig {
         level: "info".to_string(),

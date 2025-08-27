@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use tokio::time::{interval, sleep};
 use tracing::{debug, error, info, warn};
 
-use crate::config::Settings;
+use crate::config::{Settings, ServiceConfig};
 use crate::database::DatabaseClient;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
@@ -22,6 +22,69 @@ pub struct AtomicDataPublisher {
 }
 
 impl AtomicDataPublisher {
+  /// Initialize database with table validation and optional retries
+  async fn initialize_database_with_validation(
+    database: &DatabaseClient,
+    service_config: &ServiceConfig,
+  ) -> Result<()> {
+    info!("Initializing database with table validation...");
+
+    // Create the polling state table first
+    database.create_polling_state_table().await?;
+
+    let mut attempt = 1;
+    let max_attempts = service_config.validation_retry_attempts + 1;
+    let retry_delay = Duration::from_secs(service_config.validation_retry_delay_seconds);
+
+    loop {
+      info!("Database validation attempt {} of {}", attempt, max_attempts);
+
+      match database.validate_watched_tables_with_options(service_config.fail_on_missing_tables).await {
+        Ok(valid_tables) => {
+          if valid_tables.len() != service_config.watched_tables.len() {
+            warn!(
+              "Operating with {} of {} configured tables: {}",
+              valid_tables.len(),
+              service_config.watched_tables.len(),
+              valid_tables.join(", ")
+            );
+          }
+
+          // Initialize polling state for valid tables only
+          for table_name in &valid_tables {
+            if let Err(e) = database.initialize_table_polling_state(table_name).await {
+              error!("Failed to initialize polling state for table '{}': {}", table_name, e);
+              if service_config.fail_on_missing_tables {
+                return Err(e);
+              }
+            }
+          }
+
+          info!("✅ Database initialization completed successfully");
+          return Ok(());
+        }
+        Err(e) => {
+          error!("Database validation failed (attempt {}): {}", attempt, e);
+
+          if attempt >= max_attempts {
+            error!("❌ Database validation failed after {} attempts", max_attempts);
+            return Err(e);
+          }
+
+          warn!(
+            "Retrying database validation in {} seconds... (attempt {}/{})",
+            retry_delay.as_secs(),
+            attempt + 1,
+            max_attempts
+          );
+
+          sleep(retry_delay).await;
+          attempt += 1;
+        }
+      }
+    }
+  }
+
   pub async fn new(config: Settings) -> Result<Self> {
     info!("Initializing Atomic Data Publisher service");
 
@@ -29,8 +92,8 @@ impl AtomicDataPublisher {
     let database =
       Arc::new(DatabaseClient::new(&config.database, config.service.watched_tables.clone()).await?);
 
-    // Initialize polling state
-    database.initialize_polling_state().await?;
+    // Initialize polling state with table validation and optional retries
+    Self::initialize_database_with_validation(&database, &config.service).await?;
 
     // Load keypair for signing messages
     let keypair_path = std::env::var("ATOMIC_DATA_PUBLISHER_KEYPAIR_PATH")
@@ -398,6 +461,11 @@ impl AtomicDataPublisher {
   pub async fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
     let circuit_breaker_status = None; // No circuit breaker in simplified publisher
     self.metrics.get_metrics(circuit_breaker_status).await
+  }
+
+  /// Get table validation status for monitoring
+  pub async fn get_table_validation_status(&self) -> Vec<crate::database::TableValidationStatus> {
+    self.database.get_table_validation_status().await
   }
 
   /// Gracefully shutdown the service
