@@ -105,7 +105,6 @@ export class MobileHotspotInfo extends WithRes8LatLgn {
   declare is_active: boolean;
   declare device_type: string;
   declare created_at: Date;
-
 }
 MobileHotspotInfo.init(
   {
@@ -177,7 +176,7 @@ export class KeyToAsset extends Model {
   declare entity_key: Buffer;
   declare mobile_hotspot_info?: MobileHotspotInfo;
   declare iot_hotspot_info?: IotHotspotInfo;
-  declare key_serialization: string;
+  declare key_serialization: any;
 }
 
 KeyToAsset.init(

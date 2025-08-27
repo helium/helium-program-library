@@ -106,8 +106,8 @@ if (PG_POOL_SIZE < 5) {
                     programId: new PublicKey(config.programId),
                     accounts: accountType
                       ? config.accounts.filter(
-                        (acc) => acc.type === accountType
-                      )
+                          (acc) => acc.type === accountType
+                        )
                       : config.accounts,
                   });
 
@@ -186,7 +186,7 @@ if (PG_POOL_SIZE < 5) {
 
     server.get("/refreshing", async (req, res) => {
       res.code(StatusCodes.OK).send({
-        refreshing: !!refreshing
+        refreshing: !!refreshing,
       });
     });
 
@@ -203,10 +203,10 @@ if (PG_POOL_SIZE < 5) {
         const programsToCheck = programId
           ? [programId]
           : configs
-            .filter(({ crons = [] }) =>
-              crons.some((cron) => cron.type === "integrity-check")
-            )
-            .map(({ programId }) => programId);
+              .filter(({ crons = [] }) =>
+                crons.some((cron) => cron.type === "integrity-check")
+              )
+              .map(({ programId }) => programId);
 
         for (const progId of programsToCheck) {
           const config = configs.find((c) => c.programId === progId);
@@ -295,41 +295,47 @@ if (PG_POOL_SIZE < 5) {
       }
     }
 
-    server.post<{ Body: { signature: string, password: string } }>("/process-transaction", async (req, res) => {
-      const { signature, password } = req.body
-      if (password !== ADMIN_PASSWORD) {
-        res.code(StatusCodes.FORBIDDEN).send({
-          message: "Invalid password",
-        });
-        return;
-      }
+    server.post<{ Body: { signature: string; password: string } }>(
+      "/process-transaction",
+      async (req, res) => {
+        const { signature, password } = req.body;
+        if (password !== ADMIN_PASSWORD) {
+          res.code(StatusCodes.FORBIDDEN).send({
+            message: "Invalid password",
+          });
+          return;
+        }
 
-      const tx = await provider.connection.getTransaction(signature, {
-        maxSupportedTransactionVersion: 0,
-        commitment: "confirmed"
-      })
-      if (!tx) {
-        res.code(StatusCodes.NOT_FOUND).send({
-          message: "Transaction not found",
+        const tx = await provider.connection.getTransaction(signature, {
+          maxSupportedTransactionVersion: 0,
+          commitment: "confirmed",
         });
-        return;
-      }
+        if (!tx) {
+          res.code(StatusCodes.NOT_FOUND).send({
+            message: "Transaction not found",
+          });
+          return;
+        }
 
-      const { message } = tx.transaction;
-      const accountKeys = [
-        ...message.staticAccountKeys,
-        ...(tx.meta?.loadedAddresses?.writable || []),
-        ...(tx.meta?.loadedAddresses?.readonly || []),
-      ];
-      const writableAccountKeys = getWritableAccountKeys(accountKeys, message.header)
-      await insertTransactionAccounts(
-        await getMultipleAccounts({
-          connection: provider.connection,
-          keys: writableAccountKeys,
-        })
-      );
-      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-    })
+        const { message } = tx.transaction;
+        const accountKeys = [
+          ...message.staticAccountKeys,
+          ...(tx.meta?.loadedAddresses?.writable || []),
+          ...(tx.meta?.loadedAddresses?.readonly || []),
+        ];
+        const writableAccountKeys = getWritableAccountKeys(
+          accountKeys,
+          message.header
+        );
+        await insertTransactionAccounts(
+          await getMultipleAccounts({
+            connection: provider.connection,
+            keys: writableAccountKeys,
+          })
+        );
+        res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+      }
+    );
 
     if (USE_HELIUS_WEBHOOK) {
       if (!HELIUS_AUTH_SECRET) {
@@ -437,7 +443,18 @@ if (PG_POOL_SIZE < 5) {
       console.log("Refreshing all program accounts on boot...");
       for (const config of configs) {
         console.log(`Refreshing accounts for program: ${config.programId}`);
-        eventHandler.emit("refresh-accounts", config.programId);
+        // Wait for each refresh to complete before starting the next one
+        await new Promise<void>((resolve) => {
+          const originalRefreshing = refreshing;
+          eventHandler.emit("refresh-accounts", config.programId);
+
+          // If refresh started, wait for it to complete
+          if (refreshing && refreshing !== originalRefreshing) {
+            refreshing.then(() => resolve()).catch(() => resolve());
+          } else {
+            resolve();
+          }
+        });
       }
     }
 
