@@ -176,7 +176,7 @@ export class KeyToAsset extends Model {
   declare entity_key: Buffer;
   declare mobile_hotspot_info?: MobileHotspotInfo;
   declare iot_hotspot_info?: IotHotspotInfo;
-  declare key_serialization: any;
+  declare key_serialization: string;
 }
 
 KeyToAsset.init(

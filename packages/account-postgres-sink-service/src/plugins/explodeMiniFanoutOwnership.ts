@@ -137,7 +137,7 @@ export class KeyToAsset extends Model {
   declare asset: string;
   declare dao: string;
   declare entityKey: Buffer;
-  declare keySerialization: any;
+  declare keySerialization: string;
   declare encodedEntityKey: string;
 }
 
