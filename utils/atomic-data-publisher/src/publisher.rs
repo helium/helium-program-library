@@ -138,7 +138,7 @@ impl AtomicDataPublisher {
         });
 
         info!(
-          "🏠📱 MOBILE_HOTSPOT_UPDATE: {}",
+          "MOBILE_HOTSPOT_UPDATE: {}",
           serde_json::to_string_pretty(&serialized).unwrap_or_else(|_| "Failed to serialize".to_string())
         );
       }
@@ -171,7 +171,7 @@ impl AtomicDataPublisher {
         });
 
         info!(
-          "🏠🔌 IOT_HOTSPOT_UPDATE: {}",
+          "IOT_HOTSPOT_UPDATE: {}",
           serde_json::to_string_pretty(&serialized).unwrap_or_else(|_| "Failed to serialize".to_string())
         );
       }

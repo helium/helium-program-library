@@ -49,8 +49,9 @@ impl AtomicHotspotQueries {
   SELECT
     -- Core hotspot data
     mhi.address as pub_key,
-
-    -- Basic mobile hotspot fields
+    mhi.device_type,
+    mhi.deployment_info->'wifiInfoV0'->>'serial' as serial_number,
+    COALESCE((mhi.deployment_info->'wifiInfoV0'->>'azimuth')::numeric, 0) as azimuth,
     mhi.asset,
     mhi.location as asserted_hex,
     mhi.is_full_hotspot,
@@ -83,8 +84,6 @@ impl AtomicHotspotQueries {
     SELECT
       -- Core hotspot data
       ihi.address as pub_key,
-
-      -- Basic IoT hotspot fields
       ihi.asset,
       ihi.location as asserted_hex,
       ihi.elevation,
