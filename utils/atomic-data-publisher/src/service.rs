@@ -96,8 +96,8 @@ impl AtomicDataPublisher {
     Self::initialize_database_with_validation(&database, &config.service).await?;
 
     // Load keypair for signing messages
-    let keypair_path = std::env::var("ATOMIC_DATA_PUBLISHER_KEYPAIR_PATH")
-      .unwrap_or_else(|_| "/app/keypair.bin".to_string());
+    let keypair_path = std::env::var("ATOMIC_DATA_PUBLISHER_SIGNING_KEYPAIR_PATH")
+      .unwrap_or_else(|_| "./keypair.bin".to_string());
 
     let key_tag = KeyTag {
       network: Network::MainNet,

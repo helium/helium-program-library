@@ -344,7 +344,6 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
   const name = "ExplodeMiniFanoutOwnership";
   const init = async (config: { [key: string]: any }) => {
     const updateOnDuplicateFields: string[] = [];
-
     const existingColumns = (
       await database.query(
         `

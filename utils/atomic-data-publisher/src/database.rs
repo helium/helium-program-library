@@ -1,7 +1,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, Row, Column, TypeInfo, postgres::PgPoolOptions};
+use sqlx::{PgPool, Row, Column, TypeInfo, postgres::PgPoolOptions, types::BigDecimal};
 
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -93,19 +93,26 @@ impl DatabaseClient {
 
   /// Create the polling state table
   pub async fn create_polling_state_table(&self) -> Result<()> {
-    let create_query = r#"
+    // Create table
+    let create_table_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
         table_name VARCHAR(255) PRIMARY KEY,
         last_processed_block_height BIGINT NOT NULL DEFAULT 0,
         last_poll_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_polling_state_updated_at
-      ON atomic_data_polling_state (updated_at);
+      )
     "#;
 
-    sqlx::query(create_query).execute(&self.pool).await?;
+    sqlx::query(create_table_query).execute(&self.pool).await?;
+
+    // Create index
+    let create_index_query = r#"
+      CREATE INDEX IF NOT EXISTS idx_polling_state_updated_at
+      ON atomic_data_polling_state (updated_at)
+    "#;
+
+    sqlx::query(create_index_query).execute(&self.pool).await?;
+
     info!("Created or verified atomic_data_polling_state table");
     Ok(())
   }
@@ -240,13 +247,14 @@ impl DatabaseClient {
     let query_template = table.query_spec.get_query()
       .map_err(|e| anyhow::anyhow!("Failed to get query: {}", e))?;
 
-    // Replace $PRIMARY_KEY with a test value to validate query syntax
-    let test_query = query_template.replace("$PRIMARY_KEY", "'__TEST_VALIDATION__'");
+    // Use parameter binding for validation
+    let test_query = query_template.replace("$PRIMARY_KEY", "$1");
 
-    // Add LIMIT 0 to make it a dry run that doesn't return data
-    let validation_query = format!("{} LIMIT 0", test_query);
+    // Wrap in a subquery with LIMIT 0 to make it a dry run that doesn't return data
+    let validation_query = format!("SELECT * FROM ({}) AS validation_subquery LIMIT 0", test_query);
 
     sqlx::query(&validation_query)
+      .bind("__TEST_VALIDATION__")
       .fetch_all(&self.pool)
       .await
       .map_err(|e| anyhow::anyhow!("Query syntax error: {}", e))?;
@@ -294,7 +302,9 @@ impl DatabaseClient {
     let max_change_value: i64 = sqlx::query(&query)
       .fetch_one(&self.pool)
       .await?
-      .try_get("max_value")
+      .try_get::<Option<BigDecimal>, _>("max_value")
+      .unwrap_or(None)
+      .map(|bd| bd.to_string().parse::<i64>().unwrap_or(0))
       .unwrap_or(0);
 
         // Insert initial state
@@ -364,7 +374,7 @@ impl DatabaseClient {
     // Query for records with change column greater than last processed
     let query = format!(
       r#"
-      SELECT {}, {}, updated_at
+      SELECT {}, {}, refreshed_at
       FROM {}
       WHERE {} > $1
       ORDER BY {} ASC
@@ -385,8 +395,10 @@ impl DatabaseClient {
 
     for row in rows {
       let primary_key: String = row.get(table.primary_key_column.as_str());
-      let change_value: i64 = row.get(table.change_column.as_str());
-      let changed_at: DateTime<Utc> = row.try_get("updated_at").unwrap_or_else(|_| Utc::now());
+      let change_value: i64 = row.try_get::<BigDecimal, _>(table.change_column.as_str())
+        .map(|bd| bd.to_string().parse::<i64>().unwrap_or(0))
+        .unwrap_or(0);
+      let changed_at: DateTime<Utc> = row.try_get("refreshed_at").unwrap_or_else(|_| Utc::now());
 
       // Track the maximum change value
       max_block_height = max_block_height.max(change_value);
@@ -449,10 +461,11 @@ impl DatabaseClient {
     let query_template = table.query_spec.get_query()
       .map_err(|e| anyhow::anyhow!("Failed to get query for table '{}': {}", table.name, e))?;
 
-    // Replace placeholder in query with actual primary key
-    let query = query_template.replace("$PRIMARY_KEY", primary_key);
+    // Use proper parameter binding instead of string replacement
+    let query = query_template.replace("$PRIMARY_KEY", "$1");
 
     let rows = sqlx::query(&query)
+      .bind(primary_key)
       .fetch_all(&self.pool)
       .await
       .map_err(|e| {
@@ -512,6 +525,12 @@ impl DatabaseClient {
           "JSONB" | "JSON" => {
             let val: Option<serde_json::Value> = row.try_get(i).unwrap_or(None);
             val.unwrap_or(serde_json::Value::Null)
+          }
+          "NUMERIC" => {
+            let val: Option<BigDecimal> = row.try_get(i).unwrap_or(None);
+            val
+              .map(|v| serde_json::Value::String(v.to_string()))
+              .unwrap_or(serde_json::Value::Null)
           }
           _ => {
             // Fallback to string representation

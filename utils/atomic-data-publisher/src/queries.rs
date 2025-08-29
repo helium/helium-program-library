@@ -44,159 +44,74 @@ impl AtomicHotspotQueries {
     }
   }
 
-  /// Construct atomic mobile hotspot data by joining multiple tables
-  ///
-  /// This query joins:
-  /// - mobile_hotspot_infos: Core hotspot account data
-  /// - asset_owners: Current NFT ownership information
-  /// - hotspot_metadata: Additional metadata and location data
-  /// - rewards_destinations: Rewards routing configuration
+  /// Construct atomic mobile hotspot data using basic available columns
   const CONSTRUCT_ATOMIC_MOBILE_HOTSPOT: &'static str = r#"
-    SELECT
-      -- Core hotspot data
-      mhi.last_block_height as block_height,
-      EXTRACT(epoch FROM mhi.updated_at)::bigint as block_time_seconds,
-      mhi.key as pub_key,
-      mhi.address as asset,
+  SELECT
+    -- Core hotspot data
+    mhi.address as pub_key,
 
-      -- Device metadata
-      mhi.serial_number,
-      mhi.device_type,
-      COALESCE(hm.location, mhi.location) as asserted_hex,
-      COALESCE(hm.azimuth, 0) as azimuth,
+    -- Basic mobile hotspot fields
+    mhi.asset,
+    mhi.location as asserted_hex,
+    mhi.is_full_hotspot,
+    mhi.num_location_asserts,
+    mhi.is_active,
+    mhi.dc_onboarding_fee_paid,
 
-      -- Ownership information
-      COALESCE(ao.owner, mhi.owner) as owner,
-      COALESCE(ao.owner_type, 'direct_owner') as owner_type,
+    -- Ownership information with welcome pack logic
+    CASE
+      WHEN wp.owner IS NOT NULL THEN wp.owner
+      ELSE ao.owner
+    END as owner,
 
-      -- Rewards configuration
-      COALESCE(rd.rewards_recipient, mhi.rewards_recipient) as rewards_recipient,
+    CASE
+      WHEN wp.owner IS NOT NULL THEN 'welcome_pack_owner'
+      ELSE 'direct_owner'
+    END as owner_type,
 
-      -- Rewards split information (if configured)
-      CASE
-        WHEN rs.pub_key IS NOT NULL THEN
-          json_build_object(
-            'pub_key', rs.pub_key,
-            'schedule', COALESCE(rs.schedule, ''),
-            'total_shares', COALESCE(rs.total_shares, 100),
-            'recipients', COALESCE(
-              (
-                SELECT json_agg(
-                  json_build_object(
-                    'authority', rsr.authority,
-                    'recipient', rsr.recipient,
-                    'shares', rsr.shares,
-                    'fixed_amount', rsr.fixed_amount
-                  )
-                )
-                FROM rewards_split_recipients rsr
-                WHERE rsr.rewards_split_key = rs.pub_key
-              ),
-              '[]'::json
-            )
-          )
-        ELSE NULL
-      END as rewards_split,
+    mhi.refreshed_at
 
-      -- Additional metadata for enrichment
-      hm.elevation,
-      hm.gain,
-      hm.is_full_hotspot,
-      mhi.created_at,
-      mhi.updated_at
+  FROM mobile_hotspot_infos mhi
+  LEFT JOIN asset_owners ao ON ao.asset = mhi.asset
+  LEFT JOIN welcome_packs wp ON wp.address = ao.owner
+  WHERE mhi.address = $PRIMARY_KEY
+  LIMIT 1
+"#;
 
-    FROM mobile_hotspot_infos mhi
-
-    -- Join with asset ownership (may be different from hotspot account owner)
-    LEFT JOIN asset_owners ao ON ao.asset = mhi.address
-
-    -- Join with hotspot metadata for location/hardware details
-    LEFT JOIN hotspot_metadata hm ON hm.hotspot_address = mhi.address
-
-    -- Join with rewards destinations
-    LEFT JOIN rewards_destinations rd ON rd.hotspot_address = mhi.address
-
-    -- Join with rewards splits (if configured)
-    LEFT JOIN rewards_splits rs ON rs.hotspot_address = mhi.address
-
-    WHERE mhi.address = $PRIMARY_KEY
-
-    -- Ensure we get the most recent data if there are multiple records
-    ORDER BY mhi.last_block_height DESC, mhi.updated_at DESC
-    LIMIT 1;
-  "#;
-
-  /// Construct atomic IoT hotspot data by joining multiple tables
+  /// Construct atomic IoT hotspot data using basic available columns
   const CONSTRUCT_ATOMIC_IOT_HOTSPOT: &'static str = r#"
     SELECT
       -- Core hotspot data
-      ihi.last_block_height as block_height,
-      EXTRACT(epoch FROM ihi.updated_at)::bigint as block_time_seconds,
-      ihi.key as pub_key,
-      ihi.address as asset,
+      ihi.address as pub_key,
 
-      -- Location and hardware metadata
-      COALESCE(hm.location, ihi.location) as asserted_hex,
-      COALESCE(hm.elevation, ihi.elevation, 0) as elevation,
-      COALESCE(ihi.is_data_only, false) as is_data_only,
+      -- Basic IoT hotspot fields
+      ihi.asset,
+      ihi.location as asserted_hex,
+      ihi.elevation,
+      ihi.gain,
+      ihi.is_full_hotspot,
+      ihi.num_location_asserts,
+      ihi.is_active,
+      ihi.dc_onboarding_fee_paid,
 
-      -- Ownership information
-      COALESCE(ao.owner, ihi.owner) as owner,
-      COALESCE(ao.owner_type, 'direct_owner') as owner_type,
-
-      -- Rewards configuration
-      COALESCE(rd.rewards_recipient, ihi.rewards_recipient) as rewards_recipient,
-
-      -- Rewards split information (if configured)
+      -- Ownership information with welcome pack logic
       CASE
-        WHEN rs.pub_key IS NOT NULL THEN
-          json_build_object(
-            'pub_key', rs.pub_key,
-            'schedule', COALESCE(rs.schedule, ''),
-            'total_shares', COALESCE(rs.total_shares, 100),
-            'recipients', COALESCE(
-              (
-                SELECT json_agg(
-                  json_build_object(
-                    'authority', rsr.authority,
-                    'recipient', rsr.recipient,
-                    'shares', rsr.shares,
-                    'fixed_amount', rsr.fixed_amount
-                  )
-                )
-                FROM rewards_split_recipients rsr
-                WHERE rsr.rewards_split_key = rs.pub_key
-              ),
-              '[]'::json
-            )
-          )
-        ELSE NULL
-      END as rewards_split,
+        WHEN wp.owner IS NOT NULL THEN wp.owner
+        ELSE ao.owner
+      END as owner,
 
-      -- Additional metadata
-      hm.gain,
-      hm.is_full_hotspot,
-      ihi.created_at,
-      ihi.updated_at
+      CASE
+        WHEN wp.owner IS NOT NULL THEN 'welcome_pack_owner'
+        ELSE 'direct_owner'
+      END as owner_type,
+
+      ihi.refreshed_at
 
     FROM iot_hotspot_infos ihi
-
-    -- Join with asset ownership
-    LEFT JOIN asset_owners ao ON ao.asset = ihi.address
-
-    -- Join with hotspot metadata
-    LEFT JOIN hotspot_metadata hm ON hm.hotspot_address = ihi.address
-
-    -- Join with rewards destinations
-    LEFT JOIN rewards_destinations rd ON rd.hotspot_address = ihi.address
-
-    -- Join with rewards splits
-    LEFT JOIN rewards_splits rs ON rs.hotspot_address = ihi.address
-
+    LEFT JOIN asset_owners ao ON ao.asset = ihi.asset
+    LEFT JOIN welcome_packs wp ON wp.address = ao.owner
     WHERE ihi.address = $PRIMARY_KEY
-
-    ORDER BY ihi.last_block_height DESC, ihi.updated_at DESC
-    LIMIT 1;
+    LIMIT 1
   "#;
 
   /// Generic hotspot query that works for both mobile and IoT
@@ -206,8 +121,6 @@ impl AtomicHotspotQueries {
       -- Mobile hotspots
       SELECT
         'mobile' as hotspot_type,
-        mhi.last_block_height as block_height,
-        EXTRACT(epoch FROM mhi.updated_at)::bigint as block_time_seconds,
         mhi.key as pub_key,
         mhi.address as asset,
         mhi.serial_number,
@@ -219,7 +132,7 @@ impl AtomicHotspotQueries {
         COALESCE(ao.owner, mhi.owner) as owner,
         COALESCE(ao.owner_type, 'direct_owner') as owner_type,
         COALESCE(rd.rewards_recipient, mhi.rewards_recipient) as rewards_recipient,
-        mhi.created_at,
+        mhi.refreshed_at,
         mhi.updated_at
       FROM mobile_hotspot_infos mhi
       LEFT JOIN asset_owners ao ON ao.asset = mhi.address
@@ -232,8 +145,6 @@ impl AtomicHotspotQueries {
       -- IoT hotspots
       SELECT
         'iot' as hotspot_type,
-        ihi.last_block_height as block_height,
-        EXTRACT(epoch FROM ihi.updated_at)::bigint as block_time_seconds,
         ihi.key as pub_key,
         ihi.address as asset,
         NULL as serial_number,
@@ -245,7 +156,7 @@ impl AtomicHotspotQueries {
         COALESCE(ao.owner, ihi.owner) as owner,
         COALESCE(ao.owner_type, 'direct_owner') as owner_type,
         COALESCE(rd.rewards_recipient, ihi.rewards_recipient) as rewards_recipient,
-        ihi.created_at,
+        ihi.refreshed_at,
         ihi.updated_at
       FROM iot_hotspot_infos ihi
       LEFT JOIN asset_owners ao ON ao.asset = ihi.address

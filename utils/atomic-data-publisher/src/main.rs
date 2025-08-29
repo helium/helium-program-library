@@ -119,18 +119,7 @@ fn validate_config(settings: &Settings) -> Result<()> {
     ));
   }
 
-     // Validate ingestor configuration
-   if settings.ingestor.grpc_endpoint.is_empty() {
-     return Err(anyhow::anyhow!("Ingestor gRPC endpoint cannot be empty"));
-   }
-
-   if !settings.ingestor.grpc_endpoint.starts_with("http://")
-     && !settings.ingestor.grpc_endpoint.starts_with("https://")
-   {
-     return Err(anyhow::anyhow!(
-       "Ingestor gRPC endpoint must start with http:// or https://"
-     ));
-   }
+  // Note: Ingestor validation skipped - we're logging protobuf events instead of sending to gRPC
 
   // Validate service configuration
   if settings.service.polling_interval_seconds == 0 {

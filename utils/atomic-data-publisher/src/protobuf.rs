@@ -85,7 +85,7 @@ impl ProtobufBuilder {
 
     let block_height = Self::extract_u64(data, "block_height").unwrap_or(0);
     let block_time_seconds = Self::extract_u64(data, "block_time_seconds")
-      .or_else(|| Self::extract_timestamp_as_seconds(data, "updated_at"))
+      .or_else(|| Self::extract_timestamp_as_seconds(data, "refreshed_at"))
       .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
 
     let pub_key = Self::extract_helium_pub_key(data, "pub_key")?;
@@ -121,7 +121,7 @@ impl ProtobufBuilder {
 
     let block_height = Self::extract_u64(data, "block_height").unwrap_or(0);
     let block_time_seconds = Self::extract_u64(data, "block_time_seconds")
-      .or_else(|| Self::extract_timestamp_as_seconds(data, "updated_at"))
+      .or_else(|| Self::extract_timestamp_as_seconds(data, "refreshed_at"))
       .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
 
     let pub_key = Self::extract_helium_pub_key(data, "pub_key")?;
