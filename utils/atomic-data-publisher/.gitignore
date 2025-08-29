@@ -1,2 +1,2 @@
-.keypair.bin
-.local.toml
+keypair.bin
+config/local.toml
