@@ -3,7 +3,7 @@ import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
 import { init as initMfan } from "@helium/mini-fanout-sdk";
 import { batchInstructionsToTxsWithPriorityFee, bulkSendTransactions, truthy } from "@helium/spl-utils";
 import { init as initTuktuk, nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
-import { TransactionInstruction } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
@@ -48,8 +48,8 @@ export async function run(args: any = process.argv) {
       const nextTask = freeTasks.pop()!;
       const nextPreTask = freeTasks.pop()!;
 
-      const nextTaskAcc = await tuktukProgram.account.taskV0.fetchNullable(miniFanout.account.nextTask)
-      const nextPreTaskAcc = await tuktukProgram.account.taskV0.fetchNullable(miniFanout.account.nextPreTask)
+      const nextTaskAcc = miniFanout.account.nextTask.equals(PublicKey.default) ? undefined : await tuktukProgram.account.taskV0.fetchNullable(miniFanout.account.nextTask)
+      const nextPreTaskAcc = miniFanout.account.nextPreTask.equals(PublicKey.default) ? undefined : await tuktukProgram.account.taskV0.fetchNullable(miniFanout.account.nextPreTask)
 
       instructions.push([
         nextTaskAcc ? await tuktukProgram.methods.dequeueTaskV0().accounts({
