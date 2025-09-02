@@ -67,16 +67,7 @@ export async function run(args: any = process.argv) {
   const nowBig = await getUnixTimestamp(provider);
   const now = Number(nowBig);
 
-  // Filter boosted hexes by this boost config using a memcmp (offset = 8 discriminator + 1 device_type)
-  const memcmpOffset = 9;
-  const boostedHexes = await program.account.boostedHexV1.all([
-    {
-      memcmp: {
-        offset: memcmpOffset,
-        bytes: boostConfigPubkey.toBase58(),
-      },
-    },
-  ]);
+  const boostedHexes = await program.account.boostedHexV0.all()
 
   const periodLength = Number(boostConfig.periodLength);
 

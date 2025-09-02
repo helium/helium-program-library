@@ -469,7 +469,7 @@ describe("hexboosting", () => {
           });
 
           await program.methods
-            .closeBoostV0()
+            .closeBoostV1()
             .accountsPartial({
               boostedHex,
             })
