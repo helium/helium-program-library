@@ -903,7 +903,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.3.0"
+version = "0.3.3"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -956,7 +956,7 @@ dependencies = [
 
 [[package]]
 name = "hexboosting"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
