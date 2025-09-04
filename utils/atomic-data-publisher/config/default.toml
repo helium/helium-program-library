@@ -4,8 +4,8 @@ port = 5432
 username = "postgres"
 password = "postgres"
 database_name = "helium"
-max_connections = 10
-min_connections = 2
+max_connections =  10
+min_connections =2
 acquire_timeout_seconds = 30
 idle_timeout_seconds = 600
 max_lifetime_seconds = 1800
@@ -23,7 +23,7 @@ tls_enabled = false
 
 [service]
 polling_interval_seconds = 10
-batch_size = 100
+batch_size = 500
 max_concurrent_publishes = 5
 health_check_port = 3000
 
@@ -32,13 +32,22 @@ fail_on_missing_tables = true          # Set to false for graceful degradation
 validation_retry_attempts = 3          # Number of retries before giving up
 validation_retry_delay_seconds = 30    # Delay between validation retries
 
+# Performance settings
+# batch_size controls both database scanning and publishing batch size
+
 # Mobile hotspot infos table
 [[service.watched_tables]]
 name = "mobile_hotspot_infos"
 change_column = "last_block_height"
-primary_key_column = "address"
 hotspot_type = "mobile"
-query_name = "construct_atomic_mobile_hotspot"
+query_name = "construct_atomic_hotspot"
+
+# IoT hotspot infos table (commented out by default)
+#[[service.watched_tables]]
+#name = "iot_hotspot_infos"
+#change_column = "last_block_height"
+#hotspot_type = "iot"
+#query_name = "construct_atomic_hotspot"
 
 [logging]
 level = "info"

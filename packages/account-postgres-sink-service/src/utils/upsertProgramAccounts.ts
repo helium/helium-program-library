@@ -263,6 +263,7 @@ export const upsertProgramAccounts = async ({
     try {
       const model = sequelize.models[type];
       const plugins = await initPlugins(rest.plugins);
+
       const hasGeocodingPlugin = rest.plugins?.some(
         (p) => p.type === "ExtractHexLocation"
       );
@@ -308,6 +309,7 @@ export const upsertProgramAccounts = async ({
             effectiveBatchSize,
             async (chunk, transaction) => {
               let decodeErrors = 0;
+
               const accs = (
                 await Promise.all(
                   chunk.map(async ({ pubkey, account }) => {
@@ -407,36 +409,36 @@ export const upsertProgramAccounts = async ({
                   const shouldUpdate =
                     !existingRecord || !deepEqual(newClean, existingClean);
 
-                  if (shouldUpdate) {
-                    if (lastBlockHeight === null) {
-                      try {
-                        lastBlockHeight = await retry(
-                          () => connection.getBlockHeight("confirmed"),
-                          {
-                            retries: 3,
-                            factor: 2,
-                            minTimeout: 1000,
-                            maxTimeout: 5000,
-                          }
-                        );
-                      } catch (error) {
-                        console.warn(
-                          "Failed to fetch block height after retries:",
-                          error
-                        );
-                      }
+                  if (lastBlockHeight === null) {
+                    try {
+                      lastBlockHeight = await retry(
+                        () => connection.getBlockHeight("confirmed"),
+                        {
+                          retries: 3,
+                          factor: 2,
+                          minTimeout: 1000,
+                          maxTimeout: 5000,
+                        }
+                      );
+                    } catch (error) {
+                      console.warn(
+                        "Failed to fetch block height after retries:",
+                        error
+                      );
                     }
+                  }
 
+                  if (shouldUpdate) {
                     return {
                       ...newRecord,
                       last_block_height: lastBlockHeight,
                     };
                   } else {
-                    // Keep existing last_block_height for unchanged records
+                    // Keep existing last_block_height for unchanged records, but use fetched lastBlockHeight if existing is null
                     return {
                       ...newRecord,
                       last_block_height:
-                        existingData?.last_block_height || null,
+                        existingData?.last_block_height || lastBlockHeight,
                     };
                   }
                 })

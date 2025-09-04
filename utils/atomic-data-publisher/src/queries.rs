@@ -1,5 +1,4 @@
 use crate::config::HotspotType;
-use anyhow::Result;
 use std::collections::HashMap;
 
 /// SQL queries for constructing atomic hotspot data from multiple tables
@@ -10,22 +9,10 @@ impl AtomicHotspotQueries {
   pub fn get_all_queries() -> HashMap<String, &'static str> {
     let mut queries = HashMap::new();
 
-    // Mobile hotspot atomic data construction
+    // Unified atomic hotspot construction query
     queries.insert(
-      "construct_atomic_mobile_hotspot".to_string(),
-      Self::CONSTRUCT_ATOMIC_MOBILE_HOTSPOT,
-    );
-
-    // IoT hotspot atomic data construction
-    queries.insert(
-      "construct_atomic_iot_hotspot".to_string(),
-      Self::CONSTRUCT_ATOMIC_IOT_HOTSPOT,
-    );
-
-    // Generic hotspot query (when hotspot type is determined dynamically)
-    queries.insert(
-      "construct_atomic_hotspot_generic".to_string(),
-      Self::CONSTRUCT_ATOMIC_HOTSPOT_GENERIC,
+      "construct_atomic_hotspot".to_string(),
+      Self::CONSTRUCT_ATOMIC_HOTSPOT,
     );
 
     queries
@@ -36,163 +23,126 @@ impl AtomicHotspotQueries {
     Self::get_all_queries().get(query_name).copied()
   }
 
-  /// Get query for specific hotspot type
-  pub fn get_query_for_hotspot_type(hotspot_type: &HotspotType) -> &'static str {
-    match hotspot_type {
-      HotspotType::Mobile => Self::CONSTRUCT_ATOMIC_MOBILE_HOTSPOT,
-      HotspotType::Iot => Self::CONSTRUCT_ATOMIC_IOT_HOTSPOT,
-    }
+  /// Get query for specific hotspot type (now unified for all types)
+  pub fn get_query_for_hotspot_type(_hotspot_type: &HotspotType) -> &'static str {
+    Self::CONSTRUCT_ATOMIC_HOTSPOT
   }
 
-  /// Construct atomic mobile hotspot data using basic available columns
-  const CONSTRUCT_ATOMIC_MOBILE_HOTSPOT: &'static str = r#"
-  SELECT
-    -- Core hotspot data
-    mhi.address as pub_key,
-    mhi.device_type,
-    mhi.deployment_info->'wifiInfoV0'->>'serial' as serial_number,
-    COALESCE((mhi.deployment_info->'wifiInfoV0'->>'azimuth')::numeric, 0) as azimuth,
-    mhi.asset,
-    mhi.location as asserted_hex,
-    mhi.is_full_hotspot,
-    mhi.num_location_asserts,
-    mhi.is_active,
-    mhi.dc_onboarding_fee_paid,
-
-    -- Ownership information with welcome pack logic
-    CASE
-      WHEN wp.owner IS NOT NULL THEN wp.owner
-      ELSE ao.owner
-    END as owner,
-
-    CASE
-      WHEN wp.owner IS NOT NULL THEN 'welcome_pack_owner'
-      ELSE 'direct_owner'
-    END as owner_type,
-
-    mhi.refreshed_at
-
-  FROM mobile_hotspot_infos mhi
-  LEFT JOIN asset_owners ao ON ao.asset = mhi.asset
-  LEFT JOIN welcome_packs wp ON wp.address = ao.owner
-  WHERE mhi.address = $PRIMARY_KEY
-  LIMIT 1
-"#;
-
-  /// Construct atomic IoT hotspot data using basic available columns
-  const CONSTRUCT_ATOMIC_IOT_HOTSPOT: &'static str = r#"
-    SELECT
-      -- Core hotspot data
-      ihi.address as pub_key,
-      ihi.asset,
-      ihi.location as asserted_hex,
-      ihi.elevation,
-      ihi.gain,
-      ihi.is_full_hotspot,
-      ihi.num_location_asserts,
-      ihi.is_active,
-      ihi.dc_onboarding_fee_paid,
-
-      -- Ownership information with welcome pack logic
-      CASE
-        WHEN wp.owner IS NOT NULL THEN wp.owner
-        ELSE ao.owner
-      END as owner,
-
-      CASE
-        WHEN wp.owner IS NOT NULL THEN 'welcome_pack_owner'
-        ELSE 'direct_owner'
-      END as owner_type,
-
-      ihi.refreshed_at
-
-    FROM iot_hotspot_infos ihi
-    LEFT JOIN asset_owners ao ON ao.asset = ihi.asset
-    LEFT JOIN welcome_packs wp ON wp.address = ao.owner
-    WHERE ihi.address = $PRIMARY_KEY
-    LIMIT 1
-  "#;
-
-  /// Generic hotspot query that works for both mobile and IoT
-  /// Useful when hotspot type needs to be determined dynamically
-  const CONSTRUCT_ATOMIC_HOTSPOT_GENERIC: &'static str = r#"
-    WITH hotspot_data AS (
-      -- Mobile hotspots
+  /// Unified atomic hotspot construction query that works for both mobile and IoT
+  /// Takes hotspot type as parameter and constructs complete atomic hotspot data
+  /// Returns the maximum last_block_height from all joined tables for proper polling
+  const CONSTRUCT_ATOMIC_HOTSPOT: &'static str = r#"
+    WITH hotspot_base AS (
+            -- Mobile hotspot data
       SELECT
         'mobile' as hotspot_type,
-        mhi.key as pub_key,
-        mhi.address as asset,
-        mhi.serial_number,
+        kta.encoded_entity_key as pub_key,
         mhi.device_type,
-        COALESCE(hm.location, mhi.location) as asserted_hex,
-        COALESCE(hm.azimuth, 0) as azimuth,
-        COALESCE(hm.elevation, 0) as elevation,
-        false as is_data_only,
-        COALESCE(ao.owner, mhi.owner) as owner,
-        COALESCE(ao.owner_type, 'direct_owner') as owner_type,
-        COALESCE(rd.rewards_recipient, mhi.rewards_recipient) as rewards_recipient,
+        mhi.deployment_info->'wifiInfoV0'->>'serial' as serial_number,
+        COALESCE((mhi.deployment_info->'wifiInfoV0'->>'azimuth')::numeric, 0) as azimuth,
+        COALESCE((mhi.deployment_info->'wifiInfoV0'->>'elevation')::numeric, 0) as elevation,
+        0 as gain, -- Mobile hotspots don't have gain
+        mhi.asset,
+        mhi.address as solana_address, -- Keep solana address for mini_fanouts join
+        mhi.location as asserted_hex,
+        mhi.is_full_hotspot,
+        mhi.num_location_asserts,
+        mhi.is_active,
+        mhi.dc_onboarding_fee_paid,
         mhi.refreshed_at,
-        mhi.updated_at
+        mhi.last_block_height as base_block_height
       FROM mobile_hotspot_infos mhi
-      LEFT JOIN asset_owners ao ON ao.asset = mhi.address
-      LEFT JOIN hotspot_metadata hm ON hm.hotspot_address = mhi.address
-      LEFT JOIN rewards_destinations rd ON rd.hotspot_address = mhi.address
-      WHERE mhi.address = $PRIMARY_KEY
+      LEFT JOIN key_to_assets kta ON kta.asset = mhi.asset
+      WHERE mhi.address = $PRIMARY_KEY AND $HOTSPOT_TYPE = 'mobile'
 
       UNION ALL
 
-      -- IoT hotspots
+            -- IoT hotspot data
       SELECT
         'iot' as hotspot_type,
-        ihi.key as pub_key,
-        ihi.address as asset,
-        NULL as serial_number,
-        NULL as device_type,
-        COALESCE(hm.location, ihi.location) as asserted_hex,
-        0 as azimuth,
-        COALESCE(hm.elevation, ihi.elevation, 0) as elevation,
-        COALESCE(ihi.is_data_only, false) as is_data_only,
-        COALESCE(ao.owner, ihi.owner) as owner,
-        COALESCE(ao.owner_type, 'direct_owner') as owner_type,
-        COALESCE(rd.rewards_recipient, ihi.rewards_recipient) as rewards_recipient,
+        kta.encoded_entity_key as pub_key,
+        NULL as device_type, -- IoT hotspots don't have device_type
+        NULL as serial_number, -- IoT hotspots don't have serial numbers
+        0 as azimuth, -- IoT hotspots don't have azimuth
+        ihi.elevation,
+        ihi.gain,
+        ihi.asset,
+        ihi.address as solana_address, -- Keep solana address for mini_fanouts join
+        ihi.location as asserted_hex,
+        ihi.is_full_hotspot,
+        ihi.num_location_asserts,
+        ihi.is_active,
+        ihi.dc_onboarding_fee_paid,
         ihi.refreshed_at,
-        ihi.updated_at
+        ihi.last_block_height as base_block_height
       FROM iot_hotspot_infos ihi
-      LEFT JOIN asset_owners ao ON ao.asset = ihi.address
-      LEFT JOIN hotspot_metadata hm ON hm.hotspot_address = ihi.address
-      LEFT JOIN rewards_destinations rd ON rd.hotspot_address = ihi.address
-      WHERE ihi.address = $PRIMARY_KEY
+      LEFT JOIN key_to_assets kta ON kta.asset = ihi.asset
+      WHERE ihi.address = $PRIMARY_KEY AND $HOTSPOT_TYPE = 'iot'
+    ),
+    enriched_hotspot AS (
+      SELECT
+        hb.*,
+        -- Ownership information with welcome pack logic
+        CASE
+          WHEN wp.owner IS NOT NULL THEN wp.owner
+          ELSE ao.owner
+        END as owner,
+        CASE
+          WHEN wp.owner IS NOT NULL THEN 'welcome_pack_owner'
+          ELSE 'direct_owner'
+        END as owner_type,
+        -- Rewards recipient information
+        rr.destination as rewards_recipient,
+        -- Mini fanout information (rewards splits)
+        CASE
+          WHEN mf.address IS NOT NULL THEN
+            json_build_object(
+              'pub_key', mf.address,
+              'owner', mf.owner,
+              'namespace', mf.namespace,
+              'schedule', COALESCE(mf.schedule, ''),
+              'shares', CASE
+                WHEN mf.shares IS NOT NULL THEN
+                  (
+                    SELECT json_agg(share_elem::jsonb)
+                    FROM unnest(mf.shares) AS share_elem
+                  )
+                ELSE '[]'::json
+              END
+            )
+          ELSE NULL
+        END as rewards_split,
+        -- Track block heights from all joined tables for proper polling
+        GREATEST(
+          hb.base_block_height,
+          COALESCE(ao.last_block_height, 0),
+          COALESCE(wp.last_block_height, 0),
+          COALESCE(mf.last_block_height, 0)
+        ) as max_block_height
+      FROM hotspot_base hb
+      LEFT JOIN asset_owners ao ON ao.asset = hb.asset
+      LEFT JOIN welcome_packs wp ON wp.address = ao.owner
+      LEFT JOIN rewards_recipients rr ON rr.asset = hb.asset
+      LEFT JOIN mini_fanouts mf ON mf.owner = hb.solana_address
     )
     SELECT
-      hd.*,
-      -- Add rewards split information
+      eh.*,
+      -- Additional metadata if needed
       CASE
-        WHEN rs.pub_key IS NOT NULL THEN
+        WHEN eh.hotspot_type = 'mobile' THEN
           json_build_object(
-            'pub_key', rs.pub_key,
-            'schedule', COALESCE(rs.schedule, ''),
-            'total_shares', COALESCE(rs.total_shares, 100),
-            'recipients', COALESCE(
-              (
-                SELECT json_agg(
-                  json_build_object(
-                    'authority', rsr.authority,
-                    'recipient', rsr.recipient,
-                    'shares', rsr.shares,
-                    'fixed_amount', rsr.fixed_amount
-                  )
-                )
-                FROM rewards_split_recipients rsr
-                WHERE rsr.rewards_split_key = rs.pub_key
-              ),
-              '[]'::json
-            )
+            'device_type', eh.device_type,
+            'serial_number', eh.serial_number,
+            'azimuth', eh.azimuth
           )
-        ELSE NULL
-      END as rewards_split
-    FROM hotspot_data hd
-    LEFT JOIN rewards_splits rs ON rs.hotspot_address = hd.asset
-    ORDER BY hd.block_height DESC, hd.updated_at DESC
+        ELSE
+          json_build_object(
+            'gain', eh.gain,
+            'elevation', eh.elevation
+          )
+      END as type_specific_metadata
+    FROM enriched_hotspot eh
+    ORDER BY eh.max_block_height DESC
     LIMIT 1;
   "#;
 }
@@ -204,10 +154,8 @@ mod tests {
   #[test]
   fn test_query_retrieval() {
     let queries = AtomicHotspotQueries::get_all_queries();
-    assert!(queries.len() >= 3);
-    assert!(queries.contains_key("construct_atomic_mobile_hotspot"));
-    assert!(queries.contains_key("construct_atomic_iot_hotspot"));
-    assert!(queries.contains_key("construct_atomic_hotspot_generic"));
+    assert_eq!(queries.len(), 1);
+    assert!(queries.contains_key("construct_atomic_hotspot"));
   }
 
   #[test]
@@ -215,20 +163,49 @@ mod tests {
     let mobile_query = AtomicHotspotQueries::get_query_for_hotspot_type(&HotspotType::Mobile);
     let iot_query = AtomicHotspotQueries::get_query_for_hotspot_type(&HotspotType::Iot);
 
+    // Both should use the unified query now
+    assert_eq!(mobile_query, iot_query);
+    assert_eq!(mobile_query, AtomicHotspotQueries::CONSTRUCT_ATOMIC_HOTSPOT);
     assert!(mobile_query.contains("mobile_hotspot_infos"));
-    assert!(iot_query.contains("iot_hotspot_infos"));
+    assert!(mobile_query.contains("iot_hotspot_infos"));
+    assert!(mobile_query.contains("$HOTSPOT_TYPE"));
   }
 
   #[test]
-  fn test_queries_contain_primary_key_placeholder() {
-    let queries = AtomicHotspotQueries::get_all_queries();
+  fn test_unified_query_contains_required_placeholders() {
+    let unified_query = AtomicHotspotQueries::get_query("construct_atomic_hotspot").unwrap();
 
-    for (name, query) in queries {
-      assert!(
-        query.contains("$PRIMARY_KEY"),
-        "Query '{}' missing $PRIMARY_KEY placeholder",
-        name
-      );
-    }
+    assert!(
+      unified_query.contains("$PRIMARY_KEY"),
+      "Unified query missing $PRIMARY_KEY placeholder"
+    );
+    assert!(
+      unified_query.contains("$HOTSPOT_TYPE"),
+      "Unified query missing $HOTSPOT_TYPE placeholder"
+    );
+    assert!(
+      unified_query.contains("max_block_height"),
+      "Unified query missing max_block_height calculation"
+    );
+  }
+
+  #[test]
+  fn test_unified_query_contains_primary_key_placeholder() {
+    let unified_query = AtomicHotspotQueries::get_query("construct_atomic_hotspot").unwrap();
+    assert!(
+      unified_query.contains("$PRIMARY_KEY"),
+      "Unified query missing $PRIMARY_KEY placeholder"
+    );
+  }
+
+  #[test]
+  fn test_unified_query_structure() {
+    let unified_query = AtomicHotspotQueries::get_query("construct_atomic_hotspot").unwrap();
+
+    // Test that the query has the expected structure
+    assert!(unified_query.contains("WITH hotspot_base AS"));
+    assert!(unified_query.contains("enriched_hotspot AS"));
+    assert!(unified_query.contains("GREATEST(")); // For max block height calculation
+    assert!(unified_query.contains("type_specific_metadata"));
   }
 }

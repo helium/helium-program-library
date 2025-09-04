@@ -42,7 +42,7 @@ impl AtomicDataPublisher {
       return Ok(vec![]);
     }
 
-    info!("Publishing {} changes to ingestor service", changes.len());
+    debug!("Publishing {} changes to ingestor service", changes.len());
 
     let mut published_ids = Vec::new();
     let mut failed_changes = Vec::new();
@@ -107,75 +107,69 @@ impl AtomicDataPublisher {
     // Log the protobuf message instead of sending it
     let timestamp_ms = chrono::Utc::now().timestamp_millis() as u64;
 
-    match &hotspot_request {
-      HotspotUpdateRequest::Mobile(req) => {
-        // Serialize the protobuf message for logging
-        let serialized = serde_json::json!({
-          "event_type": "mobile_hotspot_update",
-          "table_name": change.table_name,
-          "primary_key": change.primary_key,
-          "change_column_value": change.change_column_value,
-          "timestamp_ms": timestamp_ms,
-          "signer": req.signer,
-          "signature_length": req.signature.len(),
-          "atomic_data": change.atomic_data,
-          "protobuf_data": {
-            "block_height": req.update.as_ref().map(|u| u.block_height),
-            "block_time_seconds": req.update.as_ref().map(|u| u.block_time_seconds),
-            "pub_key": req.update.as_ref().and_then(|u| u.pub_key.as_ref()).map(|pk| bs58::encode(&pk.value).into_string()),
-            "asset": req.update.as_ref().and_then(|u| u.asset.as_ref()).map(|a| bs58::encode(&a.value).into_string()),
-            "metadata": req.update.as_ref().and_then(|u| u.metadata.as_ref()).map(|m| serde_json::json!({
-              "serial_number": m.serial_number,
-              "device_type": m.device_type,
-              "asserted_hex": m.asserted_hex,
-              "azimuth": m.azimuth
-            })),
-            "owner": req.update.as_ref().and_then(|u| u.owner.as_ref()).map(|o| serde_json::json!({
-              "wallet": o.wallet.as_ref().map(|w| bs58::encode(&w.value).into_string()),
-              "type": o.r#type
-            }))
-          }
-        });
+    // match &hotspot_request {
+    //   HotspotUpdateRequest::Mobile(req) => {
+    //     // Serialize the protobuf message for logging
+    //     let serialized = serde_json::json!({
+    //       "event_type": "mobile_hotspot_update",
+    //       "table_name": change.table_name,
+    //       "primary_key": change.primary_key,
+    //       "change_column_value": change.change_column_value,
+    //       "timestamp_ms": timestamp_ms,
+    //       "signer": req.signer,
+    //       "signature_length": req.signature.len(),
+    //       "atomic_data": change.atomic_data,
+    //       "protobuf_data": {
+    //         "block_height": req.update.as_ref().map(|u| u.block_height),
+    //         "block_time_seconds": req.update.as_ref().map(|u| u.block_time_seconds),
+    //         "pub_key": req.update.as_ref().and_then(|u| u.pub_key.as_ref()).map(|pk| bs58::encode(&pk.value).into_string()),
+    //         "asset": req.update.as_ref().and_then(|u| u.asset.as_ref()).map(|a| bs58::encode(&a.value).into_string()),
+    //         "metadata": req.update.as_ref().and_then(|u| u.metadata.as_ref()).map(|m| serde_json::json!({
+    //           "serial_number": m.serial_number,
+    //           "device_type": m.device_type,
+    //           "asserted_hex": m.asserted_hex,
+    //           "azimuth": m.azimuth
+    //         })),
+    //         "owner": req.update.as_ref().and_then(|u| u.owner.as_ref()).map(|o| serde_json::json!({
+    //           "wallet": o.wallet.as_ref().map(|w| bs58::encode(&w.value).into_string()),
+    //           "type": o.r#type
+    //         }))
+    //       }
+    //     });
 
-        info!(
-          "MOBILE_HOTSPOT_UPDATE: {}",
-          serde_json::to_string_pretty(&serialized).unwrap_or_else(|_| "Failed to serialize".to_string())
-        );
-      }
-      HotspotUpdateRequest::Iot(req) => {
-        // Serialize the protobuf message for logging
-        let serialized = serde_json::json!({
-          "event_type": "iot_hotspot_update",
-          "table_name": change.table_name,
-          "primary_key": change.primary_key,
-          "change_column_value": change.change_column_value,
-          "timestamp_ms": timestamp_ms,
-          "signer": req.signer,
-          "signature_length": req.signature.len(),
-          "atomic_data": change.atomic_data,
-          "protobuf_data": {
-            "block_height": req.update.as_ref().map(|u| u.block_height),
-            "block_time_seconds": req.update.as_ref().map(|u| u.block_time_seconds),
-            "pub_key": req.update.as_ref().and_then(|u| u.pub_key.as_ref()).map(|pk| bs58::encode(&pk.value).into_string()),
-            "asset": req.update.as_ref().and_then(|u| u.asset.as_ref()).map(|a| bs58::encode(&a.value).into_string()),
-            "metadata": req.update.as_ref().and_then(|u| u.metadata.as_ref()).map(|m| serde_json::json!({
-              "asserted_hex": m.asserted_hex,
-              "elevation": m.elevation,
-              "is_data_only": m.is_data_only
-            })),
-            "owner": req.update.as_ref().and_then(|u| u.owner.as_ref()).map(|o| serde_json::json!({
-              "wallet": o.wallet.as_ref().map(|w| bs58::encode(&w.value).into_string()),
-              "type": o.r#type
-            }))
-          }
-        });
+    //     info!("MOBILE_HOTSPOT_UPDATE");
+    //   }
+    //   HotspotUpdateRequest::Iot(req) => {
+    //     // Serialize the protobuf message for logging
+    //     let serialized = serde_json::json!({
+    //       "event_type": "iot_hotspot_update",
+    //       "table_name": change.table_name,
+    //       "primary_key": change.primary_key,
+    //       "change_column_value": change.change_column_value,
+    //       "timestamp_ms": timestamp_ms,
+    //       "signer": req.signer,
+    //       "signature_length": req.signature.len(),
+    //       "atomic_data": change.atomic_data,
+    //       "protobuf_data": {
+    //         "block_height": req.update.as_ref().map(|u| u.block_height),
+    //         "block_time_seconds": req.update.as_ref().map(|u| u.block_time_seconds),
+    //         "pub_key": req.update.as_ref().and_then(|u| u.pub_key.as_ref()).map(|pk| bs58::encode(&pk.value).into_string()),
+    //         "asset": req.update.as_ref().and_then(|u| u.asset.as_ref()).map(|a| bs58::encode(&a.value).into_string()),
+    //         "metadata": req.update.as_ref().and_then(|u| u.metadata.as_ref()).map(|m| serde_json::json!({
+    //           "asserted_hex": m.asserted_hex,
+    //           "elevation": m.elevation,
+    //           "is_data_only": m.is_data_only
+    //         })),
+    //         "owner": req.update.as_ref().and_then(|u| u.owner.as_ref()).map(|o| serde_json::json!({
+    //           "wallet": o.wallet.as_ref().map(|w| bs58::encode(&w.value).into_string()),
+    //           "type": o.r#type
+    //         }))
+    //       }
+    //     });
 
-        info!(
-          "IOT_HOTSPOT_UPDATE: {}",
-          serde_json::to_string_pretty(&serialized).unwrap_or_else(|_| "Failed to serialize".to_string())
-        );
-      }
-    }
+    //     info!("IOT_HOTSPOT_UPDATE");
+    //   }
+    // }
 
     Ok(PublishResult {
       success: true,

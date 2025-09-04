@@ -64,12 +64,10 @@ fn default_validation_retry_delay_seconds() -> u64 {
 pub struct WatchedTable {
   pub name: String,
   pub change_column: String, // The column to monitor for changes (e.g., "last_block_height")
-  pub primary_key_column: String, // The primary key column (e.g., "id", "address", "pubkey")
 
   // Query specification - can be either a named query or inline SQL
   #[serde(flatten)]
   pub query_spec: QuerySpec,
-
   pub hotspot_type: HotspotType,
 }
 
@@ -95,12 +93,31 @@ impl QuerySpec {
     }
   }
 
-  /// Check if query contains required placeholder
+  /// Get a unique identifier for this query specification
+  pub fn get_query_identifier(&self) -> String {
+    match self {
+      QuerySpec::Named { query_name } => query_name.clone(),
+      QuerySpec::Inline { atomic_data_query } => {
+        // Create a hash of the inline query for uniqueness
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        atomic_data_query.hash(&mut hasher);
+        format!("inline_{:x}", hasher.finish())
+      }
+    }
+  }
+
+  /// Check if query contains required placeholders
   pub fn validate_query(&self) -> Result<(), String> {
     let query = self.get_query()?;
 
     if !query.contains("$PRIMARY_KEY") {
       return Err("Query must contain $PRIMARY_KEY placeholder".to_string());
+    }
+
+    if !query.contains("$HOTSPOT_TYPE") {
+      return Err("Query must contain $HOTSPOT_TYPE placeholder".to_string());
     }
 
     Ok(())

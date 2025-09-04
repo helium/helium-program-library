@@ -70,21 +70,28 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
             transaction,
           });
 
-          await RewardsRecipient.upsert(
-            {
-              asset: account.asset,
-              owner: newDestination,
-              destination: newDestination,
-              shares: 100,
-              totalShares: 100,
-              fixedAmount: 0,
-              entityKey: kta?.entityKey,
-              encodedEntityKey: kta?.encodedEntityKey,
-              keySerialization: kta?.keySerialization,
-              type: "direct",
-            },
-            { transaction }
-          );
+          // Only create the rewards recipient if we have the required KeyToAsset data
+          if (kta && kta.entityKey && kta.keySerialization) {
+            await RewardsRecipient.upsert(
+              {
+                asset: account.asset,
+                owner: newDestination,
+                destination: newDestination,
+                shares: 100,
+                totalShares: 100,
+                fixedAmount: 0,
+                entityKey: kta.entityKey,
+                encodedEntityKey: kta.encodedEntityKey,
+                keySerialization: kta.keySerialization,
+                type: "direct",
+              },
+              { transaction }
+            );
+          } else {
+            console.warn(
+              `Skipping RewardsRecipient creation for asset ${account.asset} - missing KeyToAsset data`
+            );
+          }
         }
 
         return account;

@@ -82,6 +82,10 @@ impl ProtobufBuilder {
     data: &Value,
   ) -> Result<MobileHotspotUpdateV1, AtomicDataError> {
     debug!("Building mobile hotspot update from data: {}", data);
+    debug!(
+      "Available keys in data: {:?}",
+      data.as_object().map(|obj| obj.keys().collect::<Vec<_>>())
+    );
 
     let block_height = Self::extract_u64(data, "block_height").unwrap_or(0);
     let block_time_seconds = Self::extract_u64(data, "block_time_seconds")
@@ -101,7 +105,6 @@ impl ProtobufBuilder {
     {
       Some(mobile_hotspot_update_v1::RewardsDestination::RewardsRecipient(rewards_recipient))
     } else {
-      warn!("No rewards destination found in data");
       None
     };
 
@@ -141,7 +144,6 @@ impl ProtobufBuilder {
         rewards_recipient,
       ))
     } else {
-      warn!("No rewards destination found in data");
       None
     };
 
@@ -194,7 +196,6 @@ impl ProtobufBuilder {
 
   fn build_entity_owner_info(data: &Value) -> Result<EntityOwnerInfo, AtomicDataError> {
     let wallet = Self::extract_solana_pub_key(data, "owner")?;
-
     let owner_type = Self::extract_string(data, "owner_type")
       .and_then(|s| Self::parse_entity_owner_type(&s))
       .unwrap_or(EntityOwnerType::DirectOwner);
@@ -206,8 +207,8 @@ impl ProtobufBuilder {
   }
 
   fn try_build_rewards_split(data: &Value) -> Result<Option<RewardsSplitV1>, AtomicDataError> {
-    // Check if rewards split data exists
-    if let Some(split_data) = data.get("rewards_split") {
+    // Check if rewards split data exists and is not null
+    if let Some(split_data) = data.get("rewards_split").filter(|v| !v.is_null()) {
       let pub_key = Self::extract_solana_pub_key(split_data, "pub_key")?;
       let schedule = Self::extract_string(split_data, "schedule").unwrap_or_default();
       let total_shares = Self::extract_u32(split_data, "total_shares").unwrap_or(100);
@@ -255,17 +256,34 @@ impl ProtobufBuilder {
   }
 
   fn extract_helium_pub_key(data: &Value, key: &str) -> Result<HeliumPubKey, AtomicDataError> {
+    debug!(
+      "Looking for helium pub key '{}' in data. Available keys: {:?}",
+      key,
+      data.as_object().map(|obj| obj.keys().collect::<Vec<_>>())
+    );
+    debug!("Value at key '{}': {:?}", key, data.get(key));
+
     let key_str = Self::extract_string(data, key)
       .ok_or_else(|| AtomicDataError::InvalidData(format!("Missing helium pub key: {}", key)))?;
 
     let decoded = bs58::decode(&key_str).into_vec().map_err(|e| {
-      AtomicDataError::InvalidData(format!("Invalid base58 helium pub key {}: {}", key, e))
+      AtomicDataError::InvalidData(format!(
+        "Invalid base58 helium pub key {} (value: '{}'): {}",
+        key, key_str, e
+      ))
     })?;
 
     Ok(HeliumPubKey { value: decoded })
   }
 
   fn extract_solana_pub_key(data: &Value, key: &str) -> Result<SolanaPubKey, AtomicDataError> {
+    debug!(
+      "Looking for solana pub key '{}' in data. Available keys: {:?}",
+      key,
+      data.as_object().map(|obj| obj.keys().collect::<Vec<_>>())
+    );
+    debug!("Value at key '{}': {:?}", key, data.get(key));
+
     let key_str = Self::extract_string(data, key)
       .ok_or_else(|| AtomicDataError::InvalidData(format!("Missing solana pub key: {}", key)))?;
 
@@ -331,11 +349,11 @@ impl ProtobufBuilder {
   }
 
   fn parse_mobile_device_type(device_type_str: &str) -> Option<MobileHotspotDeviceType> {
-    match device_type_str.to_lowercase().as_str() {
+    match device_type_str {
+      "wifiIndoor" => Some(MobileHotspotDeviceType::WifiIndoor),
+      "wifiOutdoor" => Some(MobileHotspotDeviceType::WifiOutdoor),
+      "wifiDataOnly" => Some(MobileHotspotDeviceType::WifiDataOnly),
       "cbrs" => Some(MobileHotspotDeviceType::Cbrs),
-      "wifi_indoor" | "wifi-indoor" => Some(MobileHotspotDeviceType::WifiIndoor),
-      "wifi_outdoor" | "wifi-outdoor" => Some(MobileHotspotDeviceType::WifiOutdoor),
-      "wifi_data_only" | "wifi-data-only" => Some(MobileHotspotDeviceType::WifiDataOnly),
       _ => {
         warn!("Unknown mobile device type: {}", device_type_str);
         None
@@ -345,8 +363,8 @@ impl ProtobufBuilder {
 
   fn parse_entity_owner_type(owner_type_str: &str) -> Option<EntityOwnerType> {
     match owner_type_str.to_lowercase().as_str() {
-      "direct_owner" | "direct-owner" => Some(EntityOwnerType::DirectOwner),
-      "welcome_pack_owner" | "welcome-pack-owner" => Some(EntityOwnerType::WelcomePackOwner),
+      "directOwner" | "direct_owner" => Some(EntityOwnerType::DirectOwner),
+      "welcomePackOwner" | "welcome_pack_owner" => Some(EntityOwnerType::WelcomePackOwner),
       _ => {
         warn!("Unknown entity owner type: {}", owner_type_str);
         None
@@ -438,7 +456,14 @@ mod tests {
       atomic_data: json!([data]),
     };
 
-    let keypair = Keypair::generate();
+    let keypair = Keypair::generate_from_entropy(
+      helium_crypto::KeyTag {
+        network: helium_crypto::Network::MainNet,
+        key_type: helium_crypto::KeyType::Ed25519,
+      },
+      &[1u8; 32], // Use non-zero entropy for testing
+    )
+    .unwrap();
     let result = ProtobufBuilder::build_mobile_hotspot_update(&change, &keypair);
 
     assert!(result.is_ok());

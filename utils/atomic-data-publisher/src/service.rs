@@ -286,7 +286,7 @@ impl AtomicDataPublisher {
     let query_start = Instant::now();
     let changes = self
       .database
-      .get_pending_changes(self.config.service.batch_size)
+      .get_all_pending_changes()
       .await?;
     let query_time = query_start.elapsed();
     self.metrics.record_database_query(true, query_time).await;
@@ -296,35 +296,40 @@ impl AtomicDataPublisher {
       return Ok(());
     }
 
-    info!("Processing {} pending changes", changes.len());
-    self
-      .metrics
-      .increment_changes_processed(changes.len() as u64);
+    info!("Processing {} pending changes in batches of {}", changes.len(), self.config.service.batch_size);
 
-    // Record per-table metrics
-    for change in &changes {
-      self
-        .metrics
-        .record_table_change_detected(&change.table_name)
-        .await;
-    }
+    // Process all changes in batches
+    let mut total_published = 0;
+    let batch_size = self.config.service.batch_size as usize;
 
-    // Publish changes in batches to avoid overwhelming the ingestor
-    let mut published_changes = Vec::new();
-    let mut failed_changes = Vec::new();
+    for (batch_index, batch) in changes.chunks(batch_size).enumerate() {
+      info!("Processing batch {}: {} changes", batch_index + 1, batch.len());
 
-    // Process changes with concurrency limit
-    let semaphore = Arc::new(tokio::sync::Semaphore::new(
-      self.config.service.max_concurrent_publishes as usize,
-    ));
-    let mut tasks = Vec::new();
+      let batch_start = Instant::now();
+      let mut published_changes = Vec::new();
+      let mut failed_changes = Vec::new();
 
-         for change in changes {
-       let publisher = self.publisher.clone();
-       let metrics = self.metrics.clone();
-       let semaphore = semaphore.clone();
+      // Record per-table metrics for this batch
+      for change in batch {
+        self
+          .metrics
+          .record_table_change_detected(&change.table_name)
+          .await;
+      }
 
-       let task = tokio::spawn(async move {
+      // Process batch with concurrency limit
+      let semaphore = Arc::new(tokio::sync::Semaphore::new(
+        self.config.service.max_concurrent_publishes as usize,
+      ));
+      let mut tasks = Vec::new();
+
+      for change in batch {
+        let change = change.clone(); // Clone the change record for the async task
+        let publisher = self.publisher.clone();
+        let metrics = self.metrics.clone();
+        let semaphore = semaphore.clone();
+
+        let task = tokio::spawn(async move {
          let _permit = semaphore.acquire().await.unwrap();
          let publish_start = Instant::now();
 
@@ -371,48 +376,42 @@ impl AtomicDataPublisher {
       }
     }
 
-    // Mark successfully published changes as processed
-    if !published_changes.is_empty() {
-      match self
-        .database
-        .mark_changes_processed(&published_changes)
-        .await
-      {
-        Ok(_) => {
-          info!("Marked {} changes as processed", published_changes.len());
-          self
-            .metrics
-            .increment_changes_published(published_changes.len() as u64);
+      // Mark successfully published changes as processed (update polling state)
+      if !published_changes.is_empty() {
+        match self
+          .database
+          .mark_changes_processed(&published_changes)
+          .await
+        {
+          Ok(_) => {
+            total_published += published_changes.len();
+            let batch_time = batch_start.elapsed();
+            info!(
+              "Batch processing completed in {:?}: {} published, {} failed",
+              batch_time, published_changes.len(), failed_changes.len()
+            );
+            self
+              .metrics
+              .increment_changes_published(published_changes.len() as u64);
+            self.metrics.record_batch_processing_time(batch_time).await;
+          }
+          Err(e) => {
+            error!("Failed to mark batch changes as processed: {}", e);
+            self
+              .metrics
+              .record_database_query(false, Duration::from_millis(0))
+              .await;
+            return Err(AtomicDataError::DatabaseError(e.to_string()));
+          }
         }
-        Err(e) => {
-          error!("Failed to mark changes as processed: {}", e);
-          self
-            .metrics
-            .record_database_query(false, Duration::from_millis(0))
-            .await;
-          return Err(AtomicDataError::DatabaseError(e.to_string()));
-        }
+      }
+
+      if !failed_changes.is_empty() {
+        warn!("Batch had {} failed changes", failed_changes.len());
       }
     }
 
-    // Log summary
-    let batch_time = batch_start.elapsed();
-    self.metrics.record_batch_processing_time(batch_time).await;
-
-    if !failed_changes.is_empty() {
-      warn!(
-        "Batch processing completed in {:?}: {} published, {} failed",
-        batch_time,
-        published_changes.len(),
-        failed_changes.len()
-      );
-    } else {
-      info!(
-        "Batch processing completed in {:?}: {} published",
-        batch_time,
-        published_changes.len()
-      );
-    }
+    info!("Completed processing all batches: {} total changes published", total_published);
 
     Ok(())
   }
