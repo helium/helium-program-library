@@ -201,31 +201,6 @@ impl AtomicDataPublisher {
     };
     handles.push(metrics_handle);
 
-    // Cleanup loop (run daily)
-    let cleanup_handle = {
-      let database = self.database.clone();
-      let mut shutdown_signal = self.shutdown_signal.clone();
-      tokio::spawn(async move {
-        let mut interval = interval(Duration::from_secs(24 * 60 * 60)); // Daily
-        loop {
-          tokio::select! {
-              _ = interval.tick() => {
-                  if let Err(e) = database.cleanup_old_changes(7).await {
-                      error!("Failed to cleanup old changes: {}", e);
-                  }
-              }
-              _ = shutdown_signal.changed() => {
-                  if *shutdown_signal.borrow() {
-                      info!("Shutting down cleanup task");
-                      break;
-                  }
-              }
-          }
-        }
-      })
-    };
-    handles.push(cleanup_handle);
-
     // Health check loop
     let health_handle = {
       let service = self.clone();
@@ -233,6 +208,7 @@ impl AtomicDataPublisher {
         service.health_check_loop().await;
       })
     };
+
     handles.push(health_handle);
 
     // Wait for shutdown signal or any task to complete
@@ -502,12 +478,6 @@ impl AtomicDataPublisher {
   pub async fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
     let circuit_breaker_status = None; // No circuit breaker in simplified publisher
     self.metrics.get_metrics(circuit_breaker_status).await
-  }
-
-  /// Get status of all polling jobs
-  pub async fn get_job_statuses(&self) -> Result<Vec<(String, String, bool, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>> {
-    self.database.get_job_statuses().await
-      .map_err(|e| anyhow::anyhow!("Failed to get job statuses: {}", e))
   }
 
   /// Gracefully shutdown the service

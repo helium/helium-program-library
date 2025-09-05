@@ -31,10 +31,6 @@ enum Commands {
   Serve,
   /// Create performance indexes for better query performance
   CreateIndexes,
-  /// Show status of all polling jobs
-  JobStatus,
-  /// Force cleanup all running job states (admin function)
-  ForceCleanup,
 }
 
 #[tokio::main]
@@ -57,8 +53,6 @@ async fn main() -> Result<()> {
   match cli.command {
     Commands::Serve => run_service().await,
     Commands::CreateIndexes => create_indexes().await,
-    Commands::JobStatus => show_job_status().await,
-    Commands::ForceCleanup => force_cleanup().await,
   }
 }
 
@@ -163,99 +157,6 @@ async fn create_indexes() -> Result<()> {
   }
 
   info!("✅ Performance indexes created successfully");
-  Ok(())
-}
-
-async fn show_job_status() -> Result<()> {
-  info!("Showing job status for Atomic Data Publisher");
-
-  // Load configuration
-  let settings = match Settings::new() {
-    Ok(s) => s,
-    Err(e) => {
-      error!("Failed to load configuration: {}", e);
-      std::process::exit(1);
-    }
-  };
-
-  // Create database client
-  let database = match database::DatabaseClient::new(&settings.database, settings.service.polling_jobs).await {
-    Ok(db) => db,
-    Err(e) => {
-      error!("Failed to create database client: {}", e);
-      std::process::exit(1);
-    }
-  };
-
-  // Get job statuses
-  match database.get_job_statuses().await {
-    Ok(statuses) => {
-      println!("\n📊 Polling Job Status:");
-      println!("┌─────────────────────────────────┬─────────────────────────┬─────────┬─────────────────────┬──────────────────────────────────┐");
-      println!("│ Job Name                        │ Query Name              │ Running │ Running Since       │ Process ID                       │");
-      println!("├─────────────────────────────────┼─────────────────────────┼─────────┼─────────────────────┼──────────────────────────────────┤");
-
-      for (job_name, query_name, is_running, running_since, process_id) in statuses {
-        let status = if is_running { "✅ YES" } else { "❌ NO" };
-        let since_str = running_since
-          .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-          .unwrap_or_else(|| "-".to_string());
-        let process_str = process_id.unwrap_or_else(|| "-".to_string());
-
-        println!(
-          "│ {:<31} │ {:<23} │ {:<7} │ {:<19} │ {:<32} │",
-          job_name, query_name, status, since_str, process_str
-        );
-      }
-
-      println!("└─────────────────────────────────┴─────────────────────────┴─────────┴─────────────────────┴──────────────────────────────────┘");
-      println!();
-    }
-    Err(e) => {
-      error!("Failed to get job statuses: {}", e);
-      std::process::exit(1);
-    }
-  }
-
-  Ok(())
-}
-
-async fn force_cleanup() -> Result<()> {
-  info!("Force cleaning up all running job states");
-
-  // Load configuration
-  let settings = match Settings::new() {
-    Ok(s) => s,
-    Err(e) => {
-      error!("Failed to load configuration: {}", e);
-      std::process::exit(1);
-    }
-  };
-
-  // Create database client
-  let database = match database::DatabaseClient::new(&settings.database, settings.service.polling_jobs).await {
-    Ok(db) => db,
-    Err(e) => {
-      error!("Failed to create database client: {}", e);
-      std::process::exit(1);
-    }
-  };
-
-  // Force cleanup all running states
-  match database.force_cleanup_all_running_states().await {
-    Ok(count) => {
-      if count > 0 {
-        info!("✅ Force cleaned up {} running job states", count);
-      } else {
-        info!("✅ No running job states found to cleanup");
-      }
-    }
-    Err(e) => {
-      error!("Failed to force cleanup running states: {}", e);
-      std::process::exit(1);
-    }
-  }
-
   Ok(())
 }
 
