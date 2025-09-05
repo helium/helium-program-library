@@ -97,6 +97,9 @@ impl DatabaseClient {
         last_processed_block_height BIGINT NOT NULL DEFAULT 0,
         last_poll_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        is_running BOOLEAN NOT NULL DEFAULT FALSE,
+        running_since TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+        process_id VARCHAR(255) DEFAULT NULL,
         PRIMARY KEY (job_name, query_name)
       )
     "#;
@@ -317,6 +320,37 @@ impl DatabaseClient {
 
   /// Poll for changes in a specific polling job
   async fn poll_job_changes(&self, job: &PollingJob, current_solana_height: u64) -> Result<Vec<ChangeRecord>> {
+    // Check if this job is already running
+    if self.is_job_running(&job.name, &job.query_name).await? {
+      debug!(
+        "Job '{}' query '{}' is already running, skipping this poll cycle",
+        job.name, job.query_name
+      );
+      return Ok(vec![]);
+    }
+
+    // Try to mark this job as running
+    if !self.mark_job_running(&job.name, &job.query_name).await? {
+      debug!(
+        "Failed to mark job '{}' query '{}' as running (race condition), skipping this poll cycle",
+        job.name, job.query_name
+      );
+      return Ok(vec![]);
+    }
+
+    // Execute the actual polling logic and ensure cleanup on exit
+    let result = self.execute_job_polling(job, current_solana_height).await;
+
+    // Always mark job as not running, regardless of success or failure
+    if let Err(e) = self.mark_job_not_running(&job.name, &job.query_name).await {
+      warn!("Failed to mark job '{}' query '{}' as not running: {}", job.name, job.query_name, e);
+    }
+
+    result
+  }
+
+  /// Execute the actual polling logic for a job (internal method)
+  async fn execute_job_polling(&self, job: &PollingJob, current_solana_height: u64) -> Result<Vec<ChangeRecord>> {
     // Get current polling state from database
     let current_state_row = sqlx::query(
       r#"
@@ -447,5 +481,219 @@ impl DatabaseClient {
     // State is maintained in memory and resets on service restart
     debug!("Cleanup called - no tracking tables to clean with polling approach");
     Ok(())
+  }
+
+  /// Check if a job is currently running
+  pub async fn is_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
+    let row = sqlx::query(
+      r#"
+      SELECT is_running, running_since, process_id
+      FROM atomic_data_polling_state
+      WHERE job_name = $1 AND query_name = $2
+      "#
+    )
+    .bind(job_name)
+    .bind(query_name)
+    .fetch_optional(&self.pool)
+    .await?;
+
+    if let Some(row) = row {
+      let is_running: bool = row.get("is_running");
+      let running_since: Option<DateTime<Utc>> = row.get("running_since");
+      let process_id: Option<String> = row.get("process_id");
+
+      if is_running {
+        // Check if the job has been running for too long (stale state)
+        if let Some(since) = running_since {
+          let stale_threshold = chrono::Utc::now() - chrono::Duration::minutes(30);
+          if since < stale_threshold {
+            warn!(
+              "Job '{}' query '{}' appears to be stale (running since {}), marking as not running",
+              job_name, query_name, since
+            );
+            self.mark_job_not_running(job_name, query_name).await?;
+            return Ok(false);
+          }
+        }
+
+        debug!(
+          "Job '{}' query '{}' is currently running (since: {:?}, process: {:?})",
+          job_name, query_name, running_since, process_id
+        );
+        return Ok(true);
+      }
+    }
+
+    Ok(false)
+  }
+
+  /// Mark a job as running
+  pub async fn mark_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
+    let process_id = format!("{}:{}", std::process::id(), uuid::Uuid::new_v4());
+
+    // Use a transaction to atomically check and set running state
+    let mut tx = self.pool.begin().await?;
+
+    // Check if already running
+    let existing = sqlx::query(
+      r#"
+      SELECT is_running
+      FROM atomic_data_polling_state
+      WHERE job_name = $1 AND query_name = $2
+      FOR UPDATE
+      "#
+    )
+    .bind(job_name)
+    .bind(query_name)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    if let Some(row) = existing {
+      let is_running: bool = row.get("is_running");
+      if is_running {
+        // Job is already running, rollback and return false
+        tx.rollback().await?;
+        debug!("Job '{}' query '{}' is already running", job_name, query_name);
+        return Ok(false);
+      }
+    }
+
+    // Mark as running
+    let result = sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        is_running = TRUE,
+        running_since = NOW(),
+        process_id = $3,
+        updated_at = NOW()
+      WHERE job_name = $1 AND query_name = $2
+      "#
+    )
+    .bind(job_name)
+    .bind(query_name)
+    .bind(&process_id)
+    .execute(&mut *tx)
+    .await?;
+
+    if result.rows_affected() > 0 {
+      tx.commit().await?;
+      info!(
+        "Marked job '{}' query '{}' as running with process_id: {}",
+        job_name, query_name, process_id
+      );
+      Ok(true)
+    } else {
+      tx.rollback().await?;
+      warn!(
+        "Failed to mark job '{}' query '{}' as running - job not found",
+        job_name, query_name
+      );
+      Ok(false)
+    }
+  }
+
+  /// Mark a job as not running
+  pub async fn mark_job_not_running(&self, job_name: &str, query_name: &str) -> Result<()> {
+    sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        is_running = FALSE,
+        running_since = NULL,
+        process_id = NULL,
+        updated_at = NOW()
+      WHERE job_name = $1 AND query_name = $2
+      "#
+    )
+    .bind(job_name)
+    .bind(query_name)
+    .execute(&self.pool)
+    .await?;
+
+    debug!("Marked job '{}' query '{}' as not running", job_name, query_name);
+    Ok(())
+  }
+
+  /// Cleanup stale running states on startup
+  pub async fn cleanup_stale_running_states(&self) -> Result<()> {
+    let stale_threshold = chrono::Utc::now() - chrono::Duration::minutes(30);
+
+    let result = sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        is_running = FALSE,
+        running_since = NULL,
+        process_id = NULL,
+        updated_at = NOW()
+      WHERE is_running = TRUE
+        AND (running_since IS NULL OR running_since < $1)
+      "#
+    )
+    .bind(stale_threshold)
+    .execute(&self.pool)
+    .await?;
+
+    if result.rows_affected() > 0 {
+      info!("Cleaned up {} stale running job states", result.rows_affected());
+    }
+
+    Ok(())
+  }
+
+  /// Get status of all polling jobs (running/not running)
+  pub async fn get_job_statuses(&self) -> Result<Vec<(String, String, bool, Option<DateTime<Utc>>, Option<String>)>> {
+    let rows = sqlx::query(
+      r#"
+      SELECT
+        job_name,
+        query_name,
+        is_running,
+        running_since,
+        process_id
+      FROM atomic_data_polling_state
+      ORDER BY job_name, query_name
+      "#
+    )
+    .fetch_all(&self.pool)
+    .await?;
+
+    let mut statuses = Vec::new();
+    for row in rows {
+      let job_name: String = row.get("job_name");
+      let query_name: String = row.get("query_name");
+      let is_running: bool = row.get("is_running");
+      let running_since: Option<DateTime<Utc>> = row.get("running_since");
+      let process_id: Option<String> = row.get("process_id");
+
+      statuses.push((job_name, query_name, is_running, running_since, process_id));
+    }
+
+    Ok(statuses)
+  }
+
+  /// Force cleanup of all running states (admin function)
+  pub async fn force_cleanup_all_running_states(&self) -> Result<u64> {
+    let result = sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        is_running = FALSE,
+        running_since = NULL,
+        process_id = NULL,
+        updated_at = NOW()
+      WHERE is_running = TRUE
+      "#
+    )
+    .execute(&self.pool)
+    .await?;
+
+    let rows_affected = result.rows_affected();
+    if rows_affected > 0 {
+      warn!("Force cleaned up {} running job states", rows_affected);
+    }
+
+    Ok(rows_affected)
   }
 }

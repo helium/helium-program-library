@@ -139,6 +139,12 @@ The Atomic Data Publisher now supports multiple commands:
 # Create performance indexes (run once before first use)
 ./atomic-data-publisher create-indexes
 
+# Show status of all polling jobs
+./atomic-data-publisher job-status
+
+# Force cleanup all running job states (admin function)
+./atomic-data-publisher force-cleanup
+
 # Show help
 ./atomic-data-publisher --help
 ```

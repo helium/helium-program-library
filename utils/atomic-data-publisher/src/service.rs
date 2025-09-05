@@ -98,6 +98,9 @@ impl AtomicDataPublisher {
     // Initialize polling state for all configured jobs
     database.initialize_polling_state().await?;
 
+    // Cleanup any stale running states from previous runs
+    database.cleanup_stale_running_states().await?;
+
     // Create performance indexes for better query performance
     if let Err(e) = database.create_performance_indexes().await {
       warn!("Failed to create performance indexes (this is non-fatal): {}", e);
@@ -499,6 +502,12 @@ impl AtomicDataPublisher {
   pub async fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
     let circuit_breaker_status = None; // No circuit breaker in simplified publisher
     self.metrics.get_metrics(circuit_breaker_status).await
+  }
+
+  /// Get status of all polling jobs
+  pub async fn get_job_statuses(&self) -> Result<Vec<(String, String, bool, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>> {
+    self.database.get_job_statuses().await
+      .map_err(|e| anyhow::anyhow!("Failed to get job statuses: {}", e))
   }
 
   /// Gracefully shutdown the service
