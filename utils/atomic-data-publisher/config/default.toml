@@ -5,14 +5,29 @@ username = "postgres"
 password = "postgres"
 database_name = "helium"
 max_connections =  10
-min_connections =2
-acquire_timeout_seconds = 30
-idle_timeout_seconds = 600
+min_connections = 2
+acquire_timeout_seconds = 60
+idle_timeout_seconds = 700
 max_lifetime_seconds = 1800
+
+# Required tables that must exist before starting
+required_tables = [
+  "asset_owners",
+  "key_to_assets",
+  "recipients",
+  "welcome_packs",
+  "rewards_recipients",
+  "mini_fanouts"
+]
 
 # Signing keypair settings
 [signing]
 keypair_path = "/app/keypair.bin"  # Path to Helium keypair file
+
+# Solana RPC settings
+[solana]
+rpc_url = "https://api.mainnet-beta.solana.com"
+timeout_seconds = 30
 
 [ingestor]
 grpc_endpoint = "http://localhost:8080"
@@ -35,19 +50,17 @@ validation_retry_delay_seconds = 30    # Delay between validation retries
 # Performance settings
 # batch_size controls both database scanning and publishing batch size
 
-# Mobile hotspot infos table
-[[service.watched_tables]]
-name = "mobile_hotspot_infos"
-change_column = "last_block_height"
-hotspot_type = "mobile"
-query_name = "construct_atomic_hotspot"
+# Polling jobs configuration - each job runs a predefined query with parameters
+[[service.polling_jobs]]
+name = "atomic_mobile_hotspots"
+query_name = "construct_atomic_hotspots"
+parameters = { hotspot_type = "mobile" }
 
-# IoT hotspot infos table (commented out by default)
-#[[service.watched_tables]]
-#name = "iot_hotspot_infos"
-#change_column = "last_block_height"
-#hotspot_type = "iot"
-#query_name = "construct_atomic_hotspot"
+# IoT hotspot atomic data job (commented out by default)
+#[[service.polling_jobs]]
+#name = "atomic_iot_hotspots"
+#query_name = "construct_atomic_hotspots"
+#parameters = { hotspot_type = "iot" }
 
 [logging]
 level = "info"

@@ -5,6 +5,7 @@ use std::time::Duration;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
   pub database: DatabaseConfig,
+  pub solana: SolanaConfig,
   pub ingestor: IngestorConfig,
   pub service: ServiceConfig,
   pub logging: LoggingConfig,
@@ -22,6 +23,13 @@ pub struct DatabaseConfig {
   pub acquire_timeout_seconds: u64,
   pub idle_timeout_seconds: u64,
   pub max_lifetime_seconds: u64,
+  pub required_tables: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct SolanaConfig {
+  pub rpc_url: String,
+  pub timeout_seconds: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -39,7 +47,7 @@ pub struct ServiceConfig {
   pub batch_size: u32,
   pub max_concurrent_publishes: u32,
   pub health_check_port: u16,
-  pub watched_tables: Vec<WatchedTable>,
+  pub polling_jobs: Vec<PollingJob>,
   #[serde(default = "default_fail_on_missing_tables")]
   pub fail_on_missing_tables: bool,
   #[serde(default = "default_validation_retry_attempts")]
@@ -61,75 +69,10 @@ fn default_validation_retry_delay_seconds() -> u64 {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct WatchedTable {
-  pub name: String,
-  pub change_column: String, // The column to monitor for changes (e.g., "last_block_height")
-
-  // Query specification - can be either a named query or inline SQL
-  #[serde(flatten)]
-  pub query_spec: QuerySpec,
-  pub hotspot_type: HotspotType,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum QuerySpec {
-  /// Reference to a named query from the queries module
-  Named { query_name: String },
-  /// Inline SQL query (for custom queries)
-  Inline { atomic_data_query: String },
-}
-
-impl QuerySpec {
-  /// Get the actual SQL query string
-  pub fn get_query(&self) -> Result<String, String> {
-    match self {
-      QuerySpec::Named { query_name } => {
-        crate::queries::AtomicHotspotQueries::get_query(query_name)
-          .map(|q| q.to_string())
-          .ok_or_else(|| format!("Unknown query name: {}", query_name))
-      }
-      QuerySpec::Inline { atomic_data_query } => Ok(atomic_data_query.clone()),
-    }
-  }
-
-  /// Get a unique identifier for this query specification
-  pub fn get_query_identifier(&self) -> String {
-    match self {
-      QuerySpec::Named { query_name } => query_name.clone(),
-      QuerySpec::Inline { atomic_data_query } => {
-        // Create a hash of the inline query for uniqueness
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut hasher = DefaultHasher::new();
-        atomic_data_query.hash(&mut hasher);
-        format!("inline_{:x}", hasher.finish())
-      }
-    }
-  }
-
-  /// Check if query contains required placeholders
-  pub fn validate_query(&self) -> Result<(), String> {
-    let query = self.get_query()?;
-
-    if !query.contains("$PRIMARY_KEY") {
-      return Err("Query must contain $PRIMARY_KEY placeholder".to_string());
-    }
-
-    if !query.contains("$HOTSPOT_TYPE") {
-      return Err("Query must contain $HOTSPOT_TYPE placeholder".to_string());
-    }
-
-    Ok(())
-  }
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub enum HotspotType {
-  #[serde(rename = "mobile")]
-  Mobile,
-  #[serde(rename = "iot")]
-  Iot,
+pub struct PollingJob {
+  pub name: String, // Unique identifier for polling state tracking (e.g., "atomic_mobile_hotspots")
+  pub query_name: String, // Name of predefined query to execute
+  pub parameters: serde_json::Value, // JSON object containing query parameters
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -199,6 +142,18 @@ impl Default for Settings {
         acquire_timeout_seconds: 30,
         idle_timeout_seconds: 600,
         max_lifetime_seconds: 1800,
+        required_tables: vec![
+          "asset_owners".to_string(),
+          "key_to_assets".to_string(),
+          "recipients".to_string(),
+          "welcome_packs".to_string(),
+          "rewards_recipients".to_string(),
+          "mini_fanouts".to_string(),
+        ],
+      },
+      solana: SolanaConfig {
+        rpc_url: "https://api.mainnet-beta.solana.com".to_string(),
+        timeout_seconds: 30,
       },
       ingestor: IngestorConfig {
         grpc_endpoint: "http://localhost:8080".to_string(),
@@ -212,7 +167,7 @@ impl Default for Settings {
         batch_size: 100,
         max_concurrent_publishes: 5,
         health_check_port: 3000,
-        watched_tables: vec![],
+        polling_jobs: vec![],
         fail_on_missing_tables: true,
         validation_retry_attempts: 3,
         validation_retry_delay_seconds: 30,

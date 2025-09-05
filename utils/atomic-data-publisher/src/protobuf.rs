@@ -12,7 +12,7 @@ use prost::Message;
 use serde_json::Value;
 use tracing::{debug, warn};
 
-use crate::config::HotspotType;
+// HotspotType removed - using string literals directly
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
 
@@ -362,9 +362,9 @@ impl ProtobufBuilder {
   }
 
   fn parse_entity_owner_type(owner_type_str: &str) -> Option<EntityOwnerType> {
-    match owner_type_str.to_lowercase().as_str() {
-      "directOwner" | "direct_owner" => Some(EntityOwnerType::DirectOwner),
-      "welcomePackOwner" | "welcome_pack_owner" => Some(EntityOwnerType::WelcomePackOwner),
+    match owner_type_str {
+      "direct_owner" => Some(EntityOwnerType::DirectOwner),
+      "welcome_pack_owner" => Some(EntityOwnerType::WelcomePackOwner),
       _ => {
         warn!("Unknown entity owner type: {}", owner_type_str);
         None
@@ -396,17 +396,22 @@ impl ProtobufBuilder {
 /// Determine which protobuf message to build based on hotspot type
 pub fn build_hotspot_update_request(
   change: &ChangeRecord,
-  hotspot_type: &HotspotType,
+  hotspot_type: &str,
   keypair: &Keypair,
 ) -> Result<HotspotUpdateRequest, AtomicDataError> {
   match hotspot_type {
-    HotspotType::Mobile => {
+    "mobile" => {
       let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
       Ok(HotspotUpdateRequest::Mobile(req))
     }
-    HotspotType::Iot => {
+    "iot" => {
       let req = ProtobufBuilder::build_iot_hotspot_update(change, keypair)?;
       Ok(HotspotUpdateRequest::Iot(req))
+    }
+    _ => {
+      // Default to mobile for unknown types
+      let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
+      Ok(HotspotUpdateRequest::Mobile(req))
     }
   }
 }

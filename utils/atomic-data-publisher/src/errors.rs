@@ -20,6 +20,9 @@ pub enum AtomicDataError {
   #[error("Timeout error: {0}")]
   Timeout(String),
 
+  #[error("Solana RPC error: {0}")]
+  SolanaRpcError(String),
+
   #[error("Unknown error: {0}")]
   Unknown(String),
 }

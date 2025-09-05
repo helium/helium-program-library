@@ -10,90 +10,98 @@ use crate::database::DatabaseClient;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
 use crate::publisher::AtomicDataPublisher as Publisher;
+use crate::solana_client::SolanaClientWrapper;
 
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
   database: Arc<DatabaseClient>,
   publisher: Arc<Publisher>,
+  solana_client: Arc<SolanaClientWrapper>,
   metrics: Arc<MetricsCollector>,
   config: Settings,
+  current_solana_block_height: Arc<tokio::sync::RwLock<u64>>,
   shutdown_signal: tokio::sync::watch::Receiver<bool>,
   shutdown_sender: tokio::sync::watch::Sender<bool>,
 }
 
 impl AtomicDataPublisher {
+  /// Validate that all required tables exist in the database
+  async fn validate_required_tables(
+    database: &DatabaseClient,
+    required_tables: &[String],
+  ) -> Result<()> {
+    info!("Validating required tables exist: {:?}", required_tables);
+
+    for table_name in required_tables {
+      match database.table_exists(table_name).await {
+        Ok(exists) => {
+          if !exists {
+            return Err(anyhow::anyhow!("Required table '{}' does not exist", table_name));
+          }
+          debug!("✅ Required table '{}' exists", table_name);
+        }
+        Err(e) => {
+          return Err(anyhow::anyhow!("Failed to check if table '{}' exists: {}", table_name, e));
+        }
+      }
+    }
+
+    info!("✅ All required tables validated successfully");
+    Ok(())
+  }
+
   /// Initialize database with table validation and optional retries
   async fn initialize_database_with_validation(
     database: &DatabaseClient,
     service_config: &ServiceConfig,
   ) -> Result<()> {
-    info!("Initializing database with table validation...");
+    info!("Initializing database with polling jobs validation...");
 
     // Create the polling state table first
     database.create_polling_state_table().await?;
 
-    let mut attempt = 1;
-    let max_attempts = service_config.validation_retry_attempts + 1;
-    let retry_delay = Duration::from_secs(service_config.validation_retry_delay_seconds);
-
-    loop {
-      info!("Database validation attempt {} of {}", attempt, max_attempts);
-
-      match database.validate_watched_tables_with_options(service_config.fail_on_missing_tables).await {
-        Ok(valid_tables) => {
-          if valid_tables.len() != service_config.watched_tables.len() {
-            warn!(
-              "Operating with {} of {} configured tables: {}",
-              valid_tables.len(),
-              service_config.watched_tables.len(),
-              valid_tables.join(", ")
-            );
-          }
-
-          // Initialize polling state for valid tables only
-          for table_name in &valid_tables {
-            if let Err(e) = database.initialize_table_polling_state(table_name).await {
-              error!("Failed to initialize polling state for table '{}': {}", table_name, e);
-              if service_config.fail_on_missing_tables {
-                return Err(e);
-              }
-            }
-          }
-
-          info!("✅ Database initialization completed successfully");
-          return Ok(());
-        }
-        Err(e) => {
-          error!("Database validation failed (attempt {}): {}", attempt, e);
-
-          if attempt >= max_attempts {
-            error!("❌ Database validation failed after {} attempts", max_attempts);
-            return Err(e);
-          }
-
-          warn!(
-            "Retrying database validation in {} seconds... (attempt {}/{})",
-            retry_delay.as_secs(),
-            attempt + 1,
-            max_attempts
-          );
-
-          sleep(retry_delay).await;
-          attempt += 1;
-        }
+    // Validate polling jobs configuration
+    if service_config.polling_jobs.is_empty() {
+      warn!("No polling jobs configured - service will not process any changes");
+    } else {
+      info!("Configured {} polling jobs", service_config.polling_jobs.len());
+      for job in &service_config.polling_jobs {
+        info!("  Job '{}' using query '{}'", job.name, job.query_name);
       }
     }
+
+    info!("✅ Database initialization completed successfully");
+    Ok(())
   }
 
   pub async fn new(config: Settings) -> Result<Self> {
     info!("Initializing Atomic Data Publisher service");
 
+    // Initialize Solana RPC client first
+    let solana_client = Arc::new(SolanaClientWrapper::new(config.solana.clone())?);
+
+    // Get initial Solana block height
+    let initial_block_height = solana_client.get_current_block_height().await
+      .map_err(|e| anyhow::anyhow!("Failed to get initial Solana block height: {}", e))?;
+    let current_solana_block_height = Arc::new(tokio::sync::RwLock::new(initial_block_height));
+
     // Initialize database client
     let database =
-      Arc::new(DatabaseClient::new(&config.database, config.service.watched_tables.clone()).await?);
+      Arc::new(DatabaseClient::new(&config.database, config.service.polling_jobs.clone()).await?);
+
+    // Validate required tables exist
+    Self::validate_required_tables(&database, &config.database.required_tables).await?;
 
     // Initialize polling state with table validation and optional retries
     Self::initialize_database_with_validation(&database, &config.service).await?;
+
+    // Initialize polling state for all configured jobs
+    database.initialize_polling_state().await?;
+
+    // Create performance indexes for better query performance
+    if let Err(e) = database.create_performance_indexes().await {
+      warn!("Failed to create performance indexes (this is non-fatal): {}", e);
+    }
 
     // Load keypair for signing messages
     let keypair_path = std::env::var("ATOMIC_DATA_PUBLISHER_SIGNING_KEYPAIR_PATH")
@@ -127,7 +135,7 @@ impl AtomicDataPublisher {
     // Initialize publisher client
     let publisher = Arc::new(Publisher::new(
       config.ingestor.clone(),
-      config.service.watched_tables.clone(),
+      config.service.polling_jobs.clone(),
       keypair,
     ).await?);
 
@@ -140,8 +148,10 @@ impl AtomicDataPublisher {
     Ok(Self {
       database,
       publisher,
+      solana_client,
       metrics,
       config,
+      current_solana_block_height,
       shutdown_signal,
       shutdown_sender,
     })
@@ -222,6 +232,15 @@ impl AtomicDataPublisher {
     };
     handles.push(health_handle);
 
+    // Solana block height update loop
+    let solana_update_handle = {
+      let service = self.clone();
+      tokio::spawn(async move {
+        service.solana_block_height_update_loop().await;
+      })
+    };
+    handles.push(solana_update_handle);
+
     // Wait for shutdown signal or any task to complete
     let mut shutdown_signal = self.shutdown_signal.clone();
     tokio::select! {
@@ -280,13 +299,19 @@ impl AtomicDataPublisher {
 
   /// Process pending changes from the database
   async fn process_changes(&self) -> Result<(), AtomicDataError> {
-    let batch_start = Instant::now();
+    let _batch_start = Instant::now();
 
-    // Get pending changes
+    // Get current Solana block height
+    let current_solana_height = {
+      let height = self.current_solana_block_height.read().await;
+      *height
+    };
+
+    // Get pending changes from polling jobs
     let query_start = Instant::now();
     let changes = self
       .database
-      .get_all_pending_changes()
+      .get_all_polling_job_changes(current_solana_height)
       .await?;
     let query_time = query_start.elapsed();
     self.metrics.record_database_query(true, query_time).await;
@@ -380,7 +405,7 @@ impl AtomicDataPublisher {
       if !published_changes.is_empty() {
         match self
           .database
-          .mark_changes_processed(&published_changes)
+          .mark_changes_processed(&published_changes, current_solana_height)
           .await
         {
           Ok(_) => {
@@ -438,6 +463,37 @@ impl AtomicDataPublisher {
     }
   }
 
+  /// Solana block height update loop - updates every 60 seconds
+  async fn solana_block_height_update_loop(&self) {
+    let mut interval = interval(Duration::from_secs(60)); // Update every minute
+    let mut shutdown_signal = self.shutdown_signal.clone();
+
+    loop {
+      tokio::select! {
+          _ = interval.tick() => {
+              match self.solana_client.get_current_block_height().await {
+                  Ok(new_height) => {
+                      let mut current_height = self.current_solana_block_height.write().await;
+                      if *current_height != new_height {
+                          debug!("Updated Solana block height from {} to {}", *current_height, new_height);
+                          *current_height = new_height;
+                      }
+                  }
+                  Err(e) => {
+                      error!("Failed to update Solana block height: {}", e);
+                  }
+              }
+          }
+          _ = shutdown_signal.changed() => {
+              if *shutdown_signal.borrow() {
+                  info!("Shutting down Solana block height update loop");
+                  break;
+              }
+          }
+      }
+    }
+  }
+
   /// Perform health checks on all components
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {
     // Check database connectivity
@@ -452,6 +508,12 @@ impl AtomicDataPublisher {
       return Err(e);
     }
 
+    // Check Solana RPC connectivity
+    if let Err(e) = self.solana_client.health_check().await {
+      error!("Solana RPC health check failed: {}", e);
+      return Err(e);
+    }
+
     debug!("Health check passed");
     Ok(())
   }
@@ -460,11 +522,6 @@ impl AtomicDataPublisher {
   pub async fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
     let circuit_breaker_status = None; // No circuit breaker in simplified publisher
     self.metrics.get_metrics(circuit_breaker_status).await
-  }
-
-  /// Get table validation status for monitoring
-  pub async fn get_table_validation_status(&self) -> Vec<crate::database::TableValidationStatus> {
-    self.database.get_table_validation_status().await
   }
 
   /// Gracefully shutdown the service

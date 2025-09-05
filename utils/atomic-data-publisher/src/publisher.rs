@@ -2,14 +2,12 @@ use anyhow::Result;
 use helium_crypto::Keypair;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use serde_json;
 use chrono;
-use bs58;
 
-use crate::config::{IngestorConfig, WatchedTable};
+use crate::config::{IngestorConfig, PollingJob};
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
-use crate::protobuf::{build_hotspot_update_request, HotspotUpdateRequest};
+use crate::protobuf::build_hotspot_update_request;
 
 #[derive(Debug, Clone)]
 pub struct PublishResult {
@@ -21,17 +19,17 @@ pub struct PublishResult {
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
   config: IngestorConfig,
-  watched_tables: Vec<WatchedTable>,
+  polling_jobs: Vec<PollingJob>,
   keypair: Arc<Keypair>,
 }
 
 impl AtomicDataPublisher {
-  pub async fn new(config: IngestorConfig, watched_tables: Vec<WatchedTable>, keypair: Keypair) -> Result<Self> {
+  pub async fn new(config: IngestorConfig, polling_jobs: Vec<PollingJob>, keypair: Keypair) -> Result<Self> {
     info!("Initializing AtomicDataPublisher for logging protobuf events (no gRPC endpoint)");
 
     Ok(Self {
       config,
-      watched_tables,
+      polling_jobs,
       keypair: Arc::new(keypair),
     })
   }
@@ -85,91 +83,52 @@ impl AtomicDataPublisher {
 
   /// Log a single change record as protobuf event
   async fn publish_single_change(&self, change: &ChangeRecord) -> Result<PublishResult, AtomicDataError> {
-    // Find the table configuration
-    let table_config = self
-      .watched_tables
+    // Find the polling job configuration
+    let job_config = self
+      .polling_jobs
       .iter()
-      .find(|t| t.name == change.table_name)
+      .find(|j| j.name == change.table_name)
       .ok_or_else(|| {
         AtomicDataError::InvalidData(format!(
-          "No configuration found for table: {}",
+          "No configuration found for job: {}",
           change.table_name
         ))
       })?;
 
+    // Extract hotspot_type from job parameters
+    let hotspot_type_str = job_config.parameters.get("hotspot_type")
+      .and_then(|v| v.as_str())
+      .unwrap_or("mobile"); // Default to mobile if not specified
+
     // Build protobuf request with proper signing
-    let hotspot_request = build_hotspot_update_request(
+    let _hotspot_request = build_hotspot_update_request(
       change,
-      &table_config.hotspot_type,
+      hotspot_type_str,
       &self.keypair,
     )?;
 
-    // Log the protobuf message instead of sending it
+    // Log the atomic data event instead of sending to gRPC
     let timestamp_ms = chrono::Utc::now().timestamp_millis() as u64;
 
-    // match &hotspot_request {
-    //   HotspotUpdateRequest::Mobile(req) => {
-    //     // Serialize the protobuf message for logging
-    //     let serialized = serde_json::json!({
-    //       "event_type": "mobile_hotspot_update",
-    //       "table_name": change.table_name,
-    //       "primary_key": change.primary_key,
-    //       "change_column_value": change.change_column_value,
-    //       "timestamp_ms": timestamp_ms,
-    //       "signer": req.signer,
-    //       "signature_length": req.signature.len(),
-    //       "atomic_data": change.atomic_data,
-    //       "protobuf_data": {
-    //         "block_height": req.update.as_ref().map(|u| u.block_height),
-    //         "block_time_seconds": req.update.as_ref().map(|u| u.block_time_seconds),
-    //         "pub_key": req.update.as_ref().and_then(|u| u.pub_key.as_ref()).map(|pk| bs58::encode(&pk.value).into_string()),
-    //         "asset": req.update.as_ref().and_then(|u| u.asset.as_ref()).map(|a| bs58::encode(&a.value).into_string()),
-    //         "metadata": req.update.as_ref().and_then(|u| u.metadata.as_ref()).map(|m| serde_json::json!({
-    //           "serial_number": m.serial_number,
-    //           "device_type": m.device_type,
-    //           "asserted_hex": m.asserted_hex,
-    //           "azimuth": m.azimuth
-    //         })),
-    //         "owner": req.update.as_ref().and_then(|u| u.owner.as_ref()).map(|o| serde_json::json!({
-    //           "wallet": o.wallet.as_ref().map(|w| bs58::encode(&w.value).into_string()),
-    //           "type": o.r#type
-    //         }))
-    //       }
-    //     });
+    // The atomic data is already a JSON Value, no need to parse
+    let atomic_data = &change.atomic_data;
 
-    //     info!("MOBILE_HOTSPOT_UPDATE");
-    //   }
-    //   HotspotUpdateRequest::Iot(req) => {
-    //     // Serialize the protobuf message for logging
-    //     let serialized = serde_json::json!({
-    //       "event_type": "iot_hotspot_update",
-    //       "table_name": change.table_name,
-    //       "primary_key": change.primary_key,
-    //       "change_column_value": change.change_column_value,
-    //       "timestamp_ms": timestamp_ms,
-    //       "signer": req.signer,
-    //       "signature_length": req.signature.len(),
-    //       "atomic_data": change.atomic_data,
-    //       "protobuf_data": {
-    //         "block_height": req.update.as_ref().map(|u| u.block_height),
-    //         "block_time_seconds": req.update.as_ref().map(|u| u.block_time_seconds),
-    //         "pub_key": req.update.as_ref().and_then(|u| u.pub_key.as_ref()).map(|pk| bs58::encode(&pk.value).into_string()),
-    //         "asset": req.update.as_ref().and_then(|u| u.asset.as_ref()).map(|a| bs58::encode(&a.value).into_string()),
-    //         "metadata": req.update.as_ref().and_then(|u| u.metadata.as_ref()).map(|m| serde_json::json!({
-    //           "asserted_hex": m.asserted_hex,
-    //           "elevation": m.elevation,
-    //           "is_data_only": m.is_data_only
-    //         })),
-    //         "owner": req.update.as_ref().and_then(|u| u.owner.as_ref()).map(|o| serde_json::json!({
-    //           "wallet": o.wallet.as_ref().map(|w| bs58::encode(&w.value).into_string()),
-    //           "type": o.r#type
-    //         }))
-    //       }
-    //     });
+    let event_log = serde_json::json!({
+      "event_type": "atomic_hotspot_update",
+      "hotspot_type": hotspot_type_str,
+      "table_name": change.table_name,
+      "primary_key": change.primary_key,
+      "change_column_value": change.change_column_value,
+      "timestamp_ms": timestamp_ms,
+      "signer": self.keypair.public_key().to_string(),
+      "atomic_data": atomic_data
+    });
 
-    //     info!("IOT_HOTSPOT_UPDATE");
-    //   }
-    // }
+    debug!(
+      target: "atomic_hotspot_events",
+      "ATOMIC_HOTSPOT_UPDATE: {}",
+      serde_json::to_string(&event_log).unwrap_or_else(|_| "serialization_error".to_string())
+    );
 
     Ok(PublishResult {
       success: true,
