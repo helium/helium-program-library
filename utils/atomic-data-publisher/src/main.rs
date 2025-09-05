@@ -78,14 +78,14 @@ async fn run_service() -> Result<()> {
     }
   };
 
-  // Setup graceful shutdown
-  let service_for_shutdown = service.clone();
+  // Setup graceful shutdown signal handler
+  let shutdown_sender = service.shutdown_sender.clone();
   let shutdown_handle = tokio::spawn(async move {
     match signal::ctrl_c().await {
       Ok(()) => {
         info!("Received Ctrl+C, initiating graceful shutdown");
-        if let Err(e) = service_for_shutdown.shutdown().await {
-          error!("Error during shutdown: {}", e);
+        if let Err(e) = shutdown_sender.send(true) {
+          error!("Failed to send shutdown signal: {}", e);
         }
       }
       Err(err) => {
@@ -98,8 +98,9 @@ async fn run_service() -> Result<()> {
   let service_result = tokio::select! {
       result = service.run() => result,
       _ = shutdown_handle => {
-          info!("Shutdown signal received");
-          Ok(())
+          info!("Shutdown signal received, waiting for service to complete cleanup");
+          // Wait for the service to finish its cleanup
+          service.run().await
       }
   };
 

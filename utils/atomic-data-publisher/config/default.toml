@@ -29,18 +29,16 @@ keypair_path = "/app/keypair.bin"  # Path to Helium keypair file
 rpc_url = "https://api.mainnet-beta.solana.com"
 timeout_seconds = 30
 
-
 [service]
 polling_interval_seconds = 10
 batch_size = 500
 max_concurrent_publishes = 5
 
-
 # Polling jobs configuration - each job runs a predefined query with parameters
-[[service.polling_jobs]]
-name = "atomic_mobile_hotspots"
-query_name = "construct_atomic_hotspots"
-parameters = { hotspot_type = "mobile" }
+#[[service.polling_jobs]]
+#name = "atomic_mobile_hotspots"
+#query_name = "construct_atomic_hotspots"
+#parameters = { hotspot_type = "mobile" }
 
 # IoT hotspot atomic data job (commented out by default)
 [[service.polling_jobs]]

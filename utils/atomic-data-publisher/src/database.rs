@@ -568,4 +568,28 @@ impl DatabaseClient {
 
     Ok(())
   }
+
+  /// Cleanup ALL running states during shutdown (regardless of time)
+  pub async fn cleanup_all_running_states(&self) -> Result<()> {
+    let result = sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        is_running = FALSE,
+        running_since = NULL,
+        updated_at = NOW()
+      WHERE is_running = TRUE
+      "#
+    )
+    .execute(&self.pool)
+    .await?;
+
+    if result.rows_affected() > 0 {
+      info!("Cleaned up {} running job states during shutdown", result.rows_affected());
+    } else {
+      info!("No running job states to clean up");
+    }
+
+    Ok(())
+  }
 }

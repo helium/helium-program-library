@@ -21,7 +21,7 @@ pub struct AtomicDataPublisher {
   config: Settings,
   current_solana_block_height: Arc<tokio::sync::RwLock<u64>>,
   shutdown_signal: tokio::sync::watch::Receiver<bool>,
-  shutdown_sender: tokio::sync::watch::Sender<bool>,
+  pub shutdown_sender: tokio::sync::watch::Sender<bool>,
 }
 
 impl AtomicDataPublisher {
@@ -222,6 +222,11 @@ impl AtomicDataPublisher {
                 Err(e) => error!("Task failed: {}", e),
             }
         }
+    }
+
+    // Clean up ALL running job states in the database before stopping
+    if let Err(e) = self.database.cleanup_all_running_states().await {
+      warn!("Failed to clean up running job states during shutdown: {}", e);
     }
 
     info!("Atomic Data Publisher service stopped");
@@ -473,22 +478,6 @@ impl AtomicDataPublisher {
   /// Get current service metrics
   pub async fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
     self.metrics._get_metrics().await
-  }
-
-  /// Gracefully shutdown the service
-  pub async fn shutdown(&self) -> Result<()> {
-    info!("Initiating graceful shutdown");
-
-    // Send shutdown signal
-    if let Err(e) = self.shutdown_sender.send(true) {
-      warn!("Failed to send shutdown signal: {}", e);
-    }
-
-    // Give tasks time to complete
-    sleep(Duration::from_secs(5)).await;
-
-    info!("Shutdown completed");
-    Ok(())
   }
 }
 
