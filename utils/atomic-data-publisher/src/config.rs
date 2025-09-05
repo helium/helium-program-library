@@ -36,7 +36,6 @@ pub struct ServiceConfig {
   pub polling_interval_seconds: u64,
   pub batch_size: u32,
   pub max_concurrent_publishes: u32,
-  pub health_check_port: u16,
   pub polling_jobs: Vec<PollingJob>,
 }
 
@@ -78,18 +77,6 @@ impl Settings {
   pub fn polling_interval(&self) -> Duration {
     Duration::from_secs(self.service.polling_interval_seconds)
   }
-
-  pub fn database_acquire_timeout(&self) -> Duration {
-    Duration::from_secs(self.database.acquire_timeout_seconds)
-  }
-
-  pub fn database_idle_timeout(&self) -> Duration {
-    Duration::from_secs(self.database.idle_timeout_seconds)
-  }
-
-  pub fn database_max_lifetime(&self) -> Duration {
-    Duration::from_secs(self.database.max_lifetime_seconds)
-  }
 }
 
 impl Default for Settings {
@@ -123,7 +110,6 @@ impl Default for Settings {
         polling_interval_seconds: 10,
         batch_size: 100,
         max_concurrent_publishes: 5,
-        health_check_port: 3000,
         polling_jobs: vec![],
       },
       logging: LoggingConfig {

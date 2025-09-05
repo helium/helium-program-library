@@ -10,7 +10,7 @@ mod solana;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use config::Settings;
+use config::{Settings, LoggingConfig};
 use service::AtomicDataPublisher;
 use std::sync::Arc;
 use tokio::signal;
@@ -38,18 +38,6 @@ async fn main() -> Result<()> {
   // Parse command line arguments
   let cli = Cli::parse();
 
-  // Initialize logging
-  let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
-
-  tracing_subscriber::registry()
-    .with(
-      tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        format!("atomic_data_publisher={},sqlx=warn,tonic=info", log_level).into()
-      }),
-    )
-    .with(tracing_subscriber::fmt::layer().json())
-    .init();
-
   match cli.command {
     Commands::Serve => run_service().await,
     Commands::CreateIndexes => create_indexes().await,
@@ -57,19 +45,20 @@ async fn main() -> Result<()> {
 }
 
 async fn run_service() -> Result<()> {
-  info!("Starting Atomic Data Publisher v0.1.0");
-
-  // Load configuration
+  // Load configuration first (before logging setup)
   let settings = match Settings::new() {
-    Ok(s) => {
-      info!("Configuration loaded successfully");
-      s
-    }
+    Ok(s) => s,
     Err(e) => {
-      error!("Failed to load configuration: {}", e);
+      eprintln!("Failed to load configuration: {}", e);
       std::process::exit(1);
     }
   };
+
+  // Initialize logging based on configuration
+  initialize_logging(&settings.logging)?;
+
+  info!("Starting Atomic Data Publisher v0.1.0");
+  info!("Configuration loaded successfully");
 
   // Validate configuration
   if let Err(e) = validate_config(&settings) {
@@ -127,19 +116,20 @@ async fn run_service() -> Result<()> {
 }
 
 async fn create_indexes() -> Result<()> {
-  info!("Creating performance indexes for Atomic Data Publisher");
-
-  // Load configuration
+  // Load configuration first (before logging setup)
   let settings = match Settings::new() {
-    Ok(s) => {
-      info!("Configuration loaded successfully");
-      s
-    }
+    Ok(s) => s,
     Err(e) => {
-      error!("Failed to load configuration: {}", e);
+      eprintln!("Failed to load configuration: {}", e);
       std::process::exit(1);
     }
   };
+
+  // Initialize logging based on configuration
+  initialize_logging(&settings.logging)?;
+
+  info!("Creating performance indexes for Atomic Data Publisher");
+  info!("Configuration loaded successfully");
 
   // Create database client
   let database = match database::DatabaseClient::new(&settings.database, settings.service.polling_jobs).await {
@@ -247,5 +237,32 @@ fn validate_config(settings: &Settings) -> Result<()> {
   }
 
   info!("Configuration validation passed");
+  Ok(())
+}
+
+/// Initialize logging based on configuration
+fn initialize_logging(logging_config: &LoggingConfig) -> Result<()> {
+  let log_level = std::env::var("RUST_LOG")
+    .unwrap_or_else(|_| logging_config.level.clone());
+
+  let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+    .unwrap_or_else(|_| {
+      format!("atomic_data_publisher={},sqlx=warn,tonic=info", log_level).into()
+    });
+
+  let subscriber = tracing_subscriber::registry().with(env_filter);
+
+  match logging_config.format.as_str() {
+    "json" => {
+      subscriber.with(tracing_subscriber::fmt::layer().json()).init();
+    }
+    "pretty" | "text" => {
+      subscriber.with(tracing_subscriber::fmt::layer().pretty()).init();
+    }
+    _ => {
+      subscriber.with(tracing_subscriber::fmt::layer()).init();
+    }
+  }
+
   Ok(())
 }

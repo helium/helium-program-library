@@ -6,12 +6,6 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
-#[derive(Debug, Clone, Serialize)]
-pub struct CircuitBreakerStatus {
-  pub is_open: bool,
-  pub failure_count: u32,
-  pub threshold: u32,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceMetrics {
@@ -22,7 +16,6 @@ pub struct ServiceMetrics {
   pub changes_by_table: HashMap<String, TableMetrics>,
   pub ingestor_metrics: IngestorMetrics,
   pub database_metrics: DatabaseMetrics,
-  pub circuit_breaker_status: CircuitBreakerMetrics,
   pub performance_metrics: PerformanceMetrics,
 }
 
@@ -41,8 +34,6 @@ pub struct IngestorMetrics {
   pub successful_requests: u64,
   pub failed_requests: u64,
   pub avg_response_time_ms: f64,
-  pub circuit_breaker_trips: u64,
-  pub retry_attempts: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,14 +46,6 @@ pub struct DatabaseMetrics {
   pub connection_pool_idle: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CircuitBreakerMetrics {
-  pub is_open: bool,
-  pub failure_count: u32,
-  pub threshold: u32,
-  pub total_trips: u64,
-  pub time_since_last_trip_seconds: Option<u64>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceMetrics {
@@ -253,10 +236,7 @@ impl MetricsCollector {
   }
 
   // Generate metrics snapshot
-  pub async fn _get_metrics(
-    &self,
-    circuit_breaker_status: Option<CircuitBreakerStatus>,
-  ) -> ServiceMetrics {
+  pub async fn _get_metrics(&self) -> ServiceMetrics {
     let uptime = self.start_time.elapsed().as_secs();
 
     // Build table metrics
@@ -342,39 +322,20 @@ impl MetricsCollector {
         successful_requests: self.ingestor_successes.load(Ordering::Relaxed),
         failed_requests: self.ingestor_failures.load(Ordering::Relaxed),
         avg_response_time_ms: avg_ingestor_response_time,
-        circuit_breaker_trips: 0,
-        retry_attempts: 0,
       },
       database_metrics: DatabaseMetrics {
         total_queries: self.db_queries.load(Ordering::Relaxed),
         successful_queries: self.db_successes.load(Ordering::Relaxed),
         failed_queries: self.db_failures.load(Ordering::Relaxed),
         avg_query_time_ms: avg_db_query_time,
-        connection_pool_active: 0, // TODO: Get from sqlx pool
-        connection_pool_idle: 0,   // TODO: Get from sqlx pool
-      },
-      circuit_breaker_status: if let Some(cb_status) = circuit_breaker_status {
-        CircuitBreakerMetrics {
-          is_open: cb_status.is_open,
-          failure_count: cb_status.failure_count,
-          threshold: cb_status.threshold,
-          total_trips: 0,
-          time_since_last_trip_seconds: None, // TODO: Track last trip time
-        }
-      } else {
-        CircuitBreakerMetrics {
-          is_open: false,
-          failure_count: 0,
-          threshold: 0,
-          total_trips: 0,
-          time_since_last_trip_seconds: None,
-        }
+        connection_pool_active: 0, // Not implemented for logging-only service
+        connection_pool_idle: 0,   // Not implemented for logging-only service
       },
       performance_metrics: PerformanceMetrics {
         avg_polling_cycle_time_ms: avg_polling_cycle_time,
         avg_batch_processing_time_ms: avg_batch_processing_time,
-        memory_usage_mb: 0.0,   // TODO: Get actual memory usage
-        cpu_usage_percent: 0.0, // TODO: Get actual CPU usage
+        memory_usage_mb: 0.0,   // Not implemented for logging-only service
+        cpu_usage_percent: 0.0, // Not implemented for logging-only service
       },
     }
   }

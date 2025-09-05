@@ -343,16 +343,11 @@ impl DatabaseClient {
 
     let mut changes = Vec::new();
     for row in rows {
-      let hotspot_type_result: String = row.get("hotspot_type");
-      let pub_key: Option<String> = row.try_get("pub_key").ok();
       let solana_address: Option<String> = row.try_get("solana_address").ok();
       let asset: Option<String> = row.try_get("asset").ok();
-      let block_height: i64 = row.try_get::<sqlx::types::BigDecimal, _>("hotspot_block_height")
-        .map(|bd| bd.to_string().parse::<i64>().unwrap_or(0))
-        .unwrap_or(0);
       let atomic_data: serde_json::Value = row.get("atomic_data");
 
-      if let (Some(address), Some(asset_key)) = (solana_address, asset) {
+      if let (Some(_address), Some(_asset_key)) = (solana_address, asset) {
         let change_record = ChangeRecord {
           job_name: job.name.clone(),
           atomic_data: serde_json::Value::Array(vec![atomic_data]),

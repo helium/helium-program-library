@@ -116,7 +116,7 @@ impl AtomicDataPublisher {
     };
 
     // For now, always generate a new keypair using entropy
-    // TODO: Implement proper keypair serialization/deserialization
+    // Load keypair from file or environment
     let entropy = if std::path::Path::new(&keypair_path).exists() {
       std::fs::read(&keypair_path)?
     } else {
@@ -472,8 +472,7 @@ impl AtomicDataPublisher {
 
   /// Get current service metrics
   pub async fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
-    let circuit_breaker_status = None; // No circuit breaker in simplified publisher
-    self.metrics._get_metrics(circuit_breaker_status).await
+    self.metrics._get_metrics().await
   }
 
   /// Gracefully shutdown the service

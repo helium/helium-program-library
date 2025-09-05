@@ -33,7 +33,45 @@ impl ProtobufBuilder {
         AtomicDataError::InvalidData("No atomic data found in change record".to_string())
       })?;
 
-    let update = Self::build_mobile_hotspot_update_v1(atomic_data)?;
+    debug!("Building mobile hotspot update from data: {}", atomic_data);
+    debug!(
+      "Available keys in data: {:?}",
+      atomic_data
+        .as_object()
+        .map(|obj| obj.keys().collect::<Vec<_>>())
+    );
+
+    let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
+    let block_time_seconds = Self::extract_u64(atomic_data, "block_time_seconds")
+      .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
+      .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
+
+    let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+    let metadata = Self::build_mobile_hotspot_metadata(atomic_data)?;
+    let owner = Self::build_entity_owner_info(atomic_data)?;
+
+    // Build rewards destination
+    let rewards_destination =
+      if let Some(rewards_split) = Self::try_build_rewards_split(atomic_data)? {
+        Some(mobile_hotspot_update_v1::RewardsDestination::RewardsSplitV1(rewards_split))
+      } else if let Some(rewards_recipient) =
+        Self::try_extract_solana_pub_key(atomic_data, "rewards_recipient")
+      {
+        Some(mobile_hotspot_update_v1::RewardsDestination::RewardsRecipient(rewards_recipient))
+      } else {
+        None
+      };
+
+    let update = MobileHotspotUpdateV1 {
+      block_height,
+      block_time_seconds,
+      pub_key: Some(pub_key),
+      asset: Some(asset),
+      metadata: Some(metadata),
+      owner: Some(owner),
+      rewards_destination,
+    };
 
     // Create the request without signature first
     let mut request = MobileHotspotUpdateReqV1 {
@@ -62,7 +100,43 @@ impl ProtobufBuilder {
         AtomicDataError::InvalidData("No atomic data found in change record".to_string())
       })?;
 
-    let update = Self::build_iot_hotspot_update_v1(atomic_data)?;
+    debug!("Building IoT hotspot update from data: {}", atomic_data);
+
+    let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
+    let block_time_seconds = Self::extract_u64(atomic_data, "block_time_seconds")
+      .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
+      .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
+
+    let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+    let metadata = Self::build_iot_hotspot_metadata(atomic_data)?;
+    let owner = Self::build_entity_owner_info(atomic_data)?;
+
+    // Build rewards destination
+    let rewards_destination =
+      if let Some(rewards_split) = Self::try_build_rewards_split(atomic_data)? {
+        Some(iot_hotspot_update_v1::RewardsDestination::RewardsSplitV1(
+          rewards_split,
+        ))
+      } else if let Some(rewards_recipient) =
+        Self::try_extract_solana_pub_key(atomic_data, "rewards_recipient")
+      {
+        Some(iot_hotspot_update_v1::RewardsDestination::RewardsRecipient(
+          rewards_recipient,
+        ))
+      } else {
+        None
+      };
+
+    let update = IotHotspotUpdateV1 {
+      block_height,
+      block_time_seconds,
+      pub_key: Some(pub_key),
+      asset: Some(asset),
+      metadata: Some(metadata),
+      owner: Some(owner),
+      rewards_destination,
+    };
 
     // Create the request without signature first
     let mut request = IotHotspotUpdateReqV1 {
@@ -76,86 +150,6 @@ impl ProtobufBuilder {
     request.signature = signature;
 
     Ok(request)
-  }
-
-  fn build_mobile_hotspot_update_v1(
-    data: &Value,
-  ) -> Result<MobileHotspotUpdateV1, AtomicDataError> {
-    debug!("Building mobile hotspot update from data: {}", data);
-    debug!(
-      "Available keys in data: {:?}",
-      data.as_object().map(|obj| obj.keys().collect::<Vec<_>>())
-    );
-
-    let block_height = Self::extract_u64(data, "block_height").unwrap_or(0);
-    let block_time_seconds = Self::extract_u64(data, "block_time_seconds")
-      .or_else(|| Self::extract_timestamp_as_seconds(data, "refreshed_at"))
-      .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
-
-    let pub_key = Self::extract_helium_pub_key(data, "pub_key")?;
-    let asset = Self::extract_solana_pub_key(data, "asset")?;
-    let metadata = Self::build_mobile_hotspot_metadata(data)?;
-    let owner = Self::build_entity_owner_info(data)?;
-
-    // Build rewards destination
-    let rewards_destination = if let Some(rewards_split) = Self::try_build_rewards_split(data)? {
-      Some(mobile_hotspot_update_v1::RewardsDestination::RewardsSplitV1(rewards_split))
-    } else if let Some(rewards_recipient) =
-      Self::try_extract_solana_pub_key(data, "rewards_recipient")
-    {
-      Some(mobile_hotspot_update_v1::RewardsDestination::RewardsRecipient(rewards_recipient))
-    } else {
-      None
-    };
-
-    Ok(MobileHotspotUpdateV1 {
-      block_height,
-      block_time_seconds,
-      pub_key: Some(pub_key),
-      asset: Some(asset),
-      metadata: Some(metadata),
-      owner: Some(owner),
-      rewards_destination,
-    })
-  }
-
-  fn build_iot_hotspot_update_v1(data: &Value) -> Result<IotHotspotUpdateV1, AtomicDataError> {
-    debug!("Building IoT hotspot update from data: {}", data);
-
-    let block_height = Self::extract_u64(data, "block_height").unwrap_or(0);
-    let block_time_seconds = Self::extract_u64(data, "block_time_seconds")
-      .or_else(|| Self::extract_timestamp_as_seconds(data, "refreshed_at"))
-      .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
-
-    let pub_key = Self::extract_helium_pub_key(data, "pub_key")?;
-    let asset = Self::extract_solana_pub_key(data, "asset")?;
-    let metadata = Self::build_iot_hotspot_metadata(data)?;
-    let owner = Self::build_entity_owner_info(data)?;
-
-    // Build rewards destination
-    let rewards_destination = if let Some(rewards_split) = Self::try_build_rewards_split(data)? {
-      Some(iot_hotspot_update_v1::RewardsDestination::RewardsSplitV1(
-        rewards_split,
-      ))
-    } else if let Some(rewards_recipient) =
-      Self::try_extract_solana_pub_key(data, "rewards_recipient")
-    {
-      Some(iot_hotspot_update_v1::RewardsDestination::RewardsRecipient(
-        rewards_recipient,
-      ))
-    } else {
-      None
-    };
-
-    Ok(IotHotspotUpdateV1 {
-      block_height,
-      block_time_seconds,
-      pub_key: Some(pub_key),
-      asset: Some(asset),
-      metadata: Some(metadata),
-      owner: Some(owner),
-      rewards_destination,
-    })
   }
 
   fn build_mobile_hotspot_metadata(data: &Value) -> Result<MobileHotspotMetadata, AtomicDataError> {
