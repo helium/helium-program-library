@@ -10,7 +10,7 @@ use crate::database::DatabaseClient;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
 use crate::publisher::AtomicDataPublisher as Publisher;
-use crate::solana_client::SolanaClientWrapper;
+use crate::solana::SolanaClientWrapper;
 
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
@@ -232,15 +232,6 @@ impl AtomicDataPublisher {
     };
     handles.push(health_handle);
 
-    // Solana block height update loop
-    let solana_update_handle = {
-      let service = self.clone();
-      tokio::spawn(async move {
-        service.solana_block_height_update_loop().await;
-      })
-    };
-    handles.push(solana_update_handle);
-
     // Wait for shutdown signal or any task to complete
     let mut shutdown_signal = self.shutdown_signal.clone();
     tokio::select! {
@@ -301,10 +292,26 @@ impl AtomicDataPublisher {
   async fn process_changes(&self) -> Result<(), AtomicDataError> {
     let _batch_start = Instant::now();
 
-    // Get current Solana block height
-    let current_solana_height = {
-      let height = self.current_solana_block_height.read().await;
-      *height
+    // Get current Solana block height just-in-time (only when we're about to process)
+    let current_solana_height = match self.solana_client.get_current_block_height().await {
+      Ok(height) => {
+        // Update our cached height for other components that might need it
+        {
+          let mut cached_height = self.current_solana_block_height.write().await;
+          if *cached_height != height {
+            debug!("Updated Solana block height from {} to {} (just-in-time)", *cached_height, height);
+            *cached_height = height;
+          }
+        }
+        height
+      }
+      Err(e) => {
+        error!("Failed to get current Solana block height just-in-time: {}", e);
+        // Fall back to cached height as emergency measure
+        let height = self.current_solana_block_height.read().await;
+        warn!("Using cached Solana block height {} due to RPC failure", *height);
+        *height
+      }
     };
 
     // Get pending changes from polling jobs
@@ -463,36 +470,6 @@ impl AtomicDataPublisher {
     }
   }
 
-  /// Solana block height update loop - updates every 60 seconds
-  async fn solana_block_height_update_loop(&self) {
-    let mut interval = interval(Duration::from_secs(60)); // Update every minute
-    let mut shutdown_signal = self.shutdown_signal.clone();
-
-    loop {
-      tokio::select! {
-          _ = interval.tick() => {
-              match self.solana_client.get_current_block_height().await {
-                  Ok(new_height) => {
-                      let mut current_height = self.current_solana_block_height.write().await;
-                      if *current_height != new_height {
-                          debug!("Updated Solana block height from {} to {}", *current_height, new_height);
-                          *current_height = new_height;
-                      }
-                  }
-                  Err(e) => {
-                      error!("Failed to update Solana block height: {}", e);
-                  }
-              }
-          }
-          _ = shutdown_signal.changed() => {
-              if *shutdown_signal.borrow() {
-                  info!("Shutting down Solana block height update loop");
-                  break;
-              }
-          }
-      }
-    }
-  }
 
   /// Perform health checks on all components
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {

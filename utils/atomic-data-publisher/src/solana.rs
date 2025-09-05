@@ -75,7 +75,7 @@ impl SolanaClientWrapper {
     }
   }
 
-    /// Health check the Solana RPC connection
+  /// Health check the Solana RPC connection
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {
     debug!("Performing Solana RPC health check");
 

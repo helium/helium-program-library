@@ -6,7 +6,7 @@ mod protobuf;
 mod publisher;
 mod queries;
 mod service;
-mod solana_client;
+mod solana;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

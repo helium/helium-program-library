@@ -47,9 +47,6 @@ fail_on_missing_tables = true          # Set to false for graceful degradation
 validation_retry_attempts = 3          # Number of retries before giving up
 validation_retry_delay_seconds = 30    # Delay between validation retries
 
-# Performance settings
-# batch_size controls both database scanning and publishing batch size
-
 # Polling jobs configuration - each job runs a predefined query with parameters
 [[service.polling_jobs]]
 name = "atomic_mobile_hotspots"
