@@ -145,7 +145,7 @@ pub fn handler(
     task_queue: ctx.accounts.task_queue.key(),
     mint: ctx.accounts.mint.key(),
     token_account: ctx.accounts.token_account.key(),
-    next_task: Pubkey::default(),
+    next_task: crate::ID,
     rent_refund: ctx.accounts.payer.key(),
     bump: ctx.bumps.mini_fanout,
     schedule: args.schedule,
@@ -161,7 +161,7 @@ pub fn handler(
         total_owed: 0,
       })
       .collect(),
-    next_pre_task: Pubkey::default(),
+    next_pre_task: crate::ID,
     pre_task: args.pre_task,
   });
 
