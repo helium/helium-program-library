@@ -221,7 +221,7 @@ pub fn handler<'info>(
     trigger: TriggerV0::Timestamp(next_time),
     transaction: TransactionSourceV0::CompiledV0(compiled_tx),
     crank_reward: None,
-    free_tasks: 0,
+    free_tasks: 2,
     description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
   }];
   if let Some(pre_task) = mini_fanout.pre_task.clone() {
