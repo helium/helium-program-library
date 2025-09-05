@@ -4,31 +4,23 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use chrono;
 
-use crate::config::{IngestorConfig, PollingJob};
+use crate::config::PollingJob;
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
 use crate::protobuf::build_hotspot_update_request;
 
-#[derive(Debug, Clone)]
-pub struct PublishResult {
-  pub success: bool,
-  pub timestamp_ms: u64,
-  pub error_message: Option<String>,
-}
 
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
-  config: IngestorConfig,
   polling_jobs: Vec<PollingJob>,
   keypair: Arc<Keypair>,
 }
 
 impl AtomicDataPublisher {
-  pub async fn new(config: IngestorConfig, polling_jobs: Vec<PollingJob>, keypair: Keypair) -> Result<Self> {
+  pub async fn new(polling_jobs: Vec<PollingJob>, keypair: Keypair) -> Result<Self> {
     info!("Initializing AtomicDataPublisher for logging protobuf events (no gRPC endpoint)");
 
     Ok(Self {
-      config,
       polling_jobs,
       keypair: Arc::new(keypair),
     })
@@ -46,28 +38,18 @@ impl AtomicDataPublisher {
     let mut failed_changes = Vec::new();
 
     for change in changes {
-      match self.publish_single_change(&change).await {
-        Ok(result) => {
-          if result.success {
-            published_ids.push(format!("{}_{}", change.table_name, change.primary_key));
-            debug!(
-              "Successfully published change for {}/{}",
-              change.table_name, change.primary_key
-            );
-          } else {
-            error!(
-              "Failed to publish change for {}/{}: {}",
-              change.table_name,
-              change.primary_key,
-              result.error_message.unwrap_or_else(|| "Unknown error".to_string())
-            );
-            failed_changes.push(change);
-          }
+      match self.process_change(&change).await {
+        Ok(()) => {
+          published_ids.push(change.job_name.clone());
+          debug!(
+            "Successfully published change for job '{}'",
+            change.job_name
+          );
         }
         Err(e) => {
           error!(
-            "Failed to publish change for {}/{}: {}",
-            change.table_name, change.primary_key, e
+            "Failed to publish change for job '{}': {}",
+            change.job_name, e
           );
           failed_changes.push(change);
         }
@@ -81,17 +63,17 @@ impl AtomicDataPublisher {
     Ok(published_ids)
   }
 
-  /// Log a single change record as protobuf event
-  async fn publish_single_change(&self, change: &ChangeRecord) -> Result<PublishResult, AtomicDataError> {
+  /// Process a single change record by logging it as a protobuf event
+  async fn process_change(&self, change: &ChangeRecord) -> Result<(), AtomicDataError> {
     // Find the polling job configuration
     let job_config = self
       .polling_jobs
       .iter()
-      .find(|j| j.name == change.table_name)
+      .find(|j| j.name == change.job_name)
       .ok_or_else(|| {
         AtomicDataError::InvalidData(format!(
           "No configuration found for job: {}",
-          change.table_name
+          change.job_name
         ))
       })?;
 
@@ -110,18 +92,13 @@ impl AtomicDataPublisher {
     // Log the atomic data event instead of sending to gRPC
     let timestamp_ms = chrono::Utc::now().timestamp_millis() as u64;
 
-    // The atomic data is already a JSON Value, no need to parse
-    let atomic_data = &change.atomic_data;
-
     let event_log = serde_json::json!({
       "event_type": "atomic_hotspot_update",
       "hotspot_type": hotspot_type_str,
-      "table_name": change.table_name,
-      "primary_key": change.primary_key,
-      "change_column_value": change.change_column_value,
+      "job_name": change.job_name,
       "timestamp_ms": timestamp_ms,
       "signer": self.keypair.public_key().to_string(),
-      "atomic_data": atomic_data
+      "atomic_data": change.atomic_data
     });
 
     debug!(
@@ -130,11 +107,7 @@ impl AtomicDataPublisher {
       serde_json::to_string(&event_log).unwrap_or_else(|_| "serialization_error".to_string())
     );
 
-    Ok(PublishResult {
-      success: true,
-      timestamp_ms,
-      error_message: None,
-    })
+    Ok(())
   }
 
   /// Health check the publisher (now just validates keypair)

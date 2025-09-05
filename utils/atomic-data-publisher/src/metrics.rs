@@ -89,8 +89,6 @@ pub struct MetricsCollector {
   ingestor_successes: AtomicU64,
   ingestor_failures: AtomicU64,
   ingestor_response_times: Arc<RwLock<Vec<Duration>>>,
-  circuit_breaker_trips: AtomicU64,
-  retry_attempts: AtomicU64,
 
   // Database metrics
   db_queries: AtomicU64,
@@ -124,8 +122,6 @@ impl MetricsCollector {
       ingestor_successes: AtomicU64::new(0),
       ingestor_failures: AtomicU64::new(0),
       ingestor_response_times: Arc::new(RwLock::new(Vec::new())),
-      circuit_breaker_trips: AtomicU64::new(0),
-      retry_attempts: AtomicU64::new(0),
       db_queries: AtomicU64::new(0),
       db_successes: AtomicU64::new(0),
       db_failures: AtomicU64::new(0),
@@ -133,15 +129,6 @@ impl MetricsCollector {
       polling_cycle_times: Arc::new(RwLock::new(Vec::new())),
       batch_processing_times: Arc::new(RwLock::new(Vec::new())),
     }
-  }
-
-  // Counter methods
-  pub fn increment_changes_processed(&self, count: u64) {
-    self.changes_processed.fetch_add(count, Ordering::Relaxed);
-  }
-
-  pub fn increment_changes_published(&self, count: u64) {
-    self.changes_published.fetch_add(count, Ordering::Relaxed);
   }
 
   pub fn increment_errors(&self) {
@@ -221,13 +208,6 @@ impl MetricsCollector {
     }
   }
 
-  pub fn record_circuit_breaker_trip(&self) {
-    self.circuit_breaker_trips.fetch_add(1, Ordering::Relaxed);
-  }
-
-  pub fn record_retry_attempt(&self) {
-    self.retry_attempts.fetch_add(1, Ordering::Relaxed);
-  }
 
   // Database metrics
   pub async fn record_database_query(&self, success: bool, query_time: Duration) {
@@ -273,7 +253,7 @@ impl MetricsCollector {
   }
 
   // Generate metrics snapshot
-  pub async fn get_metrics(
+  pub async fn _get_metrics(
     &self,
     circuit_breaker_status: Option<CircuitBreakerStatus>,
   ) -> ServiceMetrics {
@@ -362,8 +342,8 @@ impl MetricsCollector {
         successful_requests: self.ingestor_successes.load(Ordering::Relaxed),
         failed_requests: self.ingestor_failures.load(Ordering::Relaxed),
         avg_response_time_ms: avg_ingestor_response_time,
-        circuit_breaker_trips: self.circuit_breaker_trips.load(Ordering::Relaxed),
-        retry_attempts: self.retry_attempts.load(Ordering::Relaxed),
+        circuit_breaker_trips: 0,
+        retry_attempts: 0,
       },
       database_metrics: DatabaseMetrics {
         total_queries: self.db_queries.load(Ordering::Relaxed),
@@ -378,7 +358,7 @@ impl MetricsCollector {
           is_open: cb_status.is_open,
           failure_count: cb_status.failure_count,
           threshold: cb_status.threshold,
-          total_trips: self.circuit_breaker_trips.load(Ordering::Relaxed),
+          total_trips: 0,
           time_since_last_trip_seconds: None, // TODO: Track last trip time
         }
       } else {

@@ -11,14 +11,8 @@ pub enum AtomicDataError {
   #[error("Serialization error: {0}")]
   SerializationError(String),
 
-  #[error("Service unavailable: {0}")]
-  ServiceUnavailable(String),
-
   #[error("Invalid data: {0}")]
   InvalidData(String),
-
-  #[error("Timeout error: {0}")]
-  Timeout(String),
 
   #[error("Solana RPC error: {0}")]
   SolanaRpcError(String),

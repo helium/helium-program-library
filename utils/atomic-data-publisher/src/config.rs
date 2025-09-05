@@ -6,7 +6,6 @@ use std::time::Duration;
 pub struct Settings {
   pub database: DatabaseConfig,
   pub solana: SolanaConfig,
-  pub ingestor: IngestorConfig,
   pub service: ServiceConfig,
   pub logging: LoggingConfig,
 }
@@ -33,39 +32,12 @@ pub struct SolanaConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct IngestorConfig {
-  pub grpc_endpoint: String,
-  pub timeout_seconds: u64,
-  pub max_retries: u32,
-  pub retry_delay_seconds: u64,
-  pub tls_enabled: bool,
-}
-
-#[derive(Debug, Deserialize, Clone)]
 pub struct ServiceConfig {
   pub polling_interval_seconds: u64,
   pub batch_size: u32,
   pub max_concurrent_publishes: u32,
   pub health_check_port: u16,
   pub polling_jobs: Vec<PollingJob>,
-  #[serde(default = "default_fail_on_missing_tables")]
-  pub fail_on_missing_tables: bool,
-  #[serde(default = "default_validation_retry_attempts")]
-  pub validation_retry_attempts: u32,
-  #[serde(default = "default_validation_retry_delay_seconds")]
-  pub validation_retry_delay_seconds: u64,
-}
-
-fn default_fail_on_missing_tables() -> bool {
-  true
-}
-
-fn default_validation_retry_attempts() -> u32 {
-  3
-}
-
-fn default_validation_retry_delay_seconds() -> u64 {
-  30
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -105,14 +77,6 @@ impl Settings {
 
   pub fn polling_interval(&self) -> Duration {
     Duration::from_secs(self.service.polling_interval_seconds)
-  }
-
-  pub fn ingestor_timeout(&self) -> Duration {
-    Duration::from_secs(self.ingestor.timeout_seconds)
-  }
-
-  pub fn retry_delay(&self) -> Duration {
-    Duration::from_secs(self.ingestor.retry_delay_seconds)
   }
 
   pub fn database_acquire_timeout(&self) -> Duration {
@@ -155,22 +119,12 @@ impl Default for Settings {
         rpc_url: "https://api.mainnet-beta.solana.com".to_string(),
         timeout_seconds: 30,
       },
-      ingestor: IngestorConfig {
-        grpc_endpoint: "http://localhost:8080".to_string(),
-        timeout_seconds: 30,
-        max_retries: 3,
-        retry_delay_seconds: 5,
-        tls_enabled: false,
-      },
       service: ServiceConfig {
         polling_interval_seconds: 10,
         batch_size: 100,
         max_concurrent_publishes: 5,
         health_check_port: 3000,
         polling_jobs: vec![],
-        fail_on_missing_tables: true,
-        validation_retry_attempts: 3,
-        validation_retry_delay_seconds: 30,
       },
       logging: LoggingConfig {
         level: "info".to_string(),

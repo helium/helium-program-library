@@ -393,41 +393,25 @@ impl ProtobufBuilder {
   }
 }
 
-/// Determine which protobuf message to build based on hotspot type
+/// Build and validate hotspot update request based on type (for logging purposes only)
 pub fn build_hotspot_update_request(
   change: &ChangeRecord,
   hotspot_type: &str,
   keypair: &Keypair,
-) -> Result<HotspotUpdateRequest, AtomicDataError> {
+) -> Result<(), AtomicDataError> {
   match hotspot_type {
     "mobile" => {
-      let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
-      Ok(HotspotUpdateRequest::Mobile(req))
+      let _req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
+      Ok(())
     }
     "iot" => {
-      let req = ProtobufBuilder::build_iot_hotspot_update(change, keypair)?;
-      Ok(HotspotUpdateRequest::Iot(req))
+      let _req = ProtobufBuilder::build_iot_hotspot_update(change, keypair)?;
+      Ok(())
     }
     _ => {
       // Default to mobile for unknown types
-      let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
-      Ok(HotspotUpdateRequest::Mobile(req))
-    }
-  }
-}
-
-/// Enum to hold either mobile or IoT hotspot update requests
-#[derive(Debug, Clone)]
-pub enum HotspotUpdateRequest {
-  Mobile(MobileHotspotUpdateReqV1),
-  Iot(IotHotspotUpdateReqV1),
-}
-
-impl HotspotUpdateRequest {
-  pub fn hotspot_type(&self) -> &'static str {
-    match self {
-      HotspotUpdateRequest::Mobile(_) => "mobile",
-      HotspotUpdateRequest::Iot(_) => "iot",
+      let _req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
+      Ok(())
     }
   }
 }
@@ -454,10 +438,7 @@ mod tests {
     });
 
     let change = ChangeRecord {
-      table_name: "mobile_hotspots".to_string(),
-      primary_key: "1".to_string(),
-      change_column_value: "test".to_string(),
-      changed_at: chrono::Utc::now(),
+      job_name: "mobile_hotspots".to_string(),
       atomic_data: json!([data]),
     };
 

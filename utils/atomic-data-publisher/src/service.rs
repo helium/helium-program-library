@@ -137,7 +137,6 @@ impl AtomicDataPublisher {
 
     // Initialize publisher client
     let publisher = Arc::new(Publisher::new(
-      config.ingestor.clone(),
       config.service.polling_jobs.clone(),
       keypair,
     ).await?);
@@ -324,7 +323,7 @@ impl AtomicDataPublisher {
       for change in batch {
         self
           .metrics
-          .record_table_change_detected(&change.table_name)
+          .record_table_change_detected(&change.job_name)
           .await;
       }
 
@@ -351,22 +350,22 @@ impl AtomicDataPublisher {
           Ok(published_ids) if !published_ids.is_empty() => {
             metrics.record_ingestor_request(true, publish_time).await;
             metrics
-              .record_table_change_published(&change.table_name, publish_time)
+              .record_table_change_published(&change.job_name, publish_time)
               .await;
             Ok(change)
           }
           Ok(_) => {
             metrics.record_ingestor_request(false, publish_time).await;
-            metrics.record_table_error(&change.table_name).await;
+            metrics.record_table_error(&change.job_name).await;
             Err(change)
           }
           Err(e) => {
             error!(
-              "Failed to publish change for {}/{}: {}",
-              change.table_name, change.primary_key, e
+              "Failed to publish change for job '{}': {}",
+              change.job_name, e
             );
             metrics.record_ingestor_request(false, publish_time).await;
-            metrics.record_table_error(&change.table_name).await;
+            metrics.record_table_error(&change.job_name).await;
             Err(change)
           }
         }
@@ -401,9 +400,6 @@ impl AtomicDataPublisher {
               "Batch processing completed in {:?}: {} published, {} failed",
               batch_time, published_changes.len(), failed_changes.len()
             );
-            self
-              .metrics
-              .increment_changes_published(published_changes.len() as u64);
             self.metrics.record_batch_processing_time(batch_time).await;
           }
           Err(e) => {
@@ -477,7 +473,7 @@ impl AtomicDataPublisher {
   /// Get current service metrics
   pub async fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
     let circuit_breaker_status = None; // No circuit breaker in simplified publisher
-    self.metrics.get_metrics(circuit_breaker_status).await
+    self.metrics._get_metrics(circuit_breaker_status).await
   }
 
   /// Gracefully shutdown the service

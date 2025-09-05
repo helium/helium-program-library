@@ -22,11 +22,6 @@ impl AtomicHotspotQueries {
     Self::get_all_queries().get(query_name).copied()
   }
 
-  /// Get batch query for processing multiple records at once
-  pub fn get_batch_query() -> &'static str {
-    Self::CONSTRUCT_ATOMIC_HOTSPOTS
-  }
-
   /// Highly optimized query using direct UNION approach for better index utilization
   /// Eliminates complex EXISTS subqueries and leverages composite indexes directly
   /// Parameters: $1 = hotspot_type (mobile/iot), $2 = last_processed_block_height, $3 = current_solana_block_height

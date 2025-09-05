@@ -1,39 +1,16 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, Row, Column, TypeInfo, postgres::PgPoolOptions, types::BigDecimal};
+use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 
-use tracing::{debug, error, info, warn};
-use uuid::Uuid;
+use tracing::{debug, info, warn};
 
 use crate::config::{DatabaseConfig, PollingJob};
-use crate::errors::AtomicDataError;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TableValidationStatus {
-  pub table_name: String,
-  pub exists: bool,
-  pub has_change_column: bool,
-  pub query_valid: bool,
-  pub validation_errors: Vec<String>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
-  pub table_name: String,
-  pub primary_key: String,
-  pub change_column_value: String,
-  pub changed_at: DateTime<Utc>,
+  pub job_name: String,
   pub atomic_data: serde_json::Value,
-}
-
-/// Tracks the last known state for polling (now stored in database)
-#[derive(Debug, Clone)]
-pub struct TablePollingState {
-  pub table_name: String,
-  pub query_name: String, // Add query identifier
-  pub last_processed_block_height: i64,
-  pub last_poll_time: DateTime<Utc>,
 }
 
 #[derive(Debug)]
@@ -92,14 +69,13 @@ impl DatabaseClient {
   pub async fn create_polling_state_table(&self) -> Result<()> {
     let create_table_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
-        job_name VARCHAR(255) NOT NULL,
+        job_name VARCHAR(255) NOT NULL UNIQUE,
         query_name VARCHAR(255) NOT NULL DEFAULT 'default',
         last_processed_block_height BIGINT NOT NULL DEFAULT 0,
         last_poll_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         is_running BOOLEAN NOT NULL DEFAULT FALSE,
         running_since TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-        process_id VARCHAR(255) DEFAULT NULL,
         PRIMARY KEY (job_name, query_name)
       )
     "#;
@@ -223,28 +199,6 @@ impl DatabaseClient {
     Ok(exists)
   }
 
-  /// Get all column names for a table
-  async fn get_table_columns(&self, table_name: &str) -> Result<Vec<String>> {
-    let query = r#"
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-      AND table_name = $1
-      ORDER BY ordinal_position;
-    "#;
-
-    let rows = sqlx::query(query)
-      .bind(table_name)
-      .fetch_all(&self.pool)
-      .await?;
-
-    let columns: Vec<String> = rows
-      .iter()
-      .map(|row| row.get::<String, _>("column_name"))
-      .collect();
-
-    Ok(columns)
-  }
 
   /// Initialize polling state for a specific polling job
   pub async fn initialize_job_polling_state(&self, job_name: &str, query_name: &str) -> Result<()> {
@@ -303,12 +257,8 @@ impl DatabaseClient {
       all_changes.extend(changes);
     }
 
-    // Sort by block height and then by primary key for deterministic processing order
-    all_changes.sort_by(|a, b| {
-      let a_height = a.change_column_value.parse::<i64>().unwrap_or(0);
-      let b_height = b.change_column_value.parse::<i64>().unwrap_or(0);
-      a_height.cmp(&b_height).then_with(|| a.primary_key.cmp(&b.primary_key))
-    });
+    // Sort by job name for deterministic processing order
+    all_changes.sort_by(|a, b| a.job_name.cmp(&b.job_name));
 
     info!(
       "Found {} total changes across all polling jobs",
@@ -404,10 +354,7 @@ impl DatabaseClient {
 
       if let (Some(address), Some(asset_key)) = (solana_address, asset) {
         let change_record = ChangeRecord {
-          table_name: job.name.clone(), // Keep as table_name for ChangeRecord compatibility
-          primary_key: address.clone(),
-          change_column_value: block_height.to_string(),
-          changed_at: chrono::Utc::now(),
+          job_name: job.name.clone(),
           atomic_data: serde_json::Value::Array(vec![atomic_data]),
         };
         changes.push(change_record);
@@ -432,7 +379,7 @@ impl DatabaseClient {
 
     debug!("Marking {} changes as processed with Solana height {}", changes.len(), current_solana_height);
     for change in changes {
-      processed_tables.insert(change.table_name.clone());
+      processed_tables.insert(change.job_name.clone());
     }
 
     // Update polling state for each job with the current Solana block height
@@ -475,19 +422,11 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Clean up old processed changes (no-op for polling approach)
-  pub async fn cleanup_old_changes(&self, _older_than_days: u32) -> Result<()> {
-    // With polling approach, we don't have tracking tables to clean up
-    // State is maintained in memory and resets on service restart
-    debug!("Cleanup called - no tracking tables to clean with polling approach");
-    Ok(())
-  }
-
   /// Check if a job is currently running
   pub async fn is_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
     let row = sqlx::query(
       r#"
-      SELECT is_running, running_since, process_id
+      SELECT is_running, running_since
       FROM atomic_data_polling_state
       WHERE job_name = $1 AND query_name = $2
       "#
@@ -500,7 +439,6 @@ impl DatabaseClient {
     if let Some(row) = row {
       let is_running: bool = row.get("is_running");
       let running_since: Option<DateTime<Utc>> = row.get("running_since");
-      let process_id: Option<String> = row.get("process_id");
 
       if is_running {
         // Check if the job has been running for too long (stale state)
@@ -517,8 +455,8 @@ impl DatabaseClient {
         }
 
         debug!(
-          "Job '{}' query '{}' is currently running (since: {:?}, process: {:?})",
-          job_name, query_name, running_since, process_id
+          "Job '{}' query '{}' is currently running (since: {:?})",
+          job_name, query_name, running_since
         );
         return Ok(true);
       }
@@ -529,8 +467,6 @@ impl DatabaseClient {
 
   /// Mark a job as running
   pub async fn mark_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
-    let process_id = format!("{}:{}", std::process::id(), uuid::Uuid::new_v4());
-
     // Use a transaction to atomically check and set running state
     let mut tx = self.pool.begin().await?;
 
@@ -565,22 +501,20 @@ impl DatabaseClient {
       SET
         is_running = TRUE,
         running_since = NOW(),
-        process_id = $3,
         updated_at = NOW()
       WHERE job_name = $1 AND query_name = $2
       "#
     )
     .bind(job_name)
     .bind(query_name)
-    .bind(&process_id)
     .execute(&mut *tx)
     .await?;
 
     if result.rows_affected() > 0 {
       tx.commit().await?;
       info!(
-        "Marked job '{}' query '{}' as running with process_id: {}",
-        job_name, query_name, process_id
+        "Marked job '{}' query '{}' as running",
+        job_name, query_name
       );
       Ok(true)
     } else {
@@ -601,7 +535,6 @@ impl DatabaseClient {
       SET
         is_running = FALSE,
         running_since = NULL,
-        process_id = NULL,
         updated_at = NOW()
       WHERE job_name = $1 AND query_name = $2
       "#
@@ -625,7 +558,6 @@ impl DatabaseClient {
       SET
         is_running = FALSE,
         running_since = NULL,
-        process_id = NULL,
         updated_at = NOW()
       WHERE is_running = TRUE
         AND (running_since IS NULL OR running_since < $1)
