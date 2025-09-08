@@ -248,14 +248,14 @@ impl AtomicDataPublisher {
     }
   }
 
-  /// Process pending changes
+  /// Process pending changes - processes ALL jobs in the queue before returning
   async fn process_changes(&self) -> Result<(), AtomicDataError> {
     if self.database.any_job_running().await? {
       debug!("Job already running, skipping to prevent OOM");
       return Ok(());
     }
 
-    // Get current Solana block height just-in-time (only when we're about to process)
+    // Get current Solana block height once for this entire cycle
     let current_solana_height = match self.solana_client.get_current_block_height().await {
       Ok(height) => {
         // Update our cached height for other components that might need it
@@ -263,7 +263,7 @@ impl AtomicDataPublisher {
           let mut cached_height = self.current_solana_block_height.write().await;
           if *cached_height != height {
             debug!(
-              "Updated Solana block height from {} to {} (just-in-time)",
+              "Updated Solana block height from {} to {} (cycle start)",
               *cached_height, height
             );
             *cached_height = height;
@@ -272,10 +272,7 @@ impl AtomicDataPublisher {
         height
       }
       Err(e) => {
-        error!(
-          "Failed to get current Solana block height just-in-time: {}",
-          e
-        );
+        error!("Failed to get current Solana block height: {}", e);
         // Fall back to cached height as emergency measure
         let height = self.current_solana_block_height.read().await;
         warn!(
@@ -286,42 +283,77 @@ impl AtomicDataPublisher {
       }
     };
 
-    // Get pending changes from polling jobs (this now includes the full lifecycle protection)
-    let query_start = Instant::now();
-    let changes_and_job = self
-      .database
-      .get_pending_changes(current_solana_height)
-      .await?;
-    let _query_time = query_start.elapsed();
+    let mut total_jobs_processed = 0;
+    let mut total_changes_published = 0;
 
-    let (changes, active_job_context) = match changes_and_job {
-      Some((changes, job_context)) => (changes, Some(job_context)),
-      None => {
-        debug!("No pending changes found or no jobs available");
-        return Ok(());
-      }
-    };
+    // Process ALL jobs in the queue before returning
+    loop {
+      let changes_and_job = self
+        .database
+        .get_pending_changes(current_solana_height)
+        .await?;
 
-    if changes.is_empty() {
-      debug!("No pending changes found");
-      // Still need to clean up the running state for the job
-      if let Some((job_name, query_name)) = active_job_context {
-        self
-          .database
-          .mark_job_not_running(&job_name, &query_name)
-          .await?;
-        self.database.mark_completed(&job_name, &query_name).await?;
+      let (changes, active_job_context, target_height) = match changes_and_job {
+        Some((changes, job_context, target_height)) => (changes, Some(job_context), target_height),
+        None => {
+          debug!("No more jobs in queue, processed {} jobs total", total_jobs_processed);
+          break;
+        }
+      };
+
+      total_jobs_processed += 1;
+      let job_name = active_job_context.as_ref().map(|(name, _)| name.as_str()).unwrap_or("unknown");
+
+      if changes.is_empty() {
+        debug!(
+          "No changes found for job '{}', advancing to block {}",
+          job_name, target_height
+        );
+        // Still need to clean up the running state for the job and advance the block height
+        if let Some((job_name, query_name)) = active_job_context {
+          let empty_changes = vec![];
+          self
+            .database
+            .mark_processed(&empty_changes, target_height)
+            .await?;
+          self
+            .database
+            .mark_job_not_running(&job_name, &query_name)
+            .await?;
+          self.database.mark_completed(&job_name, &query_name).await?;
+        }
+        continue; // Process next job in queue
       }
-      return Ok(());
+
+      info!(
+        "Processing {} changes for job '{}' in batches of {}",
+        changes.len(),
+        job_name,
+        self.config.service.batch_size
+      );
+
+      // Process all changes in batches for this job
+      let job_published = self.process_job_changes(changes, active_job_context, target_height).await?;
+      total_changes_published += job_published;
     }
 
-    info!(
-      "Processing {} pending changes in batches of {}",
-      changes.len(),
-      self.config.service.batch_size
-    );
+    if total_jobs_processed > 0 {
+      info!(
+        "Completed processing cycle: {} jobs processed, {} total changes published",
+        total_jobs_processed, total_changes_published
+      );
+    }
 
-    // Process all changes in batches (job remains marked as running during this phase)
+    Ok(())
+  }
+
+  /// Process changes for a single job
+  async fn process_job_changes(
+    &self,
+    changes: Vec<crate::database::ChangeRecord>,
+    active_job_context: Option<(String, String)>,
+    target_height: u64,
+  ) -> Result<usize, AtomicDataError> {
     let mut total_published = 0;
     let batch_size = self.config.service.batch_size as usize;
 
@@ -393,7 +425,7 @@ impl AtomicDataPublisher {
       if !published_changes.is_empty() {
         match self
           .database
-          .mark_processed(&published_changes, current_solana_height)
+          .mark_processed(&published_changes, target_height)
           .await
         {
           Ok(_) => {
@@ -459,7 +491,7 @@ impl AtomicDataPublisher {
       }
     }
 
-    Ok(())
+    Ok(total_published)
   }
 
   /// Health check loop

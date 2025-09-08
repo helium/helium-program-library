@@ -267,7 +267,7 @@ impl DatabaseClient {
   pub async fn get_pending_changes(
     &self,
     current_solana_height: u64,
-  ) -> Result<Option<(Vec<ChangeRecord>, (String, String))>> {
+  ) -> Result<Option<(Vec<ChangeRecord>, (String, String), u64)>> {
     if self.any_job_running().await? {
       return Ok(None);
     }
@@ -277,15 +277,15 @@ impl DatabaseClient {
         return Ok(None);
       }
 
-      let changes = match self.execute_job_polling(&job, current_solana_height).await {
-        Ok(changes) => changes,
+      let (changes, target_height) = match self.execute_job_polling(&job, current_solana_height).await {
+        Ok(result) => result,
         Err(e) => {
           let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
           return Err(e);
         }
       };
 
-      Ok(Some((changes, (job.name, job.query_name))))
+      Ok(Some((changes, (job.name, job.query_name), target_height)))
     } else {
       self.reset_job_queue().await?;
       Ok(None)
@@ -297,7 +297,7 @@ impl DatabaseClient {
     &self,
     job: &PollingJob,
     current_solana_height: u64,
-  ) -> Result<Vec<ChangeRecord>> {
+  ) -> Result<(Vec<ChangeRecord>, u64)> {
     // Get current polling state from database
     let current_state_row = sqlx::query(
       r#"
@@ -327,15 +327,44 @@ impl DatabaseClient {
       .and_then(|v| v.as_str())
       .ok_or_else(|| anyhow::anyhow!("hotspot_type parameter required"))?;
 
+    // Calculate block height range for chunked processing
+    let height_diff = current_solana_height.saturating_sub(last_processed_height as u64);
+
+    // For massive backlogs, use very aggressive chunking to catch up quickly
+    let chunk_size = if last_processed_height == 0 && height_diff > 50_000_000 {
+      // For massive initial backlogs (50M+ blocks), process in 10M block chunks
+      10_000_000
+    } else if height_diff > 10_000_000 {
+      // For large backlogs (10M+ blocks), process in 1M block chunks
+      1_000_000
+    } else if height_diff > 1_000_000 {
+      // For medium backlogs (1M+ blocks), process in 100k block chunks
+      100_000
+    } else if height_diff > 100_000 {
+      // For smaller backlogs (100k+ blocks), process in 10k block chunks
+      10_000
+    } else if height_diff > 10_000 {
+      // For small backlogs (10k+ blocks), process in 1k block chunks
+      1_000
+    } else {
+      // For very small updates, process all remaining blocks
+      height_diff
+    };
+
+    let target_height = std::cmp::min(
+      last_processed_height as u64 + chunk_size,
+      current_solana_height
+    );
+
     info!(
-      "Querying job '{}' with query '{}' for hotspot_type '{}', last_processed: {}, current_solana: {}",
-      job.name, job.query_name, hotspot_type, last_processed_height, current_solana_height
+      "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks {} to {} ({} blocks)",
+      job.name, job.query_name, hotspot_type, last_processed_height, target_height, target_height - last_processed_height as u64
     );
 
     let rows = sqlx::query(query)
       .bind(hotspot_type)
       .bind(last_processed_height)
-      .bind(current_solana_height as i64)
+      .bind(target_height as i64)
       .fetch_all(&self.pool)
       .await?;
 
@@ -354,18 +383,19 @@ impl DatabaseClient {
       }
     }
 
-    info!("Found {} changes for job '{}'", changes.len(), job.name);
-    Ok(changes)
+    info!("Found {} changes for job '{}' (processed up to block {})", changes.len(), job.name, target_height);
+    Ok((changes, target_height))
   }
 
   /// Mark changes as processed
   pub async fn mark_processed(
     &self,
     changes: &[ChangeRecord],
-    current_solana_height: u64,
+    target_height: u64,
   ) -> Result<()> {
+    // Handle empty changes case by advancing block height for active job
     if changes.is_empty() {
-      return Ok(());
+      return self.advance_block_height_for_active_job(target_height).await;
     }
 
     // Group changes by table to update polling state for each
@@ -374,7 +404,7 @@ impl DatabaseClient {
     debug!(
       "Marking {} changes as processed with Solana height {}",
       changes.len(),
-      current_solana_height
+      target_height
     );
     for change in changes {
       processed_tables.insert(change.job_name.clone());
@@ -394,15 +424,15 @@ impl DatabaseClient {
           WHERE job_name = $2 AND query_name = $3
           "#,
         )
-        .bind(current_solana_height as i64)
+        .bind(target_height as i64)
         .bind(&job.name)
         .bind(&job.query_name)
         .execute(&self.pool)
         .await?;
 
         info!(
-          "Updated polling state for job '{}' query '{}': last_processed_block_height -> {} (current Solana height)",
-          job.name, job.query_name, current_solana_height
+          "Updated polling state for job '{}' query '{}': last_processed_block_height -> {} (target height)",
+          job.name, job.query_name, target_height
         );
       } else {
         warn!(
@@ -415,8 +445,47 @@ impl DatabaseClient {
     debug!(
       "Marked {} changes as processed with Solana height {}",
       changes.len(),
-      current_solana_height
+      target_height
     );
+    Ok(())
+  }
+
+  /// Advance block height for the currently active job (used when no changes found)
+  async fn advance_block_height_for_active_job(&self, target_height: u64) -> Result<()> {
+    // Find the currently running job and advance its block height
+    let active_job = sqlx::query(
+      r#"
+      SELECT job_name, query_name
+      FROM atomic_data_polling_state
+      WHERE is_running = TRUE
+      LIMIT 1
+      "#
+    )
+    .fetch_optional(&self.pool)
+    .await?;
+
+    if let Some(row) = active_job {
+      let job_name: String = row.get("job_name");
+      let query_name: String = row.get("query_name");
+
+      sqlx::query(
+        r#"
+        UPDATE atomic_data_polling_state
+        SET
+          last_processed_block_height = $1,
+          updated_at = NOW()
+        WHERE job_name = $2 AND query_name = $3
+        "#
+      )
+      .bind(target_height as i64)
+      .bind(&job_name)
+      .bind(&query_name)
+      .execute(&self.pool)
+      .await?;
+
+      debug!("Advanced block height to {} for job '{}' query '{}' (no changes)", target_height, job_name, query_name);
+    }
+
     Ok(())
   }
 
