@@ -7,7 +7,7 @@ use tracing::{debug, error, info, warn};
 use crate::config::PollingJob;
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
-use crate::protobuf::build_hotspot_update_request;
+use crate::protobuf::{build_hotspot_update_request, HotspotUpdateRequest};
 
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
@@ -84,24 +84,12 @@ impl AtomicDataPublisher {
       .unwrap_or("mobile"); // Default to mobile if not specified
 
     // Build protobuf request with proper signing
-    let _hotspot_request = build_hotspot_update_request(change, hotspot_type_str, &self.keypair)?;
+    let hotspot_request = build_hotspot_update_request(change, hotspot_type_str, &self.keypair)?;
 
-    // Log the atomic data event instead of sending to gRPC
-    let timestamp_ms = chrono::Utc::now().timestamp_millis() as u64;
-
-    let event_log = serde_json::json!({
-      "event_type": "atomic_hotspot_update",
-      "hotspot_type": hotspot_type_str,
-      "job_name": change.job_name,
-      "timestamp_ms": timestamp_ms,
-      "signer": self.keypair.public_key().to_string(),
-      "atomic_data": change.atomic_data
-    });
-
+    // Log the actual hotspot request instead of JSON event
     debug!(
-      target: "atomic_hotspot_events",
-      "ATOMIC_HOTSPOT_UPDATE: {}",
-      serde_json::to_string(&event_log).unwrap_or_else(|_| "serialization_error".to_string())
+      "ATOMIC_HOTSPOT_UPDATE: {:?}",
+      hotspot_request
     );
 
     Ok(())

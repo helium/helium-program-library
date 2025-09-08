@@ -88,7 +88,13 @@ impl AtomicHotspotQueries {
         mhi.address,
         mhi.asset,
         mhi.last_block_height,
-        'mobile' as hotspot_type
+        mhi.location,
+        'mobile' as hotspot_type,
+        mhi.device_type,
+        NULL as elevation,
+        NULL as gain,
+        mhi.is_full_hotspot,
+        mhi.deployment_info
       FROM mobile_hotspot_infos mhi
       INNER JOIN assets_with_updates awu ON awu.asset = mhi.asset
       WHERE $1 = 'mobile'
@@ -99,7 +105,13 @@ impl AtomicHotspotQueries {
         ihi.address,
         ihi.asset,
         ihi.last_block_height,
-        'iot' as hotspot_type
+        ihi.location,
+        'iot' as hotspot_type,
+        NULL as device_type,
+        ihi.elevation,
+        ihi.gain,
+        ihi.is_full_hotspot,
+        NULL::jsonb as deployment_info
       FROM iot_hotspot_infos ihi
       INNER JOIN assets_with_updates awu ON awu.asset = ihi.asset
       WHERE $1 = 'iot'
@@ -110,9 +122,12 @@ impl AtomicHotspotQueries {
       kta.encoded_entity_key as pub_key,
       hd.address as solana_address,
       hd.asset,
+      hd.location,
       hd.last_block_height as hotspot_block_height,
       hd.last_block_height as effective_block_height,
-      true as needs_update,
+      hd.device_type,
+      hd.elevation,
+      hd.gain,
       -- Ownership information (welcome_pack_owner or direct_owner only)
       CASE
         WHEN wp.owner IS NOT NULL THEN wp.owner
@@ -146,17 +161,20 @@ impl AtomicHotspotQueries {
         'pub_key', kta.encoded_entity_key,
         'address', hd.address,
         'asset', hd.asset,
+        'location', hd.location,
         'block_height', hd.last_block_height,
-        'owner', CASE
-          WHEN wp.owner IS NOT NULL THEN wp.owner
-          ELSE ao.owner
-        END,
+        'owner', COALESCE(wp.owner, ao.owner),
         'owner_type', CASE
           WHEN wp.owner IS NOT NULL THEN 'welcome_pack_owner'
           ELSE 'direct_owner'
         END,
-        'needs_update', true,
         'hotspot_type', hd.hotspot_type,
+        'device_type', hd.device_type,
+        'elevation', hd.elevation,
+        'gain', hd.gain,
+        'is_full_hotspot', hd.is_full_hotspot,
+        -- Pass raw deployment info for parsing in Rust
+        'deployment_info', hd.deployment_info,
         'rewards_split', CASE
           WHEN mf.address IS NOT NULL THEN
             json_build_object(
@@ -208,10 +226,6 @@ mod tests {
     assert!(
       batch_query.contains("$2"),
       "Batch query missing $2 placeholder for hotspot type"
-    );
-    assert!(
-      batch_query.contains("needs_update"),
-      "Batch query missing needs_update logic"
     );
   }
 

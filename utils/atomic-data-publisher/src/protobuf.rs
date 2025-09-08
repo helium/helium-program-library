@@ -153,7 +153,14 @@ impl ProtobufBuilder {
   }
 
   fn build_mobile_hotspot_metadata(data: &Value) -> Result<MobileHotspotMetadata, AtomicDataError> {
-    let serial_number = Self::extract_string(data, "serial_number").unwrap_or_default();
+    let serial_number = data
+      .get("deployment_info")
+      .and_then(|di| di.get("wifiInfoV0"))
+      .and_then(|wifi| wifi.get("serial"))
+      .and_then(|s| s.as_str())
+      .map(|s| s.to_string())
+      .or_else(|| Self::extract_string(data, "serial_number"))
+      .unwrap_or_default();
 
     let device_type = Self::extract_string(data, "device_type")
       .and_then(|s| Self::parse_mobile_device_type(&s))
@@ -161,9 +168,45 @@ impl ProtobufBuilder {
 
     let asserted_hex = Self::extract_string(data, "asserted_hex")
       .or_else(|| Self::extract_string(data, "location"))
+      .or_else(|| Self::extract_u64(data, "location").map(|loc| format!("{:x}", loc)))
       .unwrap_or_default();
 
-    let azimuth = Self::extract_u32(data, "azimuth").unwrap_or(0);
+    let azimuth = data
+      .get("deployment_info")
+      .and_then(|di| di.get("wifiInfoV0"))
+      .and_then(|wifi| wifi.get("azimuth"))
+      .and_then(|a| a.as_u64())
+      .map(|a| a as u32)
+      .or_else(|| Self::extract_u32(data, "azimuth"))
+      .unwrap_or(0);
+
+    let _antenna = data
+      .get("deployment_info")
+      .and_then(|di| di.get("wifiInfoV0"))
+      .and_then(|wifi| wifi.get("antenna"))
+      .and_then(|a| a.as_u64())
+      .map(|a| a as u32);
+
+    let _deployment_elevation = data
+      .get("deployment_info")
+      .and_then(|di| di.get("wifiInfoV0"))
+      .and_then(|wifi| wifi.get("elevation"))
+      .and_then(|e| e.as_u64())
+      .map(|e| e as u32);
+
+    let _electrical_down_tilt = data
+      .get("deployment_info")
+      .and_then(|di| di.get("wifiInfoV0"))
+      .and_then(|wifi| wifi.get("electricalDownTilt"))
+      .and_then(|t| t.as_u64())
+      .map(|t| t as u32);
+
+    let _mechanical_down_tilt = data
+      .get("deployment_info")
+      .and_then(|di| di.get("wifiInfoV0"))
+      .and_then(|wifi| wifi.get("mechanicalDownTilt"))
+      .and_then(|t| t.as_u64())
+      .map(|t| t as u32);
 
     Ok(MobileHotspotMetadata {
       serial_number,
@@ -176,6 +219,10 @@ impl ProtobufBuilder {
   fn build_iot_hotspot_metadata(data: &Value) -> Result<IotHotspotMetadata, AtomicDataError> {
     let asserted_hex = Self::extract_string(data, "asserted_hex")
       .or_else(|| Self::extract_string(data, "location"))
+      .or_else(|| {
+        // Try to extract as numeric location and convert to hex
+        Self::extract_u64(data, "location").map(|loc| format!("{:x}", loc))
+      })
       .unwrap_or_default();
 
     let elevation = Self::extract_u32(data, "elevation").unwrap_or(0);
@@ -387,25 +434,32 @@ impl ProtobufBuilder {
   }
 }
 
-/// Build and validate hotspot update request based on type (for logging purposes only)
+/// Enum to hold either mobile or IoT hotspot update requests
+#[derive(Debug)]
+pub enum HotspotUpdateRequest {
+  Mobile(MobileHotspotUpdateReqV1),
+  Iot(IotHotspotUpdateReqV1),
+}
+
+/// Build hotspot update request based on type
 pub fn build_hotspot_update_request(
   change: &ChangeRecord,
   hotspot_type: &str,
   keypair: &Keypair,
-) -> Result<(), AtomicDataError> {
+) -> Result<HotspotUpdateRequest, AtomicDataError> {
   match hotspot_type {
     "mobile" => {
-      let _req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
-      Ok(())
+      let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
+      Ok(HotspotUpdateRequest::Mobile(req))
     }
     "iot" => {
-      let _req = ProtobufBuilder::build_iot_hotspot_update(change, keypair)?;
-      Ok(())
+      let req = ProtobufBuilder::build_iot_hotspot_update(change, keypair)?;
+      Ok(HotspotUpdateRequest::Iot(req))
     }
     _ => {
       // Default to mobile for unknown types
-      let _req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
-      Ok(())
+      let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
+      Ok(HotspotUpdateRequest::Mobile(req))
     }
   }
 }

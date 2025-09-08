@@ -250,7 +250,7 @@ fn initialize_logging(logging_config: &LoggingConfig) -> Result<()> {
   let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| logging_config.level.clone());
 
   let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-    .unwrap_or_else(|_| format!("atomic_data_publisher={},sqlx=warn,tonic=info", log_level).into());
+    .unwrap_or_else(|_| format!("atomic_data_publisher={},atomic_hotspot_events={},sqlx=warn,tonic=info", log_level, log_level).into());
 
   let subscriber = tracing_subscriber::registry().with(env_filter);
 
