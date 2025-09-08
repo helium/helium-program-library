@@ -182,12 +182,12 @@ impl AtomicDataPublisher {
       let metrics = self.metrics.clone();
       let mut shutdown_signal = self.shutdown_signal.clone();
       tokio::spawn(async move {
-        let mut interval = interval(Duration::from_secs(60)); // Report every minute
-        loop {
-          tokio::select! {
-              _ = interval.tick() => {
-                  metrics.log_metrics_summary().await;
-              }
+      let mut interval = interval(Duration::from_secs(60)); // Report every minute
+      loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                metrics.log_metrics_summary();
+            }
               _ = shutdown_signal.changed() => {
                   if *shutdown_signal.borrow() {
                       info!("Shutting down metrics reporting");
@@ -257,8 +257,6 @@ impl AtomicDataPublisher {
               }
 
               let cycle_time = cycle_start.elapsed();
-              self.metrics.record_polling_cycle_time(cycle_time).await;
-
               debug!("Polling cycle completed in {:?}", cycle_time);
           }
           _ = shutdown_signal.changed() => {
@@ -273,7 +271,6 @@ impl AtomicDataPublisher {
 
   /// Process pending changes from the database
   async fn process_changes(&self) -> Result<(), AtomicDataError> {
-    let _batch_start = Instant::now();
 
     // Log current queue status for debugging
     if let Ok(queue_status) = self.database.get_queue_status().await {
@@ -308,8 +305,7 @@ impl AtomicDataPublisher {
       .database
       .get_all_polling_job_changes(current_solana_height)
       .await?;
-    let query_time = query_start.elapsed();
-    self.metrics.record_database_query(true, query_time).await;
+    let _query_time = query_start.elapsed();
 
     if changes.is_empty() {
       debug!("No pending changes found");
@@ -329,13 +325,7 @@ impl AtomicDataPublisher {
       let mut published_changes = Vec::new();
       let mut failed_changes = Vec::new();
 
-      // Record per-table metrics for this batch
-      for change in batch {
-        self
-          .metrics
-          .record_table_change_detected(&change.job_name)
-          .await;
-      }
+      // Process each change in the batch
 
       // Process batch with concurrency limit
       let semaphore = Arc::new(tokio::sync::Semaphore::new(
@@ -351,22 +341,15 @@ impl AtomicDataPublisher {
 
         let task = tokio::spawn(async move {
          let _permit = semaphore.acquire().await.unwrap();
-         let publish_start = Instant::now();
-
          let result = publisher.publish_changes(vec![change.clone()]).await;
-        let publish_time = publish_start.elapsed();
 
         match result {
           Ok(published_ids) if !published_ids.is_empty() => {
-            metrics.record_ingestor_request(true, publish_time).await;
-            metrics
-              .record_table_change_published(&change.job_name, publish_time)
-              .await;
+            metrics.increment_published();
             Ok(change)
           }
           Ok(_) => {
-            metrics.record_ingestor_request(false, publish_time).await;
-            metrics.record_table_error(&change.job_name).await;
+            metrics.increment_errors();
             Err(change)
           }
           Err(e) => {
@@ -374,8 +357,7 @@ impl AtomicDataPublisher {
               "Failed to publish change for job '{}': {}",
               change.job_name, e
             );
-            metrics.record_ingestor_request(false, publish_time).await;
-            metrics.record_table_error(&change.job_name).await;
+            metrics.increment_errors();
             Err(change)
           }
         }
@@ -410,14 +392,10 @@ impl AtomicDataPublisher {
               "Batch processing completed in {:?}: {} published, {} failed",
               batch_time, published_changes.len(), failed_changes.len()
             );
-            self.metrics.record_batch_processing_time(batch_time).await;
           }
           Err(e) => {
             error!("Failed to mark batch changes as processed: {}", e);
-            self
-              .metrics
-              .record_database_query(false, Duration::from_millis(0))
-              .await;
+            self.metrics.increment_errors();
             return Err(AtomicDataError::DatabaseError(e.to_string()));
           }
         }
@@ -481,8 +459,8 @@ impl AtomicDataPublisher {
   }
 
   /// Get current service metrics
-  pub async fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
-    self.metrics._get_metrics().await
+  pub fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
+    self.metrics.get_metrics()
   }
 }
 
