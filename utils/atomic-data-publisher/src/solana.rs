@@ -15,19 +15,23 @@ pub struct SolanaClientWrapper {
 
 impl SolanaClientWrapper {
   pub fn new(config: SolanaConfig) -> Result<Self> {
-    info!("Initializing Solana RPC client with endpoint: {}", config.rpc_url);
+    info!(
+      "Initializing Solana RPC client with endpoint: {}",
+      config.rpc_url
+    );
 
     let timeout = Duration::from_secs(config.timeout_seconds);
-    let client = Client::builder()
-      .timeout(timeout)
-      .build()?;
+    let client = Client::builder().timeout(timeout).build()?;
 
     Ok(Self { client, config })
   }
 
-    /// Get the current Solana block height
+  /// Get the current Solana block height
   pub async fn get_current_block_height(&self) -> Result<u64, AtomicDataError> {
-    debug!("Fetching current Solana block height from {}", self.config.rpc_url);
+    debug!(
+      "Fetching current Solana block height from {}",
+      self.config.rpc_url
+    );
 
     let request_body = json!({
       "jsonrpc": "2.0",
@@ -35,7 +39,8 @@ impl SolanaClientWrapper {
       "method": "getSlot"
     });
 
-    match self.client
+    match self
+      .client
       .post(&self.config.rpc_url)
       .json(&request_body)
       .send()
@@ -51,21 +56,31 @@ impl SolanaClientWrapper {
                   Ok(slot)
                 } else {
                   error!("Invalid slot format in response: {:?}", result);
-                  Err(AtomicDataError::SolanaRpcError("Invalid slot format".to_string()))
+                  Err(AtomicDataError::SolanaRpcError(
+                    "Invalid slot format".to_string(),
+                  ))
                 }
               } else {
                 error!("No result in RPC response: {:?}", json_response);
-                Err(AtomicDataError::SolanaRpcError("No result in response".to_string()))
+                Err(AtomicDataError::SolanaRpcError(
+                  "No result in response".to_string(),
+                ))
               }
             }
             Err(e) => {
               error!("Failed to parse JSON response: {}", e);
-              Err(AtomicDataError::SolanaRpcError(format!("JSON parse error: {}", e)))
+              Err(AtomicDataError::SolanaRpcError(format!(
+                "JSON parse error: {}",
+                e
+              )))
             }
           }
         } else {
           error!("HTTP error from Solana RPC: {}", response.status());
-          Err(AtomicDataError::SolanaRpcError(format!("HTTP error: {}", response.status())))
+          Err(AtomicDataError::SolanaRpcError(format!(
+            "HTTP error: {}",
+            response.status()
+          )))
         }
       }
       Err(e) => {
@@ -85,7 +100,8 @@ impl SolanaClientWrapper {
       "method": "getHealth"
     });
 
-    match self.client
+    match self
+      .client
       .post(&self.config.rpc_url)
       .json(&request_body)
       .send()
@@ -96,20 +112,24 @@ impl SolanaClientWrapper {
           debug!("Solana RPC health check passed");
           Ok(())
         } else {
-          error!("Solana RPC health check failed with status: {}", response.status());
-          Err(AtomicDataError::SolanaRpcError(format!("Health check failed: {}", response.status())))
+          error!(
+            "Solana RPC health check failed with status: {}",
+            response.status()
+          );
+          Err(AtomicDataError::SolanaRpcError(format!(
+            "Health check failed: {}",
+            response.status()
+          )))
         }
       }
       Err(e) => {
         error!("Solana RPC health check failed: {}", e);
-        Err(AtomicDataError::SolanaRpcError(format!("Health check error: {}", e)))
+        Err(AtomicDataError::SolanaRpcError(format!(
+          "Health check error: {}",
+          e
+        )))
       }
     }
-  }
-
-  /// Get RPC endpoint URL
-  pub fn get_rpc_url(&self) -> &str {
-    &self.config.rpc_url
   }
 }
 

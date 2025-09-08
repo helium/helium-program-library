@@ -63,17 +63,6 @@ impl Settings {
     s.try_deserialize()
   }
 
-  pub fn database_url(&self) -> String {
-    format!(
-      "postgres://{}:{}@{}:{}/{}",
-      self.database.username,
-      self.database.password,
-      self.database.host,
-      self.database.port,
-      self.database.database_name
-    )
-  }
-
   pub fn polling_interval(&self) -> Duration {
     Duration::from_secs(self.service.polling_interval_seconds)
   }

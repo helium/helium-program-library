@@ -10,7 +10,7 @@ mod solana;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use config::{Settings, LoggingConfig};
+use config::{LoggingConfig, Settings};
 use service::AtomicDataPublisher;
 use std::sync::Arc;
 use tokio::signal;
@@ -133,13 +133,14 @@ async fn create_indexes() -> Result<()> {
   info!("Configuration loaded successfully");
 
   // Create database client
-  let database = match database::DatabaseClient::new(&settings.database, settings.service.polling_jobs).await {
-    Ok(db) => db,
-    Err(e) => {
-      error!("Failed to create database client: {}", e);
-      std::process::exit(1);
-    }
-  };
+  let database =
+    match database::DatabaseClient::new(&settings.database, settings.service.polling_jobs).await {
+      Ok(db) => db,
+      Err(e) => {
+        error!("Failed to create database client: {}", e);
+        std::process::exit(1);
+      }
+    };
 
   // Create performance indexes
   if let Err(e) = database.create_performance_indexes().await {
@@ -191,7 +192,9 @@ fn validate_config(settings: &Settings) -> Result<()> {
 
   // Validate required tables are specified
   if settings.database.required_tables.is_empty() {
-    return Err(anyhow::anyhow!("No required tables specified in configuration"));
+    return Err(anyhow::anyhow!(
+      "No required tables specified in configuration"
+    ));
   }
 
   // Validate Solana RPC configuration
@@ -224,7 +227,8 @@ fn validate_config(settings: &Settings) -> Result<()> {
     if crate::queries::AtomicHotspotQueries::get_query(&job.query_name).is_none() {
       return Err(anyhow::anyhow!(
         "Unknown query '{}' for job '{}'",
-        job.query_name, job.name
+        job.query_name,
+        job.name
       ));
     }
 
@@ -243,22 +247,23 @@ fn validate_config(settings: &Settings) -> Result<()> {
 
 /// Initialize logging based on configuration
 fn initialize_logging(logging_config: &LoggingConfig) -> Result<()> {
-  let log_level = std::env::var("RUST_LOG")
-    .unwrap_or_else(|_| logging_config.level.clone());
+  let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| logging_config.level.clone());
 
   let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-    .unwrap_or_else(|_| {
-      format!("atomic_data_publisher={},sqlx=warn,tonic=info", log_level).into()
-    });
+    .unwrap_or_else(|_| format!("atomic_data_publisher={},sqlx=warn,tonic=info", log_level).into());
 
   let subscriber = tracing_subscriber::registry().with(env_filter);
 
   match logging_config.format.as_str() {
     "json" => {
-      subscriber.with(tracing_subscriber::fmt::layer().json()).init();
+      subscriber
+        .with(tracing_subscriber::fmt::layer().json())
+        .init();
     }
     "pretty" | "text" => {
-      subscriber.with(tracing_subscriber::fmt::layer().pretty()).init();
+      subscriber
+        .with(tracing_subscriber::fmt::layer().pretty())
+        .init();
     }
     _ => {
       subscriber.with(tracing_subscriber::fmt::layer()).init();

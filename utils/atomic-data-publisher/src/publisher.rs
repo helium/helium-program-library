@@ -1,14 +1,13 @@
 use anyhow::Result;
+use chrono;
 use helium_crypto::Keypair;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use chrono;
 
 use crate::config::PollingJob;
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
 use crate::protobuf::build_hotspot_update_request;
-
 
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
@@ -78,16 +77,14 @@ impl AtomicDataPublisher {
       })?;
 
     // Extract hotspot_type from job parameters
-    let hotspot_type_str = job_config.parameters.get("hotspot_type")
+    let hotspot_type_str = job_config
+      .parameters
+      .get("hotspot_type")
       .and_then(|v| v.as_str())
       .unwrap_or("mobile"); // Default to mobile if not specified
 
     // Build protobuf request with proper signing
-    let _hotspot_request = build_hotspot_update_request(
-      change,
-      hotspot_type_str,
-      &self.keypair,
-    )?;
+    let _hotspot_request = build_hotspot_update_request(change, hotspot_type_str, &self.keypair)?;
 
     // Log the atomic data event instead of sending to gRPC
     let timestamp_ms = chrono::Utc::now().timestamp_millis() as u64;
@@ -114,7 +111,10 @@ impl AtomicDataPublisher {
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {
     // Since we're logging instead of using gRPC, just validate that we have a valid keypair
     let public_key = self.keypair.public_key();
-    debug!("Publisher health check passed - keypair public key: {}", public_key);
+    debug!(
+      "Publisher health check passed - keypair public key: {}",
+      public_key
+    );
     Ok(())
   }
 }

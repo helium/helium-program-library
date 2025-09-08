@@ -34,14 +34,6 @@ impl MetricsCollector {
     self.changes_published.fetch_add(1, Ordering::Relaxed);
   }
 
-  pub fn get_metrics(&self) -> ServiceMetrics {
-    ServiceMetrics {
-      uptime_seconds: self.start_time.elapsed().as_secs(),
-      total_changes_published: self.changes_published.load(Ordering::Relaxed),
-      total_errors: self.total_errors.load(Ordering::Relaxed),
-    }
-  }
-
   pub fn log_metrics_summary(&self) {
     let changes_published = self.changes_published.load(Ordering::Relaxed);
     let total_errors = self.total_errors.load(Ordering::Relaxed);

@@ -1,11 +1,11 @@
 use anyhow::Result;
-use helium_crypto::{Keypair, KeyTag, KeyType, Network};
+use helium_crypto::{KeyTag, KeyType, Keypair, Network};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::{interval, sleep};
 use tracing::{debug, error, info, warn};
 
-use crate::config::{Settings, ServiceConfig};
+use crate::config::{ServiceConfig, Settings};
 use crate::database::DatabaseClient;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
@@ -25,52 +25,26 @@ pub struct AtomicDataPublisher {
 }
 
 impl AtomicDataPublisher {
-  /// Validate that all required tables exist in the database
-  async fn validate_required_tables(
-    database: &DatabaseClient,
-    required_tables: &[String],
-  ) -> Result<()> {
-    info!("Validating required tables exist: {:?}", required_tables);
-
-    for table_name in required_tables {
-      match database.table_exists(table_name).await {
-        Ok(exists) => {
-          if !exists {
-            return Err(anyhow::anyhow!("Required table '{}' does not exist", table_name));
-          }
-          debug!("✅ Required table '{}' exists", table_name);
-        }
-        Err(e) => {
-          return Err(anyhow::anyhow!("Failed to check if table '{}' exists: {}", table_name, e));
-        }
+  /// Validate required tables exist
+  async fn validate_tables(database: &DatabaseClient, tables: &[String]) -> Result<()> {
+    for table_name in tables {
+      if !database.table_exists(table_name).await? {
+        return Err(anyhow::anyhow!(
+          "Required table '{}' does not exist",
+          table_name
+        ));
       }
     }
-
-    info!("✅ All required tables validated successfully");
     Ok(())
   }
 
-  /// Initialize database with table validation and optional retries
-  async fn initialize_database_with_validation(
-    database: &DatabaseClient,
-    service_config: &ServiceConfig,
-  ) -> Result<()> {
-    info!("Initializing database with polling jobs validation...");
+  /// Initialize database
+  async fn init_database(database: &DatabaseClient, service_config: &ServiceConfig) -> Result<()> {
+    database.create_state_table().await?;
 
-    // Create the polling state table first
-    database.create_polling_state_table().await?;
-
-    // Validate polling jobs configuration
     if service_config.polling_jobs.is_empty() {
-      warn!("No polling jobs configured - service will not process any changes");
-    } else {
-      info!("Configured {} polling jobs", service_config.polling_jobs.len());
-      for job in &service_config.polling_jobs {
-        info!("  Job '{}' using query '{}'", job.name, job.query_name);
-      }
+      warn!("No polling jobs configured");
     }
-
-    info!("✅ Database initialization completed successfully");
     Ok(())
   }
 
@@ -81,7 +55,9 @@ impl AtomicDataPublisher {
     let solana_client = Arc::new(SolanaClientWrapper::new(config.solana.clone())?);
 
     // Get initial Solana block height
-    let initial_block_height = solana_client.get_current_block_height().await
+    let initial_block_height = solana_client
+      .get_current_block_height()
+      .await
       .map_err(|e| anyhow::anyhow!("Failed to get initial Solana block height: {}", e))?;
     let current_solana_block_height = Arc::new(tokio::sync::RwLock::new(initial_block_height));
 
@@ -90,20 +66,23 @@ impl AtomicDataPublisher {
       Arc::new(DatabaseClient::new(&config.database, config.service.polling_jobs.clone()).await?);
 
     // Validate required tables exist
-    Self::validate_required_tables(&database, &config.database.required_tables).await?;
+    Self::validate_tables(&database, &config.database.required_tables).await?;
 
-    // Initialize polling state with table validation and optional retries
-    Self::initialize_database_with_validation(&database, &config.service).await?;
+    // Initialize database
+    Self::init_database(&database, &config.service).await?;
 
     // Initialize polling state for all configured jobs
-    database.initialize_polling_state().await?;
+    database.init_polling_state().await?;
 
     // Cleanup any stale running states from previous runs
-    database.cleanup_stale_running_states().await?;
+    database.cleanup_stale_jobs().await?;
 
     // Create performance indexes for better query performance
     if let Err(e) = database.create_performance_indexes().await {
-      warn!("Failed to create performance indexes (this is non-fatal): {}", e);
+      warn!(
+        "Failed to create performance indexes (this is non-fatal): {}",
+        e
+      );
     }
 
     // Load keypair for signing messages
@@ -120,7 +99,10 @@ impl AtomicDataPublisher {
     let entropy = if std::path::Path::new(&keypair_path).exists() {
       std::fs::read(&keypair_path)?
     } else {
-      warn!("Keypair file not found at {}, generating new entropy", keypair_path);
+      warn!(
+        "Keypair file not found at {}, generating new entropy",
+        keypair_path
+      );
       let mut entropy = vec![0u8; 32];
       use rand::RngCore;
       rand::thread_rng().fill_bytes(&mut entropy);
@@ -136,10 +118,7 @@ impl AtomicDataPublisher {
     info!("Using keypair with public key: {}", keypair.public_key());
 
     // Initialize publisher client
-    let publisher = Arc::new(Publisher::new(
-      config.service.polling_jobs.clone(),
-      keypair,
-    ).await?);
+    let publisher = Arc::new(Publisher::new(config.service.polling_jobs.clone(), keypair).await?);
 
     // Initialize metrics collector
     let metrics = Arc::new(MetricsCollector::new());
@@ -159,11 +138,8 @@ impl AtomicDataPublisher {
     })
   }
 
-  /// Start the service with all background tasks
+  /// Start the service
   pub async fn run(&self) -> Result<()> {
-    info!("Starting Atomic Data Publisher service");
-
-    // Health check both database and publisher before starting
     self.health_check().await?;
 
     let mut handles = Vec::new();
@@ -182,9 +158,9 @@ impl AtomicDataPublisher {
       let metrics = self.metrics.clone();
       let mut shutdown_signal = self.shutdown_signal.clone();
       tokio::spawn(async move {
-      let mut interval = interval(Duration::from_secs(60)); // Report every minute
-      loop {
-        tokio::select! {
+        let mut interval = interval(Duration::from_secs(60)); // Report every minute
+        loop {
+          tokio::select! {
             _ = interval.tick() => {
                 metrics.log_metrics_summary();
             }
@@ -225,8 +201,11 @@ impl AtomicDataPublisher {
     }
 
     // Clean up ALL running job states in the database before stopping
-    if let Err(e) = self.database.cleanup_all_running_states().await {
-      warn!("Failed to clean up running job states during shutdown: {}", e);
+    if let Err(e) = self.database.cleanup_all_jobs().await {
+      warn!(
+        "Failed to clean up running job states during shutdown: {}",
+        e
+      );
     }
 
     info!("Atomic Data Publisher service stopped");
@@ -269,12 +248,11 @@ impl AtomicDataPublisher {
     }
   }
 
-  /// Process pending changes from the database
+  /// Process pending changes
   async fn process_changes(&self) -> Result<(), AtomicDataError> {
-
-    // Log current queue status for debugging
-    if let Ok(queue_status) = self.database.get_queue_status().await {
-      debug!("Current queue status: {:?}", queue_status);
+    if self.database.any_job_running().await? {
+      debug!("Job already running, skipping to prevent OOM");
+      return Ok(());
     }
 
     // Get current Solana block height just-in-time (only when we're about to process)
@@ -284,42 +262,75 @@ impl AtomicDataPublisher {
         {
           let mut cached_height = self.current_solana_block_height.write().await;
           if *cached_height != height {
-            debug!("Updated Solana block height from {} to {} (just-in-time)", *cached_height, height);
+            debug!(
+              "Updated Solana block height from {} to {} (just-in-time)",
+              *cached_height, height
+            );
             *cached_height = height;
           }
         }
         height
       }
       Err(e) => {
-        error!("Failed to get current Solana block height just-in-time: {}", e);
+        error!(
+          "Failed to get current Solana block height just-in-time: {}",
+          e
+        );
         // Fall back to cached height as emergency measure
         let height = self.current_solana_block_height.read().await;
-        warn!("Using cached Solana block height {} due to RPC failure", *height);
+        warn!(
+          "Using cached Solana block height {} due to RPC failure",
+          *height
+        );
         *height
       }
     };
 
-    // Get pending changes from polling jobs
+    // Get pending changes from polling jobs (this now includes the full lifecycle protection)
     let query_start = Instant::now();
-    let changes = self
+    let changes_and_job = self
       .database
-      .get_all_polling_job_changes(current_solana_height)
+      .get_pending_changes(current_solana_height)
       .await?;
     let _query_time = query_start.elapsed();
 
+    let (changes, active_job_context) = match changes_and_job {
+      Some((changes, job_context)) => (changes, Some(job_context)),
+      None => {
+        debug!("No pending changes found or no jobs available");
+        return Ok(());
+      }
+    };
+
     if changes.is_empty() {
       debug!("No pending changes found");
+      // Still need to clean up the running state for the job
+      if let Some((job_name, query_name)) = active_job_context {
+        self
+          .database
+          .mark_job_not_running(&job_name, &query_name)
+          .await?;
+        self.database.mark_completed(&job_name, &query_name).await?;
+      }
       return Ok(());
     }
 
-    info!("Processing {} pending changes in batches of {}", changes.len(), self.config.service.batch_size);
+    info!(
+      "Processing {} pending changes in batches of {}",
+      changes.len(),
+      self.config.service.batch_size
+    );
 
-    // Process all changes in batches
+    // Process all changes in batches (job remains marked as running during this phase)
     let mut total_published = 0;
     let batch_size = self.config.service.batch_size as usize;
 
     for (batch_index, batch) in changes.chunks(batch_size).enumerate() {
-      info!("Processing batch {}: {} changes", batch_index + 1, batch.len());
+      info!(
+        "Processing batch {}: {} changes",
+        batch_index + 1,
+        batch.len()
+      );
 
       let batch_start = Instant::now();
       let mut published_changes = Vec::new();
@@ -340,49 +351,49 @@ impl AtomicDataPublisher {
         let semaphore = semaphore.clone();
 
         let task = tokio::spawn(async move {
-         let _permit = semaphore.acquire().await.unwrap();
-         let result = publisher.publish_changes(vec![change.clone()]).await;
+          let _permit = semaphore.acquire().await.unwrap();
+          let result = publisher.publish_changes(vec![change.clone()]).await;
 
-        match result {
-          Ok(published_ids) if !published_ids.is_empty() => {
-            metrics.increment_published();
-            Ok(change)
+          match result {
+            Ok(published_ids) if !published_ids.is_empty() => {
+              metrics.increment_published();
+              Ok(change)
+            }
+            Ok(_) => {
+              metrics.increment_errors();
+              Err(change)
+            }
+            Err(e) => {
+              error!(
+                "Failed to publish change for job '{}': {}",
+                change.job_name, e
+              );
+              metrics.increment_errors();
+              Err(change)
+            }
           }
-          Ok(_) => {
-            metrics.increment_errors();
-            Err(change)
-          }
+        });
+
+        tasks.push(task);
+      }
+
+      // Wait for all publishing tasks to complete
+      for task in tasks {
+        match task.await {
+          Ok(Ok(change)) => published_changes.push(change),
+          Ok(Err(change)) => failed_changes.push(change),
           Err(e) => {
-            error!(
-              "Failed to publish change for job '{}': {}",
-              change.job_name, e
-            );
-            metrics.increment_errors();
-            Err(change)
+            error!("Publishing task panicked: {}", e);
+            self.metrics.increment_errors();
           }
-        }
-      });
-
-      tasks.push(task);
-    }
-
-    // Wait for all publishing tasks to complete
-    for task in tasks {
-      match task.await {
-        Ok(Ok(change)) => published_changes.push(change),
-        Ok(Err(change)) => failed_changes.push(change),
-        Err(e) => {
-          error!("Publishing task panicked: {}", e);
-          self.metrics.increment_errors();
         }
       }
-    }
 
       // Mark successfully published changes as processed (update polling state)
       if !published_changes.is_empty() {
         match self
           .database
-          .mark_changes_processed(&published_changes, current_solana_height)
+          .mark_processed(&published_changes, current_solana_height)
           .await
         {
           Ok(_) => {
@@ -390,12 +401,29 @@ impl AtomicDataPublisher {
             let batch_time = batch_start.elapsed();
             info!(
               "Batch processing completed in {:?}: {} published, {} failed",
-              batch_time, published_changes.len(), failed_changes.len()
+              batch_time,
+              published_changes.len(),
+              failed_changes.len()
             );
           }
           Err(e) => {
             error!("Failed to mark batch changes as processed: {}", e);
             self.metrics.increment_errors();
+
+            // Clean up job state on error
+            if let Some((job_name, query_name)) = &active_job_context {
+              if let Err(cleanup_err) = self
+                .database
+                .mark_job_not_running(job_name, query_name)
+                .await
+              {
+                warn!(
+                  "Failed to mark job '{}' query '{}' as not running after error: {}",
+                  job_name, query_name, cleanup_err
+                );
+              }
+            }
+
             return Err(AtomicDataError::DatabaseError(e.to_string()));
           }
         }
@@ -406,7 +434,30 @@ impl AtomicDataPublisher {
       }
     }
 
-    info!("Completed processing all batches: {} total changes published", total_published);
+    info!(
+      "Completed processing all batches: {} total changes published",
+      total_published
+    );
+
+    // Mark the job as not running and completed in queue after all processing is done
+    if let Some((job_name, query_name)) = active_job_context {
+      if let Err(e) = self
+        .database
+        .mark_job_not_running(&job_name, &query_name)
+        .await
+      {
+        warn!(
+          "Failed to mark job '{}' query '{}' as not running after processing: {}",
+          job_name, query_name, e
+        );
+      }
+      if let Err(e) = self.database.mark_completed(&job_name, &query_name).await {
+        warn!(
+          "Failed to mark job '{}' query '{}' as completed after processing: {}",
+          job_name, query_name, e
+        );
+      }
+    }
 
     Ok(())
   }
@@ -433,7 +484,6 @@ impl AtomicDataPublisher {
     }
   }
 
-
   /// Perform health checks on all components
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {
     // Check database connectivity
@@ -457,11 +507,4 @@ impl AtomicDataPublisher {
     debug!("Health check passed");
     Ok(())
   }
-
-  /// Get current service metrics
-  pub fn get_metrics(&self) -> crate::metrics::ServiceMetrics {
-    self.metrics.get_metrics()
-  }
 }
-
-
