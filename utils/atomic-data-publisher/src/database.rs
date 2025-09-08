@@ -56,9 +56,9 @@ impl DatabaseClient {
     // Create the polling state table if it doesn't exist
     self.create_polling_state_table().await?;
 
-    // Initialize state for each polling job
-    for job in &self.polling_jobs {
-      self.initialize_job_polling_state(&job.name, &job.query_name).await?;
+    // Initialize state for each polling job with queue positions
+    for (index, job) in self.polling_jobs.iter().enumerate() {
+      self.initialize_job_polling_state(&job.name, &job.query_name, index as i32).await?;
     }
 
     info!("Initialized polling state for {} jobs", self.polling_jobs.len());
@@ -76,6 +76,8 @@ impl DatabaseClient {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         is_running BOOLEAN NOT NULL DEFAULT FALSE,
         running_since TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+        queue_position INTEGER NOT NULL DEFAULT 0,
+        queue_completed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         PRIMARY KEY (job_name, query_name)
       )
     "#;
@@ -87,8 +89,14 @@ impl DatabaseClient {
       CREATE INDEX IF NOT EXISTS idx_polling_state_updated_at
       ON atomic_data_polling_state (updated_at)
     "#;
-
     sqlx::query(create_index_query).execute(&self.pool).await?;
+
+    // Create index for queue processing
+    let create_queue_index_query = r#"
+      CREATE INDEX IF NOT EXISTS idx_polling_state_queue_position
+      ON atomic_data_polling_state (queue_position, queue_completed_at)
+    "#;
+    sqlx::query(create_queue_index_query).execute(&self.pool).await?;
 
     info!("Created or verified atomic_data_polling_state table with query-level tracking support");
     Ok(())
@@ -201,7 +209,7 @@ impl DatabaseClient {
 
 
   /// Initialize polling state for a specific polling job
-  pub async fn initialize_job_polling_state(&self, job_name: &str, query_name: &str) -> Result<()> {
+  pub async fn initialize_job_polling_state(&self, job_name: &str, query_name: &str, queue_position: i32) -> Result<()> {
     // Check if state already exists for this job
     let existing_state = sqlx::query(
       r#"
@@ -221,51 +229,80 @@ impl DatabaseClient {
 
     if let Some(row) = existing_state {
       let block_height: i64 = row.get("last_processed_block_height");
-      info!(
-        "Resuming polling for job '{}' query '{}' from block height {}",
-        job_name, query_name, block_height
-      );
-    } else {
-      // Insert new state with block height 0
+
+      // Update queue position for existing job
       sqlx::query(
         r#"
-        INSERT INTO atomic_data_polling_state (job_name, query_name, last_processed_block_height, last_poll_time)
-        VALUES ($1, $2, $3, NOW())
+        UPDATE atomic_data_polling_state
+        SET queue_position = $1, updated_at = NOW()
+        WHERE job_name = $2 AND query_name = $3
+        "#
+      )
+      .bind(queue_position)
+      .bind(job_name)
+      .bind(query_name)
+      .execute(&self.pool)
+      .await?;
+
+      info!(
+        "Resuming polling for job '{}' query '{}' from block height {} with queue position {}",
+        job_name, query_name, block_height, queue_position
+      );
+    } else {
+      // Insert new state with block height 0 and queue position
+      sqlx::query(
+        r#"
+        INSERT INTO atomic_data_polling_state (job_name, query_name, last_processed_block_height, last_poll_time, queue_position)
+        VALUES ($1, $2, $3, NOW(), $4)
         "#
       )
       .bind(job_name)
       .bind(query_name)
       .bind(0i64)
+      .bind(queue_position)
       .execute(&self.pool)
       .await?;
 
       info!(
-        "Initialized new polling state for job '{}' query '{}' starting from block height 0",
-        job_name, query_name
+        "Initialized new polling state for job '{}' query '{}' starting from block height 0 with queue position {}",
+        job_name, query_name, queue_position
       );
     }
 
     Ok(())
   }
 
-  /// Get ALL pending changes from all polling jobs
+  /// Get pending changes from the next job in the sequential queue
   pub async fn get_all_polling_job_changes(&self, current_solana_height: u64) -> Result<Vec<ChangeRecord>> {
-    let mut all_changes = Vec::new();
-
-    for job in &self.polling_jobs {
-      let changes = self.poll_job_changes(job, current_solana_height).await?;
-      all_changes.extend(changes);
+    // First check if any job is currently running to prevent job spamming
+    if self.is_any_job_running().await? {
+      debug!("A job is already running, skipping queue processing to prevent job spamming");
+      return Ok(vec![]);
     }
 
-    // Sort by job name for deterministic processing order
-    all_changes.sort_by(|a, b| a.job_name.cmp(&b.job_name));
+    // Get the next job in the queue that should be processed
+    if let Some(job) = self.get_next_queue_job().await? {
+      info!("Processing next job in queue: '{}'", job.name);
 
-    info!(
-      "Found {} total changes across all polling jobs",
-      all_changes.len()
-    );
+      let changes = self.poll_job_changes(&job, current_solana_height).await?;
 
-    Ok(all_changes)
+      // If this job completed successfully (no errors), mark it as completed and move to next
+      if !changes.is_empty() {
+        info!("Job '{}' found {} changes, marking as completed in queue", job.name, changes.len());
+        self.mark_job_queue_completed(&job.name, &job.query_name).await?;
+      } else {
+        // If no changes, still mark as completed to move to next job
+        debug!("Job '{}' found no changes, marking as completed in queue", job.name);
+        self.mark_job_queue_completed(&job.name, &job.query_name).await?;
+      }
+
+      Ok(changes)
+    } else {
+      // No jobs in queue or all completed - reset queue for next cycle
+      debug!("No more jobs in queue, resetting for next cycle");
+      self.reset_job_queue().await?;
+      Ok(vec![])
+    }
   }
 
   /// Poll for changes in a specific polling job
@@ -417,6 +454,28 @@ impl DatabaseClient {
     Ok(())
   }
 
+  /// Check if ANY job is currently running (to prevent job spamming)
+  async fn is_any_job_running(&self) -> Result<bool> {
+    let row = sqlx::query(
+      r#"
+      SELECT COUNT(*) as running_count
+      FROM atomic_data_polling_state
+      WHERE is_running = TRUE
+      "#
+    )
+    .fetch_one(&self.pool)
+    .await?;
+
+    let running_count: i64 = row.get("running_count");
+    let is_any_running = running_count > 0;
+
+    if is_any_running {
+      debug!("Found {} job(s) currently running", running_count);
+    }
+
+    Ok(is_any_running)
+  }
+
   /// Check if a job is currently running
   pub async fn is_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
     let row = sqlx::query(
@@ -541,6 +600,98 @@ impl DatabaseClient {
 
     debug!("Marked job '{}' query '{}' as not running", job_name, query_name);
     Ok(())
+  }
+
+  /// Get the next job in the sequential queue that should be processed
+  async fn get_next_queue_job(&self) -> Result<Option<PollingJob>> {
+    // Get the job with the lowest queue_position that hasn't been completed yet
+    let row = sqlx::query(
+      r#"
+      SELECT job_name, query_name
+      FROM atomic_data_polling_state
+      WHERE queue_completed_at IS NULL
+      ORDER BY queue_position ASC
+      LIMIT 1
+      "#
+    )
+    .fetch_optional(&self.pool)
+    .await?;
+
+    if let Some(row) = row {
+      let job_name: String = row.get("job_name");
+      let query_name: String = row.get("query_name");
+
+      // Find the corresponding job in our configuration
+      for job in &self.polling_jobs {
+        if job.name == job_name && job.query_name == query_name {
+          return Ok(Some(job.clone()));
+        }
+      }
+
+      warn!("Job '{}' query '{}' found in queue but not in configuration", job_name, query_name);
+    }
+
+    Ok(None)
+  }
+
+  /// Mark a job as completed in the queue
+  async fn mark_job_queue_completed(&self, job_name: &str, query_name: &str) -> Result<()> {
+    sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        queue_completed_at = NOW(),
+        updated_at = NOW()
+      WHERE job_name = $1 AND query_name = $2
+      "#
+    )
+    .bind(job_name)
+    .bind(query_name)
+    .execute(&self.pool)
+    .await?;
+
+    debug!("Marked job '{}' query '{}' as completed in queue", job_name, query_name);
+    Ok(())
+  }
+
+  /// Reset the job queue for a new cycle (mark all jobs as not completed)
+  async fn reset_job_queue(&self) -> Result<()> {
+    sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        queue_completed_at = NULL,
+        updated_at = NOW()
+      "#
+    )
+    .execute(&self.pool)
+    .await?;
+
+    info!("Reset job queue - all jobs marked as not completed for new cycle");
+    Ok(())
+  }
+
+  /// Get current queue status for debugging (public method for visibility)
+  pub async fn get_queue_status(&self) -> Result<Vec<(String, i32, bool)>> {
+    let rows = sqlx::query(
+      r#"
+      SELECT job_name, queue_position, (queue_completed_at IS NOT NULL) as completed
+      FROM atomic_data_polling_state
+      ORDER BY queue_position ASC
+      "#
+    )
+    .fetch_all(&self.pool)
+    .await?;
+
+    let mut status = Vec::new();
+    for row in rows {
+      let job_name: String = row.get("job_name");
+      let queue_position: i32 = row.get("queue_position");
+      let completed: bool = row.get("completed");
+      status.push((job_name, queue_position, completed));
+    }
+
+    Ok(status)
   }
 
   /// Cleanup stale running states on startup

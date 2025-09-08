@@ -275,6 +275,11 @@ impl AtomicDataPublisher {
   async fn process_changes(&self) -> Result<(), AtomicDataError> {
     let _batch_start = Instant::now();
 
+    // Log current queue status for debugging
+    if let Ok(queue_status) = self.database.get_queue_status().await {
+      debug!("Current queue status: {:?}", queue_status);
+    }
+
     // Get current Solana block height just-in-time (only when we're about to process)
     let current_solana_height = match self.solana_client.get_current_block_height().await {
       Ok(height) => {
