@@ -327,29 +327,15 @@ impl DatabaseClient {
       .and_then(|v| v.as_str())
       .ok_or_else(|| anyhow::anyhow!("hotspot_type parameter required"))?;
 
-    // Calculate block height range for chunked processing
     let height_diff = current_solana_height.saturating_sub(last_processed_height as u64);
-
-    // For massive backlogs, use very aggressive chunking to catch up quickly
-    let chunk_size = if last_processed_height == 0 && height_diff > 50_000_000 {
-      // For massive initial backlogs (50M+ blocks), process in 10M block chunks
-      10_000_000
-    } else if height_diff > 10_000_000 {
-      // For large backlogs (10M+ blocks), process in 1M block chunks
-      1_000_000
-    } else if height_diff > 1_000_000 {
-      // For medium backlogs (1M+ blocks), process in 100k block chunks
-      100_000
-    } else if height_diff > 100_000 {
-      // For smaller backlogs (100k+ blocks), process in 10k block chunks
-      10_000
-    } else if height_diff > 10_000 {
-      // For small backlogs (10k+ blocks), process in 1k block chunks
-      1_000
+    let chunk_size = if height_diff <= 1000 {
+        height_diff
     } else {
-      // For very small updates, process all remaining blocks
-      height_diff
+        // Scale chunk size logarithmically: roughly 10% of remaining blocks, with bounds
+        let scaled_chunk = (height_diff as f64 * 0.10) as u64;
+        scaled_chunk.clamp(1000, 100_000_000) // Min 1k blocks, max 100M blocks
     };
+
 
     let target_height = std::cmp::min(
       last_processed_height as u64 + chunk_size,
