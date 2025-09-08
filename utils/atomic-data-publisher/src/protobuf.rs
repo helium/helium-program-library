@@ -180,34 +180,6 @@ impl ProtobufBuilder {
       .or_else(|| Self::extract_u32(data, "azimuth"))
       .unwrap_or(0);
 
-    let _antenna = data
-      .get("deployment_info")
-      .and_then(|di| di.get("wifiInfoV0"))
-      .and_then(|wifi| wifi.get("antenna"))
-      .and_then(|a| a.as_u64())
-      .map(|a| a as u32);
-
-    let _deployment_elevation = data
-      .get("deployment_info")
-      .and_then(|di| di.get("wifiInfoV0"))
-      .and_then(|wifi| wifi.get("elevation"))
-      .and_then(|e| e.as_u64())
-      .map(|e| e as u32);
-
-    let _electrical_down_tilt = data
-      .get("deployment_info")
-      .and_then(|di| di.get("wifiInfoV0"))
-      .and_then(|wifi| wifi.get("electricalDownTilt"))
-      .and_then(|t| t.as_u64())
-      .map(|t| t as u32);
-
-    let _mechanical_down_tilt = data
-      .get("deployment_info")
-      .and_then(|di| di.get("wifiInfoV0"))
-      .and_then(|wifi| wifi.get("mechanicalDownTilt"))
-      .and_then(|t| t.as_u64())
-      .map(|t| t as u32);
-
     Ok(MobileHotspotMetadata {
       serial_number,
       device_type: device_type.into(),
