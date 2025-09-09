@@ -9,7 +9,6 @@ mod service;
 mod solana;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
 use config::{LoggingConfig, Settings};
 use service::AtomicDataPublisher;
 use std::sync::Arc;
@@ -17,31 +16,9 @@ use tokio::signal;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-#[derive(Parser)]
-#[command(name = "atomic-data-publisher")]
-#[command(about = "Helium Atomic Data Publisher - Efficiently process hotspot data changes")]
-struct Cli {
-  #[command(subcommand)]
-  command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-  /// Start the atomic data publisher service
-  Serve,
-  /// Create performance indexes for better query performance
-  CreateIndexes,
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
-  // Parse command line arguments
-  let cli = Cli::parse();
-
-  match cli.command {
-    Commands::Serve => run_service().await,
-    Commands::CreateIndexes => create_indexes().await,
-  }
+  run_service().await
 }
 
 async fn run_service() -> Result<()> {
@@ -116,41 +93,6 @@ async fn run_service() -> Result<()> {
   }
 }
 
-async fn create_indexes() -> Result<()> {
-  // Load configuration first (before logging setup)
-  let settings = match Settings::new() {
-    Ok(s) => s,
-    Err(e) => {
-      eprintln!("Failed to load configuration: {}", e);
-      std::process::exit(1);
-    }
-  };
-
-  // Initialize logging based on configuration
-  initialize_logging(&settings.logging)?;
-
-  info!("Creating performance indexes for Atomic Data Publisher");
-  info!("Configuration loaded successfully");
-
-  // Create database client
-  let database =
-    match database::DatabaseClient::new(&settings.database, settings.service.polling_jobs).await {
-      Ok(db) => db,
-      Err(e) => {
-        error!("Failed to create database client: {}", e);
-        std::process::exit(1);
-      }
-    };
-
-  // Create performance indexes
-  if let Err(e) = database.create_performance_indexes().await {
-    error!("Failed to create performance indexes: {}", e);
-    std::process::exit(1);
-  }
-
-  info!("✅ Performance indexes created successfully");
-  Ok(())
-}
 
 /// Validate the configuration before starting the service
 fn validate_config(settings: &Settings) -> Result<()> {

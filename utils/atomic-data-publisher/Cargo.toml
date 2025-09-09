@@ -15,7 +15,6 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 config = "0.13"
 thiserror = "1.0"
-clap = { version = "4.0", features = ["derive"] }
 futures = "0.3"
 helium-proto = { git = "https://github.com/helium/proto", branch = "mj/chain-rewardable-entities", features = ["services"] }
 helium-crypto = { git = "https://github.com/helium/helium-crypto-rs.git", branch = "main" }

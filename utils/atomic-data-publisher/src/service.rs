@@ -77,13 +77,6 @@ impl AtomicDataPublisher {
     // Cleanup any stale running states from previous runs
     database.cleanup_stale_jobs().await?;
 
-    // Create performance indexes for better query performance
-    if let Err(e) = database.create_performance_indexes().await {
-      warn!(
-        "Failed to create performance indexes (this is non-fatal): {}",
-        e
-      );
-    }
 
     // Load keypair for signing messages
     let keypair_path = std::env::var("ATOMIC_DATA_PUBLISHER_SIGNING_KEYPAIR_PATH")
