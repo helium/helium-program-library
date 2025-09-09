@@ -1,5 +1,4 @@
 use anyhow::Result;
-use chrono;
 use helium_crypto::Keypair;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
@@ -7,7 +6,7 @@ use tracing::{debug, error, info, warn};
 use crate::config::PollingJob;
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
-use crate::protobuf::{build_hotspot_update_request, HotspotUpdateRequest};
+use crate::protobuf::build_hotspot_update_request;
 
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
@@ -87,7 +86,7 @@ impl AtomicDataPublisher {
     let hotspot_request = build_hotspot_update_request(change, hotspot_type_str, &self.keypair)?;
 
     // Log the actual hotspot request instead of JSON event
-    debug!("ATOMIC_HOTSPOT_UPDATE: {:?}", hotspot_request);
+    debug!("ATOMIC_HOTSPOT_UPDATE: {}", hotspot_request);
 
     Ok(())
   }

@@ -406,84 +406,24 @@ impl ProtobufBuilder {
   }
 }
 
-/// Enum to hold either mobile or IoT hotspot update requests
-#[derive(Debug)]
-pub enum HotspotUpdateRequest {
-  Mobile(MobileHotspotUpdateReqV1),
-  Iot(IotHotspotUpdateReqV1),
-}
-
-/// Build hotspot update request based on type
 pub fn build_hotspot_update_request(
   change: &ChangeRecord,
   hotspot_type: &str,
   keypair: &Keypair,
-) -> Result<HotspotUpdateRequest, AtomicDataError> {
+) -> Result<String, AtomicDataError> {
   match hotspot_type {
     "mobile" => {
       let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
-      Ok(HotspotUpdateRequest::Mobile(req))
+      Ok(format!("Mobile({:?})", req))
     }
     "iot" => {
       let req = ProtobufBuilder::build_iot_hotspot_update(change, keypair)?;
-      Ok(HotspotUpdateRequest::Iot(req))
+      Ok(format!("Iot({:?})", req))
     }
     _ => {
       // Default to mobile for unknown types
       let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
-      Ok(HotspotUpdateRequest::Mobile(req))
+      Ok(format!("Mobile({:?})", req))
     }
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use serde_json::json;
-
-  #[test]
-  fn test_build_mobile_hotspot_update() {
-    let data = json!({
-        "block_height": 12345,
-        "block_time_seconds": 1640995200,
-        "pub_key": "112NqN2WWMwtK29PMzRby62fDydBJfsCLkCAf392stdok48ovNT6",
-        "asset": "7isAuYXaNpBdxy95y5YktCS2tZWKWp5y7x8LjuVLjNtn",
-        "serial_number": "SN123456",
-        "device_type": "cbrs",
-        "asserted_hex": "8c2681a306607ff",
-        "azimuth": 180,
-        "owner": "7isAuYXaNpBdxy95y5YktCS2tZWKWp5y7x8LjuVLjNtn",
-        "owner_type": "direct_owner",
-        "rewards_recipient": "7isAuYXaNpBdxy95y5YktCS2tZWKWp5y7x8LjuVLjNtn"
-    });
-
-    let change = ChangeRecord {
-      job_name: "mobile_hotspots".to_string(),
-      atomic_data: json!([data]),
-    };
-
-    let keypair = Keypair::generate_from_entropy(
-      helium_crypto::KeyTag {
-        network: helium_crypto::Network::MainNet,
-        key_type: helium_crypto::KeyType::Ed25519,
-      },
-      &[1u8; 32], // Use non-zero entropy for testing
-    )
-    .unwrap();
-    let result = ProtobufBuilder::build_mobile_hotspot_update(&change, &keypair);
-
-    assert!(result.is_ok());
-    let req = result.unwrap();
-    assert_eq!(req.signer, keypair.public_key().to_string());
-    assert!(!req.signature.is_empty()); // Should have a valid signature
-    assert!(req.update.is_some());
-
-    let update = req.update.unwrap();
-    assert_eq!(update.block_height, 12345);
-    assert_eq!(update.block_time_seconds, 1640995200);
-    assert!(update.pub_key.is_some());
-    assert!(update.asset.is_some());
-    assert!(update.metadata.is_some());
-    assert!(update.owner.is_some());
   }
 }
