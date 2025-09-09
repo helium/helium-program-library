@@ -109,11 +109,16 @@ impl AtomicDataPublisher {
 
     info!("Using keypair with public key: {}", keypair.public_key());
 
-    // Initialize publisher client
-    let publisher = Arc::new(Publisher::new(config.service.polling_jobs.clone(), keypair).await?);
-
     // Initialize metrics collector
     let metrics = Arc::new(MetricsCollector::new());
+
+    // Initialize publisher client
+    let publisher = Arc::new(Publisher::new(
+      config.service.polling_jobs.clone(),
+      keypair,
+      config.ingestor.clone(),
+      metrics.clone(),
+    ).await?);
 
     // Create shutdown signal
     let (shutdown_sender, shutdown_signal) = tokio::sync::watch::channel(false);

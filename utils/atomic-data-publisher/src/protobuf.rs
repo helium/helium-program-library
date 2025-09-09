@@ -406,24 +406,31 @@ impl ProtobufBuilder {
   }
 }
 
+/// Enum to hold either mobile or IoT hotspot update requests for gRPC
+#[derive(Debug, Clone)]
+pub enum HotspotUpdateRequest {
+  Mobile(MobileHotspotUpdateReqV1),
+  Iot(IotHotspotUpdateReqV1),
+}
+
 pub fn build_hotspot_update_request(
   change: &ChangeRecord,
   hotspot_type: &str,
   keypair: &Keypair,
-) -> Result<String, AtomicDataError> {
+) -> Result<HotspotUpdateRequest, AtomicDataError> {
   match hotspot_type {
     "mobile" => {
       let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
-      Ok(format!("Mobile({:?})", req))
+      Ok(HotspotUpdateRequest::Mobile(req))
     }
     "iot" => {
       let req = ProtobufBuilder::build_iot_hotspot_update(change, keypair)?;
-      Ok(format!("Iot({:?})", req))
+      Ok(HotspotUpdateRequest::Iot(req))
     }
     _ => {
       // Default to mobile for unknown types
       let req = ProtobufBuilder::build_mobile_hotspot_update(change, keypair)?;
-      Ok(format!("Mobile({:?})", req))
+      Ok(HotspotUpdateRequest::Mobile(req))
     }
   }
 }

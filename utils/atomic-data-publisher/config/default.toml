@@ -46,6 +46,12 @@ name = "atomic_iot_hotspots"
 query_name = "construct_atomic_hotspots"
 parameters = { hotspot_type = "iot" }
 
+[ingestor]
+endpoint = "http://localhost:8080"
+timeout_seconds = 30
+max_retries = 3
+retry_delay_seconds = 2
+
 [logging]
 level = "info"
 format = "json"

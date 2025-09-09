@@ -17,6 +17,9 @@ pub enum AtomicDataError {
   #[error("Solana RPC error: {0}")]
   SolanaRpcError(String),
 
+  #[error("Network error: {0}")]
+  NetworkError(String),
+
   #[error("Unknown error: {0}")]
   Unknown(String),
 }

@@ -7,6 +7,7 @@ pub struct Settings {
   pub database: DatabaseConfig,
   pub solana: SolanaConfig,
   pub service: ServiceConfig,
+  pub ingestor: IngestorConfig,
   pub logging: LoggingConfig,
 }
 
@@ -37,6 +38,14 @@ pub struct ServiceConfig {
   pub batch_size: u32,
   pub max_concurrent_publishes: u32,
   pub polling_jobs: Vec<PollingJob>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct IngestorConfig {
+  pub endpoint: String,
+  pub timeout_seconds: u64,
+  pub max_retries: u32,
+  pub retry_delay_seconds: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -100,6 +109,12 @@ impl Default for Settings {
         batch_size: 100,
         max_concurrent_publishes: 5,
         polling_jobs: vec![],
+      },
+      ingestor: IngestorConfig {
+        endpoint: "http://localhost:8080".to_string(),
+        timeout_seconds: 30,
+        max_retries: 3,
+        retry_delay_seconds: 2,
       },
       logging: LoggingConfig {
         level: "info".to_string(),
