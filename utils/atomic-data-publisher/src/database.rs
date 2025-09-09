@@ -105,7 +105,6 @@ impl DatabaseClient {
     Ok(())
   }
 
-
   /// Check if table exists
   pub async fn table_exists(&self, table_name: &str) -> Result<bool> {
     let query = r#"
@@ -207,13 +206,14 @@ impl DatabaseClient {
         return Ok(None);
       }
 
-      let (changes, target_height) = match self.execute_job_polling(&job, current_solana_height).await {
-        Ok(result) => result,
-        Err(e) => {
-          let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
-          return Err(e);
-        }
-      };
+      let (changes, target_height) =
+        match self.execute_job_polling(&job, current_solana_height).await {
+          Ok(result) => result,
+          Err(e) => {
+            let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
+            return Err(e);
+          }
+        };
 
       Ok(Some((changes, (job.name, job.query_name), target_height)))
     } else {
@@ -259,17 +259,16 @@ impl DatabaseClient {
 
     let height_diff = current_solana_height.saturating_sub(last_processed_height as u64);
     let chunk_size = if height_diff <= 1000 {
-        height_diff
+      height_diff
     } else {
-        // Scale chunk size logarithmically: roughly 10% of remaining blocks, with bounds
-        let scaled_chunk = (height_diff as f64 * 0.10) as u64;
-        scaled_chunk.clamp(1000, 100_000_000) // Min 1k blocks, max 100M blocks
+      // Scale chunk size logarithmically: roughly 10% of remaining blocks, with bounds
+      let scaled_chunk = (height_diff as f64 * 0.10) as u64;
+      scaled_chunk.clamp(1000, 100_000_000) // Min 1k blocks, max 100M blocks
     };
-
 
     let target_height = std::cmp::min(
       last_processed_height as u64 + chunk_size,
-      current_solana_height
+      current_solana_height,
     );
 
     info!(
@@ -299,19 +298,22 @@ impl DatabaseClient {
       }
     }
 
-    info!("Found {} changes for job '{}' (processed up to block {})", changes.len(), job.name, target_height);
+    info!(
+      "Found {} changes for job '{}' (processed up to block {})",
+      changes.len(),
+      job.name,
+      target_height
+    );
     Ok((changes, target_height))
   }
 
   /// Mark changes as processed
-  pub async fn mark_processed(
-    &self,
-    changes: &[ChangeRecord],
-    target_height: u64,
-  ) -> Result<()> {
+  pub async fn mark_processed(&self, changes: &[ChangeRecord], target_height: u64) -> Result<()> {
     // Handle empty changes case by advancing block height for active job
     if changes.is_empty() {
-      return self.advance_block_height_for_active_job(target_height).await;
+      return self
+        .advance_block_height_for_active_job(target_height)
+        .await;
     }
 
     // Group changes by table to update polling state for each
@@ -375,7 +377,7 @@ impl DatabaseClient {
       FROM atomic_data_polling_state
       WHERE is_running = TRUE
       LIMIT 1
-      "#
+      "#,
     )
     .fetch_optional(&self.pool)
     .await?;
@@ -391,7 +393,7 @@ impl DatabaseClient {
           last_processed_block_height = $1,
           updated_at = NOW()
         WHERE job_name = $2 AND query_name = $3
-        "#
+        "#,
       )
       .bind(target_height as i64)
       .bind(&job_name)
@@ -399,7 +401,10 @@ impl DatabaseClient {
       .execute(&self.pool)
       .await?;
 
-      debug!("Advanced block height to {} for job '{}' query '{}' (no changes)", target_height, job_name, query_name);
+      debug!(
+        "Advanced block height to {} for job '{}' query '{}' (no changes)",
+        target_height, job_name, query_name
+      );
     }
 
     Ok(())

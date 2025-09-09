@@ -77,7 +77,6 @@ impl AtomicDataPublisher {
     // Cleanup any stale running states from previous runs
     database.cleanup_stale_jobs().await?;
 
-
     // Load keypair for signing messages
     let keypair_path = std::env::var("ATOMIC_DATA_PUBLISHER_SIGNING_KEYPAIR_PATH")
       .unwrap_or_else(|_| "./keypair.bin".to_string());
@@ -289,13 +288,19 @@ impl AtomicDataPublisher {
       let (changes, active_job_context, target_height) = match changes_and_job {
         Some((changes, job_context, target_height)) => (changes, Some(job_context), target_height),
         None => {
-          debug!("No more jobs in queue, processed {} jobs total", total_jobs_processed);
+          debug!(
+            "No more jobs in queue, processed {} jobs total",
+            total_jobs_processed
+          );
           break;
         }
       };
 
       total_jobs_processed += 1;
-      let job_name = active_job_context.as_ref().map(|(name, _)| name.as_str()).unwrap_or("unknown");
+      let job_name = active_job_context
+        .as_ref()
+        .map(|(name, _)| name.as_str())
+        .unwrap_or("unknown");
 
       if changes.is_empty() {
         debug!(
@@ -326,7 +331,9 @@ impl AtomicDataPublisher {
       );
 
       // Process all changes in batches for this job
-      let job_published = self.process_job_changes(changes, active_job_context, target_height).await?;
+      let job_published = self
+        .process_job_changes(changes, active_job_context, target_height)
+        .await?;
       total_changes_published += job_published;
     }
 

@@ -87,10 +87,7 @@ impl AtomicDataPublisher {
     let hotspot_request = build_hotspot_update_request(change, hotspot_type_str, &self.keypair)?;
 
     // Log the actual hotspot request instead of JSON event
-    debug!(
-      "ATOMIC_HOTSPOT_UPDATE: {:?}",
-      hotspot_request
-    );
+    debug!("ATOMIC_HOTSPOT_UPDATE: {:?}", hotspot_request);
 
     Ok(())
   }
