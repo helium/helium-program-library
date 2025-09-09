@@ -34,7 +34,7 @@ async fn run_service() -> Result<()> {
   // Initialize logging based on configuration
   initialize_logging(&settings.logging)?;
 
-  info!("Starting Atomic Data Publisher v0.1.0");
+  info!("Starting Atomic Data Publisher");
   info!("Configuration loaded successfully");
 
   // Validate configuration
@@ -55,19 +55,33 @@ async fn run_service() -> Result<()> {
     }
   };
 
-  // Setup graceful shutdown signal handler
+  // Setup shutdown handlers for both SIGTERM and local dev (Ctrl+C)
   let shutdown_sender = service.shutdown_sender.clone();
   let shutdown_handle = tokio::spawn(async move {
-    match signal::ctrl_c().await {
-      Ok(()) => {
-        info!("Received Ctrl+C, initiating graceful shutdown");
-        if let Err(e) = shutdown_sender.send(true) {
-          error!("Failed to send shutdown signal: {}", e);
+    let ctrl_c = async {
+      signal::ctrl_c()
+        .await
+        .expect("failed to install Ctrl+C handler");
+    };
+
+    let terminate = async {
+      signal::unix::signal(signal::unix::SignalKind::terminate())
+        .expect("failed to install signal handler")
+        .recv()
+        .await;
+    };
+
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Received Ctrl+C, initiating graceful shutdown");
         }
-      }
-      Err(err) => {
-        error!("Unable to listen for shutdown signal: {}", err);
-      }
+        _ = terminate => {
+            info!("Received SIGTERM, initiating graceful shutdown");
+        }
+    }
+
+    if let Err(e) = shutdown_sender.send(true) {
+      error!("Failed to send shutdown signal: {}", e);
     }
   });
 
@@ -76,7 +90,6 @@ async fn run_service() -> Result<()> {
       result = service.run() => result,
       _ = shutdown_handle => {
           info!("Shutdown signal received, waiting for service to complete cleanup");
-          // Wait for the service to finish its cleanup
           service.run().await
       }
   };
@@ -84,11 +97,11 @@ async fn run_service() -> Result<()> {
   match service_result {
     Ok(_) => {
       info!("Atomic Data Publisher service stopped gracefully");
-      std::process::exit(0);
+      Ok(())
     }
     Err(e) => {
       error!("Service failed: {}", e);
-      std::process::exit(1);
+      Err(e)
     }
   }
 }
