@@ -22,6 +22,7 @@ pub struct UpdateAutoTopOffArgsV0 {
   pub new_task_id: u16,
   pub new_pyth_task_id: u16,
   pub schedule: Option<String>,
+  pub threshold: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -72,6 +73,9 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
       crate::errors::ErrorCode::InvalidSchedule
     })?;
     auto_top_off.schedule = schedule;
+  }
+  if let Some(threshold) = args.threshold {
+    auto_top_off.threshold = threshold;
   }
   resize_to_fit(
     &ctx.accounts.payer.to_account_info(),

@@ -49,19 +49,17 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
           });
         }
 
-        // Case 2: New destination is a mini fanout
         if (newDestination !== PublicKey.default.toBase58()) {
           const newMiniFanout = await MiniFanout.findByPk(newDestination, {
             transaction,
           });
+
           if (newMiniFanout) {
             await handleMiniFanout(account.asset, newMiniFanout, transaction);
             return account;
           }
-        }
-
-        // Case 3: New destination is a direct recipient (not a mini fanout)
-        if (newDestination !== PublicKey.default.toBase58()) {
+          
+          // Case 3: New destination is a direct recipient (not a mini fanout)
           const kta = await KeyToAsset.findOne({
             where: {
               dao: "BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie",
