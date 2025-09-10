@@ -227,9 +227,9 @@ export async function getMigrateTransactions(
       const draft = transactions[i];
       tx.serialize();
       if (
-        draft.signers?.some((sig) =>
-          sig.publicKey.equals(provider.wallet.publicKey)
-        )
+        draft.instructions.map((ix) => ix.keys).flat().some((key) =>
+          key.pubkey.equals(provider.wallet.publicKey) && key.isSigner
+        ) || draft.feePayer?.equals(provider.wallet.publicKey)
       ) {
         return provider.wallet.signTransaction(tx);
       }
