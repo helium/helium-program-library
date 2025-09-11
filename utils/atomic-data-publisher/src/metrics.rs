@@ -3,13 +3,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 use tracing::info;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServiceMetrics {
-  pub uptime_seconds: u64,
-  pub total_changes_published: u64,
-  pub total_errors: u64,
-}
-
 #[derive(Debug)]
 pub struct MetricsCollector {
   start_time: Instant,

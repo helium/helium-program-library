@@ -91,14 +91,7 @@ impl Default for Settings {
         acquire_timeout_seconds: 30,
         idle_timeout_seconds: 600,
         max_lifetime_seconds: 1800,
-        required_tables: vec![
-          "asset_owners".to_string(),
-          "key_to_assets".to_string(),
-          "recipients".to_string(),
-          "welcome_packs".to_string(),
-          "rewards_recipients".to_string(),
-          "mini_fanouts".to_string(),
-        ],
+        required_tables: vec![],
       },
       solana: SolanaConfig {
         rpc_url: "https://api.mainnet-beta.solana.com".to_string(),

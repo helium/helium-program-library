@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono;
+use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 
@@ -604,7 +604,7 @@ impl DatabaseClient {
 
   /// Cleanup stale jobs
   pub async fn cleanup_stale_jobs(&self) -> Result<()> {
-    let stale_threshold = chrono::Utc::now() - chrono::Duration::minutes(30);
+    let stale_threshold = Utc::now() - Duration::minutes(30);
 
     let result = sqlx::query(
       r#"

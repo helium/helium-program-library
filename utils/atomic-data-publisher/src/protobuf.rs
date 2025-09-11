@@ -12,7 +12,6 @@ use prost::Message;
 use serde_json::Value;
 use tracing::{debug, warn};
 
-// HotspotType removed - using string literals directly
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
 
