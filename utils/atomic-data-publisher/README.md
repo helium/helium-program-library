@@ -1,468 +1,356 @@
 # Atomic Data Publisher
 
-A Rust service that monitors PostgreSQL database tables for changes and publishes atomic data to an ingestor service. Designed to run on Kubernetes with comprehensive monitoring, error handling, and circuit breaker patterns.
+A high-performance Rust service that monitors PostgreSQL database changes and publishes atomic hotspot data to the Helium oracles ingestor via gRPC. Built for production deployment with comprehensive error handling, metrics, and observability.
 
 ## Overview
 
-The Atomic Data Publisher is a Rust service that monitors PostgreSQL database changes and publishes atomic data updates to the Helium oracles ingestor service. It's designed to work with the Helium blockchain ecosystem, specifically integrating with:
+The Atomic Data Publisher bridges the gap between the Helium blockchain data pipeline and the oracles ingestor service. It:
 
-- **Database**: `account-postgres-sink-service` - Monitors Solana accounts and stores hotspot data
-- **Ingestor**: `oracles/ingest/server_chain.rs` - Receives and processes signed protobuf messages
-- **Protobuf**: `helium-proto` - Defines chain rewardable entities messages
-- **Crypto**: `helium-crypto-rs` - Handles message signing and verification
-
-The Atomic Data Publisher:
-
-1. **Monitors Database Changes**: Uses direct polling to detect changes in hotspot tables
-2. **Constructs Atomic Data**: Executes configurable queries to build rich hotspot update payloads
-3. **Signs Messages**: Cryptographically signs messages using Helium keypairs
-4. **Publishes to Oracles**: Connects to Helium oracles ingestor service via gRPC
-5. **Provides Observability**: Comprehensive metrics, logging, and health checks
+1. **Monitors Database Changes**: Polls PostgreSQL tables for hotspot data updates using block height tracking
+2. **Constructs Atomic Data**: Executes optimized SQL queries to build comprehensive hotspot update payloads
+3. **Signs Messages**: Cryptographically signs protobuf messages using Helium Ed25519 keypairs
+4. **Publishes via gRPC**: Sends signed messages to the Helium oracles ingestor service
+5. **Provides Observability**: Comprehensive metrics, structured logging, and health checks
 
 ## Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   PostgreSQL    │    │  Atomic Data     │    │   Helium        │
-│  (sink-service) │───▶│   Publisher      │───▶│   Oracles       │
-│                 │    │                  │    │   Ingestor      │
-│ • hotspot_infos │    │ • Polling-based  │    │                 │
-│ • Change Column │    │   Change         │    │ • gRPC Server   │
-│   (e.g. block   │    │   Detection      │    │ • Signature     │
-│   height)       │    │ • Protobuf       │    │   Verification  │
-│                 │    │   Construction   │    │                 │
-└─────────────────┘    │ • Helium Crypto  │    │ • S3 Storage    │
-                       │   Signing        │    └─────────────────┘
-                       │ • gRPC Client    │
-                       │ • Metrics        │
-                       └──────────────────┘
+│                 │───▶│   Publisher      │───▶│   Oracles       │
+│ • hotspot_infos │    │                  │    │   Ingestor      │
+│ • asset_owners  │    │ • Block Height   │    │                 │
+│ • key_to_assets │    │   Polling        │    │ • gRPC Server   │
+│ • recipients    │    │ • Batch Queries  │    │ • Protobuf      │
+│ • mini_fanouts  │    │ • Job Queue      │    │   Messages      │
+│                 │    │ • Crypto Signing │    │                 │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-## Features
+## Key Features
 
-### 🔍 Change Detection
+### 🚀 High Performance
 
-- Direct polling compares current block heights against last processed values
-- Persistent state tracking ensures crash recovery and reliable restarts
-- Efficient polling mechanism processes changes in batches based on `last_block_height`
-- Configurable polling intervals and batch sizes
+- **Batch Processing**: Processes thousands of records in single optimized SQL queries
+- **Smart Pagination**: Adaptive block height chunking based on data volume
+- **Concurrent Publishing**: Configurable concurrency limits for gRPC requests
+- **Efficient Polling**: Only processes records with `last_block_height > processed_height`
 
-### 🚀 Performance Optimizations
+### 🔄 Reliable Processing
 
-#### Batch Query Processing
+- **Job Queue System**: Sequential processing of polling jobs with queue management
+- **State Persistence**: Tracks progress per job in `atomic_data_polling_state` table
+- **Crash Recovery**: Automatically resumes from last processed block height
+- **Retry Logic**: Exponential backoff for failed gRPC requests
 
-- **Before**: Individual atomic queries executed for each hotspot record (50,000+ separate queries for large tables)
-- **After**: Single batch queries process 1,000 records at once, reducing database round trips by 99.98%
-- **Impact**: Massive performance improvement for tables with 49995 mobile + 1.3M IoT records
+### 📊 Production Ready
 
-#### Database Indexes
+- **Comprehensive Metrics**: Processing rates, error counts, connection health
+- **Structured Logging**: JSON logs with tracing and context
+- **Health Checks**: Database, Solana RPC, and publisher health monitoring
+- **Graceful Shutdown**: Clean job state cleanup on termination signals
 
-- **Automatic Index Creation**: Service creates 16+ performance indexes on startup
-- **Critical Join Columns**: Indexes on `asset`, `address`, `owner`, `last_block_height` columns
-- **Concurrent Index Creation**: Uses `CREATE INDEX CONCURRENTLY` to avoid blocking operations
+### 🔐 Secure & Compliant
 
-#### Incremental Processing
-
-- **Smart Filtering**: Only processes records with `last_block_height > current_processed_height`
-- **Efficient Pagination**: Processes data in configurable batches (default: 50,000 records)
-- **State Persistence**: Tracks progress per table to resume from last processed point
-
-#### Query Optimization
-
-- **Unified Query Logic**: Single query handles both Mobile and IoT hotspots
-- **Reduced Joins**: Optimized CTE structure minimizes redundant table scans
-- **Memory Efficient**: Batch processing prevents memory exhaustion on large datasets
-
-### 🏗️ Atomic Data Construction
-
-- Flexible SQL queries construct rich atomic data payloads
-- Support for complex joins and aggregations
-- JSON output with automatic type handling
-
-### 📡 Reliable Publishing
-
-- gRPC client connects to Helium oracles ingestor service
-- Cryptographically signed messages using Helium keypairs
-- Automatic retry logic with exponential backoff
-- Configurable concurrency limits and timeouts
-- Direct protobuf message transmission
-
-### 📊 Observability
-
-- Comprehensive metrics collection and reporting
-- Structured JSON logging with tracing
-- Health checks for all components
-- Per-table performance metrics
-
-### 🛡️ Error Handling
-
-- Graceful degradation during failures
-- Automatic cleanup of processed changes
-- Circuit breaker protection for downstream services
-
-## Ecosystem Integration
-
-### Database Schema
-
-The service is designed to work with tables created by `account-postgres-sink-service`, typically:
-
-- `mobile_hotspot_infos` - Mobile hotspot account data
-- `iot_hotspot_infos` - IoT hotspot account data
-- `hotspot_infos` - General hotspot account data
-
-**Standard Field**: All tables automatically include a `last_block_height` column that tracks the Solana block height when each record was last updated. The atomic-data-publisher monitors this field for changes.
-
-### Message Flow
-
-1. **Solana Account Changes** → `account-postgres-sink-service` → **PostgreSQL Tables**
-2. **Table Changes** → **Atomic Data Publisher** → **Signed Protobuf Messages**
-3. **gRPC Requests** → **Oracles Ingestor** → **S3 File Storage**
-
-### Protobuf Messages
-
-Uses `helium-proto` definitions:
-
-- `MobileHotspotChangeReqV1` - Mobile hotspot updates
-- `IotHotspotChangeReqV1` - IoT hotspot updates
-- Includes cryptographic signatures using `helium-crypto`
-
-## Usage
-
-### Command Line Interface
-
-The Atomic Data Publisher now supports multiple commands:
-
-```bash
-# Start the service
-./atomic-data-publisher serve
-
-# Create performance indexes (run once before first use)
-./atomic-data-publisher create-indexes
-
-# Show status of all polling jobs
-./atomic-data-publisher job-status
-
-# Force cleanup all running job states (admin function)
-./atomic-data-publisher force-cleanup
-
-# Show help
-./atomic-data-publisher --help
-```
-
-### Performance Setup
-
-For optimal performance with large datasets:
-
-1. **Create Indexes** (run once):
-
-   ```bash
-   ./atomic-data-publisher create-indexes
-   ```
-
-2. **Start Service**:
-   ```bash
-   ./atomic-data-publisher serve
-   ```
+- **Cryptographic Signing**: Ed25519 signatures using Helium crypto library
+- **Key Management**: Secure keypair loading from filesystem or generation
+- **Input Validation**: Comprehensive configuration and data validation
 
 ## Configuration
 
-Configuration is handled via TOML files and environment variables:
+Configuration is handled via TOML files with environment variable overrides:
+
+### Files
+
+- `config/default.toml` - Base configuration
+- `config/local.toml` - Local overrides (optional)
 
 ### Environment Variables
 
-All configuration can be overridden with environment variables using the prefix `ATOMIC_DATA_PUBLISHER_`:
+All settings can be overridden using the `ATOMIC_DATA_PUBLISHER_` prefix:
 
 ```bash
 export ATOMIC_DATA_PUBLISHER_DATABASE_HOST=postgres.example.com
-export ATOMIC_DATA_PUBLISHER_DATABASE_PORT=5432
-export ATOMIC_DATA_PUBLISHER_DATABASE_USERNAME=myuser
-export ATOMIC_DATA_PUBLISHER_DATABASE_PASSWORD=mypassword
-export ATOMIC_DATA_PUBLISHER_DATABASE_DATABASE_NAME=helium
-export ATOMIC_DATA_PUBLISHER_INGESTOR_BASE_URL=https://ingestor.example.com
+export ATOMIC_DATA_PUBLISHER_DATABASE_PASSWORD=secret
+export ATOMIC_DATA_PUBLISHER_INGESTOR_ENDPOINT=https://ingestor.helium.io
 ```
 
-### Configuration Files
+### Key Configuration Sections
 
-- `config/default.toml` - Default configuration
-- `config/local.toml` - Local overrides (optional)
-
-### Watched Tables Configuration
+#### Database
 
 ```toml
-[[service.watched_tables]]
-name = "hotspots"
-change_column = "updated_at"
-atomic_data_query = """
-  SELECT
-    h.id,
-    h.address,
-    h.name,
-    h.location,
-    h.owner,
-    h.status,
-    h.created_at,
-    h.updated_at,
-    COALESCE(
-      json_agg(
-        json_build_object(
-          'reward_id', r.id,
-          'amount', r.amount,
-          'currency', r.currency,
-          'timestamp', r.timestamp
-        )
-      ) FILTER (WHERE r.id IS NOT NULL),
-      '[]'::json
-    ) as rewards
-  FROM hotspots h
-  LEFT JOIN rewards r ON h.id = r.hotspot_id
-    AND r.timestamp >= NOW() - INTERVAL '24 hours'
-  WHERE h.id = $PRIMARY_KEY
-  GROUP BY h.id, h.address, h.name, h.location, h.owner, h.status, h.created_at, h.updated_at
-"""
-publish_endpoint = "/api/v1/hotspots/atomic-data"
+[database]
+host = "localhost"
+port = 5432
+username = "postgres"
+password = "postgres"
+database_name = "helium"
+max_connections = 10
+required_tables = ["asset_owners", "key_to_assets", "mobile_hotspot_infos"]
 ```
 
-## Database Setup
+#### Service & Jobs
 
-The service uses direct polling with persistent state tracking:
+```toml
+[service]
+polling_interval_seconds = 10
+batch_size = 500
+max_concurrent_publishes = 5
 
-1. **Single State Table**: Creates `atomic_data_polling_state` table to track progress
-2. **No Triggers**: No database triggers or functions required on watched tables
-3. **Block Height Polling**: Directly queries watched tables using `last_block_height` column
-4. **Crash Recovery**: Automatically resumes from last processed block height after restarts
+[[service.polling_jobs]]
+name = "atomic_mobile_hotspots"
+query_name = "construct_atomic_hotspots"
+parameters = { hotspot_type = "mobile" }
 
-### Required Permissions
+[[service.polling_jobs]]
+name = "atomic_iot_hotspots"
+query_name = "construct_atomic_hotspots"
+parameters = { hotspot_type = "iot" }
+```
 
-The database user needs:
+#### gRPC Ingestor
 
-- `SELECT` on watched tables
-- `CREATE TABLE` and `INSERT/UPDATE/SELECT` on `atomic_data_polling_state` table
+```toml
+[ingestor]
+endpoint = "http://localhost:8080"
+timeout_seconds = 30
+max_retries = 3
+retry_delay_seconds = 2
+```
 
-### Polling State Table
+## Database Schema
 
-The service automatically creates this table:
+The service expects tables created by the `account-postgres-sink-service`:
+
+### Core Tables
+
+- `mobile_hotspot_infos` - Mobile hotspot account data
+- `iot_hotspot_infos` - IoT hotspot account data
+- `asset_owners` - Hotspot ownership information
+- `key_to_assets` - Entity key to asset mappings
+- `recipients` - Rewards recipient information
+- `mini_fanouts` - Rewards split configurations
+
+### State Management
+
+The service creates and manages:
+
+- `atomic_data_polling_state` - Job progress tracking with queue management
 
 ```sql
 CREATE TABLE atomic_data_polling_state (
-    table_name VARCHAR(255) PRIMARY KEY,
+    job_name VARCHAR(255) NOT NULL,
+    query_name VARCHAR(255) NOT NULL DEFAULT 'default',
+    queue_position INTEGER NOT NULL DEFAULT 0,
     last_processed_block_height BIGINT NOT NULL DEFAULT 0,
-    last_poll_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    is_running BOOLEAN NOT NULL DEFAULT FALSE,
+    running_since TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    queue_completed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (job_name, query_name)
 );
 ```
 
-### How Polling Works
+## Query System
 
-1. **Initialization**: Service creates/loads state for each watched table, starting from current max `last_block_height`
-2. **Polling Cycle**: Queries `SELECT * FROM table WHERE last_block_height > $last_processed_height`
-3. **State Update**: Updates `atomic_data_polling_state` with the highest block height processed
-4. **Crash Recovery**: On restart, resumes from `last_processed_block_height` in state table
+The service uses a sophisticated SQL query system to construct atomic hotspot data:
 
-**Example**: If watching `mobile_hotspot_infos` table with `change_column = "last_block_height"`:
+### Core Query: `construct_atomic_hotspots`
 
-- State table shows: `last_processed_block_height = 12345`
-- Poll finds records with `last_block_height > 12345`
-- Process changes and update state to `last_processed_block_height = 12350`
-- If service crashes and restarts, automatically resumes from block height 12350
+- **Optimized CTEs**: Uses composite indexes for efficient data retrieval
+- **UNION Strategy**: Combines updates from multiple tables (asset_owners, key_to_assets, recipients, etc.)
+- **Batch Processing**: Handles both mobile and IoT hotspots in single queries
+- **Rich Data**: Includes ownership, location, device info, and rewards split data
 
-**Note**: The polling logic uses the configured `change_column` and `primary_key_column` from your watched table configuration, making it flexible for different table schemas.
+### Query Parameters
 
-## API Endpoints
+- `$1` - hotspot_type ("mobile" or "iot")
+- `$2` - last_processed_block_height
+- `$3` - current_solana_block_height
 
-### Health Check
+## Protobuf Integration
 
+The service generates signed protobuf messages for the Helium oracles:
+
+### Message Types
+
+- `MobileHotspotUpdateReqV1` - Mobile hotspot changes
+- `IotHotspotUpdateReqV1` - IoT hotspot changes
+
+### Message Structure
+
+```rust
+// Example mobile hotspot message
+MobileHotspotUpdateReqV1 {
+    update: MobileHotspotUpdateV1 {
+        block_height: u64,
+        block_time_seconds: u64,
+        pub_key: HeliumPubKey,
+        asset: SolanaPubKey,
+        metadata: MobileHotspotMetadata,
+        owner: EntityOwnerInfo,
+        rewards_destination: Option<RewardsDestination>,
+    },
+    signer: String,
+    signature: Vec<u8>,
+}
 ```
-GET /health
-```
-
-Returns service health status and component availability.
-
-### Metrics
-
-```
-GET /metrics
-```
-
-Returns comprehensive service metrics in JSON format.
 
 ## Deployment
 
 ### Docker
 
 ```bash
-# Build the image
+# Build
 docker build -t atomic-data-publisher .
 
-# Run with environment variables
+# Run
 docker run -d \
   --name atomic-data-publisher \
   -e ATOMIC_DATA_PUBLISHER_DATABASE_HOST=postgres.example.com \
-  -e ATOMIC_DATA_PUBLISHER_DATABASE_PASSWORD=mypassword \
-  -e ATOMIC_DATA_PUBLISHER_INGESTOR_BASE_URL=https://ingestor.example.com \
+  -e ATOMIC_DATA_PUBLISHER_DATABASE_PASSWORD=secret \
+  -e ATOMIC_DATA_PUBLISHER_INGESTOR_ENDPOINT=https://ingestor.helium.io \
   -p 3000:3000 \
   atomic-data-publisher
 ```
 
-### Kubernetes
+### Environment Setup
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: atomic-data-publisher
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: atomic-data-publisher
-  template:
-    metadata:
-      labels:
-        app: atomic-data-publisher
-    spec:
-      containers:
-        - name: atomic-data-publisher
-          image: atomic-data-publisher:latest
-          ports:
-            - containerPort: 3000
-          env:
-            - name: ATOMIC_DATA_PUBLISHER_DATABASE_HOST
-              value: "postgres.example.com"
-            - name: ATOMIC_DATA_PUBLISHER_DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: db-credentials
-                  key: password
-            - name: ATOMIC_DATA_PUBLISHER_INGESTOR_BASE_URL
-              value: "https://ingestor.example.com"
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 30
-            periodSeconds: 30
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "250m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
+```bash
+# Required environment variables
+export ATOMIC_DATA_PUBLISHER_DATABASE_HOST=your-postgres-host
+export ATOMIC_DATA_PUBLISHER_DATABASE_PASSWORD=your-password
+export ATOMIC_DATA_PUBLISHER_INGESTOR_ENDPOINT=https://your-ingestor
+export ATOMIC_DATA_PUBLISHER_SIGNING_KEYPAIR_PATH=/path/to/keypair.bin
 ```
 
-## Monitoring
+The service automatically starts polling and processing when launched - no additional commands needed.
 
-### Metrics
+### Health Checks
 
-The service exposes comprehensive metrics:
+The service exposes a health endpoint at `/health` on port 3000 that checks:
 
-- **Processing Metrics**: Changes processed, published, errors
-- **Performance Metrics**: Response times, batch processing times
-- **Database Metrics**: Query performance, connection pool status
-- **Ingestor Metrics**: Request success rates, circuit breaker status
-- **Per-Table Metrics**: Individual table processing statistics
-
-### Logs
-
-Structured JSON logs include:
-
-- Request/response details
-- Error information with context
-- Performance measurements
-- Circuit breaker state changes
-
-### Alerts
-
-Recommended alerts:
-
-- High error rate (>5%)
-- Circuit breaker open
-- Database connectivity issues
-- Ingestor service unavailable
-- Processing lag increasing
+- Database connectivity
+- Solana RPC availability
+- Publisher service status
 
 ## Development
 
 ### Prerequisites
 
 - Rust 1.75+
-- PostgreSQL 12+
-- Docker (optional)
+- PostgreSQL 12+ with Helium schema
+- Access to Helium oracles ingestor service
 
 ### Local Development
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd atomic-data-publisher
-
-# Install dependencies
+# Build
 cargo build
+
+# Run with debug logging
+RUST_LOG=debug cargo run
 
 # Run tests
 cargo test
-
-# Run locally
-RUST_LOG=debug cargo run
 ```
 
-### Testing
+### Key Dependencies
 
-```bash
-# Unit tests
-cargo test
+- `sqlx` - PostgreSQL async driver
+- `tonic` - gRPC client
+- `helium-proto` - Protobuf message definitions
+- `helium-crypto` - Cryptographic signing
+- `tokio` - Async runtime
+- `tracing` - Structured logging
 
-# Integration tests (requires database)
-cargo test --features integration-tests
-```
+## Monitoring & Observability
+
+### Metrics
+
+The service tracks:
+
+- Changes processed per second
+- Publishing success/failure rates
+- Database query performance
+- gRPC connection health
+- Job queue processing times
+
+### Logging
+
+Structured JSON logs include:
+
+- Job processing events
+- Database operations
+- gRPC request/response details
+- Error context and stack traces
+- Performance measurements
+
+### Health Monitoring
+
+- Periodic health checks for all components
+- Automatic stale job cleanup
+- Graceful shutdown with state preservation
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Database Connection Failed**
+1. **Database Connection Failures**
 
-   - Check database credentials and connectivity
-   - Verify user permissions
-   - Check firewall rules
+   - Verify credentials and network connectivity
+   - Check required tables exist
+   - Ensure user has proper permissions
 
-2. **Circuit Breaker Open**
+2. **gRPC Publishing Errors**
 
-   - Check ingestor service health
-   - Review ingestor service logs
-   - Verify network connectivity
+   - Verify ingestor endpoint accessibility
+   - Check keypair file permissions and format
+   - Review gRPC timeout settings
 
-3. **High Memory Usage**
-
-   - Reduce batch size
-   - Increase polling interval
-   - Check for memory leaks in atomic data queries
-
-4. **Processing Lag**
-   - Increase max concurrent publishes
-   - Optimize atomic data queries
-   - Scale ingestor service
+3. **Performance Issues**
+   - Adjust `batch_size` and `max_concurrent_publishes`
+   - Monitor database query performance
+   - Check Solana RPC response times
 
 ### Debug Mode
 
-Enable debug logging:
-
 ```bash
-RUST_LOG=debug ./atomic-data-publisher
+# For local development
+RUST_LOG=debug cargo run
+
+# For Docker deployment
+docker run -e RUST_LOG=debug atomic-data-publisher
 ```
+
+## Architecture Decisions
+
+### Why Polling vs Triggers?
+
+- **Simplicity**: No database-side logic required
+- **Reliability**: Immune to trigger failures or database restarts
+- **Scalability**: Easier to scale horizontally
+- **Observability**: Better visibility into processing pipeline
+
+### Why Job Queues?
+
+- **Memory Management**: Prevents OOM on large datasets
+- **Sequential Processing**: Ensures consistent state management
+- **Recovery**: Clear restart semantics after failures
+
+### Why Block Height Tracking?
+
+- **Consistency**: Aligns with Solana's block-based architecture
+- **Efficiency**: Only processes new/updated records
+- **Recovery**: Precise resumption point after crashes
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make changes with tests
-4. Submit a pull request
+1. Follow Rust best practices and run `cargo clippy`
+2. Add tests for new functionality
+3. Update configuration documentation
+4. Ensure proper error handling and logging
 
 ## License
 
