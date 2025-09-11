@@ -28,7 +28,7 @@ pub struct DistributeV0<'info> {
   pub next_task: Box<Account<'info, TaskV0>>,
   /// CHECK: Make sure this is empty, pre task needs to be run before task.
   #[account(
-    constraint = next_pre_task.data_is_empty() || next_pre_task.key() == Pubkey::default() @ ErrorCode::PreTaskNotRun
+    constraint = next_pre_task.data_is_empty() || next_pre_task.key() == crate::ID @ ErrorCode::PreTaskNotRun
   )]
   pub next_pre_task: UncheckedAccount<'info>,
   #[account(mut)]
@@ -203,8 +203,8 @@ pub fn handler<'info>(
       .task_queue
       .add_lamports(ctx.accounts.task_queue.min_crank_reward * 2)?;
   } else {
-    mini_fanout.next_task = Pubkey::default();
-    mini_fanout.next_pre_task = Pubkey::default();
+    mini_fanout.next_task = crate::ID;
+    mini_fanout.next_pre_task = crate::ID;
     return Ok(RunTaskReturnV0 {
       tasks: vec![],
       accounts: vec![],
@@ -221,7 +221,7 @@ pub fn handler<'info>(
     trigger: TriggerV0::Timestamp(next_time),
     transaction: TransactionSourceV0::CompiledV0(compiled_tx),
     crank_reward: None,
-    free_tasks: 0,
+    free_tasks: 2,
     description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
   }];
   if let Some(pre_task) = mini_fanout.pre_task.clone() {

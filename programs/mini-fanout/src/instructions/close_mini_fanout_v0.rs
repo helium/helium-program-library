@@ -9,7 +9,7 @@ use tuktuk_program::{
     cpi::{accounts::DequeueTaskV0, dequeue_task_v0},
     program::Tuktuk,
   },
-  TaskQueueAuthorityV0, TaskV0,
+  TaskQueueAuthorityV0,
 };
 
 use crate::{fanout_seeds, queue_authority_seeds, state::*};
@@ -51,7 +51,7 @@ pub struct CloseMiniFanoutV0<'info> {
   pub task_queue: UncheckedAccount<'info>,
   /// CHECK: current task account
   #[account(mut)]
-  pub next_task: Box<Account<'info, TaskV0>>,
+  pub next_task: UncheckedAccount<'info>,
   #[account(mut)]
   pub token_account: Account<'info, TokenAccount>,
   #[account(
@@ -63,7 +63,7 @@ pub struct CloseMiniFanoutV0<'info> {
   pub owner_token_account: Account<'info, TokenAccount>,
   /// CHECK: current pre-task account
   #[account(mut)]
-  pub next_pre_task: Box<Account<'info, TaskV0>>,
+  pub next_pre_task: UncheckedAccount<'info>,
   /// CHECK: task rent refund account
   #[account(mut)]
   pub task_rent_refund: UncheckedAccount<'info>,
@@ -95,27 +95,37 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
     },
     &[fanout_seeds!(ctx.accounts.mini_fanout)],
   ))?;
-  dequeue_task_v0(CpiContext::new_with_signer(
-    ctx.accounts.tuktuk_program.to_account_info(),
-    DequeueTaskV0 {
-      task_queue: ctx.accounts.task_queue.to_account_info(),
-      task: ctx.accounts.next_task.to_account_info(),
-      queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
-      task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
-    },
-    &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
-  ))?;
-  dequeue_task_v0(CpiContext::new_with_signer(
-    ctx.accounts.tuktuk_program.to_account_info(),
-    DequeueTaskV0 {
-      task_queue: ctx.accounts.task_queue.to_account_info(),
-      task: ctx.accounts.next_pre_task.to_account_info(),
-      queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
-      task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
-    },
-    &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
-  ))?;
+  if ctx.accounts.next_task.key() != crate::ID
+    && ctx.accounts.next_task.key() != Pubkey::default()
+    && !ctx.accounts.next_task.data_is_empty()
+  {
+    dequeue_task_v0(CpiContext::new_with_signer(
+      ctx.accounts.tuktuk_program.to_account_info(),
+      DequeueTaskV0 {
+        task_queue: ctx.accounts.task_queue.to_account_info(),
+        task: ctx.accounts.next_task.to_account_info(),
+        queue_authority: ctx.accounts.queue_authority.to_account_info(),
+        rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
+      },
+      &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
+    ))?;
+  }
+  if ctx.accounts.next_pre_task.key() != crate::ID
+    && ctx.accounts.next_pre_task.key() != Pubkey::default()
+    && !ctx.accounts.next_pre_task.data_is_empty()
+  {
+    dequeue_task_v0(CpiContext::new_with_signer(
+      ctx.accounts.tuktuk_program.to_account_info(),
+      DequeueTaskV0 {
+        task_queue: ctx.accounts.task_queue.to_account_info(),
+        task: ctx.accounts.next_pre_task.to_account_info(),
+        queue_authority: ctx.accounts.queue_authority.to_account_info(),
+        rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
+      },
+      &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
+    ))?;
+  }
   Ok(())
 }
