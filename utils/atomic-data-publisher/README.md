@@ -30,7 +30,7 @@ cargo build
 cargo run
 
 # Run with dry-run mode (logs messages without sending)
-export ATOMIC_DATA_PUBLISHER_INGESTOR_DRY_RUN=true
+export ATOMIC_DATA_PUBLISHER_DRY_RUN=true
 cargo run
 ```
 

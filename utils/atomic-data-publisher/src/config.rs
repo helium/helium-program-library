@@ -38,6 +38,10 @@ pub struct ServiceConfig {
   pub batch_size: u32,
   pub max_concurrent_publishes: u32,
   pub polling_jobs: Vec<PollingJob>,
+  #[serde(default)]
+  pub dry_run: bool,
+  #[serde(default)]
+  pub dry_run_failure_rate: f32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -46,10 +50,6 @@ pub struct IngestorConfig {
   pub timeout_seconds: u64,
   pub max_retries: u32,
   pub retry_delay_seconds: u64,
-  #[serde(default)]
-  pub dry_run: bool,
-  #[serde(default)]
-  pub dry_run_failure_rate: f32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -106,14 +106,14 @@ impl Default for Settings {
         batch_size: 100,
         max_concurrent_publishes: 5,
         polling_jobs: vec![],
+        dry_run: false,
+        dry_run_failure_rate: 0.0,
       },
       ingestor: IngestorConfig {
         endpoint: "http://localhost:8080".to_string(),
         timeout_seconds: 30,
         max_retries: 3,
         retry_delay_seconds: 2,
-        dry_run: false,
-        dry_run_failure_rate: 0.0,
       },
       logging: LoggingConfig {
         level: "info".to_string(),

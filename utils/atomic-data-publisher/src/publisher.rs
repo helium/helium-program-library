@@ -3,7 +3,7 @@ use helium_crypto::Keypair;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-use crate::config::{IngestorConfig, PollingJob};
+use crate::config::{IngestorConfig, PollingJob, ServiceConfig};
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
@@ -20,6 +20,7 @@ pub struct AtomicDataPublisher {
   polling_jobs: Vec<PollingJob>,
   keypair: Arc<Keypair>,
   grpc_client: ChainRewardableEntitiesClient<Channel>,
+  service_config: ServiceConfig,
   ingestor_config: IngestorConfig,
   metrics: Arc<MetricsCollector>,
 }
@@ -28,10 +29,11 @@ impl AtomicDataPublisher {
   pub async fn new(
     polling_jobs: Vec<PollingJob>,
     keypair: Keypair,
+    service_config: ServiceConfig,
     ingestor_config: IngestorConfig,
     metrics: Arc<MetricsCollector>,
   ) -> Result<Self> {
-    if ingestor_config.dry_run {
+    if service_config.dry_run {
       info!("Initializing AtomicDataPublisher in DRY RUN mode - skipping gRPC connection");
 
       let dummy_endpoint = Endpoint::from_static("http://localhost:1");
@@ -42,6 +44,7 @@ impl AtomicDataPublisher {
         polling_jobs,
         keypair: Arc::new(keypair),
         grpc_client,
+        service_config,
         ingestor_config,
         metrics,
       });
@@ -67,6 +70,7 @@ impl AtomicDataPublisher {
       polling_jobs,
       keypair: Arc::new(keypair),
       grpc_client,
+      service_config,
       ingestor_config,
       metrics,
     })
@@ -133,7 +137,7 @@ impl AtomicDataPublisher {
   }
 
   async fn send_with_retries(&self, request: HotspotUpdateRequest) -> Result<(), AtomicDataError> {
-    if self.ingestor_config.dry_run {
+    if self.service_config.dry_run {
       self.log_protobuf_message(&request).await?;
       return Ok(());
     }
@@ -226,13 +230,13 @@ impl AtomicDataPublisher {
   }
 
   async fn log_protobuf_message(&self, request: &HotspotUpdateRequest) -> Result<(), AtomicDataError> {
-    if self.ingestor_config.dry_run_failure_rate > 0.0 {
+    if self.service_config.dry_run_failure_rate > 0.0 {
       use rand::Rng;
       let mut rng = rand::thread_rng();
       let random_value: f32 = rng.gen();
 
-      if random_value < self.ingestor_config.dry_run_failure_rate {
-        warn!("DRY RUN: Simulating failure for message (failure rate: {})", self.ingestor_config.dry_run_failure_rate);
+      if random_value < self.service_config.dry_run_failure_rate {
+        warn!("DRY RUN: Simulating failure for message (failure rate: {})", self.service_config.dry_run_failure_rate);
         return Err(AtomicDataError::NetworkError(
           "DRY RUN: Simulated network failure".to_string()
         ));
@@ -287,7 +291,7 @@ impl AtomicDataPublisher {
       public_key
     );
 
-    if self.ingestor_config.dry_run {
+    if self.service_config.dry_run {
       debug!("Publisher health check: DRY RUN mode enabled - skipping gRPC health check");
     } else {
       debug!("Publisher health check: gRPC client ready for production mode");

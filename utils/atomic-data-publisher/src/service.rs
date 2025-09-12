@@ -105,6 +105,7 @@ impl AtomicDataPublisher {
     let publisher = Arc::new(Publisher::new(
       config.service.polling_jobs.clone(),
       keypair,
+      config.service.clone(),
       config.ingestor.clone(),
       metrics.clone(),
     ).await?);
