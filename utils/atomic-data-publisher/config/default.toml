@@ -18,10 +18,10 @@ query_name = "construct_atomic_hotspots"
 parameters = { hotspot_type = "mobile" }
 
 # IoT hotspot atomic data job (commented out by default)
-#[[service.polling_jobs]]
-#name = "atomic_iot_hotspots"
-#query_name = "construct_atomic_hotspots"
-#parameters = { hotspot_type = "iot" }
+[[service.polling_jobs]]
+name = "atomic_iot_hotspots"
+query_name = "construct_atomic_hotspots"
+parameters = { hotspot_type = "iot" }
 
 # Database configuration
 [database]
