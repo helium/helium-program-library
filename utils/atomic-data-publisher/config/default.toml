@@ -1,10 +1,36 @@
+# Logging configuration
+[logging]
+level = "info"
+format = "json"
+
+# Service configuration
+[service]
+polling_interval_seconds = 10
+batch_size = 500
+max_concurrent_publishes = 5
+dry_run = true
+dry_run_failure_rate = 0.0
+
+# Polling jobs configuration - each job runs a predefined query with parameters
+[[service.polling_jobs]]
+name = "atomic_mobile_hotspots"
+query_name = "construct_atomic_hotspots"
+parameters = { hotspot_type = "mobile" }
+
+# IoT hotspot atomic data job (commented out by default)
+#[[service.polling_jobs]]
+#name = "atomic_iot_hotspots"
+#query_name = "construct_atomic_hotspots"
+#parameters = { hotspot_type = "iot" }
+
+# Database configuration
 [database]
 host = "localhost"
 port = 5432
 username = "postgres"
 password = "postgres"
 database_name = "postgres"
-max_connections =  10
+max_connections = 10
 min_connections = 2
 acquire_timeout_seconds = 60
 idle_timeout_seconds = 700
@@ -20,41 +46,19 @@ required_tables = [
   "mini_fanouts"
 ]
 
-# Signing keypair settings
-[signing]
-keypair_path = "/app/keypair.bin"  # Path to Helium keypair file
-
 # Solana RPC settings
 [solana]
 rpc_url = "https://api.mainnet-beta.solana.com"
 timeout_seconds = 30
 
-[service]
-polling_interval_seconds = 10
-batch_size = 500
-max_concurrent_publishes = 5
-dry_run = false
-dry_run_failure_rate = 0.0
+# Signing keypair settings
+[signing]
+keypair_path = "/app/keypair.bin"  # Path to Helium keypair file
 
-# Polling jobs configuration - each job runs a predefined query with parameters
-[[service.polling_jobs]]
-name = "atomic_mobile_hotspots"
-query_name = "construct_atomic_hotspots"
-parameters = { hotspot_type = "mobile" }
-
-# IoT hotspot atomic data job (commented out by default)
-#[[service.polling_jobs]]
-#name = "atomic_iot_hotspots"
-#query_name = "construct_atomic_hotspots"
-#parameters = { hotspot_type = "iot" }
-
+# Ingestor configuration
 [ingestor]
 endpoint = "http://localhost:8080"
 timeout_seconds = 30
 max_retries = 3
 retry_delay_seconds = 2
-
-[logging]
-level = "info"
-format = "json"
 
