@@ -21,31 +21,25 @@ impl AtomicHotspotQueries {
   // Parameters: $1 = hotspot_type (mobile/iot), $2 = last_processed_block_height, $3 = current_solana_block_height
   pub const CONSTRUCT_ATOMIC_HOTSPOTS: &'static str = r#"
     WITH assets_with_updates AS (
-      -- Direct approach using composite indexes - much more efficient
-      -- Each subquery uses optimal indexes: (asset, last_block_height)
       SELECT DISTINCT asset FROM (
-        -- Asset owners updates (1.49M rows) - uses idx_asset_owners_asset_block_height
         SELECT asset FROM asset_owners
         WHERE asset IS NOT NULL
         AND last_block_height > $2 AND last_block_height <= $3
 
         UNION ALL
 
-        -- Key to assets updates (1.49M rows) - uses idx_key_to_assets_asset_block_height
         SELECT asset FROM key_to_assets
         WHERE asset IS NOT NULL
         AND last_block_height > $2 AND last_block_height <= $3
 
         UNION ALL
 
-        -- Recipients updates (1.18M rows) - uses idx_recipients_asset_block_height
         SELECT asset FROM recipients
         WHERE asset IS NOT NULL
         AND last_block_height > $2 AND last_block_height <= $3
 
         UNION ALL
 
-        -- Mobile hotspot direct updates (50K rows) - uses idx_mobile_hotspot_infos_asset_block_height
         SELECT asset FROM mobile_hotspot_infos
         WHERE asset IS NOT NULL
         AND last_block_height > $2 AND last_block_height <= $3
@@ -53,7 +47,6 @@ impl AtomicHotspotQueries {
 
         UNION ALL
 
-        -- IoT hotspot direct updates (1.03M rows) - uses idx_iot_hotspot_infos_asset_block_height
         SELECT asset FROM iot_hotspot_infos
         WHERE asset IS NOT NULL
         AND last_block_height > $2 AND last_block_height <= $3
@@ -61,22 +54,18 @@ impl AtomicHotspotQueries {
 
         UNION ALL
 
-        -- Welcome packs (2 rows) - small table, minimal impact
         SELECT asset FROM welcome_packs
         WHERE asset IS NOT NULL
         AND last_block_height > $2 AND last_block_height <= $3
 
         UNION ALL
 
-        -- Mini fanouts updates - find assets affected by mini_fanouts changes
-        -- Uses idx_mini_fanouts_owner_block_height and joins through asset_owners
         SELECT DISTINCT ao.asset FROM mini_fanouts mf
         INNER JOIN asset_owners ao ON ao.owner = mf.owner
         WHERE mf.last_block_height > $2 AND mf.last_block_height <= $3
         AND ao.asset IS NOT NULL
       ) all_asset_updates
     ),
-    -- Find hotspot info for those assets based on hotspot type
     hotspot_data AS (
       SELECT
         mhi.address,
@@ -110,7 +99,6 @@ impl AtomicHotspotQueries {
       INNER JOIN assets_with_updates awu ON awu.asset = ihi.asset
       WHERE $1 = 'iot'
     )
-    -- Create atomic data for the found hotspots
     SELECT
       hd.hotspot_type,
       kta.encoded_entity_key as pub_key,
@@ -122,7 +110,6 @@ impl AtomicHotspotQueries {
       hd.device_type,
       hd.elevation,
       hd.gain,
-      -- Ownership information (welcome_pack_owner or direct_owner only)
       CASE
         WHEN wp.owner IS NOT NULL THEN wp.owner
         ELSE ao.owner
@@ -131,7 +118,6 @@ impl AtomicHotspotQueries {
         WHEN wp.owner IS NOT NULL THEN 'welcome_pack_owner'
         ELSE 'direct_owner'
       END as owner_type,
-      -- Mini fanout information (rewards splits)
       CASE
         WHEN mf.address IS NOT NULL THEN
           json_build_object(
@@ -150,7 +136,6 @@ impl AtomicHotspotQueries {
           )
         ELSE NULL
       END as rewards_split,
-      -- Compact JSON object with all relevant data
       json_build_object(
         'pub_key', kta.encoded_entity_key,
         'address', hd.address,
@@ -167,7 +152,6 @@ impl AtomicHotspotQueries {
         'elevation', hd.elevation,
         'gain', hd.gain,
         'is_full_hotspot', hd.is_full_hotspot,
-        -- Pass raw deployment info for parsing in Rust
         'deployment_info', hd.deployment_info,
         'rewards_split', CASE
           WHEN mf.address IS NOT NULL THEN
