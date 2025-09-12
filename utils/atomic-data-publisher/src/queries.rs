@@ -1,14 +1,11 @@
 use std::collections::HashMap;
 
-/// SQL queries for constructing atomic hotspot data from multiple tables
 pub struct AtomicHotspotQueries;
 
 impl AtomicHotspotQueries {
-  /// Get all available query templates
   pub fn get_all_queries() -> HashMap<String, &'static str> {
     let mut queries = HashMap::new();
 
-    // Simplified batch query for finding hotspots that need updates
     queries.insert(
       "construct_atomic_hotspots".to_string(),
       Self::CONSTRUCT_ATOMIC_HOTSPOTS,
@@ -17,14 +14,11 @@ impl AtomicHotspotQueries {
     queries
   }
 
-  /// Get query by name
   pub fn get_query(query_name: &str) -> Option<&'static str> {
     Self::get_all_queries().get(query_name).copied()
   }
 
-  /// Highly optimized query using direct UNION approach for better index utilization
-  /// Eliminates complex EXISTS subqueries and leverages composite indexes directly
-  /// Parameters: $1 = hotspot_type (mobile/iot), $2 = last_processed_block_height, $3 = current_solana_block_height
+  // Parameters: $1 = hotspot_type (mobile/iot), $2 = last_processed_block_height, $3 = current_solana_block_height
   pub const CONSTRUCT_ATOMIC_HOTSPOTS: &'static str = r#"
     WITH assets_with_updates AS (
       -- Direct approach using composite indexes - much more efficient

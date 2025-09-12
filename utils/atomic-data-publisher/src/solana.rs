@@ -26,7 +26,6 @@ impl SolanaClientWrapper {
     Ok(Self { client, config })
   }
 
-  /// Get the current Solana block height
   pub async fn get_current_block_height(&self) -> Result<u64, AtomicDataError> {
     debug!(
       "Fetching current Solana block height from {}",
@@ -90,7 +89,6 @@ impl SolanaClientWrapper {
     }
   }
 
-  /// Health check the Solana RPC connection
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {
     debug!("Performing Solana RPC health check");
 

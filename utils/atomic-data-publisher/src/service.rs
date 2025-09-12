@@ -25,7 +25,6 @@ pub struct AtomicDataPublisher {
 }
 
 impl AtomicDataPublisher {
-  /// Validate required tables exist
   async fn validate_tables(database: &DatabaseClient, tables: &[String]) -> Result<()> {
     for table_name in tables {
       if !database.table_exists(table_name).await? {
@@ -38,7 +37,6 @@ impl AtomicDataPublisher {
     Ok(())
   }
 
-  /// Initialize database
   async fn init_database(database: &DatabaseClient, service_config: &ServiceConfig) -> Result<()> {
     database.create_state_table().await?;
 
@@ -86,22 +84,13 @@ impl AtomicDataPublisher {
       key_type: KeyType::Ed25519,
     };
 
-    // For now, always generate a new keypair using entropy
-    // Load keypair from file or environment
     let entropy = if std::path::Path::new(&keypair_path).exists() {
       std::fs::read(&keypair_path)?
     } else {
-      warn!(
-        "Keypair file not found at {}, generating new entropy",
+      return Err(anyhow::anyhow!(
+        "Keypair file not found at {}. Please provide a valid keypair file.",
         keypair_path
-      );
-      let mut entropy = vec![0u8; 32];
-      use rand::RngCore;
-      rand::thread_rng().fill_bytes(&mut entropy);
-      std::fs::write(&keypair_path, &entropy)
-        .map_err(|e| anyhow::anyhow!("Failed to save entropy: {}", e))?;
-      info!("Generated new entropy and saved to {}", keypair_path);
-      entropy
+      ));
     };
 
     let keypair = Keypair::generate_from_entropy(key_tag, &entropy)
@@ -135,7 +124,6 @@ impl AtomicDataPublisher {
     })
   }
 
-  /// Start the service
   pub async fn run(&self) -> Result<()> {
     self.health_check().await?;
 
@@ -209,7 +197,6 @@ impl AtomicDataPublisher {
     Ok(())
   }
 
-  /// Main polling loop that detects changes and publishes them
   async fn polling_loop(&self) {
     let mut interval = interval(self.config.polling_interval());
     let mut shutdown_signal = self.shutdown_signal.clone();
@@ -245,7 +232,6 @@ impl AtomicDataPublisher {
     }
   }
 
-  /// Process pending changes - processes ALL jobs in the queue before returning
   async fn process_changes(&self) -> Result<(), AtomicDataError> {
     if self.database.any_job_running().await? {
       debug!("Job already running, skipping to prevent OOM");
@@ -282,6 +268,7 @@ impl AtomicDataPublisher {
 
     let mut total_jobs_processed = 0;
     let mut total_changes_published = 0;
+    let mut total_changes_failed = 0;
 
     // Process ALL jobs in the queue before returning
     loop {
@@ -336,30 +323,36 @@ impl AtomicDataPublisher {
       );
 
       // Process all changes in batches for this job
-      let job_published = self
+      let (job_published, job_failed, should_break) = self
         .process_job_changes(changes, active_job_context, target_height)
         .await?;
       total_changes_published += job_published;
+      total_changes_failed += job_failed;
+
+      // Break out of processing loop if job failed completely
+      if should_break {
+        break;
+      }
     }
 
     if total_jobs_processed > 0 {
       info!(
-        "Completed processing cycle: {} jobs processed, {} total changes published",
-        total_jobs_processed, total_changes_published
+        "Completed processing cycle: {} jobs processed, {} total changes published, {} total failed",
+        total_jobs_processed, total_changes_published, total_changes_failed
       );
     }
 
     Ok(())
   }
 
-  /// Process changes for a single job
   async fn process_job_changes(
     &self,
     changes: Vec<crate::database::ChangeRecord>,
     active_job_context: Option<(String, String)>,
     target_height: u64,
-  ) -> Result<usize, AtomicDataError> {
+  ) -> Result<(usize, usize, bool), AtomicDataError> {
     let mut total_published = 0;
+    let mut total_failed = 0;
     let batch_size = self.config.service.batch_size as usize;
 
     for (batch_index, batch) in changes.chunks(batch_size).enumerate() {
@@ -372,17 +365,13 @@ impl AtomicDataPublisher {
       let batch_start = Instant::now();
       let mut published_changes = Vec::new();
       let mut failed_changes = Vec::new();
-
-      // Process each change in the batch
-
-      // Process batch with concurrency limit
       let semaphore = Arc::new(tokio::sync::Semaphore::new(
         self.config.service.max_concurrent_publishes as usize,
       ));
       let mut tasks = Vec::new();
 
       for change in batch {
-        let change = change.clone(); // Clone the change record for the async task
+        let change = change.clone();
         let publisher = self.publisher.clone();
         let metrics = self.metrics.clone();
         let semaphore = semaphore.clone();
@@ -426,8 +415,8 @@ impl AtomicDataPublisher {
         }
       }
 
-      // Mark successfully published changes as processed (update polling state)
-      if !published_changes.is_empty() {
+      total_failed += failed_changes.len();
+      if failed_changes.is_empty() && !published_changes.is_empty() {
         match self
           .database
           .mark_processed(&published_changes, target_height)
@@ -437,17 +426,15 @@ impl AtomicDataPublisher {
             total_published += published_changes.len();
             let batch_time = batch_start.elapsed();
             info!(
-              "Batch processing completed in {:?}: {} published, {} failed",
+              "Batch processing completed in {:?}: {} published, 0 failed. Advanced to block height {}",
               batch_time,
               published_changes.len(),
-              failed_changes.len()
+              target_height
             );
           }
           Err(e) => {
             error!("Failed to mark batch changes as processed: {}", e);
             self.metrics.increment_errors();
-
-            // Clean up job state on error
             if let Some((job_name, query_name)) = &active_job_context {
               if let Err(cleanup_err) = self
                 .database
@@ -460,23 +447,28 @@ impl AtomicDataPublisher {
                 );
               }
             }
-
             return Err(AtomicDataError::DatabaseError(e.to_string()));
           }
         }
-      }
-
-      if !failed_changes.is_empty() {
-        warn!("Batch had {} failed changes", failed_changes.len());
+      } else if !failed_changes.is_empty() {
+        // Some or all changes failed - do not advance block height, retry same range next poll
+        let batch_time = batch_start.elapsed();
+        warn!(
+          "Batch processing completed in {:?}: {} published, {} failed. Not advancing block height - will retry same range",
+          batch_time,
+          published_changes.len(),
+          failed_changes.len()
+        );
       }
     }
 
     info!(
-      "Completed processing all batches: {} total changes published",
-      total_published
+      "Completed processing all batches: {} total changes published, {} total failed",
+      total_published, total_failed
     );
 
     // Mark the job as not running and completed in queue after all processing is done
+    // Only mark as completed if there were no failures or if we processed everything successfully
     if let Some((job_name, query_name)) = active_job_context {
       if let Err(e) = self
         .database
@@ -488,18 +480,28 @@ impl AtomicDataPublisher {
           job_name, query_name, e
         );
       }
-      if let Err(e) = self.database.mark_completed(&job_name, &query_name).await {
+
+      // Only mark as completed if no changes failed
+      if total_failed == 0 {
+        if let Err(e) = self.database.mark_completed(&job_name, &query_name).await {
+          warn!(
+            "Failed to mark job '{}' query '{}' as completed after processing: {}",
+            job_name, query_name, e
+          );
+        }
+      } else {
         warn!(
-          "Failed to mark job '{}' query '{}' as completed after processing: {}",
-          job_name, query_name, e
+          "Job '{}' query '{}' had {} failed changes",
+          job_name, query_name, total_failed
         );
+        // Signal that we should break out of the processing loop
+        return Ok((total_published, total_failed, true));
       }
     }
 
-    Ok(total_published)
+    Ok((total_published, total_failed, false))
   }
 
-  /// Health check loop
   async fn health_check_loop(&self) {
     let mut interval = interval(Duration::from_secs(30)); // Check every 30 seconds
     let mut shutdown_signal = self.shutdown_signal.clone();
@@ -521,7 +523,6 @@ impl AtomicDataPublisher {
     }
   }
 
-  /// Perform health checks on all components
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {
     // Check database connectivity
     if let Err(e) = self.database.health_check().await {

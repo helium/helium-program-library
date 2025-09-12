@@ -46,13 +46,17 @@ pub struct IngestorConfig {
   pub timeout_seconds: u64,
   pub max_retries: u32,
   pub retry_delay_seconds: u64,
+  #[serde(default)]
+  pub dry_run: bool,
+  #[serde(default)]
+  pub dry_run_failure_rate: f32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct PollingJob {
-  pub name: String, // Unique identifier for polling state tracking (e.g., "atomic_mobile_hotspots")
-  pub query_name: String, // Name of predefined query to execute
-  pub parameters: serde_json::Value, // JSON object containing query parameters
+  pub name: String,
+  pub query_name: String,
+  pub parameters: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -108,6 +112,8 @@ impl Default for Settings {
         timeout_seconds: 30,
         max_retries: 3,
         retry_delay_seconds: 2,
+        dry_run: false,
+        dry_run_failure_rate: 0.0,
       },
       logging: LoggingConfig {
         level: "info".to_string(),

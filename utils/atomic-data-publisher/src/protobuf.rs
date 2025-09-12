@@ -15,11 +15,9 @@ use tracing::{debug, warn};
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
 
-/// Converts atomic data from database into protobuf messages
 pub struct ProtobufBuilder;
 
 impl ProtobufBuilder {
-  /// Build a mobile hotspot update request from change record
   pub fn build_mobile_hotspot_update(
     change: &ChangeRecord,
     keypair: &Keypair,
@@ -86,7 +84,6 @@ impl ProtobufBuilder {
     Ok(request)
   }
 
-  /// Build an IoT hotspot update request from change record
   pub fn build_iot_hotspot_update(
     change: &ChangeRecord,
     keypair: &Keypair,
@@ -384,7 +381,6 @@ impl ProtobufBuilder {
     }
   }
 
-  /// Sign a protobuf message using Helium crypto
   fn sign_message<T>(msg: &T, keypair: &Keypair) -> Result<Vec<u8>, AtomicDataError>
   where
     T: Message + Clone,
@@ -405,7 +401,6 @@ impl ProtobufBuilder {
   }
 }
 
-/// Enum to hold either mobile or IoT hotspot update requests for gRPC
 #[derive(Debug, Clone)]
 pub enum HotspotUpdateRequest {
   Mobile(MobileHotspotUpdateReqV1),

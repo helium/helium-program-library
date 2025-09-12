@@ -37,7 +37,6 @@ impl DatabaseClient {
       .connect(&database_url)
       .await?;
 
-    // Test the connection
     sqlx::query("SELECT 1").execute(&pool).await?;
 
     info!(
@@ -48,12 +47,8 @@ impl DatabaseClient {
     Ok(Self { pool, polling_jobs })
   }
 
-  /// Initialize polling state for all jobs
   pub async fn init_polling_state(&self) -> Result<()> {
-    // Create the polling state table if it doesn't exist
     self.create_state_table().await?;
-
-    // Initialize state for each polling job with queue positions
     for (index, job) in self.polling_jobs.iter().enumerate() {
       self
         .init_job_state(&job.name, &job.query_name, index as i32)
@@ -67,7 +62,6 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Create polling state table
   pub async fn create_state_table(&self) -> Result<()> {
     let create_table_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
@@ -105,7 +99,6 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Check if table exists
   pub async fn table_exists(&self, table_name: &str) -> Result<bool> {
     let query = r#"
       SELECT EXISTS (
@@ -124,7 +117,6 @@ impl DatabaseClient {
     Ok(exists)
   }
 
-  /// Initialize job state
   pub async fn init_job_state(
     &self,
     job_name: &str,
@@ -192,7 +184,6 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Get pending changes with job context
   pub async fn get_pending_changes(
     &self,
     current_solana_height: u64,
@@ -222,7 +213,6 @@ impl DatabaseClient {
     }
   }
 
-  /// Execute the actual polling logic for a job (internal method)
   async fn execute_job_polling(
     &self,
     job: &PollingJob,
@@ -266,6 +256,8 @@ impl DatabaseClient {
       scaled_chunk.clamp(1000, 100_000_000) // Min 1k blocks, max 100M blocks
     };
 
+    // Calculate target height but ensure we don't skip blocks between cycles
+    // The key insight: we need to process ALL blocks up to current_solana_height eventually
     let target_height = std::cmp::min(
       last_processed_height as u64 + chunk_size,
       current_solana_height,
@@ -307,9 +299,7 @@ impl DatabaseClient {
     Ok((changes, target_height))
   }
 
-  /// Mark changes as processed
   pub async fn mark_processed(&self, changes: &[ChangeRecord], target_height: u64) -> Result<()> {
-    // Handle empty changes case by advancing block height for active job
     if changes.is_empty() {
       return self
         .advance_block_height_for_active_job(target_height)
@@ -330,9 +320,7 @@ impl DatabaseClient {
 
     // Update polling state for each job with the current Solana block height
     for job_name in processed_tables {
-      // Find the corresponding polling job to get the query name
       if let Some(job) = self.polling_jobs.iter().find(|j| j.name == job_name) {
-        // Update to current Solana block height - this ensures we don't reprocess records up to this point
         sqlx::query(
           r#"
           UPDATE atomic_data_polling_state
@@ -368,9 +356,7 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Advance block height for the currently active job (used when no changes found)
   async fn advance_block_height_for_active_job(&self, target_height: u64) -> Result<()> {
-    // Find the currently running job and advance its block height
     let active_job = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -410,13 +396,12 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Health check - verify database connectivity
   pub async fn health_check(&self) -> Result<()> {
     sqlx::query("SELECT 1").execute(&self.pool).await?;
     Ok(())
   }
 
-  /// Check if any job is running
+
   pub async fn any_job_running(&self) -> Result<bool> {
     let row = sqlx::query(
       r#"
@@ -438,12 +423,8 @@ impl DatabaseClient {
     Ok(is_any_running)
   }
 
-  /// Mark a job as running
   pub async fn mark_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
-    // Use a transaction to atomically check and set running state
     let mut tx = self.pool.begin().await?;
-
-    // Check if already running
     let existing = sqlx::query(
       r#"
       SELECT is_running
@@ -470,7 +451,6 @@ impl DatabaseClient {
       }
     }
 
-    // Mark as running
     let result = sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -503,7 +483,6 @@ impl DatabaseClient {
     }
   }
 
-  /// Mark a job as not running
   pub async fn mark_job_not_running(&self, job_name: &str, query_name: &str) -> Result<()> {
     sqlx::query(
       r#"
@@ -527,9 +506,7 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Get the next job in the sequential queue that should be processed
   async fn get_next_queue_job(&self) -> Result<Option<PollingJob>> {
-    // Get the job with the lowest queue_position that hasn't been completed yet
     let row = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -562,7 +539,6 @@ impl DatabaseClient {
     Ok(None)
   }
 
-  /// Mark job as completed
   pub async fn mark_completed(&self, job_name: &str, query_name: &str) -> Result<()> {
     sqlx::query(
       r#"
@@ -585,7 +561,6 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Reset the job queue for a new cycle (mark all jobs as not completed)
   async fn reset_job_queue(&self) -> Result<()> {
     sqlx::query(
       r#"
@@ -602,7 +577,6 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Cleanup stale jobs
   pub async fn cleanup_stale_jobs(&self) -> Result<()> {
     let stale_threshold = Utc::now() - Duration::minutes(30);
 
@@ -631,7 +605,6 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Cleanup all running jobs
   pub async fn cleanup_all_jobs(&self) -> Result<()> {
     let result = sqlx::query(
       r#"

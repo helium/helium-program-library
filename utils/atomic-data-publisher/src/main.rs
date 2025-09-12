@@ -22,7 +22,6 @@ async fn main() -> Result<()> {
 }
 
 async fn run_service() -> Result<()> {
-  // Load configuration first (before logging setup)
   let settings = match Settings::new() {
     Ok(s) => s,
     Err(e) => {
@@ -31,19 +30,16 @@ async fn run_service() -> Result<()> {
     }
   };
 
-  // Initialize logging based on configuration
   initialize_logging(&settings.logging)?;
 
   info!("Starting Atomic Data Publisher");
   info!("Configuration loaded successfully");
 
-  // Validate configuration
   if let Err(e) = validate_config(&settings) {
     error!("Configuration validation failed: {}", e);
     std::process::exit(1);
   }
 
-  // Create and start the service
   let service = match AtomicDataPublisher::new(settings).await {
     Ok(s) => {
       info!("Atomic Data Publisher service initialized successfully");
@@ -55,7 +51,6 @@ async fn run_service() -> Result<()> {
     }
   };
 
-  // Setup shutdown handlers for both SIGTERM and local dev (Ctrl+C)
   let shutdown_sender = service.shutdown_sender.clone();
   let shutdown_handle = tokio::spawn(async move {
     let ctrl_c = async {
@@ -106,7 +101,6 @@ async fn run_service() -> Result<()> {
   }
 }
 
-/// Validate the configuration before starting the service
 fn validate_config(settings: &Settings) -> Result<()> {
   // Validate database configuration
   if settings.database.host.is_empty() {
@@ -199,7 +193,6 @@ fn validate_config(settings: &Settings) -> Result<()> {
   Ok(())
 }
 
-/// Initialize logging based on configuration
 fn initialize_logging(logging_config: &LoggingConfig) -> Result<()> {
   let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| logging_config.level.clone());
 
