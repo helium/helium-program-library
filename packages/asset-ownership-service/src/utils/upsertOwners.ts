@@ -22,35 +22,73 @@ export const upsertOwners = async ({
     })) as { asset: string }[]
   ).map((row) => new PublicKey(row.asset));
 
+  console.log(`Processing ${assetPks.length} assets for ownership updates`);
+
+  // Get current block height once for all batches
+  let lastBlockHeight: number | null = null;
+  try {
+    lastBlockHeight = await retry(
+      () => provider.connection.getBlockHeight("confirmed"),
+      {
+        retries: 3,
+        factor: 2,
+        minTimeout: 1000,
+        maxTimeout: 5000,
+      }
+    );
+    console.log(`Using block height: ${lastBlockHeight}`);
+  } catch (error) {
+    console.warn("Failed to fetch block height after retries:", error);
+  }
+
   const batchSize = 1000;
   const limit = pLimit(20);
-  const batchPromises = chunks(assetPks, batchSize).map((assetBatch) =>
-    limit(async () => {
-      const assetsWithOwner = (
-        (await retry(
-          async () =>
-            getAssetBatch(provider.connection.rpcEndpoint, assetBatch),
-          { retries: 5, minTimeout: 1000 }
-        )) as { id: PublicKey; ownership: { owner: PublicKey } }[]
-      )
-        .filter(truthy)
-        .map(({ id, ownership }) => ({
-          asset: id.toBase58(),
-          owner: ownership.owner.toBase58(),
-        }));
+  let processedCount = 0;
 
-      const transaction = await sequelize.transaction({
-        isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-      });
+  const batchPromises = chunks(assetPks, batchSize).map(
+    (assetBatch, batchIndex) =>
+      limit(async () => {
+        try {
+          const assetsWithOwner = (
+            (await retry(
+              async () =>
+                getAssetBatch(provider.connection.rpcEndpoint, assetBatch),
+              { retries: 5, minTimeout: 1000 }
+            )) as { id: PublicKey; ownership: { owner: PublicKey } }[]
+          )
+            .filter(truthy)
+            .map(({ id, ownership }) => ({
+              asset: id.toBase58(),
+              owner: ownership.owner.toBase58(),
+              last_block_height: lastBlockHeight,
+            }));
 
-      await AssetOwner.bulkCreate(assetsWithOwner, {
-        transaction,
-        updateOnDuplicate: ["asset", "owner"],
-      });
+          const transaction = await sequelize.transaction({
+            isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+          });
 
-      await transaction.commit();
-    })
+          try {
+            await AssetOwner.bulkCreate(assetsWithOwner, {
+              transaction,
+              updateOnDuplicate: ["asset", "owner", "last_block_height"],
+            });
+
+            await transaction.commit();
+
+            processedCount += assetBatch.length;
+          } catch (err) {
+            await transaction.rollback();
+            throw err;
+          }
+        } catch (err) {
+          console.error(`Error processing batch ${batchIndex + 1}:`, err);
+          throw err;
+        }
+      })
   );
 
   await Promise.all(batchPromises);
+  console.log(
+    `Finished processing ${assetPks.length} assets for ownership updates`
+  );
 };

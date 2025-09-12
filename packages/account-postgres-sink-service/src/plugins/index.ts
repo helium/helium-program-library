@@ -5,7 +5,12 @@ import { EncodeEntityKeyPlugin } from "./encodeEntityKey";
 import { ExplodeMiniFanoutOwnershipPlugin } from "./explodeMiniFanoutOwnership";
 import { ExplodeRecipientDestinationOwnershipPlugin } from "./explodeRecipientDestinationOwnership";
 
-export const Plugins = [ExtractHexLocationPlugin, EncodeEntityKeyPlugin, ExplodeMiniFanoutOwnershipPlugin, ExplodeRecipientDestinationOwnershipPlugin];
+export const Plugins = [
+  ExtractHexLocationPlugin,
+  EncodeEntityKeyPlugin,
+  ExplodeMiniFanoutOwnershipPlugin,
+  ExplodeRecipientDestinationOwnershipPlugin,
+];
 
 export const initPlugins = async (pluginConfigs: IPluginConfig[] = []) =>
   (

@@ -111,6 +111,11 @@ export const defineIdlModels = async ({
           refreshed_at: {
             type: DataTypes.DATE,
           },
+          last_block_height: {
+            type: DataTypes.DECIMAL.UNSIGNED,
+            allowNull: true,
+            defaultValue: null,
+          },
         },
         {
           underscored: true,
@@ -148,12 +153,38 @@ export const defineIdlModels = async ({
         )
       ).map((x: any) => x.indexname);
 
+      // Check for last_block_height index
+      const blockHeightIndexName = `idx_${underscore(
+        accConfig.table || acc.name
+      )}_last_block_height`;
+      const hasBlockHeightIndex =
+        existingIndexes.includes(blockHeightIndexName);
+
       if (
         !existingColumns.length ||
         !columns.every((col) => existingColumns.includes(col)) ||
-        !indexes.every((idx) => existingIndexes.includes(idx.name))
+        !indexes.every((idx) => existingIndexes.includes(idx.name)) ||
+        !hasBlockHeightIndex
       ) {
         await model.sync({ alter: true });
+
+        // Create index on last_block_height if it doesn't exist
+        if (!hasBlockHeightIndex) {
+          try {
+            await sequelize.query(`
+              CREATE INDEX CONCURRENTLY IF NOT EXISTS ${blockHeightIndexName}
+              ON ${underscore(accConfig.schema || "public")}.${underscore(
+              accConfig.table || acc.name
+            )}(last_block_height)
+            `);
+            console.log(`Created index: ${blockHeightIndexName}`);
+          } catch (indexError) {
+            console.warn(
+              `Failed to create index ${blockHeightIndexName}:`,
+              indexError
+            );
+          }
+        }
       }
     }
   }

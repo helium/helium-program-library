@@ -1,6 +1,10 @@
 import { Transaction } from "sequelize";
 
-export type Plugins = "ExtractHexLocation" | "EncodeEntityKey" | "ExplodeMiniFanoutOwnership" | "ExplodeRecipientDestinationOwnership";
+export type Plugins =
+  | "ExtractHexLocation"
+  | "EncodeEntityKey"
+  | "ExplodeMiniFanoutOwnership"
+  | "ExplodeRecipientDestinationOwnership";
 type Crons = "refresh-accounts" | "integrity-check";
 
 export interface IPluginConfig {
