@@ -82,6 +82,9 @@ address = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY" # bubblegum
 address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV" # noop
 
 [[test.validator.clone]]
+address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33" # hnt feed needed for dc auto top
+
+[[test.validator.clone]]
 address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK" # account compression
 
 [[test.validator.clone]]

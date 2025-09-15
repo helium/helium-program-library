@@ -216,6 +216,7 @@ describe("dc-auto-topoff", () => {
         newTaskId: nextTask,
         newPythTaskId: nextPythTask,
         schedule: "0 0 * * * *",
+        threshold: new anchor.BN(10000000),
       })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),

@@ -18,7 +18,7 @@ use data_credits::{
 use helium_sub_daos::{program::HeliumSubDaos, DaoV0, SubDaoV0};
 use shared_utils::*;
 
-use crate::{error::ErrorCode, hash_entity_key, state::*, TESTING};
+use crate::{error::ErrorCode, hash_entity_key, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnboardDataOnlyMobileHotspotArgsV0 {
