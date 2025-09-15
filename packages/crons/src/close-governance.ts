@@ -13,6 +13,7 @@ import {
   populateMissingDraftInfo,
   sendAndConfirmWithRetry,
   toVersionedTx,
+  truthy,
 } from "@helium/spl-utils";
 import { init as initState } from "@helium/state-controller-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
@@ -158,9 +159,9 @@ async function getSolanaUnixTimestamp(
           a.account.index < b.account.index ? 1 : -1
         );
 
-        return await Promise.all(
+        return (await Promise.all(
           sortedProxies.map(async (proxy, index) => {
-            if (index === sortedProxies.length - 1) {
+            if (proxy.account.index === 0) {
               return proxyProgram.methods
                 .closeExpiredProxyV0()
                 .accountsPartial({
@@ -169,25 +170,27 @@ async function getSolanaUnixTimestamp(
                 .instruction();
             }
 
-            const prevProxyAssignment = new PublicKey(
-              sortedProxies[index + 1].publicKey
-            );
+            if (proxy.account.index !== 0 && sortedProxies[index + 1]) {
+              const prevProxyAssignment = new PublicKey(
+                sortedProxies[index + 1].publicKey
+              );
 
-            return proxyProgram.methods
-              .unassignExpiredProxyV0()
-              .accountsPartial({
-                prevProxyAssignment,
-                proxyAssignment: new PublicKey(proxy.publicKey),
-              })
-              .instruction();
+              return proxyProgram.methods
+                .unassignExpiredProxyV0()
+                .accountsPartial({
+                  prevProxyAssignment,
+                  proxyAssignment: new PublicKey(proxy.publicKey),
+                })
+                .instruction();
+            }
           })
-        );
+        )).filter(truthy);
       })
     );
 
     const txs = await batchInstructionsToTxsWithPriorityFee(
       provider,
-      multiDimArray.flat()
+      multiDimArray
     );
 
     for (const tx of txs) {

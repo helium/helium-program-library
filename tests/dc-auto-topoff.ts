@@ -1,10 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-import {
-  PythSolanaReceiver,
-  pythSolanaReceiverIdl,
-} from "@helium/currency-utils";
 import { dataCreditsKey, delegatedDataCreditsKey, init as initDataCredits } from "@helium/data-credits-sdk";
 import { init as initHem } from "@helium/helium-entity-manager-sdk";
 import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
@@ -67,7 +63,6 @@ describe("dc-auto-topoff", () => {
   let dcMint: PublicKey;
   let routerKey: string;
   let subDao: PublicKey;
-  let pythProgram: Program<PythSolanaReceiver>;
   const tuktukConfig: PublicKey = tuktukConfigKey()[0];
   const queueAuthority = queueAuthorityKey()[0]
 
@@ -81,9 +76,6 @@ describe("dc-auto-topoff", () => {
     hsdProgram = await initHsd(provider)
     program = await init(provider);
     tuktukProgram = await initTuktuk(provider);
-    pythProgram = new Program(
-      pythSolanaReceiverIdl as any,
-    );
     dcProgram = await initDataCredits(provider);
     const config = await tuktukProgram.account.tuktukConfigV0.fetch(
       tuktukConfig
