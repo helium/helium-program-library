@@ -31,7 +31,7 @@ security_txt! {
 pub mod dc_auto_top {
   use super::*;
 
-  pub fn schedule_task(ctx: Context<ScheduleTaskV0>, args: ScheduleTaskArgsV0) -> Result<()> {
+  pub fn schedule_task_v0(ctx: Context<ScheduleTaskV0>, args: ScheduleTaskArgsV0) -> Result<()> {
     instructions::schedule_task_v0::handler(ctx, args)
   }
 

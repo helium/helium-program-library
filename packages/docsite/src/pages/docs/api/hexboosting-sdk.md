@@ -46,6 +46,21 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### close_boost_v1
+
+#### Accounts
+
+| Name                   | Mutability | Signer | Docs |
+| ---------------------- | ---------- | ------ | ---- |
+| rent_reclaim_authority | immut      | no     |      |
+| boost_config           | immut      | no     |      |
+| boosted_hex            | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### initialize_boost_config_v0
 
 #### Accounts

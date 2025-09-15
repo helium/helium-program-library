@@ -32,7 +32,7 @@ pub struct InitializeAutoTopOffV0<'info> {
     init,
     payer = payer,
     space = AutoTopOffV0::size(&args),
-    seeds = [b"auto_top_off", data_credits.key().as_ref(), sub_dao.key().as_ref(), authority.key().as_ref()],
+    seeds = [b"auto_top_off", delegated_data_credits.key().as_ref(), authority.key().as_ref()],
     bump
   )]
   pub auto_top_off: Box<Account<'info, AutoTopOffV0>>,

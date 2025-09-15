@@ -142,13 +142,13 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
       &[queue_authority_seeds!(auto_top_off)],
     ),
     QueueTaskArgsV0 {
-      trigger: TriggerV0::Timestamp(next_time - 1),
+      trigger: TriggerV0::Timestamp(next_time - 60),
       transaction: TransactionSourceV0::RemoteV0 {
         signer: TUKTUK_PYTH_SIGNER,
         url: format!("{}/{}", TUKTUK_PYTH_URL, auto_top_off.hnt_price_oracle),
       },
       crank_reward: None,
-      free_tasks: 0,
+      free_tasks: 1,
       id: args.pyth_task_id,
       description: format!(
         "pyth dist {}",

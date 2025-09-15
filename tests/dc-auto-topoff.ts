@@ -193,7 +193,7 @@ describe("dc-auto-topoff", () => {
         lamports: 1000000000,
       })]);
 
-      await program.methods.scheduleTask({
+      await program.methods.scheduleTaskV0({
         taskId: nextTask,
         pythTaskId: nextPythTask,
       })
