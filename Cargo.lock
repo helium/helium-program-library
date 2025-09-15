@@ -903,7 +903,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -926,7 +926,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.39"
+version = "0.2.40"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

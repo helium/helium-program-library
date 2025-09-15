@@ -40,7 +40,9 @@ pub struct QueueEndEpoch<'info> {
     bump,
   )]
   pub task_return_account: AccountInfo<'info>,
-  pub task_queue: Box<Account<'info, TaskQueueV0>>,
+  /// CHECK: Just used for key
+  #[account(constraint = *task_queue.owner == tuktuk_program::tuktuk::ID)]
+  pub task_queue: UncheckedAccount<'info>,
   pub system_program: Program<'info, System>,
 }
 
