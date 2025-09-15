@@ -96,8 +96,6 @@ export const navigation = [
         href: "/docs/api/treasury-management-sdk",
       },
 
-      { title: "Sessions", href: "/docs/api/sessions-sdk" },
-
       { title: "Rewards oracle", href: "/docs/api/rewards-oracle-sdk" },
 
       { title: "Price oracle", href: "/docs/api/price-oracle-sdk" },
@@ -127,6 +125,8 @@ export const navigation = [
       },
 
       { title: "Fanout", href: "/docs/api/fanout-sdk" },
+
+      { title: "Dc auto top", href: "/docs/api/dc-auto-top-sdk" },
 
       { title: "Data credits", href: "/docs/api/data-credits-sdk" },
 

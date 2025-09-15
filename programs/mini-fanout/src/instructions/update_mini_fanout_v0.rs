@@ -61,6 +61,9 @@ pub struct UpdateMiniFanoutV0<'info> {
   /// CHECK: new pre task account
   #[account(mut)]
   pub new_pre_task: UncheckedAccount<'info>,
+  /// CHECK: task rent refund account
+  #[account(mut)]
+  pub task_rent_refund: UncheckedAccount<'info>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub system_program: Program<'info, System>,
 }
@@ -108,7 +111,7 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: ctx.accounts.payer.to_account_info(),
+        rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(mini_fanout)],
@@ -121,7 +124,7 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_pre_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: ctx.accounts.payer.to_account_info(),
+        rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(mini_fanout)],
@@ -149,5 +152,6 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
   )?;
 
   mini_fanout.next_task = ctx.accounts.new_task.key();
+  mini_fanout.next_pre_task = ctx.accounts.new_pre_task.key();
   Ok(())
 }

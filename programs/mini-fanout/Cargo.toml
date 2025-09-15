@@ -29,6 +29,6 @@ solana-zk-sdk = { workspace = true }
 solana-security-txt = { workspace = true }
 default-env = { workspace = true }
 tuktuk-program = { workspace = true }
-clockwork-cron = "2.0.19"
-chrono = "0.4.39"
+clockwork-cron = { workspace = true }
+chrono = { workspace = true }
 shared-utils = { workspace = true }

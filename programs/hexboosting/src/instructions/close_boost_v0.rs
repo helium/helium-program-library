@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{BoostConfigV0, BoostedHexV1};
+use crate::{BoostConfigV0, BoostedHexV0};
 
 #[derive(Accounts)]
 pub struct CloseBoostV0<'info> {
@@ -15,7 +15,7 @@ pub struct CloseBoostV0<'info> {
     constraint = boosted_hex.is_expired(&boost_config),
     has_one = boost_config
   )]
-  pub boosted_hex: Box<Account<'info, BoostedHexV1>>,
+  pub boosted_hex: Box<Account<'info, BoostedHexV0>>,
 }
 
 pub fn handler(_ctx: Context<CloseBoostV0>) -> Result<()> {

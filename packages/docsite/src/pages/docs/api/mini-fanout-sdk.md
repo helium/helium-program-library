@@ -23,6 +23,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | token_account            | immut      | no     |      |
 | owner_token_account      | immut      | no     |      |
 | next_pre_task            | immut      | no     |      |
+| task_rent_refund         | immut      | no     |      |
 | tuktuk_program           | immut      | no     |      |
 | system_program           | immut      | no     |      |
 | token_program            | immut      | no     |      |
@@ -116,6 +117,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | next_pre_task        | immut      | no     |      |
 | new_task             | immut      | no     |      |
 | new_pre_task         | immut      | no     |      |
+| task_rent_refund     | immut      | no     |      |
 | tuktuk_program       | immut      | no     |      |
 | system_program       | immut      | no     |      |
 

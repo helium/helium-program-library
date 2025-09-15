@@ -49,3 +49,5 @@ tuktuk-program = { version = "0.3.2" }
 modular-governance = { path = "./utils/modular-governance" }
 solana-zk-sdk = "2.2.3"
 tuktuk = "0"
+clockwork-cron = "2.0.19"
+chrono = "0.4.39"

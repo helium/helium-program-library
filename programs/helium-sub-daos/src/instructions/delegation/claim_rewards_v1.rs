@@ -154,7 +154,8 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
   if !TESTING {
     require_gt!(epoch, args.epoch, ErrorCode::EpochNotOver);
     if delegated_position.is_claimed(args.epoch)? {
-      return Err(error!(ErrorCode::InvalidClaimEpoch));
+      msg!("Rewards already claimed, skipping");
+      return Ok(());
     }
   }
 

@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.10.35](https://github.com/helium/helium-program-libary/compare/v0.10.34...v0.10.35) (2025-08-19)
+
+**Note:** Version bump only for package @helium/price-oracle-sdk
+
+
+
+
+
 ## [0.10.34](https://github.com/helium/helium-program-libary/compare/v0.10.33...v0.10.34) (2025-08-05)
 
 **Note:** Version bump only for package @helium/price-oracle-sdk

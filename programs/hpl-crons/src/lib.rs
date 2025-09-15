@@ -167,4 +167,11 @@ pub mod hpl_crons {
   ) -> Result<tuktuk_program::RunTaskReturnV0> {
     requeue_entity_claim_v1::handler(ctx)
   }
+
+  pub fn return_pyth_task_v0(
+    ctx: Context<ReturnPythTaskV0>,
+    args: ReturnPythTaskArgsV0,
+  ) -> Result<tuktuk_program::RunTaskReturnV0> {
+    return_pyth_task_v0::handler(ctx, args)
+  }
 }

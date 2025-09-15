@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.10.34",
+  "version": "0.10.35",
   "description": "Faucet for devnet Helium tokens",
   "repository": {
     "type": "git",
@@ -35,8 +35,8 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/idls": "^0.10.34",
-    "@helium/spl-utils": "^0.10.34",
+    "@helium/idls": "^0.10.35",
+    "@helium/spl-utils": "^0.10.35",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",

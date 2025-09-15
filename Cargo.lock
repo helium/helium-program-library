@@ -712,6 +712,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "dc-auto-top"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "chrono",
+ "circuit-breaker",
+ "clockwork-cron",
+ "data-credits",
+ "default-env",
+ "helium-sub-daos",
+ "lazy-transactions",
+ "pyth-solana-receiver-sdk",
+ "pythnet-sdk",
+ "shared-utils",
+ "solana-security-txt",
+ "solana-zk-sdk",
+ "tuktuk-program",
+]
+
+[[package]]
 name = "default-env"
 version = "0.1.1"
 dependencies = [
@@ -882,7 +903,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.3.0"
+version = "0.3.4"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -905,7 +926,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.39"
+version = "0.2.40"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -935,7 +956,7 @@ dependencies = [
 
 [[package]]
 name = "hexboosting"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

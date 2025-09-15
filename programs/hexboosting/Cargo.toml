@@ -1,6 +1,6 @@
 [package]
 name = "hexboosting"
-version = "0.2.2"
+version = "0.2.3"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
