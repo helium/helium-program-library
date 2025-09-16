@@ -1,6 +1,7 @@
 import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Cluster, Connection, PublicKey } from "@solana/web3.js";
 import { HermesClient } from "@pythnetwork/hermes-client";
+import { HNT_PRICE_FEED_ID } from "@helium/spl-utils";
 import BN from "bn.js";
 
 export const getBalance = async ({
@@ -23,7 +24,6 @@ export const getBalance = async ({
 };
 
 export const PYTH_HERMES_URL = "https://hermes.pyth.network/"
-const HNT_PRICE_FEED_ID = "0x649fdd7ec08e8e2a20f425729854e90293dcbe2376abc47197a14da6ff339756"
 
 type PythReturn = {
   priceMessage: {

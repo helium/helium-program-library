@@ -1,12 +1,10 @@
 import { Program } from "@coral-xyz/anchor";
 import BN from "bn.js";
 import { DataCredits } from "@helium/idls/lib/types/data_credits";
-import { DC_MINT } from "@helium/spl-utils";
+import { DC_MINT, HNT_PRICE_FEED_ID } from "@helium/spl-utils";
 import { InstructionWithEphemeralSigners, PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { PublicKey } from "@solana/web3.js";
 import { HermesClient } from "@pythnetwork/hermes-client";
-
-const HNT_PRICE_FEED_ID = "0x649fdd7ec08e8e2a20f425729854e90293dcbe2376abc47197a14da6ff339756"
 
 export const PYTH_HERMES_URL = "https://hermes.pyth.network/"
 
