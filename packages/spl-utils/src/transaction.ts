@@ -559,8 +559,7 @@ export async function bulkSendTransactions(
       triesRemaining--;
       if (triesRemaining <= 0) {
         throw new Error(
-          `Failed to submit all txs after blockhashes expired, ${
-            signedTxs.length - confirmedTxs.length
+          `Failed to submit all txs after blockhashes expired, ${signedTxs.length - confirmedTxs.length
           } remain`
         );
       }
@@ -637,7 +636,11 @@ export async function bulkSendRawTransactions(
         .filter(truthy);
 
       if (failures.length > 0) {
-        console.error(failures);
+        const failureIndexes = statuses.map((status, index) => status?.meta?.err ? index : null).filter(truthy);
+        const failedTxs = await Promise.all(failureIndexes.map(index => connection.getTransaction(txids[index], { commitment: "confirmed", maxSupportedTransactionVersion: 0 })));
+        for (const tx of failedTxs) {
+          console.error(tx?.meta?.logMessages?.join("\n"));
+        }
         throw new Error("Failed to run txs");
       }
       ret.push(
