@@ -112,7 +112,7 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Bucket URL prefix holding all of the metadata jsons",
       default:
-        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP",
+        "https://entities.nft.helium.io/v2/tokens",
     },
     rewardsOracleUrl: {
       alias: "ro",
@@ -277,7 +277,7 @@ export async function run(args: any = process.argv) {
     mintKeypair: subdaoKeypair,
     amount: argv.numTokens,
     decimals: argv.decimals,
-    metadataUrl: `${argv.bucket}/${name.toLowerCase()}.json`,
+    metadataUrl: `${argv.bucket}/${name.toLowerCase()}`,
     mintAuthority: daoAcc.authority,
     freezeAuthority: daoAcc.authority,
     updateAuthority: authority,

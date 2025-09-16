@@ -118,7 +118,7 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Bucket URL prefix holding all of the metadata jsons",
       default:
-        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP",
+        "https://entities.nft.helium.io/v2/tokens",
     },
     emissionSchedulePath: {
       required: true,
@@ -266,7 +266,7 @@ export async function run(args: any = process.argv) {
     provider,
     mintKeypair: hntKeypair,
     amount: argv.numHnt,
-    metadataUrl: `${argv.bucket}/hnt.json`,
+    metadataUrl: `${argv.bucket}/hnt`,
     updateAuthority: authority,
   });
 
@@ -275,7 +275,7 @@ export async function run(args: any = process.argv) {
     mintKeypair: dcKeypair,
     amount: argv.numDc,
     decimals: 0,
-    metadataUrl: `${argv.bucket}/dc.json`,
+    metadataUrl: `${argv.bucket}/dc`,
     updateAuthority: authority,
   });
 
@@ -284,7 +284,7 @@ export async function run(args: any = process.argv) {
     mintKeypair: councilKeypair,
     amount: argv.numCouncil,
     decimals: 0,
-    metadataUrl: `${argv.bucket}/council.json`,
+    metadataUrl: `${argv.bucket}/council`,
     to: councilWallet,
     updateAuthority: authority,
   });
