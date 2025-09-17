@@ -46,16 +46,8 @@ RUN mkdir -p config && chown -R app:app /usr/src/app
 # Switch to app user
 USER app
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${ATOMIC_DATA_PUBLISHER_SERVICE_HEALTH_CHECK_PORT:-3000}/health || exit 1
-
-# Expose health check port
-EXPOSE 3000
-
 # Set environment variables
 ENV RUST_LOG=info
-ENV ATOMIC_DATA_PUBLISHER_LOGGING_FORMAT=json
 
 # Run the application
 CMD ["./atomic-data-publisher"]

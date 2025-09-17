@@ -385,16 +385,7 @@ impl ProtobufBuilder {
   where
     T: Message + Clone,
   {
-    // Clone the message and clear the signature field
-    let unsigned_msg = msg.clone();
-    let mut buf = Vec::new();
-    unsigned_msg.encode(&mut buf).map_err(|e| {
-      AtomicDataError::SerializationError(format!("Failed to encode message: {}", e))
-    })?;
-
-    // Sign the encoded message
-    let signature = keypair
-      .sign(&buf)
+    let signature = Sign::sign(keypair, &msg.encode_to_vec())
       .map_err(|e| AtomicDataError::InvalidData(format!("Failed to sign message: {}", e)))?;
 
     Ok(signature.to_vec())

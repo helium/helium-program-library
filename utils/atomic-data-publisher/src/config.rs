@@ -1,4 +1,4 @@
-use config::{Config, ConfigError, Environment, File};
+use config::{Config, ConfigError, File};
 use serde::Deserialize;
 use std::time::Duration;
 
@@ -9,6 +9,7 @@ pub struct Settings {
   pub service: ServiceConfig,
   pub ingestor: IngestorConfig,
   pub logging: LoggingConfig,
+  pub signing: SigningConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -65,12 +66,16 @@ pub struct LoggingConfig {
   pub format: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct SigningConfig {
+  pub keypair_path: String,
+}
+
 impl Settings {
   pub fn new() -> Result<Self, ConfigError> {
     let s = Config::builder()
       .add_source(File::with_name("config/default").required(false))
       .add_source(File::with_name("config/local").required(false))
-      .add_source(Environment::with_prefix("ATOMIC_DATA_PUBLISHER"))
       .build()?;
 
     s.try_deserialize()
@@ -118,6 +123,9 @@ impl Default for Settings {
       logging: LoggingConfig {
         level: "info".to_string(),
         format: "json".to_string(),
+      },
+      signing: SigningConfig {
+        keypair_path: "./keypair.bin".to_string(),
       },
     }
   }

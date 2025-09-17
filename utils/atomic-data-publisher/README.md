@@ -11,13 +11,23 @@ Rust service that polls PostgreSQL for hotspot data changes and publishes them t
 
 ## Configuration
 
-See `config/default.toml` for full configuration options. Key environment variables:
+Configuration is managed through TOML files:
 
-```bash
-export ATOMIC_DATA_PUBLISHER_DATABASE_HOST=postgres-host
-export ATOMIC_DATA_PUBLISHER_DATABASE_PASSWORD=secret
-export ATOMIC_DATA_PUBLISHER_INGESTOR_ENDPOINT=https://ingestor.helium.io
-export ATOMIC_DATA_PUBLISHER_SIGNING_KEYPAIR_PATH=/path/to/keypair.bin
+- `config/default.toml` - Default configuration settings
+- `config/local.toml` - Local overrides (create this file for your environment)
+
+Example `config/local.toml`:
+
+```toml
+[database]
+host = "your-postgres-host"
+password = "your-secret"
+
+[signing]
+keypair_path = "/path/to/your/keypair.bin"
+
+[ingestor]
+endpoint = "https://ingestor.helium.io"
 ```
 
 ## Running
@@ -30,7 +40,7 @@ cargo build
 cargo run
 
 # Run with dry-run mode (logs messages without sending)
-export ATOMIC_DATA_PUBLISHER_DRY_RUN=true
+# Set dry_run = true in your config/local.toml
 cargo run
 ```
 

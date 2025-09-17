@@ -76,15 +76,9 @@ impl AtomicDataPublisher {
     database.cleanup_stale_jobs().await?;
 
     // Load keypair for signing messages
-    let keypair_path = std::env::var("ATOMIC_DATA_PUBLISHER_SIGNING_KEYPAIR_PATH")
-      .unwrap_or_else(|_| "./keypair.bin".to_string());
+    let keypair_path = config.signing.keypair_path.clone();
 
-    let key_tag = KeyTag {
-      network: Network::MainNet,
-      key_type: KeyType::Ed25519,
-    };
-
-    let entropy = if std::path::Path::new(&keypair_path).exists() {
+    let keypair_data = if std::path::Path::new(&keypair_path).exists() {
       std::fs::read(&keypair_path)?
     } else {
       return Err(anyhow::anyhow!(
@@ -93,8 +87,8 @@ impl AtomicDataPublisher {
       ));
     };
 
-    let keypair = Keypair::generate_from_entropy(key_tag, &entropy)
-      .map_err(|e| anyhow::anyhow!("Failed to generate keypair from entropy: {}", e))?;
+    let keypair = Keypair::try_from(&keypair_data[..])
+      .map_err(|e| anyhow::anyhow!("Failed to load keypair from file: {}", e))?;
 
     info!("Using keypair with public key: {}", keypair.public_key());
 
