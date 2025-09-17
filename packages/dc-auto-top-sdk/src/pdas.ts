@@ -2,13 +2,12 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 
 export function autoTopOffKey(
-  dataCredits: PublicKey,
-  subDao: PublicKey,
+  delegatedDataCredits: PublicKey,
   authority: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
-    [Buffer.from("auto_top_off", "utf-8"), dataCredits.toBuffer(), subDao.toBuffer(), authority.toBuffer()],
+    [Buffer.from("auto_top_off", "utf-8"), delegatedDataCredits.toBuffer(), authority.toBuffer()],
     programId
   )
 }

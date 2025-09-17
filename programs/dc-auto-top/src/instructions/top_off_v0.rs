@@ -48,9 +48,6 @@ pub struct TopOffV0<'info> {
     has_one = escrow_account,
   )]
   pub delegated_data_credits: Box<Account<'info, DelegatedDataCreditsV0>>,
-  #[account(
-    has_one = hnt_price_oracle
-  )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
   #[account(mut)]
   pub dc_mint: Box<Account<'info, Mint>>,

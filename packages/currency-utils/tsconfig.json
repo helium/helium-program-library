@@ -2,6 +2,9 @@
   "extends": "../../tsconfig.root.json",
   "references": [
     {
+      "path": "../spl-utils"
+    },
+    {
       "path": "./tsconfig.cjs.json"
     },
     {

@@ -10,7 +10,7 @@ on:
       - develop
 env:
   SOLANA_CLI_VERSION: 2.1.6
-  NODE_VERSION: 18.12.1
+  NODE_VERSION: 22.19.0
 
 jobs:
   test-rust-lint:

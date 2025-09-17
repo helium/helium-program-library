@@ -58,7 +58,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
-### schedule_task
+### schedule_task_v0
 
 #### Accounts
 
@@ -422,6 +422,7 @@ undefined
 | new_task_id      | u16    |
 | new_pyth_task_id | u16    |
 | schedule         | string |
+| threshold        | u64    |
 
 ### WindowV0
 

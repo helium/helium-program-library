@@ -82,6 +82,11 @@ chai.use(chaiHttp);
 
 export class DatabaseMock implements Database {
   dao: PublicKey;
+  readonly hemProgram: Program<HeliumEntityManager>;
+  readonly getAssetFn: (
+    url: string,
+    asset: PublicKey
+  ) => Promise<Asset | undefined>;
   inMemHash: {
     totalClicks: number;
     lifetimeRewards: number;
@@ -94,13 +99,15 @@ export class DatabaseMock implements Database {
   };
 
   constructor(
-    readonly hemProgram: Program<HeliumEntityManager>,
-    readonly getAssetFn: (
+    hemProgram: Program<HeliumEntityManager>,
+    getAssetFn: (
       url: string,
       asset: PublicKey
     ) => Promise<Asset | undefined> = getAsset,
     dao: PublicKey
   ) {
+    this.hemProgram = hemProgram;
+    this.getAssetFn = getAssetFn;
     this.dao = dao;
     this.inMemHash = {
       totalClicks: 0,

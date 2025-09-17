@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { init as initDataCredits } from "@helium/data-credits-sdk";
+import { init as initDataCredits, mintDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
 import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
@@ -99,16 +99,14 @@ describe("hexboosting", () => {
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     const hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, new BN("100000000000000"), me);
-    await dcProgram.methods
-      .mintDataCreditsV0({
+    await provider.sendAll(
+      (await mintDataCredits({
+        program: dcProgram,
         dcAmount: new BN("10000000000"),
-        hntAmount: null,
-      })
-      .accountsPartial({
         dcMint: dataCredits.dcMint,
-        recipient: me,
-      })
-      .rpc({ skipPreflight: true });
+      })).txs
+    );
+    
     const { dao } = await initTestDao(
       hsdProgram,
       provider,

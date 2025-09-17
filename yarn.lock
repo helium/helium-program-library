@@ -1011,6 +1011,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/currency-utils@workspace:packages/currency-utils"
   dependencies:
+    "@helium/spl-utils": ^0.10.35
+    "@pythnetwork/hermes-client": ^2.0.0
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
   languageName: unknown
@@ -1026,6 +1028,8 @@ __metadata:
     "@helium/helium-sub-daos-sdk": ^0.10.35
     "@helium/idls": ^0.10.35
     "@helium/spl-utils": ^0.10.35
+    "@pythnetwork/hermes-client": ^2.0.0
+    "@pythnetwork/pyth-solana-receiver": ^0.10.2
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -1035,7 +1039,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/dc-auto-top-sdk@workspace:packages/dc-auto-top-sdk":
+"@helium/dc-auto-top-sdk@^0.10.35, @helium/dc-auto-top-sdk@workspace:packages/dc-auto-top-sdk":
   version: 0.0.0-use.local
   resolution: "@helium/dc-auto-top-sdk@workspace:packages/dc-auto-top-sdk"
   dependencies:
@@ -1208,6 +1212,7 @@ __metadata:
     "@helium/circuit-breaker-sdk": ^0.10.35
     "@helium/crypto": ^4.10.2
     "@helium/data-credits-sdk": ^0.10.35
+    "@helium/dc-auto-top-sdk": ^0.10.35
     "@helium/distributor-oracle": ^0.10.35
     "@helium/fanout-sdk": ^0.10.35
     "@helium/helium-entity-manager-sdk": ^0.10.35
@@ -3913,6 +3918,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@pythnetwork/pyth-solana-receiver@npm:^0.10.2":
+  version: 0.10.2
+  resolution: "@pythnetwork/pyth-solana-receiver@npm:0.10.2"
+  dependencies:
+    "@coral-xyz/anchor": ^0.29.0
+    "@noble/hashes": ^1.4.0
+    "@pythnetwork/price-service-sdk": 1.8.0
+    "@pythnetwork/solana-utils": 0.4.5
+    "@solana/web3.js": ^1.90.0
+  checksum: 0b4376cb5c927d7571ca1b91216d47251a10aff52faf3d1581b8ac267facdb8214fedea7567e2266b2ba6f31cdb8ae44e6aa2ff7688f368c0582d4d59e89a287
+  languageName: node
+  linkType: hard
+
 "@pythnetwork/pyth-solana-receiver@npm:^0.11.0":
   version: 0.11.0
   resolution: "@pythnetwork/pyth-solana-receiver@npm:0.11.0"
@@ -3948,6 +3966,19 @@ __metadata:
     bs58: ^5.0.0
     jito-ts: ^3.0.1
   checksum: 76e9116156d4c620f84e366f300c71a5faee8d01dd708676d71ef8094259550a245d5149322cca07b5a61ebed962470adcea85d66480591c738008f16155fdeb
+  languageName: node
+  linkType: hard
+
+"@pythnetwork/solana-utils@npm:0.4.5":
+  version: 0.4.5
+  resolution: "@pythnetwork/solana-utils@npm:0.4.5"
+  dependencies:
+    "@coral-xyz/anchor": ^0.29.0
+    "@solana/web3.js": ^1.90.0
+    bs58: ^5.0.0
+    jito-ts: ^3.0.1
+    ts-log: ^2.2.7
+  checksum: b877f2147a008403e13939b1b8e8a67d4d19432e46231b28c08d399010408093e9bad553ea2a7d7640496e37f1feac3e9fc01b8895f61c2d2617226a0d92d61e
   languageName: node
   linkType: hard
 

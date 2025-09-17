@@ -37,6 +37,8 @@
     "@helium/helium-sub-daos-sdk": "^0.10.35",
     "@helium/idls": "^0.10.35",
     "@helium/spl-utils": "^0.10.35",
+    "@pythnetwork/hermes-client": "^2.0.0",
+    "@pythnetwork/pyth-solana-receiver": "^0.10.2",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },

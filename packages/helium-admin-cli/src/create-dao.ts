@@ -118,7 +118,7 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Bucket URL prefix holding all of the metadata jsons",
       default:
-        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP",
+        "https://entities.nft.helium.io/v2/tokens",
     },
     emissionSchedulePath: {
       required: true,
@@ -169,10 +169,6 @@ export async function run(args: any = process.argv) {
       type: "number",
       describe: "Authority index for squads. Defaults to 1",
       default: 1,
-    },
-    hntPriceOracle: {
-      type: "string",
-      required: true,
     },
     rewardsOracleUrl: {
       alias: "ro",
@@ -270,7 +266,7 @@ export async function run(args: any = process.argv) {
     provider,
     mintKeypair: hntKeypair,
     amount: argv.numHnt,
-    metadataUrl: `${argv.bucket}/hnt.json`,
+    metadataUrl: `${argv.bucket}/hnt`,
     updateAuthority: authority,
   });
 
@@ -279,27 +275,11 @@ export async function run(args: any = process.argv) {
     mintKeypair: dcKeypair,
     amount: argv.numDc,
     decimals: 0,
-    metadataUrl: `${argv.bucket}/dc.json`,
-    updateAuthority: authority,
-  });
-
-  await createAndMint({
-    provider,
-    mintKeypair: councilKeypair,
-    amount: argv.numCouncil,
-    decimals: 0,
-    metadataUrl: `${argv.bucket}/council.json`,
-    to: councilWallet,
+    metadataUrl: `${argv.bucket}/dc`,
     updateAuthority: authority,
   });
 
   let instructions: TransactionInstruction[] = [];
-  const govProgramVersion = await getGovernanceProgramVersion(
-    conn,
-    govProgramId,
-    isLocalhost(provider) ? "localnet" : undefined
-  );
-
   const delProgram = await init(provider);
   const {
     pubkeys: { proxyConfig },
@@ -328,36 +308,6 @@ export async function run(args: any = process.argv) {
   )[0];
 
   console.log("Realm, ", realm.toBase58());
-  const needRealmCreate = !(await exists(conn, realm));
-  if (needRealmCreate) {
-    console.log("Initializing Realm");
-    await withCreateRealm(
-      instructions,
-      govProgramId,
-      govProgramVersion,
-      realmName,
-      provider.wallet.publicKey, // realmAuthorityPk
-      hntKeypair.publicKey, // communityMintPk
-      provider.wallet.publicKey, // payer
-      councilKeypair.publicKey, // councilMintPk
-      MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
-      new anchor.BN(1000000000000000), // 10mm vehnt to create governance. Council should be the only one doing this
-      new GoverningTokenConfigAccountArgs({
-        // community token config
-        voterWeightAddin: heliumVsrProgram.programId,
-        maxVoterWeightAddin: heliumVsrProgram.programId,
-        tokenType: GoverningTokenType.Liquid,
-      }),
-      new GoverningTokenConfigAccountArgs({
-        // council token config
-        voterWeightAddin: undefined,
-        maxVoterWeightAddin: undefined,
-        tokenType: GoverningTokenType.Liquid,
-      })
-    );
-    await sendInstructions(provider, instructions, []);
-    instructions = [];
-  }
 
   const registrar = (await registrarKey(realm, hntKeypair.publicKey))[0];
   if (!(await exists(conn, registrar))) {
@@ -413,17 +363,6 @@ export async function run(args: any = process.argv) {
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
-  if (needRealmCreate && !authority.equals(me)) {
-    withSetRealmAuthority(
-      instructions,
-      govProgramId,
-      govProgramVersion,
-      realm,
-      provider.wallet.publicKey,
-      authority,
-      SetRealmAuthorityAction.SetUnchecked
-    );
-  }
   await sendInstructions(provider, instructions, []);
   instructions = [];
 
@@ -442,7 +381,6 @@ export async function run(args: any = process.argv) {
       .accountsPartial({
         hntMint: hntKeypair.publicKey,
         dcMint: dcKeypair.publicKey,
-        hntPriceOracle: new PublicKey(argv.hntPriceOracle),
       })
       .rpc({ skipPreflight: true });
 

@@ -1,13 +1,8 @@
-import { Connection, PublicKey, Cluster } from "@solana/web3.js";
-import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
-import {
-  PythSolanaReceiver,
-  IDL as pythSolanaReceiverIdl,
-} from "./pyth";
-import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
-
-export type { PythSolanaReceiver } from "./pyth";
-export { pythSolanaReceiverIdl };
+import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { Cluster, Connection, PublicKey } from "@solana/web3.js";
+import { HermesClient } from "@pythnetwork/hermes-client";
+import { HNT_PRICE_FEED_ID } from "@helium/spl-utils";
+import BN from "bn.js";
 
 export const getBalance = async ({
   pubKey,
@@ -28,25 +23,55 @@ export const getBalance = async ({
   }
 };
 
-export const getOraclePrice = async ({
-  tokenType,
-  cluster,
-  connection,
-}: {
-  tokenType: "HNT";
-  cluster: Cluster;
-  connection: Connection;
+export const PYTH_HERMES_URL = "https://hermes.pyth.network/"
+
+type PythReturn = {
+  priceMessage: {
+    emaPrice: {
+      feedId: number[]
+      price: BN
+      conf: BN
+      exponent: number
+      publishTime: BN
+      prevPublishTime: BN
+      emaPrice: BN
+      emaConf: BN
+    }
+  }
+}
+
+export const getOraclePrice = async ({tokenType}: {
+  tokenType?: "HNT";
+  cluster?: Cluster;
+  connection?: Connection;
 }) => {
-  const pythProgram: Program<PythSolanaReceiver> = new Program(
-    pythSolanaReceiverIdl as any,
-    new AnchorProvider(connection, {} as Wallet, {
-      skipPreflight: true,
-    })
+  if (tokenType !== "HNT") {
+    throw new Error("Only HNT is supported");
+  }
+  const priceServiceConnection = new HermesClient(
+    PYTH_HERMES_URL,
+    {}
   );
 
-  const data = await pythProgram.account.priceUpdateV2.fetch(
-    new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33")
+  const priceUpdates = (
+    await priceServiceConnection.getLatestPriceUpdates(
+      [HNT_PRICE_FEED_ID],
+      { encoding: "base64" }
+    )
   );
-
-  return data;
+  const price = priceUpdates.parsed![0];
+  return {
+    priceMessage: {
+      emaPrice: {
+        feedId: HNT_PRICE_FEED_ID,
+        price: price.ema_price.price,
+        conf: price.ema_price.conf,
+        exponent: price.ema_price.expo,
+        publishTime: price.ema_price.publish_time,
+        prevPublishTime: price.ema_price.prev_publish_time,
+        emaPrice: price.ema_price.ema_price,
+        emaConf: price.ema_price.ema_conf,
+      }
+    }
+  }
 };

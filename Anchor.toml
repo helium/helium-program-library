@@ -82,6 +82,9 @@ address = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY" # bubblegum
 address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV" # noop
 
 [[test.validator.clone]]
+address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33" # hnt feed needed for dc auto top
+
+[[test.validator.clone]]
 address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK" # account compression
 
 [[test.validator.clone]]
@@ -114,12 +117,19 @@ address = "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM" # State controller progr
 [[test.validator.clone]]
 address = "GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E" # State controller IDL
 
+# Pyth price oracle program
 [[test.validator.clone]]
-address = "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx" # Mobile price oracle
+address = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"
 
-# Pyth price oracle
+# Wormhole
 [[test.validator.clone]]
-address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
+address = "HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ"
+
+[[test.validator.clone]]
+address = "5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn"
+
+[[test.validator.clone]]
+address = "DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b"
 
 # Squads multisig program
 [[test.validator.clone]]

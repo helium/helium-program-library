@@ -290,6 +290,7 @@ describe("welcome-pack", () => {
       })
       getAssetFn = mock.getAssetFn
       getAssetProofFn = mock.getAssetProofFn
+      console.log("getting ixns")
       const ixs = [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1000000 }),
         await (await claimWelcomePack({
@@ -305,7 +306,9 @@ describe("welcome-pack", () => {
         }))
           .instruction()
       ]
+      console.log("ixns got")
       const slot = await provider.connection.getSlot();
+      console.log("creating lut")
       const [lutIx, lut] = AddressLookupTableProgram.createLookupTable({
         authority: me,
         payer: me,
@@ -317,15 +320,17 @@ describe("welcome-pack", () => {
         lookupTable: lut,
         addresses: [taskQueue, hntMint, ASSOCIATED_PROGRAM_ID, BUBBLEGUM_PROGRAM_ID, NOOP_PROGRAM_ID],
       })])
+      console.log("lut created")
       // Wait for lut to activate
       await sleep(1000)
+      console.log("sending ixs")
       await bulkSendTransactions(provider, [{
         instructions: ixs,
         addressLookupTableAddresses: [lut],
         feePayer: me,
         signers: [claimer],
       }], undefined, 10, [claimer])
-
+      console.log("ixns sent")
       // Verify mini fanout was created
       const miniFanoutAccount = await miniFanoutProgram.account.miniFanoutV0.fetch(miniFanout)
       expect(miniFanoutAccount.schedule).to.equal(rewardsSchedule)

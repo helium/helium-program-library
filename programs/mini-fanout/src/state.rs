@@ -20,6 +20,9 @@ pub struct MiniFanoutV0 {
   pub mint: Pubkey,
   pub token_account: Pubkey,
   pub task_queue: Pubkey,
+  // If next task is set to crate::ID, it means there's no next task.
+  // The reason we do this is because you can't set Pubkey::default() as mutable,
+  // which means on `close` you'd need conditional mutability logic, which plays horribly with idls.
   pub next_task: Pubkey,
   pub rent_refund: Pubkey,
   /// Bump seed for PDA derivation

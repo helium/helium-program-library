@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-import { init as initDataCredits } from "@helium/data-credits-sdk";
+import { init as initDataCredits, mintDataCredits } from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { notEmittedKey, init as initBurn } from "@helium/no-emit-sdk";
 import {
@@ -328,13 +328,13 @@ describe("helium-entity-manager", () => {
         hotspotOwner: hotspotOwner.publicKey,
       }));
 
-      await dcProgram.methods
-        .mintDataCreditsV0({
+      await provider.sendAll(
+        (await mintDataCredits({
+          program: dcProgram,
           hntAmount: toBN(startDcBal, 8),
-          dcAmount: null,
-        })
-        .accountsPartial({ dcMint })
-        .rpc({ skipPreflight: true });
+          dcMint,
+        })).txs
+      );
     });
     it("issues and onboards an iot data only hotspot", async () => {
       let hotspotOwner = Keypair.generate();
@@ -735,13 +735,13 @@ describe("helium-entity-manager", () => {
 
       await initTestMaker(hemProgram, provider, rewardableEntityConfig, dao);
 
-      await dcProgram.methods
-        .mintDataCreditsV0({
+      await provider.sendAll(
+        (await mintDataCredits({
+          program: dcProgram,
           hntAmount: toBN(startDcBal, 8),
-          dcAmount: null,
-        })
-        .accountsPartial({ dcMint })
-        .rpc({ skipPreflight: true });
+          dcMint,
+        })).txs
+      );
 
       maker = makerConf.maker;
       makerKeypair = makerConf.makerKeypair;
@@ -917,14 +917,14 @@ describe("helium-entity-manager", () => {
         ({ mobileInfo: infoKey } = await method.pubkeys());
 
         await method.rpc({ skipPreflight: true });
-
-        await dcProgram.methods
-          .mintDataCreditsV0({
+        await provider.sendAll(
+          (await mintDataCredits({
+            program: dcProgram,
             hntAmount: toBN(startDcBal, 8),
-            dcAmount: null,
-          })
-          .accountsPartial({ dcMint, recipient: hotspotOwner.publicKey })
-          .rpc();
+            dcMint,
+            recipient: hotspotOwner.publicKey,
+          })).txs
+        );
       });
 
       it("onboarding fees be backpaid with DC when subdao fees are raised", async () => {
@@ -1103,13 +1103,13 @@ describe("helium-entity-manager", () => {
 
       await initTestMaker(hemProgram, provider, rewardableEntityConfig, dao);
 
-      await dcProgram.methods
-        .mintDataCreditsV0({
+      await provider.sendAll(
+        (await mintDataCredits({
+          program: dcProgram,
           hntAmount: toBN(startDcBal, 8),
-          dcAmount: null,
-        })
-        .accountsPartial({ dcMint: dcMint })
-        .rpc({ skipPreflight: true });
+          dcMint,
+        })).txs
+      );
 
       maker = makerConf.maker;
       makerKeypair = makerConf.makerKeypair;
@@ -1225,13 +1225,14 @@ describe("helium-entity-manager", () => {
 
         await method.rpc({ skipPreflight: true });
 
-        await dcProgram.methods
-          .mintDataCreditsV0({
+        await provider.sendAll(
+          (await mintDataCredits({
+            program: dcProgram,
             hntAmount: toBN(startDcBal, 8),
-            dcAmount: null,
-          })
-          .accountsPartial({ dcMint, recipient: hotspotOwner.publicKey })
-          .rpc();
+            dcMint,
+            recipient: hotspotOwner.publicKey,
+          })).txs
+        );
       });
 
       it("oracle can update active status", async () => {
