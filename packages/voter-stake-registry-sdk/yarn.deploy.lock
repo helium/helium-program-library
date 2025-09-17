@@ -107,7 +107,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.10.35":
+"@helium/account-fetch-cache@^0.11.0":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -129,7 +129,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.10.0-alpha.6, @helium/anchor-resolvers@^0.10.35":
+"@helium/anchor-resolvers@^0.11.0":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -143,7 +143,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/idls@^0.10.35":
+"@helium/anchor-resolvers@npm:^0.10.0-alpha.6":
+  version: 0.10.35
+  resolution: "@helium/anchor-resolvers@npm:0.10.35"
+  dependencies:
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.91.1
+  peerDependencies:
+    "@coral-xyz/anchor": ^0.31.0
+  checksum: f301beca0df6dbffb826a510ce9b9c5eb5e3a7e6aa4f8048c406345d2ba2dcb069911b3a270d70f8e3208c9d819c0f9c996e796f6250962e931475518a970856
+  languageName: node
+  linkType: hard
+
+"@helium/idls@^0.11.0":
   version: 0.0.0-use.local
   resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
@@ -179,14 +191,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/spl-utils@^0.10.35":
+"@helium/spl-utils@^0.11.0":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/account-fetch-cache": ^0.10.35
+    "@helium/account-fetch-cache": ^0.11.0
     "@helium/address": ^4.12.0
-    "@helium/anchor-resolvers": ^0.10.35
+    "@helium/anchor-resolvers": ^0.11.0
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -206,10 +218,10 @@ __metadata:
   resolution: "@helium/voter-stake-registry-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.10.35
-    "@helium/idls": ^0.10.35
+    "@helium/anchor-resolvers": ^0.11.0
+    "@helium/idls": ^0.11.0
     "@helium/nft-proxy-sdk": ^0.1.5-alpha.0
-    "@helium/spl-utils": ^0.10.35
+    "@helium/spl-utils": ^0.11.0
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0

@@ -129,7 +129,6 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name                    | Mutability | Signer | Docs |
 | ----------------------- | ---------- | ------ | ---- |
 | data_credits            | immut      | no     |      |
-| hnt_price_oracle        | immut      | no     |      |
 | hnt_mint                | immut      | no     |      |
 | circuit_breaker         | immut      | no     |      |
 | dc_mint                 | immut      | no     |      |
@@ -421,10 +420,9 @@ undefined
 
 ### UpdateDataCreditsArgsV0
 
-| Field            | Type   |
-| ---------------- | ------ |
-| new_authority    | pubkey |
-| hnt_price_oracle | pubkey |
+| Field         | Type   |
+| ------------- | ------ |
+| new_authority | pubkey |
 
 ### VerificationLevel
 
