@@ -25,6 +25,8 @@ export const HELIUM_COMMON_LUT = new PublicKey(
   "43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt"
 );
 
+export const HNT_PRICE_FEED_ID = "0x649fdd7ec08e8e2a20f425729854e90293dcbe2376abc47197a14da6ff339756"
+
 export type Network = "hnt" | "mobile" | "iot";
 export const networksToMint: { [Network: string]: PublicKey } = {
   hnt: HNT_MINT,

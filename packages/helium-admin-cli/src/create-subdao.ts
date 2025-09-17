@@ -4,7 +4,6 @@ import {
   init as initHem,
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
-import fs from "fs";
 import {
   daoKey,
   init as initDao,
@@ -15,6 +14,7 @@ import {
   init as initLazy,
   lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
+import { init } from "@helium/nft-proxy-sdk";
 import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { toU128 } from "@helium/treasury-management-sdk";
@@ -23,13 +23,7 @@ import {
   registrarKey,
 } from "@helium/voter-stake-registry-sdk";
 import {
-  getGovernanceProgramVersion,
-  GoverningTokenConfigAccountArgs,
-  GoverningTokenType,
-  MintMaxVoteWeightSource,
-  SetRealmAuthorityAction,
-  withCreateRealm,
-  withSetRealmAuthority,
+  getGovernanceProgramVersion
 } from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
@@ -39,6 +33,8 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import Squads from "@sqds/sdk";
+import BN from "bn.js";
+import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -50,8 +46,6 @@ import {
   parseEmissionsSchedule,
   sendInstructionsOrSquads,
 } from "./utils";
-import { init } from "@helium/nft-proxy-sdk";
-import BN from "bn.js"
 
 const SECS_PER_DAY = 86400;
 const SECS_PER_YEAR = 365 * SECS_PER_DAY;
@@ -112,7 +106,7 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Bucket URL prefix holding all of the metadata jsons",
       default:
-        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP",
+        "https://entities.nft.helium.io/v2/tokens",
     },
     rewardsOracleUrl: {
       alias: "ro",
@@ -157,11 +151,6 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Pubkey of the GOV program",
       default: "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S",
-    },
-    councilKeypair: {
-      type: "string",
-      describe: "Keypair of gov council token",
-      default: `${__dirname}/../../keypairs/council.json`,
     },
     multisig: {
       type: "string",
@@ -212,12 +201,10 @@ export async function run(args: any = process.argv) {
   const oracleKey = oracleKeypair.publicKey;
   const rewardsOracleUrl = argv.rewardsOracleUrl;
   const govProgramId = new PublicKey(argv.govProgramId);
-  const councilKeypair = await loadKeypair(argv.councilKeypair);
   const me = provider.wallet.publicKey;
 
   console.log("Subdao mint", subdaoKeypair.publicKey.toBase58());
   console.log("GOV PID", govProgramId.toBase58());
-  console.log("COUNCIL", councilKeypair.publicKey.toBase58());
 
   const conn = provider.connection;
 
@@ -277,7 +264,7 @@ export async function run(args: any = process.argv) {
     mintKeypair: subdaoKeypair,
     amount: argv.numTokens,
     decimals: argv.decimals,
-    metadataUrl: `${argv.bucket}/${name.toLowerCase()}.json`,
+    metadataUrl: `${argv.bucket}/${name.toLowerCase()}`,
     mintAuthority: daoAcc.authority,
     freezeAuthority: daoAcc.authority,
     updateAuthority: authority,
@@ -317,36 +304,6 @@ export async function run(args: any = process.argv) {
     govProgramId
   )[0];
   console.log("Realm, ", realm.toBase58());
-  const isFreshRealm = !(await exists(conn, realm));
-  if (isFreshRealm) {
-    console.log("Initializing Realm");
-    await withCreateRealm(
-      instructions,
-      govProgramId,
-      govProgramVersion,
-      realmName,
-      provider.wallet.publicKey, // realmAuthorityPk
-      subdaoKeypair.publicKey, // communityMintPk
-      provider.wallet.publicKey, // payer
-      councilKeypair.publicKey, // councilMintPk
-      MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
-      new anchor.BN(1000000000000000), // 10mm vehnt to create governance. Council should be the only one doing this
-      new GoverningTokenConfigAccountArgs({
-        // community token config
-        voterWeightAddin: heliumVsrProgram.programId,
-        maxVoterWeightAddin: heliumVsrProgram.programId,
-        tokenType: GoverningTokenType.Liquid,
-      }),
-      new GoverningTokenConfigAccountArgs({
-        // council token config
-        voterWeightAddin: undefined,
-        maxVoterWeightAddin: undefined,
-        tokenType: GoverningTokenType.Liquid,
-      })
-    );
-    await sendInstructions(provider, instructions, []);
-    instructions = [];
-  }
 
   const registrar = (await registrarKey(realm, subdaoKeypair.publicKey))[0];
   if (!(await exists(conn, registrar))) {
@@ -392,21 +349,6 @@ export async function run(args: any = process.argv) {
 
     await sendInstructions(provider, instructions, []);
     instructions = [];
-  }
-
-  await sendInstructions(provider, instructions, []);
-  instructions = [];
-
-  if (isFreshRealm && !authority.equals(me)) {
-    withSetRealmAuthority(
-      instructions,
-      govProgramId,
-      govProgramVersion,
-      realm,
-      provider.wallet.publicKey,
-      daoAcc.authority,
-      SetRealmAuthorityAction.SetUnchecked
-    );
   }
 
   await sendInstructions(provider, instructions, []);

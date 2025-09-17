@@ -6,7 +6,6 @@ use circuit_breaker::{
   cpi::{accounts::InitializeMintWindowedBreakerV0, initialize_mint_windowed_breaker_v0},
   CircuitBreaker, InitializeMintWindowedBreakerArgsV0, WindowedCircuitBreakerConfigV0,
 };
-use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 use crate::state::*;
 
@@ -27,7 +26,6 @@ pub struct InitializeDataCreditsV0<'info> {
     bump,
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
-  pub hnt_price_oracle: Account<'info, PriceUpdateV2>,
 
   pub hnt_mint: Box<Account<'info, Mint>>,
   /// CHECK: Initialized via cpi
@@ -66,7 +64,6 @@ pub fn handler(
   ctx.accounts.data_credits.dc_mint = ctx.accounts.dc_mint.key();
   ctx.accounts.data_credits.hnt_mint = ctx.accounts.hnt_mint.key();
   ctx.accounts.data_credits.authority = args.authority;
-  ctx.accounts.data_credits.hnt_price_oracle = ctx.accounts.hnt_price_oracle.key();
 
   ctx.accounts.data_credits.data_credits_bump = ctx.bumps.data_credits;
 

@@ -1,5 +1,5 @@
 # Specify the base image
-FROM node:20-alpine AS BUILD_IMAGE
+FROM node:22-alpine AS BUILD_IMAGE
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ RUN lerna bootstrap
 
 RUN yarn run build
 
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
