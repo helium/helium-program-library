@@ -1,6 +1,6 @@
 [package]
 name = "mini-fanout"
-version = "0.1.2"
+version = "0.1.3"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
