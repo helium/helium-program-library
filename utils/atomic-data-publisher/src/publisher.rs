@@ -7,10 +7,10 @@ use crate::config::{IngestorConfig, PollingJob, ServiceConfig};
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
-use crate::protobuf::{build_hotspot_update_request, HotspotUpdateRequest};
+use crate::protobuf::{build_entity_change_request, EntityChangeRequest};
 use helium_proto::services::chain_rewardable_entities::{
-  chain_rewardable_entities_client::ChainRewardableEntitiesClient, MobileHotspotUpdateRespV1,
-  IotHotspotUpdateRespV1,
+  chain_rewardable_entities_client::ChainRewardableEntitiesClient, EntityOwnershipChangeRespV1,
+  EntityRewardDestinationChangeRespV1, IotHotspotChangeRespV1, MobileHotspotChangeRespV1,
 };
 use tonic::transport::{Channel, Endpoint};
 use tonic::Request;
@@ -124,19 +124,31 @@ impl AtomicDataPublisher {
         ))
       })?;
 
-    let hotspot_type_str = job_config
+    let change_type = job_config
       .parameters
-      .get("hotspot_type")
+      .get("change_type")
       .and_then(|v| v.as_str())
-      .unwrap_or("mobile");
+      .or_else(|| {
+        // Fallback to legacy hotspot_type parameter for backward compatibility
+        job_config
+          .parameters
+          .get("hotspot_type")
+          .and_then(|v| v.as_str())
+          .map(|ht| match ht {
+            "mobile" => "mobile_hotspot",
+            "iot" => "iot_hotspot",
+            _ => "mobile_hotspot",
+          })
+      })
+      .unwrap_or("mobile_hotspot");
 
-    let hotspot_request = build_hotspot_update_request(change, hotspot_type_str, &self.keypair)?;
-    self.send_with_retries(hotspot_request).await?;
+    let entity_request = build_entity_change_request(change, change_type, &self.keypair)?;
+    self.send_with_retries(entity_request).await?;
 
     Ok(())
   }
 
-  async fn send_with_retries(&self, request: HotspotUpdateRequest) -> Result<(), AtomicDataError> {
+  async fn send_with_retries(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
     if self.service_config.dry_run {
       self.log_protobuf_message(&request).await?;
       return Ok(());
@@ -148,7 +160,7 @@ impl AtomicDataPublisher {
     loop {
       attempts += 1;
 
-      match self.send_hotspot_update(request.clone()).await {
+      match self.send_entity_change(request.clone()).await {
         Ok(_) => {
           debug!("Successfully sent hotspot change request on attempt {}", attempts);
           return Ok(());
@@ -180,11 +192,11 @@ impl AtomicDataPublisher {
     }
   }
 
-  async fn send_hotspot_update(&self, request: HotspotUpdateRequest) -> Result<(), AtomicDataError> {
+  async fn send_entity_change(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
     let mut client = self.grpc_client.clone();
 
     match request {
-      HotspotUpdateRequest::Mobile(mobile_req) => {
+      EntityChangeRequest::MobileHotspot(mobile_req) => {
         let response = client
           .submit_mobile_hotspot_change(Request::new(mobile_req))
           .await
@@ -201,10 +213,10 @@ impl AtomicDataPublisher {
             AtomicDataError::NetworkError(format!("gRPC mobile hotspot request failed: {}", e))
           })?;
 
-        let resp: MobileHotspotUpdateRespV1 = response.into_inner();
-        debug!("Mobile hotspot update accepted at timestamp: {}", resp.timestamp_ms);
+        let resp: MobileHotspotChangeRespV1 = response.into_inner();
+        debug!("Mobile hotspot change accepted at timestamp: {}", resp.timestamp_ms);
       }
-      HotspotUpdateRequest::Iot(iot_req) => {
+      EntityChangeRequest::IotHotspot(iot_req) => {
         let response = client
           .submit_iot_hotspot_change(Request::new(iot_req))
           .await
@@ -221,15 +233,55 @@ impl AtomicDataPublisher {
             AtomicDataError::NetworkError(format!("gRPC IoT hotspot request failed: {}", e))
           })?;
 
-        let resp: IotHotspotUpdateRespV1 = response.into_inner();
-        debug!("IoT hotspot update accepted at timestamp: {}", resp.timestamp_ms);
+        let resp: IotHotspotChangeRespV1 = response.into_inner();
+        debug!("IoT hotspot change accepted at timestamp: {}", resp.timestamp_ms);
+      }
+      EntityChangeRequest::EntityOwnership(ownership_req) => {
+        let response = client
+          .submit_entity_ownership_change(Request::new(ownership_req))
+          .await
+          .map_err(|e| {
+            // Categorize the error type for better metrics
+            match e.code() {
+              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
+                self.metrics.increment_ingestor_connection_failures();
+              }
+              _ => {
+                // Other gRPC errors (auth, invalid request, etc.)
+              }
+            }
+            AtomicDataError::NetworkError(format!("gRPC entity ownership request failed: {}", e))
+          })?;
+
+        let resp: EntityOwnershipChangeRespV1 = response.into_inner();
+        debug!("Entity ownership change accepted at timestamp: {}", resp.timestamp_ms);
+      }
+      EntityChangeRequest::EntityRewardDestination(reward_req) => {
+        let response = client
+          .submit_entity_reward_destination_change(Request::new(reward_req))
+          .await
+          .map_err(|e| {
+            // Categorize the error type for better metrics
+            match e.code() {
+              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
+                self.metrics.increment_ingestor_connection_failures();
+              }
+              _ => {
+                // Other gRPC errors (auth, invalid request, etc.)
+              }
+            }
+            AtomicDataError::NetworkError(format!("gRPC entity reward destination request failed: {}", e))
+          })?;
+
+        let resp: EntityRewardDestinationChangeRespV1 = response.into_inner();
+        debug!("Entity reward destination change accepted at timestamp: {}", resp.timestamp_ms);
       }
     }
 
     Ok(())
   }
 
-  async fn log_protobuf_message(&self, request: &HotspotUpdateRequest) -> Result<(), AtomicDataError> {
+  async fn log_protobuf_message(&self, request: &EntityChangeRequest) -> Result<(), AtomicDataError> {
     if self.service_config.dry_run_failure_rate > 0.0 {
       use rand::Rng;
       let mut rng = rand::thread_rng();
@@ -243,41 +295,77 @@ impl AtomicDataPublisher {
       }
     }
     match request {
-      HotspotUpdateRequest::Mobile(mobile_req) => {
+      EntityChangeRequest::MobileHotspot(mobile_req) => {
         info!(
-          "DRY RUN: Would send MobileHotspotUpdateReqV1 - signer: {}, signature length: {}",
+          "DRY RUN: Would send MobileHotspotChangeReqV1 - signer: {}, signature length: {}",
           mobile_req.signer,
           mobile_req.signature.len()
         );
 
-        if let Some(update) = &mobile_req.update {
+        if let Some(change) = &mobile_req.change {
           info!(
-            "DRY RUN: Mobile update details - block_height: {}, pub_key: {}, asset: {}",
-            update.block_height,
-            update.pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            update.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
+            "DRY RUN: Mobile change details - block_height: {}, pub_key: {}, asset: {}",
+            change.block_height,
+            change.pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
+            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
           );
         }
 
-        debug!("DRY RUN: Full MobileHotspotUpdateReqV1: {:?}", mobile_req);
+        debug!("DRY RUN: Full MobileHotspotChangeReqV1: {:?}", mobile_req);
       }
-      HotspotUpdateRequest::Iot(iot_req) => {
+      EntityChangeRequest::IotHotspot(iot_req) => {
         info!(
-          "DRY RUN: Would send IotHotspotUpdateReqV1 - signer: {}, signature length: {}",
+          "DRY RUN: Would send IotHotspotChangeReqV1 - signer: {}, signature length: {}",
           iot_req.signer,
           iot_req.signature.len()
         );
 
-        if let Some(update) = &iot_req.update {
+        if let Some(change) = &iot_req.change {
           info!(
-            "DRY RUN: IoT update details - block_height: {}, pub_key: {}, asset: {}",
-            update.block_height,
-            update.pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            update.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
+            "DRY RUN: IoT change details - block_height: {}, pub_key: {}, asset: {}",
+            change.block_height,
+            change.pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
+            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
           );
         }
 
-        debug!("DRY RUN: Full IotHotspotUpdateReqV1: {:?}", iot_req);
+        debug!("DRY RUN: Full IotHotspotChangeReqV1: {:?}", iot_req);
+      }
+      EntityChangeRequest::EntityOwnership(ownership_req) => {
+        info!(
+          "DRY RUN: Would send EntityOwnershipChangeReqV1 - signer: {}, signature length: {}",
+          ownership_req.signer,
+          ownership_req.signature.len()
+        );
+
+        if let Some(change) = &ownership_req.change {
+          info!(
+            "DRY RUN: Entity ownership details - block_height: {}, entity_pub_key: {}, asset: {}",
+            change.block_height,
+            change.entity_pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
+            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
+          );
+        }
+
+        debug!("DRY RUN: Full EntityOwnershipChangeReqV1: {:?}", ownership_req);
+      }
+      EntityChangeRequest::EntityRewardDestination(reward_req) => {
+        info!(
+          "DRY RUN: Would send EntityRewardDestinationChangeReqV1 - signer: {}, signature length: {}",
+          reward_req.signer,
+          reward_req.signature.len()
+        );
+
+        if let Some(change) = &reward_req.change {
+          info!(
+            "DRY RUN: Entity reward destination details - block_height: {}, entity_pub_key: {}, asset: {}",
+            change.block_height,
+            change.entity_pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
+            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
+          );
+        }
+
+        debug!("DRY RUN: Full EntityRewardDestinationChangeReqV1: {:?}", reward_req);
       }
     }
 

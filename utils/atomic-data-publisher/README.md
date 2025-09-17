@@ -4,9 +4,12 @@ Rust service that polls PostgreSQL for hotspot data changes and publishes them t
 
 ## What it does
 
-- Polls PostgreSQL tables for hotspot updates using block height tracking
-- Constructs atomic hotspot data payloads
-- Signs and publishes via gRPC to Helium oracles
+- Polls PostgreSQL tables for entity data changes using block height tracking
+- Constructs atomic entity data payloads for different change types:
+  - **Hotspot metadata changes** (location, device info, etc.)
+  - **Entity ownership changes** (NFT ownership transfers)
+  - **Reward destination changes** (where rewards are sent)
+- Signs and publishes via gRPC to Helium oracles using appropriate service endpoints
 - Tracks processing state in `atomic_data_polling_state` table
 
 ## Configuration

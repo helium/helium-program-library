@@ -1,5 +1,5 @@
 use anyhow::Result;
-use helium_crypto::{KeyTag, KeyType, Keypair, Network};
+use helium_crypto::Keypair;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::{interval, sleep};
