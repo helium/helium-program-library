@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Service that gives flashloans of sol to allow jupiter swap of small amounts of hnt/mobile/iot to sol for fees",
   "repository": {
     "type": "git",
@@ -34,9 +34,9 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/account-fetch-cache": "^0.11.2",
+    "@helium/account-fetch-cache": "^0.11.3",
     "@helium/address": "^4.12.0",
-    "@helium/spl-utils": "^0.11.2",
+    "@helium/spl-utils": "^0.11.3",
     "@jup-ag/api": "^6.0.6",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
