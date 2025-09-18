@@ -380,8 +380,25 @@ export const upsertProgramAccounts = async ({
                 existingRecords.map((record) => [record.get("address"), record])
               );
 
-              // Get current block height with retry - only if we have records that need updating
+              // Get current block height with retry - fetch once for the entire batch
               let lastBlockHeight: number | null = null;
+              try {
+                lastBlockHeight = await retry(
+                  () => connection.getBlockHeight("confirmed"),
+                  {
+                    retries: 3,
+                    factor: 2,
+                    minTimeout: 1000,
+                    maxTimeout: 5000,
+                  }
+                );
+              } catch (error) {
+                console.warn(
+                  "Failed to fetch block height after retries:",
+                  error
+                );
+              }
+
               const values = await Promise.all(
                 accs.map(async ({ publicKey, account }) => {
                   let sanitizedAccount = sanitizeAccount(account);
@@ -390,14 +407,15 @@ export const upsertProgramAccounts = async ({
                     if (plugin?.processAccount) {
                       sanitizedAccount = await plugin.processAccount(
                         { ...sanitizedAccount, address: publicKey },
-                        transaction
+                        transaction,
+                        lastBlockHeight
                       );
                     }
                   }
 
                   const newRecord = {
                     address: publicKey,
-                    refreshed_at: now,
+                    refreshedAt: now,
                     ...sanitizedAccount,
                   };
 
@@ -409,36 +427,16 @@ export const upsertProgramAccounts = async ({
                   const shouldUpdate =
                     !existingRecord || !deepEqual(newClean, existingClean);
 
-                  if (lastBlockHeight === null) {
-                    try {
-                      lastBlockHeight = await retry(
-                        () => connection.getBlockHeight("confirmed"),
-                        {
-                          retries: 3,
-                          factor: 2,
-                          minTimeout: 1000,
-                          maxTimeout: 5000,
-                        }
-                      );
-                    } catch (error) {
-                      console.warn(
-                        "Failed to fetch block height after retries:",
-                        error
-                      );
-                    }
-                  }
-
                   if (shouldUpdate) {
                     return {
                       ...newRecord,
-                      last_block_height: lastBlockHeight,
+                      lastBlockHeight,
                     };
                   } else {
-                    // Keep existing last_block_height for unchanged records, but use fetched lastBlockHeight if existing is null
                     return {
                       ...newRecord,
-                      last_block_height:
-                        existingData?.last_block_height || lastBlockHeight,
+                      lastBlockHeight:
+                        existingData?.lastBlockHeight || lastBlockHeight,
                     };
                   }
                 })
@@ -448,8 +446,8 @@ export const upsertProgramAccounts = async ({
                 transaction,
                 updateOnDuplicate: [
                   "address",
-                  "refreshed_at",
-                  "last_block_height",
+                  "refreshedAt",
+                  "lastBlockHeight",
                   ...updateOnDuplicateFields,
                 ],
               });
@@ -483,7 +481,7 @@ export const upsertProgramAccounts = async ({
         console.log(`Cleaning up old ${type} records that were not refreshed`);
         const deletedCount = await model.destroy({
           where: {
-            refreshed_at: {
+            refreshedAt: {
               [Op.lt]: now,
             },
           },

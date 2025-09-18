@@ -40,9 +40,7 @@ impl ProtobufBuilder {
     );
 
     let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
-    let ingest_time_seconds = Self::extract_u64(atomic_data, "ingest_time_seconds")
-      .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
-      .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
+    let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
 
     let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
@@ -50,7 +48,7 @@ impl ProtobufBuilder {
 
     let change_msg = MobileHotspotChangeV1 {
       block_height,
-      ingest_time_seconds,
+      timestamp_seconds,
       pub_key: Some(pub_key),
       asset: Some(asset),
       metadata: Some(metadata),
@@ -83,9 +81,7 @@ impl ProtobufBuilder {
     debug!("Building IoT hotspot update from data: {}", atomic_data);
 
     let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
-    let ingest_time_seconds = Self::extract_u64(atomic_data, "ingest_time_seconds")
-      .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
-      .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
+    let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
 
     let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
@@ -93,7 +89,7 @@ impl ProtobufBuilder {
 
     let change_msg = IotHotspotChangeV1 {
       block_height,
-      ingest_time_seconds,
+      timestamp_seconds,
       pub_key: Some(pub_key),
       asset: Some(asset),
       metadata: Some(metadata),
@@ -124,9 +120,7 @@ impl ProtobufBuilder {
       })?;
 
     let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
-    let ingest_time_seconds = Self::extract_u64(atomic_data, "ingest_time_seconds")
-      .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
-      .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
+    let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
 
     let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
@@ -134,7 +128,7 @@ impl ProtobufBuilder {
 
     let change_msg = EntityOwnerChangeV1 {
       block_height,
-      ingest_time_seconds,
+      timestamp_seconds,
       entity_pub_key: Some(entity_pub_key),
       asset: Some(asset),
       owner: Some(owner),
@@ -165,9 +159,7 @@ impl ProtobufBuilder {
       })?;
 
     let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
-    let ingest_time_seconds = Self::extract_u64(atomic_data, "ingest_time_seconds")
-      .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
-      .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
+    let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
 
     let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
@@ -190,7 +182,7 @@ impl ProtobufBuilder {
 
     let change_msg = EntityRewardDestinationChangeV1 {
       block_height,
-      ingest_time_seconds,
+      timestamp_seconds,
       entity_pub_key: Some(entity_pub_key),
       asset: Some(asset),
       rewards_destination,

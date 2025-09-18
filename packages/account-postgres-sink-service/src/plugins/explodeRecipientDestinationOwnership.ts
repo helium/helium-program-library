@@ -18,7 +18,8 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
 
     const processAccount = async (
       account: { [key: string]: any },
-      transaction?: any
+      transaction?: any,
+      lastBlockHeight?: number | null
     ) => {
       try {
         const prevAccount = await Recipient.findByPk(account.address, {
@@ -55,10 +56,15 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
           });
 
           if (newMiniFanout) {
-            await handleMiniFanout(account.asset, newMiniFanout, transaction);
+            await handleMiniFanout(
+              account.asset,
+              newMiniFanout,
+              transaction,
+              lastBlockHeight
+            );
             return account;
           }
-          
+
           // Case 3: New destination is a direct recipient (not a mini fanout)
           const kta = await KeyToAsset.findOne({
             where: {
@@ -82,6 +88,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
                 encodedEntityKey: kta.encodedEntityKey,
                 keySerialization: kta.keySerialization,
                 type: "direct",
+                lastBlockHeight,
               },
               { transaction }
             );

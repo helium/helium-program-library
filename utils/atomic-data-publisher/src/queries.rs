@@ -35,7 +35,6 @@ impl AtomicHotspotQueries {
         mhi.address,
         mhi.asset,
         mhi.last_block_height,
-        mhi.refreshed_at,
         mhi.location,
         'mobile' as hotspot_type,
         mhi.device_type,
@@ -55,7 +54,6 @@ impl AtomicHotspotQueries {
         ihi.address,
         ihi.asset,
         ihi.last_block_height,
-        ihi.refreshed_at,
         ihi.location,
         'iot' as hotspot_type,
         NULL as device_type,
@@ -74,7 +72,6 @@ impl AtomicHotspotQueries {
       hmc.address as solana_address,
       hmc.asset,
       hmc.last_block_height as block_height,
-      hmc.refreshed_at as refreshed_at,
       JSON_BUILD_OBJECT(
         'pub_key', kta.encoded_entity_key,
         'asset', hmc.asset,
@@ -86,8 +83,7 @@ impl AtomicHotspotQueries {
         'gain', hmc.gain,
         'is_full_hotspot', hmc.is_full_hotspot,
         'deployment_info', hmc.deployment_info,
-        'block_height', hmc.last_block_height,
-        'refreshed_at', hmc.refreshed_at
+        'block_height', hmc.last_block_height
       ) as atomic_data
     FROM hotspot_metadata_changes hmc
     LEFT JOIN key_to_assets kta ON kta.asset = hmc.asset
@@ -101,13 +97,19 @@ impl AtomicHotspotQueries {
       SELECT DISTINCT
         ao.asset,
         ao.last_block_height as block_height,
-        ao.refreshed_at as refreshed_at,
         kta.encoded_entity_key as pub_key,
-        ao.owner,
-        ao.owner_type,
+        CASE
+          WHEN wp.owner IS NOT NULL THEN wp.owner
+          ELSE ao.owner
+        END as owner,
+        CASE
+          WHEN wp.owner IS NOT NULL THEN 'welcome_pack_owner'
+          ELSE 'direct_owner'
+        END as owner_type,
         'entity_ownership' as change_type
       FROM asset_owners ao
       LEFT JOIN key_to_assets kta ON kta.asset = ao.asset
+      LEFT JOIN welcome_packs wp ON wp.asset = ao.asset
       WHERE ao.last_block_height > $1
         AND ao.last_block_height <= $2
         AND kta.encoded_entity_key IS NOT NULL
@@ -117,7 +119,6 @@ impl AtomicHotspotQueries {
     SELECT
       'entity_ownership_changes' as job_name,
       block_height,
-      refreshed_at,
       pub_key as solana_address,
       asset,
       JSON_BUILD_OBJECT(
@@ -126,8 +127,7 @@ impl AtomicHotspotQueries {
         'owner', owner,
         'owner_type', owner_type,
         'change_type', change_type,
-        'block_height', block_height,
-        'refreshed_at', refreshed_at
+        'block_height', block_height
       ) as atomic_data
     FROM ownership_changes
     ORDER BY block_height DESC;
@@ -140,9 +140,8 @@ impl AtomicHotspotQueries {
       SELECT DISTINCT
         r.asset,
         r.last_block_height as block_height,
-        r.refreshed_at as refreshed_at,
         kta.encoded_entity_key as pub_key,
-        r.recipient as rewards_recipient,
+        r.destination as rewards_recipient,
         NULL::text as rewards_split_data,
         'entity_reward_destination' as change_type
       FROM recipients r
@@ -151,35 +150,36 @@ impl AtomicHotspotQueries {
         AND r.last_block_height <= $2
         AND kta.encoded_entity_key IS NOT NULL
         AND r.asset IS NOT NULL
-        AND r.recipient IS NOT NULL
+        AND r.destination IS NOT NULL
 
       UNION ALL
 
-      -- Changes from mini_fanouts table (reward splits)
+      -- Changes from rewards_recipients table (fanout recipients)
       SELECT DISTINCT
-        mf.asset,
-        mf.last_block_height as block_height,
-        mf.refreshed_at as refreshed_at,
-        kta.encoded_entity_key as pub_key,
-        NULL::text as rewards_recipient,
+        rr.asset,
+        rr.last_block_height as block_height,
+        rr.encoded_entity_key as pub_key,
+        rr.destination as rewards_recipient,
         JSON_BUILD_OBJECT(
-          'pub_key', mf.owner,
-          'schedule', mf.schedule,
-          'total_shares', mf.total_shares,
-          'recipients', mf.recipients
+          'owner', rr.owner,
+          'destination', rr.destination,
+          'shares', rr.shares,
+          'total_shares', rr.total_shares,
+          'fixed_amount', rr.fixed_amount,
+          'type', rr.type
         )::text as rewards_split_data,
         'entity_reward_destination' as change_type
-      FROM mini_fanouts mf
-      LEFT JOIN key_to_assets kta ON kta.asset = mf.asset
-      WHERE mf.last_block_height > $1
-        AND mf.last_block_height <= $2
-        AND kta.encoded_entity_key IS NOT NULL
-        AND mf.asset IS NOT NULL
+      FROM rewards_recipients rr
+      WHERE rr.last_block_height > $1
+        AND rr.last_block_height <= $2
+        AND rr.encoded_entity_key IS NOT NULL
+        AND rr.asset IS NOT NULL
+        AND rr.destination IS NOT NULL
+        AND rr.type = 'fanout'
     )
     SELECT
       'entity_reward_destination_changes' as job_name,
       block_height,
-      refreshed_at,
       pub_key as solana_address,
       asset,
       JSON_BUILD_OBJECT(
@@ -188,8 +188,7 @@ impl AtomicHotspotQueries {
         'rewards_recipient', rewards_recipient,
         'rewards_split_data', rewards_split_data,
         'change_type', change_type,
-        'block_height', block_height,
-        'refreshed_at', refreshed_at
+        'block_height', block_height
       ) as atomic_data
     FROM reward_destination_changes
     ORDER BY block_height DESC;

@@ -64,7 +64,7 @@ export const database = new Sequelize({
 export class AssetOwner extends Model {
   declare asset: string;
   declare owner: string;
-  declare last_block_height: number | null;
+  declare lastBlockHeight: number | null;
 }
 
 AssetOwner.init(
@@ -78,9 +78,9 @@ AssetOwner.init(
       type: STRING,
       allowNull: false,
     },
-    last_block_height: {
+    lastBlockHeight: {
       type: INTEGER,
-      allowNull: true,
+      allowNull: false,
     },
   },
   {

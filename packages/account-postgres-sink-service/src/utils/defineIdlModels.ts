@@ -108,10 +108,10 @@ export const defineIdlModels = async ({
             primaryKey: true,
           },
           ...omit(schema[acc.name] || {}, ["indexes"]),
-          refreshed_at: {
+          refreshedAt: {
             type: DataTypes.DATE,
           },
-          last_block_height: {
+          lastBlockHeight: {
             type: DataTypes.DECIMAL.UNSIGNED,
             allowNull: true,
             defaultValue: null,
@@ -153,7 +153,6 @@ export const defineIdlModels = async ({
         )
       ).map((x: any) => x.indexname);
 
-      // Check for last_block_height index
       const blockHeightIndexName = `idx_${underscore(
         accConfig.table || acc.name
       )}_last_block_height`;
@@ -168,7 +167,6 @@ export const defineIdlModels = async ({
       ) {
         await model.sync({ alter: true });
 
-        // Create index on last_block_height if it doesn't exist
         if (!hasBlockHeightIndex) {
           try {
             await sequelize.query(`

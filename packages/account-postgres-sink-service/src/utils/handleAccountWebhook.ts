@@ -109,12 +109,33 @@ export const handleAccountWebhook = async ({
 
       let sanitized = sanitizeAccount(decodedAcc);
 
+      // Fetch block height once if there are plugins that might need it
+      let lastBlockHeight: number | null = null;
+      const hasPlugins = (pluginsByAccountType[accName] || []).length > 0;
+
+      if (hasPlugins) {
+        try {
+          lastBlockHeight = await retry(
+            () => provider.connection.getBlockHeight("confirmed"),
+            {
+              retries: 3,
+              factor: 2,
+              minTimeout: 1000,
+              maxTimeout: 5000,
+            }
+          );
+        } catch (error) {
+          console.warn("Failed to fetch block height for plugins:", error);
+        }
+      }
+
       for (const plugin of pluginsByAccountType[accName] || []) {
         if (plugin?.processAccount) {
           try {
             sanitized = await plugin.processAccount(
               { address: account.pubkey, ...sanitized },
-              t
+              t,
+              lastBlockHeight
             );
           } catch (err) {
             console.log(
@@ -128,7 +149,7 @@ export const handleAccountWebhook = async ({
       }
 
       sanitized = {
-        refreshed_at: new Date().toISOString(),
+        refreshedAt: new Date().toISOString(),
         address: account.pubkey,
         ...sanitized,
       };
@@ -139,26 +160,27 @@ export const handleAccountWebhook = async ({
       );
 
       if (shouldUpdate) {
-        let lastBlockHeight: number | null = null;
-
-        try {
-          lastBlockHeight = await retry(
-            () => provider.connection.getBlockHeight("confirmed"),
-            {
-              retries: 3,
-              factor: 2,
-              minTimeout: 1000,
-              maxTimeout: 5000,
-            }
-          );
-        } catch (error) {
-          console.warn("Failed to fetch block height after retries:", error);
+        // Use the block height we already fetched for plugins, or fetch it now if we haven't
+        if (lastBlockHeight === null) {
+          try {
+            lastBlockHeight = await retry(
+              () => provider.connection.getBlockHeight("confirmed"),
+              {
+                retries: 3,
+                factor: 2,
+                minTimeout: 1000,
+                maxTimeout: 5000,
+              }
+            );
+          } catch (error) {
+            console.warn("Failed to fetch block height after retries:", error);
+          }
         }
 
         await model.upsert(
           {
             ...sanitized,
-            last_block_height: lastBlockHeight,
+            lastBlockHeight,
           },
           { transaction: t }
         );

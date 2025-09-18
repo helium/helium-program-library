@@ -60,7 +60,7 @@ export const upsertOwners = async ({
             .map(({ id, ownership }) => ({
               asset: id.toBase58(),
               owner: ownership.owner.toBase58(),
-              last_block_height: lastBlockHeight,
+              lastBlockHeight,
             }));
 
           const transaction = await sequelize.transaction({
@@ -70,7 +70,7 @@ export const upsertOwners = async ({
           try {
             await AssetOwner.bulkCreate(assetsWithOwner, {
               transaction,
-              updateOnDuplicate: ["asset", "owner", "last_block_height"],
+              updateOnDuplicate: ["asset", "owner", "lastBlockHeight"],
             });
 
             await transaction.commit();

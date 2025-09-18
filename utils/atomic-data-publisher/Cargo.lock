@@ -905,7 +905,7 @@ dependencies = [
 [[package]]
 name = "helium-proto"
 version = "0.1.0"
-source = "git+https://www.github.com/helium/proto?branch=mj%2Fchain-rewardable-entities#99406af491afce09856f61e158c34d16339bb33a"
+source = "git+https://www.github.com/helium/proto?branch=mj%2Fchain-rewardable-entities#71194188afdfdb0750d9bfda194da649a57f9ffe"
 dependencies = [
  "bytes",
  "prost",

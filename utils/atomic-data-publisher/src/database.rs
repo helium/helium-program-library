@@ -240,13 +240,6 @@ impl DatabaseClient {
     let query = crate::queries::AtomicHotspotQueries::get_query(&job.query_name)
       .ok_or_else(|| anyhow::anyhow!("{} query not found", job.query_name))?;
 
-    // Extract hotspot_type from parameters
-    let hotspot_type = job
-      .parameters
-      .get("hotspot_type")
-      .and_then(|v| v.as_str())
-      .ok_or_else(|| anyhow::anyhow!("hotspot_type parameter required"))?;
-
     let height_diff = current_solana_height.saturating_sub(last_processed_height as u64);
     let chunk_size = if height_diff <= 1000 {
       height_diff
@@ -263,17 +256,39 @@ impl DatabaseClient {
       current_solana_height,
     );
 
-    info!(
-      "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks {} to {} ({} blocks)",
-      job.name, job.query_name, hotspot_type, last_processed_height, target_height, target_height - last_processed_height as u64
-    );
+    // Different queries have different parameter patterns
+    let rows = if job.query_name == "construct_atomic_hotspots" {
+      // Extract hotspot_type from parameters for hotspot queries
+      let hotspot_type = job
+        .parameters
+        .get("hotspot_type")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("hotspot_type parameter required for hotspot queries"))?;
 
-    let rows = sqlx::query(query)
-      .bind(hotspot_type)
-      .bind(last_processed_height)
-      .bind(target_height as i64)
-      .fetch_all(&self.pool)
-      .await?;
+      info!(
+        "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks {} to {} ({} blocks)",
+        job.name, job.query_name, hotspot_type, last_processed_height, target_height, target_height - last_processed_height as u64
+      );
+
+      sqlx::query(query)
+        .bind(hotspot_type)
+        .bind(last_processed_height)
+        .bind(target_height as i64)
+        .fetch_all(&self.pool)
+        .await?
+    } else {
+      // Entity ownership and reward destination queries don't need hotspot_type
+      info!(
+        "Querying job '{}' with query '{}', processing blocks {} to {} ({} blocks)",
+        job.name, job.query_name, last_processed_height, target_height, target_height - last_processed_height as u64
+      );
+
+      sqlx::query(query)
+        .bind(last_processed_height)
+        .bind(target_height as i64)
+        .fetch_all(&self.pool)
+        .await?
+    };
 
     let mut changes = Vec::new();
     for row in rows {

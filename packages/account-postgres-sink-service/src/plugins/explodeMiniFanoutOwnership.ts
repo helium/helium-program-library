@@ -63,6 +63,11 @@ RewardsRecipient.init(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    lastBlockHeight: {
+      type: DataTypes.DECIMAL.UNSIGNED,
+      allowNull: true,
+      defaultValue: null,
+    },
   },
   {
     sequelize: database,
@@ -265,7 +270,8 @@ export const HNT_LAZY_DISTRIBUTOR =
 export async function handleMiniFanout(
   asset: string,
   account: { [key: string]: any },
-  transaction: any
+  transaction: any,
+  lastBlockHeight?: number | null
 ) {
   const prevAccount = await MiniFanout.findByPk(account.address, {
     transaction,
@@ -332,6 +338,7 @@ export async function handleMiniFanout(
       encodedEntityKey: kta?.encodedEntityKey,
       keySerialization: kta?.keySerialization,
       type: "fanout",
+      lastBlockHeight,
     };
 
     await RewardsRecipient.upsert(toCreate, { transaction });
@@ -370,7 +377,8 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
 
     const processAccount = async (
       account: { [key: string]: any },
-      transaction?: any
+      transaction?: any,
+      lastBlockHeight?: number | null
     ) => {
       try {
         const asset = account.preTask?.remoteV0?.url
@@ -392,7 +400,7 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
         if (!recipient) {
           return account;
         }
-        return handleMiniFanout(asset, account, transaction);
+        return handleMiniFanout(asset, account, transaction, lastBlockHeight);
       } catch (err) {
         console.error("Error exploding mini fanout ownership", err);
         throw err;

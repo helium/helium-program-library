@@ -219,7 +219,7 @@ export class TransactionProcessor {
               {
                 asset: keyToAsset.asset.toBase58(),
                 owner: recipientAccount.toBase58(),
-                last_block_height: lastBlockHeight,
+                lastBlockHeight,
               },
               { transaction }
             );
@@ -253,7 +253,7 @@ export class TransactionProcessor {
             {
               asset: assetId.toBase58(),
               owner: newOwnerAccount.toBase58(),
-              last_block_height: lastBlockHeight,
+              lastBlockHeight,
             },
             { transaction }
           );

@@ -259,8 +259,8 @@ export const integrityCheckProgramAccounts = async ({
                 accounts.map((acc) =>
                   limiter(async () => {
                     const existing = existingAccMap.get(acc.pubkey);
-                    const refreshedAt = existing?.dataValues.refreshed_at
-                      ? new Date(existing.dataValues.refreshed_at)
+                    const refreshedAt = existing?.dataValues.refreshedAt
+                      ? new Date(existing.dataValues.refreshedAt)
                       : null;
 
                     if (refreshedAt && refreshedAt > refreshThreshold) {
@@ -300,11 +300,11 @@ export const integrityCheckProgramAccounts = async ({
                     );
 
                     let sanitized: {
-                      refreshed_at: string;
+                      refreshedAt: string;
                       address: string;
                       [key: string]: any;
                     } = {
-                      refreshed_at: new Date().toISOString(),
+                      refreshedAt: new Date().toISOString(),
                       address: acc.pubkey,
                       ...sanitizeAccount(decodedAcc),
                     };
@@ -337,8 +337,8 @@ export const integrityCheckProgramAccounts = async ({
                       });
 
                       const currentRefreshedAt = currentRecord?.dataValues
-                        .refreshed_at
-                        ? new Date(currentRecord.dataValues.refreshed_at)
+                        .refreshedAt
+                        ? new Date(currentRecord.dataValues.refreshedAt)
                         : null;
 
                       if (
