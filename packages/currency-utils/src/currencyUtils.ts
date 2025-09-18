@@ -64,9 +64,9 @@ export const getOraclePrice = async ({ tokenType }: {
     priceMessage: {
       feedId: HNT_PRICE_FEED_ID,
       price: new BN(price.price.price as string),
-      emaPrice: new BN(price.ema_price.ema_price as string),
+      emaPrice: new BN(price.ema_price.price as string),
       conf: new BN(price.price.conf as string),
-      emaConf: new BN(price.ema_price.ema_conf as string),
+      emaConf: new BN(price.ema_price.conf as string),
       exponent: price.ema_price.expo,
       publishTime: price.ema_price.publish_time,
       prevPublishTime: price.ema_price.prev_publish_time,
