@@ -128,19 +128,12 @@ impl AtomicDataPublisher {
       .parameters
       .get("change_type")
       .and_then(|v| v.as_str())
-      .or_else(|| {
-        // Fallback to legacy hotspot_type parameter for backward compatibility
-        job_config
-          .parameters
-          .get("hotspot_type")
-          .and_then(|v| v.as_str())
-          .map(|ht| match ht {
-            "mobile" => "mobile_hotspot",
-            "iot" => "iot_hotspot",
-            _ => "mobile_hotspot",
-          })
-      })
-      .unwrap_or("mobile_hotspot");
+      .ok_or_else(|| {
+        AtomicDataError::InvalidData(format!(
+          "No change type found for job: {}",
+          change.job_name
+        ))
+      })?;
 
     let entity_request = build_entity_change_request(change, change_type, &self.keypair)?;
     self.send_with_retries(entity_request).await?;

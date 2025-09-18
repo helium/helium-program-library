@@ -137,29 +137,6 @@ impl AtomicDataPublisher {
     };
     handles.push(polling_handle);
 
-    // Metrics reporting loop
-    let metrics_handle = {
-      let metrics = self.metrics.clone();
-      let mut shutdown_signal = self.shutdown_signal.clone();
-      tokio::spawn(async move {
-        let mut interval = interval(Duration::from_secs(120)); // Report every 2 minutes
-        loop {
-          tokio::select! {
-            _ = interval.tick() => {
-                metrics.log_metrics_summary();
-            }
-              _ = shutdown_signal.changed() => {
-                  if *shutdown_signal.borrow() {
-                      info!("Shutting down metrics reporting");
-                      break;
-                  }
-              }
-          }
-        }
-      })
-    };
-    handles.push(metrics_handle);
-
     // Health check loop
     let health_handle = {
       let service = self.clone();

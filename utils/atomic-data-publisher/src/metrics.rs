@@ -61,13 +61,6 @@ impl MetricsCollector {
     self.publish_duration.observe(duration);
   }
 
-  pub fn log_metrics_summary(&self) {
-    let uptime = self.start_time.elapsed().as_secs();
-    let published = self.changes_published_total.get();
-    let errors = self.errors_total.get();
-    info!("Metrics Summary - Uptime: {}s, Published: {}, Errors: {}", uptime, published, errors);
-  }
-
   pub async fn serve_metrics(self: Arc<Self>, bind_address: &str, mut shutdown_rx: tokio::sync::watch::Receiver<bool>) -> anyhow::Result<()> {
     let listener = TcpListener::bind(bind_address).await?;
     info!("Metrics server listening on {}", bind_address);
