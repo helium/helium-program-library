@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "API for helium vote",
   "repository": {
     "type": "git",
@@ -35,9 +35,9 @@
     "@coral-xyz/anchor": "^0.31.0",
     "@fastify/cors": "^8.1.1",
     "@fastify/static": "^6",
-    "@helium/hpl-crons-sdk": "^0.11.1",
-    "@helium/idls": "^0.11.1",
-    "@helium/spl-utils": "^0.11.1",
+    "@helium/hpl-crons-sdk": "^0.11.2",
+    "@helium/idls": "^0.11.2",
+    "@helium/spl-utils": "^0.11.2",
     "@helium/tuktuk-idls": "^0.0.9",
     "@helium/tuktuk-sdk": "^0.0.9",
     "@pythnetwork/hermes-client": "^2.0.0",

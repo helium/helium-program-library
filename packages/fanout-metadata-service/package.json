@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "Mint metadata of fanout positions",
   "repository": {
     "type": "git",
@@ -34,10 +34,10 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/account-fetch-cache": "^0.11.1",
+    "@helium/account-fetch-cache": "^0.11.2",
     "@helium/address": "^4.12.0",
-    "@helium/fanout-sdk": "^0.11.1",
-    "@helium/spl-utils": "^0.11.1",
+    "@helium/fanout-sdk": "^0.11.2",
+    "@helium/spl-utils": "^0.11.2",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.8",

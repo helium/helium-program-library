@@ -1,6 +1,6 @@
 {
   "name": "@helium/recent-helium-transactions-service",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "Service to track and provide recent Helium transactions",
   "private": true,
   "main": "lib/cjs/index.js",
@@ -20,8 +20,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
-    "@helium/lazy-distributor-sdk": "^0.11.1",
-    "@helium/spl-utils": "^0.11.1",
+    "@helium/lazy-distributor-sdk": "^0.11.2",
+    "@helium/spl-utils": "^0.11.2",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
     "axios": "^1.9.0",

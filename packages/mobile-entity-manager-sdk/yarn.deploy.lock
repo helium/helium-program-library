@@ -107,7 +107,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.11.1":
+"@helium/account-fetch-cache@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -129,7 +129,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.11.1":
+"@helium/anchor-resolvers@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -155,14 +155,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/circuit-breaker-sdk@^0.11.1":
+"@helium/circuit-breaker-sdk@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/circuit-breaker-sdk@workspace:packages/circuit-breaker-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.11.1
-    "@helium/idls": ^0.11.1
-    "@helium/spl-utils": ^0.11.1
+    "@helium/anchor-resolvers": ^0.11.2
+    "@helium/idls": ^0.11.2
+    "@helium/spl-utils": ^0.11.2
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -172,17 +172,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/helium-entity-manager-sdk@^0.11.1":
+"@helium/helium-entity-manager-sdk@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/helium-entity-manager-sdk@workspace:packages/helium-entity-manager-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@helium/address": ^4.12.0
-    "@helium/anchor-resolvers": ^0.11.1
-    "@helium/helium-sub-daos-sdk": ^0.11.1
-    "@helium/idls": ^0.11.1
-    "@helium/no-emit-sdk": ^0.11.1
-    "@helium/spl-utils": ^0.11.1
+    "@helium/anchor-resolvers": ^0.11.2
+    "@helium/helium-sub-daos-sdk": ^0.11.2
+    "@helium/idls": ^0.11.2
+    "@helium/no-emit-sdk": ^0.11.2
+    "@helium/spl-utils": ^0.11.2
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -193,17 +193,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/helium-sub-daos-sdk@^0.11.1":
+"@helium/helium-sub-daos-sdk@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/helium-sub-daos-sdk@workspace:packages/helium-sub-daos-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.11.1
-    "@helium/circuit-breaker-sdk": ^0.11.1
+    "@helium/anchor-resolvers": ^0.11.2
+    "@helium/circuit-breaker-sdk": ^0.11.2
     "@helium/nft-proxy-sdk": ^0.1.5-alpha.0
-    "@helium/spl-utils": ^0.11.1
-    "@helium/treasury-management-sdk": ^0.11.1
-    "@helium/voter-stake-registry-sdk": ^0.11.1
+    "@helium/spl-utils": ^0.11.2
+    "@helium/treasury-management-sdk": ^0.11.2
+    "@helium/voter-stake-registry-sdk": ^0.11.2
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -213,7 +213,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/idls@^0.11.1":
+"@helium/idls@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/idls@workspace:packages/idls"
   dependencies:
@@ -232,10 +232,10 @@ __metadata:
   resolution: "@helium/mobile-entity-manager-sdk@workspace:."
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.11.1
-    "@helium/helium-entity-manager-sdk": ^0.11.1
-    "@helium/idls": ^0.11.1
-    "@helium/spl-utils": ^0.11.1
+    "@helium/anchor-resolvers": ^0.11.2
+    "@helium/helium-entity-manager-sdk": ^0.11.2
+    "@helium/idls": ^0.11.2
+    "@helium/spl-utils": ^0.11.2
     "@types/crypto-js": ^4.1.1
     bn.js: ^5.2.0
     bs58: ^4.0.1
@@ -268,14 +268,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/no-emit-sdk@^0.11.1":
+"@helium/no-emit-sdk@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/no-emit-sdk@workspace:packages/no-emit-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.11.1
-    "@helium/idls": ^0.11.1
-    "@helium/spl-utils": ^0.11.1
+    "@helium/anchor-resolvers": ^0.11.2
+    "@helium/idls": ^0.11.2
+    "@helium/spl-utils": ^0.11.2
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -285,14 +285,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/spl-utils@^0.11.1":
+"@helium/spl-utils@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/account-fetch-cache": ^0.11.1
+    "@helium/account-fetch-cache": ^0.11.2
     "@helium/address": ^4.12.0
-    "@helium/anchor-resolvers": ^0.11.1
+    "@helium/anchor-resolvers": ^0.11.2
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -307,15 +307,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/treasury-management-sdk@^0.11.1":
+"@helium/treasury-management-sdk@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/treasury-management-sdk@workspace:packages/treasury-management-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.11.1
-    "@helium/circuit-breaker-sdk": ^0.11.1
-    "@helium/idls": ^0.11.1
-    "@helium/spl-utils": ^0.11.1
+    "@helium/anchor-resolvers": ^0.11.2
+    "@helium/circuit-breaker-sdk": ^0.11.2
+    "@helium/idls": ^0.11.2
+    "@helium/spl-utils": ^0.11.2
     bn.js: ^5.2.0
     bs58: ^4.0.1
     git-format-staged: ^2.1.3
@@ -325,15 +325,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/voter-stake-registry-sdk@^0.11.1":
+"@helium/voter-stake-registry-sdk@^0.11.2":
   version: 0.0.0-use.local
   resolution: "@helium/voter-stake-registry-sdk@workspace:packages/voter-stake-registry-sdk"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.11.1
-    "@helium/idls": ^0.11.1
+    "@helium/anchor-resolvers": ^0.11.2
+    "@helium/idls": ^0.11.2
     "@helium/nft-proxy-sdk": ^0.1.5-alpha.0
-    "@helium/spl-utils": ^0.11.1
+    "@helium/spl-utils": ^0.11.2
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0
