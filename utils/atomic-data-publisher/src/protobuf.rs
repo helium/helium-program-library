@@ -40,32 +40,28 @@ impl ProtobufBuilder {
     );
 
     let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
-    let block_time_seconds = Self::extract_u64(atomic_data, "block_time_seconds")
+    let ingest_time_seconds = Self::extract_u64(atomic_data, "ingest_time_seconds")
       .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
       .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
 
     let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
     let metadata = Self::build_mobile_hotspot_metadata(atomic_data)?;
-    // Note: owner and rewards_destination are now handled by separate message types
-    // in the new proto structure (entity_owner_change_v1 and entity_reward_destination_change_v1)
 
     let change_msg = MobileHotspotChangeV1 {
       block_height,
-      block_time_seconds,
+      ingest_time_seconds,
       pub_key: Some(pub_key),
       asset: Some(asset),
       metadata: Some(metadata),
     };
 
-    // Create the request without signature first
     let mut request = MobileHotspotChangeReqV1 {
       change: Some(change_msg),
       signer: keypair.public_key().to_string(),
       signature: vec![],
     };
 
-    // Sign the message
     let signature = Self::sign_message(&request, keypair)?;
     request.signature = signature;
 
@@ -87,32 +83,28 @@ impl ProtobufBuilder {
     debug!("Building IoT hotspot update from data: {}", atomic_data);
 
     let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
-    let block_time_seconds = Self::extract_u64(atomic_data, "block_time_seconds")
+    let ingest_time_seconds = Self::extract_u64(atomic_data, "ingest_time_seconds")
       .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
       .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
 
     let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
     let metadata = Self::build_iot_hotspot_metadata(atomic_data)?;
-    // Note: owner and rewards_destination are now handled by separate message types
-    // in the new proto structure (entity_owner_change_v1 and entity_reward_destination_change_v1)
 
     let change_msg = IotHotspotChangeV1 {
       block_height,
-      block_time_seconds,
+      ingest_time_seconds,
       pub_key: Some(pub_key),
       asset: Some(asset),
       metadata: Some(metadata),
     };
 
-    // Create the request without signature first
     let mut request = IotHotspotChangeReqV1 {
       change: Some(change_msg),
       signer: keypair.public_key().to_string(),
       signature: vec![],
     };
 
-    // Sign the message
     let signature = Self::sign_message(&request, keypair)?;
     request.signature = signature;
 
@@ -132,7 +124,7 @@ impl ProtobufBuilder {
       })?;
 
     let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
-    let block_time_seconds = Self::extract_u64(atomic_data, "block_time_seconds")
+    let ingest_time_seconds = Self::extract_u64(atomic_data, "ingest_time_seconds")
       .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
       .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
 
@@ -142,20 +134,18 @@ impl ProtobufBuilder {
 
     let change_msg = EntityOwnerChangeV1 {
       block_height,
-      block_time_seconds,
+      ingest_time_seconds,
       entity_pub_key: Some(entity_pub_key),
       asset: Some(asset),
       owner: Some(owner),
     };
 
-    // Create the request without signature first
     let mut request = EntityOwnershipChangeReqV1 {
       change: Some(change_msg),
       signer: keypair.public_key().to_string(),
       signature: vec![],
     };
 
-    // Sign the message
     let signature = Self::sign_message(&request, keypair)?;
     request.signature = signature;
 
@@ -175,14 +165,12 @@ impl ProtobufBuilder {
       })?;
 
     let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
-    let block_time_seconds = Self::extract_u64(atomic_data, "block_time_seconds")
+    let ingest_time_seconds = Self::extract_u64(atomic_data, "ingest_time_seconds")
       .or_else(|| Self::extract_timestamp_as_seconds(atomic_data, "refreshed_at"))
       .unwrap_or_else(|| chrono::Utc::now().timestamp() as u64);
 
     let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
-
-    // Build rewards destination
     let rewards_destination =
       if let Some(rewards_split) = Self::try_build_rewards_split(atomic_data)? {
         Some(entity_reward_destination_change_v1::RewardsDestination::RewardsSplitV1(rewards_split))
@@ -202,20 +190,18 @@ impl ProtobufBuilder {
 
     let change_msg = EntityRewardDestinationChangeV1 {
       block_height,
-      block_time_seconds,
+      ingest_time_seconds,
       entity_pub_key: Some(entity_pub_key),
       asset: Some(asset),
       rewards_destination,
     };
 
-    // Create the request without signature first
     let mut request = EntityRewardDestinationChangeReqV1 {
       change: Some(change_msg),
       signer: keypair.public_key().to_string(),
       signature: vec![],
     };
 
-    // Sign the message
     let signature = Self::sign_message(&request, keypair)?;
     request.signature = signature;
 
@@ -261,10 +247,7 @@ impl ProtobufBuilder {
   fn build_iot_hotspot_metadata(data: &Value) -> Result<IotHotspotMetadata, AtomicDataError> {
     let asserted_hex = Self::extract_string(data, "asserted_hex")
       .or_else(|| Self::extract_string(data, "location"))
-      .or_else(|| {
-        // Try to extract as numeric location and convert to hex
-        Self::extract_u64(data, "location").map(|loc| format!("{:x}", loc))
-      })
+      .or_else(|| Self::extract_u64(data, "location").map(|loc| format!("{:x}", loc)))
       .unwrap_or_default();
 
     let elevation = Self::extract_u32(data, "elevation").unwrap_or(0);
@@ -290,7 +273,6 @@ impl ProtobufBuilder {
   }
 
   fn try_build_rewards_split(data: &Value) -> Result<Option<RewardsSplitV1>, AtomicDataError> {
-    // Check if rewards split data exists and is not null
     if let Some(split_data) = data.get("rewards_split").filter(|v| !v.is_null()) {
       let pub_key = Self::extract_solana_pub_key(split_data, "pub_key")?;
       let schedule = Self::extract_string(split_data, "schedule").unwrap_or_default();
@@ -412,17 +394,14 @@ impl ProtobufBuilder {
   fn extract_timestamp_as_seconds(data: &Value, key: &str) -> Option<u64> {
     let timestamp_str = Self::extract_string(data, key)?;
 
-    // Try parsing as RFC3339 timestamp
     if let Ok(dt) = DateTime::parse_from_rfc3339(&timestamp_str) {
       return Some(dt.timestamp() as u64);
     }
 
-    // Try parsing as UTC timestamp
     if let Ok(dt) = timestamp_str.parse::<DateTime<Utc>>() {
       return Some(dt.timestamp() as u64);
     }
 
-    // Try parsing as unix timestamp
     if let Ok(timestamp) = timestamp_str.parse::<u64>() {
       return Some(timestamp);
     }
@@ -496,10 +475,9 @@ pub fn build_entity_change_request(
       let req = ProtobufBuilder::build_entity_reward_destination_change(change, keypair)?;
       Ok(EntityChangeRequest::EntityRewardDestination(req))
     }
-    _ => {
-      // Default to mobile hotspot for unknown types
-      let req = ProtobufBuilder::build_mobile_hotspot_change(change, keypair)?;
-      Ok(EntityChangeRequest::MobileHotspot(req))
-    }
+    _ => Err(AtomicDataError::InvalidData(format!(
+      "Unknown change type: {}",
+      change_type
+    ))),
   }
 }
