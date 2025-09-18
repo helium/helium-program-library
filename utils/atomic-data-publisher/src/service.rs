@@ -48,36 +48,33 @@ impl AtomicDataPublisher {
 
   pub async fn new(config: Settings) -> Result<Self> {
     info!("Initializing Atomic Data Publisher service");
-
-    // Initialize Solana RPC client first
     let solana_client = Arc::new(SolanaClientWrapper::new(config.solana.clone())?);
-
-    // Get initial Solana block height
     let initial_block_height = solana_client
       .get_current_block_height()
       .await
       .map_err(|e| anyhow::anyhow!("Failed to get initial Solana block height: {}", e))?;
     let current_solana_block_height = Arc::new(tokio::sync::RwLock::new(initial_block_height));
 
-    // Initialize database client
-    let database =
-      Arc::new(DatabaseClient::new(&config.database, config.service.polling_jobs.clone()).await?);
 
-    // Validate required tables exist
+    let metrics = Arc::new(MetricsCollector::new()?);
+
+
+    let database = Arc::new(
+      DatabaseClient::new_with_metrics(
+        &config.database,
+        config.service.polling_jobs.clone(),
+        Some(metrics.clone())
+      ).await?,
+    );
+
+
     Self::validate_tables(&database, &config.database.required_tables).await?;
-
-    // Initialize database
     Self::init_database(&database, &config.service).await?;
-
-    // Initialize polling state for all configured jobs
     database.init_polling_state().await?;
-
-    // Cleanup any stale running states from previous runs
     database.cleanup_stale_jobs().await?;
 
-    // Load keypair for signing messages
-    let keypair_path = config.signing.keypair_path.clone();
 
+    let keypair_path = config.signing.keypair_path.clone();
     let keypair_data = if std::path::Path::new(&keypair_path).exists() {
       std::fs::read(&keypair_path)?
     } else {
@@ -92,10 +89,6 @@ impl AtomicDataPublisher {
 
     info!("Using keypair with public key: {}", keypair.public_key());
 
-    // Initialize metrics collector
-    let metrics = Arc::new(MetricsCollector::new());
-
-    // Initialize publisher client
     let publisher = Arc::new(Publisher::new(
       config.service.polling_jobs.clone(),
       keypair,
@@ -104,7 +97,6 @@ impl AtomicDataPublisher {
       metrics.clone(),
     ).await?);
 
-    // Create shutdown signal
     let (shutdown_sender, shutdown_signal) = tokio::sync::watch::channel(false);
 
     Ok(Self {
@@ -121,8 +113,20 @@ impl AtomicDataPublisher {
 
   pub async fn run(&self) -> Result<()> {
     self.health_check().await?;
-
     let mut handles = Vec::new();
+    let metrics_bind_addr = format!("0.0.0.0:{}", self.config.service.port);
+    let metrics_handle = {
+      let metrics = self.metrics.clone();
+      let shutdown_signal = self.shutdown_signal.clone();
+      let bind_addr = metrics_bind_addr.clone();
+      tokio::spawn(async move {
+        if let Err(e) = metrics.serve_metrics(&bind_addr, shutdown_signal).await {
+          error!("Metrics server error: {}", e);
+        }
+      })
+    };
+    handles.push(metrics_handle);
+    info!("Metrics server started on {}", metrics_bind_addr);
 
     // Main polling loop
     let polling_handle = {
@@ -138,7 +142,7 @@ impl AtomicDataPublisher {
       let metrics = self.metrics.clone();
       let mut shutdown_signal = self.shutdown_signal.clone();
       tokio::spawn(async move {
-        let mut interval = interval(Duration::from_secs(60)); // Report every minute
+        let mut interval = interval(Duration::from_secs(120)); // Report every 2 minutes
         loop {
           tokio::select! {
             _ = interval.tick() => {
@@ -180,7 +184,6 @@ impl AtomicDataPublisher {
         }
     }
 
-    // Clean up ALL running job states in the database before stopping
     if let Err(e) = self.database.cleanup_all_jobs().await {
       warn!(
         "Failed to clean up running job states during shutdown: {}",
@@ -209,8 +212,6 @@ impl AtomicDataPublisher {
               if let Err(e) = self.process_changes().await {
                   error!("Error processing changes: {}", e);
                   self.metrics.increment_errors();
-
-                  // Back off on errors to avoid overwhelming the system
                   sleep(Duration::from_secs(5)).await;
               }
 
@@ -233,10 +234,8 @@ impl AtomicDataPublisher {
       return Ok(());
     }
 
-    // Get current Solana block height once for this entire cycle
     let current_solana_height = match self.solana_client.get_current_block_height().await {
       Ok(height) => {
-        // Update our cached height for other components that might need it
         {
           let mut cached_height = self.current_solana_block_height.write().await;
           if *cached_height != height {
@@ -265,7 +264,6 @@ impl AtomicDataPublisher {
     let mut total_changes_published = 0;
     let mut total_changes_failed = 0;
 
-    // Process ALL jobs in the queue before returning
     loop {
       let changes_and_job = self
         .database
@@ -294,7 +292,6 @@ impl AtomicDataPublisher {
           "No changes found for job '{}', advancing to block {}",
           job_name, target_height
         );
-        // Still need to clean up the running state for the job and advance the block height
         if let Some((job_name, query_name)) = active_job_context {
           let empty_changes = vec![];
           self
@@ -307,7 +304,7 @@ impl AtomicDataPublisher {
             .await?;
           self.database.mark_completed(&job_name, &query_name).await?;
         }
-        continue; // Process next job in queue
+        continue;
       }
 
       info!(
@@ -317,14 +314,12 @@ impl AtomicDataPublisher {
         self.config.service.batch_size
       );
 
-      // Process all changes in batches for this job
       let (job_published, job_failed, should_break) = self
         .process_job_changes(changes, active_job_context, target_height)
         .await?;
       total_changes_published += job_published;
       total_changes_failed += job_failed;
 
-      // Break out of processing loop if job failed completely
       if should_break {
         break;
       }
@@ -373,15 +368,19 @@ impl AtomicDataPublisher {
 
         let task = tokio::spawn(async move {
           let _permit = semaphore.acquire().await.unwrap();
+          let publish_start = Instant::now();
           let result = publisher.publish_changes(vec![change.clone()]).await;
+          let publish_duration = publish_start.elapsed().as_secs_f64();
 
           match result {
             Ok(published_ids) if !published_ids.is_empty() => {
               metrics.increment_published();
+              metrics.observe_publish_duration(publish_duration);
               Ok(change)
             }
             Ok(_) => {
               metrics.increment_errors();
+              metrics.observe_publish_duration(publish_duration);
               Err(change)
             }
             Err(e) => {
@@ -390,6 +389,7 @@ impl AtomicDataPublisher {
                 change.job_name, e
               );
               metrics.increment_errors();
+              metrics.observe_publish_duration(publish_duration);
               Err(change)
             }
           }
@@ -398,7 +398,6 @@ impl AtomicDataPublisher {
         tasks.push(task);
       }
 
-      // Wait for all publishing tasks to complete
       for task in tasks {
         match task.await {
           Ok(Ok(change)) => published_changes.push(change),
@@ -476,7 +475,6 @@ impl AtomicDataPublisher {
         );
       }
 
-      // Only mark as completed if no changes failed
       if total_failed == 0 {
         if let Err(e) = self.database.mark_completed(&job_name, &query_name).await {
           warn!(
@@ -489,7 +487,7 @@ impl AtomicDataPublisher {
           "Job '{}' query '{}' had {} failed changes",
           job_name, query_name, total_failed
         );
-        // Signal that we should break out of the processing loop
+
         return Ok((total_published, total_failed, true));
       }
     }
@@ -519,19 +517,16 @@ impl AtomicDataPublisher {
   }
 
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {
-    // Check database connectivity
     if let Err(e) = self.database.health_check().await {
       error!("Database health check failed: {}", e);
       return Err(AtomicDataError::DatabaseError(e.to_string()));
     }
 
-    // Check publisher service
     if let Err(e) = self.publisher.health_check().await {
       error!("Publisher health check failed: {}", e);
       return Err(e);
     }
 
-    // Check Solana RPC connectivity
     if let Err(e) = self.solana_client.health_check().await {
       error!("Solana RPC health check failed: {}", e);
       return Err(e);

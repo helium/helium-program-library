@@ -33,13 +33,36 @@ keypair_path = "/path/to/your/keypair.bin"
 endpoint = "https://ingestor.helium.io"
 ```
 
+## Metrics
+
+The service includes a built-in Prometheus metrics server that exposes operational metrics:
+
+- **Changes published**: Total number of changes successfully published
+- **Errors**: Total number of errors encountered
+- **Connection failures**: Ingestor connection failures
+- **Retry attempts**: Number of retry attempts made
+- **Database query duration**: Time taken for database queries (histogram)
+- **Publish duration**: Time taken to publish changes (histogram)
+- **Uptime**: Service uptime in seconds
+
+The metrics server is always enabled and serves metrics at `http://0.0.0.0:9090/metrics` by default. Configure the port in the `[service]` section:
+
+```toml
+[service]
+port = 9090  # Metrics server port
+```
+
+Access metrics via:
+
+- Metrics endpoint: `http://localhost:9090/metrics`
+
 ## Running
 
 ```bash
 # Build
 cargo build
 
-# Run
+# Run (starts both the data publisher and metrics server)
 cargo run
 
 # Run with dry-run mode (logs messages without sending)

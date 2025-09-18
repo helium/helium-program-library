@@ -6,6 +6,8 @@ use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 use tracing::{debug, info, warn};
 
 use crate::config::{DatabaseConfig, PollingJob};
+use crate::metrics::MetricsCollector;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
@@ -17,10 +19,19 @@ pub struct ChangeRecord {
 pub struct DatabaseClient {
   pool: PgPool,
   polling_jobs: Vec<PollingJob>,
+  metrics: Option<Arc<MetricsCollector>>,
 }
 
 impl DatabaseClient {
   pub async fn new(config: &DatabaseConfig, polling_jobs: Vec<PollingJob>) -> Result<Self> {
+    Self::new_with_metrics(config, polling_jobs, None).await
+  }
+
+  pub async fn new_with_metrics(
+    config: &DatabaseConfig,
+    polling_jobs: Vec<PollingJob>,
+    metrics: Option<Arc<MetricsCollector>>
+  ) -> Result<Self> {
     let database_url = format!(
       "postgres://{}:{}@{}:{}/{}",
       config.username, config.password, config.host, config.port, config.database_name
@@ -44,7 +55,7 @@ impl DatabaseClient {
       config.host, config.port, config.database_name
     );
 
-    Ok(Self { pool, polling_jobs })
+    Ok(Self { pool, polling_jobs, metrics })
   }
 
   pub async fn init_polling_state(&self) -> Result<()> {
@@ -257,6 +268,7 @@ impl DatabaseClient {
     );
 
     // Different queries have different parameter patterns
+    let query_start = std::time::Instant::now();
     let rows = if job.query_name == "construct_atomic_hotspots" {
       // Extract hotspot_type from parameters for hotspot queries
       let hotspot_type = job
@@ -289,6 +301,11 @@ impl DatabaseClient {
         .fetch_all(&self.pool)
         .await?
     };
+
+    let query_duration = query_start.elapsed().as_secs_f64();
+    if let Some(ref metrics) = self.metrics {
+      metrics.observe_database_query_duration(query_duration);
+    }
 
     let mut changes = Vec::new();
     for row in rows {

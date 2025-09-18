@@ -43,6 +43,8 @@ pub struct ServiceConfig {
   pub dry_run: bool,
   #[serde(default)]
   pub dry_run_failure_rate: f32,
+  #[serde(default = "default_metrics_port")]
+  pub port: u16,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -69,6 +71,10 @@ pub struct LoggingConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct SigningConfig {
   pub keypair_path: String,
+}
+
+fn default_metrics_port() -> u16 {
+  9090
 }
 
 impl Settings {
@@ -113,6 +119,7 @@ impl Default for Settings {
         polling_jobs: vec![],
         dry_run: false,
         dry_run_failure_rate: 0.0,
+        port: 9090,
       },
       ingestor: IngestorConfig {
         endpoint: "http://localhost:8080".to_string(),

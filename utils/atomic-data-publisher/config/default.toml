@@ -10,6 +10,7 @@ batch_size = 500
 max_concurrent_publishes = 5
 dry_run = true
 dry_run_failure_rate = 0.0
+port = 9090
 
 [[service.polling_jobs]]
 name = "atomic_mobile_hotspots"
