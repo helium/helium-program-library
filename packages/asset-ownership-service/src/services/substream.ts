@@ -138,7 +138,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
       const cursor = overrideCursor ?? (await cursorManager.checkStaleness());
       cursorManager.startStalenessCheck();
       console.log("Connected to Substream");
-      const startBlock = await provider.connection.getSlot("finalized");
+      const startBlock = await provider.connection.getBlockHeight("finalized");
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
@@ -225,21 +225,27 @@ export const setupSubstream = async (server: FastifyInstance) => {
                       ...(accountKeysFromLookups?.readonly || []),
                     ];
 
-                    const { updatedTrees } = await processor.processTransaction({
-                      accountKeys,
-                      instructions: message.compiledInstructions,
-                      innerInstructions:
-                        transactionInfo.meta.innerInstructions?.map(
-                          (inner) => ({
-                            index: inner.index,
-                            instructions: inner.instructions.map((ix) => ({
-                              programIdIndex: ix.programIdIndex,
-                              accountKeyIndexes: Buffer.from(ix.accounts, "base64").toJSON().data,
-                              data: Buffer.from(ix.data, "base64"),
-                            })),
-                          })
-                        ),
-                    }, dbTx);
+                    const { updatedTrees } = await processor.processTransaction(
+                      {
+                        accountKeys,
+                        instructions: message.compiledInstructions,
+                        innerInstructions:
+                          transactionInfo.meta.innerInstructions?.map(
+                            (inner) => ({
+                              index: inner.index,
+                              instructions: inner.instructions.map((ix) => ({
+                                programIdIndex: ix.programIdIndex,
+                                accountKeyIndexes: Buffer.from(
+                                  ix.accounts,
+                                  "base64"
+                                ).toJSON().data,
+                                data: Buffer.from(ix.data, "base64"),
+                              })),
+                            })
+                          ),
+                      },
+                      dbTx
+                    );
 
                     if (updatedTrees) {
                       console.log("Trees updated");

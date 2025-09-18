@@ -35,7 +35,7 @@ impl SolanaClientWrapper {
     let request_body = json!({
       "jsonrpc": "2.0",
       "id": 1,
-      "method": "getSlot"
+      "method": "getBlockHeight"
     });
 
     match self
@@ -50,9 +50,9 @@ impl SolanaClientWrapper {
           match response.json::<Value>().await {
             Ok(json_response) => {
               if let Some(result) = json_response.get("result") {
-                if let Some(slot) = result.as_u64() {
-                  info!("Current Solana block height: {}", slot);
-                  Ok(slot)
+                if let Some(block_height) = result.as_u64() {
+                  info!("Current Solana block height: {}", block_height);
+                  Ok(block_height)
                 } else {
                   error!("Invalid slot format in response: {:?}", result);
                   Err(AtomicDataError::SolanaRpcError(

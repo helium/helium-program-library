@@ -304,10 +304,11 @@ impl AtomicDataPublisher {
 
         if let Some(change) = &mobile_req.change {
           info!(
-            "DRY RUN: Mobile change details - block_height: {}, pub_key: {}, asset: {}",
+            "DRY RUN: Mobile change details - block_height: {}, pub_key: {}, asset: {}, metadata: {:?}",
             change.block_height,
             change.pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
+            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string()),
+            change.metadata
           );
         }
 
@@ -322,10 +323,11 @@ impl AtomicDataPublisher {
 
         if let Some(change) = &iot_req.change {
           info!(
-            "DRY RUN: IoT change details - block_height: {}, pub_key: {}, asset: {}",
+            "DRY RUN: IoT change details - block_height: {}, pub_key: {}, asset: {}, metadata: {:?}",
             change.block_height,
             change.pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
+            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string()),
+            change.metadata
           );
         }
 
@@ -340,10 +342,11 @@ impl AtomicDataPublisher {
 
         if let Some(change) = &ownership_req.change {
           info!(
-            "DRY RUN: Entity ownership details - block_height: {}, entity_pub_key: {}, asset: {}",
+            "DRY RUN: Entity ownership details - block_height: {}, entity_pub_key: {}, asset: {}, owner: {:?}",
             change.block_height,
             change.entity_pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
+            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string()),
+            change.owner
           );
         }
 
@@ -358,10 +361,11 @@ impl AtomicDataPublisher {
 
         if let Some(change) = &reward_req.change {
           info!(
-            "DRY RUN: Entity reward destination details - block_height: {}, entity_pub_key: {}, asset: {}",
+            "DRY RUN: Entity reward destination details - block_height: {}, entity_pub_key: {}, asset: {}, rewards_destination: {:?}",
             change.block_height,
             change.entity_pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string())
+            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string()),
+            change.rewards_destination
           );
         }
 
