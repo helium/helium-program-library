@@ -1,9 +1,9 @@
-use axum::{extract::State, http::StatusCode, response::{IntoResponse, Response}, routing::get, Router};
 use prometheus::{register_counter, register_gauge, register_histogram, Counter, Encoder, Gauge, Histogram, TextEncoder};
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::net::TcpListener;
-use tracing::{error, info};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+use tracing::{error, info, debug};
 
 #[derive(Debug)]
 pub struct MetricsCollector {
@@ -65,37 +65,70 @@ impl MetricsCollector {
     let listener = TcpListener::bind(bind_address).await?;
     info!("Metrics server listening on {}", bind_address);
 
-    let app = Router::new().route("/metrics", get(metrics_handler)).with_state(self);
-
-    tokio::select! {
-        result = axum::serve(listener, app) => {
-            if let Err(e) = result {
-                error!("Metrics server error: {}", e);
+    loop {
+      tokio::select! {
+        result = listener.accept() => {
+          match result {
+            Ok((stream, _)) => {
+              let metrics = self.clone();
+              tokio::spawn(async move {
+                if let Err(e) = handle_connection(stream, metrics).await {
+                  debug!("Connection error: {}", e);
+                }
+              });
             }
+            Err(e) => {
+              error!("Failed to accept connection: {}", e);
+            }
+          }
         }
         _ = shutdown_rx.changed() => {
-            info!("Metrics server shutdown");
+          info!("Metrics server shutdown");
+          break;
         }
+      }
     }
 
     Ok(())
   }
 }
 
-async fn metrics_handler(State(metrics): State<Arc<MetricsCollector>>) -> Response {
-  let uptime = metrics.start_time.elapsed().as_secs() as f64;
-  metrics.uptime_seconds.set(uptime);
+async fn handle_connection(mut stream: TcpStream, metrics: Arc<MetricsCollector>) -> anyhow::Result<()> {
+  let mut buffer = [0; 1024];
+  let n = stream.read(&mut buffer).await?;
+  let request = String::from_utf8_lossy(&buffer[..n]);
 
-  match prometheus::gather() {
-    metric_families => {
-      let encoder = TextEncoder::new();
-      let mut buffer = Vec::new();
-      if encoder.encode(&metric_families, &mut buffer).is_ok() {
-        if let Ok(output) = String::from_utf8(buffer) {
-          return (StatusCode::OK, output).into_response();
-        }
+  // Simple HTTP request parsing - just check if it's GET /metrics
+  if request.starts_with("GET /metrics") {
+    // Update uptime before serving metrics
+    let uptime = metrics.start_time.elapsed().as_secs() as f64;
+    metrics.uptime_seconds.set(uptime);
+
+    // Generate metrics
+    let metric_families = prometheus::gather();
+    let encoder = TextEncoder::new();
+    let mut buffer = Vec::new();
+
+    match encoder.encode(&metric_families, &mut buffer) {
+      Ok(_) => {
+        let metrics_output = String::from_utf8(buffer).unwrap_or_else(|_| "Failed to encode metrics".to_string());
+        let response = format!(
+          "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
+          metrics_output.len(),
+          metrics_output
+        );
+        stream.write_all(response.as_bytes()).await?;
       }
-      (StatusCode::INTERNAL_SERVER_ERROR, "Failed to export metrics").into_response()
+      Err(_) => {
+        let error_response = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 21\r\n\r\nFailed to get metrics";
+        stream.write_all(error_response.as_bytes()).await?;
+      }
     }
+  } else {
+    // Return 404 for non-metrics requests
+    let not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nNot Found";
+    stream.write_all(not_found.as_bytes()).await?;
   }
+
+  Ok(())
 }

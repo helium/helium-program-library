@@ -23,9 +23,6 @@ bs58 = "0.5"
 rand = "0.8"
 reqwest = { version = "0.11", features = ["json"] }
 prometheus = "0.13"
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors"] }
 
 [patch.'https://github.com/helium/proto']
 helium-proto = { git = "https://www.github.com/helium/proto", branch = "mj/chain-rewardable-entities" }
