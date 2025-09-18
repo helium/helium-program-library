@@ -40,7 +40,7 @@ type PythReturn = {
   }
 }
 
-export const getOraclePrice = async ({tokenType}: {
+export const getOraclePrice = async ({ tokenType }: {
   tokenType?: "HNT";
   cluster?: Cluster;
   connection?: Connection;
@@ -62,16 +62,14 @@ export const getOraclePrice = async ({tokenType}: {
   const price = priceUpdates.parsed![0];
   return {
     priceMessage: {
-      emaPrice: {
-        feedId: HNT_PRICE_FEED_ID,
-        price: price.ema_price.price,
-        conf: price.ema_price.conf,
-        exponent: price.ema_price.expo,
-        publishTime: price.ema_price.publish_time,
-        prevPublishTime: price.ema_price.prev_publish_time,
-        emaPrice: price.ema_price.ema_price,
-        emaConf: price.ema_price.ema_conf,
-      }
+      feedId: HNT_PRICE_FEED_ID,
+      price: price.price.price,
+      emaPrice: price.ema_price.ema_price,
+      conf: price.price.conf,
+      emaConf: price.ema_price.ema_conf,
+      exponent: price.ema_price.expo,
+      publishTime: price.ema_price.publish_time,
+      prevPublishTime: price.ema_price.prev_publish_time,
     }
   }
 };
