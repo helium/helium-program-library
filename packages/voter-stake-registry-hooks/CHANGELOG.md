@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.1](https://github.com/helium/helium-program-libary/compare/v0.11.0...v0.11.1) (2025-09-18)
+
+**Note:** Version bump only for package @helium/voter-stake-registry-hooks
+
+
+
+
+
 # [0.11.0](https://github.com/helium/helium-program-libary/compare/v0.10.35...v0.11.0) (2025-09-17)
 
 **Note:** Version bump only for package @helium/voter-stake-registry-hooks

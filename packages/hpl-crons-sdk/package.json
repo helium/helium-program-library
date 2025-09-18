@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "Interface to the rewards burn smart contract",
   "repository": {
     "type": "git",
@@ -33,13 +33,13 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
     "@helium/cron-sdk": "^0.0.9",
-    "@helium/helium-sub-daos-sdk": "^0.11.0",
+    "@helium/helium-sub-daos-sdk": "^0.11.1",
     "@helium/organization-sdk": "^0.1.5-alpha.0",
     "@helium/proposal-sdk": "^0.1.5-alpha.0",
-    "@helium/spl-utils": "^0.11.0",
+    "@helium/spl-utils": "^0.11.1",
     "@helium/state-controller-sdk": "^0.1.5-alpha.0",
     "@helium/tuktuk-sdk": "^0.0.9",
-    "@helium/voter-stake-registry-sdk": "^0.11.0",
+    "@helium/voter-stake-registry-sdk": "^0.11.1",
     "@solana/web3.js": "^1.91.1",
     "axios": "^1.9.0",
     "bn.js": "^5.2.0",
