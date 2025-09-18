@@ -1,6 +1,5 @@
 use anyhow::Result;
 use bs58;
-use chrono::{DateTime, Utc};
 use helium_crypto::{Keypair, Sign};
 use helium_proto::services::chain_rewardable_entities::{
   entity_reward_destination_change_v1, split_recipient_info_v1, EntityOwnerChangeV1,
@@ -381,25 +380,6 @@ impl ProtobufBuilder {
       .get(key)?
       .as_bool()
       .or_else(|| data.get(key)?.as_str()?.parse().ok())
-  }
-
-  fn extract_timestamp_as_seconds(data: &Value, key: &str) -> Option<u64> {
-    let timestamp_str = Self::extract_string(data, key)?;
-
-    if let Ok(dt) = DateTime::parse_from_rfc3339(&timestamp_str) {
-      return Some(dt.timestamp() as u64);
-    }
-
-    if let Ok(dt) = timestamp_str.parse::<DateTime<Utc>>() {
-      return Some(dt.timestamp() as u64);
-    }
-
-    if let Ok(timestamp) = timestamp_str.parse::<u64>() {
-      return Some(timestamp);
-    }
-
-    warn!("Failed to parse timestamp: {}", timestamp_str);
-    None
   }
 
   fn parse_mobile_device_type(device_type_str: &str) -> Option<MobileHotspotDeviceType> {

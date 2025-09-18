@@ -23,10 +23,6 @@ pub struct DatabaseClient {
 }
 
 impl DatabaseClient {
-  pub async fn new(config: &DatabaseConfig, polling_jobs: Vec<PollingJob>) -> Result<Self> {
-    Self::new_with_metrics(config, polling_jobs, None).await
-  }
-
   pub async fn new_with_metrics(
     config: &DatabaseConfig,
     polling_jobs: Vec<PollingJob>,
