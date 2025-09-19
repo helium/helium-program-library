@@ -75,7 +75,7 @@ impl DatabaseClient {
         job_name VARCHAR(255) NOT NULL UNIQUE,
         query_name VARCHAR(255) NOT NULL DEFAULT 'default',
         queue_position INTEGER NOT NULL DEFAULT 0,
-        last_processed_block_height BIGINT NOT NULL DEFAULT 0,
+        last_processed_block BIGINT NOT NULL DEFAULT 0,
         is_running BOOLEAN NOT NULL DEFAULT FALSE,
         running_since TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         queue_completed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
@@ -136,7 +136,7 @@ impl DatabaseClient {
       SELECT
         job_name,
         query_name,
-        last_processed_block_height
+        last_processed_block
       FROM atomic_data_polling_state
       WHERE job_name = $1 AND query_name = $2
       "#,
@@ -147,7 +147,7 @@ impl DatabaseClient {
     .await?;
 
     if let Some(row) = existing_state {
-      let block_height: i64 = row.get("last_processed_block_height");
+      let block: i64 = row.get("last_processed_block");
 
       // Update queue position for existing job
       sqlx::query(
@@ -164,14 +164,14 @@ impl DatabaseClient {
       .await?;
 
       info!(
-        "Resuming polling for job '{}' query '{}' from block height {} with queue position {}",
-        job_name, query_name, block_height, queue_position
+        "Resuming polling for job '{}' query '{}' from block {} with queue position {}",
+        job_name, query_name, block, queue_position
       );
     } else {
-      // Insert new state with block height 0 and queue position
+      // Insert new state with block 0 and queue position
       sqlx::query(
         r#"
-        INSERT INTO atomic_data_polling_state (job_name, query_name, last_processed_block_height, queue_position)
+        INSERT INTO atomic_data_polling_state (job_name, query_name, last_processed_block, queue_position)
         VALUES ($1, $2, $3, $4)
         "#
       )
@@ -183,7 +183,7 @@ impl DatabaseClient {
       .await?;
 
       info!(
-        "Initialized new polling state for job '{}' query '{}' starting from block height 0 with queue position {}",
+        "Initialized new polling state for job '{}' query '{}' starting from block 0 with queue position {}",
         job_name, query_name, queue_position
       );
     }
@@ -193,7 +193,6 @@ impl DatabaseClient {
 
   pub async fn get_pending_changes(
     &self,
-    current_solana_height: u64,
   ) -> Result<Option<(Vec<ChangeRecord>, (String, String), u64)>> {
     if self.any_job_running().await? {
       return Ok(None);
@@ -204,8 +203,8 @@ impl DatabaseClient {
         return Ok(None);
       }
 
-      let (changes, target_height) =
-        match self.execute_job_polling(&job, current_solana_height).await {
+      let (changes, target_block) =
+        match self.execute_job_polling(&job).await {
           Ok(result) => result,
           Err(e) => {
             let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
@@ -213,7 +212,7 @@ impl DatabaseClient {
           }
         };
 
-      Ok(Some((changes, (job.name, job.query_name), target_height)))
+      Ok(Some((changes, (job.name, job.query_name), target_block)))
     } else {
       self.reset_job_queue().await?;
       Ok(None)
@@ -223,7 +222,6 @@ impl DatabaseClient {
   async fn execute_job_polling(
     &self,
     job: &PollingJob,
-    current_solana_height: u64,
   ) -> Result<(Vec<ChangeRecord>, u64)> {
     // Get current polling state from database
     let current_state_row = sqlx::query(
@@ -231,7 +229,7 @@ impl DatabaseClient {
       SELECT
         job_name,
         query_name,
-        last_processed_block_height
+        last_processed_block
       FROM atomic_data_polling_state
       WHERE job_name = $1 AND query_name = $2
       "#,
@@ -241,26 +239,48 @@ impl DatabaseClient {
     .fetch_one(&self.pool)
     .await?;
 
-    let last_processed_height: i64 = current_state_row.get("last_processed_block_height");
+    let last_processed_block: i64 = current_state_row.get("last_processed_block");
+
+    // Get the maximum block available in the tables for this query
+    let max_available_block = self.get_max_last_block_for_query(&job.query_name).await?;
+
+    let max_available_block = match max_available_block {
+      Some(block) => block,
+      None => {
+        debug!(
+          "No data available in tables for query '{}', skipping",
+          job.query_name
+        );
+        return Ok((Vec::new(), last_processed_block as u64));
+      }
+    };
+
+    // Only process if there's new data available
+    if max_available_block <= last_processed_block as u64 {
+      debug!(
+        "No new data for job '{}': max_available_block={}, last_processed_block={}",
+        job.name, max_available_block, last_processed_block
+      );
+      return Ok((Vec::new(), last_processed_block as u64));
+    }
 
     // Get the query from the queries module
     let query = crate::queries::AtomicHotspotQueries::get_query(&job.query_name)
       .ok_or_else(|| anyhow::anyhow!("{} query not found", job.query_name))?;
 
-    let height_diff = current_solana_height.saturating_sub(last_processed_height as u64);
-    let chunk_size = if height_diff <= 1000 {
-      height_diff
+    let block_diff = max_available_block.saturating_sub(last_processed_block as u64);
+    let chunk_size = if block_diff <= 1000 {
+      block_diff
     } else {
       // Scale chunk size logarithmically: roughly 10% of remaining blocks, with bounds
-      let scaled_chunk = (height_diff as f64 * 0.10) as u64;
+      let scaled_chunk = (block_diff as f64 * 0.10) as u64;
       scaled_chunk.clamp(1000, 100_000_000) // Min 1k blocks, max 100M blocks
     };
 
-    // Calculate target height but ensure we don't skip blocks between cycles
-    // The key insight: we need to process ALL blocks up to current_solana_height eventually
-    let target_height = std::cmp::min(
-      last_processed_height as u64 + chunk_size,
-      current_solana_height,
+    // Calculate target block using table data availability
+    let target_block = std::cmp::min(
+      last_processed_block as u64 + chunk_size,
+      max_available_block,
     );
 
     // Different queries have different parameter patterns
@@ -274,26 +294,26 @@ impl DatabaseClient {
         .ok_or_else(|| anyhow::anyhow!("hotspot_type parameter required for hotspot queries"))?;
 
       info!(
-        "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks {} to {} ({} blocks)",
-        job.name, job.query_name, hotspot_type, last_processed_height, target_height, target_height - last_processed_height as u64
+        "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks {} to {} ({} blocks, max_available={})",
+        job.name, job.query_name, hotspot_type, last_processed_block, target_block, target_block - last_processed_block as u64, max_available_block
       );
 
       sqlx::query(query)
         .bind(hotspot_type)
-        .bind(last_processed_height)
-        .bind(target_height as i64)
+        .bind(last_processed_block)
+        .bind(target_block as i64)
         .fetch_all(&self.pool)
         .await?
     } else {
       // Entity ownership and reward destination queries don't need hotspot_type
       info!(
-        "Querying job '{}' with query '{}', processing blocks {} to {} ({} blocks)",
-        job.name, job.query_name, last_processed_height, target_height, target_height - last_processed_height as u64
+        "Querying job '{}' with query '{}', processing blocks {} to {} ({} blocks, max_available={})",
+        job.name, job.query_name, last_processed_block, target_block, target_block - last_processed_block as u64, max_available_block
       );
 
       sqlx::query(query)
-        .bind(last_processed_height)
-        .bind(target_height as i64)
+        .bind(last_processed_block)
+        .bind(target_block as i64)
         .fetch_all(&self.pool)
         .await?
     };
@@ -322,15 +342,15 @@ impl DatabaseClient {
       "Found {} changes for job '{}' (processed up to block {})",
       changes.len(),
       job.name,
-      target_height
+      target_block
     );
-    Ok((changes, target_height))
+    Ok((changes, target_block))
   }
 
-  pub async fn mark_processed(&self, changes: &[ChangeRecord], target_height: u64) -> Result<()> {
+  pub async fn mark_processed(&self, changes: &[ChangeRecord], target_block: u64) -> Result<()> {
     if changes.is_empty() {
       return self
-        .advance_block_height_for_active_job(target_height)
+        .advance_block_for_active_job(target_block)
         .await;
     }
 
@@ -340,33 +360,33 @@ impl DatabaseClient {
     debug!(
       "Marking {} changes as processed with Solana height {}",
       changes.len(),
-      target_height
+      target_block
     );
     for change in changes {
       processed_tables.insert(change.job_name.clone());
     }
 
-    // Update polling state for each job with the current Solana block height
+    // Update polling state for each job with the current Solana block
     for job_name in processed_tables {
       if let Some(job) = self.polling_jobs.iter().find(|j| j.name == job_name) {
         sqlx::query(
           r#"
           UPDATE atomic_data_polling_state
           SET
-            last_processed_block_height = $1,
+            last_processed_block = $1,
             updated_at = NOW()
           WHERE job_name = $2 AND query_name = $3
           "#,
         )
-        .bind(target_height as i64)
+        .bind(target_block as i64)
         .bind(&job.name)
         .bind(&job.query_name)
         .execute(&self.pool)
         .await?;
 
         info!(
-          "Updated polling state for job '{}' query '{}': last_processed_block_height -> {} (target height)",
-          job.name, job.query_name, target_height
+          "Updated polling state for job '{}' query '{}': last_processed_block -> {} (target height)",
+          job.name, job.query_name, target_block
         );
       } else {
         warn!(
@@ -379,12 +399,12 @@ impl DatabaseClient {
     debug!(
       "Marked {} changes as processed with Solana height {}",
       changes.len(),
-      target_height
+      target_block
     );
     Ok(())
   }
 
-  async fn advance_block_height_for_active_job(&self, target_height: u64) -> Result<()> {
+  async fn advance_block_for_active_job(&self, target_block: u64) -> Result<()> {
     let active_job = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -404,20 +424,20 @@ impl DatabaseClient {
         r#"
         UPDATE atomic_data_polling_state
         SET
-          last_processed_block_height = $1,
+          last_processed_block = $1,
           updated_at = NOW()
         WHERE job_name = $2 AND query_name = $3
         "#,
       )
-      .bind(target_height as i64)
+      .bind(target_block as i64)
       .bind(&job_name)
       .bind(&query_name)
       .execute(&self.pool)
       .await?;
 
       debug!(
-        "Advanced block height to {} for job '{}' query '{}' (no changes)",
-        target_height, job_name, query_name
+        "Advanced block to {} for job '{}' query '{}' (no changes)",
+        target_block, job_name, query_name
       );
     }
 
@@ -427,6 +447,67 @@ impl DatabaseClient {
   pub async fn health_check(&self) -> Result<()> {
     sqlx::query("SELECT 1").execute(&self.pool).await?;
     Ok(())
+  }
+
+  pub async fn get_max_last_block_for_query(&self, query_name: &str) -> Result<Option<u64>> {
+    let max_block = match query_name {
+      "construct_atomic_hotspots" => {
+        let row = sqlx::query(
+          r#"
+          SELECT GREATEST(
+            COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), 0),
+            COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), 0)
+          )::bigint as max_block
+          "#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let max_block: i64 = row.get("max_block");
+        if max_block > 1 { Some((max_block - 1) as u64) } else { None }
+      }
+      "construct_entity_ownership_changes" => {
+        let row = sqlx::query(
+          r#"
+          SELECT GREATEST(
+            COALESCE((SELECT MAX(last_block) FROM asset_owners), 0),
+            COALESCE((SELECT MAX(last_block) FROM welcome_packs), 0)
+          )::bigint as max_block
+          "#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let max_block: i64 = row.get("max_block");
+        if max_block > 1 { Some((max_block - 1) as u64) } else { None }
+      }
+      "construct_entity_reward_destination_changes" => {
+        let row = sqlx::query(
+          r#"
+          SELECT GREATEST(
+            COALESCE((SELECT MAX(last_block) FROM recipients), 0),
+            COALESCE((SELECT MAX(last_block) FROM rewards_recipients), 0)
+          )::bigint as max_block
+          "#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let max_block: i64 = row.get("max_block");
+        if max_block > 1 { Some((max_block - 1) as u64) } else { None }
+      }
+      _ => {
+        warn!("Unknown query name: {}", query_name);
+        None
+      }
+    };
+
+    debug!(
+      "Max last_block for query '{}': {:?} (using MAX(last_block) - 1 for safety)",
+      query_name, max_block
+    );
+
+    Ok(max_block)
   }
 
 

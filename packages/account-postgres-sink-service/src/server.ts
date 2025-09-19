@@ -287,6 +287,7 @@ if (PG_POOL_SIZE < 5) {
                 data: [account.data, undefined],
               },
               pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
+              block: undefined,
             });
           } catch (err) {
             throw err;
@@ -416,6 +417,7 @@ if (PG_POOL_SIZE < 5) {
                   account: parsed,
                   pluginsByAccountType:
                     pluginsByAccountTypeByProgram[parsed["owner"]] || {},
+                  block: undefined,
                 });
               } catch (err) {
                 throw err;
@@ -527,6 +529,7 @@ if (PG_POOL_SIZE < 5) {
                 },
                 pluginsByAccountType:
                   pluginsByAccountTypeByProgram[programId] || {},
+                block: undefined,
               });
             }
           }

@@ -21,7 +21,6 @@ tonic = { version = "0.10", features = ["tls"] }
 prost = "0.12"
 bs58 = "0.5"
 rand = "0.8"
-reqwest = { version = "0.11", features = ["json"] }
 prometheus = "0.13"
 
 [patch.'https://github.com/helium/proto']

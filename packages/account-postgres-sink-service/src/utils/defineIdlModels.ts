@@ -111,7 +111,7 @@ export const defineIdlModels = async ({
           refreshedAt: {
             type: DataTypes.DATE,
           },
-          lastBlockHeight: {
+          lastBlock: {
             type: DataTypes.DECIMAL.UNSIGNED,
             allowNull: true,
             defaultValue: null,
@@ -153,32 +153,31 @@ export const defineIdlModels = async ({
         )
       ).map((x: any) => x.indexname);
 
-      const blockHeightIndexName = `idx_${underscore(
+      const blockIndexName = `idx_${underscore(
         accConfig.table || acc.name
-      )}_last_block_height`;
-      const hasBlockHeightIndex =
-        existingIndexes.includes(blockHeightIndexName);
+      )}_last_block`;
+      const hasblockIndex = existingIndexes.includes(blockIndexName);
 
       if (
         !existingColumns.length ||
         !columns.every((col) => existingColumns.includes(col)) ||
         !indexes.every((idx) => existingIndexes.includes(idx.name)) ||
-        !hasBlockHeightIndex
+        !hasblockIndex
       ) {
         await model.sync({ alter: true });
 
-        if (!hasBlockHeightIndex) {
+        if (!hasblockIndex) {
           try {
             await sequelize.query(`
-              CREATE INDEX CONCURRENTLY IF NOT EXISTS ${blockHeightIndexName}
+              CREATE INDEX CONCURRENTLY IF NOT EXISTS ${blockIndexName}
               ON ${underscore(accConfig.schema || "public")}.${underscore(
               accConfig.table || acc.name
-            )}(last_block_height)
+            )}(last_block)
             `);
-            console.log(`Created index: ${blockHeightIndexName}`);
+            console.log(`Created index: ${blockIndexName}`);
           } catch (indexError) {
             console.warn(
-              `Failed to create index ${blockHeightIndexName}:`,
+              `Failed to create index ${blockIndexName}:`,
               indexError
             );
           }

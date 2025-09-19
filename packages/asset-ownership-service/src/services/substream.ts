@@ -138,7 +138,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
       const cursor = overrideCursor ?? (await cursorManager.checkStaleness());
       cursorManager.startStalenessCheck();
       console.log("Connected to Substream");
-      const startBlock = await provider.connection.getBlockHeight("finalized");
+      const startBlock = await provider.connection.getSlot("finalized");
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
@@ -179,8 +179,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
-          const blockHeight =
-            message.value.finalBlockHeight?.toString() || "unknown";
+          const block = message.value.finalBlockHeight
+            ? Number(message.value.finalBlockHeight)
+            : null;
 
           const hasTransactions =
             output !== undefined &&
@@ -244,7 +245,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
                             })
                           ),
                       },
-                      dbTx
+                      dbTx,
+                      block
                     );
 
                     if (updatedTrees) {
@@ -253,7 +255,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
                       restartCursor = cursor;
                       await cursorManager.updateCursor({
                         cursor,
-                        blockHeight,
+                        block: block?.toString() || "unknown",
                         force: true,
                       });
                     }
@@ -270,7 +272,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
           await cursorManager.updateCursor({
             cursor,
-            blockHeight,
+            block: block?.toString() || "unknown",
             force: hasFilteredTransactions,
           });
         }

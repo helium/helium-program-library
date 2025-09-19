@@ -28,13 +28,13 @@ impl AtomicHotspotQueries {
     Self::get_all_queries().get(query_name).copied()
   }
 
-  // Parameters: $1 = hotspot_type (mobile/iot), $2 = last_processed_block_height, $3 = current_solana_block_height
+  // Parameters: $1 = hotspot_type (mobile/iot), $2 = last_processed_block, $3 = max_block
   pub const CONSTRUCT_ATOMIC_HOTSPOTS: &'static str = r#"
     WITH hotspot_metadata_changes AS (
       SELECT
         mhi.address,
         mhi.asset,
-        mhi.last_block_height,
+        mhi.last_block,
         mhi.location,
         'mobile' as hotspot_type,
         mhi.device_type,
@@ -44,8 +44,8 @@ impl AtomicHotspotQueries {
         mhi.deployment_info
       FROM mobile_hotspot_infos mhi
       WHERE mhi.asset IS NOT NULL
-        AND mhi.last_block_height > $2
-        AND mhi.last_block_height <= $3
+        AND mhi.last_block > $2
+        AND mhi.last_block <= $3
         AND $1 = 'mobile'
 
       UNION ALL
@@ -53,7 +53,7 @@ impl AtomicHotspotQueries {
       SELECT
         ihi.address,
         ihi.asset,
-        ihi.last_block_height,
+        ihi.last_block,
         ihi.location,
         'iot' as hotspot_type,
         NULL as device_type,
@@ -63,15 +63,15 @@ impl AtomicHotspotQueries {
         NULL::jsonb as deployment_info
       FROM iot_hotspot_infos ihi
       WHERE ihi.asset IS NOT NULL
-        AND ihi.last_block_height > $2
-        AND ihi.last_block_height <= $3
+        AND ihi.last_block > $2
+        AND ihi.last_block <= $3
         AND $1 = 'iot'
     )
     SELECT
       CONCAT('atomic_', hmc.hotspot_type, '_hotspots') as job_name,
       hmc.address as solana_address,
       hmc.asset,
-      hmc.last_block_height as block_height,
+      hmc.last_block as block,
       JSON_BUILD_OBJECT(
         'pub_key', kta.encoded_entity_key,
         'asset', hmc.asset,
@@ -83,42 +83,60 @@ impl AtomicHotspotQueries {
         'gain', hmc.gain,
         'is_full_hotspot', hmc.is_full_hotspot,
         'deployment_info', hmc.deployment_info,
-        'block_height', hmc.last_block_height
+        'block', hmc.last_block
       ) as atomic_data
     FROM hotspot_metadata_changes hmc
     LEFT JOIN key_to_assets kta ON kta.asset = hmc.asset
     WHERE kta.encoded_entity_key IS NOT NULL
-    ORDER BY hmc.last_block_height DESC;
+    ORDER BY hmc.last_block DESC;
   "#;
 
-  // Parameters: $1 = last_processed_block_height, $2 = current_solana_block_height
+  // Parameters: $1 = last_processed_block, $2 = max_block
   pub const CONSTRUCT_ENTITY_OWNERSHIP_CHANGES: &'static str = r#"
-    WITH ownership_changes AS (
-      SELECT DISTINCT
+    WITH asset_owner_changes AS (
+      -- Get asset owner changes in the block range
+      SELECT
         ao.asset,
-        ao.last_block_height as block_height,
+        ao.last_block as block,
         kta.encoded_entity_key as pub_key,
-        CASE
-          WHEN wp.owner IS NOT NULL THEN wp.owner
-          ELSE ao.owner
-        END as owner,
-        CASE
-          WHEN wp.owner IS NOT NULL THEN 'welcome_pack_owner'
-          ELSE 'direct_owner'
-        END as owner_type,
+        ao.owner,
+        'direct_owner' as owner_type,
         'entity_ownership' as change_type
       FROM asset_owners ao
-      LEFT JOIN key_to_assets kta ON kta.asset = ao.asset
-      LEFT JOIN welcome_packs wp ON wp.asset = ao.asset
-      WHERE ao.last_block_height > $1
-        AND ao.last_block_height <= $2
+      INNER JOIN key_to_assets kta ON kta.asset = ao.asset
+      WHERE ao.last_block > $1
+        AND ao.last_block <= $2
         AND kta.encoded_entity_key IS NOT NULL
         AND ao.asset IS NOT NULL
         AND ao.owner IS NOT NULL
+    ),
+    welcome_pack_changes AS (
+      -- Get welcome pack owner changes in the block range
+      SELECT
+        wp.asset,
+        wp.last_block as block,
+        kta.encoded_entity_key as pub_key,
+        wp.owner,
+        'welcome_pack_owner' as owner_type,
+        'entity_ownership' as change_type
+      FROM welcome_packs wp
+      INNER JOIN key_to_assets kta ON kta.asset = wp.asset
+      WHERE wp.last_block > $1
+        AND wp.last_block <= $2
+        AND kta.encoded_entity_key IS NOT NULL
+        AND wp.asset IS NOT NULL
+        AND wp.owner IS NOT NULL
+    ),
+    ownership_changes AS (
+      SELECT asset, block, pub_key, owner, owner_type, change_type
+      FROM asset_owner_changes
+      UNION ALL
+      SELECT asset, block, pub_key, owner, owner_type, change_type
+      FROM welcome_pack_changes
     )
     SELECT
       'entity_ownership_changes' as job_name,
-      block_height,
+      block,
       pub_key as solana_address,
       asset,
       JSON_BUILD_OBJECT(
@@ -127,37 +145,36 @@ impl AtomicHotspotQueries {
         'owner', owner,
         'owner_type', owner_type,
         'change_type', change_type,
-        'block_height', block_height
+        'block', block
       ) as atomic_data
     FROM ownership_changes
-    ORDER BY block_height DESC;
+    ORDER BY block DESC;
   "#;
 
-  // Parameters: $1 = last_processed_block_height, $2 = current_solana_block_height
+  // Parameters: $1 = last_processed_block, $2 = max_block
   pub const CONSTRUCT_ENTITY_REWARD_DESTINATION_CHANGES: &'static str = r#"
-    WITH reward_destination_changes AS (
-      -- Changes from recipients table
-      SELECT DISTINCT
+    WITH direct_recipient_changes AS (
+      -- Get direct recipient changes in the block range
+      SELECT
         r.asset,
-        r.last_block_height as block_height,
+        r.last_block as block,
         kta.encoded_entity_key as pub_key,
         r.destination as rewards_recipient,
         NULL::text as rewards_split_data,
         'entity_reward_destination' as change_type
       FROM recipients r
-      LEFT JOIN key_to_assets kta ON kta.asset = r.asset
-      WHERE r.last_block_height > $1
-        AND r.last_block_height <= $2
+      INNER JOIN key_to_assets kta ON kta.asset = r.asset
+      WHERE r.last_block > $1
+        AND r.last_block <= $2
         AND kta.encoded_entity_key IS NOT NULL
         AND r.asset IS NOT NULL
         AND r.destination IS NOT NULL
-
-      UNION ALL
-
-      -- Changes from rewards_recipients table (fanout recipients)
-      SELECT DISTINCT
+    ),
+    fanout_recipient_changes AS (
+      -- Get fanout recipient changes in the block range
+      SELECT
         rr.asset,
-        rr.last_block_height as block_height,
+        rr.last_block as block,
         rr.encoded_entity_key as pub_key,
         rr.destination as rewards_recipient,
         JSON_BUILD_OBJECT(
@@ -170,16 +187,49 @@ impl AtomicHotspotQueries {
         )::text as rewards_split_data,
         'entity_reward_destination' as change_type
       FROM rewards_recipients rr
-      WHERE rr.last_block_height > $1
-        AND rr.last_block_height <= $2
+      WHERE rr.last_block > $1
+        AND rr.last_block <= $2
         AND rr.encoded_entity_key IS NOT NULL
         AND rr.asset IS NOT NULL
         AND rr.destination IS NOT NULL
         AND rr.type = 'fanout'
+    ),
+    direct_with_fanout_updates AS (
+      -- Update direct recipients with fanout data if available
+      SELECT
+        drc.asset,
+        GREATEST(drc.block, COALESCE(frc.block, 0)) as block,
+        drc.pub_key,
+        drc.rewards_recipient,
+        COALESCE(frc.rewards_split_data, NULL::text) as rewards_split_data,
+        drc.change_type
+      FROM direct_recipient_changes drc
+      LEFT JOIN fanout_recipient_changes frc ON frc.asset = drc.asset
+    ),
+    fanout_only_changes AS (
+      -- Get fanout-only changes (no direct recipient exists)
+      SELECT
+        frc.asset,
+        frc.block,
+        frc.pub_key,
+        frc.rewards_recipient,
+        frc.rewards_split_data,
+        frc.change_type
+      FROM fanout_recipient_changes frc
+      WHERE NOT EXISTS (
+        SELECT 1 FROM direct_recipient_changes drc WHERE drc.asset = frc.asset
+      )
+    ),
+    reward_destination_changes AS (
+      SELECT asset, block, pub_key, rewards_recipient, rewards_split_data, change_type
+      FROM direct_with_fanout_updates
+      UNION ALL
+      SELECT asset, block, pub_key, rewards_recipient, rewards_split_data, change_type
+      FROM fanout_only_changes
     )
     SELECT
       'entity_reward_destination_changes' as job_name,
-      block_height,
+      block,
       pub_key as solana_address,
       asset,
       JSON_BUILD_OBJECT(
@@ -188,9 +238,9 @@ impl AtomicHotspotQueries {
         'rewards_recipient', rewards_recipient,
         'rewards_split_data', rewards_split_data,
         'change_type', change_type,
-        'block_height', block_height
+        'block', block
       ) as atomic_data
     FROM reward_destination_changes
-    ORDER BY block_height DESC;
+    ORDER BY block DESC;
   "#;
 }

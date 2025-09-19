@@ -38,7 +38,7 @@ impl ProtobufBuilder {
         .map(|obj| obj.keys().collect::<Vec<_>>())
     );
 
-    let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
+    let block = Self::extract_u64(atomic_data, "block").unwrap_or(0);
     let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
 
     let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
@@ -46,7 +46,7 @@ impl ProtobufBuilder {
     let metadata = Self::build_mobile_hotspot_metadata(atomic_data)?;
 
     let change_msg = MobileHotspotChangeV1 {
-      block_height,
+      block,
       timestamp_seconds,
       pub_key: Some(pub_key),
       asset: Some(asset),
@@ -79,7 +79,7 @@ impl ProtobufBuilder {
 
     debug!("Building IoT hotspot update from data: {}", atomic_data);
 
-    let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
+    let block = Self::extract_u64(atomic_data, "block").unwrap_or(0);
     let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
 
     let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
@@ -87,7 +87,7 @@ impl ProtobufBuilder {
     let metadata = Self::build_iot_hotspot_metadata(atomic_data)?;
 
     let change_msg = IotHotspotChangeV1 {
-      block_height,
+      block,
       timestamp_seconds,
       pub_key: Some(pub_key),
       asset: Some(asset),
@@ -118,7 +118,7 @@ impl ProtobufBuilder {
         AtomicDataError::InvalidData("No atomic data found in change record".to_string())
       })?;
 
-    let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
+    let block = Self::extract_u64(atomic_data, "block").unwrap_or(0);
     let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
 
     let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
@@ -126,7 +126,7 @@ impl ProtobufBuilder {
     let owner = Self::build_entity_owner_info(atomic_data)?;
 
     let change_msg = EntityOwnerChangeV1 {
-      block_height,
+      block,
       timestamp_seconds,
       entity_pub_key: Some(entity_pub_key),
       asset: Some(asset),
@@ -157,7 +157,7 @@ impl ProtobufBuilder {
         AtomicDataError::InvalidData("No atomic data found in change record".to_string())
       })?;
 
-    let block_height = Self::extract_u64(atomic_data, "block_height").unwrap_or(0);
+    let block = Self::extract_u64(atomic_data, "block").unwrap_or(0);
     let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
 
     let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
@@ -180,7 +180,7 @@ impl ProtobufBuilder {
       };
 
     let change_msg = EntityRewardDestinationChangeV1 {
-      block_height,
+      block,
       timestamp_seconds,
       entity_pub_key: Some(entity_pub_key),
       asset: Some(asset),

@@ -380,23 +380,17 @@ export const upsertProgramAccounts = async ({
                 existingRecords.map((record) => [record.get("address"), record])
               );
 
-              // Get current block height with retry - fetch once for the entire batch
-              let lastBlockHeight: number | null = null;
+              // Get current slot with retry - fetch once for the entire batch
+              let lastBlock: number | null = null;
               try {
-                lastBlockHeight = await retry(
-                  () => connection.getBlockHeight("confirmed"),
-                  {
-                    retries: 3,
-                    factor: 2,
-                    minTimeout: 1000,
-                    maxTimeout: 5000,
-                  }
-                );
+                lastBlock = await retry(() => connection.getSlot("finalized"), {
+                  retries: 3,
+                  factor: 2,
+                  minTimeout: 1000,
+                  maxTimeout: 5000,
+                });
               } catch (error) {
-                console.warn(
-                  "Failed to fetch block height after retries:",
-                  error
-                );
+                console.warn("Failed to fetch block after retries:", error);
               }
 
               const values = await Promise.all(
@@ -408,7 +402,7 @@ export const upsertProgramAccounts = async ({
                       sanitizedAccount = await plugin.processAccount(
                         { ...sanitizedAccount, address: publicKey },
                         transaction,
-                        lastBlockHeight
+                        lastBlock
                       );
                     }
                   }
@@ -430,13 +424,12 @@ export const upsertProgramAccounts = async ({
                   if (shouldUpdate) {
                     return {
                       ...newRecord,
-                      lastBlockHeight,
+                      lastBlock,
                     };
                   } else {
                     return {
                       ...newRecord,
-                      lastBlockHeight:
-                        existingData?.lastBlockHeight || lastBlockHeight,
+                      lastBlock: existingData?.lastBlock || lastBlock,
                     };
                   }
                 })
@@ -447,7 +440,7 @@ export const upsertProgramAccounts = async ({
                 updateOnDuplicate: [
                   "address",
                   "refreshedAt",
-                  "lastBlockHeight",
+                  "lastBlock",
                   ...updateOnDuplicateFields,
                 ],
               });

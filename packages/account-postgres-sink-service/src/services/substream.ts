@@ -108,22 +108,19 @@ export const setupSubstream = async (
       await Cursor.sync({ alter: true });
       const cursor = await cursorManager.checkStaleness();
       cursorManager.startStalenessCheck();
-
       console.log("Connected to Substream");
-      const currentBlock = await provider.connection.getBlockHeight(
-        "finalized"
-      );
+      const startBlock = await provider.connection.getSlot("finalized");
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
         productionMode: PRODUCTION,
-        startBlockNum: cursor ? undefined : currentBlock,
+        startBlockNum: cursor ? undefined : startBlock,
         startCursor: cursor,
       });
 
       console.log(
         `Substream: Streaming from ${
-          cursor ? `cursor ${cursor}` : `block ${currentBlock}`
+          cursor ? `cursor ${cursor}` : `block ${startBlock}`
         }`
       );
 
@@ -143,8 +140,9 @@ export const setupSubstream = async (
 
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
-          const blockHeight =
-            message.value.finalBlockHeight?.toString() || "unknown";
+          const block = message.value.finalBlockHeight
+            ? Number(message.value.finalBlockHeight)
+            : null;
 
           const hasAccountChanges =
             output !== undefined &&
@@ -194,6 +192,7 @@ export const setupSubstream = async (
                     isDelete: deleted,
                     pluginsByAccountType:
                       pluginsByAccountTypeByProgram[ownerStr] || {},
+                    block,
                   });
                 }
               );
@@ -204,7 +203,7 @@ export const setupSubstream = async (
 
           await cursorManager.updateCursor({
             cursor,
-            blockHeight,
+            block: block?.toString() || "unknown",
             force: hasAccountChanges,
           });
         }

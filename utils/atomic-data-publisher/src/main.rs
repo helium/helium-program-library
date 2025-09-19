@@ -6,7 +6,6 @@ mod protobuf;
 mod publisher;
 mod queries;
 mod service;
-mod solana;
 
 use anyhow::Result;
 use config::{LoggingConfig, Settings};
@@ -143,15 +142,6 @@ fn validate_config(settings: &Settings) -> Result<()> {
     return Err(anyhow::anyhow!(
       "No required tables specified in configuration"
     ));
-  }
-
-  // Validate Solana RPC configuration
-  if settings.solana.rpc_url.is_empty() {
-    return Err(anyhow::anyhow!("Solana RPC URL cannot be empty"));
-  }
-
-  if settings.solana.timeout_seconds == 0 {
-    return Err(anyhow::anyhow!("Solana timeout must be greater than 0"));
   }
 
   // Validate polling jobs

@@ -24,6 +24,7 @@ interface HandleAccountWebhookArgs {
   isDelete?: boolean;
   sequelize?: Sequelize;
   pluginsByAccountType: Record<string, IInitedPlugin[]>;
+  block?: number | null;
 }
 
 export const handleAccountWebhook = async ({
@@ -34,6 +35,7 @@ export const handleAccountWebhook = async ({
   sequelize = database,
   pluginsByAccountType,
   isDelete = false,
+  block,
 }: HandleAccountWebhookArgs) => {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
@@ -109,14 +111,14 @@ export const handleAccountWebhook = async ({
 
       let sanitized = sanitizeAccount(decodedAcc);
 
-      // Fetch block height once if there are plugins that might need it
-      let lastBlockHeight: number | null = null;
+      // Use provided block or fetch from RPC if not available
+      let lastBlock: number | null = block ?? null;
       const hasPlugins = (pluginsByAccountType[accName] || []).length > 0;
 
-      if (hasPlugins) {
+      if (hasPlugins && lastBlock === null) {
         try {
-          lastBlockHeight = await retry(
-            () => provider.connection.getBlockHeight("confirmed"),
+          lastBlock = await retry(
+            () => provider.connection.getSlot("finalized"),
             {
               retries: 3,
               factor: 2,
@@ -125,7 +127,7 @@ export const handleAccountWebhook = async ({
             }
           );
         } catch (error) {
-          console.warn("Failed to fetch block height for plugins:", error);
+          console.warn("Failed to fetch block for plugins:", error);
         }
       }
 
@@ -135,7 +137,7 @@ export const handleAccountWebhook = async ({
             sanitized = await plugin.processAccount(
               { address: account.pubkey, ...sanitized },
               t,
-              lastBlockHeight
+              lastBlock
             );
           } catch (err) {
             console.log(
@@ -160,11 +162,11 @@ export const handleAccountWebhook = async ({
       );
 
       if (shouldUpdate) {
-        // Use the block height we already fetched for plugins, or fetch it now if we haven't
-        if (lastBlockHeight === null) {
+        // Use the block we already have, or fetch it now if we haven't and it wasn't provided
+        if (lastBlock === null) {
           try {
-            lastBlockHeight = await retry(
-              () => provider.connection.getBlockHeight("confirmed"),
+            lastBlock = await retry(
+              () => provider.connection.getSlot("finalized"),
               {
                 retries: 3,
                 factor: 2,
@@ -173,14 +175,14 @@ export const handleAccountWebhook = async ({
               }
             );
           } catch (error) {
-            console.warn("Failed to fetch block height after retries:", error);
+            console.warn("Failed to fetch block after retries:", error);
           }
         }
 
         await model.upsert(
           {
             ...sanitized,
-            lastBlockHeight,
+            lastBlock,
           },
           { transaction: t }
         );

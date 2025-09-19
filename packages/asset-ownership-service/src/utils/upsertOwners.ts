@@ -24,21 +24,18 @@ export const upsertOwners = async ({
 
   console.log(`Processing ${assetPks.length} assets for ownership updates`);
 
-  // Get current block height once for all batches
-  let lastBlockHeight: number | null = null;
+  // Get current block once for all batches
+  let lastBlock: number | null = null;
   try {
-    lastBlockHeight = await retry(
-      () => provider.connection.getBlockHeight("confirmed"),
-      {
-        retries: 3,
-        factor: 2,
-        minTimeout: 1000,
-        maxTimeout: 5000,
-      }
-    );
-    console.log(`Using block height: ${lastBlockHeight}`);
+    lastBlock = await retry(() => provider.connection.getSlot("finalized"), {
+      retries: 3,
+      factor: 2,
+      minTimeout: 1000,
+      maxTimeout: 5000,
+    });
+    console.log(`Using block: ${lastBlock}`);
   } catch (error) {
-    console.warn("Failed to fetch block height after retries:", error);
+    console.warn("Failed to fetch block after retries:", error);
   }
 
   const batchSize = 1000;
@@ -60,7 +57,7 @@ export const upsertOwners = async ({
             .map(({ id, ownership }) => ({
               asset: id.toBase58(),
               owner: ownership.owner.toBase58(),
-              lastBlockHeight,
+              lastBlock,
             }));
 
           const transaction = await sequelize.transaction({
@@ -70,7 +67,7 @@ export const upsertOwners = async ({
           try {
             await AssetOwner.bulkCreate(assetsWithOwner, {
               transaction,
-              updateOnDuplicate: ["asset", "owner", "lastBlockHeight"],
+              updateOnDuplicate: ["asset", "owner", "lastBlock"],
             });
 
             await transaction.commit();

@@ -4,7 +4,7 @@ Rust service that polls PostgreSQL for hotspot data changes and publishes them t
 
 ## What it does
 
-- Polls PostgreSQL tables for entity data changes using block height tracking
+- Polls PostgreSQL tables for entity data changes using block tracking
 - Constructs atomic entity data payloads for different change types:
   - **Hotspot metadata changes** (location, device info, etc.)
   - **Entity ownership changes** (NFT ownership transfers)

@@ -5,7 +5,6 @@ use std::time::Duration;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
   pub database: DatabaseConfig,
-  pub solana: SolanaConfig,
   pub service: ServiceConfig,
   pub ingestor: IngestorConfig,
   pub logging: LoggingConfig,
@@ -25,12 +24,6 @@ pub struct DatabaseConfig {
   pub idle_timeout_seconds: u64,
   pub max_lifetime_seconds: u64,
   pub required_tables: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct SolanaConfig {
-  pub rpc_url: String,
-  pub timeout_seconds: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -107,10 +100,6 @@ impl Default for Settings {
         idle_timeout_seconds: 600,
         max_lifetime_seconds: 1800,
         required_tables: vec![],
-      },
-      solana: SolanaConfig {
-        rpc_url: "https://api.mainnet-beta.solana.com".to_string(),
-        timeout_seconds: 30,
       },
       service: ServiceConfig {
         polling_interval_seconds: 10,

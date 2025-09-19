@@ -10,16 +10,13 @@ use crate::database::DatabaseClient;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
 use crate::publisher::AtomicDataPublisher as Publisher;
-use crate::solana::SolanaClientWrapper;
 
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
   database: Arc<DatabaseClient>,
   publisher: Arc<Publisher>,
-  solana_client: Arc<SolanaClientWrapper>,
   metrics: Arc<MetricsCollector>,
   config: Settings,
-  current_solana_block_height: Arc<tokio::sync::RwLock<u64>>,
   shutdown_signal: tokio::sync::watch::Receiver<bool>,
   pub shutdown_sender: tokio::sync::watch::Sender<bool>,
 }
@@ -48,16 +45,8 @@ impl AtomicDataPublisher {
 
   pub async fn new(config: Settings) -> Result<Self> {
     info!("Initializing Atomic Data Publisher service");
-    let solana_client = Arc::new(SolanaClientWrapper::new(config.solana.clone())?);
-    let initial_block_height = solana_client
-      .get_current_block_height()
-      .await
-      .map_err(|e| anyhow::anyhow!("Failed to get initial Solana block height: {}", e))?;
-    let current_solana_block_height = Arc::new(tokio::sync::RwLock::new(initial_block_height));
-
 
     let metrics = Arc::new(MetricsCollector::new()?);
-
 
     let database = Arc::new(
       DatabaseClient::new_with_metrics(
@@ -67,12 +56,10 @@ impl AtomicDataPublisher {
       ).await?,
     );
 
-
     Self::validate_tables(&database, &config.database.required_tables).await?;
     Self::init_database(&database, &config.service).await?;
     database.init_polling_state().await?;
     database.cleanup_stale_jobs().await?;
-
 
     let keypair_path = config.signing.keypair_path.clone();
     let keypair_data = if std::path::Path::new(&keypair_path).exists() {
@@ -102,10 +89,8 @@ impl AtomicDataPublisher {
     Ok(Self {
       database,
       publisher,
-      solana_client,
       metrics,
       config,
-      current_solana_block_height,
       shutdown_signal,
       shutdown_sender,
     })
@@ -135,6 +120,7 @@ impl AtomicDataPublisher {
         service.polling_loop().await;
       })
     };
+
     handles.push(polling_handle);
 
     // Health check loop
@@ -211,32 +197,6 @@ impl AtomicDataPublisher {
       return Ok(());
     }
 
-    let current_solana_height = match self.solana_client.get_current_block_height().await {
-      Ok(height) => {
-        {
-          let mut cached_height = self.current_solana_block_height.write().await;
-          if *cached_height != height {
-            debug!(
-              "Updated Solana block height from {} to {} (cycle start)",
-              *cached_height, height
-            );
-            *cached_height = height;
-          }
-        }
-        height
-      }
-      Err(e) => {
-        error!("Failed to get current Solana block height: {}", e);
-        // Fall back to cached height as emergency measure
-        let height = self.current_solana_block_height.read().await;
-        warn!(
-          "Using cached Solana block height {} due to RPC failure",
-          *height
-        );
-        *height
-      }
-    };
-
     let mut total_jobs_processed = 0;
     let mut total_changes_published = 0;
     let mut total_changes_failed = 0;
@@ -244,11 +204,11 @@ impl AtomicDataPublisher {
     loop {
       let changes_and_job = self
         .database
-        .get_pending_changes(current_solana_height)
+        .get_pending_changes()
         .await?;
 
-      let (changes, active_job_context, target_height) = match changes_and_job {
-        Some((changes, job_context, target_height)) => (changes, Some(job_context), target_height),
+      let (changes, active_job_context, target_block) = match changes_and_job {
+        Some((changes, job_context, target_block)) => (changes, Some(job_context), target_block),
         None => {
           debug!(
             "No more jobs in queue, processed {} jobs total",
@@ -267,13 +227,13 @@ impl AtomicDataPublisher {
       if changes.is_empty() {
         debug!(
           "No changes found for job '{}', advancing to block {}",
-          job_name, target_height
+          job_name, target_block
         );
         if let Some((job_name, query_name)) = active_job_context {
           let empty_changes = vec![];
           self
             .database
-            .mark_processed(&empty_changes, target_height)
+            .mark_processed(&empty_changes, target_block)
             .await?;
           self
             .database
@@ -292,7 +252,7 @@ impl AtomicDataPublisher {
       );
 
       let (job_published, job_failed, should_break) = self
-        .process_job_changes(changes, active_job_context, target_height)
+        .process_job_changes(changes, active_job_context, target_block)
         .await?;
       total_changes_published += job_published;
       total_changes_failed += job_failed;
@@ -316,7 +276,7 @@ impl AtomicDataPublisher {
     &self,
     changes: Vec<crate::database::ChangeRecord>,
     active_job_context: Option<(String, String)>,
-    target_height: u64,
+    target_block: u64,
   ) -> Result<(usize, usize, bool), AtomicDataError> {
     let mut total_published = 0;
     let mut total_failed = 0;
@@ -390,17 +350,17 @@ impl AtomicDataPublisher {
       if failed_changes.is_empty() && !published_changes.is_empty() {
         match self
           .database
-          .mark_processed(&published_changes, target_height)
+          .mark_processed(&published_changes, target_block)
           .await
         {
           Ok(_) => {
             total_published += published_changes.len();
             let batch_time = batch_start.elapsed();
             info!(
-              "Batch processing completed in {:?}: {} published, 0 failed. Advanced to block height {}",
+              "Batch processing completed in {:?}: {} published, 0 failed. Advanced to block {}",
               batch_time,
               published_changes.len(),
-              target_height
+              target_block
             );
           }
           Err(e) => {
@@ -422,10 +382,10 @@ impl AtomicDataPublisher {
           }
         }
       } else if !failed_changes.is_empty() {
-        // Some or all changes failed - do not advance block height, retry same range next poll
+        // Some or all changes failed - do not advance block, retry same range next poll
         let batch_time = batch_start.elapsed();
         warn!(
-          "Batch processing completed in {:?}: {} published, {} failed. Not advancing block height - will retry same range",
+          "Batch processing completed in {:?}: {} published, {} failed. Not advancing block - will retry same range",
           batch_time,
           published_changes.len(),
           failed_changes.len()
@@ -501,11 +461,6 @@ impl AtomicDataPublisher {
 
     if let Err(e) = self.publisher.health_check().await {
       error!("Publisher health check failed: {}", e);
-      return Err(e);
-    }
-
-    if let Err(e) = self.solana_client.health_check().await {
-      error!("Solana RPC health check failed: {}", e);
       return Err(e);
     }
 

@@ -63,7 +63,7 @@ RewardsRecipient.init(
       type: DataTypes.STRING,
       allowNull: false,
     },
-    lastBlockHeight: {
+    lastBlock: {
       type: DataTypes.DECIMAL.UNSIGNED,
       allowNull: true,
       defaultValue: null,
@@ -87,6 +87,18 @@ RewardsRecipient.init(
       },
       {
         fields: ["type"],
+      },
+      {
+        fields: ["last_block"],
+      },
+      {
+        fields: ["encoded_entity_key"],
+      },
+      {
+        fields: ["asset", "last_block"],
+      },
+      {
+        fields: ["type", "last_block"],
       },
     ],
   }
@@ -271,7 +283,7 @@ export async function handleMiniFanout(
   asset: string,
   account: { [key: string]: any },
   transaction: any,
-  lastBlockHeight?: number | null
+  lastBlock?: number | null
 ) {
   const prevAccount = await MiniFanout.findByPk(account.address, {
     transaction,
@@ -338,7 +350,7 @@ export async function handleMiniFanout(
       encodedEntityKey: kta?.encodedEntityKey,
       keySerialization: kta?.keySerialization,
       type: "fanout",
-      lastBlockHeight,
+      lastBlock,
     };
 
     await RewardsRecipient.upsert(toCreate, { transaction });
@@ -378,7 +390,7 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
     const processAccount = async (
       account: { [key: string]: any },
       transaction?: any,
-      lastBlockHeight?: number | null
+      lastBlock?: number | null
     ) => {
       try {
         const asset = account.preTask?.remoteV0?.url
@@ -400,7 +412,7 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
         if (!recipient) {
           return account;
         }
-        return handleMiniFanout(asset, account, transaction, lastBlockHeight);
+        return handleMiniFanout(asset, account, transaction, lastBlock);
       } catch (err) {
         console.error("Error exploding mini fanout ownership", err);
         throw err;

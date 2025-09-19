@@ -47,12 +47,6 @@ if (PG_POOL_SIZE < 5) {
     await server.register(metrics);
     await ensureTables({ sequelize: database });
     await database.sync({ alter: true });
-    await database.query(
-      "CREATE INDEX IF NOT EXISTS idx_assest_owner_asset ON asset_owners(asset);"
-    );
-    await database.query(
-      "CREATE INDEX IF NOT EXISTS idx_asset_owners_asset_block_height ON asset_owners (asset, last_block_height);"
-    );
 
     server.get("/refresh-owners", async (req, res) => {
       const { password } = req.query as any;
@@ -129,7 +123,8 @@ if (PG_POOL_SIZE < 5) {
                   })),
                 })),
               },
-              dbTx
+              dbTx,
+              tx.slot
             );
 
             await dbTx.commit();

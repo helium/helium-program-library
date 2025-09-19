@@ -65,19 +65,16 @@ export class TransactionProcessor {
     ]);
   }
 
-  private async getCurrentBlockHeight(): Promise<number | null> {
+  private async getCurrentblock(): Promise<number | null> {
     try {
-      return await retry(
-        () => provider.connection.getBlockHeight("confirmed"),
-        {
-          retries: 3,
-          factor: 2,
-          minTimeout: 1000,
-          maxTimeout: 5000,
-        }
-      );
+      return await retry(() => provider.connection.getSlot("finalized"), {
+        retries: 3,
+        factor: 2,
+        minTimeout: 1000,
+        maxTimeout: 5000,
+      });
     } catch (error) {
-      console.warn("Failed to fetch block height after retries:", error);
+      console.warn("Failed to fetch block after retries:", error);
       return null;
     }
   }
@@ -134,7 +131,8 @@ export class TransactionProcessor {
   private async processInstruction(
     instruction: ProcessableInstruction,
     tx: ProcessableTransaction,
-    transaction: Transaction
+    transaction: Transaction,
+    block?: number | null
   ): Promise<{ updatedTrees: boolean }> {
     const programId = new PublicKey(tx.accountKeys[instruction.programIdIndex]);
     const instructionCoder = this.coders[programId.toBase58()];
@@ -214,12 +212,12 @@ export class TransactionProcessor {
           );
 
           if (keyToAsset) {
-            const lastBlockHeight = await this.getCurrentBlockHeight();
+            const lastBlock = block ?? (await this.getCurrentblock());
             await AssetOwner.upsert(
               {
                 asset: keyToAsset.asset.toBase58(),
                 owner: recipientAccount.toBase58(),
-                lastBlockHeight,
+                lastBlock,
               },
               { transaction }
             );
@@ -248,12 +246,12 @@ export class TransactionProcessor {
             BUBBLEGUM_PROGRAM_ID
           );
 
-          const lastBlockHeight = await this.getCurrentBlockHeight();
+          const lastBlock = block ?? (await this.getCurrentblock());
           await AssetOwner.upsert(
             {
               asset: assetId.toBase58(),
               owner: newOwnerAccount.toBase58(),
-              lastBlockHeight,
+              lastBlock,
             },
             { transaction }
           );
@@ -267,14 +265,16 @@ export class TransactionProcessor {
 
   async processTransaction(
     tx: ProcessableTransaction,
-    transaction: Transaction
+    transaction: Transaction,
+    block?: number | null
   ): Promise<{ updatedTrees: boolean }> {
     // Process main instructions
     for (const instruction of tx.instructions) {
       const { updatedTrees } = await this.processInstruction(
         instruction,
         tx,
-        transaction
+        transaction,
+        block
       );
       if (updatedTrees) {
         return { updatedTrees: true };
@@ -288,7 +288,8 @@ export class TransactionProcessor {
           const { updatedTrees } = await this.processInstruction(
             instruction,
             tx,
-            transaction
+            transaction,
+            block
           );
           if (updatedTrees) {
             return { updatedTrees: true };

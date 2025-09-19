@@ -97,7 +97,7 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
     const processAccount = async (
       account: { [key: string]: any },
       transaction?: any,
-      lastBlockHeight?: number | null
+      lastBlock?: number | null
     ) => {
       let reverseGeod: ReverseGeoCache | null = null;
       const location = account[camelize(config.field || "location", true)];

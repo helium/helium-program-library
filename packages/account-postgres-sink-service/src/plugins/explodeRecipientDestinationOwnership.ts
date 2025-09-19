@@ -19,7 +19,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
     const processAccount = async (
       account: { [key: string]: any },
       transaction?: any,
-      lastBlockHeight?: number | null
+      lastBlock?: number | null
     ) => {
       try {
         const prevAccount = await Recipient.findByPk(account.address, {
@@ -60,7 +60,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
               account.asset,
               newMiniFanout,
               transaction,
-              lastBlockHeight
+              lastBlock
             );
             return account;
           }
@@ -88,7 +88,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
                 encodedEntityKey: kta.encodedEntityKey,
                 keySerialization: kta.keySerialization,
                 type: "direct",
-                lastBlockHeight,
+                lastBlock,
               },
               { transaction }
             );
