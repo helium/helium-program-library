@@ -277,16 +277,13 @@ impl DatabaseClient {
       scaled_chunk.clamp(1000, 100_000_000) // Min 1k blocks, max 100M blocks
     };
 
-    // Calculate target block using table data availability
     let target_block = std::cmp::min(
       last_processed_block as u64 + chunk_size,
       max_available_block,
     );
 
-    // Different queries have different parameter patterns
     let query_start = std::time::Instant::now();
     let rows = if job.query_name == "construct_atomic_hotspots" {
-      // Extract hotspot_type from parameters for hotspot queries
       let hotspot_type = job
         .parameters
         .get("hotspot_type")
@@ -305,7 +302,6 @@ impl DatabaseClient {
         .fetch_all(&self.pool)
         .await?
     } else {
-      // Entity ownership and reward destination queries don't need hotspot_type
       info!(
         "Querying job '{}' with query '{}', processing blocks {} to {} ({} blocks, max_available={})",
         job.name, job.query_name, last_processed_block, target_block, target_block - last_processed_block as u64, max_available_block
