@@ -81,8 +81,9 @@ Cursor.init(
       primaryKey: true,
       unique: true,
     },
-    blockHeight: {
+    block: {
       type: STRING,
+      field: "block_height",
     },
   },
   {

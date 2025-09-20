@@ -1,11 +1,8 @@
-import BN from "bn.js";
-import { cellToLatLng } from "h3-js";
 import { camelize } from "inflection";
 import _omit from "lodash/omit";
 import { DataTypes, Model, QueryTypes } from "sequelize";
 import { IPlugin } from "../types";
 import { database } from "../utils/database";
-import { MapboxService } from "../utils/mapboxService";
 import { PublicKey } from "@solana/web3.js";
 
 export class RewardsRecipient extends Model {
@@ -16,10 +13,10 @@ export class RewardsRecipient extends Model {
   declare destination: string;
   declare entityKey: string;
   declare encodedEntityKey: string;
-  declare shares: number
-  declare totalShares: number
-  declare fixedAmount: number
-  declare type: 'direct' | 'fanout'
+  declare shares: number;
+  declare totalShares: number;
+  declare fixedAmount: number;
+  declare type: "direct" | "fanout";
 }
 
 RewardsRecipient.init(
@@ -47,7 +44,7 @@ RewardsRecipient.init(
       field: "encoded_entity_key",
     },
     keySerialization: {
-      type: DataTypes.STRING,
+      type: DataTypes.JSONB,
       allowNull: false,
     },
     shares: {
@@ -65,6 +62,11 @@ RewardsRecipient.init(
     type: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    lastBlock: {
+      type: DataTypes.DECIMAL.UNSIGNED,
+      allowNull: true,
+      defaultValue: null,
     },
   },
   {
@@ -86,28 +88,40 @@ RewardsRecipient.init(
       {
         fields: ["type"],
       },
+      {
+        fields: ["last_block"],
+      },
+      {
+        fields: ["encoded_entity_key"],
+      },
+      {
+        fields: ["asset", "last_block"],
+      },
+      {
+        fields: ["type", "last_block"],
+      },
     ],
   }
 );
 
 type MiniFanoutShare = {
-  wallet: string,
-  delegate: string,
-  share: Share,
-  totalDust: number,
-  totalOwed: number,
-}
+  wallet: string;
+  delegate: string;
+  share: Share;
+  totalDust: number;
+  totalOwed: number;
+};
 
 type Share = {
-  share?: { amount: number },
-  fixed?: { amount: number },
-}
+  share?: { amount: number };
+  fixed?: { amount: number };
+};
 
 export class Recipient extends Model {
-  declare address: string
-  declare asset: string
-  declare destination: string
-  declare lazyDistributor: string
+  declare address: string;
+  declare asset: string;
+  declare destination: string;
+  declare lazyDistributor: string;
 }
 
 Recipient.init(
@@ -133,15 +147,15 @@ Recipient.init(
     underscored: true,
     timestamps: false,
   }
-)
+);
 
 export class KeyToAsset extends Model {
-  declare address: string
-  declare asset: string
-  declare dao: string
-  declare entityKey: Buffer
-  declare keySerialization: string
-  declare encodedEntityKey: string
+  declare address: string;
+  declare asset: string;
+  declare dao: string;
+  declare entityKey: Buffer;
+  declare keySerialization: string;
+  declare encodedEntityKey: string;
 }
 
 KeyToAsset.init(
@@ -157,7 +171,7 @@ KeyToAsset.init(
       type: DataTypes.STRING,
     },
     keySerialization: {
-      type: DataTypes.STRING,
+      type: DataTypes.JSONB,
     },
     entityKey: {
       type: "BYTEA",
@@ -177,7 +191,7 @@ KeyToAsset.init(
     underscored: true,
     timestamps: false,
   }
-)
+);
 
 export class MiniFanout extends Model {
   declare owner: string;
@@ -262,29 +276,44 @@ MiniFanout.init(
   }
 );
 
-export const HNT_LAZY_DISTRIBUTOR = "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq"
+export const HNT_LAZY_DISTRIBUTOR =
+  "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq";
 
-export async function handleMiniFanout(asset: string, account: { [key: string]: any }, transaction: any) {
-  const prevAccount = await MiniFanout.findByPk(account.address, { transaction })
-  const oldShares = prevAccount?.shares || []
-  const newShares = (account.shares || []) as MiniFanoutShare[]
+export async function handleMiniFanout(
+  asset: string,
+  account: { [key: string]: any },
+  transaction: any,
+  lastBlock?: number | null
+) {
+  const prevAccount = await MiniFanout.findByPk(account.address, {
+    transaction,
+  });
+  const oldShares = prevAccount?.shares || [];
+  const newShares = (account.shares || []) as MiniFanoutShare[];
 
   function getEffectiveDestination(share: MiniFanoutShare) {
-    return (!share.delegate || share.delegate === PublicKey.default.toBase58()) ? share.wallet : share.delegate
+    return !share.delegate || share.delegate === PublicKey.default.toBase58()
+      ? share.wallet
+      : share.delegate;
   }
 
   function getShareKey(share: MiniFanoutShare) {
-    return `${asset}-${getEffectiveDestination(share)}-${JSON.stringify(share.share)}`
+    return `${asset}-${getEffectiveDestination(share)}-${JSON.stringify(
+      share.share
+    )}`;
   }
   // Create a map of wallet+delegate to share for easy lookup
   const oldSharesMap = new Map(
-    oldShares.map(share => [getShareKey(share), share])
-  )
+    oldShares.map((share) => [getShareKey(share), share])
+  );
   const newSharesMap = new Map(
-    newShares.map(share => [getShareKey(share), share])
-  )
+    newShares.map((share) => [getShareKey(share), share])
+  );
 
-  const totalShares = newShares.reduce((acc, share) => acc + (share.share?.share?.amount || 0), 0)
+  const totalShares = newShares.reduce(
+    (acc, share) => acc + (share.share?.share?.amount || 0),
+    0
+  );
 
   // Handle deletions - remove shares that exist in old but not in new
   for (const [key, oldShare] of oldSharesMap) {
@@ -295,8 +324,8 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
           asset,
           shares: oldShare.share?.share?.amount || 0,
         },
-        transaction
-      })
+        transaction,
+      });
     }
   }
 
@@ -304,11 +333,11 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
   for (const [key, newShare] of newSharesMap) {
     const kta = await KeyToAsset.findOne({
       where: {
-        dao: 'BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie',
+        dao: "BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie",
         asset: asset,
       },
-      transaction
-    })
+      transaction,
+    });
 
     const toCreate = {
       asset,
@@ -320,20 +349,20 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
       entityKey: kta?.entityKey,
       encodedEntityKey: kta?.encodedEntityKey,
       keySerialization: kta?.keySerialization,
-      type: 'fanout'
-    }
+      type: "fanout",
+      lastBlock,
+    };
 
-    await RewardsRecipient.upsert(toCreate, { transaction })
+    await RewardsRecipient.upsert(toCreate, { transaction });
   }
 
-  return account
+  return account;
 }
 
 export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
   const name = "ExplodeMiniFanoutOwnership";
   const init = async (config: { [key: string]: any }) => {
     const updateOnDuplicateFields: string[] = [];
-
     const existingColumns = (
       await database.query(
         `
@@ -356,31 +385,37 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
       await RewardsRecipient.sync({ alter: true });
     }
 
-    const addFields = () => { };
+    const addFields = () => {};
 
     const processAccount = async (
       account: { [key: string]: any },
-      transaction?: any
+      transaction?: any,
+      lastBlock?: number | null
     ) => {
       try {
-        const asset = account.preTask?.remoteV0?.url?.replace("https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/", "").replace("https://hnt-rewards.oracle.test-helium.com/v1/tuktuk/asset/", "")
+        const asset = account.preTask?.remoteV0?.url
+          ?.replace("https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/", "")
+          .replace(
+            "https://hnt-rewards.oracle.test-helium.com/v1/tuktuk/asset/",
+            ""
+          );
         if (!asset) {
-          return account
+          return account;
         }
         const recipient = await Recipient.findOne({
           where: {
             destination: account.address,
             asset,
-            lazyDistributor: HNT_LAZY_DISTRIBUTOR
-          }
-        })
+            lazyDistributor: HNT_LAZY_DISTRIBUTOR,
+          },
+        });
         if (!recipient) {
-          return account
+          return account;
         }
-        return handleMiniFanout(asset, account, transaction)
+        return handleMiniFanout(asset, account, transaction, lastBlock);
       } catch (err) {
-        console.error("Error exploding mini fanout ownership", err)
-        throw err
+        console.error("Error exploding mini fanout ownership", err);
+        throw err;
       }
     };
 

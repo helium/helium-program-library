@@ -179,8 +179,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
-          const blockHeight =
-            message.value.finalBlockHeight?.toString() || "unknown";
+          const block = message.value.finalBlockHeight
+            ? Number(message.value.finalBlockHeight)
+            : null;
 
           const hasTransactions =
             output !== undefined &&
@@ -225,21 +226,28 @@ export const setupSubstream = async (server: FastifyInstance) => {
                       ...(accountKeysFromLookups?.readonly || []),
                     ];
 
-                    const { updatedTrees } = await processor.processTransaction({
-                      accountKeys,
-                      instructions: message.compiledInstructions,
-                      innerInstructions:
-                        transactionInfo.meta.innerInstructions?.map(
-                          (inner) => ({
-                            index: inner.index,
-                            instructions: inner.instructions.map((ix) => ({
-                              programIdIndex: ix.programIdIndex,
-                              accountKeyIndexes: Buffer.from(ix.accounts, "base64").toJSON().data,
-                              data: Buffer.from(ix.data, "base64"),
-                            })),
-                          })
-                        ),
-                    }, dbTx);
+                    const { updatedTrees } = await processor.processTransaction(
+                      {
+                        accountKeys,
+                        instructions: message.compiledInstructions,
+                        innerInstructions:
+                          transactionInfo.meta.innerInstructions?.map(
+                            (inner) => ({
+                              index: inner.index,
+                              instructions: inner.instructions.map((ix) => ({
+                                programIdIndex: ix.programIdIndex,
+                                accountKeyIndexes: Buffer.from(
+                                  ix.accounts,
+                                  "base64"
+                                ).toJSON().data,
+                                data: Buffer.from(ix.data, "base64"),
+                              })),
+                            })
+                          ),
+                      },
+                      dbTx,
+                      block
+                    );
 
                     if (updatedTrees) {
                       console.log("Trees updated");
@@ -247,7 +255,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
                       restartCursor = cursor;
                       await cursorManager.updateCursor({
                         cursor,
-                        blockHeight,
+                        block: block?.toString() || "unknown",
                         force: true,
                       });
                     }
@@ -264,7 +272,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
           await cursorManager.updateCursor({
             cursor,
-            blockHeight,
+            block: block?.toString() || "unknown",
             force: hasFilteredTransactions,
           });
         }

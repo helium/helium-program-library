@@ -11,6 +11,7 @@ import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
 import { OMIT_KEYS } from "../constants";
 import { lowerFirstChar } from "@helium/spl-utils";
+import retry from "async-retry";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
@@ -23,6 +24,7 @@ interface HandleAccountWebhookArgs {
   isDelete?: boolean;
   sequelize?: Sequelize;
   pluginsByAccountType: Record<string, IInitedPlugin[]>;
+  block?: number | null;
 }
 
 export const handleAccountWebhook = async ({
@@ -33,6 +35,7 @@ export const handleAccountWebhook = async ({
   sequelize = database,
   pluginsByAccountType,
   isDelete = false,
+  block,
 }: HandleAccountWebhookArgs) => {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
@@ -108,10 +111,34 @@ export const handleAccountWebhook = async ({
 
       let sanitized = sanitizeAccount(decodedAcc);
 
+      // Use provided block or fetch from RPC if not available
+      let lastBlock: number | null = block ?? null;
+      const hasPlugins = (pluginsByAccountType[accName] || []).length > 0;
+
+      if (hasPlugins && lastBlock === null) {
+        try {
+          lastBlock = await retry(
+            () => provider.connection.getSlot("finalized"),
+            {
+              retries: 3,
+              factor: 2,
+              minTimeout: 1000,
+              maxTimeout: 5000,
+            }
+          );
+        } catch (error) {
+          console.warn("Failed to fetch block for plugins:", error);
+        }
+      }
+
       for (const plugin of pluginsByAccountType[accName] || []) {
         if (plugin?.processAccount) {
           try {
-            sanitized = await plugin.processAccount({ address: account.pubkey, ...sanitized }, t);
+            sanitized = await plugin.processAccount(
+              { address: account.pubkey, ...sanitized },
+              t,
+              lastBlock
+            );
           } catch (err) {
             console.log(
               `Plugin processing failed for account ${account.pubkey}`,
@@ -124,7 +151,7 @@ export const handleAccountWebhook = async ({
       }
 
       sanitized = {
-        refreshed_at: new Date().toISOString(),
+        refreshedAt: new Date().toISOString(),
         address: account.pubkey,
         ...sanitized,
       };
@@ -135,7 +162,30 @@ export const handleAccountWebhook = async ({
       );
 
       if (shouldUpdate) {
-        await model.upsert({ ...sanitized }, { transaction: t });
+        // Use the block we already have, or fetch it now if we haven't and it wasn't provided
+        if (lastBlock === null) {
+          try {
+            lastBlock = await retry(
+              () => provider.connection.getSlot("finalized"),
+              {
+                retries: 3,
+                factor: 2,
+                minTimeout: 1000,
+                maxTimeout: 5000,
+              }
+            );
+          } catch (error) {
+            console.warn("Failed to fetch block after retries:", error);
+          }
+        }
+
+        await model.upsert(
+          {
+            ...sanitized,
+            lastBlock,
+          },
+          { transaction: t }
+        );
       }
 
       await t.commit();
