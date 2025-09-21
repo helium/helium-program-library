@@ -6,8 +6,13 @@ use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 use tracing::{debug, info, warn};
 
 use crate::config::{DatabaseConfig, PollingJob};
+use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
 use std::sync::Arc;
+
+const MIN_CHUNK_SIZE: u64 = 1000;
+const MAX_CHUNK_SIZE: u64 = 100_000_000;
+const DEFAULT_CHUNK_PERCENTAGE: f64 = 0.10;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
@@ -28,6 +33,8 @@ impl DatabaseClient {
     polling_jobs: Vec<PollingJob>,
     metrics: Option<Arc<MetricsCollector>>
   ) -> Result<Self> {
+    Self::validate_database_config(config)?;
+    Self::validate_polling_jobs(&polling_jobs)?;
     let database_url = format!(
       "postgres://{}:{}@{}:{}/{}",
       config.username, config.password, config.host, config.port, config.database_name
@@ -52,6 +59,57 @@ impl DatabaseClient {
     );
 
     Ok(Self { pool, polling_jobs, metrics })
+  }
+
+  fn validate_database_config(config: &DatabaseConfig) -> Result<()> {
+    if config.host.is_empty() {
+      anyhow::bail!("Database host cannot be empty");
+    }
+    if config.username.is_empty() {
+      anyhow::bail!("Database username cannot be empty");
+    }
+    if config.database_name.is_empty() {
+      anyhow::bail!("Database name cannot be empty");
+    }
+    if config.port == 0 {
+      anyhow::bail!("Database port cannot be zero");
+    }
+    if config.max_connections == 0 {
+      anyhow::bail!("Database max_connections must be greater than 0");
+    }
+    if config.max_connections < config.min_connections {
+      anyhow::bail!("Database max_connections ({}) must be >= min_connections ({})",
+                   config.max_connections, config.min_connections);
+    }
+    Ok(())
+  }
+
+  fn validate_polling_jobs(jobs: &[PollingJob]) -> Result<()> {
+    if jobs.is_empty() {
+      warn!("No polling jobs configured - service will not process any changes");
+      return Ok(());
+    }
+
+    for (index, job) in jobs.iter().enumerate() {
+      if job.name.is_empty() {
+        anyhow::bail!("Job {}: name cannot be empty", index);
+      }
+      if job.query_name.is_empty() {
+        anyhow::bail!("Job '{}' (index {}): query_name cannot be empty", job.name, index);
+      }
+      if !job.parameters.is_object() {
+        anyhow::bail!("Job '{}' (index {}): parameters must be a valid JSON object", job.name, index);
+      }
+
+      if job.query_name == "construct_atomic_hotspots" {
+        if !job.parameters.get("hotspot_type").is_some() {
+          anyhow::bail!("Job '{}' (index {}): hotspot_type parameter is required for construct_atomic_hotspots queries",
+                       job.name, index);
+        }
+      }
+    }
+
+    Ok(())
   }
 
   pub async fn init_polling_state(&self) -> Result<()> {
@@ -93,7 +151,6 @@ impl DatabaseClient {
     "#;
     sqlx::query(create_index_query).execute(&self.pool).await?;
 
-    // Create index for queue processing
     let create_queue_index_query = r#"
       CREATE INDEX IF NOT EXISTS idx_polling_state_queue_position
       ON atomic_data_polling_state (queue_position, queue_completed_at)
@@ -130,7 +187,6 @@ impl DatabaseClient {
     query_name: &str,
     queue_position: i32,
   ) -> Result<()> {
-    // Check if state already exists for this job
     let existing_state = sqlx::query(
       r#"
       SELECT
@@ -148,8 +204,6 @@ impl DatabaseClient {
 
     if let Some(row) = existing_state {
       let block: i64 = row.get("last_processed_block");
-
-      // Update queue position for existing job
       sqlx::query(
         r#"
         UPDATE atomic_data_polling_state
@@ -168,7 +222,6 @@ impl DatabaseClient {
         job_name, query_name, block, queue_position
       );
     } else {
-      // Insert new state with block 0 and queue position
       sqlx::query(
         r#"
         INSERT INTO atomic_data_polling_state (job_name, query_name, last_processed_block, queue_position)
@@ -208,7 +261,7 @@ impl DatabaseClient {
           Ok(result) => result,
           Err(e) => {
             let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
-            return Err(e);
+            return Err(e.into());
           }
         };
 
@@ -222,8 +275,27 @@ impl DatabaseClient {
   async fn execute_job_polling(
     &self,
     job: &PollingJob,
-  ) -> Result<(Vec<ChangeRecord>, u64)> {
-    // Get current polling state from database
+  ) -> Result<(Vec<ChangeRecord>, u64), AtomicDataError> {
+    let (last_processed_block, max_available_block) = self.get_polling_bounds(job).await?;
+    if max_available_block <= last_processed_block {
+      return Ok((Vec::new(), last_processed_block));
+    }
+
+    let target_block = self.calculate_target_block(last_processed_block, max_available_block);
+    let rows = self.execute_query(job, last_processed_block, target_block).await?;
+    let changes = self.process_query_results(&rows, &job.name);
+
+    info!(
+      "Found {} changes for job '{}' (processed up to block {})",
+      changes.len(),
+      job.name,
+      target_block
+    );
+    Ok((changes, target_block))
+  }
+
+  /// Get the polling bounds (last processed block and max available block) for a job
+  async fn get_polling_bounds(&self, job: &PollingJob) -> Result<(u64, u64), AtomicDataError> {
     let current_state_row = sqlx::query(
       r#"
       SELECT
@@ -241,74 +313,71 @@ impl DatabaseClient {
 
     let last_processed_block: i64 = current_state_row.get("last_processed_block");
 
-    // Get the maximum block available in the tables for this query
-    let max_available_block = self.get_max_last_block_for_query(&job.query_name).await?;
+    let max_available_block = self.get_max_last_block_for_query(&job.query_name).await?
+      .ok_or_else(|| AtomicDataError::PollingBoundsError(format!("No data available for query '{}'", job.query_name)))?;
 
-    let max_available_block = match max_available_block {
-      Some(block) => block,
-      None => {
-        debug!(
-          "No data available in tables for query '{}', skipping",
-          job.query_name
-        );
-        return Ok((Vec::new(), last_processed_block as u64));
-      }
-    };
+    Ok((last_processed_block as u64, max_available_block))
+  }
 
-    // Only process if there's new data available
-    if max_available_block <= last_processed_block as u64 {
-      debug!(
-        "No new data for job '{}': max_available_block={}, last_processed_block={}",
-        job.name, max_available_block, last_processed_block
-      );
-      return Ok((Vec::new(), last_processed_block as u64));
-    }
+  fn calculate_target_block(&self, last_processed_block: u64, max_available_block: u64) -> u64 {
+    let block_diff = max_available_block.saturating_sub(last_processed_block);
 
-    // Get the query from the queries module
-    let query = crate::queries::AtomicHotspotQueries::get_query(&job.query_name)
-      .ok_or_else(|| anyhow::anyhow!("{} query not found", job.query_name))?;
-
-    let block_diff = max_available_block.saturating_sub(last_processed_block as u64);
-    let chunk_size = if block_diff <= 1000 {
+    let chunk_size = if block_diff <= MIN_CHUNK_SIZE {
       block_diff
     } else {
       // Scale chunk size logarithmically: roughly 10% of remaining blocks, with bounds
-      let scaled_chunk = (block_diff as f64 * 0.10) as u64;
-      scaled_chunk.clamp(1000, 100_000_000) // Min 1k blocks, max 100M blocks
+      let scaled_chunk = (block_diff as f64 * DEFAULT_CHUNK_PERCENTAGE) as u64;
+      scaled_chunk.clamp(MIN_CHUNK_SIZE, MAX_CHUNK_SIZE)
     };
 
-    let target_block = std::cmp::min(
-      last_processed_block as u64 + chunk_size,
-      max_available_block,
-    );
+    std::cmp::min(last_processed_block + chunk_size, max_available_block)
+  }
+
+  async fn execute_query(
+    &self,
+    job: &PollingJob,
+    last_processed_block: u64,
+    target_block: u64,
+  ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
+    crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name)
+      .map_err(|e| AtomicDataError::QueryValidationError(format!("Query validation failed for '{}': {}", job.query_name, e)))?;
+
+    let query = crate::queries::AtomicHotspotQueries::get_query(&job.query_name)
+      .ok_or_else(|| AtomicDataError::QueryValidationError(format!("Query not found for '{}'", job.query_name)))?;
 
     let query_start = std::time::Instant::now();
+
     let rows = if job.query_name == "construct_atomic_hotspots" {
       let hotspot_type = job
         .parameters
         .get("hotspot_type")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("hotspot_type parameter required for hotspot queries"))?;
+        .ok_or_else(|| AtomicDataError::InvalidData("hotspot_type parameter required for hotspot queries".to_string()))?;
+
+      match hotspot_type {
+        "iot" | "mobile" => {},
+        _ => return Err(AtomicDataError::InvalidData(format!("Invalid hotspot_type: '{}'. Must be 'iot' or 'mobile'", hotspot_type))),
+      }
 
       info!(
-        "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks {} to {} ({} blocks, max_available={})",
-        job.name, job.query_name, hotspot_type, last_processed_block, target_block, target_block - last_processed_block as u64, max_available_block
+        "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks {} to {} ({} blocks)",
+        job.name, job.query_name, hotspot_type, last_processed_block, target_block, target_block - last_processed_block
       );
 
       sqlx::query(query)
         .bind(hotspot_type)
-        .bind(last_processed_block)
+        .bind(last_processed_block as i64)
         .bind(target_block as i64)
         .fetch_all(&self.pool)
         .await?
     } else {
       info!(
-        "Querying job '{}' with query '{}', processing blocks {} to {} ({} blocks, max_available={})",
-        job.name, job.query_name, last_processed_block, target_block, target_block - last_processed_block as u64, max_available_block
+        "Querying job '{}' with query '{}', processing blocks {} to {} ({} blocks)",
+        job.name, job.query_name, last_processed_block, target_block, target_block - last_processed_block
       );
 
       sqlx::query(query)
-        .bind(last_processed_block)
+        .bind(last_processed_block as i64)
         .bind(target_block as i64)
         .fetch_all(&self.pool)
         .await?
@@ -319,28 +388,23 @@ impl DatabaseClient {
       metrics.observe_database_query_duration(query_duration);
     }
 
-    let mut changes = Vec::new();
-    for row in rows {
-      let solana_address: Option<String> = row.try_get("solana_address").ok();
-      let asset: Option<String> = row.try_get("asset").ok();
-      let atomic_data: serde_json::Value = row.get("atomic_data");
+    Ok(rows)
+  }
 
-      if let (Some(_address), Some(_asset_key)) = (solana_address, asset) {
-        let change_record = ChangeRecord {
-          job_name: job.name.clone(),
-          atomic_data: serde_json::Value::Array(vec![atomic_data]),
-        };
-        changes.push(change_record);
-      }
+  fn process_query_results(&self, rows: &[sqlx::postgres::PgRow], job_name: &str) -> Vec<ChangeRecord> {
+    let mut changes = Vec::with_capacity(rows.len());
+
+    for row in rows {
+      let mut atomic_data_array = Vec::with_capacity(1);
+      atomic_data_array.push(row.get::<serde_json::Value, _>("atomic_data"));
+
+      changes.push(ChangeRecord {
+        job_name: job_name.to_string(),
+        atomic_data: serde_json::Value::Array(atomic_data_array),
+      });
     }
 
-    info!(
-      "Found {} changes for job '{}' (processed up to block {})",
-      changes.len(),
-      job.name,
-      target_block
-    );
-    Ok((changes, target_block))
+    changes
   }
 
   pub async fn mark_processed(&self, changes: &[ChangeRecord], target_block: u64) -> Result<()> {
@@ -350,7 +414,6 @@ impl DatabaseClient {
         .await;
     }
 
-    // Group changes by table to update polling state for each
     let mut processed_tables = std::collections::HashSet::new();
 
     debug!(
@@ -362,7 +425,6 @@ impl DatabaseClient {
       processed_tables.insert(change.job_name.clone());
     }
 
-    // Update polling state for each job with the current Solana block
     for job_name in processed_tables {
       if let Some(job) = self.polling_jobs.iter().find(|j| j.name == job_name) {
         sqlx::query(
@@ -546,7 +608,6 @@ impl DatabaseClient {
     if let Some(row) = existing {
       let is_running: bool = row.get("is_running");
       if is_running {
-        // Job is already running, rollback and return false
         tx.rollback().await?;
         debug!(
           "Job '{}' query '{}' is already running",
@@ -627,8 +688,6 @@ impl DatabaseClient {
     if let Some(row) = row {
       let job_name: String = row.get("job_name");
       let query_name: String = row.get("query_name");
-
-      // Find the corresponding job in our configuration
       for job in &self.polling_jobs {
         if job.name == job_name && job.query_name == query_name {
           return Ok(Some(job.clone()));

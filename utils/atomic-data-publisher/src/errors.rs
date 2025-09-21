@@ -17,6 +17,12 @@ pub enum AtomicDataError {
   #[error("Network error: {0}")]
   NetworkError(String),
 
+  #[error("Query validation error: {0}")]
+  QueryValidationError(String),
+
+  #[error("Polling bounds error: {0}")]
+  PollingBoundsError(String),
+
   #[error("Unknown error: {0}")]
   Unknown(String),
 }
@@ -42,5 +48,11 @@ impl From<config::ConfigError> for AtomicDataError {
 impl From<anyhow::Error> for AtomicDataError {
   fn from(err: anyhow::Error) -> Self {
     AtomicDataError::Unknown(err.to_string())
+  }
+}
+
+impl From<std::io::Error> for AtomicDataError {
+  fn from(err: std::io::Error) -> Self {
+    AtomicDataError::ConfigError(err.to_string())
   }
 }

@@ -7,11 +7,10 @@ mod publisher;
 mod queries;
 mod service;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use config::{LoggingConfig, Settings};
 use service::AtomicDataPublisher;
 use std::sync::Arc;
-use tokio::signal;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -21,72 +20,23 @@ async fn main() -> Result<()> {
 }
 
 async fn run_service() -> Result<()> {
-  let settings = match Settings::new() {
-    Ok(s) => s,
-    Err(e) => {
-      eprintln!("Failed to load configuration: {}", e);
-      std::process::exit(1);
-    }
-  };
+  let settings = Settings::new().context("Failed to load configuration")?;
 
   initialize_logging(&settings.logging)?;
 
   info!("Starting Atomic Data Publisher");
   info!("Configuration loaded successfully");
 
-  if let Err(e) = validate_config(&settings) {
-    error!("Configuration validation failed: {}", e);
-    std::process::exit(1);
-  }
+  validate_config(&settings).context("Configuration validation failed")?;
 
-  let service = match AtomicDataPublisher::new(settings).await {
-    Ok(s) => {
-      info!("Atomic Data Publisher service initialized successfully");
-      Arc::new(s)
-    }
-    Err(e) => {
-      error!("Failed to initialize service: {}", e);
-      std::process::exit(1);
-    }
-  };
+  let service = Arc::new(
+    AtomicDataPublisher::new(settings)
+      .await
+      .context("Failed to initialize service")?
+  );
+  info!("Atomic Data Publisher service initialized successfully");
 
-  let shutdown_sender = service.shutdown_sender.clone();
-  let shutdown_handle = tokio::spawn(async move {
-    let ctrl_c = async {
-      signal::ctrl_c()
-        .await
-        .expect("failed to install Ctrl+C handler");
-    };
-
-    let terminate = async {
-      signal::unix::signal(signal::unix::SignalKind::terminate())
-        .expect("failed to install signal handler")
-        .recv()
-        .await;
-    };
-
-    tokio::select! {
-        _ = ctrl_c => {
-            info!("Received Ctrl+C, initiating graceful shutdown");
-        }
-        _ = terminate => {
-            info!("Received SIGTERM, initiating graceful shutdown");
-        }
-    }
-
-    if let Err(e) = shutdown_sender.send(true) {
-      error!("Failed to send shutdown signal: {}", e);
-    }
-  });
-
-  // Start the service
-  let service_result = tokio::select! {
-      result = service.run() => result,
-      _ = shutdown_handle => {
-          info!("Shutdown signal received, waiting for service to complete cleanup");
-          service.run().await
-      }
-  };
+  let service_result = service.run().await;
 
   match service_result {
     Ok(_) => {
@@ -95,87 +45,63 @@ async fn run_service() -> Result<()> {
     }
     Err(e) => {
       error!("Service failed: {}", e);
-      Err(e)
+      Err(e.into())
     }
   }
 }
 
 fn validate_config(settings: &Settings) -> Result<()> {
-  // Validate database configuration
   if settings.database.host.is_empty() {
-    return Err(anyhow::anyhow!("Database host cannot be empty"));
+    anyhow::bail!("Database host cannot be empty");
   }
 
   if settings.database.username.is_empty() {
-    return Err(anyhow::anyhow!("Database username cannot be empty"));
+    anyhow::bail!("Database username cannot be empty");
   }
 
   if settings.database.database_name.is_empty() {
-    return Err(anyhow::anyhow!("Database name cannot be empty"));
+    anyhow::bail!("Database name cannot be empty");
   }
 
   if settings.database.max_connections == 0 {
-    return Err(anyhow::anyhow!(
-      "Database max_connections must be greater than 0"
-    ));
+    anyhow::bail!("Database max_connections must be greater than 0, got: {}", settings.database.max_connections);
   }
 
-  // Note: Ingestor validation skipped - we're logging protobuf events instead of sending to gRPC
-
-  // Validate service configuration
   if settings.service.polling_interval_seconds == 0 {
-    return Err(anyhow::anyhow!("Polling interval must be greater than 0"));
+    anyhow::bail!("Service polling interval must be greater than 0 seconds, got: {}", settings.service.polling_interval_seconds);
   }
 
   if settings.service.batch_size == 0 {
-    return Err(anyhow::anyhow!("Batch size must be greater than 0"));
+    anyhow::bail!("Service batch size must be greater than 0, got: {}", settings.service.batch_size);
   }
 
   if settings.service.max_concurrent_publishes == 0 {
-    return Err(anyhow::anyhow!(
-      "Max concurrent publishes must be greater than 0"
-    ));
+    anyhow::bail!("Max concurrent publishes must be greater than 0, got: {}", settings.service.max_concurrent_publishes);
   }
 
-  // Validate required tables are specified
   if settings.database.required_tables.is_empty() {
-    return Err(anyhow::anyhow!(
-      "No required tables specified in configuration"
-    ));
+    anyhow::bail!("No required tables specified in configuration. At least one table must be configured for monitoring.");
   }
 
-  // Validate polling jobs
   if settings.service.polling_jobs.is_empty() {
     warn!("No polling jobs configured - service will not process any changes");
   }
 
-  for job in &settings.service.polling_jobs {
+  for (index, job) in settings.service.polling_jobs.iter().enumerate() {
     if job.name.is_empty() {
-      return Err(anyhow::anyhow!("Job name cannot be empty"));
+      anyhow::bail!("Job {}: name cannot be empty", index);
     }
 
     if job.query_name.is_empty() {
-      return Err(anyhow::anyhow!(
-        "Query name cannot be empty for job: {}",
-        job.name
-      ));
+      anyhow::bail!("Job '{}': query name cannot be empty", job.name);
     }
 
-    // Validate that the query exists
-    if crate::queries::AtomicHotspotQueries::get_query(&job.query_name).is_none() {
-      return Err(anyhow::anyhow!(
-        "Unknown query '{}' for job '{}'",
-        job.query_name,
-        job.name
-      ));
+    if let Err(e) = crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name) {
+      anyhow::bail!("Job '{}': query validation failed: {}", job.name, e);
     }
 
-    // Validate parameters are provided
     if job.parameters.is_null() || !job.parameters.is_object() {
-      return Err(anyhow::anyhow!(
-        "Parameters must be a valid JSON object for job '{}'",
-        job.name
-      ));
+      anyhow::bail!("Job '{}': parameters must be a valid JSON object", job.name);
     }
   }
 
@@ -186,13 +112,14 @@ fn validate_config(settings: &Settings) -> Result<()> {
 fn initialize_logging(logging_config: &LoggingConfig) -> Result<()> {
   let log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| logging_config.level.clone());
 
-  let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-    format!(
-      "atomic_data_publisher={},atomic_hotspot_events={},sqlx=warn,tonic=info",
-      log_level, log_level
-    )
-    .into()
-  });
+  let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+    .unwrap_or_else(|_| {
+      format!(
+        "atomic_data_publisher={},atomic_hotspot_events={},sqlx=warn,tonic=info",
+        log_level, log_level
+      )
+      .into()
+    });
 
   let subscriber = tracing_subscriber::registry().with(env_filter);
 
@@ -208,7 +135,9 @@ fn initialize_logging(logging_config: &LoggingConfig) -> Result<()> {
         .init();
     }
     _ => {
-      subscriber.with(tracing_subscriber::fmt::layer()).init();
+      subscriber
+        .with(tracing_subscriber::fmt::layer())
+        .init();
     }
   }
 

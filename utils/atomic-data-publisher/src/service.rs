@@ -2,7 +2,7 @@ use anyhow::Result;
 use helium_crypto::Keypair;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::time::{interval, sleep};
+use tokio::{signal, time::{interval, sleep}};
 use tracing::{debug, error, info, warn};
 
 use crate::config::{ServiceConfig, Settings};
@@ -10,6 +10,9 @@ use crate::database::DatabaseClient;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
 use crate::publisher::AtomicDataPublisher as Publisher;
+
+const HEALTH_CHECK_INTERVAL_SECONDS: u64 = 30;
+const POLLING_ERROR_RETRY_SECONDS: u64 = 5;
 
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
@@ -22,19 +25,19 @@ pub struct AtomicDataPublisher {
 }
 
 impl AtomicDataPublisher {
-  async fn validate_tables(database: &DatabaseClient, tables: &[String]) -> Result<()> {
+  async fn validate_tables(database: &DatabaseClient, tables: &[String]) -> Result<(), AtomicDataError> {
     for table_name in tables {
       if !database.table_exists(table_name).await? {
-        return Err(anyhow::anyhow!(
+        return Err(AtomicDataError::ConfigError(format!(
           "Required table '{}' does not exist",
           table_name
-        ));
+        )));
       }
     }
     Ok(())
   }
 
-  async fn init_database(database: &DatabaseClient, service_config: &ServiceConfig) -> Result<()> {
+  async fn init_database(database: &DatabaseClient, service_config: &ServiceConfig) -> Result<(), AtomicDataError> {
     database.create_state_table().await?;
 
     if service_config.polling_jobs.is_empty() {
@@ -43,7 +46,7 @@ impl AtomicDataPublisher {
     Ok(())
   }
 
-  pub async fn new(config: Settings) -> Result<Self> {
+  pub async fn new(config: Settings) -> Result<Self, AtomicDataError> {
     info!("Initializing Atomic Data Publisher service");
 
     let metrics = Arc::new(MetricsCollector::new()?);
@@ -65,14 +68,14 @@ impl AtomicDataPublisher {
     let keypair_data = if std::path::Path::new(&keypair_path).exists() {
       std::fs::read(&keypair_path)?
     } else {
-      return Err(anyhow::anyhow!(
+      return Err(AtomicDataError::ConfigError(format!(
         "Keypair file not found at {}. Please provide a valid keypair file.",
         keypair_path
-      ));
+      )));
     };
 
     let keypair = Keypair::try_from(&keypair_data[..])
-      .map_err(|e| anyhow::anyhow!("Failed to load keypair from file: {}", e))?;
+      .map_err(|e| AtomicDataError::ConfigError(format!("Failed to load keypair from file: {}", e)))?;
 
     info!("Using keypair with public key: {}", keypair.public_key());
 
@@ -96,8 +99,59 @@ impl AtomicDataPublisher {
     })
   }
 
-  pub async fn run(&self) -> Result<()> {
+  pub async fn run(&self) -> Result<(), AtomicDataError> {
     self.health_check().await?;
+    let (handles, _metrics_bind_addr) = self.spawn_background_tasks().await?;
+    let shutdown_sender = self.shutdown_sender.clone();
+    let signal_handle = tokio::spawn(async move {
+      tokio::select! {
+        _ = signal::ctrl_c() => {
+          info!("Received Ctrl+C within service, initiating graceful shutdown");
+        }
+        _ = async {
+          signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await
+        } => {
+          info!("Received SIGTERM within service, initiating graceful shutdown");
+        }
+      }
+
+      if let Err(e) = shutdown_sender.send(true) {
+        error!("Failed to send internal shutdown signal: {}", e);
+      }
+    });
+
+    let mut shutdown_signal = self.shutdown_signal.clone();
+    tokio::select! {
+        _ = shutdown_signal.changed() => {
+            info!("Shutdown signal received");
+        }
+        result = futures::future::try_join_all(handles) => {
+            match result {
+                Ok(results) => {
+                    let failed_tasks = results.iter().filter(|r| r.is_err()).count();
+                    if failed_tasks > 0 {
+                        warn!("{} out of {} background tasks failed", failed_tasks, results.len());
+                    } else {
+                        info!("All background tasks completed successfully");
+                    }
+                }
+                Err(e) => error!("Background task failure: {}", e),
+            }
+        }
+        _ = signal_handle => {
+          // Signal handler completed
+        }
+    }
+
+    self.perform_graceful_shutdown().await?;
+    info!("Atomic Data Publisher service stopped");
+    Ok(())
+  }
+
+  async fn spawn_background_tasks(&self) -> Result<(Vec<tokio::task::JoinHandle<Result<(), AtomicDataError>>>, String), AtomicDataError> {
     let mut handles = Vec::new();
     let metrics_bind_addr = format!("0.0.0.0:{}", self.config.service.port);
     let metrics_handle = {
@@ -107,54 +161,43 @@ impl AtomicDataPublisher {
       tokio::spawn(async move {
         if let Err(e) = metrics.serve_metrics(&bind_addr, shutdown_signal).await {
           error!("Metrics server error: {}", e);
+          return Err(AtomicDataError::NetworkError(e.to_string()));
         }
+        Ok(())
       })
     };
     handles.push(metrics_handle);
     info!("Metrics server started on {}", metrics_bind_addr);
 
-    // Main polling loop
     let polling_handle = {
       let service = self.clone();
       tokio::spawn(async move {
         service.polling_loop().await;
+        Ok(())
       })
     };
-
     handles.push(polling_handle);
 
-    // Health check loop
     let health_handle = {
       let service = self.clone();
       tokio::spawn(async move {
         service.health_check_loop().await;
+        Ok(())
       })
     };
-
     handles.push(health_handle);
 
-    // Wait for shutdown signal or any task to complete
-    let mut shutdown_signal = self.shutdown_signal.clone();
-    tokio::select! {
-        _ = shutdown_signal.changed() => {
-            info!("Shutdown signal received");
-        }
-        result = futures::future::try_join_all(handles) => {
-            match result {
-                Ok(_) => info!("All tasks completed successfully"),
-                Err(e) => error!("Task failed: {}", e),
-            }
-        }
-    }
+    Ok((handles, metrics_bind_addr))
+  }
+
+  async fn perform_graceful_shutdown(&self) -> Result<(), AtomicDataError> {
+    info!("Performing graceful shutdown cleanup");
 
     if let Err(e) = self.database.cleanup_all_jobs().await {
-      warn!(
-        "Failed to clean up running job states during shutdown: {}",
-        e
-      );
+      warn!("Failed to clean up running job states during shutdown: {}", e);
     }
 
-    info!("Atomic Data Publisher service stopped");
+    tokio::time::sleep(Duration::from_millis(100)).await;
     Ok(())
   }
 
@@ -175,7 +218,7 @@ impl AtomicDataPublisher {
               if let Err(e) = self.process_changes().await {
                   error!("Error processing changes: {}", e);
                   self.metrics.increment_errors();
-                  sleep(Duration::from_secs(5)).await;
+                  sleep(Duration::from_secs(POLLING_ERROR_RETRY_SECONDS)).await;
               }
 
               let cycle_time = cycle_start.elapsed();
@@ -278,162 +321,161 @@ impl AtomicDataPublisher {
     active_job_context: Option<(String, String)>,
     target_block: u64,
   ) -> Result<(usize, usize, bool), AtomicDataError> {
+    let (total_published, total_failed, should_break) = self.process_batches(changes, &active_job_context, target_block).await?;
+    self.finalize_job_state(&active_job_context, total_failed).await?;
+    Ok((total_published, total_failed, should_break))
+  }
+
+  async fn process_batches(
+    &self,
+    changes: Vec<crate::database::ChangeRecord>,
+    _active_job_context: &Option<(String, String)>,
+    target_block: u64,
+  ) -> Result<(usize, usize, bool), AtomicDataError> {
     let mut total_published = 0;
     let mut total_failed = 0;
     let batch_size = self.config.service.batch_size as usize;
 
     for (batch_index, batch) in changes.chunks(batch_size).enumerate() {
-      info!(
-        "Processing batch {}: {} changes",
-        batch_index + 1,
-        batch.len()
-      );
+      info!("Processing batch {}: {} changes", batch_index + 1, batch.len());
 
-      let batch_start = Instant::now();
-      let mut published_changes = Vec::new();
-      let mut failed_changes = Vec::new();
-      let semaphore = Arc::new(tokio::sync::Semaphore::new(
-        self.config.service.max_concurrent_publishes as usize,
-      ));
-      let mut tasks = Vec::new();
+      let (batch_published, batch_failed) = self.process_batch(batch, target_block).await?;
+      total_published += batch_published;
+      total_failed += batch_failed;
 
-      for change in batch {
+      if batch_failed > 0 {
+        warn!(
+          "Batch {} had {} failed changes, stopping processing",
+          batch_index + 1, batch_failed
+        );
+        return Ok((total_published, total_failed, true));
+      }
+    }
+
+    info!("Completed processing all batches: {} published, {} failed", total_published, total_failed);
+    Ok((total_published, total_failed, false))
+  }
+
+  async fn process_batch(
+    &self,
+    batch: &[crate::database::ChangeRecord],
+    target_block: u64,
+  ) -> Result<(usize, usize), AtomicDataError> {
+    let batch_start = Instant::now();
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(
+      self.config.service.max_concurrent_publishes as usize,
+    ));
+
+    let tasks: Vec<_> = batch
+      .iter()
+      .map(|change| {
         let change = change.clone();
         let publisher = self.publisher.clone();
         let metrics = self.metrics.clone();
         let semaphore = semaphore.clone();
 
-        let task = tokio::spawn(async move {
-          let _permit = semaphore.acquire().await.unwrap();
-          let publish_start = Instant::now();
-          let result = publisher.publish_changes(vec![change.clone()]).await;
-          let publish_duration = publish_start.elapsed().as_secs_f64();
+        tokio::spawn(async move {
+          Self::publish_single_change(change, publisher, metrics, semaphore).await
+        })
+      })
+      .collect();
 
-          match result {
-            Ok(published_ids) if !published_ids.is_empty() => {
-              metrics.increment_published();
-              metrics.observe_publish_duration(publish_duration);
-              Ok(change)
-            }
-            Ok(_) => {
-              metrics.increment_errors();
-              metrics.observe_publish_duration(publish_duration);
-              Err(change)
-            }
-            Err(e) => {
-              error!(
-                "Failed to publish change for job '{}': {}",
-                change.job_name, e
-              );
-              metrics.increment_errors();
-              metrics.observe_publish_duration(publish_duration);
-              Err(change)
-            }
-          }
-        });
+    let mut published_changes = Vec::new();
+    let mut failed_changes = Vec::new();
 
-        tasks.push(task);
-      }
-
-      for task in tasks {
-        match task.await {
-          Ok(Ok(change)) => published_changes.push(change),
-          Ok(Err(change)) => failed_changes.push(change),
-          Err(e) => {
-            error!("Publishing task panicked: {}", e);
-            self.metrics.increment_errors();
-          }
+    for task in tasks {
+      match task.await {
+        Ok(Ok(change)) => published_changes.push(change),
+        Ok(Err(change)) => failed_changes.push(change),
+        Err(e) => {
+          error!(
+            "Publishing task panicked: {}. This indicates a serious bug in the publishing logic.",
+            e
+          );
+          self.metrics.increment_errors();
         }
-      }
-
-      total_failed += failed_changes.len();
-      if failed_changes.is_empty() && !published_changes.is_empty() {
-        match self
-          .database
-          .mark_processed(&published_changes, target_block)
-          .await
-        {
-          Ok(_) => {
-            total_published += published_changes.len();
-            let batch_time = batch_start.elapsed();
-            info!(
-              "Batch processing completed in {:?}: {} published, 0 failed. Advanced to block {}",
-              batch_time,
-              published_changes.len(),
-              target_block
-            );
-          }
-          Err(e) => {
-            error!("Failed to mark batch changes as processed: {}", e);
-            self.metrics.increment_errors();
-            if let Some((job_name, query_name)) = &active_job_context {
-              if let Err(cleanup_err) = self
-                .database
-                .mark_job_not_running(job_name, query_name)
-                .await
-              {
-                warn!(
-                  "Failed to mark job '{}' query '{}' as not running after error: {}",
-                  job_name, query_name, cleanup_err
-                );
-              }
-            }
-            return Err(AtomicDataError::DatabaseError(e.to_string()));
-          }
-        }
-      } else if !failed_changes.is_empty() {
-        // Some or all changes failed - do not advance block, retry same range next poll
-        let batch_time = batch_start.elapsed();
-        warn!(
-          "Batch processing completed in {:?}: {} published, {} failed. Not advancing block - will retry same range",
-          batch_time,
-          published_changes.len(),
-          failed_changes.len()
-        );
       }
     }
 
+    let batch_published = published_changes.len();
+    let batch_failed = failed_changes.len();
+    if !published_changes.is_empty() {
+      self.database.mark_processed(&published_changes, target_block).await?;
+    }
+
+    let batch_time = batch_start.elapsed();
     info!(
-      "Completed processing all batches: {} total changes published, {} total failed",
-      total_published, total_failed
+      "Batch completed in {:?}: {} published, {} failed",
+      batch_time, batch_published, batch_failed
     );
 
-    // Mark the job as not running and completed in queue after all processing is done
-    // Only mark as completed if there were no failures or if we processed everything successfully
-    if let Some((job_name, query_name)) = active_job_context {
-      if let Err(e) = self
-        .database
-        .mark_job_not_running(&job_name, &query_name)
-        .await
-      {
-        warn!(
-          "Failed to mark job '{}' query '{}' as not running after processing: {}",
-          job_name, query_name, e
+    Ok((batch_published, batch_failed))
+  }
+
+  async fn publish_single_change(
+    change: crate::database::ChangeRecord,
+    publisher: Arc<Publisher>,
+    metrics: Arc<MetricsCollector>,
+    semaphore: Arc<tokio::sync::Semaphore>,
+  ) -> Result<crate::database::ChangeRecord, crate::database::ChangeRecord> {
+    let _permit = semaphore.acquire().await.map_err(|_| {
+      error!(
+        "Failed to acquire semaphore permit for publishing change from job '{}'. This may indicate high concurrency or semaphore configuration issues.",
+        change.job_name
+      );
+      change.clone()
+    })?;
+
+    let publish_start = Instant::now();
+    let result = publisher.publish_changes(vec![change.clone()]).await;
+    let publish_duration = publish_start.elapsed().as_secs_f64();
+
+    match result {
+      Ok(published_ids) if !published_ids.is_empty() => {
+        metrics.increment_published();
+        metrics.observe_publish_duration(publish_duration);
+        Ok(change)
+      }
+      Ok(_) => {
+        metrics.increment_errors();
+        metrics.observe_publish_duration(publish_duration);
+        Err(change)
+      }
+      Err(e) => {
+        error!(
+          "Failed to publish change for job '{}' (duration: {:.2}s): {}",
+          change.job_name, publish_duration, e
         );
+        metrics.increment_errors();
+        metrics.observe_publish_duration(publish_duration);
+        Err(change)
+      }
+    }
+  }
+
+  async fn finalize_job_state(
+    &self,
+    active_job_context: &Option<(String, String)>,
+    total_failed: usize,
+  ) -> Result<(), AtomicDataError> {
+    if let Some((job_name, query_name)) = active_job_context {
+      if let Err(e) = self.database.mark_job_not_running(job_name, query_name).await {
+        warn!("Failed to mark job '{}' as not running: {}", job_name, e);
       }
 
       if total_failed == 0 {
-        if let Err(e) = self.database.mark_completed(&job_name, &query_name).await {
-          warn!(
-            "Failed to mark job '{}' query '{}' as completed after processing: {}",
-            job_name, query_name, e
-          );
+        if let Err(e) = self.database.mark_completed(job_name, query_name).await {
+          warn!("Failed to mark job '{}' as completed: {}", job_name, e);
         }
       } else {
-        warn!(
-          "Job '{}' query '{}' had {} failed changes",
-          job_name, query_name, total_failed
-        );
-
-        return Ok((total_published, total_failed, true));
+        warn!("Job '{}' had {} failed changes", job_name, total_failed);
       }
     }
-
-    Ok((total_published, total_failed, false))
+    Ok(())
   }
 
   async fn health_check_loop(&self) {
-    let mut interval = interval(Duration::from_secs(30)); // Check every 30 seconds
+    let mut interval = interval(Duration::from_secs(HEALTH_CHECK_INTERVAL_SECONDS));
     let mut shutdown_signal = self.shutdown_signal.clone();
 
     loop {
@@ -468,3 +510,4 @@ impl AtomicDataPublisher {
     Ok(())
   }
 }
+

@@ -18,10 +18,62 @@ use crate::errors::AtomicDataError;
 pub struct ProtobufBuilder;
 
 impl ProtobufBuilder {
+  fn current_timestamp() -> u64 {
+    chrono::Utc::now().timestamp() as u64
+  }
+
+  fn validate_change_record(change: &ChangeRecord) -> Result<(), AtomicDataError> {
+    if change.atomic_data.is_null() {
+      return Err(AtomicDataError::InvalidData(
+        "Change record has null atomic_data".to_string(),
+      ));
+    }
+
+    if !change.atomic_data.is_array() {
+      return Err(AtomicDataError::InvalidData(format!(
+        "Change record atomic_data must be an array, got: {}",
+        change.atomic_data
+      )));
+    }
+
+    if change
+      .atomic_data
+      .as_array()
+      .map_or(true, |arr| arr.is_empty())
+    {
+      return Err(AtomicDataError::InvalidData(
+        "Change record has empty atomic_data array".to_string(),
+      ));
+    }
+
+    Ok(())
+  }
+
+  fn get_required_field<'a>(
+    data: &'a Value,
+    field_name: &str,
+  ) -> Result<&'a Value, AtomicDataError> {
+    data.get(field_name).ok_or_else(|| {
+      AtomicDataError::InvalidData(format!("Required field '{}' not found", field_name))
+    })
+  }
+
+  fn get_u64_field(data: &Value, field_name: &str) -> Result<u64, AtomicDataError> {
+    let field = Self::get_required_field(data, field_name)?;
+    field
+      .as_u64()
+      .or_else(|| field.as_str()?.parse().ok())
+      .ok_or_else(|| {
+        AtomicDataError::InvalidData(format!("Field '{}' is not a valid u64", field_name))
+      })
+  }
+
   pub fn build_mobile_hotspot_change(
     change: &ChangeRecord,
     keypair: &Keypair,
   ) -> Result<MobileHotspotChangeReqV1, AtomicDataError> {
+    Self::validate_change_record(change)?;
+
     let atomic_data = change
       .atomic_data
       .as_array()
@@ -38,8 +90,8 @@ impl ProtobufBuilder {
         .map(|obj| obj.keys().collect::<Vec<_>>())
     );
 
-    let block = Self::extract_u64(atomic_data, "block").unwrap_or(0);
-    let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
+    let block = Self::get_u64_field(atomic_data, "block")?;
+    let timestamp_seconds = Self::current_timestamp();
 
     let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
@@ -69,6 +121,8 @@ impl ProtobufBuilder {
     change: &ChangeRecord,
     keypair: &Keypair,
   ) -> Result<IotHotspotChangeReqV1, AtomicDataError> {
+    Self::validate_change_record(change)?;
+
     let atomic_data = change
       .atomic_data
       .as_array()
@@ -79,8 +133,8 @@ impl ProtobufBuilder {
 
     debug!("Building IoT hotspot update from data: {}", atomic_data);
 
-    let block = Self::extract_u64(atomic_data, "block").unwrap_or(0);
-    let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
+    let block = Self::get_u64_field(atomic_data, "block")?;
+    let timestamp_seconds = Self::current_timestamp();
 
     let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
@@ -110,6 +164,8 @@ impl ProtobufBuilder {
     change: &ChangeRecord,
     keypair: &Keypair,
   ) -> Result<EntityOwnershipChangeReqV1, AtomicDataError> {
+    Self::validate_change_record(change)?;
+
     let atomic_data = change
       .atomic_data
       .as_array()
@@ -118,8 +174,8 @@ impl ProtobufBuilder {
         AtomicDataError::InvalidData("No atomic data found in change record".to_string())
       })?;
 
-    let block = Self::extract_u64(atomic_data, "block").unwrap_or(0);
-    let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
+    let block = Self::get_u64_field(atomic_data, "block")?;
+    let timestamp_seconds = Self::current_timestamp();
 
     let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
@@ -149,6 +205,8 @@ impl ProtobufBuilder {
     change: &ChangeRecord,
     keypair: &Keypair,
   ) -> Result<EntityRewardDestinationChangeReqV1, AtomicDataError> {
+    Self::validate_change_record(change)?;
+
     let atomic_data = change
       .atomic_data
       .as_array()
@@ -157,8 +215,8 @@ impl ProtobufBuilder {
         AtomicDataError::InvalidData("No atomic data found in change record".to_string())
       })?;
 
-    let block = Self::extract_u64(atomic_data, "block").unwrap_or(0);
-    let timestamp_seconds = chrono::Utc::now().timestamp() as u64;
+    let block = Self::get_u64_field(atomic_data, "block")?;
+    let timestamp_seconds = Self::current_timestamp();
 
     let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
     let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
@@ -209,9 +267,16 @@ impl ProtobufBuilder {
       .or_else(|| Self::extract_string(data, "serial_number"))
       .unwrap_or_default();
 
-    let device_type = Self::extract_string(data, "device_type")
-      .and_then(|s| Self::parse_mobile_device_type(&s))
-      .unwrap_or(MobileHotspotDeviceType::Unknown);
+    let device_type_str = Self::extract_string(data, "device_type")
+      .ok_or_else(|| AtomicDataError::InvalidData("Missing device_type field".to_string()))?;
+
+    let device_type = Self::parse_mobile_device_type(&device_type_str).unwrap_or_else(|_| {
+      warn!(
+        "Invalid mobile device type: {}, using Unknown",
+        device_type_str
+      );
+      MobileHotspotDeviceType::Unknown
+    });
 
     let asserted_hex = Self::extract_string(data, "asserted_hex")
       .or_else(|| Self::extract_string(data, "location"))
@@ -225,7 +290,7 @@ impl ProtobufBuilder {
       .and_then(|a| a.as_u64())
       .map(|a| a as u32)
       .or_else(|| Self::extract_u32(data, "azimuth"))
-      .unwrap_or(0);
+      .ok_or_else(|| AtomicDataError::InvalidData("Missing azimuth field".to_string()))?;
 
     Ok(MobileHotspotMetadata {
       serial_number,
@@ -241,8 +306,11 @@ impl ProtobufBuilder {
       .or_else(|| Self::extract_u64(data, "location").map(|loc| format!("{:x}", loc)))
       .unwrap_or_default();
 
-    let elevation = Self::extract_u32(data, "elevation").unwrap_or(0);
-    let is_data_only = Self::extract_bool(data, "is_data_only").unwrap_or(false);
+    let elevation = Self::extract_u32(data, "elevation")
+      .ok_or_else(|| AtomicDataError::InvalidData("Missing elevation field".to_string()))?;
+
+    let is_data_only = Self::extract_bool(data, "is_data_only")
+      .ok_or_else(|| AtomicDataError::InvalidData("Missing is_data_only field".to_string()))?;
 
     Ok(IotHotspotMetadata {
       asserted_hex,
@@ -253,9 +321,15 @@ impl ProtobufBuilder {
 
   fn build_entity_owner_info(data: &Value) -> Result<EntityOwnerInfo, AtomicDataError> {
     let wallet = Self::extract_solana_pub_key(data, "owner")?;
-    let owner_type = Self::extract_string(data, "owner_type")
-      .and_then(|s| Self::parse_entity_owner_type(&s))
-      .unwrap_or(EntityOwnerType::DirectOwner);
+    let owner_type_str = Self::extract_string(data, "owner_type")
+      .ok_or_else(|| AtomicDataError::InvalidData("Missing owner_type field".to_string()))?;
+    let owner_type = Self::parse_entity_owner_type(&owner_type_str).unwrap_or_else(|_| {
+      warn!(
+        "Invalid entity owner type: {}, using DirectOwner",
+        owner_type_str
+      );
+      EntityOwnerType::DirectOwner
+    });
 
     Ok(EntityOwnerInfo {
       wallet: Some(wallet),
@@ -266,15 +340,20 @@ impl ProtobufBuilder {
   fn try_build_rewards_split(data: &Value) -> Result<Option<RewardsSplitV1>, AtomicDataError> {
     if let Some(split_data) = data.get("rewards_split").filter(|v| !v.is_null()) {
       let pub_key = Self::extract_solana_pub_key(split_data, "pub_key")?;
-      let schedule = Self::extract_string(split_data, "schedule").unwrap_or_default();
-      let total_shares = Self::extract_u32(split_data, "total_shares").unwrap_or(100);
+      let schedule = Self::extract_string(split_data, "schedule")
+        .ok_or_else(|| AtomicDataError::InvalidData("Missing schedule field".to_string()))?;
+      let total_shares = Self::extract_u32(split_data, "total_shares")
+        .ok_or_else(|| AtomicDataError::InvalidData("Missing total_shares field".to_string()))?;
 
       let recipients =
         if let Some(recipients_array) = split_data.get("recipients").and_then(|v| v.as_array()) {
-          recipients_array
-            .iter()
-            .filter_map(|recipient| Self::try_build_split_recipient(recipient).ok())
-            .collect()
+          let mut recipients = Vec::with_capacity(recipients_array.len());
+          for recipient in recipients_array {
+            if let Ok(split_recipient) = Self::try_build_split_recipient(recipient) {
+              recipients.push(split_recipient);
+            }
+          }
+          recipients
         } else {
           Vec::new()
         };
@@ -382,27 +461,29 @@ impl ProtobufBuilder {
       .or_else(|| data.get(key)?.as_str()?.parse().ok())
   }
 
-  fn parse_mobile_device_type(device_type_str: &str) -> Option<MobileHotspotDeviceType> {
+  fn parse_mobile_device_type(
+    device_type_str: &str,
+  ) -> Result<MobileHotspotDeviceType, AtomicDataError> {
     match device_type_str {
-      "wifiIndoor" => Some(MobileHotspotDeviceType::WifiIndoor),
-      "wifiOutdoor" => Some(MobileHotspotDeviceType::WifiOutdoor),
-      "wifiDataOnly" => Some(MobileHotspotDeviceType::WifiDataOnly),
-      "cbrs" => Some(MobileHotspotDeviceType::Cbrs),
-      _ => {
-        warn!("Unknown mobile device type: {}", device_type_str);
-        None
-      }
+      "wifiIndoor" => Ok(MobileHotspotDeviceType::WifiIndoor),
+      "wifiOutdoor" => Ok(MobileHotspotDeviceType::WifiOutdoor),
+      "wifiDataOnly" => Ok(MobileHotspotDeviceType::WifiDataOnly),
+      "cbrs" => Ok(MobileHotspotDeviceType::Cbrs),
+      _ => Err(AtomicDataError::InvalidData(format!(
+        "Unknown mobile device type: {}",
+        device_type_str
+      ))),
     }
   }
 
-  fn parse_entity_owner_type(owner_type_str: &str) -> Option<EntityOwnerType> {
+  fn parse_entity_owner_type(owner_type_str: &str) -> Result<EntityOwnerType, AtomicDataError> {
     match owner_type_str {
-      "direct_owner" => Some(EntityOwnerType::DirectOwner),
-      "welcome_pack_owner" => Some(EntityOwnerType::WelcomePackOwner),
-      _ => {
-        warn!("Unknown entity owner type: {}", owner_type_str);
-        None
-      }
+      "direct_owner" => Ok(EntityOwnerType::DirectOwner),
+      "welcome_pack_owner" => Ok(EntityOwnerType::WelcomePackOwner),
+      _ => Err(AtomicDataError::InvalidData(format!(
+        "Unknown entity owner type: {}",
+        owner_type_str
+      ))),
     }
   }
 
