@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use account_compression_cpi::{account_compression::program::SplAccountCompression, Noop};
 use anchor_lang::{
   prelude::*,
@@ -5,6 +7,7 @@ use anchor_lang::{
   system_program::{transfer, Transfer},
 };
 use bubblegum_cpi::{bubblegum::program::Bubblegum, get_asset_id};
+use clockwork_cron::Schedule;
 use lazy_distributor::{
   cpi::{accounts::UpdateCompressionDestinationV0, update_compression_destination_v0},
   program::LazyDistributor,
@@ -88,6 +91,13 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, InitializeWelcomePackV0<'info>>,
   args: InitializeWelcomePackArgsV0,
 ) -> Result<()> {
+  require_gt!(args.rewards_split.len(), 0, ErrorCode::InvalidRewardsSplit);
+  // Validate schedule
+  Schedule::from_str(&args.rewards_schedule).map_err(|e| {
+    msg!("Invalid schedule {}", e);
+    ErrorCode::InvalidSchedule
+  })?;
+
   let asset = get_asset_id(&ctx.accounts.merkle_tree.key(), args.index as u64);
   // First, set the custom destination to the owner so claims don't go to the welcome pack
   let remaining_accounts = ctx.remaining_accounts.to_vec();
@@ -95,7 +105,7 @@ pub fn handler<'info>(
     CpiContext::new(
       ctx.accounts.lazy_distributor_program.to_account_info(),
       UpdateCompressionDestinationV0 {
-        owner: ctx.accounts.owner.to_account_info().clone(),
+        owner: ctx.accounts.leaf_owner.to_account_info().clone(),
         destination: ctx.accounts.owner.to_account_info(),
         merkle_tree: ctx.accounts.merkle_tree.clone(),
         compression_program: ctx.accounts.compression_program.to_account_info(),

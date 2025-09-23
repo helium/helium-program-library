@@ -56,14 +56,14 @@ pub struct ClaimWelcomePackV0<'info> {
     mut,
     // If rent_refund is Pubkey::default, that indicates we want to send the asset to the claimer
     // otherwise send to the rent_refund
-    constraint = rent_refund.key() == welcome_pack.rent_refund || (welcome_pack.rent_refund == Pubkey::default() && rent_refund.key() == claimer.key()) @ ErrorCode::InvalidRentRefund
+    constraint = (welcome_pack.rent_refund != Pubkey::default() && rent_refund.key() == welcome_pack.rent_refund) || (welcome_pack.rent_refund == Pubkey::default() && rent_refund.key() == claimer.key()) @ ErrorCode::InvalidRentRefund
   )]
   pub rent_refund: AccountInfo<'info>,
   /// CHECK: by constraint
   #[account(
     // If asset_return_address is Pubkey::default, that indicates we want to send the asset to the claimer
     // otherwise send to the asset_return_address
-    constraint = asset_return_address.key() == welcome_pack.asset_return_address || (welcome_pack.asset_return_address == Pubkey::default() && asset_return_address.key() == claimer.key()) @ ErrorCode::InvalidAssetReturnAddress
+    constraint =  (welcome_pack.asset_return_address != Pubkey::default() && asset_return_address.key() == welcome_pack.asset_return_address) || (welcome_pack.asset_return_address == Pubkey::default() && asset_return_address.key() == claimer.key()) @ ErrorCode::InvalidAssetReturnAddress
   )]
   pub asset_return_address: AccountInfo<'info>,
   /// CHECK: Just needed for setting the ownwer of the mini fanout
@@ -125,12 +125,6 @@ pub fn handler<'info>(
     Clock::get()?.unix_timestamp,
     ErrorCode::ClaimApprovalExpired
   );
-  let mut claim_approval_bytes = Vec::with_capacity(8 + 32);
-  ClaimApprovalV0 {
-    welcome_pack: ctx.accounts.welcome_pack.key(),
-    expiration_timestamp: args.approval_expiration_timestamp,
-  }
-  .serialize(&mut claim_approval_bytes)?;
   let msg = format!(
     "Approve invite {} expiring {}",
     ctx.accounts.welcome_pack.unique_id, args.approval_expiration_timestamp
@@ -315,7 +309,7 @@ pub fn handler<'info>(
           to: ctx.accounts.rewards_recipient.to_account_info(),
         },
       ),
-      FANOUT_FUNDING_AMOUNT - ctx.accounts.task.lamports(),
+      FANOUT_FUNDING_AMOUNT.saturating_sub(ctx.accounts.task.lamports()),
     )?;
   }
 

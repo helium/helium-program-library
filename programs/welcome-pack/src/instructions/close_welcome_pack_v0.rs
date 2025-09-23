@@ -24,6 +24,9 @@ pub struct CloseWelcomePackV0<'info> {
     close = rent_refund,
   )]
   pub welcome_pack: Account<'info, WelcomePackV0>,
+  #[account(
+    has_one = owner,
+  )]
   pub user_welcome_packs: Account<'info, UserWelcomePacksV0>,
   /// CHECK: Rent refund
   #[account(
