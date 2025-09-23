@@ -10,7 +10,7 @@ use tuktuk_program::{TaskQueueV0, TransactionSourceV0};
 
 use crate::{errors::ErrorCode, state::*};
 
-pub const MAX_SHARES: usize = 7;
+pub const MAX_SHARES: usize = 6;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitializeMiniFanoutArgsV0 {
@@ -58,6 +58,7 @@ pub struct InitializeMiniFanoutV0<'info> {
   /// CHECK: Via seeds
   #[account(
     seeds = [b"queue_authority"],
+    // This is the canonical bump for this program id, saves compute hardcoding it.
     bump = 254,
   )]
   pub queue_authority: UncheckedAccount<'info>,
@@ -88,7 +89,9 @@ impl MiniFanoutV0 {
           size += 4
             + 3
             + 4
-            + 32 * compiled.instructions.len()
+            + 32 * compiled.accounts.len()
+            + 1 // option
+            + 4 // Vec<>
             + compiled
               .instructions
               .iter()
@@ -113,15 +116,6 @@ impl MiniFanoutShareV0 {
     // total_owed: u64 (8)
     // delegate: Pubkey (32)
     32 + 4 + 8 + 8 + 32
-  }
-}
-
-impl UserMiniFanoutsV0 {
-  pub fn size() -> usize {
-    // next_id: u32 (4)
-    // owner: Pubkey (32)
-    // bump_seed: u8 (1)
-    4 + 32 + 1 + 68
   }
 }
 

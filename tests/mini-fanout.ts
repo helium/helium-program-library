@@ -386,8 +386,8 @@ describe("mini-fanout", () => {
       ).to.not.be.null
     })
 
-    it("should distribute tokens to 7 wallets in one tx", async () => {
-      const wallets = Array.from({ length: 7 }, () => Keypair.generate())
+    it("should distribute tokens to 6 wallets in one tx", async () => {
+      const wallets = Array.from({ length: 6 }, () => Keypair.generate())
       const shares = wallets.map(w => ({
         wallet: w.publicKey,
         share: { share: { amount: 10 } },
@@ -449,7 +449,7 @@ describe("mini-fanout", () => {
         })
         .rpc()
 
-      await createAtaAndMint(provider, mint, 700000000, fanoutK)
+      await createAtaAndMint(provider, mint, 600000000, fanoutK)
 
       // Wait for cron and run all tasks
       await new Promise(resolve => setTimeout(resolve, 2000))

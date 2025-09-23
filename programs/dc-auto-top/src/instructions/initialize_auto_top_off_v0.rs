@@ -13,8 +13,6 @@ use tuktuk_program::TaskQueueV0;
 
 use crate::{errors::ErrorCode, state::*};
 
-pub const MAX_SHARES: usize = 7;
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitializeAutoTopOffArgsV0 {
   pub schedule: String,

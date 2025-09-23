@@ -82,6 +82,7 @@ pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransa
     task_queue: mini_fanout.task_queue,
     next_task: mini_fanout.next_task,
     next_pre_task: mini_fanout.next_pre_task,
+    instruction_sysvar: anchor_lang::solana_program::sysvar::instructions::ID,
   }
   .to_account_metas(None);
 

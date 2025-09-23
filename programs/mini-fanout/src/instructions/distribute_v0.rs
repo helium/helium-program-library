@@ -1,7 +1,10 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{
+  prelude::*,
+  solana_program::sysvar::instructions::{get_instruction_relative, ID as IX_ID},
+};
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use tuktuk_program::{
-  RunTaskReturnV0, TaskQueueV0, TaskReturnV0, TaskV0, TransactionSourceV0, TriggerV0,
+  tuktuk, RunTaskReturnV0, TaskQueueV0, TaskReturnV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
 
 use crate::{errors::ErrorCode, get_next_time, get_task_ix, state::*};
@@ -34,6 +37,12 @@ pub struct DistributeV0<'info> {
   #[account(mut)]
   pub token_account: Box<Account<'info, TokenAccount>>,
   pub token_program: Program<'info, Token>,
+  /// CHECK: The address check is needed because otherwise
+  /// the supplied Sysvar could be anything else.
+  /// The Instruction Sysvar has not been implemented
+  /// in the Anchor framework yet, so this is the safe approach.
+  #[account(address = IX_ID)]
+  pub instruction_sysvar: AccountInfo<'info>,
   // Remaining accounts: shareholder token accounts (as TokenAccount)
 }
 
@@ -68,6 +77,29 @@ macro_rules! try_from {
 pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, DistributeV0<'info>>,
 ) -> Result<RunTaskReturnV0> {
+  // Validate that this instruction is being called via CPI from tuktuk for the next_task
+  let current_ix = get_instruction_relative(0, &ctx.accounts.instruction_sysvar)
+    .map_err(|_| error!(ErrorCode::InvalidCpiContext))?;
+
+  // Check that the current instruction is being called by tuktuk program
+  require_eq!(
+    current_ix.program_id,
+    tuktuk::ID,
+    ErrorCode::InvalidCpiContext
+  );
+
+  // Verify that the next_task account matches the task being executed
+  // The first account in the instruction should be the task account
+  require!(
+    !current_ix.accounts.is_empty(),
+    ErrorCode::InvalidCpiContext
+  );
+  require_eq!(
+    current_ix.accounts[3].pubkey,
+    ctx.accounts.next_task.key(),
+    ErrorCode::InvalidCpiContext
+  );
+
   let mini_fanout = &mut ctx.accounts.mini_fanout;
   let token_account = &ctx.accounts.token_account;
 
@@ -95,7 +127,7 @@ pub fn handler<'info>(
     .sum::<u128>()
     .checked_div(DUST_PRECISION)
     .ok_or(error!(ErrorCode::ArithmeticError))?;
-  let mut remaining = token_account.amount as u128 - total_dust;
+  let mut remaining = (token_account.amount as u128).saturating_sub(total_dust);
 
   // 3. Assign fixed payouts in order, saturating if not enough left
   let mut new_dusts = vec![0u128; mini_fanout.shares.len()];
@@ -105,7 +137,13 @@ pub fn handler<'info>(
       Share::Fixed { amount } => amount as u128 + mini_fanout.shares[i].total_owed as u128,
       _ => 0,
     };
-    let payout = remaining.min(fixed_val);
+    let payout = if fixed_val > remaining {
+      mini_fanout.shares[i].total_owed += (fixed_val - remaining) as u64;
+      remaining
+    } else {
+      mini_fanout.shares[i].total_owed = 0;
+      fixed_val
+    };
     payouts[i] = payout as u64;
     new_dusts[i] = mini_fanout.shares[i].total_dust as u128;
     remaining = remaining.saturating_sub(payout);
@@ -170,7 +208,7 @@ pub fn handler<'info>(
     let to_token_account = &mut ctx.remaining_accounts[i].to_account_info();
     if payouts[i] > 0 {
       if to_token_account.data_is_empty() {
-        share.total_owed = payouts[i];
+        share.total_owed += payouts[i];
       } else {
         let parsed_to_token_account: Account<TokenAccount> =
           try_from!(Account<TokenAccount>, to_token_account)?;
@@ -196,7 +234,7 @@ pub fn handler<'info>(
 
   // Pay min crank reward to task_queue from mini_fanout, if available
   let min_rent_exempt = Rent::get()?.minimum_balance(mini_fanout_info.data_len());
-  if mini_fanout_info.lamports() - min_rent_exempt >= ctx.accounts.task_queue.min_crank_reward {
+  if mini_fanout_info.lamports() - min_rent_exempt >= ctx.accounts.task_queue.min_crank_reward * 2 {
     mini_fanout.sub_lamports(ctx.accounts.task_queue.min_crank_reward * 2)?;
     ctx
       .accounts

@@ -37,14 +37,6 @@ pub struct MiniFanoutV0 {
 }
 
 #[account]
-#[derive(Default)]
-pub struct UserMiniFanoutsV0 {
-  pub next_id: u32,
-  pub owner: Pubkey,
-  pub bump_seed: u8,
-}
-
-#[account]
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct MiniFanoutShareV0 {
   pub wallet: Pubkey,
