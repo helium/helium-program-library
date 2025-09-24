@@ -179,6 +179,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
+          // Despite the name "finalBlockHeight", this is actually the final SLOT height
+          // In Substreams terminology, a Solana slot is referred to as a "block"
+          // This represents the number of the slot that is finalized (rooted)
           const block = message.value.finalBlockHeight
             ? Number(message.value.finalBlockHeight)
             : null;
