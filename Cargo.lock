@@ -3444,6 +3444,7 @@ dependencies = [
  "brine-ed25519",
  "bubblegum-cpi",
  "circuit-breaker",
+ "clockwork-cron",
  "default-env",
  "lazy-distributor",
  "mini-fanout",

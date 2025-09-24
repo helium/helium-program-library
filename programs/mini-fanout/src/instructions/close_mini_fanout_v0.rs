@@ -95,8 +95,7 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
     },
     &[fanout_seeds!(ctx.accounts.mini_fanout)],
   ))?;
-  if ctx.accounts.next_task.key() != crate::ID
-    && ctx.accounts.next_task.key() != Pubkey::default()
+  if ctx.accounts.next_task.key() != ctx.accounts.mini_fanout.key()
     && !ctx.accounts.next_task.data_is_empty()
   {
     dequeue_task_v0(CpiContext::new_with_signer(
@@ -111,8 +110,7 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
       &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
     ))?;
   }
-  if ctx.accounts.next_pre_task.key() != crate::ID
-    && ctx.accounts.next_pre_task.key() != Pubkey::default()
+  if ctx.accounts.next_pre_task.key() != ctx.accounts.mini_fanout.key()
     && !ctx.accounts.next_pre_task.data_is_empty()
   {
     dequeue_task_v0(CpiContext::new_with_signer(

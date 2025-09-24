@@ -7,6 +7,9 @@ pub struct AutoTopOffV0 {
   pub data_credits: Pubkey,
   pub task_queue: Pubkey,
   pub sub_dao: Pubkey,
+  // If next task is set to auto_top_off.key(), it means there's no next task.
+  // The reason we do this is because you can't set Pubkey::default() as mutable,
+  // which means on `close` you'd need conditional mutability logic, which plays horribly with idls.
   pub next_task: Pubkey,
   pub next_pyth_task: Pubkey,
   pub delegated_data_credits: Pubkey,

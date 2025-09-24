@@ -22,4 +22,6 @@ pub enum ErrorCode {
   InvalidOwner,
   #[msg("Pre task not run")]
   PreTaskNotRun,
+  #[msg("Invalid CPI context - must be called via tuktuk for next_task")]
+  InvalidCpiContext,
 }

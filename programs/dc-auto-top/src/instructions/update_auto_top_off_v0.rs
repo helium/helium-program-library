@@ -130,5 +130,6 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
 
   auto_top_off.next_task = ctx.accounts.new_task.key();
   auto_top_off.next_pyth_task = ctx.accounts.new_pyth_task.key();
+
   Ok(())
 }
