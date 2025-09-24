@@ -85,20 +85,16 @@ impl AutoTopOffV0 {
   pub fn size(args: &InitializeAutoTopOffArgsV0) -> usize {
     // Discriminator
     let mut size = 8;
-    // Pubkey fields: authority, data_credits, sub_dao, task_queue, next_task, next_pyth_task, delegated_data_credits, dc_mint, hnt_mint, dao, hnt_price_oracle, hnt_account, dc_account, escrow_account, circuit_breaker (14 * 32)
-    size += 14 * 32;
+    // Pubkey fields: authority, data_credits, sub_dao, task_queue, next_task, next_pyth_task, delegated_data_credits, dc_mint, hnt_mint, dao, hnt_price_oracle, hnt_account, dc_account, escrow_account, circuit_breaker (15 * 32)
+    size += 15 * 32;
     // bump: u8
     size += 1;
     // schedule: String (4 bytes len + string bytes)
     size += 4 + args.schedule.len();
-    // router_key: String (4 bytes len + string bytes)
-    size += 4 + args.router_key.len();
     // threshold: u64 (8)
     size += 8;
-    // next_task: Pubkey (32)
-    size += 32;
-    // next_pyth_task: Pubkey (32)
-    size += 32;
+    // queue_authority_bump: u8
+    size += 1;
     size
   }
 }
@@ -119,8 +115,8 @@ pub fn handler(
     data_credits: ctx.accounts.data_credits.key(),
     sub_dao: ctx.accounts.sub_dao.key(),
     threshold: args.threshold,
-    next_task: Pubkey::default(),
-    next_pyth_task: Pubkey::default(),
+    next_task: auto_top_off.key(),
+    next_pyth_task: auto_top_off.key(),
     schedule: args.schedule,
     bump: ctx.bumps.auto_top_off,
     task_queue: ctx.accounts.task_queue.key(),

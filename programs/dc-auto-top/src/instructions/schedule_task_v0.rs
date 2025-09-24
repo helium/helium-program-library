@@ -1,6 +1,10 @@
 use std::str::FromStr;
 
-use anchor_lang::{prelude::*, solana_program::system_program, InstructionData};
+use anchor_lang::{
+  prelude::*,
+  solana_program::{system_program, sysvar::instructions::ID as IX_ID},
+  InstructionData,
+};
 use anchor_spl::token::spl_token;
 use chrono::{DateTime, Utc};
 use clockwork_cron::Schedule;
@@ -40,7 +44,7 @@ pub struct ScheduleTaskV0<'info> {
   /// CHECK: Via constraint
   /// Only allow one task to be scheduled at a time
   #[account(
-    constraint = next_task.data_is_empty() || next_task.key() == Pubkey::default()
+    constraint = next_task.data_is_empty() || next_task.key() == auto_top_off.key()
   )]
   pub next_task: UncheckedAccount<'info>,
   /// CHECK: queue authority
@@ -76,7 +80,6 @@ pub fn get_task_ix(auto_top_off: &Account<AutoTopOffV0>) -> Result<CompiledTrans
     sub_dao: auto_top_off.sub_dao,
     token_program: spl_token::ID,
     task_queue: auto_top_off.task_queue,
-    next_task: auto_top_off.next_task,
     delegated_data_credits: auto_top_off.delegated_data_credits,
     dc_mint: auto_top_off.dc_mint,
     hnt_mint: auto_top_off.hnt_mint,
@@ -90,6 +93,7 @@ pub fn get_task_ix(auto_top_off: &Account<AutoTopOffV0>) -> Result<CompiledTrans
     system_program: system_program::ID,
     circuit_breaker_program: circuit_breaker::ID,
     data_credits_program: data_credits::ID,
+    instruction_sysvar: IX_ID,
   }
   .to_account_metas(None);
 

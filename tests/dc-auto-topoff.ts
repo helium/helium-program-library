@@ -272,7 +272,7 @@ describe("dc-auto-topoff", () => {
 
     it("should topoff the delegated data credits", async () => {
       await createAtaAndTransfer(provider, hntMint, 10000000000, me, autoTopOff)
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise(resolve => setTimeout(resolve, 3000))
       await runAllTasks()
       const delegatedDataCreditsAcc = await dcProgram.account.delegatedDataCreditsV0.fetch(delegatedDataCredits)
       const escrow = delegatedDataCreditsAcc.escrowAccount

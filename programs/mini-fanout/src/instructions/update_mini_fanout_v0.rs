@@ -151,5 +151,10 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
     },
   )?;
 
+  if mini_fanout.pre_task.is_some() {
+    mini_fanout.next_pre_task = ctx.accounts.new_pre_task.key();
+  }
+  mini_fanout.next_task = ctx.accounts.new_task.key();
+
   Ok(())
 }

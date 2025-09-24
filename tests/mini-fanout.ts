@@ -266,6 +266,8 @@ describe("mini-fanout", () => {
       expect(miniFanoutAcc.shares[0].wallet.toBase58()).to.equal(newWallet.publicKey.toBase58())
       expect(miniFanoutAcc.shares[0].share.share!.amount).to.equal(10)
       expect(miniFanoutAcc.shares[0].totalDust.toString()).to.equal(toBN(0, 8).toString())
+      console.log("nextTask", miniFanoutAcc.nextTask.toBase58())
+      console.log("nextPreTask", miniFanoutAcc.nextPreTask.toBase58())
       expect(miniFanoutAcc.nextTask.toBase58()).to.equal(taskKey(taskQueue, nextTask)[0].toBase58())
       expect(miniFanoutAcc.schedule).to.equal("0 0 * * * *")
     })

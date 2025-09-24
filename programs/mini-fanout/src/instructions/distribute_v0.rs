@@ -4,7 +4,7 @@ use anchor_lang::{
 };
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use tuktuk_program::{
-  tuktuk, RunTaskReturnV0, TaskQueueV0, TaskReturnV0, TaskV0, TransactionSourceV0, TriggerV0,
+  tuktuk, RunTaskReturnV0, TaskQueueV0, TaskReturnV0, TransactionSourceV0, TriggerV0,
 };
 
 use crate::{errors::ErrorCode, get_next_time, get_task_ix, state::*};
@@ -16,22 +16,14 @@ pub struct DistributeV0<'info> {
   #[account(
     mut,
     has_one = task_queue,
-    has_one = next_task,
     has_one = next_pre_task
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   #[account(mut)]
   pub task_queue: Box<Account<'info, TaskQueueV0>>,
-  #[account(
-    constraint = match next_task.trigger {
-      TriggerV0::Now => true,
-      TriggerV0::Timestamp(timestamp) => timestamp <= Clock::get()?.unix_timestamp,
-    } @ ErrorCode::TaskNotDue
-  )]
-  pub next_task: Box<Account<'info, TaskV0>>,
   /// CHECK: Make sure this is empty, pre task needs to be run before task.
   #[account(
-    constraint = next_pre_task.data_is_empty() || next_pre_task.key() == crate::ID @ ErrorCode::PreTaskNotRun
+    constraint = next_pre_task.data_is_empty() || next_pre_task.key() == mini_fanout.key() @ ErrorCode::PreTaskNotRun
   )]
   pub next_pre_task: UncheckedAccount<'info>,
   #[account(mut)]
@@ -74,17 +66,24 @@ macro_rules! try_from {
   }};
 }
 
-pub fn handler<'info>(
-  ctx: Context<'_, '_, '_, 'info, DistributeV0<'info>>,
-) -> Result<RunTaskReturnV0> {
+pub fn verify_running_in_tuktuk(instruction_sysvar: AccountInfo, task_id: Pubkey) -> Result<()> {
   // Validate that this instruction is being called via CPI from tuktuk for the next_task
-  let current_ix = get_instruction_relative(0, &ctx.accounts.instruction_sysvar)
+  let current_ix = get_instruction_relative(0, &instruction_sysvar)
     .map_err(|_| error!(ErrorCode::InvalidCpiContext))?;
 
   // Check that the current instruction is being called by tuktuk program
   require_eq!(
     current_ix.program_id,
     tuktuk::ID,
+    ErrorCode::InvalidCpiContext
+  );
+
+  // Check that the instruction being called is run_task_v0 by verifying the discriminator
+  // The discriminator for run_task_v0 is the first 8 bytes of SHA256("global:run_task_v0")
+  const RUN_TASK_V0_DISCRIMINATOR: [u8; 8] = [0x34, 0xb8, 0x27, 0x81, 0x7e, 0xf5, 0xb0, 0xed];
+  require!(current_ix.data.len() >= 8, ErrorCode::InvalidCpiContext);
+  require!(
+    current_ix.data[0..8] == RUN_TASK_V0_DISCRIMINATOR,
     ErrorCode::InvalidCpiContext
   );
 
@@ -96,9 +95,20 @@ pub fn handler<'info>(
   );
   require_eq!(
     current_ix.accounts[3].pubkey,
-    ctx.accounts.next_task.key(),
+    task_id,
     ErrorCode::InvalidCpiContext
   );
+
+  Ok(())
+}
+
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, DistributeV0<'info>>,
+) -> Result<RunTaskReturnV0> {
+  verify_running_in_tuktuk(
+    ctx.accounts.instruction_sysvar.to_account_info(),
+    ctx.accounts.mini_fanout.next_task,
+  )?;
 
   let mini_fanout = &mut ctx.accounts.mini_fanout;
   let token_account = &ctx.accounts.token_account;
@@ -241,8 +251,8 @@ pub fn handler<'info>(
       .task_queue
       .add_lamports(ctx.accounts.task_queue.min_crank_reward * 2)?;
   } else {
-    mini_fanout.next_task = crate::ID;
-    mini_fanout.next_pre_task = crate::ID;
+    mini_fanout.next_task = mini_fanout.key();
+    mini_fanout.next_pre_task = mini_fanout.key();
     return Ok(RunTaskReturnV0 {
       tasks: vec![],
       accounts: vec![],

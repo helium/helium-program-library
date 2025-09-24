@@ -7,4 +7,7 @@ pub enum ErrorCode {
 
   #[msg("Invalid schedule")]
   InvalidSchedule,
+
+  #[msg("Invalid CPI context")]
+  InvalidCpiContext,
 }
