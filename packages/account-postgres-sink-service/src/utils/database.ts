@@ -83,7 +83,6 @@ Cursor.init(
     },
     block: {
       type: STRING,
-      field: "block_height",
     },
   },
   {
