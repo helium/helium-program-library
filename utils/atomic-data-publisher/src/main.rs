@@ -1,7 +1,9 @@
 mod config;
 mod database;
 mod errors;
+mod health_service;
 mod metrics;
+mod polling_service;
 mod protobuf;
 mod publisher;
 mod queries;
@@ -10,7 +12,6 @@ mod service;
 use anyhow::{Context, Result};
 use config::{LoggingConfig, Settings};
 use service::AtomicDataPublisher;
-use std::sync::Arc;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -29,11 +30,9 @@ async fn run_service() -> Result<()> {
 
   validate_config(&settings).context("Configuration validation failed")?;
 
-  let service = Arc::new(
-    AtomicDataPublisher::new(settings)
-      .await
-      .context("Failed to initialize service")?
-  );
+  let service = AtomicDataPublisher::new(settings)
+    .await
+    .context("Failed to initialize service")?;
   info!("Atomic Data Publisher service initialized successfully");
 
   let service_result = service.run().await;

@@ -68,160 +68,166 @@ impl ProtobufBuilder {
       })
   }
 
-  pub fn build_mobile_hotspot_change(
+  pub fn build_mobile_hotspot_changes(
     change: &ChangeRecord,
     keypair: &Keypair,
-  ) -> Result<MobileHotspotChangeReqV1, AtomicDataError> {
+  ) -> Result<Vec<MobileHotspotChangeReqV1>, AtomicDataError> {
     Self::validate_change_record(change)?;
 
-    let atomic_data = change
-      .atomic_data
-      .as_array()
-      .and_then(|arr| arr.first())
-      .ok_or_else(|| {
-        AtomicDataError::InvalidData("No atomic data found in change record".to_string())
-      })?;
+    let atomic_data_array = change.atomic_data.as_array().ok_or_else(|| {
+      AtomicDataError::InvalidData("No atomic data found in change record".to_string())
+    })?;
 
-    debug!("Building mobile hotspot update from data: {}", atomic_data);
-    debug!(
-      "Available keys in data: {:?}",
-      atomic_data
-        .as_object()
-        .map(|obj| obj.keys().collect::<Vec<_>>())
-    );
+    let mut change_requests = Vec::with_capacity(atomic_data_array.len());
 
-    let block = Self::get_u64_field(atomic_data, "block")?;
-    let timestamp_seconds = Self::current_timestamp();
+    for atomic_data in atomic_data_array {
+      debug!("Building mobile hotspot update from data: {}", atomic_data);
+      debug!(
+        "Available keys in data: {:?}",
+        atomic_data
+          .as_object()
+          .map(|obj| obj.keys().collect::<Vec<_>>())
+      );
 
-    let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
-    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
-    let metadata = Self::build_mobile_hotspot_metadata(atomic_data)?;
+      let block = Self::get_u64_field(atomic_data, "block")?;
+      let timestamp_seconds = Self::current_timestamp();
 
-    let change_msg = MobileHotspotChangeV1 {
-      block,
-      timestamp_seconds,
-      pub_key: Some(pub_key),
-      asset: Some(asset),
-      metadata: Some(metadata),
-    };
+      let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+      let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+      let metadata = Self::build_mobile_hotspot_metadata(atomic_data)?;
 
-    let mut request = MobileHotspotChangeReqV1 {
-      change: Some(change_msg),
-      signer: keypair.public_key().to_string(),
-      signature: vec![],
-    };
+      let change_msg = MobileHotspotChangeV1 {
+        block,
+        timestamp_seconds,
+        pub_key: Some(pub_key),
+        asset: Some(asset),
+        metadata: Some(metadata),
+      };
 
-    let signature = Self::sign_message(&request, keypair)?;
-    request.signature = signature;
+      let mut request = MobileHotspotChangeReqV1 {
+        change: Some(change_msg),
+        signer: keypair.public_key().to_string(),
+        signature: vec![],
+      };
 
-    Ok(request)
+      let signature = Self::sign_message(&request, keypair)?;
+      request.signature = signature;
+
+      change_requests.push(request);
+    }
+
+    Ok(change_requests)
   }
 
-  pub fn build_iot_hotspot_change(
+  pub fn build_iot_hotspot_changes(
     change: &ChangeRecord,
     keypair: &Keypair,
-  ) -> Result<IotHotspotChangeReqV1, AtomicDataError> {
+  ) -> Result<Vec<IotHotspotChangeReqV1>, AtomicDataError> {
     Self::validate_change_record(change)?;
 
-    let atomic_data = change
-      .atomic_data
-      .as_array()
-      .and_then(|arr| arr.first())
-      .ok_or_else(|| {
-        AtomicDataError::InvalidData("No atomic data found in change record".to_string())
-      })?;
+    let atomic_data_array = change.atomic_data.as_array().ok_or_else(|| {
+      AtomicDataError::InvalidData("No atomic data found in change record".to_string())
+    })?;
 
-    debug!("Building IoT hotspot update from data: {}", atomic_data);
+    let mut change_requests = Vec::with_capacity(atomic_data_array.len());
 
-    let block = Self::get_u64_field(atomic_data, "block")?;
-    let timestamp_seconds = Self::current_timestamp();
+    for atomic_data in atomic_data_array {
+      debug!("Building IoT hotspot update from data: {}", atomic_data);
 
-    let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
-    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
-    let metadata = Self::build_iot_hotspot_metadata(atomic_data)?;
+      let block = Self::get_u64_field(atomic_data, "block")?;
+      let timestamp_seconds = Self::current_timestamp();
 
-    let change_msg = IotHotspotChangeV1 {
-      block,
-      timestamp_seconds,
-      pub_key: Some(pub_key),
-      asset: Some(asset),
-      metadata: Some(metadata),
-    };
+      let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+      let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+      let metadata = Self::build_iot_hotspot_metadata(atomic_data)?;
 
-    let mut request = IotHotspotChangeReqV1 {
-      change: Some(change_msg),
-      signer: keypair.public_key().to_string(),
-      signature: vec![],
-    };
+      let change_msg = IotHotspotChangeV1 {
+        block,
+        timestamp_seconds,
+        pub_key: Some(pub_key),
+        asset: Some(asset),
+        metadata: Some(metadata),
+      };
 
-    let signature = Self::sign_message(&request, keypair)?;
-    request.signature = signature;
+      let mut request = IotHotspotChangeReqV1 {
+        change: Some(change_msg),
+        signer: keypair.public_key().to_string(),
+        signature: vec![],
+      };
 
-    Ok(request)
+      let signature = Self::sign_message(&request, keypair)?;
+      request.signature = signature;
+
+      change_requests.push(request);
+    }
+
+    Ok(change_requests)
   }
 
-  pub fn build_entity_ownership_change(
+  pub fn build_entity_ownership_changes(
     change: &ChangeRecord,
     keypair: &Keypair,
-  ) -> Result<EntityOwnershipChangeReqV1, AtomicDataError> {
+  ) -> Result<Vec<EntityOwnershipChangeReqV1>, AtomicDataError> {
     Self::validate_change_record(change)?;
 
-    let atomic_data = change
-      .atomic_data
-      .as_array()
-      .and_then(|arr| arr.first())
-      .ok_or_else(|| {
-        AtomicDataError::InvalidData("No atomic data found in change record".to_string())
-      })?;
+    let atomic_data_array = change.atomic_data.as_array().ok_or_else(|| {
+      AtomicDataError::InvalidData("No atomic data found in change record".to_string())
+    })?;
 
-    let block = Self::get_u64_field(atomic_data, "block")?;
-    let timestamp_seconds = Self::current_timestamp();
+    let mut change_requests = Vec::with_capacity(atomic_data_array.len());
 
-    let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
-    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
-    let owner = Self::build_entity_owner_info(atomic_data)?;
+    for atomic_data in atomic_data_array {
+      let block = Self::get_u64_field(atomic_data, "block")?;
+      let timestamp_seconds = Self::current_timestamp();
 
-    let change_msg = EntityOwnerChangeV1 {
-      block,
-      timestamp_seconds,
-      entity_pub_key: Some(entity_pub_key),
-      asset: Some(asset),
-      owner: Some(owner),
-    };
+      let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+      let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+      let owner = Self::build_entity_owner_info(atomic_data)?;
 
-    let mut request = EntityOwnershipChangeReqV1 {
-      change: Some(change_msg),
-      signer: keypair.public_key().to_string(),
-      signature: vec![],
-    };
+      let change_msg = EntityOwnerChangeV1 {
+        block,
+        timestamp_seconds,
+        entity_pub_key: Some(entity_pub_key),
+        asset: Some(asset),
+        owner: Some(owner),
+      };
 
-    let signature = Self::sign_message(&request, keypair)?;
-    request.signature = signature;
+      let mut request = EntityOwnershipChangeReqV1 {
+        change: Some(change_msg),
+        signer: keypair.public_key().to_string(),
+        signature: vec![],
+      };
 
-    Ok(request)
+      let signature = Self::sign_message(&request, keypair)?;
+      request.signature = signature;
+
+      change_requests.push(request);
+    }
+
+    Ok(change_requests)
   }
 
-  pub fn build_entity_reward_destination_change(
+  pub fn build_entity_reward_destination_changes(
     change: &ChangeRecord,
     keypair: &Keypair,
-  ) -> Result<EntityRewardDestinationChangeReqV1, AtomicDataError> {
+  ) -> Result<Vec<EntityRewardDestinationChangeReqV1>, AtomicDataError> {
     Self::validate_change_record(change)?;
 
-    let atomic_data = change
-      .atomic_data
-      .as_array()
-      .and_then(|arr| arr.first())
-      .ok_or_else(|| {
-        AtomicDataError::InvalidData("No atomic data found in change record".to_string())
-      })?;
+    let atomic_data_array = change.atomic_data.as_array().ok_or_else(|| {
+      AtomicDataError::InvalidData("No atomic data found in change record".to_string())
+    })?;
 
-    let block = Self::get_u64_field(atomic_data, "block")?;
-    let timestamp_seconds = Self::current_timestamp();
+    let mut change_requests = Vec::with_capacity(atomic_data_array.len());
 
-    let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
-    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
-    let rewards_destination =
-      if let Some(rewards_split) = Self::try_build_rewards_split(atomic_data)? {
+    for atomic_data in atomic_data_array {
+      let block = Self::get_u64_field(atomic_data, "block")?;
+      let timestamp_seconds = Self::current_timestamp();
+
+      let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+      let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+      let rewards_destination = if let Some(rewards_split) =
+        Self::try_build_rewards_split(atomic_data)?
+      {
         Some(entity_reward_destination_change_v1::RewardsDestination::RewardsSplitV1(rewards_split))
       } else if let Some(rewards_recipient) =
         Self::try_extract_solana_pub_key(atomic_data, "rewards_recipient")
@@ -237,31 +243,31 @@ impl ProtobufBuilder {
         ));
       };
 
-    let change_msg = EntityRewardDestinationChangeV1 {
-      block,
-      timestamp_seconds,
-      entity_pub_key: Some(entity_pub_key),
-      asset: Some(asset),
-      rewards_destination,
-    };
+      let change_msg = EntityRewardDestinationChangeV1 {
+        block,
+        timestamp_seconds,
+        entity_pub_key: Some(entity_pub_key),
+        asset: Some(asset),
+        rewards_destination,
+      };
 
-    let mut request = EntityRewardDestinationChangeReqV1 {
-      change: Some(change_msg),
-      signer: keypair.public_key().to_string(),
-      signature: vec![],
-    };
+      let mut request = EntityRewardDestinationChangeReqV1 {
+        change: Some(change_msg),
+        signer: keypair.public_key().to_string(),
+        signature: vec![],
+      };
 
-    let signature = Self::sign_message(&request, keypair)?;
-    request.signature = signature;
+      let signature = Self::sign_message(&request, keypair)?;
+      request.signature = signature;
 
-    Ok(request)
+      change_requests.push(request);
+    }
+
+    Ok(change_requests)
   }
 
   fn build_mobile_hotspot_metadata(data: &Value) -> Result<MobileHotspotMetadata, AtomicDataError> {
-    let serial_number = data
-      .get("deployment_info")
-      .and_then(|di| di.get("wifiInfoV0"))
-      .and_then(|wifi| wifi.get("serial"))
+    let serial_number = Self::safe_get_nested(data, &["deployment_info", "wifiInfoV0", "serial"])
       .and_then(|s| s.as_str())
       .map(|s| s.to_string())
       .or_else(|| Self::extract_string(data, "serial_number"))
@@ -283,14 +289,11 @@ impl ProtobufBuilder {
       .or_else(|| Self::extract_u64(data, "location").map(|loc| format!("{:x}", loc)))
       .unwrap_or_default();
 
-    let azimuth = data
-      .get("deployment_info")
-      .and_then(|di| di.get("wifiInfoV0"))
-      .and_then(|wifi| wifi.get("azimuth"))
+    let azimuth = Self::safe_get_nested(data, &["deployment_info", "wifiInfoV0", "azimuth"])
       .and_then(|a| a.as_u64())
       .map(|a| a as u32)
       .or_else(|| Self::extract_u32(data, "azimuth"))
-      .ok_or_else(|| AtomicDataError::InvalidData("Missing azimuth field".to_string()))?;
+      .unwrap_or_default();
 
     Ok(MobileHotspotMetadata {
       serial_number,
@@ -309,8 +312,8 @@ impl ProtobufBuilder {
     let elevation = Self::extract_u32(data, "elevation")
       .ok_or_else(|| AtomicDataError::InvalidData("Missing elevation field".to_string()))?;
 
-    let is_data_only = Self::extract_bool(data, "is_data_only")
-      .ok_or_else(|| AtomicDataError::InvalidData("Missing is_data_only field".to_string()))?;
+    let is_data_only = !Self::extract_bool(data, "is_full_hotspot")
+      .ok_or_else(|| AtomicDataError::InvalidData("Missing is_full_hotspot field".to_string()))?;
 
     Ok(IotHotspotMetadata {
       asserted_hex,
@@ -338,25 +341,36 @@ impl ProtobufBuilder {
   }
 
   fn try_build_rewards_split(data: &Value) -> Result<Option<RewardsSplitV1>, AtomicDataError> {
-    if let Some(split_data) = data.get("rewards_split").filter(|v| !v.is_null()) {
+    if let Some(split_data) = data
+      .get("rewards_split")
+      .filter(|v| !v.is_null() && !Self::is_empty_value(v))
+    {
       let pub_key = Self::extract_solana_pub_key(split_data, "pub_key")?;
       let schedule = Self::extract_string(split_data, "schedule")
-        .ok_or_else(|| AtomicDataError::InvalidData("Missing schedule field".to_string()))?;
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+          AtomicDataError::InvalidData("Missing or empty schedule field".to_string())
+        })?;
       let total_shares = Self::extract_u32(split_data, "total_shares")
         .ok_or_else(|| AtomicDataError::InvalidData("Missing total_shares field".to_string()))?;
 
-      let recipients =
-        if let Some(recipients_array) = split_data.get("recipients").and_then(|v| v.as_array()) {
-          let mut recipients = Vec::with_capacity(recipients_array.len());
-          for recipient in recipients_array {
+      let recipients = if let Some(recipients_array) = split_data
+        .get("recipients")
+        .and_then(|v| v.as_array())
+        .filter(|arr| !arr.is_empty())
+      {
+        let mut recipients = Vec::with_capacity(recipients_array.len());
+        for recipient in recipients_array {
+          if !Self::is_empty_value(recipient) {
             if let Ok(split_recipient) = Self::try_build_split_recipient(recipient) {
               recipients.push(split_recipient);
             }
           }
-          recipients
-        } else {
-          Vec::new()
-        };
+        }
+        recipients
+      } else {
+        Vec::new()
+      };
 
       Ok(Some(RewardsSplitV1 {
         pub_key: Some(pub_key),
@@ -435,8 +449,32 @@ impl ProtobufBuilder {
       .map(|decoded| SolanaPubKey { value: decoded })
   }
 
+  fn is_empty_value(value: &Value) -> bool {
+    match value {
+      Value::Object(obj) => obj.is_empty(),
+      Value::Array(arr) => arr.is_empty(),
+      Value::String(s) => s.is_empty(),
+      Value::Null => true,
+      _ => false,
+    }
+  }
+
+  fn safe_get_nested<'a>(data: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    let mut current = data;
+    for key in path {
+      current = current
+        .get(key)
+        .filter(|v| !v.is_null() && !Self::is_empty_value(v))?;
+    }
+    Some(current)
+  }
+
   fn extract_string(data: &Value, key: &str) -> Option<String> {
-    data.get(key)?.as_str().map(|s| s.to_string())
+    data
+      .get(key)?
+      .as_str()
+      .filter(|s| !s.is_empty())
+      .map(|s| s.to_string())
   }
 
   fn extract_u64(data: &Value, key: &str) -> Option<u64> {
@@ -506,27 +544,47 @@ pub enum EntityChangeRequest {
   EntityRewardDestination(EntityRewardDestinationChangeReqV1),
 }
 
-pub fn build_entity_change_request(
+pub fn build_entity_change_requests(
   change: &ChangeRecord,
   change_type: &str,
   keypair: &Keypair,
-) -> Result<EntityChangeRequest, AtomicDataError> {
+) -> Result<Vec<EntityChangeRequest>, AtomicDataError> {
   match change_type {
     "mobile_hotspot" => {
-      let req = ProtobufBuilder::build_mobile_hotspot_change(change, keypair)?;
-      Ok(EntityChangeRequest::MobileHotspot(req))
+      let reqs = ProtobufBuilder::build_mobile_hotspot_changes(change, keypair)?;
+      Ok(
+        reqs
+          .into_iter()
+          .map(EntityChangeRequest::MobileHotspot)
+          .collect(),
+      )
     }
     "iot_hotspot" => {
-      let req = ProtobufBuilder::build_iot_hotspot_change(change, keypair)?;
-      Ok(EntityChangeRequest::IotHotspot(req))
+      let reqs = ProtobufBuilder::build_iot_hotspot_changes(change, keypair)?;
+      Ok(
+        reqs
+          .into_iter()
+          .map(EntityChangeRequest::IotHotspot)
+          .collect(),
+      )
     }
     "entity_ownership" => {
-      let req = ProtobufBuilder::build_entity_ownership_change(change, keypair)?;
-      Ok(EntityChangeRequest::EntityOwnership(req))
+      let reqs = ProtobufBuilder::build_entity_ownership_changes(change, keypair)?;
+      Ok(
+        reqs
+          .into_iter()
+          .map(EntityChangeRequest::EntityOwnership)
+          .collect(),
+      )
     }
     "entity_reward_destination" => {
-      let req = ProtobufBuilder::build_entity_reward_destination_change(change, keypair)?;
-      Ok(EntityChangeRequest::EntityRewardDestination(req))
+      let reqs = ProtobufBuilder::build_entity_reward_destination_changes(change, keypair)?;
+      Ok(
+        reqs
+          .into_iter()
+          .map(EntityChangeRequest::EntityRewardDestination)
+          .collect(),
+      )
     }
     _ => Err(AtomicDataError::InvalidData(format!(
       "Unknown change type: {}",

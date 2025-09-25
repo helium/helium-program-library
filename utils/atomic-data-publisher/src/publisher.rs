@@ -7,7 +7,7 @@ use crate::config::{IngestorConfig, PollingJob, ServiceConfig};
 use crate::database::ChangeRecord;
 use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
-use crate::protobuf::{build_entity_change_request, EntityChangeRequest};
+use crate::protobuf::{build_entity_change_requests, EntityChangeRequest};
 use helium_proto::services::chain_rewardable_entities::{
   chain_rewardable_entities_client::ChainRewardableEntitiesClient, EntityOwnershipChangeRespV1,
   EntityRewardDestinationChangeRespV1, IotHotspotChangeRespV1, MobileHotspotChangeRespV1,
@@ -88,11 +88,13 @@ impl AtomicDataPublisher {
 
     for change in changes {
       match self.process_change(&change).await {
-        Ok(()) => {
-          published_ids.push(change.job_name.clone());
+        Ok(published_count) => {
+          for _ in 0..published_count {
+            published_ids.push(change.job_name.clone());
+          }
           debug!(
-            "Successfully published change for job '{}'",
-            change.job_name
+            "Successfully published {} individual changes for job '{}'",
+            published_count, change.job_name
           );
         }
         Err(e) => {
@@ -112,7 +114,7 @@ impl AtomicDataPublisher {
     Ok(published_ids)
   }
 
-  async fn process_change(&self, change: &ChangeRecord) -> Result<(), AtomicDataError> {
+  async fn process_change(&self, change: &ChangeRecord) -> Result<usize, AtomicDataError> {
     let job_config = self
       .polling_jobs
       .iter()
@@ -135,10 +137,14 @@ impl AtomicDataPublisher {
         ))
       })?;
 
-    let entity_request = build_entity_change_request(change, change_type, &self.keypair)?;
-    self.send_with_retries(entity_request).await?;
+    let entity_requests = build_entity_change_requests(change, change_type, &self.keypair)?;
+    debug!("Processing {} entity change requests for job '{}'", entity_requests.len(), change.job_name);
 
-    Ok(())
+    for entity_request in entity_requests.iter() {
+      self.send_with_retries(entity_request.clone()).await?;
+    }
+
+    Ok(entity_requests.len())
   }
 
   async fn send_with_retries(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {

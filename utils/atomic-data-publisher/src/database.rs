@@ -17,6 +17,8 @@ const DEFAULT_CHUNK_PERCENTAGE: f64 = 0.10;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
   pub job_name: String,
+  pub query_name: String,
+  pub target_block: u64,
   pub atomic_data: serde_json::Value,
 }
 
@@ -101,11 +103,9 @@ impl DatabaseClient {
         anyhow::bail!("Job '{}' (index {}): parameters must be a valid JSON object", job.name, index);
       }
 
-      if job.query_name == "construct_atomic_hotspots" {
-        if !job.parameters.get("hotspot_type").is_some() {
-          anyhow::bail!("Job '{}' (index {}): hotspot_type parameter is required for construct_atomic_hotspots queries",
-                       job.name, index);
-        }
+      if job.query_name == "construct_atomic_hotspots" && job.parameters.get("hotspot_type").is_none() {
+        anyhow::bail!("Job '{}' (index {}): hotspot_type parameter is required for construct_atomic_hotspots queries",
+                     job.name, index);
       }
     }
 
@@ -246,52 +246,66 @@ impl DatabaseClient {
 
   pub async fn get_pending_changes(
     &self,
-  ) -> Result<Option<(Vec<ChangeRecord>, (String, String), u64)>> {
-    if self.any_job_running().await? {
-      return Ok(None);
-    }
+  ) -> Result<Option<ChangeRecord>> {
+    loop {
+      if let Some(job) = self.get_next_queue_job().await? {
+        if !self.mark_job_running(&job.name, &job.query_name).await? {
+          continue; // Try next job if this one couldn't be marked as running
+        }
 
-    if let Some(job) = self.get_next_queue_job().await? {
-      if !self.mark_job_running(&job.name, &job.query_name).await? {
-        return Ok(None);
-      }
-
-      let (changes, target_block) =
         match self.execute_job_polling(&job).await {
-          Ok(result) => result,
+          Ok(change_record) => {
+            // If no data found, mark job as completed and not running, then continue to next job
+            if change_record.is_none() {
+              info!("No data found for job '{}', marking as completed and continuing to next job", job.name);
+              let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
+              let _ = self.mark_completed(&job.name, &job.query_name).await;
+              continue; // Continue to next job in the same cycle
+            }
+            return Ok(change_record);
+          }
           Err(e) => {
             let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
             return Err(e.into());
           }
-        };
-
-      Ok(Some((changes, (job.name, job.query_name), target_block)))
-    } else {
-      self.reset_job_queue().await?;
-      Ok(None)
+        }
+      } else {
+        // No more jobs available, reset queue for next cycle
+        self.reset_job_queue().await?;
+        return Ok(None);
+      }
     }
   }
 
   async fn execute_job_polling(
     &self,
     job: &PollingJob,
-  ) -> Result<(Vec<ChangeRecord>, u64), AtomicDataError> {
+  ) -> Result<Option<ChangeRecord>, AtomicDataError> {
     let (last_processed_block, max_available_block) = self.get_polling_bounds(job).await?;
     if max_available_block <= last_processed_block {
-      return Ok((Vec::new(), last_processed_block));
+      return Ok(None);
     }
 
     let target_block = self.calculate_target_block(last_processed_block, max_available_block);
     let rows = self.execute_query(job, last_processed_block, target_block).await?;
-    let changes = self.process_query_results(&rows, &job.name);
+    let change_record = self.process_query_results(&rows, job, target_block);
 
-    info!(
-      "Found {} changes for job '{}' (processed up to block {})",
-      changes.len(),
-      job.name,
-      target_block
-    );
-    Ok((changes, target_block))
+    if change_record.is_some() {
+      info!(
+        "Found {} rows for job '{}' (processed up to block {})",
+        rows.len(),
+        job.name,
+        target_block
+      );
+    } else {
+      info!(
+        "No changes found for job '{}' (processed up to block {})",
+        job.name,
+        target_block
+      );
+    }
+
+    Ok(change_record)
   }
 
   /// Get the polling bounds (last processed block and max available block) for a job
@@ -391,20 +405,22 @@ impl DatabaseClient {
     Ok(rows)
   }
 
-  fn process_query_results(&self, rows: &[sqlx::postgres::PgRow], job_name: &str) -> Vec<ChangeRecord> {
-    let mut changes = Vec::with_capacity(rows.len());
-
-    for row in rows {
-      let mut atomic_data_array = Vec::with_capacity(1);
-      atomic_data_array.push(row.get::<serde_json::Value, _>("atomic_data"));
-
-      changes.push(ChangeRecord {
-        job_name: job_name.to_string(),
-        atomic_data: serde_json::Value::Array(atomic_data_array),
-      });
+  fn process_query_results(&self, rows: &[sqlx::postgres::PgRow], job: &PollingJob, target_block: u64) -> Option<ChangeRecord> {
+    if rows.is_empty() {
+      return None;
     }
 
-    changes
+    let mut atomic_data_array = Vec::with_capacity(rows.len());
+    for row in rows {
+      atomic_data_array.push(row.get::<serde_json::Value, _>("atomic_data"));
+    }
+
+    Some(ChangeRecord {
+      job_name: job.name.clone(),
+      query_name: job.query_name.clone(),
+      target_block,
+      atomic_data: serde_json::Value::Array(atomic_data_array),
+    })
   }
 
   pub async fn mark_processed(&self, changes: &[ChangeRecord], target_block: u64) -> Result<()> {
@@ -766,6 +782,25 @@ impl DatabaseClient {
       );
     }
 
+    Ok(())
+  }
+
+  pub async fn finalize_job(&self, record: &ChangeRecord, failed_count: usize) -> Result<()> {
+    if let Err(e) = self.mark_job_not_running(&record.job_name, &record.query_name).await {
+      warn!("Failed to mark job '{}' as not running: {}", record.job_name, e);
+    }
+
+    // Only mark as completed if there were no failures
+    // Jobs with data will be marked completed after successful processing
+    if failed_count == 0 {
+      if let Err(e) = self.mark_completed(&record.job_name, &record.query_name).await {
+        warn!("Failed to mark job '{}' as completed: {}", record.job_name, e);
+      } else {
+        info!("Job '{}' completed successfully and marked as done", record.job_name);
+      }
+    } else {
+      warn!("Job '{}' had {} failed changes, leaving in queue for retry", record.job_name, failed_count);
+    }
     Ok(())
   }
 
