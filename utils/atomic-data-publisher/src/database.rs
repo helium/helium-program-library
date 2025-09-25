@@ -10,9 +10,9 @@ use crate::errors::AtomicDataError;
 use crate::metrics::MetricsCollector;
 use std::sync::Arc;
 
-const MIN_CHUNK_SIZE: u64 = 1000;
-const MAX_CHUNK_SIZE: u64 = 100_000_000;
-const DEFAULT_CHUNK_PERCENTAGE: f64 = 0.10;
+const MIN_CHUNK_SIZE: u64 = 50_000;
+const MAX_CHUNK_SIZE: u64 = 500_000;
+const DEFAULT_CHUNK_PERCENTAGE: f64 = 0.25;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
@@ -138,12 +138,27 @@ impl DatabaseClient {
         running_since TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         queue_completed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        last_max_block BIGINT DEFAULT NULL,
+        max_block_occurrences INTEGER DEFAULT 0,
         PRIMARY KEY (job_name, query_name)
       )
     "#;
 
     sqlx::query(create_table_query).execute(&self.pool).await?;
-    info!("Created or verified atomic_data_polling_state table with job_name structure");
+
+    // Add new columns if they don't exist (for existing installations)
+    let add_columns_query = r#"
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'atomic_data_polling_state' AND column_name = 'last_max_block') THEN
+          ALTER TABLE atomic_data_polling_state ADD COLUMN last_max_block BIGINT DEFAULT NULL;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'atomic_data_polling_state' AND column_name = 'max_block_occurrences') THEN
+          ALTER TABLE atomic_data_polling_state ADD COLUMN max_block_occurrences INTEGER DEFAULT 0;
+        END IF;
+      END $$;
+    "#;
+    sqlx::query(add_columns_query).execute(&self.pool).await?;
 
     let create_index_query = r#"
       CREATE INDEX IF NOT EXISTS idx_polling_state_updated_at
@@ -159,7 +174,7 @@ impl DatabaseClient {
       .execute(&self.pool)
       .await?;
 
-    info!("Created or verified atomic_data_polling_state table with query-level tracking support");
+    info!("Created or verified atomic_data_polling_state table with max_block occurrence tracking");
     Ok(())
   }
 
@@ -303,6 +318,7 @@ impl DatabaseClient {
         job.name,
         target_block
       );
+      self.advance_block_for_job(&job.name, &job.query_name, target_block).await?;
     }
 
     Ok(change_record)
@@ -315,7 +331,9 @@ impl DatabaseClient {
       SELECT
         job_name,
         query_name,
-        last_processed_block
+        last_processed_block,
+        last_max_block,
+        max_block_occurrences
       FROM atomic_data_polling_state
       WHERE job_name = $1 AND query_name = $2
       "#,
@@ -326,11 +344,123 @@ impl DatabaseClient {
     .await?;
 
     let last_processed_block: i64 = current_state_row.get("last_processed_block");
+    let last_max_block: Option<i64> = current_state_row.get("last_max_block");
+    let max_block_occurrences: i32 = current_state_row.get("max_block_occurrences");
 
-    let max_available_block = self.get_max_last_block_for_query(&job.query_name).await?
+    let raw_max_available_block = self.get_max_last_block_for_query(&job.query_name, &job.parameters).await?
       .ok_or_else(|| AtomicDataError::PollingBoundsError(format!("No data available for query '{}'", job.query_name)))?;
 
+    let max_available_block = self.handle_max_block_occurrences(
+      &job.name,
+      &job.query_name,
+      raw_max_available_block,
+      last_processed_block as u64,
+      last_max_block.map(|b| b as u64),
+      max_block_occurrences,
+    ).await?;
+
     Ok((last_processed_block as u64, max_available_block))
+  }
+
+  async fn handle_max_block_occurrences(
+    &self,
+    job_name: &str,
+    query_name: &str,
+    raw_max_block: u64,
+    last_processed_block: u64,
+    last_max_block: Option<u64>,
+    max_block_occurrences: i32,
+  ) -> Result<u64, AtomicDataError> {
+    const OCCURRENCE_THRESHOLD: i32 = 5;
+    let safe_max_block = if raw_max_block > 1 { raw_max_block - 1 } else { raw_max_block };
+
+    let max_block_changed = last_max_block.map_or(true, |last| last != raw_max_block);
+    if max_block_changed {
+      self.update_max_block_tracking(job_name, query_name, raw_max_block).await?;
+      return Ok(safe_max_block);
+    }
+
+    if last_processed_block < safe_max_block {
+      return Ok(safe_max_block);
+    }
+
+    if last_processed_block >= raw_max_block {
+      if max_block_occurrences > 0 {
+        self.reset_max_block_occurrences(job_name, query_name).await?;
+      }
+      return Ok(raw_max_block);
+    }
+
+    let new_occurrences = max_block_occurrences + 1;
+    self.increment_max_block_occurrences(job_name, query_name, new_occurrences).await?;
+
+    if new_occurrences >= OCCURRENCE_THRESHOLD {
+      info!(
+        "Job '{}' has seen same max_block {} for {} times, processing final block {} to {}",
+        job_name, raw_max_block, new_occurrences, last_processed_block, raw_max_block
+      );
+      self.reset_max_block_occurrences(job_name, query_name).await?;
+      return Ok(raw_max_block);
+    }
+
+    Ok(safe_max_block)
+  }
+
+  async fn update_max_block_tracking(&self, job_name: &str, query_name: &str, max_block: u64) -> Result<(), AtomicDataError> {
+    sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        last_max_block = $1,
+        max_block_occurrences = 0,
+        updated_at = NOW()
+      WHERE job_name = $2 AND query_name = $3
+      "#,
+    )
+    .bind(max_block as i64)
+    .bind(job_name)
+    .bind(query_name)
+    .execute(&self.pool)
+    .await?;
+
+    Ok(())
+  }
+
+  async fn increment_max_block_occurrences(&self, job_name: &str, query_name: &str, new_occurrences: i32) -> Result<(), AtomicDataError> {
+    sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        max_block_occurrences = $1,
+        updated_at = NOW()
+      WHERE job_name = $2 AND query_name = $3
+      "#,
+    )
+    .bind(new_occurrences)
+    .bind(job_name)
+    .bind(query_name)
+    .execute(&self.pool)
+    .await?;
+
+    Ok(())
+  }
+
+  async fn reset_max_block_occurrences(&self, job_name: &str, query_name: &str) -> Result<(), AtomicDataError> {
+    sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        max_block_occurrences = 0,
+        updated_at = NOW()
+      WHERE job_name = $1 AND query_name = $2
+      "#,
+    )
+    .bind(job_name)
+    .bind(query_name)
+    .execute(&self.pool)
+    .await?;
+
+    Ok(())
   }
 
   fn calculate_target_block(&self, last_processed_block: u64, max_available_block: u64) -> u64 {
@@ -339,7 +469,7 @@ impl DatabaseClient {
     let chunk_size = if block_diff <= MIN_CHUNK_SIZE {
       block_diff
     } else {
-      // Scale chunk size logarithmically: roughly 10% of remaining blocks, with bounds
+      // Scale chunk size logarithmically with remaining blocks, with bounds
       let scaled_chunk = (block_diff as f64 * DEFAULT_CHUNK_PERCENTAGE) as u64;
       scaled_chunk.clamp(MIN_CHUNK_SIZE, MAX_CHUNK_SIZE)
     };
@@ -478,6 +608,30 @@ impl DatabaseClient {
     Ok(())
   }
 
+  async fn advance_block_for_job(&self, job_name: &str, query_name: &str, target_block: u64) -> Result<()> {
+    sqlx::query(
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        last_processed_block = $1,
+        updated_at = NOW()
+      WHERE job_name = $2 AND query_name = $3
+      "#,
+    )
+    .bind(target_block as i64)
+    .bind(job_name)
+    .bind(query_name)
+    .execute(&self.pool)
+    .await?;
+
+    debug!(
+      "Advanced block to {} for job '{}' query '{}' (no changes found, skipping gap)",
+      target_block, job_name, query_name
+    );
+
+    Ok(())
+  }
+
   async fn advance_block_for_active_job(&self, target_block: u64) -> Result<()> {
     let active_job = sqlx::query(
       r#"
@@ -494,25 +648,7 @@ impl DatabaseClient {
       let job_name: String = row.get("job_name");
       let query_name: String = row.get("query_name");
 
-      sqlx::query(
-        r#"
-        UPDATE atomic_data_polling_state
-        SET
-          last_processed_block = $1,
-          updated_at = NOW()
-        WHERE job_name = $2 AND query_name = $3
-        "#,
-      )
-      .bind(target_block as i64)
-      .bind(&job_name)
-      .bind(&query_name)
-      .execute(&self.pool)
-      .await?;
-
-      debug!(
-        "Advanced block to {} for job '{}' query '{}' (no changes)",
-        target_block, job_name, query_name
-      );
+      self.advance_block_for_job(&job_name, &query_name, target_block).await?;
     }
 
     Ok(())
@@ -523,22 +659,45 @@ impl DatabaseClient {
     Ok(())
   }
 
-  pub async fn get_max_last_block_for_query(&self, query_name: &str) -> Result<Option<u64>> {
+
+  pub async fn get_max_last_block_for_query(&self, query_name: &str, parameters: &serde_json::Value) -> Result<Option<u64>> {
     let max_block = match query_name {
       "construct_atomic_hotspots" => {
-        let row = sqlx::query(
-          r#"
-          SELECT GREATEST(
-            COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), 0),
-            COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), 0)
-          )::bigint as max_block
-          "#
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let hotspot_type = parameters
+          .get("hotspot_type")
+          .and_then(|v| v.as_str())
+          .unwrap_or("mobile"); // Default to mobile if not specified
 
-        let max_block: i64 = row.get("max_block");
-        if max_block > 1 { Some((max_block - 1) as u64) } else { None }
+        let (table_name, max_block) = match hotspot_type {
+          "mobile" => {
+            let row = sqlx::query(
+              r#"
+              SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), 0)::bigint as max_block
+              "#
+            )
+            .fetch_one(&self.pool)
+            .await?;
+            ("mobile_hotspot_infos", row.get::<i64, _>("max_block"))
+          },
+          "iot" => {
+            let row = sqlx::query(
+              r#"
+              SELECT COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), 0)::bigint as max_block
+              "#
+            )
+            .fetch_one(&self.pool)
+            .await?;
+            ("iot_hotspot_infos", row.get::<i64, _>("max_block"))
+          },
+          _ => return Err(anyhow::anyhow!("Invalid hotspot_type: '{}'. Must be 'mobile' or 'iot'", hotspot_type).into()),
+        };
+
+        debug!(
+          "Max last_block for {} hotspots: {}",
+          hotspot_type, max_block
+        );
+
+        if max_block > 0 { Some(max_block as u64) } else { None }
       }
       "construct_entity_ownership_changes" => {
         let row = sqlx::query(
@@ -553,7 +712,7 @@ impl DatabaseClient {
         .await?;
 
         let max_block: i64 = row.get("max_block");
-        if max_block > 1 { Some((max_block - 1) as u64) } else { None }
+        if max_block > 0 { Some(max_block as u64) } else { None }
       }
       "construct_entity_reward_destination_changes" => {
         let row = sqlx::query(
@@ -568,7 +727,7 @@ impl DatabaseClient {
         .await?;
 
         let max_block: i64 = row.get("max_block");
-        if max_block > 1 { Some((max_block - 1) as u64) } else { None }
+        if max_block > 0 { Some(max_block as u64) } else { None }
       }
       _ => {
         warn!("Unknown query name: {}", query_name);
@@ -577,7 +736,7 @@ impl DatabaseClient {
     };
 
     debug!(
-      "Max last_block for query '{}': {:?} (using MAX(last_block) - 1 for safety)",
+      "Max last_block for query '{}': {:?}",
       query_name, max_block
     );
 

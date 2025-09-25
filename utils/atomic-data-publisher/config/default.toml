@@ -17,20 +17,20 @@ name = "atomic_mobile_hotspots"
 query_name = "construct_atomic_hotspots"
 parameters = { change_type = "mobile_hotspot", hotspot_type = "mobile" }
 
-[[service.polling_jobs]]
-name = "atomic_iot_hotspots"
-query_name = "construct_atomic_hotspots"
-parameters = { change_type = "iot_hotspot", hotspot_type = "iot" }
+#[[service.polling_jobs]]
+#name = "atomic_iot_hotspots"
+#query_name = "construct_atomic_hotspots"
+#parameters = { change_type = "iot_hotspot", hotspot_type = "iot" }
 
-[[service.polling_jobs]]
-name = "entity_ownership_changes"
-query_name = "construct_entity_ownership_changes"
-parameters = { change_type = "entity_ownership" }
+#[[service.polling_jobs]]
+#name = "entity_ownership_changes"
+#query_name = "construct_entity_ownership_changes"
+#parameters = { change_type = "entity_ownership" }
 
-[[service.polling_jobs]]
-name = "entity_reward_destination_changes"
-query_name = "construct_entity_reward_destination_changes"
-parameters = { change_type = "entity_reward_destination" }
+#[[service.polling_jobs]]
+#name = "entity_reward_destination_changes"
+#query_name = "construct_entity_reward_destination_changes"
+#parameters = { change_type = "entity_reward_destination" }
 
 # Database configuration
 [database]
