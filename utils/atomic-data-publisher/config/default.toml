@@ -12,26 +12,6 @@ dry_run = true
 dry_run_failure_rate = 0.0
 port = 9090
 
-[[service.polling_jobs]]
-name = "atomic_mobile_hotspots"
-query_name = "construct_atomic_hotspots"
-parameters = { change_type = "mobile_hotspot", hotspot_type = "mobile" }
-
-[[service.polling_jobs]]
-name = "atomic_iot_hotspots"
-query_name = "construct_atomic_hotspots"
-parameters = { change_type = "iot_hotspot", hotspot_type = "iot" }
-
-[[service.polling_jobs]]
-name = "entity_ownership_changes"
-query_name = "construct_entity_ownership_changes"
-parameters = { change_type = "entity_ownership" }
-
-[[service.polling_jobs]]
-name = "entity_reward_destination_changes"
-query_name = "construct_entity_reward_destination_changes"
-parameters = { change_type = "entity_reward_destination" }
-
 # Database configuration
 [database]
 host = "localhost"
@@ -55,11 +35,6 @@ required_tables = [
   "mini_fanouts"
 ]
 
-# Solana RPC settings
-[solana]
-rpc_url = "https://api.mainnet-beta.solana.com"
-timeout_seconds = 30
-
 # Signing keypair settings
 [signing]
 keypair_path = "/app/keypair.bin"  # Path to Helium keypair file
@@ -70,4 +45,24 @@ endpoint = "http://localhost:8080"
 timeout_seconds = 30
 max_retries = 3
 retry_delay_seconds = 2
+
+[[service.polling_jobs]]
+name = "atomic_mobile_hotspots"
+query_name = "construct_atomic_hotspots"
+parameters = { change_type = "mobile_hotspot", hotspot_type = "mobile" }
+
+[[service.polling_jobs]]
+name = "atomic_iot_hotspots"
+query_name = "construct_atomic_hotspots"
+parameters = { change_type = "iot_hotspot", hotspot_type = "iot" }
+
+[[service.polling_jobs]]
+name = "entity_ownership_changes"
+query_name = "construct_entity_ownership_changes"
+parameters = { change_type = "entity_ownership" }
+
+[[service.polling_jobs]]
+name = "entity_reward_destination_changes"
+query_name = "construct_entity_reward_destination_changes"
+parameters = { change_type = "entity_reward_destination" }
 
