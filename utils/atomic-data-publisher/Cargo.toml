@@ -21,7 +21,8 @@ tonic = { version = "0.10", features = ["tls"] }
 prost = "0.12"
 bs58 = "0.5"
 rand = "0.8"
-prometheus = "0.13"
+metrics = "0.23"
+metrics-exporter-prometheus = "0.15"
 
 [patch.'https://github.com/helium/proto']
 helium-proto = { git = "https://www.github.com/helium/proto", branch = "mj/chain-rewardable-entities" }

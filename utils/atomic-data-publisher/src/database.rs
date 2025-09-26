@@ -614,9 +614,9 @@ impl DatabaseClient {
         let hotspot_type = parameters
           .get("hotspot_type")
           .and_then(|v| v.as_str())
-          .unwrap_or("mobile"); // Default to mobile if not specified
+          .ok_or_else(|| AtomicDataError::ConfigError("hotspot_type parameter is required".to_string()))?;
 
-        let (table_name, max_block) = match hotspot_type {
+        let (_table_name, max_block) = match hotspot_type {
           "mobile" => {
             let row = sqlx::query(
               r#"

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use helium_crypto::Keypair;
+use metrics_exporter_prometheus::PrometheusBuilder;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
@@ -154,20 +155,17 @@ impl AtomicDataPublisher {
     let mut handles = Vec::new();
     let metrics_bind_addr = format!("0.0.0.0:{}", self.config.service.port);
 
-    // Metrics server
-    let metrics_handle = {
-      let metrics = self.metrics.clone();
-      let shutdown_signal = self.shutdown_signal.clone();
-      let bind_addr = metrics_bind_addr.clone();
-      tokio::spawn(async move {
-        if let Err(e) = metrics.serve_metrics(&bind_addr, shutdown_signal).await {
-          error!("Metrics server error: {}", e);
-          return Err(AtomicDataError::NetworkError(e.to_string()));
-        }
-        Ok(())
-      })
-    };
-    handles.push(metrics_handle);
+    // Initialize Prometheus metrics exporter
+    let builder = PrometheusBuilder::new()
+      .with_http_listener(([0, 0, 0, 0], self.config.service.port));
+
+    builder
+      .install()
+      .map_err(|e| AtomicDataError::NetworkError(format!("Failed to install Prometheus exporter: {}", e)))?;
+
+    // Initialize all metrics after the exporter is installed
+    self.metrics.initialize_metrics();
+
     info!("Metrics server started on {}", metrics_bind_addr);
 
     // Polling service
@@ -197,6 +195,27 @@ impl AtomicDataPublisher {
       })
     };
     handles.push(health_handle);
+
+    // Periodic uptime update task
+    let uptime_handle = {
+      let metrics = self.metrics.clone();
+      let mut shutdown_signal = self.shutdown_signal.clone();
+      tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(30));
+        loop {
+          tokio::select! {
+            _ = interval.tick() => {
+              metrics.update_uptime();
+            }
+            _ = shutdown_signal.changed() => {
+              break;
+            }
+          }
+        }
+        Ok(())
+      })
+    };
+    handles.push(uptime_handle);
 
     Ok((handles, metrics_bind_addr))
   }
