@@ -139,7 +139,6 @@ impl DatabaseClient {
         queue_completed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         last_max_block BIGINT DEFAULT NULL,
-        max_block_occurrences INTEGER DEFAULT 0,
         PRIMARY KEY (job_name, query_name)
       )
     "#;
@@ -152,9 +151,6 @@ impl DatabaseClient {
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'atomic_data_polling_state' AND column_name = 'last_max_block') THEN
           ALTER TABLE atomic_data_polling_state ADD COLUMN last_max_block BIGINT DEFAULT NULL;
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'atomic_data_polling_state' AND column_name = 'max_block_occurrences') THEN
-          ALTER TABLE atomic_data_polling_state ADD COLUMN max_block_occurrences INTEGER DEFAULT 0;
         END IF;
       END $$;
     "#;
@@ -174,7 +170,7 @@ impl DatabaseClient {
       .execute(&self.pool)
       .await?;
 
-    info!("Created or verified atomic_data_polling_state table with max_block occurrence tracking");
+    info!("Created or verified atomic_data_polling_state table with simplified max_block tracking");
     Ok(())
   }
 
@@ -332,8 +328,7 @@ impl DatabaseClient {
         job_name,
         query_name,
         last_processed_block,
-        last_max_block,
-        max_block_occurrences
+        last_max_block
       FROM atomic_data_polling_state
       WHERE job_name = $1 AND query_name = $2
       "#,
@@ -345,65 +340,55 @@ impl DatabaseClient {
 
     let last_processed_block: i64 = current_state_row.get("last_processed_block");
     let last_max_block: Option<i64> = current_state_row.get("last_max_block");
-    let max_block_occurrences: i32 = current_state_row.get("max_block_occurrences");
 
     let raw_max_available_block = self.get_max_last_block_for_query(&job.query_name, &job.parameters).await?
       .ok_or_else(|| AtomicDataError::PollingBoundsError(format!("No data available for query '{}'", job.query_name)))?;
 
-    let max_available_block = self.handle_max_block_occurrences(
+    let max_available_block = self.handle_max_block_logic(
       &job.name,
       &job.query_name,
       raw_max_available_block,
       last_processed_block as u64,
       last_max_block.map(|b| b as u64),
-      max_block_occurrences,
     ).await?;
 
     Ok((last_processed_block as u64, max_available_block))
   }
 
-  async fn handle_max_block_occurrences(
+  async fn handle_max_block_logic(
     &self,
     job_name: &str,
     query_name: &str,
     raw_max_block: u64,
     last_processed_block: u64,
     last_max_block: Option<u64>,
-    max_block_occurrences: i32,
   ) -> Result<u64, AtomicDataError> {
-    const OCCURRENCE_THRESHOLD: i32 = 5;
     let safe_max_block = if raw_max_block > 1 { raw_max_block - 1 } else { raw_max_block };
 
+    // If max block changed, update tracking and use safe max
     let max_block_changed = last_max_block.map_or(true, |last| last != raw_max_block);
     if max_block_changed {
       self.update_max_block_tracking(job_name, query_name, raw_max_block).await?;
       return Ok(safe_max_block);
     }
 
+    // If we haven't caught up to the safe max block yet, continue processing
     if last_processed_block < safe_max_block {
       return Ok(safe_max_block);
     }
 
-    if last_processed_block >= raw_max_block {
-      if max_block_occurrences > 0 {
-        self.reset_max_block_occurrences(job_name, query_name).await?;
-      }
-      return Ok(raw_max_block);
-    }
-
-    let new_occurrences = max_block_occurrences + 1;
-    self.increment_max_block_occurrences(job_name, query_name, new_occurrences).await?;
-
-    if new_occurrences >= OCCURRENCE_THRESHOLD {
+    // We've seen this max block before and caught up to safe_max_block
+    // Process the final block to complete this range
+    if last_processed_block < raw_max_block {
       info!(
-        "Job '{}' has seen same max_block {} for {} times, processing final block {} to {}",
-        job_name, raw_max_block, new_occurrences, last_processed_block, raw_max_block
+        "Job '{}' encountered same max_block {} on sequential run, processing final block {} to {}",
+        job_name, raw_max_block, last_processed_block, raw_max_block
       );
-      self.reset_max_block_occurrences(job_name, query_name).await?;
       return Ok(raw_max_block);
     }
 
-    Ok(safe_max_block)
+    // We're fully caught up (last_processed_block >= raw_max_block), nothing to do
+    Ok(raw_max_block)
   }
 
   async fn update_max_block_tracking(&self, job_name: &str, query_name: &str, max_block: u64) -> Result<(), AtomicDataError> {
@@ -412,7 +397,6 @@ impl DatabaseClient {
       UPDATE atomic_data_polling_state
       SET
         last_max_block = $1,
-        max_block_occurrences = 0,
         updated_at = NOW()
       WHERE job_name = $2 AND query_name = $3
       "#,
@@ -426,42 +410,6 @@ impl DatabaseClient {
     Ok(())
   }
 
-  async fn increment_max_block_occurrences(&self, job_name: &str, query_name: &str, new_occurrences: i32) -> Result<(), AtomicDataError> {
-    sqlx::query(
-      r#"
-      UPDATE atomic_data_polling_state
-      SET
-        max_block_occurrences = $1,
-        updated_at = NOW()
-      WHERE job_name = $2 AND query_name = $3
-      "#,
-    )
-    .bind(new_occurrences)
-    .bind(job_name)
-    .bind(query_name)
-    .execute(&self.pool)
-    .await?;
-
-    Ok(())
-  }
-
-  async fn reset_max_block_occurrences(&self, job_name: &str, query_name: &str) -> Result<(), AtomicDataError> {
-    sqlx::query(
-      r#"
-      UPDATE atomic_data_polling_state
-      SET
-        max_block_occurrences = 0,
-        updated_at = NOW()
-      WHERE job_name = $1 AND query_name = $2
-      "#,
-    )
-    .bind(job_name)
-    .bind(query_name)
-    .execute(&self.pool)
-    .await?;
-
-    Ok(())
-  }
 
   fn calculate_target_block(&self, last_processed_block: u64, max_available_block: u64) -> u64 {
     let block_diff = max_available_block.saturating_sub(last_processed_block);
