@@ -83,6 +83,9 @@ Cursor.init(
     },
     block: {
       type: STRING,
+      // mistakenly named the field "block_height" in the database when it actually represents the slot/block height
+      // this alias is used to ensure backwards compatibility with the previous name
+      field: "block_height",
     },
   },
   {
