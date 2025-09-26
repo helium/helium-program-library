@@ -11,7 +11,7 @@ export const CursorManager = (
   let lastReceivedBlock: number = Date.now();
   let pendingCursor: {
     cursor: string;
-    blockHeight: string;
+    block: string;
     service: string;
   } | null = null;
   let lastCursorUpdate = 0;
@@ -35,16 +35,16 @@ export const CursorManager = (
 
   const updateCursor = async ({
     cursor,
-    blockHeight,
+    block,
     force = false,
   }: {
     cursor: string;
-    blockHeight: string;
+    block: string;
     force?: boolean;
   }): Promise<void> => {
     const now = Date.now();
     recordBlockReceived();
-    pendingCursor = { cursor, blockHeight, service };
+    pendingCursor = { cursor, block, service };
 
     if (force || now - lastCursorUpdate >= CURSOR_UPDATE_INTERVAL) {
       if (pendingCursor) {

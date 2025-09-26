@@ -1,1 +1,1 @@
-export const OMIT_KEYS = ["refreshed_at", "createdAt"];
+export const OMIT_KEYS = ["createdAt", "refreshedAt", "lastBlock"];

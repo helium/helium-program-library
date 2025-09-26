@@ -108,20 +108,19 @@ export const setupSubstream = async (
       await Cursor.sync({ alter: true });
       const cursor = await cursorManager.checkStaleness();
       cursorManager.startStalenessCheck();
-
       console.log("Connected to Substream");
-      const currentBlock = await provider.connection.getSlot("finalized");
+      const startBlock = await provider.connection.getSlot("finalized");
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
         productionMode: PRODUCTION,
-        startBlockNum: cursor ? undefined : currentBlock,
+        startBlockNum: cursor ? undefined : startBlock,
         startCursor: cursor,
       });
 
       console.log(
         `Substream: Streaming from ${
-          cursor ? `cursor ${cursor}` : `block ${currentBlock}`
+          cursor ? `cursor ${cursor}` : `block ${startBlock}`
         }`
       );
 
@@ -141,8 +140,12 @@ export const setupSubstream = async (
 
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
-          const blockHeight =
-            message.value.finalBlockHeight?.toString() || "unknown";
+          // Despite the name "finalBlockHeight", this is actually the final SLOT height
+          // In Substreams terminology, a Solana slot is referred to as a "block"
+          // This represents the number of the slot that is finalized (rooted)
+          const block = message.value.finalBlockHeight
+            ? Number(message.value.finalBlockHeight)
+            : null;
 
           const hasAccountChanges =
             output !== undefined &&
@@ -151,42 +154,51 @@ export const setupSubstream = async (
 
           if (hasAccountChanges) {
             // Group accounts by owner
-            const accountsByOwner = (output as any).accounts.reduce((acc: { [key: string]: IOutputAccount[] }, account: IOutputAccount) => {
-              const ownerKey = new PublicKey(account.owner).toBase58();
-              if (!acc[ownerKey]) {
-                acc[ownerKey] = [];
-              }
-              acc[ownerKey].push(account);
-              return acc;
-            }, {});
+            const accountsByOwner = (output as any).accounts.reduce(
+              (
+                acc: { [key: string]: IOutputAccount[] },
+                account: IOutputAccount
+              ) => {
+                const ownerKey = new PublicKey(account.owner).toBase58();
+                if (!acc[ownerKey]) {
+                  acc[ownerKey] = [];
+                }
+                acc[ownerKey].push(account);
+                return acc;
+              },
+              {}
+            );
 
             // Process each owner's accounts sequentially, but accounts within an owner in parallel
             // This prevents race conditions in plugins that rely on bidirectional relationships
-            for (const [ownerStr, accounts] of Object.entries(accountsByOwner) as [string, IOutputAccount[]][]) {
+            for (const [ownerStr, accounts] of Object.entries(
+              accountsByOwner
+            ) as [string, IOutputAccount[]][]) {
               const ownerKey = new PublicKey(ownerStr);
-              const config = configs.find(
-                (x) => x.programId === ownerStr
-              );
+              const config = configs.find((x) => x.programId === ownerStr);
 
               if (!config) continue;
 
-              const accountPromises = accounts.map(async (account: IOutputAccount) => {
-                const { address, data, deleted } = account;
-                const addressKey = new PublicKey(address);
-                
-                return handleAccountWebhook({
-                  fastify: server,
-                  programId: ownerKey,
-                  accounts: config.accounts,
-                  account: {
-                    pubkey: addressKey.toBase58(),
-                    data: [data, undefined],
-                  },
-                  isDelete: deleted,
-                  pluginsByAccountType:
-                    pluginsByAccountTypeByProgram[ownerStr] || {},
-                });
-              });
+              const accountPromises = accounts.map(
+                async (account: IOutputAccount) => {
+                  const { address, data, deleted } = account;
+                  const addressKey = new PublicKey(address);
+
+                  return handleAccountWebhook({
+                    fastify: server,
+                    programId: ownerKey,
+                    accounts: config.accounts,
+                    account: {
+                      pubkey: addressKey.toBase58(),
+                      data: [data, undefined],
+                    },
+                    isDelete: deleted,
+                    pluginsByAccountType:
+                      pluginsByAccountTypeByProgram[ownerStr] || {},
+                    block,
+                  });
+                }
+              );
 
               await Promise.all(accountPromises);
             }
@@ -194,7 +206,7 @@ export const setupSubstream = async (
 
           await cursorManager.updateCursor({
             cursor,
-            blockHeight,
+            block: block?.toString() || "unknown",
             force: hasAccountChanges,
           });
         }
