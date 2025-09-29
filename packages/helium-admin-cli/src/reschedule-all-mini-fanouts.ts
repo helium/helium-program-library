@@ -43,13 +43,12 @@ export async function run(args: any = process.argv) {
 
     const batch = miniFanouts.slice(i, i + batchSize);
 
-    await Promise.all(batch.map(async (delegation, j) => {
-      const miniFanout = batch[j];
+    await Promise.all(batch.map(async (miniFanout) => {
       const nextTask = freeTasks.pop()!;
       const nextPreTask = freeTasks.pop()!;
 
-      const nextTaskAcc = miniFanout.account.nextTask.equals(PublicKey.default) ? undefined : await tuktukProgram.account.taskV0.fetchNullable(miniFanout.account.nextTask)
-      const nextPreTaskAcc = miniFanout.account.nextPreTask.equals(PublicKey.default) ? undefined : await tuktukProgram.account.taskV0.fetchNullable(miniFanout.account.nextPreTask)
+      const nextTaskAcc = miniFanout.account.nextTask.equals(program.programId) || miniFanout.account.nextTask.equals(miniFanout.publicKey) ? undefined : await tuktukProgram.account.taskV0.fetchNullable(miniFanout.account.nextTask)
+      const nextPreTaskAcc = miniFanout.account.nextPreTask.equals(program.programId) || miniFanout.account.nextPreTask.equals(miniFanout.publicKey) ? undefined : await tuktukProgram.account.taskV0.fetchNullable(miniFanout.account.nextPreTask)
 
       instructions.push([
         nextTaskAcc ? await tuktukProgram.methods.dequeueTaskV0().accounts({
