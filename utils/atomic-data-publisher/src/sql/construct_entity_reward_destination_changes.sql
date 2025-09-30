@@ -50,7 +50,6 @@ FROM
         AND mf.last_block <= $2
       )
     )
-    -- AND ((ao.last_block > $1 AND ao.last_block <= $2) OR (r.last_block > $1 AND r.last_block <= $2))
 )
 SELECT
   'entity_reward_destination_changes' as job_name,

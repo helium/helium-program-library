@@ -1,6 +1,8 @@
+use std::str::FromStr;
+
 use anyhow::Result;
 use bs58;
-use helium_crypto::{Keypair, Sign};
+use helium_crypto::{Keypair, PublicKey, Sign};
 use helium_proto::services::chain_rewardable_entities::{
   entity_reward_destination_change_v1, split_recipient_info_v1, EntityOwnerChangeV1,
   EntityOwnerInfo, EntityOwnerType, EntityOwnershipChangeReqV1, EntityRewardDestinationChangeReqV1,
@@ -413,14 +415,16 @@ impl ProtobufBuilder {
     let key_str = Self::extract_string(data, key)
       .ok_or_else(|| AtomicDataError::InvalidData(format!("Missing helium pub key: {}", key)))?;
 
-    let decoded = bs58::decode(&key_str).into_vec().map_err(|e| {
+    let decoded = PublicKey::from_str(&key_str).map_err(|e| {
       AtomicDataError::InvalidData(format!(
         "Invalid base58 helium pub key {} (value: '{}'): {}",
         key, key_str, e
       ))
     })?;
 
-    Ok(HeliumPubKey { value: decoded })
+    Ok(HeliumPubKey {
+      value: decoded.to_vec(),
+    })
   }
 
   fn extract_solana_pub_key(data: &Value, key: &str) -> Result<SolanaPubKey, AtomicDataError> {
