@@ -4,6 +4,7 @@ import { DataTypes, Model, QueryTypes } from "sequelize";
 import { IPlugin } from "../types";
 import { database } from "../utils/database";
 import { PublicKey } from "@solana/web3.js";
+import sequelize from "sequelize";
 
 export class RewardsRecipient extends Model {
   declare asset: string;
@@ -166,6 +167,7 @@ KeyToAsset.init(
     },
     asset: {
       type: DataTypes.STRING,
+      allowNull: false,
     },
     dao: {
       type: DataTypes.STRING,
@@ -382,6 +384,12 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
       !existingColumns.length ||
       !columns.every((col) => existingColumns.includes(col))
     ) {
+      console.log("Syncing rewards_recipients table");
+      if (existingColumns.includes("lastBlock") && !columns.includes("lastBlock")) {
+        await database.query(`
+          DROP VIEW IF EXISTS hotspot_ownership_v0;
+        `, { type: QueryTypes.RAW });
+      }
       await RewardsRecipient.sync({ alter: true });
     }
 

@@ -1,6 +1,7 @@
+use std::time::Duration;
+
 use config::{Config, ConfigError, File};
 use serde::Deserialize;
-use std::time::Duration;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {

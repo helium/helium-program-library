@@ -129,8 +129,8 @@ if (PG_POOL_SIZE < 5) {
 
   try {
     // models are defined on boot, and updated in refresh-accounts
-    await database.sync();
     await defineAllIdlModels({ configs, sequelize: database });
+    await database.sync();
     await createPgIndexes({ indexConfigs, sequelize: database });
     const pluginsByAccountTypeByProgram =
       await getPluginsByAccountTypeByProgram(configs);
@@ -240,7 +240,8 @@ if (PG_POOL_SIZE < 5) {
     // Assume 10 million accounts we might not want to watch (token accounts, etc)
     const nonWatchedAccountsFilter = BloomFilter.create(10000000, 0.05);
     async function insertTransactionAccounts(
-      accounts: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[]
+      accounts: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[],
+      block: number | undefined
     ) {
       if (configs) {
         let index = 0;
@@ -287,7 +288,7 @@ if (PG_POOL_SIZE < 5) {
                 data: [account.data, undefined],
               },
               pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
-              block: undefined,
+              block,
             });
           } catch (err) {
             throw err;
@@ -332,7 +333,8 @@ if (PG_POOL_SIZE < 5) {
           await getMultipleAccounts({
             connection: provider.connection,
             keys: writableAccountKeys,
-          })
+          }),
+          tx.slot
         );
         res.code(StatusCodes.OK).send(ReasonPhrases.OK);
       }
@@ -370,7 +372,8 @@ if (PG_POOL_SIZE < 5) {
             await getMultipleAccounts({
               connection: provider.connection,
               keys: writableAccountKeys,
-            })
+            }),
+            transactions[0].slot
           );
           res.code(StatusCodes.OK).send(ReasonPhrases.OK);
         } catch (err) {

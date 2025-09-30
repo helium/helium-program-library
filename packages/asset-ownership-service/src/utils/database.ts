@@ -80,7 +80,7 @@ AssetOwner.init(
     },
     lastBlock: {
       type: INTEGER,
-      allowNull: false,
+      allowNull: true,
     },
   },
   {

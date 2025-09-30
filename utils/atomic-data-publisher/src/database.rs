@@ -1,14 +1,16 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
-
 use tracing::{debug, info, warn};
 
-use crate::config::{DatabaseConfig, PollingJob};
-use crate::errors::AtomicDataError;
-use crate::metrics::MetricsCollector;
-use std::sync::Arc;
+use crate::{
+  config::{DatabaseConfig, PollingJob},
+  errors::AtomicDataError,
+  metrics::MetricsCollector,
+};
 
 const MIN_CHUNK_SIZE: u64 = 50_000;
 const MAX_CHUNK_SIZE: u64 = 500_000;
@@ -33,7 +35,7 @@ impl DatabaseClient {
   pub async fn new_with_metrics(
     config: &DatabaseConfig,
     polling_jobs: Vec<PollingJob>,
-    metrics: Option<Arc<MetricsCollector>>
+    metrics: Option<Arc<MetricsCollector>>,
   ) -> Result<Self> {
     Self::validate_database_config(config)?;
     Self::validate_polling_jobs(&polling_jobs)?;
@@ -60,7 +62,11 @@ impl DatabaseClient {
       config.host, config.port, config.database_name
     );
 
-    Ok(Self { pool, polling_jobs, metrics })
+    Ok(Self {
+      pool,
+      polling_jobs,
+      metrics,
+    })
   }
 
   fn validate_database_config(config: &DatabaseConfig) -> Result<()> {
@@ -80,8 +86,11 @@ impl DatabaseClient {
       anyhow::bail!("Database max_connections must be greater than 0");
     }
     if config.max_connections < config.min_connections {
-      anyhow::bail!("Database max_connections ({}) must be >= min_connections ({})",
-                   config.max_connections, config.min_connections);
+      anyhow::bail!(
+        "Database max_connections ({}) must be >= min_connections ({})",
+        config.max_connections,
+        config.min_connections
+      );
     }
     Ok(())
   }
@@ -97,13 +106,23 @@ impl DatabaseClient {
         anyhow::bail!("Job {}: name cannot be empty", index);
       }
       if job.query_name.is_empty() {
-        anyhow::bail!("Job '{}' (index {}): query_name cannot be empty", job.name, index);
+        anyhow::bail!(
+          "Job '{}' (index {}): query_name cannot be empty",
+          job.name,
+          index
+        );
       }
       if !job.parameters.is_object() {
-        anyhow::bail!("Job '{}' (index {}): parameters must be a valid JSON object", job.name, index);
+        anyhow::bail!(
+          "Job '{}' (index {}): parameters must be a valid JSON object",
+          job.name,
+          index
+        );
       }
 
-      if job.query_name == "construct_atomic_hotspots" && job.parameters.get("hotspot_type").is_none() {
+      if job.query_name == "construct_atomic_hotspots"
+        && job.parameters.get("hotspot_type").is_none()
+      {
         anyhow::bail!("Job '{}' (index {}): hotspot_type parameter is required for construct_atomic_hotspots queries",
                      job.name, index);
       }
@@ -255,9 +274,7 @@ impl DatabaseClient {
     Ok(())
   }
 
-  pub async fn get_pending_changes(
-    &self,
-  ) -> Result<Option<ChangeRecord>> {
+  pub async fn get_pending_changes(&self) -> Result<Option<ChangeRecord>> {
     loop {
       if let Some(job) = self.get_next_queue_job().await? {
         if !self.mark_job_running(&job.name, &job.query_name).await? {
@@ -268,7 +285,10 @@ impl DatabaseClient {
           Ok(change_record) => {
             // If no data found, mark job as completed and not running, then continue to next job
             if change_record.is_none() {
-              info!("No data found for job '{}', marking as completed and continuing to next job", job.name);
+              info!(
+                "No data found for job '{}', marking as completed and continuing to next job",
+                job.name
+              );
               let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
               let _ = self.mark_completed(&job.name, &job.query_name).await;
               continue; // Continue to next job in the same cycle
@@ -298,7 +318,9 @@ impl DatabaseClient {
     }
 
     let target_block = self.calculate_target_block(last_processed_block, max_available_block);
-    let rows = self.execute_query(job, last_processed_block, target_block).await?;
+    let rows = self
+      .execute_query(job, last_processed_block, target_block)
+      .await?;
     let change_record = self.process_query_results(&rows, job, target_block);
 
     if change_record.is_some() {
@@ -311,10 +333,11 @@ impl DatabaseClient {
     } else {
       info!(
         "No changes found for job '{}' (processed up to block {})",
-        job.name,
-        target_block
+        job.name, target_block
       );
-      self.advance_block_for_job(&job.name, &job.query_name, target_block).await?;
+      self
+        .advance_block_for_job(&job.name, &job.query_name, target_block)
+        .await?;
     }
 
     Ok(change_record)
@@ -341,18 +364,35 @@ impl DatabaseClient {
     let last_processed_block: i64 = current_state_row.get("last_processed_block");
     let last_max_block: Option<i64> = current_state_row.get("last_max_block");
 
-    let raw_max_available_block = self.get_max_last_block_for_query(&job.query_name, &job.parameters).await?
-      .ok_or_else(|| AtomicDataError::PollingBoundsError(format!("No data available for query '{}'", job.query_name)))?;
+    let raw_max_available_block = self
+      .get_last_block_for_query(&job.query_name, &job.parameters, true)
+      .await?
+      .ok_or_else(|| {
+        AtomicDataError::PollingBoundsError(format!(
+          "No data available for query '{}'",
+          job.query_name
+        ))
+      })?;
 
-    let max_available_block = self.handle_max_block_logic(
-      &job.name,
-      &job.query_name,
-      raw_max_available_block,
-      last_processed_block as u64,
-      last_max_block.map(|b| b as u64),
-    ).await?;
+    // Get the min block for this table and use it if it's greater than last_processed_block
+    let min_block = self
+      .get_last_block_for_query(&job.query_name, &job.parameters, false)
+      .await?
+      .unwrap_or(0);
 
-    Ok((last_processed_block as u64, max_available_block))
+    let effective_start_block = std::cmp::max(min_block, last_processed_block as u64);
+
+    let max_available_block = self
+      .handle_max_block_logic(
+        &job.name,
+        &job.query_name,
+        raw_max_available_block,
+        effective_start_block,
+        last_max_block.map(|b| b as u64),
+      )
+      .await?;
+
+    Ok((effective_start_block, max_available_block))
   }
 
   async fn handle_max_block_logic(
@@ -363,12 +403,18 @@ impl DatabaseClient {
     last_processed_block: u64,
     last_max_block: Option<u64>,
   ) -> Result<u64, AtomicDataError> {
-    let safe_max_block = if raw_max_block > 1 { raw_max_block - 1 } else { raw_max_block };
+    let safe_max_block = if raw_max_block > 1 {
+      raw_max_block - 1
+    } else {
+      raw_max_block
+    };
 
     // If max block changed, update tracking and use safe max
-    let max_block_changed = last_max_block.map_or(true, |last| last != raw_max_block);
+    let max_block_changed = last_max_block != Some(raw_max_block);
     if max_block_changed {
-      self.update_max_block_tracking(job_name, query_name, raw_max_block).await?;
+      self
+        .update_max_block_tracking(job_name, query_name, raw_max_block)
+        .await?;
       return Ok(safe_max_block);
     }
 
@@ -391,7 +437,12 @@ impl DatabaseClient {
     Ok(raw_max_block)
   }
 
-  async fn update_max_block_tracking(&self, job_name: &str, query_name: &str, max_block: u64) -> Result<(), AtomicDataError> {
+  async fn update_max_block_tracking(
+    &self,
+    job_name: &str,
+    query_name: &str,
+    max_block: u64,
+  ) -> Result<(), AtomicDataError> {
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -409,7 +460,6 @@ impl DatabaseClient {
 
     Ok(())
   }
-
 
   fn calculate_target_block(&self, last_processed_block: u64, max_available_block: u64) -> u64 {
     let block_diff = max_available_block.saturating_sub(last_processed_block);
@@ -431,11 +481,17 @@ impl DatabaseClient {
     last_processed_block: u64,
     target_block: u64,
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
-    crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name)
-      .map_err(|e| AtomicDataError::QueryValidationError(format!("Query validation failed for '{}': {}", job.query_name, e)))?;
+    crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name).map_err(|e| {
+      AtomicDataError::QueryValidationError(format!(
+        "Query validation failed for '{}': {}",
+        job.query_name, e
+      ))
+    })?;
 
-    let query = crate::queries::AtomicHotspotQueries::get_query(&job.query_name)
-      .ok_or_else(|| AtomicDataError::QueryValidationError(format!("Query not found for '{}'", job.query_name)))?;
+    let query =
+      crate::queries::AtomicHotspotQueries::get_query(&job.query_name).ok_or_else(|| {
+        AtomicDataError::QueryValidationError(format!("Query not found for '{}'", job.query_name))
+      })?;
 
     let query_start = std::time::Instant::now();
 
@@ -444,11 +500,20 @@ impl DatabaseClient {
         .parameters
         .get("hotspot_type")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| AtomicDataError::InvalidData("hotspot_type parameter required for hotspot queries".to_string()))?;
+        .ok_or_else(|| {
+          AtomicDataError::InvalidData(
+            "hotspot_type parameter required for hotspot queries".to_string(),
+          )
+        })?;
 
       match hotspot_type {
-        "iot" | "mobile" => {},
-        _ => return Err(AtomicDataError::InvalidData(format!("Invalid hotspot_type: '{}'. Must be 'iot' or 'mobile'", hotspot_type))),
+        "iot" | "mobile" => {}
+        _ => {
+          return Err(AtomicDataError::InvalidData(format!(
+            "Invalid hotspot_type: '{}'. Must be 'iot' or 'mobile'",
+            hotspot_type
+          )))
+        }
       }
 
       info!(
@@ -465,7 +530,11 @@ impl DatabaseClient {
     } else {
       info!(
         "Querying job '{}' with query '{}', processing blocks {} to {} ({} blocks)",
-        job.name, job.query_name, last_processed_block, target_block, target_block - last_processed_block
+        job.name,
+        job.query_name,
+        last_processed_block,
+        target_block,
+        target_block - last_processed_block
       );
 
       sqlx::query(query)
@@ -483,7 +552,12 @@ impl DatabaseClient {
     Ok(rows)
   }
 
-  fn process_query_results(&self, rows: &[sqlx::postgres::PgRow], job: &PollingJob, target_block: u64) -> Option<ChangeRecord> {
+  fn process_query_results(
+    &self,
+    rows: &[sqlx::postgres::PgRow],
+    job: &PollingJob,
+    target_block: u64,
+  ) -> Option<ChangeRecord> {
     if rows.is_empty() {
       return None;
     }
@@ -503,9 +577,7 @@ impl DatabaseClient {
 
   pub async fn mark_processed(&self, changes: &[ChangeRecord], target_block: u64) -> Result<()> {
     if changes.is_empty() {
-      return self
-        .advance_block_for_active_job(target_block)
-        .await;
+      return self.advance_block_for_active_job(target_block).await;
     }
 
     let mut processed_tables = std::collections::HashSet::new();
@@ -556,7 +628,12 @@ impl DatabaseClient {
     Ok(())
   }
 
-  async fn advance_block_for_job(&self, job_name: &str, query_name: &str, target_block: u64) -> Result<()> {
+  async fn advance_block_for_job(
+    &self,
+    job_name: &str,
+    query_name: &str,
+    target_block: u64,
+  ) -> Result<()> {
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -596,7 +673,9 @@ impl DatabaseClient {
       let job_name: String = row.get("job_name");
       let query_name: String = row.get("query_name");
 
-      self.advance_block_for_job(&job_name, &query_name, target_block).await?;
+      self
+        .advance_block_for_job(&job_name, &query_name, target_block)
+        .await?;
     }
 
     Ok(())
@@ -607,75 +686,109 @@ impl DatabaseClient {
     Ok(())
   }
 
-
-  pub async fn get_max_last_block_for_query(&self, query_name: &str, parameters: &serde_json::Value) -> Result<Option<u64>> {
-    let max_block = match query_name {
+  pub async fn get_last_block_for_query(
+    &self,
+    query_name: &str,
+    parameters: &serde_json::Value,
+    use_max: bool,
+  ) -> Result<Option<u64>> {
+    let block = match query_name {
       "construct_atomic_hotspots" => {
         let hotspot_type = parameters
           .get("hotspot_type")
           .and_then(|v| v.as_str())
-          .ok_or_else(|| AtomicDataError::ConfigError("hotspot_type parameter is required".to_string()))?;
+          .ok_or_else(|| {
+            AtomicDataError::ConfigError("hotspot_type parameter is required".to_string())
+          })?;
 
-        let (_table_name, max_block) = match hotspot_type {
+        let (_table_name, block) = match hotspot_type {
           "mobile" => {
-            let row = sqlx::query(
-              r#"
-              SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), 0)::bigint as max_block
-              "#
-            )
-            .fetch_one(&self.pool)
-            .await?;
-            ("mobile_hotspot_infos", row.get::<i64, _>("max_block"))
-          },
+            let query = if use_max {
+              r#"SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), 0)::bigint as block"#
+            } else {
+              r#"SELECT COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos), 0)::bigint as block"#
+            };
+            let row = sqlx::query(query).fetch_one(&self.pool).await?;
+            ("mobile_hotspot_infos", row.get::<i64, _>("block"))
+          }
           "iot" => {
-            let row = sqlx::query(
-              r#"
-              SELECT COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), 0)::bigint as max_block
-              "#
-            )
-            .fetch_one(&self.pool)
-            .await?;
-            ("iot_hotspot_infos", row.get::<i64, _>("max_block"))
-          },
-          _ => return Err(anyhow::anyhow!("Invalid hotspot_type: '{}'. Must be 'mobile' or 'iot'", hotspot_type).into()),
+            let query = if use_max {
+              r#"SELECT COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), 0)::bigint as block"#
+            } else {
+              r#"SELECT COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos), 0)::bigint as block"#
+            };
+            let row = sqlx::query(query).fetch_one(&self.pool).await?;
+            ("iot_hotspot_infos", row.get::<i64, _>("block"))
+          }
+          _ => {
+            return Err(anyhow::anyhow!(
+              "Invalid hotspot_type: '{}'. Must be 'mobile' or 'iot'",
+              hotspot_type
+            ))
+          }
         };
 
+        let operation = if use_max { "Max" } else { "Min" };
         debug!(
-          "Max last_block for {} hotspots: {}",
-          hotspot_type, max_block
+          "{} last_block for {} hotspots: {}",
+          operation, hotspot_type, block
         );
 
-        if max_block > 0 { Some(max_block as u64) } else { None }
+        if block > 0 {
+          Some(block as u64)
+        } else {
+          None
+        }
       }
       "construct_entity_ownership_changes" => {
-        let row = sqlx::query(
+        let query = if use_max {
           r#"
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), 0),
             COALESCE((SELECT MAX(last_block) FROM welcome_packs), 0)
-          )::bigint as max_block
+          )::bigint as block
           "#
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        } else {
+          r#"
+          SELECT LEAST(
+            COALESCE((SELECT MIN(last_block) FROM asset_owners), 0),
+            COALESCE((SELECT MIN(last_block) FROM welcome_packs), 0)
+          )::bigint as block
+          "#
+        };
+        let row = sqlx::query(query).fetch_one(&self.pool).await?;
 
-        let max_block: i64 = row.get("max_block");
-        if max_block > 0 { Some(max_block as u64) } else { None }
+        let block: i64 = row.get("block");
+        if block > 0 {
+          Some(block as u64)
+        } else {
+          None
+        }
       }
       "construct_entity_reward_destination_changes" => {
-        let row = sqlx::query(
+        let query = if use_max {
           r#"
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM recipients), 0),
             COALESCE((SELECT MAX(last_block) FROM rewards_recipients), 0)
-          )::bigint as max_block
+          )::bigint as block
           "#
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        } else {
+          r#"
+          SELECT LEAST(
+            COALESCE((SELECT MIN(last_block) FROM recipients), 0),
+            COALESCE((SELECT MIN(last_block) FROM rewards_recipients), 0)
+          )::bigint as block
+          "#
+        };
+        let row = sqlx::query(query).fetch_one(&self.pool).await?;
 
-        let max_block: i64 = row.get("max_block");
-        if max_block > 0 { Some(max_block as u64) } else { None }
+        let block: i64 = row.get("block");
+        if block > 0 {
+          Some(block as u64)
+        } else {
+          None
+        }
       }
       _ => {
         warn!("Unknown query name: {}", query_name);
@@ -683,14 +796,14 @@ impl DatabaseClient {
       }
     };
 
+    let operation = if use_max { "Max" } else { "Min" };
     debug!(
-      "Max last_block for query '{}': {:?}",
-      query_name, max_block
+      "{} last_block for query '{}': {:?}",
+      operation, query_name, block
     );
 
-    Ok(max_block)
+    Ok(block)
   }
-
 
   pub async fn any_job_running(&self) -> Result<bool> {
     let row = sqlx::query(
@@ -893,20 +1006,38 @@ impl DatabaseClient {
   }
 
   pub async fn finalize_job(&self, record: &ChangeRecord, failed_count: usize) -> Result<()> {
-    if let Err(e) = self.mark_job_not_running(&record.job_name, &record.query_name).await {
-      warn!("Failed to mark job '{}' as not running: {}", record.job_name, e);
+    if let Err(e) = self
+      .mark_job_not_running(&record.job_name, &record.query_name)
+      .await
+    {
+      warn!(
+        "Failed to mark job '{}' as not running: {}",
+        record.job_name, e
+      );
     }
 
     // Only mark as completed if there were no failures
     // Jobs with data will be marked completed after successful processing
     if failed_count == 0 {
-      if let Err(e) = self.mark_completed(&record.job_name, &record.query_name).await {
-        warn!("Failed to mark job '{}' as completed: {}", record.job_name, e);
+      if let Err(e) = self
+        .mark_completed(&record.job_name, &record.query_name)
+        .await
+      {
+        warn!(
+          "Failed to mark job '{}' as completed: {}",
+          record.job_name, e
+        );
       } else {
-        info!("Job '{}' completed successfully and marked as done", record.job_name);
+        info!(
+          "Job '{}' completed successfully and marked as done",
+          record.job_name
+        );
       }
     } else {
-      warn!("Job '{}' had {} failed changes, leaving in queue for retry", record.job_name, failed_count);
+      warn!(
+        "Job '{}' had {} failed changes, leaving in queue for retry",
+        record.job_name, failed_count
+      );
     }
     Ok(())
   }

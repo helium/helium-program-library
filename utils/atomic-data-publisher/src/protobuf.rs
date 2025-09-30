@@ -12,8 +12,7 @@ use prost::Message;
 use serde_json::Value;
 use tracing::{debug, warn};
 
-use crate::database::ChangeRecord;
-use crate::errors::AtomicDataError;
+use crate::{database::ChangeRecord, errors::AtomicDataError};
 
 pub struct ProtobufBuilder;
 
@@ -180,14 +179,14 @@ impl ProtobufBuilder {
       let block = Self::get_u64_field(atomic_data, "block")?;
       let timestamp_seconds = Self::current_timestamp();
 
-      let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+      let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key").ok();
       let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
       let owner = Self::build_entity_owner_info(atomic_data)?;
 
       let change_msg = EntityOwnerChangeV1 {
         block,
         timestamp_seconds,
-        entity_pub_key: Some(entity_pub_key),
+        entity_pub_key,
         asset: Some(asset),
         owner: Some(owner),
       };
@@ -309,8 +308,7 @@ impl ProtobufBuilder {
       .or_else(|| Self::extract_u64(data, "location").map(|loc| format!("{:x}", loc)))
       .unwrap_or_default();
 
-    let elevation = Self::extract_u32(data, "elevation")
-      .ok_or_else(|| AtomicDataError::InvalidData("Missing elevation field".to_string()))?;
+    let elevation = Self::extract_u32(data, "elevation").unwrap_or_default();
 
     let is_data_only = !Self::extract_bool(data, "is_full_hotspot")
       .ok_or_else(|| AtomicDataError::InvalidData("Missing is_full_hotspot field".to_string()))?;

@@ -4,79 +4,53 @@
 --
 -- Returns: job_name, block, solana_address, asset, atomic_data (JSON)
 
-WITH direct_recipient_changes AS (
-  -- Get direct recipient changes in the block range
+WITH updates AS (
   SELECT
-    r.asset,
-    r.last_block as block,
-    kta.encoded_entity_key as pub_key,
-    r.destination as rewards_recipient,
-    NULL::text as rewards_split_data,
-    'entity_reward_destination' as change_type
-  FROM recipients r
-  INNER JOIN key_to_assets kta ON kta.asset = r.asset
-  WHERE r.last_block > $1
-    AND r.last_block <= $2
-    AND kta.encoded_entity_key IS NOT NULL
-    AND r.asset IS NOT NULL
-    AND r.destination IS NOT NULL
-),
-fanout_recipient_changes AS (
-  -- Get fanout recipient changes in the block range
-  SELECT
-    rr.asset,
-    rr.last_block as block,
-    rr.encoded_entity_key as pub_key,
-    rr.destination as rewards_recipient,
-    JSON_BUILD_OBJECT(
-      'owner', rr.owner,
-      'destination', rr.destination,
-      'shares', rr.shares,
-      'total_shares', rr.total_shares,
-      'fixed_amount', rr.fixed_amount,
-      'type', rr.type
-    )::text as rewards_split_data,
-    'entity_reward_destination' as change_type
-  FROM rewards_recipients rr
-  WHERE rr.last_block > $1
-    AND rr.last_block <= $2
-    AND rr.encoded_entity_key IS NOT NULL
-    AND rr.asset IS NOT NULL
-    AND rr.destination IS NOT NULL
-    AND rr.type = 'fanout'
-),
-direct_with_fanout_updates AS (
-  -- Update direct recipients with fanout data if available
-  SELECT
-    drc.asset,
-    GREATEST(drc.block, COALESCE(frc.block, 0)) as block,
-    drc.pub_key,
-    drc.rewards_recipient,
-    COALESCE(frc.rewards_split_data, NULL::text) as rewards_split_data,
-    drc.change_type
-  FROM direct_recipient_changes drc
-  LEFT JOIN fanout_recipient_changes frc ON frc.asset = drc.asset
-),
-fanout_only_changes AS (
-  -- Get fanout-only changes (no direct recipient exists)
-  SELECT
-    frc.asset,
-    frc.block,
-    frc.pub_key,
-    frc.rewards_recipient,
-    frc.rewards_split_data,
-    frc.change_type
-  FROM fanout_recipient_changes frc
-  WHERE NOT EXISTS (
-    SELECT 1 FROM direct_recipient_changes drc WHERE drc.asset = frc.asset
-  )
-),
-reward_destination_changes AS (
-  SELECT asset, block, pub_key, rewards_recipient, rewards_split_data, change_type
-  FROM direct_with_fanout_updates
-  UNION ALL
-  SELECT asset, block, pub_key, rewards_recipient, rewards_split_data, change_type
-  FROM fanout_only_changes
+  kta.asset as asset,
+  GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) as block,
+  kta.encoded_entity_key as pub_key,
+  ao.owner as rewards_recipient,
+  CASE WHEN mf.address IS NULL THEN NULL::json ELSE JSON_BUILD_OBJECT(
+    'pub_key', mf.address,
+    'schedule', mf.schedule,
+    'total_shares', (
+      SELECT COALESCE(SUM((share_item->'share'->'share'->>'amount')::int), 0)
+      FROM unnest(mf.shares) AS share_item
+    ),
+    'recipients', (
+      SELECT jsonb_agg(
+        JSON_BUILD_OBJECT(
+          'authority', mf.owner,
+          'recipient', share_item->>'wallet',
+          'shares', (share_item->'share'->'share'->>'amount')::int
+        )
+      )
+      FROM unnest(mf.shares) AS share_item
+    )
+  ) END as rewards_split,
+  'entity_reward_destination' as change_type
+FROM
+  key_to_assets kta
+  JOIN asset_owners ao ON ao.asset = kta.asset
+  LEFT OUTER JOIN recipients r ON r.asset = ao.asset
+  AND r.lazy_distributor = '6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq' -- Exclude hotspots that have rewards recipients, as they're in the other query.
+  LEFT OUTER JOIN mini_fanouts mf ON mf.address = r.destination
+  WHERE
+    (
+      (
+        ao.last_block > $1
+        AND ao.last_block <= $2
+      )
+      OR (
+        r.last_block > $1
+        AND r.last_block <= $2
+      )
+      OR (
+        mf.last_block > $1
+        AND mf.last_block <= $2
+      )
+    )
+    -- AND ((ao.last_block > $1 AND ao.last_block <= $2) OR (r.last_block > $1 AND r.last_block <= $2))
 )
 SELECT
   'entity_reward_destination_changes' as job_name,
@@ -86,10 +60,10 @@ SELECT
   JSON_BUILD_OBJECT(
     'pub_key', pub_key,
     'asset', asset,
-    'rewards_recipient', rewards_recipient,
-    'rewards_split_data', rewards_split_data,
+    'rewards_recipient', CASE WHEN rewards_split IS NULL THEN rewards_recipient ELSE NULL END,
+    'rewards_split', rewards_split,
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM reward_destination_changes
+FROM updates
 ORDER BY block DESC;

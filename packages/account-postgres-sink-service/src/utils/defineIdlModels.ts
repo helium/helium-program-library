@@ -97,7 +97,9 @@ export const defineIdlModels = async ({
       });
 
       if (accConfig.schema) {
-        await sequelize.createSchema(accConfig.schema, {});
+        if (!await sequelize.query(`SELECT 1 FROM pg_namespace WHERE nspname = '${accConfig.schema}'`, { type: QueryTypes.SELECT })) {
+          await sequelize.createSchema(accConfig.schema, {});
+        }
       }
 
       const model = sequelize.define(
@@ -215,10 +217,9 @@ export const defineAllIdlModels = async ({
       )
     ) {
       throw new Error(
-        `idl does not have every account type ${
-          config.accounts.find(
-            ({ type }) => !idl.types!.some(({ name }) => name === type)
-          )?.type
+        `idl does not have every account type ${config.accounts.find(
+          ({ type }) => !idl.types!.some(({ name }) => name === type)
+        )?.type
         }`
       );
     }
