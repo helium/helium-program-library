@@ -91,13 +91,10 @@ AssetOwner.init(
     timestamps: true,
     indexes: [
       {
-        fields: ["asset"],
+        fields: ["asset", "last_block"],
       },
       {
         fields: ["last_block"],
-      },
-      {
-        fields: ["asset", "last_block"],
       },
     ],
   }
