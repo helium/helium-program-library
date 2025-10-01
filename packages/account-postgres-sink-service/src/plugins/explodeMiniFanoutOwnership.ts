@@ -45,7 +45,7 @@ RewardsRecipient.init(
       field: "encoded_entity_key",
     },
     keySerialization: {
-      type: DataTypes.JSONB,
+      type: "TEXT",
       allowNull: false,
     },
     shares: {
@@ -385,10 +385,16 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
       !columns.every((col) => existingColumns.includes(col))
     ) {
       console.log("Syncing rewards_recipients table");
-      if (existingColumns.includes("lastBlock") && !columns.includes("lastBlock")) {
-        await database.query(`
+      if (
+        existingColumns.includes("lastBlock") &&
+        !columns.includes("lastBlock")
+      ) {
+        await database.query(
+          `
           DROP VIEW IF EXISTS hotspot_ownership_v0;
-        `, { type: QueryTypes.RAW });
+        `,
+          { type: QueryTypes.RAW }
+        );
       }
       await RewardsRecipient.sync({ alter: true });
     }
