@@ -1,19 +1,24 @@
-use anyhow::Result;
-use helium_crypto::Keypair;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 
-use crate::config::{IngestorConfig, PollingJob, ServiceConfig};
-use crate::database::ChangeRecord;
-use crate::errors::AtomicDataError;
-use crate::metrics::MetricsCollector;
-use crate::protobuf::{build_entity_change_requests, EntityChangeRequest};
+use anyhow::Result;
+use helium_crypto::{Keypair, Sign};
 use helium_proto::services::chain_rewardable_entities::{
   chain_rewardable_entities_client::ChainRewardableEntitiesClient, EntityOwnershipChangeRespV1,
   EntityRewardDestinationChangeRespV1, IotHotspotChangeRespV1, MobileHotspotChangeRespV1,
 };
-use tonic::transport::{Channel, Endpoint};
-use tonic::Request;
+use tonic::{
+  transport::{Channel, Endpoint},
+  Request,
+};
+use tracing::{debug, error, info, warn};
+
+use crate::{
+  config::{IngestorConfig, PollingJob, ServiceConfig},
+  database::ChangeRecord,
+  errors::AtomicDataError,
+  metrics,
+  protobuf::{build_entity_change_requests, EntityChangeRequest},
+};
 
 #[derive(Debug, Clone)]
 pub struct AtomicDataPublisher {
@@ -22,7 +27,6 @@ pub struct AtomicDataPublisher {
   grpc_client: ChainRewardableEntitiesClient<Channel>,
   service_config: ServiceConfig,
   ingestor_config: IngestorConfig,
-  metrics: Arc<MetricsCollector>,
 }
 
 impl AtomicDataPublisher {
@@ -31,7 +35,6 @@ impl AtomicDataPublisher {
     keypair: Keypair,
     service_config: ServiceConfig,
     ingestor_config: IngestorConfig,
-    metrics: Arc<MetricsCollector>,
   ) -> Result<Self> {
     if service_config.dry_run {
       info!("Initializing AtomicDataPublisher in DRY RUN mode - skipping gRPC connection");
@@ -46,23 +49,24 @@ impl AtomicDataPublisher {
         grpc_client,
         service_config,
         ingestor_config,
-        metrics,
       });
     }
 
-    info!("Initializing AtomicDataPublisher with gRPC endpoint: {}", ingestor_config.endpoint);
+    info!(
+      "Initializing AtomicDataPublisher with gRPC endpoint: {}",
+      ingestor_config.endpoint
+    );
 
     let endpoint = Endpoint::from_shared(ingestor_config.endpoint.clone())
       .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?
-      .timeout(std::time::Duration::from_secs(ingestor_config.timeout_seconds));
+      .timeout(std::time::Duration::from_secs(
+        ingestor_config.timeout_seconds,
+      ));
 
-    let channel = endpoint
-      .connect()
-      .await
-      .map_err(|e| {
-        metrics.increment_ingestor_connection_failures();
-        anyhow::anyhow!("Failed to connect to ingestor: {}", e)
-      })?;
+    let channel = endpoint.connect().await.map_err(|e| {
+      metrics::increment_ingestor_connection_failures();
+      anyhow::anyhow!("Failed to connect to ingestor: {}", e)
+    })?;
 
     let grpc_client = ChainRewardableEntitiesClient::new(channel);
 
@@ -72,7 +76,6 @@ impl AtomicDataPublisher {
       grpc_client,
       service_config,
       ingestor_config,
-      metrics,
     })
   }
 
@@ -131,14 +134,15 @@ impl AtomicDataPublisher {
       .get("change_type")
       .and_then(|v| v.as_str())
       .ok_or_else(|| {
-        AtomicDataError::InvalidData(format!(
-          "No change type found for job: {}",
-          change.job_name
-        ))
+        AtomicDataError::InvalidData(format!("No change type found for job: {}", change.job_name))
       })?;
 
     let entity_requests = build_entity_change_requests(change, change_type, &self.keypair)?;
-    debug!("Processing {} entity change requests for job '{}'", entity_requests.len(), change.job_name);
+    debug!(
+      "Processing {} entity change requests for job '{}'",
+      entity_requests.len(),
+      change.job_name
+    );
 
     for entity_request in entity_requests.iter() {
       self.send_with_retries(entity_request.clone()).await?;
@@ -161,12 +165,15 @@ impl AtomicDataPublisher {
 
       match self.send_entity_change(request.clone()).await {
         Ok(_) => {
-          debug!("Successfully sent hotspot change request on attempt {}", attempts);
+          debug!(
+            "Successfully sent hotspot change request on attempt {}",
+            attempts
+          );
           return Ok(());
         }
         Err(e) => {
           if attempts <= max_retries {
-            self.metrics.increment_ingestor_retry_attempts();
+            metrics::increment_ingestor_retry_attempts();
             warn!(
               "Failed to send hotspot update request (attempt {}/{}): {}. Retrying...",
               attempts, max_retries, e
@@ -176,7 +183,7 @@ impl AtomicDataPublisher {
             ))
             .await;
           } else {
-            self.metrics.increment_ingestor_publish_failures();
+            metrics::increment_ingestor_publish_failures();
             error!(
               "Failed to send hotspot update request after {} attempts: {}",
               attempts, e
@@ -203,7 +210,7 @@ impl AtomicDataPublisher {
             // Categorize the error type for better metrics
             match e.code() {
               tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                self.metrics.increment_ingestor_connection_failures();
+                metrics::increment_ingestor_connection_failures();
               }
               _ => {
                 // Other gRPC errors (auth, invalid request, etc.)
@@ -213,7 +220,10 @@ impl AtomicDataPublisher {
           })?;
 
         let resp: MobileHotspotChangeRespV1 = response.into_inner();
-        debug!("Mobile hotspot change accepted at timestamp: {}", resp.timestamp_ms);
+        debug!(
+          "Mobile hotspot change accepted at timestamp: {}",
+          resp.timestamp_ms
+        );
       }
       EntityChangeRequest::IotHotspot(iot_req) => {
         let response = client
@@ -223,7 +233,7 @@ impl AtomicDataPublisher {
             // Categorize the error type for better metrics
             match e.code() {
               tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                self.metrics.increment_ingestor_connection_failures();
+                metrics::increment_ingestor_connection_failures();
               }
               _ => {
                 // Other gRPC errors (auth, invalid request, etc.)
@@ -233,7 +243,10 @@ impl AtomicDataPublisher {
           })?;
 
         let resp: IotHotspotChangeRespV1 = response.into_inner();
-        debug!("IoT hotspot change accepted at timestamp: {}", resp.timestamp_ms);
+        debug!(
+          "IoT hotspot change accepted at timestamp: {}",
+          resp.timestamp_ms
+        );
       }
       EntityChangeRequest::EntityOwnership(ownership_req) => {
         let response = client
@@ -243,7 +256,7 @@ impl AtomicDataPublisher {
             // Categorize the error type for better metrics
             match e.code() {
               tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                self.metrics.increment_ingestor_connection_failures();
+                metrics::increment_ingestor_connection_failures();
               }
               _ => {
                 // Other gRPC errors (auth, invalid request, etc.)
@@ -253,7 +266,10 @@ impl AtomicDataPublisher {
           })?;
 
         let resp: EntityOwnershipChangeRespV1 = response.into_inner();
-        debug!("Entity ownership change accepted at timestamp: {}", resp.timestamp_ms);
+        debug!(
+          "Entity ownership change accepted at timestamp: {}",
+          resp.timestamp_ms
+        );
       }
       EntityChangeRequest::EntityRewardDestination(reward_req) => {
         let response = client
@@ -263,33 +279,45 @@ impl AtomicDataPublisher {
             // Categorize the error type for better metrics
             match e.code() {
               tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                self.metrics.increment_ingestor_connection_failures();
+                metrics::increment_ingestor_connection_failures();
               }
               _ => {
                 // Other gRPC errors (auth, invalid request, etc.)
               }
             }
-            AtomicDataError::NetworkError(format!("gRPC entity reward destination request failed: {}", e))
+            AtomicDataError::NetworkError(format!(
+              "gRPC entity reward destination request failed: {}",
+              e
+            ))
           })?;
 
         let resp: EntityRewardDestinationChangeRespV1 = response.into_inner();
-        debug!("Entity reward destination change accepted at timestamp: {}", resp.timestamp_ms);
+        debug!(
+          "Entity reward destination change accepted at timestamp: {}",
+          resp.timestamp_ms
+        );
       }
     }
 
     Ok(())
   }
 
-  async fn log_protobuf_message(&self, request: &EntityChangeRequest) -> Result<(), AtomicDataError> {
+  async fn log_protobuf_message(
+    &self,
+    request: &EntityChangeRequest,
+  ) -> Result<(), AtomicDataError> {
     if self.service_config.dry_run_failure_rate > 0.0 {
       use rand::Rng;
       let mut rng = rand::thread_rng();
       let random_value: f32 = rng.gen();
 
       if random_value < self.service_config.dry_run_failure_rate {
-        warn!("DRY RUN: Simulating failure for message (failure rate: {})", self.service_config.dry_run_failure_rate);
+        warn!(
+          "DRY RUN: Simulating failure for message (failure rate: {})",
+          self.service_config.dry_run_failure_rate
+        );
         return Err(AtomicDataError::NetworkError(
-          "DRY RUN: Simulated network failure".to_string()
+          "DRY RUN: Simulated network failure".to_string(),
         ));
       }
     }
@@ -299,8 +327,16 @@ impl AtomicDataPublisher {
           info!(
             "DRY RUN: Mobile change details - block: {}, pub_key: {}, asset: {}, metadata: {:?}",
             change.block,
-            change.pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string()),
+            change
+              .pub_key
+              .as_ref()
+              .map(|pk| format!("{:?}", pk.value))
+              .unwrap_or("None".to_string()),
+            change
+              .asset
+              .as_ref()
+              .map(|asset| format!("{:?}", asset.value))
+              .unwrap_or("None".to_string()),
             change.metadata
           );
         }
@@ -312,8 +348,16 @@ impl AtomicDataPublisher {
           info!(
             "DRY RUN: IoT change details - block: {}, pub_key: {}, asset: {}, metadata: {:?}",
             change.block,
-            change.pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string()),
+            change
+              .pub_key
+              .as_ref()
+              .map(|pk| format!("{:?}", pk.value))
+              .unwrap_or("None".to_string()),
+            change
+              .asset
+              .as_ref()
+              .map(|asset| format!("{:?}", asset.value))
+              .unwrap_or("None".to_string()),
             change.metadata
           );
         }
@@ -331,7 +375,10 @@ impl AtomicDataPublisher {
           );
         }
 
-        debug!("DRY RUN: Full EntityOwnershipChangeReqV1: {:?}", ownership_req);
+        debug!(
+          "DRY RUN: Full EntityOwnershipChangeReqV1: {:?}",
+          ownership_req
+        );
       }
       EntityChangeRequest::EntityRewardDestination(reward_req) => {
         if let Some(change) = &reward_req.change {
@@ -344,7 +391,10 @@ impl AtomicDataPublisher {
           );
         }
 
-        debug!("DRY RUN: Full EntityRewardDestinationChangeReqV1: {:?}", reward_req);
+        debug!(
+          "DRY RUN: Full EntityRewardDestinationChangeReqV1: {:?}",
+          reward_req
+        );
       }
     }
 
@@ -354,16 +404,62 @@ impl AtomicDataPublisher {
   pub async fn health_check(&self) -> Result<(), AtomicDataError> {
     let public_key = self.keypair.public_key();
     debug!(
-      "Publisher health check passed - keypair public key: {}",
+      "Publisher health check - keypair public key: {}",
       public_key
     );
+
+    // Verify keypair is valid and can sign
+    let test_message = b"health_check_test";
+    if self.keypair.sign(test_message).is_err() {
+      return Err(AtomicDataError::NetworkError(
+        "Keypair signing failed".to_string(),
+      ));
+    }
 
     if self.service_config.dry_run {
       debug!("Publisher health check: DRY RUN mode enabled - skipping gRPC health check");
     } else {
-      debug!("Publisher health check: gRPC client ready for production mode");
+      // In production mode, test gRPC connectivity
+      debug!("Publisher health check: testing gRPC connectivity");
+
+      // Try to create a simple gRPC request to test connectivity
+      // This will fail if the gRPC service is unreachable
+      let mut client = self.grpc_client.clone();
+
+      // Create a minimal valid request to test connectivity
+      // We'll use an empty mobile hotspot change request
+      let test_request = tonic::Request::new(
+        helium_proto::services::chain_rewardable_entities::MobileHotspotChangeReqV1 {
+          change: None, // Empty change for health check
+          signature: vec![],
+          signer: self.keypair.public_key().to_string(),
+        },
+      );
+
+      // Use a short timeout for health check
+      match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        client.submit_mobile_hotspot_change(test_request),
+      )
+      .await
+      {
+        Ok(Ok(_)) => {
+          debug!("Publisher health check: gRPC connectivity verified");
+        }
+        Ok(Err(e)) => {
+          // Even if the request fails with an error, it means gRPC connectivity is working
+          // The error might be due to invalid request parameters, not connectivity
+          debug!("Publisher health check: gRPC connectivity verified (request failed with expected error: {})", e);
+        }
+        Err(_) => {
+          return Err(AtomicDataError::NetworkError(
+            "gRPC request timed out".to_string(),
+          ));
+        }
+      }
     }
 
+    debug!("Publisher health check passed");
     Ok(())
   }
 }

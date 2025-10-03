@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -9,7 +7,7 @@ use tracing::{debug, info, warn};
 use crate::{
   config::{DatabaseConfig, PollingJob},
   errors::AtomicDataError,
-  metrics::MetricsCollector,
+  metrics,
 };
 
 const MIN_CHUNK_SIZE: u64 = 50_000;
@@ -21,22 +19,17 @@ pub struct ChangeRecord {
   pub job_name: String,
   pub query_name: String,
   pub target_block: u64,
-  pub atomic_data: serde_json::Value,
+  pub atomic_data: Vec<serde_json::Value>,
 }
 
 #[derive(Debug)]
 pub struct DatabaseClient {
   pool: PgPool,
   polling_jobs: Vec<PollingJob>,
-  metrics: Option<Arc<MetricsCollector>>,
 }
 
 impl DatabaseClient {
-  pub async fn new_with_metrics(
-    config: &DatabaseConfig,
-    polling_jobs: Vec<PollingJob>,
-    metrics: Option<Arc<MetricsCollector>>,
-  ) -> Result<Self> {
+  pub async fn new(config: &DatabaseConfig, polling_jobs: Vec<PollingJob>) -> Result<Self> {
     Self::validate_database_config(config)?;
     Self::validate_polling_jobs(&polling_jobs)?;
     let database_url = format!(
@@ -62,11 +55,7 @@ impl DatabaseClient {
       config.host, config.port, config.database_name
     );
 
-    Ok(Self {
-      pool,
-      polling_jobs,
-      metrics,
-    })
+    Ok(Self { pool, polling_jobs })
   }
 
   fn validate_database_config(config: &DatabaseConfig) -> Result<()> {
@@ -274,8 +263,14 @@ impl DatabaseClient {
     Ok(())
   }
 
-  pub async fn get_pending_changes(&self) -> Result<Option<ChangeRecord>> {
+  pub async fn get_pending_changes(&self, batch_size: u32) -> Result<Vec<ChangeRecord>> {
+    let mut change_records = Vec::new();
+
     loop {
+      if change_records.len() >= batch_size as usize {
+        break;
+      }
+
       if let Some(job) = self.get_next_queue_job().await? {
         if !self.mark_job_running(&job.name, &job.query_name).await? {
           continue; // Try next job if this one couldn't be marked as running
@@ -293,19 +288,24 @@ impl DatabaseClient {
               let _ = self.mark_completed(&job.name, &job.query_name).await;
               continue; // Continue to next job in the same cycle
             }
-            return Ok(change_record);
+
+            // Add the change record to our batch
+            change_records.push(change_record.unwrap());
           }
           Err(e) => {
             let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
             return Err(e.into());
           }
         }
-      } else {
+      } else if change_records.is_empty() {
         // No more jobs available, reset queue for next cycle
         self.reset_job_queue().await?;
-        return Ok(None);
       }
+
+      break;
     }
+
+    Ok(change_records)
   }
 
   async fn execute_job_polling(
@@ -467,9 +467,7 @@ impl DatabaseClient {
     let chunk_size = if block_diff <= MIN_CHUNK_SIZE {
       block_diff
     } else {
-      // Scale chunk size logarithmically with remaining blocks, with bounds
-      let scaled_chunk = (block_diff as f64 * DEFAULT_CHUNK_PERCENTAGE) as u64;
-      scaled_chunk.clamp(MIN_CHUNK_SIZE, MAX_CHUNK_SIZE)
+      block_diff.min(MAX_CHUNK_SIZE)
     };
 
     std::cmp::min(last_processed_block + chunk_size, max_available_block)
@@ -545,9 +543,7 @@ impl DatabaseClient {
     };
 
     let query_duration = query_start.elapsed().as_secs_f64();
-    if let Some(ref metrics) = self.metrics {
-      metrics.observe_database_query_duration(query_duration);
-    }
+    metrics::observe_database_query_duration(query_duration);
 
     Ok(rows)
   }
@@ -571,7 +567,7 @@ impl DatabaseClient {
       job_name: job.name.clone(),
       query_name: job.query_name.clone(),
       target_block,
-      atomic_data: serde_json::Value::Array(atomic_data_array),
+      atomic_data: atomic_data_array,
     })
   }
 
@@ -681,8 +677,20 @@ impl DatabaseClient {
     Ok(())
   }
 
-  pub async fn health_check(&self) -> Result<()> {
+  pub async fn health_check(&self) -> Result<(), sqlx::Error> {
+    // Test basic connectivity
     sqlx::query("SELECT 1").execute(&self.pool).await?;
+
+    // Test that we can actually query the atomic_data table (our main table)
+    sqlx::query("SELECT COUNT(*) FROM atomic_data_polling_state LIMIT 1")
+      .execute(&self.pool)
+      .await?;
+
+    // Check connection pool health
+    if self.pool.size() == 0 {
+      return Err(sqlx::Error::PoolTimedOut);
+    }
+
     Ok(())
   }
 
@@ -698,7 +706,9 @@ impl DatabaseClient {
           .get("hotspot_type")
           .and_then(|v| v.as_str())
           .ok_or_else(|| {
-            AtomicDataError::ConfigError("hotspot_type parameter is required".to_string())
+            AtomicDataError::ConfigError(config::ConfigError::Message(
+              "hotspot_type parameter is required".to_string(),
+            ))
           })?;
 
         let (_table_name, block) = match hotspot_type {

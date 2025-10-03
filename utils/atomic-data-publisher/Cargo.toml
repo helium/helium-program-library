@@ -23,6 +23,8 @@ bs58 = "0.5"
 rand = "0.8"
 metrics = "0.23"
 metrics-exporter-prometheus = "0.15"
+triggered = "0.1"
+reqwest = { version = "0.11", features = ["json"] }
 
 [patch.'https://github.com/helium/proto']
 helium-proto = { git = "https://www.github.com/helium/proto", branch = "mj/chain-rewardable-entities" }

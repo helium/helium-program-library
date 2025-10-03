@@ -1,13 +1,19 @@
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::{
+  sync::Arc,
+  time::{Duration, Instant},
+};
+
 use tokio::time::{interval, sleep};
 use tracing::{debug, error, info, warn};
+use triggered::Listener;
 
-use crate::config::Settings;
-use crate::database::{DatabaseClient, ChangeRecord};
-use crate::errors::AtomicDataError;
-use crate::metrics::MetricsCollector;
-use crate::publisher::AtomicDataPublisher as Publisher;
+use crate::{
+  config::Settings,
+  database::{ChangeRecord, DatabaseClient},
+  errors::AtomicDataError,
+  metrics,
+  publisher::AtomicDataPublisher as Publisher,
+};
 
 const POLLING_ERROR_RETRY_SECONDS: u64 = 5;
 
@@ -15,29 +21,19 @@ const POLLING_ERROR_RETRY_SECONDS: u64 = 5;
 pub struct PollingService {
   database: Arc<DatabaseClient>,
   publisher: Arc<Publisher>,
-  metrics: Arc<MetricsCollector>,
   config: Settings,
 }
 
 impl PollingService {
-  pub fn new(
-    database: Arc<DatabaseClient>,
-    publisher: Arc<Publisher>,
-    metrics: Arc<MetricsCollector>,
-    config: Settings,
-  ) -> Self {
+  pub fn new(database: Arc<DatabaseClient>, publisher: Arc<Publisher>, config: Settings) -> Self {
     Self {
       database,
       publisher,
-      metrics,
       config,
     }
   }
 
-  pub async fn run(
-    &self,
-    mut shutdown_signal: tokio::sync::watch::Receiver<bool>,
-  ) -> Result<(), AtomicDataError> {
+  pub async fn run(&self, shutdown_listener: Listener) -> Result<(), AtomicDataError> {
     let mut interval = interval(self.config.polling_interval());
 
     info!(
@@ -52,18 +48,16 @@ impl PollingService {
 
               if let Err(e) = self.process_changes().await {
                   error!("Error processing changes: {}", e);
-                  self.metrics.increment_errors();
+                  metrics::increment_errors();
                   sleep(Duration::from_secs(POLLING_ERROR_RETRY_SECONDS)).await;
               }
 
               let cycle_time = cycle_start.elapsed();
               debug!("Polling cycle completed in {:?}", cycle_time);
           }
-          _ = shutdown_signal.changed() => {
-              if *shutdown_signal.borrow() {
-                  info!("Shutting down polling service");
-                  break;
-              }
+          _ = shutdown_listener.clone() => {
+              info!("Shutting down polling service");
+              break;
           }
       }
     }
@@ -86,50 +80,48 @@ impl PollingService {
 
     // Process all available jobs in this cycle
     loop {
-      let change_record = self
+      let change_records = self
         .database
-        .get_pending_changes()
+        .get_pending_changes(self.config.service.job_batch_size)
         .await?;
 
-      let record = match change_record {
-        Some(record) => record,
-        None => {
-          info!(
-            "Completed polling cycle: {} jobs processed ({} had data), {} total individual changes published, {} total failed",
-            total_jobs_processed, total_jobs_with_data, total_changes_published, total_changes_failed
-          );
-          break;
-        }
-      };
-
-      total_jobs_processed += 1;
-      total_jobs_with_data += 1; // If we got a record, it has data
-      let job_name = record.job_name.clone(); // Clone the job name to avoid borrow issues
-
-      let row_count = if let serde_json::Value::Array(arr) = &record.atomic_data {
-        arr.len()
-      } else {
-        1
-      };
+      if change_records.is_empty() {
+        info!(
+          "Completed polling cycle: {} jobs processed ({} had data), {} total individual changes published, {} total failed",
+          total_jobs_processed, total_jobs_with_data, total_changes_published, total_changes_failed
+        );
+        break;
+      }
 
       info!(
-        "Processing job {} of cycle: '{}' with {} rows (batches of {})",
-        total_jobs_processed,
-        job_name,
-        row_count,
-        self.config.service.batch_size
+        "Processing batch of {} jobs in this cycle",
+        change_records.len()
       );
 
-      let (job_published, job_failed, should_break) = self
-        .process_job_changes(record)
-        .await?;
-      total_changes_published += job_published;
-      total_changes_failed += job_failed;
+      for record in change_records {
+        total_jobs_processed += 1;
+        total_jobs_with_data += 1; // If we got a record, it has data
+        let job_name = record.job_name.clone(); // Clone the job name to avoid borrow issues
 
-      info!("Completed job '{}': {} individual changes published, {} failed", job_name, job_published, job_failed);
+        let row_count = record.atomic_data.len();
 
-      if should_break {
-        break;
+        info!(
+          "Processing job {} of cycle: '{}' with {} rows (batches of {})",
+          total_jobs_processed, job_name, row_count, self.config.service.batch_size
+        );
+
+        let (job_published, job_failed, should_break) = self.process_job_changes(record).await?;
+        total_changes_published += job_published;
+        total_changes_failed += job_failed;
+
+        info!(
+          "Completed job '{}': {} individual changes published, {} failed",
+          job_name, job_published, job_failed
+        );
+
+        if should_break {
+          return Ok(());
+        }
       }
     }
 
@@ -146,7 +138,8 @@ impl PollingService {
   ) -> Result<(usize, usize, bool), AtomicDataError> {
     let changes = vec![record.clone()];
 
-    let (total_published, total_failed, should_break) = self.process_batches(changes, record.target_block).await?;
+    let (total_published, total_failed, should_break) =
+      self.process_batches(changes, record.target_block).await?;
     self.database.finalize_job(&record, total_failed).await?;
     Ok((total_published, total_failed, should_break))
   }
@@ -161,17 +154,14 @@ impl PollingService {
     let batch_size = self.config.service.batch_size as usize;
 
     for (batch_index, batch) in changes.chunks(batch_size).enumerate() {
-      let total_atomic_items: usize = batch.iter()
-        .map(|change| {
-          if let serde_json::Value::Array(arr) = &change.atomic_data {
-            arr.len()
-          } else {
-            1
-          }
-        })
-        .sum();
+      let total_atomic_items: usize = batch.iter().map(|change| change.atomic_data.len()).sum();
 
-      info!("Processing batch {}: {} ChangeRecords ({} individual atomic items)", batch_index + 1, batch.len(), total_atomic_items);
+      info!(
+        "Processing batch {}: {} ChangeRecords ({} individual atomic items)",
+        batch_index + 1,
+        batch.len(),
+        total_atomic_items
+      );
       let (batch_published, batch_failed) = self.process_batch(batch, target_block).await?;
       total_published += batch_published;
       total_failed += batch_failed;
@@ -179,13 +169,17 @@ impl PollingService {
       if batch_failed > 0 {
         warn!(
           "Batch {} had {} failed changes, stopping processing",
-          batch_index + 1, batch_failed
+          batch_index + 1,
+          batch_failed
         );
         return Ok((total_published, total_failed, true));
       }
     }
 
-    info!("Completed processing all batches: {} published, {} failed", total_published, total_failed);
+    info!(
+      "Completed processing all batches: {} published, {} failed",
+      total_published, total_failed
+    );
     Ok((total_published, total_failed, false))
   }
 
@@ -204,12 +198,9 @@ impl PollingService {
       .map(|change| {
         let change = change.clone();
         let publisher = self.publisher.clone();
-        let metrics = self.metrics.clone();
         let semaphore = semaphore.clone();
 
-        tokio::spawn(async move {
-          Self::publish_single_change(change, publisher, metrics, semaphore).await
-        })
+        tokio::spawn(async move { Self::publish_single_change(change, publisher, semaphore).await })
       })
       .collect();
 
@@ -225,7 +216,7 @@ impl PollingService {
             "Publishing task panicked: {}. This indicates a serious bug in the publishing logic.",
             e
           );
-          self.metrics.increment_errors();
+          metrics::increment_errors();
         }
       }
     }
@@ -233,18 +224,16 @@ impl PollingService {
     let batch_published = published_changes.len();
     let batch_failed = failed_changes.len();
     if !published_changes.is_empty() {
-      self.database.mark_processed(&published_changes, target_block).await?;
+      self
+        .database
+        .mark_processed(&published_changes, target_block)
+        .await?;
     }
 
     // Calculate total individual changes published by looking at the atomic_data arrays
-    let total_individual_changes: usize = published_changes.iter()
-      .map(|change| {
-        if let serde_json::Value::Array(arr) = &change.atomic_data {
-          arr.len()
-        } else {
-          1
-        }
-      })
+    let total_individual_changes: usize = published_changes
+      .iter()
+      .map(|change| change.atomic_data.len())
       .sum();
 
     let batch_time = batch_start.elapsed();
@@ -259,7 +248,6 @@ impl PollingService {
   async fn publish_single_change(
     change: ChangeRecord,
     publisher: Arc<Publisher>,
-    metrics: Arc<MetricsCollector>,
     semaphore: Arc<tokio::sync::Semaphore>,
   ) -> Result<ChangeRecord, ChangeRecord> {
     let _permit = semaphore.acquire().await.map_err(|_| {
@@ -278,15 +266,19 @@ impl PollingService {
       Ok(published_ids) if !published_ids.is_empty() => {
         // Increment metrics for each individual change published
         for _ in 0..published_ids.len() {
-          metrics.increment_published();
+          metrics::increment_published();
         }
-        metrics.observe_publish_duration(publish_duration);
-        info!("Published {} individual changes for job '{}'", published_ids.len(), change.job_name);
+        metrics::observe_publish_duration(publish_duration);
+        info!(
+          "Published {} individual changes for job '{}'",
+          published_ids.len(),
+          change.job_name
+        );
         Ok(change)
       }
       Ok(_) => {
-        metrics.increment_errors();
-        metrics.observe_publish_duration(publish_duration);
+        metrics::increment_errors();
+        metrics::observe_publish_duration(publish_duration);
         Err(change)
       }
       Err(e) => {
@@ -294,11 +286,30 @@ impl PollingService {
           "Failed to publish change for job '{}' (duration: {:.2}s): {}",
           change.job_name, publish_duration, e
         );
-        metrics.increment_errors();
-        metrics.observe_publish_duration(publish_duration);
+        metrics::increment_errors();
+        metrics::observe_publish_duration(publish_duration);
         Err(change)
       }
     }
   }
 
+  pub async fn health_check(&self) -> Result<(), AtomicDataError> {
+    // Check if we can access the database for polling operations
+    if let Err(e) = self.database.health_check().await {
+      return Err(AtomicDataError::DatabaseError(e));
+    }
+
+    // Check if we can access the publisher
+    self.publisher.health_check().await?;
+
+    // Verify polling configuration is valid
+    if self.config.service.polling_jobs.is_empty() {
+      return Err(AtomicDataError::ConfigError(config::ConfigError::Message(
+        "No polling jobs configured".to_string(),
+      )));
+    }
+
+    debug!("Polling service health check passed");
+    Ok(())
+  }
 }

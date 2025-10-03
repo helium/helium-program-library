@@ -7,6 +7,7 @@ format = "json"
 [service]
 polling_interval_seconds = 10
 batch_size = 500
+job_batch_size = 5
 max_concurrent_publishes = 5
 dry_run = true
 dry_run_failure_rate = 0.0

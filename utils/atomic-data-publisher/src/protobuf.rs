@@ -23,33 +23,6 @@ impl ProtobufBuilder {
     chrono::Utc::now().timestamp() as u64
   }
 
-  fn validate_change_record(change: &ChangeRecord) -> Result<(), AtomicDataError> {
-    if change.atomic_data.is_null() {
-      return Err(AtomicDataError::InvalidData(
-        "Change record has null atomic_data".to_string(),
-      ));
-    }
-
-    if !change.atomic_data.is_array() {
-      return Err(AtomicDataError::InvalidData(format!(
-        "Change record atomic_data must be an array, got: {}",
-        change.atomic_data
-      )));
-    }
-
-    if change
-      .atomic_data
-      .as_array()
-      .map_or(true, |arr| arr.is_empty())
-    {
-      return Err(AtomicDataError::InvalidData(
-        "Change record has empty atomic_data array".to_string(),
-      ));
-    }
-
-    Ok(())
-  }
-
   fn get_required_field<'a>(
     data: &'a Value,
     field_name: &str,
@@ -73,11 +46,7 @@ impl ProtobufBuilder {
     change: &ChangeRecord,
     keypair: &Keypair,
   ) -> Result<Vec<MobileHotspotChangeReqV1>, AtomicDataError> {
-    Self::validate_change_record(change)?;
-
-    let atomic_data_array = change.atomic_data.as_array().ok_or_else(|| {
-      AtomicDataError::InvalidData("No atomic data found in change record".to_string())
-    })?;
+    let atomic_data_array = &change.atomic_data;
 
     let mut change_requests = Vec::with_capacity(atomic_data_array.len());
 
@@ -90,12 +59,12 @@ impl ProtobufBuilder {
           .map(|obj| obj.keys().collect::<Vec<_>>())
       );
 
-      let block = Self::get_u64_field(atomic_data, "block")?;
+      let block = Self::get_u64_field(&atomic_data, "block")?;
       let timestamp_seconds = Self::current_timestamp();
 
-      let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
-      let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
-      let metadata = Self::build_mobile_hotspot_metadata(atomic_data)?;
+      let pub_key = Self::extract_helium_pub_key(&atomic_data, "pub_key")?;
+      let asset = Self::extract_solana_pub_key(&atomic_data, "asset")?;
+      let metadata = Self::build_mobile_hotspot_metadata(&atomic_data)?;
 
       let change_msg = MobileHotspotChangeV1 {
         block,
@@ -124,11 +93,7 @@ impl ProtobufBuilder {
     change: &ChangeRecord,
     keypair: &Keypair,
   ) -> Result<Vec<IotHotspotChangeReqV1>, AtomicDataError> {
-    Self::validate_change_record(change)?;
-
-    let atomic_data_array = change.atomic_data.as_array().ok_or_else(|| {
-      AtomicDataError::InvalidData("No atomic data found in change record".to_string())
-    })?;
+    let atomic_data_array = &change.atomic_data;
 
     let mut change_requests = Vec::with_capacity(atomic_data_array.len());
 
@@ -169,11 +134,7 @@ impl ProtobufBuilder {
     change: &ChangeRecord,
     keypair: &Keypair,
   ) -> Result<Vec<EntityOwnershipChangeReqV1>, AtomicDataError> {
-    Self::validate_change_record(change)?;
-
-    let atomic_data_array = change.atomic_data.as_array().ok_or_else(|| {
-      AtomicDataError::InvalidData("No atomic data found in change record".to_string())
-    })?;
+    let atomic_data_array = &change.atomic_data;
 
     let mut change_requests = Vec::with_capacity(atomic_data_array.len());
 
@@ -212,11 +173,7 @@ impl ProtobufBuilder {
     change: &ChangeRecord,
     keypair: &Keypair,
   ) -> Result<Vec<EntityRewardDestinationChangeReqV1>, AtomicDataError> {
-    Self::validate_change_record(change)?;
-
-    let atomic_data_array = change.atomic_data.as_array().ok_or_else(|| {
-      AtomicDataError::InvalidData("No atomic data found in change record".to_string())
-    })?;
+    let atomic_data_array = &change.atomic_data;
 
     let mut change_requests = Vec::with_capacity(atomic_data_array.len());
 
