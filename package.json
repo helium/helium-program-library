@@ -18,7 +18,7 @@
     "watch": "lerna run --parallel prebuild && tsc --build --watch",
     "clean": "npx shx rm -rf {.,packages/*}/{node_modules,lib,dist}",
     "fmt": "cargo fmt --check",
-    "clippy": "cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::unexpected-cfgs",
+    "clippy": "cargo clippy --all-targets -- -D warnings -A clippy::manual_is_multiple_of -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::unexpected-cfgs",
     "generate-idl-docs": "ts-node -T scripts/generate-idl-docs.ts",
     "heroku-postbuild": "npm run build -w hpl-docs",
     "docs-dev": "yarn workspace hpl-docs dev"

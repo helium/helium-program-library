@@ -18,7 +18,6 @@ pub fn calculate_current_price(oracles: &[OracleV0], curr_ts: i64) -> Option<u64
 
   prices.sort();
   let n = prices.len();
-  #[allow(clippy::manual_is_multiple_of)]
   let median = if n % 2 == 0 {
     ((prices[n / 2 - 1] + prices[n / 2]) as f64 / 2.0).round() as u64
   } else {
