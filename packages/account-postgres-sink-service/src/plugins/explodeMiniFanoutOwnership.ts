@@ -5,6 +5,7 @@ import { IPlugin } from "../types";
 import { database } from "../utils/database";
 import { PublicKey } from "@solana/web3.js";
 import sequelize from "sequelize";
+import { syncTableWithViews } from "../utils/syncTableWithViews";
 
 export class RewardsRecipient extends Model {
   declare asset: string;
@@ -45,7 +46,7 @@ RewardsRecipient.init(
       field: "encoded_entity_key",
     },
     keySerialization: {
-      type: DataTypes.JSONB,
+      type: "TEXT",
       allowNull: false,
     },
     shares: {
@@ -78,16 +79,10 @@ RewardsRecipient.init(
     timestamps: true,
     indexes: [
       {
-        fields: ["asset"],
-      },
-      {
         fields: ["destination"],
       },
       {
         fields: ["owner"],
-      },
-      {
-        fields: ["type"],
       },
       {
         fields: ["last_block"],
@@ -385,12 +380,14 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
       !columns.every((col) => existingColumns.includes(col))
     ) {
       console.log("Syncing rewards_recipients table");
-      if (existingColumns.includes("lastBlock") && !columns.includes("lastBlock")) {
-        await database.query(`
-          DROP VIEW IF EXISTS hotspot_ownership_v0;
-        `, { type: QueryTypes.RAW });
-      }
-      await RewardsRecipient.sync({ alter: true });
+      await syncTableWithViews(
+        database,
+        "rewards_recipients",
+        "public",
+        async () => {
+          await RewardsRecipient.sync({ alter: true });
+        }
+      );
     }
 
     const addFields = () => {};

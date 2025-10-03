@@ -10,12 +10,15 @@ import {
 } from "./env";
 import { ensureTables } from "./utils/ensureTables";
 import { setupSubstream } from "./services/substream";
-import database from "./utils/database";
+import database, { AssetOwner, Cursor } from "./utils/database";
 import { upsertOwners } from "./utils/upsertOwners";
 import { metrics } from "./plugins/metrics";
 import { provider } from "./utils/solana";
 import { TransactionProcessor } from "./utils/processTransaction";
 import bs58 from "bs58";
+import { syncTableWithViews } from "./utils/syncTableWithViews";
+import { camelize } from "inflection";
+import { QueryTypes } from "sequelize";
 
 if (PG_POOL_SIZE < 5) {
   throw new Error("PG_POOL_SIZE must be minimum of 5");
@@ -46,8 +49,46 @@ if (PG_POOL_SIZE < 5) {
     await server.register(cors, { origin: "*" });
     await server.register(metrics);
     await ensureTables({ sequelize: database });
-    await database.sync({ alter: true });
+    const assetOwnerColumns = Object.keys(AssetOwner.getAttributes()).map(
+      (att) => camelize(att, true)
+    );
+    const assetOwnerIndexes = ((AssetOwner.options as any).indexes ||
+      []) as any[];
 
+    const existingAssetOwnerColumns = (
+      await database.query(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+         AND table_name = 'asset_owners'`,
+        { type: QueryTypes.SELECT }
+      )
+    ).map((x: any) => camelize(x.column_name, true));
+
+    const existingAssetOwnerIndexes = (
+      await database.query(
+        `SELECT indexname FROM pg_indexes
+         WHERE tablename = 'asset_owners'
+         AND schemaname = 'public'`,
+        { type: QueryTypes.SELECT }
+      )
+    ).map((x: any) => x.indexname);
+
+    if (
+      !existingAssetOwnerColumns.length ||
+      !assetOwnerColumns.every((col) =>
+        existingAssetOwnerColumns.includes(col)
+      ) ||
+      !assetOwnerIndexes.every((idx) =>
+        idx.name ? existingAssetOwnerIndexes.includes(idx.name) : true
+      )
+    ) {
+      await syncTableWithViews(database, "asset_owners", "public", async () => {
+        await AssetOwner.sync({ alter: true });
+      });
+    }
+
+    await Cursor.sync({ alter: true });
     server.get("/refresh-owners", async (req, res) => {
       const { password } = req.query as any;
       if (password !== ADMIN_PASSWORD) {

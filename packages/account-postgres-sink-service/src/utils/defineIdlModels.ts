@@ -11,6 +11,7 @@ import {
   IdlTypeDefTyStruct,
 } from "@coral-xyz/anchor/dist/cjs/idl";
 import { omit, pick } from "lodash";
+import { syncTableWithViews } from "./syncTableWithViews";
 
 const TypeMap = new Map<string, any>([
   ["string", DataTypes.STRING],
@@ -97,7 +98,12 @@ export const defineIdlModels = async ({
       });
 
       if (accConfig.schema) {
-        if (!await sequelize.query(`SELECT 1 FROM pg_namespace WHERE nspname = '${accConfig.schema}'`, { type: QueryTypes.SELECT })) {
+        if (
+          !(await sequelize.query(
+            `SELECT 1 FROM pg_namespace WHERE nspname = '${accConfig.schema}'`,
+            { type: QueryTypes.SELECT }
+          ))
+        ) {
           await sequelize.createSchema(accConfig.schema, {});
         }
       }
@@ -166,7 +172,12 @@ export const defineIdlModels = async ({
         !indexes.every((idx) => existingIndexes.includes(idx.name)) ||
         !hasblockIndex
       ) {
-        await model.sync({ alter: true });
+        const tableName = underscore(accConfig.table || acc.name);
+        const schemaName = underscore(accConfig.schema || "public");
+
+        await syncTableWithViews(sequelize, tableName, schemaName, async () => {
+          await model.sync({ alter: true });
+        });
 
         if (!hasblockIndex) {
           try {
@@ -217,9 +228,10 @@ export const defineAllIdlModels = async ({
       )
     ) {
       throw new Error(
-        `idl does not have every account type ${config.accounts.find(
-          ({ type }) => !idl.types!.some(({ name }) => name === type)
-        )?.type
+        `idl does not have every account type ${
+          config.accounts.find(
+            ({ type }) => !idl.types!.some(({ name }) => name === type)
+          )?.type
         }`
       );
     }
