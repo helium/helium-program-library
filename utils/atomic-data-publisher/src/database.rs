@@ -313,15 +313,15 @@ impl DatabaseClient {
     }
 
     let target_block = self.calculate_target_block(last_processed_block, max_available_block);
-    let rows = self
+    let query_results = self
       .execute_query(job, last_processed_block, target_block)
       .await?;
-    let change_record = self.process_query_results(&rows, job, target_block);
+    let change_record = self.process_query_results(&query_results, job, target_block);
 
     if change_record.is_some() {
       info!(
-        "Found {} rows for job '{}' (processed up to block {})",
-        rows.len(),
+        "Found {} items for job '{}' (processed up to block {})",
+        query_results.len(),
         job.name,
         target_block
       );
@@ -358,8 +358,8 @@ impl DatabaseClient {
 
     let last_processed_block: i64 = current_state_row.get("last_processed_block");
     let last_max_block: Option<i64> = current_state_row.get("last_max_block");
-    let raw_max_available_block = match self
-      .get_last_block_for_query(&job.query_name, &job.parameters, true)
+    let current_max_block = match self
+      .get_max_block_for_query(&job.query_name, &job.parameters)
       .await?
     {
       Some(block) => block,
@@ -375,17 +375,17 @@ impl DatabaseClient {
 
     // Get the min block for this table and use it if it's greater than last_processed_block
     let min_block = self
-      .get_last_block_for_query(&job.query_name, &job.parameters, false)
+      .get_min_block_for_query(&job.query_name, &job.parameters)
       .await?
       .unwrap_or(0);
 
     let effective_start_block = std::cmp::max(min_block, last_processed_block as u64);
 
     let max_available_block = self
-      .handle_max_block_logic(
+      .apply_safety_buffer_and_track_progress(
         &job.name,
         &job.query_name,
-        raw_max_available_block,
+        current_max_block,
         effective_start_block,
         last_max_block.map(|b| b as u64),
       )
@@ -394,25 +394,25 @@ impl DatabaseClient {
     Ok((effective_start_block, max_available_block))
   }
 
-  async fn handle_max_block_logic(
+  async fn apply_safety_buffer_and_track_progress(
     &self,
     job_name: &str,
     query_name: &str,
-    raw_max_block: u64,
+    current_max_block: u64,
     last_processed_block: u64,
     last_max_block: Option<u64>,
   ) -> Result<u64, AtomicDataError> {
-    let safe_max_block = if raw_max_block > 1 {
-      raw_max_block - 1
+    let safe_max_block = if current_max_block > 1 {
+      current_max_block - 1
     } else {
-      raw_max_block
+      current_max_block
     };
 
     // If max block changed, update tracking and use safe max
-    let max_block_changed = last_max_block != Some(raw_max_block);
+    let max_block_changed = last_max_block != Some(current_max_block);
     if max_block_changed {
       self
-        .update_max_block_tracking(job_name, query_name, raw_max_block)
+        .update_max_block_tracking(job_name, query_name, current_max_block)
         .await?;
       return Ok(safe_max_block);
     }
@@ -424,16 +424,16 @@ impl DatabaseClient {
 
     // We've seen this max block before and caught up to safe_max_block
     // Process the final block to complete this range
-    if last_processed_block < raw_max_block {
+    if last_processed_block < current_max_block {
       info!(
         "Job '{}' encountered same max_block {} on sequential run, processing final block {} to {}",
-        job_name, raw_max_block, last_processed_block, raw_max_block
+        job_name, current_max_block, last_processed_block, current_max_block
       );
-      return Ok(raw_max_block);
+      return Ok(current_max_block);
     }
 
-    // We're fully caught up (last_processed_block >= raw_max_block), nothing to do
-    Ok(raw_max_block)
+    // We're fully caught up (last_processed_block >= current_max_block), nothing to do
+    Ok(current_max_block)
   }
 
   async fn update_max_block_tracking(
@@ -693,7 +693,23 @@ impl DatabaseClient {
     Ok(())
   }
 
-  pub async fn get_last_block_for_query(
+  pub async fn get_max_block_for_query(
+    &self,
+    query_name: &str,
+    parameters: &serde_json::Value,
+  ) -> Result<Option<u64>> {
+    self.get_block_for_query(query_name, parameters, true).await
+  }
+
+  pub async fn get_min_block_for_query(
+    &self,
+    query_name: &str,
+    parameters: &serde_json::Value,
+  ) -> Result<Option<u64>> {
+    self.get_block_for_query(query_name, parameters, false).await
+  }
+
+  async fn get_block_for_query(
     &self,
     query_name: &str,
     parameters: &serde_json::Value,

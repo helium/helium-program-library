@@ -79,15 +79,19 @@ impl AtomicDataPublisher {
     })
   }
 
-  pub async fn publish_change(&self, change: &ChangeRecord) -> Result<usize, AtomicDataError> {
+  /// Prepare a batch of change records for publishing by building protobuf requests
+  pub async fn prepare_changes_batch(
+    &self,
+    change_record: &ChangeRecord,
+  ) -> Result<Vec<EntityChangeRequest>, AtomicDataError> {
     let job_config = self
       .polling_jobs
       .iter()
-      .find(|j| j.name == change.job_name)
+      .find(|j| j.name == change_record.job_name)
       .ok_or_else(|| {
         AtomicDataError::InvalidData(format!(
           "No configuration found for job: {}",
-          change.job_name
+          change_record.job_name
         ))
       })?;
 
@@ -96,24 +100,20 @@ impl AtomicDataPublisher {
       .get("change_type")
       .and_then(|v| v.as_str())
       .ok_or_else(|| {
-        AtomicDataError::InvalidData(format!("No change type found for job: {}", change.job_name))
+        AtomicDataError::InvalidData(format!(
+          "No change type found for job: {}",
+          change_record.job_name
+        ))
       })?;
 
-    let entity_requests = build_entity_change_requests(change, change_type, &self.keypair)?;
-    debug!(
-      "Processing {} entity change requests for job '{}'",
-      entity_requests.len(),
-      change.job_name
-    );
-
-    for entity_request in entity_requests.iter() {
-      self.send_with_retries(entity_request.clone()).await?;
-    }
-
-    Ok(entity_requests.len())
+    build_entity_change_requests(change_record, change_type, &self.keypair)
   }
 
-  async fn send_with_retries(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
+  /// Publish a single change request with retries
+  pub async fn publish_change_request(
+    &self,
+    request: EntityChangeRequest,
+  ) -> Result<(), AtomicDataError> {
     if self.service_config.dry_run {
       self.log_protobuf_message(&request).await?;
       return Ok(());
@@ -125,10 +125,10 @@ impl AtomicDataPublisher {
     loop {
       attempts += 1;
 
-      match self.send_entity_change(request.clone()).await {
+      match self.publish_entity_change(request.clone()).await {
         Ok(_) => {
           debug!(
-            "Successfully sent hotspot change request on attempt {}",
+            "Successfully published entity change request on attempt {}",
             attempts
           );
           return Ok(());
@@ -137,7 +137,7 @@ impl AtomicDataPublisher {
           if attempts <= max_retries {
             metrics::increment_ingestor_retry_attempts();
             warn!(
-              "Failed to send hotspot update request (attempt {}/{}): {}. Retrying...",
+              "Failed to publish entity change request (attempt {}/{}): {}. Retrying...",
               attempts, max_retries, e
             );
             tokio::time::sleep(std::time::Duration::from_secs(
@@ -147,7 +147,7 @@ impl AtomicDataPublisher {
           } else {
             metrics::increment_ingestor_publish_failures();
             error!(
-              "Failed to send hotspot update request after {} attempts: {}",
+              "Failed to publish entity change request after {} attempts: {}",
               attempts, e
             );
             return Err(AtomicDataError::NetworkError(format!(
@@ -160,7 +160,7 @@ impl AtomicDataPublisher {
     }
   }
 
-  async fn send_entity_change(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
+  async fn publish_entity_change(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
     let mut client = self.grpc_client.clone();
 
     match request {

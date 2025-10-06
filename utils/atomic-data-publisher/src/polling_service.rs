@@ -92,18 +92,18 @@ impl PollingService {
       for record in change_records {
         total_jobs_processed += 1;
         total_jobs_with_data += 1;
-        let row_count = record.atomic_data.len();
+        let item_count = record.atomic_data.len();
         let job_name = record.job_name.clone();
         let query_name = record.query_name.clone();
         let target_block = record.target_block;
 
         info!(
-          "Processing job '{}' with {} rows (target block: {})",
-          job_name, row_count, target_block
+          "Processing job '{}' with {} items (target block: {})",
+          job_name, item_count, target_block
         );
 
         match self.process_job(&record).await {
-          Ok((job_published, job_failed, should_break)) => {
+          Ok((job_published, job_failed, has_failures)) => {
             total_changes_published += job_published;
             total_changes_failed += job_failed;
 
@@ -118,7 +118,7 @@ impl PollingService {
               job_name, job_published, job_failed
             );
 
-            if should_break {
+            if has_failures {
               return Ok(());
             }
           }
@@ -165,7 +165,7 @@ impl PollingService {
           batch_index + 1,
           chunk_failed
         );
-        return Ok((total_published, total_failed, true));
+        return Ok((total_published, total_failed, true)); // has_failures = true
       }
     }
 
@@ -173,7 +173,7 @@ impl PollingService {
       "Completed processing all batches: {} published, {} failed",
       total_published, total_failed
     );
-    Ok((total_published, total_failed, false))
+    Ok((total_published, total_failed, false)) // has_failures = false
   }
 
   async fn process_atomic_chunk(
@@ -182,47 +182,86 @@ impl PollingService {
     atomic_items: &[serde_json::Value],
   ) -> Result<(usize, usize), AtomicDataError> {
     let batch_start = Instant::now();
+    let chunk_record = ChangeRecord {
+      job_name: job.job_name.clone(),
+      query_name: job.query_name.clone(),
+      target_block: job.target_block,
+      atomic_data: atomic_items.to_vec(),
+    };
+
+    let change_requests = match self.publisher.prepare_changes_batch(&chunk_record).await {
+      Ok(requests) => requests,
+      Err(e) => {
+        error!("Failed to prepare changes batch for chunk: {}", e);
+        return Ok((0, atomic_items.len()));
+      }
+    };
+
+    if change_requests.len() != atomic_items.len() {
+      error!(
+        "Mismatch between change requests ({}) and atomic items ({}) for job '{}'",
+        change_requests.len(),
+        atomic_items.len(),
+        job.job_name
+      );
+      return Ok((0, atomic_items.len()));
+    }
+
+    debug!(
+      "Prepared {} change requests for {} atomic items",
+      change_requests.len(),
+      atomic_items.len()
+    );
+
     let semaphore = Arc::new(tokio::sync::Semaphore::new(
       self.config.service.max_concurrent_publishes as usize,
     ));
 
-    let tasks: Vec<_> = atomic_items
-      .iter()
-      .map(|item| {
-        let change_record = ChangeRecord {
-          job_name: job.job_name.clone(),
-          query_name: job.query_name.clone(),
-          target_block: job.target_block,
-          atomic_data: vec![item.clone()],
-        };
+    let tasks: Vec<_> = change_requests
+      .into_iter()
+      .zip(atomic_items.iter())
+      .map(|(request, atomic_item)| {
         let publisher = self.publisher.clone();
         let semaphore = semaphore.clone();
+        let atomic_item = atomic_item.clone();
+        let job_name = job.job_name.clone();
+        let query_name = job.query_name.clone();
+        let target_block = job.target_block;
 
         tokio::spawn(async move {
-          Self::publish_single_change(change_record, publisher, semaphore).await
+          Self::publish_single_change(
+            request,
+            atomic_item,
+            job_name,
+            query_name,
+            target_block,
+            publisher,
+            semaphore,
+          )
+          .await
         })
       })
       .collect();
 
     let mut published_changes = Vec::new();
-    let mut failed_changes = Vec::new();
+    let mut failed_count = 0;
 
     for task in tasks {
       match task.await {
         Ok(Ok(change)) => published_changes.push(change),
-        Ok(Err(change)) => failed_changes.push(change),
+        Ok(Err(_)) => failed_count += 1,
         Err(e) => {
           error!(
             "Publishing task panicked: {}. This indicates a serious bug in the publishing logic.",
             e
           );
           metrics::increment_errors();
+          failed_count += 1;
         }
       }
     }
 
     let chunk_published = published_changes.len();
-    let chunk_failed = failed_changes.len();
 
     if !published_changes.is_empty() {
       self
@@ -234,51 +273,62 @@ impl PollingService {
     let batch_time = batch_start.elapsed();
     info!(
       "Batch completed in {:?}: {} changes published, {} failed",
-      batch_time, chunk_published, chunk_failed
+      batch_time, chunk_published, failed_count
     );
 
-    Ok((chunk_published, chunk_failed))
+    Ok((chunk_published, failed_count))
   }
 
   async fn publish_single_change(
-    change: ChangeRecord,
+    request: crate::protobuf::EntityChangeRequest,
+    atomic_item: serde_json::Value,
+    job_name: String,
+    query_name: String,
+    target_block: u64,
     publisher: Arc<Publisher>,
     semaphore: Arc<tokio::sync::Semaphore>,
   ) -> Result<ChangeRecord, ChangeRecord> {
     let _permit = semaphore.acquire().await.map_err(|_| {
       error!(
         "Failed to acquire semaphore permit for publishing change from job '{}'. This may indicate high concurrency or semaphore configuration issues.",
-        change.job_name
+        job_name
       );
-      change.clone()
+      ChangeRecord {
+        job_name: job_name.clone(),
+        query_name: query_name.clone(),
+        target_block,
+        atomic_data: vec![atomic_item.clone()],
+      }
     })?;
 
     let publish_start = Instant::now();
-    let result = publisher.publish_change(&change).await;
+    let result = publisher.publish_change_request(request).await;
     let publish_duration = publish_start.elapsed().as_secs_f64();
 
     match result {
-      Ok(published_count) => {
-        // Increment metrics for each individual change published
-        for _ in 0..published_count {
-          metrics::increment_published();
-        }
+      Ok(()) => {
+        metrics::increment_published();
         metrics::observe_publish_duration(publish_duration);
-        info!(
-          "Published {} individual changes for job '{}'",
-          published_count,
-          change.job_name
-        );
-        Ok(change)
+        Ok(ChangeRecord {
+          job_name,
+          query_name,
+          target_block,
+          atomic_data: vec![atomic_item],
+        })
       }
       Err(e) => {
         error!(
           "Failed to publish change for job '{}' (duration: {:.2}s): {}",
-          change.job_name, publish_duration, e
+          job_name, publish_duration, e
         );
         metrics::increment_errors();
         metrics::observe_publish_duration(publish_duration);
-        Err(change)
+        Err(ChangeRecord {
+          job_name,
+          query_name,
+          target_block,
+          atomic_data: vec![atomic_item],
+        })
       }
     }
   }
