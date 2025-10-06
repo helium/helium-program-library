@@ -254,27 +254,22 @@ impl PollingService {
     })?;
 
     let publish_start = Instant::now();
-    let result = publisher.publish_changes(vec![change.clone()]).await;
+    let result = publisher.publish_change(&change).await;
     let publish_duration = publish_start.elapsed().as_secs_f64();
 
     match result {
-      Ok(published_ids) if !published_ids.is_empty() => {
+      Ok(published_count) => {
         // Increment metrics for each individual change published
-        for _ in 0..published_ids.len() {
+        for _ in 0..published_count {
           metrics::increment_published();
         }
         metrics::observe_publish_duration(publish_duration);
         info!(
           "Published {} individual changes for job '{}'",
-          published_ids.len(),
+          published_count,
           change.job_name
         );
         Ok(change)
-      }
-      Ok(_) => {
-        metrics::increment_errors();
-        metrics::observe_publish_duration(publish_duration);
-        Err(change)
       }
       Err(e) => {
         error!(

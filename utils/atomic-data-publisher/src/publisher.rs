@@ -79,45 +79,7 @@ impl AtomicDataPublisher {
     })
   }
 
-  pub async fn publish_changes(&self, changes: Vec<ChangeRecord>) -> Result<Vec<String>> {
-    if changes.is_empty() {
-      return Ok(vec![]);
-    }
-
-    debug!("Publishing {} changes to ingestor service", changes.len());
-
-    let mut published_ids = Vec::new();
-    let mut failed_changes = Vec::new();
-
-    for change in changes {
-      match self.process_change(&change).await {
-        Ok(published_count) => {
-          for _ in 0..published_count {
-            published_ids.push(change.job_name.clone());
-          }
-          debug!(
-            "Successfully published {} individual changes for job '{}'",
-            published_count, change.job_name
-          );
-        }
-        Err(e) => {
-          error!(
-            "Failed to publish change for job '{}': {}",
-            change.job_name, e
-          );
-          failed_changes.push(change);
-        }
-      }
-    }
-
-    if !failed_changes.is_empty() {
-      warn!("{} changes failed to publish", failed_changes.len());
-    }
-
-    Ok(published_ids)
-  }
-
-  async fn process_change(&self, change: &ChangeRecord) -> Result<usize, AtomicDataError> {
+  pub async fn publish_change(&self, change: &ChangeRecord) -> Result<usize, AtomicDataError> {
     let job_config = self
       .polling_jobs
       .iter()
