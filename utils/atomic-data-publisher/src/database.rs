@@ -262,14 +262,10 @@ impl DatabaseClient {
     Ok(())
   }
 
-  pub async fn get_pending_changes(&self, batch_size: u32) -> Result<Vec<ChangeRecord>> {
+  pub async fn get_pending_changes(&self) -> Result<Vec<ChangeRecord>> {
     let mut change_records = Vec::new();
 
     loop {
-      if change_records.len() >= batch_size as usize {
-        break;
-      }
-
       if let Some(job) = self.get_next_queue_job().await? {
         if !self.mark_job_running(&job.name, &job.query_name).await? {
           continue; // Try next job if this one couldn't be marked as running
@@ -288,20 +284,20 @@ impl DatabaseClient {
               continue; // Continue to next job in the same cycle
             }
 
-            // Add the change record to our batch
+            // Found a job with data - return it for processing
             change_records.push(change_record.unwrap());
+            break;
           }
           Err(e) => {
             let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
             return Err(e.into());
           }
         }
-      } else if change_records.is_empty() {
+      } else {
         // No more jobs available, reset queue for next cycle
         self.reset_job_queue().await?;
+        break;
       }
-
-      break;
     }
 
     Ok(change_records)
@@ -362,16 +358,20 @@ impl DatabaseClient {
 
     let last_processed_block: i64 = current_state_row.get("last_processed_block");
     let last_max_block: Option<i64> = current_state_row.get("last_max_block");
-
-    let raw_max_available_block = self
+    let raw_max_available_block = match self
       .get_last_block_for_query(&job.query_name, &job.parameters, true)
       .await?
-      .ok_or_else(|| {
-        AtomicDataError::PollingBoundsError(format!(
-          "No data available for query '{}'",
-          job.query_name
-        ))
-      })?;
+    {
+      Some(block) => block,
+      None => {
+        // No new changes in source tables - return bounds that indicate nothing to process
+        debug!(
+          "No data available yet for job '{}' query '{}' - source tables empty",
+          job.name, job.query_name
+        );
+        return Ok((last_processed_block as u64, last_processed_block as u64));
+      }
+    };
 
     // Get the min block for this table and use it if it's greater than last_processed_block
     let min_block = self

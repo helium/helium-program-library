@@ -78,12 +78,8 @@ impl PollingService {
 
     info!("Starting new polling cycle - processing all available jobs");
 
-    // Process all available jobs in this cycle
     loop {
-      let change_records = self
-        .database
-        .get_pending_changes(self.config.service.job_batch_size)
-        .await?;
+      let change_records = self.database.get_pending_changes().await?;
 
       if change_records.is_empty() {
         info!(
@@ -93,34 +89,44 @@ impl PollingService {
         break;
       }
 
-      info!(
-        "Processing batch of {} jobs in this cycle",
-        change_records.len()
-      );
-
       for record in change_records {
         total_jobs_processed += 1;
-        total_jobs_with_data += 1; // If we got a record, it has data
-        let job_name = record.job_name.clone(); // Clone the job name to avoid borrow issues
-
+        total_jobs_with_data += 1;
         let row_count = record.atomic_data.len();
+        let job_name = record.job_name.clone();
+        let query_name = record.query_name.clone();
+        let target_block = record.target_block;
 
         info!(
-          "Processing job {} of cycle: '{}' with {} rows (batches of {})",
-          total_jobs_processed, job_name, row_count, self.config.service.batch_size
+          "Processing job '{}' with {} rows (target block: {})",
+          job_name, row_count, target_block
         );
 
-        let (job_published, job_failed, should_break) = self.process_job_changes(record).await?;
-        total_changes_published += job_published;
-        total_changes_failed += job_failed;
+        match self.process_job(&record).await {
+          Ok((job_published, job_failed, should_break)) => {
+            total_changes_published += job_published;
+            total_changes_failed += job_failed;
 
-        info!(
-          "Completed job '{}': {} individual changes published, {} failed",
-          job_name, job_published, job_failed
-        );
+            if let Err(e) = self.database.finalize_job(&record, job_failed).await {
+              error!("Failed to finalize job '{}': {}", job_name, e);
+              let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
+              continue;
+            }
 
-        if should_break {
-          return Ok(());
+            info!(
+              "Completed job '{}': {} individual changes published, {} failed",
+              job_name, job_published, job_failed
+            );
+
+            if should_break {
+              return Ok(());
+            }
+          }
+          Err(e) => {
+            error!("Job '{}' failed: {}", job_name, e);
+            let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
+            continue;
+          }
         }
       }
     }
@@ -132,45 +138,32 @@ impl PollingService {
     Ok(())
   }
 
-  async fn process_job_changes(
+  async fn process_job(
     &self,
-    record: crate::database::ChangeRecord,
-  ) -> Result<(usize, usize, bool), AtomicDataError> {
-    let changes = vec![record.clone()];
-
-    let (total_published, total_failed, should_break) =
-      self.process_batches(changes, record.target_block).await?;
-    self.database.finalize_job(&record, total_failed).await?;
-    Ok((total_published, total_failed, should_break))
-  }
-
-  async fn process_batches(
-    &self,
-    changes: Vec<ChangeRecord>,
-    target_block: u64,
+    job: &ChangeRecord,
   ) -> Result<(usize, usize, bool), AtomicDataError> {
     let mut total_published = 0;
     let mut total_failed = 0;
     let batch_size = self.config.service.batch_size as usize;
 
-    for (batch_index, batch) in changes.chunks(batch_size).enumerate() {
-      let total_atomic_items: usize = batch.iter().map(|change| change.atomic_data.len()).sum();
-
+    for (batch_index, atomic_chunk) in job.atomic_data.chunks(batch_size).enumerate() {
       info!(
-        "Processing batch {}: {} ChangeRecords ({} individual atomic items)",
+        "Processing batch {}: {} atomic items",
         batch_index + 1,
-        batch.len(),
-        total_atomic_items
+        atomic_chunk.len()
       );
-      let (batch_published, batch_failed) = self.process_batch(batch, target_block).await?;
-      total_published += batch_published;
-      total_failed += batch_failed;
 
-      if batch_failed > 0 {
+      let (chunk_published, chunk_failed) =
+        self.process_atomic_chunk(job, atomic_chunk).await?;
+
+      total_published += chunk_published;
+      total_failed += chunk_failed;
+
+      if chunk_failed > 0 {
         warn!(
           "Batch {} had {} failed changes, stopping processing",
           batch_index + 1,
-          batch_failed
+          chunk_failed
         );
         return Ok((total_published, total_failed, true));
       }
@@ -183,24 +176,31 @@ impl PollingService {
     Ok((total_published, total_failed, false))
   }
 
-  async fn process_batch(
+  async fn process_atomic_chunk(
     &self,
-    batch: &[ChangeRecord],
-    target_block: u64,
+    job: &ChangeRecord,
+    atomic_items: &[serde_json::Value],
   ) -> Result<(usize, usize), AtomicDataError> {
     let batch_start = Instant::now();
     let semaphore = Arc::new(tokio::sync::Semaphore::new(
       self.config.service.max_concurrent_publishes as usize,
     ));
 
-    let tasks: Vec<_> = batch
+    let tasks: Vec<_> = atomic_items
       .iter()
-      .map(|change| {
-        let change = change.clone();
+      .map(|item| {
+        let change_record = ChangeRecord {
+          job_name: job.job_name.clone(),
+          query_name: job.query_name.clone(),
+          target_block: job.target_block,
+          atomic_data: vec![item.clone()],
+        };
         let publisher = self.publisher.clone();
         let semaphore = semaphore.clone();
 
-        tokio::spawn(async move { Self::publish_single_change(change, publisher, semaphore).await })
+        tokio::spawn(async move {
+          Self::publish_single_change(change_record, publisher, semaphore).await
+        })
       })
       .collect();
 
@@ -221,28 +221,23 @@ impl PollingService {
       }
     }
 
-    let batch_published = published_changes.len();
-    let batch_failed = failed_changes.len();
+    let chunk_published = published_changes.len();
+    let chunk_failed = failed_changes.len();
+
     if !published_changes.is_empty() {
       self
         .database
-        .mark_processed(&published_changes, target_block)
+        .mark_processed(&published_changes, job.target_block)
         .await?;
     }
 
-    // Calculate total individual changes published by looking at the atomic_data arrays
-    let total_individual_changes: usize = published_changes
-      .iter()
-      .map(|change| change.atomic_data.len())
-      .sum();
-
     let batch_time = batch_start.elapsed();
     info!(
-      "Batch completed in {:?}: {} ChangeRecords ({} individual changes) published, {} failed",
-      batch_time, batch_published, total_individual_changes, batch_failed
+      "Batch completed in {:?}: {} changes published, {} failed",
+      batch_time, chunk_published, chunk_failed
     );
 
-    Ok((total_individual_changes, batch_failed))
+    Ok((chunk_published, chunk_failed))
   }
 
   async fn publish_single_change(
