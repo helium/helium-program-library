@@ -31,7 +31,7 @@ jobs:
           key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo build --locked
       - run: cargo fmt -- --check
-      - run: cargo clippy --all-targets -- -D warnings -A clippy::manual_is_multiple_of -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A ambiguous_glob_reexports -A unexpected-cfgs
+      - run: cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A ambiguous_glob_reexports -A unexpected-cfgs
 
   test-unit:
     name: Rust Unit Tests
