@@ -24,7 +24,6 @@ use spl_concurrent_merkle_tree::node::{empty_node_cached, Node, EMPTY};
 
 use crate::error::ErrorCode;
 
-#[allow(clippy::manual_is_multiple_of)]
 #[inline(always)]
 pub fn check_canopy_bytes(canopy_bytes: &[u8]) -> Result<()> {
   if canopy_bytes.len() % size_of::<Node>() != 0 {
@@ -67,7 +66,7 @@ fn get_cached_path_length(canopy: &[Node], max_depth: u32) -> Result<u32> {
   // 1 is subtracted from the trailing zeros because the root is not stored in the canopy
   Ok(closest_power_of_2.trailing_zeros() - 1)
 }
-#[allow(clippy::manual_is_multiple_of)]
+
 pub fn fill_in_proof_from_canopy(
   canopy_bytes: &[u8],
   max_depth: u32,
