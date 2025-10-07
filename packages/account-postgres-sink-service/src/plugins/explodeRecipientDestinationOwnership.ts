@@ -7,11 +7,14 @@ import {
   Recipient,
   KeyToAsset,
   HNT_LAZY_DISTRIBUTOR,
+  initializeModels,
 } from "./explodeMiniFanoutOwnership";
 
 export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
   const name = "ExplodeRecipientDestinationOwnership";
   const init = async (config: { [key: string]: any }) => {
+    initializeModels();
+
     const updateOnDuplicateFields: string[] = [];
 
     const addFields = () => {};
