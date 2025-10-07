@@ -34,18 +34,18 @@ impl PollingService {
   }
 
   pub async fn run(&self, shutdown_listener: Listener) -> Result<(), AtomicDataError> {
-    let mut interval = interval(self.config.polling_interval());
+    let polling_interval = self.config.polling_interval();
 
     info!(
       "Starting polling service with interval: {:?}",
-      self.config.polling_interval()
+      polling_interval
     );
 
     loop {
-      tokio::select! {
-          _ = interval.tick() => {
-              let cycle_start = Instant::now();
+      let cycle_start = Instant::now();
 
+      tokio::select! {
+          _ = async {
               if let Err(e) = self.process_changes().await {
                   error!("Error processing changes: {}", e);
                   metrics::increment_errors();
@@ -54,7 +54,10 @@ impl PollingService {
 
               let cycle_time = cycle_start.elapsed();
               debug!("Polling cycle completed in {:?}", cycle_time);
-          }
+
+              // Wait for the full interval after completing the cycle
+              sleep(polling_interval).await;
+          } => {},
           _ = shutdown_listener.clone() => {
               info!("Shutting down polling service");
               break;

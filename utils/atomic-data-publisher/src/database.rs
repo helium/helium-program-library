@@ -140,7 +140,7 @@ impl DatabaseClient {
         job_name VARCHAR(255) NOT NULL UNIQUE,
         query_name VARCHAR(255) NOT NULL DEFAULT 'default',
         queue_position INTEGER NOT NULL DEFAULT 0,
-        last_processed_block BIGINT NOT NULL DEFAULT 0,
+        last_processed_block BIGINT DEFAULT NULL,
         is_running BOOLEAN NOT NULL DEFAULT FALSE,
         running_since TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         queue_completed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
@@ -152,13 +152,16 @@ impl DatabaseClient {
 
     sqlx::query(create_table_query).execute(&self.pool).await?;
 
-    // Add new columns if they don't exist (for existing installations)
+    // Add new columns and alter existing ones if they don't exist (for existing installations)
     let add_columns_query = r#"
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'atomic_data_polling_state' AND column_name = 'last_max_block') THEN
           ALTER TABLE atomic_data_polling_state ADD COLUMN last_max_block BIGINT DEFAULT NULL;
         END IF;
+
+        -- Make last_processed_block nullable if it isn't already
+        ALTER TABLE atomic_data_polling_state ALTER COLUMN last_processed_block DROP NOT NULL;
       END $$;
     "#;
     sqlx::query(add_columns_query).execute(&self.pool).await?;
@@ -221,7 +224,7 @@ impl DatabaseClient {
     .await?;
 
     if let Some(row) = existing_state {
-      let block: i64 = row.get("last_processed_block");
+      let block: Option<i64> = row.get("last_processed_block");
       sqlx::query(
         r#"
         UPDATE atomic_data_polling_state
@@ -235,10 +238,16 @@ impl DatabaseClient {
       .execute(&self.pool)
       .await?;
 
-      info!(
-        "Resuming polling for job '{}' query '{}' from block {} with queue position {}",
-        job_name, query_name, block, queue_position
-      );
+      match block {
+        Some(b) => info!(
+          "Resuming polling for job '{}' query '{}' from block {} with queue position {}",
+          job_name, query_name, b, queue_position
+        ),
+        None => info!(
+          "Resuming polling for job '{}' query '{}' from start (NULL) with queue position {}",
+          job_name, query_name, queue_position
+        ),
+      }
     } else {
       sqlx::query(
         r#"
@@ -248,13 +257,13 @@ impl DatabaseClient {
       )
       .bind(job_name)
       .bind(query_name)
-      .bind(0i64)
+      .bind(None::<i64>)
       .bind(queue_position)
       .execute(&self.pool)
       .await?;
 
       info!(
-        "Initialized new polling state for job '{}' query '{}' starting from block 0 with queue position {}",
+        "Initialized new polling state for job '{}' query '{}' starting from NULL (will process from block 0) with queue position {}",
         job_name, query_name, queue_position
       );
     }
@@ -307,14 +316,21 @@ impl DatabaseClient {
     &self,
     job: &PollingJob,
   ) -> Result<Option<ChangeRecord>, AtomicDataError> {
-    let (last_processed_block, max_available_block) = self.get_polling_bounds(job).await?;
-    if max_available_block <= last_processed_block {
+    let (last_processed_block_opt, max_available_block) = self.get_polling_bounds(job).await?;
+    let should_skip = match last_processed_block_opt {
+      None => false,
+      Some(last_processed) => max_available_block <= last_processed as u64,
+    };
+
+    if should_skip {
       return Ok(None);
     }
 
-    let target_block = self.calculate_target_block(last_processed_block, max_available_block);
+    let last_processed_block_u64 = last_processed_block_opt.unwrap_or(0) as u64;
+    let target_block = self.calculate_target_block(last_processed_block_u64, max_available_block);
+    let query_last_block = last_processed_block_opt.unwrap_or(-1);
     let query_results = self
-      .execute_query(job, last_processed_block, target_block)
+      .execute_query(job, query_last_block, target_block)
       .await?;
     let change_record = self.process_query_results(&query_results, job, target_block);
 
@@ -339,7 +355,8 @@ impl DatabaseClient {
   }
 
   /// Get the polling bounds (last processed block and max available block) for a job
-  async fn get_polling_bounds(&self, job: &PollingJob) -> Result<(u64, u64), AtomicDataError> {
+  /// Returns (last_processed_block as Option<i64> from DB, max_available_block as u64)
+  async fn get_polling_bounds(&self, job: &PollingJob) -> Result<(Option<i64>, u64), AtomicDataError> {
     let current_state_row = sqlx::query(
       r#"
       SELECT
@@ -356,7 +373,7 @@ impl DatabaseClient {
     .fetch_one(&self.pool)
     .await?;
 
-    let last_processed_block: i64 = current_state_row.get("last_processed_block");
+    let last_processed_block: Option<i64> = current_state_row.get("last_processed_block");
     let last_max_block: Option<i64> = current_state_row.get("last_max_block");
     let current_max_block = match self
       .get_max_block_for_query(&job.query_name, &job.parameters)
@@ -369,7 +386,7 @@ impl DatabaseClient {
           "No data available yet for job '{}' query '{}' - source tables empty",
           job.name, job.query_name
         );
-        return Ok((last_processed_block as u64, last_processed_block as u64));
+        return Ok((last_processed_block, 0));
       }
     };
 
@@ -379,7 +396,10 @@ impl DatabaseClient {
       .await?
       .unwrap_or(0);
 
-    let effective_start_block = std::cmp::max(min_block, last_processed_block as u64);
+    // Convert last_processed_block to u64 for calculations, treating NULL as 0
+    let last_processed_block_u64 = last_processed_block.unwrap_or(0) as u64;
+
+    let effective_start_block = std::cmp::max(min_block, last_processed_block_u64);
 
     let max_available_block = self
       .apply_safety_buffer_and_track_progress(
@@ -391,7 +411,8 @@ impl DatabaseClient {
       )
       .await?;
 
-    Ok((effective_start_block, max_available_block))
+    // Return the actual Option<i64> value from DB (which may be NULL) for use in SQL queries
+    Ok((last_processed_block, max_available_block))
   }
 
   async fn apply_safety_buffer_and_track_progress(
@@ -475,7 +496,7 @@ impl DatabaseClient {
   async fn execute_query(
     &self,
     job: &PollingJob,
-    last_processed_block: u64,
+    last_processed_block: i64,
     target_block: u64,
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
     crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name).map_err(|e| {
@@ -513,29 +534,43 @@ impl DatabaseClient {
         }
       }
 
+      let blocks_span = if last_processed_block < 0 {
+        target_block + 1
+      } else {
+        target_block.saturating_sub(last_processed_block as u64)
+      };
+
+      let last_block_display = if last_processed_block < 0 { "NULL".to_string() } else { last_processed_block.to_string() };
       info!(
-        "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks {} to {} ({} blocks)",
-        job.name, job.query_name, hotspot_type, last_processed_block, target_block, target_block - last_processed_block
+        "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks > {} to {} ({} blocks)",
+        job.name, job.query_name, hotspot_type, last_block_display, target_block, blocks_span
       );
 
       sqlx::query(query)
         .bind(hotspot_type)
-        .bind(last_processed_block as i64)
+        .bind(last_processed_block)
         .bind(target_block as i64)
         .fetch_all(&self.pool)
         .await?
     } else {
+      let blocks_span = if last_processed_block < 0 {
+        target_block + 1
+      } else {
+        target_block.saturating_sub(last_processed_block as u64)
+      };
+
+      let last_block_display = if last_processed_block < 0 { "NULL".to_string() } else { last_processed_block.to_string() };
       info!(
-        "Querying job '{}' with query '{}', processing blocks {} to {} ({} blocks)",
+        "Querying job '{}' with query '{}', processing blocks > {} to {} ({} blocks)",
         job.name,
         job.query_name,
-        last_processed_block,
+        last_block_display,
         target_block,
-        target_block - last_processed_block
+        blocks_span
       );
 
       sqlx::query(query)
-        .bind(last_processed_block as i64)
+        .bind(last_processed_block)
         .bind(target_block as i64)
         .fetch_all(&self.pool)
         .await?
@@ -726,24 +761,26 @@ impl DatabaseClient {
             ))
           })?;
 
-        let (_table_name, block) = match hotspot_type {
+        let (_table_name, block, has_data) = match hotspot_type {
           "mobile" => {
             let query = if use_max {
-              r#"SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), 0)::bigint as block"#
+              r#"SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
             } else {
-              r#"SELECT COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos), 0)::bigint as block"#
+              r#"SELECT COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
             };
             let row = sqlx::query(query).fetch_one(&self.pool).await?;
-            ("mobile_hotspot_infos", row.get::<i64, _>("block"))
+            let block_value = row.get::<i64, _>("block");
+            ("mobile_hotspot_infos", block_value, block_value >= 0)
           }
           "iot" => {
             let query = if use_max {
-              r#"SELECT COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), 0)::bigint as block"#
+              r#"SELECT COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1)::bigint as block"#
             } else {
-              r#"SELECT COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos), 0)::bigint as block"#
+              r#"SELECT COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos), -1)::bigint as block"#
             };
             let row = sqlx::query(query).fetch_one(&self.pool).await?;
-            ("iot_hotspot_infos", row.get::<i64, _>("block"))
+            let block_value = row.get::<i64, _>("block");
+            ("iot_hotspot_infos", block_value, block_value >= 0)
           }
           _ => {
             return Err(anyhow::anyhow!(
@@ -759,7 +796,7 @@ impl DatabaseClient {
           operation, hotspot_type, block
         );
 
-        if block > 0 {
+        if has_data {
           Some(block as u64)
         } else {
           None
@@ -769,22 +806,22 @@ impl DatabaseClient {
         let query = if use_max {
           r#"
           SELECT GREATEST(
-            COALESCE((SELECT MAX(last_block) FROM asset_owners), 0),
-            COALESCE((SELECT MAX(last_block) FROM welcome_packs), 0)
+            COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
+            COALESCE((SELECT MAX(last_block) FROM welcome_packs), -1)
           )::bigint as block
           "#
         } else {
           r#"
           SELECT LEAST(
-            COALESCE((SELECT MIN(last_block) FROM asset_owners), 0),
-            COALESCE((SELECT MIN(last_block) FROM welcome_packs), 0)
+            COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM welcome_packs WHERE last_block >= 0), -1)
           )::bigint as block
           "#
         };
         let row = sqlx::query(query).fetch_one(&self.pool).await?;
 
         let block: i64 = row.get("block");
-        if block > 0 {
+        if block >= 0 {
           Some(block as u64)
         } else {
           None
@@ -794,22 +831,22 @@ impl DatabaseClient {
         let query = if use_max {
           r#"
           SELECT GREATEST(
-            COALESCE((SELECT MAX(last_block) FROM recipients), 0),
-            COALESCE((SELECT MAX(last_block) FROM rewards_recipients), 0)
+            COALESCE((SELECT MAX(last_block) FROM recipients), -1),
+            COALESCE((SELECT MAX(last_block) FROM rewards_recipients), -1)
           )::bigint as block
           "#
         } else {
           r#"
           SELECT LEAST(
-            COALESCE((SELECT MIN(last_block) FROM recipients), 0),
-            COALESCE((SELECT MIN(last_block) FROM rewards_recipients), 0)
+            COALESCE((SELECT MIN(last_block) FROM recipients WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM rewards_recipients WHERE last_block >= 0), -1)
           )::bigint as block
           "#
         };
         let row = sqlx::query(query).fetch_one(&self.pool).await?;
 
         let block: i64 = row.get("block");
-        if block > 0 {
+        if block >= 0 {
           Some(block as u64)
         } else {
           None
