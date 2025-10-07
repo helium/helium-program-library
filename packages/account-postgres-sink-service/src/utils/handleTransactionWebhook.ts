@@ -132,7 +132,6 @@ export const handleTransactionWebhook = async ({
           }
 
           await t.commit();
-          // @ts-ignore
           fastify.customMetrics.transactionWebhookCounter.inc();
         } catch (err) {
           await t.rollback();

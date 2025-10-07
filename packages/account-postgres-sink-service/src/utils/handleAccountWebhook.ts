@@ -79,7 +79,6 @@ export const handleAccountWebhook = async ({
 
         await Promise.all(deletePromises);
         await t.commit();
-        // @ts-ignore
         fastify.customMetrics.accountWebhookCounter.inc();
         return;
       }
@@ -189,7 +188,6 @@ export const handleAccountWebhook = async ({
       }
 
       await t.commit();
-      // @ts-ignore
       fastify.customMetrics.accountWebhookCounter.inc();
     } catch (err) {
       await t.rollback();

@@ -5,7 +5,7 @@ import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
 import pLimit from "p-limit";
-import { Sequelize, Transaction } from "sequelize";
+import { Sequelize, Transaction, Op } from "sequelize";
 import { SOLANA_URL, INTEGRITY_CHECK_REFRESH_THRESHOLD_MS } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig, IInitedPlugin } from "../types";
@@ -191,17 +191,39 @@ export const integrityCheckProgramAccounts = async ({
       limiter = pLimit(100);
       const uniqueWritableAccountsArray = [...uniqueWritableAccounts.values()];
 
-      const delayMs =
-        (process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS
-          ? parseInt(process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS, 10)
-          : 120000) + Math.floor(Math.random() * 30000); // default 2 minutes + 30 second jitter
+      // Filter out recently refreshed accounts from the database first
+      const accountsToCheck = new Set<string>();
+      for (const accName of accounts.map((a) => a.type)) {
+        const model = sequelize.models[accName];
+        if (!model) continue;
 
-      if (delayMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        const staleAccounts = await model.findAll({
+          attributes: ["address"],
+          where: {
+            address: uniqueWritableAccountsArray,
+            [Op.or]: [
+              { refreshedAt: null },
+              {
+                refreshedAt: { [Op.lt]: refreshThreshold },
+              },
+            ],
+          },
+          raw: true,
+          transaction: t,
+        });
+        staleAccounts.forEach((acc: any) => accountsToCheck.add(acc.address));
       }
 
+      const filteredAccountsArray = uniqueWritableAccountsArray.filter((addr) =>
+        accountsToCheck.has(addr)
+      );
+
+      console.log(
+        `Filtered ${uniqueWritableAccountsArray.length} accounts down to ${filteredAccountsArray.length} that need checking`
+      );
+
       await Promise.all(
-        chunks(uniqueWritableAccountsArray, 100).map(async (chunk) => {
+        chunks(filteredAccountsArray, 100).map(async (chunk) => {
           const accountInfos = await limiter(() =>
             retry(
               () =>
@@ -267,33 +289,6 @@ export const integrityCheckProgramAccounts = async ({
                       return;
                     }
 
-                    const latestTxSignature = (txIdsByAccountId[acc.pubkey] ||
-                      [])[0];
-
-                    if (latestTxSignature) {
-                      const latestTx = await connection.getTransaction(
-                        latestTxSignature,
-                        {
-                          commitment: "finalized",
-                          maxSupportedTransactionVersion: 0,
-                        }
-                      );
-
-                      if (latestTx) {
-                        if (latestTx.slot >= snapshotSlot) {
-                          return;
-                        }
-
-                        if (latestTx.blockTime) {
-                          if (
-                            new Date(latestTx.blockTime * 1000) >= snapshotTime
-                          ) {
-                            return;
-                          }
-                        }
-                      }
-                    }
-
                     const decodedAcc = program.coder.accounts.decode(
                       lowerFirstChar(accName),
                       acc.data as Buffer
@@ -331,6 +326,33 @@ export const integrityCheckProgramAccounts = async ({
                       (!refreshedAt || refreshedAt < snapshotTime);
 
                     if (shouldUpdate) {
+                      const latestTxSignature = (txIdsByAccountId[acc.pubkey] ||
+                        [])[0];
+
+                      if (latestTxSignature) {
+                        const latestTx = await connection.getTransaction(
+                          latestTxSignature,
+                          {
+                            commitment: "finalized",
+                            maxSupportedTransactionVersion: 0,
+                          }
+                        );
+
+                        if (latestTx) {
+                          if (latestTx.slot >= snapshotSlot) {
+                            return;
+                          }
+
+                          if (latestTx.blockTime) {
+                            if (
+                              new Date(latestTx.blockTime * 1000) >=
+                              snapshotTime
+                            ) {
+                              return;
+                            }
+                          }
+                        }
+                      }
                       const currentRecord = await model.findOne({
                         where: { address: acc.pubkey },
                         transaction: t,
@@ -399,7 +421,6 @@ export const integrityCheckProgramAccounts = async ({
         console.log(`Integrity check corrections for: ${programId}`);
         await Promise.all(
           corrections.map(async (correction) => {
-            // @ts-ignore
             fastify.customMetrics.integrityCheckCounter.inc();
             console.dir(correction, { depth: null });
           })
