@@ -1,0 +1,30 @@
+[package]
+name = "atomic-data-publisher"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "bigdecimal"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+config = "0.13"
+thiserror = "1.0"
+futures = "0.3"
+helium-proto = { git = "https://github.com/helium/proto", branch = "master", features = [ "services"] }
+helium-crypto = { git = "https://github.com/helium/helium-crypto-rs.git", branch = "main" }
+tonic = { version = "0.10", features = ["tls"] }
+prost = "0.12"
+bs58 = "0.5"
+rand = "0.8"
+metrics = "0.23"
+metrics-exporter-prometheus = "0.15"
+triggered = "0.1"
+reqwest = { version = "0.11", features = ["json"] }
+
+[patch.'https://github.com/helium/proto']
+helium-proto = { git = "https://www.github.com/helium/proto", branch = "mj/chain-rewardable-entities" }

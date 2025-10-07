@@ -96,7 +96,8 @@ export const ExtractHexLocationPlugin = ((): IPlugin => {
     const mapbox = MapboxService.getInstance();
     const processAccount = async (
       account: { [key: string]: any },
-      transaction?: any
+      transaction?: any,
+      lastBlock?: number
     ) => {
       let reverseGeod: ReverseGeoCache | null = null;
       const location = account[camelize(config.field || "location", true)];

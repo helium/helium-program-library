@@ -88,49 +88,94 @@ if (PG_POOL_SIZE < 5) {
   await server.register(fastifyCron, { jobs: [...customJobs] });
   await server.register(metrics);
   const eventHandler = new EventEmitter();
-  let refreshing: Promise<void> | undefined = undefined;
-  eventHandler.on("refresh-accounts", (programId, accountType) => {
-    if (!refreshing) {
-      refreshing = (async () => {
-        try {
-          if (configs) {
-            for (const config of configs) {
-              if (programId && programId == config.programId) {
-                const refreshTarget = accountType
-                  ? `account type '${accountType}' for program: ${config.programId}`
-                  : `all accounts for program: ${config.programId}`;
-                console.log(`Refreshing ${refreshTarget}`);
+  let processingJob = false;
+  const jobQueue: {
+    type: "integrity-check" | "refresh-accounts";
+    programId: string;
+    accountType?: string;
+    resolve: () => void;
+    reject: (err: any) => void;
+  }[] = [];
 
-                try {
-                  await upsertProgramAccounts({
-                    programId: new PublicKey(config.programId),
-                    accounts: accountType
-                      ? config.accounts.filter(
-                        (acc) => acc.type === accountType
-                      )
-                      : config.accounts,
-                  });
-
-                  console.log(`Accounts refreshed for ${refreshTarget}`);
-                } catch (err) {
-                  throw err;
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.error(err);
-        } finally {
-          refreshing = undefined;
-        }
-      })();
+  const processJobQueue = async () => {
+    if (processingJob || jobQueue.length === 0) {
+      return;
     }
+
+    processingJob = true;
+    const job = jobQueue.shift();
+
+    if (!job) {
+      processingJob = false;
+      return;
+    }
+
+    const jobDesc =
+      job.type === "refresh-accounts" && job.accountType
+        ? `${job.type} (${job.accountType}) for: ${job.programId}`
+        : `${job.type} for: ${job.programId}`;
+
+    console.log(`Starting ${jobDesc} (${jobQueue.length} remaining in queue)`);
+
+    try {
+      const config = configs.find((c) => c.programId === job.programId);
+
+      if (!config) {
+        throw new Error(`No config for program: ${job.programId}`);
+      }
+
+      if (job.type === "integrity-check") {
+        await integrityCheckProgramAccounts({
+          fastify: server,
+          programId: new PublicKey(config.programId),
+          accounts: config.accounts,
+        });
+      } else if (job.type === "refresh-accounts") {
+        await upsertProgramAccounts({
+          programId: new PublicKey(config.programId),
+          accounts: job.accountType
+            ? config.accounts.filter((acc) => acc.type === job.accountType)
+            : config.accounts,
+        });
+      }
+
+      console.log(`Completed ${jobDesc}`);
+      job.resolve();
+    } catch (err) {
+      console.error(`Job failed for ${jobDesc}:`, err);
+      job.reject(err);
+    } finally {
+      processingJob = false;
+      setImmediate(() => processJobQueue());
+    }
+  };
+
+  const queueJob = (
+    type: "integrity-check" | "refresh-accounts",
+    programId: string,
+    accountType?: string
+  ): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      jobQueue.push({ type, programId, accountType, resolve, reject });
+      console.log(
+        `Queued ${type} for: ${programId}${
+          accountType ? ` (${accountType})` : ""
+        } (queue size: ${jobQueue.length})`
+      );
+      processJobQueue();
+    });
+  };
+
+  eventHandler.on("refresh-accounts", (programId, accountType) => {
+    queueJob("refresh-accounts", programId, accountType).catch((err) => {
+      console.error("Error in queued refresh job:", err);
+    });
   });
 
   try {
     // models are defined on boot, and updated in refresh-accounts
-    await database.sync();
     await defineAllIdlModels({ configs, sequelize: database });
+    await database.sync();
     await createPgIndexes({ indexConfigs, sequelize: database });
     const pluginsByAccountTypeByProgram =
       await getPluginsByAccountTypeByProgram(configs);
@@ -173,20 +218,11 @@ if (PG_POOL_SIZE < 5) {
         }
       }
 
-      let prevRefreshing = refreshing;
+      // Queue the refresh job
       eventHandler.emit("refresh-accounts", programId, accountType);
-      if (prevRefreshing) {
-        res
-          .code(StatusCodes.TOO_MANY_REQUESTS)
-          .send(ReasonPhrases.TOO_MANY_REQUESTS);
-      } else {
-        res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-      }
-    });
-
-    server.get("/refreshing", async (req, res) => {
       res.code(StatusCodes.OK).send({
-        refreshing: !!refreshing
+        message: "Refresh job queued",
+        queueSize: jobQueue.length,
       });
     });
 
@@ -203,34 +239,27 @@ if (PG_POOL_SIZE < 5) {
         const programsToCheck = programId
           ? [programId]
           : configs
-            .filter(({ crons = [] }) =>
-              crons.some((cron) => cron.type === "integrity-check")
-            )
-            .map(({ programId }) => programId);
+              .filter(({ crons = [] }) =>
+                crons.some((cron) => cron.type === "integrity-check")
+              )
+              .map(({ programId }) => programId);
 
-        for (const progId of programsToCheck) {
-          const config = configs.find((c) => c.programId === progId);
+        // Queue all integrity checks instead of running them directly
+        const queuePromises = programsToCheck.map((progId) =>
+          queueJob("integrity-check", progId)
+        );
 
-          if (!config) {
-            console.error(`No config for program: ${progId} found`);
-            continue;
-          }
+        // Return immediately after queueing (don't wait for completion)
+        res.code(StatusCodes.OK).send({
+          message: "Integrity checks queued",
+          queued: programsToCheck.length,
+          queueSize: jobQueue.length,
+        });
 
-          try {
-            await integrityCheckProgramAccounts({
-              fastify: server,
-              programId: new PublicKey(config.programId),
-              accounts: config.accounts,
-            });
-          } catch (err) {
-            console.error(
-              `Integrity check failed for program: ${progId}:`,
-              err
-            );
-          }
-        }
-
-        res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+        // Let them run in background
+        Promise.all(queuePromises).catch((err) => {
+          console.error("Error in queued integrity checks:", err);
+        });
       } catch (err) {
         res.code(StatusCodes.INTERNAL_SERVER_ERROR).send(err);
         console.error(err);
@@ -240,7 +269,8 @@ if (PG_POOL_SIZE < 5) {
     // Assume 10 million accounts we might not want to watch (token accounts, etc)
     const nonWatchedAccountsFilter = BloomFilter.create(10000000, 0.05);
     async function insertTransactionAccounts(
-      accounts: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[]
+      accounts: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[],
+      block: number | undefined
     ) {
       if (configs) {
         let index = 0;
@@ -287,6 +317,7 @@ if (PG_POOL_SIZE < 5) {
                 data: [account.data, undefined],
               },
               pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
+              block,
             });
           } catch (err) {
             throw err;
@@ -295,41 +326,48 @@ if (PG_POOL_SIZE < 5) {
       }
     }
 
-    server.post<{ Body: { signature: string, password: string } }>("/process-transaction", async (req, res) => {
-      const { signature, password } = req.body
-      if (password !== ADMIN_PASSWORD) {
-        res.code(StatusCodes.FORBIDDEN).send({
-          message: "Invalid password",
-        });
-        return;
-      }
+    server.post<{ Body: { signature: string; password: string } }>(
+      "/process-transaction",
+      async (req, res) => {
+        const { signature, password } = req.body;
+        if (password !== ADMIN_PASSWORD) {
+          res.code(StatusCodes.FORBIDDEN).send({
+            message: "Invalid password",
+          });
+          return;
+        }
 
-      const tx = await provider.connection.getTransaction(signature, {
-        maxSupportedTransactionVersion: 0,
-        commitment: "confirmed"
-      })
-      if (!tx) {
-        res.code(StatusCodes.NOT_FOUND).send({
-          message: "Transaction not found",
+        const tx = await provider.connection.getTransaction(signature, {
+          maxSupportedTransactionVersion: 0,
+          commitment: "confirmed",
         });
-        return;
-      }
+        if (!tx) {
+          res.code(StatusCodes.NOT_FOUND).send({
+            message: "Transaction not found",
+          });
+          return;
+        }
 
-      const { message } = tx.transaction;
-      const accountKeys = [
-        ...message.staticAccountKeys,
-        ...(tx.meta?.loadedAddresses?.writable || []),
-        ...(tx.meta?.loadedAddresses?.readonly || []),
-      ];
-      const writableAccountKeys = getWritableAccountKeys(accountKeys, message.header)
-      await insertTransactionAccounts(
-        await getMultipleAccounts({
-          connection: provider.connection,
-          keys: writableAccountKeys,
-        })
-      );
-      res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-    })
+        const { message } = tx.transaction;
+        const accountKeys = [
+          ...message.staticAccountKeys,
+          ...(tx.meta?.loadedAddresses?.writable || []),
+          ...(tx.meta?.loadedAddresses?.readonly || []),
+        ];
+        const writableAccountKeys = getWritableAccountKeys(
+          accountKeys,
+          message.header
+        );
+        await insertTransactionAccounts(
+          await getMultipleAccounts({
+            connection: provider.connection,
+            keys: writableAccountKeys,
+          }),
+          tx.slot
+        );
+        res.code(StatusCodes.OK).send(ReasonPhrases.OK);
+      }
+    );
 
     if (USE_HELIUS_WEBHOOK) {
       if (!HELIUS_AUTH_SECRET) {
@@ -343,7 +381,10 @@ if (PG_POOL_SIZE < 5) {
           });
           return;
         }
-        if (refreshing) {
+        const hasRefreshJob =
+          (processingJob && jobQueue[0]?.type === "refresh-accounts") ||
+          jobQueue.some((job) => job.type === "refresh-accounts");
+        if (hasRefreshJob) {
           res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
             message: "Refresh is happening, cannot create transactions",
           });
@@ -363,7 +404,8 @@ if (PG_POOL_SIZE < 5) {
             await getMultipleAccounts({
               connection: provider.connection,
               keys: writableAccountKeys,
-            })
+            }),
+            transactions[0].slot
           );
           res.code(StatusCodes.OK).send(ReasonPhrases.OK);
         } catch (err) {
@@ -379,7 +421,10 @@ if (PG_POOL_SIZE < 5) {
           });
           return;
         }
-        if (refreshing) {
+        const hasRefreshJob =
+          (processingJob && jobQueue[0]?.type === "refresh-accounts") ||
+          jobQueue.some((job) => job.type === "refresh-accounts");
+        if (hasRefreshJob) {
           res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
             message: "Refresh is happening, cannot create transactions",
           });
@@ -410,6 +455,7 @@ if (PG_POOL_SIZE < 5) {
                   account: parsed,
                   pluginsByAccountType:
                     pluginsByAccountTypeByProgram[parsed["owner"]] || {},
+                  block: undefined,
                 });
               } catch (err) {
                 throw err;
@@ -434,11 +480,12 @@ if (PG_POOL_SIZE < 5) {
     console.log(`Running on 0.0.0.0:${port}`);
 
     if (REFRESH_ON_BOOT) {
-      console.log("Refreshing all program accounts on boot...");
+      console.log("Queueing all program accounts for refresh on boot...");
       for (const config of configs) {
-        console.log(`Refreshing accounts for program: ${config.programId}`);
-        eventHandler.emit("refresh-accounts", config.programId);
+        console.log(`Queueing refresh for program: ${config.programId}`);
+        await queueJob("refresh-accounts", config.programId);
       }
+      console.log("All boot refresh jobs completed");
     }
 
     if (customJobs.length > 0) {
@@ -510,6 +557,7 @@ if (PG_POOL_SIZE < 5) {
                 },
                 pluginsByAccountType:
                   pluginsByAccountTypeByProgram[programId] || {},
+                block: undefined,
               });
             }
           }

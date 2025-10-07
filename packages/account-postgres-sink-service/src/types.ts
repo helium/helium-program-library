@@ -1,6 +1,10 @@
 import { Transaction } from "sequelize";
 
-export type Plugins = "ExtractHexLocation" | "EncodeEntityKey" | "ExplodeMiniFanoutOwnership" | "ExplodeRecipientDestinationOwnership";
+export type Plugins =
+  | "ExtractHexLocation"
+  | "EncodeEntityKey"
+  | "ExplodeMiniFanoutOwnership"
+  | "ExplodeRecipientDestinationOwnership";
 type Crons = "refresh-accounts" | "integrity-check";
 
 export interface IPluginConfig {
@@ -36,7 +40,11 @@ export interface IInitedPlugin {
   addFields?: (schema: { [key: string]: any }, accountName: string) => void;
   addIndexes?: (schema: { [key: string]: any }, accountName: string) => void;
   dropIndexes?: () => Promise<void>;
-  processAccount: (account: any, t?: Transaction) => Promise<any>;
+  processAccount: (
+    account: any,
+    t?: Transaction,
+    lastBlock?: number
+  ) => Promise<any>;
 }
 
 export interface IPlugin {

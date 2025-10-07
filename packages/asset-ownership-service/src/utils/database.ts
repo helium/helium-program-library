@@ -1,4 +1,4 @@
-import { Model, STRING, Sequelize } from "sequelize";
+import { Model, STRING, INTEGER, Sequelize } from "sequelize";
 import AWS from "aws-sdk";
 import * as pg from "pg";
 import { PG_POOL_SIZE } from "../env";
@@ -64,6 +64,7 @@ export const database = new Sequelize({
 export class AssetOwner extends Model {
   declare asset: string;
   declare owner: string;
+  declare lastBlock: number;
 }
 
 AssetOwner.init(
@@ -77,6 +78,11 @@ AssetOwner.init(
       type: STRING,
       allowNull: false,
     },
+    lastBlock: {
+      type: INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
   },
   {
     sequelize: database,
@@ -84,6 +90,14 @@ AssetOwner.init(
     tableName: "asset_owners",
     underscored: true,
     timestamps: true,
+    indexes: [
+      {
+        fields: ["asset", "last_block"],
+      },
+      {
+        fields: ["last_block"],
+      },
+    ],
   }
 );
 
@@ -101,8 +115,11 @@ Cursor.init(
       primaryKey: true,
       unique: true,
     },
-    blockHeight: {
+    block: {
       type: STRING,
+      // mistakenly named the field "block_height" in the database when it actually represents the slot/block height
+      // this alias is used to ensure backwards compatibility with the previous name
+      field: "block_height",
     },
   },
   {

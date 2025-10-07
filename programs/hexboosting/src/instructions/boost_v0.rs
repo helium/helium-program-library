@@ -178,7 +178,7 @@ pub fn handler(ctx: Context<BoostV0>, args: BoostArgsV0) -> Result<()> {
   let dc_fee: u64 = args
     .amounts
     .iter()
-    .map(|amount| (amount.amount as u64 * ctx.accounts.boost_config.boost_price))
+    .map(|amount| amount.amount as u64 * ctx.accounts.boost_config.boost_price)
     .sum::<u64>();
 
   burn_without_tracking_v0(
