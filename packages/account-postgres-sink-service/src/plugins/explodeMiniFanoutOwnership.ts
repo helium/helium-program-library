@@ -67,8 +67,8 @@ RewardsRecipient.init(
     },
     lastBlock: {
       type: DataTypes.DECIMAL.UNSIGNED,
-      allowNull: true,
-      defaultValue: null,
+      allowNull: false,
+      defaultValue: 0,
     },
   },
   {
@@ -280,7 +280,7 @@ export async function handleMiniFanout(
   asset: string,
   account: { [key: string]: any },
   transaction: any,
-  lastBlock?: number | null
+  lastBlock?: number
 ) {
   const prevAccount = await MiniFanout.findByPk(account.address, {
     transaction,
@@ -395,7 +395,7 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
     const processAccount = async (
       account: { [key: string]: any },
       transaction?: any,
-      lastBlock?: number | null
+      lastBlock?: number
     ) => {
       try {
         const asset = account.preTask?.remoteV0?.url

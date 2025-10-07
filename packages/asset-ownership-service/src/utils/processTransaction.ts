@@ -65,7 +65,7 @@ export class TransactionProcessor {
     ]);
   }
 
-  private async getCurrentblock(): Promise<number | null> {
+  private async getCurrentblock(): Promise<number> {
     try {
       return await retry(() => provider.connection.getSlot("finalized"), {
         retries: 3,
@@ -75,7 +75,7 @@ export class TransactionProcessor {
       });
     } catch (error) {
       console.warn("Failed to fetch block after retries:", error);
-      return null;
+      return 0;
     }
   }
 
@@ -132,7 +132,7 @@ export class TransactionProcessor {
     instruction: ProcessableInstruction,
     tx: ProcessableTransaction,
     transaction: Transaction,
-    block?: number | null
+    block?: number
   ): Promise<{ updatedTrees: boolean }> {
     const programId = new PublicKey(tx.accountKeys[instruction.programIdIndex]);
     const instructionCoder = this.coders[programId.toBase58()];
@@ -266,7 +266,7 @@ export class TransactionProcessor {
   async processTransaction(
     tx: ProcessableTransaction,
     transaction: Transaction,
-    block?: number | null
+    block?: number
   ): Promise<{ updatedTrees: boolean }> {
     // Process main instructions
     for (const instruction of tx.instructions) {

@@ -121,8 +121,8 @@ export const defineIdlModels = async ({
           },
           lastBlock: {
             type: DataTypes.DECIMAL.UNSIGNED,
-            allowNull: true,
-            defaultValue: null,
+            allowNull: false,
+            defaultValue: 0,
           },
         },
         {

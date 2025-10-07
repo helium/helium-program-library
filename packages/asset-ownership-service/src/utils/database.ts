@@ -64,7 +64,7 @@ export const database = new Sequelize({
 export class AssetOwner extends Model {
   declare asset: string;
   declare owner: string;
-  declare lastBlock: number | null;
+  declare lastBlock: number;
 }
 
 AssetOwner.init(
@@ -80,7 +80,8 @@ AssetOwner.init(
     },
     lastBlock: {
       type: INTEGER,
-      allowNull: true,
+      allowNull: false,
+      defaultValue: 0,
     },
   },
   {

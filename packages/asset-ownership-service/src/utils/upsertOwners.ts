@@ -25,7 +25,7 @@ export const upsertOwners = async ({
   console.log(`Processing ${assetPks.length} assets for ownership updates`);
 
   // Get current block once for all batches
-  let lastBlock: number | null = null;
+  let lastBlock: number = 0;
   try {
     lastBlock = await retry(() => provider.connection.getSlot("finalized"), {
       retries: 3,

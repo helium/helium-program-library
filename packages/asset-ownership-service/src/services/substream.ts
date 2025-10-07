@@ -184,7 +184,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
           // This represents the number of the slot that is finalized (rooted)
           const block = message.value.finalBlockHeight
             ? Number(message.value.finalBlockHeight)
-            : null;
+            : 0;
 
           const hasTransactions =
             output !== undefined &&

@@ -43,7 +43,7 @@ export interface IInitedPlugin {
   processAccount: (
     account: any,
     t?: Transaction,
-    lastBlock?: number | null
+    lastBlock?: number
   ) => Promise<any>;
 }
 

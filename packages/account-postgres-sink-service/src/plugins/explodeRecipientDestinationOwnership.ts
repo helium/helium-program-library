@@ -19,7 +19,7 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
     const processAccount = async (
       account: { [key: string]: any },
       transaction?: any,
-      lastBlock?: number | null
+      lastBlock?: number
     ) => {
       try {
         const prevAccount = await Recipient.findByPk(account.address, {

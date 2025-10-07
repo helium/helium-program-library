@@ -381,7 +381,7 @@ export const upsertProgramAccounts = async ({
               );
 
               // Get current slot with retry - fetch once for the entire batch
-              let lastBlock: number | null = null;
+              let lastBlock: number = 0;
               try {
                 lastBlock = await retry(() => connection.getSlot("finalized"), {
                   retries: 3,

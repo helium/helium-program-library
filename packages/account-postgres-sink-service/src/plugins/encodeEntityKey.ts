@@ -39,7 +39,7 @@ export const EncodeEntityKeyPlugin = ((): IPlugin => {
     const processAccount = async (
       account: { [key: string]: any },
       transaction?: any,
-      lastBlock?: number | null
+      lastBlock?: number
     ) => {
       try {
         const entityKey = account[camelize(config.field || "entity_key", true)];

@@ -111,10 +111,10 @@ export const handleAccountWebhook = async ({
       let sanitized = sanitizeAccount(decodedAcc);
 
       // Use provided block or fetch from RPC if not available
-      let lastBlock: number | null = block ?? null;
+      let lastBlock: number = block ?? 0;
       const hasPlugins = (pluginsByAccountType[accName] || []).length > 0;
 
-      if (hasPlugins && lastBlock === null) {
+      if (hasPlugins && lastBlock === 0) {
         try {
           lastBlock = await retry(
             () => provider.connection.getSlot("finalized"),
@@ -162,7 +162,7 @@ export const handleAccountWebhook = async ({
 
       if (shouldUpdate) {
         // Use the block we already have, or fetch it now if we haven't and it wasn't provided
-        if (lastBlock === null) {
+        if (lastBlock === 0) {
           try {
             lastBlock = await retry(
               () => provider.connection.getSlot("finalized"),
