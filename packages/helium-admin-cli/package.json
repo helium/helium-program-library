@@ -63,6 +63,7 @@
     "@solana/spl-governance": "^0.3.18",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
+    "@sqds/multisig": "^2.1.4",
     "@sqds/sdk": "2.0.4",
     "axios": "^1.9.0",
     "bn.js": "^5.2.0",
