@@ -30,6 +30,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
@@ -40,14 +41,26 @@ WORKDIR /usr/src/app
 # Copy the binary from builder stage
 COPY --from=builder /usr/src/app/target/release/atomic-data-publisher ./atomic-data-publisher
 
-# Create config directory
-RUN mkdir -p config && chown -R app:app /usr/src/app
+# Copy default config files
+COPY config ./config
+
+# Create directories for K8s volume mounts
+# - /usr/src/app/config for ConfigMap
+# - /usr/src/app/secrets for keypair Secret
+RUN mkdir -p config secrets && chown -R app:app /usr/src/app
 
 # Switch to app user
 USER app
 
+# Expose metrics/health port
+EXPOSE 9090
+
 # Set environment variables
 ENV RUST_LOG=info
+
+# Health check using metrics endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:9090/metrics || exit 1
 
 # Run the application
 CMD ["./atomic-data-publisher"]

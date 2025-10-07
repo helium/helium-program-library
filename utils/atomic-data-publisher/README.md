@@ -58,6 +58,8 @@ Access metrics via:
 
 ## Running
 
+### Local Development
+
 ```bash
 # Build
 cargo build
@@ -68,6 +70,20 @@ cargo run
 # Run with dry-run mode (logs messages without sending)
 # Set dry_run = true in your config/local.toml
 cargo run
+```
+
+### Docker
+
+```bash
+# Build the image
+docker build -t atomic-data-publisher:latest .
+
+# Run with volume mounts
+docker run \
+  -v $(pwd)/config:/usr/src/app/config:ro \
+  -v $(pwd)/secrets:/usr/src/app/secrets:ro \
+  -p 9090:9090 \
+  atomic-data-publisher:latest
 ```
 
 ## Dependencies

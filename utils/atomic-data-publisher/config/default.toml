@@ -37,7 +37,7 @@ required_tables = [
 
 # Signing keypair settings
 [signing]
-keypair_path = "/app/keypair.bin"  # Path to Helium keypair file
+keypair_path = "/usr/src/app/secrets/keypair.bin"  # Path to Helium keypair file (K8s Secret mount)
 
 # Ingestor configuration
 [ingestor]
