@@ -1,15 +1,6 @@
 use anchor_lang::prelude::*;
 use tuktuk_program::TransactionSourceV0;
 
-// ["global_state"]
-#[account]
-#[derive(Default)]
-pub struct GlobalStateV0 {
-  pub authority: Pubkey,
-  pub task_queue: Pubkey,
-  pub bump: u8,
-}
-
 // ["fanout", hash(name)]
 #[account]
 #[derive(Default)]

@@ -143,45 +143,7 @@ export async function run(args: any = process.argv) {
         .accountsPartial({
           rewardableEntityConfig: config,
           authority: configAcc.authority,
-        })
-        .instruction()
-    );
-
-    // update dnt cb auth
-    const dntCircuitBreaker = mintWindowedBreakerKey(subDaoAcc.dntMint)[0];
-    const dntCbAcc = await cbProgram.account.mintWindowedCircuitBreakerV0.fetch(
-      dntCircuitBreaker
-    );
-    instructions.push(
-      await cbProgram.methods
-        .updateMintWindowedBreakerV0({
-          newAuthority: new PublicKey(argv.newAuthority),
-          config: null,
-        })
-        .accountsPartial({
-          circuitBreaker: dntCircuitBreaker,
-          authority: dntCbAcc.authority,
-        })
-        .instruction()
-    );
-
-    // update treasury cb auth
-    const treasuryCircuitBreaker = accountWindowedBreakerKey(
-      subDaoAcc.treasury
-    )[0];
-    const treasuryCbAcc =
-      await cbProgram.account.accountWindowedCircuitBreakerV0.fetch(
-        treasuryCircuitBreaker
-      );
-    instructions.push(
-      await cbProgram.methods
-        .updateAccountWindowedBreakerV0({
-          newAuthority: new PublicKey(argv.newAuthority),
-          config: null,
-        })
-        .accountsPartial({
-          circuitBreaker: treasuryCircuitBreaker,
-          authority: treasuryCbAcc.authority,
+          payer: configAcc.authority,
         })
         .instruction()
     );
