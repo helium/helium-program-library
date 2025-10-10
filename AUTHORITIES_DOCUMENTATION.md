@@ -117,6 +117,13 @@ helium-admin update-account-circuit-breaker \
   --authorityIndex 1
 ```
 
+List of account windowed breakers (mint ones should update when you update dao auth):
+
+Delegator pool for HNT - `GjumWQJZUcUwYdMkHDPDCRFhA7AQmb1kLapqLmDAYTVY`
+HNT Rewards circuit breaker - `73zsmmqCXjvHHhNSib26Y8p3jYiH3UUuyKv71RJDnctW`
+IOT Escrow circuit breaker - `5veMSa4ks66zydSaKSPMhV7H2eF88HvuKDArScNH9jaG`
+MOBILE Escrow circuit breaker - `4qGj88CX3McdTXEviEaqeP2pnZJxRTsZFWyU3Mrnbku4`
+
 ---
 
 ## Entity Manager Authorities
