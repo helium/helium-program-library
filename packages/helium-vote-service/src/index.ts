@@ -489,9 +489,11 @@ server.get<{
         vm.proposal,
         vm.weight,
         vm.choice,
-        p.choices[vm.choice + 1]->>'name' as "choiceName"
+        p.choices[vm.choice + 1]->>'name' as "choiceName",
+        proxies.name as "proxyName"
       FROM exploded_choice_vote_markers vm
       JOIN proposals p ON p.address = vm.proposal
+      LEFT OUTER JOIN proxies ON proxies.wallet = vm.voter
     `)
   )[0].map(deepCamelCaseKeys);
 });
