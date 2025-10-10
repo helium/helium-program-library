@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use shared_utils::try_from;
 use tuktuk_program::{
   RunTaskReturnV0, TaskQueueV0, TaskReturnV0, TaskV0, TransactionSourceV0, TriggerV0,
 };
@@ -50,19 +51,6 @@ impl Share {
       Share::Fixed { amount } => *amount as u128,
     }
   }
-}
-
-#[macro_export]
-macro_rules! try_from {
-  ($ty: ty, $acc: expr) => {{
-    let account_info = $acc.as_ref();
-    <$ty>::try_from(unsafe {
-      core::mem::transmute::<
-        &anchor_lang::prelude::AccountInfo<'_>,
-        &anchor_lang::prelude::AccountInfo<'_>,
-      >(account_info)
-    })
-  }};
 }
 
 pub fn handler<'info>(

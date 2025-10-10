@@ -3,6 +3,7 @@ use std::cmp::min;
 use anchor_lang::{prelude::*, Discriminator};
 use anchor_spl::token::{Mint, TokenAccount};
 use modular_governance::nft_proxy::accounts::ProxyConfigV0;
+use shared_utils::try_from;
 use voter_stake_registry::{
   state::{LockupKind, PositionV0, Registrar},
   VoterStakeRegistry,
@@ -16,7 +17,6 @@ use crate::{
   error::ErrorCode,
   id,
   state::*,
-  try_from,
   utils::*,
 };
 

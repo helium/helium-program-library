@@ -3,6 +3,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use modular_governance::proposal::accounts::ProposalV0;
+use shared_utils::try_from;
 use voter_stake_registry::{
   state::{PositionV0, Registrar, VoteMarkerV0},
   VoterStakeRegistry,
@@ -13,7 +14,7 @@ use crate::{
   error::ErrorCode,
   get_sub_dao_epoch_info_seed,
   state::{DaoEpochInfoV0, DaoV0, DelegatedPositionV0},
-  try_from, SubDaoV0,
+  SubDaoV0,
 };
 #[derive(Accounts)]
 pub struct TrackVoteV0<'info> {

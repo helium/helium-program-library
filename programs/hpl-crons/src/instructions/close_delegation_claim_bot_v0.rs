@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
-use helium_sub_daos::{try_from, DelegatedPositionV0};
+use helium_sub_daos::DelegatedPositionV0;
+use shared_utils::try_from;
 use tuktuk_program::{
   tuktuk::{
     cpi::{accounts::DequeueTaskV0, dequeue_task_v0},
