@@ -2,12 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
 use no_emit::{NoEmit, NotEmittedCounterV0};
-use shared_utils::precise_number::PreciseNumber;
+use shared_utils::{precise_number::PreciseNumber, try_from};
 use voter_stake_registry::state::Registrar;
 
-use crate::{
-  current_epoch, error::ErrorCode, state::*, try_from, update_subdao_vehnt, EPOCH_LENGTH,
-};
+use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CalculateUtilityScoreArgsV0 {

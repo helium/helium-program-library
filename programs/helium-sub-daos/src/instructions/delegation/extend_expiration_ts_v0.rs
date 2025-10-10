@@ -3,10 +3,11 @@ use std::{cmp::min, str::FromStr};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use modular_governance::nft_proxy::accounts::ProxyConfigV0;
+use shared_utils::try_from;
 use voter_stake_registry::state::{PositionV0, Registrar};
 
 use crate::{
-  caclulate_vhnt_info, current_epoch, error::ErrorCode, id, try_from, DaoV0, DelegatedPositionV0,
+  caclulate_vhnt_info, current_epoch, error::ErrorCode, id, DaoV0, DelegatedPositionV0,
   SubDaoEpochInfoV0, SubDaoV0,
 };
 

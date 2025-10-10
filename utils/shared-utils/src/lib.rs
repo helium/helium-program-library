@@ -3,6 +3,7 @@ pub mod error;
 pub mod precise_number;
 pub mod resize_to_fit;
 pub mod signed_precise_number;
+pub mod try_from;
 pub mod uint;
 
 use anchor_lang::{prelude::Pubkey, pubkey};
@@ -11,6 +12,7 @@ pub use error::*;
 pub use precise_number::*;
 pub use resize_to_fit::*;
 pub use signed_precise_number::*;
+pub use try_from::*;
 
 pub use crate::uint::*;
 
