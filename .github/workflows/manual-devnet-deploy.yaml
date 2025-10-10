@@ -80,7 +80,7 @@ jobs:
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
 
       - name: Squads program upgrade
-        uses: helium/squads-program-upgrade@v0.4.7
+        uses: helium/squads-program-upgrade@v0.5.0
         with:
           network-url: "https://api.devnet.solana.com"
           program-multisig: ${{ secrets.DEVNET_MULTISIG }}
