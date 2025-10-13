@@ -3,7 +3,7 @@ use std::{
   time::{Duration, Instant},
 };
 
-use tokio::time::{interval, sleep};
+use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 use triggered::Listener;
 
