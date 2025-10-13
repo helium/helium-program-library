@@ -68,6 +68,32 @@ pub struct SigningConfig {
 impl Settings {
   pub fn new() -> Result<Self, ConfigError> {
     let s = Config::builder()
+      // Database defaults
+      .set_default("database.host", "localhost")?
+      .set_default("database.port", 5432)?
+      .set_default("database.username", "postgres")?
+      .set_default("database.password", "postgres")?
+      .set_default("database.database_name", "helium")?
+      .set_default("database.max_connections", 10)?
+      .set_default("database.min_connections", 2)?
+      .set_default("database.acquire_timeout_seconds", 30)?
+      .set_default("database.idle_timeout_seconds", 600)?
+      .set_default("database.max_lifetime_seconds", 1800)?
+      // Service defaults
+      .set_default("service.polling_interval_seconds", 10)?
+      .set_default("service.batch_size", 500)?
+      .set_default("service.max_concurrent_publishes", 50)?
+      .set_default("service.dry_run", false)?
+      .set_default("service.dry_run_failure_rate", 0.0)?
+      .set_default("service.port", 8000)?
+      // Ingestor defaults
+      .set_default("ingestor.timeout_seconds", 30)?
+      .set_default("ingestor.max_retries", 3)?
+      .set_default("ingestor.retry_delay_seconds", 5)?
+      // Logging defaults
+      .set_default("logging.level", "info")?
+      .set_default("logging.format", "json")?
+      // Load from files and environment
       .add_source(File::with_name("settings").required(true))
       .add_source(Environment::default().separator("__").try_parsing(true))
       .build()?;

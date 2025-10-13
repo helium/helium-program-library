@@ -31,26 +31,40 @@ cp .env.example .env
 
 ### Environment Variables
 
-Environment variables use double underscore (`__`) for nested config:
+Environment variables use double underscore (`__`) for nested config. All variables have defaults except where noted:
 
 ```bash
 # Database config
-DATABASE__HOST=localhost
-DATABASE__PORT=5432
-DATABASE__USERNAME=postgres
-DATABASE__PASSWORD=your_secret
-DATABASE__DATABASE_NAME=helium
+DATABASE__HOST=localhost                           # Default: localhost
+DATABASE__PORT=5432                                # Default: 5432
+DATABASE__USERNAME=postgres                        # Default: postgres
+DATABASE__PASSWORD=your_secret                     # Default: postgres
+DATABASE__DATABASE_NAME=helium                     # Default: helium
+DATABASE__MAX_CONNECTIONS=10                       # Default: 10
+DATABASE__MIN_CONNECTIONS=2                        # Default: 2
+DATABASE__ACQUIRE_TIMEOUT_SECONDS=30               # Default: 30
+DATABASE__IDLE_TIMEOUT_SECONDS=600                 # Default: 600
+DATABASE__MAX_LIFETIME_SECONDS=1800                # Default: 1800
 
 # Service config
-SERVICE__POLLING_INTERVAL_SECONDS=60
-SERVICE__BATCH_SIZE=100
-SERVICE__DRY_RUN=true
-SERVICE__PORT=8080
+SERVICE__POLLING_INTERVAL_SECONDS=120              # Default: 120
+SERVICE__BATCH_SIZE=500                            # Default: 500
+SERVICE__MAX_CONCURRENT_PUBLISHES=10               # Default: 10
+SERVICE__DRY_RUN=false                             # Default: flase
+SERVICE__DRY_RUN_FAILURE_RATE=0.0                  # Default: 0.0
+SERVICE__PORT=8000                                 # Default: 8000
 
 # Ingestor config
-INGESTOR__ENDPOINT=https://ingestor.helium.io
+INGESTOR__ENDPOINT=https://ingestor.helium.io      # Default: http://localhost:8081
+INGESTOR__TIMEOUT_SECONDS=30                       # Default: 30
+INGESTOR__MAX_RETRIES=3                            # Default: 3
+INGESTOR__RETRY_DELAY_SECONDS=5                    # Default: 5
 
-# Signing config
+# Logging config
+LOGGING__LEVEL=info                                # Default: info
+LOGGING__FORMAT=json                               # Default: json
+
+# Signing config (REQUIRED - no meaningful default)
 SIGNING__KEYPAIR_PATH=/usr/src/app/secrets/keypair.bin
 ```
 
