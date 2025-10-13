@@ -31,28 +31,28 @@ cp .env.example .env
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` and configure:
+Environment variables use double underscore (`__`) for nested config:
 
 ```bash
-# Required: Database connection
-DATABASE_HOST=localhost
-DATABASE_PASSWORD=your_secret
-# ... see .env.example for all options
+# Database config
+DATABASE__HOST=localhost
+DATABASE__PORT=5432
+DATABASE__USERNAME=postgres
+DATABASE__PASSWORD=your_secret
+DATABASE__DATABASE_NAME=helium
 
-# Required: Signing keypair
-SIGNING_KEYPAIR_PATH=/path/to/keypair.bin
+# Service config
+SERVICE__POLLING_INTERVAL_SECONDS=60
+SERVICE__BATCH_SIZE=100
+SERVICE__DRY_RUN=true
+SERVICE__PORT=8080
 
-# Required: Ingestor endpoint
-INGESTOR_ENDPOINT=https://ingestor.helium.io
+# Ingestor config
+INGESTOR__ENDPOINT=https://ingestor.helium.io
 
-# Required: Service configuration
-SERVICE_POLLING_INTERVAL_SECONDS=10
-SERVICE_BATCH_SIZE=500
-SERVICE_DRY_RUN=true
-# ... etc
+# Signing config
+SIGNING__KEYPAIR_PATH=/usr/src/app/secrets/keypair.bin
 ```
-
-All fields in `.env.example` are required unless marked [OPTIONAL].
 
 ## Metrics
 
@@ -66,15 +66,11 @@ The service includes a built-in Prometheus metrics server that exposes operation
 - **Publish duration**: Time taken to publish changes (histogram)
 - **Uptime**: Service uptime in seconds
 
-The metrics server is always enabled and serves metrics at `http://0.0.0.0:8080/metrics` by default. Configure the port via environment variable:
+The metrics server is always enabled and serves metrics at `http://0.0.0.0:8080/metrics` by default. Configure the port via:
 
 ```bash
-SERVICE_PORT=8080  # Metrics server port (default: 8080)
+SERVICE__PORT=8080
 ```
-
-Access metrics via:
-
-- Metrics endpoint: `http://localhost:8080/metrics`
 
 ## Running
 
@@ -93,22 +89,20 @@ cargo build
 cargo run
 
 # Run with dry-run mode (no actual publishing)
-SERVICE_DRY_RUN=true cargo run
+SERVICE__DRY_RUN=true cargo run
 ```
 
 ### Docker
 
 ```bash
-# Build the image
+# Build
 docker build -t atomic-data-publisher:latest .
 
-# Run with environment variables and volumes
-# Note: settings.toml MUST be mounted from host
+# Run with env vars and volume mounts
 docker run \
   --env-file .env \
   -v $(pwd)/settings.toml:/usr/src/app/settings.toml:ro \
   -v $(pwd)/secrets:/usr/src/app/secrets:ro \
-  -p 8080:8080 \
   atomic-data-publisher:latest
 ```
 
@@ -145,20 +139,33 @@ spec:
           image: atomic-data-publisher:latest
           env:
             # Database config
-            - name: DATABASE_HOST
+            - name: DATABASE__HOST
               value: "postgres.default.svc.cluster.local"
-            - name: DATABASE_PORT
+            - name: DATABASE__PORT
               value: "5432"
-            - name: DATABASE_USERNAME
+            - name: DATABASE__USERNAME
               value: "postgres"
-            - name: DATABASE_PASSWORD
+            - name: DATABASE__PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: atomic-publisher-secrets
                   key: db-password
-            - name: DATABASE_DATABASE_NAME
+            - name: DATABASE__DATABASE_NAME
               value: "helium"
-            # ... all other required env vars (see .env.example)
+            # Service config
+            - name: SERVICE__POLLING_INTERVAL_SECONDS
+              value: "60"
+            - name: SERVICE__BATCH_SIZE
+              value: "100"
+            - name: SERVICE__PORT
+              value: "8080"
+            # Ingestor config
+            - name: INGESTOR__ENDPOINT
+              value: "https://ingestor.helium.io"
+            # Signing config
+            - name: SIGNING__KEYPAIR_PATH
+              value: "/usr/src/app/secrets/keypair.bin"
+            # ... add remaining required env vars
           volumeMounts:
             - name: settings
               mountPath: /usr/src/app/settings.toml
