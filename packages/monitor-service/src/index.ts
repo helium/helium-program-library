@@ -208,12 +208,12 @@ async function run() {
   );
 
   await monitorTokenBalance(
-    getAssociatedTokenAddressSync(dao.hntMint, mobileAutoTopOff),
+    getAssociatedTokenAddressSync(dao.hntMint, mobileAutoTopOff, true),
     "helium_mobile_auto_topoff_hnt"
   );
 
   await monitorTokenBalance(
-    getAssociatedTokenAddressSync(dao.hntMint, carrierAutoTopOff),
+    getAssociatedTokenAddressSync(dao.hntMint, carrierAutoTopOff, true),
     "carrier_auto_topoff_hnt"
   );
 
