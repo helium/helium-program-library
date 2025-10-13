@@ -68,10 +68,7 @@ pub struct SigningConfig {
 impl Settings {
   pub fn new() -> Result<Self, ConfigError> {
     let s = Config::builder()
-      // Load polling jobs from settings.toml (required for job definitions)
       .add_source(File::with_name("settings").required(true))
-      // Load environment variables (highest priority, provides all required config)
-      // Use single underscore as separator: DATABASE__PASSWORD, INGESTOR__ENDPOINT, etc.
       .add_source(Environment::default().separator("__").try_parsing(true))
       .build()?;
 

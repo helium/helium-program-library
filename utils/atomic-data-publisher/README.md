@@ -17,7 +17,17 @@ Rust service that polls PostgreSQL for hotspot data changes and publishes them t
 Configuration uses a hybrid approach:
 
 - **Environment Variables** - All runtime config (database, ingestor, logging, service params) - **REQUIRED**
-- **settings.toml** - Defines polling job configurations only
+- **settings.toml** - Defines polling job configurations and required tables - **REQUIRED**
+
+### Setup
+
+```bash
+# Copy example files
+cp settings.toml.example settings.toml
+cp .env.example .env
+
+# Edit with your values
+```
 
 ### Environment Variables
 
@@ -56,24 +66,25 @@ The service includes a built-in Prometheus metrics server that exposes operation
 - **Publish duration**: Time taken to publish changes (histogram)
 - **Uptime**: Service uptime in seconds
 
-The metrics server is always enabled and serves metrics at `http://0.0.0.0:9090/metrics` by default. Configure the port via environment variable:
+The metrics server is always enabled and serves metrics at `http://0.0.0.0:8080/metrics` by default. Configure the port via environment variable:
 
 ```bash
-SERVICE_PORT=9090  # Metrics server port
+SERVICE_PORT=8080  # Metrics server port (default: 8080)
 ```
 
 Access metrics via:
 
-- Metrics endpoint: `http://localhost:9090/metrics`
+- Metrics endpoint: `http://localhost:8080/metrics`
 
 ## Running
 
 ### Local Development
 
 ```bash
-# Setup environment
+# Setup configuration files
+cp settings.toml.example settings.toml
 cp .env.example .env
-# Edit .env with your values
+# Edit both files with your values
 
 # Build
 cargo build
@@ -92,56 +103,77 @@ SERVICE_DRY_RUN=true cargo run
 docker build -t atomic-data-publisher:latest .
 
 # Run with environment variables and volumes
+# Note: settings.toml MUST be mounted from host
 docker run \
   --env-file .env \
   -v $(pwd)/settings.toml:/usr/src/app/settings.toml:ro \
   -v $(pwd)/secrets:/usr/src/app/secrets:ro \
-  -p 9090:9090 \
+  -p 8080:8080 \
   atomic-data-publisher:latest
 ```
 
 ### Kubernetes
 
-Mount settings.toml via ConfigMap and use Secrets for sensitive data:
+**REQUIRED**: Mount settings.toml via ConfigMap and provide all environment variables.
 
 ```yaml
-# ConfigMap with polling jobs configuration
+# ConfigMap with polling jobs configuration (REQUIRED)
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: atomic-publisher-config
 data:
   settings.toml: |
-    # Polling jobs config...
+    [database]
+    required_tables = ["asset_owners", "key_to_assets"]
 
+    [[service.polling_jobs]]
+    name = "atomic_mobile_hotspots"
+    query_name = "construct_atomic_hotspots"
+    parameters = { change_type = "mobile_hotspot", hotspot_type = "mobile" }
+    # ... more jobs
+
+---
 # Deployment
+apiVersion: apps/v1
+kind: Deployment
 spec:
-  containers:
-    - name: atomic-data-publisher
-      env:
-        - name: DATABASE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: atomic-publisher-secrets
-              key: db-password
-        - name: DATABASE_HOST
-          value: "postgres.default.svc.cluster.local"
-        # ... all other env vars
-      volumeMounts:
+  template:
+    spec:
+      containers:
+        - name: atomic-data-publisher
+          image: atomic-data-publisher:latest
+          env:
+            # Database config
+            - name: DATABASE_HOST
+              value: "postgres.default.svc.cluster.local"
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_USERNAME
+              value: "postgres"
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atomic-publisher-secrets
+                  key: db-password
+            - name: DATABASE_DATABASE_NAME
+              value: "helium"
+            # ... all other required env vars (see .env.example)
+          volumeMounts:
+            - name: settings
+              mountPath: /usr/src/app/settings.toml
+              subPath: settings.toml
+              readOnly: true
+            - name: keypair
+              mountPath: /usr/src/app/secrets
+              readOnly: true
+      volumes:
         - name: settings
-          mountPath: /usr/src/app/settings.toml
-          subPath: settings.toml
-          readOnly: true
+          configMap:
+            name: atomic-publisher-config
         - name: keypair
-          mountPath: /usr/src/app/secrets
-          readOnly: true
-  volumes:
-    - name: settings
-      configMap:
-        name: atomic-publisher-config
-    - name: keypair
-      secret:
-        secretName: helium-keypair
+          secret:
+            secretName: helium-keypair
 ```
 
 ## Dependencies

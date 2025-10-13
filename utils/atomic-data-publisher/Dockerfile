@@ -1,15 +1,11 @@
 FROM rust:1.75-slim as builder
+WORKDIR /usr/src/app
 
-# Install system dependencies
+COPY Cargo.toml Cargo.lock ./
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /usr/src/app
-
-# Copy manifests
-COPY Cargo.toml Cargo.lock ./
 
 # Create src directory with dummy main to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -41,23 +37,20 @@ WORKDIR /usr/src/app
 # Copy the binary from builder stage
 COPY --from=builder /usr/src/app/target/release/atomic-data-publisher ./atomic-data-publisher
 
-# Create directories for K8s volume mounts
-# - /usr/src/app/settings.toml for ConfigMap (polling jobs config)
-# - /usr/src/app/secrets for keypair Secret
-RUN mkdir -p secrets && chown -R app:app /usr/src/app
-
 # Switch to app user
 USER app
 
-# Expose metrics/health port
-EXPOSE 9090
+# Expose metrics/health port (configurable via SERVICE_PORT env var)
+EXPOSE 8080
 
 # Set environment variables
-ENV RUST_LOG=info
+ENV RUST_LOG=info \
+    SERVICE_PORT=8080
 
 # Health check using metrics endpoint
+# Note: This assumes SERVICE_PORT=8080. If you change SERVICE_PORT, update the healthcheck in K8s.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:9090/metrics || exit 1
+  CMD curl -f http://localhost:${SERVICE_PORT:-8080}/metrics || exit 1
 
 # Run the application
 CMD ["./atomic-data-publisher"]
