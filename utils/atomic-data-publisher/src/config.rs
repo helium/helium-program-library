@@ -73,7 +73,7 @@ impl Settings {
       .set_default("database.port", 5432)?
       .set_default("database.username", "postgres")?
       .set_default("database.password", "postgres")?
-      .set_default("database.database_name", "helium")?
+      .set_default("database.database_name", "postgres")?
       .set_default("database.max_connections", 10)?
       .set_default("database.min_connections", 2)?
       .set_default("database.acquire_timeout_seconds", 30)?
@@ -87,12 +87,15 @@ impl Settings {
       .set_default("service.dry_run_failure_rate", 0.0)?
       .set_default("service.port", 8000)?
       // Ingestor defaults
+      .set_default("ingestor.endpoint", "")?
       .set_default("ingestor.timeout_seconds", 30)?
       .set_default("ingestor.max_retries", 3)?
       .set_default("ingestor.retry_delay_seconds", 5)?
       // Logging defaults
       .set_default("logging.level", "info")?
       .set_default("logging.format", "json")?
+      // Signing defaults
+      .set_default("signing.keypair_path", "")?
       // Load from files and environment
       .add_source(File::with_name("settings").required(true))
       .add_source(Environment::default().separator("__").try_parsing(true))
