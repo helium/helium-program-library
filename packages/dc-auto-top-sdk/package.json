@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.4",
+  "version": "0.11.5",
   "description": "Interface to the dc-auto-top smart contract",
   "repository": {
     "type": "git",
@@ -32,9 +32,9 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
-    "@helium/anchor-resolvers": "^0.11.4",
-    "@helium/idls": "^0.11.4",
-    "@helium/spl-utils": "^0.11.4",
+    "@helium/anchor-resolvers": "^0.11.5",
+    "@helium/idls": "^0.11.5",
+    "@helium/spl-utils": "^0.11.5",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
