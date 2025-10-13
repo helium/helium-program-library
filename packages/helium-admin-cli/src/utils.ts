@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
 import {
+  bulkSendTransactions,
   createAtaAndMintInstructions,
   createMintInstructions,
   sendInstructions,
@@ -57,9 +58,11 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import Squads, { getTxPDA } from "@sqds/sdk";
+import * as multisig from "@sqds/multisig";
 import { BN } from "bn.js";
 import fs from "fs";
 import fetch from "node-fetch";
+import { packageInstructions } from "./squads-batch-optimizer";
 
 const SECONDS_PER_DAY = 86400;
 
@@ -679,6 +682,140 @@ export async function createCloseBufferInstruction(
   });
 }
 
+export async function sendInstructionsOrSquadsV4({
+  provider,
+  instructions,
+  signers = [],
+  payer = provider.wallet.publicKey,
+  commitment = "confirmed",
+  idlErrors = new Map(),
+  multisig: multisigPda,
+}: {
+  provider: anchor.AnchorProvider;
+  instructions: TransactionInstruction[];
+  signers?: Signer[];
+  payer?: PublicKey;
+  commitment?: Commitment;
+  idlErrors?: Map<number, string>;
+  multisig?: PublicKey;
+}): Promise<string | undefined> {
+  if (!multisig) {
+    return await sendInstructions(
+      provider,
+      await withPriorityFees({
+        connection: provider.connection,
+        computeUnits: 1000000,
+        instructions,
+        feePayer: payer,
+      }),
+      signers,
+      payer,
+      commitment,
+      idlErrors
+    );
+  }
+
+  const signerSet = new Set(
+    instructions
+      .map((ix) =>
+        ix.keys.filter((k) => k.isSigner).map((k) => k.pubkey.toBase58())
+      )
+      .flat()
+  );
+  const signerKeys = Array.from(signerSet).map((k) => new PublicKey(k));
+
+  const nonMissingSignerIxs = instructions.filter(
+    (ix) =>
+      !ix.keys.some(
+        (k) => k.isSigner && !k.pubkey.equals(provider.wallet.publicKey)
+      )
+  );
+  const squadsSignatures = signerKeys.filter(
+    (k) =>
+      !k.equals(provider.wallet.publicKey) &&
+      !signers.some((s) => s.publicKey.equals(k))
+  );
+
+  if (squadsSignatures.length == 0) {
+    return await sendInstructions(
+      provider,
+      await withPriorityFees({
+        connection: provider.connection,
+        computeUnits: 1000000,
+        instructions: nonMissingSignerIxs,
+        feePayer: payer,
+      }),
+      signers,
+      payer,
+      commitment,
+      idlErrors
+    );
+  }
+
+  if (squadsSignatures.length >= 2) {
+    throw new Error("Too many missing signatures");
+  }
+
+  const multisigInfo = await multisig.accounts.Multisig.fromAccountAddress(
+    provider.connection,
+    multisigPda!
+  );
+
+  const transactionIndex = Number(multisigInfo.transactionIndex) + 1;
+  const createBatchIx = await multisig.instructions.batchCreate({
+    batchIndex: BigInt(transactionIndex),
+    creator: provider.wallet.publicKey,
+    multisigPda: multisigPda!,
+    vaultIndex: 0,
+    memo: "Helium-admin-cli batch",
+  });
+  await sendInstructions(provider, await withPriorityFees({
+    connection: provider.connection,
+    instructions: [createBatchIx, await multisig.instructions.proposalCreate({
+      multisigPda: multisigPda!,
+      transactionIndex: BigInt(transactionIndex),
+      creator: provider.wallet.publicKey,
+      isDraft: true,
+    })],
+    feePayer: payer,
+  }));
+
+
+  const [vault] = await multisig.getVaultPda({
+    multisigPda: multisigPda!,
+    index: 0,
+    programId: multisig.PROGRAM_ID,
+  })
+  const { transactionMessages, failedBuckets } = await packageInstructions(instructions.map(ix => [ix]), [], vault)
+  const addInstructions = await Promise.all(transactionMessages.map((tm, index) => multisig.instructions.batchAddTransaction({
+    batchIndex: BigInt(transactionIndex),
+    multisigPda: multisigPda!,
+    transactionIndex: index + 1,
+    transactionMessage: tm,
+    vaultIndex: 0,
+    member: provider.wallet.publicKey,
+    ephemeralSigners: 0
+  })))
+  if (failedBuckets.length > 0) {
+    throw new Error(`Failed to package instructions: ${failedBuckets.join(", ")}`);
+  }
+
+  await bulkSendTransactions(provider, addInstructions.map(ix => ({
+    feePayer: provider.wallet.publicKey,
+    instructions: [ix],
+  })))
+
+  await sendInstructions(provider, await withPriorityFees({
+    connection: provider.connection,
+    instructions: [await multisig.instructions.proposalActivate({
+      multisigPda: multisigPda!,
+      transactionIndex: BigInt(transactionIndex),
+      member: provider.wallet.publicKey,
+    })],
+    feePayer: payer,
+  }));
+}
+
 export async function sendInstructionsOrSquads({
   provider,
   instructions,
@@ -754,7 +891,7 @@ export async function sendInstructionsOrSquads({
   }
 
   if (squadsSignatures.length >= 2) {
-    throw new Error("Too many missing signatures");
+    throw new Error("Too many missing signatures " + squadsSignatures.map(s => s.toBase58()).join(", "));
   }
 
   const txIndex = await squads.getNextTransactionIndex(multisig);
@@ -827,12 +964,12 @@ export async function parseEmissionsSchedule(filepath: string) {
       "percent" in x
         ? { percent: x.percent }
         : "emissionsPerEpoch" in x
-        ? {
+          ? {
             emissionsPerEpoch: new anchor.BN(
               x.emissionsPerEpoch.replaceAll(".", "").replaceAll(",", "")
             ),
           }
-        : null;
+          : null;
     if (!extra || !("startTime" in x)) throw new Error("json format incorrect");
     return {
       startUnixTime: new anchor.BN(Math.floor(Date.parse(x.startTime) / 1000)),

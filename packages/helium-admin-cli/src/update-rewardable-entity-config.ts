@@ -36,6 +36,10 @@ export async function run(args: any = process.argv) {
       required: true,
       describe: "The name of the entity config",
     },
+    newAuthority: {
+      type: "string",
+      describe: "The new authority for the entity config",
+    },
     executeTransaction: {
       type: "boolean",
     },
@@ -151,13 +155,11 @@ export async function run(args: any = process.argv) {
     };
   }
 
-  console.log(settings, rewardableConfigAcc.authority.toBase58());
-
   const instructions = [
     await hemProgram.methods
       .updateRewardableEntityConfigV0({
         settings,
-        newAuthority: null,
+        newAuthority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
         stakingRequirement: argv.stakingRequirement
           ? toBN(argv.stakingRequirement, dntMintAcc.decimals)
           : new BN(0),
