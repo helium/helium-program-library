@@ -17,6 +17,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+  dotenv::dotenv().ok();
+
   run_service().await
 }
 

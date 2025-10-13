@@ -4,4 +4,7 @@ target/
 *.md
 Dockerfile
 .dockerignore
+.env
+.env.*
+keypair.bin
 

@@ -41,13 +41,10 @@ WORKDIR /usr/src/app
 # Copy the binary from builder stage
 COPY --from=builder /usr/src/app/target/release/atomic-data-publisher ./atomic-data-publisher
 
-# Copy default config files
-COPY config ./config
-
 # Create directories for K8s volume mounts
-# - /usr/src/app/config for ConfigMap
+# - /usr/src/app/settings.toml for ConfigMap (polling jobs config)
 # - /usr/src/app/secrets for keypair Secret
-RUN mkdir -p config secrets && chown -R app:app /usr/src/app
+RUN mkdir -p secrets && chown -R app:app /usr/src/app
 
 # Switch to app user
 USER app
