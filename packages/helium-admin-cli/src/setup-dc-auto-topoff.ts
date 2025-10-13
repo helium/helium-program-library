@@ -181,7 +181,7 @@ export async function run(args: any = process.argv) {
       .accountsPartial({
         payer: authority,
         autoTopOff: autoTopOff!,
-        nextTask: PublicKey.default,
+        nextTask: autoTopOff!,
         task: taskKey(TASK_QUEUE_ID, nextTask)[0],
         pythTask: taskKey(TASK_QUEUE_ID, nextPythTask)[0],
         taskQueue: TASK_QUEUE_ID,
