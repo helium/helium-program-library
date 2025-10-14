@@ -1,4 +1,4 @@
-FROM rust:1.90-slim AS BUILD_IMAGEr
+FROM rust:1.90-slim AS BUILD_IMAGE
 
 WORKDIR /usr/src/app
 
