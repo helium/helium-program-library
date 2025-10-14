@@ -1,17 +1,18 @@
 use anyhow::Result;
+use aws_sdk_rds::auth_token::AuthTokenGenerator;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    PgPool, Row,
+};
 use tracing::{debug, info, warn};
 
 use crate::{
-  config::{DatabaseConfig, PollingJob},
-  errors::AtomicDataError,
-  metrics,
+    config::{DatabaseConfig, PollingJob},
+    errors::AtomicDataError,
+    metrics,
 };
-
-use aws_credential_types::{provider::ProvideCredentials, Credentials};
-use std::time::SystemTime;
 
 const MIN_CHUNK_SIZE: u64 = 50_000;
 const MAX_CHUNK_SIZE: u64 = 500_000;
@@ -44,17 +45,18 @@ impl DatabaseClient {
       config.password.clone()
     };
 
-    let mut database_url = format!(
-      "postgres://{}:{}@{}:{}/{}",
-      config.username,
-      urlencoding::encode(&password),
-      config.host,
-      config.port,
-      config.database_name
-    );
+    let mut connect_options = PgConnectOptions::new()
+      .host(&config.host)
+      .port(config.port)
+      .username(&config.username)
+      .database(&config.database_name);
 
     if let Some(ssl_mode) = &config.ssl_mode {
-      database_url.push_str(&format!("?sslmode={}", ssl_mode));
+      connect_options = connect_options.ssl_mode(ssl_mode.parse()?);
+    }
+
+    if !password.is_empty() {
+      connect_options = connect_options.password(&password);
     }
 
     let pool = PgPoolOptions::new()
@@ -65,7 +67,7 @@ impl DatabaseClient {
       ))
       .idle_timeout(std::time::Duration::from_secs(config.idle_timeout_seconds))
       .max_lifetime(std::time::Duration::from_secs(config.max_lifetime_seconds))
-      .connect(&database_url)
+      .connect_with(connect_options)
       .await?;
 
     sqlx::query("SELECT 1").execute(&pool).await?;
@@ -81,115 +83,31 @@ impl DatabaseClient {
   }
 
   async fn generate_rds_auth_token(config: &DatabaseConfig) -> Result<String> {
-    let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
-
-    let region = config.aws_region.as_ref()
+    let region = config
+      .aws_region
+      .as_ref()
       .ok_or_else(|| anyhow::anyhow!("AWS_REGION required for RDS IAM authentication"))?;
 
-    let credentials = aws_config.credentials_provider()
-      .ok_or_else(|| anyhow::anyhow!("No AWS credentials found"))?
-      .provide_credentials()
-      .await?;
+    let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
+    let credentials_provider = aws_config
+      .credentials_provider()
+      .ok_or_else(|| anyhow::anyhow!("No AWS credentials found"))?;
 
-    // Generate RDS auth token
-    let token = Self::sign_rds_request(
-      &config.host,
-      config.port,
-      &config.username,
-      region,
-      &credentials,
-    )?;
+    let auth_token_config = aws_sdk_rds::auth_token::Config::builder()
+      .hostname(&config.host)
+      .port(u64::from(config.port))
+      .username(&config.username)
+      .region(aws_sdk_rds::config::Region::new(region.clone()))
+      .credentials(credentials_provider.clone())
+      .build()
+      .map_err(|e| anyhow::anyhow!("Failed to build auth token config: {}", e))?;
 
-    Ok(token)
-  }
+    let auth_token = AuthTokenGenerator::new(auth_token_config)
+      .auth_token(&aws_config)
+      .await
+      .map_err(|e| anyhow::anyhow!("Failed to generate auth token: {}", e))?;
 
-  fn sign_rds_request(
-    hostname: &str,
-    port: u16,
-    username: &str,
-    region: &str,
-    credentials: &Credentials,
-  ) -> Result<String> {
-    use std::fmt::Write;
-
-    // RDS auth token is a presigned URL for the connect action
-    let timestamp = SystemTime::now()
-      .duration_since(SystemTime::UNIX_EPOCH)?
-      .as_secs();
-
-    let date = format_timestamp(timestamp);
-    let scope = format!("{}/{}/rds-db/aws4_request", &date[..8], region);
-
-    // Canonical request
-    let canonical_uri = "/";
-    let canonical_querystring = format!(
-      "Action=connect&DBUser={}",
-      urlencoding::encode(username)
-    );
-
-    let canonical_headers = format!(
-      "host:{}\n",
-      hostname
-    );
-
-    let signed_headers = "host";
-    let payload_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"; // empty payload
-
-    let canonical_request = format!(
-      "GET\n{}\n{}\n{}\n{}\n{}",
-      canonical_uri,
-      canonical_querystring,
-      canonical_headers,
-      signed_headers,
-      payload_hash
-    );
-
-    // String to sign
-    let canonical_request_hash = sha256_hex(&canonical_request);
-    let string_to_sign = format!(
-      "AWS4-HMAC-SHA256\n{}\n{}\n{}",
-      date,
-      scope,
-      canonical_request_hash
-    );
-
-    // Calculate signature
-    let k_date = hmac_sha256(
-      format!("AWS4{}", credentials.secret_access_key()).as_bytes(),
-      &date[..8]
-    );
-    let k_region = hmac_sha256(&k_date, region);
-    let k_service = hmac_sha256(&k_region, "rds-db");
-    let k_signing = hmac_sha256(&k_service, "aws4_request");
-    let signature = hmac_sha256_hex(&k_signing, &string_to_sign);
-
-    // Build the final token URL
-    let mut token = format!(
-      "{}:{}/?Action=connect&DBUser={}&X-Amz-Algorithm=AWS4-HMAC-SHA256",
-      hostname,
-      port,
-      urlencoding::encode(username)
-    );
-
-    write!(
-      &mut token,
-      "&X-Amz-Credential={}/{}/{}/rds-db/aws4_request",
-      urlencoding::encode(credentials.access_key_id()),
-      &date[..8],
-      region
-    )?;
-
-    write!(&mut token, "&X-Amz-Date={}", date)?;
-    write!(&mut token, "&X-Amz-Expires=900")?;
-    write!(&mut token, "&X-Amz-SignedHeaders={}", signed_headers)?;
-
-    if let Some(session_token) = credentials.session_token() {
-      write!(&mut token, "&X-Amz-Security-Token={}", urlencoding::encode(session_token))?;
-    }
-
-    write!(&mut token, "&X-Amz-Signature={}", signature)?;
-
-    Ok(token)
+    Ok(auth_token.to_string())
   }
 
   fn validate_database_config(config: &DatabaseConfig) -> Result<()> {
@@ -1402,30 +1320,3 @@ impl DatabaseClient {
   }
 }
 
-// Helper functions for AWS Signature Version 4
-fn format_timestamp(timestamp: u64) -> String {
-  use chrono::prelude::*;
-  let dt = DateTime::<Utc>::from_timestamp(timestamp as i64, 0).expect("Invalid timestamp");
-  dt.format("%Y%m%dT%H%M%SZ").to_string()
-}
-
-fn sha256_hex(data: &str) -> String {
-  use sha2::{Digest, Sha256};
-  let mut hasher = Sha256::new();
-  hasher.update(data.as_bytes());
-  hex::encode(hasher.finalize())
-}
-
-fn hmac_sha256(key: &[u8], data: &str) -> Vec<u8> {
-  use hmac::{Hmac, Mac};
-  use sha2::Sha256;
-  type HmacSha256 = Hmac<Sha256>;
-
-  let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
-  mac.update(data.as_bytes());
-  mac.finalize().into_bytes().to_vec()
-}
-
-fn hmac_sha256_hex(key: &[u8], data: &str) -> String {
-  hex::encode(hmac_sha256(key, data))
-}
