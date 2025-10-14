@@ -78,8 +78,8 @@ impl Settings {
       .set_default("database.max_connections", 10)?
       .set_default("database.min_connections", 2)?
       .set_default("database.acquire_timeout_seconds", 30)?
-      .set_default("database.idle_timeout_seconds", 600)?
-      .set_default("database.max_lifetime_seconds", 1800)?
+      .set_default("database.idle_timeout_seconds", 300)?
+      .set_default("database.max_lifetime_seconds", 600)?
       // Service defaults
       .set_default("service.polling_interval_seconds", 10)?
       .set_default("service.batch_size", 1000)?
