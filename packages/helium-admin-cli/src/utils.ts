@@ -80,6 +80,73 @@ export const merkleSizes = [
   [24, 64, 17],
 ];
 
+export async function createProgramSetAuthorityInstruction(
+  programId: PublicKey,
+  upgradeAuthority: PublicKey,
+  newAuthority: PublicKey
+) {
+  const bpfUpgradableLoaderId = BPF_UPGRADE_LOADER_ID;
+
+  const [programDataAddress] = await PublicKey.findProgramAddress(
+    [programId.toBuffer()],
+    bpfUpgradableLoaderId
+  );
+
+  const keys = [
+    {
+      pubkey: programDataAddress,
+      isWritable: true,
+      isSigner: false,
+    },
+    {
+      pubkey: upgradeAuthority,
+      isWritable: false,
+      isSigner: true,
+    },
+    {
+      pubkey: newAuthority,
+      isWritable: false,
+      isSigner: false,
+    },
+  ];
+
+  return new TransactionInstruction({
+    keys,
+    programId: bpfUpgradableLoaderId,
+    data: Buffer.from([4, 0, 0, 0]), // SetAuthority instruction bincode
+  });
+}
+
+export async function createSetIdlAuthorityInstruction(
+  programId: PublicKey,
+  upgradeAuthority: PublicKey,
+  newAuthority: PublicKey
+) {
+  const prefix = Buffer.from("0a69e9a778bcf440", "hex");
+  const ixn = Buffer.from("04", "hex");
+  const data = Buffer.concat([prefix.reverse(), ixn, newAuthority.toBuffer()]);
+  const idlAddr = await idlAddress(programId);
+
+  const keys = [
+    {
+      pubkey: idlAddr,
+      isWritable: true,
+      isSigner: false,
+    },
+    {
+      pubkey: upgradeAuthority,
+      isWritable: false,
+      isSigner: true,
+    },
+  ];
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+}
+
 export async function createIdlUpgradeInstruction(
   programId: PublicKey,
   bufferAddress: PublicKey,
