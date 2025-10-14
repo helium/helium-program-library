@@ -56,8 +56,14 @@ impl AtomicDataPublisher {
   pub async fn new(config: Settings) -> Result<Self, AtomicDataError> {
     info!("Initializing Atomic Data Publisher service");
 
-    let database =
-      Arc::new(DatabaseClient::new(&config.database, config.service.polling_jobs.clone()).await?);
+    let database = Arc::new(
+      DatabaseClient::new(
+        &config.database,
+        config.service.polling_jobs.clone(),
+        config.service.dry_run,
+      )
+      .await?,
+    );
 
     Self::validate_tables(&database, &config.database.required_tables).await?;
     Self::init_database(&database, &config.service).await?;

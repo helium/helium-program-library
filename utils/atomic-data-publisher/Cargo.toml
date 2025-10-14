@@ -26,6 +26,12 @@ metrics = "0.23"
 metrics-exporter-prometheus = "0.15"
 triggered = "0.1"
 reqwest = { version = "0.11", features = ["json"] }
+aws-config = { version = "1.0", features = ["behavior-version-latest"] }
+aws-credential-types = { version = "1.0", features = ["hardcoded-credentials"] }
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+urlencoding = "2.1"
 
 #[patch.'https://github.com/helium/proto']
 #helium-proto = { git = "https://www.github.com/helium/proto", branch = "mj/chain-rewardable-entities" }

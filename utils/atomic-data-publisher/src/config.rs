@@ -17,6 +17,7 @@ pub struct DatabaseConfig {
   pub host: String,
   pub port: u16,
   pub username: String,
+  #[serde(default)]
   pub password: String,
   pub database_name: String,
   pub max_connections: u32,
@@ -25,6 +26,10 @@ pub struct DatabaseConfig {
   pub idle_timeout_seconds: u64,
   pub max_lifetime_seconds: u64,
   pub required_tables: Vec<String>,
+  #[serde(default)]
+  pub ssl_mode: Option<String>,
+  #[serde(default)]
+  pub aws_region: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -77,11 +82,11 @@ impl Settings {
       .set_default("database.max_lifetime_seconds", 1800)?
       // Service defaults
       .set_default("service.polling_interval_seconds", 10)?
-      .set_default("service.batch_size", 500)?
+      .set_default("service.batch_size", 1000)?
       .set_default("service.max_concurrent_publishes", 50)?
       .set_default("service.dry_run", false)?
       .set_default("service.dry_run_failure_rate", 0.0)?
-      .set_default("service.port", 8000)?
+      .set_default("service.port", 3000)?
       // Ingestor defaults
       .set_default("ingestor.timeout_seconds", 30)?
       .set_default("ingestor.max_retries", 3)?
