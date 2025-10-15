@@ -385,7 +385,8 @@ helium-admin update-proxy-config \
 helium-admin update-token-metadata \
   --mint <MINT_ADDRESS> \
   --multisig <MULTISIG_ADDRESS> \
-  --authorityIndex 1
+  --authorityIndex 1 \
+  --newAuthority <NEW_AUTHORITY>
 ```
 
 ---

@@ -44,6 +44,10 @@ export async function run(args: any = process.argv) {
       describe: "Initial lamports to send to the auto topoff, pays for crank turns.",
       default: 10000000,
     },
+    newAuthority: {
+      type: "string",
+      describe: "New authority for the auto topoff",
+    },
     routerKey: {
       type: "string",
       describe: "The router key for the delegated data credits",
@@ -137,6 +141,7 @@ export async function run(args: any = process.argv) {
       newPythTaskId: nextPythTask,
       schedule: argv.schedule,
       threshold: new anchor.BN(argv.threshold),
+      authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
     })
       .accountsStrict({
         payer: authority,

@@ -237,7 +237,7 @@ pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, TopOffV0<'info>>) -> Resul
         ),
       },
       crank_reward: None,
-      free_tasks: 0,
+      free_tasks: 1,
       description: format!(
         "pre dist {}",
         &auto_top_off.key().to_string()[..(32 - 11 - 4)]
