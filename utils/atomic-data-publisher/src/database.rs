@@ -6,6 +6,8 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     PgPool, Row,
 };
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use crate::{
@@ -27,7 +29,8 @@ pub struct ChangeRecord {
 
 #[derive(Debug)]
 pub struct DatabaseClient {
-  pool: PgPool,
+  pool: Arc<RwLock<PgPool>>,
+  config: DatabaseConfig,
   polling_jobs: Vec<PollingJob>,
   dry_run: bool,
 }
@@ -37,6 +40,18 @@ impl DatabaseClient {
     Self::validate_database_config(config)?;
     Self::validate_polling_jobs(&polling_jobs)?;
 
+    let pool = Self::create_pool(config, dry_run).await?;
+    let pool = Arc::new(RwLock::new(pool));
+
+    Ok(Self {
+      pool,
+      config: config.clone(),
+      polling_jobs,
+      dry_run,
+    })
+  }
+
+  async fn create_pool(config: &DatabaseConfig, dry_run: bool) -> Result<PgPool> {
     let is_rds = config.host.contains("rds.amazonaws.com");
     let password = if is_rds && config.password.is_empty() {
       info!("Detected AWS RDS connection, generating IAM auth token");
@@ -59,27 +74,60 @@ impl DatabaseClient {
       connect_options = connect_options.password(&password);
     }
 
+    // IAM auth tokens expire after 15 minutes, so force shorter connection lifetimes
+    // to ensure connections are recycled before token expiration
+    let (max_lifetime, idle_timeout) = if is_rds && config.password.is_empty() {
+      let iam_safe_lifetime = 600; // 10 minutes, well before 15 min token expiry
+      let iam_safe_idle = 300; // 5 minutes
+      info!("Using IAM auth - setting max_lifetime to {}s and idle_timeout to {}s to prevent token expiration",
+            iam_safe_lifetime, iam_safe_idle);
+      (
+        std::cmp::min(config.max_lifetime_seconds, iam_safe_lifetime),
+        std::cmp::min(config.idle_timeout_seconds, iam_safe_idle)
+      )
+    } else {
+      (config.max_lifetime_seconds, config.idle_timeout_seconds)
+    };
+
     let pool = PgPoolOptions::new()
       .max_connections(config.max_connections)
       .min_connections(config.min_connections)
       .acquire_timeout(std::time::Duration::from_secs(
         config.acquire_timeout_seconds,
       ))
-      .idle_timeout(std::time::Duration::from_secs(config.idle_timeout_seconds))
-      .max_lifetime(std::time::Duration::from_secs(config.max_lifetime_seconds))
+      .idle_timeout(std::time::Duration::from_secs(idle_timeout))
+      .max_lifetime(std::time::Duration::from_secs(max_lifetime))
       .connect_with(connect_options)
       .await?;
 
     sqlx::query("SELECT 1").execute(&pool).await?;
 
     info!(
-      "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {})",
+      "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {}, max_lifetime: {}s, idle_timeout: {}s)",
       config.host, config.port, config.database_name, config.ssl_mode,
       if is_rds && config.password.is_empty() { "IAM" } else { "password" },
-      dry_run
+      dry_run, max_lifetime, idle_timeout
     );
 
-    Ok(Self { pool, polling_jobs, dry_run })
+    Ok(pool)
+  }
+
+  /// Recreates the database pool with a fresh IAM auth token (if using IAM auth)
+  pub async fn refresh_pool(&self) -> Result<()> {
+    let is_rds = self.config.host.contains("rds.amazonaws.com");
+    if is_rds && self.config.password.is_empty() {
+      info!("Refreshing database pool with new IAM auth token");
+      let new_pool = Self::create_pool(&self.config, self.dry_run).await?;
+
+      let mut pool_write = self.pool.write().await;
+      let old_pool = std::mem::replace(&mut *pool_write, new_pool);
+      drop(pool_write);
+
+      // Close old pool gracefully
+      old_pool.close().await;
+      info!("Database pool refreshed successfully");
+    }
+    Ok(())
   }
 
   async fn generate_rds_auth_token(config: &DatabaseConfig) -> Result<String> {
@@ -188,6 +236,7 @@ impl DatabaseClient {
   }
 
   pub async fn create_state_table(&self) -> Result<()> {
+    let pool = self.pool.read().await;
     let create_table_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
         job_name VARCHAR(255) NOT NULL UNIQUE,
@@ -204,20 +253,20 @@ impl DatabaseClient {
       )
     "#;
 
-    sqlx::query(create_table_query).execute(&self.pool).await?;
+    sqlx::query(create_table_query).execute(&*pool).await?;
 
     let create_index_query = r#"
       CREATE INDEX IF NOT EXISTS idx_polling_state_updated_at
       ON atomic_data_polling_state (updated_at)
     "#;
-    sqlx::query(create_index_query).execute(&self.pool).await?;
+    sqlx::query(create_index_query).execute(&*pool).await?;
 
     let create_queue_index_query = r#"
       CREATE INDEX IF NOT EXISTS idx_polling_state_queue_position
       ON atomic_data_polling_state (queue_position, queue_completed_at)
     "#;
     sqlx::query(create_queue_index_query)
-      .execute(&self.pool)
+      .execute(&*pool)
       .await?;
 
     info!("Created or verified atomic_data_polling_state table with dry_run support");
@@ -225,6 +274,7 @@ impl DatabaseClient {
   }
 
   pub async fn table_exists(&self, table_name: &str) -> Result<bool> {
+    let pool = self.pool.read().await;
     let query = r#"
       SELECT EXISTS (
         SELECT FROM information_schema.tables
@@ -235,7 +285,7 @@ impl DatabaseClient {
 
     let row = sqlx::query(query)
       .bind(table_name)
-      .fetch_one(&self.pool)
+      .fetch_one(&*pool)
       .await?;
 
     let exists: bool = row.get(0);
@@ -248,6 +298,7 @@ impl DatabaseClient {
     query_name: &str,
     queue_position: i32,
   ) -> Result<()> {
+    let pool = self.pool.read().await;
     let existing_state = sqlx::query(
       r#"
       SELECT
@@ -262,7 +313,7 @@ impl DatabaseClient {
     )
     .bind(job_name)
     .bind(query_name)
-    .fetch_optional(&self.pool)
+    .fetch_optional(&*pool)
     .await?;
 
     if let Some(row) = existing_state {
@@ -280,7 +331,7 @@ impl DatabaseClient {
       .bind(queue_position)
       .bind(job_name)
       .bind(query_name)
-      .execute(&self.pool)
+      .execute(&*pool)
       .await?;
 
       match (block, dry_run_block) {
@@ -313,7 +364,7 @@ impl DatabaseClient {
       .bind(None::<i64>)
       .bind(None::<i64>)
       .bind(queue_position)
-      .execute(&self.pool)
+      .execute(&*pool)
       .await?;
 
       info!(
@@ -428,6 +479,7 @@ impl DatabaseClient {
   /// Get the polling bounds (last processed block and max available block) for a job
   /// Returns (last_processed_block as Option<i64> from DB, max_available_block as u64)
   async fn get_polling_bounds(&self, job: &PollingJob) -> Result<(Option<i64>, u64), AtomicDataError> {
+    let pool = self.pool.read().await;
     let current_state_row = sqlx::query(
       r#"
       SELECT
@@ -442,7 +494,7 @@ impl DatabaseClient {
     )
     .bind(&job.name)
     .bind(&job.query_name)
-    .fetch_one(&self.pool)
+    .fetch_one(&*pool)
     .await?;
 
     // Use dry_run_last_processed_block if in dry_run mode, otherwise use last_processed_block
@@ -541,6 +593,7 @@ impl DatabaseClient {
     query_name: &str,
     max_block: u64,
   ) -> Result<(), AtomicDataError> {
+    let pool = self.pool.read().await;
     // last_max_block tracks the source data state, shared across both modes
     sqlx::query(
       r#"
@@ -554,7 +607,7 @@ impl DatabaseClient {
     .bind(max_block as i64)
     .bind(job_name)
     .bind(query_name)
-    .execute(&self.pool)
+    .execute(&*pool)
     .await?;
 
     Ok(())
@@ -578,6 +631,7 @@ impl DatabaseClient {
     last_processed_block: i64,
     target_block: u64,
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
+    let pool = self.pool.read().await;
     crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name).map_err(|e| {
       AtomicDataError::QueryValidationError(format!(
         "Query validation failed for '{}': {}",
@@ -629,7 +683,7 @@ impl DatabaseClient {
         .bind(hotspot_type)
         .bind(last_processed_block)
         .bind(target_block as i64)
-        .fetch_all(&self.pool)
+        .fetch_all(&*pool)
         .await?
     } else {
       let blocks_span = if last_processed_block < 0 {
@@ -651,7 +705,7 @@ impl DatabaseClient {
       sqlx::query(query)
         .bind(last_processed_block)
         .bind(target_block as i64)
-        .fetch_all(&self.pool)
+        .fetch_all(&*pool)
         .await?
     };
 
@@ -689,6 +743,7 @@ impl DatabaseClient {
       return self.advance_block_for_active_job(target_block).await;
     }
 
+    let pool = self.pool.read().await;
     let mut processed_tables = std::collections::HashSet::new();
 
     debug!(
@@ -725,7 +780,7 @@ impl DatabaseClient {
           .bind(target_block as i64)
           .bind(&job.name)
           .bind(&job.query_name)
-          .execute(&self.pool)
+          .execute(&*pool)
           .await?;
 
         let block_type = if self.dry_run { "dry_run_last_processed_block" } else { "last_processed_block" };
@@ -755,6 +810,7 @@ impl DatabaseClient {
     query_name: &str,
     target_block: u64,
   ) -> Result<()> {
+    let pool = self.pool.read().await;
     // Update the appropriate block counter based on dry_run mode
     let update_query = if self.dry_run {
       r#"
@@ -778,7 +834,7 @@ impl DatabaseClient {
       .bind(target_block as i64)
       .bind(job_name)
       .bind(query_name)
-      .execute(&self.pool)
+      .execute(&*pool)
       .await?;
 
     let block_type = if self.dry_run { "dry_run_last_processed_block" } else { "last_processed_block" };
@@ -791,6 +847,7 @@ impl DatabaseClient {
   }
 
   async fn advance_block_for_active_job(&self, target_block: u64) -> Result<()> {
+    let pool = self.pool.read().await;
     let active_job = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -799,7 +856,7 @@ impl DatabaseClient {
       LIMIT 1
       "#,
     )
-    .fetch_optional(&self.pool)
+    .fetch_optional(&*pool)
     .await?;
 
     if let Some(row) = active_job {
@@ -815,16 +872,17 @@ impl DatabaseClient {
   }
 
   pub async fn health_check(&self) -> Result<(), sqlx::Error> {
+    let pool = self.pool.read().await;
     // Test basic connectivity
-    sqlx::query("SELECT 1").execute(&self.pool).await?;
+    sqlx::query("SELECT 1").execute(&*pool).await?;
 
     // Test that we can actually query the atomic_data table (our main table)
     sqlx::query("SELECT COUNT(*) FROM atomic_data_polling_state LIMIT 1")
-      .execute(&self.pool)
+      .execute(&*pool)
       .await?;
 
     // Check connection pool health
-    if self.pool.size() == 0 {
+    if pool.size() == 0 {
       return Err(sqlx::Error::PoolTimedOut);
     }
 
@@ -853,6 +911,7 @@ impl DatabaseClient {
     parameters: &serde_json::Value,
     use_max: bool,
   ) -> Result<Option<u64>> {
+    let pool = self.pool.read().await;
     let block = match query_name {
       "construct_atomic_hotspots" => {
         let hotspot_type = parameters
@@ -871,7 +930,7 @@ impl DatabaseClient {
             } else {
               r#"SELECT COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
             };
-            let row = sqlx::query(query).fetch_one(&self.pool).await?;
+            let row = sqlx::query(query).fetch_one(&*pool).await?;
             let block_value = row.get::<i64, _>("block");
             ("mobile_hotspot_infos", block_value, block_value >= 0)
           }
@@ -881,7 +940,7 @@ impl DatabaseClient {
             } else {
               r#"SELECT COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos), -1)::bigint as block"#
             };
-            let row = sqlx::query(query).fetch_one(&self.pool).await?;
+            let row = sqlx::query(query).fetch_one(&*pool).await?;
             let block_value = row.get::<i64, _>("block");
             ("iot_hotspot_infos", block_value, block_value >= 0)
           }
@@ -921,7 +980,7 @@ impl DatabaseClient {
           )::bigint as block
           "#
         };
-        let row = sqlx::query(query).fetch_one(&self.pool).await?;
+        let row = sqlx::query(query).fetch_one(&*pool).await?;
 
         let block: i64 = row.get("block");
         if block >= 0 {
@@ -946,7 +1005,7 @@ impl DatabaseClient {
           )::bigint as block
           "#
         };
-        let row = sqlx::query(query).fetch_one(&self.pool).await?;
+        let row = sqlx::query(query).fetch_one(&*pool).await?;
 
         let block: i64 = row.get("block");
         if block >= 0 {
@@ -975,6 +1034,7 @@ impl DatabaseClient {
     job: &PollingJob,
     after_block: u64,
   ) -> Result<Option<u64>> {
+    let pool = self.pool.read().await;
     let block = match job.query_name.as_str() {
       "construct_atomic_hotspots" => {
         let hotspot_type = job.parameters
@@ -1003,7 +1063,7 @@ impl DatabaseClient {
 
         let row = sqlx::query(query)
           .bind(after_block as i64)
-          .fetch_one(&self.pool)
+          .fetch_one(&*pool)
           .await?;
 
         row.get::<Option<i64>, _>("block").map(|b| b as u64)
@@ -1019,7 +1079,7 @@ impl DatabaseClient {
 
         let row = sqlx::query(query)
           .bind(after_block as i64)
-          .fetch_one(&self.pool)
+          .fetch_one(&*pool)
           .await?;
 
         row.get::<Option<i64>, _>("block").map(|b| b as u64)
@@ -1035,7 +1095,7 @@ impl DatabaseClient {
 
         let row = sqlx::query(query)
           .bind(after_block as i64)
-          .fetch_one(&self.pool)
+          .fetch_one(&*pool)
           .await?;
 
         row.get::<Option<i64>, _>("block").map(|b| b as u64)
@@ -1057,6 +1117,7 @@ impl DatabaseClient {
   }
 
   pub async fn any_job_running(&self) -> Result<bool> {
+    let pool = self.pool.read().await;
     let row = sqlx::query(
       r#"
       SELECT COUNT(*) as running_count
@@ -1064,7 +1125,7 @@ impl DatabaseClient {
       WHERE is_running = TRUE
       "#,
     )
-    .fetch_one(&self.pool)
+    .fetch_one(&*pool)
     .await?;
 
     let running_count: i64 = row.get("running_count");
@@ -1078,7 +1139,8 @@ impl DatabaseClient {
   }
 
   pub async fn mark_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
-    let mut tx = self.pool.begin().await?;
+    let pool = self.pool.read().await;
+    let mut tx = pool.begin().await?;
     let existing = sqlx::query(
       r#"
       SELECT is_running
@@ -1137,6 +1199,7 @@ impl DatabaseClient {
   }
 
   pub async fn mark_job_not_running(&self, job_name: &str, query_name: &str) -> Result<()> {
+    let pool = self.pool.read().await;
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1149,7 +1212,7 @@ impl DatabaseClient {
     )
     .bind(job_name)
     .bind(query_name)
-    .execute(&self.pool)
+    .execute(&*pool)
     .await?;
 
     debug!(
@@ -1160,6 +1223,7 @@ impl DatabaseClient {
   }
 
   async fn get_next_queue_job(&self) -> Result<Option<PollingJob>> {
+    let pool = self.pool.read().await;
     let row = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -1169,7 +1233,7 @@ impl DatabaseClient {
       LIMIT 1
       "#,
     )
-    .fetch_optional(&self.pool)
+    .fetch_optional(&*pool)
     .await?;
 
     if let Some(row) = row {
@@ -1191,6 +1255,7 @@ impl DatabaseClient {
   }
 
   pub async fn mark_completed(&self, job_name: &str, query_name: &str) -> Result<()> {
+    let pool = self.pool.read().await;
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1202,7 +1267,7 @@ impl DatabaseClient {
     )
     .bind(job_name)
     .bind(query_name)
-    .execute(&self.pool)
+    .execute(&*pool)
     .await?;
 
     debug!(
@@ -1213,6 +1278,7 @@ impl DatabaseClient {
   }
 
   async fn reset_job_queue(&self) -> Result<()> {
+    let pool = self.pool.read().await;
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1221,7 +1287,7 @@ impl DatabaseClient {
         updated_at = NOW()
       "#,
     )
-    .execute(&self.pool)
+    .execute(&*pool)
     .await?;
 
     info!("Reset job queue - all jobs marked as not completed for new cycle");
@@ -1229,6 +1295,7 @@ impl DatabaseClient {
   }
 
   pub async fn cleanup_stale_jobs(&self) -> Result<()> {
+    let pool = self.pool.read().await;
     let stale_threshold = Utc::now() - Duration::minutes(30);
 
     let result = sqlx::query(
@@ -1243,7 +1310,7 @@ impl DatabaseClient {
       "#,
     )
     .bind(stale_threshold)
-    .execute(&self.pool)
+    .execute(&*pool)
     .await?;
 
     if result.rows_affected() > 0 {
@@ -1294,6 +1361,7 @@ impl DatabaseClient {
   }
 
   pub async fn cleanup_all_jobs(&self) -> Result<()> {
+    let pool = self.pool.read().await;
     let result = sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1304,7 +1372,7 @@ impl DatabaseClient {
       WHERE is_running = TRUE
       "#,
     )
-    .execute(&self.pool)
+    .execute(&*pool)
     .await?;
 
     if result.rows_affected() > 0 {
