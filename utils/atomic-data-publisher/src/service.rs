@@ -230,6 +230,30 @@ impl AtomicDataPublisher {
     };
     handles.push(uptime_handle);
 
+    // Periodic database pool refresh task for IAM auth token renewal
+    // Refresh every 8 minutes to stay well under the 10-minute connection lifetime limit
+    let pool_refresh_handle = {
+      let shutdown_listener = self.shutdown_listener.clone();
+      let database = self.database.clone();
+      tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(480)); // 8 minutes
+        loop {
+          tokio::select! {
+            _ = interval.tick() => {
+              if let Err(e) = database.refresh_pool().await {
+                warn!("Failed to refresh database pool: {}", e);
+              }
+            }
+            _ = shutdown_listener.clone() => {
+              break;
+            }
+          }
+        }
+        Ok(())
+      })
+    };
+    handles.push(pool_refresh_handle);
+
     Ok((handles, metrics_bind_addr))
   }
 
