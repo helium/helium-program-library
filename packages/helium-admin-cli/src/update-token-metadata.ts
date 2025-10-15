@@ -22,13 +22,12 @@ export async function run(args: any = process.argv) {
       default: 'http://127.0.0.1:8899',
       describe: 'The solana url',
     },
-    token: {
+    mint: {
       required: true,
       type: 'string',
       describe: 'Token address to update metadata for',
     },
     uri: {
-      required: true,
       type: 'string',
       describe: 'The new metadata URI',
     },
@@ -44,6 +43,10 @@ export async function run(args: any = process.argv) {
       type: 'number',
       describe: 'Authority index for squads. Defaults to 1',
       default: 1,
+    },
+    newAuthority: {
+      type: 'string',
+      describe: 'New authority for the token',
     },
   });
 
@@ -63,7 +66,7 @@ export async function run(args: any = process.argv) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
   }
   try {
-    const tokenAddress = new PublicKey(argv.token);
+    const tokenAddress = new PublicKey(argv.mint);
 
     // Find the metadata PDA for the token
     const [metadataAddress] = PublicKey.findProgramAddressSync(
@@ -93,13 +96,13 @@ export async function run(args: any = process.argv) {
             data: {
               name: metadataAccount.data.name,
               symbol: metadataAccount.data.symbol,
-              uri: argv.uri,
+              uri: argv.uri ? argv.uri : metadataAccount.data.uri,
               sellerFeeBasisPoints: metadataAccount.data.sellerFeeBasisPoints,
               creators: metadataAccount.data.creators || null,
               collection: null,
               uses: null
             },
-            updateAuthority: metadataAccount.updateAuthority,
+            updateAuthority: argv.newAuthority ? new PublicKey(argv.newAuthority) : metadataAccount.updateAuthority,
             primarySaleHappened: metadataAccount.primarySaleHappened,
             isMutable: metadataAccount.isMutable
           }
