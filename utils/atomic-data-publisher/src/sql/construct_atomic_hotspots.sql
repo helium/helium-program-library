@@ -3,7 +3,7 @@
 -- $2: last_processed_block - The last block that was already processed
 -- $3: max_block - The maximum block number to process (exclusive)
 --
--- Returns: job_name, solana_address, asset, block, atomic_data (JSON)
+-- Returns: job_name, atomic_data (JSON)
 
 WITH hotspot_metadata_changes AS (
   SELECT
@@ -44,9 +44,6 @@ WITH hotspot_metadata_changes AS (
 )
 SELECT
   CONCAT('atomic_', hmc.hotspot_type, '_hotspots') as job_name,
-  hmc.address as solana_address,
-  hmc.asset,
-  hmc.last_block as block,
   JSON_BUILD_OBJECT(
     'pub_key', kta.encoded_entity_key,
     'asset', hmc.asset,

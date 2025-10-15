@@ -135,7 +135,6 @@ impl ProtobufBuilder {
     keypair: &Keypair,
   ) -> Result<Vec<EntityOwnershipChangeReqV1>, AtomicDataError> {
     let atomic_data_array = &change.atomic_data;
-
     let mut change_requests = Vec::with_capacity(atomic_data_array.len());
 
     for atomic_data in atomic_data_array {

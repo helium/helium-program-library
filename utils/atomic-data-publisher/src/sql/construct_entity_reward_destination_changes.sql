@@ -2,7 +2,7 @@
 -- $1: last_processed_block - The last block that was already processed
 -- $2: max_block - The maximum block number to process (exclusive)
 --
--- Returns: job_name, block, solana_address, asset, atomic_data (JSON)
+-- Returns: job_name, atomic_data (JSON)
 
 WITH updates AS (
   SELECT
@@ -32,11 +32,17 @@ WITH updates AS (
 FROM
   key_to_assets kta
   JOIN asset_owners ao ON ao.asset = kta.asset
+  LEFT JOIN iot_hotspot_infos ihi ON ihi.asset = kta.asset
+  LEFT JOIN mobile_hotspot_infos mhi ON mhi.asset = kta.asset
   LEFT OUTER JOIN recipients r ON r.asset = ao.asset
   AND r.lazy_distributor = '6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq' -- Exclude hotspots that have rewards recipients, as they're in the other query.
   LEFT OUTER JOIN mini_fanouts mf ON mf.address = r.destination
   WHERE
-    (
+    (ihi.asset IS NOT NULL OR mhi.asset IS NOT NULL)
+    AND kta.encoded_entity_key IS NOT NULL
+    AND kta.asset IS NOT NULL
+    AND ao.owner IS NOT NULL
+    AND (
       (
         ao.last_block > $1
         AND ao.last_block <= $2
@@ -53,9 +59,6 @@ FROM
 )
 SELECT
   'entity_reward_destination_changes' as job_name,
-  block,
-  pub_key as solana_address,
-  asset,
   JSON_BUILD_OBJECT(
     'pub_key', pub_key,
     'asset', asset,

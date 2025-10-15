@@ -1,2 +1,5 @@
 keypair.bin
-config/local.toml
+.env
+.env.local
+settings.toml
+target

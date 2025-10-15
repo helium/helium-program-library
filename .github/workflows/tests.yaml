@@ -91,6 +91,7 @@ jobs:
       matrix:
         test:
           - utils/ecc-sig-verifier
+          - utils/atomic-data-publisher
           - packages/monitor-service
           - packages/faucet-service
           - packages/metadata-service
