@@ -1,4 +1,4 @@
-FROM rust:1.90-bookworm-slim AS BUILD_IMAGE
+FROM rust:1.90.0 AS BUILD_IMAGE
 
 WORKDIR /usr/src/app
 
