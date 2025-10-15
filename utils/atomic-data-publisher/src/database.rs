@@ -1,13 +1,17 @@
 use anyhow::Result;
+use aws_sdk_rds::auth_token::AuthTokenGenerator;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    PgPool, Row,
+};
 use tracing::{debug, info, warn};
 
 use crate::{
-  config::{DatabaseConfig, PollingJob},
-  errors::AtomicDataError,
-  metrics,
+    config::{DatabaseConfig, PollingJob},
+    errors::AtomicDataError,
+    metrics,
 };
 
 const MIN_CHUNK_SIZE: u64 = 50_000;
@@ -25,16 +29,35 @@ pub struct ChangeRecord {
 pub struct DatabaseClient {
   pool: PgPool,
   polling_jobs: Vec<PollingJob>,
+  dry_run: bool,
 }
 
 impl DatabaseClient {
-  pub async fn new(config: &DatabaseConfig, polling_jobs: Vec<PollingJob>) -> Result<Self> {
+  pub async fn new(config: &DatabaseConfig, polling_jobs: Vec<PollingJob>, dry_run: bool) -> Result<Self> {
     Self::validate_database_config(config)?;
     Self::validate_polling_jobs(&polling_jobs)?;
-    let database_url = format!(
-      "postgres://{}:{}@{}:{}/{}",
-      config.username, config.password, config.host, config.port, config.database_name
-    );
+
+    let is_rds = config.host.contains("rds.amazonaws.com");
+    let password = if is_rds && config.password.is_empty() {
+      info!("Detected AWS RDS connection, generating IAM auth token");
+      Self::generate_rds_auth_token(config).await?
+    } else {
+      config.password.clone()
+    };
+
+    let mut connect_options = PgConnectOptions::new()
+      .host(&config.host)
+      .port(config.port)
+      .username(&config.username)
+      .database(&config.database_name);
+
+    if let Some(ssl_mode) = &config.ssl_mode {
+      connect_options = connect_options.ssl_mode(ssl_mode.parse()?);
+    }
+
+    if !password.is_empty() {
+      connect_options = connect_options.password(&password);
+    }
 
     let pool = PgPoolOptions::new()
       .max_connections(config.max_connections)
@@ -44,17 +67,47 @@ impl DatabaseClient {
       ))
       .idle_timeout(std::time::Duration::from_secs(config.idle_timeout_seconds))
       .max_lifetime(std::time::Duration::from_secs(config.max_lifetime_seconds))
-      .connect(&database_url)
+      .connect_with(connect_options)
       .await?;
 
     sqlx::query("SELECT 1").execute(&pool).await?;
 
     info!(
-      "Connected to database at {}:{}/{}",
-      config.host, config.port, config.database_name
+      "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {})",
+      config.host, config.port, config.database_name, config.ssl_mode,
+      if is_rds && config.password.is_empty() { "IAM" } else { "password" },
+      dry_run
     );
 
-    Ok(Self { pool, polling_jobs })
+    Ok(Self { pool, polling_jobs, dry_run })
+  }
+
+  async fn generate_rds_auth_token(config: &DatabaseConfig) -> Result<String> {
+    let region = config
+      .aws_region
+      .as_ref()
+      .ok_or_else(|| anyhow::anyhow!("AWS_REGION required for RDS IAM authentication"))?;
+
+    let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
+    let credentials_provider = aws_config
+      .credentials_provider()
+      .ok_or_else(|| anyhow::anyhow!("No AWS credentials found"))?;
+
+    let auth_token_config = aws_sdk_rds::auth_token::Config::builder()
+      .hostname(&config.host)
+      .port(u64::from(config.port))
+      .username(&config.username)
+      .region(aws_sdk_rds::config::Region::new(region.clone()))
+      .credentials(credentials_provider.clone())
+      .build()
+      .map_err(|e| anyhow::anyhow!("Failed to build auth token config: {}", e))?;
+
+    let auth_token = AuthTokenGenerator::new(auth_token_config)
+      .auth_token(&aws_config)
+      .await
+      .map_err(|e| anyhow::anyhow!("Failed to generate auth token: {}", e))?;
+
+    Ok(auth_token.to_string())
   }
 
   fn validate_database_config(config: &DatabaseConfig) -> Result<()> {
@@ -141,6 +194,7 @@ impl DatabaseClient {
         query_name VARCHAR(255) NOT NULL DEFAULT 'default',
         queue_position INTEGER NOT NULL DEFAULT 0,
         last_processed_block BIGINT DEFAULT NULL,
+        dry_run_last_processed_block BIGINT DEFAULT NULL,
         is_running BOOLEAN NOT NULL DEFAULT FALSE,
         running_since TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         queue_completed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
@@ -151,20 +205,6 @@ impl DatabaseClient {
     "#;
 
     sqlx::query(create_table_query).execute(&self.pool).await?;
-
-    // Add new columns and alter existing ones if they don't exist (for existing installations)
-    let add_columns_query = r#"
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'atomic_data_polling_state' AND column_name = 'last_max_block') THEN
-          ALTER TABLE atomic_data_polling_state ADD COLUMN last_max_block BIGINT DEFAULT NULL;
-        END IF;
-
-        -- Make last_processed_block nullable if it isn't already
-        ALTER TABLE atomic_data_polling_state ALTER COLUMN last_processed_block DROP NOT NULL;
-      END $$;
-    "#;
-    sqlx::query(add_columns_query).execute(&self.pool).await?;
 
     let create_index_query = r#"
       CREATE INDEX IF NOT EXISTS idx_polling_state_updated_at
@@ -180,7 +220,7 @@ impl DatabaseClient {
       .execute(&self.pool)
       .await?;
 
-    info!("Created or verified atomic_data_polling_state table with simplified max_block tracking");
+    info!("Created or verified atomic_data_polling_state table with dry_run support");
     Ok(())
   }
 
@@ -213,7 +253,9 @@ impl DatabaseClient {
       SELECT
         job_name,
         query_name,
-        last_processed_block
+        last_processed_block,
+        dry_run_last_processed_block,
+        last_max_block
       FROM atomic_data_polling_state
       WHERE job_name = $1 AND query_name = $2
       "#,
@@ -225,6 +267,9 @@ impl DatabaseClient {
 
     if let Some(row) = existing_state {
       let block: Option<i64> = row.get("last_processed_block");
+      let dry_run_block: Option<i64> = row.get("dry_run_last_processed_block");
+      let max_block: Option<i64> = row.get("last_max_block");
+
       sqlx::query(
         r#"
         UPDATE atomic_data_polling_state
@@ -238,12 +283,20 @@ impl DatabaseClient {
       .execute(&self.pool)
       .await?;
 
-      match block {
-        Some(b) => info!(
-          "Resuming polling for job '{}' query '{}' from block {} with queue position {}",
-          job_name, query_name, b, queue_position
+      match (block, dry_run_block) {
+        (Some(b), Some(db)) => info!(
+          "Resuming polling for job '{}' query '{}' from block {} (dry_run: {}, last_max: {:?}) with queue position {}",
+          job_name, query_name, b, db, max_block, queue_position
         ),
-        None => info!(
+        (Some(b), None) => info!(
+          "Resuming polling for job '{}' query '{}' from block {} (last_max: {:?}) with queue position {}",
+          job_name, query_name, b, max_block, queue_position
+        ),
+        (None, Some(db)) => info!(
+          "Resuming polling for job '{}' query '{}' from start (dry_run: {}, last_max: {:?}) with queue position {}",
+          job_name, query_name, db, max_block, queue_position
+        ),
+        (None, None) => info!(
           "Resuming polling for job '{}' query '{}' from start (NULL) with queue position {}",
           job_name, query_name, queue_position
         ),
@@ -251,12 +304,13 @@ impl DatabaseClient {
     } else {
       sqlx::query(
         r#"
-        INSERT INTO atomic_data_polling_state (job_name, query_name, last_processed_block, queue_position)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO atomic_data_polling_state (job_name, query_name, last_processed_block, dry_run_last_processed_block, queue_position)
+        VALUES ($1, $2, $3, $4, $5)
         "#
       )
       .bind(job_name)
       .bind(query_name)
+      .bind(None::<i64>)
       .bind(None::<i64>)
       .bind(queue_position)
       .execute(&self.pool)
@@ -327,7 +381,24 @@ impl DatabaseClient {
     }
 
     let last_processed_block_u64 = last_processed_block_opt.unwrap_or(0) as u64;
-    let target_block = self.calculate_target_block(last_processed_block_u64, max_available_block);
+    let next_data_block = self.get_next_data_block_after(job, last_processed_block_u64).await?;
+
+    let target_block = if let Some(next_block) = next_data_block {
+      let gap_size = next_block.saturating_sub(last_processed_block_u64);
+      if gap_size > MAX_CHUNK_SIZE * 2 {
+        let skip_to = next_block.saturating_sub(1);
+        info!(
+          "Job '{}': Large gap detected ({} blocks), skipping from {} to {}",
+          job.name, gap_size, last_processed_block_u64, skip_to
+        );
+        std::cmp::min(skip_to, max_available_block)
+      } else {
+        self.calculate_target_block(last_processed_block_u64, max_available_block)
+      }
+    } else {
+      self.calculate_target_block(last_processed_block_u64, max_available_block)
+    };
+
     let query_last_block = last_processed_block_opt.unwrap_or(-1);
     let query_results = self
       .execute_query(job, query_last_block, target_block)
@@ -363,6 +434,7 @@ impl DatabaseClient {
         job_name,
         query_name,
         last_processed_block,
+        dry_run_last_processed_block,
         last_max_block
       FROM atomic_data_polling_state
       WHERE job_name = $1 AND query_name = $2
@@ -373,7 +445,13 @@ impl DatabaseClient {
     .fetch_one(&self.pool)
     .await?;
 
-    let last_processed_block: Option<i64> = current_state_row.get("last_processed_block");
+    // Use dry_run_last_processed_block if in dry_run mode, otherwise use last_processed_block
+    // But last_max_block is shared - it tracks the source data, not processing state
+    let last_processed_block: Option<i64> = if self.dry_run {
+      current_state_row.get("dry_run_last_processed_block")
+    } else {
+      current_state_row.get("last_processed_block")
+    };
     let last_max_block: Option<i64> = current_state_row.get("last_max_block");
     let current_max_block = match self
       .get_max_block_for_query(&job.query_name, &job.parameters)
@@ -463,6 +541,7 @@ impl DatabaseClient {
     query_name: &str,
     max_block: u64,
   ) -> Result<(), AtomicDataError> {
+    // last_max_block tracks the source data state, shared across both modes
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -623,24 +702,36 @@ impl DatabaseClient {
 
     for job_name in processed_tables {
       if let Some(job) = self.polling_jobs.iter().find(|j| j.name == job_name) {
-        sqlx::query(
+        // Update the appropriate block counter based on dry_run mode
+        let update_query = if self.dry_run {
+          r#"
+          UPDATE atomic_data_polling_state
+          SET
+            dry_run_last_processed_block = $1,
+            updated_at = NOW()
+          WHERE job_name = $2 AND query_name = $3
+          "#
+        } else {
           r#"
           UPDATE atomic_data_polling_state
           SET
             last_processed_block = $1,
             updated_at = NOW()
           WHERE job_name = $2 AND query_name = $3
-          "#,
-        )
-        .bind(target_block as i64)
-        .bind(&job.name)
-        .bind(&job.query_name)
-        .execute(&self.pool)
-        .await?;
+          "#
+        };
 
+        sqlx::query(update_query)
+          .bind(target_block as i64)
+          .bind(&job.name)
+          .bind(&job.query_name)
+          .execute(&self.pool)
+          .await?;
+
+        let block_type = if self.dry_run { "dry_run_last_processed_block" } else { "last_processed_block" };
         info!(
-          "Updated polling state for job '{}' query '{}': last_processed_block -> {} (target height)",
-          job.name, job.query_name, target_block
+          "Updated polling state for job '{}' query '{}': {} -> {} (target height)",
+          job.name, job.query_name, block_type, target_block
         );
       } else {
         warn!(
@@ -664,24 +755,36 @@ impl DatabaseClient {
     query_name: &str,
     target_block: u64,
   ) -> Result<()> {
-    sqlx::query(
+    // Update the appropriate block counter based on dry_run mode
+    let update_query = if self.dry_run {
+      r#"
+      UPDATE atomic_data_polling_state
+      SET
+        dry_run_last_processed_block = $1,
+        updated_at = NOW()
+      WHERE job_name = $2 AND query_name = $3
+      "#
+    } else {
       r#"
       UPDATE atomic_data_polling_state
       SET
         last_processed_block = $1,
         updated_at = NOW()
       WHERE job_name = $2 AND query_name = $3
-      "#,
-    )
-    .bind(target_block as i64)
-    .bind(job_name)
-    .bind(query_name)
-    .execute(&self.pool)
-    .await?;
+      "#
+    };
 
+    sqlx::query(update_query)
+      .bind(target_block as i64)
+      .bind(job_name)
+      .bind(query_name)
+      .execute(&self.pool)
+      .await?;
+
+    let block_type = if self.dry_run { "dry_run_last_processed_block" } else { "last_processed_block" };
     debug!(
-      "Advanced block to {} for job '{}' query '{}' (no changes found, skipping gap)",
-      target_block, job_name, query_name
+      "Advanced {} to {} for job '{}' query '{}' (no changes found, skipping gap)",
+      block_type, target_block, job_name, query_name
     );
 
     Ok(())
@@ -863,6 +966,92 @@ impl DatabaseClient {
       "{} last_block for query '{}': {:?}",
       operation, query_name, block
     );
+
+    Ok(block)
+  }
+
+  async fn get_next_data_block_after(
+    &self,
+    job: &PollingJob,
+    after_block: u64,
+  ) -> Result<Option<u64>> {
+    let block = match job.query_name.as_str() {
+      "construct_atomic_hotspots" => {
+        let hotspot_type = job.parameters
+          .get("hotspot_type")
+          .and_then(|v| v.as_str())
+          .ok_or_else(|| {
+            AtomicDataError::ConfigError(config::ConfigError::Message(
+              "hotspot_type parameter is required".to_string(),
+            ))
+          })?;
+
+        let query = match hotspot_type {
+          "mobile" => {
+            r#"SELECT MIN(last_block)::bigint as block FROM mobile_hotspot_infos WHERE last_block > $1"#
+          }
+          "iot" => {
+            r#"SELECT MIN(last_block)::bigint as block FROM iot_hotspot_infos WHERE last_block > $1"#
+          }
+          _ => {
+            return Err(anyhow::anyhow!(
+              "Invalid hotspot_type: '{}'. Must be 'mobile' or 'iot'",
+              hotspot_type
+            ).into())
+          }
+        };
+
+        let row = sqlx::query(query)
+          .bind(after_block as i64)
+          .fetch_one(&self.pool)
+          .await?;
+
+        row.get::<Option<i64>, _>("block").map(|b| b as u64)
+      }
+      "construct_entity_ownership_changes" => {
+        let query = r#"
+          SELECT MIN(next_block)::bigint as block FROM (
+            SELECT MIN(last_block) as next_block FROM asset_owners WHERE last_block > $1
+            UNION ALL
+            SELECT MIN(last_block) as next_block FROM welcome_packs WHERE last_block > $1
+          ) combined WHERE next_block IS NOT NULL
+        "#;
+
+        let row = sqlx::query(query)
+          .bind(after_block as i64)
+          .fetch_one(&self.pool)
+          .await?;
+
+        row.get::<Option<i64>, _>("block").map(|b| b as u64)
+      }
+      "construct_entity_reward_destination_changes" => {
+        let query = r#"
+          SELECT MIN(next_block)::bigint as block FROM (
+            SELECT MIN(last_block) as next_block FROM recipients WHERE last_block > $1
+            UNION ALL
+            SELECT MIN(last_block) as next_block FROM rewards_recipients WHERE last_block > $1
+          ) combined WHERE next_block IS NOT NULL
+        "#;
+
+        let row = sqlx::query(query)
+          .bind(after_block as i64)
+          .fetch_one(&self.pool)
+          .await?;
+
+        row.get::<Option<i64>, _>("block").map(|b| b as u64)
+      }
+      _ => {
+        debug!("Unknown query name for next block lookup: {}", job.query_name);
+        None
+      }
+    };
+
+    if let Some(next_block) = block {
+      debug!(
+        "Next data block after {} for query '{}': {}",
+        after_block, job.query_name, next_block
+      );
+    }
 
     Ok(block)
   }
@@ -1130,3 +1319,4 @@ impl DatabaseClient {
     Ok(())
   }
 }
+

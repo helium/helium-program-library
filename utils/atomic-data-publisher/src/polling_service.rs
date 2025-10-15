@@ -266,6 +266,8 @@ impl PollingService {
 
     let chunk_published = published_changes.len();
 
+    // Mark changes as processed - the database layer will update the appropriate block counter
+    // (dry_run_last_processed_block in dry_run mode, last_processed_block in normal mode)
     if !published_changes.is_empty() {
       self
         .database

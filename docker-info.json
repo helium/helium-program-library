@@ -17,7 +17,8 @@
     "geocoder-service": "./packages/geocoder-service",
     "recent-helium-transactions-service": "./packages/recent-helium-transactions-service",
     "asset-ownership-service": "./packages/asset-ownership-service",
-    "tuktuk-pyth-service": "./packages/tuktuk-pyth-service"
+    "tuktuk-pyth-service": "./packages/tuktuk-pyth-service",
+    "atomic-data-publisher-service": "./utils/atomic-data-publisher"
   },
   "oracle": {
     "distributor-oracle": "./packages/distributor-oracle"

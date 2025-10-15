@@ -1,31 +1,12 @@
-# Logging configuration
-[logging]
-level = "info"
-format = "json"
+# ===================================
+# Static Configuration
+# ===================================
+# This file defines polling jobs and required database tables.
+# All other settings (database connection, ingestor, logging, signing, service params)
+# must be provided via environment variables.
 
-# Service configuration
-[service]
-polling_interval_seconds = 10
-batch_size = 500
-max_concurrent_publishes = 50
-dry_run = true
-dry_run_failure_rate = 0.0
-port = 9090
-
-# Database configuration
+# Database tables required for operation
 [database]
-host = "localhost"
-port = 5432
-username = "postgres"
-password = "postgres"
-database_name = "postgres"
-max_connections = 10
-min_connections = 2
-acquire_timeout_seconds = 60
-idle_timeout_seconds = 700
-max_lifetime_seconds = 1800
-
-# Required tables that must exist before starting
 required_tables = [
   "asset_owners",
   "key_to_assets",
@@ -35,17 +16,7 @@ required_tables = [
   "mini_fanouts"
 ]
 
-# Signing keypair settings
-[signing]
-keypair_path = "/usr/src/app/secrets/keypair.bin"  # Path to Helium keypair file (K8s Secret mount)
-
-# Ingestor configuration
-[ingestor]
-endpoint = "http://localhost:8080"
-timeout_seconds = 30
-max_retries = 3
-retry_delay_seconds = 2
-
+# Polling job definitions
 [[service.polling_jobs]]
 name = "atomic_mobile_hotspots"
 query_name = "construct_atomic_hotspots"
