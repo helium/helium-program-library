@@ -201,6 +201,41 @@ spec:
 
 Requires PostgreSQL with tables from `account-postgres-sink-service`. Creates `atomic_data_polling_state` table for tracking progress.
 
+## Troubleshooting
+
+### gRPC Timeout Errors
+
+If you see errors like:
+
+```
+Failed to publish entity change request: Network error: gRPC mobile hotspot request failed: status: 'The operation was cancelled', self: "operation was canceled"
+```
+
+This indicates gRPC requests are timing out. Solutions:
+
+1. **Increase timeout** - Add/update in your k8s deployment:
+
+   ```yaml
+   - name: INGESTOR__TIMEOUT_SECONDS
+     value: "60" # Increase from default 30 seconds
+   ```
+
+2. **Check endpoint connectivity** - Verify the ingestor endpoint is reachable and responding:
+
+   ```bash
+   curl -v https://your-ingestor-endpoint:9091
+   ```
+
+3. **Review retry settings** - Adjust retry behavior:
+   ```yaml
+   - name: INGESTOR__MAX_RETRIES
+     value: "3"
+   - name: INGESTOR__RETRY_DELAY_SECONDS
+     value: "5"
+   ```
+
+Per-request timeouts are enforced at the application level, matching `INGESTOR__TIMEOUT_SECONDS`.
+
 ## Development
 
 ```bash

@@ -162,24 +162,34 @@ impl AtomicDataPublisher {
 
   async fn publish_entity_change(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
     let mut client = self.grpc_client.clone();
+    let timeout_duration = std::time::Duration::from_secs(self.ingestor_config.timeout_seconds);
 
     match request {
       EntityChangeRequest::MobileHotspot(mobile_req) => {
-        let response = client
-          .submit_mobile_hotspot_change(Request::new(mobile_req))
-          .await
-          .map_err(|e| {
-            // Categorize the error type for better metrics
-            match e.code() {
-              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                metrics::increment_ingestor_connection_failures();
-              }
-              _ => {
-                // Other gRPC errors (auth, invalid request, etc.)
-              }
+        let response = tokio::time::timeout(
+          timeout_duration,
+          client.submit_mobile_hotspot_change(Request::new(mobile_req))
+        )
+        .await
+        .map_err(|_| {
+          metrics::increment_ingestor_connection_failures();
+          AtomicDataError::NetworkError(format!(
+            "gRPC mobile hotspot request timed out after {} seconds",
+            self.ingestor_config.timeout_seconds
+          ))
+        })?
+        .map_err(|e| {
+          // Categorize the error type for better metrics
+          match e.code() {
+            tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
+              metrics::increment_ingestor_connection_failures();
             }
-            AtomicDataError::NetworkError(format!("gRPC mobile hotspot request failed: {}", e))
-          })?;
+            _ => {
+              // Other gRPC errors (auth, invalid request, etc.)
+            }
+          }
+          AtomicDataError::NetworkError(format!("gRPC mobile hotspot request failed: status: '{}', self: \"{}\"", e.code(), e.message()))
+        })?;
 
         let resp: MobileHotspotChangeRespV1 = response.into_inner();
         debug!(
@@ -188,21 +198,30 @@ impl AtomicDataPublisher {
         );
       }
       EntityChangeRequest::IotHotspot(iot_req) => {
-        let response = client
-          .submit_iot_hotspot_change(Request::new(iot_req))
-          .await
-          .map_err(|e| {
-            // Categorize the error type for better metrics
-            match e.code() {
-              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                metrics::increment_ingestor_connection_failures();
-              }
-              _ => {
-                // Other gRPC errors (auth, invalid request, etc.)
-              }
+        let response = tokio::time::timeout(
+          timeout_duration,
+          client.submit_iot_hotspot_change(Request::new(iot_req))
+        )
+        .await
+        .map_err(|_| {
+          metrics::increment_ingestor_connection_failures();
+          AtomicDataError::NetworkError(format!(
+            "gRPC IoT hotspot request timed out after {} seconds",
+            self.ingestor_config.timeout_seconds
+          ))
+        })?
+        .map_err(|e| {
+          // Categorize the error type for better metrics
+          match e.code() {
+            tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
+              metrics::increment_ingestor_connection_failures();
             }
-            AtomicDataError::NetworkError(format!("gRPC IoT hotspot request failed: {}", e))
-          })?;
+            _ => {
+              // Other gRPC errors (auth, invalid request, etc.)
+            }
+          }
+          AtomicDataError::NetworkError(format!("gRPC IoT hotspot request failed: status: '{}', self: \"{}\"", e.code(), e.message()))
+        })?;
 
         let resp: IotHotspotChangeRespV1 = response.into_inner();
         debug!(
@@ -211,21 +230,30 @@ impl AtomicDataPublisher {
         );
       }
       EntityChangeRequest::EntityOwnership(ownership_req) => {
-        let response = client
-          .submit_entity_ownership_change(Request::new(ownership_req))
-          .await
-          .map_err(|e| {
-            // Categorize the error type for better metrics
-            match e.code() {
-              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                metrics::increment_ingestor_connection_failures();
-              }
-              _ => {
-                // Other gRPC errors (auth, invalid request, etc.)
-              }
+        let response = tokio::time::timeout(
+          timeout_duration,
+          client.submit_entity_ownership_change(Request::new(ownership_req))
+        )
+        .await
+        .map_err(|_| {
+          metrics::increment_ingestor_connection_failures();
+          AtomicDataError::NetworkError(format!(
+            "gRPC entity ownership request timed out after {} seconds",
+            self.ingestor_config.timeout_seconds
+          ))
+        })?
+        .map_err(|e| {
+          // Categorize the error type for better metrics
+          match e.code() {
+            tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
+              metrics::increment_ingestor_connection_failures();
             }
-            AtomicDataError::NetworkError(format!("gRPC entity ownership request failed: {}", e))
-          })?;
+            _ => {
+              // Other gRPC errors (auth, invalid request, etc.)
+            }
+          }
+          AtomicDataError::NetworkError(format!("gRPC entity ownership request failed: status: '{}', self: \"{}\"", e.code(), e.message()))
+        })?;
 
         let resp: EntityOwnershipChangeRespV1 = response.into_inner();
         debug!(
@@ -234,24 +262,33 @@ impl AtomicDataPublisher {
         );
       }
       EntityChangeRequest::EntityRewardDestination(reward_req) => {
-        let response = client
-          .submit_entity_reward_destination_change(Request::new(reward_req))
-          .await
-          .map_err(|e| {
-            // Categorize the error type for better metrics
-            match e.code() {
-              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                metrics::increment_ingestor_connection_failures();
-              }
-              _ => {
-                // Other gRPC errors (auth, invalid request, etc.)
-              }
+        let response = tokio::time::timeout(
+          timeout_duration,
+          client.submit_entity_reward_destination_change(Request::new(reward_req))
+        )
+        .await
+        .map_err(|_| {
+          metrics::increment_ingestor_connection_failures();
+          AtomicDataError::NetworkError(format!(
+            "gRPC entity reward destination request timed out after {} seconds",
+            self.ingestor_config.timeout_seconds
+          ))
+        })?
+        .map_err(|e| {
+          // Categorize the error type for better metrics
+          match e.code() {
+            tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
+              metrics::increment_ingestor_connection_failures();
             }
-            AtomicDataError::NetworkError(format!(
-              "gRPC entity reward destination request failed: {}",
-              e
-            ))
-          })?;
+            _ => {
+              // Other gRPC errors (auth, invalid request, etc.)
+            }
+          }
+          AtomicDataError::NetworkError(format!(
+            "gRPC entity reward destination request failed: status: '{}', self: \"{}\"",
+            e.code(), e.message()
+          ))
+        })?;
 
         let resp: EntityRewardDestinationChangeRespV1 = response.into_inner();
         debug!(
