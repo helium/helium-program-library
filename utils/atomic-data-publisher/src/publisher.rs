@@ -54,11 +54,7 @@ impl AtomicDataPublisher {
       );
 
       let endpoint = Endpoint::from_shared(ingestor_config.endpoint.clone())
-        .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?
-        .tcp_keepalive(Some(std::time::Duration::from_secs(30)))
-        .http2_keep_alive_interval(std::time::Duration::from_secs(30))
-        .http2_adaptive_window(true)
-        .keep_alive_timeout(std::time::Duration::from_secs(10));
+        .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?;
 
       // Create a shared channel that will be reused for all requests
       let channel = endpoint.connect().await.map_err(|e| {
@@ -119,13 +115,18 @@ impl AtomicDataPublisher {
       return Ok(());
     }
 
+    // Create the client once, outside the retry loop
+    let channel = self.channel.as_ref()
+      .ok_or_else(|| AtomicDataError::NetworkError("No channel configured".to_string()))?;
+    let mut client = ChainRewardableEntitiesClient::new(channel.clone());
+
     let mut attempts = 0;
     let max_retries = self.ingestor_config.max_retries;
 
     loop {
       attempts += 1;
 
-      match self.publish_entity_change(request.clone()).await {
+      match self.publish_entity_change(&mut client, request.clone()).await {
         Ok(_) => {
           debug!(
             "Successfully published entity change request on attempt {}",
@@ -160,11 +161,11 @@ impl AtomicDataPublisher {
     }
   }
 
-  async fn publish_entity_change(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
-let channel = self.channel.as_ref()
-  .ok_or_else(|| AtomicDataError::NetworkError("No channel configured".to_string()))?;
-
-    let mut client = ChainRewardableEntitiesClient::new(channel.clone());
+  async fn publish_entity_change(
+    &self,
+    client: &mut ChainRewardableEntitiesClient<Channel>,
+    request: EntityChangeRequest
+  ) -> Result<(), AtomicDataError> {
 
     match request {
       EntityChangeRequest::MobileHotspot(mobile_req) => {
