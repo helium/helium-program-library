@@ -23,6 +23,7 @@ pub struct UpdateAutoTopOffArgsV0 {
   pub new_pyth_task_id: u16,
   pub schedule: Option<String>,
   pub threshold: Option<u64>,
+  pub authority: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -76,6 +77,9 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
   }
   if let Some(threshold) = args.threshold {
     auto_top_off.threshold = threshold;
+  }
+  if let Some(authority) = args.authority {
+    auto_top_off.authority = authority;
   }
   resize_to_fit(
     &ctx.accounts.payer.to_account_info(),

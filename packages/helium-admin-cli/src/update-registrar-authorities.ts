@@ -25,7 +25,13 @@ export async function run(args: any = process.argv) {
     authority: {
       type: 'string',
       required: true
-    }
+    },
+    multisig: {
+      type: 'string',
+    },
+    authorityIndex: {
+      type: 'number',
+    },
   });
 
   const argv = await yarg.argv;
@@ -55,8 +61,10 @@ export async function run(args: any = process.argv) {
   await sendInstructionsOrSquads({
     provider,
     instructions,
-    executeTransaction: true,
+    executeTransaction: false,
     squads,
     signers: [],
+    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
+    authorityIndex: argv.authorityIndex,
   });
 }

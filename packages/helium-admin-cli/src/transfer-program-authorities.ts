@@ -58,7 +58,6 @@ export async function run(args: any = process.argv) {
   if (multisig) {
     authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
   }
-  console.log(authority.toBase58());
   await sendInstructionsOrSquads({
     provider,
     instructions: [

@@ -37,12 +37,15 @@ export async function run(args: any = process.argv) {
     threshold: {
       type: "number",
       describe: "Threshold for auto topoff in DC, raw with no decimals",
-      default: 1,
     },
     initialLamports: {
       type: "number",
       describe: "Initial lamports to send to the auto topoff, pays for crank turns.",
       default: 10000000,
+    },
+    newAuthority: {
+      type: "string",
+      describe: "New authority for the auto topoff",
     },
     routerKey: {
       type: "string",
@@ -67,7 +70,6 @@ export async function run(args: any = process.argv) {
     schedule: {
       type: 'string',
       describe: 'Cron schedule for the auto topoff',
-      required: true,
     },
   });
 
@@ -135,8 +137,9 @@ export async function run(args: any = process.argv) {
     const updateIx = await dcAutoTopoffProgram.methods.updateAutoTopOffV0({
       newTaskId: nextTask,
       newPythTaskId: nextPythTask,
-      schedule: argv.schedule,
-      threshold: new anchor.BN(argv.threshold),
+      schedule: argv.schedule ? argv.schedule : null,
+      threshold: argv.threshold ? new anchor.BN(argv.threshold) : null,
+      authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
     })
       .accountsStrict({
         payer: authority,
@@ -155,9 +158,12 @@ export async function run(args: any = process.argv) {
       .instruction()
     instructions.push(updateIx)
   } else {
+    if (!argv.schedule || !argv.threshold) {
+      throw new Error("Schedule and threshold are required to initialize auto topoff")
+    }
     const instruction = await dcAutoTopoffProgram.methods.initializeAutoTopOffV0({
-      schedule: argv.schedule,
-      threshold: new anchor.BN(argv.threshold),
+      schedule: argv.schedule!,
+      threshold: new anchor.BN(argv.threshold!),
       routerKey,
     })
       .accountsPartial({
