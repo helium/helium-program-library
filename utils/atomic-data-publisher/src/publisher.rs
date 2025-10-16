@@ -79,13 +79,13 @@ impl AtomicDataPublisher {
         .http2_keep_alive_interval(std::time::Duration::from_secs(30))
         .keep_alive_timeout(std::time::Duration::from_secs(20));
 
-      info!("Attempting to connect to ingestor (lazy connection)...");
+      info!("Configuring gRPC channel...");
 
       // Create a shared channel with lazy connection
       // The actual connection happens on the first RPC call
       let channel = endpoint.connect_lazy();
 
-      info!("Successfully established shared gRPC channel");
+      info!("gRPC channel configured successfully");
       Some(channel)
     };
 

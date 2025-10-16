@@ -18,7 +18,7 @@ thiserror = "1.0"
 futures = "0.3"
 helium-proto = { git = "https://github.com/helium/proto", branch = "master", features = [ "services"] }
 helium-crypto = { git = "https://github.com/helium/helium-crypto-rs.git", branch = "main" }
-tonic = { version = "0.14", features = ["tls-webpki-roots"] }
+tonic = { version = "0.14", features = ["tls-aws-lc", "tls-native-roots", "tls-webpki-roots"] }
 prost = "0.14"
 bs58 = "0.5"
 rand = "0.8"
