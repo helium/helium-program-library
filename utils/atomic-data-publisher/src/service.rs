@@ -231,12 +231,12 @@ impl AtomicDataPublisher {
     handles.push(uptime_handle);
 
     // Periodic database pool refresh task for IAM auth token renewal
-    // Refresh every 8 minutes to stay well under the 10-minute connection lifetime limit
+    // Refresh every 12 minutes to stay under the 15-minute IAM token expiry with 3-minute buffer
     let pool_refresh_handle = {
       let shutdown_listener = self.shutdown_listener.clone();
       let database = self.database.clone();
       tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(480)); // 8 minutes
+        let mut interval = tokio::time::interval(Duration::from_secs(720)); // 12 minutes
         loop {
           tokio::select! {
             _ = interval.tick() => {
