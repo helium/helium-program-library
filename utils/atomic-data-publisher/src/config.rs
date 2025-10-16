@@ -36,7 +36,6 @@ pub struct DatabaseConfig {
 pub struct ServiceConfig {
   pub polling_interval_seconds: u64,
   pub batch_size: u32,
-  pub max_concurrent_publishes: u32,
   pub polling_jobs: Vec<PollingJob>,
   pub dry_run: bool,
   #[serde(default)]
@@ -83,7 +82,6 @@ impl Settings {
       // Service defaults
       .set_default("service.polling_interval_seconds", 10)?
       .set_default("service.batch_size", 500)?
-      .set_default("service.max_concurrent_publishes", 5)?
       .set_default("service.dry_run", false)?
       .set_default("service.dry_run_failure_rate", 0.0)?
       .set_default("service.port", 3000)?

@@ -216,51 +216,23 @@ impl PollingService {
       atomic_items.len()
     );
 
-    let semaphore = Arc::new(tokio::sync::Semaphore::new(
-      self.config.service.max_concurrent_publishes as usize,
-    ));
-
-    let tasks: Vec<_> = change_requests
-      .into_iter()
-      .zip(atomic_items.iter())
-      .map(|(request, atomic_item)| {
-        let publisher = self.publisher.clone();
-        let semaphore = semaphore.clone();
-        let atomic_item = atomic_item.clone();
-        let job_name = job.job_name.clone();
-        let query_name = job.query_name.clone();
-        let target_block = job.target_block;
-
-        tokio::spawn(async move {
-          Self::publish_single_change(
-            request,
-            atomic_item,
-            job_name,
-            query_name,
-            target_block,
-            publisher,
-            semaphore,
-          )
-          .await
-        })
-      })
-      .collect();
-
     let mut published_changes = Vec::new();
     let mut failed_count = 0;
 
-    for task in tasks {
-      match task.await {
-        Ok(Ok(change)) => published_changes.push(change),
-        Ok(Err(_)) => failed_count += 1,
-        Err(e) => {
-          error!(
-            "Publishing task panicked: {}. This indicates a serious bug in the publishing logic.",
-            e
-          );
-          metrics::increment_errors();
-          failed_count += 1;
-        }
+    // Publish changes sequentially
+    for (request, atomic_item) in change_requests.into_iter().zip(atomic_items.iter()) {
+      match Self::publish_single_change(
+        request,
+        atomic_item.clone(),
+        job.job_name.clone(),
+        job.query_name.clone(),
+        job.target_block,
+        &self.publisher,
+      )
+      .await
+      {
+        Ok(change) => published_changes.push(change),
+        Err(_) => failed_count += 1,
       }
     }
 
@@ -290,22 +262,8 @@ impl PollingService {
     job_name: String,
     query_name: String,
     target_block: u64,
-    publisher: Arc<Publisher>,
-    semaphore: Arc<tokio::sync::Semaphore>,
+    publisher: &Publisher,
   ) -> Result<ChangeRecord, ChangeRecord> {
-    let _permit = semaphore.acquire().await.map_err(|_| {
-      error!(
-        "Failed to acquire semaphore permit for publishing change from job '{}'. This may indicate high concurrency or semaphore configuration issues.",
-        job_name
-      );
-      ChangeRecord {
-        job_name: job_name.clone(),
-        query_name: query_name.clone(),
-        target_block,
-        atomic_data: vec![atomic_item.clone()],
-      }
-    })?;
-
     let publish_start = Instant::now();
     let result = publisher.publish_change_request(request).await;
     let publish_duration = publish_start.elapsed().as_secs_f64();
