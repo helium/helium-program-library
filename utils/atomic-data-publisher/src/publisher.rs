@@ -52,6 +52,7 @@ impl AtomicDataPublisher {
         ))
         .tcp_keepalive(Some(std::time::Duration::from_secs(30)))
         .http2_keep_alive_interval(std::time::Duration::from_secs(30))
+        .http2_adaptive_window(true)
         .keep_alive_timeout(std::time::Duration::from_secs(10));
 
       // Test initial connection
