@@ -7,7 +7,7 @@ use helium_proto::services::chain_rewardable_entities::{
   EntityRewardDestinationChangeRespV1, IotHotspotChangeRespV1, MobileHotspotChangeRespV1,
 };
 use tonic::{
-  transport::Endpoint,
+  transport::{Channel, Endpoint},
   Request,
 };
 use tracing::{debug, error, info, warn};
@@ -20,13 +20,24 @@ use crate::{
   protobuf::{build_entity_change_requests, EntityChangeRequest},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AtomicDataPublisher {
   polling_jobs: Vec<PollingJob>,
   keypair: Arc<Keypair>,
-  endpoint: Option<Endpoint>,
+  channel: Option<Channel>,
   service_config: ServiceConfig,
   ingestor_config: IngestorConfig,
+}
+
+impl std::fmt::Debug for AtomicDataPublisher {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("AtomicDataPublisher")
+      .field("polling_jobs", &self.polling_jobs)
+      .field("channel", &self.channel.as_ref().map(|_| "Channel { .. }"))
+      .field("service_config", &self.service_config)
+      .field("ingestor_config", &self.ingestor_config)
+      .finish()
+  }
 }
 
 impl AtomicDataPublisher {
@@ -36,8 +47,8 @@ impl AtomicDataPublisher {
     service_config: ServiceConfig,
     ingestor_config: IngestorConfig,
   ) -> Result<Self> {
-    let endpoint = if service_config.dry_run {
-      info!("Initializing AtomicDataPublisher in DRY RUN mode - no gRPC endpoint configured");
+    let channel = if service_config.dry_run {
+      info!("Initializing AtomicDataPublisher in DRY RUN mode - no gRPC channel configured");
       None
     } else {
       info!(
@@ -45,7 +56,7 @@ impl AtomicDataPublisher {
         ingestor_config.endpoint
       );
 
-      let ep = Endpoint::from_shared(ingestor_config.endpoint.clone())
+      let endpoint = Endpoint::from_shared(ingestor_config.endpoint.clone())
         .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?
         .timeout(std::time::Duration::from_secs(
           ingestor_config.timeout_seconds,
@@ -55,20 +66,20 @@ impl AtomicDataPublisher {
         .http2_adaptive_window(true)
         .keep_alive_timeout(std::time::Duration::from_secs(10));
 
-      // Test initial connection
-      ep.connect().await.map_err(|e| {
+      // Create a shared channel that will be reused for all requests
+      let channel = endpoint.connect().await.map_err(|e| {
         metrics::increment_ingestor_connection_failures();
         anyhow::anyhow!("Failed to connect to ingestor: {}", e)
       })?;
 
-      info!("Successfully validated gRPC endpoint connectivity");
-      Some(ep)
+      info!("Successfully established shared gRPC channel");
+      Some(channel)
     };
 
     Ok(Self {
       polling_jobs,
       keypair: Arc::new(keypair),
-      endpoint,
+      channel,
       service_config,
       ingestor_config,
     })
@@ -156,12 +167,11 @@ impl AtomicDataPublisher {
   }
 
   async fn publish_entity_change(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
-    // Create a fresh connection for each request to avoid HTTP/2 connection reuse issues
-    let endpoint = self.endpoint.as_ref()
-      .ok_or_else(|| AtomicDataError::NetworkError("No endpoint configured (dry run mode?)".to_string()))?;
+    // Use the shared channel - it's designed to be cloned cheaply and reused
+    let channel = self.channel.as_ref()
+      .ok_or_else(|| AtomicDataError::NetworkError("No channel configured (dry run mode?)".to_string()))?;
 
-    let channel = endpoint.connect_lazy();
-    let mut client = ChainRewardableEntitiesClient::new(channel);
+    let mut client = ChainRewardableEntitiesClient::new(channel.clone());
     let timeout_duration = std::time::Duration::from_secs(self.ingestor_config.timeout_seconds);
 
     match request {
@@ -188,7 +198,7 @@ impl AtomicDataPublisher {
               // Other gRPC errors (auth, invalid request, etc.)
             }
           }
-          AtomicDataError::NetworkError(format!("gRPC mobile hotspot request failed: status: '{}', self: \"{}\"", e.code(), e.message()))
+          AtomicDataError::NetworkError(format!("gRPC mobile hotspot request failed: status: '{}', message: \"{}\"", e.code(), e.message()))
         })?;
 
         let resp: MobileHotspotChangeRespV1 = response.into_inner();
@@ -220,7 +230,7 @@ impl AtomicDataPublisher {
               // Other gRPC errors (auth, invalid request, etc.)
             }
           }
-          AtomicDataError::NetworkError(format!("gRPC IoT hotspot request failed: status: '{}', self: \"{}\"", e.code(), e.message()))
+          AtomicDataError::NetworkError(format!("gRPC IoT hotspot request failed: status: '{}', message: \"{}\"", e.code(), e.message()))
         })?;
 
         let resp: IotHotspotChangeRespV1 = response.into_inner();
@@ -252,7 +262,7 @@ impl AtomicDataPublisher {
               // Other gRPC errors (auth, invalid request, etc.)
             }
           }
-          AtomicDataError::NetworkError(format!("gRPC entity ownership request failed: status: '{}', self: \"{}\"", e.code(), e.message()))
+          AtomicDataError::NetworkError(format!("gRPC entity ownership request failed: status: '{}', message: \"{}\"", e.code(), e.message()))
         })?;
 
         let resp: EntityOwnershipChangeRespV1 = response.into_inner();
@@ -285,7 +295,7 @@ impl AtomicDataPublisher {
             }
           }
           AtomicDataError::NetworkError(format!(
-            "gRPC entity reward destination request failed: status: '{}', self: \"{}\"",
+            "gRPC entity reward destination request failed: status: '{}', message: \"{}\"",
             e.code(), e.message()
           ))
         })?;
@@ -418,33 +428,16 @@ impl AtomicDataPublisher {
     if self.service_config.dry_run {
       debug!("Publisher health check: DRY RUN mode enabled - skipping gRPC health check");
     } else {
-      // In production mode, test gRPC connectivity
-      debug!("Publisher health check: testing gRPC connectivity");
+      // In production mode, verify the channel is available
+      debug!("Publisher health check: verifying gRPC channel");
 
-      let endpoint = self.endpoint.as_ref()
-        .ok_or_else(|| AtomicDataError::NetworkError("No endpoint configured".to_string()))?;
-
-      // Test connectivity by creating a connection
-      match tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        endpoint.connect()
-      )
-      .await
-      {
-        Ok(Ok(_)) => {
-          debug!("Publisher health check: gRPC connectivity verified");
-        }
-        Ok(Err(e)) => {
-          return Err(AtomicDataError::NetworkError(
-            format!("gRPC connection failed: {}", e)
-          ));
-        }
-        Err(_) => {
-          return Err(AtomicDataError::NetworkError(
-            "gRPC connection timed out".to_string(),
-          ));
-        }
+      if self.channel.is_none() {
+        return Err(AtomicDataError::NetworkError(
+          "No gRPC channel configured".to_string()
+        ));
       }
+
+      debug!("Publisher health check: gRPC channel available");
     }
 
     debug!("Publisher health check passed");
