@@ -65,7 +65,8 @@ impl AtomicDataPublisher {
         info!("Configuring TLS for domain: {}", domain);
 
         let tls_config = tonic::transport::ClientTlsConfig::new()
-          .domain_name(domain);
+          .domain_name(domain)
+          .danger_accept_invalid_certs(true);
 
         endpoint = endpoint.tls_config(tls_config).map_err(|e| {
           anyhow::anyhow!("Failed to configure TLS: {}", e)
