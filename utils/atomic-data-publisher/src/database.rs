@@ -269,7 +269,7 @@ impl DatabaseClient {
       .execute(&*pool)
       .await?;
 
-    info!("Created or verified atomic_data_polling_state table with dry_run support");
+    info!("Created or verified atomic_data_polling_state table");
     Ok(())
   }
 

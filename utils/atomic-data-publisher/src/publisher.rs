@@ -57,17 +57,33 @@ impl AtomicDataPublisher {
         .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?;
 
       if ingestor_config.endpoint.starts_with("https://") {
-        let tls_config = tonic::transport::ClientTlsConfig::new();
+        let domain = ingestor_config.endpoint
+          .strip_prefix("https://")
+          .and_then(|s| s.split(':').next())
+          .ok_or_else(|| anyhow::anyhow!("Failed to extract domain from endpoint"))?;
+
+        info!("Configuring TLS for domain: {}", domain);
+
+        let tls_config = tonic::transport::ClientTlsConfig::new()
+          .domain_name(domain);
+
         endpoint = endpoint.tls_config(tls_config).map_err(|e| {
           anyhow::anyhow!("Failed to configure TLS: {}", e)
         })?;
       }
 
-      // Create a shared channel that will be reused for all requests
-      let channel = endpoint.connect().await.map_err(|e| {
-        metrics::increment_ingestor_connection_failures();
-        anyhow::anyhow!("Failed to connect to ingestor: {}", e)
-      })?;
+      endpoint = endpoint
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .tcp_keepalive(Some(std::time::Duration::from_secs(60)))
+        .http2_keep_alive_interval(std::time::Duration::from_secs(30))
+        .keep_alive_timeout(std::time::Duration::from_secs(20));
+
+      info!("Attempting to connect to ingestor (lazy connection)...");
+
+      // Create a shared channel with lazy connection
+      // The actual connection happens on the first RPC call
+      let channel = endpoint.connect_lazy();
 
       info!("Successfully established shared gRPC channel");
       Some(channel)
