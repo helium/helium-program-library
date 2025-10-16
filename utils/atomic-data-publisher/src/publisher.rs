@@ -7,7 +7,7 @@ use helium_proto::services::chain_rewardable_entities::{
   EntityRewardDestinationChangeRespV1, IotHotspotChangeRespV1, MobileHotspotChangeRespV1,
 };
 use tonic::{
-  transport::{Channel, Endpoint},
+  transport::Endpoint,
   Request,
 };
 use tracing::{debug, error, info, warn};
@@ -24,7 +24,7 @@ use crate::{
 pub struct AtomicDataPublisher {
   polling_jobs: Vec<PollingJob>,
   keypair: Arc<Keypair>,
-  grpc_client: ChainRewardableEntitiesClient<Channel>,
+  endpoint: Option<Endpoint>,
   service_config: ServiceConfig,
   ingestor_config: IngestorConfig,
 }
@@ -36,44 +36,38 @@ impl AtomicDataPublisher {
     service_config: ServiceConfig,
     ingestor_config: IngestorConfig,
   ) -> Result<Self> {
-    if service_config.dry_run {
-      info!("Initializing AtomicDataPublisher in DRY RUN mode - skipping gRPC connection");
+    let endpoint = if service_config.dry_run {
+      info!("Initializing AtomicDataPublisher in DRY RUN mode - no gRPC endpoint configured");
+      None
+    } else {
+      info!(
+        "Initializing AtomicDataPublisher with gRPC endpoint: {}",
+        ingestor_config.endpoint
+      );
 
-      let dummy_endpoint = Endpoint::from_static("http://localhost:1");
-      let dummy_channel = dummy_endpoint.connect_lazy();
-      let grpc_client = ChainRewardableEntitiesClient::new(dummy_channel);
+      let ep = Endpoint::from_shared(ingestor_config.endpoint.clone())
+        .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?
+        .timeout(std::time::Duration::from_secs(
+          ingestor_config.timeout_seconds,
+        ))
+        .tcp_keepalive(Some(std::time::Duration::from_secs(30)))
+        .http2_keep_alive_interval(std::time::Duration::from_secs(30))
+        .keep_alive_timeout(std::time::Duration::from_secs(10));
 
-      return Ok(Self {
-        polling_jobs,
-        keypair: Arc::new(keypair),
-        grpc_client,
-        service_config,
-        ingestor_config,
-      });
-    }
+      // Test initial connection
+      ep.connect().await.map_err(|e| {
+        metrics::increment_ingestor_connection_failures();
+        anyhow::anyhow!("Failed to connect to ingestor: {}", e)
+      })?;
 
-    info!(
-      "Initializing AtomicDataPublisher with gRPC endpoint: {}",
-      ingestor_config.endpoint
-    );
-
-    let endpoint = Endpoint::from_shared(ingestor_config.endpoint.clone())
-      .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?
-      .timeout(std::time::Duration::from_secs(
-        ingestor_config.timeout_seconds,
-      ));
-
-    let channel = endpoint.connect().await.map_err(|e| {
-      metrics::increment_ingestor_connection_failures();
-      anyhow::anyhow!("Failed to connect to ingestor: {}", e)
-    })?;
-
-    let grpc_client = ChainRewardableEntitiesClient::new(channel);
+      info!("Successfully validated gRPC endpoint connectivity");
+      Some(ep)
+    };
 
     Ok(Self {
       polling_jobs,
       keypair: Arc::new(keypair),
-      grpc_client,
+      endpoint,
       service_config,
       ingestor_config,
     })
@@ -161,7 +155,12 @@ impl AtomicDataPublisher {
   }
 
   async fn publish_entity_change(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
-    let mut client = self.grpc_client.clone();
+    // Create a fresh connection for each request to avoid HTTP/2 connection reuse issues
+    let endpoint = self.endpoint.as_ref()
+      .ok_or_else(|| AtomicDataError::NetworkError("No endpoint configured (dry run mode?)".to_string()))?;
+
+    let channel = endpoint.connect_lazy();
+    let mut client = ChainRewardableEntitiesClient::new(channel);
     let timeout_duration = std::time::Duration::from_secs(self.ingestor_config.timeout_seconds);
 
     match request {
@@ -421,24 +420,13 @@ impl AtomicDataPublisher {
       // In production mode, test gRPC connectivity
       debug!("Publisher health check: testing gRPC connectivity");
 
-      // Try to create a simple gRPC request to test connectivity
-      // This will fail if the gRPC service is unreachable
-      let mut client = self.grpc_client.clone();
+      let endpoint = self.endpoint.as_ref()
+        .ok_or_else(|| AtomicDataError::NetworkError("No endpoint configured".to_string()))?;
 
-      // Create a minimal valid request to test connectivity
-      // We'll use an empty mobile hotspot change request
-      let test_request = tonic::Request::new(
-        helium_proto::services::chain_rewardable_entities::MobileHotspotChangeReqV1 {
-          change: None, // Empty change for health check
-          signature: vec![],
-          signer: self.keypair.public_key().to_string(),
-        },
-      );
-
-      // Use a short timeout for health check
+      // Test connectivity by creating a connection
       match tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        client.submit_mobile_hotspot_change(test_request),
+        endpoint.connect()
       )
       .await
       {
@@ -446,13 +434,13 @@ impl AtomicDataPublisher {
           debug!("Publisher health check: gRPC connectivity verified");
         }
         Ok(Err(e)) => {
-          // Even if the request fails with an error, it means gRPC connectivity is working
-          // The error might be due to invalid request parameters, not connectivity
-          debug!("Publisher health check: gRPC connectivity verified (request failed with expected error: {})", e);
+          return Err(AtomicDataError::NetworkError(
+            format!("gRPC connection failed: {}", e)
+          ));
         }
         Err(_) => {
           return Err(AtomicDataError::NetworkError(
-            "gRPC request timed out".to_string(),
+            "gRPC connection timed out".to_string(),
           ));
         }
       }
