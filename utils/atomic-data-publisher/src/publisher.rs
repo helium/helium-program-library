@@ -53,8 +53,15 @@ impl AtomicDataPublisher {
         ingestor_config.endpoint
       );
 
-      let endpoint = Endpoint::from_shared(ingestor_config.endpoint.clone())
+      let mut endpoint = Endpoint::from_shared(ingestor_config.endpoint.clone())
         .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?;
+
+      if ingestor_config.endpoint.starts_with("https://") {
+        let tls_config = tonic::transport::ClientTlsConfig::new();
+        endpoint = endpoint.tls_config(tls_config).map_err(|e| {
+          anyhow::anyhow!("Failed to configure TLS: {}", e)
+        })?;
+      }
 
       // Create a shared channel that will be reused for all requests
       let channel = endpoint.connect().await.map_err(|e| {
