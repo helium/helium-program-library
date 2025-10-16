@@ -46,7 +46,6 @@ pub struct ServiceConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct IngestorConfig {
   pub endpoint: String,
-  pub timeout_seconds: u64,
   pub max_retries: u32,
   pub retry_delay_seconds: u64,
 }
@@ -86,7 +85,6 @@ impl Settings {
       .set_default("service.dry_run_failure_rate", 0.0)?
       .set_default("service.port", 3000)?
       // Ingestor defaults
-      .set_default("ingestor.timeout_seconds", 60)?
       .set_default("ingestor.max_retries", 3)?
       .set_default("ingestor.retry_delay_seconds", 5)?
       // Logging defaults

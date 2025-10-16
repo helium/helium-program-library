@@ -42,11 +42,8 @@ impl AtomicDataPublisher {
   }
 
   async fn init_database(
-    database: &DatabaseClient,
     service_config: &ServiceConfig,
   ) -> Result<(), AtomicDataError> {
-    database.create_state_table().await?;
-
     if service_config.polling_jobs.is_empty() {
       warn!("No polling jobs configured");
     }
@@ -66,7 +63,7 @@ impl AtomicDataPublisher {
     );
 
     Self::validate_tables(&database, &config.database.required_tables).await?;
-    Self::init_database(&database, &config.service).await?;
+    Self::init_database(&config.service).await?;
     database.init_polling_state().await?;
     database.cleanup_stale_jobs().await?;
 
