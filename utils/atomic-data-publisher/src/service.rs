@@ -237,6 +237,7 @@ impl AtomicDataPublisher {
       let database = self.database.clone();
       tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(720)); // 12 minutes
+        interval.tick().await;
         loop {
           tokio::select! {
             _ = interval.tick() => {
