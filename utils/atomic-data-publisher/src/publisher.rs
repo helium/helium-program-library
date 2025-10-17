@@ -62,37 +62,17 @@ impl AtomicDataPublisher {
           .and_then(|s| s.split(':').next())
           .ok_or_else(|| anyhow::anyhow!("Failed to extract domain from endpoint"))?;
 
-        info!("Configuring TLS for domain: {}", domain);
+        info!("Configuring TLS for domain: {} using webpki-roots (Mozilla CA bundle)", domain);
 
-        info!("Loading system CA certificates for TLS verification");
-        let cert_result = rustls_native_certs::load_native_certs();
-
-        if !cert_result.errors.is_empty() {
-          warn!("Encountered {} errors loading system CA certificates", cert_result.errors.len());
-          for err in &cert_result.errors {
-            warn!("CA cert load error: {}", err);
-          }
-        }
-
-        if cert_result.certs.is_empty() {
-          return Err(anyhow::anyhow!("No system CA certificates found - cannot establish TLS connection"));
-        }
-
-        info!("Loaded {} system CA certificates", cert_result.certs.len());
-
-        let mut tls_config = tonic::transport::ClientTlsConfig::new()
+        // webpki-roots includes Mozilla's trusted CA bundle (which includes Amazon Root CA 1)
+        let tls_config = tonic::transport::ClientTlsConfig::new()
           .domain_name(domain);
-
-        for cert in cert_result.certs {
-          let cert_pem = tonic::transport::Certificate::from_pem(cert);
-          tls_config = tls_config.ca_certificate(cert_pem);
-        }
-
-        info!("TLS configuration complete with system CA trust for domain: {}", domain);
 
         endpoint = endpoint.tls_config(tls_config).map_err(|e| {
           anyhow::anyhow!("Failed to configure TLS: {}", e)
         })?;
+
+        info!("TLS configuration complete - using webpki-roots trust store");
       }
 
       endpoint = endpoint
