@@ -104,6 +104,7 @@ impl AtomicDataPublisher {
   ) -> Result<(), AtomicDataError> {
     if self.service_config.dry_run {
       self.log_protobuf_message(&request).await?;
+      tokio::task::yield_now().await;
       return Ok(());
     }
 
