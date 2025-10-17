@@ -70,7 +70,7 @@ impl AtomicDataPublisher {
           anyhow::anyhow!("Failed to configure TLS: {}", e)
         })?;
 
-        info!("TLS configuration complete - using webpki-roots trust store");
+        info!("TLS configuration complete");
       }
 
       endpoint = endpoint
