@@ -25,12 +25,7 @@ rand = "0.8"
 metrics = "0.23"
 metrics-exporter-prometheus = "0.15"
 triggered = "0.1"
-reqwest = { version = "0.12.14", default-features = false, features = [
-  "gzip",
-  "json",
-  "http2",
-  "rustls-tls"
-] }
+reqwest = "0.12.14"
 aws-config = "1.8"
 aws-credential-types = "1.2.4"
 aws-sdk-rds = "1.112.1"
