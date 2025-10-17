@@ -7,7 +7,7 @@ use helium_proto::services::chain_rewardable_entities::{
   chain_rewardable_entities_client::ChainRewardableEntitiesClient, EntityOwnershipChangeRespV1,
   EntityRewardDestinationChangeRespV1, IotHotspotChangeRespV1, MobileHotspotChangeRespV1,
 };
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 pub struct AtomicDataPublisher {
   polling_jobs: Vec<PollingJob>,
   keypair: Arc<Keypair>,
-  channel: Option<Channel>,
+  client: Option<ChainRewardableEntitiesClient<Channel>>,
   service_config: ServiceConfig,
   ingestor_config: IngestorConfig,
 }
@@ -31,7 +31,7 @@ impl std::fmt::Debug for AtomicDataPublisher {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_struct("AtomicDataPublisher")
       .field("polling_jobs", &self.polling_jobs)
-      .field("channel", &self.channel.as_ref().map(|_| "Channel { .. }"))
+      .field("client", &self.client.as_ref().map(|_| "ChainRewardableEntitiesClient { .. }"))
       .field("service_config", &self.service_config)
       .field("ingestor_config", &self.ingestor_config)
       .finish()
@@ -45,52 +45,23 @@ impl AtomicDataPublisher {
     service_config: ServiceConfig,
     ingestor_config: IngestorConfig,
   ) -> Result<Self> {
-    let channel = if service_config.dry_run {
-      info!("Initializing AtomicDataPublisher in DRY RUN mode - no gRPC channel configured");
+    let client = if service_config.dry_run {
+      info!("Initializing AtomicDataPublisher in DRY RUN mode - no gRPC client configured");
       None
     } else {
       info!(
         "Initializing AtomicDataPublisher with gRPC endpoint: {}",
         ingestor_config.endpoint
       );
-
-      let mut endpoint = Endpoint::from_shared(ingestor_config.endpoint.clone())
-        .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?;
-
-      if ingestor_config.endpoint.starts_with("https://") {
-        info!("Configuring TLS");
-        let tls_config = tonic::transport::ClientTlsConfig::new();
-
-        endpoint = endpoint.tls_config(tls_config).map_err(|e| {
-          error!("Failed to configure TLS: {}", e);
-          anyhow::anyhow!("Failed to configure TLS: {}", e)
-        })?;
-
-        info!("TLS config applied");
-      }
-
-      endpoint = endpoint
-        .timeout(std::time::Duration::from_secs(30))
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .tcp_keepalive(Some(std::time::Duration::from_secs(60)))
-        .http2_keep_alive_interval(std::time::Duration::from_secs(30))
-        .keep_alive_timeout(std::time::Duration::from_secs(20));
-
-      info!("Creating gRPC channel with lazy connection...");
-      debug!("Endpoint configured: timeout=30s, connect_timeout=10s, keepalive=60s");
-
-      // Create a shared channel with lazy connection
-      // The actual connection happens on the first RPC call
-      let channel = endpoint.connect_lazy();
-
-      info!("gRPC channel configured - will connect on first RPC");
-      Some(channel)
+      let client = ChainRewardableEntitiesClient::connect(ingestor_config.endpoint.clone()).await?;
+      info!("gRPC client connected successfully");
+      Some(client)
     };
 
     Ok(Self {
       polling_jobs,
       keypair: Arc::new(keypair),
-      channel,
+      client,
       service_config,
       ingestor_config,
     })
@@ -136,12 +107,9 @@ impl AtomicDataPublisher {
       return Ok(());
     }
 
-    // Create the client once, outside the retry loop
-    let channel = self.channel.as_ref()
-      .ok_or_else(|| AtomicDataError::NetworkError("No channel configured".to_string()))?;
-
-    debug!("Creating gRPC client for endpoint: {}", self.ingestor_config.endpoint);
-    let mut client = ChainRewardableEntitiesClient::new(channel.clone());
+    let mut client = self.client.as_ref()
+      .ok_or_else(|| AtomicDataError::NetworkError("No client configured".to_string()))?
+      .clone();
 
     let mut attempts = 0;
     let max_retries = self.ingestor_config.max_retries;
@@ -432,16 +400,16 @@ impl AtomicDataPublisher {
     if self.service_config.dry_run {
       debug!("Publisher health check: DRY RUN mode enabled - skipping gRPC health check");
     } else {
-      // In production mode, verify the channel is available
-      debug!("Publisher health check: verifying gRPC channel");
+      // In production mode, verify the client is available
+      debug!("Publisher health check: verifying gRPC client");
 
-      if self.channel.is_none() {
+      if self.client.is_none() {
         return Err(AtomicDataError::NetworkError(
-          "No gRPC channel configured".to_string()
+          "No gRPC client configured".to_string()
         ));
       }
 
-      debug!("Publisher health check: gRPC channel available");
+      debug!("Publisher health check: gRPC client available");
     }
 
     debug!("Publisher health check passed");
