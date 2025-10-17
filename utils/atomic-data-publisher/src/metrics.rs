@@ -12,6 +12,7 @@ pub fn initialize_metrics() {
   counter!("atomic_data_publisher_ingestor_connection_failures_total").absolute(0);
   counter!("atomic_data_publisher_ingestor_retry_attempts_total").absolute(0);
   counter!("atomic_data_publisher_ingestor_publish_failures_total").absolute(0);
+  counter!("atomic_data_publisher_protobuf_build_failures_total").absolute(0);
 
   // Initialize histograms (they'll show up after first recording)
   describe_histogram!(
@@ -45,6 +46,10 @@ pub fn increment_ingestor_retry_attempts() {
 
 pub fn increment_ingestor_publish_failures() {
   counter!("atomic_data_publisher_ingestor_publish_failures_total").increment(1);
+}
+
+pub fn increment_protobuf_build_failures() {
+  counter!("atomic_data_publisher_protobuf_build_failures_total").increment(1);
 }
 
 pub fn observe_database_query_duration(duration: f64) {

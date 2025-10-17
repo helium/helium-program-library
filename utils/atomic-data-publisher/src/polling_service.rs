@@ -219,6 +219,7 @@ impl PollingService {
       Ok(requests) => requests,
       Err(e) => {
         error!("Failed to prepare changes batch for chunk: {}", e);
+        metrics::increment_protobuf_build_failures();
         return Ok((0, atomic_items.len(), Vec::new()));
       }
     };
