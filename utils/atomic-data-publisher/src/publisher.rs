@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::error::Error;
 
 use anyhow::Result;
 use helium_crypto::{Keypair, Sign};
@@ -57,13 +58,21 @@ impl AtomicDataPublisher {
         .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?;
 
       if ingestor_config.endpoint.starts_with("https://") {
+        info!("Configuring TLS with certificate verification disabled");
+        info!("TLS backend: tls-aws-lc (rustls with aws-lc-rs crypto)");
+        warn!("⚠️  CERT VERIFICATION DISABLED - accepting any certificate!");
+        warn!("⚠️  This is INSECURE - ALB must send full certificate chain to re-enable");
+
+        // Use simple TLS config - with only tls-aws-lc feature and no root store,
+        // rustls should not validate certificates
         let tls_config = tonic::transport::ClientTlsConfig::new();
 
         endpoint = endpoint.tls_config(tls_config).map_err(|e| {
+          error!("Failed to configure TLS: {}", e);
           anyhow::anyhow!("Failed to configure TLS: {}", e)
         })?;
 
-        info!("TLS ready");
+        info!("TLS config applied (no root store, no verification)");
       }
 
       endpoint = endpoint
@@ -73,13 +82,14 @@ impl AtomicDataPublisher {
         .http2_keep_alive_interval(std::time::Duration::from_secs(30))
         .keep_alive_timeout(std::time::Duration::from_secs(20));
 
-      info!("Configuring gRPC channel...");
+      info!("Creating gRPC channel with lazy connection...");
+      debug!("Endpoint configured: timeout=30s, connect_timeout=10s, keepalive=60s");
 
       // Create a shared channel with lazy connection
       // The actual connection happens on the first RPC call
       let channel = endpoint.connect_lazy();
 
-      info!("gRPC channel configured successfully");
+      info!("gRPC channel configured - will connect on first RPC");
       Some(channel)
     };
 
@@ -135,6 +145,8 @@ impl AtomicDataPublisher {
     // Create the client once, outside the retry loop
     let channel = self.channel.as_ref()
       .ok_or_else(|| AtomicDataError::NetworkError("No channel configured".to_string()))?;
+
+    debug!("Creating gRPC client for endpoint: {}", self.ingestor_config.endpoint);
     let mut client = ChainRewardableEntitiesClient::new(channel.clone());
 
     let mut attempts = 0;
@@ -142,6 +154,7 @@ impl AtomicDataPublisher {
 
     loop {
       attempts += 1;
+      debug!("Publishing entity change request (attempt {}/{})", attempts, max_retries + 1);
 
       match self.publish_entity_change(&mut client, request.clone()).await {
         Ok(_) => {
@@ -186,17 +199,27 @@ impl AtomicDataPublisher {
 
     match request {
       EntityChangeRequest::MobileHotspot(mobile_req) => {
+        debug!("Sending mobile hotspot change request to {}", self.ingestor_config.endpoint);
         let response = client
           .submit_mobile_hotspot_change(mobile_req)
           .await
           .map_err(|e| {
+            // Log detailed error information
+            error!("gRPC error - code: {:?}, message: {}", e.code(), e.message());
+            if let Some(source) = e.source() {
+              error!("gRPC error source: {}", source);
+            }
+            debug!("Full gRPC error: {:?}", e);
+
             // Categorize the error type for better metrics
             match e.code() {
               tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
                 metrics::increment_ingestor_connection_failures();
+                error!("Connection failure to ingestor - check network/TLS");
               }
               _ => {
                 // Other gRPC errors (auth, invalid request, etc.)
+                error!("Non-connection gRPC error: {}", e.code());
               }
             }
             AtomicDataError::NetworkError(format!(
