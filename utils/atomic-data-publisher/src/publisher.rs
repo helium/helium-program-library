@@ -57,20 +57,13 @@ impl AtomicDataPublisher {
         .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?;
 
       if ingestor_config.endpoint.starts_with("https://") {
-        let domain = ingestor_config.endpoint
-          .strip_prefix("https://")
-          .and_then(|s| s.split(':').next())
-          .ok_or_else(|| anyhow::anyhow!("Failed to extract domain from endpoint"))?;
-
-        info!("Configuring TLS for domain: {}", domain);
-        let tls_config = tonic::transport::ClientTlsConfig::new()
-          .domain_name(domain);
+        let tls_config = tonic::transport::ClientTlsConfig::new();
 
         endpoint = endpoint.tls_config(tls_config).map_err(|e| {
           anyhow::anyhow!("Failed to configure TLS: {}", e)
         })?;
 
-        info!("TLS ready - trusting {}", domain);
+        info!("TLS ready");
       }
 
       endpoint = endpoint
