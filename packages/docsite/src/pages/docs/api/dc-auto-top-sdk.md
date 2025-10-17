@@ -423,6 +423,7 @@ undefined
 | new_pyth_task_id | u16    |
 | schedule         | string |
 | threshold        | u64    |
+| authority        | pubkey |
 
 ### WindowV0
 
