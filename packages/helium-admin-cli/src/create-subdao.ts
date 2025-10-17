@@ -32,7 +32,7 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
+import * as multisig from "@sqds/multisig";
 import BN from "bn.js";
 import fs from "fs";
 import os from "os";
@@ -44,7 +44,7 @@ import {
   isLocalhost,
   loadKeypair,
   parseEmissionsSchedule,
-  sendInstructionsOrSquads,
+  sendInstructionsOrSquadsV4,
 } from "./utils";
 
 const SECS_PER_DAY = 86400;
@@ -228,13 +228,14 @@ export async function run(args: any = process.argv) {
     argv.emissionSchedulePath
   );
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
   let authority = provider.wallet.publicKey;
-  const multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  const multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
   }
   if (await exists(conn, subdao)) {
     console.log(`Subdao exists. Key: ${subdao.toBase58()}.`);
@@ -417,15 +418,12 @@ export async function run(args: any = process.argv) {
         authority: daoAcc.authority,
       });
 
-    await sendInstructionsOrSquads({
+    await sendInstructionsOrSquadsV4({
       provider,
       instructions: [
         await initSubdaoMethod.instruction(),
       ],
-      executeTransaction: true,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
+      multisig: multisigPda!,
       signers: [],
     });
 
@@ -438,7 +436,7 @@ export async function run(args: any = process.argv) {
     ]);
 
     const { subDao } = await initSubdaoMethod.pubkeys();
-    await sendInstructionsOrSquads({
+    await sendInstructionsOrSquadsV4({
       provider,
       instructions: [
         await heliumSubDaosProgram.methods
@@ -458,10 +456,7 @@ export async function run(args: any = process.argv) {
           })
           .instruction(),
       ],
-      executeTransaction: true,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
+      multisig: multisigPda!,
       signers: [],
     });
   }
@@ -530,13 +525,10 @@ export async function run(args: any = process.argv) {
         .instruction()
     );
 
-    await sendInstructionsOrSquads({
+    await sendInstructionsOrSquadsV4({
       provider,
       instructions,
-      squads,
-      executeTransaction: true,
-      multisig: multisig!,
-      authorityIndex: argv.authorityIndex,
+      multisig: multisigPda!,
     });
   }
 }

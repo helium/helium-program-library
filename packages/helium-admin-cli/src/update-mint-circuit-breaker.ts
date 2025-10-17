@@ -1,11 +1,10 @@
 import * as anchor from '@coral-xyz/anchor';
 import { init } from '@helium/circuit-breaker-sdk';
 import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import { BN } from 'bn.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
+import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -30,9 +29,6 @@ export async function run(args: any = process.argv) {
     threshold: {
       type: 'number',
     },
-    executeTransaction: {
-      type: 'boolean',
-    },
     multisig: {
       type: 'string',
       describe:
@@ -40,11 +36,6 @@ export async function run(args: any = process.argv) {
     },
     newAuthority: {
       type: 'string',
-    },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
     },
   });
 
@@ -86,16 +77,10 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }

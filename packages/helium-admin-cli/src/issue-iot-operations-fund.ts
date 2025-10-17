@@ -4,11 +4,10 @@ import { init as initHsd } from '@helium/helium-sub-daos-sdk';
 import { daoKey } from '@helium/helium-sub-daos-sdk';
 import { createMintInstructions, sendInstructions } from '@helium/spl-utils';
 import { PublicKey, Keypair, TransactionInstruction } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import { BN } from 'bn.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
+import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -32,18 +31,10 @@ export async function run(args: any = process.argv) {
       required: true,
       describe: 'Recipient wallet address for the iot ops fund nft',
     },
-    executeTransaction: {
-      type: 'boolean',
-    },
     multisig: {
       type: 'string',
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
-    },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
     },
   });
 
@@ -85,16 +76,10 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }

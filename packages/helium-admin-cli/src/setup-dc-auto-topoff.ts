@@ -4,12 +4,12 @@ import { autoTopOffKey, init as initDcAutoTopoff, queueAuthorityKey } from "@hel
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
 import { DC_MINT, HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import * as multisig from '@sqds/multisig';
 import { createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { ComputeBudgetProgram, PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 import { init as initTuktuk, nextAvailableTaskIds, taskKey, taskQueueAuthorityKey } from "@helium/tuktuk-sdk";
 
 export async function run(args: any = process.argv) {
@@ -62,11 +62,6 @@ export async function run(args: any = process.argv) {
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
-    },
     schedule: {
       type: 'string',
       describe: 'Cron schedule for the auto topoff',
@@ -89,13 +84,14 @@ export async function run(args: any = process.argv) {
   const tuktukProgram = await initTuktuk(provider);
 
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
   let authority = provider.wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
   }
 
   const routerKey = argv.routerKey;
@@ -134,6 +130,8 @@ export async function run(args: any = process.argv) {
   const autoTopOffAcc = await dcAutoTopoffProgram.account.autoTopOffV0.fetchNullable(autoTopOff!)
   if (autoTopOffAcc) {
     const queueAuthority = queueAuthorityKey()[0]
+    const taskRentRefund = (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextTask))?.rentRefund || authority
+    const pythTaskRentRefund = (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextPythTask))?.rentRefund || authority
     const updateIx = await dcAutoTopoffProgram.methods.updateAutoTopOffV0({
       newTaskId: nextTask,
       newPythTaskId: nextPythTask,
@@ -154,6 +152,8 @@ export async function run(args: any = process.argv) {
         nextPythTask: autoTopOffAcc.nextPythTask,
         taskQueueAuthority: taskQueueAuthorityKey(TASK_QUEUE_ID, queueAuthority)[0],
         tuktukProgram: tuktukProgram.programId,
+        taskRentRefund,
+        pythTaskRentRefund,
       })
       .instruction()
     instructions.push(updateIx)
@@ -205,13 +205,10 @@ export async function run(args: any = process.argv) {
     )
   }
 
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: false,
-    squads,
-    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
+    multisig: multisigPda!,
     signers: [],
   });
   console.log(`Initialized auto topoff for ${routerKey} with schedule ${argv.schedule} and threshold ${argv.threshold}. Send HNT to ${autoTopOff!.toBase58()}`);

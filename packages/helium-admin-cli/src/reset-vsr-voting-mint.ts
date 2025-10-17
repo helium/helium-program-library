@@ -6,14 +6,13 @@ import {
 } from '@helium/helium-sub-daos-sdk';
 import { init as initVsr } from '@helium/voter-stake-registry-sdk';
 import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import os from 'os';
 import yargs from 'yargs/yargs';
 import {
   getTimestampFromDays,
   getUnixTimestamp,
   loadKeypair,
-  sendInstructionsOrSquads,
+  sendInstructionsOrSquadsV4,
 } from './utils';
 
 const SECS_PER_DAY = 86400;
@@ -52,18 +51,10 @@ export async function run(args: any = process.argv) {
       describe: 'Reset the subdao voting mint',
       default: false,
     },
-    executeTransaction: {
-      type: 'boolean',
-    },
     multisig: {
       type: 'string',
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
-    },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
     },
   });
 
@@ -85,9 +76,6 @@ export async function run(args: any = process.argv) {
   const in7Days = now + getTimestampFromDays(7);
   const instructions: TransactionInstruction[] = [];
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
 
   if (argv.resetDaoVotingMint) {
     console.log('resetting dao votingMint');
@@ -153,13 +141,10 @@ export async function run(args: any = process.argv) {
     );
   }
 
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }

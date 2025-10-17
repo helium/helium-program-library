@@ -3,10 +3,9 @@ import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -25,11 +24,6 @@ export async function run(args: any = process.argv) {
       describe:
         "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
-    authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
-      default: 1,
-    },
   });
 
   const argv = await yarg.argv;
@@ -39,9 +33,6 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
   let multisig = argv.multisig ? new PublicKey(argv.multisig) : undefined;
 
   const hsdProgram = await initHsd(provider);
@@ -68,13 +59,10 @@ export async function run(args: any = process.argv) {
       .instruction(),
   ];
 
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
     signers: [],
-    executeTransaction: false,
-    squads,
     multisig,
-    authorityIndex: argv.authorityIndex,
   });
 }

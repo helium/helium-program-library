@@ -46,7 +46,7 @@ import {
   Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
+import * as multisig from "@sqds/multisig";
 import { BN } from "bn.js";
 import fs from "fs";
 import os from "os";
@@ -56,7 +56,7 @@ import {
   isLocalhost,
   loadKeypair,
   parseEmissionsSchedule,
-  sendInstructionsOrSquads,
+  sendInstructionsOrSquadsV4,
 } from "./utils";
 import { init } from "@helium/nft-proxy-sdk";
 import { oracleSignerKey } from "@helium/rewards-oracle-sdk";
@@ -165,11 +165,6 @@ export async function run(args: any = process.argv) {
       describe:
         "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
     },
-    authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
-      default: 1,
-    },
     rewardsOracleUrl: {
       alias: "ro",
       type: "string",
@@ -241,13 +236,14 @@ export async function run(args: any = process.argv) {
 
   const conn = provider.connection;
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
   let authority = provider.wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
     // Fund authority
     const authAcc = await provider.connection.getAccountInfo(authority);
     if (!authAcc || authAcc.lamports < LAMPORTS_PER_SOL) {
@@ -468,7 +464,7 @@ export async function run(args: any = process.argv) {
       })
       .rpc({ skipPreflight: true });
 
-    await sendInstructionsOrSquads({
+    await sendInstructionsOrSquadsV4({
       provider,
       instructions: [
         await heliumSubDaosProgram.methods
@@ -488,10 +484,7 @@ export async function run(args: any = process.argv) {
           })
           .instruction(),
       ],
-      executeTransaction: true,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
+      multisig: multisigPda!,
       signers: [],
     });
   }
@@ -528,7 +521,7 @@ export async function run(args: any = process.argv) {
         [merkle]
       );
     }
-    await sendInstructionsOrSquads({
+    await sendInstructionsOrSquadsV4({
       provider,
       instructions: [
         await hemProgram.methods
@@ -551,10 +544,7 @@ export async function run(args: any = process.argv) {
           })
           .instruction(),
       ],
-      executeTransaction: false,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
+      multisig: multisigPda!,
       signers: [],
     });
   }

@@ -7,8 +7,8 @@ import {
   getAccount,
   getAssociatedTokenAddressSync,
 } from '@solana/spl-token';
+import * as multisig from '@sqds/multisig';
 import { ComputeBudgetProgram, Keypair, PublicKey } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import fs from 'fs';
 import os from 'os';
 import yargs from 'yargs/yargs';
@@ -76,12 +76,13 @@ export async function run(args: any = process.argv) {
   const hstKeypair = loadKeypair(argv.hstKeypair);
 
   let authority = provider.wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
   }
 
   const state = JSON.parse(fs.readFileSync(argv.state).toString());

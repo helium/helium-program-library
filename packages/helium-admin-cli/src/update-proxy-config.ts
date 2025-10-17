@@ -4,13 +4,12 @@ import {
   proxyConfigKey,
 } from "@helium/nft-proxy-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
 import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
   loadKeypair,
-  sendInstructionsOrSquads
+  sendInstructionsOrSquadsV4
 } from "./utils";
 
 export async function run(args: any = process.argv) {
@@ -40,18 +39,10 @@ export async function run(args: any = process.argv) {
       type: "string",
       default: `${__dirname}/../../proxy-seasons.json`,
     },
-    executeTransaction: {
-      type: "boolean",
-    },
     multisig: {
       type: "string",
       describe:
         "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
-    },
-    authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
-      default: 1,
     },
   });
   const argv = await yarg.argv;
@@ -85,16 +76,10 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }
