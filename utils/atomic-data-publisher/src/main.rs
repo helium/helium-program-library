@@ -76,10 +76,6 @@ fn validate_config(settings: &Settings) -> Result<()> {
     anyhow::bail!("Service batch size must be greater than 0, got: {}", settings.service.batch_size);
   }
 
-  if settings.service.max_concurrent_publishes == 0 {
-    anyhow::bail!("Max concurrent publishes must be greater than 0, got: {}", settings.service.max_concurrent_publishes);
-  }
-
   if settings.database.required_tables.is_empty() {
     anyhow::bail!("No required tables specified in configuration. At least one table must be configured for monitoring.");
   }

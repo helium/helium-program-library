@@ -45,6 +45,7 @@ impl ProtobufBuilder {
   pub fn build_mobile_hotspot_changes(
     change: &ChangeRecord,
     keypair: &Keypair,
+    skip_signing: bool,
   ) -> Result<Vec<MobileHotspotChangeReqV1>, AtomicDataError> {
     let atomic_data_array = &change.atomic_data;
 
@@ -80,8 +81,10 @@ impl ProtobufBuilder {
         signature: vec![],
       };
 
-      let signature = Self::sign_message(&request, keypair)?;
-      request.signature = signature;
+      if !skip_signing {
+        let signature = Self::sign_message(&request, keypair)?;
+        request.signature = signature;
+      }
 
       change_requests.push(request);
     }
@@ -92,6 +95,7 @@ impl ProtobufBuilder {
   pub fn build_iot_hotspot_changes(
     change: &ChangeRecord,
     keypair: &Keypair,
+    skip_signing: bool,
   ) -> Result<Vec<IotHotspotChangeReqV1>, AtomicDataError> {
     let atomic_data_array = &change.atomic_data;
 
@@ -121,8 +125,10 @@ impl ProtobufBuilder {
         signature: vec![],
       };
 
-      let signature = Self::sign_message(&request, keypair)?;
-      request.signature = signature;
+      if !skip_signing {
+        let signature = Self::sign_message(&request, keypair)?;
+        request.signature = signature;
+      }
 
       change_requests.push(request);
     }
@@ -133,6 +139,7 @@ impl ProtobufBuilder {
   pub fn build_entity_ownership_changes(
     change: &ChangeRecord,
     keypair: &Keypair,
+    skip_signing: bool,
   ) -> Result<Vec<EntityOwnershipChangeReqV1>, AtomicDataError> {
     let atomic_data_array = &change.atomic_data;
     let mut change_requests = Vec::with_capacity(atomic_data_array.len());
@@ -141,14 +148,14 @@ impl ProtobufBuilder {
       let block = Self::get_u64_field(atomic_data, "block")?;
       let timestamp_seconds = Self::current_timestamp();
 
-      let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key").ok();
+      let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
       let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
       let owner = Self::build_entity_owner_info(atomic_data)?;
 
       let change_msg = EntityOwnerChangeV1 {
         block,
         timestamp_seconds,
-        entity_pub_key,
+        entity_pub_key: Some(pub_key),
         asset: Some(asset),
         owner: Some(owner),
       };
@@ -159,8 +166,10 @@ impl ProtobufBuilder {
         signature: vec![],
       };
 
-      let signature = Self::sign_message(&request, keypair)?;
-      request.signature = signature;
+      if !skip_signing {
+        let signature = Self::sign_message(&request, keypair)?;
+        request.signature = signature;
+      }
 
       change_requests.push(request);
     }
@@ -171,6 +180,7 @@ impl ProtobufBuilder {
   pub fn build_entity_reward_destination_changes(
     change: &ChangeRecord,
     keypair: &Keypair,
+    skip_signing: bool,
   ) -> Result<Vec<EntityRewardDestinationChangeReqV1>, AtomicDataError> {
     let atomic_data_array = &change.atomic_data;
 
@@ -214,8 +224,10 @@ impl ProtobufBuilder {
         signature: vec![],
       };
 
-      let signature = Self::sign_message(&request, keypair)?;
-      request.signature = signature;
+      if !skip_signing {
+        let signature = Self::sign_message(&request, keypair)?;
+        request.signature = signature;
+      }
 
       change_requests.push(request);
     }
@@ -506,10 +518,11 @@ pub fn build_entity_change_requests(
   change: &ChangeRecord,
   change_type: &str,
   keypair: &Keypair,
+  skip_signing: bool,
 ) -> Result<Vec<EntityChangeRequest>, AtomicDataError> {
   match change_type {
     "mobile_hotspot" => {
-      let reqs = ProtobufBuilder::build_mobile_hotspot_changes(change, keypair)?;
+      let reqs = ProtobufBuilder::build_mobile_hotspot_changes(change, keypair, skip_signing)?;
       Ok(
         reqs
           .into_iter()
@@ -518,7 +531,7 @@ pub fn build_entity_change_requests(
       )
     }
     "iot_hotspot" => {
-      let reqs = ProtobufBuilder::build_iot_hotspot_changes(change, keypair)?;
+      let reqs = ProtobufBuilder::build_iot_hotspot_changes(change, keypair, skip_signing)?;
       Ok(
         reqs
           .into_iter()
@@ -527,7 +540,7 @@ pub fn build_entity_change_requests(
       )
     }
     "entity_ownership" => {
-      let reqs = ProtobufBuilder::build_entity_ownership_changes(change, keypair)?;
+      let reqs = ProtobufBuilder::build_entity_ownership_changes(change, keypair, skip_signing)?;
       Ok(
         reqs
           .into_iter()
@@ -536,7 +549,8 @@ pub fn build_entity_change_requests(
       )
     }
     "entity_reward_destination" => {
-      let reqs = ProtobufBuilder::build_entity_reward_destination_changes(change, keypair)?;
+      let reqs =
+        ProtobufBuilder::build_entity_reward_destination_changes(change, keypair, skip_signing)?;
       Ok(
         reqs
           .into_iter()

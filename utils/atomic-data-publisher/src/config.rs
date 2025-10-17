@@ -36,7 +36,6 @@ pub struct DatabaseConfig {
 pub struct ServiceConfig {
   pub polling_interval_seconds: u64,
   pub batch_size: u32,
-  pub max_concurrent_publishes: u32,
   pub polling_jobs: Vec<PollingJob>,
   pub dry_run: bool,
   #[serde(default)]
@@ -47,7 +46,6 @@ pub struct ServiceConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct IngestorConfig {
   pub endpoint: String,
-  pub timeout_seconds: u64,
   pub max_retries: u32,
   pub retry_delay_seconds: u64,
 }
@@ -82,13 +80,11 @@ impl Settings {
       .set_default("database.max_lifetime_seconds", 600)?
       // Service defaults
       .set_default("service.polling_interval_seconds", 10)?
-      .set_default("service.batch_size", 1000)?
-      .set_default("service.max_concurrent_publishes", 50)?
+      .set_default("service.batch_size", 500)?
       .set_default("service.dry_run", false)?
       .set_default("service.dry_run_failure_rate", 0.0)?
       .set_default("service.port", 3000)?
       // Ingestor defaults
-      .set_default("ingestor.timeout_seconds", 30)?
       .set_default("ingestor.max_retries", 3)?
       .set_default("ingestor.retry_delay_seconds", 5)?
       // Logging defaults

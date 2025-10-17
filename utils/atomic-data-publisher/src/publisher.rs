@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::error::Error;
 
 use anyhow::Result;
 use helium_crypto::{Keypair, Sign};
@@ -6,10 +7,7 @@ use helium_proto::services::chain_rewardable_entities::{
   chain_rewardable_entities_client::ChainRewardableEntitiesClient, EntityOwnershipChangeRespV1,
   EntityRewardDestinationChangeRespV1, IotHotspotChangeRespV1, MobileHotspotChangeRespV1,
 };
-use tonic::{
-  transport::{Channel, Endpoint},
-  Request,
-};
+use tonic::transport::Channel;
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -20,13 +18,24 @@ use crate::{
   protobuf::{build_entity_change_requests, EntityChangeRequest},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AtomicDataPublisher {
   polling_jobs: Vec<PollingJob>,
   keypair: Arc<Keypair>,
-  grpc_client: ChainRewardableEntitiesClient<Channel>,
+  client: Option<ChainRewardableEntitiesClient<Channel>>,
   service_config: ServiceConfig,
   ingestor_config: IngestorConfig,
+}
+
+impl std::fmt::Debug for AtomicDataPublisher {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("AtomicDataPublisher")
+      .field("polling_jobs", &self.polling_jobs)
+      .field("client", &self.client.as_ref().map(|_| "ChainRewardableEntitiesClient { .. }"))
+      .field("service_config", &self.service_config)
+      .field("ingestor_config", &self.ingestor_config)
+      .finish()
+  }
 }
 
 impl AtomicDataPublisher {
@@ -36,44 +45,23 @@ impl AtomicDataPublisher {
     service_config: ServiceConfig,
     ingestor_config: IngestorConfig,
   ) -> Result<Self> {
-    if service_config.dry_run {
-      info!("Initializing AtomicDataPublisher in DRY RUN mode - skipping gRPC connection");
-
-      let dummy_endpoint = Endpoint::from_static("http://localhost:1");
-      let dummy_channel = dummy_endpoint.connect_lazy();
-      let grpc_client = ChainRewardableEntitiesClient::new(dummy_channel);
-
-      return Ok(Self {
-        polling_jobs,
-        keypair: Arc::new(keypair),
-        grpc_client,
-        service_config,
-        ingestor_config,
-      });
-    }
-
-    info!(
-      "Initializing AtomicDataPublisher with gRPC endpoint: {}",
-      ingestor_config.endpoint
-    );
-
-    let endpoint = Endpoint::from_shared(ingestor_config.endpoint.clone())
-      .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?
-      .timeout(std::time::Duration::from_secs(
-        ingestor_config.timeout_seconds,
-      ));
-
-    let channel = endpoint.connect().await.map_err(|e| {
-      metrics::increment_ingestor_connection_failures();
-      anyhow::anyhow!("Failed to connect to ingestor: {}", e)
-    })?;
-
-    let grpc_client = ChainRewardableEntitiesClient::new(channel);
+    let client = if service_config.dry_run {
+      info!("Initializing AtomicDataPublisher in DRY RUN mode - no gRPC client configured");
+      None
+    } else {
+      info!(
+        "Initializing AtomicDataPublisher with gRPC endpoint: {}",
+        ingestor_config.endpoint
+      );
+      let client = ChainRewardableEntitiesClient::connect(ingestor_config.endpoint.clone()).await?;
+      info!("gRPC client connected successfully");
+      Some(client)
+    };
 
     Ok(Self {
       polling_jobs,
       keypair: Arc::new(keypair),
-      grpc_client,
+      client,
       service_config,
       ingestor_config,
     })
@@ -106,7 +94,7 @@ impl AtomicDataPublisher {
         ))
       })?;
 
-    build_entity_change_requests(change_record, change_type, &self.keypair)
+    build_entity_change_requests(change_record, change_type, &self.keypair, false)
   }
 
   /// Publish a single change request with retries
@@ -116,16 +104,22 @@ impl AtomicDataPublisher {
   ) -> Result<(), AtomicDataError> {
     if self.service_config.dry_run {
       self.log_protobuf_message(&request).await?;
+      tokio::task::yield_now().await;
       return Ok(());
     }
+
+    let mut client = self.client.as_ref()
+      .ok_or_else(|| AtomicDataError::NetworkError("No client configured".to_string()))?
+      .clone();
 
     let mut attempts = 0;
     let max_retries = self.ingestor_config.max_retries;
 
     loop {
       attempts += 1;
+      debug!("Publishing entity change request (attempt {}/{})", attempts, max_retries + 1);
 
-      match self.publish_entity_change(request.clone()).await {
+      match self.publish_entity_change(&mut client, request.clone()).await {
         Ok(_) => {
           debug!(
             "Successfully published entity change request on attempt {}",
@@ -160,25 +154,42 @@ impl AtomicDataPublisher {
     }
   }
 
-  async fn publish_entity_change(&self, request: EntityChangeRequest) -> Result<(), AtomicDataError> {
-    let mut client = self.grpc_client.clone();
+  async fn publish_entity_change(
+    &self,
+    client: &mut ChainRewardableEntitiesClient<Channel>,
+    request: EntityChangeRequest
+  ) -> Result<(), AtomicDataError> {
 
     match request {
       EntityChangeRequest::MobileHotspot(mobile_req) => {
+        debug!("Sending mobile hotspot change request to {}", self.ingestor_config.endpoint);
         let response = client
-          .submit_mobile_hotspot_change(Request::new(mobile_req))
+          .submit_mobile_hotspot_change(mobile_req)
           .await
           .map_err(|e| {
+            // Log detailed error information
+            error!("gRPC error - code: {:?}, message: {}", e.code(), e.message());
+            if let Some(source) = e.source() {
+              error!("gRPC error source: {}", source);
+            }
+            debug!("Full gRPC error: {:?}", e);
+
             // Categorize the error type for better metrics
             match e.code() {
               tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
                 metrics::increment_ingestor_connection_failures();
+                error!("Connection failure to ingestor - check network/TLS");
               }
               _ => {
                 // Other gRPC errors (auth, invalid request, etc.)
+                error!("Non-connection gRPC error: {}", e.code());
               }
             }
-            AtomicDataError::NetworkError(format!("gRPC mobile hotspot request failed: {}", e))
+            AtomicDataError::NetworkError(format!(
+              "gRPC mobile hotspot request failed: status: '{}', message: \"{}\"",
+              e.code(),
+              e.message()
+            ))
           })?;
 
         let resp: MobileHotspotChangeRespV1 = response.into_inner();
@@ -189,53 +200,7 @@ impl AtomicDataPublisher {
       }
       EntityChangeRequest::IotHotspot(iot_req) => {
         let response = client
-          .submit_iot_hotspot_change(Request::new(iot_req))
-          .await
-          .map_err(|e| {
-            // Categorize the error type for better metrics
-            match e.code() {
-              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                metrics::increment_ingestor_connection_failures();
-              }
-              _ => {
-                // Other gRPC errors (auth, invalid request, etc.)
-              }
-            }
-            AtomicDataError::NetworkError(format!("gRPC IoT hotspot request failed: {}", e))
-          })?;
-
-        let resp: IotHotspotChangeRespV1 = response.into_inner();
-        debug!(
-          "IoT hotspot change accepted at timestamp: {}",
-          resp.timestamp_ms
-        );
-      }
-      EntityChangeRequest::EntityOwnership(ownership_req) => {
-        let response = client
-          .submit_entity_ownership_change(Request::new(ownership_req))
-          .await
-          .map_err(|e| {
-            // Categorize the error type for better metrics
-            match e.code() {
-              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
-                metrics::increment_ingestor_connection_failures();
-              }
-              _ => {
-                // Other gRPC errors (auth, invalid request, etc.)
-              }
-            }
-            AtomicDataError::NetworkError(format!("gRPC entity ownership request failed: {}", e))
-          })?;
-
-        let resp: EntityOwnershipChangeRespV1 = response.into_inner();
-        debug!(
-          "Entity ownership change accepted at timestamp: {}",
-          resp.timestamp_ms
-        );
-      }
-      EntityChangeRequest::EntityRewardDestination(reward_req) => {
-        let response = client
-          .submit_entity_reward_destination_change(Request::new(reward_req))
+          .submit_iot_hotspot_change(iot_req)
           .await
           .map_err(|e| {
             // Categorize the error type for better metrics
@@ -248,8 +213,63 @@ impl AtomicDataPublisher {
               }
             }
             AtomicDataError::NetworkError(format!(
-              "gRPC entity reward destination request failed: {}",
-              e
+              "gRPC IoT hotspot request failed: status: '{}', message: \"{}\"",
+              e.code(),
+              e.message()
+            ))
+          })?;
+
+        let resp: IotHotspotChangeRespV1 = response.into_inner();
+        debug!(
+          "IoT hotspot change accepted at timestamp: {}",
+          resp.timestamp_ms
+        );
+      }
+      EntityChangeRequest::EntityOwnership(ownership_req) => {
+        let response = client
+          .submit_entity_ownership_change(ownership_req)
+          .await
+          .map_err(|e| {
+            // Categorize the error type for better metrics
+            match e.code() {
+              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
+                metrics::increment_ingestor_connection_failures();
+              }
+              _ => {
+                // Other gRPC errors (auth, invalid request, etc.)
+              }
+            }
+            AtomicDataError::NetworkError(format!(
+              "gRPC entity ownership request failed: status: '{}', message: \"{}\"",
+              e.code(),
+              e.message()
+            ))
+          })?;
+
+        let resp: EntityOwnershipChangeRespV1 = response.into_inner();
+        debug!(
+          "Entity ownership change accepted at timestamp: {}",
+          resp.timestamp_ms
+        );
+      }
+      EntityChangeRequest::EntityRewardDestination(reward_req) => {
+        let response = client
+          .submit_entity_reward_destination_change(reward_req)
+          .await
+          .map_err(|e| {
+            // Categorize the error type for better metrics
+            match e.code() {
+              tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
+                metrics::increment_ingestor_connection_failures();
+              }
+              _ => {
+                // Other gRPC errors (auth, invalid request, etc.)
+              }
+            }
+            AtomicDataError::NetworkError(format!(
+              "gRPC entity reward destination request failed: status: '{}', message: \"{}\"",
+              e.code(),
+              e.message()
             ))
           })?;
 
@@ -381,44 +401,16 @@ impl AtomicDataPublisher {
     if self.service_config.dry_run {
       debug!("Publisher health check: DRY RUN mode enabled - skipping gRPC health check");
     } else {
-      // In production mode, test gRPC connectivity
-      debug!("Publisher health check: testing gRPC connectivity");
+      // In production mode, verify the client is available
+      debug!("Publisher health check: verifying gRPC client");
 
-      // Try to create a simple gRPC request to test connectivity
-      // This will fail if the gRPC service is unreachable
-      let mut client = self.grpc_client.clone();
-
-      // Create a minimal valid request to test connectivity
-      // We'll use an empty mobile hotspot change request
-      let test_request = tonic::Request::new(
-        helium_proto::services::chain_rewardable_entities::MobileHotspotChangeReqV1 {
-          change: None, // Empty change for health check
-          signature: vec![],
-          signer: self.keypair.public_key().to_string(),
-        },
-      );
-
-      // Use a short timeout for health check
-      match tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        client.submit_mobile_hotspot_change(test_request),
-      )
-      .await
-      {
-        Ok(Ok(_)) => {
-          debug!("Publisher health check: gRPC connectivity verified");
-        }
-        Ok(Err(e)) => {
-          // Even if the request fails with an error, it means gRPC connectivity is working
-          // The error might be due to invalid request parameters, not connectivity
-          debug!("Publisher health check: gRPC connectivity verified (request failed with expected error: {})", e);
-        }
-        Err(_) => {
-          return Err(AtomicDataError::NetworkError(
-            "gRPC request timed out".to_string(),
-          ));
-        }
+      if self.client.is_none() {
+        return Err(AtomicDataError::NetworkError(
+          "No gRPC client configured".to_string()
+        ));
       }
+
+      debug!("Publisher health check: gRPC client available");
     }
 
     debug!("Publisher health check passed");

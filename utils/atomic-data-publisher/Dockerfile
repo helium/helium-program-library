@@ -20,6 +20,7 @@ WORKDIR /usr/src/app
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=BUILD_IMAGE /usr/src/app/target/release/atomic-data-publisher ./atomic-data-publisher
