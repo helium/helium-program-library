@@ -62,9 +62,7 @@ impl AtomicDataPublisher {
           .and_then(|s| s.split(':').next())
           .ok_or_else(|| anyhow::anyhow!("Failed to extract domain from endpoint"))?;
 
-        info!("Configuring TLS for domain: {} using webpki-roots (Mozilla CA bundle)", domain);
-
-        // webpki-roots includes Mozilla's trusted CA bundle (which includes Amazon Root CA 1)
+        info!("Configuring TLS for domain: {}", domain);
         let tls_config = tonic::transport::ClientTlsConfig::new()
           .domain_name(domain);
 
