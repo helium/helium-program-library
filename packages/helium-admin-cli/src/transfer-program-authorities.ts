@@ -1,14 +1,14 @@
 import * as anchor from '@coral-xyz/anchor';
 import { PublicKey } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import os from 'os';
 import yargs from 'yargs/yargs';
 import {
   createProgramSetAuthorityInstruction,
   createSetIdlAuthorityInstruction,
   loadKeypair,
-  sendInstructionsOrSquads
+  sendInstructionsOrSquadsV4
 } from './utils';
+import * as multisig from '@sqds/multisig';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -22,18 +22,10 @@ export async function run(args: any = process.argv) {
       default: 'http://127.0.0.1:8899',
       describe: 'The solana url',
     },
-    executeTransaction: {
-      type: 'boolean',
-    },
     multisig: {
       type: 'string',
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
-    },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
     },
     newAuthority: {
       type: 'string',
@@ -50,15 +42,16 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
   let authority = provider.wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
   }
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions: [
       await createProgramSetAuthorityInstruction(
@@ -72,10 +65,7 @@ export async function run(args: any = process.argv) {
         new PublicKey(argv.newAuthority),
       ),
     ],
-    executeTransaction: argv.executeTransaction,
-    squads,
-    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
+    multisig: multisigPda!,
     signers: [],
   });
 }

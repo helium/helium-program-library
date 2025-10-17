@@ -59,6 +59,12 @@ pub struct UpdateAutoTopOffV0<'info> {
   /// CHECK: new task account
   #[account(mut)]
   pub new_task: UncheckedAccount<'info>,
+  /// CHECK: task rent refund account
+  #[account(mut)]
+  pub task_rent_refund: UncheckedAccount<'info>,
+  /// CHECK: pyth task rent refund account
+  #[account(mut)]
+  pub pyth_task_rent_refund: UncheckedAccount<'info>,
   /// CHECK: new pre task account
   #[account(mut)]
   pub new_pyth_task: UncheckedAccount<'info>,
@@ -93,7 +99,7 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: ctx.accounts.payer.to_account_info(),
+        rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(auto_top_off)],
@@ -106,7 +112,7 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_pyth_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: ctx.accounts.payer.to_account_info(),
+        rent_refund: ctx.accounts.pyth_task_rent_refund.to_account_info(),
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(auto_top_off)],

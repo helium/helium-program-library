@@ -4,10 +4,9 @@ import {
   lazyTransactionsKey,
 } from '@helium/lazy-transactions-sdk';
 import { PublicKey } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
+import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -21,18 +20,10 @@ export async function run(args: any = process.argv) {
       default: 'http://127.0.0.1:8899',
       describe: 'The solana url',
     },
-    executeTransaction: {
-      type: 'boolean',
-    },
     multisig: {
       type: 'string',
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
-    },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
     },
     newAuthority: {
       type: 'string',
@@ -53,9 +44,6 @@ export async function run(args: any = process.argv) {
   const lazyTrAcc = await lazyTrProgram.account.lazyTransactionsV0.fetch(
     lazyTransactions
   );
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
 
   console.log(lazyTransactions.toBase58());
   const ix = await lazyTrProgram.methods
@@ -73,13 +61,10 @@ export async function run(args: any = process.argv) {
     })
     .instruction();
 
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions: [ix],
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }

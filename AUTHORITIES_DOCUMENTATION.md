@@ -389,6 +389,22 @@ helium-admin update-token-metadata \
   --newAuthority <NEW_AUTHORITY>
 ```
 
+## Organization Authorities (modgov)
+
+### Organization Authority
+- **Program**: `organizations` (external, modular-governance)
+- **Account**: `OrganizationV0`
+- **Authority Field**: `authority`
+- **Description**: Controls token metadata updates
+- **CLI Command**:
+```bash
+helium-admin update-organization \
+  --orgName <NAME> \
+  --multisig <MULTISIG_ADDRESS> \
+  --authorityIndex 1 \
+  --newAuthority <NEW_AUTHORITY>
+```
+
 ---
 
 ## Common CLI Parameters

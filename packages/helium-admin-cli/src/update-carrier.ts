@@ -2,10 +2,9 @@ import * as anchor from "@coral-xyz/anchor";
 import { carrierKey, init as initMem } from "@helium/mobile-entity-manager-sdk";
 import { subDaoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 import { MOBILE_MINT } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
@@ -26,18 +25,10 @@ export async function run(args: any = process.argv) {
       required: true,
       describe: "Name of the carrier, case sensitive",
     },
-    executeTransaction: {
-      type: "boolean",
-    },
     multisig: {
       type: "string",
       describe:
         "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
-    },
-    authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
-      default: 1,
     },
     updateAuthority: {
       type: "string",
@@ -98,17 +89,10 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
-
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }

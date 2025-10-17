@@ -3,10 +3,9 @@ import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { carrierKey, incentiveProgramKey, init as initMem } from "@helium/mobile-entity-manager-sdk";
 import { MOBILE_MINT } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { sendInstructionsOrSquads } from "./utils";
+import { sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -117,18 +116,12 @@ export async function run(args: any = process.argv) {
     );
   }
 
-  // @ts-ignore
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, provider.wallet, {
-    commitmentOrConfig: "finalized",
-  });
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
     signers: [],
     payer: provider.wallet.publicKey,
     commitment: "confirmed",
-    executeTransaction: false,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    squads,
   });
 }
