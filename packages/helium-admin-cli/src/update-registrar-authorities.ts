@@ -1,10 +1,9 @@
 import * as anchor from '@coral-xyz/anchor';
 import { init } from '@helium/voter-stake-registry-sdk';
 import { PublicKey } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
+import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -29,9 +28,6 @@ export async function run(args: any = process.argv) {
     multisig: {
       type: 'string',
     },
-    authorityIndex: {
-      type: 'number',
-    },
   });
 
   const argv = await yarg.argv;
@@ -55,16 +51,10 @@ export async function run(args: any = process.argv) {
       .instruction(),
   ];
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: false,
-    squads,
     signers: [],
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
   });
 }

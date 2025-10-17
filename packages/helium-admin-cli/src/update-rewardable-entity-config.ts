@@ -5,10 +5,9 @@ import {
 } from "@helium/helium-entity-manager-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { PublicKey } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 import BN from "bn.js";
 import { getMint } from "@solana/spl-token";
 import { toBN } from "@helium/spl-utils";
@@ -40,18 +39,10 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "The new authority for the entity config",
     },
-    executeTransaction: {
-      type: "boolean",
-    },
     multisig: {
       type: "string",
       describe:
         "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
-    },
-    authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
-      default: 1,
     },
     fullLocationStakingFee: {
       type: "number",
@@ -104,9 +95,6 @@ export async function run(args: any = process.argv) {
       rewardableConfigKey
     );
   let payer = provider.wallet.publicKey;
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
 
   let settings;
   if (name.toUpperCase() == "IOT") {
@@ -172,13 +160,10 @@ export async function run(args: any = process.argv) {
       .instruction(),
   ];
 
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }

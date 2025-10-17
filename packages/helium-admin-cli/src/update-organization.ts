@@ -1,14 +1,13 @@
 import * as anchor from '@coral-xyz/anchor';
-import { daoKey, init as initHsd } from '@helium/helium-sub-daos-sdk';
-import { PublicKey, TransactionInstruction } from '@solana/web3.js';
+import { init, organizationKey } from '@helium/organization-sdk';
+import {
+  init as initLazy,
+  lazyDistributorKey,
+} from '@helium/lazy-distributor-sdk';
+import { PublicKey } from '@solana/web3.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import {
-  loadKeypair,
-  parseEmissionsSchedule,
-  sendInstructionsOrSquadsV4,
-} from './utils';
-import { init, lazyTransactionsKey } from '@helium/lazy-transactions-sdk';
+import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -22,15 +21,18 @@ export async function run(args: any = process.argv) {
       default: 'http://127.0.0.1:8899',
       describe: 'The solana url',
     },
-    name: {
-      required: true,
+    orgName: {
       type: 'string',
-      describe: 'Lazy dist name',
+      describe: 'The name of the organization',
+      required: true,
     },
     multisig: {
       type: 'string',
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+    },
+    newAuthority: {
+      type: 'string',
     },
   });
   const argv = await yarg.argv;
@@ -39,24 +41,27 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
+
   const program = await init(provider);
+  const [organizationK] = organizationKey(argv.orgName)
+  const organizationAcc = await program.account.organizationV0.fetch(organizationK)
 
-  const instructions: TransactionInstruction[] = [];
-
-  const lazyTransactions = lazyTransactionsKey(argv.name)[0];
-  instructions.push(
-    await program.methods
-      .closeCanopyV0()
-      .accountsPartial({
-        lazyTransactions,
-        refund: provider.wallet.publicKey,
-      })
-      .instruction()
-  );
+  const ix = await program.methods
+    .updateOrganizationV0({
+      authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
+      defaultProposalConfig: null,
+      proposalProgram: null,
+      uri: null
+    })
+    .accountsPartial({
+      organization: organizationK,
+      authority: organizationAcc.authority,
+    })
+    .instruction();
 
   await sendInstructionsOrSquadsV4({
     provider,
-    instructions,
+    instructions: [ix],
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
     signers: [],
   });

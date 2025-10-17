@@ -31,10 +31,10 @@ import yargs from 'yargs/yargs';
 import {
   exists,
   loadKeypair,
-  sendInstructionsOrSquads,
+  sendInstructionsOrSquadsV4,
   merkleSizes,
 } from './utils';
-import Squads from '@sqds/sdk';
+import * as multisig from '@sqds/multisig';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -42,9 +42,6 @@ export async function run(args: any = process.argv) {
       alias: 'k',
       describe: 'Anchor wallet keypair',
       default: `${os.homedir()}/.config/solana/id.json`,
-    },
-    executeTransaction: {
-      type: 'boolean',
     },
     url: {
       alias: 'u',
@@ -100,11 +97,6 @@ export async function run(args: any = process.argv) {
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
-    },
   });
 
   const argv = await yarg.argv;
@@ -153,13 +145,14 @@ export async function run(args: any = process.argv) {
   const dao = await hsdProgram.account.daoV0.fetch(subdaoAcc.dao);
   let subdaoPayer = provider.wallet.publicKey;
   let daoPayer = provider.wallet.publicKey;
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
   let authority = provider.wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
     subdaoPayer = authority;
     daoPayer = authority;
     console.log('SQUAD AUTH', authority.toBase58());
@@ -331,19 +324,16 @@ export async function run(args: any = process.argv) {
 
   console.log('Total sol needed: ', humanReadable(new anchor.BN(totalSol), 9));
 
-  if (multisig) {
+  if (multisigPda) {
     // Approve instructions must execute after ALL create instructions
     const instrs = createInstructions.flat().filter(truthy);
     const approveInstrs = approveInstructions.flat().filter(truthy);
     for (const chunk of chunks([...instrs, ...approveInstrs], 3)) {
-      await sendInstructionsOrSquads({
+      await sendInstructionsOrSquadsV4({
         provider,
         instructions: chunk,
         signers: [],
-        executeTransaction: argv.executeTransaction,
-        squads,
-        multisig,
-        authorityIndex: argv.authorityIndex,
+        multisig: multisigPda,
       });
     }
   } else {

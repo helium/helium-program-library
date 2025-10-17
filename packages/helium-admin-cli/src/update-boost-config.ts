@@ -2,10 +2,9 @@ import * as anchor from "@coral-xyz/anchor";
 import { boostConfigKey, init as initHex } from "@helium/hexboosting-sdk";
 import { MOBILE_MINT } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 import {
   init as initHsd,
   subDaoKey,
@@ -23,18 +22,10 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
-    executeTransaction: {
-      type: "boolean",
-    },
     multisig: {
       type: "string",
       describe:
         "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
-    },
-    authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
-      default: 1,
     },
     startAuthority: {
       type: "string",
@@ -97,17 +88,10 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
-
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }

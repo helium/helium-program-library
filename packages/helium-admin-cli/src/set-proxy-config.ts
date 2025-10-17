@@ -1,5 +1,5 @@
 import yargs from "yargs/yargs";
-import { exists, loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { exists, loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 import os from "os";
 import * as anchor from "@coral-xyz/anchor";
 import { init } from "@helium/nft-proxy-sdk";
@@ -7,7 +7,7 @@ import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import fs from "fs";
 import { sendInstructions } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
+import * as multisig from "@sqds/multisig";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -30,11 +30,6 @@ export async function run(args: any = process.argv) {
       describe:
         "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
     },
-    authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
-      default: 1,
-    },
     proxySeasonsFile: {
       type: "string",
       default: `${__dirname}/../../proxy-seasons.json`,
@@ -48,13 +43,14 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
   let authority = provider.wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
   }
 
   const delProgram = await init(provider);
@@ -88,7 +84,7 @@ export async function run(args: any = process.argv) {
   }
 
   console.log("Updating registrar to delegation config");
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions: [
       await vsrProgram.methods
@@ -100,10 +96,7 @@ export async function run(args: any = process.argv) {
         })
         .instruction(),
     ],
-    executeTransaction: false,
-    squads,
-    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
+    multisig: multisigPda!,
     signers: [],
   });
 }

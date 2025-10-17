@@ -5,6 +5,7 @@ import {
 } from '@helium/helium-entity-manager-sdk';
 import { HNT_MINT, sendInstructions } from '@helium/spl-utils';
 import { daoKey } from '@helium/helium-sub-daos-sdk';
+import * as multisig from '@sqds/multisig';
 import {
   ComputeBudgetProgram,
   Connection,
@@ -13,10 +14,9 @@ import {
   PublicKey,
   SystemProgram,
 } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
+import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
 import fs from 'fs';
 import { BN } from 'bn.js';
 import {
@@ -53,11 +53,6 @@ export async function run(args: any = process.argv) {
       describe:
         'Address of the squads multisig to control the dao. If not provided, your wallet will be the authority',
     },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
-    },
     merklePath: {
       type: 'string',
       describe: 'Path to the merkle keypair',
@@ -77,13 +72,14 @@ export async function run(args: any = process.argv) {
   const hntMint = new PublicKey(argv.hntMint);
   const dao = daoKey(hntMint)[0];
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
   let authority = provider.wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
     // Fund authority
     const authAcc = await provider.connection.getAccountInfo(authority);
     if (!authAcc || authAcc.lamports < LAMPORTS_PER_SOL) {
@@ -132,7 +128,7 @@ export async function run(args: any = process.argv) {
       [merkle]
     );
   }
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions: [
       ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
@@ -156,10 +152,7 @@ export async function run(args: any = process.argv) {
         })
         .instruction(),
     ],
-    executeTransaction: false,
-    squads,
-    multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
+    multisig: multisigPda!,
     signers: [],
   });
 }
