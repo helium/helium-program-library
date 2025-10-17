@@ -70,7 +70,7 @@ impl AtomicDataPublisher {
           anyhow::anyhow!("Failed to configure TLS: {}", e)
         })?;
 
-        info!("TLS configuration complete");
+        info!("TLS ready", domain);
       }
 
       endpoint = endpoint
