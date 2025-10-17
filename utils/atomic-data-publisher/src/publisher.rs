@@ -58,13 +58,7 @@ impl AtomicDataPublisher {
         .map_err(|e| anyhow::anyhow!("Invalid ingestor endpoint: {}", e))?;
 
       if ingestor_config.endpoint.starts_with("https://") {
-        info!("Configuring TLS with certificate verification disabled");
-        info!("TLS backend: tls-aws-lc (rustls with aws-lc-rs crypto)");
-        warn!("⚠️  CERT VERIFICATION DISABLED - accepting any certificate!");
-        warn!("⚠️  This is INSECURE - ALB must send full certificate chain to re-enable");
-
-        // Use simple TLS config - with only tls-aws-lc feature and no root store,
-        // rustls should not validate certificates
+        info!("Configuring TLS");
         let tls_config = tonic::transport::ClientTlsConfig::new();
 
         endpoint = endpoint.tls_config(tls_config).map_err(|e| {
@@ -72,7 +66,7 @@ impl AtomicDataPublisher {
           anyhow::anyhow!("Failed to configure TLS: {}", e)
         })?;
 
-        info!("TLS config applied (no root store, no verification)");
+        info!("TLS config applied");
       }
 
       endpoint = endpoint
