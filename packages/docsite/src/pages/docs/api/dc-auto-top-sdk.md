@@ -116,20 +116,22 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name                 | Mutability | Signer | Docs |
-| -------------------- | ---------- | ------ | ---- |
-| authority            | immut      | no     |      |
-| payer                | immut      | no     |      |
-| auto_top_off         | immut      | no     |      |
-| queue_authority      | immut      | no     |      |
-| task_queue_authority | immut      | no     |      |
-| task_queue           | immut      | no     |      |
-| next_task            | immut      | no     |      |
-| next_pyth_task       | immut      | no     |      |
-| new_task             | immut      | no     |      |
-| new_pyth_task        | immut      | no     |      |
-| tuktuk_program       | immut      | no     |      |
-| system_program       | immut      | no     |      |
+| Name                  | Mutability | Signer | Docs |
+| --------------------- | ---------- | ------ | ---- |
+| authority             | immut      | no     |      |
+| payer                 | immut      | no     |      |
+| auto_top_off          | immut      | no     |      |
+| queue_authority       | immut      | no     |      |
+| task_queue_authority  | immut      | no     |      |
+| task_queue            | immut      | no     |      |
+| next_task             | immut      | no     |      |
+| next_pyth_task        | immut      | no     |      |
+| new_task              | immut      | no     |      |
+| task_rent_refund      | immut      | no     |      |
+| pyth_task_rent_refund | immut      | no     |      |
+| new_pyth_task         | immut      | no     |      |
+| tuktuk_program        | immut      | no     |      |
+| system_program        | immut      | no     |      |
 
 #### Args
 
