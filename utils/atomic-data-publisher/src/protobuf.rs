@@ -148,14 +148,14 @@ impl ProtobufBuilder {
       let block = Self::get_u64_field(atomic_data, "block")?;
       let timestamp_seconds = Self::current_timestamp();
 
-      let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key").ok();
+      let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
       let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
       let owner = Self::build_entity_owner_info(atomic_data)?;
 
       let change_msg = EntityOwnerChangeV1 {
         block,
         timestamp_seconds,
-        entity_pub_key,
+        entity_pub_key: Some(pub_key),
         asset: Some(asset),
         owner: Some(owner),
       };
