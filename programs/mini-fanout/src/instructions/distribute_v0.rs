@@ -16,7 +16,8 @@ pub struct DistributeV0<'info> {
   #[account(
     mut,
     has_one = task_queue,
-    has_one = next_pre_task
+    has_one = next_pre_task,
+    has_one = token_account
   )]
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   #[account(mut)]
@@ -148,7 +149,7 @@ pub fn handler<'info>(
       _ => 0,
     };
     let payout = if fixed_val > remaining {
-      mini_fanout.shares[i].total_owed += (fixed_val - remaining) as u64;
+      mini_fanout.shares[i].total_owed = (fixed_val - remaining) as u64;
       remaining
     } else {
       mini_fanout.shares[i].total_owed = 0;

@@ -636,7 +636,7 @@ export async function bulkSendRawTransactions(
         .filter(truthy);
 
       if (failures.length > 0) {
-        const failureIndexes = statuses.map((status, index) => status?.meta?.err ? index : null).filter(i => typeof i !== 'undefined');
+        const failureIndexes = statuses.map((status, index) => status?.meta?.err ? index : null).filter(i => typeof i !== 'undefined' && i !== null);
         const failedTxs = await Promise.all(failureIndexes.map(index => connection.getTransaction(txids[index!], { commitment: "confirmed", maxSupportedTransactionVersion: 0 })));
         for (const tx of failedTxs) {
           console.error(tx?.meta?.logMessages?.join("\n"));
