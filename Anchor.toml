@@ -21,6 +21,7 @@ hpl_crons = "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu"
 mini_fanout = "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn"
 welcome_pack = "we1cGnTxTkDP9Sk49dw1d3T7ik7V2NfnY4qDGCDHXfC"
 dc_auto_top = "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU"
+tuktuk-dca = "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN"
 
 [workspace]
 members = [
@@ -41,7 +42,8 @@ members = [
   "programs/hpl-crons",
   "programs/mini-fanout",
   "programs/welcome-pack",
-  "programs/dc-auto-top"
+  "programs/dc-auto-top",
+  "programs/tuktuk-dca",
 ]
 
 [registry]
@@ -83,6 +85,12 @@ address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV" # noop
 
 [[test.validator.clone]]
 address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33" # hnt feed needed for dc auto top
+
+[[test.validator.clone]]
+address = "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD" # USDC/USD price feed for tuktuk-dca
+
+[[test.validator.clone]]
+address = "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm" # HNT/USD price feed for tuktuk-dca
 
 [[test.validator.clone]]
 address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK" # account compression

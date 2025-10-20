@@ -489,6 +489,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fastify/cors@npm:^8.0.0":
+  version: 8.5.0
+  resolution: "@fastify/cors@npm:8.5.0"
+  dependencies:
+    fastify-plugin: ^4.0.0
+    mnemonist: 0.39.6
+  checksum: b8adf78fa0c1f2ecbffe644dfda148f57f7e9c3c815de3eb6fd90ff359486d372f275c696db3c4f6441b0864e7427c1b7d8a307582a31925bddf21087a943c18
+  languageName: node
+  linkType: hard
+
 "@fastify/cors@npm:^8.1.1":
   version: 8.3.0
   resolution: "@fastify/cors@npm:8.3.0"
@@ -2006,6 +2016,28 @@ __metadata:
     git-format-staged: ^2.1.3
     ts-loader: ^9.2.3
     ts-node: ^10.9.1
+    typescript: ^5.2.2
+  languageName: unknown
+  linkType: soft
+
+"@helium/tuktuk-dca-sdk@workspace:packages/tuktuk-dca-sdk":
+  version: 0.0.0-use.local
+  resolution: "@helium/tuktuk-dca-sdk@workspace:packages/tuktuk-dca-sdk"
+  dependencies:
+    "@coral-xyz/anchor": ^0.31.0
+    "@fastify/cors": ^8.0.0
+    "@helium/anchor-resolvers": ^0.11.5
+    "@helium/idls": ^0.11.5
+    "@helium/spl-utils": ^0.11.5
+    "@helium/tuktuk-sdk": ^0.0.9
+    "@solana/spl-token": ^0.4.8
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+    fastify: ^4.0.0
+    git-format-staged: ^2.1.3
+    ts-loader: ^9.2.3
+    ts-node: ^10.9.1
+    tweetnacl: ^1.0.3
     typescript: ^5.2.2
   languageName: unknown
   linkType: soft
@@ -4379,6 +4411,21 @@ __metadata:
   peerDependencies:
     "@solana/web3.js": ^1.95.5
   checksum: 6100244c3f71f9887d1671261396f29f3528d1067f1691ceda26623f16fa93369991217fbca96c84fbf7d5d7fd610de48a6e1078895fd37a66768e599391a8a2
+  languageName: node
+  linkType: hard
+
+"@solana/spl-token@npm:^0.4.8":
+  version: 0.4.14
+  resolution: "@solana/spl-token@npm:0.4.14"
+  dependencies:
+    "@solana/buffer-layout": ^4.0.0
+    "@solana/buffer-layout-utils": ^0.2.0
+    "@solana/spl-token-group": ^0.0.7
+    "@solana/spl-token-metadata": ^0.1.6
+    buffer: ^6.0.3
+  peerDependencies:
+    "@solana/web3.js": ^1.95.5
+  checksum: 71419c84f6c5bc0e0741b86c7c8448ec98e298164d930a89b5c2603bb38dbe6d111230959aa5d81675129e6061f3ce6cf4521808da3a448f6747202deda95c41
   languageName: node
   linkType: hard
 
@@ -9244,6 +9291,30 @@ __metadata:
   languageName: node
   linkType: hard
 
+"fastify@npm:^4.0.0":
+  version: 4.29.1
+  resolution: "fastify@npm:4.29.1"
+  dependencies:
+    "@fastify/ajv-compiler": ^3.5.0
+    "@fastify/error": ^3.4.0
+    "@fastify/fast-json-stringify-compiler": ^4.3.0
+    abstract-logging: ^2.0.1
+    avvio: ^8.3.0
+    fast-content-type-parse: ^1.1.0
+    fast-json-stringify: ^5.8.0
+    find-my-way: ^8.0.0
+    light-my-request: ^5.11.0
+    pino: ^9.0.0
+    process-warning: ^3.0.0
+    proxy-addr: ^2.0.7
+    rfdc: ^1.3.0
+    secure-json-parse: ^2.7.0
+    semver: ^7.5.4
+    toad-cache: ^3.3.0
+  checksum: d0a4f4e47393bdddf7e183c260aa7fe489e61436558ee2e4b95b8289e694757a722c3a969cd0495e35d04a46aaf8a9947c40e450c32c96e903220895f8637c4b
+  languageName: node
+  linkType: hard
+
 "fastify@npm:^4.13.0":
   version: 4.29.0
   resolution: "fastify@npm:4.29.0"
@@ -12498,6 +12569,15 @@ __metadata:
   dependencies:
     obliterator: "npm:^2.0.1"
   checksum: 6669d687a434226924b2c84ee6eb7ce7d0f83dfc5caad8bcc164c73c0c11fb6d43cbe32636e710f068046f4b40a56c3032532554e93e02640aafc6ca3dd222e6
+  languageName: node
+  linkType: hard
+
+"mnemonist@npm:0.39.6":
+  version: 0.39.6
+  resolution: "mnemonist@npm:0.39.6"
+  dependencies:
+    obliterator: ^2.0.1
+  checksum: 10cb09aa33de92625d5004f541e6aaaab8ae4bb26c6917e8505189f2fc20b122c773a4c11639bb6b5bfdc6000645c2d210ecd47fb203176fe28c338443c466eb
   languageName: node
   linkType: hard
 

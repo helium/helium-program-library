@@ -1,0 +1,32 @@
+# Helium Program Library - Cursor Rules
+
+## Anchor Account Initialization
+
+When initializing new Anchor accounts in instruction handlers, always use the `set_inner()` syntax instead of setting fields individually.
+
+**Preferred:**
+```rust
+pub fn handler(ctx: Context<InitializeV0>, args: InitializeArgsV0) -> Result<()> {
+  let account = &mut ctx.accounts.account;
+  account.set_inner(AccountV0 {
+    field1: value1,
+    field2: value2,
+    // ... all fields
+  });
+  Ok(())
+}
+```
+
+**Not preferred:**
+```rust
+pub fn handler(ctx: Context<InitializeV0>, args: InitializeArgsV0) -> Result<()> {
+  let account = &mut ctx.accounts.account;
+  account.field1 = value1;
+  account.field2 = value2;
+  // ... setting fields individually
+  Ok(())
+}
+```
+
+This pattern is cleaner, ensures all fields are explicitly initialized, and makes it easier to see the complete state of the account at initialization time.
+

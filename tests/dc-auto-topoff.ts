@@ -7,11 +7,11 @@ import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { createAtaAndTransfer, sendInstructions } from "@helium/spl-utils";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
 import { init as initTuktuk, nextAvailableTaskIds, runTask, taskKey, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey } from "@helium/tuktuk-sdk";
-import { createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { createAssociatedTokenAccountIdempotentInstruction, getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { ComputeBudgetProgram, PublicKey, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
 import { execSync } from "child_process";
-import { init, PROGRAM_ID, queueAuthorityKey } from "../packages/dc-auto-top-sdk/src";
+import { init, queueAuthorityKey } from "../packages/dc-auto-top-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { DcAutoTop } from "../target/types/dc_auto_top";
 import { HeliumEntityManager } from "../target/types/helium_entity_manager";
@@ -217,6 +217,7 @@ describe("dc-auto-topoff", () => {
         newPythTaskId: nextPythTask,
         schedule: "0 0 * * * *",
         threshold: new anchor.BN(10000000),
+        authority: null,
       })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
@@ -226,6 +227,8 @@ describe("dc-auto-topoff", () => {
           autoTopOff,
           newTask: taskKey(taskQueue, nextTask)[0],
           newPythTask: taskKey(taskQueue, nextPythTask)[0],
+          taskRentRefund: autoTopOff,
+          pythTaskRentRefund: autoTopOff,
         })
         .rpcAndKeys()
 

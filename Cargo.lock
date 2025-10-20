@@ -3272,6 +3272,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tuktuk-dca"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "default-env",
+ "pyth-solana-receiver-sdk",
+ "shared-utils",
+ "solana-security-txt",
+ "solana-zk-sdk",
+ "tuktuk-program",
+]
+
+[[package]]
 name = "tuktuk-program"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
