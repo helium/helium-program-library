@@ -24,7 +24,7 @@ pub struct ChangeRecord {
   pub job_name: String,
   pub query_name: String,
   pub target_block: u64,
-  pub atomic_data: Vec<serde_json::Value>,
+  pub atomic_data: serde_json::Value,
 }
 
 #[derive(Debug)]
@@ -377,8 +377,6 @@ impl DatabaseClient {
   }
 
   pub async fn get_pending_changes(&self) -> Result<Vec<ChangeRecord>> {
-    let mut change_records = Vec::new();
-
     loop {
       if let Some(job) = self.get_next_queue_job().await? {
         if !self.mark_job_running(&job.name, &job.query_name).await? {
@@ -386,9 +384,9 @@ impl DatabaseClient {
         }
 
         match self.execute_job_polling(&job).await {
-          Ok(change_record) => {
+          Ok(change_records) => {
             // If no data found, mark job as completed and not running, then continue to next job
-            if change_record.is_none() {
+            if change_records.is_empty() {
               info!(
                 "No data found for job '{}', marking as completed and continuing to next job",
                 job.name
@@ -398,9 +396,8 @@ impl DatabaseClient {
               continue; // Continue to next job in the same cycle
             }
 
-            // Found a job with data - return it for processing
-            change_records.push(change_record.unwrap());
-            break;
+            // Found a job with data - return all records for processing
+            return Ok(change_records);
           }
           Err(e) => {
             let _ = self.mark_job_not_running(&job.name, &job.query_name).await;
@@ -414,13 +411,13 @@ impl DatabaseClient {
       }
     }
 
-    Ok(change_records)
+    Ok(Vec::new())
   }
 
   async fn execute_job_polling(
     &self,
     job: &PollingJob,
-  ) -> Result<Option<ChangeRecord>, AtomicDataError> {
+  ) -> Result<Vec<ChangeRecord>, AtomicDataError> {
     let (last_processed_block_opt, max_available_block) = self.get_polling_bounds(job).await?;
     let should_skip = match last_processed_block_opt {
       None => false,
@@ -428,7 +425,7 @@ impl DatabaseClient {
     };
 
     if should_skip {
-      return Ok(None);
+      return Ok(Vec::new());
     }
 
     let last_processed_block_u64 = last_processed_block_opt.unwrap_or(0) as u64;
@@ -454,12 +451,12 @@ impl DatabaseClient {
     let query_results = self
       .execute_query(job, query_last_block, target_block)
       .await?;
-    let change_record = self.process_query_results(&query_results, job, target_block);
+    let change_records = self.process_query_results(&query_results, job, target_block);
 
-    if change_record.is_some() {
+    if !change_records.is_empty() {
       info!(
         "Found {} items for job '{}' (processed up to block {})",
-        query_results.len(),
+        change_records.len(),
         job.name,
         target_block
       );
@@ -473,7 +470,7 @@ impl DatabaseClient {
         .await?;
     }
 
-    Ok(change_record)
+    Ok(change_records)
   }
 
   /// Get the polling bounds (last processed block and max available block) for a job
@@ -528,9 +525,7 @@ impl DatabaseClient {
 
     // Convert last_processed_block to u64 for calculations, treating NULL as 0
     let last_processed_block_u64 = last_processed_block.unwrap_or(0) as u64;
-
     let effective_start_block = std::cmp::max(min_block, last_processed_block_u64);
-
     let max_available_block = self
       .apply_safety_buffer_and_track_progress(
         &job.name,
@@ -720,22 +715,16 @@ impl DatabaseClient {
     rows: &[sqlx::postgres::PgRow],
     job: &PollingJob,
     target_block: u64,
-  ) -> Option<ChangeRecord> {
-    if rows.is_empty() {
-      return None;
-    }
-
-    let mut atomic_data_array = Vec::with_capacity(rows.len());
-    for row in rows {
-      atomic_data_array.push(row.get::<serde_json::Value, _>("atomic_data"));
-    }
-
-    Some(ChangeRecord {
-      job_name: job.name.clone(),
-      query_name: job.query_name.clone(),
-      target_block,
-      atomic_data: atomic_data_array,
-    })
+  ) -> Vec<ChangeRecord> {
+    rows
+      .iter()
+      .map(|row| ChangeRecord {
+        job_name: job.name.clone(),
+        query_name: job.query_name.clone(),
+        target_block,
+        atomic_data: row.get::<serde_json::Value, _>("atomic_data"),
+      })
+      .collect()
   }
 
   pub async fn mark_processed(&self, changes: &[ChangeRecord], target_block: u64) -> Result<()> {

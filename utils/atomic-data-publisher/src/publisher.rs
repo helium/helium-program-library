@@ -15,7 +15,7 @@ use crate::{
   database::ChangeRecord,
   errors::AtomicDataError,
   metrics,
-  protobuf::{build_entity_change_requests, EntityChangeRequest},
+  protobuf::{build_entity_change_request, EntityChangeRequest},
 };
 
 #[derive(Clone)]
@@ -67,11 +67,11 @@ impl AtomicDataPublisher {
     })
   }
 
-  /// Prepare change records for publishing by building protobuf requests
-  pub async fn prepare_changes_batch(
+  /// Prepare a change record for publishing by building a protobuf request
+  pub async fn prepare_change(
     &self,
     change_record: &ChangeRecord,
-  ) -> Result<Vec<EntityChangeRequest>, AtomicDataError> {
+  ) -> Result<EntityChangeRequest, AtomicDataError> {
     let job_config = self
       .polling_jobs
       .iter()
@@ -94,7 +94,7 @@ impl AtomicDataPublisher {
         ))
       })?;
 
-    build_entity_change_requests(change_record, change_type, &self.keypair, false)
+    build_entity_change_request(change_record, change_type, &self.keypair, false)
   }
 
   /// Publish a single change request with retries

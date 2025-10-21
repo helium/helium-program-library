@@ -92,46 +92,44 @@ impl PollingService {
         break;
       }
 
-      for record in change_records {
-        total_jobs_processed += 1;
-        total_jobs_with_data += 1;
-        let item_count = record.atomic_data.len();
-        let job_name = record.job_name.clone();
-        let query_name = record.query_name.clone();
-        let target_block = record.target_block;
+      total_jobs_processed += 1;
+      total_jobs_with_data += 1;
+      let item_count = change_records.len();
+      let job_name = change_records[0].job_name.clone();
+      let query_name = change_records[0].query_name.clone();
+      let target_block = change_records[0].target_block;
 
-        info!(
-          "Processing job '{}' with {} items (target block: {})",
-          job_name, item_count, target_block
-        );
+      info!(
+        "Processing job '{}' with {} items (target block: {})",
+        job_name, item_count, target_block
+      );
 
-        match self.process_job(&record, shutdown_listener.clone()).await {
-          Ok((job_published, job_failed, has_failures)) => {
-            total_changes_published += job_published;
-            total_changes_failed += job_failed;
+      match self.process_job(&change_records, shutdown_listener.clone()).await {
+        Ok((job_published, job_failed, has_failures)) => {
+          total_changes_published += job_published;
+          total_changes_failed += job_failed;
 
-            if let Err(e) = self.database.finalize_job(&record, job_failed).await {
-              error!("Failed to finalize job '{}': {}", job_name, e);
-              let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
-              continue;
-            }
-
-            info!(
-              "Completed job '{}': {} individual changes published, {} failed",
-              job_name, job_published, job_failed
-            );
-
-            if has_failures {
-              // Mark as not running to allow retry on next cycle
-              let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
-              return Ok(());
-            }
-          }
-          Err(e) => {
-            error!("Job '{}' failed: {}", job_name, e);
+          if let Err(e) = self.database.finalize_job(&change_records[0], job_failed).await {
+            error!("Failed to finalize job '{}': {}", job_name, e);
             let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
             continue;
           }
+
+          info!(
+            "Completed job '{}': {} individual changes published, {} failed",
+            job_name, job_published, job_failed
+          );
+
+          if has_failures {
+            // Mark as not running to allow retry on next cycle
+            let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
+            return Ok(());
+          }
+        }
+        Err(e) => {
+          error!("Job '{}' failed: {}", job_name, e);
+          let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
+          continue;
         }
       }
     }
@@ -145,17 +143,17 @@ impl PollingService {
 
   async fn process_job(
     &self,
-    job: &ChangeRecord,
+    records: &[ChangeRecord],
     shutdown_listener: Listener,
   ) -> Result<(usize, usize, bool), AtomicDataError> {
     let mut total_published = 0;
     let mut total_failed = 0;
     let mut all_published_changes = Vec::new();
-    let total_items = job.atomic_data.len();
+    let total_items = records.len();
 
     info!("Processing {} atomic items", total_items);
 
-    for (item_index, atomic_item) in job.atomic_data.iter().enumerate() {
+    for (item_index, record) in records.iter().enumerate() {
       // Check for shutdown signal before processing each item
       if shutdown_listener.is_triggered() {
         warn!(
@@ -189,7 +187,7 @@ impl PollingService {
       }
 
       match self
-        .process_single_item(job, atomic_item, shutdown_listener.clone())
+        .process_single_item(record, shutdown_listener.clone())
         .await
       {
         Ok(Some(published_change)) => {
@@ -222,7 +220,7 @@ impl PollingService {
     if !has_failures && !all_published_changes.is_empty() {
       self
         .database
-        .mark_processed(&all_published_changes, job.target_block)
+        .mark_processed(&all_published_changes, records[0].target_block)
         .await?;
     } else if has_failures {
       warn!(
@@ -236,8 +234,7 @@ impl PollingService {
 
   async fn process_single_item(
     &self,
-    job: &ChangeRecord,
-    atomic_item: &serde_json::Value,
+    record: &ChangeRecord,
     shutdown_listener: Listener,
   ) -> Result<Option<ChangeRecord>, AtomicDataError> {
     // Check for shutdown signal
@@ -245,35 +242,15 @@ impl PollingService {
       return Ok(None);
     }
 
-    // Create a single-item record for this item
-    let item_record = ChangeRecord {
-      job_name: job.job_name.clone(),
-      query_name: job.query_name.clone(),
-      target_block: job.target_block,
-      atomic_data: vec![atomic_item.clone()],
-    };
-
-    // Prepare the protobuf request for this single item
-    let change_requests = match self.publisher.prepare_changes_batch(&item_record).await {
-      Ok(requests) => requests,
+    // Prepare the protobuf request
+    let request = match self.publisher.prepare_change(record).await {
+      Ok(req) => req,
       Err(e) => {
         error!("Failed to prepare change request for item: {}", e);
         metrics::increment_protobuf_build_failures();
         return Ok(None); // Failed to prepare, return None
       }
     };
-
-    // Should have exactly one request
-    if change_requests.len() != 1 {
-      error!(
-        "Expected 1 change request but got {} for job '{}'",
-        change_requests.len(),
-        job.job_name
-      );
-      return Ok(None);
-    }
-
-    let request = change_requests.into_iter().next().unwrap();
 
     // Publish the change with retries
     let publish_start = Instant::now();
@@ -292,17 +269,12 @@ impl PollingService {
         metrics::increment_published();
         metrics::observe_publish_duration(publish_duration);
         debug!("Successfully published change (duration: {:.2}s)", publish_duration);
-        Ok(Some(ChangeRecord {
-          job_name: job.job_name.clone(),
-          query_name: job.query_name.clone(),
-          target_block: job.target_block,
-          atomic_data: vec![atomic_item.clone()],
-        }))
+        Ok(Some(record.clone()))
       }
       Err(e) => {
         error!(
           "Failed to publish change for job '{}' (duration: {:.2}s): {}",
-          job.job_name, publish_duration, e
+          record.job_name, publish_duration, e
         );
         metrics::increment_errors();
         metrics::observe_publish_duration(publish_duration);
