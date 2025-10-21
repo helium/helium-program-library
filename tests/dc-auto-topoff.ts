@@ -118,14 +118,14 @@ describe("dc-auto-topoff", () => {
       routerKey,
       amount: new anchor.BN(0),
     })
-    .preInstructions([
-      createAssociatedTokenAccountIdempotentInstruction(
-        me,
-        getAssociatedTokenAddressSync(dcMint, me, true),
-        me,
-        dcMint,
-      )
-    ])
+      .preInstructions([
+        createAssociatedTokenAccountIdempotentInstruction(
+          me,
+          getAssociatedTokenAddressSync(dcMint, me, true),
+          me,
+          dcMint,
+        )
+      ])
       .accountsPartial({
         payer: me,
         subDao: subDao,
@@ -217,7 +217,6 @@ describe("dc-auto-topoff", () => {
         newPythTaskId: nextPythTask,
         schedule: "0 0 * * * *",
         threshold: new anchor.BN(10000000),
-        authority: null,
       })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
@@ -281,6 +280,24 @@ describe("dc-auto-topoff", () => {
       const escrow = delegatedDataCreditsAcc.escrowAccount
       const escrowBalance = await getAccount(provider.connection, escrow)
       expect(Number(escrowBalance.amount)).to.equal(10000000)
+    })
+
+    it("should close the auto topoff", async () => {
+      await program.methods.closeAutoTopOffV0()
+        .accounts({
+          autoTopOff,
+          rentRefund: me,
+        })
+        .rpc()
+
+      const autoTopOffAcc = await program.account.autoTopOffV0.fetchNullable(autoTopOff)
+      expect(autoTopOffAcc).to.be.null
+
+      const escrow = await provider.connection.getAccountInfo(getAssociatedTokenAddressSync(dcMint, autoTopOff, true))
+      expect(escrow).to.be.null
+
+      const dc = await provider.connection.getAccountInfo(getAssociatedTokenAddressSync(dcMint, autoTopOff, true))
+      expect(dc).to.be.null
     })
   })
 });

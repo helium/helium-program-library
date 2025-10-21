@@ -30,3 +30,42 @@ pub fn handler(ctx: Context<InitializeV0>, args: InitializeArgsV0) -> Result<()>
 
 This pattern is cleaner, ensures all fields are explicitly initialized, and makes it easier to see the complete state of the account at initialization time.
 
+## Anchor Method Account Resolution
+
+When calling Anchor program methods in TypeScript/JavaScript, always use `.accounts()` instead of `.accountsPartial()` or `.accountsStrict()`. Anchor's account resolvers will automatically derive the remaining accounts.
+
+**Preferred:**
+```typescript
+await program.methods.someInstruction(args)
+  .accounts({
+    payer: authority,
+    authority,
+    someAccount: myAccount,
+  })
+  .instruction()
+```
+
+**Not preferred:**
+```typescript
+// Don't use accountsPartial
+await program.methods.someInstruction(args)
+  .accountsPartial({
+    payer: authority,
+    authority,
+    someAccount: myAccount,
+  })
+  .instruction()
+
+// Don't use accountsStrict
+await program.methods.someInstruction(args)
+  .accountsStrict({
+    payer: authority,
+    authority,
+    someAccount: myAccount,
+    // ... all accounts manually specified
+  })
+  .instruction()
+```
+
+This approach is cleaner and leverages Anchor's automatic account resolution, reducing boilerplate and potential errors.
+

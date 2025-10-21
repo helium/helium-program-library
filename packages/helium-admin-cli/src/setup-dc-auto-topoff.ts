@@ -5,7 +5,7 @@ import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
 import { DC_MINT, HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import * as multisig from '@sqds/multisig';
-import { createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { createAssociatedTokenAccountIdempotentInstruction, createTransferInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { ComputeBudgetProgram, PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -128,7 +128,102 @@ export async function run(args: any = process.argv) {
   const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID)
   const [nextPythTask, nextTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 2)
   const autoTopOffAcc = await dcAutoTopoffProgram.account.autoTopOffV0.fetchNullable(autoTopOff!)
-  if (autoTopOffAcc) {
+  
+  // Check if auto topoff exists with different authority
+  if (autoTopOffAcc && !autoTopOffAcc.authority.equals(authority)) {
+    console.log(`Authority mismatch detected. Old authority: ${autoTopOffAcc.authority.toBase58()}, New authority: ${authority.toBase58()}`)
+    
+    // Get HNT balance from old auto topoff
+    const oldAutoTopOffHntAccount = getAssociatedTokenAddressSync(hntMint, autoTopOff!, true)
+    const oldHntAccountInfo = await provider.connection.getAccountInfo(oldAutoTopOffHntAccount)
+    let oldHntBalance = new anchor.BN(0)
+    if (oldHntAccountInfo) {
+      const oldHntAccount = await provider.connection.getTokenAccountBalance(oldAutoTopOffHntAccount)
+      oldHntBalance = new anchor.BN(oldHntAccount.value.amount)
+      console.log(`Old auto topoff HNT balance: ${oldHntBalance.toString()}`)
+    }
+    
+    // Close the old auto topoff
+    const closeIx = await dcAutoTopoffProgram.methods.closeAutoTopOffV0()
+      .accounts({
+        autoTopOff: autoTopOff!,
+        rentRefund: authority,
+      })
+      .instruction()
+    instructions.push(closeIx)
+    
+    const schedule = argv.schedule ? argv.schedule : autoTopOffAcc.schedule
+    const threshold = argv.threshold ? new anchor.BN(argv.threshold) : autoTopOffAcc.threshold
+    
+    const newAutoTopOff = autoTopOffKey(delegatedDc, authority)[0]
+    const initIx = await dcAutoTopoffProgram.methods.initializeAutoTopOffV0({
+      schedule,
+      threshold,
+      routerKey,
+    })
+      .accountsPartial({
+        payer: authority,
+        authority,
+        taskQueue: TASK_QUEUE_ID,
+        delegatedDataCredits: delegatedDc,
+        dao: daoKey(hntMint)[0],
+        dataCredits: dataCreditsKey(dcMint)[0],
+        dcMint,
+        hntMint,
+        subDao,
+      })
+      .instruction()
+    instructions.push(initIx)
+    
+    const { instruction: scheduleTaskInstruction } = await dcAutoTopoffProgram.methods.scheduleTaskV0({
+      taskId: nextTask,
+      pythTaskId: nextPythTask,
+    })
+      .accountsPartial({
+        payer: authority,
+        autoTopOff: autoTopOff!,
+        nextTask: autoTopOff!,
+        task: taskKey(TASK_QUEUE_ID, nextTask)[0],
+        pythTask: taskKey(TASK_QUEUE_ID, nextPythTask)[0],
+        taskQueue: TASK_QUEUE_ID,
+      })
+      .prepare()
+    instructions.push(scheduleTaskInstruction)
+    
+    instructions.push(
+      SystemProgram.transfer({
+        fromPubkey: authority,
+        toPubkey: newAutoTopOff,
+        lamports: argv.initialLamports,
+      })
+    )
+    
+    // Transfer HNT from old wallet (if any) to new auto topoff
+    if (oldHntBalance.gt(new anchor.BN(0))) {
+      const walletHntAccount = getAssociatedTokenAddressSync(hntMint, authority, true)
+      const newAutoTopOffHntAccount = getAssociatedTokenAddressSync(hntMint, newAutoTopOff, true)
+      
+      instructions.push(
+        createAssociatedTokenAccountIdempotentInstruction(
+          authority,
+          newAutoTopOffHntAccount,
+          newAutoTopOff,
+          hntMint
+        )
+      )
+      
+      instructions.push(
+        createTransferInstruction(
+          walletHntAccount,
+          newAutoTopOffHntAccount,
+          authority,
+          BigInt(oldHntBalance.toString())
+        )
+      )
+      
+      console.log(`Will transfer ${oldHntBalance.toString()} HNT from wallet to new auto topoff`)
+    }
+  } else if (autoTopOffAcc) {
     const queueAuthority = queueAuthorityKey()[0]
     const taskRentRefund = (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextTask))?.rentRefund || authority
     const pythTaskRentRefund = (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextPythTask))?.rentRefund || authority
@@ -137,7 +232,6 @@ export async function run(args: any = process.argv) {
       newPythTaskId: nextPythTask,
       schedule: argv.schedule ? argv.schedule : null,
       threshold: argv.threshold ? new anchor.BN(argv.threshold) : null,
-      authority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
     })
       .accountsStrict({
         payer: authority,
