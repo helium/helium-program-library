@@ -2,10 +2,10 @@ use anchor_lang::{
   prelude::*,
   solana_program::sysvar::instructions::{get_instruction_relative, ID as IX_ID},
 };
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 use tuktuk_program::{tuktuk, TaskV0, TriggerV0};
 
-use crate::{errors::ErrorCode, state::*};
+use crate::{dca_seeds, errors::ErrorCode, state::*};
 
 #[derive(Accounts)]
 pub struct LendV0<'info> {
@@ -31,6 +31,9 @@ pub struct LendV0<'info> {
     associated_token::authority = destination_wallet,
   )]
   pub destination_token_account: Box<Account<'info, TokenAccount>>,
+  /// CHECK: Account to receive the lent input tokens for swapping
+  #[account(mut)]
+  pub lend_destination: UncheckedAccount<'info>,
   #[account(
     mut,
     // We snure that the _exact_ task is being executed.
@@ -112,8 +115,19 @@ pub fn handler(ctx: Context<LendV0>) -> Result<()> {
   dca.pre_swap_destination_balance = ctx.accounts.destination_token_account.amount;
   dca.swap_input_amount = swap_amount;
 
-  // The actual transfer of input tokens will be handled by the Jupiter swap in the remote transaction
-  // This just validates that we're running in the correct context and sets up the pre-swap state
+  // Transfer (lend) the input tokens to the lend destination so they can be swapped
+  transfer(
+    CpiContext::new_with_signer(
+      ctx.accounts.token_program.to_account_info(),
+      Transfer {
+        from: ctx.accounts.input_account.to_account_info(),
+        to: ctx.accounts.lend_destination.to_account_info(),
+        authority: dca.to_account_info(),
+      },
+      &[dca_seeds!(dca)],
+    ),
+    swap_amount,
+  )?;
 
   Ok(())
 }

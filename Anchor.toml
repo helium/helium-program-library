@@ -87,10 +87,10 @@ address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV" # noop
 address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33" # hnt feed needed for dc auto top
 
 [[test.validator.clone]]
-address = "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD" # USDC/USD price feed for tuktuk-dca
+address = "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX" # USDC/USD price feed for tuktuk-dca
 
 [[test.validator.clone]]
-address = "7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm" # HNT/USD price feed for tuktuk-dca
+address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33" # HNT/USD price feed for tuktuk-dca
 
 [[test.validator.clone]]
 address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK" # account compression

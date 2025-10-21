@@ -5,6 +5,7 @@ import { init as initTuktuk, taskKey, taskQueueKey, taskQueueNameMappingKey, tuk
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk"
 import { createMint, createTransferInstruction, getAccount, getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token"
 import { ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js"
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver"
 import { expect } from "chai"
 import { execSync } from "child_process"
 import { sendInstructions, createAtaAndMint } from "@helium/spl-utils"
@@ -16,9 +17,11 @@ import { ensureTuktukDcaIdl } from "./utils/fixtures"
 
 export const ANCHOR_PATH = "anchor"
 
-// Pyth price feed addresses on devnet
-const USDC_PRICE_FEED = new PublicKey("Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD") // USDC/USD
-const HNT_PRICE_FEED = new PublicKey("7moA1i5vQUpfDwSpK6Pw9s56ahB7WFGidtbL2ujWrVvm") // HNT/USD
+// Pyth Solana Receiver sponsored price feed addresses on devnet
+// These are PriceUpdateV2 accounts, not Hermes feed IDs
+// Get the latest addresses from: https://www.pyth.network/developers/price-feed-ids
+const USDC_PRICE_FEED = new PublicKey("Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX") // USDC/USD
+const HNT_PRICE_FEED = new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33") // HNT/USD
 
 describe("tuktuk-dca", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"))
@@ -113,7 +116,15 @@ describe("tuktuk-dca", () => {
       }),
     ])
 
-    // Mint HNT to the swap payer's ATA
+    // Create USDC ATA for swap payer (to receive input tokens)
+    await createAtaAndMint(
+      provider,
+      usdcMint,
+      new BN(0), // No initial USDC needed
+      swapPayer
+    )
+
+    // Mint HNT to the swap payer's ATA (to provide output tokens)
     await createAtaAndMint(
       provider,
       hntMint,
@@ -138,22 +149,60 @@ describe("tuktuk-dca", () => {
         const bumpBuffer = Buffer.alloc(1)
         bumpBuffer.writeUint8(bump)
 
-        // Build instructions: lend -> transfer -> check_repay
-        const lendIx = await program.methods
-          .lendV0()
-          .accounts({ dca })
-          .instruction()
-
-        // Calculate swap output (simplified)
+        // Build instructions: lend -> swap transfer -> check_repay
+        
+        // Calculate swap amounts based on actual oracle prices
         const inputAccountInfo = await provider.connection.getAccountInfo(dcaAccount.inputAccount)
         const inputBalance = new BN(inputAccountInfo!.data.slice(64, 72), "le")
         const swapAmount = inputBalance.div(new BN(dcaAccount.numOrders))
-        const expectedHntOutput = swapAmount.div(new BN(1000000)).mul(new BN(100000000)).div(new BN(25)).mul(new BN(10))
 
+        // Fetch PriceUpdateV2 accounts using the Pyth SDK (matching check_repay_v0 logic)
+        const pythReceiver = new PythSolanaReceiver({ 
+          connection: provider.connection, 
+          wallet: provider.wallet as anchor.Wallet
+        })
+        
+        const usdcPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.inputPriceOracle)
+        const hntPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.outputPriceOracle)
+
+        console.log(`USDC EMA Price: ${usdcPriceUpdate.priceMessage.emaPrice.toString()} (expo: ${usdcPriceUpdate.priceMessage.exponent})`)
+        console.log(`HNT EMA Price: ${hntPriceUpdate.priceMessage.emaPrice.toString()} (expo: ${hntPriceUpdate.priceMessage.exponent})`)
+
+        // Calculate expected output using EMA prices with confidence adjustment (matching check_repay_v0)
+        const inputPriceWithConf = new BN(usdcPriceUpdate.priceMessage.emaPrice.toString())
+          .sub(new BN(usdcPriceUpdate.priceMessage.emaConf.toString()).muln(2))
+        const outputPriceWithConf = new BN(hntPriceUpdate.priceMessage.emaPrice.toString())
+          .sub(new BN(hntPriceUpdate.priceMessage.emaConf.toString()).muln(2))
+        const outputPerInput = inputPriceWithConf.div(outputPriceWithConf)
+        
+        const expoDiff = usdcPriceUpdate.priceMessage.exponent - hntPriceUpdate.priceMessage.exponent
+        let expectedHntOutput: BN
+        if (expoDiff > 0) {
+          expectedHntOutput = swapAmount.mul(new BN(10).pow(new BN(Math.abs(expoDiff)))).mul(outputPerInput)
+        } else if (expoDiff < 0) {
+          expectedHntOutput = swapAmount.mul(outputPerInput).div(new BN(10).pow(new BN(Math.abs(expoDiff))))
+        } else {
+          expectedHntOutput = swapAmount.mul(outputPerInput)
+        }
+
+        console.log(`Swap Amount (USDC): ${swapAmount.toString()}`)
+        console.log(`Expected HNT Output (oracle-based, with confidence): ${expectedHntOutput.toString()}`)
+
+        // Lend instruction - this transfers input tokens from DCA to lend destination
+        const swapPayerUsdcAccount = getAssociatedTokenAddressSync(dcaAccount.inputMint, swapPayer, true)
+        const lendIx = await program.methods
+          .lendV0()
+          .accounts({ 
+            dca,
+            lendDestination: swapPayerUsdcAccount,
+          })
+          .instruction()
+
+        // Transfer output HNT from swap payer to destination (simulating swap output)
         const swapSourceAccount = getAssociatedTokenAddressSync(hntMint, swapPayer, true)
         const destinationTokenAccount = getAssociatedTokenAddressSync(hntMint, dcaAccount.destinationWallet, true)
 
-        const swapTransferIx = createTransferInstruction(
+        const outputTransferIx = createTransferInstruction(
           swapSourceAccount,
           destinationTokenAccount,
           swapPayer,
@@ -167,7 +216,7 @@ describe("tuktuk-dca", () => {
 
         const instructions = [
           lendIx,
-          swapTransferIx,
+          outputTransferIx,
           checkRepayIx,
         ]
 
@@ -231,9 +280,9 @@ describe("tuktuk-dca", () => {
     let destinationWallet: PublicKey = destinationKeypair.publicKey
     let destinationTokenAccount: PublicKey
     let task: PublicKey
-    const numOrders = 4
-    const intervalSeconds = new anchor.BN(60)
-    const slippageBps = 5000 // 50% slippage for testing (very loose)
+      const numOrders = 4
+      const intervalSeconds = new anchor.BN(60)
+      const slippageBps = 0 // 0% slippage, we know the output
 
     beforeEach(async () => {
       dca = dcaKey(me, usdcMint, hntMint, dcaIndex)[0]
@@ -336,8 +385,47 @@ describe("tuktuk-dca", () => {
       console.log(`Input balance after: ${inputBalanceAfter}`)
       console.log(`HNT balance: ${hntBalance}`)
 
-      expect(Number(inputBalanceAfter)).to.be.lessThan(Number(inputBalanceBefore))
-      expect(Number(hntBalance)).to.be.greaterThan(0)
+      // Calculate expected HNT output based on oracle prices (same logic as check_repay_v0)
+      const swapAmount = new BN(250_000000) // 250 USDC
+      
+      // Fetch PriceUpdateV2 accounts using the Pyth SDK
+      const pythReceiver = new PythSolanaReceiver({ 
+        connection: provider.connection, 
+        wallet: provider.wallet as anchor.Wallet
+      })
+      
+      const usdcPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.inputPriceOracle)
+      const hntPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.outputPriceOracle)
+
+      console.log(`USDC EMA Price: ${usdcPriceUpdate.priceMessage.emaPrice.toString()} (expo: ${usdcPriceUpdate.priceMessage.exponent})`)
+      console.log(`HNT EMA Price: ${hntPriceUpdate.priceMessage.emaPrice.toString()} (expo: ${hntPriceUpdate.priceMessage.exponent})`)
+
+      // Calculate expected output using EMA prices (matching check_repay_v0 logic)
+      // Apply confidence interval: price - (conf * 2) for conservative pricing
+      const inputPriceWithConf = new BN(usdcPriceUpdate.priceMessage.emaPrice.toString())
+        .sub(new BN(usdcPriceUpdate.priceMessage.emaConf.toString()).muln(2))
+      const outputPriceWithConf = new BN(hntPriceUpdate.priceMessage.emaPrice.toString())
+        .sub(new BN(hntPriceUpdate.priceMessage.emaConf.toString()).muln(2))
+      const outputPerInput = inputPriceWithConf.div(outputPriceWithConf)
+      
+      const expoDiff = usdcPriceUpdate.priceMessage.exponent - hntPriceUpdate.priceMessage.exponent
+      let expectedHntOutput: BN
+      if (expoDiff > 0) {
+        expectedHntOutput = swapAmount.mul(new BN(10).pow(new BN(Math.abs(expoDiff)))).mul(outputPerInput)
+      } else if (expoDiff < 0) {
+        expectedHntOutput = swapAmount.mul(outputPerInput).div(new BN(10).pow(new BN(Math.abs(expoDiff))))
+      } else {
+        expectedHntOutput = swapAmount.mul(outputPerInput)
+      }
+
+      console.log(`Expected HNT based on oracle (with confidence): ${expectedHntOutput.toString()}`)
+
+      // Expected amounts
+      const expectedUsdcAfter = BigInt(1000_000000 - 250_000000) // 750 USDC remaining
+      const expectedHntBalance = expectedHntOutput.addn(1) // Oracle-calculated amount + 1 bone initial mint
+      
+      expect(inputBalanceAfter.toString()).to.equal(expectedUsdcAfter.toString())
+      expect(hntBalance.toString()).to.equal(expectedHntBalance.toString())
     })
 
     it("closes a DCA", async () => {
