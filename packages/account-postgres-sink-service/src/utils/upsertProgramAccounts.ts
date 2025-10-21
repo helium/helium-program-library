@@ -117,7 +117,8 @@ export const upsertProgramAccounts = async ({
     batchSize: number,
     processChunk: (
       chunk: anchor.web3.GetProgramAccountsResponse,
-      transaction: Transaction
+      transaction: Transaction,
+      lastBlock: number
     ) => Promise<void>
   ) => {
     const startTime = Date.now();
@@ -178,15 +179,31 @@ export const upsertProgramAccounts = async ({
               }
 
               const batchPromise = limit(async () => {
+                // Get current slot at start of transaction
+                let lastBlock: number = 0;
+                try {
+                  lastBlock = await retry(
+                    () => connection.getSlot("finalized"),
+                    {
+                      retries: 3,
+                      factor: 2,
+                      minTimeout: 1000,
+                      maxTimeout: 5000,
+                    }
+                  );
+                } catch (error) {
+                  console.warn("Failed to fetch block after retries:", error);
+                }
+
                 const t = await sequelize.transaction({
                   isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
                 });
                 try {
-                  await processChunk(currentBatch, t);
+                  await processChunk(currentBatch, t, lastBlock);
                   await t.commit();
                   processedCount += currentBatch.length;
                   console.log(
-                    `Processing ${currentBatch.length} ${accountType} accounts`
+                    `Processing ${currentBatch.length} ${accountType} accounts (block: ${lastBlock})`
                   );
                 } catch (err) {
                   await t.rollback();
@@ -211,15 +228,28 @@ export const upsertProgramAccounts = async ({
 
           if (batch.length > 0) {
             const batchPromise = limit(async () => {
+              // Get current slot at start of transaction
+              let lastBlock: number = 0;
+              try {
+                lastBlock = await retry(() => connection.getSlot("finalized"), {
+                  retries: 3,
+                  factor: 2,
+                  minTimeout: 1000,
+                  maxTimeout: 5000,
+                });
+              } catch (error) {
+                console.warn("Failed to fetch block after retries:", error);
+              }
+
               const t = await sequelize.transaction({
                 isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
               });
               try {
-                await processChunk(batch, t);
+                await processChunk(batch, t, lastBlock);
                 await t.commit();
                 processedCount += batch.length;
                 console.log(
-                  `Processing ${batch.length} ${accountType} accounts`
+                  `Processing ${batch.length} ${accountType} accounts (block: ${lastBlock})`
                 );
               } catch (err) {
                 await t.rollback();
@@ -307,7 +337,7 @@ export const upsertProgramAccounts = async ({
             type,
             coderFilters,
             effectiveBatchSize,
-            async (chunk, transaction) => {
+            async (chunk, transaction, lastBlock) => {
               let decodeErrors = 0;
 
               const accs = (
@@ -379,19 +409,6 @@ export const upsertProgramAccounts = async ({
               const existingRecordMap = new Map(
                 existingRecords.map((record) => [record.get("address"), record])
               );
-
-              // Get current slot with retry - fetch once for the entire batch
-              let lastBlock: number = 0;
-              try {
-                lastBlock = await retry(() => connection.getSlot("finalized"), {
-                  retries: 3,
-                  factor: 2,
-                  minTimeout: 1000,
-                  maxTimeout: 5000,
-                });
-              } catch (error) {
-                console.warn("Failed to fetch block after retries:", error);
-              }
 
               const values = await Promise.all(
                 accs.map(async ({ publicKey, account }) => {
