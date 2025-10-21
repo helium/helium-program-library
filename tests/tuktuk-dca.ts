@@ -23,6 +23,28 @@ export const ANCHOR_PATH = "anchor"
 const USDC_PRICE_FEED = new PublicKey("Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX") // USDC/USD
 const HNT_PRICE_FEED = new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33") // HNT/USD
 
+// Calculate expected output based on oracle prices (matching check_repay_v0 logic)
+function calculateExpectedOutput(
+  swapAmount: BN,
+  inputPriceUpdate: any,
+  outputPriceUpdate: any
+): BN {
+  const inputPriceWithConf = inputPriceUpdate.priceMessage.price
+  const outputPriceWithConf = outputPriceUpdate.priceMessage.price
+
+  const expoDiff = inputPriceUpdate.priceMessage.exponent - outputPriceUpdate.priceMessage.exponent
+  let expectedOutput: BN
+  if (expoDiff > 0) {
+    expectedOutput = swapAmount.mul(new BN(10).pow(new BN(Math.abs(expoDiff)))).mul(inputPriceWithConf).div(outputPriceWithConf)
+  } else if (expoDiff < 0) {
+    expectedOutput = swapAmount.mul(inputPriceWithConf).div(outputPriceWithConf).div(new BN(10).pow(new BN(Math.abs(expoDiff))))
+  } else {
+    expectedOutput = swapAmount.mul(inputPriceWithConf).div(outputPriceWithConf)
+  }
+
+  return expectedOutput
+}
+
 describe("tuktuk-dca", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"))
 
@@ -150,40 +172,27 @@ describe("tuktuk-dca", () => {
         bumpBuffer.writeUint8(bump)
 
         // Build instructions: lend -> swap transfer -> check_repay
-        
-        // Calculate swap amounts based on actual oracle prices
+
+        // Calculate swap amounts based on fixed swap_amount_per_order
         const inputAccountInfo = await provider.connection.getAccountInfo(dcaAccount.inputAccount)
         const inputBalance = new BN(inputAccountInfo!.data.slice(64, 72), "le")
-        const swapAmount = inputBalance.div(new BN(dcaAccount.numOrders))
+        // For the last order, use whatever is remaining; otherwise use the fixed amount
+        const swapAmount = dcaAccount.numOrders === 1 ? inputBalance : dcaAccount.swapAmountPerOrder
 
         // Fetch PriceUpdateV2 accounts using the Pyth SDK (matching check_repay_v0 logic)
-        const pythReceiver = new PythSolanaReceiver({ 
-          connection: provider.connection, 
+        const pythReceiver = new PythSolanaReceiver({
+          connection: provider.connection,
           wallet: provider.wallet as anchor.Wallet
         })
-        
+
         const usdcPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.inputPriceOracle)
         const hntPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.outputPriceOracle)
 
-        console.log(`USDC EMA Price: ${usdcPriceUpdate.priceMessage.emaPrice.toString()} (expo: ${usdcPriceUpdate.priceMessage.exponent})`)
-        console.log(`HNT EMA Price: ${hntPriceUpdate.priceMessage.emaPrice.toString()} (expo: ${hntPriceUpdate.priceMessage.exponent})`)
+        console.log(`USDC Price: ${usdcPriceUpdate.priceMessage.price.toString()} (expo: ${usdcPriceUpdate.priceMessage.exponent})`)
+        console.log(`HNT Price: ${hntPriceUpdate.priceMessage.price.toString()} (expo: ${hntPriceUpdate.priceMessage.exponent})`)
 
-        // Calculate expected output using EMA prices with confidence adjustment (matching check_repay_v0)
-        const inputPriceWithConf = new BN(usdcPriceUpdate.priceMessage.emaPrice.toString())
-          .sub(new BN(usdcPriceUpdate.priceMessage.emaConf.toString()).muln(2))
-        const outputPriceWithConf = new BN(hntPriceUpdate.priceMessage.emaPrice.toString())
-          .sub(new BN(hntPriceUpdate.priceMessage.emaConf.toString()).muln(2))
-        const outputPerInput = inputPriceWithConf.div(outputPriceWithConf)
-        
-        const expoDiff = usdcPriceUpdate.priceMessage.exponent - hntPriceUpdate.priceMessage.exponent
-        let expectedHntOutput: BN
-        if (expoDiff > 0) {
-          expectedHntOutput = swapAmount.mul(new BN(10).pow(new BN(Math.abs(expoDiff)))).mul(outputPerInput)
-        } else if (expoDiff < 0) {
-          expectedHntOutput = swapAmount.mul(outputPerInput).div(new BN(10).pow(new BN(Math.abs(expoDiff))))
-        } else {
-          expectedHntOutput = swapAmount.mul(outputPerInput)
-        }
+        // Calculate expected output using shared function
+        const expectedHntOutput = calculateExpectedOutput(swapAmount, usdcPriceUpdate, hntPriceUpdate)
 
         console.log(`Swap Amount (USDC): ${swapAmount.toString()}`)
         console.log(`Expected HNT Output (oracle-based, with confidence): ${expectedHntOutput.toString()}`)
@@ -192,7 +201,7 @@ describe("tuktuk-dca", () => {
         const swapPayerUsdcAccount = getAssociatedTokenAddressSync(dcaAccount.inputMint, swapPayer, true)
         const lendIx = await program.methods
           .lendV0()
-          .accounts({ 
+          .accounts({
             dca,
             lendDestination: swapPayerUsdcAccount,
           })
@@ -280,11 +289,19 @@ describe("tuktuk-dca", () => {
     let destinationWallet: PublicKey = destinationKeypair.publicKey
     let destinationTokenAccount: PublicKey
     let task: PublicKey
-      const numOrders = 4
-      const intervalSeconds = new anchor.BN(60)
-      const slippageBps = 0 // 0% slippage, we know the output
+    const numOrders = 4
+    const intervalSeconds = new anchor.BN(1)
+    const slippageBps = 0 // 0% slippage, we know the output
+    const crankTurner = Keypair.generate()
 
     beforeEach(async () => {
+      await sendInstructions(provider, [
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: crankTurner.publicKey,
+          lamports: LAMPORTS_PER_SOL,
+        }),
+      ])
       dca = dcaKey(me, usdcMint, hntMint, dcaIndex)[0]
       inputAccount = getAssociatedTokenAddressSync(usdcMint, dca, true)
       destinationTokenAccount = getAssociatedTokenAddressSync(hntMint, destinationWallet, true)
@@ -292,6 +309,17 @@ describe("tuktuk-dca", () => {
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
       const [taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)
       task = taskKey(taskQueue, taskId)[0]
+
+      // Mint USDC to the authority's account
+      // swap_amount_per_order will be 235 USDC per order x 4 orders = 940 USDC total
+      const swapAmountPerOrder = new BN(235_000000) // 235 USDC per order
+      const totalAmount = swapAmountPerOrder.muln(numOrders) // 940 USDC total
+      await createAtaAndMint(
+        provider,
+        usdcMint,
+        totalAmount,
+        me
+      )
 
       console.log("Initializing DCA", {
         payer: me.toBase58(),
@@ -303,12 +331,14 @@ describe("tuktuk-dca", () => {
         destinationWallet: destinationWallet.toBase58(),
         task: task.toBase58(),
         taskQueue: taskQueue.toBase58(),
+        swapAmountPerOrder: swapAmountPerOrder.toString(),
       })
       // Initialize DCA
       await program.methods
         .initializeDcaV0({
           index: dcaIndex,
           numOrders,
+          swapAmountPerOrder,
           intervalSeconds,
           slippageBpsFromOracle: slippageBps,
           taskId,
@@ -330,14 +360,6 @@ describe("tuktuk-dca", () => {
 
       console.log("DCA initialized", dca.toBase58())
 
-      // Mint USDC to the DCA's input account
-      await createAtaAndMint(
-        provider,
-        usdcMint,
-        new BN(1000_000000), // 1000 USDC
-        dca
-      )
-
       // Mint HNT to the DCA's destination wallet just to make sure it has some balance
       await createAtaAndMint(
         provider,
@@ -347,85 +369,142 @@ describe("tuktuk-dca", () => {
       )
     })
 
-    it("executes a full DCA swap cycle through tuktuk", async () => {
+    async function runAllTasks() {
+      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
+
+      // Find all task IDs that need to be executed (have a 1 in the bitmap)
+      const taskIds: number[] = []
+      for (let i = 0; i < taskQueueAcc.taskBitmap.length; i++) {
+        const byte = taskQueueAcc.taskBitmap[i]
+        for (let bit = 0; bit < 8; bit++) {
+          if ((byte & (1 << bit)) !== 0) {
+            taskIds.push(i * 8 + bit)
+          }
+        }
+      }
+
+      // Execute all tasks
+      for (const taskId of taskIds) {
+        const task = taskKey(taskQueue, taskId)[0]
+        const taskAcc = await tuktukProgram.account.taskV0.fetch(task)
+        if ((taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) > (new Date().getTime() / 1000)) {
+          continue
+        }
+        console.log("Running task", taskId)
+        await sendInstructions(
+          provider,
+          [
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+            ...await runTask({
+              program: tuktukProgram,
+              task,
+              crankTurner: crankTurner.publicKey,
+            })
+          ],
+          [crankTurner],
+          crankTurner.publicKey
+        )
+      }
+    }
+
+    it("executes a full DCA swap cycle through multiple runs", async () => {
       let dcaAccount = await program.account.dcaV0.fetch(dca)
       expect(dcaAccount.numOrders).to.equal(numOrders)
       expect(dcaAccount.isSwapping).to.be.false
 
-      const inputBalanceBefore = (await getAccount(provider.connection, inputAccount)).amount
-      console.log(`Input balance before: ${inputBalanceBefore}`)
+      const swapAmountPerOrder = dcaAccount.swapAmountPerOrder // 235 USDC per order
+      const initialInputBalance = swapAmountPerOrder.muln(numOrders) // 940 USDC total
+      console.log(`Fixed swap amount per order: ${swapAmountPerOrder.toString()} USDC`)
 
-      // Wait a bit for the task to be schedulable
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Get initial payer balance (for rent refund verification)
+      const initialPayerBalance = await provider.connection.getBalance(me)
 
-      // Run the task through Tuktuk
-      console.log("Running task", task.toBase58())
-      const runTaskIxs = await runTask({
-        program: tuktukProgram,
-        task,
-        crankTurner: me,
-      })
+      let currentInputBalance = initialInputBalance
+      let totalHntReceived = new BN(1) // Start with 1 bone from initial mint
 
-      await sendInstructions(provider, [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-        ...runTaskIxs
-      ])
-
-      console.log("✅ Executed DCA task through Tuktuk")
-
-      // Verify final state
-      dcaAccount = await program.account.dcaV0.fetch(dca)
-      expect(dcaAccount.isSwapping).to.be.false
-      expect(dcaAccount.numOrders).to.equal(numOrders - 1)
-      expect(dcaAccount.preSwapDestinationBalance.toNumber()).to.equal(0)
-
-      const inputBalanceAfter = (await getAccount(provider.connection, inputAccount)).amount
-      const hntBalance = (await getAccount(provider.connection, destinationTokenAccount)).amount
-
-      console.log(`Input balance after: ${inputBalanceAfter}`)
-      console.log(`HNT balance: ${hntBalance}`)
-
-      // Calculate expected HNT output based on oracle prices (same logic as check_repay_v0)
-      const swapAmount = new BN(250_000000) // 250 USDC
-      
-      // Fetch PriceUpdateV2 accounts using the Pyth SDK
-      const pythReceiver = new PythSolanaReceiver({ 
-        connection: provider.connection, 
+      // Fetch price updates once (they should be stable for the test)
+      const pythReceiver = new PythSolanaReceiver({
+        connection: provider.connection,
         wallet: provider.wallet as anchor.Wallet
       })
-      
+
       const usdcPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.inputPriceOracle)
       const hntPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.outputPriceOracle)
 
-      console.log(`USDC EMA Price: ${usdcPriceUpdate.priceMessage.emaPrice.toString()} (expo: ${usdcPriceUpdate.priceMessage.exponent})`)
-      console.log(`HNT EMA Price: ${hntPriceUpdate.priceMessage.emaPrice.toString()} (expo: ${hntPriceUpdate.priceMessage.exponent})`)
+      console.log(`USDC Price: ${usdcPriceUpdate.priceMessage.price.toString()} (expo: ${usdcPriceUpdate.priceMessage.exponent})`)
+      console.log(`HNT Price: ${hntPriceUpdate.priceMessage.price.toString()} (expo: ${hntPriceUpdate.priceMessage.exponent})`)
 
-      // Calculate expected output using EMA prices (matching check_repay_v0 logic)
-      // Apply confidence interval: price - (conf * 2) for conservative pricing
-      const inputPriceWithConf = new BN(usdcPriceUpdate.priceMessage.emaPrice.toString())
-        .sub(new BN(usdcPriceUpdate.priceMessage.emaConf.toString()).muln(2))
-      const outputPriceWithConf = new BN(hntPriceUpdate.priceMessage.emaPrice.toString())
-        .sub(new BN(hntPriceUpdate.priceMessage.emaConf.toString()).muln(2))
-      const outputPerInput = inputPriceWithConf.div(outputPriceWithConf)
-      
-      const expoDiff = usdcPriceUpdate.priceMessage.exponent - hntPriceUpdate.priceMessage.exponent
-      let expectedHntOutput: BN
-      if (expoDiff > 0) {
-        expectedHntOutput = swapAmount.mul(new BN(10).pow(new BN(Math.abs(expoDiff)))).mul(outputPerInput)
-      } else if (expoDiff < 0) {
-        expectedHntOutput = swapAmount.mul(outputPerInput).div(new BN(10).pow(new BN(Math.abs(expoDiff))))
-      } else {
-        expectedHntOutput = swapAmount.mul(outputPerInput)
+      // Run through all 4 swaps
+      for (let i = 0; i < numOrders; i++) {
+        console.log(`\n=== DCA Swap ${i + 1}/${numOrders} ===`)
+
+        dcaAccount = await program.account.dcaV0.fetch(dca)
+        const ordersRemaining = dcaAccount.numOrders
+
+        // Calculate expected swap amount:
+        // - For all but the last order: use the fixed swap_amount_per_order
+        // - For the last order: use whatever is remaining (to handle rounding)
+        const expectedSwapAmount = (i === numOrders - 1) ? currentInputBalance : swapAmountPerOrder
+        console.log(`Expected swap amount: ${expectedSwapAmount.toString()} USDC`)
+
+        // Calculate expected HNT output
+        const expectedHntOutput = calculateExpectedOutput(expectedSwapAmount, usdcPriceUpdate, hntPriceUpdate)
+        console.log(`Expected HNT output: ${expectedHntOutput.toString()}`)
+
+        // Wait a bit for the task to be schedulable
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        // Run all tasks
+        await runAllTasks()
+
+        // Verify state after swap
+        const dcaAccountNow = await program.account.dcaV0.fetchNullable(dca)
+        if (dcaAccountNow) {
+          expect(dcaAccountNow.isSwapping).to.be.false
+          expect(dcaAccountNow.numOrders).to.equal(numOrders - (i + 1))
+          expect(dcaAccountNow.preSwapDestinationBalance.toNumber()).to.equal(0)
+        }
+
+        // Check balances
+        const inputBalanceAfter = dcaAccountNow ? (await getAccount(provider.connection, inputAccount)).amount : new BN(0)
+        const hntBalance = (await getAccount(provider.connection, destinationTokenAccount)).amount
+
+        // Update tracking
+        currentInputBalance = currentInputBalance.sub(expectedSwapAmount)
+        totalHntReceived = totalHntReceived.add(expectedHntOutput)
+
+        console.log(`Input balance after swap ${i + 1}: ${inputBalanceAfter.toString()}`)
+        console.log(`HNT balance after swap ${i + 1}: ${hntBalance.toString()}`)
+        console.log(`Expected input remaining: ${currentInputBalance.toString()}`)
+        console.log(`Expected total HNT: ${totalHntReceived.toString()}`)
+
+        // Verify balances match expectations
+        expect(inputBalanceAfter.toString()).to.equal(currentInputBalance.toString())
+        expect(hntBalance.toString()).to.equal(totalHntReceived.toString())
+
+        if (i === numOrders - 1) {
+          console.log(`✅ Final swap complete - all USDC swapped!`)
+          expect(inputBalanceAfter.toString()).to.equal("0")
+
+          // Verify accounts are closed
+          const dcaAccountInfo = await provider.connection.getAccountInfo(dca)
+          const inputAccountInfo = await provider.connection.getAccountInfo(inputAccount)
+          expect(dcaAccountInfo).to.be.null
+          expect(inputAccountInfo).to.be.null
+          console.log(`✅ DCA account and input account closed`)
+
+          // Verify rent was refunded
+          const finalPayerBalance = await provider.connection.getBalance(me)
+          expect(finalPayerBalance).to.be.greaterThan(initialPayerBalance)
+          console.log(`✅ Rent refunded to payer (initial: ${initialPayerBalance}, final: ${finalPayerBalance})`)
+        } else {
+          console.log(`✅ Swap ${i + 1} complete, ${ordersRemaining - 1} orders remaining`)
+        }
       }
 
-      console.log(`Expected HNT based on oracle (with confidence): ${expectedHntOutput.toString()}`)
-
-      // Expected amounts
-      const expectedUsdcAfter = BigInt(1000_000000 - 250_000000) // 750 USDC remaining
-      const expectedHntBalance = expectedHntOutput.addn(1) // Oracle-calculated amount + 1 bone initial mint
-      
-      expect(inputBalanceAfter.toString()).to.equal(expectedUsdcAfter.toString())
-      expect(hntBalance.toString()).to.equal(expectedHntBalance.toString())
+      console.log(`\n=== DCA Complete ===`)
+      console.log(`Total USDC swapped: ${initialInputBalance.toString()}`)
+      console.log(`Total HNT received: ${totalHntReceived.toString()}`)
     })
 
     it("closes a DCA", async () => {
@@ -434,7 +513,6 @@ describe("tuktuk-dca", () => {
         .closeDcaV0()
         .accounts({
           dca,
-          rentRefund: me,
         })
         .rpc({ skipPreflight: true })
 

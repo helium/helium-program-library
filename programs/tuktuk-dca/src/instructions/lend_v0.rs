@@ -3,7 +3,7 @@ use anchor_lang::{
   solana_program::sysvar::instructions::{get_instruction_relative, ID as IX_ID},
 };
 use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
-use tuktuk_program::{tuktuk, TaskV0, TriggerV0};
+use tuktuk_program::{tuktuk, TaskV0};
 
 use crate::{dca_seeds, errors::ErrorCode, state::*};
 
@@ -13,34 +13,21 @@ pub struct LendV0<'info> {
     mut,
     has_one = next_task,
     has_one = input_account,
-    has_one = input_mint,
-    has_one = output_mint,
-    has_one = destination_wallet,
+    has_one = destination_token_account,
     constraint = !dca.is_swapping,
   )]
   pub dca: Box<Account<'info, DcaV0>>,
   #[account(mut)]
   pub input_account: Box<Account<'info, TokenAccount>>,
-  pub input_mint: Box<Account<'info, Mint>>,
-  pub output_mint: Box<Account<'info, Mint>>,
-  /// CHECK: destination wallet for output tokens
-  pub destination_wallet: UncheckedAccount<'info>,
-  #[account(
-    mut,
-    associated_token::mint = output_mint,
-    associated_token::authority = destination_wallet,
-  )]
+  #[account(mut)]
   pub destination_token_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: Account to receive the lent input tokens for swapping
   #[account(mut)]
   pub lend_destination: UncheckedAccount<'info>,
   #[account(
     mut,
-    // We snure that the _exact_ task is being executed.
-    constraint = match next_task.trigger {
-      TriggerV0::Timestamp(trigger_time) => trigger_time == dca.trigger_time,
-      _ => false,
-    }
+    // Ensure that the _exact_ task we queued at initialize is being executed.
+    constraint = next_task.queued_at == dca.queued_at,
   )]
   pub next_task: Account<'info, TaskV0>,
   pub token_program: Program<'info, Token>,
@@ -94,18 +81,15 @@ pub fn handler(ctx: Context<LendV0>) -> Result<()> {
 
   let dca = &mut ctx.accounts.dca;
 
-  // Calculate how much to swap this time
-  // Total amount in account divided by remaining orders
-  // On the last order, we'll just use whatever is left
+  // Use the fixed swap amount per order from initialization
+  // On the last order, we'll use whatever is left to handle any rounding
   let current_input_balance = ctx.accounts.input_account.amount;
   let swap_amount = if dca.num_orders == 1 {
     // Last order - use everything remaining
     current_input_balance
   } else {
-    // Divide remaining balance by remaining orders
-    current_input_balance
-      .checked_div(u64::from(dca.num_orders))
-      .ok_or(ErrorCode::ArithmeticError)?
+    // Use the swap amount per order specified at initialization
+    dca.swap_amount_per_order
   };
 
   // Store the pre-swap balance of the destination token account and the input amount being swapped

@@ -123,8 +123,7 @@ export async function run(args: any = process.argv) {
     )
   }
 
-  const autoTopOff = autoTopOffKey(delegatedDc, new PublicKey("89oNwxpAssUhCHcMYd5zNrqGcGtW5kdPTfazTnNnRqst"))[0]
-  console.log("Auto topoff", autoTopOff.toBase58())
+  const autoTopOff = autoTopOffKey(delegatedDc, authority)[0]
 
   const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID)
   const [nextPythTask, nextTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 2)

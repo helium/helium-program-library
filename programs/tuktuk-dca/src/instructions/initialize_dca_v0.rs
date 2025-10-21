@@ -16,12 +16,13 @@ use tuktuk_program::{
   RunTaskReturnV0, TaskQueueAuthorityV0, TaskReturnV0,
 };
 
-use crate::{queue_authority_seeds, state::*};
+use crate::{errors::ErrorCode, queue_authority_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitializeDcaArgsV0 {
   pub index: u16,
   pub num_orders: u32,
+  pub swap_amount_per_order: u64,
   pub interval_seconds: u64,
   pub slippage_bps_from_oracle: u16,
   pub task_id: u16,
@@ -45,6 +46,13 @@ pub struct InitializeDcaV0<'info> {
   pub dca: Box<Account<'info, DcaV0>>,
   pub input_mint: Box<Account<'info, Mint>>,
   pub output_mint: Box<Account<'info, Mint>>,
+  #[account(
+    init_if_needed,
+    payer = payer,
+    associated_token::mint = output_mint,
+    associated_token::authority = destination_wallet,
+  )]
+  pub destination_token_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: Checked by loading with pyth
   pub input_price_oracle: UncheckedAccount<'info>,
   /// CHECK: Checked by loading with pyth
@@ -56,6 +64,12 @@ pub struct InitializeDcaV0<'info> {
     associated_token::authority = dca,
   )]
   pub input_account: Box<Account<'info, TokenAccount>>,
+  #[account(
+    mut,
+    associated_token::mint = input_mint,
+    associated_token::authority = payer,
+  )]
+  pub payer_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: destination wallet for output tokens
   pub destination_wallet: UncheckedAccount<'info>,
   /// CHECK: queue authority
@@ -106,9 +120,29 @@ pub fn handler(
 ) -> Result<RunTaskReturnV0> {
   let dca = &mut ctx.accounts.dca;
   let now = Clock::get()?.unix_timestamp;
+
+  // Transfer the total amount needed for all orders from authority to DCA input account
+  let total_amount = args
+    .swap_amount_per_order
+    .checked_mul(u64::from(args.num_orders))
+    .ok_or(ErrorCode::ArithmeticError)?;
+
+  anchor_spl::token::transfer(
+    CpiContext::new(
+      ctx.accounts.token_program.to_account_info(),
+      anchor_spl::token::Transfer {
+        from: ctx.accounts.payer_account.to_account_info(),
+        to: ctx.accounts.input_account.to_account_info(),
+        authority: ctx.accounts.payer.to_account_info(),
+      },
+    ),
+    total_amount,
+  )?;
+
   dca.set_inner(DcaV0 {
     index: args.index,
-    trigger_time: now,
+    queued_at: now,
+    destination_token_account: ctx.accounts.destination_token_account.key(),
     authority: ctx.accounts.authority.key(),
     input_price_oracle: ctx.accounts.input_price_oracle.key(),
     output_price_oracle: ctx.accounts.output_price_oracle.key(),
@@ -120,6 +154,7 @@ pub fn handler(
     swap_input_amount: 0,
     initial_num_orders: args.num_orders,
     num_orders: args.num_orders,
+    swap_amount_per_order: args.swap_amount_per_order,
     interval_seconds: args.interval_seconds,
     next_task: ctx.accounts.task.key(),
     slippage_bps_from_oracle: args.slippage_bps_from_oracle,
@@ -129,6 +164,7 @@ pub fn handler(
     is_swapping: false,
     dca_signer: args.dca_signer,
     dca_url: args.dca_url.clone(),
+    rent_refund: ctx.accounts.payer.key(),
   });
 
   let running_in_tuktuk = is_running_in_tuktuk(&ctx.accounts.instruction_sysvar);

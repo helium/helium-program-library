@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 use tuktuk_program::{
   tuktuk::{
     self,
@@ -8,7 +9,7 @@ use tuktuk_program::{
   TaskQueueAuthorityV0, TaskV0,
 };
 
-use crate::{queue_authority_seeds, state::*};
+use crate::{dca_seeds, queue_authority_seeds, state::*};
 
 #[derive(Accounts)]
 pub struct CloseDcaV0<'info> {
@@ -20,8 +21,24 @@ pub struct CloseDcaV0<'info> {
     has_one = authority,
     has_one = next_task,
     has_one = task_queue,
+    has_one = rent_refund,
+    has_one = input_mint,
+    has_one = input_account,
   )]
   pub dca: Box<Account<'info, DcaV0>>,
+  pub input_mint: Box<Account<'info, Mint>>,
+  #[account(
+    mut,
+    associated_token::mint = input_mint,
+    associated_token::authority = dca,
+  )]
+  pub input_account: Box<Account<'info, TokenAccount>>,
+  #[account(
+    mut,
+    associated_token::mint = input_mint,
+    associated_token::authority = authority,
+  )]
+  pub authority_input_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: queue authority
   #[account(
     seeds = [b"queue_authority"],
@@ -35,6 +52,7 @@ pub struct CloseDcaV0<'info> {
     seeds::program = tuktuk::ID,
   )]
   pub task_queue_authority: Box<Account<'info, TaskQueueAuthorityV0>>,
+  /// CHECK: Rent refund destination
   #[account(mut)]
   pub rent_refund: SystemAccount<'info>,
   /// CHECK: task queue account
@@ -44,10 +62,41 @@ pub struct CloseDcaV0<'info> {
   #[account(mut)]
   pub next_task: Box<Account<'info, TaskV0>>,
   pub tuktuk_program: Program<'info, Tuktuk>,
+  pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
 }
 
 pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
+  let dca = &ctx.accounts.dca;
+
+  // Transfer any remaining tokens back to authority
+  let remaining_balance = ctx.accounts.input_account.amount;
+  if remaining_balance > 0 {
+    anchor_spl::token::transfer(
+      CpiContext::new_with_signer(
+        ctx.accounts.token_program.to_account_info(),
+        anchor_spl::token::Transfer {
+          from: ctx.accounts.input_account.to_account_info(),
+          to: ctx.accounts.authority_input_account.to_account_info(),
+          authority: dca.to_account_info(),
+        },
+        &[dca_seeds!(dca)],
+      ),
+      remaining_balance,
+    )?;
+  }
+
+  // Close the input token account
+  anchor_spl::token::close_account(CpiContext::new_with_signer(
+    ctx.accounts.token_program.to_account_info(),
+    anchor_spl::token::CloseAccount {
+      account: ctx.accounts.input_account.to_account_info(),
+      destination: ctx.accounts.rent_refund.to_account_info(),
+      authority: dca.to_account_info(),
+    },
+    &[dca_seeds!(dca)],
+  ))?;
+
   // Only dequeue the task if it's not pointing to itself (which means no task scheduled)
   if ctx.accounts.next_task.key() != ctx.accounts.dca.key() {
     dequeue_task_v0(CpiContext::new_with_signer(
@@ -66,5 +115,6 @@ pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
       &[queue_authority_seeds!(ctx.accounts.dca)],
     ))?
   }
+
   Ok(())
 }
