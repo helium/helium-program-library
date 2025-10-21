@@ -150,175 +150,163 @@ impl PollingService {
   ) -> Result<(usize, usize, bool), AtomicDataError> {
     let mut total_published = 0;
     let mut total_failed = 0;
-    let batch_size = self.config.service.batch_size as usize;
     let mut all_published_changes = Vec::new();
+    let total_items = job.atomic_data.len();
 
-    for (batch_index, atomic_chunk) in job.atomic_data.chunks(batch_size).enumerate() {
-      // Check for shutdown signal before processing each batch
+    info!("Processing {} atomic items", total_items);
+
+    for (item_index, atomic_item) in job.atomic_data.iter().enumerate() {
+      // Check for shutdown signal before processing each item
       if shutdown_listener.is_triggered() {
         warn!(
-          "Shutdown signal received during batch processing, stopping at batch {}",
-          batch_index + 1
+          "Shutdown signal received during processing, stopping at item {}/{}",
+          item_index + 1,
+          total_items
         );
         return Ok((total_published, total_failed, true)); // has_failures = true to prevent block advancement
       }
 
-      info!(
-        "Processing batch {}: {} atomic items",
-        batch_index + 1,
-        atomic_chunk.len()
-      );
+      let should_log = if total_items >= 10000 {
+        let log_interval = total_items / 10;
+        (item_index + 1) % log_interval == 0 || (item_index + 1) == total_items
+      } else if total_items >= 1000 {
+        (item_index + 1) % 1000 == 0 || (item_index + 1) == total_items
+      } else if total_items >= 100 {
+        (item_index + 1) % 100 == 0 || (item_index + 1) == total_items
+      } else {
+        (item_index + 1) == total_items
+      };
 
-      let (chunk_published, chunk_failed, published_changes) =
-        self.process_atomic_chunk(job, atomic_chunk, shutdown_listener.clone()).await?;
-
-      total_published += chunk_published;
-      total_failed += chunk_failed;
-      all_published_changes.extend(published_changes);
-
-      if chunk_failed > 0 {
-        warn!(
-          "Batch {} had {} failed changes, stopping processing",
-          batch_index + 1,
-          chunk_failed
+      if should_log {
+        info!(
+          "Progress: {}/{} items ({:.1}%) - {} published, {} failed",
+          item_index + 1,
+          total_items,
+          (item_index + 1) as f64 / total_items as f64 * 100.0,
+          total_published,
+          total_failed
         );
-        return Ok((total_published, total_failed, true)); // has_failures = true
+      }
+
+      match self
+        .process_single_item(job, atomic_item, shutdown_listener.clone())
+        .await
+      {
+        Ok(Some(published_change)) => {
+          total_published += 1;
+          all_published_changes.push(published_change);
+        }
+        Ok(None) => {
+          // Item failed, but we continue processing
+          total_failed += 1;
+        }
+        Err(e) => {
+          // Unexpected error, log and continue
+          error!("Unexpected error processing item {}: {}", item_index + 1, e);
+          total_failed += 1;
+        }
       }
     }
 
-    // Only update the block counter after all batches succeed
-    if !all_published_changes.is_empty() {
+    info!(
+      "Completed processing all items: {} published, {} failed",
+      total_published, total_failed
+    );
+
+    // Return has_failures = true if any items failed
+    // This blocks progress and requires manual intervention to fix bad data
+    let has_failures = total_failed > 0;
+
+    // Only advance the block if there were NO failures
+    // If there are failures, don't advance so the same data will be retried
+    if !has_failures && !all_published_changes.is_empty() {
       self
         .database
         .mark_processed(&all_published_changes, job.target_block)
         .await?;
+    } else if has_failures {
+      warn!(
+        "Skipping block advancement due to {} failed items - job will retry same data on next cycle",
+        total_failed
+      );
     }
 
-    info!(
-      "Completed processing all batches: {} published, {} failed",
-      total_published, total_failed
-    );
-    Ok((total_published, total_failed, false)) // has_failures = false
+    Ok((total_published, total_failed, has_failures))
   }
 
-  async fn process_atomic_chunk(
+  async fn process_single_item(
     &self,
     job: &ChangeRecord,
-    atomic_items: &[serde_json::Value],
+    atomic_item: &serde_json::Value,
     shutdown_listener: Listener,
-  ) -> Result<(usize, usize, Vec<ChangeRecord>), AtomicDataError> {
-    let batch_start = Instant::now();
-    let chunk_record = ChangeRecord {
+  ) -> Result<Option<ChangeRecord>, AtomicDataError> {
+    // Check for shutdown signal
+    if shutdown_listener.is_triggered() {
+      return Ok(None);
+    }
+
+    // Create a single-item record for this item
+    let item_record = ChangeRecord {
       job_name: job.job_name.clone(),
       query_name: job.query_name.clone(),
       target_block: job.target_block,
-      atomic_data: atomic_items.to_vec(),
+      atomic_data: vec![atomic_item.clone()],
     };
 
-    let change_requests = match self.publisher.prepare_changes_batch(&chunk_record).await {
+    // Prepare the protobuf request for this single item
+    let change_requests = match self.publisher.prepare_changes_batch(&item_record).await {
       Ok(requests) => requests,
       Err(e) => {
-        error!("Failed to prepare changes batch for chunk: {}", e);
+        error!("Failed to prepare change request for item: {}", e);
         metrics::increment_protobuf_build_failures();
-        return Ok((0, atomic_items.len(), Vec::new()));
+        return Ok(None); // Failed to prepare, return None
       }
     };
 
-    if change_requests.len() != atomic_items.len() {
+    // Should have exactly one request
+    if change_requests.len() != 1 {
       error!(
-        "Mismatch between change requests ({}) and atomic items ({}) for job '{}'",
+        "Expected 1 change request but got {} for job '{}'",
         change_requests.len(),
-        atomic_items.len(),
         job.job_name
       );
-      return Ok((0, atomic_items.len(), Vec::new()));
+      return Ok(None);
     }
 
-    debug!(
-      "Prepared {} change requests for {} atomic items",
-      change_requests.len(),
-      atomic_items.len()
-    );
+    let request = change_requests.into_iter().next().unwrap();
 
-    let mut published_changes = Vec::new();
-    let mut failed_count = 0;
-
-    // Publish changes sequentially, checking for shutdown before each item
-    for (index, (request, atomic_item)) in change_requests.into_iter().zip(atomic_items.iter()).enumerate() {
-      // Use tokio::select to race publish against shutdown signal
-      tokio::select! {
-        result = Self::publish_single_change(
-          request,
-          atomic_item.clone(),
-          job.job_name.clone(),
-          job.query_name.clone(),
-          job.target_block,
-          &self.publisher,
-        ) => {
-          match result {
-            Ok(change) => published_changes.push(change),
-            Err(_) => failed_count += 1,
-          }
-        }
-        _ = shutdown_listener.clone() => {
-          warn!(
-            "Shutdown signal received during item publishing, stopping at item {}/{}",
-            index + 1, atomic_items.len()
-          );
-          // Return what we've published so far, mark rest as failed
-          let remaining = atomic_items.len() - index;
-          return Ok((published_changes.len(), failed_count + remaining, published_changes));
-        }
-      }
-    }
-
-    let chunk_published = published_changes.len();
-
-    let batch_time = batch_start.elapsed();
-    info!(
-      "Batch completed in {:?}: {} changes published, {} failed",
-      batch_time, chunk_published, failed_count
-    );
-
-    Ok((chunk_published, failed_count, published_changes))
-  }
-
-  async fn publish_single_change(
-    request: crate::protobuf::EntityChangeRequest,
-    atomic_item: serde_json::Value,
-    job_name: String,
-    query_name: String,
-    target_block: u64,
-    publisher: &Publisher,
-  ) -> Result<ChangeRecord, ChangeRecord> {
+    // Publish the change with retries
     let publish_start = Instant::now();
-    let result = publisher.publish_change_request(request).await;
+    let result = tokio::select! {
+      result = self.publisher.publish_change_request(request) => result,
+      _ = shutdown_listener.clone() => {
+        warn!("Shutdown signal received during item publishing");
+        return Ok(None);
+      }
+    };
+
     let publish_duration = publish_start.elapsed().as_secs_f64();
 
     match result {
       Ok(()) => {
         metrics::increment_published();
         metrics::observe_publish_duration(publish_duration);
-        Ok(ChangeRecord {
-          job_name,
-          query_name,
-          target_block,
-          atomic_data: vec![atomic_item],
-        })
+        debug!("Successfully published change (duration: {:.2}s)", publish_duration);
+        Ok(Some(ChangeRecord {
+          job_name: job.job_name.clone(),
+          query_name: job.query_name.clone(),
+          target_block: job.target_block,
+          atomic_data: vec![atomic_item.clone()],
+        }))
       }
       Err(e) => {
         error!(
           "Failed to publish change for job '{}' (duration: {:.2}s): {}",
-          job_name, publish_duration, e
+          job.job_name, publish_duration, e
         );
         metrics::increment_errors();
         metrics::observe_publish_duration(publish_duration);
-        Err(ChangeRecord {
-          job_name,
-          query_name,
-          target_block,
-          atomic_data: vec![atomic_item],
-        })
+        Ok(None) // Failed to publish, return None
       }
     }
   }

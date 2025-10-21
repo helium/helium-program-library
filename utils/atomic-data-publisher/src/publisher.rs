@@ -67,7 +67,7 @@ impl AtomicDataPublisher {
     })
   }
 
-  /// Prepare a batch of change records for publishing by building protobuf requests
+  /// Prepare change records for publishing by building protobuf requests
   pub async fn prepare_changes_batch(
     &self,
     change_record: &ChangeRecord,
@@ -295,7 +295,7 @@ impl AtomicDataPublisher {
 
       if random_value < self.service_config.dry_run_failure_rate {
         warn!(
-          "DRY RUN: Simulating failure for message (failure rate: {})",
+          "DRY RUN: Simulating failure (failure rate: {})",
           self.service_config.dry_run_failure_rate
         );
         return Err(AtomicDataError::NetworkError(
@@ -303,80 +303,20 @@ impl AtomicDataPublisher {
         ));
       }
     }
+
+    // Log detailed information only at debug level
     match request {
       EntityChangeRequest::MobileHotspot(mobile_req) => {
-        if let Some(change) = &mobile_req.change {
-          info!(
-            "DRY RUN: Mobile change details - block: {}, pub_key: {}, asset: {}, metadata: {:?}",
-            change.block,
-            change
-              .pub_key
-              .as_ref()
-              .map(|pk| format!("{:?}", pk.value))
-              .unwrap_or("None".to_string()),
-            change
-              .asset
-              .as_ref()
-              .map(|asset| format!("{:?}", asset.value))
-              .unwrap_or("None".to_string()),
-            change.metadata
-          );
-        }
-
-        debug!("DRY RUN: Full MobileHotspotChangeReqV1: {:?}", mobile_req);
+        debug!("DRY RUN: Mobile hotspot change: {:?}", mobile_req);
       }
       EntityChangeRequest::IotHotspot(iot_req) => {
-        if let Some(change) = &iot_req.change {
-          info!(
-            "DRY RUN: IoT change details - block: {}, pub_key: {}, asset: {}, metadata: {:?}",
-            change.block,
-            change
-              .pub_key
-              .as_ref()
-              .map(|pk| format!("{:?}", pk.value))
-              .unwrap_or("None".to_string()),
-            change
-              .asset
-              .as_ref()
-              .map(|asset| format!("{:?}", asset.value))
-              .unwrap_or("None".to_string()),
-            change.metadata
-          );
-        }
-
-        debug!("DRY RUN: Full IotHotspotChangeReqV1: {:?}", iot_req);
+        debug!("DRY RUN: IoT hotspot change: {:?}", iot_req);
       }
       EntityChangeRequest::EntityOwnership(ownership_req) => {
-        if let Some(change) = &ownership_req.change {
-          info!(
-            "DRY RUN: Entity ownership details - block: {}, entity_pub_key: {}, asset: {}, owner: {:?}",
-            change.block,
-            change.entity_pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string()),
-            change.owner
-          );
-        }
-
-        debug!(
-          "DRY RUN: Full EntityOwnershipChangeReqV1: {:?}",
-          ownership_req
-        );
+        debug!("DRY RUN: Entity ownership change: {:?}", ownership_req);
       }
       EntityChangeRequest::EntityRewardDestination(reward_req) => {
-        if let Some(change) = &reward_req.change {
-          info!(
-            "DRY RUN: Entity reward destination details - block: {}, entity_pub_key: {}, asset: {}, rewards_destination: {:?}",
-            change.block,
-            change.entity_pub_key.as_ref().map(|pk| format!("{:?}", pk.value)).unwrap_or("None".to_string()),
-            change.asset.as_ref().map(|asset| format!("{:?}", asset.value)).unwrap_or("None".to_string()),
-            change.rewards_destination
-          );
-        }
-
-        debug!(
-          "DRY RUN: Full EntityRewardDestinationChangeReqV1: {:?}",
-          reward_req
-        );
+        debug!("DRY RUN: Entity reward destination change: {:?}", reward_req);
       }
     }
 

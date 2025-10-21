@@ -48,8 +48,6 @@ DATABASE__MAX_LIFETIME_SECONDS=1800                # Default: 1800
 
 # Service config
 SERVICE__POLLING_INTERVAL_SECONDS=10               # Default: 10
-SERVICE__BATCH_SIZE=500                            # Default: 500
-SERVICE__MAX_CONCURRENT_PUBLISHES=50               # Default: 50
 SERVICE__DRY_RUN=false                             # Default: false
 SERVICE__DRY_RUN_FAILURE_RATE=0.0                  # Default: 0.0
 SERVICE__PORT=8000                                 # Default: 8000
@@ -169,8 +167,6 @@ spec:
             # Service config
             - name: SERVICE__POLLING_INTERVAL_SECONDS
               value: "60"
-            - name: SERVICE__BATCH_SIZE
-              value: "100"
             - name: SERVICE__PORT
               value: "8080"
             # Ingestor config

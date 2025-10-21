@@ -8,7 +8,7 @@ use sqlx::{
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     config::{DatabaseConfig, PollingJob},
@@ -1335,7 +1335,7 @@ impl DatabaseClient {
     }
 
     // Only mark as completed if there were no failures
-    // Jobs with data will be marked completed after successful processing
+    // Jobs with failures require manual intervention to fix bad data
     if failed_count == 0 {
       if let Err(e) = self
         .mark_completed(&record.job_name, &record.query_name)
@@ -1352,8 +1352,8 @@ impl DatabaseClient {
         );
       }
     } else {
-      warn!(
-        "Job '{}' had {} failed changes, leaving in queue for retry",
+      error!(
+        "Job '{}' had {} FAILED items - BLOCKING PROGRESS. Manual intervention required to fix bad data. Job will retry on next cycle.",
         record.job_name, failed_count
       );
     }

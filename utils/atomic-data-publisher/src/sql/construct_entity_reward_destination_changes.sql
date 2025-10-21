@@ -8,7 +8,7 @@ WITH updates AS (
   SELECT
   kta.asset as asset,
   GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) as block,
-  kta.encoded_entity_key as pub_key,
+  (SELECT array_agg(get_byte(kta.entity_key, i)) FROM generate_series(0, length(kta.entity_key) - 1) AS i) as pub_key,
   ao.owner as rewards_recipient,
   CASE WHEN mf.address IS NULL THEN NULL::json ELSE JSON_BUILD_OBJECT(
     'pub_key', mf.address,
@@ -39,7 +39,7 @@ FROM
   LEFT OUTER JOIN mini_fanouts mf ON mf.address = r.destination
   WHERE
     (ihi.asset IS NOT NULL OR mhi.asset IS NOT NULL)
-    AND kta.encoded_entity_key IS NOT NULL
+    AND kta.entity_key IS NOT NULL
     AND kta.asset IS NOT NULL
     AND ao.owner IS NOT NULL
     AND (

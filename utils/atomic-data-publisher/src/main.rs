@@ -72,10 +72,6 @@ fn validate_config(settings: &Settings) -> Result<()> {
     anyhow::bail!("Service polling interval must be greater than 0 seconds, got: {}", settings.service.polling_interval_seconds);
   }
 
-  if settings.service.batch_size == 0 {
-    anyhow::bail!("Service batch size must be greater than 0, got: {}", settings.service.batch_size);
-  }
-
   if settings.database.required_tables.is_empty() {
     anyhow::bail!("No required tables specified in configuration. At least one table must be configured for monitoring.");
   }

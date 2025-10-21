@@ -1,8 +1,6 @@
-use std::str::FromStr;
-
 use anyhow::Result;
 use bs58;
-use helium_crypto::{Keypair, PublicKey, Sign};
+use helium_crypto::{Keypair, PublicKeyBinary, Sign};
 use helium_proto::services::chain_rewardable_entities::{
   entity_reward_destination_change_v1, split_recipient_info_v1, EntityOwnerChangeV1,
   EntityOwnerInfo, EntityOwnerType, EntityOwnershipChangeReqV1, EntityRewardDestinationChangeReqV1,
@@ -374,24 +372,32 @@ impl ProtobufBuilder {
 
   fn extract_helium_pub_key(data: &Value, key: &str) -> Result<HeliumPubKey, AtomicDataError> {
     debug!(
-      "Looking for helium pub key '{}' in data. Available keys: {:?}",
+      "Looking for helium pub key field '{}' in data. Available fields: {:?}",
       key,
       data.as_object().map(|obj| obj.keys().collect::<Vec<_>>())
     );
-    debug!("Value at key '{}': {:?}", key, data.get(key));
+    debug!("Value at field '{}': {:?}", key, data.get(key));
 
-    let key_str = Self::extract_string(data, key)
-      .ok_or_else(|| AtomicDataError::InvalidData(format!("Missing helium pub key: {}", key)))?;
-
-    let decoded = PublicKey::from_str(&key_str).map_err(|e| {
-      AtomicDataError::InvalidData(format!(
-        "Invalid base58 helium pub key {} (value: '{}'): {}",
-        key, key_str, e
-      ))
+    let key_bytes = data.get(key).and_then(|v| v.as_array()).ok_or_else(|| {
+      AtomicDataError::InvalidData(format!("Missing or invalid helium pub key field: {}", key))
     })?;
 
+    let bytes: Vec<u8> = key_bytes
+      .iter()
+      .filter_map(|v| v.as_u64().and_then(|n| u8::try_from(n).ok()))
+      .collect();
+
+    if bytes.len() != key_bytes.len() {
+      return Err(AtomicDataError::InvalidData(format!(
+        "Invalid byte array for helium pub key field '{}': expected all values 0-255",
+        key
+      )));
+    }
+
+    let pubkey_binary = PublicKeyBinary::from(bytes);
+
     Ok(HeliumPubKey {
-      value: decoded.to_vec(),
+      value: Vec::from(pubkey_binary),
     })
   }
 
