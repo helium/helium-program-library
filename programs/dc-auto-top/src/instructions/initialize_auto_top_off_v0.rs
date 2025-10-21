@@ -9,6 +9,7 @@ use circuit_breaker::MintWindowedCircuitBreakerV0;
 use clockwork_cron::Schedule;
 use data_credits::{DataCreditsV0, DelegatedDataCreditsV0};
 use helium_sub_daos::{DaoV0, SubDaoV0};
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 use tuktuk_program::TaskQueueV0;
 
 use crate::{errors::ErrorCode, state::*};
@@ -34,6 +35,7 @@ pub struct InitializeAutoTopOffV0<'info> {
     bump
   )]
   pub auto_top_off: Box<Account<'info, AutoTopOffV0>>,
+  pub hnt_price_oracle: Box<Account<'info, PriceUpdateV2>>,
   #[account(has_one = dc_mint, has_one = hnt_mint)]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(has_one = dc_mint)]
@@ -125,7 +127,7 @@ pub fn handler(
     dc_mint: ctx.accounts.data_credits.dc_mint,
     hnt_mint: ctx.accounts.data_credits.hnt_mint,
     dao: ctx.accounts.dao.key(),
-    hnt_price_oracle: ctx.accounts.data_credits.hnt_price_oracle,
+    hnt_price_oracle: ctx.accounts.hnt_price_oracle.key(),
     hnt_account: ctx.accounts.hnt_account.key(),
     dc_account: ctx.accounts.dc_account.key(),
     circuit_breaker: ctx.accounts.circuit_breaker.key(),

@@ -23,6 +23,7 @@ pub struct UpdateAutoTopOffArgsV0 {
   pub new_pyth_task_id: u16,
   pub schedule: Option<String>,
   pub threshold: Option<u64>,
+  pub hnt_price_oracle: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -136,6 +137,10 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
 
   auto_top_off.next_task = ctx.accounts.new_task.key();
   auto_top_off.next_pyth_task = ctx.accounts.new_pyth_task.key();
+
+  if let Some(hnt_price_oracle) = args.hnt_price_oracle {
+    auto_top_off.hnt_price_oracle = hnt_price_oracle;
+  }
 
   Ok(())
 }

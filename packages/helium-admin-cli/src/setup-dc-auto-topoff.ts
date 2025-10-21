@@ -66,6 +66,10 @@ export async function run(args: any = process.argv) {
       type: 'string',
       describe: 'Cron schedule for the auto topoff',
     },
+    hntPriceOracle: {
+      type: 'string',
+      describe: 'Pubkey of the HNT price oracle',
+    },
   });
 
   const argv = await yarg.argv;
@@ -171,6 +175,7 @@ export async function run(args: any = process.argv) {
         dcMint,
         hntMint,
         subDao,
+        hntPriceOracle: argv.hntPriceOracle ? new PublicKey(argv.hntPriceOracle) : autoTopOffAcc.hntPriceOracle,
       })
       .instruction()
     instructions.push(initIx)
@@ -232,6 +237,7 @@ export async function run(args: any = process.argv) {
       newPythTaskId: nextPythTask,
       schedule: argv.schedule ? argv.schedule : null,
       threshold: argv.threshold ? new anchor.BN(argv.threshold) : null,
+      hntPriceOracle: argv.hntPriceOracle ? new PublicKey(argv.hntPriceOracle) : null,
     })
       .accountsStrict({
         payer: authority,
@@ -255,6 +261,9 @@ export async function run(args: any = process.argv) {
     if (!argv.schedule || !argv.threshold) {
       throw new Error("Schedule and threshold are required to initialize auto topoff")
     }
+    if (!argv.hntPriceOracle) {
+      throw new Error("HNT price oracle is required to initialize auto topoff")
+    }
     const instruction = await dcAutoTopoffProgram.methods.initializeAutoTopOffV0({
       schedule: argv.schedule!,
       threshold: new anchor.BN(argv.threshold!),
@@ -270,6 +279,7 @@ export async function run(args: any = process.argv) {
         dcMint,
         hntMint,
         subDao,
+        hntPriceOracle: new PublicKey(argv.hntPriceOracle),
       })
       .instruction()
 

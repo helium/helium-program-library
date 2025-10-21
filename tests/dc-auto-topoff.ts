@@ -150,6 +150,7 @@ describe("dc-auto-topoff", () => {
         authority: me,
         taskQueue,
         delegatedDataCredits,
+        hntPriceOracle: new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"),
       })
       .rpcAndKeys()
 
@@ -183,6 +184,7 @@ describe("dc-auto-topoff", () => {
           authority: me,
           taskQueue,
           delegatedDataCredits,
+          hntPriceOracle: new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"),
         })
         .rpcAndKeys()
       autoTopOff = autoTopOffK
@@ -217,6 +219,7 @@ describe("dc-auto-topoff", () => {
         newPythTaskId: nextPythTask,
         schedule: "0 0 * * * *",
         threshold: new anchor.BN(10000000),
+        hntPriceOracle: null,
       })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),

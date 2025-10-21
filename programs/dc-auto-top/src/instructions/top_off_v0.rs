@@ -30,7 +30,8 @@ pub struct TopOffV0<'info> {
     has_one = task_queue,
     has_one = data_credits,
     has_one = sub_dao,
-    has_one = delegated_data_credits
+    has_one = delegated_data_credits,
+    has_one = hnt_price_oracle,
   )]
   pub auto_top_off: Box<Account<'info, AutoTopOffV0>>,
   /// CHECK: This account takes a ton of memory. Instead of loading it into memory, just pull the min_crank_reward directly.
