@@ -424,6 +424,7 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
             asset,
             lazyDistributor: HNT_LAZY_DISTRIBUTOR,
           },
+          transaction,
         });
         if (!recipient) {
           return account;

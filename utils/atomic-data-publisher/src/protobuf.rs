@@ -1,8 +1,6 @@
-use std::str::FromStr;
-
 use anyhow::Result;
 use bs58;
-use helium_crypto::{Keypair, PublicKey, Sign};
+use helium_crypto::{Keypair, PublicKeyBinary, Sign};
 use helium_proto::services::chain_rewardable_entities::{
   entity_reward_destination_change_v1, split_recipient_info_v1, EntityOwnerChangeV1,
   EntityOwnerInfo, EntityOwnerType, EntityOwnershipChangeReqV1, EntityRewardDestinationChangeReqV1,
@@ -42,159 +40,138 @@ impl ProtobufBuilder {
       })
   }
 
-  pub fn build_mobile_hotspot_changes(
+  pub fn build_mobile_hotspot_change(
     change: &ChangeRecord,
     keypair: &Keypair,
     skip_signing: bool,
-  ) -> Result<Vec<MobileHotspotChangeReqV1>, AtomicDataError> {
-    let atomic_data_array = &change.atomic_data;
+  ) -> Result<MobileHotspotChangeReqV1, AtomicDataError> {
+    let atomic_data = &change.atomic_data;
 
-    let mut change_requests = Vec::with_capacity(atomic_data_array.len());
+    debug!("Building mobile hotspot update from data: {}", atomic_data);
+    debug!(
+      "Available keys in data: {:?}",
+      atomic_data
+        .as_object()
+        .map(|obj| obj.keys().collect::<Vec<_>>())
+    );
 
-    for atomic_data in atomic_data_array {
-      debug!("Building mobile hotspot update from data: {}", atomic_data);
-      debug!(
-        "Available keys in data: {:?}",
-        atomic_data
-          .as_object()
-          .map(|obj| obj.keys().collect::<Vec<_>>())
-      );
+    let block = Self::get_u64_field(atomic_data, "block")?;
+    let timestamp_seconds = Self::current_timestamp();
 
-      let block = Self::get_u64_field(&atomic_data, "block")?;
-      let timestamp_seconds = Self::current_timestamp();
+    let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+    let metadata = Self::build_mobile_hotspot_metadata(atomic_data)?;
 
-      let pub_key = Self::extract_helium_pub_key(&atomic_data, "pub_key")?;
-      let asset = Self::extract_solana_pub_key(&atomic_data, "asset")?;
-      let metadata = Self::build_mobile_hotspot_metadata(&atomic_data)?;
+    let change_msg = MobileHotspotChangeV1 {
+      block,
+      timestamp_seconds,
+      pub_key: Some(pub_key),
+      asset: Some(asset),
+      metadata: Some(metadata),
+    };
 
-      let change_msg = MobileHotspotChangeV1 {
-        block,
-        timestamp_seconds,
-        pub_key: Some(pub_key),
-        asset: Some(asset),
-        metadata: Some(metadata),
-      };
+    let mut request = MobileHotspotChangeReqV1 {
+      change: Some(change_msg),
+      signer: keypair.public_key().to_string(),
+      signature: vec![],
+    };
 
-      let mut request = MobileHotspotChangeReqV1 {
-        change: Some(change_msg),
-        signer: keypair.public_key().to_string(),
-        signature: vec![],
-      };
-
-      if !skip_signing {
-        let signature = Self::sign_message(&request, keypair)?;
-        request.signature = signature;
-      }
-
-      change_requests.push(request);
+    if !skip_signing {
+      let signature = Self::sign_message(&request, keypair)?;
+      request.signature = signature;
     }
 
-    Ok(change_requests)
+    Ok(request)
   }
 
-  pub fn build_iot_hotspot_changes(
+  pub fn build_iot_hotspot_change(
     change: &ChangeRecord,
     keypair: &Keypair,
     skip_signing: bool,
-  ) -> Result<Vec<IotHotspotChangeReqV1>, AtomicDataError> {
-    let atomic_data_array = &change.atomic_data;
+  ) -> Result<IotHotspotChangeReqV1, AtomicDataError> {
+    let atomic_data = &change.atomic_data;
 
-    let mut change_requests = Vec::with_capacity(atomic_data_array.len());
+    debug!("Building IoT hotspot update from data: {}", atomic_data);
 
-    for atomic_data in atomic_data_array {
-      debug!("Building IoT hotspot update from data: {}", atomic_data);
+    let block = Self::get_u64_field(atomic_data, "block")?;
+    let timestamp_seconds = Self::current_timestamp();
 
-      let block = Self::get_u64_field(atomic_data, "block")?;
-      let timestamp_seconds = Self::current_timestamp();
+    let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+    let metadata = Self::build_iot_hotspot_metadata(atomic_data)?;
 
-      let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
-      let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
-      let metadata = Self::build_iot_hotspot_metadata(atomic_data)?;
+    let change_msg = IotHotspotChangeV1 {
+      block,
+      timestamp_seconds,
+      pub_key: Some(pub_key),
+      asset: Some(asset),
+      metadata: Some(metadata),
+    };
 
-      let change_msg = IotHotspotChangeV1 {
-        block,
-        timestamp_seconds,
-        pub_key: Some(pub_key),
-        asset: Some(asset),
-        metadata: Some(metadata),
-      };
+    let mut request = IotHotspotChangeReqV1 {
+      change: Some(change_msg),
+      signer: keypair.public_key().to_string(),
+      signature: vec![],
+    };
 
-      let mut request = IotHotspotChangeReqV1 {
-        change: Some(change_msg),
-        signer: keypair.public_key().to_string(),
-        signature: vec![],
-      };
-
-      if !skip_signing {
-        let signature = Self::sign_message(&request, keypair)?;
-        request.signature = signature;
-      }
-
-      change_requests.push(request);
+    if !skip_signing {
+      let signature = Self::sign_message(&request, keypair)?;
+      request.signature = signature;
     }
 
-    Ok(change_requests)
+    Ok(request)
   }
 
-  pub fn build_entity_ownership_changes(
+  pub fn build_entity_ownership_change(
     change: &ChangeRecord,
     keypair: &Keypair,
     skip_signing: bool,
-  ) -> Result<Vec<EntityOwnershipChangeReqV1>, AtomicDataError> {
-    let atomic_data_array = &change.atomic_data;
-    let mut change_requests = Vec::with_capacity(atomic_data_array.len());
+  ) -> Result<EntityOwnershipChangeReqV1, AtomicDataError> {
+    let atomic_data = &change.atomic_data;
 
-    for atomic_data in atomic_data_array {
-      let block = Self::get_u64_field(atomic_data, "block")?;
-      let timestamp_seconds = Self::current_timestamp();
+    let block = Self::get_u64_field(atomic_data, "block")?;
+    let timestamp_seconds = Self::current_timestamp();
 
-      let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
-      let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
-      let owner = Self::build_entity_owner_info(atomic_data)?;
+    let pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+    let owner = Self::build_entity_owner_info(atomic_data)?;
 
-      let change_msg = EntityOwnerChangeV1 {
-        block,
-        timestamp_seconds,
-        entity_pub_key: Some(pub_key),
-        asset: Some(asset),
-        owner: Some(owner),
-      };
+    let change_msg = EntityOwnerChangeV1 {
+      block,
+      timestamp_seconds,
+      entity_pub_key: Some(pub_key),
+      asset: Some(asset),
+      owner: Some(owner),
+    };
 
-      let mut request = EntityOwnershipChangeReqV1 {
-        change: Some(change_msg),
-        signer: keypair.public_key().to_string(),
-        signature: vec![],
-      };
+    let mut request = EntityOwnershipChangeReqV1 {
+      change: Some(change_msg),
+      signer: keypair.public_key().to_string(),
+      signature: vec![],
+    };
 
-      if !skip_signing {
-        let signature = Self::sign_message(&request, keypair)?;
-        request.signature = signature;
-      }
-
-      change_requests.push(request);
+    if !skip_signing {
+      let signature = Self::sign_message(&request, keypair)?;
+      request.signature = signature;
     }
 
-    Ok(change_requests)
+    Ok(request)
   }
 
-  pub fn build_entity_reward_destination_changes(
+  pub fn build_entity_reward_destination_change(
     change: &ChangeRecord,
     keypair: &Keypair,
     skip_signing: bool,
-  ) -> Result<Vec<EntityRewardDestinationChangeReqV1>, AtomicDataError> {
-    let atomic_data_array = &change.atomic_data;
+  ) -> Result<EntityRewardDestinationChangeReqV1, AtomicDataError> {
+    let atomic_data = &change.atomic_data;
 
-    let mut change_requests = Vec::with_capacity(atomic_data_array.len());
+    let block = Self::get_u64_field(atomic_data, "block")?;
+    let timestamp_seconds = Self::current_timestamp();
 
-    for atomic_data in atomic_data_array {
-      let block = Self::get_u64_field(atomic_data, "block")?;
-      let timestamp_seconds = Self::current_timestamp();
-
-      let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
-      let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
-      let rewards_destination = if let Some(rewards_split) =
-        Self::try_build_rewards_split(atomic_data)?
-      {
+    let entity_pub_key = Self::extract_helium_pub_key(atomic_data, "pub_key")?;
+    let asset = Self::extract_solana_pub_key(atomic_data, "asset")?;
+    let rewards_destination =
+      if let Some(rewards_split) = Self::try_build_rewards_split(atomic_data)? {
         Some(entity_reward_destination_change_v1::RewardsDestination::RewardsSplitV1(rewards_split))
       } else if let Some(rewards_recipient) =
         Self::try_extract_solana_pub_key(atomic_data, "rewards_recipient")
@@ -210,29 +187,26 @@ impl ProtobufBuilder {
         ));
       };
 
-      let change_msg = EntityRewardDestinationChangeV1 {
-        block,
-        timestamp_seconds,
-        entity_pub_key: Some(entity_pub_key),
-        asset: Some(asset),
-        rewards_destination,
-      };
+    let change_msg = EntityRewardDestinationChangeV1 {
+      block,
+      timestamp_seconds,
+      entity_pub_key: Some(entity_pub_key),
+      asset: Some(asset),
+      rewards_destination,
+    };
 
-      let mut request = EntityRewardDestinationChangeReqV1 {
-        change: Some(change_msg),
-        signer: keypair.public_key().to_string(),
-        signature: vec![],
-      };
+    let mut request = EntityRewardDestinationChangeReqV1 {
+      change: Some(change_msg),
+      signer: keypair.public_key().to_string(),
+      signature: vec![],
+    };
 
-      if !skip_signing {
-        let signature = Self::sign_message(&request, keypair)?;
-        request.signature = signature;
-      }
-
-      change_requests.push(request);
+    if !skip_signing {
+      let signature = Self::sign_message(&request, keypair)?;
+      request.signature = signature;
     }
 
-    Ok(change_requests)
+    Ok(request)
   }
 
   fn build_mobile_hotspot_metadata(data: &Value) -> Result<MobileHotspotMetadata, AtomicDataError> {
@@ -374,24 +348,32 @@ impl ProtobufBuilder {
 
   fn extract_helium_pub_key(data: &Value, key: &str) -> Result<HeliumPubKey, AtomicDataError> {
     debug!(
-      "Looking for helium pub key '{}' in data. Available keys: {:?}",
+      "Looking for helium pub key field '{}' in data. Available fields: {:?}",
       key,
       data.as_object().map(|obj| obj.keys().collect::<Vec<_>>())
     );
-    debug!("Value at key '{}': {:?}", key, data.get(key));
+    debug!("Value at field '{}': {:?}", key, data.get(key));
 
-    let key_str = Self::extract_string(data, key)
-      .ok_or_else(|| AtomicDataError::InvalidData(format!("Missing helium pub key: {}", key)))?;
-
-    let decoded = PublicKey::from_str(&key_str).map_err(|e| {
-      AtomicDataError::InvalidData(format!(
-        "Invalid base58 helium pub key {} (value: '{}'): {}",
-        key, key_str, e
-      ))
+    let key_bytes = data.get(key).and_then(|v| v.as_array()).ok_or_else(|| {
+      AtomicDataError::InvalidData(format!("Missing or invalid helium pub key field: {}", key))
     })?;
 
+    let bytes: Vec<u8> = key_bytes
+      .iter()
+      .filter_map(|v| v.as_u64().and_then(|n| u8::try_from(n).ok()))
+      .collect();
+
+    if bytes.len() != key_bytes.len() {
+      return Err(AtomicDataError::InvalidData(format!(
+        "Invalid byte array for helium pub key field '{}': expected all values 0-255",
+        key
+      )));
+    }
+
+    let pubkey_binary = PublicKeyBinary::from(bytes);
+
     Ok(HeliumPubKey {
-      value: decoded.to_vec(),
+      value: Vec::from(pubkey_binary),
     })
   }
 
@@ -514,49 +496,29 @@ pub enum EntityChangeRequest {
   EntityRewardDestination(EntityRewardDestinationChangeReqV1),
 }
 
-pub fn build_entity_change_requests(
+pub fn build_entity_change_request(
   change: &ChangeRecord,
   change_type: &str,
   keypair: &Keypair,
   skip_signing: bool,
-) -> Result<Vec<EntityChangeRequest>, AtomicDataError> {
+) -> Result<EntityChangeRequest, AtomicDataError> {
   match change_type {
     "mobile_hotspot" => {
-      let reqs = ProtobufBuilder::build_mobile_hotspot_changes(change, keypair, skip_signing)?;
-      Ok(
-        reqs
-          .into_iter()
-          .map(EntityChangeRequest::MobileHotspot)
-          .collect(),
-      )
+      let req = ProtobufBuilder::build_mobile_hotspot_change(change, keypair, skip_signing)?;
+      Ok(EntityChangeRequest::MobileHotspot(req))
     }
     "iot_hotspot" => {
-      let reqs = ProtobufBuilder::build_iot_hotspot_changes(change, keypair, skip_signing)?;
-      Ok(
-        reqs
-          .into_iter()
-          .map(EntityChangeRequest::IotHotspot)
-          .collect(),
-      )
+      let req = ProtobufBuilder::build_iot_hotspot_change(change, keypair, skip_signing)?;
+      Ok(EntityChangeRequest::IotHotspot(req))
     }
     "entity_ownership" => {
-      let reqs = ProtobufBuilder::build_entity_ownership_changes(change, keypair, skip_signing)?;
-      Ok(
-        reqs
-          .into_iter()
-          .map(EntityChangeRequest::EntityOwnership)
-          .collect(),
-      )
+      let req = ProtobufBuilder::build_entity_ownership_change(change, keypair, skip_signing)?;
+      Ok(EntityChangeRequest::EntityOwnership(req))
     }
     "entity_reward_destination" => {
-      let reqs =
-        ProtobufBuilder::build_entity_reward_destination_changes(change, keypair, skip_signing)?;
-      Ok(
-        reqs
-          .into_iter()
-          .map(EntityChangeRequest::EntityRewardDestination)
-          .collect(),
-      )
+      let req =
+        ProtobufBuilder::build_entity_reward_destination_change(change, keypair, skip_signing)?;
+      Ok(EntityChangeRequest::EntityRewardDestination(req))
     }
     _ => Err(AtomicDataError::InvalidData(format!(
       "Unknown change type: {}",

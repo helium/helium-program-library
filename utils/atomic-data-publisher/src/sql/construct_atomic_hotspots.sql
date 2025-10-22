@@ -45,7 +45,7 @@ WITH hotspot_metadata_changes AS (
 SELECT
   CONCAT('atomic_', hmc.hotspot_type, '_hotspots') as job_name,
   JSON_BUILD_OBJECT(
-    'pub_key', kta.encoded_entity_key,
+    'pub_key', (SELECT array_agg(get_byte(kta.entity_key, i)) FROM generate_series(0, length(kta.entity_key) - 1) AS i),
     'asset', hmc.asset,
     'address', hmc.address,
     'location', hmc.location,
@@ -59,5 +59,5 @@ SELECT
   ) as atomic_data
 FROM hotspot_metadata_changes hmc
 LEFT JOIN key_to_assets kta ON kta.asset = hmc.asset
-WHERE kta.encoded_entity_key IS NOT NULL
+WHERE kta.entity_key IS NOT NULL
 ORDER BY hmc.last_block DESC;

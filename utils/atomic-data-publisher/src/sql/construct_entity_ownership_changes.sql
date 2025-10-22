@@ -9,7 +9,7 @@ WITH asset_owner_changes AS (
   SELECT
     ao.asset,
     ao.last_block as block,
-    kta.encoded_entity_key as pub_key,
+    (SELECT array_agg(get_byte(kta.entity_key, i)) FROM generate_series(0, length(kta.entity_key) - 1) AS i) as pub_key,
     ao.owner,
     'direct_owner' as owner_type,
     'entity_ownership' as change_type
@@ -18,7 +18,7 @@ WITH asset_owner_changes AS (
   LEFT JOIN iot_hotspot_infos ihi ON ihi.asset = ao.asset
   LEFT JOIN mobile_hotspot_infos mhi ON mhi.asset = ao.asset
   WHERE (ihi.asset IS NOT NULL OR mhi.asset IS NOT NULL)
-    AND kta.encoded_entity_key IS NOT NULL
+    AND kta.entity_key IS NOT NULL
     AND ao.asset IS NOT NULL
     AND ao.owner IS NOT NULL
     AND ao.last_block > $1
@@ -29,7 +29,7 @@ welcome_pack_changes AS (
   SELECT
     wp.asset,
     wp.last_block as block,
-    kta.encoded_entity_key as pub_key,
+    (SELECT array_agg(get_byte(kta.entity_key, i)) FROM generate_series(0, length(kta.entity_key) - 1) AS i) as pub_key,
     wp.owner,
     'welcome_pack_owner' as owner_type,
     'entity_ownership' as change_type
@@ -38,7 +38,7 @@ welcome_pack_changes AS (
   LEFT JOIN iot_hotspot_infos ihi ON ihi.asset = wp.asset
   LEFT JOIN mobile_hotspot_infos mhi ON mhi.asset = wp.asset
   WHERE (ihi.asset IS NOT NULL OR mhi.asset IS NOT NULL)
-    AND kta.encoded_entity_key IS NOT NULL
+    AND kta.entity_key IS NOT NULL
     AND wp.asset IS NOT NULL
     AND wp.owner IS NOT NULL
     AND wp.last_block > $1
