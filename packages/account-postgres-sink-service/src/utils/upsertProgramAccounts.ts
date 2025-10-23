@@ -179,26 +179,25 @@ export const upsertProgramAccounts = async ({
               }
 
               const batchPromise = limit(async () => {
-                // Get current slot at start of transaction
-                let lastBlock: number = 0;
-                try {
-                  lastBlock = await retry(
-                    () => connection.getSlot("finalized"),
-                    {
-                      retries: 3,
-                      factor: 2,
-                      minTimeout: 1000,
-                      maxTimeout: 5000,
-                    }
-                  );
-                } catch (error) {
-                  console.warn("Failed to fetch block after retries:", error);
-                }
-
                 const t = await sequelize.transaction({
                   isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
                 });
                 try {
+                  // Get current slot at start of transaction
+                  let lastBlock: number = 0;
+                  try {
+                    lastBlock = await retry(
+                      () => connection.getSlot("finalized"),
+                      {
+                        retries: 3,
+                        factor: 2,
+                        minTimeout: 1000,
+                        maxTimeout: 5000,
+                      }
+                    );
+                  } catch (error) {
+                    console.warn("Failed to fetch block after retries:", error);
+                  }
                   await processChunk(currentBatch, t, lastBlock);
                   await t.commit();
                   processedCount += currentBatch.length;
@@ -228,23 +227,25 @@ export const upsertProgramAccounts = async ({
 
           if (batch.length > 0) {
             const batchPromise = limit(async () => {
-              // Get current slot at start of transaction
-              let lastBlock: number = 0;
-              try {
-                lastBlock = await retry(() => connection.getSlot("finalized"), {
-                  retries: 3,
-                  factor: 2,
-                  minTimeout: 1000,
-                  maxTimeout: 5000,
-                });
-              } catch (error) {
-                console.warn("Failed to fetch block after retries:", error);
-              }
-
               const t = await sequelize.transaction({
                 isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
               });
               try {
+                // Get current slot at start of transaction
+                let lastBlock: number = 0;
+                try {
+                  lastBlock = await retry(
+                    () => connection.getSlot("finalized"),
+                    {
+                      retries: 3,
+                      factor: 2,
+                      minTimeout: 1000,
+                      maxTimeout: 5000,
+                    }
+                  );
+                } catch (error) {
+                  console.warn("Failed to fetch block after retries:", error);
+                }
                 await processChunk(batch, t, lastBlock);
                 await t.commit();
                 processedCount += batch.length;
