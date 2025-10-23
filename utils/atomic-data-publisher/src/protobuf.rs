@@ -354,21 +354,24 @@ impl ProtobufBuilder {
     );
     debug!("Value at field '{}': {:?}", key, data.get(key));
 
-    let key_bytes = data.get(key).and_then(|v| v.as_array()).ok_or_else(|| {
-      AtomicDataError::InvalidData(format!("Missing or invalid helium pub key field: {}", key))
+    let field_value = data.get(key).ok_or_else(|| {
+      AtomicDataError::InvalidData(format!("Missing helium pub key field: {}", key))
     })?;
 
-    let bytes: Vec<u8> = key_bytes
-      .iter()
-      .filter_map(|v| v.as_u64().and_then(|n| u8::try_from(n).ok()))
-      .collect();
-
-    if bytes.len() != key_bytes.len() {
+    let bytes = if let Some(base64_str) = field_value.as_str() {
+      use base64::{engine::general_purpose::STANDARD, Engine};
+      STANDARD.decode(base64_str).map_err(|e| {
+        AtomicDataError::InvalidData(format!(
+          "Invalid base64 helium pub key field '{}': {}",
+          key, e
+        ))
+      })?
+    } else {
       return Err(AtomicDataError::InvalidData(format!(
-        "Invalid byte array for helium pub key field '{}': expected all values 0-255",
+        "Invalid helium pub key field '{}': expected base64 string",
         key
       )));
-    }
+    };
 
     let pubkey_binary = PublicKeyBinary::from(bytes);
 

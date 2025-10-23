@@ -45,7 +45,8 @@ WITH hotspot_metadata_changes AS (
 SELECT
   CONCAT('atomic_', hmc.hotspot_type, '_hotspots') as job_name,
   JSON_BUILD_OBJECT(
-    'pub_key', (SELECT array_agg(get_byte(kta.entity_key, i)) FROM generate_series(0, length(kta.entity_key) - 1) AS i),
+    -- Note: PostgreSQL's encode() adds newlines every 76 chars, so we strip them for valid base64
+    'pub_key', replace(encode(kta.entity_key, 'base64'), E'\n', ''),
     'asset', hmc.asset,
     'address', hmc.address,
     'location', hmc.location,
@@ -58,6 +59,6 @@ SELECT
     'block', hmc.last_block
   ) as atomic_data
 FROM hotspot_metadata_changes hmc
-LEFT JOIN key_to_assets kta ON kta.asset = hmc.asset
+INNER JOIN key_to_assets kta ON kta.asset = hmc.asset
 WHERE kta.entity_key IS NOT NULL
 ORDER BY hmc.last_block DESC;

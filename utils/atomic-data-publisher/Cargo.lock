@@ -83,6 +83,7 @@ dependencies = [
  "aws-config",
  "aws-credential-types",
  "aws-sdk-rds",
+ "base64 0.22.1",
  "bs58",
  "chrono",
  "config",

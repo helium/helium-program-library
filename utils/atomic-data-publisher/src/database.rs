@@ -436,8 +436,8 @@ impl DatabaseClient {
       if gap_size > MAX_CHUNK_SIZE * 2 {
         let skip_to = next_block.saturating_sub(1);
         info!(
-          "Job '{}': Large gap detected ({} blocks), skipping from {} to {}",
-          job.name, gap_size, last_processed_block_u64, skip_to
+          "Job '{}': Large block range detected ({} blocks), setting target_block to {} to process all available data",
+          job.name, gap_size, skip_to
         );
         std::cmp::min(skip_to, max_available_block)
       } else {
