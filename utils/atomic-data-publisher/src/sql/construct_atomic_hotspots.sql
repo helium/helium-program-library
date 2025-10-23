@@ -60,4 +60,5 @@ SELECT
   ) as atomic_data
 FROM hotspot_metadata_changes hmc
 INNER JOIN key_to_assets kta ON kta.asset = hmc.asset
-WHERE kta.entity_key IS NOT NULL;
+WHERE kta.entity_key IS NOT NULL
+ORDER BY hmc.last_block DESC;

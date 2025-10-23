@@ -63,4 +63,5 @@ SELECT
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM ownership_changes;
+FROM ownership_changes
+ORDER BY block DESC;

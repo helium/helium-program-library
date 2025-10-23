@@ -68,4 +68,5 @@ SELECT
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM updates;
+FROM updates
+ORDER BY block DESC;
