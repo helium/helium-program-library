@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor"
 import { Program, BN } from "@coral-xyz/anchor"
-import { init as initTuktuk, taskKey, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey, runTask, nextAvailableTaskIds, compileTransaction, RemoteTaskTransactionV0, customSignerKey } from "@helium/tuktuk-sdk"
+import { init as initTuktuk, taskKey, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey, runTask, nextAvailableTaskIds, compileTransaction, RemoteTaskTransactionV0, customSignerKey, taskQueueAuthorityKey } from "@helium/tuktuk-sdk"
 // @ts-ignore
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk"
 import { createMint, createTransferInstruction, getAccount, getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token"
@@ -11,39 +11,17 @@ import { execSync } from "child_process"
 import { sendInstructions, createAtaAndMint } from "@helium/spl-utils"
 import { init, PROGRAM_ID, dcaKey, queueAuthorityKey } from "../packages/tuktuk-dca-sdk/src"
 import { TuktukDca } from "../target/types/tuktuk_dca"
-import Fastify, { FastifyInstance } from "fastify"
-import { sign } from "tweetnacl"
+import { FastifyInstance } from "fastify"
 import { ensureTuktukDcaIdl } from "./utils/fixtures"
+import { createDcaServer, runAllTasks as runAllTasksUtil, calculateExpectedOutput } from "./utils/dca-test-server"
 
 export const ANCHOR_PATH = "anchor"
 
 // Pyth Solana Receiver sponsored price feed addresses on devnet
 // These are PriceUpdateV2 accounts, not Hermes feed IDs
 // Get the latest addresses from: https://www.pyth.network/developers/price-feed-ids
-const USDC_PRICE_FEED = new PublicKey("Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX") // USDC/USD
-const HNT_PRICE_FEED = new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33") // HNT/USD
-
-// Calculate expected output based on oracle prices (matching check_repay_v0 logic)
-function calculateExpectedOutput(
-  swapAmount: BN,
-  inputPriceUpdate: any,
-  outputPriceUpdate: any
-): BN {
-  const inputPriceWithConf = inputPriceUpdate.priceMessage.price
-  const outputPriceWithConf = outputPriceUpdate.priceMessage.price
-
-  const expoDiff = inputPriceUpdate.priceMessage.exponent - outputPriceUpdate.priceMessage.exponent
-  let expectedOutput: BN
-  if (expoDiff > 0) {
-    expectedOutput = swapAmount.mul(new BN(10).pow(new BN(Math.abs(expoDiff)))).mul(inputPriceWithConf).div(outputPriceWithConf)
-  } else if (expoDiff < 0) {
-    expectedOutput = swapAmount.mul(inputPriceWithConf).div(outputPriceWithConf).div(new BN(10).pow(new BN(Math.abs(expoDiff))))
-  } else {
-    expectedOutput = swapAmount.mul(inputPriceWithConf).div(outputPriceWithConf)
-  }
-
-  return expectedOutput
-}
+export const USDC_PRICE_FEED = new PublicKey("Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX") // USDC/USD
+export const HNT_PRICE_FEED = new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33") // HNT/USD
 
 describe("tuktuk-dca", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"))
@@ -154,125 +132,15 @@ describe("tuktuk-dca", () => {
       swapPayer
     )
 
-    console.log("Initializing DCA server")
-    // Start simple test DCA server
-    dcaServer = Fastify({ logger: false })
-
-    dcaServer.post("/dca/:dcaKey", async (request: any, reply: any) => {
-      try {
-        const dca = new PublicKey(request.params.dcaKey)
-        const task = new PublicKey(request.body.task)
-        const taskQueuedAt = new BN(request.body.task_queued_at)
-
-        const dcaAccount = await program.account.dcaV0.fetch(dca)
-
-        // Get swap payer PDA
-        const [swapPayer, bump] = customSignerKey(taskQueue, [Buffer.from("swap_payer")])
-        const bumpBuffer = Buffer.alloc(1)
-        bumpBuffer.writeUint8(bump)
-
-        // Build instructions: lend -> swap transfer -> check_repay
-
-        // Calculate swap amounts based on fixed swap_amount_per_order
-        const inputAccountInfo = await provider.connection.getAccountInfo(dcaAccount.inputAccount)
-        const inputBalance = new BN(inputAccountInfo!.data.slice(64, 72), "le")
-        // For the last order, use whatever is remaining; otherwise use the fixed amount
-        const swapAmount = dcaAccount.numOrders === 1 ? inputBalance : dcaAccount.swapAmountPerOrder
-
-        // Fetch PriceUpdateV2 accounts using the Pyth SDK (matching check_repay_v0 logic)
-        const pythReceiver = new PythSolanaReceiver({
-          connection: provider.connection,
-          wallet: provider.wallet as anchor.Wallet
-        })
-
-        const usdcPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.inputPriceOracle)
-        const hntPriceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(dcaAccount.outputPriceOracle)
-
-        console.log(`USDC Price: ${usdcPriceUpdate.priceMessage.price.toString()} (expo: ${usdcPriceUpdate.priceMessage.exponent})`)
-        console.log(`HNT Price: ${hntPriceUpdate.priceMessage.price.toString()} (expo: ${hntPriceUpdate.priceMessage.exponent})`)
-
-        // Calculate expected output using shared function
-        const expectedHntOutput = calculateExpectedOutput(swapAmount, usdcPriceUpdate, hntPriceUpdate)
-
-        console.log(`Swap Amount (USDC): ${swapAmount.toString()}`)
-        console.log(`Expected HNT Output (oracle-based, with confidence): ${expectedHntOutput.toString()}`)
-
-        // Lend instruction - this transfers input tokens from DCA to lend destination
-        const swapPayerUsdcAccount = getAssociatedTokenAddressSync(dcaAccount.inputMint, swapPayer, true)
-        const lendIx = await program.methods
-          .lendV0()
-          .accounts({
-            dca,
-            lendDestination: swapPayerUsdcAccount,
-          })
-          .instruction()
-
-        // Transfer output HNT from swap payer to destination (simulating swap output)
-        const swapSourceAccount = getAssociatedTokenAddressSync(hntMint, swapPayer, true)
-        const destinationTokenAccount = getAssociatedTokenAddressSync(hntMint, dcaAccount.destinationWallet, true)
-
-        const outputTransferIx = createTransferInstruction(
-          swapSourceAccount,
-          destinationTokenAccount,
-          swapPayer,
-          expectedHntOutput.toNumber()
-        )
-
-        const checkRepayIx = await program.methods
-          .checkRepayV0({})
-          .accounts({ dca })
-          .instruction()
-
-        const instructions = [
-          lendIx,
-          outputTransferIx,
-          checkRepayIx,
-        ]
-
-        const { transaction, remainingAccounts } = await compileTransaction(
-          instructions,
-          [[Buffer.from("swap_payer"), bumpBuffer]] // PDA seeds for swap payer
-        )
-
-        const remoteTx = new RemoteTaskTransactionV0({
-          task,
-          taskQueuedAt,
-          transaction: {
-            ...transaction,
-            accounts: remainingAccounts.map((acc) => acc.pubkey),
-          },
-        })
-
-        const serialized = await RemoteTaskTransactionV0.serialize(
-          tuktukProgram.coder.accounts,
-          remoteTx
-        )
-
-        reply.status(200).send({
-          transaction: serialized.toString("base64"),
-          signature: Buffer.from(
-            sign.detached(Uint8Array.from(serialized), dcaSigner.secretKey)
-          ).toString("base64"),
-          remaining_accounts: remainingAccounts.map((acc) => ({
-            pubkey: acc.pubkey.toBase58(),
-            is_signer: acc.isSigner,
-            is_writable: acc.isWritable,
-          })),
-        })
-      } catch (err: any) {
-        console.error(err)
-        reply.status(500).send({ error: err.message })
-      }
-    })
-
     console.log("Starting DCA server")
-    try {
-      await dcaServer.listen({ port: 8123, host: "0.0.0.0" })
-    } catch (err: any) {
-      console.error(err)
-      throw err
-    }
-    console.log("DCA server listening on port 8123")
+    dcaServer = await createDcaServer({
+      program,
+      provider,
+      taskQueue,
+      outputMint: hntMint,
+      dcaSigner,
+      port: 8123,
+    })
   })
 
   after(async () => {
@@ -293,6 +161,7 @@ describe("tuktuk-dca", () => {
     const intervalSeconds = new anchor.BN(1)
     const slippageBps = 0 // 0% slippage, we know the output
     const crankTurner = Keypair.generate()
+    const dcaAuthority = Keypair.generate()
 
     beforeEach(async () => {
       await sendInstructions(provider, [
@@ -301,10 +170,21 @@ describe("tuktuk-dca", () => {
           toPubkey: crankTurner.publicKey,
           lamports: LAMPORTS_PER_SOL,
         }),
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: dcaAuthority.publicKey,
+          lamports: LAMPORTS_PER_SOL,
+        }),
       ])
-      dca = dcaKey(me, usdcMint, hntMint, dcaIndex)[0]
+      dca = dcaKey(dcaAuthority.publicKey, usdcMint, hntMint, dcaIndex)[0]
       inputAccount = getAssociatedTokenAddressSync(usdcMint, dca, true)
       destinationTokenAccount = getAssociatedTokenAddressSync(hntMint, destinationWallet, true)
+      await createAtaAndMint(
+        provider,
+        hntMint,
+        new BN(0),
+        destinationWallet
+      )
 
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
       const [taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)
@@ -322,8 +202,9 @@ describe("tuktuk-dca", () => {
       )
 
       console.log("Initializing DCA", {
+        crankTurner: crankTurner.publicKey.toBase58(),
         payer: me.toBase58(),
-        authority: me.toBase58(),
+        authority: dcaAuthority.publicKey.toBase58(),
         inputMint: usdcMint.toBase58(),
         outputMint: hntMint.toBase58(),
         inputPriceOracle: USDC_PRICE_FEED.toBase58(),
@@ -345,17 +226,23 @@ describe("tuktuk-dca", () => {
           dcaSigner: dcaSigner.publicKey,
           dcaUrl: "http://localhost:8123/dca",
         })
-        .accounts({
-          payer: me,
-          authority: me,
-          inputMint: usdcMint,
-          outputMint: hntMint,
-          inputPriceOracle: USDC_PRICE_FEED,
-          outputPriceOracle: HNT_PRICE_FEED,
-          destinationWallet,
+        .accountsPartial({
+          core: {
+            rentPayer: me,
+            dcaPayer: me,
+            authority: dcaAuthority.publicKey,
+            inputMint: usdcMint,
+            outputMint: hntMint,
+            inputPriceOracle: USDC_PRICE_FEED,
+            outputPriceOracle: HNT_PRICE_FEED,
+            destinationTokenAccount,
+            taskQueue,
+          },
           task,
-          taskQueue,
+          queueAuthority: queueAuthorityKey()[0],
+          taskQueueAuthority: taskQueueAuthorityKey(taskQueue, queueAuthorityKey()[0])[0],
         })
+        .signers([dcaAuthority])
         .rpc({ skipPreflight: true })
 
       console.log("DCA initialized", dca.toBase58())
@@ -370,41 +257,7 @@ describe("tuktuk-dca", () => {
     })
 
     async function runAllTasks() {
-      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
-
-      // Find all task IDs that need to be executed (have a 1 in the bitmap)
-      const taskIds: number[] = []
-      for (let i = 0; i < taskQueueAcc.taskBitmap.length; i++) {
-        const byte = taskQueueAcc.taskBitmap[i]
-        for (let bit = 0; bit < 8; bit++) {
-          if ((byte & (1 << bit)) !== 0) {
-            taskIds.push(i * 8 + bit)
-          }
-        }
-      }
-
-      // Execute all tasks
-      for (const taskId of taskIds) {
-        const task = taskKey(taskQueue, taskId)[0]
-        const taskAcc = await tuktukProgram.account.taskV0.fetch(task)
-        if ((taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) > (new Date().getTime() / 1000)) {
-          continue
-        }
-        console.log("Running task", taskId)
-        await sendInstructions(
-          provider,
-          [
-            ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-            ...await runTask({
-              program: tuktukProgram,
-              task,
-              crankTurner: crankTurner.publicKey,
-            })
-          ],
-          [crankTurner],
-          crankTurner.publicKey
-        )
-      }
+      await runAllTasksUtil(provider, tuktukProgram, taskQueue, crankTurner)
     }
 
     it("executes a full DCA swap cycle through multiple runs", async () => {
@@ -511,9 +364,11 @@ describe("tuktuk-dca", () => {
       // Close DCA
       await program.methods
         .closeDcaV0()
-        .accounts({
+        .accountsPartial({
           dca,
+          authority: dcaAuthority.publicKey,
         })
+        .signers([dcaAuthority])
         .rpc({ skipPreflight: true })
 
       // Verify DCA is closed

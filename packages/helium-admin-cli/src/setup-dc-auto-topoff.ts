@@ -70,6 +70,38 @@ export async function run(args: any = process.argv) {
       type: 'string',
       describe: 'Pubkey of the HNT price oracle',
     },
+    hntThreshold: {
+      type: 'number',
+      describe: 'HNT threshold for the auto topoff',
+    },
+    dcaMint: {
+      type: 'string',
+      describe: 'Pubkey of the DCA mint',
+    },
+    dcaSwapAmount: {
+      type: 'number',
+      describe: 'DCA swap amount for the auto topoff',
+    },
+    dcaIntervalSeconds: {
+      type: 'number',
+      describe: 'DCA interval seconds for the auto topoff',
+    },
+    dcaInputPriceOracle: {
+      type: 'string',
+      describe: 'Pubkey of the DCA input price oracle',
+    },
+    dcaOutputPriceOracle: {
+      type: 'string',
+      describe: 'Pubkey of the DCA output price oracle',
+    },
+    dcaSigner: {
+      type: 'string',
+      describe: 'Pubkey of the DCA signer',
+    },
+    dcaUrl: {
+      type: 'string',
+      describe: 'URL of the DCA server',
+    },
   });
 
   const argv = await yarg.argv;
@@ -130,7 +162,7 @@ export async function run(args: any = process.argv) {
   const autoTopOff = autoTopOffKey(delegatedDc, authority)[0]
 
   const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID)
-  const [nextPythTask, nextTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 2)
+  const [nextTask, nextHntTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 2)
   const autoTopOffAcc = await dcAutoTopoffProgram.account.autoTopOffV0.fetchNullable(autoTopOff!)
   
   // Check if auto topoff exists with different authority
@@ -156,7 +188,7 @@ export async function run(args: any = process.argv) {
       .instruction()
     instructions.push(closeIx)
     
-    const schedule = argv.schedule ? argv.schedule : autoTopOffAcc.schedule
+    const schedule = argv.schedule ? argv.schedule : Buffer.from(autoTopOffAcc.schedule).toString('utf-8').replace(/\0/g, '')
     const threshold = argv.threshold ? new anchor.BN(argv.threshold) : autoTopOffAcc.threshold
     
     const newAutoTopOff = autoTopOffKey(delegatedDc, authority)[0]
@@ -164,6 +196,13 @@ export async function run(args: any = process.argv) {
       schedule,
       threshold,
       routerKey,
+      hntThreshold: argv.hntThreshold ? new anchor.BN(argv.hntThreshold) : autoTopOffAcc.hntThreshold,
+      dcaMint: argv.dcaMint ? new PublicKey(argv.dcaMint) : autoTopOffAcc.dcaMint,
+      dcaSwapAmount: argv.dcaSwapAmount ? new anchor.BN(argv.dcaSwapAmount) : autoTopOffAcc.dcaSwapAmount,
+      dcaIntervalSeconds: argv.dcaIntervalSeconds ? new anchor.BN(argv.dcaIntervalSeconds) : autoTopOffAcc.dcaIntervalSeconds,
+      dcaInputPriceOracle: argv.dcaInputPriceOracle ? new PublicKey(argv.dcaInputPriceOracle) : autoTopOffAcc.dcaInputPriceOracle,
+      dcaSigner: argv.dcaSigner ? new PublicKey(argv.dcaSigner) : autoTopOffAcc.dcaSigner,
+      dcaUrl: argv.dcaUrl ? argv.dcaUrl : Buffer.from(autoTopOffAcc.dcaUrl).toString('utf-8').replace(/\0/g, ''),
     })
       .accountsPartial({
         payer: authority,
@@ -182,14 +221,14 @@ export async function run(args: any = process.argv) {
     
     const { instruction: scheduleTaskInstruction } = await dcAutoTopoffProgram.methods.scheduleTaskV0({
       taskId: nextTask,
-      pythTaskId: nextPythTask,
+      hntTaskId: nextHntTask,
     })
       .accountsPartial({
         payer: authority,
         autoTopOff: autoTopOff!,
         nextTask: autoTopOff!,
         task: taskKey(TASK_QUEUE_ID, nextTask)[0],
-        pythTask: taskKey(TASK_QUEUE_ID, nextPythTask)[0],
+        hntTask: taskKey(TASK_QUEUE_ID, nextHntTask)[0],
         taskQueue: TASK_QUEUE_ID,
       })
       .prepare()
@@ -231,32 +270,45 @@ export async function run(args: any = process.argv) {
   } else if (autoTopOffAcc) {
     const queueAuthority = queueAuthorityKey()[0]
     const taskRentRefund = (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextTask))?.rentRefund || authority
-    const pythTaskRentRefund = (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextPythTask))?.rentRefund || authority
+    const hntTaskRentRefund = (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextHntTask))?.rentRefund || authority
+    
+    // Update the auto topoff configuration
     const updateIx = await dcAutoTopoffProgram.methods.updateAutoTopOffV0({
-      newTaskId: nextTask,
-      newPythTaskId: nextPythTask,
       schedule: argv.schedule ? argv.schedule : null,
       threshold: argv.threshold ? new anchor.BN(argv.threshold) : null,
       hntPriceOracle: argv.hntPriceOracle ? new PublicKey(argv.hntPriceOracle) : null,
+      hntThreshold: argv.hntThreshold ? new anchor.BN(argv.hntThreshold) : null,
+      dcaMint: argv.dcaMint ? new PublicKey(argv.dcaMint) : null,
+      dcaSwapAmount: argv.dcaSwapAmount ? new anchor.BN(argv.dcaSwapAmount) : null,
+      dcaIntervalSeconds: argv.dcaIntervalSeconds ? new anchor.BN(argv.dcaIntervalSeconds) : null,
+      dcaInputPriceOracle: argv.dcaInputPriceOracle ? new PublicKey(argv.dcaInputPriceOracle) : null,
     })
-      .accountsStrict({
+      .accountsPartial({
         payer: authority,
         autoTopOff: autoTopOff!,
         nextTask: autoTopOffAcc.nextTask,
-        newTask: taskKey(TASK_QUEUE_ID, nextTask)[0],
-        newPythTask: taskKey(TASK_QUEUE_ID, nextPythTask)[0],
-        taskQueue: TASK_QUEUE_ID,
-        authority: authority,
-        systemProgram: SystemProgram.programId,
-        queueAuthority,
-        nextPythTask: autoTopOffAcc.nextPythTask,
-        taskQueueAuthority: taskQueueAuthorityKey(TASK_QUEUE_ID, queueAuthority)[0],
-        tuktukProgram: tuktukProgram.programId,
+        nextHntTask: autoTopOffAcc.nextHntTask,
         taskRentRefund,
-        pythTaskRentRefund,
+        hntTaskRentRefund,
       })
       .instruction()
     instructions.push(updateIx)
+    
+    // Schedule new tasks separately
+    const scheduleTaskIx = await dcAutoTopoffProgram.methods.scheduleTaskV0({
+      taskId: nextTask,
+      hntTaskId: nextHntTask,
+    })
+      .accountsPartial({
+        payer: authority,
+        autoTopOff: autoTopOff!,
+        nextTask: autoTopOffAcc.nextTask,
+        task: taskKey(TASK_QUEUE_ID, nextTask)[0],
+        hntTask: taskKey(TASK_QUEUE_ID, nextHntTask)[0],
+        taskQueue: TASK_QUEUE_ID,
+      })
+      .instruction()
+    instructions.push(scheduleTaskIx)
   } else {
     if (!argv.schedule || !argv.threshold) {
       throw new Error("Schedule and threshold are required to initialize auto topoff")
@@ -264,10 +316,23 @@ export async function run(args: any = process.argv) {
     if (!argv.hntPriceOracle) {
       throw new Error("HNT price oracle is required to initialize auto topoff")
     }
+    if (!argv.dcaSigner) {
+      throw new Error("DCA signer is required to initialize auto topoff")
+    }
+    if (!argv.dcaUrl) {
+      throw new Error("DCA URL is required to initialize auto topoff")
+    }
     const instruction = await dcAutoTopoffProgram.methods.initializeAutoTopOffV0({
       schedule: argv.schedule!,
       threshold: new anchor.BN(argv.threshold!),
       routerKey,
+      hntThreshold: new anchor.BN(argv.hntThreshold!),
+      dcaMint: new PublicKey(argv.dcaMint!),
+      dcaSwapAmount: new anchor.BN(argv.dcaSwapAmount!),
+      dcaIntervalSeconds: new anchor.BN(argv.dcaIntervalSeconds!),
+      dcaInputPriceOracle: new PublicKey(argv.dcaInputPriceOracle!),
+      dcaSigner: new PublicKey(argv.dcaSigner!),
+      dcaUrl: argv.dcaUrl!,
     })
       .accountsPartial({
         payer: authority,
@@ -286,14 +351,14 @@ export async function run(args: any = process.argv) {
     instructions.push(instruction)
     const { instruction: scheduleTaskInstruction, pubkeys: { queueAuthority } } = await dcAutoTopoffProgram.methods.scheduleTaskV0({
       taskId: nextTask,
-      pythTaskId: nextPythTask,
+      hntTaskId: nextHntTask,
     })
       .accountsPartial({
         payer: authority,
         autoTopOff: autoTopOff!,
         nextTask: autoTopOff!,
         task: taskKey(TASK_QUEUE_ID, nextTask)[0],
-        pythTask: taskKey(TASK_QUEUE_ID, nextPythTask)[0],
+        hntTask: taskKey(TASK_QUEUE_ID, nextHntTask)[0],
         taskQueue: TASK_QUEUE_ID,
       })
       .prepare()

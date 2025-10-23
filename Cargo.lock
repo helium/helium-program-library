@@ -717,6 +717,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "bytemuck",
  "chrono",
  "circuit-breaker",
  "clockwork-cron",
@@ -729,6 +730,7 @@ dependencies = [
  "shared-utils",
  "solana-security-txt",
  "solana-zk-sdk",
+ "tuktuk-dca",
  "tuktuk-program",
 ]
 

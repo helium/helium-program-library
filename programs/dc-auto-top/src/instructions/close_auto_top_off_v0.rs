@@ -24,15 +24,17 @@ pub struct CloseAutoTopOffV0<'info> {
     close = rent_refund,
     has_one = authority,
     has_one = next_task,
-    has_one = next_pyth_task,
+    has_one = next_hnt_task,
     has_one = task_queue,
     has_one = dao,
+    has_one = dc_account,
+    has_one = dca_mint_account,
   )]
-  pub auto_top_off: Box<Account<'info, AutoTopOffV0>>,
+  pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
   /// CHECK: queue authority
   #[account(
     seeds = [b"queue_authority"],
-    bump = auto_top_off.queue_authority_bump,
+    bump = auto_top_off.load()?.queue_authority_bump,
   )]
   pub queue_authority: UncheckedAccount<'info>,
   /// CHECK: task queue authority
@@ -57,15 +59,13 @@ pub struct CloseAutoTopOffV0<'info> {
     associated_token::authority = auto_top_off,
   )]
   pub hnt_account: Box<Account<'info, TokenAccount>>,
-  #[account(
-    mut,
-    associated_token::mint = auto_top_off.dc_mint,
-    associated_token::authority = auto_top_off,
-  )]
-  pub dc_account: Box<Account<'info, TokenAccount>>,
-  /// CHECK: current pre-task account
   #[account(mut)]
-  pub next_pyth_task: Box<Account<'info, TaskV0>>,
+  pub dc_account: Box<Account<'info, TokenAccount>>,
+  #[account(mut)]
+  pub dca_mint_account: Box<Account<'info, TokenAccount>>,
+  /// CHECK: current HNT task account
+  #[account(mut)]
+  pub next_hnt_task: Box<Account<'info, TaskV0>>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
   pub tuktuk_program: Program<'info, Tuktuk>,
@@ -73,6 +73,17 @@ pub struct CloseAutoTopOffV0<'info> {
 }
 
 pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
+  let auto_top_off = ctx.accounts.auto_top_off.load()?;
+  let queue_authority_bump = auto_top_off.queue_authority_bump;
+  let remaining_hnt_balance = ctx.accounts.hnt_account.amount;
+  let delegated_data_credits = auto_top_off.delegated_data_credits;
+  let authority = auto_top_off.authority;
+  let bump = auto_top_off.bump;
+  let auto_top_off_seeds: &[&[&[u8]]] =
+    &[auto_top_off_seeds!(delegated_data_credits, authority, bump)];
+  drop(auto_top_off);
+  let queue_authority_seeds: &[&[&[u8]]] = &[queue_authority_seeds!(queue_authority_bump)];
+  // Dequeue DC topoff task
   dequeue_task_v0(CpiContext::new_with_signer(
     ctx.accounts.tuktuk_program.to_account_info(),
     DequeueTaskV0 {
@@ -86,26 +97,26 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
       },
       task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
     },
-    &[queue_authority_seeds!(ctx.accounts.auto_top_off)],
+    queue_authority_seeds,
   ))?;
+  // Dequeue HNT topoff task
   dequeue_task_v0(CpiContext::new_with_signer(
     ctx.accounts.tuktuk_program.to_account_info(),
     DequeueTaskV0 {
       task_queue: ctx.accounts.task_queue.to_account_info(),
-      task: ctx.accounts.next_pyth_task.to_account_info(),
+      task: ctx.accounts.next_hnt_task.to_account_info(),
       queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: if ctx.accounts.next_pyth_task.rent_refund == ctx.accounts.rent_refund.key() {
+      rent_refund: if ctx.accounts.next_hnt_task.rent_refund == ctx.accounts.rent_refund.key() {
         ctx.accounts.rent_refund.to_account_info()
       } else {
         ctx.accounts.task_queue.to_account_info()
       },
       task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
     },
-    &[queue_authority_seeds!(ctx.accounts.auto_top_off)],
+    queue_authority_seeds,
   ))?;
 
-  // Transfer any remaining tokens back to authority
-  let remaining_hnt_balance = ctx.accounts.hnt_account.amount;
+  // Transfer any remaining HNT tokens back to authority
   if remaining_hnt_balance > 0 {
     anchor_spl::token::transfer(
       CpiContext::new_with_signer(
@@ -115,13 +126,30 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
           to: ctx.accounts.authority.to_account_info(),
           authority: ctx.accounts.auto_top_off.to_account_info(),
         },
-        &[auto_top_off_seeds!(ctx.accounts.auto_top_off)],
+        auto_top_off_seeds,
       ),
       remaining_hnt_balance,
     )?;
   }
 
-  // Close the escrow account
+  // Transfer any remaining DCA mint tokens back to authority
+  let remaining_dca_balance = ctx.accounts.dca_mint_account.amount;
+  if remaining_dca_balance > 0 {
+    anchor_spl::token::transfer(
+      CpiContext::new_with_signer(
+        ctx.accounts.token_program.to_account_info(),
+        anchor_spl::token::Transfer {
+          from: ctx.accounts.dca_mint_account.to_account_info(),
+          to: ctx.accounts.authority.to_account_info(),
+          authority: ctx.accounts.auto_top_off.to_account_info(),
+        },
+        auto_top_off_seeds,
+      ),
+      remaining_dca_balance,
+    )?;
+  }
+
+  // Close the HNT account
   anchor_spl::token::close_account(CpiContext::new_with_signer(
     ctx.accounts.token_program.to_account_info(),
     anchor_spl::token::CloseAccount {
@@ -129,7 +157,7 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
       destination: ctx.accounts.rent_refund.to_account_info(),
       authority: ctx.accounts.auto_top_off.to_account_info(),
     },
-    &[auto_top_off_seeds!(ctx.accounts.auto_top_off)],
+    auto_top_off_seeds,
   ))?;
   // Close the DC account
   anchor_spl::token::close_account(CpiContext::new_with_signer(
@@ -139,7 +167,17 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
       destination: ctx.accounts.rent_refund.to_account_info(),
       authority: ctx.accounts.auto_top_off.to_account_info(),
     },
-    &[auto_top_off_seeds!(ctx.accounts.auto_top_off)],
+    auto_top_off_seeds,
+  ))?;
+  // Close the DCA mint account
+  anchor_spl::token::close_account(CpiContext::new_with_signer(
+    ctx.accounts.token_program.to_account_info(),
+    anchor_spl::token::CloseAccount {
+      account: ctx.accounts.dca_mint_account.to_account_info(),
+      destination: ctx.accounts.rent_refund.to_account_info(),
+      authority: ctx.accounts.auto_top_off.to_account_info(),
+    },
+    auto_top_off_seeds,
   ))?;
 
   Ok(())

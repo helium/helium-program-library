@@ -3,13 +3,15 @@ use anchor_lang::prelude::*;
 pub mod close_auto_top_off_v0;
 pub mod initialize_auto_top_off_v0;
 pub mod schedule_task_v0;
-pub mod top_off_v0;
+pub mod top_off_dc_v0;
+pub mod top_off_hnt_v0;
 pub mod update_auto_top_off_v0;
 
 pub use close_auto_top_off_v0::*;
 pub use initialize_auto_top_off_v0::*;
 pub use schedule_task_v0::*;
-pub use top_off_v0::*;
+pub use top_off_dc_v0::*;
+pub use top_off_hnt_v0::*;
 pub use update_auto_top_off_v0::*;
 
 pub const ASSOCIATED_TOKEN_PROGRAM_ID: Pubkey =

@@ -10,7 +10,7 @@ crate-type = ["cdylib", "lib"]
 name = "dc_auto_top"
 
 [features]
-idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build", "circuit-breaker/idl-build", "lazy-transactions/idl-build", "data-credits/idl-build"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build", "circuit-breaker/idl-build", "lazy-transactions/idl-build", "data-credits/idl-build", "tuktuk-dca/idl-build"]
 devnet = []
 no-genesis = []
 no-entrypoint = []
@@ -28,9 +28,11 @@ anchor-spl = { workspace = true }
 solana-zk-sdk = { workspace = true }
 helium-sub-daos = { workspace = true }
 circuit-breaker = { workspace = true }
+bytemuck = "1.14.0"
 pyth-solana-receiver-sdk = { workspace = true }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
 data-credits = { path = "../data-credits", features = ["cpi"] }
+tuktuk-dca = { path = "../tuktuk-dca", features = ["cpi"] }
 solana-security-txt = { workspace = true }
 pythnet-sdk = { workspace = true }
 default-env = { workspace = true }

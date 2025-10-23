@@ -69,3 +69,24 @@ await program.methods.someInstruction(args)
 
 This approach is cleaner and leverages Anchor's automatic account resolution, reducing boilerplate and potential errors.
 
+## Test Assertions
+
+When writing tests, always use precise assertions with exact values rather than lazy comparisons like `.greaterThan()` or `.lessThan()` whenever the exact expected value can be calculated.
+
+**Preferred:**
+```typescript
+const balance = await getTokenBalance(account);
+expect(balance.toString()).to.equal(expectedAmount.toString()); // Exact value
+```
+
+**Not preferred:**
+```typescript
+const balance = await getTokenBalance(account);
+expect(balance).to.be.greaterThan(0); // Lazy assertion
+```
+
+Only use comparison assertions when:
+- The exact value is truly non-deterministic (e.g., timestamps, randomness)
+- Testing boundary conditions where you explicitly need to verify > or < behavior
+- The calculation is complex enough that approximation is acceptable (document why)
+

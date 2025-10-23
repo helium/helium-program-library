@@ -23,7 +23,6 @@ pub struct DcaV0 {
   pub slippage_bps_from_oracle: u16,
   pub task_queue: Pubkey,
   pub queued_at: i64,
-  pub queue_authority_bump: u8,
   pub bump: u8,
   pub dca_signer: Pubkey,
   pub dca_url: String,
@@ -46,7 +45,7 @@ macro_rules! dca_seeds {
 
 #[macro_export]
 macro_rules! queue_authority_seeds {
-  ( $dca:expr ) => {
-    &[b"queue_authority".as_ref(), &[$dca.queue_authority_bump]]
+  ( $bump:expr ) => {
+    &[b"queue_authority".as_ref(), &[$bump]]
   };
 }

@@ -35,10 +35,16 @@ pub mod dc_auto_top {
     instructions::schedule_task_v0::handler(ctx, args)
   }
 
-  pub fn top_off_v0<'info>(
-    ctx: Context<'_, '_, '_, 'info, TopOffV0<'info>>,
+  pub fn top_off_dc_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, TopOffDcV0<'info>>,
   ) -> Result<tuktuk_program::RunTaskReturnV0> {
-    instructions::top_off_v0::handler(ctx)
+    instructions::top_off_dc_v0::handler(ctx)
+  }
+
+  pub fn top_off_hnt_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, TopOffHntV0<'info>>,
+  ) -> Result<tuktuk_program::RunTaskReturnV0> {
+    instructions::top_off_hnt_v0::handler(ctx)
   }
 
   pub fn update_auto_top_off_v0(

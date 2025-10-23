@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{Mint, Token, TokenAccount},
+};
 use tuktuk_program::{
   tuktuk::{
     self,
@@ -34,7 +37,8 @@ pub struct CloseDcaV0<'info> {
   )]
   pub input_account: Box<Account<'info, TokenAccount>>,
   #[account(
-    mut,
+    init_if_needed,
+    payer = authority,
     associated_token::mint = input_mint,
     associated_token::authority = authority,
   )]
@@ -42,7 +46,7 @@ pub struct CloseDcaV0<'info> {
   /// CHECK: queue authority
   #[account(
     seeds = [b"queue_authority"],
-    bump = dca.queue_authority_bump,
+    bump,
   )]
   pub queue_authority: UncheckedAccount<'info>,
   /// CHECK: task queue authority
@@ -64,6 +68,7 @@ pub struct CloseDcaV0<'info> {
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
+  pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
@@ -112,7 +117,7 @@ pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
         },
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
-      &[queue_authority_seeds!(ctx.accounts.dca)],
+      &[queue_authority_seeds!(ctx.bumps.queue_authority)],
     ))?
   }
 

@@ -2,7 +2,7 @@ use anchor_lang::{
   prelude::*,
   solana_program::sysvar::instructions::{get_instruction_relative, ID as IX_ID},
 };
-use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
 use tuktuk_program::{tuktuk, TaskV0};
 
 use crate::{dca_seeds, errors::ErrorCode, state::*};

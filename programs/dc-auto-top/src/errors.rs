@@ -10,4 +10,10 @@ pub enum ErrorCode {
 
   #[msg("Invalid CPI context")]
   InvalidCpiContext,
+
+  #[msg("Arithmetic error")]
+  ArithmeticError,
+
+  #[msg("Pyth price not found")]
+  PythPriceNotFound,
 }

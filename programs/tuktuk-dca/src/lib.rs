@@ -31,11 +31,15 @@ security_txt! {
 pub mod tuktuk_dca {
   use super::*;
 
-  pub fn initialize_dca_v0(
-    ctx: Context<InitializeDcaV0>,
+  pub fn initialize_dca_v0(ctx: Context<InitializeDcaV0>, args: InitializeDcaArgsV0) -> Result<()> {
+    instructions::initialize_dca_v0::handler(ctx, args)
+  }
+
+  pub fn initialize_dca_nested_v0(
+    ctx: Context<InitializeDcaNestedV0>,
     args: InitializeDcaArgsV0,
   ) -> Result<tuktuk_program::RunTaskReturnV0> {
-    instructions::initialize_dca_v0::handler(ctx, args)
+    instructions::initialize_dca_v0::handler_nested(ctx, args)
   }
 
   pub fn close_dca_v0(ctx: Context<CloseDcaV0>) -> Result<()> {

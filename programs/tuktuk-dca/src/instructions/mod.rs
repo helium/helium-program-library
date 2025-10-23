@@ -10,6 +10,9 @@ pub use close_dca_v0::*;
 pub use initialize_dca_v0::*;
 pub use lend_v0::*;
 
+// Re-export nested version
+pub use initialize_dca_v0::InitializeDcaNestedV0;
+
 pub const ASSOCIATED_TOKEN_PROGRAM_ID: Pubkey =
   pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
