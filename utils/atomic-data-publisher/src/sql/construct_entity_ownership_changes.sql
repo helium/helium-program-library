@@ -9,7 +9,8 @@ WITH asset_owner_changes AS (
   SELECT
     ao.asset,
     ao.last_block as block,
-    encode(kta.entity_key, 'base64') as pub_key,
+    -- Note: PostgreSQL's encode() adds newlines every 76 chars, so we strip them for valid base64
+    replace(encode(kta.entity_key, 'base64'), E'\n', '') as pub_key,
     ao.owner,
     'direct_owner' as owner_type,
     'entity_ownership' as change_type
@@ -29,7 +30,8 @@ welcome_pack_changes AS (
   SELECT
     wp.asset,
     wp.last_block as block,
-    encode(kta.entity_key, 'base64') as pub_key,
+    -- Note: PostgreSQL's encode() adds newlines every 76 chars, so we strip them for valid base64
+    replace(encode(kta.entity_key, 'base64'), E'\n', '') as pub_key,
     wp.owner,
     'welcome_pack_owner' as owner_type,
     'entity_ownership' as change_type
