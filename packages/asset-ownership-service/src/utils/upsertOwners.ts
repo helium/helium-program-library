@@ -40,38 +40,38 @@ export const upsertOwners = async ({
             )) as { id: PublicKey; ownership: { owner: PublicKey } }[]
           ).filter(truthy);
 
-          // Get current block for this batch right before committing
-          let lastBlock: number = 0;
-          try {
-            lastBlock = await retry(
-              () => provider.connection.getSlot("finalized"),
-              {
-                retries: 3,
-                factor: 2,
-                minTimeout: 1000,
-                maxTimeout: 5000,
-              }
-            );
-          } catch (error) {
-            console.warn(
-              `Failed to fetch block for batch ${batchIndex + 1}:`,
-              error
-            );
-          }
-
-          const assetsWithOwnerAndBlock = assetsWithOwner.map(
-            ({ id, ownership }) => ({
-              asset: id.toBase58(),
-              owner: ownership.owner.toBase58(),
-              lastBlock,
-            })
-          );
-
           const transaction = await sequelize.transaction({
             isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
           });
 
           try {
+            // Get current block for this batch right before committing
+            let lastBlock: number = 0;
+            try {
+              lastBlock = await retry(
+                () => provider.connection.getSlot("finalized"),
+                {
+                  retries: 3,
+                  factor: 2,
+                  minTimeout: 1000,
+                  maxTimeout: 5000,
+                }
+              );
+            } catch (error) {
+              console.warn(
+                `Failed to fetch block for batch ${batchIndex + 1}:`,
+                error
+              );
+            }
+
+            const assetsWithOwnerAndBlock = assetsWithOwner.map(
+              ({ id, ownership }) => ({
+                asset: id.toBase58(),
+                owner: ownership.owner.toBase58(),
+                lastBlock,
+              })
+            );
+
             await AssetOwner.bulkCreate(assetsWithOwnerAndBlock, {
               transaction,
               updateOnDuplicate: ["asset", "owner", "lastBlock"],
