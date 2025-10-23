@@ -8,7 +8,7 @@ WITH updates AS (
   SELECT
   kta.asset as asset,
   GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) as block,
-  (SELECT array_agg(get_byte(kta.entity_key, i)) FROM generate_series(0, length(kta.entity_key) - 1) AS i) as pub_key,
+  encode(kta.entity_key, 'base64') as pub_key,
   ao.owner as rewards_recipient,
   CASE WHEN mf.address IS NULL THEN NULL::json ELSE JSON_BUILD_OBJECT(
     'pub_key', mf.address,
@@ -67,5 +67,4 @@ SELECT
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM updates
-ORDER BY block DESC;
+FROM updates;

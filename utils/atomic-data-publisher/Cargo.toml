@@ -21,6 +21,7 @@ helium-crypto = { git = "https://github.com/helium/helium-crypto-rs.git", branch
 tonic = { version = "0.14", features = ["tls-aws-lc", "tls-native-roots"] }
 prost = "0.14"
 bs58 = "0.5"
+base64 = "0.22"
 rand = "0.8"
 metrics = "0.23"
 metrics-exporter-prometheus = "0.15"

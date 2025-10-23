@@ -9,7 +9,7 @@ WITH asset_owner_changes AS (
   SELECT
     ao.asset,
     ao.last_block as block,
-    (SELECT array_agg(get_byte(kta.entity_key, i)) FROM generate_series(0, length(kta.entity_key) - 1) AS i) as pub_key,
+    encode(kta.entity_key, 'base64') as pub_key,
     ao.owner,
     'direct_owner' as owner_type,
     'entity_ownership' as change_type
@@ -29,7 +29,7 @@ welcome_pack_changes AS (
   SELECT
     wp.asset,
     wp.last_block as block,
-    (SELECT array_agg(get_byte(kta.entity_key, i)) FROM generate_series(0, length(kta.entity_key) - 1) AS i) as pub_key,
+    encode(kta.entity_key, 'base64') as pub_key,
     wp.owner,
     'welcome_pack_owner' as owner_type,
     'entity_ownership' as change_type
@@ -61,5 +61,4 @@ SELECT
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM ownership_changes
-ORDER BY block DESC;
+FROM ownership_changes;
