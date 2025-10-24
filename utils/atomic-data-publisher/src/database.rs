@@ -18,6 +18,7 @@ use crate::{
 
 const MIN_CHUNK_SIZE: u64 = 50_000;
 const MAX_CHUNK_SIZE: u64 = 500_000;
+pub const BATCH_MARK_SIZE: usize = 1_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
