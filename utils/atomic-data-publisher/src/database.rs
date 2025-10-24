@@ -1,6 +1,7 @@
 use anyhow::Result;
 use aws_sdk_rds::auth_token::AuthTokenGenerator;
 use chrono::{Duration, Utc};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
@@ -18,7 +19,7 @@ use crate::{
 
 const MIN_CHUNK_SIZE: u64 = 50_000;
 const MAX_CHUNK_SIZE: u64 = 500_000;
-pub const BATCH_MARK_SIZE: usize = 1_000;
+pub const BATCH_SIZE: usize = 1_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
@@ -642,7 +643,9 @@ impl DatabaseClient {
 
     let query_start = std::time::Instant::now();
 
-    let rows = if job.query_name == "construct_atomic_hotspots" {
+    let mut rows = Vec::with_capacity(BATCH_SIZE);
+
+    if job.query_name == "construct_atomic_hotspots" {
       let hotspot_type = job
         .parameters
         .get("hotspot_type")
@@ -675,12 +678,25 @@ impl DatabaseClient {
         job.name, job.query_name, hotspot_type, last_block_display, target_block, blocks_span
       );
 
-      sqlx::query(query)
+      let mut stream = sqlx::query(query)
         .bind(hotspot_type)
         .bind(last_processed_block)
         .bind(target_block as i64)
-        .fetch_all(&*pool)
-        .await?
+        .fetch(&*pool);
+
+      let mut row_count = 0;
+      while let Some(row_result) = stream.next().await {
+        rows.push(row_result?);
+        row_count += 1;
+
+        if row_count % 10_000 == 0 {
+          debug!("Streamed {} rows for job '{}'", row_count, job.name);
+        }
+      }
+
+      if row_count > 0 {
+        debug!("Streamed {} total rows for job '{}'", row_count, job.name);
+      }
     } else {
       let blocks_span = if last_processed_block < 0 {
         target_block + 1
@@ -698,12 +714,25 @@ impl DatabaseClient {
         blocks_span
       );
 
-      sqlx::query(query)
+      let mut stream = sqlx::query(query)
         .bind(last_processed_block)
         .bind(target_block as i64)
-        .fetch_all(&*pool)
-        .await?
-    };
+        .fetch(&*pool);
+
+      let mut row_count = 0;
+      while let Some(row_result) = stream.next().await {
+        rows.push(row_result?);
+        row_count += 1;
+
+        if row_count % 10_000 == 0 {
+          debug!("Streamed {} rows for job '{}'", row_count, job.name);
+        }
+      }
+
+      if row_count > 0 {
+        debug!("Streamed {} total rows for job '{}'", row_count, job.name);
+      }
+    }
 
     let query_duration = query_start.elapsed().as_secs_f64();
     metrics::observe_database_query_duration(query_duration);

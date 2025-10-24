@@ -148,27 +148,19 @@ impl PollingService {
   ) -> Result<(usize, usize, bool), AtomicDataError> {
     let mut total_published = 0;
     let mut total_failed = 0;
-    // Use a bounded Vec that we clear periodically to limit memory, but don't persist until end
-    // This means on crash we may reprocess records, but we won't lose data
-    let mut published_batch = Vec::with_capacity(crate::database::BATCH_MARK_SIZE);
+    let mut published_batch = Vec::with_capacity(crate::database::BATCH_SIZE);
     let total_items = records.len();
 
-    info!(
-      "Processing {} atomic items (memory-bounded batches, mark at end)",
-      total_items
-    );
+    info!("Processing {} atomic items", total_items);
 
     for (item_index, record) in records.iter().enumerate() {
-      // Check for shutdown signal before processing each item
       if shutdown_listener.is_triggered() {
         warn!(
           "Shutdown signal received during processing, stopping at item {}/{}",
           item_index + 1,
           total_items
         );
-        // DO NOT mark progress - on restart we'll reprocess from last checkpoint
-        // This prevents data loss but may cause duplicate publishes on restart
-        return Ok((total_published, total_failed, true)); // has_failures = true to prevent block advancement
+        return Ok((total_published, total_failed, true));
       }
 
       let should_log = if total_items >= 10000 {
@@ -201,23 +193,17 @@ impl PollingService {
           total_published += 1;
           published_batch.push(published_change);
 
-          // When batch reaches size limit, clear to free memory but DON'T mark as processed
-          // We only mark at the very end when ALL records are done
-          if published_batch.len() >= crate::database::BATCH_MARK_SIZE {
-            debug!(
-              "Clearing batch of {} items to free memory (not marking as processed yet)",
-              published_batch.len()
-            );
+          // Clear batch periodically to free memory (checkpoint only at end)
+          if published_batch.len() >= crate::database::BATCH_SIZE {
+            debug!("Clearing batch of {} items to free memory", published_batch.len());
             published_batch.clear();
-            published_batch.shrink_to(crate::database::BATCH_MARK_SIZE);
+            published_batch.shrink_to(crate::database::BATCH_SIZE);
           }
         }
         Ok(None) => {
-          // Item failed, but we continue processing
           total_failed += 1;
         }
         Err(e) => {
-          // Unexpected error, log and continue
           error!("Unexpected error processing item {}: {}", item_index + 1, e);
           total_failed += 1;
         }
@@ -229,14 +215,10 @@ impl PollingService {
       total_published, total_failed
     );
 
-    // Return has_failures = true if any items failed
-    // This blocks progress and requires manual intervention to fix bad data
     let has_failures = total_failed > 0;
 
-    // Only mark as processed at the very end when ALL records are successfully processed
-    // This ensures we don't skip records on crash, though we may reprocess some on restart
+    // Only checkpoint progress when all items successfully processed
     if !has_failures && total_published > 0 {
-      // We need at least one record to get the target_block, use the first one
       self
         .database
         .mark_processed(&records[0..1], records[0].target_block)
@@ -260,22 +242,19 @@ impl PollingService {
     record: &ChangeRecord,
     shutdown_listener: Listener,
   ) -> Result<Option<ChangeRecord>, AtomicDataError> {
-    // Check for shutdown signal
     if shutdown_listener.is_triggered() {
       return Ok(None);
     }
 
-    // Prepare the protobuf request
     let request = match self.publisher.prepare_change(record).await {
       Ok(req) => req,
       Err(e) => {
         error!("Failed to prepare change request for item: {}", e);
         metrics::increment_protobuf_build_failures();
-        return Ok(None); // Failed to prepare, return None
+        return Ok(None);
       }
     };
 
-    // Publish the change with retries
     let publish_start = Instant::now();
     let result = tokio::select! {
       result = self.publisher.publish_change_request(request) => result,
@@ -301,7 +280,7 @@ impl PollingService {
         );
         metrics::increment_errors();
         metrics::observe_publish_duration(publish_duration);
-        Ok(None) // Failed to publish, return None
+        Ok(None)
       }
     }
   }
