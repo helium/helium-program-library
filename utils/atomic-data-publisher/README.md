@@ -195,7 +195,7 @@ spec:
 
 ## Dependencies
 
-Requires PostgreSQL with tables from `account-postgres-sink-service`. Creates `atomic_data_polling_state` table for tracking progress.
+Requires PostgreSQL with tables from `account-postgres-sink-service` and `asset-ownership-service`. Creates `atomic_data_polling_state` table for tracking progress.
 
 ## Troubleshooting
 
