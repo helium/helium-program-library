@@ -5,16 +5,10 @@
       "path": "./packages/idls"
     },
     {
-      "path": "./packages/fanout-sdk"
-    },
-    {
       "path": "./packages/sus"
     },
     {
       "path": "./packages/dc-auto-top-sdk"
-    },
-    {
-      "path": "./packages/hexboosting-sdk"
     },
     {
       "path": "./packages/spl-utils"
@@ -87,9 +81,6 @@
     },
     {
       "path": "./packages/circuit-breaker-sdk"
-    },
-    {
-      "path": "./packages/price-oracle-sdk"
     },
     {
       "path": "./packages/hotspot-utils"

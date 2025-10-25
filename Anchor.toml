@@ -10,12 +10,9 @@ helium_entity_manager = "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8"
 circuit_breaker = "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g"
 treasury_management = "treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5"
 lazy_transactions = "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h"
-price_oracle = "porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy"
 rewards_oracle = "rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF"
 voter_stake_registry = "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8"
-fanout = "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6"
 mobile_entity_manager = "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr"
-hexboosting = "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ"
 no_emit = "noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv"
 hpl_crons = "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu"
 mini_fanout = "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn"
@@ -31,12 +28,9 @@ members = [
   "programs/circuit-breaker",
   "programs/treasury-management",
   "programs/lazy-transactions",
-  "programs/price-oracle",
   "programs/rewards-oracle",
   "programs/voter-stake-registry",
-  "programs/fanout",
   "programs/mobile-entity-manager",
-  "programs/hexboosting",
   "programs/no-emit",
   "programs/hpl-crons",
   "programs/mini-fanout",

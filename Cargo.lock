@@ -1509,15 +1509,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "price-oracle"
-version = "0.2.2"
-dependencies = [
- "anchor-lang",
- "default-env",
- "solana-security-txt",
-]
-
-[[package]]
 name = "proc-macro-crate"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
