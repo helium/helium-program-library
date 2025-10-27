@@ -18,6 +18,7 @@
     "recent-helium-transactions-service": "./packages/recent-helium-transactions-service",
     "asset-ownership-service": "./packages/asset-ownership-service",
     "tuktuk-pyth-service": "./packages/tuktuk-pyth-service",
+    "tuktuk-dca-service": "./packages/tuktuk-dca-service",
     "atomic-data-publisher-service": "./utils/atomic-data-publisher"
   },
   "oracle": {
