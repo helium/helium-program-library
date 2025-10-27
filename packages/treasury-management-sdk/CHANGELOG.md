@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.6](https://github.com/helium/helium-program-libary/compare/v0.11.5...v0.11.6) (2025-10-27)
+
+**Note:** Version bump only for package @helium/treasury-management-sdk
+
+
+
+
+
 ## [0.11.5](https://github.com/helium/helium-program-libary/compare/v0.11.4...v0.11.5) (2025-10-13)
 
 **Note:** Version bump only for package @helium/treasury-management-sdk

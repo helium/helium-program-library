@@ -91,10 +91,14 @@ export const navigation = [
         href: "/docs/api/voter-stake-registry-sdk",
       },
 
+      { title: "Tuktuk dca", href: "/docs/api/tuktuk-dca-sdk" },
+
       {
         title: "Treasury management",
         href: "/docs/api/treasury-management-sdk",
       },
+
+      { title: "Sessions", href: "/docs/api/sessions-sdk" },
 
       { title: "Rewards oracle", href: "/docs/api/rewards-oracle-sdk" },
 
