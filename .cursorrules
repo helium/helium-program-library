@@ -1,0 +1,92 @@
+# Helium Program Library - Cursor Rules
+
+## Anchor Account Initialization
+
+When initializing new Anchor accounts in instruction handlers, always use the `set_inner()` syntax instead of setting fields individually.
+
+**Preferred:**
+```rust
+pub fn handler(ctx: Context<InitializeV0>, args: InitializeArgsV0) -> Result<()> {
+  let account = &mut ctx.accounts.account;
+  account.set_inner(AccountV0 {
+    field1: value1,
+    field2: value2,
+    // ... all fields
+  });
+  Ok(())
+}
+```
+
+**Not preferred:**
+```rust
+pub fn handler(ctx: Context<InitializeV0>, args: InitializeArgsV0) -> Result<()> {
+  let account = &mut ctx.accounts.account;
+  account.field1 = value1;
+  account.field2 = value2;
+  // ... setting fields individually
+  Ok(())
+}
+```
+
+This pattern is cleaner, ensures all fields are explicitly initialized, and makes it easier to see the complete state of the account at initialization time.
+
+## Anchor Method Account Resolution
+
+When calling Anchor program methods in TypeScript/JavaScript, always use `.accounts()` instead of `.accountsPartial()` or `.accountsStrict()`. Anchor's account resolvers will automatically derive the remaining accounts.
+
+**Preferred:**
+```typescript
+await program.methods.someInstruction(args)
+  .accounts({
+    payer: authority,
+    authority,
+    someAccount: myAccount,
+  })
+  .instruction()
+```
+
+**Not preferred:**
+```typescript
+// Don't use accountsPartial
+await program.methods.someInstruction(args)
+  .accountsPartial({
+    payer: authority,
+    authority,
+    someAccount: myAccount,
+  })
+  .instruction()
+
+// Don't use accountsStrict
+await program.methods.someInstruction(args)
+  .accountsStrict({
+    payer: authority,
+    authority,
+    someAccount: myAccount,
+    // ... all accounts manually specified
+  })
+  .instruction()
+```
+
+This approach is cleaner and leverages Anchor's automatic account resolution, reducing boilerplate and potential errors.
+
+## Test Assertions
+
+When writing tests, always use precise assertions with exact values rather than lazy comparisons like `.greaterThan()` or `.lessThan()` whenever the exact expected value can be calculated.
+
+**Preferred:**
+```typescript
+const balance = await getTokenBalance(account);
+expect(balance.toString()).to.equal(expectedAmount.toString()); // Exact value
+```
+
+**Not preferred:**
+```typescript
+const balance = await getTokenBalance(account);
+expect(balance).to.be.greaterThan(0); // Lazy assertion
+```
+
+Only use comparison assertions when:
+- The exact value is truly non-deterministic (e.g., timestamps, randomness)
+- Testing boundary conditions where you explicitly need to verify > or < behavior
+- The calculation is complex enough that approximation is acceptable (document why)
+

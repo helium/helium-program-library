@@ -157,6 +157,7 @@ jobs:
           - tests/mini-fanout.ts
           - tests/welcome-pack.ts
           - tests/dc-auto-topoff.ts
+          - tests/tuktuk-dca.ts
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
