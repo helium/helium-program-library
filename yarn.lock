@@ -2173,6 +2173,7 @@ __metadata:
     "@helium/tuktuk-idls": ^0.0.9
     "@helium/tuktuk-sdk": ^0.0.9
     "@jup-ag/core": ^4.0.0-beta.18
+    "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
     "@types/bn.js": ^5.1.1
     dotenv: ^16.0.3
