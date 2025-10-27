@@ -143,6 +143,12 @@ pub fn handler(ctx: Context<CheckRepayV0>, _args: CheckRepayArgsV0) -> Result<Ru
     ErrorCode::SlippageExceeded
   );
 
+  msg!(
+    "Swap of {} input tokens to {} output tokens successful",
+    input_amount,
+    amount_received
+  );
+
   // Reset swap state (but keep swap_input_amount for tracking)
   dca.pre_swap_destination_balance = 0;
   dca.is_swapping = 0;
