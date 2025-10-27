@@ -8,8 +8,7 @@ WITH updates AS (
   SELECT
   kta.asset as asset,
   GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) as block,
-  -- Note: PostgreSQL's encode() adds newlines every 76 chars, so we strip them for valid base64
-  replace(encode(kta.entity_key, 'base64'), E'\n', '') as pub_key,
+  encode(kta.entity_key, 'hex') as pub_key,
   ao.owner as rewards_recipient,
   CASE WHEN mf.address IS NULL THEN NULL::json ELSE JSON_BUILD_OBJECT(
     'pub_key', mf.address,

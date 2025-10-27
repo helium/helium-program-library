@@ -358,26 +358,20 @@ impl ProtobufBuilder {
       AtomicDataError::InvalidData(format!("Missing helium pub key field: {}", key))
     })?;
 
-    let bytes = if let Some(base64_str) = field_value.as_str() {
-      use base64::{engine::general_purpose::STANDARD, Engine};
-      STANDARD.decode(base64_str).map_err(|e| {
-        AtomicDataError::InvalidData(format!(
-          "Invalid base64 helium pub key field '{}': {}",
-          key, e
-        ))
+    let bytes = if let Some(hex_str) = field_value.as_str() {
+      hex::decode(hex_str).map_err(|e| {
+        AtomicDataError::InvalidData(format!("Invalid hex helium pub key field '{}': {}", key, e))
       })?
     } else {
       return Err(AtomicDataError::InvalidData(format!(
-        "Invalid helium pub key field '{}': expected base64 string",
+        "Invalid helium pub key field '{}': expected hex string",
         key
       )));
     };
 
-    let pubkey_binary = PublicKeyBinary::from(bytes);
+    debug!("Decoded helium pub key bytes (len={})", bytes.len());
 
-    Ok(HeliumPubKey {
-      value: Vec::from(pubkey_binary),
-    })
+    Ok(HeliumPubKey { value: bytes })
   }
 
   fn extract_solana_pub_key(data: &Value, key: &str) -> Result<SolanaPubKey, AtomicDataError> {
