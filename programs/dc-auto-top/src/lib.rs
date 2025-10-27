@@ -64,4 +64,8 @@ pub mod dc_auto_top {
   ) -> Result<()> {
     instructions::initialize_auto_top_off_v0::handler(ctx, args)
   }
+
+  pub fn close_legacy_auto_top_off(ctx: Context<CloseLegacyAutoTopOff>) -> Result<()> {
+    instructions::close_legacy_auto_top_off::handler(ctx)
+  }
 }

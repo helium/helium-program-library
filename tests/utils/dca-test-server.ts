@@ -215,9 +215,14 @@ export async function createDcaServer(
     }
   });
 
-  await dcaServer.listen({ port, host: "0.0.0.0" });
-  console.log(`DCA server listening on port ${port}`);
-  return dcaServer;
+  try {
+    await dcaServer.listen({ port, host: "0.0.0.0" });
+    console.log(`DCA server listening on port ${port}`);
+    return dcaServer;
+  } catch (err: any) {
+    console.error(err);
+    throw err;
+  }
 }
 
 export async function runAllTasks(

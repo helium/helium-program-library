@@ -14,20 +14,20 @@ pub struct LendV0<'info> {
     has_one = next_task,
     has_one = input_account,
     has_one = destination_token_account,
-    constraint = !dca.is_swapping,
+    constraint = dca.load()?.is_swapping == 0,
   )]
-  pub dca: Box<Account<'info, DcaV0>>,
+  pub dca: AccountLoader<'info, DcaV0>,
   #[account(mut)]
-  pub input_account: Box<Account<'info, TokenAccount>>,
+  pub input_account: Account<'info, TokenAccount>,
   #[account(mut)]
-  pub destination_token_account: Box<Account<'info, TokenAccount>>,
+  pub destination_token_account: Account<'info, TokenAccount>,
   /// CHECK: Account to receive the lent input tokens for swapping
   #[account(mut)]
   pub lend_destination: UncheckedAccount<'info>,
   #[account(
     mut,
     // Ensure that the _exact_ task we queued at initialize is being executed.
-    constraint = next_task.queued_at == dca.queued_at,
+    constraint = next_task.queued_at == dca.load()?.queued_at,
   )]
   pub next_task: Account<'info, TaskV0>,
   pub token_program: Program<'info, Token>,
@@ -76,10 +76,10 @@ pub fn verify_running_in_tuktuk(instruction_sysvar: AccountInfo, task_id: Pubkey
 pub fn handler(ctx: Context<LendV0>) -> Result<()> {
   verify_running_in_tuktuk(
     ctx.accounts.instruction_sysvar.to_account_info(),
-    ctx.accounts.dca.next_task,
+    ctx.accounts.dca.load()?.next_task,
   )?;
 
-  let dca = &mut ctx.accounts.dca;
+  let mut dca = ctx.accounts.dca.load_mut()?;
 
   // Use the fixed swap amount per order from initialization
   // On the last order, we'll use whatever is left to handle any rounding
@@ -95,9 +95,16 @@ pub fn handler(ctx: Context<LendV0>) -> Result<()> {
   // Store the pre-swap balance of the destination token account and the input amount being swapped
   // Note: check_repay_v0 must be called after this to validate the swap and reset is_swapping.
   // If check_repay_v0 is not called, is_swapping will remain true and the next DCA execution will fail.
-  dca.is_swapping = true;
+  dca.is_swapping = 1;
   dca.pre_swap_destination_balance = ctx.accounts.destination_token_account.amount;
   dca.swap_input_amount = swap_amount;
+  let authority = dca.authority;
+  let input_mint = dca.input_mint;
+  let output_mint = dca.output_mint;
+  let index = dca.index;
+  let bump = dca.bump;
+
+  drop(dca);
 
   // Transfer (lend) the input tokens to the lend destination so they can be swapped
   transfer(
@@ -106,9 +113,9 @@ pub fn handler(ctx: Context<LendV0>) -> Result<()> {
       Transfer {
         from: ctx.accounts.input_account.to_account_info(),
         to: ctx.accounts.lend_destination.to_account_info(),
-        authority: dca.to_account_info(),
+        authority: ctx.accounts.dca.to_account_info(),
       },
-      &[dca_seeds!(dca)],
+      &[dca_seeds!(authority, input_mint, output_mint, index, bump)],
     ),
     swap_amount,
   )?;

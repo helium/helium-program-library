@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.root.json",
+  "references": [
+    {
+      "path": "../spl-utils"
+    },
+    {
+      "path": "../idls"
+    },
+    {
+      "path": "../tuktuk-dca-sdk"
+    },
+    {
+      "path": "./tsconfig.cjs.json"
+    },
+    {
+      "path": "./tsconfig.esm.json"
+    }
+  ]
+}

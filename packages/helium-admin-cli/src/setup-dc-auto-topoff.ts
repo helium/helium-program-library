@@ -160,9 +160,9 @@ export async function run(args: any = process.argv) {
   }
 
   const autoTopOff = autoTopOffKey(delegatedDc, authority)[0]
-
   const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID)
   const [nextTask, nextHntTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 2)
+
   const autoTopOffAcc = await dcAutoTopoffProgram.account.autoTopOffV0.fetchNullable(autoTopOff!)
   
   // Check if auto topoff exists with different authority

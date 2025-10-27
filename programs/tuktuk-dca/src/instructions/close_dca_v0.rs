@@ -28,21 +28,21 @@ pub struct CloseDcaV0<'info> {
     has_one = input_mint,
     has_one = input_account,
   )]
-  pub dca: Box<Account<'info, DcaV0>>,
-  pub input_mint: Box<Account<'info, Mint>>,
+  pub dca: AccountLoader<'info, DcaV0>,
+  pub input_mint: Account<'info, Mint>,
   #[account(
     mut,
     associated_token::mint = input_mint,
     associated_token::authority = dca,
   )]
-  pub input_account: Box<Account<'info, TokenAccount>>,
+  pub input_account: Account<'info, TokenAccount>,
   #[account(
     init_if_needed,
     payer = authority,
     associated_token::mint = input_mint,
     associated_token::authority = authority,
   )]
-  pub authority_input_account: Box<Account<'info, TokenAccount>>,
+  pub authority_input_account: Account<'info, TokenAccount>,
   /// CHECK: queue authority
   #[account(
     seeds = [b"queue_authority"],
@@ -55,7 +55,7 @@ pub struct CloseDcaV0<'info> {
     bump = task_queue_authority.bump_seed,
     seeds::program = tuktuk::ID,
   )]
-  pub task_queue_authority: Box<Account<'info, TaskQueueAuthorityV0>>,
+  pub task_queue_authority: Account<'info, TaskQueueAuthorityV0>,
   /// CHECK: Rent refund destination
   #[account(mut)]
   pub rent_refund: SystemAccount<'info>,
@@ -64,7 +64,7 @@ pub struct CloseDcaV0<'info> {
   pub task_queue: UncheckedAccount<'info>,
   /// CHECK: current task account
   #[account(mut)]
-  pub next_task: Box<Account<'info, TaskV0>>,
+  pub next_task: Account<'info, TaskV0>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
@@ -72,7 +72,13 @@ pub struct CloseDcaV0<'info> {
 }
 
 pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
-  let dca = &ctx.accounts.dca;
+  let dca = ctx.accounts.dca.load()?;
+  let authority = dca.authority;
+  let input_mint = dca.input_mint;
+  let output_mint = dca.output_mint;
+  let index = dca.index;
+  let bump = dca.bump;
+  drop(dca);
 
   // Transfer any remaining tokens back to authority
   let remaining_balance = ctx.accounts.input_account.amount;
@@ -83,9 +89,9 @@ pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
         anchor_spl::token::Transfer {
           from: ctx.accounts.input_account.to_account_info(),
           to: ctx.accounts.authority_input_account.to_account_info(),
-          authority: dca.to_account_info(),
+          authority: ctx.accounts.dca.to_account_info(),
         },
-        &[dca_seeds!(dca)],
+        &[dca_seeds!(authority, input_mint, output_mint, index, bump)],
       ),
       remaining_balance,
     )?;
@@ -97,9 +103,9 @@ pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
     anchor_spl::token::CloseAccount {
       account: ctx.accounts.input_account.to_account_info(),
       destination: ctx.accounts.rent_refund.to_account_info(),
-      authority: dca.to_account_info(),
+      authority: ctx.accounts.dca.to_account_info(),
     },
-    &[dca_seeds!(dca)],
+    &[dca_seeds!(authority, input_mint, output_mint, index, bump)],
   ))?;
 
   // Only dequeue the task if it's not pointing to itself (which means no task scheduled)

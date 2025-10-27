@@ -141,6 +141,7 @@ describe("tuktuk-dca", () => {
       dcaSigner,
       port: 8123,
     })
+    console.log("DCA server started")
   })
 
   after(async () => {
@@ -225,6 +226,7 @@ describe("tuktuk-dca", () => {
           taskId,
           dcaSigner: dcaSigner.publicKey,
           dcaUrl: "http://localhost:8123/dca",
+          crankReward: new anchor.BN(15000),
         })
         .accountsPartial({
           core: {
@@ -263,7 +265,7 @@ describe("tuktuk-dca", () => {
     it("executes a full DCA swap cycle through multiple runs", async () => {
       let dcaAccount = await program.account.dcaV0.fetch(dca)
       expect(dcaAccount.numOrders).to.equal(numOrders)
-      expect(dcaAccount.isSwapping).to.be.false
+      expect(dcaAccount.isSwapping).to.eq(0)
 
       const swapAmountPerOrder = dcaAccount.swapAmountPerOrder // 235 USDC per order
       const initialInputBalance = swapAmountPerOrder.muln(numOrders) // 940 USDC total
@@ -313,7 +315,7 @@ describe("tuktuk-dca", () => {
         // Verify state after swap
         const dcaAccountNow = await program.account.dcaV0.fetchNullable(dca)
         if (dcaAccountNow) {
-          expect(dcaAccountNow.isSwapping).to.be.false
+          expect(dcaAccountNow.isSwapping).to.eq(0)
           expect(dcaAccountNow.numOrders).to.equal(numOrders - (i + 1))
           expect(dcaAccountNow.preSwapDestinationBalance.toNumber()).to.equal(0)
         }

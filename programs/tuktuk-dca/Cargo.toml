@@ -31,3 +31,4 @@ solana-security-txt = { workspace = true }
 default-env = { workspace = true }
 tuktuk-program = { workspace = true }
 shared-utils = { workspace = true }
+bytemuck = { workspace = true }

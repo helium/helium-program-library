@@ -23,26 +23,26 @@ pub struct CheckRepayV0<'info> {
     has_one = next_task,
     has_one = input_account,
     has_one = rent_refund,
-    constraint = dca.is_swapping @ ErrorCode::LendNotCalled,
+    constraint = dca.load()?.is_swapping == 1 @ ErrorCode::LendNotCalled,
   )]
-  pub dca: Box<Account<'info, DcaV0>>,
+  pub dca: AccountLoader<'info, DcaV0>,
   #[account(
     mut,
     // Ensure that the _exact_ task we queued at initialize is being executed.
-    constraint = next_task.queued_at == dca.queued_at,
+    constraint = next_task.queued_at == dca.load()?.queued_at,
   )]
-  pub next_task: Box<Account<'info, TaskV0>>,
+  pub next_task: Account<'info, TaskV0>,
   #[account(
     mut,
-    constraint = input_account.mint == dca.input_mint,
+    constraint = input_account.mint == dca.load()?.input_mint,
     constraint = input_account.owner == dca.key(),
   )]
-  pub input_account: Box<Account<'info, TokenAccount>>,
+  pub input_account: Account<'info, TokenAccount>,
   /// CHECK: Rent refund destination
   #[account(mut)]
   pub rent_refund: UncheckedAccount<'info>,
   #[account(mut)]
-  pub destination_token_account: Box<Account<'info, TokenAccount>>,
+  pub destination_token_account: Account<'info, TokenAccount>,
   /// CHECK: Checked by loading with pyth
   #[account(
     constraint = input_price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceNotFound,
@@ -57,7 +57,13 @@ pub struct CheckRepayV0<'info> {
 }
 
 pub fn handler(ctx: Context<CheckRepayV0>, _args: CheckRepayArgsV0) -> Result<RunTaskReturnV0> {
-  let dca = &mut ctx.accounts.dca;
+  let dca_key = ctx.accounts.dca.key();
+  let mut dca = ctx.accounts.dca.load_mut()?;
+  let authority = dca.authority;
+  let input_mint = dca.input_mint;
+  let output_mint = dca.output_mint;
+  let index = dca.index;
+  let bump = dca.bump;
 
   // Calculate the amount received
   let current_balance = ctx.accounts.destination_token_account.amount;
@@ -139,7 +145,7 @@ pub fn handler(ctx: Context<CheckRepayV0>, _args: CheckRepayArgsV0) -> Result<Ru
 
   // Reset swap state (but keep swap_input_amount for tracking)
   dca.pre_swap_destination_balance = 0;
-  dca.is_swapping = false;
+  dca.is_swapping = 0;
 
   // Decrement num_orders
   dca.num_orders = dca
@@ -157,29 +163,33 @@ pub fn handler(ctx: Context<CheckRepayV0>, _args: CheckRepayArgsV0) -> Result<Ru
     dca.queued_at = now;
     dca.next_task = ctx.remaining_accounts[0].key();
 
+    let dca_url = String::from_utf8(dca.dca_url.to_vec())
+      .unwrap()
+      .replace("\0", "");
     Ok(RunTaskReturnV0 {
       tasks: vec![TaskReturnV0 {
         trigger: TriggerV0::Timestamp(next_time),
         transaction: TransactionSourceV0::RemoteV0 {
           signer: dca.dca_signer,
-          url: format!("{}/{}", dca.dca_url, dca.key()),
+          url: format!("{}/{}", dca_url, dca_key),
         },
-        crank_reward: None,
-        free_tasks: 3,
-        description: format!("dca {}", &dca.key().to_string()[..(32 - 4)]),
+        crank_reward: Some(dca.crank_reward),
+        free_tasks: 1,
+        description: format!("dca {}", &dca_key.to_string()[..(32 - 4)]),
       }],
       accounts: vec![],
     })
   } else {
-    // Final swap - close the input token account and DCA to rent refund
+    drop(dca);
+
     anchor_spl::token::close_account(CpiContext::new_with_signer(
       ctx.accounts.token_program.to_account_info(),
       anchor_spl::token::CloseAccount {
         account: ctx.accounts.input_account.to_account_info(),
         destination: ctx.accounts.rent_refund.to_account_info(),
-        authority: dca.to_account_info(),
+        authority: ctx.accounts.dca.to_account_info(),
       },
-      &[dca_seeds!(dca)],
+      &[dca_seeds!(authority, input_mint, output_mint, index, bump)],
     ))?;
 
     ctx

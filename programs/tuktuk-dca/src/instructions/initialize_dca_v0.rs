@@ -25,6 +25,7 @@ pub struct InitializeDcaArgsV0 {
   pub task_id: u16,
   pub dca_signer: Pubkey,
   pub dca_url: String,
+  pub crank_reward: u64,
 }
 
 // Shared accounts for both nested and non-nested versions
@@ -42,14 +43,14 @@ pub struct InitializeDcaCore<'info> {
     seeds = [b"dca", authority.key().as_ref(), input_mint.key().as_ref(), output_mint.key().as_ref(), args.index.to_le_bytes().as_ref()],
     bump
   )]
-  pub dca: Account<'info, DcaV0>,
-  pub input_mint: Box<Account<'info, Mint>>,
-  pub output_mint: Box<Account<'info, Mint>>,
+  pub dca: AccountLoader<'info, DcaV0>,
+  pub input_mint: Account<'info, Mint>,
+  pub output_mint: Account<'info, Mint>,
   #[account(
     mut,
     token::mint = output_mint,
   )]
-  pub destination_token_account: Box<Account<'info, TokenAccount>>,
+  pub destination_token_account: Account<'info, TokenAccount>,
   /// CHECK: Checked by loading with pyth
   pub input_price_oracle: UncheckedAccount<'info>,
   /// CHECK: Checked by loading with pyth
@@ -60,13 +61,13 @@ pub struct InitializeDcaCore<'info> {
     associated_token::mint = input_mint,
     associated_token::authority = dca,
   )]
-  pub input_account: Box<Account<'info, TokenAccount>>,
+  pub input_account: Account<'info, TokenAccount>,
   #[account(
     mut,
     associated_token::mint = input_mint,
     associated_token::authority = dca_payer,
   )]
-  pub dca_payer_account: Box<Account<'info, TokenAccount>>,
+  pub dca_payer_account: Account<'info, TokenAccount>,
   /// CHECK: task queue account
   #[account(mut)]
   pub task_queue: UncheckedAccount<'info>,
@@ -112,7 +113,8 @@ pub fn initialize_dca_impl(
   args: &InitializeDcaArgsV0,
   dca_bump: u8,
 ) -> Result<TaskReturnV0> {
-  let dca = &mut core.dca;
+  let dca_key = core.dca.key();
+  let mut dca = core.dca.load_init()?;
   let now = Clock::get()?.unix_timestamp;
 
   // Transfer the total amount needed for all orders from authority to DCA input account
@@ -133,7 +135,10 @@ pub fn initialize_dca_impl(
     total_amount,
   )?;
 
-  dca.set_inner(DcaV0 {
+  let url_bytes = args.dca_url.as_bytes();
+  let mut dca_url = [0; 128];
+  dca_url[..url_bytes.len()].copy_from_slice(url_bytes);
+  *dca = DcaV0 {
     index: args.index,
     queued_at: now,
     destination_token_account: core.destination_token_account.key(),
@@ -149,26 +154,28 @@ pub fn initialize_dca_impl(
     initial_num_orders: args.num_orders,
     num_orders: args.num_orders,
     swap_amount_per_order: args.swap_amount_per_order,
+    crank_reward: args.crank_reward,
     interval_seconds: args.interval_seconds,
     next_task: task_key,
     slippage_bps_from_oracle: args.slippage_bps_from_oracle,
     task_queue: core.task_queue.key(),
     bump: dca_bump,
-    is_swapping: false,
+    is_swapping: 0,
     dca_signer: args.dca_signer,
-    dca_url: args.dca_url.clone(),
+    dca_url,
     rent_refund: core.rent_payer.key(),
-  });
+    reserved: [0; 2],
+  };
 
   Ok(TaskReturnV0 {
     trigger: TriggerV0::Timestamp(now),
     transaction: TransactionSourceV0::RemoteV0 {
       signer: args.dca_signer,
-      url: format!("{}/{}", args.dca_url, dca.key()),
+      url: format!("{}/{}", args.dca_url, core.dca.key()),
     },
-    crank_reward: None,
-    free_tasks: 3,
-    description: format!("dca {}", &dca.key().to_string()[..(32 - 4)]),
+    crank_reward: Some(args.crank_reward),
+    free_tasks: 1,
+    description: format!("dca {}", &dca_key.to_string()[..(32 - 4)]),
   })
 }
 

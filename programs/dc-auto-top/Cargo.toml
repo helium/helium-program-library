@@ -28,7 +28,7 @@ anchor-spl = { workspace = true }
 solana-zk-sdk = { workspace = true }
 helium-sub-daos = { workspace = true }
 circuit-breaker = { workspace = true }
-bytemuck = "1.14.0"
+bytemuck = { workspace = true }
 pyth-solana-receiver-sdk = { workspace = true }
 lazy-transactions = { path = "../lazy-transactions", features = ["cpi"] }
 data-credits = { path = "../data-credits", features = ["cpi"] }

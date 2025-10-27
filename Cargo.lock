@@ -3279,6 +3279,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "bytemuck",
  "default-env",
  "pyth-solana-receiver-sdk",
  "shared-utils",
