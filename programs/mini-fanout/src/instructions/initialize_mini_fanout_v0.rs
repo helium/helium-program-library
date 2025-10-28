@@ -83,6 +83,8 @@ impl MiniFanoutV0 {
     size += 4 + args.shares.len() * MiniFanoutShareV0::size();
     // seed: Vec<u8> (4 bytes len + seed bytes)
     size += 4 + args.seed.len();
+    // Option<TransactionSourceV0> and enum in TransactionSourceV0
+    size += 2;
     if let Some(pre_task) = &args.pre_task {
       match pre_task {
         TransactionSourceV0::CompiledV0(compiled) => {
@@ -111,11 +113,11 @@ impl MiniFanoutV0 {
 impl MiniFanoutShareV0 {
   pub fn size() -> usize {
     // wallet: Pubkey (32)
-    // shares: u32 (4)
+    // shares: 1 enum + 8 u64
     // total_dust: u64 (8)
     // total_owed: u64 (8)
     // delegate: Pubkey (32)
-    32 + 4 + 8 + 8 + 32
+    32 + 1 + 8 + 8 + 8 + 32
   }
 }
 
