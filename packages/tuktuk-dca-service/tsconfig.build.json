@@ -1,11 +1,27 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./lib",
+    "target": "ES2016",
+    "module": "CommonJS",
+    "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "composite": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": false,
+    "moduleResolution": "Node",
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "types": ["node"],
+    "strict": true,
+    "paths": {
+      "@/*": ["*"]
+    },
+    "outDir": "lib"
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "lib", "**/*.test.ts", "**/*.spec.ts"]
+  "include": ["src"]
 }
