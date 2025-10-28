@@ -10,6 +10,7 @@ use helium_proto::services::chain_rewardable_entities::{
 };
 use prost::Message;
 use serde_json::Value;
+use std::str::FromStr;
 use tracing::{debug, warn};
 
 use crate::{database::ChangeRecord, errors::AtomicDataError};
@@ -371,7 +372,12 @@ impl ProtobufBuilder {
 
     debug!("Decoded helium pub key bytes (len={})", bytes.len());
 
-    Ok(HeliumPubKey { value: bytes })
+    let public_key_binary = PublicKeyBinary::from_str(&bs58::encode(&bytes).into_string())
+      .map_err(|e| AtomicDataError::InvalidData(format!("Invalid public key: {}", e)))?;
+
+    Ok(HeliumPubKey {
+      value: public_key_binary.into(),
+    })
   }
 
   fn extract_solana_pub_key(data: &Value, key: &str) -> Result<SolanaPubKey, AtomicDataError> {
