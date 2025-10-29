@@ -20,9 +20,6 @@ pub enum AtomicDataError {
   #[error("Query validation error: {0}")]
   QueryValidationError(String),
 
-  #[error("Polling bounds error: {0}")]
-  PollingBoundsError(String),
-
   #[error("Unknown error: {0}")]
   Unknown(#[from] anyhow::Error),
 

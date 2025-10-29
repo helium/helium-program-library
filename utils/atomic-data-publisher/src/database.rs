@@ -119,17 +119,51 @@ impl DatabaseClient {
     let is_rds = self.config.host.contains("rds.amazonaws.com");
     if is_rds && self.config.password.is_empty() {
       info!("Refreshing database pool with new IAM auth token");
-      let new_pool = Self::create_pool(&self.config, self.dry_run).await?;
 
-      let mut pool_write = self.pool.write().await;
-      let old_pool = std::mem::replace(&mut *pool_write, new_pool);
-      drop(pool_write);
+      // Retry pool refresh up to 3 times with exponential backoff
+      let mut last_error = None;
+      for attempt in 1..=3 {
+        match Self::create_pool(&self.config, self.dry_run).await {
+          Ok(new_pool) => {
+            let mut pool_write = self.pool.write().await;
+            let old_pool = std::mem::replace(&mut *pool_write, new_pool);
+            drop(pool_write);
 
-      // Close old pool gracefully
-      old_pool.close().await;
-      info!("Database pool refreshed successfully");
+            // Close old pool gracefully
+            old_pool.close().await;
+            info!("Database pool refreshed successfully on attempt {}", attempt);
+            return Ok(());
+          }
+          Err(e) => {
+            warn!("Failed to refresh database pool (attempt {}): {}", attempt, e);
+            last_error = Some(e);
+            if attempt < 3 {
+              tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
+            }
+          }
+        }
+      }
+
+      if let Some(e) = last_error {
+        error!("Failed to refresh database pool after 3 attempts");
+        return Err(e);
+      }
     }
     Ok(())
+  }
+
+  /// Check if an error is likely an IAM authentication error
+  pub fn is_auth_error(err: &sqlx::Error) -> bool {
+    match err {
+      sqlx::Error::Database(db_err) => {
+        let msg = db_err.message().to_lowercase();
+        msg.contains("authentication")
+          || msg.contains("password authentication failed")
+          || msg.contains("no password supplied")
+          || msg.contains("connection refused")
+      }
+      _ => false,
+    }
   }
 
   async fn generate_rds_auth_token(config: &DatabaseConfig) -> Result<String> {
@@ -160,7 +194,7 @@ impl DatabaseClient {
     Ok(auth_token.to_string())
   }
 
-  fn validate_database_config(config: &DatabaseConfig) -> Result<()> {
+  pub fn validate_database_config(config: &DatabaseConfig) -> Result<()> {
     if config.host.is_empty() {
       anyhow::bail!("Database host cannot be empty");
     }
@@ -174,7 +208,7 @@ impl DatabaseClient {
       anyhow::bail!("Database port cannot be zero");
     }
     if config.max_connections == 0 {
-      anyhow::bail!("Database max_connections must be greater than 0");
+      anyhow::bail!("Database max_connections must be greater than 0, got: {}", config.max_connections);
     }
     if config.max_connections < config.min_connections {
       anyhow::bail!(
@@ -186,7 +220,7 @@ impl DatabaseClient {
     Ok(())
   }
 
-  fn validate_polling_jobs(jobs: &[PollingJob]) -> Result<()> {
+  pub fn validate_polling_jobs(jobs: &[PollingJob]) -> Result<()> {
     if jobs.is_empty() {
       warn!("No polling jobs configured - service will not process any changes");
       return Ok(());
@@ -211,11 +245,22 @@ impl DatabaseClient {
         );
       }
 
+      // Validate query name exists
+      if let Err(e) = crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name) {
+        anyhow::bail!("Job '{}' (index {}): query validation failed: {}", job.name, index, e);
+      }
+
+      // Query-specific parameter validation
       if job.query_name == "construct_atomic_hotspots"
         && job.parameters.get("hotspot_type").is_none()
       {
         anyhow::bail!("Job '{}' (index {}): hotspot_type parameter is required for construct_atomic_hotspots queries",
                      job.name, index);
+      }
+
+      // Validate change_type parameter exists for all jobs
+      if job.parameters.get("change_type").is_none() {
+        anyhow::bail!("Job '{}' (index {}): change_type parameter is required", job.name, index);
       }
     }
 

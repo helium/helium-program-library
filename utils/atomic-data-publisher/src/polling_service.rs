@@ -39,6 +39,25 @@ impl PollingService {
     }
   }
 
+  fn should_log_progress(item_index: usize, total_items: usize) -> bool {
+    let current = item_index + 1;
+    let is_last = current == total_items;
+
+    if is_last {
+      return true;
+    }
+
+    if total_items >= 10000 {
+      current % (total_items / 10) == 0
+    } else if total_items >= 1000 {
+      current % 1000 == 0
+    } else if total_items >= 100 {
+      current % 100 == 0
+    } else {
+      false
+    }
+  }
+
   pub async fn run(&self, shutdown_listener: Listener) -> Result<(), AtomicDataError> {
     let polling_interval = self.config.polling_interval();
 
@@ -75,9 +94,26 @@ impl PollingService {
   }
 
   async fn process_changes(&self, shutdown_listener: Listener) -> Result<(), AtomicDataError> {
-    if self.database.any_job_running().await? {
-      debug!("Job already running, skipping to prevent OOM");
-      return Ok(());
+    match self.database.any_job_running().await {
+      Ok(is_running) if is_running => {
+        debug!("Job already running, skipping to prevent OOM");
+        return Ok(());
+      }
+      Ok(_) => {}
+      Err(e) => {
+        // Check if this is an auth error and attempt pool refresh
+        if let Some(sqlx_err) = e.downcast_ref::<sqlx::Error>() {
+          if DatabaseClient::is_auth_error(sqlx_err) {
+            warn!("Database authentication error detected, attempting pool refresh");
+            if let Err(refresh_err) = self.database.refresh_pool().await {
+              error!("Failed to refresh database pool: {}", refresh_err);
+            } else {
+              info!("Database pool refreshed successfully after auth error");
+            }
+          }
+        }
+        return Err(e.into());
+      }
     }
 
     let mut total_jobs_processed = 0;
@@ -88,7 +124,23 @@ impl PollingService {
     info!("Starting new polling cycle - processing all available jobs");
 
     loop {
-      let change_records = self.database.get_pending_changes().await?;
+      let change_records = match self.database.get_pending_changes().await {
+        Ok(records) => records,
+        Err(e) => {
+          // Check if this is an auth error and attempt pool refresh
+          if let Some(sqlx_err) = e.downcast_ref::<sqlx::Error>() {
+            if DatabaseClient::is_auth_error(sqlx_err) {
+              warn!("Database authentication error detected, attempting pool refresh");
+              if let Err(refresh_err) = self.database.refresh_pool().await {
+                error!("Failed to refresh database pool: {}", refresh_err);
+              } else {
+                info!("Database pool refreshed successfully after auth error");
+              }
+            }
+          }
+          return Err(e.into());
+        }
+      };
 
       if change_records.is_empty() {
         info!(
@@ -179,18 +231,7 @@ impl PollingService {
         return Ok((total_published, total_data_errors, total_publish_errors, true));
       }
 
-      let should_log = if total_items >= 10000 {
-        let log_interval = total_items / 10;
-        (item_index + 1) % log_interval == 0 || (item_index + 1) == total_items
-      } else if total_items >= 1000 {
-        (item_index + 1) % 1000 == 0 || (item_index + 1) == total_items
-      } else if total_items >= 100 {
-        (item_index + 1) % 100 == 0 || (item_index + 1) == total_items
-      } else {
-        (item_index + 1) == total_items
-      };
-
-      if should_log {
+      if Self::should_log_progress(item_index, total_items) {
         info!(
           "Progress: {}/{} items ({:.1}%) - {} published, {} data errors, {} publish errors",
           item_index + 1,
@@ -274,7 +315,9 @@ impl PollingService {
         error!("{}", error_msg);
 
         // Data error - log to DB and move on
-        let _ = self.database.mark_record_failed(record, "protobuf_build_failure", &error_msg).await;
+        if let Err(db_err) = self.database.mark_record_failed(record, "protobuf_build_failure", &error_msg).await {
+          warn!("Failed to log failed record to database: {}", db_err);
+        }
         metrics::increment_protobuf_build_failures();
 
         return Ok(ProcessResult::DataError);
