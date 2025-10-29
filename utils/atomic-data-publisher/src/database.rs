@@ -272,6 +272,41 @@ impl DatabaseClient {
       .await?;
 
     info!("Created or verified atomic_data_polling_state table");
+
+    // Create table to track permanently failed records
+    let create_failed_records_table = r#"
+      CREATE TABLE IF NOT EXISTS atomic_data_failed_records (
+        id SERIAL PRIMARY KEY,
+        job_name VARCHAR(255) NOT NULL,
+        query_name VARCHAR(255) NOT NULL,
+        record_hash TEXT NOT NULL,
+        error_type VARCHAR(255) NOT NULL,
+        error_message TEXT NOT NULL,
+        target_block BIGINT NOT NULL,
+        failure_count INTEGER NOT NULL DEFAULT 1,
+        first_failed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        last_failed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        atomic_data JSONB,
+        UNIQUE(job_name, query_name, record_hash)
+      )
+    "#;
+
+    sqlx::query(create_failed_records_table).execute(&*pool).await?;
+
+    let create_failed_records_index = r#"
+      CREATE INDEX IF NOT EXISTS idx_failed_records_lookup
+      ON atomic_data_failed_records (job_name, query_name, record_hash)
+    "#;
+    sqlx::query(create_failed_records_index).execute(&*pool).await?;
+
+    let create_failed_records_time_index = r#"
+      CREATE INDEX IF NOT EXISTS idx_failed_records_last_failed
+      ON atomic_data_failed_records (last_failed_at)
+    "#;
+    sqlx::query(create_failed_records_time_index).execute(&*pool).await?;
+
+    info!("Created or verified atomic_data_failed_records table");
+
     Ok(())
   }
 
@@ -1353,8 +1388,8 @@ impl DatabaseClient {
       );
     }
 
-    // Only mark as completed if there were no failures
-    // Jobs with failures require manual intervention to fix bad data
+    // Only mark as completed if there were no publish failures
+    // Publish failures are transient (network/infrastructure) and will retry
     if failed_count == 0 {
       if let Err(e) = self
         .mark_completed(&record.job_name, &record.query_name)
@@ -1371,8 +1406,8 @@ impl DatabaseClient {
         );
       }
     } else {
-      error!(
-        "Job '{}' had {} FAILED items - BLOCKING PROGRESS. Manual intervention required to fix bad data. Job will retry on next cycle.",
+      warn!(
+        "Job '{}' had {} publish errors (network/infrastructure) - will retry on next cycle",
         record.job_name, failed_count
       );
     }
@@ -1402,6 +1437,70 @@ impl DatabaseClient {
     } else {
       info!("No running job states to clean up");
     }
+
+    Ok(())
+  }
+
+  /// Generate a unique hash for a record based on its identifying fields
+  fn generate_record_hash(record: &ChangeRecord) -> String {
+    use sha2::{Digest, Sha256};
+
+    // Use pub_key and asset as the unique identifier if available
+    let identifier = if let Some(pub_key) = record.atomic_data.get("pub_key") {
+      if let Some(asset) = record.atomic_data.get("asset") {
+        format!("{}:{}", pub_key, asset)
+      } else {
+        // Fallback to entire atomic_data if no asset
+        serde_json::to_string(&record.atomic_data).unwrap_or_default()
+      }
+    } else {
+      // Fallback to entire atomic_data
+      serde_json::to_string(&record.atomic_data).unwrap_or_default()
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(identifier.as_bytes());
+    format!("{:x}", hasher.finalize())
+  }
+
+  /// Mark a record as failed
+  pub async fn mark_record_failed(
+    &self,
+    record: &ChangeRecord,
+    error_type: &str,
+    error_message: &str,
+  ) -> Result<()> {
+    let pool = self.pool.read().await;
+    let record_hash = Self::generate_record_hash(record);
+
+    // Use INSERT ... ON CONFLICT to update failure count if already exists
+    sqlx::query(
+      r#"
+      INSERT INTO atomic_data_failed_records
+        (job_name, query_name, record_hash, error_type, error_message, target_block, failure_count, atomic_data)
+      VALUES ($1, $2, $3, $4, $5, $6, 1, $7)
+      ON CONFLICT (job_name, query_name, record_hash)
+      DO UPDATE SET
+        failure_count = atomic_data_failed_records.failure_count + 1,
+        last_failed_at = NOW(),
+        error_message = $5,
+        target_block = $6
+      "#,
+    )
+    .bind(&record.job_name)
+    .bind(&record.query_name)
+    .bind(&record_hash)
+    .bind(error_type)
+    .bind(error_message)
+    .bind(record.target_block as i64)
+    .bind(&record.atomic_data)
+    .execute(&*pool)
+    .await?;
+
+    debug!(
+      "Logged failed record for job '{}' (hash: {}, error: {})",
+      record.job_name, &record_hash[..8], error_type
+    );
 
     Ok(())
   }

@@ -11,7 +11,7 @@ use helium_proto::services::chain_rewardable_entities::{
 use prost::Message;
 use serde_json::Value;
 use std::str::FromStr;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 use crate::{database::ChangeRecord, errors::AtomicDataError};
 
@@ -355,25 +355,56 @@ impl ProtobufBuilder {
     );
     debug!("Value at field '{}': {:?}", key, data.get(key));
 
-    let field_value = data.get(key).ok_or_else(|| {
-      AtomicDataError::InvalidData(format!("Missing helium pub key field: {}", key))
-    })?;
+    let field_value = match data.get(key) {
+      Some(val) => val,
+      None => {
+        let err_msg = format!(
+          "Missing helium pub key field: '{}'. Available fields: {:?}",
+          key,
+          data.as_object().map(|obj| obj.keys().collect::<Vec<_>>())
+        );
+        error!("{}", err_msg);
+        return Err(AtomicDataError::InvalidData(err_msg));
+      }
+    };
 
     let bytes = if let Some(hex_str) = field_value.as_str() {
-      hex::decode(hex_str).map_err(|e| {
-        AtomicDataError::InvalidData(format!("Invalid hex helium pub key field '{}': {}", key, e))
-      })?
+      match hex::decode(hex_str) {
+        Ok(b) => b,
+        Err(e) => {
+          let err_msg = format!(
+            "Invalid hex helium pub key field '{}': {} (value: '{}')",
+            key, e, hex_str
+          );
+          error!("{}", err_msg);
+          return Err(AtomicDataError::InvalidData(err_msg));
+        }
+      }
     } else {
-      return Err(AtomicDataError::InvalidData(format!(
-        "Invalid helium pub key field '{}': expected hex string",
-        key
-      )));
+      let err_msg = format!(
+        "Invalid helium pub key field '{}': expected hex string but got {:?}",
+        key, field_value
+      );
+      error!("{}", err_msg);
+      return Err(AtomicDataError::InvalidData(err_msg));
     };
 
     debug!("Decoded helium pub key bytes (len={})", bytes.len());
 
-    let public_key_binary = PublicKeyBinary::from_str(&bs58::encode(&bytes).into_string())
-      .map_err(|e| AtomicDataError::InvalidData(format!("Invalid public key: {}", e)))?;
+    let public_key_binary = match PublicKeyBinary::from_str(&bs58::encode(&bytes).into_string()) {
+      Ok(pk) => pk,
+      Err(e) => {
+        let err_msg = format!(
+          "Invalid public key for field '{}': {} (decoded {} bytes from hex, bs58: '{}')",
+          key,
+          e,
+          bytes.len(),
+          bs58::encode(&bytes).into_string()
+        );
+        error!("{}", err_msg);
+        return Err(AtomicDataError::InvalidData(err_msg));
+      }
+    };
 
     Ok(HeliumPubKey {
       value: public_key_binary.into(),
