@@ -238,8 +238,14 @@ impl AtomicDataPublisher {
         loop {
           tokio::select! {
             _ = interval.tick() => {
-              if let Err(e) = database.refresh_pool().await {
-                warn!("Failed to refresh database pool: {}", e);
+              match database.refresh_pool().await {
+                Ok(_) => {
+                  debug!("Database pool refreshed successfully (periodic)");
+                }
+                Err(e) => {
+                  error!("Failed to refresh database pool (periodic): {}", e);
+                  // Continue running - the next refresh attempt might succeed
+                }
               }
             }
             _ = shutdown_listener.clone() => {

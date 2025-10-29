@@ -119,17 +119,51 @@ impl DatabaseClient {
     let is_rds = self.config.host.contains("rds.amazonaws.com");
     if is_rds && self.config.password.is_empty() {
       info!("Refreshing database pool with new IAM auth token");
-      let new_pool = Self::create_pool(&self.config, self.dry_run).await?;
 
-      let mut pool_write = self.pool.write().await;
-      let old_pool = std::mem::replace(&mut *pool_write, new_pool);
-      drop(pool_write);
+      // Retry pool refresh up to 3 times with exponential backoff
+      let mut last_error = None;
+      for attempt in 1..=3 {
+        match Self::create_pool(&self.config, self.dry_run).await {
+          Ok(new_pool) => {
+            let mut pool_write = self.pool.write().await;
+            let old_pool = std::mem::replace(&mut *pool_write, new_pool);
+            drop(pool_write);
 
-      // Close old pool gracefully
-      old_pool.close().await;
-      info!("Database pool refreshed successfully");
+            // Close old pool gracefully
+            old_pool.close().await;
+            info!("Database pool refreshed successfully on attempt {}", attempt);
+            return Ok(());
+          }
+          Err(e) => {
+            warn!("Failed to refresh database pool (attempt {}): {}", attempt, e);
+            last_error = Some(e);
+            if attempt < 3 {
+              tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
+            }
+          }
+        }
+      }
+
+      if let Some(e) = last_error {
+        error!("Failed to refresh database pool after 3 attempts");
+        return Err(e);
+      }
     }
     Ok(())
+  }
+
+  /// Check if an error is likely an IAM authentication error
+  pub fn is_auth_error(err: &sqlx::Error) -> bool {
+    match err {
+      sqlx::Error::Database(db_err) => {
+        let msg = db_err.message().to_lowercase();
+        msg.contains("authentication")
+          || msg.contains("password authentication failed")
+          || msg.contains("no password supplied")
+          || msg.contains("connection refused")
+      }
+      _ => false,
+    }
   }
 
   async fn generate_rds_auth_token(config: &DatabaseConfig) -> Result<String> {
@@ -160,7 +194,7 @@ impl DatabaseClient {
     Ok(auth_token.to_string())
   }
 
-  fn validate_database_config(config: &DatabaseConfig) -> Result<()> {
+  pub fn validate_database_config(config: &DatabaseConfig) -> Result<()> {
     if config.host.is_empty() {
       anyhow::bail!("Database host cannot be empty");
     }
@@ -174,7 +208,7 @@ impl DatabaseClient {
       anyhow::bail!("Database port cannot be zero");
     }
     if config.max_connections == 0 {
-      anyhow::bail!("Database max_connections must be greater than 0");
+      anyhow::bail!("Database max_connections must be greater than 0, got: {}", config.max_connections);
     }
     if config.max_connections < config.min_connections {
       anyhow::bail!(
@@ -186,7 +220,7 @@ impl DatabaseClient {
     Ok(())
   }
 
-  fn validate_polling_jobs(jobs: &[PollingJob]) -> Result<()> {
+  pub fn validate_polling_jobs(jobs: &[PollingJob]) -> Result<()> {
     if jobs.is_empty() {
       warn!("No polling jobs configured - service will not process any changes");
       return Ok(());
@@ -211,11 +245,22 @@ impl DatabaseClient {
         );
       }
 
+      // Validate query name exists
+      if let Err(e) = crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name) {
+        anyhow::bail!("Job '{}' (index {}): query validation failed: {}", job.name, index, e);
+      }
+
+      // Query-specific parameter validation
       if job.query_name == "construct_atomic_hotspots"
         && job.parameters.get("hotspot_type").is_none()
       {
         anyhow::bail!("Job '{}' (index {}): hotspot_type parameter is required for construct_atomic_hotspots queries",
                      job.name, index);
+      }
+
+      // Validate change_type parameter exists for all jobs
+      if job.parameters.get("change_type").is_none() {
+        anyhow::bail!("Job '{}' (index {}): change_type parameter is required", job.name, index);
       }
     }
 
@@ -223,7 +268,7 @@ impl DatabaseClient {
   }
 
   pub async fn init_polling_state(&self) -> Result<()> {
-    self.create_state_table().await?;
+    self.create_state_tables().await?;
     for (index, job) in self.polling_jobs.iter().enumerate() {
       self
         .init_job_state(&job.name, &job.query_name, index as i32)
@@ -237,7 +282,7 @@ impl DatabaseClient {
     Ok(())
   }
 
-  pub async fn create_state_table(&self) -> Result<()> {
+  pub async fn create_state_tables(&self) -> Result<()> {
     let pool = self.pool.read().await;
     let create_table_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
@@ -272,6 +317,40 @@ impl DatabaseClient {
       .await?;
 
     info!("Created or verified atomic_data_polling_state table");
+
+    let create_failed_records_table = r#"
+      CREATE TABLE IF NOT EXISTS atomic_data_failed_records (
+        id SERIAL PRIMARY KEY,
+        job_name VARCHAR(255) NOT NULL,
+        query_name VARCHAR(255) NOT NULL,
+        record_hash TEXT NOT NULL,
+        error_type VARCHAR(255) NOT NULL,
+        error_message TEXT NOT NULL,
+        target_block BIGINT NOT NULL,
+        failure_count INTEGER NOT NULL DEFAULT 1,
+        first_failed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        last_failed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        atomic_data JSONB,
+        UNIQUE(job_name, query_name, record_hash)
+      )
+    "#;
+
+    sqlx::query(create_failed_records_table).execute(&*pool).await?;
+
+    let create_failed_records_index = r#"
+      CREATE INDEX IF NOT EXISTS idx_failed_records_lookup
+      ON atomic_data_failed_records (job_name, query_name, record_hash)
+    "#;
+    sqlx::query(create_failed_records_index).execute(&*pool).await?;
+
+    let create_failed_records_time_index = r#"
+      CREATE INDEX IF NOT EXISTS idx_failed_records_last_failed
+      ON atomic_data_failed_records (last_failed_at)
+    "#;
+    sqlx::query(create_failed_records_time_index).execute(&*pool).await?;
+
+    info!("Created or verified atomic_data_failed_records table");
+
     Ok(())
   }
 
@@ -1353,8 +1432,8 @@ impl DatabaseClient {
       );
     }
 
-    // Only mark as completed if there were no failures
-    // Jobs with failures require manual intervention to fix bad data
+    // Only mark as completed if there were no publish failures
+    // Publish failures are transient (network/infrastructure) and will retry
     if failed_count == 0 {
       if let Err(e) = self
         .mark_completed(&record.job_name, &record.query_name)
@@ -1371,8 +1450,8 @@ impl DatabaseClient {
         );
       }
     } else {
-      error!(
-        "Job '{}' had {} FAILED items - BLOCKING PROGRESS. Manual intervention required to fix bad data. Job will retry on next cycle.",
+      warn!(
+        "Job '{}' had {} publish errors (network/infrastructure) - will retry on next cycle",
         record.job_name, failed_count
       );
     }
@@ -1402,6 +1481,70 @@ impl DatabaseClient {
     } else {
       info!("No running job states to clean up");
     }
+
+    Ok(())
+  }
+
+  /// Generate a unique hash for a record based on its identifying fields
+  fn generate_record_hash(record: &ChangeRecord) -> String {
+    use sha2::{Digest, Sha256};
+
+    // Use pub_key and asset as the unique identifier if available
+    let identifier = if let Some(pub_key) = record.atomic_data.get("pub_key") {
+      if let Some(asset) = record.atomic_data.get("asset") {
+        format!("{}:{}", pub_key, asset)
+      } else {
+        // Fallback to entire atomic_data if no asset
+        serde_json::to_string(&record.atomic_data).unwrap_or_default()
+      }
+    } else {
+      // Fallback to entire atomic_data
+      serde_json::to_string(&record.atomic_data).unwrap_or_default()
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(identifier.as_bytes());
+    format!("{:x}", hasher.finalize())
+  }
+
+  /// Mark a record as failed
+  pub async fn mark_record_failed(
+    &self,
+    record: &ChangeRecord,
+    error_type: &str,
+    error_message: &str,
+  ) -> Result<()> {
+    let pool = self.pool.read().await;
+    let record_hash = Self::generate_record_hash(record);
+
+    // Use INSERT ... ON CONFLICT to update failure count if already exists
+    sqlx::query(
+      r#"
+      INSERT INTO atomic_data_failed_records
+        (job_name, query_name, record_hash, error_type, error_message, target_block, failure_count, atomic_data)
+      VALUES ($1, $2, $3, $4, $5, $6, 1, $7)
+      ON CONFLICT (job_name, query_name, record_hash)
+      DO UPDATE SET
+        failure_count = atomic_data_failed_records.failure_count + 1,
+        last_failed_at = NOW(),
+        error_message = $5,
+        target_block = $6
+      "#,
+    )
+    .bind(&record.job_name)
+    .bind(&record.query_name)
+    .bind(&record_hash)
+    .bind(error_type)
+    .bind(error_message)
+    .bind(record.target_block as i64)
+    .bind(&record.atomic_data)
+    .execute(&*pool)
+    .await?;
+
+    debug!(
+      "Logged failed record for job '{}' (hash: {}, error: {})",
+      record.job_name, &record_hash[..8], error_type
+    );
 
     Ok(())
   }

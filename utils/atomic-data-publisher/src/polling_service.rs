@@ -17,6 +17,12 @@ use crate::{
 
 const POLLING_ERROR_RETRY_SECONDS: u64 = 5;
 
+enum ProcessResult {
+  Published,
+  DataError,      // Bad data - permanently failed, logged to DB
+  PublishError,   // Transient infrastructure error - retry next cycle
+}
+
 #[derive(Debug, Clone)]
 pub struct PollingService {
   database: Arc<DatabaseClient>,
@@ -30,6 +36,25 @@ impl PollingService {
       database,
       publisher,
       config,
+    }
+  }
+
+  fn should_log_progress(item_index: usize, total_items: usize) -> bool {
+    let current = item_index + 1;
+    let is_last = current == total_items;
+
+    if is_last {
+      return true;
+    }
+
+    if total_items >= 10000 {
+      current % (total_items / 10) == 0
+    } else if total_items >= 1000 {
+      current % 1000 == 0
+    } else if total_items >= 100 {
+      current % 100 == 0
+    } else {
+      false
     }
   }
 
@@ -69,9 +94,26 @@ impl PollingService {
   }
 
   async fn process_changes(&self, shutdown_listener: Listener) -> Result<(), AtomicDataError> {
-    if self.database.any_job_running().await? {
-      debug!("Job already running, skipping to prevent OOM");
-      return Ok(());
+    match self.database.any_job_running().await {
+      Ok(is_running) if is_running => {
+        debug!("Job already running, skipping to prevent OOM");
+        return Ok(());
+      }
+      Ok(_) => {}
+      Err(e) => {
+        // Check if this is an auth error and attempt pool refresh
+        if let Some(sqlx_err) = e.downcast_ref::<sqlx::Error>() {
+          if DatabaseClient::is_auth_error(sqlx_err) {
+            warn!("Database authentication error detected, attempting pool refresh");
+            if let Err(refresh_err) = self.database.refresh_pool().await {
+              error!("Failed to refresh database pool: {}", refresh_err);
+            } else {
+              info!("Database pool refreshed successfully after auth error");
+            }
+          }
+        }
+        return Err(e.into());
+      }
     }
 
     let mut total_jobs_processed = 0;
@@ -82,7 +124,23 @@ impl PollingService {
     info!("Starting new polling cycle - processing all available jobs");
 
     loop {
-      let change_records = self.database.get_pending_changes().await?;
+      let change_records = match self.database.get_pending_changes().await {
+        Ok(records) => records,
+        Err(e) => {
+          // Check if this is an auth error and attempt pool refresh
+          if let Some(sqlx_err) = e.downcast_ref::<sqlx::Error>() {
+            if DatabaseClient::is_auth_error(sqlx_err) {
+              warn!("Database authentication error detected, attempting pool refresh");
+              if let Err(refresh_err) = self.database.refresh_pool().await {
+                error!("Failed to refresh database pool: {}", refresh_err);
+              } else {
+                info!("Database pool refreshed successfully after auth error");
+              }
+            }
+          }
+          return Err(e.into());
+        }
+      };
 
       if change_records.is_empty() {
         info!(
@@ -105,23 +163,31 @@ impl PollingService {
       );
 
       match self.process_job(&change_records, shutdown_listener.clone()).await {
-        Ok((job_published, job_failed, has_failures)) => {
+        Ok((job_published, job_data_errors, job_publish_errors, was_interrupted)) => {
           total_changes_published += job_published;
-          total_changes_failed += job_failed;
+          total_changes_failed += job_data_errors + job_publish_errors;
 
-          if let Err(e) = self.database.finalize_job(&change_records[0], job_failed).await {
+          // Only pass publish errors to finalize_job (data errors are logged and don't block)
+          if let Err(e) = self.database.finalize_job(&change_records[0], job_publish_errors).await {
             error!("Failed to finalize job '{}': {}", job_name, e);
             let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
             continue;
           }
 
-          info!(
-            "Completed job '{}': {} individual changes published, {} failed",
-            job_name, job_published, job_failed
-          );
+          if job_data_errors > 0 {
+            info!(
+              "Completed job '{}': {} published, {} data errors logged to DB, {} publish errors",
+              job_name, job_published, job_data_errors, job_publish_errors
+            );
+          } else {
+            info!(
+              "Completed job '{}': {} published, {} publish errors",
+              job_name, job_published, job_publish_errors
+            );
+          }
 
-          if has_failures {
-            // Mark as not running to allow retry on next cycle
+          if was_interrupted {
+            // Shutdown signal received - mark as not running to retry on restart
             let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
             return Ok(());
           }
@@ -145,10 +211,10 @@ impl PollingService {
     &self,
     records: &[ChangeRecord],
     shutdown_listener: Listener,
-  ) -> Result<(usize, usize, bool), AtomicDataError> {
+  ) -> Result<(usize, usize, usize, bool), AtomicDataError> {
     let mut total_published = 0;
-    let mut total_failed = 0;
-    let mut published_batch = Vec::with_capacity(crate::database::BATCH_SIZE);
+    let mut total_data_errors = 0;
+    let mut total_publish_errors = 0;
     let total_items = records.len();
 
     info!("Processing {} atomic items", total_items);
@@ -160,28 +226,19 @@ impl PollingService {
           item_index + 1,
           total_items
         );
-        return Ok((total_published, total_failed, true));
+        // Return was_interrupted=true so we can retry this batch on restart
+        return Ok((total_published, total_data_errors, total_publish_errors, true));
       }
 
-      let should_log = if total_items >= 10000 {
-        let log_interval = total_items / 10;
-        (item_index + 1) % log_interval == 0 || (item_index + 1) == total_items
-      } else if total_items >= 1000 {
-        (item_index + 1) % 1000 == 0 || (item_index + 1) == total_items
-      } else if total_items >= 100 {
-        (item_index + 1) % 100 == 0 || (item_index + 1) == total_items
-      } else {
-        (item_index + 1) == total_items
-      };
-
-      if should_log {
+      if Self::should_log_progress(item_index, total_items) {
         info!(
-          "Progress: {}/{} items ({:.1}%) - {} published, {} failed",
+          "Progress: {}/{} items ({:.1}%) - {} published, {} data errors, {} publish errors",
           item_index + 1,
           total_items,
           (item_index + 1) as f64 / total_items as f64 * 100.0,
           total_published,
-          total_failed
+          total_data_errors,
+          total_publish_errors
         );
       }
 
@@ -189,69 +246,72 @@ impl PollingService {
         .process_single_item(record, shutdown_listener.clone())
         .await
       {
-        Ok(Some(published_change)) => {
+        Ok(ProcessResult::Published) => {
           total_published += 1;
-          published_batch.push(published_change);
-
-          // Clear batch periodically to free memory (checkpoint only at end)
-          if published_batch.len() >= crate::database::BATCH_SIZE {
-            debug!("Clearing batch of {} items to free memory", published_batch.len());
-            published_batch.clear();
-            published_batch.shrink_to(crate::database::BATCH_SIZE);
-          }
         }
-        Ok(None) => {
-          total_failed += 1;
+        Ok(ProcessResult::DataError) => {
+          total_data_errors += 1;
+        }
+        Ok(ProcessResult::PublishError) => {
+          total_publish_errors += 1;
         }
         Err(e) => {
           error!("Unexpected error processing item {}: {}", item_index + 1, e);
-          total_failed += 1;
+          total_publish_errors += 1;
         }
       }
     }
 
     info!(
-      "Completed processing all items: {} published, {} failed",
-      total_published, total_failed
+      "Completed processing all items: {} published, {} data errors (logged), {} publish errors",
+      total_published, total_data_errors, total_publish_errors
     );
 
-    let has_failures = total_failed > 0;
-
-    // Only checkpoint progress when all items successfully processed
-    if !has_failures && total_published > 0 {
+    // Only advance block if NO publish errors (transient failures should retry)
+    // Data errors are logged and we can advance past them
+    if total_publish_errors == 0 && (total_published > 0 || total_data_errors > 0) {
       self
         .database
         .mark_processed(&records[0..1], records[0].target_block)
         .await?;
       info!(
-        "Marked all {} items as processed up to block {}",
-        total_published, records[0].target_block
+        "Marked block {} as processed ({} published, {} data errors logged)",
+        records[0].target_block, total_published, total_data_errors
       );
-    } else if has_failures {
+    } else if total_publish_errors > 0 {
       warn!(
-        "Skipping block advancement due to {} failed items - job will retry same data on next cycle",
-        total_failed
+        "NOT advancing block due to {} publish errors - will retry on next cycle",
+        total_publish_errors
       );
     }
 
-    Ok((total_published, total_failed, has_failures))
+    // Return was_interrupted=false since we completed normally
+    // (publish errors are retried next cycle, not interruptions)
+    Ok((total_published, total_data_errors, total_publish_errors, false))
   }
 
   async fn process_single_item(
     &self,
     record: &ChangeRecord,
     shutdown_listener: Listener,
-  ) -> Result<Option<ChangeRecord>, AtomicDataError> {
+  ) -> Result<ProcessResult, AtomicDataError> {
     if shutdown_listener.is_triggered() {
-      return Ok(None);
+      return Ok(ProcessResult::PublishError);
     }
 
     let request = match self.publisher.prepare_change(record).await {
       Ok(req) => req,
       Err(e) => {
-        error!("Failed to prepare change request for item: {}", e);
+        let error_msg = format!("Failed to prepare change request for item: {}", e);
+        error!("{}", error_msg);
+
+        // Data error - log to DB and move on
+        if let Err(db_err) = self.database.mark_record_failed(record, "protobuf_build_failure", &error_msg).await {
+          warn!("Failed to log failed record to database: {}", db_err);
+        }
         metrics::increment_protobuf_build_failures();
-        return Ok(None);
+
+        return Ok(ProcessResult::DataError);
       }
     };
 
@@ -260,7 +320,7 @@ impl PollingService {
       result = self.publisher.publish_change_request(request) => result,
       _ = shutdown_listener.clone() => {
         warn!("Shutdown signal received during item publishing");
-        return Ok(None);
+        return Ok(ProcessResult::PublishError);
       }
     };
 
@@ -271,16 +331,19 @@ impl PollingService {
         metrics::increment_published();
         metrics::observe_publish_duration(publish_duration);
         debug!("Successfully published change (duration: {:.2}s)", publish_duration);
-        Ok(Some(record.clone()))
+        Ok(ProcessResult::Published)
       }
       Err(e) => {
-        error!(
+        let error_msg = format!(
           "Failed to publish change for job '{}' (duration: {:.2}s): {}",
           record.job_name, publish_duration, e
         );
-        metrics::increment_errors();
+        error!("{}", error_msg);
         metrics::observe_publish_duration(publish_duration);
-        Ok(None)
+
+        // Publish failure - transient (network, ingestor issues)
+        // Return PublishError to retry next cycle (don't mark as permanently failed)
+        Ok(ProcessResult::PublishError)
       }
     }
   }

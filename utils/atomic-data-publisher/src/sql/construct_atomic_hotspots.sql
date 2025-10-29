@@ -45,8 +45,7 @@ WITH hotspot_metadata_changes AS (
 SELECT
   CONCAT('atomic_', hmc.hotspot_type, '_hotspots') as job_name,
   JSON_BUILD_OBJECT(
-    -- Note: PostgreSQL's encode() adds newlines every 76 chars, so we strip them for valid base64
-    'pub_key', replace(encode(kta.entity_key, 'base64'), E'\n', ''),
+    'pub_key', encode(kta.entity_key, 'hex'),
     'asset', hmc.asset,
     'address', hmc.address,
     'location', hmc.location,
