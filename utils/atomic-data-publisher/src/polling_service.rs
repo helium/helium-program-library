@@ -18,7 +18,7 @@ use crate::{
 const POLLING_ERROR_RETRY_SECONDS: u64 = 5;
 
 enum ProcessResult {
-  Published(ChangeRecord),
+  Published,
   DataError,      // Bad data - permanently failed, logged to DB
   PublishError,   // Transient infrastructure error - retry next cycle
 }
@@ -215,7 +215,6 @@ impl PollingService {
     let mut total_published = 0;
     let mut total_data_errors = 0;
     let mut total_publish_errors = 0;
-    let mut published_batch = Vec::with_capacity(crate::database::BATCH_SIZE);
     let total_items = records.len();
 
     info!("Processing {} atomic items", total_items);
@@ -247,16 +246,8 @@ impl PollingService {
         .process_single_item(record, shutdown_listener.clone())
         .await
       {
-        Ok(ProcessResult::Published(published_change)) => {
+        Ok(ProcessResult::Published) => {
           total_published += 1;
-          published_batch.push(published_change);
-
-          // Clear batch periodically to free memory (checkpoint only at end)
-          if published_batch.len() >= crate::database::BATCH_SIZE {
-            debug!("Clearing batch of {} items to free memory", published_batch.len());
-            published_batch.clear();
-            published_batch.shrink_to(crate::database::BATCH_SIZE);
-          }
         }
         Ok(ProcessResult::DataError) => {
           total_data_errors += 1;
@@ -340,7 +331,7 @@ impl PollingService {
         metrics::increment_published();
         metrics::observe_publish_duration(publish_duration);
         debug!("Successfully published change (duration: {:.2}s)", publish_duration);
-        Ok(ProcessResult::Published(record.clone()))
+        Ok(ProcessResult::Published)
       }
       Err(e) => {
         let error_msg = format!(
