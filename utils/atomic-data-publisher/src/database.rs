@@ -268,7 +268,7 @@ impl DatabaseClient {
   }
 
   pub async fn init_polling_state(&self) -> Result<()> {
-    self.create_state_table().await?;
+    self.create_state_tables().await?;
     for (index, job) in self.polling_jobs.iter().enumerate() {
       self
         .init_job_state(&job.name, &job.query_name, index as i32)
@@ -282,7 +282,7 @@ impl DatabaseClient {
     Ok(())
   }
 
-  pub async fn create_state_table(&self) -> Result<()> {
+  pub async fn create_state_tables(&self) -> Result<()> {
     let pool = self.pool.read().await;
     let create_table_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
@@ -318,7 +318,6 @@ impl DatabaseClient {
 
     info!("Created or verified atomic_data_polling_state table");
 
-    // Create table to track permanently failed records
     let create_failed_records_table = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_failed_records (
         id SERIAL PRIMARY KEY,
