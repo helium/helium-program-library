@@ -288,6 +288,7 @@ export const integrityCheckProgramAccounts = async ({
               );
 
               limiter = pLimit(50);
+              const recentSigsLimiter = pLimit(10);
               await Promise.all(
                 accounts.map((acc) =>
                   limiter(async () => {
@@ -368,6 +369,35 @@ export const integrityCheckProgramAccounts = async ({
                           }
                         }
                       }
+
+                      const recentSigs = await recentSigsLimiter(() =>
+                        retry(
+                          () =>
+                            connection.getSignaturesForAddress(
+                              new PublicKey(acc.pubkey),
+                              { limit: 10 },
+                              "finalized"
+                            ),
+                          {
+                            retries: 3,
+                            factor: 2,
+                            minTimeout: 1000,
+                            maxTimeout: 5000,
+                          }
+                        )
+                      );
+
+                      const hasNewerTx = recentSigs.some(
+                        (sig) =>
+                          sig.slot >= snapshotSlot ||
+                          (sig.blockTime &&
+                            new Date(sig.blockTime * 1000) >= snapshotTime)
+                      );
+
+                      if (hasNewerTx) {
+                        return;
+                      }
+
                       const currentRecord = await model.findOne({
                         where: { address: acc.pubkey },
                         transaction: t,
