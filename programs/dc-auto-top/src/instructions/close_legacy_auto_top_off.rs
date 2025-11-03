@@ -28,6 +28,12 @@ pub struct CloseLegacyAutoTopOff<'info> {
     associated_token::authority = auto_top_off,
   )]
   pub hnt_account: Box<Account<'info, TokenAccount>>,
+  #[account(
+    mut,
+    associated_token::mint = HNT_MINT,
+    associated_token::authority = authority,
+  )]
+  pub authority_hnt_account: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub dc_account: Box<Account<'info, TokenAccount>>,
   pub associated_token_program: Program<'info, AssociatedToken>,
@@ -61,7 +67,7 @@ pub fn handler(ctx: Context<CloseLegacyAutoTopOff>) -> Result<()> {
         ctx.accounts.token_program.to_account_info(),
         anchor_spl::token::Transfer {
           from: ctx.accounts.hnt_account.to_account_info(),
-          to: ctx.accounts.authority.to_account_info(),
+          to: ctx.accounts.authority_hnt_account.to_account_info(),
           authority: ctx.accounts.auto_top_off.to_account_info(),
         },
         seeds,
