@@ -33,6 +33,7 @@ export async function closeWelcomePack({
     accounts,
     remainingAccounts,
   } = await proofArgsAndAccounts({
+    assetEndpoint,
     connection: program.provider.connection,
     assetId,
     ...rest,

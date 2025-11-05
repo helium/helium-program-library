@@ -50,6 +50,7 @@ export async function claimWelcomePack({
   } = await proofArgsAndAccounts({
     connection: program.provider.connection,
     assetId,
+    assetEndpoint,
     ...rest,
   });
 
