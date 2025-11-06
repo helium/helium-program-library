@@ -32,6 +32,7 @@ pub fn handler(ctx: Context<RelinquishExpiredVoteV0>) -> Result<()> {
     msg!("Marker account has already been closed, skipping");
     return Ok(());
   }
+  drop(marker_data);
 
   // Attempt to deserialize the marker account
   let marker = try_from!(Account<VoteMarkerV0>, ctx.accounts.marker)?;
