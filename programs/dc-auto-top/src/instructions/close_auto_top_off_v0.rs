@@ -29,6 +29,7 @@ pub struct CloseAutoTopOffV0<'info> {
     has_one = dao,
     has_one = dc_account,
     has_one = dca_mint_account,
+    has_one = dca_mint,
   )]
   pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
   /// CHECK: queue authority
@@ -55,6 +56,7 @@ pub struct CloseAutoTopOffV0<'info> {
   #[account(has_one = hnt_mint)]
   pub dao: Box<Account<'info, DaoV0>>,
   pub hnt_mint: Box<Account<'info, Mint>>,
+  pub dca_mint: Box<Account<'info, Mint>>,
   #[account(
     mut,
     associated_token::mint = hnt_mint,
@@ -72,6 +74,13 @@ pub struct CloseAutoTopOffV0<'info> {
   pub dc_account: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub dca_mint_account: Box<Account<'info, TokenAccount>>,
+  #[account(
+    init_if_needed,
+    payer = authority,
+    associated_token::mint = dca_mint,
+    associated_token::authority = authority,
+  )]
+  pub authority_dca_mint_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: current HNT task account
   #[account(mut)]
   pub next_hnt_task: UncheckedAccount<'info>,
@@ -159,7 +168,7 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
         ctx.accounts.token_program.to_account_info(),
         anchor_spl::token::Transfer {
           from: ctx.accounts.dca_mint_account.to_account_info(),
-          to: ctx.accounts.authority.to_account_info(),
+          to: ctx.accounts.authority_hnt_account.to_account_info(),
           authority: ctx.accounts.auto_top_off.to_account_info(),
         },
         auto_top_off_seeds,
