@@ -258,6 +258,37 @@ impl AtomicDataPublisher {
     };
     handles.push(pool_refresh_handle);
 
+    // Periodic stale job cleanup task
+    // Run every 5 minutes to detect and recover from stuck jobs
+    let stale_job_cleanup_handle = {
+      let shutdown_listener = self.shutdown_listener.clone();
+      let database = self.database.clone();
+      tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(300)); // 5 minutes
+        interval.tick().await;
+        loop {
+          tokio::select! {
+            _ = interval.tick() => {
+              match database.cleanup_stale_jobs().await {
+                Ok(_) => {
+                  debug!("Periodic stale job cleanup completed");
+                }
+                Err(e) => {
+                  error!("Failed to cleanup stale jobs: {}", e);
+                  // Continue running - the next cleanup attempt might succeed
+                }
+              }
+            }
+            _ = shutdown_listener.clone() => {
+              break;
+            }
+          }
+        }
+        Ok(())
+      })
+    };
+    handles.push(stale_job_cleanup_handle);
+
     Ok((handles, metrics_bind_addr))
   }
 

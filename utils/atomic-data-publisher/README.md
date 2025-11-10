@@ -45,6 +45,7 @@ DATABASE__MIN_CONNECTIONS=2                        # Default: 2
 DATABASE__ACQUIRE_TIMEOUT_SECONDS=30               # Default: 30
 DATABASE__IDLE_TIMEOUT_SECONDS=600                 # Default: 600
 DATABASE__MAX_LIFETIME_SECONDS=1800                # Default: 1800
+DATABASE__STATEMENT_TIMEOUT_SECONDS=300            # Default: 300
 
 # Service config
 SERVICE__POLLING_INTERVAL_SECONDS=10               # Default: 10

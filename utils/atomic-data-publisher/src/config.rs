@@ -30,6 +30,7 @@ pub struct DatabaseConfig {
   pub ssl_mode: Option<String>,
   #[serde(default)]
   pub aws_region: Option<String>,
+  pub statement_timeout_seconds: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -77,6 +78,7 @@ impl Settings {
       .set_default("database.acquire_timeout_seconds", 30)?
       .set_default("database.idle_timeout_seconds", 300)?
       .set_default("database.max_lifetime_seconds", 600)?
+      .set_default("database.statement_timeout_seconds", 300)?
       // Service defaults
       .set_default("service.polling_interval_seconds", 10)?
       .set_default("service.dry_run", false)?
