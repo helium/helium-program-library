@@ -20,6 +20,7 @@ use crate::{
 const MIN_CHUNK_SIZE: u64 = 50_000;
 const MAX_CHUNK_SIZE: u64 = 500_000;
 pub const BATCH_SIZE: usize = 1_000;
+const QUERY_TIMEOUT_SECONDS: u64 = 300; // 5 minutes
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
@@ -722,6 +723,34 @@ impl DatabaseClient {
 
     let query_start = std::time::Instant::now();
 
+    // Wrap entire query execution in timeout to prevent hung queries
+    let rows = tokio::time::timeout(
+      std::time::Duration::from_secs(QUERY_TIMEOUT_SECONDS),
+      self.execute_query_inner(job, query, last_processed_block, target_block, pool)
+    )
+    .await
+    .map_err(|_| {
+      error!(
+        "Query timeout after {}s for job '{}' query '{}' (blocks {} to {})",
+        QUERY_TIMEOUT_SECONDS, job.name, job.query_name, last_processed_block, target_block
+      );
+      AtomicDataError::DatabaseError(sqlx::Error::PoolTimedOut)
+    })??;
+
+    let query_duration = query_start.elapsed().as_secs_f64();
+    metrics::observe_database_query_duration(query_duration);
+
+    Ok(rows)
+  }
+
+  async fn execute_query_inner(
+    &self,
+    job: &PollingJob,
+    query: &str,
+    last_processed_block: i64,
+    target_block: u64,
+    pool: tokio::sync::RwLockReadGuard<'_, PgPool>,
+  ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
     let mut rows = Vec::with_capacity(BATCH_SIZE);
 
     if job.query_name == "construct_atomic_hotspots" {
@@ -812,9 +841,6 @@ impl DatabaseClient {
         debug!("Streamed {} total rows for job '{}'", row_count, job.name);
       }
     }
-
-    let query_duration = query_start.elapsed().as_secs_f64();
-    metrics::observe_database_query_duration(query_duration);
 
     Ok(rows)
   }
@@ -984,6 +1010,18 @@ impl DatabaseClient {
       return Err(sqlx::Error::PoolTimedOut);
     }
 
+    Ok(())
+  }
+
+  /// Test database connection with timeout
+  pub async fn test_connection(&self) -> Result<()> {
+    let pool = self.pool.read().await;
+    tokio::time::timeout(
+      std::time::Duration::from_secs(5),
+      sqlx::query("SELECT 1").execute(&*pool)
+    )
+    .await
+    .map_err(|_| anyhow::anyhow!("Database connection test timed out"))??;
     Ok(())
   }
 
@@ -1394,27 +1432,104 @@ impl DatabaseClient {
 
   pub async fn cleanup_stale_jobs(&self) -> Result<()> {
     let pool = self.pool.read().await;
-    let stale_threshold = Utc::now() - Duration::minutes(30);
 
-    let result = sqlx::query(
+    // Adaptive stale job detection:
+    // - If job is caught up (within 10% of max_block), use 10 min threshold (likely stuck)
+    // - If job is doing initial backfill (far behind), use 30 min threshold (legitimately slow)
+    let short_threshold = Utc::now() - Duration::minutes(10);
+    let long_threshold = Utc::now() - Duration::minutes(30);
+
+    // Get all running jobs with their state
+    let running_jobs = sqlx::query(
       r#"
-      UPDATE atomic_data_polling_state
-      SET
-        is_running = FALSE,
-        running_since = NULL,
-        updated_at = NOW()
+      SELECT
+        job_name,
+        query_name,
+        running_since,
+        last_processed_block,
+        last_max_block,
+        EXTRACT(EPOCH FROM (NOW() - running_since))/60 as minutes_running
+      FROM atomic_data_polling_state
       WHERE is_running = TRUE
-        AND (running_since IS NULL OR running_since < $1)
       "#,
     )
-    .bind(stale_threshold)
-    .execute(&*pool)
+    .fetch_all(&*pool)
     .await?;
 
-    if result.rows_affected() > 0 {
-      info!(
-        "Cleaned up {} stale running job states",
-        result.rows_affected()
+    let mut jobs_to_cleanup = Vec::new();
+    let mut caught_up_count = 0;
+    let mut backfill_count = 0;
+
+    for row in running_jobs {
+      let job_name: String = row.get("job_name");
+      let query_name: String = row.get("query_name");
+      let running_since: Option<chrono::DateTime<Utc>> = row.get("running_since");
+      let last_processed: Option<i64> = row.get("last_processed_block");
+      let last_max: Option<i64> = row.get("last_max_block");
+      let minutes_running: Option<f64> = row.get("minutes_running");
+
+      // Check if job is caught up (within 10% or 1000 blocks of max)
+      let is_caught_up = match (last_processed, last_max) {
+        (Some(processed), Some(max)) if max > 0 => {
+          let blocks_behind = max.saturating_sub(processed);
+          let ten_percent = (max as f64 * 0.1) as i64;
+          blocks_behind <= ten_percent.max(1000)
+        }
+        _ => false, // Can't determine, treat as backfilling (conservative)
+      };
+
+      // Determine if job is stale based on adaptive thresholds
+      let is_stale = match running_since {
+        None => true, // No running_since means it's in a bad state
+        Some(since) => {
+          if is_caught_up {
+            // Caught up jobs: use 10 min threshold
+            since < short_threshold
+          } else {
+            // Backfilling jobs: use 30 min threshold
+            since < long_threshold
+          }
+        }
+      };
+
+      if is_stale {
+        if is_caught_up {
+          caught_up_count += 1;
+        } else {
+          backfill_count += 1;
+        }
+
+        let job_type = if is_caught_up { "caught up" } else { "backfilling" };
+        warn!(
+          "Marking job '{}' query '{}' for cleanup - {} but running for {:.1}min (last_processed: {:?}, last_max: {:?})",
+          job_name, query_name, job_type, minutes_running.unwrap_or(0.0), last_processed, last_max
+        );
+        jobs_to_cleanup.push((job_name, query_name));
+      }
+    }
+
+    // Clean up all stale jobs in one batch
+    if !jobs_to_cleanup.is_empty() {
+      for (job_name, query_name) in &jobs_to_cleanup {
+        sqlx::query(
+          r#"
+          UPDATE atomic_data_polling_state
+          SET
+            is_running = FALSE,
+            running_since = NULL,
+            updated_at = NOW()
+          WHERE job_name = $1 AND query_name = $2
+          "#,
+        )
+        .bind(job_name)
+        .bind(query_name)
+        .execute(&*pool)
+        .await?;
+      }
+
+      warn!(
+        "Cleaned up {} stale job(s): {} caught-up (>10min), {} backfilling (>30min)",
+        jobs_to_cleanup.len(), caught_up_count, backfill_count
       );
     }
 
