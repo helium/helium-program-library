@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
   associated_token::AssociatedToken,
-  token::{Token, TokenAccount},
+  token::{Mint, Token, TokenAccount},
 };
-use helium_sub_daos::DaoV0;
+use helium_sub_daos::{try_from, DaoV0};
 use tuktuk_program::{
   tuktuk::{
     self,
@@ -51,21 +51,30 @@ pub struct CloseAutoTopOffV0<'info> {
   pub task_queue: UncheckedAccount<'info>,
   /// CHECK: current task account
   #[account(mut)]
-  pub next_task: Box<Account<'info, TaskV0>>,
+  pub next_task: UncheckedAccount<'info>,
+  #[account(has_one = hnt_mint)]
   pub dao: Box<Account<'info, DaoV0>>,
+  pub hnt_mint: Box<Account<'info, Mint>>,
   #[account(
     mut,
-    associated_token::mint = dao.hnt_mint,
+    associated_token::mint = hnt_mint,
     associated_token::authority = auto_top_off,
   )]
   pub hnt_account: Box<Account<'info, TokenAccount>>,
+  #[account(
+    init_if_needed,
+    payer = authority,
+    associated_token::mint = hnt_mint,
+    associated_token::authority = authority,
+  )]
+  pub authority_hnt_account: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub dc_account: Box<Account<'info, TokenAccount>>,
   #[account(mut)]
   pub dca_mint_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: current HNT task account
   #[account(mut)]
-  pub next_hnt_task: Box<Account<'info, TaskV0>>,
+  pub next_hnt_task: UncheckedAccount<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
   pub tuktuk_program: Program<'info, Tuktuk>,
@@ -83,38 +92,48 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
     &[auto_top_off_seeds!(delegated_data_credits, authority, bump)];
   drop(auto_top_off);
   let queue_authority_seeds: &[&[&[u8]]] = &[queue_authority_seeds!(queue_authority_bump)];
-  // Dequeue DC topoff task
-  dequeue_task_v0(CpiContext::new_with_signer(
-    ctx.accounts.tuktuk_program.to_account_info(),
-    DequeueTaskV0 {
-      task_queue: ctx.accounts.task_queue.to_account_info(),
-      task: ctx.accounts.next_task.to_account_info(),
-      queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: if ctx.accounts.next_task.rent_refund == ctx.accounts.rent_refund.key() {
-        ctx.accounts.rent_refund.to_account_info()
-      } else {
-        ctx.accounts.task_queue.to_account_info()
+  if !ctx.accounts.next_task.data_is_empty()
+    || ctx.accounts.next_task.key() != ctx.accounts.auto_top_off.key()
+  {
+    let next_task = try_from!(Account<TaskV0>, ctx.accounts.next_task)?;
+    // Dequeue DC topoff task
+    dequeue_task_v0(CpiContext::new_with_signer(
+      ctx.accounts.tuktuk_program.to_account_info(),
+      DequeueTaskV0 {
+        task_queue: ctx.accounts.task_queue.to_account_info(),
+        task: ctx.accounts.next_task.to_account_info(),
+        queue_authority: ctx.accounts.queue_authority.to_account_info(),
+        rent_refund: if next_task.rent_refund == ctx.accounts.rent_refund.key() {
+          ctx.accounts.rent_refund.to_account_info()
+        } else {
+          ctx.accounts.task_queue.to_account_info()
+        },
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
-      task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
-    },
-    queue_authority_seeds,
-  ))?;
+      queue_authority_seeds,
+    ))?;
+  }
   // Dequeue HNT topoff task
-  dequeue_task_v0(CpiContext::new_with_signer(
-    ctx.accounts.tuktuk_program.to_account_info(),
-    DequeueTaskV0 {
-      task_queue: ctx.accounts.task_queue.to_account_info(),
-      task: ctx.accounts.next_hnt_task.to_account_info(),
-      queue_authority: ctx.accounts.queue_authority.to_account_info(),
-      rent_refund: if ctx.accounts.next_hnt_task.rent_refund == ctx.accounts.rent_refund.key() {
-        ctx.accounts.rent_refund.to_account_info()
-      } else {
-        ctx.accounts.task_queue.to_account_info()
+  if !ctx.accounts.next_hnt_task.data_is_empty()
+    && ctx.accounts.next_hnt_task.key() != ctx.accounts.auto_top_off.key()
+  {
+    let next_hnt_task = try_from!(Account<TaskV0>, ctx.accounts.next_hnt_task)?;
+    dequeue_task_v0(CpiContext::new_with_signer(
+      ctx.accounts.tuktuk_program.to_account_info(),
+      DequeueTaskV0 {
+        task_queue: ctx.accounts.task_queue.to_account_info(),
+        task: ctx.accounts.next_hnt_task.to_account_info(),
+        queue_authority: ctx.accounts.queue_authority.to_account_info(),
+        rent_refund: if next_hnt_task.rent_refund == ctx.accounts.rent_refund.key() {
+          ctx.accounts.rent_refund.to_account_info()
+        } else {
+          ctx.accounts.task_queue.to_account_info()
+        },
+        task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
-      task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
-    },
-    queue_authority_seeds,
-  ))?;
+      queue_authority_seeds,
+    ))?;
+  }
 
   // Transfer any remaining HNT tokens back to authority
   if remaining_hnt_balance > 0 {
@@ -123,7 +142,7 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
         ctx.accounts.token_program.to_account_info(),
         anchor_spl::token::Transfer {
           from: ctx.accounts.hnt_account.to_account_info(),
-          to: ctx.accounts.authority.to_account_info(),
+          to: ctx.accounts.authority_hnt_account.to_account_info(),
           authority: ctx.accounts.auto_top_off.to_account_info(),
         },
         auto_top_off_seeds,

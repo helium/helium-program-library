@@ -332,6 +332,7 @@ describe("dc-auto-topoff", () => {
           autoTopOff,
           taskRentRefund,
           hntTaskRentRefund,
+          dcaMint: dcaMint,
         })
         .rpc({ skipPreflight: true })
 
@@ -404,11 +405,11 @@ describe("dc-auto-topoff", () => {
 
       let dcaSwapAmount: anchor.BN
       if (expoDiff > 0) {
-        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).div(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff))))
+        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).div(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff)))).add(new anchor.BN(1))
       } else if (expoDiff < 0) {
-        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).mul(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff))))
+        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).mul(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff)))).add(new anchor.BN(1))
       } else {
-        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice)
+        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).add(new anchor.BN(1))
       }
 
       console.log(`Calculated DCA swap amount: ${dcaSwapAmount.toString()} dcaMint tokens per order`)
@@ -448,6 +449,7 @@ describe("dc-auto-topoff", () => {
           autoTopOff,
           taskRentRefund,
           hntTaskRentRefund,
+          dcaMint: dcaMint,
         })
         .rpc({ skipPreflight: true })
 

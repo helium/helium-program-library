@@ -1,6 +1,10 @@
 use std::str::FromStr;
 
 use anchor_lang::prelude::*;
+use anchor_spl::{
+  associated_token::AssociatedToken,
+  token::{Mint, Token, TokenAccount},
+};
 use clockwork_cron::Schedule;
 use tuktuk_program::{
   tuktuk::{
@@ -61,7 +65,18 @@ pub struct UpdateAutoTopOffV0<'info> {
   /// CHECK: HNT task rent refund account
   #[account(mut)]
   pub hnt_task_rent_refund: UncheckedAccount<'info>,
+  pub dca_mint: Account<'info, Mint>,
+  #[account(
+    init_if_needed,
+    payer = payer,
+    associated_token::mint = dca_mint,
+    associated_token::authority = auto_top_off,
+  )]
+  pub dca_mint_account: Account<'info, TokenAccount>,
   pub tuktuk_program: Program<'info, Tuktuk>,
+  pub system_program: Program<'info, System>,
+  pub token_program: Program<'info, Token>,
+  pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -> Result<()> {
@@ -89,6 +104,7 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
   }
   if let Some(dca_mint) = args.dca_mint {
     auto_top_off.dca_mint = dca_mint;
+    auto_top_off.dca_mint_account = ctx.accounts.dca_mint_account.key();
   }
   if let Some(dca_swap_amount) = args.dca_swap_amount {
     auto_top_off.dca_swap_amount = dca_swap_amount;
@@ -107,7 +123,9 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
   let queue_authority = ctx.accounts.queue_authority.to_account_info();
   let task_queue_authority = ctx.accounts.task_queue_authority.to_account_info();
 
-  if !ctx.accounts.next_task.data_is_empty() {
+  if !ctx.accounts.next_task.data_is_empty()
+    && ctx.accounts.next_task.key() != ctx.accounts.auto_top_off.key()
+  {
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
@@ -121,7 +139,9 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
     ))?;
   }
 
-  if !ctx.accounts.next_hnt_task.data_is_empty() {
+  if !ctx.accounts.next_hnt_task.data_is_empty()
+    && ctx.accounts.next_hnt_task.key() != ctx.accounts.auto_top_off.key()
+  {
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
