@@ -94,7 +94,6 @@ impl PollingService {
   }
 
   async fn process_changes(&self, shutdown_listener: Listener) -> Result<(), AtomicDataError> {
-    // Test connection health before starting
     if let Err(e) = self.database.test_connection().await {
       warn!("Database connection test failed: {}, attempting pool refresh", e);
       if let Err(refresh_err) = self.database.refresh_pool().await {

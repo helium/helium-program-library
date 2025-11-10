@@ -20,7 +20,6 @@ use crate::{
 const MIN_CHUNK_SIZE: u64 = 50_000;
 const MAX_CHUNK_SIZE: u64 = 500_000;
 pub const BATCH_SIZE: usize = 1_000;
-const QUERY_TIMEOUT_SECONDS: u64 = 300; // 5 minutes
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
@@ -77,6 +76,11 @@ impl DatabaseClient {
       connect_options = connect_options.password(&password);
     }
 
+    let statement_timeout_ms = config.statement_timeout_seconds * 1000;
+    connect_options = connect_options
+      .application_name("atomic-data-publisher")
+      .options([("statement_timeout", statement_timeout_ms.to_string().as_str())]);
+
     // IAM auth tokens expire after 15 minutes, so force shorter connection lifetimes
     // to ensure connections are recycled before token expiration
     let (max_lifetime, idle_timeout) = if is_rds && config.password.is_empty() {
@@ -106,10 +110,10 @@ impl DatabaseClient {
     sqlx::query("SELECT 1").execute(&pool).await?;
 
     info!(
-      "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {}, max_lifetime: {}s, idle_timeout: {}s)",
+      "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {}, max_lifetime: {}s, idle_timeout: {}s, statement_timeout: {}s)",
       config.host, config.port, config.database_name, config.ssl_mode,
       if is_rds && config.password.is_empty() { "IAM" } else { "password" },
-      dry_run, max_lifetime, idle_timeout
+      dry_run, max_lifetime, idle_timeout, config.statement_timeout_seconds
     );
 
     Ok(pool)
@@ -722,17 +726,15 @@ impl DatabaseClient {
       })?;
 
     let query_start = std::time::Instant::now();
-
-    // Wrap entire query execution in timeout to prevent hung queries
     let rows = tokio::time::timeout(
-      std::time::Duration::from_secs(QUERY_TIMEOUT_SECONDS),
+      std::time::Duration::from_secs(self.config.statement_timeout_seconds),
       self.execute_query_inner(job, query, last_processed_block, target_block, pool)
     )
     .await
     .map_err(|_| {
       error!(
         "Query timeout after {}s for job '{}' query '{}' (blocks {} to {})",
-        QUERY_TIMEOUT_SECONDS, job.name, job.query_name, last_processed_block, target_block
+        self.config.statement_timeout_seconds, job.name, job.query_name, last_processed_block, target_block
       );
       AtomicDataError::DatabaseError(sqlx::Error::PoolTimedOut)
     })??;
@@ -1013,7 +1015,6 @@ impl DatabaseClient {
     Ok(())
   }
 
-  /// Test database connection with timeout
   pub async fn test_connection(&self) -> Result<()> {
     let pool = self.pool.read().await;
     tokio::time::timeout(
@@ -1433,9 +1434,11 @@ impl DatabaseClient {
   pub async fn cleanup_stale_jobs(&self) -> Result<()> {
     let pool = self.pool.read().await;
 
-    // Adaptive stale job detection:
+    // Adaptive stale job detection (backup safety net):
     // - If job is caught up (within 10% of max_block), use 10 min threshold (likely stuck)
     // - If job is doing initial backfill (far behind), use 30 min threshold (legitimately slow)
+    // Note: Tokio + PostgreSQL statement_timeout is the primary defense; this cleanup handles
+    // edge cases where both timeouts fail
     let short_threshold = Utc::now() - Duration::minutes(10);
     let long_threshold = Utc::now() - Duration::minutes(30);
 
