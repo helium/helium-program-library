@@ -168,7 +168,7 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
         ctx.accounts.token_program.to_account_info(),
         anchor_spl::token::Transfer {
           from: ctx.accounts.dca_mint_account.to_account_info(),
-          to: ctx.accounts.authority_hnt_account.to_account_info(),
+          to: ctx.accounts.authority_dca_mint_account.to_account_info(),
           authority: ctx.accounts.auto_top_off.to_account_info(),
         },
         auto_top_off_seeds,
