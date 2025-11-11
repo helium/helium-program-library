@@ -35,6 +35,7 @@ export async function initializeCompressionRecipient({
   } = await proofArgsAndAccounts({
     connection: program.provider.connection,
     assetId,
+    assetEndpoint,
     ...rest,
   });
   const recipient = recipientKey(lazyDistributor, assetId)[0];

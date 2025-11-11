@@ -25,6 +25,7 @@ export async function updateIotMetadata({
   dcFeePayer?: PublicKey;
   location: BN | null;
   elevation: number | null;
+  assetEndpoint?: string;
   gain: number | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;

@@ -24,6 +24,7 @@ export async function updateMobileMetadata({
   payer?: PublicKey;
   dcFeePayer?: PublicKey;
   location: BN | null;
+  assetEndpoint?: string;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
   deploymentInfo?: MobileDeploymentInfoV0 | null;
