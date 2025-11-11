@@ -134,12 +134,12 @@ describe("dc-auto-topoff", () => {
       SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: dcaSigner.publicKey,
-        lamports: LAMPORTS_PER_SOL,
+        lamports: 10 * LAMPORTS_PER_SOL,
       }),
       SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: crankTurner.publicKey,
-        lamports: LAMPORTS_PER_SOL,
+        lamports: 10 * LAMPORTS_PER_SOL,
       }),
     ])
 
@@ -149,7 +149,7 @@ describe("dc-auto-topoff", () => {
       SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: swapPayer,
-        lamports: LAMPORTS_PER_SOL,
+        lamports: 10 * LAMPORTS_PER_SOL,
       }),
     ]);
 
@@ -287,7 +287,7 @@ describe("dc-auto-topoff", () => {
       await sendInstructions(provider, [SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: autoTopOff,
-        lamports: 1000000000,
+        lamports: LAMPORTS_PER_SOL * 10,
       })]);
 
       await program.methods.scheduleTaskV0({
