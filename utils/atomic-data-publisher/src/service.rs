@@ -238,9 +238,36 @@ impl AtomicDataPublisher {
         loop {
           tokio::select! {
             _ = interval.tick() => {
+              // Wait for any running jobs to complete before refreshing pool
+              // This prevents swapping the pool while queries are in flight
+              let mut waited = false;
+              loop {
+                match database.any_job_running().await {
+                  Ok(true) => {
+                    if !waited {
+                      info!("Pool refresh scheduled but jobs are running - waiting for jobs to complete");
+                      waited = true;
+                    }
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                  }
+                  Ok(false) => {
+                    // No jobs running, safe to refresh
+                    if waited {
+                      info!("Jobs completed, proceeding with pool refresh");
+                    }
+                    break;
+                  }
+                  Err(e) => {
+                    error!("Failed to check job status before pool refresh: {}", e);
+                    // Try to refresh anyway
+                    break;
+                  }
+                }
+              }
+
               match database.refresh_pool().await {
                 Ok(_) => {
-                  debug!("Database pool refreshed successfully (periodic)");
+                  info!("Database pool refreshed successfully (periodic)");
                 }
                 Err(e) => {
                   error!("Failed to refresh database pool (periodic): {}", e);
