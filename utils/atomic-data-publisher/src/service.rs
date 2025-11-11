@@ -238,15 +238,8 @@ impl AtomicDataPublisher {
         loop {
           tokio::select! {
             _ = interval.tick() => {
-              match database.refresh_pool().await {
-                Ok(_) => {
-                  debug!("Database pool refreshed successfully (periodic)");
-                }
-                Err(e) => {
-                  error!("Failed to refresh database pool (periodic): {}", e);
-                  // Continue running - the next refresh attempt might succeed
-                }
-              }
+              Self::wait_for_jobs_to_complete(&database).await;
+              Self::attempt_pool_refresh(&database).await;
             }
             _ = shutdown_listener.clone() => {
               break;
@@ -318,5 +311,37 @@ impl AtomicDataPublisher {
 
     debug!("Health check passed");
     Ok(())
+  }
+
+  async fn wait_for_jobs_to_complete(database: &DatabaseClient) {
+    let mut has_logged_wait = false;
+
+    loop {
+      match database.any_job_running().await {
+        Ok(true) => {
+          if !has_logged_wait {
+            info!("Pool refresh scheduled but jobs are running - waiting for jobs to complete");
+            has_logged_wait = true;
+          }
+          tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+        Err(e) => {
+          error!("Failed to check job status before pool refresh: {}", e);
+          break;
+        }
+        _ => break,
+      }
+    }
+
+    if has_logged_wait {
+      info!("Jobs completed, proceeding with pool refresh");
+    }
+  }
+
+  async fn attempt_pool_refresh(database: &DatabaseClient) {
+    match database.refresh_pool().await {
+      Ok(_) => info!("Database pool refreshed successfully (periodic)"),
+      Err(e) => error!("Failed to refresh database pool (periodic): {}", e),
+    }
   }
 }

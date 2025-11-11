@@ -1451,7 +1451,7 @@ impl DatabaseClient {
         running_since,
         last_processed_block,
         last_max_block,
-        EXTRACT(EPOCH FROM (NOW() - running_since))/60 as minutes_running
+        CAST(EXTRACT(EPOCH FROM (NOW() - running_since))/60 AS DOUBLE PRECISION) as minutes_running
       FROM atomic_data_polling_state
       WHERE is_running = TRUE
       "#,
