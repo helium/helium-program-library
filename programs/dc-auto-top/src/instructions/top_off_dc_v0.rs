@@ -30,6 +30,7 @@ pub struct TopOffDcV0<'info> {
     has_one = delegated_data_credits,
     has_one = hnt_price_oracle,
     has_one = hnt_account,
+    has_one = dao,
   )]
   pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
   /// CHECK: This account takes a ton of memory. Instead of loading it into memory, just pull the min_crank_reward directly.
@@ -37,8 +38,6 @@ pub struct TopOffDcV0<'info> {
   pub task_queue: UncheckedAccount<'info>,
   #[account(
     mut,
-    has_one = sub_dao,
-    has_one = data_credits,
     has_one = escrow_account,
   )]
   pub delegated_data_credits: Box<Account<'info, DelegatedDataCreditsV0>>,

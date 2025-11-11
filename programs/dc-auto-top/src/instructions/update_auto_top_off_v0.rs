@@ -23,7 +23,6 @@ pub struct UpdateAutoTopOffArgsV0 {
   pub threshold: Option<u64>,
   pub hnt_price_oracle: Option<Pubkey>,
   pub hnt_threshold: Option<u64>,
-  pub dca_mint: Option<Pubkey>,
   pub dca_swap_amount: Option<u64>,
   pub dca_interval_seconds: Option<u64>,
   pub dca_input_price_oracle: Option<Pubkey>,
@@ -102,10 +101,8 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
   if let Some(hnt_threshold) = args.hnt_threshold {
     auto_top_off.hnt_threshold = hnt_threshold;
   }
-  if let Some(dca_mint) = args.dca_mint {
-    auto_top_off.dca_mint = dca_mint;
-    auto_top_off.dca_mint_account = ctx.accounts.dca_mint_account.key();
-  }
+  auto_top_off.dca_mint = ctx.accounts.dca_mint.key();
+  auto_top_off.dca_mint_account = ctx.accounts.dca_mint_account.key();
   if let Some(dca_swap_amount) = args.dca_swap_amount {
     auto_top_off.dca_swap_amount = dca_swap_amount;
   }

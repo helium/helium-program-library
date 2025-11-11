@@ -278,7 +278,6 @@ export async function run(args: any = process.argv) {
       threshold: argv.threshold ? new anchor.BN(argv.threshold) : null,
       hntPriceOracle: argv.hntPriceOracle ? new PublicKey(argv.hntPriceOracle) : null,
       hntThreshold: argv.hntThreshold ? new anchor.BN(argv.hntThreshold) : null,
-      dcaMint: argv.dcaMint ? new PublicKey(argv.dcaMint) : null,
       dcaSwapAmount: argv.dcaSwapAmount ? new anchor.BN(argv.dcaSwapAmount) : null,
       dcaIntervalSeconds: argv.dcaIntervalSeconds ? new anchor.BN(argv.dcaIntervalSeconds) : null,
       dcaInputPriceOracle: argv.dcaInputPriceOracle ? new PublicKey(argv.dcaInputPriceOracle) : null,
@@ -290,6 +289,7 @@ export async function run(args: any = process.argv) {
         nextHntTask: autoTopOffAcc.nextHntTask,
         taskRentRefund,
         hntTaskRentRefund,
+        dcaMint: argv.dcaMint ? new PublicKey(argv.dcaMint) : autoTopOffAcc.dcaMint,
       })
       .instruction()
     instructions.push(updateIx)

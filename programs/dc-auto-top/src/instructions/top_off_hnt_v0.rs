@@ -31,6 +31,7 @@ pub struct TopOffHntV0<'info> {
     has_one = dca_mint_account,
     has_one = dca_input_price_oracle,
     has_one = hnt_price_oracle,
+    has_one = hnt_mint,
   )]
   pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
   /// CHECK: This account takes a ton of memory. Instead of loading it into memory, just pull the min_crank_reward directly.

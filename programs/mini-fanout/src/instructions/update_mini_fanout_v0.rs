@@ -104,7 +104,7 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
     &ctx.accounts.system_program.to_account_info(),
     mini_fanout,
   )?;
-  if !ctx.accounts.next_task.data_is_empty() {
+  if !ctx.accounts.next_task.data_is_empty() && ctx.accounts.next_task.key() != mini_fanout.key() {
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
@@ -117,7 +117,9 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
       &[queue_authority_seeds!(mini_fanout)],
     ))?;
   }
-  if !ctx.accounts.next_pre_task.data_is_empty() {
+  if !ctx.accounts.next_pre_task.data_is_empty()
+    && ctx.accounts.next_pre_task.key() != mini_fanout.key()
+  {
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {

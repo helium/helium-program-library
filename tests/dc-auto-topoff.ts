@@ -319,7 +319,6 @@ describe("dc-auto-topoff", () => {
         threshold: new anchor.BN(10000000),
         hntPriceOracle: null,
         hntThreshold: null,
-        dcaMint: null,
         dcaSwapAmount: null,
         dcaIntervalSeconds: null,
         dcaInputPriceOracle: null,
@@ -436,7 +435,6 @@ describe("dc-auto-topoff", () => {
         threshold: new anchor.BN(0), // No dc threshold or it'll mess with our expected HNT
         hntPriceOracle: new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"),
         hntThreshold,
-        dcaMint,
         dcaSwapAmount,
         dcaIntervalSeconds,
         dcaInputPriceOracle: USDC_PRICE_FEED,

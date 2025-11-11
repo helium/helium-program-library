@@ -39,7 +39,7 @@ pub struct InitializeDcaCore<'info> {
   #[account(
     init,
     payer = rent_payer,
-    space = 8 + std::mem::size_of::<DcaV0>() + 64 + args.dca_url.len(),
+    space = 8 + std::mem::size_of::<DcaV0>() + 64,
     seeds = [b"dca", authority.key().as_ref(), input_mint.key().as_ref(), output_mint.key().as_ref(), args.index.to_le_bytes().as_ref()],
     bump
   )]
