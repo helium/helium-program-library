@@ -314,7 +314,6 @@ impl AtomicDataPublisher {
   }
 
   async fn wait_for_jobs_to_complete(database: &DatabaseClient) {
-    const JOB_CHECK_INTERVAL: Duration = Duration::from_secs(1);
     let mut has_logged_wait = false;
 
     loop {
@@ -324,7 +323,7 @@ impl AtomicDataPublisher {
             info!("Pool refresh scheduled but jobs are running - waiting for jobs to complete");
             has_logged_wait = true;
           }
-          tokio::time::sleep(JOB_CHECK_INTERVAL).await;
+          tokio::time::sleep(Duration::from_secs(5)).await;
         }
         Err(e) => {
           error!("Failed to check job status before pool refresh: {}", e);
