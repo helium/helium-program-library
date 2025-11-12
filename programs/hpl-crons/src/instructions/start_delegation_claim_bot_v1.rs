@@ -2,7 +2,8 @@ use std::cmp::max;
 
 use anchor_lang::{prelude::*, InstructionData};
 use anchor_spl::token::{Mint, TokenAccount};
-use helium_sub_daos::{try_from, DaoV0, DelegatedPositionV0, SubDaoV0};
+use helium_sub_daos::{DaoV0, DelegatedPositionV0, SubDaoV0};
+use shared_utils::try_from;
 use spl_token::solana_program::instruction::Instruction;
 use tuktuk_program::{
   compile_transaction,

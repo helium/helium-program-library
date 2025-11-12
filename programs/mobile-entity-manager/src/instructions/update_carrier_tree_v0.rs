@@ -5,6 +5,7 @@ use bubblegum_cpi::bubblegum::{
   cpi::{accounts::CreateTree, create_tree},
   program::Bubblegum,
 };
+use shared_utils::try_from;
 
 use crate::{carrier_seeds, error::ErrorCode, state::*};
 
@@ -45,19 +46,6 @@ pub struct UpdateCarrierTreeV0<'info> {
   pub system_program: Program<'info, System>,
   pub bubblegum_program: Program<'info, Bubblegum>,
   pub compression_program: Program<'info, SplAccountCompression>,
-}
-
-#[macro_export]
-macro_rules! try_from {
-  ($ty: ty, $acc: expr) => {{
-    let account_info = $acc.as_ref();
-    <$ty>::try_from(unsafe {
-      core::mem::transmute::<
-        &anchor_lang::prelude::AccountInfo<'_>,
-        &anchor_lang::prelude::AccountInfo<'_>,
-      >(account_info)
-    })
-  }};
 }
 
 pub fn handler(ctx: Context<UpdateCarrierTreeV0>, args: UpdateCarrierTreeArgsV0) -> Result<()> {

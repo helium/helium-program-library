@@ -1,6 +1,6 @@
 [package]
 name = "voter-stake-registry"
-version = "0.4.4"
+version = "0.4.6"
 description = "Heliums voter weight plugin for spl-governance"
 license = "GPL-3.0-or-later"
 homepage = "https://github.com/helium/helium-program-library"

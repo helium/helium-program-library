@@ -3,6 +3,7 @@ use anchor_lang::{
   solana_program::sysvar::instructions::{get_instruction_relative, ID as IX_ID},
 };
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use shared_utils::try_from;
 use tuktuk_program::{
   tuktuk, RunTaskReturnV0, TaskQueueV0, TaskReturnV0, TransactionSourceV0, TriggerV0,
 };
@@ -52,19 +53,6 @@ impl Share {
       Share::Fixed { amount } => *amount as u128,
     }
   }
-}
-
-#[macro_export]
-macro_rules! try_from {
-  ($ty: ty, $acc: expr) => {{
-    let account_info = $acc.as_ref();
-    <$ty>::try_from(unsafe {
-      core::mem::transmute::<
-        &anchor_lang::prelude::AccountInfo<'_>,
-        &anchor_lang::prelude::AccountInfo<'_>,
-      >(account_info)
-    })
-  }};
 }
 
 pub fn verify_running_in_tuktuk(instruction_sysvar: AccountInfo, task_id: Pubkey) -> Result<()> {
