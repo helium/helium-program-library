@@ -58,11 +58,6 @@ pub fn handler(ctx: Context<CloseLegacyAutoTopOff>) -> Result<()> {
   let authority = ctx.accounts.authority.key();
   let seeds: &[&[&[u8]]] = &[auto_top_off_seeds!(delegated_data_credits, authority, bump)];
 
-  close(
-    ctx.accounts.auto_top_off.to_account_info(),
-    ctx.accounts.authority.to_account_info(),
-  )?;
-
   let remaining_hnt_balance = ctx.accounts.hnt_account.amount;
   if remaining_hnt_balance > 0 {
     anchor_spl::token::transfer(
@@ -99,6 +94,11 @@ pub fn handler(ctx: Context<CloseLegacyAutoTopOff>) -> Result<()> {
     },
     seeds,
   ))?;
+
+  close(
+    ctx.accounts.auto_top_off.to_account_info(),
+    ctx.accounts.authority.to_account_info(),
+  )?;
 
   Ok(())
 }
