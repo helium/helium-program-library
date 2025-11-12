@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::system_program};
 use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Token, TokenAccount},
@@ -41,24 +41,27 @@ pub struct CloseLegacyAutoTopOff<'info> {
   pub system_program: Program<'info, System>,
 }
 
+pub fn close<'info>(info: AccountInfo<'info>, sol_destination: AccountInfo<'info>) -> Result<()> {
+  // Transfer tokens from the account to the sol_destination.
+  let dest_starting_lamports = sol_destination.lamports();
+  **sol_destination.lamports.borrow_mut() =
+    dest_starting_lamports.checked_add(info.lamports()).unwrap();
+  **info.lamports.borrow_mut() = 0;
+
+  info.assign(&system_program::ID);
+  info.realloc(0, false).map_err(Into::into)
+}
+
 pub fn handler(ctx: Context<CloseLegacyAutoTopOff>) -> Result<()> {
   let bump: u8 = ctx.bumps.auto_top_off;
   let delegated_data_credits = ctx.accounts.delegated_data_credits.key();
   let authority = ctx.accounts.authority.key();
   let seeds: &[&[&[u8]]] = &[auto_top_off_seeds!(delegated_data_credits, authority, bump)];
 
-  let remaining_lamports = ctx.accounts.auto_top_off.lamports();
-  ctx.accounts.auto_top_off.sub_lamports(remaining_lamports)?;
-  ctx.accounts.authority.add_lamports(remaining_lamports)?;
-  ctx
-    .accounts
-    .auto_top_off
-    .assign(&ctx.accounts.system_program.key());
-  ctx
-    .accounts
-    .auto_top_off
-    .to_account_info()
-    .realloc(0, false)?;
+  close(
+    ctx.accounts.auto_top_off.to_account_info(),
+    ctx.accounts.authority.to_account_info(),
+  )?;
 
   let remaining_hnt_balance = ctx.accounts.hnt_account.amount;
   if remaining_hnt_balance > 0 {
