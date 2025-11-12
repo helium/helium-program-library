@@ -14,7 +14,7 @@ use tuktuk_program::{
   TaskQueueAuthorityV0, TaskQueueV0, TransactionSourceV0, TriggerV0,
 };
 
-use super::TEN_MINUTES;
+use super::FIFTEEN_MINUTES;
 use crate::{error::ErrorCode, DelegationClaimBotV0, EPOCH_LENGTH};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -129,7 +129,7 @@ pub fn handler(
   let curr_epoch = ctx.accounts.delegated_position.last_claimed_epoch + 1;
   ctx.accounts.delegation_claim_bot.last_claimed_epoch =
     ctx.accounts.delegated_position.last_claimed_epoch;
-  let trigger_time = ((curr_epoch + 1) * EPOCH_LENGTH) - TEN_MINUTES as u64;
+  let trigger_time = ((curr_epoch + 1) * EPOCH_LENGTH) - FIFTEEN_MINUTES as u64;
   ctx.accounts.delegation_claim_bot.next_task = ctx.accounts.task.key();
   queue_task_v0(
     CpiContext::new_with_signer(
