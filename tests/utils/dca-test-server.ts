@@ -85,7 +85,7 @@ export async function createDcaServer(
 
       // Get swap payer PDA
       const [swapPayer, bump] = customSignerKey(taskQueue, [
-        Buffer.from("swap_payer"),
+        Buffer.from("dca_swap_payer"),
       ]);
       const bumpBuffer = Buffer.alloc(1);
       bumpBuffer.writeUint8(bump);
@@ -179,7 +179,7 @@ export async function createDcaServer(
 
       const { transaction, remainingAccounts } = await compileTransaction(
         instructions,
-        [[Buffer.from("swap_payer"), bumpBuffer]] // PDA seeds for swap payer
+        [[Buffer.from("dca_swap_payer"), bumpBuffer]] // PDA seeds for swap payer
       );
 
       const remoteTx = new RemoteTaskTransactionV0({
@@ -258,15 +258,16 @@ export async function runAllTasks(
     }
     console.log("Running task", taskId);
 
+    const runTaskIxs = await runTask({
+      program: tuktukProgram,
+      task,
+      crankTurner: crankTurner.publicKey,
+    });
     await sendInstructions(
       provider,
       [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-        ...(await runTask({
-          program: tuktukProgram,
-          task,
-          crankTurner: crankTurner.publicKey,
-        })),
+        ...runTaskIxs,
       ],
       [crankTurner],
       crankTurner.publicKey

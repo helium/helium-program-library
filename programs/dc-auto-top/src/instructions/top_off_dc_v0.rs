@@ -30,6 +30,7 @@ pub struct TopOffDcV0<'info> {
     has_one = delegated_data_credits,
     has_one = hnt_price_oracle,
     has_one = hnt_account,
+    has_one = dao,
   )]
   pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
   /// CHECK: This account takes a ton of memory. Instead of loading it into memory, just pull the min_crank_reward directly.
@@ -37,8 +38,6 @@ pub struct TopOffDcV0<'info> {
   pub task_queue: UncheckedAccount<'info>,
   #[account(
     mut,
-    has_one = sub_dao,
-    has_one = data_credits,
     has_one = escrow_account,
   )]
   pub delegated_data_credits: Box<Account<'info, DelegatedDataCreditsV0>>,
@@ -208,8 +207,7 @@ pub fn handler<'info>(
   }
   // Calculate the number of free tasks we're using for this call
   // - 1 free task for the DC topoff task
-  // - 1 free task for the pyth pre-task
-  let num_tasks_used = 2u64;
+  let num_tasks_used = 1u64;
 
   // Pay min crank reward to task_queue from auto_top_off, if available
   // descriminator + tuktuk_config + id + update_authority + reserved
@@ -230,7 +228,6 @@ pub fn handler<'info>(
   } else {
     let mut auto_top_off = ctx.accounts.auto_top_off.load_mut()?;
     auto_top_off.next_task = auto_top_off_key;
-    auto_top_off.next_hnt_task = auto_top_off_key;
     drop(auto_top_off);
     return Ok(RunTaskReturnV0 {
       tasks: vec![],
@@ -239,8 +236,8 @@ pub fn handler<'info>(
   }
 
   // Schedule next DC topoff task
-  // Free tasks: 1 for DC topoff + 1 for pyth
-  const MAX_FREE_TASKS: u8 = 2;
+  // Free tasks: 1 for DC topoff
+  const MAX_FREE_TASKS: u8 = 1;
 
   let auto_top_off = ctx.accounts.auto_top_off.load()?;
   let next_time = get_next_time(&auto_top_off)?;

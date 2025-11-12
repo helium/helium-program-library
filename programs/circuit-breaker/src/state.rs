@@ -6,16 +6,11 @@ pub struct WindowV0 {
   pub last_unix_timestamp: i64,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub enum ThresholdType {
+  #[default]
   Percent,
   Absolute,
-}
-
-impl Default for ThresholdType {
-  fn default() -> Self {
-    Self::Percent
-  }
 }
 
 #[derive(Default, AnchorSerialize, AnchorDeserialize, Clone)]

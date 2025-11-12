@@ -6,13 +6,13 @@ import { init as initHem } from "@helium/helium-entity-manager-sdk";
 import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { createAtaAndTransfer, createMint, sendInstructions } from "@helium/spl-utils";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
-import { init as initTuktuk, nextAvailableTaskIds, runTask, taskKey, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey } from "@helium/tuktuk-sdk";
+import { init as initTuktuk, nextAvailableTaskIds, taskKey, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey } from "@helium/tuktuk-sdk";
 import { createAssociatedTokenAccountIdempotentInstruction, getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { ComputeBudgetProgram, PublicKey, SystemProgram } from "@solana/web3.js";
 import { USDC_PRICE_FEED, HNT_PRICE_FEED } from "./tuktuk-dca";
 import { expect } from "chai";
 import { execSync } from "child_process";
-import { init, queueAuthorityKey } from "../packages/dc-auto-top-sdk/src";
+import { autoTopOffKey, init, queueAuthorityKey } from "../packages/dc-auto-top-sdk/src";
 import { init as initTuktukDca } from "../packages/tuktuk-dca-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { DcAutoTop } from "../target/types/dc_auto_top";
@@ -134,24 +134,15 @@ describe("dc-auto-topoff", () => {
       SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: dcaSigner.publicKey,
-        lamports: LAMPORTS_PER_SOL,
+        lamports: 10 * LAMPORTS_PER_SOL,
       }),
       SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: crankTurner.publicKey,
-        lamports: LAMPORTS_PER_SOL,
-      }),
-    ])
-
-    // Create and fund swap payer for DCA
-    const [swapPayer] = customSignerKey(taskQueue, [Buffer.from("swap_payer")])
-    await sendInstructions(provider, [
-      SystemProgram.transfer({
-        fromPubkey: me,
-        toPubkey: swapPayer,
-        lamports: LAMPORTS_PER_SOL,
+        lamports: 10 * LAMPORTS_PER_SOL,
       }),
     ]);
+
 
     ({ dao: { mint: hntMint }, dataCredits: { dcMint }, subDao: { subDao } } = await initWorld(provider, hemProgram, hsdProgram, dcProgram))
 
@@ -174,6 +165,16 @@ describe("dc-auto-topoff", () => {
   beforeEach(async () => {
     routerKey = (await HeliumKeypair.makeRandom()).address.b58;
     delegatedDataCredits = delegatedDataCreditsKey(subDao, routerKey)[0]
+    // Create and fund swap payer for DCA
+    const [swapPayer] = customSignerKey(taskQueue, [Buffer.from("dca_swap_payer")])
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: me,
+        toPubkey: swapPayer,
+        lamports: 10 * LAMPORTS_PER_SOL,
+      }),
+    ]);
+
     await dcProgram.methods.delegateDataCreditsV0({
       routerKey,
       amount: new anchor.BN(0),
@@ -196,9 +197,6 @@ describe("dc-auto-topoff", () => {
         dataCredits: dataCreditsKey(dcMint)[0],
       })
       .rpc({ skipPreflight: true });
-
-    // Start DCA server for this test
-    const [swapPayer] = customSignerKey(taskQueue, [Buffer.from("swap_payer")])
 
     // Create DCA mint ATA for swap payer (will receive tokens during lend, so 0 starting balance)
     const swapPayerDcaAta = getAssociatedTokenAddressSync(dcaMint, swapPayer, true)
@@ -287,7 +285,7 @@ describe("dc-auto-topoff", () => {
       await sendInstructions(provider, [SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: autoTopOff,
-        lamports: 1000000000,
+        lamports: LAMPORTS_PER_SOL * 10,
       })]);
 
       await program.methods.scheduleTaskV0({
@@ -319,7 +317,6 @@ describe("dc-auto-topoff", () => {
         threshold: new anchor.BN(10000000),
         hntPriceOracle: null,
         hntThreshold: null,
-        dcaMint: null,
         dcaSwapAmount: null,
         dcaIntervalSeconds: null,
         dcaInputPriceOracle: null,
@@ -332,6 +329,7 @@ describe("dc-auto-topoff", () => {
           autoTopOff,
           taskRentRefund,
           hntTaskRentRefund,
+          dcaMint: dcaMint,
         })
         .rpc({ skipPreflight: true })
 
@@ -404,11 +402,11 @@ describe("dc-auto-topoff", () => {
 
       let dcaSwapAmount: anchor.BN
       if (expoDiff > 0) {
-        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).div(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff))))
+        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).div(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff)))).add(new anchor.BN(1))
       } else if (expoDiff < 0) {
-        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).mul(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff))))
+        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).mul(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff)))).add(new anchor.BN(1))
       } else {
-        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice)
+        dcaSwapAmount = hntPerSwap.mul(outputPrice).div(inputPrice).add(new anchor.BN(1))
       }
 
       console.log(`Calculated DCA swap amount: ${dcaSwapAmount.toString()} dcaMint tokens per order`)
@@ -435,7 +433,6 @@ describe("dc-auto-topoff", () => {
         threshold: new anchor.BN(0), // No dc threshold or it'll mess with our expected HNT
         hntPriceOracle: new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"),
         hntThreshold,
-        dcaMint,
         dcaSwapAmount,
         dcaIntervalSeconds,
         dcaInputPriceOracle: USDC_PRICE_FEED,
@@ -448,6 +445,7 @@ describe("dc-auto-topoff", () => {
           autoTopOff,
           taskRentRefund,
           hntTaskRentRefund,
+          dcaMint: dcaMint,
         })
         .rpc({ skipPreflight: true })
 
@@ -494,10 +492,9 @@ describe("dc-auto-topoff", () => {
 
       const hntAccountAfterFirstSwap = await getAccount(provider.connection, getAssociatedTokenAddressSync(hntMint, autoTopOff, true))
       const expectedAfterFirstSwap = startingHnt.add(hntPerSwap)
-      console.log(`HNT balance after first swap: ${hntAccountAfterFirstSwap.amount} (expected: ${expectedAfterFirstSwap.toString()})`)
       // Allow for 1 bone tolerance due to rounding in DCA calculations
       const actualAmount = new anchor.BN(hntAccountAfterFirstSwap.amount.toString())
-      const difference = actualAmount.gt(expectedAfterFirstSwap) 
+      const difference = actualAmount.gt(expectedAfterFirstSwap)
         ? actualAmount.sub(expectedAfterFirstSwap)
         : expectedAfterFirstSwap.sub(actualAmount)
       expect(difference.toNumber()).to.be.lessThanOrEqual(1, "After first swap, should have approximately 20 HNT (allowing for 1 bone rounding)")

@@ -19,6 +19,8 @@ use tuktuk_program::{tuktuk, RunTaskReturnV0, TaskReturnV0, TransactionSourceV0,
 
 use crate::{auto_top_off_seeds, errors::ErrorCode, get_next_time, get_task_ix_hnt, state::*};
 
+pub const TESTING: bool = std::option_env!("TESTING").is_some();
+
 #[derive(Accounts)]
 pub struct TopOffHntV0<'info> {
   #[account(
@@ -29,6 +31,7 @@ pub struct TopOffHntV0<'info> {
     has_one = dca_mint_account,
     has_one = dca_input_price_oracle,
     has_one = hnt_price_oracle,
+    has_one = hnt_mint,
   )]
   pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
   /// CHECK: This account takes a ton of memory. Instead of loading it into memory, just pull the min_crank_reward directly.
@@ -190,9 +193,26 @@ pub fn handler<'info>(
       let input_price_message = ctx.accounts.dca_input_price_oracle.price_message;
       let output_price_message = ctx.accounts.hnt_price_oracle.price_message;
 
+      // Verify prices are not older than 5 minutes
+      let current_time = Clock::get()?.unix_timestamp;
+      require_gte!(
+        input_price_message.publish_time,
+        current_time.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
+        ErrorCode::PythPriceNotFound
+      );
+      require_gte!(
+        output_price_message.publish_time,
+        current_time.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
+        ErrorCode::PythPriceNotFound
+      );
+
       let input_price = input_price_message.price;
       let output_price = output_price_message.price;
       let expo_diff = input_price_message.exponent - output_price_message.exponent;
+
+      // Check that prices are > 0
+      require_gt!(input_price, 0, ErrorCode::PythPriceNotFound);
+      require_gt!(output_price, 0, ErrorCode::PythPriceNotFound);
 
       // Calculate expected HNT output per swap: dca_swap_amount * (input_price / output_price)
       let hnt_per_swap = match expo_diff.cmp(&0) {
@@ -200,9 +220,9 @@ pub fn handler<'info>(
           .dca_swap_amount
           .checked_mul(input_price as u64)
           .ok_or(ErrorCode::ArithmeticError)?
-          .checked_div(output_price as u64)
+          .checked_mul(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
           .ok_or(ErrorCode::ArithmeticError)?
-          .checked_div(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
+          .checked_div(output_price as u64)
           .ok_or(ErrorCode::ArithmeticError)?,
         std::cmp::Ordering::Less => auto_top_off
           .dca_swap_amount
@@ -210,7 +230,7 @@ pub fn handler<'info>(
           .ok_or(ErrorCode::ArithmeticError)?
           .checked_div(output_price as u64)
           .ok_or(ErrorCode::ArithmeticError)?
-          .checked_mul(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
+          .checked_div(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
           .ok_or(ErrorCode::ArithmeticError)?,
         std::cmp::Ordering::Equal => auto_top_off
           .dca_swap_amount
@@ -220,9 +240,11 @@ pub fn handler<'info>(
           .ok_or(ErrorCode::ArithmeticError)?,
       };
 
+      msg!("hnt_per_swap: {}", hnt_per_swap);
+
       // Now calculate number of orders needed using ceiling division
       if hnt_per_swap > 0 {
-        hnt_needed / hnt_per_swap
+        hnt_needed.div_ceil(hnt_per_swap)
       } else {
         0
       }

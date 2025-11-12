@@ -36,6 +36,7 @@ pub struct ScheduleTaskV0<'info> {
   #[account(
     mut,
     has_one = next_task,
+    has_one = next_hnt_task,
     has_one = task_queue,
   )]
   pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
@@ -45,6 +46,12 @@ pub struct ScheduleTaskV0<'info> {
     constraint = next_task.data_is_empty() || next_task.key() == auto_top_off.key()
   )]
   pub next_task: UncheckedAccount<'info>,
+  /// CHECK: Via constraint
+  /// Only allow one task to be scheduled at a time
+  #[account(
+    constraint = next_hnt_task.data_is_empty() || next_hnt_task.key() == auto_top_off.key()
+  )]
+  pub next_hnt_task: UncheckedAccount<'info>,
   /// CHECK: queue authority
   #[account(
     seeds = [b"queue_authority"],
@@ -120,8 +127,7 @@ pub fn get_task_ix_hnt(
     &[
       b"custom",
       auto_top_off.task_queue.key().as_ref(),
-      auto_top_off_key.as_ref(),
-      b"dca",
+      b"dca_swap_payer",
     ],
     &tuktuk::ID,
   );
@@ -176,8 +182,7 @@ pub fn get_task_ix_hnt(
   let compiled_tx = compile_transaction_efficient(
     vec![top_off_ix],
     vec![vec![
-      auto_top_off_key.to_bytes().as_ref().to_vec(),
-      b"dca".to_vec(),
+      b"dca_swap_payer".to_vec(),
       bump.to_le_bytes().to_vec(),
     ]],
   )?;

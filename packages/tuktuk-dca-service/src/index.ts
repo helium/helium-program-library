@@ -162,7 +162,7 @@ server.post<{
 
     // Get swap payer PDA
     const [swapPayer, bump] = customSignerKey(taskQueue, [
-      Buffer.from("swap_payer"),
+      Buffer.from("dca_swap_payer"),
     ]);
     const bumpBuffer = Buffer.alloc(1);
     bumpBuffer.writeUint8(bump);
@@ -235,7 +235,7 @@ server.post<{
     // Compile transaction
     const { transaction, remainingAccounts } = await compileTransaction(
       instructions,
-      [[Buffer.from("swap_payer"), bumpBuffer]]
+      [[Buffer.from("dca_swap_payer"), bumpBuffer]]
     );
 
     const remoteTx = new RemoteTaskTransactionV0({
