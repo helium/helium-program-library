@@ -102,7 +102,7 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
   drop(auto_top_off);
   let queue_authority_seeds: &[&[&[u8]]] = &[queue_authority_seeds!(queue_authority_bump)];
   if !ctx.accounts.next_task.data_is_empty()
-    || ctx.accounts.next_task.key() != ctx.accounts.auto_top_off.key()
+    && ctx.accounts.next_task.key() != ctx.accounts.auto_top_off.key()
   {
     let next_task = try_from!(Account<TaskV0>, ctx.accounts.next_task)?;
     // Dequeue DC topoff task
