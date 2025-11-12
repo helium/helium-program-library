@@ -430,7 +430,7 @@ describe("dc-auto-topoff", () => {
         nextMinutes = now.getMinutes() + 1
       }
 
-      await program.methods.updateAutoTopOffV0({
+      const { pubkeys: updateAutoTopOffKeys } = await program.methods.updateAutoTopOffV0({
         schedule: `${nextSeconds} ${nextMinutes} * * * *`, // Run in 2 seconds
         threshold: new anchor.BN(0), // No dc threshold or it'll mess with our expected HNT
         hntPriceOracle: new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"),
@@ -449,7 +449,8 @@ describe("dc-auto-topoff", () => {
           hntTaskRentRefund,
           dcaMint: dcaMint,
         })
-        .rpc({ skipPreflight: true })
+        .rpcAndKeys({ skipPreflight: true })
+        console.log("Some pubkeys:", updateAutoTopOffKeys)
 
       // Schedule new tasks with DCA configuration
       await program.methods.scheduleTaskV0({

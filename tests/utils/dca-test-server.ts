@@ -266,7 +266,6 @@ export async function runAllTasks(
     for (const ix of runTaskIxs) {
       console.log(ix.keys.map((k) => k.pubkey.toBase58()).join("\n"));
     }
-    console.log
     await sendInstructions(
       provider,
       [
