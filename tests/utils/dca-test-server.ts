@@ -258,15 +258,20 @@ export async function runAllTasks(
     }
     console.log("Running task", taskId);
 
+    const runTaskIxs = await runTask({
+      program: tuktukProgram,
+      task,
+      crankTurner: crankTurner.publicKey,
+    });
+    for (const ix of runTaskIxs) {
+      console.log(ix.keys.map((k) => k.pubkey.toBase58()).join("\n"));
+    }
+    console.log
     await sendInstructions(
       provider,
       [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-        ...(await runTask({
-          program: tuktukProgram,
-          task,
-          crankTurner: crankTurner.publicKey,
-        })),
+        ...runTaskIxs,
       ],
       [crankTurner],
       crankTurner.publicKey
