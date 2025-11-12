@@ -19,6 +19,7 @@ exclude = [
   "utils/generate-test-gateway-txn",
   "utils/standardize-hotspot-metadata",
   "utils/pyth_solana_receiver_sdk",
+  "utils/atomic-data-publisher",
 ]
 
 [workspace.dependencies]
@@ -51,3 +52,4 @@ solana-zk-sdk = "2.2.3"
 tuktuk = "0"
 clockwork-cron = "2.0.19"
 chrono = "0.4.39"
+bytemuck = "1.14.0"

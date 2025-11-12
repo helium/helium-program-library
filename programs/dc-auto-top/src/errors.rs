@@ -7,4 +7,13 @@ pub enum ErrorCode {
 
   #[msg("Invalid schedule")]
   InvalidSchedule,
+
+  #[msg("Invalid CPI context")]
+  InvalidCpiContext,
+
+  #[msg("Arithmetic error")]
+  ArithmeticError,
+
+  #[msg("Pyth price not found")]
+  PythPriceNotFound,
 }

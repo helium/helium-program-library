@@ -17,7 +17,7 @@ use voter_stake_registry::state::PositionV0;
 
 use crate::{hpl_crons::CIRCUIT_BREAKER_PROGRAM, DelegationClaimBotV0, EPOCH_LENGTH};
 
-pub const TEN_MINUTES: i64 = 60 * 10;
+pub const FIFTEEN_MINUTES: i64 = 60 * 15;
 
 #[derive(Accounts)]
 pub struct QueueDelegationClaimV0<'info> {
@@ -196,14 +196,16 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
   };
   let (compiled_reschedule_tx, _) = compile_transaction(vec![reschedule_ix], seeds).unwrap();
 
-  // Trigger the claim 10m after the epoch closes
-  let after_epoch_trigger =
-    TriggerV0::Timestamp(max(Clock::get()?.unix_timestamp, epoch_ts + TEN_MINUTES));
+  // Trigger the claim 15m after the epoch closes
+  let after_epoch_trigger = TriggerV0::Timestamp(max(
+    Clock::get()?.unix_timestamp,
+    epoch_ts + FIFTEEN_MINUTES,
+  ));
 
-  // Trigger the transaction that schedules the next claim 10m before the next epoch ends
+  // Trigger the transaction that schedules the next claim 15m before the next epoch ends
   let before_epoch_trigger = TriggerV0::Timestamp(max(
     Clock::get()?.unix_timestamp,
-    epoch_ts + (EPOCH_LENGTH as i64) - TEN_MINUTES,
+    epoch_ts + (EPOCH_LENGTH as i64) - FIFTEEN_MINUTES,
   ));
 
   // Pay for the tasks

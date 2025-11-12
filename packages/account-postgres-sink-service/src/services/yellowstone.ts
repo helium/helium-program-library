@@ -87,6 +87,7 @@ export const setupYellowstone = async (
                     },
                     pluginsByAccountType:
                       pluginsByAccountTypeByProgram[owner] || {},
+                    block: undefined,
                   });
                 } catch (err) {
                   console.error(err);

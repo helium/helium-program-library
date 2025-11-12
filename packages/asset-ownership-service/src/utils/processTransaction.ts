@@ -1,6 +1,9 @@
-import { PublicKey, Transaction as SolanaTransaction, VersionedTransaction } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
-import { PROGRAM_ID as HEM_PROGRAM_ID, init as initHem } from "@helium/helium-entity-manager-sdk";
+import {
+  PROGRAM_ID as HEM_PROGRAM_ID,
+  init as initHem,
+} from "@helium/helium-entity-manager-sdk";
 import { PROGRAM_ID as MEM_PROGRAM_ID } from "@helium/mobile-entity-manager-sdk";
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
@@ -10,6 +13,7 @@ import { PG_CARRIER_TABLE, PG_DATA_ONLY_TABLE, PG_MAKER_TABLE } from "../env";
 import { QueryTypes, Transaction } from "sequelize";
 import database from "./database";
 import { provider } from "./solana";
+import retry from "async-retry";
 
 interface TreeConfig {
   accountKey: string;
@@ -46,7 +50,7 @@ export class TransactionProcessor {
   private constructor(
     hemProgram: Awaited<ReturnType<typeof initHem>>,
     coders: { [programId: string]: anchor.BorshInstructionCoder },
-    treeConfigs: TreeConfigs,
+    treeConfigs: TreeConfigs
   ) {
     this.hemProgram = hemProgram;
     this.coders = coders;
@@ -57,8 +61,22 @@ export class TransactionProcessor {
     return new Set([
       ...this.treeConfigs.update_maker_tree_v0.merkleTrees,
       ...this.treeConfigs.update_data_only_tree_v0.merkleTrees,
-      ...this.treeConfigs.update_carrier_tree_v0.merkleTrees
+      ...this.treeConfigs.update_carrier_tree_v0.merkleTrees,
     ]);
+  }
+
+  private async getCurrentblock(): Promise<number> {
+    try {
+      return await retry(() => provider.connection.getSlot("finalized"), {
+        retries: 3,
+        factor: 2,
+        minTimeout: 1000,
+        maxTimeout: 5000,
+      });
+    } catch (error) {
+      console.warn("Failed to fetch block after retries:", error);
+      return 0;
+    }
   }
 
   static async create(): Promise<TransactionProcessor> {
@@ -107,14 +125,15 @@ export class TransactionProcessor {
       },
     };
 
-    return new TransactionProcessor(
-      hemProgram,
-      coders,
-      treeConfigs,
-    );
+    return new TransactionProcessor(hemProgram, coders, treeConfigs);
   }
 
-  private async processInstruction(instruction: ProcessableInstruction, tx: ProcessableTransaction, transaction: Transaction): Promise<{ updatedTrees: boolean }> {
+  private async processInstruction(
+    instruction: ProcessableInstruction,
+    tx: ProcessableTransaction,
+    transaction: Transaction,
+    block?: number
+  ): Promise<{ updatedTrees: boolean }> {
     const programId = new PublicKey(tx.accountKeys[instruction.programIdIndex]);
     const instructionCoder = this.coders[programId.toBase58()];
 
@@ -138,17 +157,11 @@ export class TransactionProcessor {
     if (!formattedInstruction) return { updatedTrees: false };
 
     const accountMap = Object.fromEntries(
-      (formattedInstruction.accounts || []).map((acc) => [
-        acc.name,
-        acc,
-      ])
+      (formattedInstruction.accounts || []).map((acc) => [acc.name, acc])
     );
 
     const argMap = Object.fromEntries(
-      (formattedInstruction.args || []).map((arg) => [
-        arg.name,
-        arg,
-      ])
+      (formattedInstruction.args || []).map((arg) => [arg.name, arg])
     );
 
     switch (decodedInstruction.name) {
@@ -199,10 +212,12 @@ export class TransactionProcessor {
           );
 
           if (keyToAsset) {
+            const lastBlock = block ?? (await this.getCurrentblock());
             await AssetOwner.upsert(
               {
                 asset: keyToAsset.asset.toBase58(),
                 owner: recipientAccount.toBase58(),
+                lastBlock,
               },
               { transaction }
             );
@@ -231,10 +246,12 @@ export class TransactionProcessor {
             BUBBLEGUM_PROGRAM_ID
           );
 
+          const lastBlock = block ?? (await this.getCurrentblock());
           await AssetOwner.upsert(
             {
               asset: assetId.toBase58(),
               owner: newOwnerAccount.toBase58(),
+              lastBlock,
             },
             { transaction }
           );
@@ -246,10 +263,19 @@ export class TransactionProcessor {
     return { updatedTrees: false };
   }
 
-  async processTransaction(tx: ProcessableTransaction, transaction: Transaction): Promise<{ updatedTrees: boolean }> {
+  async processTransaction(
+    tx: ProcessableTransaction,
+    transaction: Transaction,
+    block?: number
+  ): Promise<{ updatedTrees: boolean }> {
     // Process main instructions
     for (const instruction of tx.instructions) {
-      const { updatedTrees } = await this.processInstruction(instruction, tx, transaction);
+      const { updatedTrees } = await this.processInstruction(
+        instruction,
+        tx,
+        transaction,
+        block
+      );
       if (updatedTrees) {
         return { updatedTrees: true };
       }
@@ -259,7 +285,12 @@ export class TransactionProcessor {
     if (tx.innerInstructions) {
       for (const innerSet of tx.innerInstructions) {
         for (const instruction of innerSet.instructions) {
-          const { updatedTrees } = await this.processInstruction(instruction, tx, transaction);
+          const { updatedTrees } = await this.processInstruction(
+            instruction,
+            tx,
+            transaction,
+            block
+          );
           if (updatedTrees) {
             return { updatedTrees: true };
           }
@@ -269,4 +300,4 @@ export class TransactionProcessor {
 
     return { updatedTrees: false };
   }
-} 
+}

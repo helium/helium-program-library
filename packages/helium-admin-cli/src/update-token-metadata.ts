@@ -5,10 +5,10 @@ import {
   Metadata,
   PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID
 } from '@metaplex-foundation/mpl-token-metadata'
-import Squads from '@sqds/sdk';
+import * as multisig from '@sqds/multisig';
 import os from 'os';
 import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
+import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -22,28 +22,23 @@ export async function run(args: any = process.argv) {
       default: 'http://127.0.0.1:8899',
       describe: 'The solana url',
     },
-    token: {
+    mint: {
       required: true,
       type: 'string',
       describe: 'Token address to update metadata for',
     },
     uri: {
-      required: true,
       type: 'string',
       describe: 'The new metadata URI',
-    },
-    executeTransaction: {
-      type: 'boolean',
     },
     multisig: {
       type: 'string',
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
     },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
+    newAuthority: {
+      type: 'string',
+      describe: 'New authority for the token',
     },
   });
 
@@ -54,16 +49,17 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const walletKP = loadKeypair(argv.wallet);
   const wallet = new anchor.Wallet(walletKP);
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
   let authority = wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
   }
   try {
-    const tokenAddress = new PublicKey(argv.token);
+    const tokenAddress = new PublicKey(argv.mint);
 
     // Find the metadata PDA for the token
     const [metadataAddress] = PublicKey.findProgramAddressSync(
@@ -93,13 +89,13 @@ export async function run(args: any = process.argv) {
             data: {
               name: metadataAccount.data.name,
               symbol: metadataAccount.data.symbol,
-              uri: argv.uri,
+              uri: argv.uri ? argv.uri : metadataAccount.data.uri,
               sellerFeeBasisPoints: metadataAccount.data.sellerFeeBasisPoints,
               creators: metadataAccount.data.creators || null,
               collection: null,
               uses: null
             },
-            updateAuthority: metadataAccount.updateAuthority,
+            updateAuthority: argv.newAuthority ? new PublicKey(argv.newAuthority) : metadataAccount.updateAuthority,
             primarySaleHappened: metadataAccount.primarySaleHappened,
             isMutable: metadataAccount.isMutable
           }
@@ -107,13 +103,10 @@ export async function run(args: any = process.argv) {
       )
     ];
 
-    await sendInstructionsOrSquads({
+    await sendInstructionsOrSquadsV4({
       provider,
       instructions: updateInstructions,
-      executeTransaction: argv.executeTransaction,
-      squads,
-      multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-      authorityIndex: argv.authorityIndex,
+      multisig: multisigPda!,
       signers: [],
     });
 

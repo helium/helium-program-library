@@ -34,3 +34,4 @@ bubblegum-cpi = { workspace = true }
 account-compression-cpi = { workspace = true }
 lazy-distributor = { workspace = true }
 tuktuk-program = { workspace = true }
+clockwork-cron = { workspace = true }

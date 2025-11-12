@@ -3,6 +3,54 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.6](https://github.com/helium/helium-program-libary/compare/v0.11.5...v0.11.6) (2025-10-27)
+
+**Note:** Version bump only for package @helium/fanout-sdk
+
+
+
+
+
+## [0.11.5](https://github.com/helium/helium-program-libary/compare/v0.11.4...v0.11.5) (2025-10-13)
+
+**Note:** Version bump only for package @helium/fanout-sdk
+
+
+
+
+
+## [0.11.4](https://github.com/helium/helium-program-libary/compare/v0.11.3...v0.11.4) (2025-09-22)
+
+**Note:** Version bump only for package @helium/fanout-sdk
+
+
+
+
+
+## [0.11.3](https://github.com/helium/helium-program-libary/compare/v0.11.2...v0.11.3) (2025-09-18)
+
+**Note:** Version bump only for package @helium/fanout-sdk
+
+
+
+
+
+## [0.11.2](https://github.com/helium/helium-program-libary/compare/v0.11.1...v0.11.2) (2025-09-18)
+
+**Note:** Version bump only for package @helium/fanout-sdk
+
+
+
+
+
+## [0.11.1](https://github.com/helium/helium-program-libary/compare/v0.11.0...v0.11.1) (2025-09-18)
+
+**Note:** Version bump only for package @helium/fanout-sdk
+
+
+
+
+
 # [0.11.0](https://github.com/helium/helium-program-libary/compare/v0.10.35...v0.11.0) (2025-09-17)
 
 **Note:** Version bump only for package @helium/fanout-sdk

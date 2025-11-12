@@ -142,24 +142,24 @@ export const formPositionClaims = async ({
 
         // Chunk size is 128 because we want each chunk to correspond to the 128 bits in bitmap
         for (const chunk of chunks(epochsToClaim, 128)) {
-          const daoEpochInfoKeys = chunk.map(
+          const subDaoEpochInfoKeys = chunk.map(
             (epoch) =>
-              daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
+              subDaoEpochInfoKey(subDao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
           );
-          const daoEpochInfoAccounts = await getMultipleAccounts({
+          const subDaoEpochInfoAccounts = await getMultipleAccounts({
             connection: connNoCache,
-            keys: daoEpochInfoKeys,
+            keys: subDaoEpochInfoKeys,
           });
           bucketedEpochsByPosition[position.pubkey.toBase58()].push(
             await Promise.all(
               chunk.map((epoch, index) => {
-                const daoEpochInfoAccount = daoEpochInfoAccounts[index];
-                const daoEpochInfoData = hsdProgram.coder.accounts.decode(
-                  "daoEpochInfoV0",
-                  daoEpochInfoAccount?.data
+                const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
+                const subDaoEpochInfoData = hsdProgram.coder.accounts.decode(
+                  "subDaoEpochInfoV0",
+                  subDaoEpochInfoAccount?.data
                 );
 
-                if (daoEpochInfoData.delegationRewardsIssued.gt(new BN(0))) {
+                if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
                   return hsdProgram.methods
                     .claimRewardsV1({
                       epoch,

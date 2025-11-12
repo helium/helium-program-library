@@ -38,14 +38,14 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name          | Mutability | Signer | Docs |
-| ------------- | ---------- | ------ | ---- |
-| mini_fanout   | immut      | no     |      |
-| task_queue    | immut      | no     |      |
-| next_task     | immut      | no     |      |
-| next_pre_task | immut      | no     |      |
-| token_account | immut      | no     |      |
-| token_program | immut      | no     |      |
+| Name               | Mutability | Signer | Docs                                                                                                                                                   |
+| ------------------ | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| mini_fanout        | immut      | no     |                                                                                                                                                        |
+| task_queue         | immut      | no     |                                                                                                                                                        |
+| next_pre_task      | immut      | no     |                                                                                                                                                        |
+| token_account      | immut      | no     |                                                                                                                                                        |
+| token_program      | immut      | no     |                                                                                                                                                        |
+| instruction_sysvar | immut      | no     | the supplied Sysvar could be anything else. The Instruction Sysvar has not been implemented in the Anchor framework yet, so this is the safe approach. |
 
 #### Args
 
@@ -163,10 +163,6 @@ undefined
 undefined
 
 ### TaskQueueV0
-
-undefined
-
-### TaskV0
 
 undefined
 
@@ -292,22 +288,6 @@ undefined
 | trigger      | [object Object] |
 | transaction  | [object Object] |
 | crank_reward | u64             |
-| free_tasks   | u8              |
-| description  | string          |
-
-### TaskV0
-
-| Field        | Type            |
-| ------------ | --------------- |
-| task_queue   | pubkey          |
-| rent_amount  | u64             |
-| crank_reward | u64             |
-| id           | u16             |
-| trigger      | [object Object] |
-| rent_refund  | pubkey          |
-| transaction  | [object Object] |
-| queued_at    | i64             |
-| bump_seed    | u8              |
 | free_tasks   | u8              |
 | description  | string          |
 

@@ -11,6 +11,7 @@ import {
   IdlTypeDefTyStruct,
 } from "@coral-xyz/anchor/dist/cjs/idl";
 import { omit, pick } from "lodash";
+import { syncTableWithViews } from "./syncTableWithViews";
 
 const TypeMap = new Map<string, any>([
   ["string", DataTypes.STRING],
@@ -97,7 +98,14 @@ export const defineIdlModels = async ({
       });
 
       if (accConfig.schema) {
-        await sequelize.createSchema(accConfig.schema, {});
+        if (
+          !(await sequelize.query(
+            `SELECT 1 FROM pg_namespace WHERE nspname = '${accConfig.schema}'`,
+            { type: QueryTypes.SELECT }
+          ))
+        ) {
+          await sequelize.createSchema(accConfig.schema, {});
+        }
       }
 
       const model = sequelize.define(
@@ -108,8 +116,13 @@ export const defineIdlModels = async ({
             primaryKey: true,
           },
           ...omit(schema[acc.name] || {}, ["indexes"]),
-          refreshed_at: {
+          refreshedAt: {
             type: DataTypes.DATE,
+          },
+          lastBlock: {
+            type: DataTypes.DECIMAL.UNSIGNED,
+            allowNull: false,
+            defaultValue: 0,
           },
         },
         {
@@ -148,12 +161,40 @@ export const defineIdlModels = async ({
         )
       ).map((x: any) => x.indexname);
 
+      const blockIndexName = `idx_${underscore(
+        accConfig.table || acc.name
+      )}_last_block`;
+      const hasblockIndex = existingIndexes.includes(blockIndexName);
+
       if (
         !existingColumns.length ||
         !columns.every((col) => existingColumns.includes(col)) ||
-        !indexes.every((idx) => existingIndexes.includes(idx.name))
+        !indexes.every((idx) => existingIndexes.includes(idx.name)) ||
+        !hasblockIndex
       ) {
-        await model.sync({ alter: true });
+        const tableName = underscore(accConfig.table || acc.name);
+        const schemaName = underscore(accConfig.schema || "public");
+
+        await syncTableWithViews(sequelize, tableName, schemaName, async () => {
+          await model.sync({ alter: true });
+        });
+
+        if (!hasblockIndex) {
+          try {
+            await sequelize.query(`
+              CREATE INDEX CONCURRENTLY IF NOT EXISTS ${blockIndexName}
+              ON ${underscore(accConfig.schema || "public")}.${underscore(
+              accConfig.table || acc.name
+            )}(last_block)
+            `);
+            console.log(`Created index: ${blockIndexName}`);
+          } catch (indexError) {
+            console.warn(
+              `Failed to create index ${blockIndexName}:`,
+              indexError
+            );
+          }
+        }
       }
     }
   }

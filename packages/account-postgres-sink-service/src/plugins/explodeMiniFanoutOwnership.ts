@@ -1,13 +1,25 @@
-import BN from "bn.js";
-import { cellToLatLng } from "h3-js";
 import { camelize } from "inflection";
 import _omit from "lodash/omit";
 import { DataTypes, Model, QueryTypes } from "sequelize";
 import { IPlugin } from "../types";
 import { database } from "../utils/database";
-import { MapboxService } from "../utils/mapboxService";
 import { PublicKey } from "@solana/web3.js";
+import { syncTableWithViews } from "../utils/syncTableWithViews";
 
+type MiniFanoutShare = {
+  wallet: string;
+  delegate: string;
+  share: Share;
+  totalDust: number;
+  totalOwed: number;
+};
+
+type Share = {
+  share?: { amount: number };
+  fixed?: { amount: number };
+};
+
+// Models are declared but not initialized at module load
 export class RewardsRecipient extends Model {
   declare asset: string;
   // For fanouts, the owner and delegate/destination may be different.
@@ -16,168 +28,27 @@ export class RewardsRecipient extends Model {
   declare destination: string;
   declare entityKey: string;
   declare encodedEntityKey: string;
-  declare shares: number
-  declare totalShares: number
-  declare fixedAmount: number
-  declare type: 'direct' | 'fanout'
-}
-
-RewardsRecipient.init(
-  {
-    asset: {
-      type: DataTypes.STRING,
-      primaryKey: true,
-    },
-    owner: {
-      type: DataTypes.STRING,
-      primaryKey: true,
-    },
-    destination: {
-      type: DataTypes.STRING,
-      primaryKey: true,
-    },
-    entityKey: {
-      type: "BYTEA",
-      allowNull: false,
-      field: "entity_key",
-    },
-    encodedEntityKey: {
-      type: "TEXT",
-      allowNull: true,
-      field: "encoded_entity_key",
-    },
-    keySerialization: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    shares: {
-      type: DataTypes.DECIMAL.UNSIGNED,
-      primaryKey: true,
-    },
-    totalShares: {
-      type: DataTypes.DECIMAL.UNSIGNED,
-      primaryKey: true,
-    },
-    fixedAmount: {
-      type: DataTypes.DECIMAL.UNSIGNED,
-      primaryKey: true,
-    },
-    type: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-  },
-  {
-    sequelize: database,
-    modelName: "rewards_recipients",
-    tableName: "rewards_recipients",
-    underscored: true,
-    timestamps: true,
-    indexes: [
-      {
-        fields: ["asset"],
-      },
-      {
-        fields: ["destination"],
-      },
-      {
-        fields: ["owner"],
-      },
-      {
-        fields: ["type"],
-      },
-    ],
-  }
-);
-
-type MiniFanoutShare = {
-  wallet: string,
-  delegate: string,
-  share: Share,
-  totalDust: number,
-  totalOwed: number,
-}
-
-type Share = {
-  share?: { amount: number },
-  fixed?: { amount: number },
+  declare shares: number;
+  declare totalShares: number;
+  declare fixedAmount: number;
+  declare type: "direct" | "fanout";
 }
 
 export class Recipient extends Model {
-  declare address: string
-  declare asset: string
-  declare destination: string
-  declare lazyDistributor: string
+  declare address: string;
+  declare asset: string;
+  declare destination: string;
+  declare lazyDistributor: string;
 }
-
-Recipient.init(
-  {
-    address: {
-      type: DataTypes.STRING,
-      primaryKey: true,
-    },
-    asset: {
-      type: DataTypes.STRING,
-    },
-    destination: {
-      type: DataTypes.STRING,
-    },
-    lazyDistributor: {
-      type: DataTypes.STRING,
-    },
-  },
-  {
-    sequelize: database,
-    modelName: "recipients",
-    tableName: "recipients",
-    underscored: true,
-    timestamps: false,
-  }
-)
 
 export class KeyToAsset extends Model {
-  declare address: string
-  declare asset: string
-  declare dao: string
-  declare entityKey: Buffer
-  declare keySerialization: string
-  declare encodedEntityKey: string
+  declare address: string;
+  declare asset: string;
+  declare dao: string;
+  declare entityKey: Buffer;
+  declare keySerialization: string;
+  declare encodedEntityKey: string;
 }
-
-KeyToAsset.init(
-  {
-    address: {
-      type: DataTypes.STRING,
-      primaryKey: true,
-    },
-    asset: {
-      type: DataTypes.STRING,
-    },
-    dao: {
-      type: DataTypes.STRING,
-    },
-    keySerialization: {
-      type: DataTypes.STRING,
-    },
-    entityKey: {
-      type: "BYTEA",
-      allowNull: false,
-      field: "entity_key",
-    },
-    encodedEntityKey: {
-      type: "TEXT",
-      allowNull: true,
-      field: "encoded_entity_key",
-    },
-  },
-  {
-    sequelize: database,
-    modelName: "key_to_assets",
-    tableName: "key_to_assets",
-    underscored: true,
-    timestamps: false,
-  }
-)
 
 export class MiniFanout extends Model {
   declare owner: string;
@@ -198,93 +69,257 @@ export class MiniFanout extends Model {
   declare createdAt: Date;
 }
 
-MiniFanout.init(
-  {
-    address: {
-      type: DataTypes.STRING,
-      primaryKey: true,
-    },
-    owner: {
-      type: DataTypes.STRING,
-    },
-    namespace: {
-      type: DataTypes.STRING,
-    },
-    mint: {
-      type: DataTypes.STRING,
-    },
-    tokenAccount: {
-      type: DataTypes.STRING,
-    },
-    taskQueue: {
-      type: DataTypes.STRING,
-    },
-    nextTask: {
-      type: DataTypes.STRING,
-    },
-    rentRefund: {
-      type: DataTypes.STRING,
-    },
-    bump: {
-      type: DataTypes.INTEGER,
-    },
-    schedule: {
-      type: DataTypes.STRING,
-    },
-    queueAuthorityBump: {
-      type: DataTypes.INTEGER,
-    },
-    shares: {
-      type: DataTypes.ARRAY(DataTypes.JSONB),
-    },
-    seed: {
-      type: DataTypes.BLOB,
-    },
-    nextPreTask: {
-      type: DataTypes.STRING,
-    },
-    preTask: {
-      type: DataTypes.JSONB,
-    },
-    refreshedAt: {
-      type: DataTypes.DATE,
-    },
-    createdAt: {
-      type: DataTypes.DATE,
-    },
-  },
-  {
-    sequelize: database,
-    modelName: "mini_fanouts",
-    tableName: "mini_fanouts",
-    underscored: true,
-    timestamps: false,
-  }
-);
+// Flag to track if models have been initialized
+let modelsInitialized = false;
 
-export const HNT_LAZY_DISTRIBUTOR = "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq"
+export function initializeModels() {
+  if (modelsInitialized) return;
 
-export async function handleMiniFanout(asset: string, account: { [key: string]: any }, transaction: any) {
-  const prevAccount = await MiniFanout.findByPk(account.address, { transaction })
-  const oldShares = prevAccount?.shares || []
-  const newShares = (account.shares || []) as MiniFanoutShare[]
+  RewardsRecipient.init(
+    {
+      asset: {
+        type: DataTypes.STRING,
+        primaryKey: true,
+      },
+      owner: {
+        type: DataTypes.STRING,
+        primaryKey: true,
+      },
+      destination: {
+        type: DataTypes.STRING,
+        primaryKey: true,
+      },
+      entityKey: {
+        type: "BYTEA",
+        allowNull: false,
+        field: "entity_key",
+      },
+      encodedEntityKey: {
+        type: "TEXT",
+        allowNull: true,
+        field: "encoded_entity_key",
+      },
+      keySerialization: {
+        type: "TEXT",
+        allowNull: false,
+      },
+      shares: {
+        type: DataTypes.DECIMAL.UNSIGNED,
+        primaryKey: true,
+      },
+      totalShares: {
+        type: DataTypes.DECIMAL.UNSIGNED,
+        primaryKey: true,
+      },
+      fixedAmount: {
+        type: DataTypes.DECIMAL.UNSIGNED,
+        primaryKey: true,
+      },
+      type: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      lastBlock: {
+        type: DataTypes.DECIMAL.UNSIGNED,
+        allowNull: false,
+        defaultValue: 0,
+      },
+    },
+    {
+      sequelize: database,
+      modelName: "rewards_recipients",
+      tableName: "rewards_recipients",
+      underscored: true,
+      timestamps: true,
+      indexes: [
+        {
+          fields: ["destination"],
+        },
+        {
+          fields: ["owner"],
+        },
+        {
+          fields: ["last_block"],
+        },
+        {
+          fields: ["encoded_entity_key"],
+        },
+        {
+          fields: ["asset", "last_block"],
+        },
+        {
+          fields: ["type", "last_block"],
+        },
+      ],
+    }
+  );
+
+  Recipient.init(
+    {
+      address: {
+        type: DataTypes.STRING,
+        primaryKey: true,
+      },
+      asset: {
+        type: DataTypes.STRING,
+      },
+      destination: {
+        type: DataTypes.STRING,
+      },
+      lazyDistributor: {
+        type: DataTypes.STRING,
+      },
+    },
+    {
+      sequelize: database,
+      modelName: "recipients",
+      tableName: "recipients",
+      underscored: true,
+      timestamps: false,
+    }
+  );
+
+  KeyToAsset.init(
+    {
+      address: {
+        type: DataTypes.STRING,
+        primaryKey: true,
+      },
+      asset: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      dao: {
+        type: DataTypes.STRING,
+      },
+      keySerialization: {
+        type: DataTypes.JSONB,
+      },
+      entityKey: {
+        type: "BYTEA",
+        allowNull: false,
+        field: "entity_key",
+      },
+      encodedEntityKey: {
+        type: "TEXT",
+        allowNull: true,
+        field: "encoded_entity_key",
+      },
+    },
+    {
+      sequelize: database,
+      modelName: "key_to_assets",
+      tableName: "key_to_assets",
+      underscored: true,
+      timestamps: false,
+    }
+  );
+
+  MiniFanout.init(
+    {
+      address: {
+        type: DataTypes.STRING,
+        primaryKey: true,
+      },
+      owner: {
+        type: DataTypes.STRING,
+      },
+      namespace: {
+        type: DataTypes.STRING,
+      },
+      mint: {
+        type: DataTypes.STRING,
+      },
+      tokenAccount: {
+        type: DataTypes.STRING,
+      },
+      taskQueue: {
+        type: DataTypes.STRING,
+      },
+      nextTask: {
+        type: DataTypes.STRING,
+      },
+      rentRefund: {
+        type: DataTypes.STRING,
+      },
+      bump: {
+        type: DataTypes.INTEGER,
+      },
+      schedule: {
+        type: DataTypes.STRING,
+      },
+      queueAuthorityBump: {
+        type: DataTypes.INTEGER,
+      },
+      shares: {
+        type: DataTypes.ARRAY(DataTypes.JSONB),
+      },
+      seed: {
+        type: DataTypes.BLOB,
+      },
+      nextPreTask: {
+        type: DataTypes.STRING,
+      },
+      preTask: {
+        type: DataTypes.JSONB,
+      },
+      refreshedAt: {
+        type: DataTypes.DATE,
+      },
+      createdAt: {
+        type: DataTypes.DATE,
+      },
+    },
+    {
+      sequelize: database,
+      modelName: "mini_fanouts",
+      tableName: "mini_fanouts",
+      underscored: true,
+      timestamps: false,
+    }
+  );
+
+  modelsInitialized = true;
+}
+
+export const HNT_LAZY_DISTRIBUTOR =
+  "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq";
+
+export async function handleMiniFanout(
+  asset: string,
+  account: { [key: string]: any },
+  transaction: any,
+  lastBlock?: number
+) {
+  const prevAccount = await MiniFanout.findByPk(account.address, {
+    transaction,
+  });
+  const oldShares = prevAccount?.shares || [];
+  const newShares = (account.shares || []) as MiniFanoutShare[];
 
   function getEffectiveDestination(share: MiniFanoutShare) {
-    return (!share.delegate || share.delegate === PublicKey.default.toBase58()) ? share.wallet : share.delegate
+    return !share.delegate || share.delegate === PublicKey.default.toBase58()
+      ? share.wallet
+      : share.delegate;
   }
 
   function getShareKey(share: MiniFanoutShare) {
-    return `${asset}-${getEffectiveDestination(share)}-${JSON.stringify(share.share)}`
+    return `${asset}-${getEffectiveDestination(share)}-${JSON.stringify(
+      share.share
+    )}`;
   }
   // Create a map of wallet+delegate to share for easy lookup
   const oldSharesMap = new Map(
-    oldShares.map(share => [getShareKey(share), share])
-  )
+    oldShares.map((share) => [getShareKey(share), share])
+  );
   const newSharesMap = new Map(
-    newShares.map(share => [getShareKey(share), share])
-  )
+    newShares.map((share) => [getShareKey(share), share])
+  );
 
-  const totalShares = newShares.reduce((acc, share) => acc + (share.share?.share?.amount || 0), 0)
+  const totalShares = newShares.reduce(
+    (acc, share) => acc + (share.share?.share?.amount || 0),
+    0
+  );
 
   // Handle deletions - remove shares that exist in old but not in new
   for (const [key, oldShare] of oldSharesMap) {
@@ -295,8 +330,8 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
           asset,
           shares: oldShare.share?.share?.amount || 0,
         },
-        transaction
-      })
+        transaction,
+      });
     }
   }
 
@@ -304,11 +339,11 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
   for (const [key, newShare] of newSharesMap) {
     const kta = await KeyToAsset.findOne({
       where: {
-        dao: 'BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie',
+        dao: "BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie",
         asset: asset,
       },
-      transaction
-    })
+      transaction,
+    });
 
     const toCreate = {
       asset,
@@ -320,20 +355,22 @@ export async function handleMiniFanout(asset: string, account: { [key: string]: 
       entityKey: kta?.entityKey,
       encodedEntityKey: kta?.encodedEntityKey,
       keySerialization: kta?.keySerialization,
-      type: 'fanout'
-    }
+      type: "fanout",
+      lastBlock,
+    };
 
-    await RewardsRecipient.upsert(toCreate, { transaction })
+    await RewardsRecipient.upsert(toCreate, { transaction });
   }
 
-  return account
+  return account;
 }
 
 export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
   const name = "ExplodeMiniFanoutOwnership";
   const init = async (config: { [key: string]: any }) => {
-    const updateOnDuplicateFields: string[] = [];
+    initializeModels();
 
+    const updateOnDuplicateFields: string[] = [];
     const existingColumns = (
       await database.query(
         `
@@ -353,34 +390,49 @@ export const ExplodeMiniFanoutOwnershipPlugin = ((): IPlugin => {
       !existingColumns.length ||
       !columns.every((col) => existingColumns.includes(col))
     ) {
-      await RewardsRecipient.sync({ alter: true });
+      console.log("Syncing rewards_recipients table");
+      await syncTableWithViews(
+        database,
+        "rewards_recipients",
+        "public",
+        async () => {
+          await RewardsRecipient.sync({ alter: true });
+        }
+      );
     }
 
-    const addFields = () => { };
+    const addFields = () => {};
 
     const processAccount = async (
       account: { [key: string]: any },
-      transaction?: any
+      transaction?: any,
+      lastBlock?: number
     ) => {
       try {
-        const asset = account.preTask?.remoteV0?.url?.replace("https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/", "").replace("https://hnt-rewards.oracle.test-helium.com/v1/tuktuk/asset/", "")
+        const asset = account.preTask?.remoteV0?.url
+          ?.replace("https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/", "")
+          .replace(
+            "https://hnt-rewards.oracle.test-helium.com/v1/tuktuk/asset/",
+            ""
+          );
         if (!asset) {
-          return account
+          return account;
         }
         const recipient = await Recipient.findOne({
           where: {
             destination: account.address,
             asset,
-            lazyDistributor: HNT_LAZY_DISTRIBUTOR
-          }
-        })
+            lazyDistributor: HNT_LAZY_DISTRIBUTOR,
+          },
+          transaction,
+        });
         if (!recipient) {
-          return account
+          return account;
         }
-        return handleMiniFanout(asset, account, transaction)
+        return handleMiniFanout(asset, account, transaction, lastBlock);
       } catch (err) {
-        console.error("Error exploding mini fanout ownership", err)
-        throw err
+        console.error("Error exploding mini fanout ownership", err);
+        throw err;
       }
     };
 

@@ -99,7 +99,7 @@ export async function createAtaAndTransfer(
 
   try {
     if (instructions.length > 0)
-      await provider.sendAndConfirm(transferIx, undefined, confirmOptions);
+      await provider.sendAndConfirm(transferIx, undefined, { skipPreflight: true, ...confirmOptions });
   } catch (e: any) {
     console.log("Error", e, e.logs);
     if (e.logs) {

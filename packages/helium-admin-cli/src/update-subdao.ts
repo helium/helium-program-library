@@ -13,14 +13,13 @@ import {
   subDaoKey,
 } from '@helium/helium-sub-daos-sdk';
 import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import { BN } from 'bn.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
 import {
   loadKeypair,
   parseEmissionsSchedule,
-  sendInstructionsOrSquads,
+  sendInstructionsOrSquadsV4,
 } from './utils';
 
 export async function run(args: any = process.argv) {
@@ -63,18 +62,10 @@ export async function run(args: any = process.argv) {
       default: null,
       type: 'string',
     },
-    executeTransaction: {
-      type: 'boolean',
-    },
     multisig: {
       type: 'string',
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
-    },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
     },
     switchboardNetwork: {
       type: 'string',
@@ -143,45 +134,7 @@ export async function run(args: any = process.argv) {
         .accountsPartial({
           rewardableEntityConfig: config,
           authority: configAcc.authority,
-        })
-        .instruction()
-    );
-
-    // update dnt cb auth
-    const dntCircuitBreaker = mintWindowedBreakerKey(subDaoAcc.dntMint)[0];
-    const dntCbAcc = await cbProgram.account.mintWindowedCircuitBreakerV0.fetch(
-      dntCircuitBreaker
-    );
-    instructions.push(
-      await cbProgram.methods
-        .updateMintWindowedBreakerV0({
-          newAuthority: new PublicKey(argv.newAuthority),
-          config: null,
-        })
-        .accountsPartial({
-          circuitBreaker: dntCircuitBreaker,
-          authority: dntCbAcc.authority,
-        })
-        .instruction()
-    );
-
-    // update treasury cb auth
-    const treasuryCircuitBreaker = accountWindowedBreakerKey(
-      subDaoAcc.treasury
-    )[0];
-    const treasuryCbAcc =
-      await cbProgram.account.accountWindowedCircuitBreakerV0.fetch(
-        treasuryCircuitBreaker
-      );
-    instructions.push(
-      await cbProgram.methods
-        .updateAccountWindowedBreakerV0({
-          newAuthority: new PublicKey(argv.newAuthority),
-          config: null,
-        })
-        .accountsPartial({
-          circuitBreaker: treasuryCircuitBreaker,
-          authority: treasuryCbAcc.authority,
+          payer: configAcc.authority,
         })
         .instruction()
     );
@@ -216,16 +169,10 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }

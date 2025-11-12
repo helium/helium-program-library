@@ -52,6 +52,7 @@ export async function initializeWelcomePack({
   } = await proofArgsAndAccounts({
     connection: program.provider.connection,
     assetId,
+    assetEndpoint,
     ...rest,
   });
 

@@ -105,7 +105,6 @@ export class MobileHotspotInfo extends WithRes8LatLgn {
   declare is_active: boolean;
   declare device_type: string;
   declare created_at: Date;
-
 }
 MobileHotspotInfo.init(
   {

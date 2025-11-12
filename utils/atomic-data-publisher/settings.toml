@@ -1,0 +1,39 @@
+# ===================================
+# Static Configuration
+# ===================================
+# This file defines polling jobs and required database tables.
+# All other settings (database connection, ingestor, logging, signing, service params)
+# must be provided via environment variables.
+
+# Database tables required for operation
+[database]
+required_tables = [
+  "asset_owners",
+  "key_to_assets",
+  "recipients",
+  "welcome_packs",
+  "rewards_recipients",
+  "mini_fanouts"
+]
+
+# Polling job definitions
+[[service.polling_jobs]]
+name = "atomic_mobile_hotspots"
+query_name = "construct_atomic_hotspots"
+parameters = { change_type = "mobile_hotspot", hotspot_type = "mobile" }
+
+[[service.polling_jobs]]
+name = "atomic_iot_hotspots"
+query_name = "construct_atomic_hotspots"
+parameters = { change_type = "iot_hotspot", hotspot_type = "iot" }
+
+[[service.polling_jobs]]
+name = "entity_ownership_changes"
+query_name = "construct_entity_ownership_changes"
+parameters = { change_type = "entity_ownership" }
+
+[[service.polling_jobs]]
+name = "entity_reward_destination_changes"
+query_name = "construct_entity_reward_destination_changes"
+parameters = { change_type = "entity_reward_destination" }
+

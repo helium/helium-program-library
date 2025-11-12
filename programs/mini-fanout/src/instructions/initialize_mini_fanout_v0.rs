@@ -10,7 +10,7 @@ use tuktuk_program::{TaskQueueV0, TransactionSourceV0};
 
 use crate::{errors::ErrorCode, state::*};
 
-pub const MAX_SHARES: usize = 7;
+pub const MAX_SHARES: usize = 6;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitializeMiniFanoutArgsV0 {
@@ -58,6 +58,7 @@ pub struct InitializeMiniFanoutV0<'info> {
   /// CHECK: Via seeds
   #[account(
     seeds = [b"queue_authority"],
+    // This is the canonical bump for this program id, saves compute hardcoding it.
     bump = 254,
   )]
   pub queue_authority: UncheckedAccount<'info>,
@@ -82,13 +83,17 @@ impl MiniFanoutV0 {
     size += 4 + args.shares.len() * MiniFanoutShareV0::size();
     // seed: Vec<u8> (4 bytes len + seed bytes)
     size += 4 + args.seed.len();
+    // Option<TransactionSourceV0> and enum in TransactionSourceV0
+    size += 2;
     if let Some(pre_task) = &args.pre_task {
       match pre_task {
         TransactionSourceV0::CompiledV0(compiled) => {
           size += 4
             + 3
             + 4
-            + 32 * compiled.instructions.len()
+            + 32 * compiled.accounts.len()
+            + 1 // option
+            + 4 // Vec<>
             + compiled
               .instructions
               .iter()
@@ -108,20 +113,11 @@ impl MiniFanoutV0 {
 impl MiniFanoutShareV0 {
   pub fn size() -> usize {
     // wallet: Pubkey (32)
-    // shares: u32 (4)
+    // shares: 1 enum + 8 u64
     // total_dust: u64 (8)
     // total_owed: u64 (8)
     // delegate: Pubkey (32)
-    32 + 4 + 8 + 8 + 32
-  }
-}
-
-impl UserMiniFanoutsV0 {
-  pub fn size() -> usize {
-    // next_id: u32 (4)
-    // owner: Pubkey (32)
-    // bump_seed: u8 (1)
-    4 + 32 + 1 + 68
+    32 + 1 + 8 + 8 + 8 + 32
   }
 }
 
@@ -145,7 +141,7 @@ pub fn handler(
     task_queue: ctx.accounts.task_queue.key(),
     mint: ctx.accounts.mint.key(),
     token_account: ctx.accounts.token_account.key(),
-    next_task: crate::ID,
+    next_task: mini_fanout.key(),
     rent_refund: ctx.accounts.payer.key(),
     bump: ctx.bumps.mini_fanout,
     schedule: args.schedule,
@@ -161,7 +157,7 @@ pub fn handler(
         total_owed: 0,
       })
       .collect(),
-    next_pre_task: crate::ID,
+    next_pre_task: mini_fanout.key(),
     pre_task: args.pre_task,
   });
 

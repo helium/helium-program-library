@@ -56,14 +56,14 @@ pub struct ClaimWelcomePackV0<'info> {
     mut,
     // If rent_refund is Pubkey::default, that indicates we want to send the asset to the claimer
     // otherwise send to the rent_refund
-    constraint = rent_refund.key() == welcome_pack.rent_refund || (welcome_pack.rent_refund == Pubkey::default() && rent_refund.key() == claimer.key()) @ ErrorCode::InvalidRentRefund
+    constraint = (welcome_pack.rent_refund != Pubkey::default() && rent_refund.key() == welcome_pack.rent_refund) || (welcome_pack.rent_refund == Pubkey::default() && rent_refund.key() == claimer.key()) @ ErrorCode::InvalidRentRefund
   )]
   pub rent_refund: AccountInfo<'info>,
   /// CHECK: by constraint
   #[account(
     // If asset_return_address is Pubkey::default, that indicates we want to send the asset to the claimer
     // otherwise send to the asset_return_address
-    constraint = asset_return_address.key() == welcome_pack.asset_return_address || (welcome_pack.asset_return_address == Pubkey::default() && asset_return_address.key() == claimer.key()) @ ErrorCode::InvalidAssetReturnAddress
+    constraint =  (welcome_pack.asset_return_address != Pubkey::default() && asset_return_address.key() == welcome_pack.asset_return_address) || (welcome_pack.asset_return_address == Pubkey::default() && asset_return_address.key() == claimer.key()) @ ErrorCode::InvalidAssetReturnAddress
   )]
   pub asset_return_address: AccountInfo<'info>,
   /// CHECK: Just needed for setting the ownwer of the mini fanout
@@ -125,12 +125,6 @@ pub fn handler<'info>(
     Clock::get()?.unix_timestamp,
     ErrorCode::ClaimApprovalExpired
   );
-  let mut claim_approval_bytes = Vec::with_capacity(8 + 32);
-  ClaimApprovalV0 {
-    welcome_pack: ctx.accounts.welcome_pack.key(),
-    expiration_timestamp: args.approval_expiration_timestamp,
-  }
-  .serialize(&mut claim_approval_bytes)?;
   let msg = format!(
     "Approve invite {} expiring {}",
     ctx.accounts.welcome_pack.unique_id, args.approval_expiration_timestamp
@@ -289,12 +283,12 @@ pub fn handler<'info>(
         ScheduleTaskV0 {
           payer: ctx.accounts.claimer.to_account_info(),
           mini_fanout: ctx.accounts.rewards_recipient.to_account_info(),
-          next_task: ctx.accounts.mini_fanout_program.to_account_info(),
+          next_task: ctx.accounts.rewards_recipient.to_account_info(),
           queue_authority: ctx.accounts.queue_authority.to_account_info(),
           task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
           task_queue: ctx.accounts.task_queue.to_account_info(),
           task: ctx.accounts.task.to_account_info(),
-          next_pre_task: ctx.accounts.mini_fanout_program.to_account_info(),
+          next_pre_task: ctx.accounts.rewards_recipient.to_account_info(),
           pre_task: ctx.accounts.pre_task.to_account_info(),
           tuktuk_program: ctx.accounts.tuktuk_program.to_account_info(),
           system_program: ctx.accounts.system_program.to_account_info(),
@@ -315,7 +309,7 @@ pub fn handler<'info>(
           to: ctx.accounts.rewards_recipient.to_account_info(),
         },
       ),
-      FANOUT_FUNDING_AMOUNT - ctx.accounts.task.lamports(),
+      FANOUT_FUNDING_AMOUNT.saturating_sub(ctx.accounts.task.lamports()),
     )?;
   }
 

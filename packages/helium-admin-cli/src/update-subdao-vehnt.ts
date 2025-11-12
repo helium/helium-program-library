@@ -1,13 +1,12 @@
 import * as anchor from '@coral-xyz/anchor';
 import { init as initHsd, subDaoKey } from '@helium/helium-sub-daos-sdk';
 import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import Squads from '@sqds/sdk';
 import AWS from 'aws-sdk';
 import { BN } from 'bn.js';
 import os from 'os';
 import { Client } from 'pg';
 import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquads } from './utils';
+import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
 import fs from 'fs';
 
 export async function run(args: any = process.argv) {
@@ -33,18 +32,10 @@ export async function run(args: any = process.argv) {
       required: false,
       describe: 'The name of the entity config',
     },
-    executeTransaction: {
-      type: 'boolean',
-    },
     multisig: {
       type: 'string',
       describe:
         'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
-    },
-    authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
-      default: 1,
     },
     pgUser: {
       default: 'postgres',
@@ -267,16 +258,10 @@ FROM subdao_delegations;
       .instruction()
   );
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
-  await sendInstructionsOrSquads({
+  await sendInstructionsOrSquadsV4({
     provider,
     instructions,
-    executeTransaction: argv.executeTransaction,
-    squads,
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
-    authorityIndex: argv.authorityIndex,
     signers: [],
   });
 }

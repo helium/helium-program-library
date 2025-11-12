@@ -12,6 +12,7 @@ import {
   getConcurrentMerkleTreeAccountSize,
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { PROGRAM_ID as TUKTUK_DCA_ID } from "@helium/tuktuk-dca-sdk";
 import { execSync } from "child_process";
 import { ThresholdType } from "../../packages/circuit-breaker-sdk/src";
 import { makerKey } from "../../packages/helium-entity-manager-sdk/src";
@@ -234,6 +235,10 @@ export async function ensureIdl(path: string, programId: PublicKey) {
 
 export async function ensureDCIdl() {
   await ensureIdl("data_credits", DC_ID);
+}
+
+export async function ensureTuktukDcaIdl() {
+  await ensureIdl("tuktuk_dca", TUKTUK_DCA_ID);
 }
 
 export async function ensureMemIdl() {

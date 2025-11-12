@@ -63,7 +63,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.11.0":
+"@helium/account-fetch-cache@^0.11.6":
   version: 0.0.0-use.local
   resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
   dependencies:
@@ -85,7 +85,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@^0.11.0":
+"@helium/anchor-resolvers@^0.11.6":
   version: 0.0.0-use.local
   resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
   dependencies:
@@ -103,21 +103,21 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@helium/currency-utils@workspace:."
   dependencies:
-    "@helium/spl-utils": ^0.11.0
+    "@helium/spl-utils": ^0.11.6
     "@pythnetwork/hermes-client": ^2.0.0
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
   languageName: unknown
   linkType: soft
 
-"@helium/spl-utils@^0.11.0":
+"@helium/spl-utils@^0.11.6":
   version: 0.0.0-use.local
   resolution: "@helium/spl-utils@workspace:packages/spl-utils"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/account-fetch-cache": ^0.11.0
+    "@helium/account-fetch-cache": ^0.11.6
     "@helium/address": ^4.12.0
-    "@helium/anchor-resolvers": ^0.11.0
+    "@helium/anchor-resolvers": ^0.11.6
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8

@@ -717,6 +717,7 @@ version = "0.0.1"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
+ "bytemuck",
  "chrono",
  "circuit-breaker",
  "clockwork-cron",
@@ -729,6 +730,7 @@ dependencies = [
  "shared-utils",
  "solana-security-txt",
  "solana-zk-sdk",
+ "tuktuk-dca",
  "tuktuk-program",
 ]
 
@@ -981,7 +983,7 @@ dependencies = [
 
 [[package]]
 name = "hpl-crons"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1666,9 +1668,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.8"
+version = "0.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03a862b389f93e68874fbf580b9de08dd02facb9a788ebadaf4a3fd33cf58834"
+checksum = "5407465600fb0548f1442edf71dd20683c6ed326200ace4b1ef0763521bb3b77"
 dependencies = [
  "bitflags",
 ]
@@ -3272,6 +3274,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tuktuk-dca"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "default-env",
+ "pyth-solana-receiver-sdk",
+ "shared-utils",
+ "solana-security-txt",
+ "solana-zk-sdk",
+ "tuktuk-program",
+]
+
+[[package]]
 name = "tuktuk-program"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3444,6 +3461,7 @@ dependencies = [
  "brine-ed25519",
  "bubblegum-cpi",
  "circuit-breaker",
+ "clockwork-cron",
  "default-env",
  "lazy-distributor",
  "mini-fanout",

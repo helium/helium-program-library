@@ -27,6 +27,7 @@ export async function onboardMobileHotspot({
   payer?: PublicKey;
   dcFeePayer?: PublicKey;
   assetId: PublicKey;
+  assetEndpoint?: string;
   location?: BN;
   rewardableEntityConfig: PublicKey;
   deploymentInfo?: MobileDeploymentInfoV0 | null;

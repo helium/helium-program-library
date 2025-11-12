@@ -39,13 +39,15 @@ pub struct ScheduleTaskV0<'info> {
   /// CHECK: Via constraint
   /// Only allow one task to be scheduled at a time
   #[account(
-    constraint = next_task.data_is_empty() || next_task.key() == Pubkey::default() || next_task.key() == crate::ID
+    // Legacy: crate::ID for the next task key. This was abandoned because it cannot be mut
+    constraint = next_task.data_is_empty() || next_task.key() == mini_fanout.key() || next_task.key() == crate::ID
   )]
   pub next_task: UncheckedAccount<'info>,
   /// CHECK: Via constraint
   /// Only allow one task to be scheduled at a time
   #[account(
-    constraint = next_pre_task.data_is_empty() || next_pre_task.key() == Pubkey::default() || next_pre_task.key() == crate::ID
+    // Legacy: crate::ID for the next task key. This was abandoned because it cannot be mut
+    constraint = next_pre_task.data_is_empty() || next_pre_task.key() == mini_fanout.key() || next_pre_task.key() == crate::ID
   )]
   pub next_pre_task: UncheckedAccount<'info>,
   /// CHECK: queue authority
@@ -80,8 +82,8 @@ pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransa
     token_account: mini_fanout.token_account,
     token_program: spl_token::ID,
     task_queue: mini_fanout.task_queue,
-    next_task: mini_fanout.next_task,
     next_pre_task: mini_fanout.next_pre_task,
+    instruction_sysvar: anchor_lang::solana_program::sysvar::instructions::ID,
   }
   .to_account_metas(None);
 

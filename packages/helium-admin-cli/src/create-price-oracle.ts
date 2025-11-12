@@ -4,7 +4,7 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import os from 'os';
 import yargs from 'yargs/yargs';
 import { exists, loadKeypair } from './utils';
-import Squads from '@sqds/sdk';
+import * as multisig from '@sqds/multisig';
 import fs from 'fs';
 import { heliumAddressToSolPublicKey } from '@helium/spl-utils';
 
@@ -57,13 +57,14 @@ export async function run(args: any = process.argv) {
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const program = await init(provider);
 
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: 'finalized',
-  });
   let authority = provider.wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
   }
 
   const priceOracleKeypair = argv.priceOracleKeypair

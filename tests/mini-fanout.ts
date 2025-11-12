@@ -266,6 +266,8 @@ describe("mini-fanout", () => {
       expect(miniFanoutAcc.shares[0].wallet.toBase58()).to.equal(newWallet.publicKey.toBase58())
       expect(miniFanoutAcc.shares[0].share.share!.amount).to.equal(10)
       expect(miniFanoutAcc.shares[0].totalDust.toString()).to.equal(toBN(0, 8).toString())
+      console.log("nextTask", miniFanoutAcc.nextTask.toBase58())
+      console.log("nextPreTask", miniFanoutAcc.nextPreTask.toBase58())
       expect(miniFanoutAcc.nextTask.toBase58()).to.equal(taskKey(taskQueue, nextTask)[0].toBase58())
       expect(miniFanoutAcc.schedule).to.equal("0 0 * * * *")
     })
@@ -386,8 +388,8 @@ describe("mini-fanout", () => {
       ).to.not.be.null
     })
 
-    it("should distribute tokens to 7 wallets in one tx", async () => {
-      const wallets = Array.from({ length: 7 }, () => Keypair.generate())
+    it("should distribute tokens to 6 wallets in one tx", async () => {
+      const wallets = Array.from({ length: 6 }, () => Keypair.generate())
       const shares = wallets.map(w => ({
         wallet: w.publicKey,
         share: { share: { amount: 10 } },
@@ -449,7 +451,7 @@ describe("mini-fanout", () => {
         })
         .rpc()
 
-      await createAtaAndMint(provider, mint, 700000000, fanoutK)
+      await createAtaAndMint(provider, mint, 600000000, fanoutK)
 
       // Wait for cron and run all tasks
       await new Promise(resolve => setTimeout(resolve, 2000))

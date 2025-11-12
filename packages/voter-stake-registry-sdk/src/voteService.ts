@@ -70,6 +70,7 @@ export type Vote = {
   weight: string;
   choice: number;
   choiceName: string;
+  proxyName: string;
 };
 
 export type SubDaoDelegationSplit = {

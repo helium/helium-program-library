@@ -5,7 +5,7 @@ import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
 import _omit from "lodash/omit";
 import pLimit from "p-limit";
-import { Sequelize, Transaction } from "sequelize";
+import { Sequelize, Transaction, Op } from "sequelize";
 import { SOLANA_URL, INTEGRITY_CHECK_REFRESH_THRESHOLD_MS } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig, IInitedPlugin } from "../types";
@@ -69,179 +69,212 @@ export const integrityCheckProgramAccounts = async ({
       snapshotTime.getTime() - INTEGRITY_CHECK_REFRESH_THRESHOLD_MS
     );
 
-    const t = await sequelize.transaction({
-      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-    });
+    let limiter: pLimit.Limit;
+    const program = new anchor.Program(idl, provider);
+    const snapshotSlot = await connection.getSlot("finalized");
+    let blockTime24HoursAgo: number | null = null;
+    let attemptSlot = snapshotSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
+    const SLOTS_INCREMENT = 2;
 
-    try {
-      let limiter: pLimit.Limit;
-      const program = new anchor.Program(idl, provider);
-      const snapshotSlot = await connection.getSlot("finalized");
-      let blockTime24HoursAgo: number | null = null;
-      let attemptSlot = snapshotSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
-      const SLOTS_INCREMENT = 2;
+    for (
+      let blockTimeAttemps = 0;
+      blockTimeAttemps < 10 && !blockTime24HoursAgo;
+      blockTimeAttemps++
+    ) {
+      blockTime24HoursAgo = await getBlockTimeWithRetry({
+        slot: attemptSlot,
+        provider,
+      });
 
-      for (
-        let blockTimeAttemps = 0;
-        blockTimeAttemps < 10 && !blockTime24HoursAgo;
-        blockTimeAttemps++
-      ) {
-        blockTime24HoursAgo = await getBlockTimeWithRetry({
-          slot: attemptSlot,
-          provider,
-        });
-
-        if (blockTime24HoursAgo) {
-          break;
-        }
-
-        if (!blockTime24HoursAgo) {
-          attemptSlot += SLOTS_INCREMENT; // move forward 2 slots each attempt
-          console.log(
-            `Failed to get blocktime for slot ${
-              attemptSlot - SLOTS_INCREMENT
-            }, trying slot ${attemptSlot}`
-          );
-        }
+      if (blockTime24HoursAgo) {
+        break;
       }
 
       if (!blockTime24HoursAgo) {
-        throw new Error("Unable to get any blocktime in the last 24 hours");
+        attemptSlot += SLOTS_INCREMENT; // move forward 2 slots each attempt
+        console.log(
+          `Failed to get blocktime for slot ${
+            attemptSlot - SLOTS_INCREMENT
+          }, trying slot ${attemptSlot}`
+        );
       }
+    }
 
-      const txIdsByAccountId: { [key: string]: string[] } = {};
-      const corrections: {
-        type: string;
-        accountId: string;
-        txSignatures: string[];
-        currentValues: null | { [key: string]: any };
-        newValues: { [key: string]: any };
-      }[] = [];
+    if (!blockTime24HoursAgo) {
+      throw new Error("Unable to get any blocktime in the last 24 hours");
+    }
 
-      const txSignatureChunks = chunks(
-        await getTransactionSignaturesUptoBlockTime({
-          programId,
-          blockTime: blockTime24HoursAgo,
-          provider,
-        }),
-        100
-      );
+    const txIdsByAccountId: { [key: string]: string[] } = {};
+    const corrections: {
+      type: string;
+      accountId: string;
+      txSignatures: string[];
+      currentValues: null | { [key: string]: any };
+      newValues: { [key: string]: any };
+    }[] = [];
 
-      limiter = pLimit(10);
-      const parsedTransactions = (
-        await Promise.all(
-          txSignatureChunks.map((chunk) =>
-            limiter(async () => {
-              await new Promise((resolve) => setTimeout(resolve, 250));
-              return retry(
-                () =>
-                  connection.getParsedTransactions(chunk, {
-                    commitment: "finalized",
-                    maxSupportedTransactionVersion: 0,
-                  }),
-                retryOptions
-              );
-            })
-          )
-        )
-      ).flat();
+    const txSignatureChunks = chunks(
+      await getTransactionSignaturesUptoBlockTime({
+        programId,
+        blockTime: blockTime24HoursAgo,
+        provider,
+      }),
+      100
+    );
 
-      const uniqueWritableAccounts = new Set<string>();
-      for (const parsed of parsedTransactions) {
-        if (!parsed) continue;
-        const signatures = parsed.transaction.signatures;
-        parsed.transaction.message.accountKeys.forEach((acc) => {
-          if (acc.writable) {
-            const pubkey = acc.pubkey.toBase58();
-            uniqueWritableAccounts.add(pubkey);
-            txIdsByAccountId[pubkey] = [
-              ...signatures,
-              ...(txIdsByAccountId[pubkey] || []),
-            ];
-          }
-        });
-      }
-
-      // Dereference txSignatureChunks after use
-      txSignatureChunks.length = 0;
-      // Dereference parsedTransactions after use
-      parsedTransactions.length = 0;
-
-      const pluginsByAccountType = (
-        await Promise.all(
-          accounts.map(async (acc) => {
-            const plugins = await initPlugins(acc.plugins);
-            return { type: acc.type, plugins };
+    limiter = pLimit(10);
+    const parsedTransactions = (
+      await Promise.all(
+        txSignatureChunks.map((chunk) =>
+          limiter(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            return retry(
+              () =>
+                connection.getParsedTransactions(chunk, {
+                  commitment: "finalized",
+                  maxSupportedTransactionVersion: 0,
+                }),
+              retryOptions
+            );
           })
         )
-      ).reduce((acc, { type, plugins }) => {
-        acc[type] = plugins.filter(truthy);
-        return acc;
-      }, {} as Record<string, IInitedPlugin[]>);
+      )
+    ).flat();
 
-      const discriminatorsByType = new Map(
-        accounts.map(({ type }) => [
-          type,
-          (
-            program.coder.accounts as anchor.BorshAccountsCoder
-          ).accountDiscriminator(lowerFirstChar(type)),
-        ])
-      );
+    const uniqueWritableAccounts = new Set<string>();
+    for (const parsed of parsedTransactions) {
+      if (!parsed) continue;
+      const signatures = parsed.transaction.signatures;
+      parsed.transaction.message.accountKeys.forEach((acc) => {
+        if (acc.writable) {
+          const pubkey = acc.pubkey.toBase58();
+          uniqueWritableAccounts.add(pubkey);
+          txIdsByAccountId[pubkey] = [
+            ...signatures,
+            ...(txIdsByAccountId[pubkey] || []),
+          ];
+        }
+      });
+    }
 
-      limiter = pLimit(100);
-      const uniqueWritableAccountsArray = [...uniqueWritableAccounts.values()];
+    // Dereference txSignatureChunks after use
+    txSignatureChunks.length = 0;
+    // Dereference parsedTransactions after use
+    parsedTransactions.length = 0;
 
-      const delayMs =
-        (process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS
-          ? parseInt(process.env.INTEGRITY_CHECK_PROCESS_DELAY_MS, 10)
-          : 120000) + Math.floor(Math.random() * 30000); // default 2 minutes + 30 second jitter
-
-      if (delayMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-
+    const pluginsByAccountType = (
       await Promise.all(
-        chunks(uniqueWritableAccountsArray, 100).map(async (chunk) => {
-          const accountInfos = await limiter(() =>
-            retry(
-              () =>
-                connection.getMultipleAccountsInfo(
-                  chunk.map((c) => new PublicKey(c)),
-                  "finalized"
-                ),
-              retryOptions
-            )
-          );
+        accounts.map(async (acc) => {
+          const plugins = await initPlugins(acc.plugins);
+          return { type: acc.type, plugins };
+        })
+      )
+    ).reduce((acc, { type, plugins }) => {
+      acc[type] = plugins.filter(truthy);
+      return acc;
+    }, {} as Record<string, IInitedPlugin[]>);
 
-          const accountInfosWithPk = accountInfos.map((accountInfo, idx) => ({
-            pubkey: chunk[idx],
-            ...accountInfo,
-          }));
+    const discriminatorsByType = new Map(
+      accounts.map(({ type }) => [
+        type,
+        (
+          program.coder.accounts as anchor.BorshAccountsCoder
+        ).accountDiscriminator(lowerFirstChar(type)),
+      ])
+    );
 
-          // Dereference accountInfos after use
-          accountInfos.length = 0;
+    limiter = pLimit(100);
+    const uniqueWritableAccountsArray = [...uniqueWritableAccounts.values()];
 
-          const accsByType: Record<string, typeof accountInfosWithPk> = {};
-          accountInfosWithPk.forEach((accountInfo) => {
-            const accName = accounts.find(
-              ({ type }) =>
-                accountInfo.data &&
-                discriminatorsByType
-                  .get(type)
-                  ?.equals(accountInfo.data.subarray(0, 8))
-            )?.type;
+    // Filter out recently refreshed accounts from the database first
+    const accountsToCheck = new Set<string>();
+    for (const accName of accounts.map((a) => a.type)) {
+      const model = sequelize.models[accName];
+      if (!model) continue;
 
-            if (accName) {
-              accsByType[accName] = accsByType[accName] || [];
-              accsByType[accName].push(accountInfo);
-            }
-          });
+      const staleAccounts = await model.findAll({
+        attributes: ["address"],
+        where: {
+          address: uniqueWritableAccountsArray,
+          [Op.or]: [
+            { refreshedAt: null },
+            {
+              refreshedAt: { [Op.lt]: refreshThreshold },
+            },
+          ],
+        },
+        raw: true,
+      });
+      staleAccounts.forEach((acc: any) => accountsToCheck.add(acc.address));
+    }
 
-          // Dereference accountInfosWithPk after use
-          accountInfosWithPk.length = 0;
+    const filteredAccountsArray = uniqueWritableAccountsArray.filter((addr) =>
+      accountsToCheck.has(addr)
+    );
 
-          await Promise.all(
-            Object.entries(accsByType).map(async ([accName, accounts]) => {
+    console.log(
+      `Filtered ${uniqueWritableAccountsArray.length} accounts down to ${filteredAccountsArray.length} that need checking`
+    );
+
+    await Promise.all(
+      chunks(filteredAccountsArray, 100).map(async (chunk) => {
+        const accountInfos = await limiter(() =>
+          retry(
+            () =>
+              connection.getMultipleAccountsInfo(
+                chunk.map((c) => new PublicKey(c)),
+                "finalized"
+              ),
+            retryOptions
+          )
+        );
+
+        const accountInfosWithPk = accountInfos.map((accountInfo, idx) => ({
+          pubkey: chunk[idx],
+          ...accountInfo,
+        }));
+
+        // Dereference accountInfos after use
+        accountInfos.length = 0;
+
+        const accsByType: Record<string, typeof accountInfosWithPk> = {};
+        accountInfosWithPk.forEach((accountInfo) => {
+          const accName = accounts.find(
+            ({ type }) =>
+              accountInfo.data &&
+              discriminatorsByType
+                .get(type)
+                ?.equals(accountInfo.data.subarray(0, 8))
+          )?.type;
+
+          if (accName) {
+            accsByType[accName] = accsByType[accName] || [];
+            accsByType[accName].push(accountInfo);
+          }
+        });
+
+        // Dereference accountInfosWithPk after use
+        accountInfosWithPk.length = 0;
+
+        await Promise.all(
+          Object.entries(accsByType).map(async ([accName, accounts]) => {
+            const t = await sequelize.transaction({
+              isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+            });
+
+            try {
+              let lastBlock: number = 0;
+              try {
+                lastBlock = await retry(() => connection.getSlot("finalized"), {
+                  retries: 3,
+                  factor: 2,
+                  minTimeout: 1000,
+                  maxTimeout: 5000,
+                });
+              } catch (error) {
+                console.warn("Failed to fetch block after retries:", error);
+              }
+
               const upserts: any[] = [];
               const model = sequelize.models[accName];
               const pubkeys = accounts.map((c) => c.pubkey);
@@ -255,43 +288,17 @@ export const integrityCheckProgramAccounts = async ({
               );
 
               limiter = pLimit(50);
+              const recentSigsLimiter = pLimit(10);
               await Promise.all(
                 accounts.map((acc) =>
                   limiter(async () => {
                     const existing = existingAccMap.get(acc.pubkey);
-                    const refreshedAt = existing?.dataValues.refreshed_at
-                      ? new Date(existing.dataValues.refreshed_at)
+                    const refreshedAt = existing?.dataValues.refreshedAt
+                      ? new Date(existing.dataValues.refreshedAt)
                       : null;
 
                     if (refreshedAt && refreshedAt > refreshThreshold) {
                       return;
-                    }
-
-                    const latestTxSignature = (txIdsByAccountId[acc.pubkey] ||
-                      [])[0];
-
-                    if (latestTxSignature) {
-                      const latestTx = await connection.getTransaction(
-                        latestTxSignature,
-                        {
-                          commitment: "finalized",
-                          maxSupportedTransactionVersion: 0,
-                        }
-                      );
-
-                      if (latestTx) {
-                        if (latestTx.slot >= snapshotSlot) {
-                          return;
-                        }
-
-                        if (latestTx.blockTime) {
-                          if (
-                            new Date(latestTx.blockTime * 1000) >= snapshotTime
-                          ) {
-                            return;
-                          }
-                        }
-                      }
                     }
 
                     const decodedAcc = program.coder.accounts.decode(
@@ -300,11 +307,11 @@ export const integrityCheckProgramAccounts = async ({
                     );
 
                     let sanitized: {
-                      refreshed_at: string;
+                      refreshedAt: string;
                       address: string;
                       [key: string]: any;
                     } = {
-                      refreshed_at: new Date().toISOString(),
+                      refreshedAt: new Date().toISOString(),
                       address: acc.pubkey,
                       ...sanitizeAccount(decodedAcc),
                     };
@@ -312,7 +319,11 @@ export const integrityCheckProgramAccounts = async ({
                     for (const plugin of pluginsByAccountType[accName] || []) {
                       if (plugin?.processAccount) {
                         try {
-                          sanitized = await plugin.processAccount(sanitized, t);
+                          sanitized = await plugin.processAccount(
+                            sanitized,
+                            t,
+                            lastBlock
+                          );
                         } catch (err) {
                           console.log(
                             `Plugin processing failed for account ${acc.pubkey}`,
@@ -331,14 +342,70 @@ export const integrityCheckProgramAccounts = async ({
                       (!refreshedAt || refreshedAt < snapshotTime);
 
                     if (shouldUpdate) {
+                      const latestTxSignature = (txIdsByAccountId[acc.pubkey] ||
+                        [])[0];
+
+                      if (latestTxSignature) {
+                        const latestTx = await connection.getTransaction(
+                          latestTxSignature,
+                          {
+                            commitment: "finalized",
+                            maxSupportedTransactionVersion: 0,
+                          }
+                        );
+
+                        if (latestTx) {
+                          if (latestTx.slot >= snapshotSlot) {
+                            return;
+                          }
+
+                          if (latestTx.blockTime) {
+                            if (
+                              new Date(latestTx.blockTime * 1000) >=
+                              snapshotTime
+                            ) {
+                              return;
+                            }
+                          }
+                        }
+                      }
+
+                      const recentSigs = await recentSigsLimiter(() =>
+                        retry(
+                          () =>
+                            connection.getSignaturesForAddress(
+                              new PublicKey(acc.pubkey),
+                              { limit: 10 },
+                              "finalized"
+                            ),
+                          {
+                            retries: 3,
+                            factor: 2,
+                            minTimeout: 1000,
+                            maxTimeout: 5000,
+                          }
+                        )
+                      );
+
+                      const hasNewerTx = recentSigs.some(
+                        (sig) =>
+                          sig.slot >= snapshotSlot ||
+                          (sig.blockTime &&
+                            new Date(sig.blockTime * 1000) >= snapshotTime)
+                      );
+
+                      if (hasNewerTx) {
+                        return;
+                      }
+
                       const currentRecord = await model.findOne({
                         where: { address: acc.pubkey },
                         transaction: t,
                       });
 
                       const currentRefreshedAt = currentRecord?.dataValues
-                        .refreshed_at
-                        ? new Date(currentRecord.dataValues.refreshed_at)
+                        .refreshedAt
+                        ? new Date(currentRecord.dataValues.refreshedAt)
                         : null;
 
                       if (
@@ -376,7 +443,10 @@ export const integrityCheckProgramAccounts = async ({
                         ),
                       });
 
-                      upserts.push(sanitized);
+                      upserts.push({
+                        ...sanitized,
+                        lastBlock,
+                      });
                     }
                   })
                 )
@@ -388,30 +458,30 @@ export const integrityCheckProgramAccounts = async ({
                   transaction: t,
                 });
               }
-            })
-          );
-        })
-      );
 
-      await t.commit();
-      console.log(`Integrity check complete for: ${programId}`);
-      if (corrections.length > 0) {
-        console.log(`Integrity check corrections for: ${programId}`);
-        await Promise.all(
-          corrections.map(async (correction) => {
-            // @ts-ignore
-            fastify.customMetrics.integrityCheckCounter.inc();
-            console.dir(correction, { depth: null });
+              await t.commit();
+            } catch (err) {
+              await t.rollback();
+              console.error(
+                `Integrity check error for account type ${accName}:`,
+                err
+              );
+              throw err;
+            }
           })
         );
-      }
-    } catch (err) {
-      await t.rollback();
-      console.error(
-        `Integrity check error while inserting for: ${programId}`,
-        err
+      })
+    );
+
+    console.log(`Integrity check complete for: ${programId}`);
+    if (corrections.length > 0) {
+      console.log(`Integrity check corrections for: ${programId}`);
+      await Promise.all(
+        corrections.map(async (correction) => {
+          fastify.customMetrics.integrityCheckCounter.inc();
+          console.dir(correction, { depth: null });
+        })
       );
-      throw err; // Rethrow the error to be caught by the retry mechanism
     }
   };
 

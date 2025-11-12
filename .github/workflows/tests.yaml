@@ -31,7 +31,7 @@ jobs:
           key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo build --locked
       - run: cargo fmt -- --check
-      - run: cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A ambiguous_glob_reexports -A unexpected-cfgs
+      - run: cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A clippy::manual_is_multiple_of -A ambiguous_glob_reexports -A unexpected-cfgs
 
   test-unit:
     name: Rust Unit Tests
@@ -91,6 +91,7 @@ jobs:
       matrix:
         test:
           - utils/ecc-sig-verifier
+          - utils/atomic-data-publisher
           - packages/monitor-service
           - packages/faucet-service
           - packages/metadata-service
@@ -156,6 +157,7 @@ jobs:
           - tests/mini-fanout.ts
           - tests/welcome-pack.ts
           - tests/dc-auto-topoff.ts
+          - tests/tuktuk-dca.ts
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/

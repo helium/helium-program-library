@@ -10,18 +10,44 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name                 | Mutability | Signer | Docs |
-| -------------------- | ---------- | ------ | ---- |
-| authority            | immut      | no     |      |
-| auto_top_off         | immut      | no     |      |
-| queue_authority      | immut      | no     |      |
-| task_queue_authority | immut      | no     |      |
-| rent_refund          | immut      | no     |      |
-| task_queue           | immut      | no     |      |
-| next_task            | immut      | no     |      |
-| next_pyth_task       | immut      | no     |      |
-| tuktuk_program       | immut      | no     |      |
-| system_program       | immut      | no     |      |
+| Name                     | Mutability | Signer | Docs |
+| ------------------------ | ---------- | ------ | ---- |
+| authority                | immut      | no     |      |
+| auto_top_off             | immut      | no     |      |
+| queue_authority          | immut      | no     |      |
+| task_queue_authority     | immut      | no     |      |
+| rent_refund              | immut      | no     |      |
+| task_queue               | immut      | no     |      |
+| next_task                | immut      | no     |      |
+| dao                      | immut      | no     |      |
+| hnt_account              | immut      | no     |      |
+| dc_account               | immut      | no     |      |
+| dca_mint_account         | immut      | no     |      |
+| next_hnt_task            | immut      | no     |      |
+| associated_token_program | immut      | no     |      |
+| token_program            | immut      | no     |      |
+| tuktuk_program           | immut      | no     |      |
+| system_program           | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
+### close_legacy_auto_top_off
+
+#### Accounts
+
+| Name                     | Mutability | Signer | Docs |
+| ------------------------ | ---------- | ------ | ---- |
+| authority                | immut      | no     |      |
+| auto_top_off             | immut      | no     |      |
+| delegated_data_credits   | immut      | no     |      |
+| hnt_account              | immut      | no     |      |
+| dc_account               | immut      | no     |      |
+| associated_token_program | immut      | no     |      |
+| token_program            | immut      | no     |      |
+| system_program           | immut      | no     |      |
 
 #### Args
 
@@ -37,6 +63,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | payer                    | immut      | no     |      |
 | authority                | immut      | no     |      |
 | auto_top_off             | immut      | no     |      |
+| hnt_price_oracle         | immut      | no     |      |
 | dao                      | immut      | no     |      |
 | data_credits             | immut      | no     |      |
 | dc_mint                  | immut      | no     |      |
@@ -44,6 +71,8 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | delegated_data_credits   | immut      | no     |      |
 | dc_account               | immut      | no     |      |
 | hnt_account              | immut      | no     |      |
+| dca_mint                 | immut      | no     |      |
+| dca_mint_account         | immut      | no     |      |
 | sub_dao                  | immut      | no     |      |
 | task_queue               | immut      | no     |      |
 | circuit_breaker          | immut      | no     |      |
@@ -71,7 +100,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | task_queue_authority | immut      | no     |                                               |
 | task_queue           | immut      | no     |                                               |
 | task                 | immut      | no     |                                               |
-| pyth_task            | immut      | no     |                                               |
+| hnt_task             | immut      | no     |                                               |
 | tuktuk_program       | immut      | no     |                                               |
 | system_program       | immut      | no     |                                               |
 
@@ -81,31 +110,61 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
-### top_off_v0
+### top_off_dc_v0
 
 #### Accounts
 
-| Name                     | Mutability | Signer | Docs |
-| ------------------------ | ---------- | ------ | ---- |
-| auto_top_off             | immut      | no     |      |
-| task_queue               | immut      | no     |      |
-| next_task                | immut      | no     |      |
-| delegated_data_credits   | immut      | no     |      |
-| data_credits             | immut      | no     |      |
-| dc_mint                  | immut      | no     |      |
-| hnt_mint                 | immut      | no     |      |
-| dao                      | immut      | no     |      |
-| sub_dao                  | immut      | no     |      |
-| from_account             | immut      | no     |      |
-| from_hnt_account         | immut      | no     |      |
-| hnt_price_oracle         | immut      | no     |      |
-| escrow_account           | immut      | no     |      |
-| circuit_breaker          | immut      | no     |      |
-| associated_token_program | immut      | no     |      |
-| token_program            | immut      | no     |      |
-| system_program           | immut      | no     |      |
-| circuit_breaker_program  | immut      | no     |      |
-| data_credits_program     | immut      | no     |      |
+| Name                     | Mutability | Signer | Docs                                                                                                                                                   |
+| ------------------------ | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| auto_top_off             | immut      | no     |                                                                                                                                                        |
+| task_queue               | immut      | no     |                                                                                                                                                        |
+| delegated_data_credits   | immut      | no     |                                                                                                                                                        |
+| data_credits             | immut      | no     |                                                                                                                                                        |
+| dc_mint                  | immut      | no     |                                                                                                                                                        |
+| hnt_mint                 | immut      | no     |                                                                                                                                                        |
+| dao                      | immut      | no     |                                                                                                                                                        |
+| sub_dao                  | immut      | no     |                                                                                                                                                        |
+| from_account             | immut      | no     |                                                                                                                                                        |
+| from_hnt_account         | immut      | no     |                                                                                                                                                        |
+| hnt_account              | immut      | no     |                                                                                                                                                        |
+| hnt_price_oracle         | immut      | no     |                                                                                                                                                        |
+| escrow_account           | immut      | no     |                                                                                                                                                        |
+| circuit_breaker          | immut      | no     |                                                                                                                                                        |
+| associated_token_program | immut      | no     |                                                                                                                                                        |
+| token_program            | immut      | no     |                                                                                                                                                        |
+| system_program           | immut      | no     |                                                                                                                                                        |
+| circuit_breaker_program  | immut      | no     |                                                                                                                                                        |
+| data_credits_program     | immut      | no     |                                                                                                                                                        |
+| instruction_sysvar       | immut      | no     | the supplied Sysvar could be anything else. The Instruction Sysvar has not been implemented in the Anchor framework yet, so this is the safe approach. |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
+### top_off_hnt_v0
+
+#### Accounts
+
+| Name                          | Mutability | Signer | Docs                                                                                                                                                   |
+| ----------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| auto_top_off                  | immut      | no     |                                                                                                                                                        |
+| task_queue                    | immut      | no     |                                                                                                                                                        |
+| hnt_account                   | immut      | no     |                                                                                                                                                        |
+| hnt_mint                      | immut      | no     |                                                                                                                                                        |
+| dca_mint                      | immut      | no     |                                                                                                                                                        |
+| dca_mint_account              | immut      | no     |                                                                                                                                                        |
+| dca_input_price_oracle        | immut      | no     |                                                                                                                                                        |
+| hnt_price_oracle              | immut      | no     |                                                                                                                                                        |
+| dca                           | immut      | no     |                                                                                                                                                        |
+| dca_input_account             | immut      | no     |                                                                                                                                                        |
+| dca_destination_token_account | immut      | no     |                                                                                                                                                        |
+| associated_token_program      | immut      | no     |                                                                                                                                                        |
+| token_program                 | immut      | no     |                                                                                                                                                        |
+| system_program                | immut      | no     |                                                                                                                                                        |
+| tuktuk_dca_program            | immut      | no     |                                                                                                                                                        |
+| instruction_sysvar            | immut      | no     | the supplied Sysvar could be anything else. The Instruction Sysvar has not been implemented in the Anchor framework yet, so this is the safe approach. |
+| dca_custom_signer             | immut      | no     |                                                                                                                                                        |
 
 #### Args
 
@@ -125,11 +184,10 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | task_queue_authority | immut      | no     |      |
 | task_queue           | immut      | no     |      |
 | next_task            | immut      | no     |      |
-| next_pyth_task       | immut      | no     |      |
-| new_task             | immut      | no     |      |
-| new_pyth_task        | immut      | no     |      |
+| next_hnt_task        | immut      | no     |      |
+| task_rent_refund     | immut      | no     |      |
+| hnt_task_rent_refund | immut      | no     |      |
 | tuktuk_program       | immut      | no     |      |
-| system_program       | immut      | no     |      |
 
 #### Args
 
@@ -159,6 +217,10 @@ undefined
 
 undefined
 
+### PriceUpdateV2
+
+undefined
+
 ### SubDaoV0
 
 undefined
@@ -179,27 +241,37 @@ undefined
 
 ### AutoTopOffV0
 
-| Field                  | Type   |
-| ---------------------- | ------ |
-| authority              | pubkey |
-| data_credits           | pubkey |
-| task_queue             | pubkey |
-| sub_dao                | pubkey |
-| next_task              | pubkey |
-| next_pyth_task         | pubkey |
-| delegated_data_credits | pubkey |
-| dc_mint                | pubkey |
-| hnt_mint               | pubkey |
-| dao                    | pubkey |
-| hnt_price_oracle       | pubkey |
-| hnt_account            | pubkey |
-| dc_account             | pubkey |
-| escrow_account         | pubkey |
-| circuit_breaker        | pubkey |
-| bump                   | u8     |
-| queue_authority_bump   | u8     |
-| threshold              | u64    |
-| schedule               | string |
+| Field                  | Type            |
+| ---------------------- | --------------- |
+| authority              | pubkey          |
+| data_credits           | pubkey          |
+| task_queue             | pubkey          |
+| sub_dao                | pubkey          |
+| next_task              | pubkey          |
+| next_hnt_task          | pubkey          |
+| delegated_data_credits | pubkey          |
+| dc_mint                | pubkey          |
+| hnt_mint               | pubkey          |
+| dao                    | pubkey          |
+| hnt_price_oracle       | pubkey          |
+| hnt_account            | pubkey          |
+| dc_account             | pubkey          |
+| escrow_account         | pubkey          |
+| circuit_breaker        | pubkey          |
+| bump                   | u8              |
+| queue_authority_bump   | u8              |
+| reserved               | [object Object] |
+| threshold              | u64             |
+| schedule               | [object Object] |
+| dca_url                | [object Object] |
+| dca_signer             | pubkey          |
+| hnt_threshold          | u64             |
+| dca_mint               | pubkey          |
+| dca_mint_account       | pubkey          |
+| dca_swap_amount        | u64             |
+| dca_interval_seconds   | u64             |
+| dca_input_price_oracle | pubkey          |
+| dca                    | pubkey          |
 
 ### CompiledInstructionV0
 
@@ -271,11 +343,18 @@ undefined
 
 ### InitializeAutoTopOffArgsV0
 
-| Field      | Type   |
-| ---------- | ------ |
-| schedule   | string |
-| threshold  | u64    |
-| router_key | string |
+| Field                  | Type   |
+| ---------------------- | ------ |
+| schedule               | string |
+| threshold              | u64    |
+| router_key             | string |
+| hnt_threshold          | u64    |
+| dca_mint               | pubkey |
+| dca_swap_amount        | u64    |
+| dca_interval_seconds   | u64    |
+| dca_input_price_oracle | pubkey |
+| dca_url                | string |
+| dca_signer             | pubkey |
 
 ### MintWindowedCircuitBreakerV0
 
@@ -295,6 +374,28 @@ undefined
 | start_unix_time | i64  |
 | percent         | u8   |
 
+### PriceFeedMessage
+
+| Field             | Type            |
+| ----------------- | --------------- |
+| feed_id           | [object Object] |
+| price             | i64             |
+| conf              | u64             |
+| exponent          | i32             |
+| publish_time      | i64             |
+| prev_publish_time | i64             |
+| ema_price         | i64             |
+| ema_conf          | u64             |
+
+### PriceUpdateV2
+
+| Field              | Type            |
+| ------------------ | --------------- |
+| write_authority    | pubkey          |
+| verification_level | [object Object] |
+| price_message      | [object Object] |
+| posted_slot        | u64             |
+
 ### RecentProposal
 
 | Field    | Type   |
@@ -311,10 +412,10 @@ undefined
 
 ### ScheduleTaskArgsV0
 
-| Field        | Type |
-| ------------ | ---- |
-| task_id      | u16  |
-| pyth_task_id | u16  |
+| Field       | Type |
+| ----------- | ---- |
+| task_id     | u16  |
+| hnt_task_id | u16  |
 
 ### SubDaoV0
 
@@ -417,12 +518,23 @@ undefined
 
 ### UpdateAutoTopOffArgsV0
 
-| Field            | Type   |
-| ---------------- | ------ |
-| new_task_id      | u16    |
-| new_pyth_task_id | u16    |
-| schedule         | string |
-| threshold        | u64    |
+| Field                  | Type   |
+| ---------------------- | ------ |
+| schedule               | string |
+| threshold              | u64    |
+| hnt_price_oracle       | pubkey |
+| hnt_threshold          | u64    |
+| dca_mint               | pubkey |
+| dca_swap_amount        | u64    |
+| dca_interval_seconds   | u64    |
+| dca_input_price_oracle | pubkey |
+
+### VerificationLevel
+
+| Variant | Fields             |
+| ------- | ------------------ |
+| Partial | num_signatures: u8 |
+| Full    |                    |
 
 ### WindowV0
 

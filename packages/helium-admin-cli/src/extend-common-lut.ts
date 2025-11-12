@@ -10,10 +10,10 @@ import {
   AddressLookupTableProgram,
   PublicKey,
 } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
+import * as multisig from '@sqds/multisig';
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquads } from "./utils";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -32,11 +32,6 @@ export async function run(args: any = process.argv) {
       describe:
         "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
-    authorityIndex: {
-      type: "number",
-      describe: "Authority index for squads. Defaults to 1",
-      default: 1,
-    },
     lookupTable: {
       type: "string",
       describe: "Address of the address lookup table",
@@ -49,13 +44,14 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
-  const squads = Squads.endpoint(process.env.ANCHOR_PROVIDER_URL, wallet, {
-    commitmentOrConfig: "finalized",
-  });
   let authority = provider.wallet.publicKey;
-  let multisig = argv.multisig ? new PublicKey(argv.multisig) : null;
-  if (multisig) {
-    authority = squads.getAuthorityPDA(multisig, argv.authorityIndex);
+  let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
+  if (multisigPda) {
+    const [vaultPda] = multisig.getVaultPda({
+      multisigPda,
+      index: 0,
+    });
+    authority = vaultPda;
   }
 
   const accounts = [
@@ -75,12 +71,10 @@ export async function run(args: any = process.argv) {
 
   const lookupTableAddress = new PublicKey(argv.lookupTable);
   for (const addresses of chunks(accounts, 20)) {
-    await sendInstructionsOrSquads({
+    await sendInstructionsOrSquadsV4({
       provider,
       signers: [],
-      squads,
-      multisig: multisig!,
-      authorityIndex: argv.authorityIndex,
+      multisig: multisigPda!,
       instructions: await withPriorityFees({
         connection: provider.connection,
         computeUnits: 200000,

@@ -14,4 +14,8 @@ pub enum ErrorCode {
   InvalidClaimApprovalSignature,
   #[msg("Invalid rent refund")]
   InvalidRentRefund,
+  #[msg("Invalid rewards split")]
+  InvalidRewardsSplit,
+  #[msg("Invalid schedule")]
+  InvalidSchedule,
 }
