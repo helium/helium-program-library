@@ -713,7 +713,7 @@ dependencies = [
 
 [[package]]
 name = "dc-auto-top"
-version = "0.0.2"
+version = "0.0.4"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
