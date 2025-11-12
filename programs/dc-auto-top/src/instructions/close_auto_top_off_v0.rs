@@ -3,7 +3,8 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
 };
-use helium_sub_daos::{try_from, DaoV0};
+use helium_sub_daos::DaoV0;
+use shared_utils::try_from;
 use tuktuk_program::{
   tuktuk::{
     self,
