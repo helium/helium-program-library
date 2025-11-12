@@ -450,7 +450,7 @@ describe("dc-auto-topoff", () => {
           dcaMint: dcaMint,
         })
         .rpcAndKeys({ skipPreflight: true })
-        console.log("Some pubkeys:", updateAutoTopOffKeys)
+      console.log("Some pubkeys:", updateAutoTopOffKeys)
 
       // Schedule new tasks with DCA configuration
       await program.methods.scheduleTaskV0({
@@ -486,11 +486,13 @@ describe("dc-auto-topoff", () => {
       await new Promise(resolve => setTimeout(resolve, 2000))
 
       // Run the topoff task which should initialize the DCA
+      console.log("1. Balance of auto topoff:", (await provider.connection.getAccountInfo(autoTopOff))?.lamports)
       await runAllTasks()
 
       await new Promise(resolve => setTimeout(resolve, 1500))
 
       // Run first DCA swap
+      console.log("2. Balance of auto topoff:", (await provider.connection.getAccountInfo(autoTopOff))?.lamports)
       await runAllTasks()
 
       const hntAccountAfterFirstSwap = await getAccount(provider.connection, getAssociatedTokenAddressSync(hntMint, autoTopOff, true))
@@ -498,7 +500,7 @@ describe("dc-auto-topoff", () => {
       console.log(`HNT balance after first swap: ${hntAccountAfterFirstSwap.amount} (expected: ${expectedAfterFirstSwap.toString()})`)
       // Allow for 1 bone tolerance due to rounding in DCA calculations
       const actualAmount = new anchor.BN(hntAccountAfterFirstSwap.amount.toString())
-      const difference = actualAmount.gt(expectedAfterFirstSwap) 
+      const difference = actualAmount.gt(expectedAfterFirstSwap)
         ? actualAmount.sub(expectedAfterFirstSwap)
         : expectedAfterFirstSwap.sub(actualAmount)
       expect(difference.toNumber()).to.be.lessThanOrEqual(1, "After first swap, should have approximately 20 HNT (allowing for 1 bone rounding)")
@@ -507,6 +509,7 @@ describe("dc-auto-topoff", () => {
       await new Promise(resolve => setTimeout(resolve, 1500))
 
       // Run second DCA swap
+      console.log("3. Balance of auto topoff:", (await provider.connection.getAccountInfo(autoTopOff))?.lamports)
       await runAllTasks()
 
       // Check that HNT balance is now at or above the threshold (allowing for rounding)
