@@ -6,13 +6,13 @@ import { init as initHem } from "@helium/helium-entity-manager-sdk";
 import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { createAtaAndTransfer, createMint, sendInstructions } from "@helium/spl-utils";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
-import { init as initTuktuk, nextAvailableTaskIds, runTask, taskKey, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey } from "@helium/tuktuk-sdk";
+import { init as initTuktuk, nextAvailableTaskIds, taskKey, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey } from "@helium/tuktuk-sdk";
 import { createAssociatedTokenAccountIdempotentInstruction, getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { ComputeBudgetProgram, PublicKey, SystemProgram } from "@solana/web3.js";
 import { USDC_PRICE_FEED, HNT_PRICE_FEED } from "./tuktuk-dca";
 import { expect } from "chai";
 import { execSync } from "child_process";
-import { init, queueAuthorityKey } from "../packages/dc-auto-top-sdk/src";
+import { autoTopOffKey, init, queueAuthorityKey } from "../packages/dc-auto-top-sdk/src";
 import { init as initTuktukDca } from "../packages/tuktuk-dca-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
 import { DcAutoTop } from "../target/types/dc_auto_top";
@@ -141,17 +141,8 @@ describe("dc-auto-topoff", () => {
         toPubkey: crankTurner.publicKey,
         lamports: 10 * LAMPORTS_PER_SOL,
       }),
-    ])
-
-    // Create and fund swap payer for DCA
-    const [swapPayer] = customSignerKey(taskQueue, [Buffer.from("swap_payer")])
-    await sendInstructions(provider, [
-      SystemProgram.transfer({
-        fromPubkey: me,
-        toPubkey: swapPayer,
-        lamports: 10 * LAMPORTS_PER_SOL,
-      }),
     ]);
+
 
     ({ dao: { mint: hntMint }, dataCredits: { dcMint }, subDao: { subDao } } = await initWorld(provider, hemProgram, hsdProgram, dcProgram))
 
@@ -174,6 +165,16 @@ describe("dc-auto-topoff", () => {
   beforeEach(async () => {
     routerKey = (await HeliumKeypair.makeRandom()).address.b58;
     delegatedDataCredits = delegatedDataCreditsKey(subDao, routerKey)[0]
+    // Create and fund swap payer for DCA
+    const [swapPayer] = customSignerKey(taskQueue, [Buffer.from("dca_swap_payer")])
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: me,
+        toPubkey: swapPayer,
+        lamports: 10 * LAMPORTS_PER_SOL,
+      }),
+    ]);
+
     await dcProgram.methods.delegateDataCreditsV0({
       routerKey,
       amount: new anchor.BN(0),
@@ -196,9 +197,6 @@ describe("dc-auto-topoff", () => {
         dataCredits: dataCreditsKey(dcMint)[0],
       })
       .rpc({ skipPreflight: true });
-
-    // Start DCA server for this test
-    const [swapPayer] = customSignerKey(taskQueue, [Buffer.from("swap_payer")])
 
     // Create DCA mint ATA for swap payer (will receive tokens during lend, so 0 starting balance)
     const swapPayerDcaAta = getAssociatedTokenAddressSync(dcaMint, swapPayer, true)
@@ -430,7 +428,7 @@ describe("dc-auto-topoff", () => {
         nextMinutes = now.getMinutes() + 1
       }
 
-      const { pubkeys: updateAutoTopOffKeys } = await program.methods.updateAutoTopOffV0({
+      await program.methods.updateAutoTopOffV0({
         schedule: `${nextSeconds} ${nextMinutes} * * * *`, // Run in 2 seconds
         threshold: new anchor.BN(0), // No dc threshold or it'll mess with our expected HNT
         hntPriceOracle: new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"),
@@ -449,8 +447,7 @@ describe("dc-auto-topoff", () => {
           hntTaskRentRefund,
           dcaMint: dcaMint,
         })
-        .rpcAndKeys({ skipPreflight: true })
-      console.log("Some pubkeys:", updateAutoTopOffKeys)
+        .rpc({ skipPreflight: true })
 
       // Schedule new tasks with DCA configuration
       await program.methods.scheduleTaskV0({
@@ -486,18 +483,15 @@ describe("dc-auto-topoff", () => {
       await new Promise(resolve => setTimeout(resolve, 2000))
 
       // Run the topoff task which should initialize the DCA
-      console.log("1. Balance of auto topoff:", (await provider.connection.getAccountInfo(autoTopOff))?.lamports)
       await runAllTasks()
 
       await new Promise(resolve => setTimeout(resolve, 1500))
 
       // Run first DCA swap
-      console.log("2. Balance of auto topoff:", (await provider.connection.getAccountInfo(autoTopOff))?.lamports)
       await runAllTasks()
 
       const hntAccountAfterFirstSwap = await getAccount(provider.connection, getAssociatedTokenAddressSync(hntMint, autoTopOff, true))
       const expectedAfterFirstSwap = startingHnt.add(hntPerSwap)
-      console.log(`HNT balance after first swap: ${hntAccountAfterFirstSwap.amount} (expected: ${expectedAfterFirstSwap.toString()})`)
       // Allow for 1 bone tolerance due to rounding in DCA calculations
       const actualAmount = new anchor.BN(hntAccountAfterFirstSwap.amount.toString())
       const difference = actualAmount.gt(expectedAfterFirstSwap)
@@ -509,7 +503,6 @@ describe("dc-auto-topoff", () => {
       await new Promise(resolve => setTimeout(resolve, 1500))
 
       // Run second DCA swap
-      console.log("3. Balance of auto topoff:", (await provider.connection.getAccountInfo(autoTopOff))?.lamports)
       await runAllTasks()
 
       // Check that HNT balance is now at or above the threshold (allowing for rounding)

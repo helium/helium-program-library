@@ -127,8 +127,7 @@ pub fn get_task_ix_hnt(
     &[
       b"custom",
       auto_top_off.task_queue.key().as_ref(),
-      auto_top_off_key.as_ref(),
-      b"dca",
+      b"dca_swap_payer",
     ],
     &tuktuk::ID,
   );
@@ -183,8 +182,7 @@ pub fn get_task_ix_hnt(
   let compiled_tx = compile_transaction_efficient(
     vec![top_off_ix],
     vec![vec![
-      auto_top_off_key.to_bytes().as_ref().to_vec(),
-      b"dca".to_vec(),
+      b"dca_swap_payer".to_vec(),
       bump.to_le_bytes().to_vec(),
     ]],
   )?;

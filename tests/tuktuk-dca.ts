@@ -104,7 +104,7 @@ describe("tuktuk-dca", () => {
     )
 
     // Create PDA for swap source (similar to claim_payer in distributor-oracle)
-    const [swapPayer] = customSignerKey(taskQueue, [Buffer.from("swap_payer")])
+    const [swapPayer] = customSignerKey(taskQueue, [Buffer.from("dca_swap_payer")])
 
     // Fund the swap payer PDA
     await sendInstructions(provider, [

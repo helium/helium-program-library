@@ -174,8 +174,6 @@ export async function sendInstructions(
   ) {
     tx = await provider.wallet.signTransaction(tx);
   }
-  console.log("ACCOUNT KEYS:")
-  console.log(tx.compileMessage().accountKeys.map((k) => k.toBase58()).join("\n"));
 
   try {
     const { txid } = await sendAndConfirmWithRetry(
