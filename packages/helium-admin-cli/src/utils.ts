@@ -4,6 +4,7 @@ import {
   bulkSendTransactions,
   createAtaAndMintInstructions,
   createMintInstructions,
+  getAddressLookupTableAccounts,
   sendInstructions,
   toBN,
   withPriorityFees,
@@ -757,6 +758,7 @@ export async function sendInstructionsOrSquadsV4({
   commitment = "confirmed",
   idlErrors = new Map(),
   multisig: multisigPda,
+  addressLookupTableAddresses = [],
 }: {
   provider: anchor.AnchorProvider;
   instructions: TransactionInstruction[];
@@ -765,6 +767,7 @@ export async function sendInstructionsOrSquadsV4({
   commitment?: Commitment;
   idlErrors?: Map<number, string>;
   multisig?: PublicKey;
+  addressLookupTableAddresses?: PublicKey[];
 }): Promise<string | undefined> {
   if (!multisig) {
     return await sendInstructions(
@@ -774,6 +777,7 @@ export async function sendInstructionsOrSquadsV4({
         computeUnits: 1000000,
         instructions,
         feePayer: payer,
+        addressLookupTableAddresses,
       }),
       signers,
       payer,
@@ -811,6 +815,7 @@ export async function sendInstructionsOrSquadsV4({
         computeUnits: 1000000,
         instructions: nonMissingSignerIxs,
         feePayer: payer,
+        addressLookupTableAddresses,
       }),
       signers,
       payer,
@@ -836,51 +841,86 @@ export async function sendInstructionsOrSquadsV4({
     vaultIndex: 0,
     memo: "Helium-admin-cli batch",
   });
-  await sendInstructions(provider, await withPriorityFees({
-    connection: provider.connection,
-    instructions: [createBatchIx, await multisig.instructions.proposalCreate({
-      multisigPda: multisigPda!,
-      transactionIndex: BigInt(transactionIndex),
-      creator: provider.wallet.publicKey,
-      isDraft: true,
-    })],
-    feePayer: payer,
-  }));
-
 
   const [vault] = await multisig.getVaultPda({
     multisigPda: multisigPda!,
     index: 0,
     programId: multisig.PROGRAM_ID,
-  })
-  const { transactionMessages, failedBuckets } = await packageInstructions(instructions.map(ix => [ix]), [], vault)
-  const addInstructions = await Promise.all(transactionMessages.map((tm, index) => multisig.instructions.batchAddTransaction({
-    batchIndex: BigInt(transactionIndex),
-    multisigPda: multisigPda!,
-    transactionIndex: index + 1,
-    transactionMessage: tm,
-    vaultIndex: 0,
-    member: provider.wallet.publicKey,
-    ephemeralSigners: 0
-  })))
+  });
+  const addressLookupTableAccounts = await getAddressLookupTableAccounts(
+    provider.connection,
+    addressLookupTableAddresses
+  );
+  const { transactionMessages, failedBuckets } = await packageInstructions(
+    instructions.map((ix) => [ix]),
+    addressLookupTableAccounts,
+    vault
+  );
+
+  await sendInstructions(
+    provider,
+    await withPriorityFees({
+      connection: provider.connection,
+      addressLookupTableAddresses,
+      instructions: [
+        createBatchIx,
+        await multisig.instructions.proposalCreate({
+          multisigPda: multisigPda!,
+          transactionIndex: BigInt(transactionIndex),
+          creator: provider.wallet.publicKey,
+          isDraft: true,
+        }),
+      ],
+      feePayer: payer,
+    })
+  );
+  const addInstructions = await Promise.all(
+    transactionMessages.map((tm, index) =>
+      multisig.instructions.batchAddTransaction({
+        batchIndex: BigInt(transactionIndex),
+        multisigPda: multisigPda!,
+        transactionIndex: index + 1,
+        transactionMessage: tm,
+        vaultIndex: 0,
+        member: provider.wallet.publicKey,
+        ephemeralSigners: 0,
+        addressLookupTableAccounts,
+      })
+    )
+  );
   if (failedBuckets.length > 0) {
-    throw new Error(`Failed to package instructions: ${failedBuckets.join(", ")}`);
+    throw new Error(
+      `Failed to package instructions: ${failedBuckets.join(", ")}`
+    );
   }
 
-  await bulkSendTransactions(provider, addInstructions.map(ix => ({
-    feePayer: provider.wallet.publicKey,
-    instructions: [ix],
-  })))
+  for (const ix of addInstructions) {
+    await sendInstructions(
+      provider,
+      await withPriorityFees({
+        feePayer: payer,
+        connection: provider.connection,
+        instructions: [ix],
+        addressLookupTableAddresses,
+      })
+    );
+  }
 
-  await sendInstructions(provider, await withPriorityFees({
-    connection: provider.connection,
-    instructions: [await multisig.instructions.proposalActivate({
-      multisigPda: multisigPda!,
-      transactionIndex: BigInt(transactionIndex),
-      member: provider.wallet.publicKey,
-    })],
-    feePayer: payer,
-  }));
+  await sendInstructions(
+    provider,
+    await withPriorityFees({
+      connection: provider.connection,
+      instructions: [
+        await multisig.instructions.proposalActivate({
+          multisigPda: multisigPda!,
+          transactionIndex: BigInt(transactionIndex),
+          member: provider.wallet.publicKey,
+        }),
+      ],
+      feePayer: payer,
+      addressLookupTableAddresses,
+    })
+  );
 }
 
 export async function sendInstructionsOrSquads({
@@ -958,7 +998,10 @@ export async function sendInstructionsOrSquads({
   }
 
   if (squadsSignatures.length >= 2) {
-    throw new Error("Too many missing signatures " + squadsSignatures.map(s => s.toBase58()).join(", "));
+    throw new Error(
+      "Too many missing signatures " +
+        squadsSignatures.map((s) => s.toBase58()).join(", ")
+    );
   }
 
   const txIndex = await squads.getNextTransactionIndex(multisig);
@@ -989,12 +1032,7 @@ export async function sendInstructionsOrSquads({
       await withPriorityFees({
         connection: provider.connection,
         instructions: [
-          await squads.buildAddInstruction(
-            multisig,
-            txKey,
-            ix,
-            index
-          ),
+          await squads.buildAddInstruction(multisig, txKey, ix, index),
         ],
         computeUnits: 200000,
       })
@@ -1002,15 +1040,14 @@ export async function sendInstructionsOrSquads({
     index++;
   }
 
-  const ixs: TransactionInstruction[] = []
-  ixs.push(await squads.buildActivateTransaction(multisig, txKey))
-  ixs.push(await squads.buildApproveTransaction(multisig, txKey))
+  const ixs: TransactionInstruction[] = [];
+  ixs.push(await squads.buildActivateTransaction(multisig, txKey));
+  ixs.push(await squads.buildApproveTransaction(multisig, txKey));
 
   if (executeTransaction) {
-    ixs.push(await squads.buildExecuteTransaction(
-      txKey,
-      provider.wallet.publicKey
-    ));
+    ixs.push(
+      await squads.buildExecuteTransaction(txKey, provider.wallet.publicKey)
+    );
   }
 
   await sendInstructions(
@@ -1018,10 +1055,10 @@ export async function sendInstructionsOrSquads({
     await withPriorityFees({
       connection: provider.connection,
       computeUnits: 1000000,
-      instructions: ixs
+      instructions: ixs,
     }),
     signers
-  )
+  );
 }
 
 export async function parseEmissionsSchedule(filepath: string) {
@@ -1031,12 +1068,12 @@ export async function parseEmissionsSchedule(filepath: string) {
       "percent" in x
         ? { percent: x.percent }
         : "emissionsPerEpoch" in x
-          ? {
+        ? {
             emissionsPerEpoch: new anchor.BN(
               x.emissionsPerEpoch.replaceAll(".", "").replaceAll(",", "")
             ),
           }
-          : null;
+        : null;
     if (!extra || !("startTime" in x)) throw new Error("json format incorrect");
     return {
       startUnixTime: new anchor.BN(Math.floor(Date.parse(x.startTime) / 1000)),

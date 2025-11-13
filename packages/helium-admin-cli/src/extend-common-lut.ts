@@ -10,10 +10,15 @@ import {
   AddressLookupTableProgram,
   PublicKey,
 } from "@solana/web3.js";
-import * as multisig from '@sqds/multisig';
+import * as multisig from "@sqds/multisig";
 import os from "os";
 import yargs from "yargs/yargs";
-import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
+import {
+  loadKeypair,
+  sendInstructionsOrSquads,
+  sendInstructionsOrSquadsV4,
+} from "./utils";
+import Squads from "@sqds/sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -45,13 +50,13 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   let authority = provider.wallet.publicKey;
+  const squads = new Squads({
+    connection: provider.connection,
+    wallet: wallet,
+  });
   let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisigPda) {
-    const [vaultPda] = multisig.getVaultPda({
-      multisigPda,
-      index: 0,
-    });
-    authority = vaultPda;
+    authority = squads.getAuthorityPDA(multisigPda, 1);
   }
 
   const accounts = [
@@ -62,19 +67,30 @@ export async function run(args: any = process.argv) {
     // HNT Rewards pool
     // "BDs6RPnpJNzmuMNv1z8cDh9cxKFgCxEVDaCfoHZWyvqJ",
     // TaskQueueAuthorityV0 for welcome-pack
-    "9hLWFGiit1ZpFHmopyacWqiVx8sQX9U86dnKqtDjkjnL",
+    // "9hLWFGiit1ZpFHmopyacWqiVx8sQX9U86dnKqtDjkjnL",
     // Queue authority for welcome-pack
-    "3HTSCuJGL8e5zPpf7rMhq42YgA7f3WdF5bm78YQ3HEBK"
+    // "3HTSCuJGL8e5zPpf7rMhq42YgA7f3WdF5bm78YQ3HEBK"
+    // HNT pyth
+    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33",
+    // USDC pyth
+    "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX",
+    // Prod multisig
+    "FXyzyVsmPRuZjbe97tsCpDqPAPPhBny4dr2hemo8XmL1",
+    // Prod multisig vault
+    "pULUgsYtKvT7qhsL8QJ2oJXYQUeCCdjtfawPnBqEr3U",
   ].map((a) => {
     return new PublicKey(a);
   });
 
   const lookupTableAddress = new PublicKey(argv.lookupTable);
   for (const addresses of chunks(accounts, 20)) {
-    await sendInstructionsOrSquadsV4({
+    await sendInstructionsOrSquads({
       provider,
       signers: [],
       multisig: multisigPda!,
+      authorityIndex: 1,
+      executeTransaction: false,
+      squads,
       instructions: await withPriorityFees({
         connection: provider.connection,
         computeUnits: 200000,
