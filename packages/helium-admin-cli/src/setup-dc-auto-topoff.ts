@@ -1,16 +1,44 @@
 import * as anchor from "@coral-xyz/anchor";
-import { dataCreditsKey, delegatedDataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
-import { autoTopOffKey, init as initDcAutoTopoff, queueAuthorityKey } from "@helium/dc-auto-top-sdk";
+import {
+  dataCreditsKey,
+  delegatedDataCreditsKey,
+  init as initDc,
+} from "@helium/data-credits-sdk";
+import {
+  autoTopOffKey,
+  init as initDcAutoTopoff,
+  queueAuthorityKey,
+} from "@helium/dc-auto-top-sdk";
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
-import { DC_MINT, HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
-import * as multisig from '@sqds/multisig';
-import { createAssociatedTokenAccountIdempotentInstruction, createTransferInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { ComputeBudgetProgram, PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import {
+  DC_MINT,
+  HELIUM_COMMON_LUT,
+  HELIUM_COMMON_LUT_DEVNET,
+  HNT_MINT,
+  MOBILE_MINT,
+} from "@helium/spl-utils";
+import * as multisig from "@sqds/multisig";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  createTransferInstruction,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
+import {
+  ComputeBudgetProgram,
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
-import { init as initTuktuk, nextAvailableTaskIds, taskKey, taskQueueAuthorityKey } from "@helium/tuktuk-sdk";
+import {
+  init as initTuktuk,
+  nextAvailableTaskIds,
+  taskKey,
+  taskQueueAuthorityKey,
+} from "@helium/tuktuk-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -40,7 +68,8 @@ export async function run(args: any = process.argv) {
     },
     initialLamports: {
       type: "number",
-      describe: "Initial lamports to send to the auto topoff, pays for crank turns.",
+      describe:
+        "Initial lamports to send to the auto topoff, pays for crank turns.",
       default: 10000000,
     },
     newAuthority: {
@@ -58,49 +87,49 @@ export async function run(args: any = process.argv) {
       default: MOBILE_MINT.toBase58(),
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     schedule: {
-      type: 'string',
-      describe: 'Cron schedule for the auto topoff',
+      type: "string",
+      describe: "Cron schedule for the auto topoff",
     },
     hntPriceOracle: {
-      type: 'string',
-      describe: 'Pubkey of the HNT price oracle',
+      type: "string",
+      describe: "Pubkey of the HNT price oracle",
     },
     hntThreshold: {
-      type: 'number',
-      describe: 'HNT threshold for the auto topoff',
+      type: "number",
+      describe: "HNT threshold for the auto topoff",
     },
     dcaMint: {
-      type: 'string',
-      describe: 'Pubkey of the DCA mint',
+      type: "string",
+      describe: "Pubkey of the DCA mint",
     },
     dcaSwapAmount: {
-      type: 'number',
-      describe: 'DCA swap amount for the auto topoff',
+      type: "number",
+      describe: "DCA swap amount for the auto topoff",
     },
     dcaIntervalSeconds: {
-      type: 'number',
-      describe: 'DCA interval seconds for the auto topoff',
+      type: "number",
+      describe: "DCA interval seconds for the auto topoff",
     },
     dcaInputPriceOracle: {
-      type: 'string',
-      describe: 'Pubkey of the DCA input price oracle',
+      type: "string",
+      describe: "Pubkey of the DCA input price oracle",
     },
     dcaOutputPriceOracle: {
-      type: 'string',
-      describe: 'Pubkey of the DCA output price oracle',
+      type: "string",
+      describe: "Pubkey of the DCA output price oracle",
     },
     dcaSigner: {
-      type: 'string',
-      describe: 'Pubkey of the DCA signer',
+      type: "string",
+      describe: "Pubkey of the DCA signer",
     },
     dcaUrl: {
-      type: 'string',
-      describe: 'URL of the DCA server',
+      type: "string",
+      describe: "URL of the DCA server",
     },
   });
 
@@ -112,7 +141,6 @@ export async function run(args: any = process.argv) {
   const subDaoMint = new PublicKey(argv.subDaoMint);
   const subDao = subDaoKey(subDaoMint)[0];
   const dcMint = new PublicKey(argv.dcMint);
-
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dataCreditsProgram = await initDc(provider);
@@ -131,21 +159,25 @@ export async function run(args: any = process.argv) {
   }
 
   const routerKey = argv.routerKey;
-  const delegatedDc = delegatedDataCreditsKey(subDao, routerKey)[0]
-  const instructions: TransactionInstruction[] = []
-  const delegatedDcAcc = await dataCreditsProgram.account.delegatedDataCreditsV0.fetchNullable(delegatedDc)
+  const delegatedDc = delegatedDataCreditsKey(subDao, routerKey)[0];
+  const instructions: TransactionInstruction[] = [];
+  const delegatedDcAcc =
+    await dataCreditsProgram.account.delegatedDataCreditsV0.fetchNullable(
+      delegatedDc
+    );
   if (!delegatedDcAcc) {
     instructions.push(
       createAssociatedTokenAccountIdempotentInstruction(
         authority,
         getAssociatedTokenAddressSync(dcMint, authority, true),
         authority,
-        dcMint,
+        dcMint
       ),
-      await dataCreditsProgram.methods.delegateDataCreditsV0({
-        routerKey,
-        amount: new anchor.BN(0),
-      })
+      await dataCreditsProgram.methods
+        .delegateDataCreditsV0({
+          routerKey,
+          amount: new anchor.BN(0),
+        })
         .accountsPartial({
           payer: authority,
           subDao: subDao,
@@ -156,97 +188,146 @@ export async function run(args: any = process.argv) {
           dataCredits: dataCreditsKey(dcMint)[0],
         })
         .instruction()
-    )
+    );
   }
 
-  const autoTopOff = autoTopOffKey(delegatedDc, authority)[0]
-  const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID)
-  const [nextTask, nextHntTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 2)
+  const autoTopOff = autoTopOffKey(delegatedDc, authority)[0];
+  const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
+    TASK_QUEUE_ID
+  );
+  const [nextTask, nextHntTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 2);
 
-  const autoTopOffAcc = await dcAutoTopoffProgram.account.autoTopOffV0.fetchNullable(autoTopOff!)
-  
+  const autoTopOffAcc =
+    await dcAutoTopoffProgram.account.autoTopOffV0.fetchNullable(autoTopOff!);
+
   // Check if auto topoff exists with different authority
   if (autoTopOffAcc && !autoTopOffAcc.authority.equals(authority)) {
-    console.log(`Authority mismatch detected. Old authority: ${autoTopOffAcc.authority.toBase58()}, New authority: ${authority.toBase58()}`)
-    
+    console.log(
+      `Authority mismatch detected. Old authority: ${autoTopOffAcc.authority.toBase58()}, New authority: ${authority.toBase58()}`
+    );
+
     // Get HNT balance from old auto topoff
-    const oldAutoTopOffHntAccount = getAssociatedTokenAddressSync(hntMint, autoTopOff!, true)
-    const oldHntAccountInfo = await provider.connection.getAccountInfo(oldAutoTopOffHntAccount)
-    let oldHntBalance = new anchor.BN(0)
+    const oldAutoTopOffHntAccount = getAssociatedTokenAddressSync(
+      hntMint,
+      autoTopOff!,
+      true
+    );
+    const oldHntAccountInfo = await provider.connection.getAccountInfo(
+      oldAutoTopOffHntAccount
+    );
+    let oldHntBalance = new anchor.BN(0);
     if (oldHntAccountInfo) {
-      const oldHntAccount = await provider.connection.getTokenAccountBalance(oldAutoTopOffHntAccount)
-      oldHntBalance = new anchor.BN(oldHntAccount.value.amount)
-      console.log(`Old auto topoff HNT balance: ${oldHntBalance.toString()}`)
+      const oldHntAccount = await provider.connection.getTokenAccountBalance(
+        oldAutoTopOffHntAccount
+      );
+      oldHntBalance = new anchor.BN(oldHntAccount.value.amount);
+      console.log(`Old auto topoff HNT balance: ${oldHntBalance.toString()}`);
     }
-    
+
     // Close the old auto topoff
-    const closeIx = await dcAutoTopoffProgram.methods.closeAutoTopOffV0()
+    const closeIx = await dcAutoTopoffProgram.methods
+      .closeAutoTopOffV0()
       .accounts({
         autoTopOff: autoTopOff!,
         rentRefund: authority,
       })
-      .instruction()
-    instructions.push(closeIx)
-    
-    const schedule = argv.schedule ? argv.schedule : Buffer.from(autoTopOffAcc.schedule).toString('utf-8').replace(/\0/g, '')
-    const threshold = argv.threshold ? new anchor.BN(argv.threshold) : autoTopOffAcc.threshold
-    
-    const newAutoTopOff = autoTopOffKey(delegatedDc, authority)[0]
-    const initIx = await dcAutoTopoffProgram.methods.initializeAutoTopOffV0({
-      schedule,
-      threshold,
-      routerKey,
-      hntThreshold: argv.hntThreshold ? new anchor.BN(argv.hntThreshold) : autoTopOffAcc.hntThreshold,
-      dcaMint: argv.dcaMint ? new PublicKey(argv.dcaMint) : autoTopOffAcc.dcaMint,
-      dcaSwapAmount: argv.dcaSwapAmount ? new anchor.BN(argv.dcaSwapAmount) : autoTopOffAcc.dcaSwapAmount,
-      dcaIntervalSeconds: argv.dcaIntervalSeconds ? new anchor.BN(argv.dcaIntervalSeconds) : autoTopOffAcc.dcaIntervalSeconds,
-      dcaInputPriceOracle: argv.dcaInputPriceOracle ? new PublicKey(argv.dcaInputPriceOracle) : autoTopOffAcc.dcaInputPriceOracle,
-      dcaSigner: argv.dcaSigner ? new PublicKey(argv.dcaSigner) : autoTopOffAcc.dcaSigner,
-      dcaUrl: argv.dcaUrl ? argv.dcaUrl : Buffer.from(autoTopOffAcc.dcaUrl).toString('utf-8').replace(/\0/g, ''),
-    })
+      .instruction();
+    instructions.push(closeIx);
+
+    const schedule = argv.schedule
+      ? argv.schedule
+      : Buffer.from(autoTopOffAcc.schedule)
+          .toString("utf-8")
+          .replace(/\0/g, "");
+    const threshold = argv.threshold
+      ? new anchor.BN(argv.threshold)
+      : autoTopOffAcc.threshold;
+
+    const newAutoTopOff = autoTopOffKey(delegatedDc, authority)[0];
+    const initIx = await dcAutoTopoffProgram.methods
+      .initializeAutoTopOffV0({
+        schedule,
+        threshold,
+        routerKey,
+        hntThreshold: argv.hntThreshold
+          ? new anchor.BN(argv.hntThreshold)
+          : autoTopOffAcc.hntThreshold,
+        dcaSwapAmount: argv.dcaSwapAmount
+          ? new anchor.BN(argv.dcaSwapAmount)
+          : autoTopOffAcc.dcaSwapAmount,
+        dcaIntervalSeconds: argv.dcaIntervalSeconds
+          ? new anchor.BN(argv.dcaIntervalSeconds)
+          : autoTopOffAcc.dcaIntervalSeconds,
+        dcaSigner: argv.dcaSigner
+          ? new PublicKey(argv.dcaSigner)
+          : autoTopOffAcc.dcaSigner,
+        dcaUrl: argv.dcaUrl
+          ? argv.dcaUrl
+          : Buffer.from(autoTopOffAcc.dcaUrl)
+              .toString("utf-8")
+              .replace(/\0/g, ""),
+      })
       .accountsPartial({
         payer: authority,
         authority,
         taskQueue: TASK_QUEUE_ID,
         delegatedDataCredits: delegatedDc,
+        dcaInputPriceOracle: argv.dcaInputPriceOracle
+          ? new PublicKey(argv.dcaInputPriceOracle)
+          : autoTopOffAcc.dcaInputPriceOracle,
         dao: daoKey(hntMint)[0],
         dataCredits: dataCreditsKey(dcMint)[0],
         dcMint,
         hntMint,
+        dcaMint: argv.dcaMint
+          ? new PublicKey(argv.dcaMint)
+          : autoTopOffAcc.dcaMint,
         subDao,
-        hntPriceOracle: argv.hntPriceOracle ? new PublicKey(argv.hntPriceOracle) : autoTopOffAcc.hntPriceOracle,
+        hntPriceOracle: argv.hntPriceOracle
+          ? new PublicKey(argv.hntPriceOracle)
+          : autoTopOffAcc.hntPriceOracle,
       })
-      .instruction()
-    instructions.push(initIx)
-    
-    const { instruction: scheduleTaskInstruction } = await dcAutoTopoffProgram.methods.scheduleTaskV0({
-      taskId: nextTask,
-      hntTaskId: nextHntTask,
-    })
-      .accountsPartial({
-        payer: authority,
-        autoTopOff: autoTopOff!,
-        nextTask: autoTopOff!,
-        task: taskKey(TASK_QUEUE_ID, nextTask)[0],
-        hntTask: taskKey(TASK_QUEUE_ID, nextHntTask)[0],
-        taskQueue: TASK_QUEUE_ID,
-      })
-      .prepare()
-    instructions.push(scheduleTaskInstruction)
-    
+      .instruction();
+    instructions.push(initIx);
+
+    const { instruction: scheduleTaskInstruction } =
+      await dcAutoTopoffProgram.methods
+        .scheduleTaskV0({
+          taskId: nextTask,
+          hntTaskId: nextHntTask,
+        })
+        .accountsPartial({
+          payer: authority,
+          autoTopOff: autoTopOff!,
+          nextTask: autoTopOff!,
+          task: taskKey(TASK_QUEUE_ID, nextTask)[0],
+          hntTask: taskKey(TASK_QUEUE_ID, nextHntTask)[0],
+          taskQueue: TASK_QUEUE_ID,
+        })
+        .prepare();
+    instructions.push(scheduleTaskInstruction);
+
     instructions.push(
       SystemProgram.transfer({
         fromPubkey: authority,
         toPubkey: newAutoTopOff,
         lamports: argv.initialLamports,
       })
-    )
-    
+    );
+
     // Transfer HNT from old wallet (if any) to new auto topoff
     if (oldHntBalance.gt(new anchor.BN(0))) {
-      const walletHntAccount = getAssociatedTokenAddressSync(hntMint, authority, true)
-      const newAutoTopOffHntAccount = getAssociatedTokenAddressSync(hntMint, newAutoTopOff, true)
-      
+      const walletHntAccount = getAssociatedTokenAddressSync(
+        hntMint,
+        authority,
+        true
+      );
+      const newAutoTopOffHntAccount = getAssociatedTokenAddressSync(
+        hntMint,
+        newAutoTopOff,
+        true
+      );
+
       instructions.push(
         createAssociatedTokenAccountIdempotentInstruction(
           authority,
@@ -254,8 +335,8 @@ export async function run(args: any = process.argv) {
           newAutoTopOff,
           hntMint
         )
-      )
-      
+      );
+
       instructions.push(
         createTransferInstruction(
           walletHntAccount,
@@ -263,25 +344,45 @@ export async function run(args: any = process.argv) {
           authority,
           BigInt(oldHntBalance.toString())
         )
-      )
-      
-      console.log(`Will transfer ${oldHntBalance.toString()} HNT from wallet to new auto topoff`)
+      );
+
+      console.log(
+        `Will transfer ${oldHntBalance.toString()} HNT from wallet to new auto topoff`
+      );
     }
   } else if (autoTopOffAcc) {
-    const queueAuthority = queueAuthorityKey()[0]
-    const taskRentRefund = (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextTask))?.rentRefund || authority
-    const hntTaskRentRefund = (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextHntTask))?.rentRefund || authority
-    
+    const queueAuthority = queueAuthorityKey()[0];
+    const taskRentRefund =
+      (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextTask))
+        ?.rentRefund || authority;
+    const hntTaskRentRefund =
+      (
+        await tuktukProgram.account.taskV0.fetchNullable(
+          autoTopOffAcc.nextHntTask
+        )
+      )?.rentRefund || authority;
+
     // Update the auto topoff configuration
-    const updateIx = await dcAutoTopoffProgram.methods.updateAutoTopOffV0({
-      schedule: argv.schedule ? argv.schedule : null,
-      threshold: argv.threshold ? new anchor.BN(argv.threshold) : null,
-      hntPriceOracle: argv.hntPriceOracle ? new PublicKey(argv.hntPriceOracle) : null,
-      hntThreshold: argv.hntThreshold ? new anchor.BN(argv.hntThreshold) : null,
-      dcaSwapAmount: argv.dcaSwapAmount ? new anchor.BN(argv.dcaSwapAmount) : null,
-      dcaIntervalSeconds: argv.dcaIntervalSeconds ? new anchor.BN(argv.dcaIntervalSeconds) : null,
-      dcaInputPriceOracle: argv.dcaInputPriceOracle ? new PublicKey(argv.dcaInputPriceOracle) : null,
-    })
+    const updateIx = await dcAutoTopoffProgram.methods
+      .updateAutoTopOffV0({
+        schedule: argv.schedule ? argv.schedule : null,
+        threshold: argv.threshold ? new anchor.BN(argv.threshold) : null,
+        hntPriceOracle: argv.hntPriceOracle
+          ? new PublicKey(argv.hntPriceOracle)
+          : null,
+        hntThreshold: argv.hntThreshold
+          ? new anchor.BN(argv.hntThreshold)
+          : null,
+        dcaSwapAmount: argv.dcaSwapAmount
+          ? new anchor.BN(argv.dcaSwapAmount)
+          : null,
+        dcaIntervalSeconds: argv.dcaIntervalSeconds
+          ? new anchor.BN(argv.dcaIntervalSeconds)
+          : null,
+        dcaInputPriceOracle: argv.dcaInputPriceOracle
+          ? new PublicKey(argv.dcaInputPriceOracle)
+          : null,
+      })
       .accountsPartial({
         payer: authority,
         autoTopOff: autoTopOff!,
@@ -289,16 +390,19 @@ export async function run(args: any = process.argv) {
         nextHntTask: autoTopOffAcc.nextHntTask,
         taskRentRefund,
         hntTaskRentRefund,
-        dcaMint: argv.dcaMint ? new PublicKey(argv.dcaMint) : autoTopOffAcc.dcaMint,
+        dcaMint: argv.dcaMint
+          ? new PublicKey(argv.dcaMint)
+          : autoTopOffAcc.dcaMint,
       })
-      .instruction()
-    instructions.push(updateIx)
-    
+      .instruction();
+    instructions.push(updateIx);
+
     // Schedule new tasks separately
-    const scheduleTaskIx = await dcAutoTopoffProgram.methods.scheduleTaskV0({
-      taskId: nextTask,
-      hntTaskId: nextHntTask,
-    })
+    const scheduleTaskIx = await dcAutoTopoffProgram.methods
+      .scheduleTaskV0({
+        taskId: nextTask,
+        hntTaskId: nextHntTask,
+      })
       .accountsPartial({
         payer: authority,
         autoTopOff: autoTopOff!,
@@ -307,63 +411,90 @@ export async function run(args: any = process.argv) {
         hntTask: taskKey(TASK_QUEUE_ID, nextHntTask)[0],
         taskQueue: TASK_QUEUE_ID,
       })
-      .instruction()
-    instructions.push(scheduleTaskIx)
+      .instruction();
+    instructions.push(scheduleTaskIx);
   } else {
     if (!argv.schedule || !argv.threshold) {
-      throw new Error("Schedule and threshold are required to initialize auto topoff")
+      throw new Error(
+        "Schedule and threshold are required to initialize auto topoff"
+      );
     }
     if (!argv.hntPriceOracle) {
-      throw new Error("HNT price oracle is required to initialize auto topoff")
+      throw new Error("HNT price oracle is required to initialize auto topoff");
     }
     if (!argv.dcaSigner) {
-      throw new Error("DCA signer is required to initialize auto topoff")
+      throw new Error("DCA signer is required to initialize auto topoff");
     }
     if (!argv.dcaUrl) {
-      throw new Error("DCA URL is required to initialize auto topoff")
+      throw new Error("DCA URL is required to initialize auto topoff");
     }
-    const instruction = await dcAutoTopoffProgram.methods.initializeAutoTopOffV0({
-      schedule: argv.schedule!,
-      threshold: new anchor.BN(argv.threshold!),
-      routerKey,
-      hntThreshold: new anchor.BN(argv.hntThreshold!),
-      dcaMint: new PublicKey(argv.dcaMint!),
-      dcaSwapAmount: new anchor.BN(argv.dcaSwapAmount!),
-      dcaIntervalSeconds: new anchor.BN(argv.dcaIntervalSeconds!),
-      dcaInputPriceOracle: new PublicKey(argv.dcaInputPriceOracle!),
-      dcaSigner: new PublicKey(argv.dcaSigner!),
-      dcaUrl: argv.dcaUrl!,
-    })
+    if (!argv.dcaMint) {
+      throw new Error("DCA mint is required to initialize auto topoff");
+    }
+    if (typeof argv.dcaSwapAmount !== "number") {
+      throw new Error("DCA swap amount is required to initialize auto topoff");
+    }
+    if (typeof argv.dcaIntervalSeconds !== "number") {
+      throw new Error(
+        "DCA interval seconds is required to initialize auto topoff"
+      );
+    }
+    if (!argv.dcaInputPriceOracle) {
+      throw new Error(
+        "DCA input price oracle is required to initialize auto topoff"
+      );
+    }
+    const instruction = await dcAutoTopoffProgram.methods
+      .initializeAutoTopOffV0({
+        schedule: argv.schedule!,
+        threshold: new anchor.BN(argv.threshold!),
+        routerKey,
+        hntThreshold: new anchor.BN(argv.hntThreshold!),
+        dcaSwapAmount: new anchor.BN(argv.dcaSwapAmount!),
+        dcaIntervalSeconds: new anchor.BN(argv.dcaIntervalSeconds!),
+        dcaSigner: new PublicKey(argv.dcaSigner!),
+        dcaUrl: argv.dcaUrl!,
+      })
       .accountsPartial({
         payer: authority,
         authority,
         taskQueue: TASK_QUEUE_ID,
+        dcaInputPriceOracle: new PublicKey(argv.dcaInputPriceOracle!),
         delegatedDataCredits: delegatedDc,
         dao: daoKey(hntMint)[0],
         dataCredits: dataCreditsKey(dcMint)[0],
-        dcMint,
+        dcaMint: new PublicKey(argv.dcaMint!),
         hntMint,
         subDao,
         hntPriceOracle: new PublicKey(argv.hntPriceOracle),
+        dcaMintAccount: getAssociatedTokenAddressSync(
+          new PublicKey(argv.dcaMint!),
+          autoTopOff!,
+          true
+        ),
       })
-      .instruction()
-
-    instructions.push(instruction)
-    const { instruction: scheduleTaskInstruction, pubkeys: { queueAuthority } } = await dcAutoTopoffProgram.methods.scheduleTaskV0({
-      taskId: nextTask,
-      hntTaskId: nextHntTask,
-    })
+      .instruction();
+    instructions.push(instruction);
+    const {
+      instruction: scheduleTaskInstruction,
+      pubkeys: { queueAuthority },
+    } = await dcAutoTopoffProgram.methods
+      .scheduleTaskV0({
+        taskId: nextTask,
+        hntTaskId: nextHntTask,
+      })
       .accountsPartial({
         payer: authority,
         autoTopOff: autoTopOff!,
         nextTask: autoTopOff!,
         task: taskKey(TASK_QUEUE_ID, nextTask)[0],
         hntTask: taskKey(TASK_QUEUE_ID, nextHntTask)[0],
+        nextHntTask: autoTopOff!,
         taskQueue: TASK_QUEUE_ID,
       })
-      .prepare()
-    console.log("Queue authority", queueAuthority!.toBase58())
-    instructions.push(scheduleTaskInstruction)
+      .prepare();
+    console.log("Queue authority", queueAuthority!.toBase58());
+    instructions.push(scheduleTaskInstruction);
 
     instructions.push(
       SystemProgram.transfer({
@@ -371,14 +502,23 @@ export async function run(args: any = process.argv) {
         toPubkey: autoTopOff!,
         lamports: argv.initialLamports,
       })
-    )
+    );
   }
 
   await sendInstructionsOrSquadsV4({
     provider,
     instructions,
+    addressLookupTableAddresses: [
+      provider.connection.rpcEndpoint.includes("test")
+        ? HELIUM_COMMON_LUT_DEVNET
+        : HELIUM_COMMON_LUT,
+    ],
     multisig: multisigPda!,
     signers: [],
   });
-  console.log(`Initialized auto topoff for ${routerKey} with schedule ${argv.schedule} and threshold ${argv.threshold}. Send HNT to ${autoTopOff!.toBase58()}`);
+  console.log(
+    `Initialized auto topoff for ${routerKey} with schedule ${
+      argv.schedule
+    } and threshold ${argv.threshold}. Send HNT to ${autoTopOff!.toBase58()}`
+  );
 }
