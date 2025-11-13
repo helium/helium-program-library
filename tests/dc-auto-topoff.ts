@@ -674,7 +674,7 @@ describe("dc-auto-topoff", () => {
         : expectedAfterFirstSwap.sub(actualAmount);
       expect(difference.toNumber()).to.be.lessThanOrEqual(
         1,
-        "After first swap, should have approximately 20 HNT (allowing for 1 bone rounding)"
+        "After first swap, should have approximately 10 HNT (allowing for 1 bone rounding)"
       );
 
       // Wait for second DCA swap (1 second interval)
