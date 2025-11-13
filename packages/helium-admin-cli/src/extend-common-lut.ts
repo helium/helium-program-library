@@ -70,14 +70,6 @@ export async function run(args: any = process.argv) {
     // "9hLWFGiit1ZpFHmopyacWqiVx8sQX9U86dnKqtDjkjnL",
     // Queue authority for welcome-pack
     // "3HTSCuJGL8e5zPpf7rMhq42YgA7f3WdF5bm78YQ3HEBK"
-    // HNT pyth
-    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33",
-    // USDC pyth
-    "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX",
-    // Prod multisig
-    "FXyzyVsmPRuZjbe97tsCpDqPAPPhBny4dr2hemo8XmL1",
-    // Prod multisig vault
-    "pULUgsYtKvT7qhsL8QJ2oJXYQUeCCdjtfawPnBqEr3U",
   ].map((a) => {
     return new PublicKey(a);
   });
