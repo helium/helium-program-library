@@ -77,9 +77,16 @@ impl DatabaseClient {
     }
 
     let statement_timeout_ms = config.statement_timeout_seconds * 1000;
+    let lock_timeout_ms = std::cmp::min(statement_timeout_ms, 30_000); // Max 30s to wait for locks
     connect_options = connect_options
       .application_name("atomic-data-publisher")
-      .options([("statement_timeout", statement_timeout_ms.to_string().as_str())]);
+      .options([
+        ("statement_timeout", statement_timeout_ms.to_string().as_str()),
+        ("lock_timeout", lock_timeout_ms.to_string().as_str()),
+        ("tcp_keepalives_idle", "60"),
+        ("tcp_keepalives_interval", "10"),
+        ("tcp_keepalives_count", "6"),
+      ]);
 
     // IAM auth tokens expire after 15 minutes, so force shorter connection lifetimes
     // to ensure connections are recycled before token expiration
@@ -110,10 +117,10 @@ impl DatabaseClient {
     sqlx::query("SELECT 1").execute(&pool).await?;
 
     info!(
-      "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {}, max_lifetime: {}s, idle_timeout: {}s, statement_timeout: {}s)",
+      "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {}, max_lifetime: {}s, idle_timeout: {}s, statement_timeout: {}s, lock_timeout: {}s, tcp_keepalive: 60s)",
       config.host, config.port, config.database_name, config.ssl_mode,
       if is_rds && config.password.is_empty() { "IAM" } else { "password" },
-      dry_run, max_lifetime, idle_timeout, config.statement_timeout_seconds
+      dry_run, max_lifetime, idle_timeout, config.statement_timeout_seconds, lock_timeout_ms / 1000
     );
 
     Ok(pool)
@@ -712,7 +719,11 @@ impl DatabaseClient {
     last_processed_block: i64,
     target_block: u64,
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      pool_guard.clone()
+    };
+
     crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name).map_err(|e| {
       AtomicDataError::QueryValidationError(format!(
         "Query validation failed for '{}': {}",
@@ -728,7 +739,7 @@ impl DatabaseClient {
     let query_start = std::time::Instant::now();
     let rows = tokio::time::timeout(
       std::time::Duration::from_secs(self.config.statement_timeout_seconds),
-      self.execute_query_inner(job, query, last_processed_block, target_block, pool)
+      self.execute_query_inner(job, query, last_processed_block, target_block, &pool)
     )
     .await
     .map_err(|_| {
@@ -751,7 +762,7 @@ impl DatabaseClient {
     query: &str,
     last_processed_block: i64,
     target_block: u64,
-    pool: tokio::sync::RwLockReadGuard<'_, PgPool>,
+    pool: &PgPool,
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
     let mut rows = Vec::with_capacity(BATCH_SIZE);
 
@@ -792,7 +803,7 @@ impl DatabaseClient {
         .bind(hotspot_type)
         .bind(last_processed_block)
         .bind(target_block as i64)
-        .fetch(&*pool);
+        .fetch(pool);
 
       let mut row_count = 0;
       while let Some(row_result) = stream.next().await {
@@ -827,7 +838,7 @@ impl DatabaseClient {
       let mut stream = sqlx::query(query)
         .bind(last_processed_block)
         .bind(target_block as i64)
-        .fetch(&*pool);
+        .fetch(pool);
 
       let mut row_count = 0;
       while let Some(row_result) = stream.next().await {
