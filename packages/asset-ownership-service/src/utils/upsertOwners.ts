@@ -72,10 +72,29 @@ export const upsertOwners = async ({
               })
             );
 
-            await AssetOwner.bulkCreate(assetsWithOwnerAndBlock, {
+            const existingOwners = await AssetOwner.findAll({
+              where: {
+                asset: assetsWithOwnerAndBlock.map((a) => a.asset),
+              },
+              attributes: ["asset", "owner"],
               transaction,
-              updateOnDuplicate: ["asset", "owner", "lastBlock"],
             });
+
+            const existingOwnerMap = new Map(
+              existingOwners.map((a) => [a.asset, a.owner])
+            );
+
+            const assetsToUpdate = assetsWithOwnerAndBlock.filter((a) => {
+              const existing = existingOwnerMap.get(a.asset);
+              return !existing || existing !== a.owner;
+            });
+
+            if (assetsToUpdate.length > 0) {
+              await AssetOwner.bulkCreate(assetsToUpdate, {
+                transaction,
+                updateOnDuplicate: ["owner", "lastBlock", "updatedAt"],
+              });
+            }
 
             await transaction.commit();
 
