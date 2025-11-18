@@ -411,7 +411,7 @@ export const upsertProgramAccounts = async ({
                 existingRecords.map((record) => [record.get("address"), record])
               );
 
-              const values = await Promise.all(
+              const results = await Promise.all(
                 accs.map(async ({ publicKey, account }) => {
                   let sanitizedAccount = sanitizeAccount(account);
 
@@ -441,27 +441,50 @@ export const upsertProgramAccounts = async ({
 
                   if (shouldUpdate) {
                     return {
-                      ...newRecord,
-                      lastBlock,
+                      record: {
+                        ...newRecord,
+                        lastBlock,
+                      },
+                      shouldUpdate: true,
                     };
                   } else {
                     return {
-                      ...newRecord,
-                      lastBlock: existingData?.lastBlock || lastBlock,
+                      record: {
+                        ...newRecord,
+                        lastBlock: existingData?.lastBlock || lastBlock,
+                      },
+                      shouldUpdate: false,
                     };
                   }
                 })
               );
 
-              await model.bulkCreate(values, {
-                transaction,
-                updateOnDuplicate: [
-                  "address",
-                  "refreshedAt",
-                  "lastBlock",
-                  ...updateOnDuplicateFields,
-                ],
-              });
+              const toUpdate = results
+                .filter((r) => r.shouldUpdate)
+                .map((r) => r.record);
+
+              const toTouch = results
+                .filter((r) => !r.shouldUpdate)
+                .map((r) => r.record);
+
+              if (toUpdate.length > 0) {
+                await model.bulkCreate(toUpdate, {
+                  transaction,
+                  updateOnDuplicate: [
+                    "address",
+                    "refreshedAt",
+                    "lastBlock",
+                    ...updateOnDuplicateFields,
+                  ],
+                });
+              }
+
+              if (toTouch.length > 0) {
+                await model.bulkCreate(toTouch, {
+                  transaction,
+                  updateOnDuplicate: ["address", "refreshedAt"],
+                });
+              }
             }
           );
 
