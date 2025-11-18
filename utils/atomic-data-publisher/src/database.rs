@@ -31,7 +31,7 @@ pub struct ChangeRecord {
 
 #[derive(Debug)]
 pub struct DatabaseClient {
-  pool: Arc<RwLock<PgPool>>,
+  pool: Arc<RwLock<Arc<PgPool>>>,
   config: DatabaseConfig,
   polling_jobs: Vec<PollingJob>,
   dry_run: bool,
@@ -43,7 +43,7 @@ impl DatabaseClient {
     Self::validate_polling_jobs(&polling_jobs)?;
 
     let pool = Self::create_pool(config, dry_run).await?;
-    let pool = Arc::new(RwLock::new(pool));
+    let pool = Arc::new(RwLock::new(Arc::new(pool)));
 
     Ok(Self {
       pool,
@@ -77,9 +77,16 @@ impl DatabaseClient {
     }
 
     let statement_timeout_ms = config.statement_timeout_seconds * 1000;
+    let lock_timeout_ms = std::cmp::min(statement_timeout_ms, 30_000); // Max 30s to wait for row locks
     connect_options = connect_options
       .application_name("atomic-data-publisher")
-      .options([("statement_timeout", statement_timeout_ms.to_string().as_str())]);
+      .options([
+        ("statement_timeout", statement_timeout_ms.to_string().as_str()),
+        ("lock_timeout", lock_timeout_ms.to_string().as_str()),
+        ("tcp_keepalives_idle", "60"),
+        ("tcp_keepalives_interval", "10"),
+        ("tcp_keepalives_count", "6"),
+      ]);
 
     // IAM auth tokens expire after 15 minutes, so force shorter connection lifetimes
     // to ensure connections are recycled before token expiration
@@ -110,10 +117,10 @@ impl DatabaseClient {
     sqlx::query("SELECT 1").execute(&pool).await?;
 
     info!(
-      "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {}, max_lifetime: {}s, idle_timeout: {}s, statement_timeout: {}s)",
+      "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {}, max_lifetime: {}s, idle_timeout: {}s, statement_timeout: {}s, lock_timeout: {}s, tcp_keepalive: 60s)",
       config.host, config.port, config.database_name, config.ssl_mode,
       if is_rds && config.password.is_empty() { "IAM" } else { "password" },
-      dry_run, max_lifetime, idle_timeout, config.statement_timeout_seconds
+      dry_run, max_lifetime, idle_timeout, config.statement_timeout_seconds, lock_timeout_ms / 1000
     );
 
     Ok(pool)
@@ -130,12 +137,19 @@ impl DatabaseClient {
       for attempt in 1..=3 {
         match Self::create_pool(&self.config, self.dry_run).await {
           Ok(new_pool) => {
-            let mut pool_write = self.pool.write().await;
-            let old_pool = std::mem::replace(&mut *pool_write, new_pool);
-            drop(pool_write);
+            let new_pool_arc = Arc::new(new_pool);
+            let old_pool = {
+              let mut pool_write = self.pool.write().await;
+              let old = std::mem::replace(&mut *pool_write, new_pool_arc);
+              old
+            }; // Write lock dropped here
 
-            // Close old pool gracefully
-            old_pool.close().await;
+            // Close old pool gracefully in background - don't block on it
+            tokio::spawn(async move {
+              old_pool.close().await;
+              debug!("Old database pool closed");
+            });
+
             info!("Database pool refreshed successfully on attempt {}", attempt);
             return Ok(());
           }
@@ -288,7 +302,10 @@ impl DatabaseClient {
   }
 
   pub async fn create_state_tables(&self) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let create_table_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
         job_name VARCHAR(255) NOT NULL UNIQUE,
@@ -360,7 +377,10 @@ impl DatabaseClient {
   }
 
   pub async fn table_exists(&self, table_name: &str) -> Result<bool> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let query = r#"
       SELECT EXISTS (
         SELECT FROM information_schema.tables
@@ -384,7 +404,10 @@ impl DatabaseClient {
     query_name: &str,
     queue_position: i32,
   ) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let existing_state = sqlx::query(
       r#"
       SELECT
@@ -562,7 +585,10 @@ impl DatabaseClient {
   /// Get the polling bounds (last processed block and max available block) for a job
   /// Returns (last_processed_block as Option<i64> from DB, max_available_block as u64)
   async fn get_polling_bounds(&self, job: &PollingJob) -> Result<(Option<i64>, u64), AtomicDataError> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let current_state_row = sqlx::query(
       r#"
       SELECT
@@ -674,7 +700,10 @@ impl DatabaseClient {
     query_name: &str,
     max_block: u64,
   ) -> Result<(), AtomicDataError> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     // last_max_block tracks the source data state, shared across both modes
     sqlx::query(
       r#"
@@ -712,7 +741,11 @@ impl DatabaseClient {
     last_processed_block: i64,
     target_block: u64,
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
+
     crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name).map_err(|e| {
       AtomicDataError::QueryValidationError(format!(
         "Query validation failed for '{}': {}",
@@ -728,7 +761,7 @@ impl DatabaseClient {
     let query_start = std::time::Instant::now();
     let rows = tokio::time::timeout(
       std::time::Duration::from_secs(self.config.statement_timeout_seconds),
-      self.execute_query_inner(job, query, last_processed_block, target_block, pool)
+      self.execute_query_inner(job, query, last_processed_block, target_block, &pool)
     )
     .await
     .map_err(|_| {
@@ -751,7 +784,7 @@ impl DatabaseClient {
     query: &str,
     last_processed_block: i64,
     target_block: u64,
-    pool: tokio::sync::RwLockReadGuard<'_, PgPool>,
+    pool: &PgPool,
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
     let mut rows = Vec::with_capacity(BATCH_SIZE);
 
@@ -792,7 +825,7 @@ impl DatabaseClient {
         .bind(hotspot_type)
         .bind(last_processed_block)
         .bind(target_block as i64)
-        .fetch(&*pool);
+        .fetch(pool);
 
       let mut row_count = 0;
       while let Some(row_result) = stream.next().await {
@@ -827,7 +860,7 @@ impl DatabaseClient {
       let mut stream = sqlx::query(query)
         .bind(last_processed_block)
         .bind(target_block as i64)
-        .fetch(&*pool);
+        .fetch(pool);
 
       let mut row_count = 0;
       while let Some(row_result) = stream.next().await {
@@ -869,7 +902,10 @@ impl DatabaseClient {
       return self.advance_block_for_active_job(target_block).await;
     }
 
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let mut processed_tables = std::collections::HashSet::new();
 
     debug!(
@@ -936,7 +972,10 @@ impl DatabaseClient {
     query_name: &str,
     target_block: u64,
   ) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     // Update the appropriate block counter based on dry_run mode
     let update_query = if self.dry_run {
       r#"
@@ -973,7 +1012,10 @@ impl DatabaseClient {
   }
 
   async fn advance_block_for_active_job(&self, target_block: u64) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let active_job = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -998,7 +1040,10 @@ impl DatabaseClient {
   }
 
   pub async fn health_check(&self) -> Result<(), sqlx::Error> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     // Test basic connectivity
     sqlx::query("SELECT 1").execute(&*pool).await?;
 
@@ -1016,7 +1061,10 @@ impl DatabaseClient {
   }
 
   pub async fn test_connection(&self) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     tokio::time::timeout(
       std::time::Duration::from_secs(5),
       sqlx::query("SELECT 1").execute(&*pool)
@@ -1048,7 +1096,10 @@ impl DatabaseClient {
     parameters: &serde_json::Value,
     use_max: bool,
   ) -> Result<Option<u64>> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let block = match query_name {
       "construct_atomic_hotspots" => {
         let hotspot_type = parameters
@@ -1171,7 +1222,10 @@ impl DatabaseClient {
     job: &PollingJob,
     after_block: u64,
   ) -> Result<Option<u64>> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let block = match job.query_name.as_str() {
       "construct_atomic_hotspots" => {
         let hotspot_type = job.parameters
@@ -1254,7 +1308,10 @@ impl DatabaseClient {
   }
 
   pub async fn any_job_running(&self) -> Result<bool> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let row = sqlx::query(
       r#"
       SELECT COUNT(*) as running_count
@@ -1276,7 +1333,10 @@ impl DatabaseClient {
   }
 
   pub async fn mark_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let mut tx = pool.begin().await?;
     let existing = sqlx::query(
       r#"
@@ -1336,7 +1396,10 @@ impl DatabaseClient {
   }
 
   pub async fn mark_job_not_running(&self, job_name: &str, query_name: &str) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1360,7 +1423,10 @@ impl DatabaseClient {
   }
 
   async fn get_next_queue_job(&self) -> Result<Option<PollingJob>> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let row = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -1392,7 +1458,10 @@ impl DatabaseClient {
   }
 
   pub async fn mark_completed(&self, job_name: &str, query_name: &str) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1415,7 +1484,10 @@ impl DatabaseClient {
   }
 
   async fn reset_job_queue(&self) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1432,7 +1504,10 @@ impl DatabaseClient {
   }
 
   pub async fn cleanup_stale_jobs(&self) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
 
     // Adaptive stale job detection (backup safety net):
     // - If job is caught up (within 10% of max_block), use 10 min threshold (likely stuck)
@@ -1577,7 +1652,10 @@ impl DatabaseClient {
   }
 
   pub async fn cleanup_all_jobs(&self) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let result = sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1632,7 +1710,10 @@ impl DatabaseClient {
     error_type: &str,
     error_message: &str,
   ) -> Result<()> {
-    let pool = self.pool.read().await;
+    let pool = {
+      let pool_guard = self.pool.read().await;
+      Arc::clone(&*pool_guard)
+    };
     let record_hash = Self::generate_record_hash(record);
 
     // Use INSERT ... ON CONFLICT to update failure count if already exists
