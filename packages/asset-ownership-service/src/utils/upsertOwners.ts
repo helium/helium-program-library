@@ -78,10 +78,11 @@ export const upsertOwners = async ({
               },
               attributes: ["asset", "owner"],
               transaction,
+              raw: true,
             });
 
             const existingOwnerMap = new Map(
-              existingOwners.map((a) => [a.asset, a.owner])
+              existingOwners.map((a: any) => [a.asset, a.owner])
             );
 
             const assetsToUpdate = assetsWithOwnerAndBlock.filter((a) => {
@@ -98,7 +99,7 @@ export const upsertOwners = async ({
 
             await transaction.commit();
 
-            processedCount += assetBatch.length;
+            processedCount += assetsToUpdate.length;
           } catch (err) {
             await transaction.rollback();
             throw err;
@@ -112,6 +113,10 @@ export const upsertOwners = async ({
 
   await Promise.all(batchPromises);
   console.log(
-    `Finished processing ${assetPks.length} assets for ownership updates`
+    `Finished processing ${
+      assetPks.length
+    } assets: ${processedCount} updated, ${
+      assetPks.length - processedCount
+    } unchanged`
   );
 };
