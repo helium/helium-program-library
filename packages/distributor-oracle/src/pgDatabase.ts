@@ -38,7 +38,7 @@ export class PgDatabase implements Database {
     ) => Promise<Asset[]> = searchAssets
   ) {}
 
-  private async getOrCreateWalletClaimJob(
+  private async getOrCreateWalletClaimJobForOwner(
     wallet: PublicKey,
     batchNumber?: number
   ) {
@@ -67,11 +67,11 @@ export class PgDatabase implements Database {
           LEFT JOIN recipients rec
             ON kta.asset = rec.asset
             AND rec.lazy_distributor = :lazyDistributor
-          WHERE ao.owner = :owner
+          WHERE ao.owner = :wallet
         `,
         {
           replacements: {
-            owner: wallet.toBase58(),
+            wallet: wallet.toBase58(),
             lazyDistributor: this.lazyDistributor.toBase58(),
           },
           type: QueryTypes.SELECT,
@@ -94,15 +94,103 @@ export class PgDatabase implements Database {
     return job;
   }
 
+  private async getOrCreateWalletClaimJobForDestination(
+    destination: PublicKey,
+    batchNumber?: number
+  ) {
+    if (!batchNumber) {
+      await WalletClaimJob.destroy({
+        where: { wallet: destination.toBase58() },
+      });
+    }
+    let job = await WalletClaimJob.findOne({
+      where: { wallet: destination.toBase58() },
+    });
+    if (!job) {
+      const results = await sequelize.query<{
+        kta_address: string;
+        lifetime: string;
+        claimed: string;
+      }>(
+        `
+          SELECT
+            kta.address AS kta_address,
+            COALESCE(r.rewards, '0') AS lifetime,
+            COALESCE(rec.total_rewards, '0') AS claimed
+          FROM key_to_assets kta
+          JOIN reward_index r ON kta.encoded_entity_key = r.address
+          JOIN recipients rec
+            ON kta.asset = rec.asset
+            AND rec.lazy_distributor = :lazyDistributor
+          WHERE rec.destination = :wallet
+        `,
+        {
+          replacements: {
+            wallet: destination.toBase58(),
+            lazyDistributor: this.lazyDistributor.toBase58(),
+          },
+          type: QueryTypes.SELECT,
+        }
+      );
+      const allKtas = results
+        .filter((row) => {
+          const lifetime = row.lifetime ?? "0";
+          const claimed = row.claimed ?? "0";
+          return new BN(lifetime).sub(new BN(claimed)).gt(new BN("0"));
+        })
+        .map((row) => row.kta_address);
+
+      job = await WalletClaimJob.create({
+        wallet: destination.toBase58(),
+        remainingKtas: allKtas,
+      });
+      await job.save();
+    }
+    return job;
+  }
+
   async getRewardableEntities(
     wallet: PublicKey,
     limit: number,
     batchNumber: number = 0
   ): Promise<{
-    entities: { keyToAsset: PublicKey }[];
+    entities: Pick<RewardableEntity, "keyToAsset">[];
     nextBatchNumber: number;
   }> {
-    const job = await this.getOrCreateWalletClaimJob(wallet, batchNumber);
+    const job = await this.getOrCreateWalletClaimJobForOwner(
+      wallet,
+      batchNumber
+    );
+    let nextBatchNumber = batchNumber || 0;
+    const remainingKtas = job.remainingKtas.slice(
+      nextBatchNumber * limit,
+      (nextBatchNumber + 1) * limit
+    );
+
+    const entities = remainingKtas.map((kta: string) => ({
+      keyToAsset: new PublicKey(kta),
+    }));
+
+    nextBatchNumber++;
+
+    return {
+      entities,
+      nextBatchNumber,
+    };
+  }
+
+  async getRewardableEntitiesByDestination(
+    destination: PublicKey,
+    limit: number,
+    batchNumber: number = 0
+  ): Promise<{
+    entities: Pick<RewardableEntity, "keyToAsset">[];
+    nextBatchNumber: number;
+  }> {
+    const job = await this.getOrCreateWalletClaimJobForDestination(
+      destination,
+      batchNumber
+    );
     let nextBatchNumber = batchNumber || 0;
     const remainingKtas = job.remainingKtas.slice(
       nextBatchNumber * limit,
