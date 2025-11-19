@@ -69,7 +69,7 @@ import {
   MAX_CLAIMS_PER_TX,
   RECIPIENT_RENT,
 } from "./constants";
-import { Database, DeviceType } from "./database";
+import { Database, DeviceType, RewardableEntity } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
 import { KeyToAsset, Reward } from "./model";
 import { PgDatabase } from "./pgDatabase";
@@ -176,6 +176,10 @@ export class OracleServer {
     this.app.post(
       "/v1/tuktuk/wallet/:wallet",
       this.tuktukWalletHandler.bind(this)
+    );
+    this.app.post(
+      "/v1/tuktuk/destination/:wallet",
+      this.tuktukDestinationHandler.bind(this)
     );
     this.app.post("/v1/sign", this.signHandler.bind(this));
   }
@@ -566,8 +570,8 @@ export class OracleServer {
       // @ts-ignore
       const currentRewards = entityKey
         ? await this.db.getCurrentRewardsByEntity(
-          decodeEntityKey(entityKey, keySerialization)!
-        )
+            decodeEntityKey(entityKey, keySerialization)!
+          )
         : await this.db.getCurrentRewards(mint);
       if (proposedCurrentRewards.gt(new BN(currentRewards))) {
         return {
@@ -671,7 +675,7 @@ export class OracleServer {
     try {
       const asset = await getAsset(
         process.env.ASSET_API_URL ||
-        this.ldProgram.provider.connection.rpcEndpoint,
+          this.ldProgram.provider.connection.rpcEndpoint,
         new PublicKey(request.params.assetId)
       );
       if (!asset) {
@@ -683,8 +687,8 @@ export class OracleServer {
       const keyToAssetK = await keyToAssetForAsset(asset, this.dao);
       let keyToAsset = await KeyToAsset.findOne({
         where: {
-          address: keyToAssetK.toBase58()
-        }
+          address: keyToAssetK.toBase58(),
+        },
       });
       if (!keyToAsset) {
         reply.status(404).send({
@@ -693,7 +697,14 @@ export class OracleServer {
         return;
       }
 
-      return this.handleKta(reply, asset, keyToAsset, taskQueue, task, taskQueuedAt);
+      return this.handleKta(
+        reply,
+        asset,
+        keyToAsset,
+        taskQueue,
+        task,
+        taskQueuedAt
+      );
     } catch (err) {
       console.error(err);
       reply.status(500).send({
@@ -702,14 +713,24 @@ export class OracleServer {
     }
   }
 
-  private async handleKta(reply: FastifyReply, asset: Asset, keyToAsset: KeyToAsset, taskQueue: PublicKey, task: PublicKey, taskQueuedAt: BN) {
+  private async handleKta(
+    reply: FastifyReply,
+    asset: Asset,
+    keyToAsset: KeyToAsset,
+    taskQueue: PublicKey,
+    task: PublicKey,
+    taskQueuedAt: BN
+  ) {
     const [wallet, bump] = customSignerKey(taskQueue, [
       Buffer.from("claim_payer"),
       asset!.ownership.owner.toBuffer(),
     ]);
     const bumpBuffer = Buffer.alloc(1);
     bumpBuffer.writeUint8(bump);
-    const recipient = recipientKey(this.lazyDistributor, new PublicKey(keyToAsset.asset!))[0];
+    const recipient = recipientKey(
+      this.lazyDistributor,
+      new PublicKey(keyToAsset.asset!)
+    )[0];
     let recipientAcc = await this.ldProgram.account.recipientV0.fetchNullable(
       recipient
     );
@@ -727,7 +748,7 @@ export class OracleServer {
     const ataExists =
       !!(await this.ldProgram.provider.connection.getAccountInfo(ata));
     const neededBalance =
-      ((!ataExists || !recipientAcc) ? 0.00089088 * LAMPORTS_PER_SOL : 0) +
+      (!ataExists || !recipientAcc ? 0.00089088 * LAMPORTS_PER_SOL : 0) +
       (recipientAcc ? 0 : RECIPIENT_RENT) +
       (ataExists ? 0 : ATA_RENT);
 
@@ -742,10 +763,9 @@ export class OracleServer {
       // @ts-ignore (we can remove this after a package publish)
     } else if (asset?.burnt) {
       instructions.push(
-        createMemoInstruction(
-          "Couldn't claim rewards due to burnt hotspot",
-          [wallet]
-        )
+        createMemoInstruction("Couldn't claim rewards due to burnt hotspot", [
+          wallet,
+        ])
       );
     } else {
       let distributeIx;
@@ -806,7 +826,7 @@ export class OracleServer {
           .instruction();
       }
 
-      const entityKey = keyToAsset.encodedEntityKey!
+      const entityKey = keyToAsset.encodedEntityKey!;
 
       if (!recipientAcc) {
         if (asset?.compression.compressed) {
@@ -893,7 +913,6 @@ export class OracleServer {
       })),
     };
     reply.status(200).send(resp);
-
   }
 
   private async tuktukKtaHandler(
@@ -909,8 +928,8 @@ export class OracleServer {
     try {
       let keyToAsset = await KeyToAsset.findOne({
         where: {
-          address: request.params.keyToAssetKey
-        }
+          address: request.params.keyToAssetKey,
+        },
       });
       if (!keyToAsset) {
         reply.status(404).send({
@@ -920,7 +939,7 @@ export class OracleServer {
       }
       const asset = await getAsset(
         process.env.ASSET_API_URL ||
-        this.ldProgram.provider.connection.rpcEndpoint,
+          this.ldProgram.provider.connection.rpcEndpoint,
         new PublicKey(keyToAsset.asset!)
       );
       if (!asset) {
@@ -929,13 +948,138 @@ export class OracleServer {
         });
         return;
       }
-      return this.handleKta(reply, asset, keyToAsset, taskQueue, task, taskQueuedAt);
+      return this.handleKta(
+        reply,
+        asset,
+        keyToAsset,
+        taskQueue,
+        task,
+        taskQueuedAt
+      );
     } catch (err) {
       console.error(err);
       reply.status(500).send({
         message: "Request failed",
       });
     }
+  }
+
+  private async handleTuktukWalletOrDestination(
+    wallet: string,
+    entities: Pick<RewardableEntity, "keyToAsset">[],
+    nextBatchNumber: number,
+    taskQueue: PublicKey,
+    task: PublicKey,
+    taskQueuedAt: BN
+  ): Promise<{
+    transaction: string;
+    signature: string;
+    remaining_accounts: Array<{
+      pubkey: string;
+      is_signer: boolean;
+      is_writable: boolean;
+    }>;
+  }> {
+    const [customSignerWallet, bump] = customSignerKey(taskQueue, [
+      Buffer.from("claim_payer"),
+      new PublicKey(wallet).toBuffer(),
+    ]);
+    const bumpBuffer = Buffer.alloc(1);
+    bumpBuffer.writeUint8(bump);
+
+    const taskQueueAcc = await this.tuktukProgram.account.taskQueueV0.fetch(
+      taskQueue
+    );
+    const balance =
+      (
+        await this.ldProgram.provider.connection.getAccountInfo(
+          customSignerWallet
+        )
+      )?.lamports || 0;
+    const fees = taskQueueAcc.minCrankReward.toNumber() * (entities.length + 1);
+    const neededBalance = 0.00089088 * LAMPORTS_PER_SOL + fees;
+    const instructions: TransactionInstruction[] = [];
+    if (balance < neededBalance) {
+      instructions.push(
+        createMemoInstruction(
+          "Finished claiming rewards due to insufficient balance",
+          [customSignerWallet]
+        )
+      );
+    } else {
+      instructions.push(
+        SystemProgram.transfer({
+          fromPubkey: customSignerWallet,
+          toPubkey: task,
+          lamports: fees,
+        })
+      );
+      for (const entity of entities) {
+        instructions.push(
+          // @ts-ignore (we can remove this after a package publish)
+          await this.hplCronsProgram.methods
+            .requeueEntityClaimV1()
+            .accounts({
+              keyToAsset: entity.keyToAsset,
+              wallet: new PublicKey(wallet),
+            })
+            .instruction()
+        );
+      }
+
+      if (entities.length > 0) {
+        instructions.push(
+          await this.hplCronsProgram.methods
+            .requeueWalletClaimV0({
+              batchNumber: nextBatchNumber,
+            })
+            .accounts({
+              wallet: new PublicKey(wallet),
+            })
+            .instruction()
+        );
+      } else {
+        instructions.push(
+          createMemoInstruction("Finished claiming rewards", [
+            customSignerWallet,
+          ])
+        );
+      }
+    }
+
+    const { transaction, remainingAccounts } = await compileTransaction(
+      instructions,
+      [
+        [
+          Buffer.from("claim_payer"),
+          new PublicKey(wallet).toBuffer(),
+          bumpBuffer,
+        ],
+      ]
+    );
+    const remoteTx = new RemoteTaskTransactionV0({
+      task,
+      taskQueuedAt,
+      transaction: {
+        ...transaction,
+        accounts: remainingAccounts.map((acc) => acc.pubkey),
+      },
+    });
+    const serialized = await RemoteTaskTransactionV0.serialize(
+      this.tuktukProgram.coder.accounts,
+      remoteTx
+    );
+    return {
+      transaction: serialized.toString("base64"),
+      signature: Buffer.from(
+        sign.detached(Uint8Array.from(serialized), this.oracle.secretKey)
+      ).toString("base64"),
+      remaining_accounts: remainingAccounts.map((acc) => ({
+        pubkey: acc.pubkey.toBase58(),
+        is_signer: acc.isSigner,
+        is_writable: acc.isWritable,
+      })),
+    };
   }
 
   private async tuktukWalletHandler(
@@ -952,113 +1096,56 @@ export class OracleServer {
     const task = new PublicKey(request.body.task);
     const taskQueuedAt = new BN(request.body.task_queued_at);
     try {
-      const [customSignerWallet, bump] = customSignerKey(taskQueue, [
-        Buffer.from("claim_payer"),
-        new PublicKey(wallet).toBuffer(),
-      ]);
-      const bumpBuffer = Buffer.alloc(1);
-      bumpBuffer.writeUint8(bump);
-
       const { entities, nextBatchNumber } = await this.db.getRewardableEntities(
         new PublicKey(wallet),
         MAX_CLAIMS_PER_TX,
         Number(batchNumber || 0)
       );
-
-      const taskQueueAcc = await this.tuktukProgram.account.taskQueueV0.fetch(
-        taskQueue
-      );
-      const balance =
-        (
-          await this.ldProgram.provider.connection.getAccountInfo(
-            customSignerWallet
-          )
-        )?.lamports || 0;
-      const fees =
-        taskQueueAcc.minCrankReward.toNumber() * (entities.length + 1);
-      const neededBalance = 0.00089088 * LAMPORTS_PER_SOL + fees;
-      const instructions: TransactionInstruction[] = [];
-      if (balance < neededBalance) {
-        instructions.push(
-          createMemoInstruction(
-            "Finished claiming rewards due to insufficient balance",
-            [customSignerWallet]
-          )
-        );
-      } else {
-        instructions.push(
-          SystemProgram.transfer({
-            fromPubkey: customSignerWallet,
-            toPubkey: task,
-            lamports: fees,
-          })
-        );
-        for (const entity of entities) {
-          instructions.push(
-            // @ts-ignore (we can remove this after a package publish)
-            await this.hplCronsProgram.methods
-              .requeueEntityClaimV1()
-              .accounts({
-                keyToAsset: entity.keyToAsset,
-                wallet: new PublicKey(wallet),
-              })
-              .instruction()
-          );
-        }
-
-        if (entities.length > 0) {
-          instructions.push(
-            await this.hplCronsProgram.methods
-              .requeueWalletClaimV0({
-                batchNumber: nextBatchNumber,
-              })
-              .accounts({
-                wallet: new PublicKey(wallet),
-              })
-              .instruction()
-          );
-        } else {
-          instructions.push(
-            createMemoInstruction("Finished claiming rewards", [
-              customSignerWallet,
-            ])
-          );
-        }
-      }
-
-      const { transaction, remainingAccounts } = await compileTransaction(
-        instructions,
-        [
-          [
-            Buffer.from("claim_payer"),
-            new PublicKey(wallet).toBuffer(),
-            bumpBuffer,
-          ],
-        ]
-      );
-      const remoteTx = new RemoteTaskTransactionV0({
+      const resp = await this.handleTuktukWalletOrDestination(
+        wallet,
+        entities,
+        nextBatchNumber,
+        taskQueue,
         task,
-        taskQueuedAt,
-        transaction: {
-          ...transaction,
-          accounts: remainingAccounts.map((acc) => acc.pubkey),
-        },
-      });
-      const serialized = await RemoteTaskTransactionV0.serialize(
-        this.tuktukProgram.coder.accounts,
-        remoteTx
+        taskQueuedAt
       );
-      const resp = {
-        transaction: serialized.toString("base64"),
-        signature: Buffer.from(
-          sign.detached(Uint8Array.from(serialized), this.oracle.secretKey)
-        ).toString("base64"),
-        remaining_accounts: remainingAccounts.map((acc) => ({
-          pubkey: acc.pubkey.toBase58(),
-          is_signer: acc.isSigner,
-          is_writable: acc.isWritable,
-        })),
-      };
+      reply.status(200).send(resp);
+    } catch (err) {
+      console.error(err);
+      reply.status(500).send({
+        message: "Request failed",
+      });
+    }
+  }
+
+  private async tuktukDestinationHandler(
+    request: FastifyRequest<{
+      Params: { wallet: string };
+      Querystring: { batchNumber?: number };
+      Body: { task_queue: string; task: string; task_queued_at: number };
+    }>,
+    reply: FastifyReply
+  ) {
+    const wallet = request.params.wallet;
+    const batchNumber = request.query.batchNumber;
+    const taskQueue = new PublicKey(request.body.task_queue);
+    const task = new PublicKey(request.body.task);
+    const taskQueuedAt = new BN(request.body.task_queued_at);
+    try {
+      const { entities, nextBatchNumber } =
+        await this.db.getRewardableEntitiesByDestination(
+          new PublicKey(wallet),
+          MAX_CLAIMS_PER_TX,
+          Number(batchNumber || 0)
+        );
+      const resp = await this.handleTuktukWalletOrDestination(
+        wallet,
+        entities,
+        nextBatchNumber,
+        taskQueue,
+        task,
+        taskQueuedAt
+      );
       reply.status(200).send(resp);
     } catch (err) {
       console.error(err);
