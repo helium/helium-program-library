@@ -405,10 +405,11 @@ export const upsertProgramAccounts = async ({
               const existingRecords = await model.findAll({
                 where: { address: addresses },
                 transaction,
+                raw: true,
               });
 
               const existingRecordMap = new Map(
-                existingRecords.map((record) => [record.get("address"), record])
+                existingRecords.map((record: any) => [record.address, record])
               );
 
               const results = await Promise.all(
@@ -432,8 +433,7 @@ export const upsertProgramAccounts = async ({
                   };
 
                   const existingRecord = existingRecordMap.get(publicKey);
-                  const existingData = existingRecord?.dataValues;
-                  const existingClean = _omit(existingData || {}, OMIT_KEYS);
+                  const existingClean = _omit(existingRecord || {}, OMIT_KEYS);
                   const newClean = _omit(newRecord, OMIT_KEYS);
 
                   const shouldUpdate =
@@ -451,7 +451,7 @@ export const upsertProgramAccounts = async ({
                     return {
                       record: {
                         ...newRecord,
-                        lastBlock: existingData?.lastBlock || lastBlock,
+                        lastBlock: existingRecord?.lastBlock || lastBlock,
                       },
                       shouldUpdate: false,
                     };
