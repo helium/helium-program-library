@@ -532,12 +532,11 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name          | Mutability | Signer | Docs |
-| ------------- | ---------- | ------ | ---- |
-| key_to_asset  | immut      | no     |      |
-| dao           | immut      | no     |      |
-| authority     | immut      | no     |      |
-| rent_receiver | immut      | no     |      |
+| Name         | Mutability | Signer | Docs |
+| ------------ | ---------- | ------ | ---- |
+| key_to_asset | immut      | no     |      |
+| dao          | immut      | no     |      |
+| authority    | immut      | no     |      |
 
 #### Args
 

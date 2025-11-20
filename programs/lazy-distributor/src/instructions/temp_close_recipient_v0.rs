@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::state::*;
 
-const AUTHORITY: Pubkey = pubkey!("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW");
+const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY");
 const REWARDS_ORACLE_PROGRAM: Pubkey = pubkey!("rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF");
 
 #[derive(Accounts)]
@@ -23,13 +23,10 @@ pub struct TempCloseRecipientV0<'info> {
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
     mut,
-    close = rent_receiver,
+    close = authority,
     has_one = lazy_distributor
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
-  /// CHECK: Receives the rent refund
-  #[account(mut)]
-  pub rent_receiver: UncheckedAccount<'info>,
 }
 
 pub fn handler(ctx: Context<TempCloseRecipientV0>) -> Result<()> {

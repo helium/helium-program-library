@@ -1,9 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  init as initHem,
-  keyToAssetForAsset,
-  decodeEntityKey,
-} from "@helium/helium-entity-manager-sdk";
+import { keyToAssetForAsset } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -16,18 +12,13 @@ import {
   getAssetBatch,
   batchInstructionsToTxsWithPriorityFee,
   bulkSendTransactions,
+  chunks,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-// @ts-ignore
 import bs58 from "bs58";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
-
-// RecipientV0 discriminator
-const RECIPIENT_DISCRIMINATOR = Buffer.from([
-  174, 14, 199, 217, 206, 108, 154, 50,
-]);
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -43,8 +34,7 @@ export async function run(args: any = process.argv) {
     },
     authority: {
       type: "string",
-      describe:
-        "Path to the authority keypair (hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW). Defaults to wallet.",
+      describe: "Path to the authority keypair. Defaults to wallet.",
     },
     approver: {
       type: "string",
@@ -65,54 +55,28 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
 
   const lazyProgram = await initLazy(provider);
-  const hemProgram = await initHem(provider);
   const rewardsOracleProgram = await initRewards(provider);
+
   const authority = argv.authority
     ? loadKeypair(argv.authority as string)
     : loadKeypair(argv.wallet as string);
   const approver = argv.approver ? loadKeypair(argv.approver as string) : null;
 
-  // Verify authority is the expected pubkey
-  const expectedAuthority = new PublicKey(
-    "hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW"
-  );
-  if (!authority.publicKey.equals(expectedAuthority)) {
-    console.error(
-      `Authority keypair ${authority.publicKey.toBase58()} does not match expected ${expectedAuthority.toBase58()}`
-    );
-    process.exit(1);
-  }
-
   const dao = daoKey(HNT_MINT)[0];
   const lazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
-  const lazyDistributorAcc = await lazyProgram.account.lazyDistributorV0.fetch(
-    lazyDistributor
-  );
 
   console.log(
     "Getting all RecipientV0 accounts for MOBILE lazy distributor..."
   );
 
-  // Get all RecipientV0 accounts
-  const allRecipients = await provider.connection.getProgramAccounts(
-    lazyProgram.programId,
+  const allRecipients = await lazyProgram.account.recipientV0.all([
     {
-      filters: [
-        {
-          memcmp: {
-            offset: 0,
-            bytes: RECIPIENT_DISCRIMINATOR.toString("base64"),
-          },
-        },
-        {
-          memcmp: {
-            offset: 8, // After discriminator
-            bytes: lazyDistributor.toBase58(),
-          },
-        },
-      ],
-    }
-  );
+      memcmp: {
+        offset: 8, // After discriminator
+        bytes: lazyDistributor.toBase58(),
+      },
+    },
+  ]);
 
   console.log(`Found ${allRecipients.length} total RecipientV0 accounts`);
 
@@ -123,12 +87,8 @@ export async function run(args: any = process.argv) {
     recipientData: any;
   }[] = [];
 
-  for (const { pubkey, account } of allRecipients) {
+  for (const { publicKey: pubkey, account: recipient } of allRecipients) {
     try {
-      const recipient = lazyProgram.coder.accounts.decode(
-        "recipientV0",
-        account.data
-      );
       recipientsWithAssets.push({
         address: pubkey,
         asset: recipient.asset,
@@ -141,19 +101,30 @@ export async function run(args: any = process.argv) {
 
   console.log("Checking which recipients are for subscriber assets...");
 
-  // Batch fetch asset metadata from DAS
   const assetIds = recipientsWithAssets.map((r) => r.asset);
-  const assets = await getAssetBatch(provider.connection.rpcEndpoint, assetIds);
+  const assets = (
+    await Promise.all(
+      chunks(assetIds, 1000).map(async (chunk) => {
+        const result = await getAssetBatch(
+          provider.connection.rpcEndpoint,
+          chunk
+        );
+        return result || [];
+      })
+    )
+  ).flat();
 
   const subscriberRecipients: {
     address: PublicKey;
     asset: any;
     recipientData: any;
   }[] = [];
+
   if (!assets) {
     console.error("Failed to fetch assets");
     process.exit(1);
   }
+
   for (let i = 0; i < assets.length; i++) {
     const asset = assets[i];
     if (asset && asset.content?.metadata?.symbol === "SUBSCRIBER") {
@@ -187,59 +158,62 @@ export async function run(args: any = process.argv) {
   const instructions: TransactionInstruction[] = [];
   let failedCount = 0;
 
-  for (let i = 0; i < subscriberRecipients.length; i++) {
-    if (i > 0 && i % 100 === 0) {
-      console.log(
-        `Prepared ${i}/${subscriberRecipients.length} close instructions...`
-      );
-    }
+  for (const chunk of chunks(subscriberRecipients, 20)) {
+    const batchResults = await Promise.all(
+      chunk.map(async (recipient) => {
+        const { address: recipientAddr, asset } = recipient;
+        try {
+          // Compute the KeyToAssetV0 address (should be closed already)
+          const keyToAsset = keyToAssetForAsset(asset, dao);
 
-    const {
-      address: recipientAddr,
-      asset,
-      recipientData,
-    } = subscriberRecipients[i];
+          // Get the entity key from the asset (it's the last part of the json_uri)
+          const entityKeyStr = asset.content.json_uri
+            .split("/")
+            .slice(-1)[0] as string;
+          const entityKeyBytes = Buffer.from(bs58.decode(entityKeyStr));
 
-    try {
-      // Compute the KeyToAssetV0 address (should be closed already)
-      const keyToAsset = keyToAssetForAsset(asset, dao);
+          // Get oracle_signer PDA
+          const [oracleSigner] = PublicKey.findProgramAddressSync(
+            [Buffer.from("oracle_signer", "utf-8")],
+            rewardsOracleProgram.programId
+          );
 
-      // Get the entity key from the asset (it's the last part of the json_uri)
-      const entityKeyStr = asset.content.json_uri
-        .split("/")
-        .slice(-1)[0] as string;
-      const entityKeyBytes = Buffer.from(bs58.decode(entityKeyStr));
+          return await rewardsOracleProgram.methods
+            .tempCloseRecipientWrapperV0({
+              entityKey: entityKeyBytes,
+            })
+            .accountsPartial({
+              lazyDistributor,
+              recipient: recipientAddr,
+              keyToAsset,
+              dao,
+              authority: authority.publicKey,
+              approver: approver?.publicKey || null,
+              oracleSigner,
+              lazyDistributorProgram: lazyProgram.programId,
+            })
+            .instruction();
+        } catch (err: any) {
+          console.error(
+            `Error building instruction for recipient ${recipientAddr.toBase58()}: ${
+              err.message
+            }`
+          );
+          return null;
+        }
+      })
+    );
 
-      // Get oracle_signer PDA
-      const [oracleSigner] = PublicKey.findProgramAddressSync(
-        [Buffer.from("oracle_signer", "utf-8")],
-        rewardsOracleProgram.programId
-      );
+    const validInstructions = batchResults.filter(
+      (i): i is TransactionInstruction => i !== null
+    );
 
-      instructions.push(
-        await rewardsOracleProgram.methods
-          .tempCloseRecipientWrapperV0({
-            entityKey: entityKeyBytes,
-          })
-          .accountsPartial({
-            lazyDistributor,
-            recipient: recipientAddr,
-            keyToAsset,
-            dao,
-            oracleSigner,
-            rentReceiver: provider.wallet.publicKey,
-            lazyDistributorProgram: lazyProgram.programId,
-          })
-          .instruction()
-      );
-    } catch (err: any) {
-      console.error(
-        `Error building instruction for recipient ${recipientAddr.toBase58()}: ${
-          err.message
-        }`
-      );
-      failedCount++;
-    }
+    instructions.push(...validInstructions);
+    failedCount += chunk.length - validInstructions.length;
+
+    console.log(
+      `Prepared ${instructions.length}/${subscriberRecipients.length} close instructions...`
+    );
   }
 
   console.log(

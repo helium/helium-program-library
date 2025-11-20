@@ -171,7 +171,6 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | approver              | immut      | no     | Optional approver - must sign if lazy_distributor.approver is set                  |
 | lazy_distributor      | immut      | no     |                                                                                    |
 | recipient             | immut      | no     |                                                                                    |
-| rent_receiver         | immut      | no     |                                                                                    |
 
 #### Args
 

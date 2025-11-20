@@ -19,6 +19,8 @@ import {
   batchInstructionsToTxsWithPriorityFee,
   bulkSendTransactions,
   bulkSendRawTransactions,
+  chunks,
+  truthy,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
@@ -40,8 +42,7 @@ export async function run(args: any = process.argv) {
     },
     authority: {
       type: "string",
-      describe:
-        "Path to the authority keypair (hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW). Defaults to wallet.",
+      describe: "Path to the authority keypair. Defaults to wallet.",
     },
     commit: {
       type: "boolean",
@@ -59,20 +60,10 @@ export async function run(args: any = process.argv) {
   const lazyProgram = await initLazy(provider);
   const hemProgram = await initHem(provider);
   const rewardsOracleProgram = await initRewards(provider);
+
   const authority = argv.authority
     ? loadKeypair(argv.authority as string)
     : loadKeypair(argv.wallet as string);
-
-  // Verify authority is the expected pubkey
-  const expectedAuthority = new PublicKey(
-    "hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW"
-  );
-  if (!authority.publicKey.equals(expectedAuthority)) {
-    console.error(
-      `Authority keypair ${authority.publicKey.toBase58()} does not match expected ${expectedAuthority.toBase58()}`
-    );
-    process.exit(1);
-  }
 
   const dao = daoKey(HNT_MINT)[0];
   const lazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
@@ -91,12 +82,12 @@ export async function run(args: any = process.argv) {
       creatorAddress: entityCreator.toBase58(),
       page,
       limit,
-      ownerAddress: "", // Not filtering by owner, filtering by creator
-    } as any);
+    });
 
     const subscribers = assets.filter(
       (asset) => asset?.content?.metadata?.symbol === "SUBSCRIBER"
     );
+
     allSubscriberAssets = allSubscriberAssets.concat(subscribers);
 
     if (assets.length < limit) {
@@ -122,49 +113,71 @@ export async function run(args: any = process.argv) {
     let assetsWithRewards = 0;
     let assetsWithZeroRewards = 0;
     let totalPendingRewards = new BN(0);
+
     const assetsToClaim: { asset: PublicKey; rewards: client.Reward[] }[] = [];
+    const existingRecipients = new Set<string>();
+    const recipientKeys = allSubscriberAssets.map(
+      (asset) => recipientKey(lazyDistributor, asset.id)[0]
+    );
 
-    for (let i = 0; i < allSubscriberAssets.length; i++) {
-      if (i > 0 && i % 100 === 0) {
-        console.log(`Checked ${i}/${allSubscriberAssets.length} assets...`);
-      }
+    // Fetch recipients in parallel batches
+    const recipientKeyChunks = chunks(recipientKeys, 100);
+    for (const batch of chunks(recipientKeyChunks, 10)) {
+      await Promise.all(
+        batch.map(async (chunk) => {
+          const accountInfos =
+            await lazyProgram.account.recipientV0.fetchMultiple(chunk);
+          accountInfos.forEach((info, index) => {
+            if (info) {
+              existingRecipients.add(chunk[index].toBase58());
+            }
+          });
+        })
+      );
+    }
 
-      const asset = allSubscriberAssets[i];
-      const assetId = asset.id;
+    // Check rewards for each asset
+    for (const chunk of chunks(allSubscriberAssets, 100)) {
+      await Promise.all(
+        chunk.map(async (asset) => {
+          const assetId = asset.id;
+          const [recipientAddr] = recipientKey(lazyDistributor, assetId);
 
-      // Check if recipient exists
-      const [recipientAddr] = recipientKey(lazyDistributor, assetId);
-      const recipientInfo = await provider.connection.getAccountInfo(
-        recipientAddr
+          if (!existingRecipients.has(recipientAddr.toBase58())) {
+            assetsWithZeroRewards++;
+            return;
+          }
+
+          try {
+            const rewards = await client.getCurrentRewards(
+              lazyProgram,
+              lazyDistributor,
+              assetId
+            );
+
+            const totalRewards = rewards.reduce((sum, r) => {
+              return sum.add(new BN(r.currentRewards));
+            }, new BN(0));
+
+            if (totalRewards.gt(new BN(0))) {
+              assetsWithRewards++;
+              totalPendingRewards = totalPendingRewards.add(totalRewards);
+              assetsToClaim.push({ asset: assetId, rewards });
+            } else {
+              assetsWithZeroRewards++;
+            }
+          } catch (err: any) {
+            // Skip assets that error (e.g., no recipient)
+            assetsWithZeroRewards++;
+          }
+        })
       );
 
-      if (!recipientInfo) {
-        assetsWithZeroRewards++;
-        continue;
-      }
-
-      try {
-        const rewards = await client.getCurrentRewards(
-          lazyProgram,
-          lazyDistributor,
-          assetId
-        );
-
-        const totalRewards = rewards.reduce((sum, r) => {
-          return sum.add(new BN(r.currentRewards));
-        }, new BN(0));
-
-        if (totalRewards.gt(new BN(0))) {
-          assetsWithRewards++;
-          totalPendingRewards = totalPendingRewards.add(totalRewards);
-          assetsToClaim.push({ asset: assetId, rewards });
-        } else {
-          assetsWithZeroRewards++;
-        }
-      } catch (err: any) {
-        // Skip assets that error (e.g., no recipient)
-        assetsWithZeroRewards++;
-      }
+      console.log(
+        `Checked ${assetsWithRewards + assetsWithZeroRewards} / ${
+          allSubscriberAssets.length
+        } assets...`
+      );
     }
 
     console.log(`Assets with pending rewards: ${assetsWithRewards}`);
@@ -196,46 +209,46 @@ export async function run(args: any = process.argv) {
 
     // Batch claim rewards
     const txns: anchor.web3.VersionedTransaction[] = [];
-    for (let i = 0; i < assetsToClaim.length; i++) {
-      if (i > 0 && i % 100 === 0) {
-        console.log(
-          `Prepared ${i}/${assetsToClaim.length} claim transactions...`
-        );
-      }
 
-      const { asset, rewards } = assetsToClaim[i];
+    for (const chunk of chunks(assetsToClaim, 20)) {
+      const batchTxns = await Promise.all(
+        chunk.map(async ({ asset, rewards }) => {
+          try {
+            return await client.formTransaction({
+              program: lazyProgram,
+              rewardsOracleProgram: rewardsOracleProgram,
+              provider,
+              rewards,
+              asset,
+              lazyDistributor,
+              wallet: authority.publicKey,
+            });
+          } catch (err: any) {
+            console.error(
+              `Error forming transaction for asset ${asset.toBase58()}: ${
+                err.message
+              }`
+            );
+            return null;
+          }
+        })
+      );
 
-      try {
-        const tx = await client.formTransaction({
-          program: lazyProgram,
-          rewardsOracleProgram: rewardsOracleProgram,
-          provider,
-          rewards,
-          asset,
-          lazyDistributor,
-        });
-
-        txns.push(tx);
-      } catch (err: any) {
-        console.error(
-          `Error forming transaction for asset ${asset.toBase58()}: ${
-            err.message
-          }`
-        );
-      }
+      txns.push(...batchTxns.filter(truthy));
+      console.log(
+        `Prepared ${txns.length}/${assetsToClaim.length} claim transactions...`
+      );
     }
 
     console.log(`Sending ${txns.length} transactions...`);
 
-    // Sign all transactions (already partially signed by oracle)
-    const signedTxns = await Promise.all(
-      txns.map((tx) => provider.wallet.signTransaction(tx))
-    );
+    for (const tx of txns) {
+      tx.sign([authority]);
+    }
 
-    // Send as raw transactions
     await bulkSendRawTransactions(
       provider.connection,
-      signedTxns.map((tx) => Buffer.from(tx.serialize())),
+      txns.map((tx) => Buffer.from(tx.serialize())),
       (status) => {
         console.log(
           `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} in batch. ${status.totalProgress} / ${txns.length}`
@@ -277,15 +290,23 @@ export async function run(args: any = process.argv) {
   }
 
   console.log("Checking which KeyToAssetV0 accounts exist on-chain...");
-  const accountInfos = await provider.connection.getMultipleAccountsInfo(
-    keyToAssetAddresses
-  );
 
   const existingKeyToAssets: PublicKey[] = [];
-  for (let i = 0; i < accountInfos.length; i++) {
-    if (accountInfos[i]) {
-      existingKeyToAssets.push(keyToAssetAddresses[i]);
-    }
+  const keyToAssetChunks = chunks(keyToAssetAddresses, 100);
+
+  for (const batch of chunks(keyToAssetChunks, 10)) {
+    await Promise.all(
+      batch.map(async (chunk) => {
+        const infos = await hemProgram.account.keyToAssetV0.fetchMultiple(
+          chunk
+        );
+        infos.forEach((info, idx) => {
+          if (info) {
+            existingKeyToAssets.push(chunk[idx]);
+          }
+        });
+      })
+    );
   }
 
   console.log(
@@ -317,23 +338,24 @@ export async function run(args: any = process.argv) {
 
   // Build close instructions
   const instructions: TransactionInstruction[] = [];
-  for (let i = 0; i < existingKeyToAssets.length; i++) {
-    if (i > 0 && i % 100 === 0) {
-      console.log(
-        `Prepared ${i}/${existingKeyToAssets.length} close instructions...`
-      );
-    }
 
-    const keyToAsset = existingKeyToAssets[i];
+  for (const chunk of chunks(existingKeyToAssets, 20)) {
+    const batchInstructions = await Promise.all(
+      chunk.map(async (keyToAsset) => {
+        return await hemProgram.methods
+          .tempCloseKeyToAssetV0()
+          .accountsPartial({
+            keyToAsset,
+            dao,
+            authority: authority.publicKey,
+          })
+          .instruction();
+      })
+    );
 
-    instructions.push(
-      await hemProgram.methods
-        .tempCloseKeyToAssetV0()
-        .accountsPartial({
-          keyToAsset,
-          rentReceiver: provider.wallet.publicKey,
-        })
-        .instruction()
+    instructions.push(...batchInstructions);
+    console.log(
+      `Prepared ${instructions.length}/${existingKeyToAssets.length} close instructions...`
     );
   }
 

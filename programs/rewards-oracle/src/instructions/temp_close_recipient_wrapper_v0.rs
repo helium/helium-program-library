@@ -5,7 +5,7 @@ use lazy_distributor::{
   state::*,
 };
 
-const AUTHORITY: Pubkey = pubkey!("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW");
+const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY");
 const HEM_PROGRAM: Pubkey = pubkey!("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -38,9 +38,6 @@ pub struct TempCloseRecipientWrapperV0<'info> {
     bump
   )]
   pub oracle_signer: AccountInfo<'info>,
-  /// CHECK: Receives the rent refund
-  #[account(mut)]
-  pub rent_receiver: UncheckedAccount<'info>,
   pub lazy_distributor_program: Program<'info, LazyDistributor>,
 }
 
@@ -84,7 +81,6 @@ pub fn handler(
       approver: ctx.accounts.approver.as_ref().map(|a| a.to_account_info()),
       lazy_distributor: ctx.accounts.lazy_distributor.to_account_info(),
       recipient: ctx.accounts.recipient.to_account_info(),
-      rent_receiver: ctx.accounts.rent_receiver.to_account_info(),
     },
     signer_seeds,
   ))?;

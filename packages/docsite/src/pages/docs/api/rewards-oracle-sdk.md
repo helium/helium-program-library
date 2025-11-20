@@ -80,7 +80,6 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | key_to_asset             | immut      | no     |                                                                   |
 | dao                      | immut      | no     |                                                                   |
 | oracle_signer            | immut      | no     |                                                                   |
-| rent_receiver            | immut      | no     |                                                                   |
 | lazy_distributor_program | immut      | no     |                                                                   |
 
 #### Args

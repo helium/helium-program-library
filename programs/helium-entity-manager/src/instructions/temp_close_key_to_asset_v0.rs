@@ -3,13 +3,13 @@ use anchor_lang::prelude::*;
 use crate::KeyToAssetV0;
 use helium_sub_daos::DaoV0;
 
-const AUTHORITY: Pubkey = pubkey!("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW");
+const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY");
 
 #[derive(Accounts)]
 pub struct TempCloseKeyToAssetV0<'info> {
   #[account(
     mut,
-    close = rent_receiver,
+    close = authority,
     has_one = dao
   )]
   pub key_to_asset: Box<Account<'info, KeyToAssetV0>>,
@@ -18,9 +18,6 @@ pub struct TempCloseKeyToAssetV0<'info> {
     address = AUTHORITY
   )]
   pub authority: Signer<'info>,
-  /// CHECK: Receives the rent refund
-  #[account(mut)]
-  pub rent_receiver: UncheckedAccount<'info>,
 }
 
 pub fn handler(_ctx: Context<TempCloseKeyToAssetV0>) -> Result<()> {
