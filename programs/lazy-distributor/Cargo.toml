@@ -34,3 +34,4 @@ account-compression-cpi = { workspace = true }
 solana-security-txt = { workspace = true }
 solana-program = { workspace = true }
 default-env = { workspace = true }
+rewards-oracle = { path = "../rewards-oracle", features = ["cpi"] }

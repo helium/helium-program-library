@@ -110,6 +110,10 @@ pub mod lazy_distributor {
   ) -> Result<()> {
     temp_update_matching_destination::handler(ctx)
   }
+
+  pub fn temp_close_recipient_v0(ctx: Context<TempCloseRecipientV0>) -> Result<()> {
+    temp_close_recipient_v0::handler(ctx)
+  }
 }
 
 #[derive(Accounts)]

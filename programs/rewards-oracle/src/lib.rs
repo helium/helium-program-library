@@ -2,8 +2,10 @@ use anchor_lang::prelude::*;
 #[cfg(not(feature = "no-entrypoint"))]
 use {default_env::default_env, solana_security_txt::security_txt};
 
+pub mod error;
 pub mod instructions;
 
+pub use error::*;
 pub use instructions::*;
 
 declare_id!("rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF");
@@ -46,5 +48,12 @@ pub mod rewards_oracle {
     args: SetCurrentRewardsWrapperArgsV1,
   ) -> Result<()> {
     set_current_rewards_wrapper_v2::handler(ctx, args)
+  }
+
+  pub fn temp_close_recipient_wrapper_v0(
+    ctx: Context<TempCloseRecipientWrapperV0>,
+    args: TempCloseRecipientWrapperArgsV0,
+  ) -> Result<()> {
+    temp_close_recipient_wrapper_v0::handler(ctx, args)
   }
 }
