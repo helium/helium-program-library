@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::{DaoV0, KeyToAssetV0};
+use crate::KeyToAssetV0;
+use helium_sub_daos::DaoV0;
 
 const AUTHORITY: Pubkey = pubkey!("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW");
 

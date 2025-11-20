@@ -67,6 +67,28 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### temp_close_recipient_wrapper_v0
+
+#### Accounts
+
+| Name                     | Mutability | Signer | Docs                                                              |
+| ------------------------ | ---------- | ------ | ----------------------------------------------------------------- |
+| authority                | immut      | no     |                                                                   |
+| approver                 | immut      | no     | Optional approver - must sign if lazy_distributor.approver is set |
+| lazy_distributor         | immut      | no     |                                                                   |
+| recipient                | immut      | no     |                                                                   |
+| key_to_asset             | immut      | no     |                                                                   |
+| dao                      | immut      | no     |                                                                   |
+| oracle_signer            | immut      | no     |                                                                   |
+| rent_receiver            | immut      | no     |                                                                   |
+| lazy_distributor_program | immut      | no     |                                                                   |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ## Accounts
 
 ### KeyToAssetV0
@@ -146,3 +168,9 @@ undefined
 | --------------- | ---- |
 | oracle_index    | u16  |
 | current_rewards | u64  |
+
+### TempCloseRecipientWrapperArgsV0
+
+| Field      | Type  |
+| ---------- | ----- |
+| entity_key | bytes |

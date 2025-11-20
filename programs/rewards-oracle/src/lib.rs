@@ -2,10 +2,8 @@ use anchor_lang::prelude::*;
 #[cfg(not(feature = "no-entrypoint"))]
 use {default_env::default_env, solana_security_txt::security_txt};
 
-pub mod error;
 pub mod instructions;
 
-pub use error::*;
 pub use instructions::*;
 
 declare_id!("rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF");

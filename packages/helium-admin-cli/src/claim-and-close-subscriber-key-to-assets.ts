@@ -18,6 +18,7 @@ import {
   searchAssets,
   batchInstructionsToTxsWithPriorityFee,
   bulkSendTransactions,
+  bulkSendRawTransactions,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
@@ -90,7 +91,8 @@ export async function run(args: any = process.argv) {
       creatorAddress: entityCreator.toBase58(),
       page,
       limit,
-    });
+      ownerAddress: "", // Not filtering by owner, filtering by creator
+    } as any);
 
     const subscribers = assets.filter(
       (asset) => asset?.content?.metadata?.symbol === "SUBSCRIBER"
@@ -225,11 +227,21 @@ export async function run(args: any = process.argv) {
 
     console.log(`Sending ${txns.length} transactions...`);
 
-    await bulkSendTransactions(provider, txns, (status) => {
-      console.log(
-        `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} in batch. ${status.totalProgress} / ${txns.length}`
-      );
-    });
+    // Sign all transactions (already partially signed by oracle)
+    const signedTxns = await Promise.all(
+      txns.map((tx) => provider.wallet.signTransaction(tx))
+    );
+
+    // Send as raw transactions
+    await bulkSendRawTransactions(
+      provider.connection,
+      signedTxns.map((tx) => Buffer.from(tx.serialize())),
+      (status) => {
+        console.log(
+          `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} in batch. ${status.totalProgress} / ${txns.length}`
+        );
+      }
+    );
 
     totalClaimedAmount = totalClaimedAmount.add(totalPendingRewards);
     totalClaimedTransactions += txns.length;
@@ -317,10 +329,8 @@ export async function run(args: any = process.argv) {
     instructions.push(
       await hemProgram.methods
         .tempCloseKeyToAssetV0()
-        .accounts({
+        .accountsPartial({
           keyToAsset,
-          dao,
-          authority: authority.publicKey,
           rentReceiver: provider.wallet.publicKey,
         })
         .instruction()
@@ -342,19 +352,18 @@ export async function run(args: any = process.argv) {
 
   console.log(`\nSending ${closeTxns.length} transactions...`);
 
-  // Sign with authority
-  const signedTxns = await Promise.all(
-    closeTxns.map(async (tx) => {
-      tx.sign([authority]);
-      return tx;
-    })
+  // Sign with authority and send
+  await bulkSendTransactions(
+    provider,
+    closeTxns,
+    (status) => {
+      console.log(
+        `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} in batch. ${status.totalProgress} / ${closeTxns.length}`
+      );
+    },
+    10,
+    [authority]
   );
-
-  await bulkSendTransactions(provider, signedTxns, (status) => {
-    console.log(
-      `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} in batch. ${status.totalProgress} / ${signedTxns.length}`
-    );
-  });
 
   console.log(
     `\n✓ Closed ${existingKeyToAssets.length} KeyToAssetV0 accounts.`

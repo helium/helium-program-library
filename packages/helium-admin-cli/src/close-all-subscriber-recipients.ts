@@ -150,6 +150,10 @@ export async function run(args: any = process.argv) {
     asset: any;
     recipientData: any;
   }[] = [];
+  if (!assets) {
+    console.error("Failed to fetch assets");
+    process.exit(1);
+  }
   for (let i = 0; i < assets.length; i++) {
     const asset = assets[i];
     if (asset && asset.content?.metadata?.symbol === "SUBSCRIBER") {
@@ -212,24 +216,20 @@ export async function run(args: any = process.argv) {
         rewardsOracleProgram.programId
       );
 
-      const accounts: any = {
-        authority: authority.publicKey,
-        approver: approver ? approver.publicKey : null,
-        lazyDistributor,
-        recipient: recipientAddr,
-        keyToAsset,
-        dao,
-        oracleSigner,
-        rentReceiver: provider.wallet.publicKey,
-        lazyDistributorProgram: lazyProgram.programId,
-      };
-
       instructions.push(
         await rewardsOracleProgram.methods
           .tempCloseRecipientWrapperV0({
-            entityKey: Array.from(entityKeyBytes),
+            entityKey: entityKeyBytes,
           })
-          .accounts(accounts)
+          .accountsPartial({
+            lazyDistributor,
+            recipient: recipientAddr,
+            keyToAsset,
+            dao,
+            oracleSigner,
+            rentReceiver: provider.wallet.publicKey,
+            lazyDistributorProgram: lazyProgram.programId,
+          })
           .instruction()
       );
     } catch (err: any) {
@@ -258,22 +258,22 @@ export async function run(args: any = process.argv) {
   console.log(`\nSending ${txns.length} transactions...`);
 
   // Sign with authority and approver (if present)
-  const signedTxns = await Promise.all(
-    txns.map(async (tx) => {
-      const signers = [authority];
-      if (approver) {
-        signers.push(approver);
-      }
-      tx.sign(signers);
-      return tx;
-    })
-  );
+  const extraSigners = [authority];
+  if (approver) {
+    extraSigners.push(approver);
+  }
 
-  await bulkSendTransactions(provider, signedTxns, (status) => {
-    console.log(
-      `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} in batch. ${status.totalProgress} / ${signedTxns.length}`
-    );
-  });
+  await bulkSendTransactions(
+    provider,
+    txns,
+    (status) => {
+      console.log(
+        `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} in batch. ${status.totalProgress} / ${txns.length}`
+      );
+    },
+    10,
+    extraSigners
+  );
 
   console.log(
     `\nDone. Closed ${subscriberRecipients.length} recipient accounts${

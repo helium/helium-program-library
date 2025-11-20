@@ -160,6 +160,24 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### temp_close_recipient_v0
+
+#### Accounts
+
+| Name                  | Mutability | Signer | Docs                                                                               |
+| --------------------- | ---------- | ------ | ---------------------------------------------------------------------------------- |
+| authority             | immut      | no     |                                                                                    |
+| rewards_oracle_signer | immut      | no     | Rewards oracle PDA signer - ensures this can only be called through rewards-oracle |
+| approver              | immut      | no     | Optional approver - must sign if lazy_distributor.approver is set                  |
+| lazy_distributor      | immut      | no     |                                                                                    |
+| recipient             | immut      | no     |                                                                                    |
+| rent_receiver         | immut      | no     |                                                                                    |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### temp_update_matching_destination
 
 #### Accounts

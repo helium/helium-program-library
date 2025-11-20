@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use crate::state::*;
 
 const AUTHORITY: Pubkey = pubkey!("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW");
+const REWARDS_ORACLE_PROGRAM: Pubkey = pubkey!("rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF");
 
 #[derive(Accounts)]
 pub struct TempCloseRecipientV0<'info> {
@@ -13,7 +14,7 @@ pub struct TempCloseRecipientV0<'info> {
   /// Rewards oracle PDA signer - ensures this can only be called through rewards-oracle
   #[account(
     seeds = [b"oracle_signer"],
-    seeds::program = rewards_oracle::ID,
+    seeds::program = REWARDS_ORACLE_PROGRAM,
     bump
   )]
   pub rewards_oracle_signer: Signer<'info>,

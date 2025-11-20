@@ -528,6 +528,22 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### temp_close_key_to_asset_v0
+
+#### Accounts
+
+| Name          | Mutability | Signer | Docs |
+| ------------- | ---------- | ------ | ---- |
+| key_to_asset  | immut      | no     |      |
+| dao           | immut      | no     |      |
+| authority     | immut      | no     |      |
+| rent_receiver | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### temp_pay_mobile_onboarding_fee_v0
 
 #### Accounts
