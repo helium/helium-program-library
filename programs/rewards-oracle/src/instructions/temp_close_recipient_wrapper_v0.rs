@@ -7,6 +7,7 @@ use lazy_distributor::{
 
 const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY");
 const HEM_PROGRAM: Pubkey = pubkey!("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8");
+const HELIUM_SUB_DAOS_PROGRAM: Pubkey = pubkey!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TempCloseRecipientWrapperArgsV0 {
@@ -45,6 +46,19 @@ pub fn handler(
   ctx: Context<TempCloseRecipientWrapperV0>,
   args: TempCloseRecipientWrapperArgsV0,
 ) -> Result<()> {
+  // Verify dao matches the expected subdao PDA derivation
+  // The subdao is derived from the lazy_distributor's rewards_mint
+  let rewards_mint = ctx.accounts.lazy_distributor.rewards_mint;
+  let (expected_dao, _bump) = Pubkey::find_program_address(
+    &[b"sub_dao", rewards_mint.as_ref()],
+    &HELIUM_SUB_DAOS_PROGRAM,
+  );
+
+  if ctx.accounts.dao.key() != expected_dao {
+    msg!("Dao account does not match expected subdao derivation");
+    return Err(ProgramError::InvalidAccountData.into());
+  }
+
   // Verify the key_to_asset address matches the expected derivation
   let hash = anchor_lang::solana_program::hash::hash(&args.entity_key);
   let (expected_key_to_asset, _bump) = Pubkey::find_program_address(
