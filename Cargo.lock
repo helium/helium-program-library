@@ -917,6 +917,7 @@ dependencies = [
  "data-credits",
  "default-env",
  "helium-sub-daos",
+ "lazy-distributor",
  "mpl-token-metadata",
  "no-emit",
  "pyth-solana-receiver-sdk",

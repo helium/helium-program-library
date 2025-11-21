@@ -283,22 +283,31 @@ export async function run(args: any = process.argv) {
   console.log("\n\n=== STEP 2: CLOSING KEYTOASSETV0 ACCOUNTS ===\n");
 
   // Check which KeyToAssetV0 accounts exist
-  const keyToAssetAddresses: PublicKey[] = [];
+  const keyToAssetInfos: {
+    keyToAsset: PublicKey;
+    assetId: PublicKey;
+    recipient: PublicKey;
+  }[] = [];
   for (const asset of allSubscriberAssets) {
     const keyToAssetAddr = keyToAssetForAsset(asset, dao);
-    keyToAssetAddresses.push(keyToAssetAddr);
+    const recipient = recipientKey(lazyDistributor, asset.id)[0];
+    keyToAssetInfos.push({
+      keyToAsset: keyToAssetAddr,
+      assetId: asset.id,
+      recipient,
+    });
   }
 
   console.log("Checking which KeyToAssetV0 accounts exist on-chain...");
 
-  const existingKeyToAssets: PublicKey[] = [];
-  const keyToAssetChunks = chunks(keyToAssetAddresses, 100);
+  const existingKeyToAssets: typeof keyToAssetInfos = [];
+  const keyToAssetChunks = chunks(keyToAssetInfos, 100);
 
   for (const batch of chunks(keyToAssetChunks, 10)) {
     await Promise.all(
       batch.map(async (chunk) => {
         const infos = await hemProgram.account.keyToAssetV0.fetchMultiple(
-          chunk
+          chunk.map((c) => c.keyToAsset)
         );
         infos.forEach((info, idx) => {
           if (info) {
@@ -341,13 +350,15 @@ export async function run(args: any = process.argv) {
 
   for (const chunk of chunks(existingKeyToAssets, 20)) {
     const batchInstructions = await Promise.all(
-      chunk.map(async (keyToAsset) => {
+      chunk.map(async ({ keyToAsset, assetId, recipient }) => {
         return await hemProgram.methods
           .tempCloseKeyToAssetV0()
           .accountsPartial({
             keyToAsset,
             dao,
             authority: authority.publicKey,
+            asset: assetId,
+            recipient,
           })
           .instruction();
       })
