@@ -4,8 +4,11 @@ import {
   init as initHem,
   entityCreatorKey,
   keyToAssetForAsset,
+  rewardableEntityConfigKey,
+  iotInfoKey,
+  mobileInfoKey,
 } from "@helium/helium-entity-manager-sdk";
-import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
   lazyDistributorKey,
@@ -15,6 +18,7 @@ import { init as initRewards } from "@helium/rewards-oracle-sdk";
 import {
   HNT_MINT,
   MOBILE_MINT,
+  IOT_MINT,
   searchAssets,
   batchInstructionsToTxsWithPriorityFee,
   bulkSendTransactions,
@@ -66,6 +70,10 @@ export async function run(args: any = process.argv) {
     : loadKeypair(argv.wallet as string);
 
   const dao = daoKey(HNT_MINT)[0];
+  const mobileSubDao = subDaoKey(MOBILE_MINT)[0];
+  const iotSubDao = subDaoKey(IOT_MINT)[0];
+  const mobileConfig = rewardableEntityConfigKey(mobileSubDao, "MOBILE")[0];
+  const iotConfig = rewardableEntityConfigKey(iotSubDao, "IOT")[0];
   const lazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
   const entityCreator = entityCreatorKey(dao)[0];
 
@@ -350,7 +358,15 @@ export async function run(args: any = process.argv) {
 
   for (const chunk of chunks(existingKeyToAssets, 20)) {
     const batchInstructions = await Promise.all(
-      chunk.map(async ({ keyToAsset, assetId, recipient }) => {
+      chunk.map(async ({ keyToAsset, assetId }) => {
+        const keyToAssetAcc = await hemProgram.account.keyToAssetV0.fetch(
+          keyToAsset
+        );
+        const [mobileInfo] = await mobileInfoKey(
+          mobileConfig,
+          keyToAssetAcc.entityKey
+        );
+        const [iotInfo] = await iotInfoKey(iotConfig, keyToAssetAcc.entityKey);
         return await hemProgram.methods
           .tempCloseKeyToAssetV0()
           .accountsPartial({
@@ -358,7 +374,10 @@ export async function run(args: any = process.argv) {
             dao,
             authority: authority.publicKey,
             asset: assetId,
-            recipient,
+            mobileConfig,
+            iotConfig,
+            mobileInfo,
+            iotInfo,
           })
           .instruction();
       })

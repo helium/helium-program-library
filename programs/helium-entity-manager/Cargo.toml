@@ -1,6 +1,6 @@
 [package]
 name = "helium-entity-manager"
-version = "0.3.4"
+version = "0.3.5"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
@@ -40,5 +40,4 @@ no-emit = { workspace = true }
 pyth-solana-receiver-sdk = { workspace = true }
 pythnet-sdk = { workspace = true }
 default-env = { workspace = true }
-lazy-distributor = { workspace = true, features = ["cpi", "no-entrypoint"] }
 
