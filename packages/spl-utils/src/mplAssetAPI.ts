@@ -335,7 +335,7 @@ export type SearchAssetsOpts = {
   page?: number;
   limit?: number;
   collection?: string;
-  ownerAddress: string;
+  ownerAddress?: string;
   creatorAddress?: string;
   creatorVerified?: boolean;
   tokenType?:

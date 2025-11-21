@@ -47,4 +47,11 @@ pub mod rewards_oracle {
   ) -> Result<()> {
     set_current_rewards_wrapper_v2::handler(ctx, args)
   }
+
+  pub fn temp_close_recipient_wrapper_v0(
+    ctx: Context<TempCloseRecipientWrapperV0>,
+    args: TempCloseRecipientWrapperArgsV0,
+  ) -> Result<()> {
+    temp_close_recipient_wrapper_v0::handler(ctx, args)
+  }
 }

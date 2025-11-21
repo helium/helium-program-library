@@ -528,6 +528,23 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### temp_close_key_to_asset_v0
+
+#### Accounts
+
+| Name         | Mutability | Signer | Docs |
+| ------------ | ---------- | ------ | ---- |
+| key_to_asset | immut      | no     |      |
+| dao          | immut      | no     |      |
+| asset        | immut      | no     |      |
+| recipient    | immut      | no     |      |
+| authority    | immut      | no     |      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### temp_pay_mobile_onboarding_fee_v0
 
 #### Accounts
@@ -755,6 +772,10 @@ undefined
 undefined
 
 ### ProgramApprovalV0
+
+undefined
+
+### RecipientV0
 
 undefined
 
@@ -1091,6 +1112,19 @@ undefined
 | -------- | ------ |
 | proposal | pubkey |
 | ts       | i64    |
+
+### RecipientV0
+
+| Field                  | Type            |
+| ---------------------- | --------------- |
+| lazy_distributor       | pubkey          |
+| asset                  | pubkey          |
+| total_rewards          | u64             |
+| current_config_version | u16             |
+| current_rewards        | [object Object] |
+| bump_seed              | u8              |
+| reserved               | u64             |
+| destination            | pubkey          |
 
 ### RevokeProgramArgsV0
 
