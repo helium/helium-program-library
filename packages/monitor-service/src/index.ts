@@ -192,24 +192,31 @@ async function run() {
   );
 
   const carrierAutoTopOff = new PublicKey(
-    process.env.CARRIER_AUTO_TOPOFF_KEY || "7by77ihAcDCiqB18ctScJZZ26RCygbd5wZHCefZbk1B7"
-  )
-  await monitorSolBalance(
-    carrierAutoTopOff,
-    "carrier_auto_topoff"
+    process.env.CARRIER_AUTO_TOPOFF_KEY ||
+      "EsNPf1Beanrb96PmPqLD7V2RGhNrv4UV4nwJamF6ncr3"
   );
+  await monitorSolBalance(carrierAutoTopOff, "carrier_auto_topoff");
 
   const mobileAutoTopOff = new PublicKey(
-    process.env.HELIUM_MOBILE_AUTO_TOPOFF_KEY || "FDEQKnHJCVAoqGzjGJZymQ1JvwKozMUHgJsj1rf6z6n1"
-  )
-  await monitorSolBalance(
-    mobileAutoTopOff,
-    "helium_mobile_auto_topoff"
+    process.env.HELIUM_MOBILE_AUTO_TOPOFF_KEY ||
+      "Bvge1RMm2qfqsG4ijxv3ULNYzSosiaKuu8D2XPNpm2W6"
   );
+  await monitorSolBalance(mobileAutoTopOff, "helium_mobile_auto_topoff");
+
+  const mobileRevAutoTopOff = new PublicKey(
+    process.env.MOBILE_REV_AUTO_TOPOFF_KEY ||
+      "2j65rdW1jZvrEUx1xzC9ctcVbDW9smw2TUMhp3REFhNR"
+  );
+  await monitorSolBalance(mobileRevAutoTopOff, "helium_mobile_rev_auto_topoff");
 
   await monitorTokenBalance(
     getAssociatedTokenAddressSync(dao.hntMint, mobileAutoTopOff, true),
     "helium_mobile_auto_topoff_hnt"
+  );
+
+  await monitorTokenBalance(
+    getAssociatedTokenAddressSync(dao.hntMint, mobileRevAutoTopOff, true),
+    "helium_mobile_rev_auto_topoff_hnt"
   );
 
   await monitorTokenBalance(
