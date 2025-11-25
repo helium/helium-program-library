@@ -4,7 +4,7 @@ WORKDIR /usr/src/app
 
 COPY package.json ./
 
-RUN yarn install
+RUN yarn install --immutable
 
 COPY src src
 COPY tsconfig.build.json tsconfig.json
