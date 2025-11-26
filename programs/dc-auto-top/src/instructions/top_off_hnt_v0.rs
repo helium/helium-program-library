@@ -223,10 +223,6 @@ pub fn handler<'info>(
           .checked_mul(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
           .ok_or(ErrorCode::ArithmeticError)?
           .checked_div(output_price as u64)
-          .ok_or(ErrorCode::ArithmeticError)?
-          .checked_mul(auto_top_off.dca_swap_amount)
-          .ok_or(ErrorCode::ArithmeticError)?
-          .checked_div(10_u64.pow(u32::from(ctx.accounts.dca_mint.decimals)))
           .ok_or(ErrorCode::ArithmeticError)?,
         std::cmp::Ordering::Less => auto_top_off
           .dca_swap_amount
@@ -235,28 +231,31 @@ pub fn handler<'info>(
           .checked_div(output_price as u64)
           .ok_or(ErrorCode::ArithmeticError)?
           .checked_div(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
-          .ok_or(ErrorCode::ArithmeticError)?
-          .checked_mul(auto_top_off.dca_swap_amount)
-          .ok_or(ErrorCode::ArithmeticError)?
-          .checked_div(10_u64.pow(u32::from(ctx.accounts.dca_mint.decimals)))
           .ok_or(ErrorCode::ArithmeticError)?,
         std::cmp::Ordering::Equal => auto_top_off
           .dca_swap_amount
           .checked_mul(input_price as u64)
           .ok_or(ErrorCode::ArithmeticError)?
           .checked_div(output_price as u64)
-          .ok_or(ErrorCode::ArithmeticError)?
-          .checked_mul(auto_top_off.dca_swap_amount)
-          .ok_or(ErrorCode::ArithmeticError)?
-          .checked_div(10_u64.pow(u32::from(ctx.accounts.dca_mint.decimals)))
           .ok_or(ErrorCode::ArithmeticError)?,
       };
 
-      msg!("hnt_per_swap: {}", hnt_per_swap);
+      // Convert HNT per swap to HNT decimals from DCA decimals
+      let hnt_per_swap_hnt_decimals = match ctx.accounts.dca_mint.decimals.cmp(&8u8) {
+        std::cmp::Ordering::Greater => hnt_per_swap
+          .checked_mul(10_u64.pow(u32::from(ctx.accounts.dca_mint.decimals - 8)))
+          .ok_or(ErrorCode::ArithmeticError)?,
+        std::cmp::Ordering::Less => hnt_per_swap
+          .checked_div(10_u64.pow(u32::from(8 - ctx.accounts.dca_mint.decimals)))
+          .ok_or(ErrorCode::ArithmeticError)?,
+        std::cmp::Ordering::Equal => hnt_per_swap,
+      };
+
+      msg!("hnt_per_swap: {}", hnt_per_swap_hnt_decimals);
 
       // Now calculate number of orders needed using ceiling division
-      if hnt_per_swap > 0 {
-        hnt_needed.div_ceil(hnt_per_swap)
+      if hnt_per_swap_hnt_decimals > 0 {
+        hnt_needed.div_ceil(hnt_per_swap_hnt_decimals)
       } else {
         0
       }
