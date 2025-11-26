@@ -223,6 +223,10 @@ pub fn handler<'info>(
           .checked_mul(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
           .ok_or(ErrorCode::ArithmeticError)?
           .checked_div(output_price as u64)
+          .ok_or(ErrorCode::ArithmeticError)?
+          .checked_mul(auto_top_off.dca_swap_amount)
+          .ok_or(ErrorCode::ArithmeticError)?
+          .checked_div(10_u64.pow(u32::from(ctx.accounts.dca_mint.decimals)))
           .ok_or(ErrorCode::ArithmeticError)?,
         std::cmp::Ordering::Less => auto_top_off
           .dca_swap_amount
@@ -231,12 +235,20 @@ pub fn handler<'info>(
           .checked_div(output_price as u64)
           .ok_or(ErrorCode::ArithmeticError)?
           .checked_div(10_u64.pow(u32::try_from(expo_diff.abs()).unwrap()))
+          .ok_or(ErrorCode::ArithmeticError)?
+          .checked_mul(auto_top_off.dca_swap_amount)
+          .ok_or(ErrorCode::ArithmeticError)?
+          .checked_div(10_u64.pow(u32::from(ctx.accounts.dca_mint.decimals)))
           .ok_or(ErrorCode::ArithmeticError)?,
         std::cmp::Ordering::Equal => auto_top_off
           .dca_swap_amount
           .checked_mul(input_price as u64)
           .ok_or(ErrorCode::ArithmeticError)?
           .checked_div(output_price as u64)
+          .ok_or(ErrorCode::ArithmeticError)?
+          .checked_mul(auto_top_off.dca_swap_amount)
+          .ok_or(ErrorCode::ArithmeticError)?
+          .checked_div(10_u64.pow(u32::from(ctx.accounts.dca_mint.decimals)))
           .ok_or(ErrorCode::ArithmeticError)?,
       };
 
