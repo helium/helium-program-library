@@ -49,7 +49,8 @@ function calculateExpectedOutput(
       .div(outputPriceWithConf);
   }
 
-  return expectedOutput;
+  // Extra two decimals on HNT
+  return expectedOutput.mul(new BN(100));
 }
 
 export interface DcaServerConfig {
@@ -117,11 +118,13 @@ export async function createDcaServer(
         );
 
       console.log(
-        `Input Price: ${inputPriceUpdate.priceMessage.price.toString()} (expo: ${inputPriceUpdate.priceMessage.exponent
+        `Input Price: ${inputPriceUpdate.priceMessage.price.toString()} (expo: ${
+          inputPriceUpdate.priceMessage.exponent
         })`
       );
       console.log(
-        `Output Price: ${outputPriceUpdate.priceMessage.price.toString()} (expo: ${outputPriceUpdate.priceMessage.exponent
+        `Output Price: ${outputPriceUpdate.priceMessage.price.toString()} (expo: ${
+          outputPriceUpdate.priceMessage.exponent
         })`
       );
 
@@ -231,9 +234,7 @@ export async function runAllTasks(
   taskQueue: PublicKey,
   crankTurner: Keypair
 ) {
-  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-    taskQueue
-  );
+  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
 
   // Find all task IDs that need to be executed (have a 1 in the bitmap)
   const taskIds: number[] = [];
@@ -251,8 +252,9 @@ export async function runAllTasks(
     const task = taskKey(taskQueue, taskId)[0];
     const taskAcc = await tuktukProgram.account.taskV0.fetch(task);
     if (
-      ((taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) >
-        new Date().getTime() / 1000) || taskAcc.transaction.remoteV0?.url?.includes(".helium.io")
+      (taskAcc.trigger.timestamp?.[0]?.toNumber() || 0) >
+        new Date().getTime() / 1000 ||
+      taskAcc.transaction.remoteV0?.url?.includes(".helium.io")
     ) {
       continue;
     }
@@ -276,4 +278,3 @@ export async function runAllTasks(
 }
 
 export { calculateExpectedOutput };
-
