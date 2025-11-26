@@ -338,7 +338,8 @@ pub fn handler<'info>(
   const MAX_FREE_TASKS: u8 = 2;
 
   let auto_top_off = ctx.accounts.auto_top_off.load()?;
-  let next_time = get_next_time(&auto_top_off)?;
+  // HNT always 5 minutes after the DC
+  let next_time = get_next_time(&auto_top_off)? + if TESTING { 0 } else { 5 * 60 };
   let compiled_tx = get_task_ix_hnt(auto_top_off_key, &auto_top_off)?;
   let mut tasks = vec![TaskReturnV0 {
     trigger: TriggerV0::Timestamp(next_time),
