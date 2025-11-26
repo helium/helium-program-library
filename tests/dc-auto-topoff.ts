@@ -510,6 +510,7 @@ describe("dc-auto-topoff", () => {
 
       // Calculate required input amount per swap to get exactly hntNeeded/numOrders HNT per swap
       // Formula: outputAmount = inputAmount * (inputPrice / outputPrice)
+      // (dollars / dollars) / (dollars / hnt) = hnt / dollars
       // So: inputAmount = outputAmount * (outputPrice / inputPrice)
       const hntPerSwap = hntNeeded.divn(numOrders); // 10 HNT per swap
 
@@ -525,17 +526,23 @@ describe("dc-auto-topoff", () => {
           .mul(outputPrice)
           .div(inputPrice)
           .div(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff))))
+          // Decimal difference between USDC and HNT
+          .div(new anchor.BN(100))
           .add(new anchor.BN(1));
       } else if (expoDiff < 0) {
         dcaSwapAmount = hntPerSwap
           .mul(outputPrice)
           .div(inputPrice)
           .mul(new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff))))
+          // Decimal difference between USDC and HNT
+          .div(new anchor.BN(100))
           .add(new anchor.BN(1));
       } else {
         dcaSwapAmount = hntPerSwap
           .mul(outputPrice)
           .div(inputPrice)
+          // Decimal difference between USDC and HNT
+          .div(new anchor.BN(100))
           .add(new anchor.BN(1));
       }
 
@@ -668,6 +675,10 @@ describe("dc-auto-topoff", () => {
       // Allow for 1 bone tolerance due to rounding in DCA calculations
       const actualAmount = new anchor.BN(
         hntAccountAfterFirstSwap.amount.toString()
+      );
+      console.log(`Actual amount after first swap: ${actualAmount.toString()}`);
+      console.log(
+        `Expected amount after first swap: ${expectedAfterFirstSwap.toString()}`
       );
       const difference = actualAmount.gt(expectedAfterFirstSwap)
         ? actualAmount.sub(expectedAfterFirstSwap)

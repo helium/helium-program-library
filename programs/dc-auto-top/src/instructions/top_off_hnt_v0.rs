@@ -243,10 +243,10 @@ pub fn handler<'info>(
       // Convert HNT per swap to HNT decimals from DCA decimals
       let hnt_per_swap_hnt_decimals = match ctx.accounts.dca_mint.decimals.cmp(&8u8) {
         std::cmp::Ordering::Greater => hnt_per_swap
-          .checked_mul(10_u64.pow(u32::from(ctx.accounts.dca_mint.decimals - 8)))
+          .checked_div(10_u64.pow(u32::from(ctx.accounts.dca_mint.decimals - 8)))
           .ok_or(ErrorCode::ArithmeticError)?,
         std::cmp::Ordering::Less => hnt_per_swap
-          .checked_div(10_u64.pow(u32::from(8 - ctx.accounts.dca_mint.decimals)))
+          .checked_mul(10_u64.pow(u32::from(8 - ctx.accounts.dca_mint.decimals)))
           .ok_or(ErrorCode::ArithmeticError)?,
         std::cmp::Ordering::Equal => hnt_per_swap,
       };
