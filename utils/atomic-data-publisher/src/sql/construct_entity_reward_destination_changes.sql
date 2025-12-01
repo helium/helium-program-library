@@ -4,7 +4,7 @@
 --
 -- Returns: job_name, atomic_data (JSON)
 
-WITH updates AS (
+WITH asset_reward_destination_changes AS (
   SELECT
   kta.asset as asset,
   GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) as block,
@@ -103,9 +103,9 @@ FROM
     -- Reward destination state was set before this block range (race condition case)
     AND GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) <= $1
 ),
-all_updates AS (
+reward_destination_changes AS (
   SELECT asset, block, pub_key, rewards_recipient, rewards_split, change_type
-  FROM updates
+  FROM asset_reward_destination_changes
   UNION ALL
   SELECT asset, block, pub_key, rewards_recipient, rewards_split, change_type
   FROM newly_onboarded_hotspots
@@ -120,5 +120,5 @@ SELECT
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM all_updates
+FROM reward_destination_changes
 ORDER BY block DESC;
