@@ -44,12 +44,39 @@ welcome_pack_changes AS (
     AND wp.last_block > $1
     AND wp.last_block <= $2
 ),
+hotspots_onboarded_in_range AS (
+  -- Get hotspots onboarded in this block range
+  SELECT asset, last_block FROM iot_hotspot_infos WHERE last_block > $1 AND last_block <= $2
+  UNION ALL
+  SELECT asset, last_block FROM mobile_hotspot_infos WHERE last_block > $1 AND last_block <= $2
+),
+newly_onboarded_hotspots AS (
+  -- Catch entities that were issued before this block range but onboarded as hotspots within it
+  -- This handles the race condition where IssueEntity and OnboardHotspot happen in different blocks
+  SELECT
+    hs.asset,
+    hs.last_block as block,
+    encode(kta.entity_key, 'hex') as pub_key,
+    ao.owner,
+    'direct_owner' as owner_type,
+    'entity_ownership' as change_type
+  FROM hotspots_onboarded_in_range hs
+  INNER JOIN key_to_assets kta ON kta.asset = hs.asset
+  INNER JOIN asset_owners ao ON ao.asset = hs.asset
+  WHERE kta.entity_key IS NOT NULL
+    AND ao.owner IS NOT NULL
+    -- Asset owner was set before this block range (race condition case)
+    AND ao.last_block <= $1
+),
 ownership_changes AS (
   SELECT asset, block, pub_key, owner, owner_type, change_type
   FROM asset_owner_changes
   UNION ALL
   SELECT asset, block, pub_key, owner, owner_type, change_type
   FROM welcome_pack_changes
+  UNION ALL
+  SELECT asset, block, pub_key, owner, owner_type, change_type
+  FROM newly_onboarded_hotspots
 )
 SELECT
   'entity_ownership_changes' as job_name,

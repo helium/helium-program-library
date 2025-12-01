@@ -7,6 +7,7 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     PgPool, Row,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
@@ -19,6 +20,7 @@ use crate::{
 
 const MIN_CHUNK_SIZE: u64 = 50_000;
 const MAX_CHUNK_SIZE: u64 = 500_000;
+const REQUIRED_CONSECUTIVE_RUNS: u32 = 5;
 pub const BATCH_SIZE: usize = 1_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +37,8 @@ pub struct DatabaseClient {
   config: DatabaseConfig,
   polling_jobs: Vec<PollingJob>,
   dry_run: bool,
+  // Tracks consecutive encounters of the same max_block per job (session-only, not persisted)
+  same_max_count: Arc<RwLock<HashMap<String, (u64, u32)>>>, // (max_block, count)
 }
 
 impl DatabaseClient {
@@ -50,6 +54,7 @@ impl DatabaseClient {
       config: config.clone(),
       polling_jobs,
       dry_run,
+      same_max_count: Arc::new(RwLock::new(HashMap::new())),
     })
   }
 
@@ -666,32 +671,65 @@ impl DatabaseClient {
       current_max_block
     };
 
-    // If max block changed, update tracking and use safe max
+    // Check if max block changed from previous run
     let max_block_changed = last_max_block != Some(current_max_block);
+
+    // Update session counter
+    let job_key = format!("{}:{}", job_name, query_name);
+    let mut counter_map = self.same_max_count.write().await;
+
     if max_block_changed {
+      // Max block changed - reset counter and update tracking
+      counter_map.remove(&job_key);
+      drop(counter_map); // Release lock before await
+
       self
         .update_max_block_tracking(job_name, query_name, current_max_block)
         .await?;
       return Ok(safe_max_block);
     }
 
+    // Max block hasn't changed - check/increment session counter
+    let (stored_block, count) = counter_map
+      .entry(job_key.clone())
+      .or_insert((current_max_block, 0));
+
+    if *stored_block != current_max_block {
+      // Different block than what we were tracking - reset
+      *stored_block = current_max_block;
+      *count = 1;
+    } else {
+      // Same block - increment counter
+      *count += 1;
+    }
+
+    let current_count = *count;
+    drop(counter_map); // Release lock
+
     // If we haven't caught up to the safe max block yet, continue processing
     if last_processed_block < safe_max_block {
       return Ok(safe_max_block);
     }
 
-    // We've seen this max block before and caught up to safe_max_block
-    // Process the final block to complete this range
-    if last_processed_block < current_max_block {
+    // We've caught up to safe_max_block, check if we should process final block
+    // Require seeing the same max_block for required consecutive runs in this session
+    if last_processed_block < current_max_block && current_count >= REQUIRED_CONSECUTIVE_RUNS {
       info!(
-        "Job '{}' encountered same max_block {} on sequential run, processing final block {} to {}",
-        job_name, current_max_block, last_processed_block, current_max_block
+        "Job '{}' encountered same max_block {} for {} consecutive runs, processing final block {} to {}",
+        job_name, current_max_block, current_count, last_processed_block, current_max_block
       );
       return Ok(current_max_block);
     }
 
-    // We're fully caught up (last_processed_block >= current_max_block), nothing to do
-    Ok(current_max_block)
+    // Either fully caught up or haven't seen max_block enough times yet
+    if last_processed_block < current_max_block {
+      info!(
+        "Job '{}' at max_block {} (run {} of {} required), waiting for next cycle before processing final block",
+        job_name, current_max_block, current_count, REQUIRED_CONSECUTIVE_RUNS
+      );
+    }
+
+    Ok(safe_max_block)
   }
 
   async fn update_max_block_tracking(
