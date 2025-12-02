@@ -12,7 +12,7 @@ COPY packages packages
 
 COPY target/types target/types
 
-RUN yarn install && yarn global add lerna
+RUN yarn install --immutable && yarn global add lerna
 RUN lerna bootstrap
 
 RUN yarn run build

@@ -9,7 +9,7 @@ COPY package.json ./
 COPY yarn.deploy.lock ./
 
 ENV YARN_LOCKFILE_FILENAME=yarn.deploy.lock
-RUN yarn install
+RUN yarn install --immutable
 
 COPY src src
 COPY tsconfig.build.json tsconfig.json
