@@ -1195,14 +1195,18 @@ impl DatabaseClient {
           r#"
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
-            COALESCE((SELECT MAX(last_block) FROM welcome_packs), -1)
+            COALESCE((SELECT MAX(last_block) FROM welcome_packs), -1),
+            COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1),
+            COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)
           )::bigint as block
           "#
         } else {
           r#"
           SELECT LEAST(
             COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM welcome_packs WHERE last_block >= 0), -1)
+            COALESCE((SELECT MIN(last_block) FROM welcome_packs WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block >= 0), -1)
           )::bigint as block
           "#
         };
@@ -1219,15 +1223,21 @@ impl DatabaseClient {
         let query = if use_max {
           r#"
           SELECT GREATEST(
+            COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
             COALESCE((SELECT MAX(last_block) FROM recipients), -1),
-            COALESCE((SELECT MAX(last_block) FROM rewards_recipients), -1)
+            COALESCE((SELECT MAX(last_block) FROM mini_fanouts), -1),
+            COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1),
+            COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)
           )::bigint as block
           "#
         } else {
           r#"
           SELECT LEAST(
+            COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM recipients WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM rewards_recipients WHERE last_block >= 0), -1)
+            COALESCE((SELECT MIN(last_block) FROM mini_fanouts WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block >= 0), -1)
           )::bigint as block
           "#
         };
