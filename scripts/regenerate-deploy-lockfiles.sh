@@ -77,7 +77,7 @@ regenerate_package_lockfile() {
 
 if [ -n "$1" ]; then
   # Regenerate specific package
-  PACKAGE_DIR="packages/$1"
+  PACKAGE_DIR="$ROOT_DIR/packages/$1"
   if [ ! -d "$PACKAGE_DIR" ]; then
     echo "❌ Package $1 not found in packages/"
     exit 1
