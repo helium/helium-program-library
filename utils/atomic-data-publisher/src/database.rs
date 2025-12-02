@@ -1059,14 +1059,6 @@ impl DatabaseClient {
     self.get_block_for_query(query_name, parameters, true).await
   }
 
-  pub async fn get_min_block_for_query(
-    &self,
-    query_name: &str,
-    parameters: &serde_json::Value,
-  ) -> Result<Option<u64>> {
-    self.get_block_for_query(query_name, parameters, false).await
-  }
-
   async fn get_block_for_query(
     &self,
     query_name: &str,
