@@ -654,17 +654,18 @@ impl DatabaseClient {
 
     let job_key = format!("{}:{}", job_name, query_name);
     let mut counts = self.max_block_seen_count.write().await;
-    let entry = counts.entry(job_key).or_insert((0, 0));
+    let (last_seen_block, times_seen) = counts.entry(job_key).or_insert((0, 0));
 
-    let times_seen = if entry.0 == current_max_block {
-      entry.1 += 1;
-      entry.1
+    // Reset counter if max_block changed, otherwise increment
+    if *last_seen_block != current_max_block {
+      *last_seen_block = current_max_block;
+      *times_seen = 1;
     } else {
-      *entry = (current_max_block, 1);
-      1
-    };
+      *times_seen += 1;
+    }
 
-    if times_seen >= 5 {
+    // Process current_max_block after seeing it 5 times, otherwise stay 1 behind
+    if *times_seen >= 5 {
       Ok(current_max_block)
     } else {
       Ok(current_max_block.saturating_sub(1))
