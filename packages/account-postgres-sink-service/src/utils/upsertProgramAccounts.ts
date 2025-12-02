@@ -274,7 +274,7 @@ export const upsertProgramAccounts = async ({
         factor: 2,
         minTimeout: 1000,
         maxTimeout: 60000,
-        onRetry: (err, attempt) => {
+        onRetry: (err: any, attempt: any) => {
           console.warn(
             `Retrying getProgramAccounts for ${accountType}, attempt #${attempt}: Retrying due to ${err.message}`
           );
@@ -502,7 +502,7 @@ export const upsertProgramAccounts = async ({
           factor: 2,
           minTimeout: 2000,
           maxTimeout: 10000,
-          onRetry: (err, attempt) => {
+          onRetry: (err: any, attempt: any) => {
             console.warn(
               `Retrying account processing for ${type}, attempt #${attempt}: ${err.message}`
             );

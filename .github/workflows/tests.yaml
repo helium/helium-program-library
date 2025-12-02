@@ -97,7 +97,6 @@ jobs:
           - packages/metadata-service
           - packages/distributor-oracle
           - packages/account-postgres-sink-service
-          - packages/active-device-oracle
           - packages/fanout-metadata-service
           - packages/tokens-to-rent-service
           - packages/rewards-oracle-faucet-service
