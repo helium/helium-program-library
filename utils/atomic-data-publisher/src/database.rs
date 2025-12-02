@@ -7,7 +7,6 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     PgPool, Row,
 };
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
@@ -36,8 +35,6 @@ pub struct DatabaseClient {
   config: DatabaseConfig,
   polling_jobs: Vec<PollingJob>,
   dry_run: bool,
-  /// Tracks (max_block, times_seen) per job. Process max_block after seeing it 5 times.
-  max_block_seen_count: Arc<RwLock<HashMap<String, (u64, u32)>>>,
 }
 
 impl DatabaseClient {
@@ -53,7 +50,6 @@ impl DatabaseClient {
       config: config.clone(),
       polling_jobs,
       dry_run,
-      max_block_seen_count: Arc::new(RwLock::new(HashMap::new())),
     })
   }
 
@@ -632,44 +628,11 @@ impl DatabaseClient {
       }
     };
 
-    let max_available_block = self
-      .get_safe_target_block(&job.name, &job.query_name, current_max_block)
-      .await?;
-
-    // Return the actual Option<i64> value from DB (which may be NULL) for use in SQL queries
-    Ok((last_processed_block, max_available_block))
-  }
-
-  /// Returns target block to process with a safety buffer.
-  /// Stay 1 block behind until we've seen the same max_block 5 times, then process it.
-  async fn get_safe_target_block(
-    &self,
-    job_name: &str,
-    query_name: &str,
-    current_max_block: u64,
-  ) -> Result<u64, AtomicDataError> {
     self
-      .update_max_block_tracking(job_name, query_name, current_max_block)
+      .update_max_block_tracking(&job.name, &job.query_name, current_max_block)
       .await?;
 
-    let job_key = format!("{}:{}", job_name, query_name);
-    let mut counts = self.max_block_seen_count.write().await;
-    let (last_seen_block, times_seen) = counts.entry(job_key).or_insert((0, 0));
-
-    // Reset counter if max_block changed, otherwise increment
-    if *last_seen_block != current_max_block {
-      *last_seen_block = current_max_block;
-      *times_seen = 1;
-    } else {
-      *times_seen += 1;
-    }
-
-    // Process current_max_block after seeing it 5 times, otherwise stay 1 behind
-    if *times_seen >= 5 {
-      Ok(current_max_block)
-    } else {
-      Ok(current_max_block.saturating_sub(1))
-    }
+    Ok((last_processed_block, current_max_block))
   }
 
   async fn update_max_block_tracking(
