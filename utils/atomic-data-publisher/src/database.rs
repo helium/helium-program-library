@@ -22,10 +22,6 @@ const MIN_CHUNK_SIZE: u64 = 50_000;
 const MAX_CHUNK_SIZE: u64 = 500_000;
 pub const BATCH_SIZE: usize = 1_000;
 
-/// Number of consecutive runs seeing the same max_block before we consider it "stable"
-/// and safe to process. This prevents processing blocks that are still being written to.
-const STABILITY_THRESHOLD: u32 = 5;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeRecord {
   pub job_name: String,
@@ -40,9 +36,8 @@ pub struct DatabaseClient {
   config: DatabaseConfig,
   polling_jobs: Vec<PollingJob>,
   dry_run: bool,
-  /// Tracks max_block stability per job: (last_seen_max_block, consecutive_stable_count)
-  /// Resets on service restart to ensure fresh stability checks.
-  max_block_stability: Arc<RwLock<HashMap<String, (u64, u32)>>>,
+  /// Tracks (max_block, times_seen) per job. Process max_block after seeing it 5 times.
+  max_block_seen_count: Arc<RwLock<HashMap<String, (u64, u32)>>>,
 }
 
 impl DatabaseClient {
@@ -58,7 +53,7 @@ impl DatabaseClient {
       config: config.clone(),
       polling_jobs,
       dry_run,
-      max_block_stability: Arc::new(RwLock::new(HashMap::new())),
+      max_block_seen_count: Arc::new(RwLock::new(HashMap::new())),
     })
   }
 
@@ -637,88 +632,43 @@ impl DatabaseClient {
       }
     };
 
-    // Get the min block for this table and use it if it's greater than last_processed_block
-    let min_block = self
-      .get_min_block_for_query(&job.query_name, &job.parameters)
-      .await?
-      .unwrap_or(0);
-
-    // Convert last_processed_block to u64 for calculations, treating NULL as 0
-    let last_processed_block_u64 = last_processed_block.unwrap_or(0) as u64;
-    let effective_start_block = std::cmp::max(min_block, last_processed_block_u64);
     let max_available_block = self
-      .get_stable_target_block(
-        &job.name,
-        &job.query_name,
-        current_max_block,
-        effective_start_block,
-      )
+      .get_safe_target_block(&job.name, &job.query_name, current_max_block)
       .await?;
 
     // Return the actual Option<i64> value from DB (which may be NULL) for use in SQL queries
     Ok((last_processed_block, max_available_block))
   }
 
-  /// Determines the target block to process, applying a safety buffer to avoid
-  /// processing blocks that may still have data being written.
-  ///
-  /// Strategy:
-  /// 1. Always stay 1 block behind current_max (safety buffer)
-  /// 2. Track how many times we've seen the same max_block consecutively
-  /// 3. Only process the final block once max_block has been "stable" for STABILITY_THRESHOLD runs
-  async fn get_stable_target_block(
+  /// Returns target block to process with a safety buffer.
+  /// Stay 1 block behind until we've seen the same max_block 5 times, then process it.
+  async fn get_safe_target_block(
     &self,
     job_name: &str,
     query_name: &str,
     current_max_block: u64,
-    last_processed_block: u64,
   ) -> Result<u64, AtomicDataError> {
-    let safe_target = current_max_block.saturating_sub(1);
-    let job_key = format!("{}:{}", job_name, query_name);
-
-    // Update stability tracking
-    let stable_count = {
-      let mut stability_map = self.max_block_stability.write().await;
-      let entry = stability_map.entry(job_key).or_insert((0, 0));
-
-      if entry.0 == current_max_block {
-        entry.1 += 1; // Same max_block, increment count
-      } else {
-        *entry = (current_max_block, 1); // New max_block, reset count
-      }
-      entry.1
-    };
-
-    // Update DB tracking for observability
     self
       .update_max_block_tracking(job_name, query_name, current_max_block)
       .await?;
 
-    // Still catching up to safe_target? Keep processing.
-    if last_processed_block < safe_target {
-      return Ok(safe_target);
+    let job_key = format!("{}:{}", job_name, query_name);
+    let mut counts = self.max_block_seen_count.write().await;
+    let entry = counts.entry(job_key).or_insert((0, 0));
+
+    let times_seen = if entry.0 == current_max_block {
+      entry.1 += 1;
+      entry.1
+    } else {
+      *entry = (current_max_block, 1);
+      1
+    };
+
+    if times_seen >= 5 {
+      Ok(current_max_block)
+    } else {
+      Ok(current_max_block.saturating_sub(1))
     }
-
-    // At safe_target - check if we should process the final block
-    let at_final_block = last_processed_block >= safe_target && last_processed_block < current_max_block;
-    let is_stable = stable_count >= STABILITY_THRESHOLD;
-
-    if at_final_block && is_stable {
-      info!(
-        "Job '{}': max_block {} stable for {} runs, processing final block",
-        job_name, current_max_block, stable_count
-      );
-      return Ok(current_max_block);
-    }
-
-    if at_final_block {
-      info!(
-        "Job '{}': waiting for stability ({}/{} runs at max_block {})",
-        job_name, stable_count, STABILITY_THRESHOLD, current_max_block
-      );
-    }
-
-    Ok(safe_target)
   }
 
   async fn update_max_block_tracking(
