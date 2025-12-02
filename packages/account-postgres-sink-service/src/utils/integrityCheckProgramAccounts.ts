@@ -244,7 +244,7 @@ export const integrityCheckProgramAccounts = async ({
               accountInfo.data &&
               discriminatorsByType
                 .get(type)
-                ?.equals(accountInfo.data.subarray(0, 8))
+                ?.equals(new Uint8Array(accountInfo.data.subarray(0, 8)))
           )?.type;
 
           if (accName) {
@@ -459,7 +459,7 @@ export const integrityCheckProgramAccounts = async ({
   try {
     await retry(performIntegrityCheck, {
       ...retryOptions,
-      onRetry: (error, attempt) => {
+      onRetry: (error: any, attempt: any) => {
         console.log(
           `Integrity check ${programId} attempt ${attempt}: Retrying due to ${error.message}`
         );
