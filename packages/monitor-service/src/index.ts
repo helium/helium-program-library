@@ -36,6 +36,8 @@ import { monitorSupply } from "./monitors/supply";
 import { monitorVehnt } from "./monitors/vehnt";
 import { provider } from "./solana";
 
+const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+
 let hemProgram: anchor.Program<HeliumEntityManager>;
 let hsdProgram: anchor.Program<HeliumSubDaos>;
 let cbProgram: anchor.Program<CircuitBreaker>;
@@ -217,6 +219,11 @@ async function run() {
   await monitorTokenBalance(
     getAssociatedTokenAddressSync(dao.hntMint, mobileRevAutoTopOff, true),
     "helium_mobile_rev_auto_topoff_hnt"
+  );
+
+  await monitorTokenBalance(
+    getAssociatedTokenAddressSync(USDC_MINT, mobileRevAutoTopOff, true),
+    "helium_mobile_rev_auto_topoff_usdc"
   );
 
   await monitorTokenBalance(
