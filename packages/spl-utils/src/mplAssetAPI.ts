@@ -295,7 +295,7 @@ export type AssetsByOwnerOpts = {
   after?: string;
 };
 
-export async function getAssetsByOwner(
+export async function getAssetsByOwnerWithPageInfo(
   url: string,
   wallet: string,
   {
@@ -305,12 +305,19 @@ export async function getAssetsByOwner(
     before = "",
     after = "",
   }: AssetsByOwnerOpts = {}
-): Promise<Asset[]> {
+): Promise<{
+  page: number;
+  total: number;
+  limit: number;
+  items: Asset[];
+  before?: string;
+  after?: string;
+}> {
   try {
     const response = await axios.post(url, {
       jsonrpc: "2.0",
       method: "getAssetsByOwner",
-      id: "rpd-op-123",
+      id: "get-assets-by-owner",
       params: [wallet, sortBy, limit, page, before, after],
       headers: {
         "Cache-Control": "no-cache",
@@ -323,11 +330,33 @@ export async function getAssetsByOwner(
       throw new Error(response.data.error.message);
     }
 
-    return response.data.result?.items.map(toAsset);
+    const result = response.data.result;
+    return {
+      items: result.items?.map(toAsset) || [],
+      limit: result.limit || limit,
+      total: result.total || 0,
+      page: result.page || page,
+      before: result.before,
+      after: result.after,
+    };
   } catch (error) {
     console.error(error);
     throw error;
   }
+}
+
+/**
+ * Get assets by owner address.
+ * Returns just the assets array for backward compatibility.
+ * Use getAssetsByOwnerWithPageInfo for pagination info.
+ */
+export async function getAssetsByOwner(
+  url: string,
+  wallet: string,
+  opts: AssetsByOwnerOpts = {}
+): Promise<Asset[]> {
+  const result = await getAssetsByOwnerWithPageInfo(url, wallet, opts);
+  return result.items;
 }
 
 export type SearchAssetsOpts = {
@@ -409,6 +438,138 @@ export async function searchAssetsWithPageInfo(
       total: ret.total,
       page: ret.page,
       grandTotal: ret.grand_total,
+    };
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+/**
+ * Get assets by group (e.g., collection).
+ * More performant than searchAssets for collection queries.
+ * Supports both page-based and cursor-based pagination.
+ *
+ * For cursor-based pagination, pass the `cursor` from the previous response.
+ * The API will return the next page of items. Continue until cursor is undefined.
+ */
+export async function getAssetsByGroup(
+  url: string,
+  {
+    groupKey = "collection",
+    groupValue,
+    page,
+    limit = 1000,
+    cursor,
+  }: {
+    groupKey?: string;
+    groupValue: string;
+    page?: number;
+    limit?: number;
+    cursor?: string;
+  }
+): Promise<{
+  page?: number;
+  total: number;
+  limit: number;
+  items: Asset[];
+  cursor?: string;
+}> {
+  try {
+    const params: any = {
+      groupKey,
+      groupValue,
+      limit,
+    };
+
+    // Use cursor-based pagination (forward-only)
+    if (cursor) {
+      params.cursor = cursor;
+    } else if (page) {
+      params.page = page;
+    }
+
+    const response = await axios.post(url, {
+      jsonrpc: "2.0",
+      method: "getAssetsByGroup",
+      id: "get-assets-by-group",
+      params,
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+
+    if (response.data && response.data.error) {
+      throw new Error(response.data.error.message);
+    }
+
+    const result = response.data.result;
+    return {
+      items: result.items?.map(toAsset) || [],
+      limit: result.limit || limit,
+      total: result.total || 0,
+      page: result.page,
+      cursor: result.cursor,
+    };
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+/**
+ * Get assets by creator address.
+ * More performant than searchAssets for creator queries.
+ */
+export async function getAssetsByCreator(
+  url: string,
+  {
+    creatorAddress,
+    onlyVerified = true,
+    page = 1,
+    limit = 1000,
+  }: {
+    creatorAddress: string;
+    onlyVerified?: boolean;
+    page?: number;
+    limit?: number;
+  }
+): Promise<{
+  page: number;
+  total: number;
+  limit: number;
+  items: Asset[];
+}> {
+  try {
+    const response = await axios.post(url, {
+      jsonrpc: "2.0",
+      method: "getAssetsByCreator",
+      id: "get-assets-by-creator",
+      params: {
+        creatorAddress,
+        onlyVerified,
+        page,
+        limit,
+      },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+
+    if (response.data && response.data.error) {
+      throw new Error(response.data.error.message);
+    }
+
+    const result = response.data.result;
+    return {
+      items: result.items?.map(toAsset) || [],
+      limit: result.limit || limit,
+      total: result.total || 0,
+      page: result.page || page,
     };
   } catch (error) {
     console.error(error);

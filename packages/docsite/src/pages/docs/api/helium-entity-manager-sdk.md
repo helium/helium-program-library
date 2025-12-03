@@ -532,13 +532,16 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name         | Mutability | Signer | Docs |
-| ------------ | ---------- | ------ | ---- |
-| key_to_asset | immut      | no     |      |
-| dao          | immut      | no     |      |
-| asset        | immut      | no     |      |
-| recipient    | immut      | no     |      |
-| authority    | immut      | no     |      |
+| Name          | Mutability | Signer | Docs |
+| ------------- | ---------- | ------ | ---- |
+| authority     | immut      | no     |      |
+| key_to_asset  | immut      | no     |      |
+| dao           | immut      | no     |      |
+| asset         | immut      | no     |      |
+| iot_info      | immut      | no     |      |
+| mobile_info   | immut      | no     |      |
+| iot_config    | immut      | no     |      |
+| mobile_config | immut      | no     |      |
 
 #### Args
 
@@ -772,10 +775,6 @@ undefined
 undefined
 
 ### ProgramApprovalV0
-
-undefined
-
-### RecipientV0
 
 undefined
 
@@ -1112,19 +1111,6 @@ undefined
 | -------- | ------ |
 | proposal | pubkey |
 | ts       | i64    |
-
-### RecipientV0
-
-| Field                  | Type            |
-| ---------------------- | --------------- |
-| lazy_distributor       | pubkey          |
-| asset                  | pubkey          |
-| total_rewards          | u64             |
-| current_config_version | u16             |
-| current_rewards        | [object Object] |
-| bump_seed              | u8              |
-| reserved               | u64             |
-| destination            | pubkey          |
 
 ### RevokeProgramArgsV0
 
