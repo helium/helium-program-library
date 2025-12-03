@@ -205,7 +205,7 @@ server.post<{
       dcaAccount.inputMint.toBase58(),
       dcaAccount.outputMint.toBase58(),
       swapAmount.toString(),
-      dcaAccount.slippageBpsFromOracle
+      50 // 0.5% slippage
     );
 
     console.log(`Jupiter quote: ${quote.outAmount} output tokens`);
