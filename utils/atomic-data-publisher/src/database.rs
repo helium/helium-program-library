@@ -607,13 +607,12 @@ impl DatabaseClient {
     .await?;
 
     // Use dry_run_last_processed_block if in dry_run mode, otherwise use last_processed_block
-    // But last_max_block is shared - it tracks the source data, not processing state
     let last_processed_block: Option<i64> = if self.dry_run {
       current_state_row.get("dry_run_last_processed_block")
     } else {
       current_state_row.get("last_processed_block")
     };
-    let last_max_block: Option<i64> = current_state_row.get("last_max_block");
+
     let current_max_block = match self
       .get_max_block_for_query(&job.query_name, &job.parameters)
       .await?
@@ -629,69 +628,11 @@ impl DatabaseClient {
       }
     };
 
-    // Get the min block for this table and use it if it's greater than last_processed_block
-    let min_block = self
-      .get_min_block_for_query(&job.query_name, &job.parameters)
-      .await?
-      .unwrap_or(0);
-
-    // Convert last_processed_block to u64 for calculations, treating NULL as 0
-    let last_processed_block_u64 = last_processed_block.unwrap_or(0) as u64;
-    let effective_start_block = std::cmp::max(min_block, last_processed_block_u64);
-    let max_available_block = self
-      .apply_safety_buffer_and_track_progress(
-        &job.name,
-        &job.query_name,
-        current_max_block,
-        effective_start_block,
-        last_max_block.map(|b| b as u64),
-      )
+    self
+      .update_max_block_tracking(&job.name, &job.query_name, current_max_block)
       .await?;
 
-    // Return the actual Option<i64> value from DB (which may be NULL) for use in SQL queries
-    Ok((last_processed_block, max_available_block))
-  }
-
-  async fn apply_safety_buffer_and_track_progress(
-    &self,
-    job_name: &str,
-    query_name: &str,
-    current_max_block: u64,
-    last_processed_block: u64,
-    last_max_block: Option<u64>,
-  ) -> Result<u64, AtomicDataError> {
-    let safe_max_block = if current_max_block > 1 {
-      current_max_block - 1
-    } else {
-      current_max_block
-    };
-
-    // If max block changed, update tracking and use safe max
-    let max_block_changed = last_max_block != Some(current_max_block);
-    if max_block_changed {
-      self
-        .update_max_block_tracking(job_name, query_name, current_max_block)
-        .await?;
-      return Ok(safe_max_block);
-    }
-
-    // If we haven't caught up to the safe max block yet, continue processing
-    if last_processed_block < safe_max_block {
-      return Ok(safe_max_block);
-    }
-
-    // We've seen this max block before and caught up to safe_max_block
-    // Process the final block to complete this range
-    if last_processed_block < current_max_block {
-      info!(
-        "Job '{}' encountered same max_block {} on sequential run, processing final block {} to {}",
-        job_name, current_max_block, last_processed_block, current_max_block
-      );
-      return Ok(current_max_block);
-    }
-
-    // We're fully caught up (last_processed_block >= current_max_block), nothing to do
-    Ok(current_max_block)
+    Ok((last_processed_block, current_max_block))
   }
 
   async fn update_max_block_tracking(
@@ -1082,14 +1023,6 @@ impl DatabaseClient {
     self.get_block_for_query(query_name, parameters, true).await
   }
 
-  pub async fn get_min_block_for_query(
-    &self,
-    query_name: &str,
-    parameters: &serde_json::Value,
-  ) -> Result<Option<u64>> {
-    self.get_block_for_query(query_name, parameters, false).await
-  }
-
   async fn get_block_for_query(
     &self,
     query_name: &str,
@@ -1157,14 +1090,18 @@ impl DatabaseClient {
           r#"
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
-            COALESCE((SELECT MAX(last_block) FROM welcome_packs), -1)
+            COALESCE((SELECT MAX(last_block) FROM welcome_packs), -1),
+            COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1),
+            COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)
           )::bigint as block
           "#
         } else {
           r#"
           SELECT LEAST(
             COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM welcome_packs WHERE last_block >= 0), -1)
+            COALESCE((SELECT MIN(last_block) FROM welcome_packs WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block >= 0), -1)
           )::bigint as block
           "#
         };

@@ -32,7 +32,7 @@ const cachedIdlFetch = (() => {
         // Prune cache to 10 items
         if (cache.size > 10) {
           const firstKey = cache.keys().next().value;
-          cache.delete(firstKey);
+          cache.delete(firstKey!);
         }
       }
     }

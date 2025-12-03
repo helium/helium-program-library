@@ -13,7 +13,7 @@ runs:
         path: |
           ./node_modules/
         key: node-modules-${{ runner.os }}-v0000-${{ env.NODE_VERSION }}-${{ hashFiles('./yarn.lock') }}-${{ hashFiles('./**/*/package.json') }}
-    - run: yarn
+    - run: yarn install --immutable
       shell: bash
       if: steps.cache-typescript-node-modules.outputs.cache-hit != 'true'
     - run: yarn run build
