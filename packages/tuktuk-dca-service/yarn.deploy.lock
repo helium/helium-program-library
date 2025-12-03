@@ -371,16 +371,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@^0.11.6":
-  version: 0.0.0-use.local
-  resolution: "@helium/account-fetch-cache@workspace:packages/account-fetch-cache"
+"@helium/account-fetch-cache@npm:^0.11.6":
+  version: 0.11.6
+  resolution: "@helium/account-fetch-cache@npm:0.11.6"
   dependencies:
     "@solana/web3.js": ^1.91.1
-    git-format-staged: ^2.1.3
-    ts-loader: ^9.2.3
-    typescript: ^5.2.2
-  languageName: unknown
-  linkType: soft
+  checksum: fb17a999e7909b88bc18c41cd29876829c7f4ff8ae00083217239e0aabaf523e19863669e2659887166bbd7f472d1265856e3a0e52b91bee51f4669072ec2777
+  languageName: node
+  linkType: hard
 
 "@helium/address@npm:^4.12.0":
   version: 4.12.0
@@ -392,20 +390,6 @@ __metadata:
   checksum: d4ea0fd0ea565776cd2bf70835235784d87e483436328648b2b7605f6c2c93a6baa35a6b56f7e8b571d3a7417888da66638e262db1204b2abb3b0500d37ba7e0
   languageName: node
   linkType: hard
-
-"@helium/anchor-resolvers@^0.11.6":
-  version: 0.0.0-use.local
-  resolution: "@helium/anchor-resolvers@workspace:packages/anchor-resolvers"
-  dependencies:
-    "@solana/spl-token": ^0.3.8
-    "@solana/web3.js": ^1.91.1
-    git-format-staged: ^2.1.3
-    ts-loader: ^9.2.3
-    typescript: ^5.2.2
-  peerDependencies:
-    "@coral-xyz/anchor": ^0.31.0
-  languageName: unknown
-  linkType: soft
 
 "@helium/anchor-resolvers@npm:^0.10.0-alpha.4":
   version: 0.10.35
@@ -419,23 +403,34 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/idls@^0.11.6":
-  version: 0.0.0-use.local
-  resolution: "@helium/idls@workspace:packages/idls"
+"@helium/anchor-resolvers@npm:^0.11.6":
+  version: 0.11.6
+  resolution: "@helium/anchor-resolvers@npm:0.11.6"
+  dependencies:
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.91.1
+  peerDependencies:
+    "@coral-xyz/anchor": ^0.31.0
+  checksum: e32d4fe73cb3b7cd0c750a70ee28dc2dab138920b6c6ab1e8459b680cb96d3dce45c8821e032ca001ef14262e13b44ca60cef472739c22510835b0ca450aee09
+  languageName: node
+  linkType: hard
+
+"@helium/idls@npm:^0.11.6":
+  version: 0.11.6
+  resolution: "@helium/idls@npm:0.11.6"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@solana/web3.js": ^1.91.1
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-    ts-loader: ^9.2.3
-    typescript: ^5.2.2
-  languageName: unknown
-  linkType: soft
+  checksum: 3a330b7aefab4d4a1b5e438d87df50cc18918c46f0ff305f6598ac81548d3fda3ab1f998ba28ebf0752b332fbc47ff221d3947c813e44463ce7a147dc86628ad
+  languageName: node
+  linkType: hard
 
-"@helium/spl-utils@^0.11.6":
-  version: 0.0.0-use.local
-  resolution: "@helium/spl-utils@workspace:packages/spl-utils"
+"@helium/spl-utils@npm:^0.11.6":
+  version: 0.11.6
+  resolution: "@helium/spl-utils@npm:0.11.6"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@helium/account-fetch-cache": ^0.11.6
@@ -449,15 +444,13 @@ __metadata:
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-    git-format-staged: ^2.1.3
-    ts-loader: ^9.2.3
-    typescript: ^5.2.2
-  languageName: unknown
-  linkType: soft
+  checksum: 77213d7e34c6e773f78448cd6eb798aaf0ae48abe3ef628dae61f1b1d53ab95ee1c41434f40bdab3585331f95e02d4fff922d550ac5bc9101bf1d9b1d9ab8896
+  languageName: node
+  linkType: hard
 
-"@helium/tuktuk-dca-sdk@^0.11.6":
-  version: 0.0.0-use.local
-  resolution: "@helium/tuktuk-dca-sdk@workspace:packages/tuktuk-dca-sdk"
+"@helium/tuktuk-dca-sdk@npm:^0.11.6":
+  version: 0.11.6
+  resolution: "@helium/tuktuk-dca-sdk@npm:0.11.6"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@helium/anchor-resolvers": ^0.11.6
@@ -465,12 +458,9 @@ __metadata:
     "@helium/spl-utils": ^0.11.6
     bn.js: ^5.2.0
     bs58: ^4.0.1
-    git-format-staged: ^2.1.3
-    ts-loader: ^9.2.3
-    ts-node: ^10.9.1
-    typescript: ^5.2.2
-  languageName: unknown
-  linkType: soft
+  checksum: 181ea312cd48ab4f247082645754d6dae80616d12e9c8836b3a9d545c924b04473c2c5b0a219ead6c4bfe638dbf317f36de7e21ab8defc85e96508d0ea3bfb72
+  languageName: node
+  linkType: hard
 
 "@helium/tuktuk-dca-service@workspace:.":
   version: 0.0.0-use.local

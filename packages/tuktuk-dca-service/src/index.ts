@@ -18,7 +18,14 @@ import {
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
-import { DCA_SIGNER, JUPITER_API_URL, PORT, SOLANA_URL } from "./env";
+import {
+  DCA_SIGNER,
+  JUPITER_API_KEY,
+  JUPITER_API_URL,
+  PORT,
+  SLIPPAGE_BPS,
+  SOLANA_URL,
+} from "./env";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 const server: FastifyInstance = Fastify({
@@ -105,7 +112,11 @@ async function getJupiterQuote(
     onlyDirectRoutes: "true",
   });
 
-  const response = await fetch(`${JUPITER_API_URL}/swap/v1/quote?${params}`);
+  const response = await fetch(`${JUPITER_API_URL}/swap/v1/quote?${params}`, {
+    headers: {
+      "x-api-key": JUPITER_API_KEY!,
+    },
+  });
   if (!response.ok) {
     throw new Error(
       `Jupiter Lite API error: ${response.status} ${response.statusText}`
@@ -127,6 +138,7 @@ async function getJupiterSwapInstructions(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-api-key": JUPITER_API_KEY!,
     },
     body: JSON.stringify({
       userPublicKey: sourcePublicKey,
@@ -205,7 +217,7 @@ server.post<{
       dcaAccount.inputMint.toBase58(),
       dcaAccount.outputMint.toBase58(),
       swapAmount.toString(),
-      50 // 0.5% slippage
+      Number(SLIPPAGE_BPS)
     );
 
     console.log(`Jupiter quote: ${quote.outAmount} output tokens`);
