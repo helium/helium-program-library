@@ -69,7 +69,7 @@ pub struct IssueServiceRewardsNftV0<'info> {
     seeds = [
       "key_to_asset".as_bytes(),
       dao.key().as_ref(),
-      &hash_entity_key("Helium Mobile Mapping Rewards".as_bytes())
+      &hash_entity_key("Helium Mobile Service Rewards".as_bytes())
     ],
     seeds::program = helium_entity_manager_program.key(),
     bump
