@@ -95,4 +95,11 @@ pub mod mobile_entity_manager {
   ) -> Result<()> {
     issue_mapping_rewards_nft_v0::handler(ctx, args)
   }
+
+  pub fn issue_service_rewards_nft_v0(
+    ctx: Context<IssueServiceRewardsNftV0>,
+    args: IssueServiceRewardsNftArgsV0,
+  ) -> Result<()> {
+    issue_service_rewards_nft_v0::handler(ctx, args)
+  }
 }
