@@ -6,6 +6,7 @@ import {
   lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
 import { init as initRewards } from "@helium/rewards-oracle-sdk";
+import { init as initMem } from "@helium/mobile-entity-manager-sdk";
 import {
   HNT_MINT,
   MOBILE_MINT,
@@ -57,6 +58,7 @@ export async function run(args: any = process.argv) {
 
   const lazyProgram = await initLazy(provider);
   const rewardsOracleProgram = await initRewards(provider);
+  const memProgram = await initMem(provider);
 
   const authority = argv.authority
     ? loadKeypair(argv.authority as string)
@@ -65,6 +67,19 @@ export async function run(args: any = process.argv) {
 
   const dao = daoKey(HNT_MINT)[0];
   const lazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
+
+  // Fetch all subscriber collections
+  console.log(
+    "Fetching CarrierV0 accounts to identify subscriber collections..."
+  );
+  const carriers = await memProgram.account.carrierV0.all();
+  const subscriberCollections = new Set<string>();
+  for (const carrier of carriers) {
+    subscriberCollections.add(carrier.account.collection.toBase58());
+  }
+  console.log(
+    `  Found ${subscriberCollections.size} subscriber collection(s) from ${carriers.length} carriers\n`
+  );
 
   console.log(
     "Fetching RecipientV0 accounts for MOBILE lazy distributor using pagination..."
@@ -76,6 +91,8 @@ export async function run(args: any = process.argv) {
   let paginationKey: string | null = null;
   let page = 0;
   let totalRecipientsFetched = 0;
+  let totalSkippedMissingAsset = 0;
+  let totalSkippedNonSubscriber = 0;
   let currentBatch: any[] = [];
   const subscriberRecipients: {
     address: PublicKey;
@@ -213,21 +230,41 @@ export async function run(args: any = process.argv) {
 
       const assets = assetResults.flat();
 
-      // Filter for subscriber assets
+      // Filter for subscriber assets by checking against subscriber collections
       console.log("Filtering for subscriber assets...");
+      let batchSkippedNonSubscriber = 0;
+      let batchSkippedMissingAsset = 0;
+
       currentBatch.forEach((recipient, index) => {
         const asset = assets[index];
-        if (asset && asset.content?.metadata?.symbol === "SUBSCRIBER") {
+        if (!asset) {
+          batchSkippedMissingAsset++;
+          totalSkippedMissingAsset++;
+          return;
+        }
+
+        // Check if asset belongs to a subscriber collection
+        const assetCollection = asset.grouping?.find(
+          (g: any) => g.group_key === "collection"
+        )?.group_value;
+
+        if (
+          assetCollection &&
+          subscriberCollections.has(assetCollection.toBase58())
+        ) {
           subscriberRecipients.push({
             address: recipient.publicKey,
             asset,
             recipientData: recipient.account,
           });
+        } else {
+          batchSkippedNonSubscriber++;
+          totalSkippedNonSubscriber++;
         }
       });
 
       console.log(
-        `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients so far\n`
+        `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients so far (${batchSkippedMissingAsset} missing assets, ${batchSkippedNonSubscriber} non-subscribers)\n`
       );
 
       // Clear current batch to free memory
@@ -237,9 +274,87 @@ export async function run(args: any = process.argv) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   } while (paginationKey);
 
+  // Process any remaining batch
+  if (currentBatch.length > 0) {
+    console.log(
+      `\n--- Processing final batch of ${currentBatch.length.toLocaleString()} recipients ---`
+    );
+
+    const assetIds = currentBatch.map((r) => r.account.asset);
+    console.log(`Fetching ${assetIds.length.toLocaleString()} assets...`);
+
+    const assetChunks = chunks(assetIds, 1000);
+    const assetLimiter = pLimit(5);
+    let fetchedCount = 0;
+    let assetBatchIndex = 0;
+
+    const assetResults = await Promise.all(
+      assetChunks.map((chunk) =>
+        assetLimiter(async () => {
+          const result = await fetchAssetBatchWithRetry(chunk);
+          fetchedCount += chunk.length;
+          assetBatchIndex++;
+
+          if (assetBatchIndex % 10 === 0 || fetchedCount >= assetIds.length) {
+            console.log(
+              `  ${assetBatchIndex} batches: ${fetchedCount.toLocaleString()} assets`
+            );
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          return result;
+        })
+      )
+    );
+
+    const assets = assetResults.flat();
+
+    console.log("Filtering for subscriber assets...");
+    let batchSkippedNonSubscriber = 0;
+    let batchSkippedMissingAsset = 0;
+
+    currentBatch.forEach((recipient, index) => {
+      const asset = assets[index];
+      if (!asset) {
+        batchSkippedMissingAsset++;
+        totalSkippedMissingAsset++;
+        return;
+      }
+
+      const assetCollection = asset.grouping?.find(
+        (g: any) => g.group_key === "collection"
+      )?.group_value;
+
+      if (
+        assetCollection &&
+        subscriberCollections.has(assetCollection.toBase58())
+      ) {
+        subscriberRecipients.push({
+          address: recipient.publicKey,
+          asset,
+          recipientData: recipient.account,
+        });
+      } else {
+        batchSkippedNonSubscriber++;
+        totalSkippedNonSubscriber++;
+      }
+    });
+
+    console.log(
+      `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients total (${batchSkippedMissingAsset} missing assets, ${batchSkippedNonSubscriber} non-subscribers in final batch)\n`
+    );
+  }
+
   console.log(`\n=== Summary ===`);
-  console.log(`Processed ${totalRecipientsFetched} total RecipientV0 accounts`);
-  console.log(`${subscriberRecipients.length} are for subscriber assets`);
+  console.log(
+    `Processed ${totalRecipientsFetched.toLocaleString()} total RecipientV0 accounts`
+  );
+  console.log(
+    `${subscriberRecipients.length.toLocaleString()} are for subscriber assets`
+  );
+  console.log(
+    `${totalSkippedNonSubscriber.toLocaleString()} skipped (non-subscriber assets)`
+  );
 
   if (!argv.commit) {
     console.log(
