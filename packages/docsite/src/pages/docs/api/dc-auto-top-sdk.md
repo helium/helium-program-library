@@ -10,24 +10,28 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name                     | Mutability | Signer | Docs |
-| ------------------------ | ---------- | ------ | ---- |
-| authority                | immut      | no     |      |
-| auto_top_off             | immut      | no     |      |
-| queue_authority          | immut      | no     |      |
-| task_queue_authority     | immut      | no     |      |
-| rent_refund              | immut      | no     |      |
-| task_queue               | immut      | no     |      |
-| next_task                | immut      | no     |      |
-| dao                      | immut      | no     |      |
-| hnt_account              | immut      | no     |      |
-| dc_account               | immut      | no     |      |
-| dca_mint_account         | immut      | no     |      |
-| next_hnt_task            | immut      | no     |      |
-| associated_token_program | immut      | no     |      |
-| token_program            | immut      | no     |      |
-| tuktuk_program           | immut      | no     |      |
-| system_program           | immut      | no     |      |
+| Name                       | Mutability | Signer | Docs |
+| -------------------------- | ---------- | ------ | ---- |
+| authority                  | immut      | no     |      |
+| auto_top_off               | immut      | no     |      |
+| queue_authority            | immut      | no     |      |
+| task_queue_authority       | immut      | no     |      |
+| rent_refund                | immut      | no     |      |
+| task_queue                 | immut      | no     |      |
+| next_task                  | immut      | no     |      |
+| dao                        | immut      | no     |      |
+| hnt_mint                   | immut      | no     |      |
+| dca_mint                   | immut      | no     |      |
+| hnt_account                | immut      | no     |      |
+| authority_hnt_account      | immut      | no     |      |
+| dc_account                 | immut      | no     |      |
+| dca_mint_account           | immut      | no     |      |
+| authority_dca_mint_account | immut      | no     |      |
+| next_hnt_task              | immut      | no     |      |
+| associated_token_program   | immut      | no     |      |
+| token_program              | immut      | no     |      |
+| tuktuk_program             | immut      | no     |      |
+| system_program             | immut      | no     |      |
 
 #### Args
 
@@ -44,6 +48,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | auto_top_off             | immut      | no     |      |
 | delegated_data_credits   | immut      | no     |      |
 | hnt_account              | immut      | no     |      |
+| authority_hnt_account    | immut      | no     |      |
 | dc_account               | immut      | no     |      |
 | associated_token_program | immut      | no     |      |
 | token_program            | immut      | no     |      |
@@ -96,6 +101,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | payer                | immut      | no     |                                               |
 | auto_top_off         | immut      | no     |                                               |
 | next_task            | immut      | no     | Only allow one task to be scheduled at a time |
+| next_hnt_task        | immut      | no     | Only allow one task to be scheduled at a time |
 | queue_authority      | immut      | no     |                                               |
 | task_queue_authority | immut      | no     |                                               |
 | task_queue           | immut      | no     |                                               |
@@ -175,19 +181,24 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name                 | Mutability | Signer | Docs |
-| -------------------- | ---------- | ------ | ---- |
-| authority            | immut      | no     |      |
-| payer                | immut      | no     |      |
-| auto_top_off         | immut      | no     |      |
-| queue_authority      | immut      | no     |      |
-| task_queue_authority | immut      | no     |      |
-| task_queue           | immut      | no     |      |
-| next_task            | immut      | no     |      |
-| next_hnt_task        | immut      | no     |      |
-| task_rent_refund     | immut      | no     |      |
-| hnt_task_rent_refund | immut      | no     |      |
-| tuktuk_program       | immut      | no     |      |
+| Name                     | Mutability | Signer | Docs |
+| ------------------------ | ---------- | ------ | ---- |
+| authority                | immut      | no     |      |
+| payer                    | immut      | no     |      |
+| auto_top_off             | immut      | no     |      |
+| queue_authority          | immut      | no     |      |
+| task_queue_authority     | immut      | no     |      |
+| task_queue               | immut      | no     |      |
+| next_task                | immut      | no     |      |
+| next_hnt_task            | immut      | no     |      |
+| task_rent_refund         | immut      | no     |      |
+| hnt_task_rent_refund     | immut      | no     |      |
+| dca_mint                 | immut      | no     |      |
+| dca_mint_account         | immut      | no     |      |
+| tuktuk_program           | immut      | no     |      |
+| system_program           | immut      | no     |      |
+| token_program            | immut      | no     |      |
+| associated_token_program | immut      | no     |      |
 
 #### Args
 
@@ -230,10 +241,6 @@ undefined
 undefined
 
 ### TaskQueueV0
-
-undefined
-
-### TaskV0
 
 undefined
 
@@ -479,22 +486,6 @@ undefined
 | free_tasks   | u8              |
 | description  | string          |
 
-### TaskV0
-
-| Field        | Type            |
-| ------------ | --------------- |
-| task_queue   | pubkey          |
-| rent_amount  | u64             |
-| crank_reward | u64             |
-| id           | u16             |
-| trigger      | [object Object] |
-| rent_refund  | pubkey          |
-| transaction  | [object Object] |
-| queued_at    | i64             |
-| bump_seed    | u8              |
-| free_tasks   | u8              |
-| description  | string          |
-
 ### ThresholdType
 
 | Variant  | Fields |
@@ -524,7 +515,6 @@ undefined
 | threshold              | u64    |
 | hnt_price_oracle       | pubkey |
 | hnt_threshold          | u64    |
-| dca_mint               | pubkey |
 | dca_swap_amount        | u64    |
 | dca_interval_seconds   | u64    |
 | dca_input_price_oracle | pubkey |

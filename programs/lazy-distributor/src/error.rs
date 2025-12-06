@@ -37,4 +37,10 @@ pub enum ErrorCode {
 
   #[msg("Don't use the dummy instruction")]
   DummyInstruction,
+
+  #[msg("Approver signature is required but was not provided")]
+  MissingApprover,
+
+  #[msg("Invalid approver")]
+  InvalidApprover,
 }
