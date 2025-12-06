@@ -816,7 +816,7 @@ export async function run(args: any = process.argv) {
 
     let processed = 0;
     const subscriberChunks = chunks(subscriberAccounts, 100);
-    const instructionLimiter = pLimit(25);
+    const instructionLimiter = pLimit(50);
 
     const allBatchInstructions = await Promise.all(
       subscriberChunks.map((chunk) =>

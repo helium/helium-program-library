@@ -91,7 +91,6 @@ export async function run(args: any = process.argv) {
   let paginationKey: string | null = null;
   let page = 0;
   let totalRecipientsFetched = 0;
-  let totalSkippedMissingAsset = 0;
   let totalSkippedNonSubscriber = 0;
   let currentBatch: any[] = [];
   const subscriberRecipients: {
@@ -123,6 +122,78 @@ export async function run(args: any = process.argv) {
       }
     }
     return [];
+  }
+
+  async function processBatch(
+    batch: any[],
+    batchLabel: string
+  ): Promise<{ subscribers: number; nonSubscribers: number }> {
+    console.log(`\n--- Processing ${batchLabel} ---`);
+
+    const assetIds = batch.map((r) => r.account.asset);
+    console.log(`Fetching ${assetIds.length.toLocaleString()} assets...`);
+
+    // Fetch assets with concurrency control
+    const assetChunks = chunks(assetIds, 1000);
+    const assetLimiter = pLimit(10);
+    let fetchedCount = 0;
+    let assetBatchIndex = 0;
+
+    const assetResults = await Promise.all(
+      assetChunks.map((chunk) =>
+        assetLimiter(async () => {
+          const result = await fetchAssetBatchWithRetry(chunk);
+          fetchedCount += chunk.length;
+          assetBatchIndex++;
+
+          if (assetBatchIndex % 10 === 0 || fetchedCount >= assetIds.length) {
+            console.log(
+              `  ${assetBatchIndex} batches: ${fetchedCount.toLocaleString()} assets`
+            );
+          }
+
+          return result;
+        })
+      )
+    );
+
+    const assets = assetResults.flat();
+
+    // Filter for subscriber assets
+    console.log("Filtering for subscriber assets...");
+    let batchNonSubscribers = 0;
+    let batchSubscribers = 0;
+
+    batch.forEach((recipient, index) => {
+      const asset = assets[index];
+      if (!asset) {
+        batchNonSubscribers++;
+        return;
+      }
+
+      const assetCollection = asset.grouping?.find(
+        (g: any) => g.group_key === "collection"
+      )?.group_value;
+
+      if (
+        assetCollection &&
+        subscriberCollections.has(assetCollection.toBase58())
+      ) {
+        subscriberRecipients.push({
+          address: recipient.publicKey,
+          asset,
+          recipientData: recipient.account,
+        });
+        batchSubscribers++;
+      } else {
+        batchNonSubscribers++;
+      }
+    });
+
+    return {
+      subscribers: batchSubscribers,
+      nonSubscribers: batchNonSubscribers,
+    };
   }
 
   // Pagination and batch processing loop
@@ -166,184 +237,52 @@ export async function run(args: any = process.argv) {
     }
 
     const { result } = data;
+
+    // If no more results, set paginationKey to null to end pagination
     if (!result || !result.accounts || result.accounts.length === 0) {
-      break;
+      paginationKey = null;
+    } else {
+      // Decode and add to current batch
+      const pageRecipients = result.accounts.map((item: any) => ({
+        publicKey: new PublicKey(item.pubkey),
+        account: lazyProgram.coder.accounts.decode(
+          "recipientV0",
+          Buffer.from(item.account.data[0], "base64")
+        ),
+      }));
+
+      currentBatch.push(...pageRecipients);
+      totalRecipientsFetched += pageRecipients.length;
+
+      if (page % 10 === 0) {
+        console.log(
+          `  Fetched ${totalRecipientsFetched.toLocaleString()} recipients (batch size: ${currentBatch.length.toLocaleString()})...`
+        );
+      }
+
+      paginationKey = result.paginationKey || null;
     }
-
-    // Decode and add to current batch
-    const pageRecipients = result.accounts.map((item: any) => ({
-      publicKey: new PublicKey(item.pubkey),
-      account: lazyProgram.coder.accounts.decode(
-        "recipientV0",
-        Buffer.from(item.account.data[0], "base64")
-      ),
-    }));
-
-    currentBatch.push(...pageRecipients);
-    totalRecipientsFetched += pageRecipients.length;
-
-    if (page % 10 === 0) {
-      console.log(
-        `  Fetched ${totalRecipientsFetched.toLocaleString()} recipients (batch size: ${currentBatch.length.toLocaleString()})...`
-      );
-    }
-
-    paginationKey = result.paginationKey || null;
 
     // Process batch when we hit BATCH_SIZE or finished pagination
     const shouldProcessBatch =
       currentBatch.length >= BATCH_SIZE || !paginationKey;
 
     if (shouldProcessBatch && currentBatch.length > 0) {
-      console.log(
-        `\n--- Processing batch of ${currentBatch.length.toLocaleString()} recipients ---`
+      const { subscribers, nonSubscribers } = await processBatch(
+        currentBatch,
+        `batch of ${currentBatch.length.toLocaleString()} recipients`
       );
 
-      // Get asset IDs
-      const assetIds = currentBatch.map((r) => r.account.asset);
-      console.log(`Fetching ${assetIds.length.toLocaleString()} assets...`);
-
-      // Fetch assets
-      const assetChunks = chunks(assetIds, 1000);
-      const assetLimiter = pLimit(5);
-      let fetchedCount = 0;
-      let assetBatchIndex = 0;
-
-      const assetResults = await Promise.all(
-        assetChunks.map((chunk) =>
-          assetLimiter(async () => {
-            const result = await fetchAssetBatchWithRetry(chunk);
-            fetchedCount += chunk.length;
-            assetBatchIndex++;
-
-            if (assetBatchIndex % 10 === 0 || fetchedCount >= assetIds.length) {
-              console.log(
-                `  ${assetBatchIndex} batches: ${fetchedCount.toLocaleString()} assets`
-              );
-            }
-
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            return result;
-          })
-        )
-      );
-
-      const assets = assetResults.flat();
-
-      // Filter for subscriber assets by checking against subscriber collections
-      console.log("Filtering for subscriber assets...");
-      let batchSkippedNonSubscriber = 0;
-      let batchSkippedMissingAsset = 0;
-
-      currentBatch.forEach((recipient, index) => {
-        const asset = assets[index];
-        if (!asset) {
-          batchSkippedMissingAsset++;
-          totalSkippedMissingAsset++;
-          return;
-        }
-
-        // Check if asset belongs to a subscriber collection
-        const assetCollection = asset.grouping?.find(
-          (g: any) => g.group_key === "collection"
-        )?.group_value;
-
-        if (
-          assetCollection &&
-          subscriberCollections.has(assetCollection.toBase58())
-        ) {
-          subscriberRecipients.push({
-            address: recipient.publicKey,
-            asset,
-            recipientData: recipient.account,
-          });
-        } else {
-          batchSkippedNonSubscriber++;
-          totalSkippedNonSubscriber++;
-        }
-      });
+      totalSkippedNonSubscriber += nonSubscribers;
 
       console.log(
-        `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients so far (${batchSkippedMissingAsset} missing assets, ${batchSkippedNonSubscriber} non-subscribers)\n`
+        `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients so far (${subscribers} subscribers, ${nonSubscribers} non-subscribers in this batch)\n`
       );
 
       // Clear current batch to free memory
       currentBatch = [];
     }
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
   } while (paginationKey);
-
-  // Process any remaining batch
-  if (currentBatch.length > 0) {
-    console.log(
-      `\n--- Processing final batch of ${currentBatch.length.toLocaleString()} recipients ---`
-    );
-
-    const assetIds = currentBatch.map((r) => r.account.asset);
-    console.log(`Fetching ${assetIds.length.toLocaleString()} assets...`);
-
-    const assetChunks = chunks(assetIds, 1000);
-    const assetLimiter = pLimit(5);
-    let fetchedCount = 0;
-    let assetBatchIndex = 0;
-
-    const assetResults = await Promise.all(
-      assetChunks.map((chunk) =>
-        assetLimiter(async () => {
-          const result = await fetchAssetBatchWithRetry(chunk);
-          fetchedCount += chunk.length;
-          assetBatchIndex++;
-
-          if (assetBatchIndex % 10 === 0 || fetchedCount >= assetIds.length) {
-            console.log(
-              `  ${assetBatchIndex} batches: ${fetchedCount.toLocaleString()} assets`
-            );
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          return result;
-        })
-      )
-    );
-
-    const assets = assetResults.flat();
-
-    console.log("Filtering for subscriber assets...");
-    let batchSkippedNonSubscriber = 0;
-    let batchSkippedMissingAsset = 0;
-
-    currentBatch.forEach((recipient, index) => {
-      const asset = assets[index];
-      if (!asset) {
-        batchSkippedMissingAsset++;
-        totalSkippedMissingAsset++;
-        return;
-      }
-
-      const assetCollection = asset.grouping?.find(
-        (g: any) => g.group_key === "collection"
-      )?.group_value;
-
-      if (
-        assetCollection &&
-        subscriberCollections.has(assetCollection.toBase58())
-      ) {
-        subscriberRecipients.push({
-          address: recipient.publicKey,
-          asset,
-          recipientData: recipient.account,
-        });
-      } else {
-        batchSkippedNonSubscriber++;
-        totalSkippedNonSubscriber++;
-      }
-    });
-
-    console.log(
-      `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients total (${batchSkippedMissingAsset} missing assets, ${batchSkippedNonSubscriber} non-subscribers in final batch)\n`
-    );
-  }
 
   console.log(`\n=== Summary ===`);
   console.log(
@@ -377,38 +316,26 @@ export async function run(args: any = process.argv) {
   let processed = 0;
 
   const recipientChunks = chunks(subscriberRecipients, 100);
-  const instructionLimiter = pLimit(25);
+  const instructionLimiter = pLimit(50);
 
   const allBatchResults = await Promise.all(
     recipientChunks.map((chunk) =>
       instructionLimiter(async () => {
         const batchResults = await Promise.all(
           chunk.map(async (recipient) => {
-            const { address: recipientAddr, asset } = recipient;
             try {
-              // Compute the KeyToAssetV0 address (should be closed already)
+              const { address: recipientAddr, asset } = recipient;
+
+              // Compute the KeyToAssetV0 address
               const keyToAsset = keyToAssetForAsset(asset, dao);
 
-              // Get the entity key from the asset (try URI extraction)
-              let entityKeyBytes: Buffer;
-              try {
-                const entityKeyStr = asset.content.json_uri
-                  .split("/")
-                  .slice(-1)[0] as string;
-                const cleanEntityKeyStr = entityKeyStr
-                  .split(".")[0]
-                  .split("?")[0]
-                  .split("#")[0];
-                entityKeyBytes = Buffer.from(bs58.decode(cleanEntityKeyStr));
-              } catch (uriError: any) {
-                // URI extraction failed - this shouldn't happen for subscriber assets
-                console.error(
-                  `Failed to extract entity key from URI for recipient ${recipientAddr.toBase58()}: ${
-                    uriError.message
-                  }`
-                );
-                return null;
-              }
+              // Extract entity key from asset URI
+              const entityKeyStr =
+                asset.content.json_uri.split("/").pop() || "";
+              const cleanEntityKeyStr = entityKeyStr.split(/[.?#]/)[0];
+              const entityKeyBytes = Buffer.from(
+                bs58.decode(cleanEntityKeyStr)
+              );
 
               // Get oracle_signer PDA
               const [oracleSigner] = PublicKey.findProgramAddressSync(
@@ -417,9 +344,7 @@ export async function run(args: any = process.argv) {
               );
 
               return await rewardsOracleProgram.methods
-                .tempCloseRecipientWrapperV0({
-                  entityKey: entityKeyBytes,
-                })
+                .tempCloseRecipientWrapperV0({ entityKey: entityKeyBytes })
                 .accountsPartial({
                   lazyDistributor,
                   recipient: recipientAddr,
@@ -433,7 +358,7 @@ export async function run(args: any = process.argv) {
                 .instruction();
             } catch (err: any) {
               console.error(
-                `Error building instruction for recipient ${recipientAddr.toBase58()}: ${
+                `Error building instruction for recipient ${recipient.address.toBase58()}: ${
                   err.message
                 }`
               );
@@ -467,16 +392,14 @@ export async function run(args: any = process.argv) {
     .flat()
     .filter((i): i is TransactionInstruction => i !== null);
 
-  const subscriberCount = subscriberRecipients.length;
+  const instructionCount = instructions.length;
 
   // Free memory
   subscriberRecipients.length = 0;
 
   console.log(
-    `\nBatching ${instructions.length.toLocaleString()} instructions into transactions...`
+    `\nBatching ${instructionCount.toLocaleString()} instructions into transactions...`
   );
-
-  const instructionCount = instructions.length;
   const txns = await batchInstructionsToTxsWithPriorityFee(
     provider,
     instructions,
