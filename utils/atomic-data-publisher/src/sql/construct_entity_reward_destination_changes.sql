@@ -46,6 +46,7 @@ FROM
       (
         ao.last_block > $1
         AND ao.last_block <= $2
+        AND (r.asset IS NULL OR r.destination = '11111111111111111111111111111111')
       )
       OR (
         r.last_block > $1
@@ -56,10 +57,6 @@ FROM
         AND mf.last_block <= $2
       )
     )
-),
-reward_destination_changes AS (
-  SELECT asset, block, pub_key, rewards_recipient, rewards_split, change_type
-  FROM asset_reward_destination_changes
 )
 SELECT
   'entity_reward_destination_changes' as job_name,
@@ -71,5 +68,5 @@ SELECT
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM reward_destination_changes
+FROM asset_reward_destination_changes
 ORDER BY block DESC;

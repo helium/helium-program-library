@@ -1118,6 +1118,7 @@ impl DatabaseClient {
         let query = if use_max {
           r#"
           SELECT GREATEST(
+            COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
             COALESCE((SELECT MAX(last_block) FROM recipients), -1),
             COALESCE((SELECT MAX(last_block) FROM rewards_recipients), -1)
           )::bigint as block
@@ -1125,6 +1126,7 @@ impl DatabaseClient {
         } else {
           r#"
           SELECT LEAST(
+            COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM recipients WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM rewards_recipients WHERE last_block >= 0), -1)
           )::bigint as block
@@ -1215,6 +1217,8 @@ impl DatabaseClient {
       "construct_entity_reward_destination_changes" => {
         let query = r#"
           SELECT MIN(next_block)::bigint as block FROM (
+            SELECT MIN(last_block) as next_block FROM asset_owners WHERE last_block > $1
+            UNION ALL
             SELECT MIN(last_block) as next_block FROM recipients WHERE last_block > $1
             UNION ALL
             SELECT MIN(last_block) as next_block FROM rewards_recipients WHERE last_block > $1
