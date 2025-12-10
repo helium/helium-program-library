@@ -344,7 +344,10 @@ export async function run(args: any = process.argv) {
               );
 
               return await rewardsOracleProgram.methods
-                .tempCloseRecipientWrapperV0({ entityKey: entityKeyBytes })
+                .tempCloseRecipientWrapperV0({
+                  entityKey: entityKeyBytes,
+                  asset: new PublicKey(asset.id),
+                })
                 .accountsPartial({
                   lazyDistributor,
                   recipient: recipientAddr,

@@ -532,16 +532,18 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name          | Mutability | Signer | Docs |
-| ------------- | ---------- | ------ | ---- |
-| authority     | immut      | no     |      |
-| key_to_asset  | immut      | no     |      |
-| dao           | immut      | no     |      |
-| asset         | immut      | no     |      |
-| iot_info      | immut      | no     |      |
-| mobile_info   | immut      | no     |      |
-| iot_config    | immut      | no     |      |
-| mobile_config | immut      | no     |      |
+| Name           | Mutability | Signer | Docs                                                                 |
+| -------------- | ---------- | ------ | -------------------------------------------------------------------- |
+| authority      | immut      | no     |                                                                      |
+| key_to_asset   | immut      | no     |                                                                      |
+| dao            | immut      | no     |                                                                      |
+| asset          | immut      | no     |                                                                      |
+| iot_info       | immut      | no     |                                                                      |
+| mobile_info    | immut      | no     |                                                                      |
+| iot_sub_dao    | immut      | no     | Validate that iot_sub_dao belongs to the same dao as key_to_asset    |
+| mobile_sub_dao | immut      | no     | Validate that mobile_sub_dao belongs to the same dao as key_to_asset |
+| iot_config     | immut      | no     |                                                                      |
+| mobile_config  | immut      | no     |                                                                      |
 
 #### Args
 

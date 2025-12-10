@@ -170,6 +170,7 @@ undefined
 
 ### TempCloseRecipientWrapperArgsV0
 
-| Field      | Type  |
-| ---------- | ----- |
-| entity_key | bytes |
+| Field      | Type   |
+| ---------- | ------ |
+| entity_key | bytes  |
+| asset      | pubkey |

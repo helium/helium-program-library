@@ -3,7 +3,11 @@ use anchor_lang::{prelude::*, solana_program::system_program};
 use crate::{
   hash_entity_key, IotHotspotInfoV0, KeyToAssetV0, MobileHotspotInfoV0, RewardableEntityConfigV0,
 };
-use helium_sub_daos::DaoV0;
+use helium_sub_daos::{DaoV0, SubDaoV0};
+
+// Special entity keys that should be rejected
+const NOT_EMITTED: &str = "not_emitted";
+const IOT_OPERATIONS_FUND: &str = "iot_operations_fund";
 
 const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY");
 
@@ -67,21 +71,38 @@ pub struct TempCloseKeyToAssetV0<'info> {
     constraint = ALLOWED_KEY_TO_ASSETS.contains(&key_to_asset.key()) || mobile_info.data_is_empty()
   )]
   pub mobile_info: UncheckedAccount<'info>,
-  /// CHECK: Validated by seeds
+  /// Validate that iot_sub_dao belongs to the same dao as key_to_asset
   #[account(
-    seeds = ["rewardable_entity_config".as_bytes(), iot_config.sub_dao.as_ref(), "IOT".as_bytes()],
+    has_one = dao,
+  )]
+  pub iot_sub_dao: Box<Account<'info, SubDaoV0>>,
+  /// Validate that mobile_sub_dao belongs to the same dao as key_to_asset
+  #[account(
+    has_one = dao,
+  )]
+  pub mobile_sub_dao: Box<Account<'info, SubDaoV0>>,
+  /// CHECK: Validated by seeds. Ensure it's derived from iot_sub_dao
+  #[account(
+    seeds = ["rewardable_entity_config".as_bytes(), iot_sub_dao.key().as_ref(), "IOT".as_bytes()],
     bump = iot_config.bump_seed,
   )]
   pub iot_config: Box<Account<'info, RewardableEntityConfigV0>>,
-  /// CHECK: Validated by seeds
+  /// CHECK: Validated by seeds. Ensure it's derived from mobile_sub_dao
   #[account(
-    seeds = ["rewardable_entity_config".as_bytes(), mobile_config.sub_dao.as_ref(), "MOBILE".as_bytes()],
+    seeds = ["rewardable_entity_config".as_bytes(), mobile_sub_dao.key().as_ref(), "MOBILE".as_bytes()],
     bump = mobile_config.bump_seed,
   )]
   pub mobile_config: Box<Account<'info, RewardableEntityConfigV0>>,
 }
 
 pub fn handler(ctx: Context<TempCloseKeyToAssetV0>) -> Result<()> {
+  // Reject key_to_asset accounts created for special entities
+  let entity_key_str = String::from_utf8_lossy(&ctx.accounts.key_to_asset.entity_key);
+  require!(
+    entity_key_str != NOT_EMITTED && entity_key_str != IOT_OPERATIONS_FUND,
+    ErrorCode::ConstraintRaw
+  );
+
   // Only close info accounts if key_to_asset is in the allowed list
   if ALLOWED_KEY_TO_ASSETS.contains(&ctx.accounts.key_to_asset.key()) {
     // Close iot_info if it exists (has data)

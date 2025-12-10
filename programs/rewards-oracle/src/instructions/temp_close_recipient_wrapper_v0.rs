@@ -7,11 +7,11 @@ use lazy_distributor::{
 
 const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY");
 const HEM_PROGRAM: Pubkey = pubkey!("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8");
-const HELIUM_SUB_DAOS_PROGRAM: Pubkey = pubkey!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct TempCloseRecipientWrapperArgsV0 {
   pub entity_key: Vec<u8>,
+  pub asset: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -46,20 +46,28 @@ pub fn handler(
   ctx: Context<TempCloseRecipientWrapperV0>,
   args: TempCloseRecipientWrapperArgsV0,
 ) -> Result<()> {
-  // Verify dao matches the expected subdao PDA derivation
-  // The subdao is derived from the lazy_distributor's rewards_mint
-  let rewards_mint = ctx.accounts.lazy_distributor.rewards_mint;
-  let (expected_dao, _bump) = Pubkey::find_program_address(
-    &[b"sub_dao", rewards_mint.as_ref()],
-    &HELIUM_SUB_DAOS_PROGRAM,
-  );
-
-  if ctx.accounts.dao.key() != expected_dao {
-    msg!("Dao account does not match expected subdao derivation");
+  // Verify the connection between recipient and the asset from key_to_asset
+  // This ensures we're closing the correct recipient for the closed key_to_asset
+  if ctx.accounts.recipient.asset != args.asset {
+    msg!("Recipient asset does not match provided asset");
     return Err(ProgramError::InvalidAccountData.into());
   }
 
-  // Verify the key_to_asset address matches the expected derivation
+  // Verify the KeyToAssetV0 account is closed (owned by system program)
+  // Note: We intentionally don't check lamports as dust can be sent to game that check
+  if ctx.accounts.key_to_asset.owner != &anchor_lang::system_program::ID {
+    msg!("KeyToAssetV0 still exists (not owned by system program), cannot close recipient");
+    return Err(ProgramError::InvalidAccountData.into());
+  }
+
+  // Verify that key_to_asset data has been cleared (account fully closed)
+  if !ctx.accounts.key_to_asset.data_is_empty() {
+    msg!("KeyToAssetV0 account still has data, cannot proceed");
+    return Err(ProgramError::InvalidAccountData.into());
+  }
+
+  // Verify the key_to_asset PDA derivation matches the expected address for this dao and entity_key
+  // This ensures the provided entity_key and dao correspond to a valid key_to_asset that was closed
   let hash = anchor_lang::solana_program::hash::hash(&args.entity_key);
   let (expected_key_to_asset, _bump) = Pubkey::find_program_address(
     &[
@@ -72,14 +80,6 @@ pub fn handler(
 
   if ctx.accounts.key_to_asset.key() != expected_key_to_asset {
     msg!("KeyToAssetV0 derivation does not match expected address");
-    return Err(ProgramError::InvalidAccountData.into());
-  }
-
-  // Verify the KeyToAssetV0 account is closed (has 0 lamports and owned by system program)
-  if ctx.accounts.key_to_asset.lamports() != 0
-    || ctx.accounts.key_to_asset.owner != &anchor_lang::system_program::ID
-  {
-    msg!("KeyToAssetV0 still exists, cannot close recipient");
     return Err(ProgramError::InvalidAccountData.into());
   }
 
