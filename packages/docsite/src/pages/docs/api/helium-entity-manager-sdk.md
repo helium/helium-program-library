@@ -528,6 +528,28 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### temp_close_key_to_asset_v0
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs                                                                 |
+| -------------- | ---------- | ------ | -------------------------------------------------------------------- |
+| authority      | immut      | no     |                                                                      |
+| key_to_asset   | immut      | no     |                                                                      |
+| dao            | immut      | no     |                                                                      |
+| asset          | immut      | no     |                                                                      |
+| iot_info       | immut      | no     |                                                                      |
+| mobile_info    | immut      | no     |                                                                      |
+| iot_sub_dao    | immut      | no     | Validate that iot_sub_dao belongs to the same dao as key_to_asset    |
+| mobile_sub_dao | immut      | no     | Validate that mobile_sub_dao belongs to the same dao as key_to_asset |
+| iot_config     | immut      | no     |                                                                      |
+| mobile_config  | immut      | no     |                                                                      |
+
+#### Args
+
+| Name | Type | Docs |
+| ---- | ---- | ---- |
+
 ### temp_pay_mobile_onboarding_fee_v0
 
 #### Accounts
