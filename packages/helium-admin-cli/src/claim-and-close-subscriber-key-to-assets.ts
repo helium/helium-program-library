@@ -582,6 +582,33 @@ export async function run(args: any = process.argv) {
       )
     );
 
+    // Merge bulk rewards from all chunks
+    // Each chunk has the same oracle keys but different entity key data
+    const mergedBulkRewards: client.BulkRewards[] = [];
+
+    if (
+      bulkRewardsResults.length > 0 &&
+      bulkRewardsResults[0].bulkRewards.length > 0
+    ) {
+      const numOracles = bulkRewardsResults[0].bulkRewards.length;
+
+      for (let oracleIdx = 0; oracleIdx < numOracles; oracleIdx++) {
+        const mergedRewards: Record<string, string> = {};
+
+        // Merge rewards from all chunks for this oracle
+        bulkRewardsResults.forEach(({ bulkRewards }) => {
+          if (bulkRewards[oracleIdx]) {
+            Object.assign(mergedRewards, bulkRewards[oracleIdx].currentRewards);
+          }
+        });
+
+        mergedBulkRewards.push({
+          currentRewards: mergedRewards,
+          oracleKey: bulkRewardsResults[0].bulkRewards[oracleIdx].oracleKey,
+        });
+      }
+    }
+
     // Process bulk results
     bulkRewardsResults.forEach(({ chunk, bulkRewards }) => {
       chunk.forEach((entityKey) => {
@@ -631,51 +658,47 @@ export async function run(args: any = process.argv) {
 
     console.log(`\nClaiming rewards for ${assetsWithRewards} assets...`);
 
-    // Batch claim rewards
+    // Batch claim rewards using formBulkTransactions (up to 100 assets per call)
     console.log(`Preparing ${assetsToClaim.length} claim transactions...`);
 
-    const claimChunks = chunks(assetsToClaim, 20);
+    const claimChunks = chunks(assetsToClaim, 100); // formBulkTransactions supports up to 100
     const claimTxLimiter = pLimit(10);
     let preparedCount = 0;
 
     const allBatchTxns = await Promise.all(
       claimChunks.map((chunk) =>
         claimTxLimiter(async () => {
-          const batchTxns = await Promise.all(
-            chunk.map(async ({ asset, rewards }) => {
-              try {
-                return await client.formTransaction({
-                  program: lazyProgram,
-                  rewardsOracleProgram: rewardsOracleProgram,
-                  provider,
-                  rewards,
-                  asset,
-                  lazyDistributor,
-                  wallet: authority.publicKey,
-                });
-              } catch (err: any) {
-                console.error(
-                  `Error forming tx for asset ${asset.toBase58()}: ${
-                    err.message
-                  }`
-                );
-                return null;
-              }
-            })
-          );
+          try {
+            const assets = chunk.map((c) => c.asset);
 
-          preparedCount += chunk.length;
-          // Show progress every 100 or at end
-          if (
-            preparedCount % 100 === 0 ||
-            preparedCount === assetsToClaim.length
-          ) {
-            console.log(
-              `  Prepared ${preparedCount}/${assetsToClaim.length} transactions`
+            // Use formBulkTransactions which is more efficient than individual formTransaction calls
+            const txns = await client.formBulkTransactions({
+              program: lazyProgram,
+              rewardsOracleProgram: rewardsOracleProgram,
+              rewards: mergedBulkRewards, // Use the merged bulk rewards that contain all entity keys
+              assets,
+              lazyDistributor,
+              wallet: authority.publicKey,
+            });
+
+            preparedCount += chunk.length;
+            // Show progress every 100 or at end
+            if (
+              preparedCount % 100 === 0 ||
+              preparedCount === assetsToClaim.length
+            ) {
+              console.log(
+                `  Prepared ${preparedCount}/${assetsToClaim.length} transactions`
+              );
+            }
+
+            return txns;
+          } catch (err: any) {
+            console.error(
+              `Error forming bulk transactions for batch: ${err.message}`
             );
+            return [];
           }
-
-          return batchTxns;
         })
       )
     );
