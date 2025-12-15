@@ -609,33 +609,31 @@ export async function run(args: any = process.argv) {
       }
     }
 
-    // Process bulk results
-    bulkRewardsResults.forEach(({ chunk, bulkRewards }) => {
-      chunk.forEach((entityKey) => {
-        const assetInfo = entityKeyToAsset.get(entityKey);
-        if (!assetInfo) return;
+    // Process rewards using merged bulk rewards
+    entityKeys.forEach((entityKey) => {
+      const assetInfo = entityKeyToAsset.get(entityKey);
+      if (!assetInfo) return;
 
-        // Aggregate rewards across all oracles for this entity
-        const rewards: client.Reward[] = bulkRewards.map((oracle) => ({
-          currentRewards: oracle.currentRewards[entityKey] || "0",
-          oracleKey: oracle.oracleKey,
-        }));
+      // Aggregate rewards across all oracles for this entity
+      const rewards: client.Reward[] = mergedBulkRewards.map((oracle) => ({
+        currentRewards: oracle.currentRewards[entityKey] || "0",
+        oracleKey: oracle.oracleKey,
+      }));
 
-        const totalRewards = rewards.reduce((sum, r) => {
-          return sum.add(new BN(r.currentRewards));
-        }, new BN(0));
+      const totalRewards = rewards.reduce((sum, r) => {
+        return sum.add(new BN(r.currentRewards));
+      }, new BN(0));
 
-        if (totalRewards.gt(new BN(0))) {
-          assetsWithRewards++;
-          totalPendingRewards = totalPendingRewards.add(totalRewards);
-          assetsToClaim.push({
-            asset: assetInfo.assetId,
-            rewards,
-          });
-        } else {
-          assetsWithZeroRewards++;
-        }
-      });
+      if (totalRewards.gt(new BN(0))) {
+        assetsWithRewards++;
+        totalPendingRewards = totalPendingRewards.add(totalRewards);
+        assetsToClaim.push({
+          asset: assetInfo.assetId,
+          rewards,
+        });
+      } else {
+        assetsWithZeroRewards++;
+      }
     });
 
     const pendingMobile = totalPendingRewards.div(new BN(100000000)).toString();
