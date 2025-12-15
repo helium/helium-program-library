@@ -169,16 +169,17 @@ export async function run(args: any = process.argv) {
         try {
           return await getAssetsByGroup(endpoint, params);
         } catch (err: any) {
-          const is429 = err.message?.includes("429") || err.status === 429;
-          if (attempt === maxRetries - 1 || !is429) {
+          if (attempt === maxRetries - 1) {
             throw err;
           }
-          // Exponential backoff: 2s, 4s, 8s, 16s
+
+          // Exponential backoff: 2s, 4s, 8s, 16s, 30s
           const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
+          const errorMsg = err.message || err.toString();
           console.log(
-            `    Rate limited (429), retrying in ${delay / 1000}s... (attempt ${
-              attempt + 1
-            }/${maxRetries})`
+            `    Error: ${errorMsg.substring(0, 80)}... retrying in ${
+              delay / 1000
+            }s (attempt ${attempt + 1}/${maxRetries})`
           );
           await new Promise((resolve) => setTimeout(resolve, delay));
         }
