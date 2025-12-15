@@ -72,14 +72,34 @@ export const upsertOwners = async ({
               })
             );
 
-            await AssetOwner.bulkCreate(assetsWithOwnerAndBlock, {
+            const existingOwners = await AssetOwner.findAll({
+              where: {
+                asset: assetsWithOwnerAndBlock.map((a) => a.asset),
+              },
+              attributes: ["asset", "owner"],
               transaction,
-              updateOnDuplicate: ["asset", "owner", "lastBlock"],
+              raw: true,
             });
+
+            const existingOwnerMap = new Map(
+              existingOwners.map((a: any) => [a.asset, a.owner])
+            );
+
+            const assetsToUpdate = assetsWithOwnerAndBlock.filter((a) => {
+              const existing = existingOwnerMap.get(a.asset);
+              return !existing || existing !== a.owner;
+            });
+
+            if (assetsToUpdate.length > 0) {
+              await AssetOwner.bulkCreate(assetsToUpdate, {
+                transaction,
+                updateOnDuplicate: ["owner", "lastBlock", "updatedAt"],
+              });
+            }
 
             await transaction.commit();
 
-            processedCount += assetBatch.length;
+            processedCount += assetsToUpdate.length;
           } catch (err) {
             await transaction.rollback();
             throw err;
@@ -93,6 +113,10 @@ export const upsertOwners = async ({
 
   await Promise.all(batchPromises);
   console.log(
-    `Finished processing ${assetPks.length} assets for ownership updates`
+    `Finished processing ${
+      assetPks.length
+    } assets: ${processedCount} updated, ${
+      assetPks.length - processedCount
+    } unchanged`
   );
 };

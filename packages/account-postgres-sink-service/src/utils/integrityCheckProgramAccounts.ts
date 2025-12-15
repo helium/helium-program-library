@@ -244,7 +244,7 @@ export const integrityCheckProgramAccounts = async ({
               accountInfo.data &&
               discriminatorsByType
                 .get(type)
-                ?.equals(accountInfo.data.subarray(0, 8))
+                ?.equals(new Uint8Array(accountInfo.data.subarray(0, 8)))
           )?.type;
 
           if (accName) {
@@ -288,7 +288,6 @@ export const integrityCheckProgramAccounts = async ({
               );
 
               limiter = pLimit(50);
-              const recentSigsLimiter = pLimit(10);
               await Promise.all(
                 accounts.map((acc) =>
                   limiter(async () => {
@@ -368,34 +367,6 @@ export const integrityCheckProgramAccounts = async ({
                             }
                           }
                         }
-                      }
-
-                      const recentSigs = await recentSigsLimiter(() =>
-                        retry(
-                          () =>
-                            connection.getSignaturesForAddress(
-                              new PublicKey(acc.pubkey),
-                              { limit: 10 },
-                              "finalized"
-                            ),
-                          {
-                            retries: 3,
-                            factor: 2,
-                            minTimeout: 1000,
-                            maxTimeout: 5000,
-                          }
-                        )
-                      );
-
-                      const hasNewerTx = recentSigs.some(
-                        (sig) =>
-                          sig.slot >= snapshotSlot ||
-                          (sig.blockTime &&
-                            new Date(sig.blockTime * 1000) >= snapshotTime)
-                      );
-
-                      if (hasNewerTx) {
-                        return;
                       }
 
                       const currentRecord = await model.findOne({
@@ -488,7 +459,7 @@ export const integrityCheckProgramAccounts = async ({
   try {
     await retry(performIntegrityCheck, {
       ...retryOptions,
-      onRetry: (error, attempt) => {
+      onRetry: (error: any, attempt: any) => {
         console.log(
           `Integrity check ${programId} attempt ${attempt}: Retrying due to ${error.message}`
         );

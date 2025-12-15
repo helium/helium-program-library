@@ -4,7 +4,7 @@
 --
 -- Returns: job_name, atomic_data (JSON)
 
-WITH updates AS (
+WITH asset_reward_destination_changes AS (
   SELECT
   kta.asset as asset,
   GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) as block,
@@ -46,6 +46,7 @@ FROM
       (
         ao.last_block > $1
         AND ao.last_block <= $2
+        AND (r.asset IS NULL OR r.destination = '11111111111111111111111111111111')
       )
       OR (
         r.last_block > $1
@@ -67,5 +68,5 @@ SELECT
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM updates
+FROM asset_reward_destination_changes
 ORDER BY block DESC;

@@ -20,6 +20,7 @@
     "fmt": "cargo fmt --check",
     "clippy": "cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments -A ambiguous_glob_reexports -A unexpected-cfgs",
     "generate-idl-docs": "ts-node -T scripts/generate-idl-docs.ts",
+    "regenerate-deploy-lockfiles": "./scripts/regenerate-deploy-lockfiles.sh",
     "heroku-postbuild": "npm run build -w hpl-docs",
     "docs-dev": "yarn workspace hpl-docs dev"
   },

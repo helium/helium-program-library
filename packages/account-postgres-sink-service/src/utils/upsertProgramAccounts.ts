@@ -274,7 +274,7 @@ export const upsertProgramAccounts = async ({
         factor: 2,
         minTimeout: 1000,
         maxTimeout: 60000,
-        onRetry: (err, attempt) => {
+        onRetry: (err: any, attempt: any) => {
           console.warn(
             `Retrying getProgramAccounts for ${accountType}, attempt #${attempt}: Retrying due to ${err.message}`
           );
@@ -405,13 +405,14 @@ export const upsertProgramAccounts = async ({
               const existingRecords = await model.findAll({
                 where: { address: addresses },
                 transaction,
+                raw: true,
               });
 
               const existingRecordMap = new Map(
-                existingRecords.map((record) => [record.get("address"), record])
+                existingRecords.map((record: any) => [record.address, record])
               );
 
-              const values = await Promise.all(
+              const results = await Promise.all(
                 accs.map(async ({ publicKey, account }) => {
                   let sanitizedAccount = sanitizeAccount(account);
 
@@ -432,8 +433,7 @@ export const upsertProgramAccounts = async ({
                   };
 
                   const existingRecord = existingRecordMap.get(publicKey);
-                  const existingData = existingRecord?.dataValues;
-                  const existingClean = _omit(existingData || {}, OMIT_KEYS);
+                  const existingClean = _omit(existingRecord || {}, OMIT_KEYS);
                   const newClean = _omit(newRecord, OMIT_KEYS);
 
                   const shouldUpdate =
@@ -441,27 +441,50 @@ export const upsertProgramAccounts = async ({
 
                   if (shouldUpdate) {
                     return {
-                      ...newRecord,
-                      lastBlock,
+                      record: {
+                        ...newRecord,
+                        lastBlock,
+                      },
+                      shouldUpdate: true,
                     };
                   } else {
                     return {
-                      ...newRecord,
-                      lastBlock: existingData?.lastBlock || lastBlock,
+                      record: {
+                        ...newRecord,
+                        lastBlock: existingRecord?.lastBlock || lastBlock,
+                      },
+                      shouldUpdate: false,
                     };
                   }
                 })
               );
 
-              await model.bulkCreate(values, {
-                transaction,
-                updateOnDuplicate: [
-                  "address",
-                  "refreshedAt",
-                  "lastBlock",
-                  ...updateOnDuplicateFields,
-                ],
-              });
+              const toUpdate = results
+                .filter((r) => r.shouldUpdate)
+                .map((r) => r.record);
+
+              const toTouch = results
+                .filter((r) => !r.shouldUpdate)
+                .map((r) => r.record);
+
+              if (toUpdate.length > 0) {
+                await model.bulkCreate(toUpdate, {
+                  transaction,
+                  updateOnDuplicate: [
+                    "address",
+                    "refreshedAt",
+                    "lastBlock",
+                    ...updateOnDuplicateFields,
+                  ],
+                });
+              }
+
+              if (toTouch.length > 0) {
+                await model.bulkCreate(toTouch, {
+                  transaction,
+                  updateOnDuplicate: ["address", "refreshedAt"],
+                });
+              }
             }
           );
 
@@ -479,7 +502,7 @@ export const upsertProgramAccounts = async ({
           factor: 2,
           minTimeout: 2000,
           maxTimeout: 10000,
-          onRetry: (err, attempt) => {
+          onRetry: (err: any, attempt: any) => {
             console.warn(
               `Retrying account processing for ${type}, attempt #${attempt}: ${err.message}`
             );

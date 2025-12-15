@@ -28,6 +28,14 @@ export interface Database {
     entities: Pick<RewardableEntity, "keyToAsset">[];
     nextBatchNumber: number;
   }>;
+  getRewardableEntitiesByDestination(
+    destination: PublicKey,
+    limit: number,
+    batchNumber?: number
+  ): Promise<{
+    entities: Pick<RewardableEntity, "keyToAsset">[];
+    nextBatchNumber: number;
+  }>;
 }
 
 export type KeyToAssetV0 =

@@ -1,12 +1,31 @@
 import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
 import cors from "@fastify/cors";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
-import { compileTransaction, customSignerKey, init, RemoteTaskTransactionV0 } from "@helium/tuktuk-sdk";
-import { Connection, Keypair, PublicKey, TransactionInstruction, VersionedTransaction, Transaction } from "@solana/web3.js";
+import {
+  compileTransaction,
+  customSignerKey,
+  init,
+  RemoteTaskTransactionV0,
+} from "@helium/tuktuk-sdk";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  TransactionInstruction,
+  VersionedTransaction,
+  Transaction,
+} from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
-import { DCA_SIGNER, JUPITER_API_URL, PORT, SOLANA_URL } from "./env";
+import {
+  DCA_SIGNER,
+  JUPITER_API_KEY,
+  JUPITER_API_URL,
+  PORT,
+  SLIPPAGE_BPS,
+  SOLANA_URL,
+} from "./env";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 const server: FastifyInstance = Fastify({
@@ -23,11 +42,9 @@ server.get("/health", async () => {
 
 const wallet = new Wallet(DCA_SIGNER);
 
-const provider = new AnchorProvider(
-  new Connection(SOLANA_URL),
-  wallet,
-  { commitment: "confirmed" }
-);
+const provider = new AnchorProvider(new Connection(SOLANA_URL), wallet, {
+  commitment: "confirmed",
+});
 
 let tuktukProgram: Promise<Program<Tuktuk>> | null = null;
 function getTuktukProgram() {
@@ -95,9 +112,15 @@ async function getJupiterQuote(
     onlyDirectRoutes: "true",
   });
 
-  const response = await fetch(`${JUPITER_API_URL}/swap/v1/quote?${params}`);
+  const response = await fetch(`${JUPITER_API_URL}/swap/v1/quote?${params}`, {
+    headers: {
+      "x-api-key": JUPITER_API_KEY!,
+    },
+  });
   if (!response.ok) {
-    throw new Error(`Jupiter Lite API error: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Jupiter Lite API error: ${response.status} ${response.statusText}`
+    );
   }
 
   return response.json();
@@ -107,7 +130,7 @@ async function getJupiterQuote(
 async function getJupiterSwapInstructions(
   quoteResponse: JupiterQuoteResponse,
   sourcePublicKey: string,
-  destinationTokenAccount: string,
+  destinationTokenAccount: string
 ): Promise<JupiterSwapInstructionsResponse> {
   const jupUrl = `${JUPITER_API_URL}/swap/v1/swap-instructions`;
   console.log("Jupiter URL", jupUrl);
@@ -115,6 +138,7 @@ async function getJupiterSwapInstructions(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-api-key": JUPITER_API_KEY!,
     },
     body: JSON.stringify({
       userPublicKey: sourcePublicKey,
@@ -125,14 +149,18 @@ async function getJupiterSwapInstructions(
   });
 
   if (!response.ok) {
-    throw new Error(`Jupiter Lite swap-instructions API error: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Jupiter Lite swap-instructions API error: ${response.status} ${response.statusText}`
+    );
   }
 
   return response.json();
 }
 
 // Convert Jupiter instruction format to Solana TransactionInstruction
-function convertJupiterInstruction(jupiterInstruction: any): TransactionInstruction {
+function convertJupiterInstruction(
+  jupiterInstruction: any
+): TransactionInstruction {
   return {
     programId: new PublicKey(jupiterInstruction.programId),
     keys: jupiterInstruction.accounts.map((account: any) => ({
@@ -140,7 +168,7 @@ function convertJupiterInstruction(jupiterInstruction: any): TransactionInstruct
       isSigner: account.isSigner,
       isWritable: account.isWritable,
     })),
-    data: Buffer.from(jupiterInstruction.data, 'base64'),
+    data: Buffer.from(jupiterInstruction.data, "base64"),
   };
 }
 
@@ -175,11 +203,11 @@ server.post<{
 
     // Calculate swap amount (use remaining balance for last order)
     const swapAmount =
-      dcaAccount.numOrders === 1
-        ? inputBalance
-        : dcaAccount.swapAmountPerOrder;
+      dcaAccount.numOrders === 1 ? inputBalance : dcaAccount.swapAmountPerOrder;
 
-    console.log(`DCA ${dca.toBase58()}: Swapping ${swapAmount.toString()} tokens`);
+    console.log(
+      `DCA ${dca.toBase58()}: Swapping ${swapAmount.toString()} tokens`
+    );
     console.log(`Input mint: ${dcaAccount.inputMint.toBase58()}`);
     console.log(`Output mint: ${dcaAccount.outputMint.toBase58()}`);
     console.log("Swap payer", swapPayer.toBase58());
@@ -189,7 +217,7 @@ server.post<{
       dcaAccount.inputMint.toBase58(),
       dcaAccount.outputMint.toBase58(),
       swapAmount.toString(),
-      dcaAccount.slippageBpsFromOracle
+      Number(SLIPPAGE_BPS)
     );
 
     console.log(`Jupiter quote: ${quote.outAmount} output tokens`);
@@ -200,7 +228,11 @@ server.post<{
       .lendV0()
       .accounts({
         dca,
-        lendDestination: getAssociatedTokenAddressSync(dcaAccount.inputMint, swapPayer, true),
+        lendDestination: getAssociatedTokenAddressSync(
+          dcaAccount.inputMint,
+          swapPayer,
+          true
+        ),
       })
       .instruction();
 
@@ -208,16 +240,21 @@ server.post<{
     const swapInstructions = await getJupiterSwapInstructions(
       quote,
       swapPayer.toBase58(),
-      dcaAccount.destinationTokenAccount.toBase58(),
+      dcaAccount.destinationTokenAccount.toBase58()
     );
 
-    console.log("Lookup table addresses", swapInstructions.addressLookupTableAddresses);
+    console.log(
+      "Lookup table addresses",
+      swapInstructions.addressLookupTableAddresses
+    );
 
     // Convert Jupiter instructions to Solana TransactionInstructions
     const jupiterInstructions = [
       ...swapInstructions.setupInstructions.map(convertJupiterInstruction),
       convertJupiterInstruction(swapInstructions.swapInstruction),
-      ...(swapInstructions.cleanupInstruction ? [convertJupiterInstruction(swapInstructions.cleanupInstruction)] : []),
+      ...(swapInstructions.cleanupInstruction
+        ? [convertJupiterInstruction(swapInstructions.cleanupInstruction)]
+        : []),
       ...swapInstructions.otherInstructions.map(convertJupiterInstruction),
     ];
 
@@ -262,6 +299,7 @@ server.post<{
         is_signer: acc.isSigner,
         is_writable: acc.isWritable,
       })),
+      lookup_tables: swapInstructions.addressLookupTableAddresses,
     });
   } catch (err: any) {
     console.error("DCA swap error:", err);

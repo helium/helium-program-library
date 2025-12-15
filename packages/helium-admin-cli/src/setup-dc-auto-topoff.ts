@@ -390,6 +390,7 @@ export async function run(args: any = process.argv) {
         nextHntTask: autoTopOffAcc.nextHntTask,
         taskRentRefund,
         hntTaskRentRefund,
+        authority: autoTopOffAcc.authority,
         dcaMint: argv.dcaMint
           ? new PublicKey(argv.dcaMint)
           : autoTopOffAcc.dcaMint,
