@@ -20,10 +20,8 @@ pub struct InitializeAutoTopOffArgsV0 {
   pub threshold: u64,
   pub router_key: String,
   pub hnt_threshold: u64,
-  pub dca_mint: Pubkey,
   pub dca_swap_amount: u64,
   pub dca_interval_seconds: u64,
-  pub dca_input_price_oracle: Pubkey,
   pub dca_url: String,
   pub dca_signer: Pubkey,
 }
@@ -43,6 +41,7 @@ pub struct InitializeAutoTopOffV0<'info> {
   )]
   pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
   pub hnt_price_oracle: Box<Account<'info, PriceUpdateV2>>,
+  pub dca_input_price_oracle: Box<Account<'info, PriceUpdateV2>>,
   #[account(has_one = dc_mint, has_one = hnt_mint)]
   pub dao: Box<Account<'info, DaoV0>>,
   #[account(has_one = dc_mint)]
@@ -140,7 +139,7 @@ pub fn handler(
     dca_mint_account: ctx.accounts.dca_mint_account.key(),
     dca_swap_amount: args.dca_swap_amount,
     dca_interval_seconds: args.dca_interval_seconds,
-    dca_input_price_oracle: args.dca_input_price_oracle,
+    dca_input_price_oracle: ctx.accounts.dca_input_price_oracle.key(),
     dca_url,
     dca: Pubkey::find_program_address(
       &[

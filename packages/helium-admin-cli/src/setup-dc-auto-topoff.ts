@@ -11,7 +11,13 @@ import {
 } from "@helium/dc-auto-top-sdk";
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
-import { DC_MINT, HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import {
+  DC_MINT,
+  HELIUM_COMMON_LUT,
+  HELIUM_COMMON_LUT_DEVNET,
+  HNT_MINT,
+  MOBILE_MINT,
+} from "@helium/spl-utils";
 import * as multisig from "@sqds/multisig";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -246,18 +252,12 @@ export async function run(args: any = process.argv) {
         hntThreshold: argv.hntThreshold
           ? new anchor.BN(argv.hntThreshold)
           : autoTopOffAcc.hntThreshold,
-        dcaMint: argv.dcaMint
-          ? new PublicKey(argv.dcaMint)
-          : autoTopOffAcc.dcaMint,
         dcaSwapAmount: argv.dcaSwapAmount
           ? new anchor.BN(argv.dcaSwapAmount)
           : autoTopOffAcc.dcaSwapAmount,
         dcaIntervalSeconds: argv.dcaIntervalSeconds
           ? new anchor.BN(argv.dcaIntervalSeconds)
           : autoTopOffAcc.dcaIntervalSeconds,
-        dcaInputPriceOracle: argv.dcaInputPriceOracle
-          ? new PublicKey(argv.dcaInputPriceOracle)
-          : autoTopOffAcc.dcaInputPriceOracle,
         dcaSigner: argv.dcaSigner
           ? new PublicKey(argv.dcaSigner)
           : autoTopOffAcc.dcaSigner,
@@ -272,10 +272,16 @@ export async function run(args: any = process.argv) {
         authority,
         taskQueue: TASK_QUEUE_ID,
         delegatedDataCredits: delegatedDc,
+        dcaInputPriceOracle: argv.dcaInputPriceOracle
+          ? new PublicKey(argv.dcaInputPriceOracle)
+          : autoTopOffAcc.dcaInputPriceOracle,
         dao: daoKey(hntMint)[0],
         dataCredits: dataCreditsKey(dcMint)[0],
         dcMint,
         hntMint,
+        dcaMint: argv.dcaMint
+          ? new PublicKey(argv.dcaMint)
+          : autoTopOffAcc.dcaMint,
         subDao,
         hntPriceOracle: argv.hntPriceOracle
           ? new PublicKey(argv.hntPriceOracle)
@@ -423,16 +429,30 @@ export async function run(args: any = process.argv) {
     if (!argv.dcaUrl) {
       throw new Error("DCA URL is required to initialize auto topoff");
     }
+    if (!argv.dcaMint) {
+      throw new Error("DCA mint is required to initialize auto topoff");
+    }
+    if (typeof argv.dcaSwapAmount !== "number") {
+      throw new Error("DCA swap amount is required to initialize auto topoff");
+    }
+    if (typeof argv.dcaIntervalSeconds !== "number") {
+      throw new Error(
+        "DCA interval seconds is required to initialize auto topoff"
+      );
+    }
+    if (!argv.dcaInputPriceOracle) {
+      throw new Error(
+        "DCA input price oracle is required to initialize auto topoff"
+      );
+    }
     const instruction = await dcAutoTopoffProgram.methods
       .initializeAutoTopOffV0({
         schedule: argv.schedule!,
         threshold: new anchor.BN(argv.threshold!),
         routerKey,
         hntThreshold: new anchor.BN(argv.hntThreshold!),
-        dcaMint: new PublicKey(argv.dcaMint!),
         dcaSwapAmount: new anchor.BN(argv.dcaSwapAmount!),
         dcaIntervalSeconds: new anchor.BN(argv.dcaIntervalSeconds!),
-        dcaInputPriceOracle: new PublicKey(argv.dcaInputPriceOracle!),
         dcaSigner: new PublicKey(argv.dcaSigner!),
         dcaUrl: argv.dcaUrl!,
       })
@@ -440,16 +460,21 @@ export async function run(args: any = process.argv) {
         payer: authority,
         authority,
         taskQueue: TASK_QUEUE_ID,
+        dcaInputPriceOracle: new PublicKey(argv.dcaInputPriceOracle!),
         delegatedDataCredits: delegatedDc,
         dao: daoKey(hntMint)[0],
         dataCredits: dataCreditsKey(dcMint)[0],
-        dcMint,
+        dcaMint: new PublicKey(argv.dcaMint!),
         hntMint,
         subDao,
         hntPriceOracle: new PublicKey(argv.hntPriceOracle),
+        dcaMintAccount: getAssociatedTokenAddressSync(
+          new PublicKey(argv.dcaMint!),
+          autoTopOff!,
+          true
+        ),
       })
       .instruction();
-
     instructions.push(instruction);
     const {
       instruction: scheduleTaskInstruction,
@@ -465,6 +490,7 @@ export async function run(args: any = process.argv) {
         nextTask: autoTopOff!,
         task: taskKey(TASK_QUEUE_ID, nextTask)[0],
         hntTask: taskKey(TASK_QUEUE_ID, nextHntTask)[0],
+        nextHntTask: autoTopOff!,
         taskQueue: TASK_QUEUE_ID,
       })
       .prepare();
@@ -483,6 +509,11 @@ export async function run(args: any = process.argv) {
   await sendInstructionsOrSquadsV4({
     provider,
     instructions,
+    addressLookupTableAddresses: [
+      provider.connection.rpcEndpoint.includes("test")
+        ? HELIUM_COMMON_LUT_DEVNET
+        : HELIUM_COMMON_LUT,
+    ],
     multisig: multisigPda!,
     signers: [],
   });

@@ -1,14 +1,25 @@
 import * as anchor from "@coral-xyz/anchor";
 import { delegatedDataCreditsKey } from "@helium/data-credits-sdk";
-import { autoTopOffKey, init as initDcAutoTopoff } from "@helium/dc-auto-top-sdk";
+import {
+  autoTopOffKey,
+  init as initDcAutoTopoff,
+} from "@helium/dc-auto-top-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { DC_MINT, HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import * as multisig from '@sqds/multisig';
+import * as multisig from "@sqds/multisig";
 import os from "os";
 import yargs from "yargs/yargs";
-import { sendInstructionsOrSquadsV4 } from "./utils";
+import {
+  loadKeypair,
+  sendInstructionsOrSquads,
+  sendInstructionsOrSquadsV4,
+} from "./utils";
+import Squads from "@sqds/sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -43,9 +54,9 @@ export async function run(args: any = process.argv) {
       default: MOBILE_MINT.toBase58(),
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
   });
 
@@ -57,34 +68,43 @@ export async function run(args: any = process.argv) {
   const subDao = subDaoKey(subDaoMint)[0];
   const dcMint = new PublicKey(argv.dcMint);
 
-
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dcAutoTopoffProgram = await initDcAutoTopoff(provider);
 
   let authority = provider.wallet.publicKey;
+  const squads = new Squads({
+    connection: provider.connection,
+    wallet: provider.wallet as any,
+  });
   let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisigPda) {
-    const [vaultPda] = multisig.getVaultPda({
-      multisigPda,
-      index: 0,
-    });
-    authority = vaultPda;
+    authority = squads.getAuthorityPDA(multisigPda, 1);
   }
 
   const routerKey = argv.routerKey;
-  const delegatedDc = delegatedDataCreditsKey(subDao, routerKey)[0]
-  const autoTopOff = autoTopOffKey(delegatedDc, authority)[0]
-  const closeLegacyIx = await dcAutoTopoffProgram.methods.closeLegacyAutoTopOff()
+  const delegatedDc = delegatedDataCreditsKey(subDao, routerKey)[0];
+  const autoTopOff = autoTopOffKey(delegatedDc, authority)[0];
+  const createDcAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+    authority,
+    getAssociatedTokenAddressSync(dcMint, authority, true),
+    authority,
+    dcMint
+  );
+  const closeLegacyIx = await dcAutoTopoffProgram.methods
+    .closeLegacyAutoTopOff()
     .accounts({
       delegatedDataCredits: delegatedDc,
       dcAccount: getAssociatedTokenAddressSync(dcMint, autoTopOff, true),
     })
-    .instruction()
+    .instruction();
 
-  await sendInstructionsOrSquadsV4({
+  await sendInstructionsOrSquads({
     provider,
-    instructions: [closeLegacyIx],
+    instructions: [createDcAtaIx, closeLegacyIx],
     multisig: multisigPda!,
     signers: [],
+    authorityIndex: 1,
+    executeTransaction: false,
+    squads,
   });
 }
