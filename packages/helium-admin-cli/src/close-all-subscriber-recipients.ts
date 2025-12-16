@@ -1,5 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
-import { keyToAssetForAsset } from "@helium/helium-entity-manager-sdk";
+import {
+  init as initHem,
+  keyToAssetForAsset,
+} from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -21,6 +24,9 @@ import os from "os";
 import pLimit from "p-limit";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
+
+const PAGE_SIZE = 5000;
+const BATCH_SIZE = 50000;
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -59,6 +65,7 @@ export async function run(args: any = process.argv) {
   const lazyProgram = await initLazy(provider);
   const rewardsOracleProgram = await initRewards(provider);
   const memProgram = await initMem(provider);
+  const hemProgram = await initHem(provider);
 
   const authority = argv.authority
     ? loadKeypair(argv.authority as string)
@@ -81,9 +88,6 @@ export async function run(args: any = process.argv) {
   console.log(
     `  Found ${subscriberCollections.size} subscriber collection(s) from ${carriers.length} carriers\n`
   );
-
-  const PAGE_SIZE = 5000; // Helius supports up to 5k per page for getProgramAccountsV2
-  const BATCH_SIZE = 50000; // Process in 50k chunks to avoid memory issues
 
   const subscriberRecipients: {
     address: PublicKey;
@@ -325,15 +329,113 @@ export async function run(args: any = process.argv) {
     return;
   }
 
+  // Verify recipients still exist (idempotent - skips already closed)
   console.log(
-    `\nPreparing to close ${subscriberRecipients.length.toLocaleString()} recipient accounts...`
+    `\nVerifying ${subscriberRecipients.length.toLocaleString()} recipient accounts still exist...`
+  );
+
+  const recipientAddresses = subscriberRecipients.map((r) => r.address);
+  const verifyChunks = chunks(recipientAddresses, 100);
+  const verifyLimiter = pLimit(10);
+  const existingRecipients = new Set<string>();
+
+  await Promise.all(
+    verifyChunks.map((chunk) =>
+      verifyLimiter(async () => {
+        try {
+          const accounts = await lazyProgram.account.recipientV0.fetchMultiple(
+            chunk
+          );
+          accounts.forEach((account: any, index: number) => {
+            if (account) {
+              existingRecipients.add(chunk[index].toBase58());
+            }
+          });
+        } catch (err: any) {
+          console.error(`Error verifying recipients: ${err.message}`);
+        }
+      })
+    )
+  );
+
+  const validRecipients = subscriberRecipients.filter((r) =>
+    existingRecipients.has(r.address.toBase58())
+  );
+
+  console.log(
+    `  Found ${validRecipients.length.toLocaleString()} existing recipients (${
+      subscriberRecipients.length - validRecipients.length
+    } already closed)`
+  );
+
+  if (validRecipients.length === 0) {
+    console.log("\nNo recipient accounts to close.");
+    return;
+  }
+
+  // Verify keyToAsset accounts are closed (required by tempCloseRecipientWrapperV0)
+  console.log(
+    `\nVerifying ${validRecipients.length.toLocaleString()} keyToAsset accounts are closed...`
+  );
+
+  const keyToAssetAddresses = validRecipients.map((r) => {
+    const keyToAsset = keyToAssetForAsset(r.asset, dao);
+    return typeof keyToAsset === "string"
+      ? new PublicKey(keyToAsset)
+      : keyToAsset;
+  });
+
+  const keyToAssetChunks = chunks(keyToAssetAddresses, 100);
+  const keyToAssetLimiter = pLimit(10);
+  const existingKeyToAssets = new Set<string>();
+
+  await Promise.all(
+    keyToAssetChunks.map((chunk) =>
+      keyToAssetLimiter(async () => {
+        try {
+          const accounts = await hemProgram.account.keyToAssetV0.fetchMultiple(
+            chunk
+          );
+          accounts.forEach((account: any, index: number) => {
+            if (account) {
+              existingKeyToAssets.add(chunk[index].toBase58());
+            }
+          });
+        } catch (err: any) {
+          console.error(`Error verifying keyToAsset accounts: ${err.message}`);
+        }
+      })
+    )
+  );
+
+  // Only process recipients where keyToAsset is CLOSED (instruction requires it)
+  const recipientsWithClosedKeyToAsset = validRecipients.filter(
+    (r, index) =>
+      !existingKeyToAssets.has(keyToAssetAddresses[index].toBase58())
+  );
+
+  const skippedDueToOpenKeyToAsset =
+    validRecipients.length - recipientsWithClosedKeyToAsset.length;
+  console.log(
+    `  Found ${recipientsWithClosedKeyToAsset.length.toLocaleString()} recipients with closed keyToAsset (${skippedDueToOpenKeyToAsset} skipped - keyToAsset not yet closed)`
+  );
+
+  if (recipientsWithClosedKeyToAsset.length === 0) {
+    console.log(
+      "\nNo recipient accounts to close (run claim-and-close-subscriber-key-to-assets first)."
+    );
+    return;
+  }
+
+  console.log(
+    `\nPreparing to close ${recipientsWithClosedKeyToAsset.length.toLocaleString()} recipient accounts...`
   );
 
   // Build close instructions
   let failedCount = 0;
   let processed = 0;
 
-  const recipientChunks = chunks(subscriberRecipients, 100);
+  const recipientChunks = chunks(recipientsWithClosedKeyToAsset, 100);
   const instructionLimiter = pLimit(50);
 
   const allBatchResults = await Promise.all(
@@ -399,12 +501,12 @@ export async function run(args: any = process.argv) {
         // Show progress every 1000 recipients or at end
         if (
           processed % 1000 === 0 ||
-          processed === subscriberRecipients.length
+          processed === recipientsWithClosedKeyToAsset.length
         ) {
           console.log(
             `  Prepared ${
               processed - failedCount
-            } / ${subscriberRecipients.length.toLocaleString()} instructions (${failedCount} failed)...`
+            } / ${recipientsWithClosedKeyToAsset.length.toLocaleString()} instructions (${failedCount} failed)...`
           );
         }
 
@@ -418,6 +520,12 @@ export async function run(args: any = process.argv) {
     .filter((i): i is TransactionInstruction => i !== null);
 
   const instructionCount = instructions.length;
+  const finalMobileCount = recipientsWithClosedKeyToAsset.filter(
+    (r) => r.distributorType === "MOBILE"
+  ).length;
+  const finalHntCount = recipientsWithClosedKeyToAsset.filter(
+    (r) => r.distributorType === "HNT"
+  ).length;
 
   // Free memory
   subscriberRecipients.length = 0;
@@ -443,9 +551,9 @@ export async function run(args: any = process.argv) {
     console.log(
       `\nDry run: would send ${
         txns.length
-      } transactions to close ${instructionCount} subscriber recipient accounts (${mobileRecipientCount.toLocaleString()} mobile, ${hntRecipientCount.toLocaleString()} hnt)`
+      } transactions to close ${instructionCount} subscriber recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)`
     );
-    console.log(`\nRe-run with --commit to execute`);
+    console.log(`\nRe-run with --commit to execute 🚀`);
     return;
   }
 
@@ -470,7 +578,7 @@ export async function run(args: any = process.argv) {
   );
 
   console.log(
-    `\n✓ Complete: Closed ${instructionCount} recipient accounts (${mobileRecipientCount.toLocaleString()} mobile, ${hntRecipientCount.toLocaleString()} hnt)${
+    `\n✓ Complete: Closed ${instructionCount} recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)${
       failedCount > 0 ? ` - ${failedCount} failed to build instructions` : ""
     }`
   );
