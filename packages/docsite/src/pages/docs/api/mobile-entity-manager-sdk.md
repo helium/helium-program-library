@@ -187,6 +187,40 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | ---- | --------------- | ---- |
 | args | [object Object] |      |
 
+### issue_service_rewards_nft_v0
+
+#### Accounts
+
+| Name                          | Mutability | Signer | Docs |
+| ----------------------------- | ---------- | ------ | ---- |
+| payer                         | immut      | no     |      |
+| program_approval              | immut      | no     |      |
+| carrier                       | immut      | no     |      |
+| issuing_authority             | immut      | no     |      |
+| collection                    | immut      | no     |      |
+| collection_metadata           | immut      | no     |      |
+| collection_master_edition     | immut      | no     |      |
+| entity_creator                | immut      | no     |      |
+| dao                           | immut      | no     |      |
+| sub_dao                       | immut      | no     |      |
+| key_to_asset                  | immut      | no     |      |
+| tree_authority                | immut      | no     |      |
+| recipient                     | immut      | no     |      |
+| merkle_tree                   | immut      | no     |      |
+| bubblegum_signer              | immut      | no     |      |
+| token_metadata_program        | immut      | no     |      |
+| log_wrapper                   | immut      | no     |      |
+| bubblegum_program             | immut      | no     |      |
+| compression_program           | immut      | no     |      |
+| system_program                | immut      | no     |      |
+| helium_entity_manager_program | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### revoke_carrier_v0
 
 #### Accounts
@@ -408,6 +442,12 @@ undefined
 | metadata_url | string |
 
 ### IssueMappingRewardsNftArgsV0
+
+| Field        | Type   |
+| ------------ | ------ |
+| metadata_url | string |
+
+### IssueServiceRewardsNftArgsV0
 
 | Field        | Type   |
 | ------------ | ------ |
