@@ -26,6 +26,7 @@ import {
   bulkSendRawTransactions,
   chunks,
   truthy,
+  humanReadable,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
@@ -34,6 +35,14 @@ import os from "os";
 import pLimit from "p-limit";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
+
+// Token decimals
+const MOBILE_DECIMALS = 6;
+const HNT_DECIMALS = 8;
+
+// Helper to format token amounts
+const toMobile = (amount: BN) => humanReadable(amount, MOBILE_DECIMALS);
+const toHnt = (amount: BN) => humanReadable(amount, HNT_DECIMALS);
 
 // Hardcoded key_to_asset addresses from initial migration that need special handling
 // These can be closed even if they have iot_info or mobile_info accounts
@@ -437,17 +446,26 @@ export async function run(args: any = process.argv) {
 
   // Build recipient lookup for both mobile and hnt lazy distributors
   console.log(
-    `Fetching ${existingKeyToAssets.length.toLocaleString()} recipient accounts for both MOBILE and HNT...`
+    `Computing recipient PDAs for ${existingKeyToAssets.length.toLocaleString()} assets...`
   );
+
   const existingRecipients = new Map<
     string,
     { mobile: boolean; hnt: boolean }
   >();
-  const mobileRecipientKeys = existingKeyToAssets.map(
-    ({ assetId }) => recipientKey(mobileLazyDistributor, assetId)[0]
-  );
-  const hntRecipientKeys = existingKeyToAssets.map(
-    ({ assetId }) => recipientKey(hntLazyDistributor, assetId)[0]
+
+  // Pre-compute asset ID strings to avoid repeated .toBase58() calls
+  const assetIdStrings: string[] = [];
+  const mobileRecipientKeys: PublicKey[] = [];
+  const hntRecipientKeys: PublicKey[] = [];
+  existingKeyToAssets.forEach(({ assetId }) => {
+    assetIdStrings.push(assetId.toBase58());
+    mobileRecipientKeys.push(recipientKey(mobileLazyDistributor, assetId)[0]);
+    hntRecipientKeys.push(recipientKey(hntLazyDistributor, assetId)[0]);
+  });
+
+  console.log(
+    `  Done: ${mobileRecipientKeys.length.toLocaleString()} MOBILE + ${hntRecipientKeys.length.toLocaleString()} HNT keys\n`
   );
 
   async function fetchRecipientsWithRetry(chunk: PublicKey[], maxRetries = 3) {
@@ -465,111 +483,103 @@ export async function run(args: any = process.argv) {
     throw new Error("Max retries exceeded");
   }
 
-  // Fetch mobile recipients
-  console.log("  Checking MOBILE recipients...");
+  // Fetch mobile and hnt recipients in parallel
+  console.log("  Checking MOBILE and HNT recipients in parallel...");
   const mobileRecipientChunks = chunks(mobileRecipientKeys, 1000);
+  const hntRecipientChunks = chunks(hntRecipientKeys, 1000);
   const limiter = pLimit(10);
   let mobileFetchedCount = 0;
-  let mobileBatchIndex = 0;
-
-  await Promise.all(
-    mobileRecipientChunks.map((chunk, chunkIndex) =>
-      limiter(async () => {
-        const result = await fetchRecipientsWithRetry(chunk);
-        mobileFetchedCount += chunk.length;
-        mobileBatchIndex++;
-
-        // Calculate starting index for this chunk
-        const chunkStartIndex = chunkIndex * 1000;
-
-        // Track which assets have mobile recipients
-        result.accountInfos.forEach((info, index) => {
-          if (info) {
-            const assetKey =
-              existingKeyToAssets[chunkStartIndex + index].assetId.toBase58();
-            const existing = existingRecipients.get(assetKey) || {
-              mobile: false,
-              hnt: false,
-            };
-            existing.mobile = true;
-            existingRecipients.set(assetKey, existing);
-          }
-        });
-
-        // Show progress: first 3 batches, then every 25 batches
-        if (
-          mobileBatchIndex <= 3 ||
-          mobileBatchIndex % 25 === 0 ||
-          mobileFetchedCount === mobileRecipientKeys.length
-        ) {
-          console.log(
-            `    ${mobileBatchIndex} batches: ${mobileFetchedCount.toLocaleString()} accounts`
-          );
-        }
-
-        return result;
-      })
-    )
-  );
-
-  const mobileRecipientsCount = Array.from(existingRecipients.values()).filter(
-    (r) => r.mobile
-  ).length;
-  console.log(
-    `    Found ${mobileRecipientsCount.toLocaleString()} MOBILE recipients\n`
-  );
-
-  // Fetch hnt recipients
-  console.log("  Checking HNT recipients...");
-  const hntRecipientChunks = chunks(hntRecipientKeys, 1000);
   let hntFetchedCount = 0;
+  let mobileBatchIndex = 0;
   let hntBatchIndex = 0;
+  let mobileRecipientsCount = 0;
+  let hntRecipientsCount = 0;
 
-  await Promise.all(
-    hntRecipientChunks.map((chunk, chunkIndex) =>
-      limiter(async () => {
-        const result = await fetchRecipientsWithRetry(chunk);
-        hntFetchedCount += chunk.length;
-        hntBatchIndex++;
+  await Promise.all([
+    // Fetch mobile recipients
+    Promise.all(
+      mobileRecipientChunks.map((chunk, chunkIndex) =>
+        limiter(async () => {
+          const result = await fetchRecipientsWithRetry(chunk);
+          mobileFetchedCount += chunk.length;
+          mobileBatchIndex++;
 
-        // Calculate starting index for this chunk
-        const chunkStartIndex = chunkIndex * 1000;
+          // Calculate starting index for this chunk
+          const chunkStartIndex = chunkIndex * 1000;
 
-        // Track which assets have hnt recipients
-        result.accountInfos.forEach((info, index) => {
-          if (info) {
-            const assetKey =
-              existingKeyToAssets[chunkStartIndex + index].assetId.toBase58();
-            const existing = existingRecipients.get(assetKey) || {
-              mobile: false,
-              hnt: false,
-            };
-            existing.hnt = true;
-            existingRecipients.set(assetKey, existing);
+          // Track which assets have mobile recipients
+          result.accountInfos.forEach((info, index) => {
+            if (info) {
+              const assetKey = assetIdStrings[chunkStartIndex + index];
+              const existing = existingRecipients.get(assetKey) || {
+                mobile: false,
+                hnt: false,
+              };
+              existing.mobile = true;
+              existingRecipients.set(assetKey, existing);
+              mobileRecipientsCount++;
+            }
+          });
+
+          // Show progress: first 3 batches, then every 25 batches
+          if (
+            mobileBatchIndex <= 3 ||
+            mobileBatchIndex % 25 === 0 ||
+            mobileFetchedCount === mobileRecipientKeys.length
+          ) {
+            console.log(
+              `    MOBILE ${mobileBatchIndex} batches: ${mobileFetchedCount.toLocaleString()} accounts`
+            );
           }
-        });
 
-        // Show progress: first 3 batches, then every 25 batches
-        if (
-          hntBatchIndex <= 3 ||
-          hntBatchIndex % 25 === 0 ||
-          hntFetchedCount === hntRecipientKeys.length
-        ) {
-          console.log(
-            `    ${hntBatchIndex} batches: ${hntFetchedCount.toLocaleString()} accounts`
-          );
-        }
+          return result;
+        })
+      )
+    ),
+    // Fetch hnt recipients
+    Promise.all(
+      hntRecipientChunks.map((chunk, chunkIndex) =>
+        limiter(async () => {
+          const result = await fetchRecipientsWithRetry(chunk);
+          hntFetchedCount += chunk.length;
+          hntBatchIndex++;
 
-        return result;
-      })
-    )
-  );
+          // Calculate starting index for this chunk
+          const chunkStartIndex = chunkIndex * 1000;
 
-  const hntRecipientsCount = Array.from(existingRecipients.values()).filter(
-    (r) => r.hnt
-  ).length;
+          // Track which assets have hnt recipients
+          result.accountInfos.forEach((info, index) => {
+            if (info) {
+              const assetKey = assetIdStrings[chunkStartIndex + index];
+              const existing = existingRecipients.get(assetKey) || {
+                mobile: false,
+                hnt: false,
+              };
+              existing.hnt = true;
+              existingRecipients.set(assetKey, existing);
+              hntRecipientsCount++;
+            }
+          });
+
+          // Show progress: first 3 batches, then every 25 batches
+          if (
+            hntBatchIndex <= 3 ||
+            hntBatchIndex % 25 === 0 ||
+            hntFetchedCount === hntRecipientKeys.length
+          ) {
+            console.log(
+              `    HNT ${hntBatchIndex} batches: ${hntFetchedCount.toLocaleString()} accounts`
+            );
+          }
+
+          return result;
+        })
+      )
+    ),
+  ]);
+
   console.log(
-    `    Found ${hntRecipientsCount.toLocaleString()} HNT recipients\n`
+    `    Found ${mobileRecipientsCount.toLocaleString()} MOBILE recipients, ${hntRecipientsCount.toLocaleString()} HNT recipients\n`
   );
 
   // Build assetsWithRecipients - assets that have at least one recipient
@@ -646,80 +656,86 @@ export async function run(args: any = process.argv) {
     const rewardsChunks = chunks(entityKeys, 5000);
     const rewardsLimiter = pLimit(5);
 
-    // Fetch mobile rewards
-    console.log("  Checking MOBILE rewards...");
+    // Fetch mobile and hnt rewards in parallel
+    console.log("  Checking MOBILE and HNT rewards in parallel...");
     let mobileCheckedCount = 0;
-    let mobileRewardsBatchIndex = 0;
-
-    const mobileBulkRewardsResults = await Promise.all(
-      rewardsChunks.map((chunk) =>
-        rewardsLimiter(async () => {
-          try {
-            const bulkRewards = await client.getBulkRewards(
-              lazyProgram,
-              mobileLazyDistributor,
-              chunk
-            );
-
-            mobileRewardsBatchIndex++;
-            mobileCheckedCount += chunk.length;
-
-            // Show progress
-            if (
-              mobileRewardsBatchIndex <= 3 ||
-              mobileRewardsBatchIndex % 5 === 0 ||
-              mobileCheckedCount === entityKeys.length
-            ) {
-              console.log(
-                `    ${mobileRewardsBatchIndex} batches: ${mobileCheckedCount.toLocaleString()} assets`
-              );
-            }
-
-            return { chunk, bulkRewards };
-          } catch (err: any) {
-            console.error(`Error fetching mobile bulk rewards: ${err.message}`);
-            return { chunk, bulkRewards: [] };
-          }
-        })
-      )
-    );
-
-    // Fetch hnt rewards
-    console.log("  Checking HNT rewards...");
     let hntCheckedCount = 0;
+    let mobileRewardsBatchIndex = 0;
     let hntRewardsBatchIndex = 0;
 
-    const hntBulkRewardsResults = await Promise.all(
-      rewardsChunks.map((chunk) =>
-        rewardsLimiter(async () => {
-          try {
-            const bulkRewards = await client.getBulkRewards(
-              lazyProgram,
-              hntLazyDistributor,
-              chunk
-            );
+    const [mobileBulkRewardsResults, hntBulkRewardsResults] = await Promise.all(
+      [
+        // Fetch mobile rewards
+        Promise.all(
+          rewardsChunks.map((chunk) =>
+            rewardsLimiter(async () => {
+              try {
+                const bulkRewards = await client.getBulkRewards(
+                  lazyProgram,
+                  mobileLazyDistributor,
+                  chunk
+                );
 
-            hntRewardsBatchIndex++;
-            hntCheckedCount += chunk.length;
+                mobileRewardsBatchIndex++;
+                mobileCheckedCount += chunk.length;
 
-            // Show progress
-            if (
-              hntRewardsBatchIndex <= 3 ||
-              hntRewardsBatchIndex % 5 === 0 ||
-              hntCheckedCount === entityKeys.length
-            ) {
-              console.log(
-                `    ${hntRewardsBatchIndex} batches: ${hntCheckedCount.toLocaleString()} assets`
-              );
-            }
+                // Show progress
+                if (
+                  mobileRewardsBatchIndex <= 3 ||
+                  mobileRewardsBatchIndex % 5 === 0 ||
+                  mobileCheckedCount === entityKeys.length
+                ) {
+                  console.log(
+                    `    MOBILE ${mobileRewardsBatchIndex} batches: ${mobileCheckedCount.toLocaleString()} assets`
+                  );
+                }
 
-            return { chunk, bulkRewards };
-          } catch (err: any) {
-            console.error(`Error fetching hnt bulk rewards: ${err.message}`);
-            return { chunk, bulkRewards: [] };
-          }
-        })
-      )
+                return { chunk, bulkRewards };
+              } catch (err: any) {
+                console.error(
+                  `Error fetching mobile bulk rewards: ${err.message}`
+                );
+                return { chunk, bulkRewards: [] };
+              }
+            })
+          )
+        ),
+        // Fetch hnt rewards
+        Promise.all(
+          rewardsChunks.map((chunk) =>
+            rewardsLimiter(async () => {
+              try {
+                const bulkRewards = await client.getBulkRewards(
+                  lazyProgram,
+                  hntLazyDistributor,
+                  chunk
+                );
+
+                hntRewardsBatchIndex++;
+                hntCheckedCount += chunk.length;
+
+                // Show progress
+                if (
+                  hntRewardsBatchIndex <= 3 ||
+                  hntRewardsBatchIndex % 5 === 0 ||
+                  hntCheckedCount === entityKeys.length
+                ) {
+                  console.log(
+                    `    HNT ${hntRewardsBatchIndex} batches: ${hntCheckedCount.toLocaleString()} assets`
+                  );
+                }
+
+                return { chunk, bulkRewards };
+              } catch (err: any) {
+                console.error(
+                  `Error fetching hnt bulk rewards: ${err.message}`
+                );
+                return { chunk, bulkRewards: [] };
+              }
+            })
+          )
+        ),
+      ]
     );
 
     // Merge bulk rewards from all chunks for mobile
@@ -824,12 +840,12 @@ export async function run(args: any = process.argv) {
       }
     });
 
-    const pendingMobile = totalPendingMobileRewards
-      .div(new BN(100000000))
-      .toString();
-    const pendingHnt = totalPendingHntRewards.div(new BN(100000000)).toString();
     console.log(
-      `\nPending: ${assetsWithRewards} assets with ${pendingMobile} MOBILE and ${pendingHnt} HNT (${assetsWithZeroRewards} with zero)`
+      `\nPending: ${assetsWithRewards} assets with ${toMobile(
+        totalPendingMobileRewards
+      )} MOBILE and ${toHnt(
+        totalPendingHntRewards
+      )} HNT (${assetsWithZeroRewards} with zero)`
     );
 
     // If no more rewards, break out of loop
@@ -1072,14 +1088,12 @@ export async function run(args: any = process.argv) {
     totalClaimedHnt = totalClaimedHnt.add(totalPendingHntRewards);
     totalClaimedTransactions += txns.length;
 
-    const claimedMobileThisIteration = totalPendingMobileRewards
-      .div(new BN(100000000))
-      .toString();
-    const claimedHntThisIteration = totalPendingHntRewards
-      .div(new BN(100000000))
-      .toString();
     console.log(
-      `Iteration ${claimIteration} complete. Claimed ${claimedMobileThisIteration} MOBILE and ${claimedHntThisIteration} HNT across ${txns.length} transactions.`
+      `Iteration ${claimIteration} complete. Claimed ${toMobile(
+        totalPendingMobileRewards
+      )} MOBILE and ${toHnt(totalPendingHntRewards)} HNT across ${
+        txns.length
+      } transactions.`
     );
 
     // Free memory for next iteration
@@ -1091,12 +1105,10 @@ export async function run(args: any = process.argv) {
     await new Promise((resolve) => setTimeout(resolve, 5000));
   }
 
-  const claimedMobileTotal = totalClaimedMobile
-    .div(new BN(100000000))
-    .toString();
-  const claimedHntTotal = totalClaimedHnt.div(new BN(100000000)).toString();
   console.log(
-    `\nClaimed ${claimedMobileTotal} MOBILE and ${claimedHntTotal} HNT in ${claimIteration} iteration(s), ${totalClaimedTransactions} tx(s)`
+    `\nClaimed ${toMobile(totalClaimedMobile)} MOBILE and ${toHnt(
+      totalClaimedHnt
+    )} HNT in ${claimIteration} iteration(s), ${totalClaimedTransactions} tx(s)`
   );
 
   // Free memory - no longer need recipient data
@@ -1265,12 +1277,10 @@ export async function run(args: any = process.argv) {
     [authority]
   );
 
-  const finalClaimedMobile = totalClaimedMobile
-    .div(new BN(100000000))
-    .toString();
-  const finalClaimedHnt = totalClaimedHnt.div(new BN(100000000)).toString();
   console.log(
-    `\n✓ Complete: Claimed ${finalClaimedMobile} MOBILE and ${finalClaimedHnt} HNT, closed ${instructions.length} accounts`
+    `\n✓ Complete: Claimed ${toMobile(totalClaimedMobile)} MOBILE and ${toHnt(
+      totalClaimedHnt
+    )} HNT, closed ${instructions.length} accounts`
   );
   console.log(`Next: run close-all-subscriber-recipients`);
 }
