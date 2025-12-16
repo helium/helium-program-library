@@ -38,7 +38,7 @@ import { loadKeypair } from "./utils";
 // Hardcoded key_to_asset addresses from initial migration that need special handling
 // These can be closed even if they have iot_info or mobile_info accounts
 const HARDCODED_KEY_TO_ASSETS = [
-  new PublicKey("2RtR6aVt6QgCSdV8LEH6ogWtDXGJpL73aB72DevJKgFC"),
+  new PublicKey("AcKpRTmy6YKpQaWfLDBUaduQU1kHhNVLrPkW3TmEEqsc"),
   new PublicKey("3stUgrUq4j5BbamGdy7X2Y3dee24EeY5u1F7RHrrmaoP"),
   new PublicKey("4v7nfEN2Wj342Zm6V1Jwk9i5YCUHu6zBAJFENk6Gxzvr"),
   new PublicKey("2RtR6aVt6QgCSdV8LEH6ogWtDXGJpL73aB72DevJKgFC"),
@@ -823,6 +823,8 @@ export async function run(args: any = process.argv) {
           iotConfig,
           mobileInfo,
           iotInfo,
+          iotSubDao,
+          mobileSubDao,
         })
         .instruction();
 
@@ -859,6 +861,8 @@ export async function run(args: any = process.argv) {
                   iotConfig,
                   mobileInfo,
                   iotInfo,
+                  iotSubDao,
+                  mobileSubDao,
                 })
                 .instruction();
             })
