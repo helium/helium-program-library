@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.6",
+  "version": "0.11.7",
   "description": "Interface to the rewards burn smart contract",
   "repository": {
     "type": "git",
@@ -32,9 +32,9 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
-    "@helium/anchor-resolvers": "^0.11.6",
-    "@helium/idls": "^0.11.6",
-    "@helium/spl-utils": "^0.11.6",
+    "@helium/anchor-resolvers": "^0.11.7",
+    "@helium/idls": "^0.11.7",
+    "@helium/spl-utils": "^0.11.7",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
