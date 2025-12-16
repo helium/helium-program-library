@@ -587,8 +587,9 @@ export async function run(args: any = process.argv) {
     hasMobileRecipient: boolean;
     hasHntRecipient: boolean;
   })[] = [];
-  existingKeyToAssets.forEach((asset) => {
-    const recipients = existingRecipients.get(asset.assetId.toBase58());
+
+  existingKeyToAssets.forEach((asset, index) => {
+    const recipients = existingRecipients.get(assetIdStrings[index]);
     if (recipients && (recipients.mobile || recipients.hnt)) {
       assetsWithRecipients.push({
         ...asset,
@@ -607,6 +608,9 @@ export async function run(args: any = process.argv) {
       existingKeyToAssets.length - assetsWithRecipients.length
     ).toLocaleString()} without recipients)\n`
   );
+
+  // Track assets that fail with 400 errors - skip closing their key_to_asset accounts
+  const problematicAssets = new Set<string>();
 
   while (true) {
     claimIteration++;
@@ -924,11 +928,11 @@ export async function run(args: any = process.argv) {
             return [...firstTxns, ...secondTxns];
           }
 
-          // For single asset 400 errors, log and skip
+          // For single asset 400 errors, log, track, and skip
           if (is400 && assets.length === 1) {
-            console.error(
-              `    Skipping problematic asset: ${assets[0].toBase58()}`
-            );
+            const assetStr = assets[0].toBase58();
+            console.error(`    Skipping problematic asset: ${assetStr}`);
+            problematicAssets.add(assetStr);
             return [];
           }
 
@@ -1065,10 +1069,7 @@ export async function run(args: any = process.argv) {
     }
 
     console.log(`Sending ${txns.length} transactions...`);
-
-    for (const tx of txns) {
-      tx.sign([authority]);
-    }
+    txns.forEach((tx) => tx.sign([authority]));
 
     await bulkSendRawTransactions(
       provider.connection,
@@ -1119,18 +1120,27 @@ export async function run(args: any = process.argv) {
   // ========== STEP 3: Close all KeyToAssetV0 accounts ==========
   console.log("\n=== STEP 3: CLOSING ACCOUNTS ===\n");
 
+  // Filter out problematic assets that failed during claiming
+  if (problematicAssets.size > 0) {
+    console.log(
+      `\n⚠️  Skipping ${problematicAssets.size} problematic assets from closing`
+    );
+  }
+
+  const assetsToClose = existingKeyToAssets.filter(
+    (k) => !problematicAssets.has(k.assetId.toBase58())
+  );
+
   console.log(
-    `Preparing to close ${existingKeyToAssets.length.toLocaleString()} accounts...`
+    `Preparing to close ${assetsToClose.length.toLocaleString()} accounts...`
   );
 
   // Build close instructions
   const instructions: TransactionInstruction[] = [];
 
   // Separate hardcoded (need info checks) from subscribers (no checks needed)
-  const hardcodedAccountsToClose = existingKeyToAssets.filter(
-    (k) => k.isHardcoded
-  );
-  const subscriberAccounts = existingKeyToAssets.filter((k) => !k.isHardcoded);
+  const hardcodedAccountsToClose = assetsToClose.filter((k) => k.isHardcoded);
+  const subscriberAccounts = assetsToClose.filter((k) => !k.isHardcoded);
 
   console.log(
     `  Hardcoded: ${
@@ -1186,45 +1196,58 @@ export async function run(args: any = process.argv) {
       `Processing ${subscriberAccounts.length.toLocaleString()} subscriber accounts...`
     );
 
-    let processed = 0;
-    const subscriberChunks = chunks(subscriberAccounts, 10000);
-    const allBatchInstructions = await Promise.all(
-      subscriberChunks.map(async (chunk) => {
-        const batchInstructions = await Promise.all(
-          chunk.map(async ({ keyToAsset, assetId, entityKey }) => {
-            const [mobileInfo] = mobileInfoKey(mobileConfig, entityKey);
-            const [iotInfo] = iotInfoKey(iotConfig, entityKey);
+    // Pre-compute all PDAs synchronously (fast CPU-bound operation)
+    console.log("  Pre-computing PDAs...");
+    const subscriberPdas = subscriberAccounts.map(({ entityKey }) => ({
+      mobileInfo: mobileInfoKey(mobileConfig, entityKey)[0],
+      iotInfo: iotInfoKey(iotConfig, entityKey)[0],
+    }));
 
-            return await hemProgram.methods
-              .tempCloseKeyToAssetV0()
-              .accountsPartial({
-                keyToAsset,
-                dao,
-                authority: authority.publicKey,
-                asset: assetId,
-                mobileConfig,
-                iotConfig,
-                mobileInfo,
-                iotInfo,
-                iotSubDao,
-                mobileSubDao,
-              })
-              .instruction();
-          })
-        );
-
-        processed += chunk.length;
-
-        // Show progress every chunk
-        console.log(
-          `  Prepared ${processed.toLocaleString()} / ${subscriberAccounts.length.toLocaleString()} instructions...`
-        );
-
-        return batchInstructions;
-      })
+    console.log(
+      `  Done: ${subscriberPdas.length.toLocaleString()} PDA pairs computed`
     );
 
-    instructions.push(...allBatchInstructions.flat().filter(truthy));
+    // Rate-limited concurrent instruction generation
+    const ixLimiter = pLimit(100);
+    let processed = 0;
+
+    const allInstructions = await Promise.all(
+      subscriberAccounts.map(({ keyToAsset, assetId }, index) =>
+        ixLimiter(async () => {
+          const { mobileInfo, iotInfo } = subscriberPdas[index];
+
+          const ix = await hemProgram.methods
+            .tempCloseKeyToAssetV0()
+            .accountsPartial({
+              keyToAsset,
+              dao,
+              authority: authority.publicKey,
+              asset: assetId,
+              mobileConfig,
+              iotConfig,
+              mobileInfo,
+              iotInfo,
+              iotSubDao,
+              mobileSubDao,
+            })
+            .instruction();
+
+          processed++;
+          if (
+            processed % 50000 === 0 ||
+            processed === subscriberAccounts.length
+          ) {
+            console.log(
+              `  Prepared ${processed.toLocaleString()} / ${subscriberAccounts.length.toLocaleString()} instructions...`
+            );
+          }
+
+          return ix;
+        })
+      )
+    );
+
+    instructions.push(...allInstructions.filter(truthy));
   }
 
   console.log(
@@ -1232,7 +1255,7 @@ export async function run(args: any = process.argv) {
   );
 
   // Save counts before clearing memory
-  const totalAccountsToClose = existingKeyToAssets.length;
+  const totalAccountsToClose = assetsToClose.length;
   const hardcodedToClose = hardcodedAccountsToClose.length;
   const subscribersToClose = subscriberAccounts.length;
 
