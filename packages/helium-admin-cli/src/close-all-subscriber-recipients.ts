@@ -295,20 +295,13 @@ export async function run(args: any = process.argv) {
     `${totalSkippedNonSubscriber.toLocaleString()} skipped (non-subscriber assets)`
   );
 
-  if (!argv.commit) {
-    console.log(
-      `\nDry run: would close ${subscriberRecipients.length} subscriber recipient accounts. Re-run with --commit to close recipients.`
-    );
-    return;
-  }
-
   if (subscriberRecipients.length === 0) {
     console.log("\nNo subscriber recipient accounts to close.");
     return;
   }
 
   console.log(
-    `\nClosing ${subscriberRecipients.length.toLocaleString()} recipient accounts...`
+    `\nPreparing to close ${subscriberRecipients.length.toLocaleString()} recipient accounts...`
   );
 
   // Build close instructions
@@ -415,7 +408,17 @@ export async function run(args: any = process.argv) {
   // Free memory - instructions now in transactions
   instructions.length = 0;
 
-  console.log(`\nSending ${txns.length} transactions...`);
+  console.log(`\nPrepared ${txns.length} transactions`);
+
+  if (!argv.commit) {
+    console.log(
+      `\nDry run: would send ${txns.length} transactions to close ${instructionCount} subscriber recipient accounts`
+    );
+    console.log(`\nRe-run with --commit to execute`);
+    return;
+  }
+
+  console.log(`Sending ${txns.length} transactions...`);
 
   // Sign with authority and approver (if present)
   const extraSigners = [authority];

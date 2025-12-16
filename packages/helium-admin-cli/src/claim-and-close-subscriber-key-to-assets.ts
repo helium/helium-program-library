@@ -648,13 +648,6 @@ export async function run(args: any = process.argv) {
       break;
     }
 
-    if (!argv.commit) {
-      console.log(
-        `\nDry run: would claim rewards for ${assetsWithRewards} assets`
-      );
-      break;
-    }
-
     console.log(`\nClaiming rewards for ${assetsWithRewards} assets...`);
 
     // Batch claim rewards using formBulkTransactions (up to 100 assets per call)
@@ -703,6 +696,15 @@ export async function run(args: any = process.argv) {
     );
 
     const txns = allBatchTxns.flat().filter(truthy);
+
+    console.log(`Prepared ${txns.length} transactions`);
+
+    if (!argv.commit) {
+      console.log(
+        `\nDry run: would send ${txns.length} transactions to claim rewards for ${assetsWithRewards} assets`
+      );
+      break;
+    }
 
     console.log(`Sending ${txns.length} transactions...`);
 
@@ -754,25 +756,8 @@ export async function run(args: any = process.argv) {
   // ========== STEP 3: Close all KeyToAssetV0 accounts ==========
   console.log("\n=== STEP 3: CLOSING ACCOUNTS ===\n");
 
-  if (!argv.commit) {
-    const closingHardcoded = existingKeyToAssets.filter(
-      (k) => k.isHardcoded
-    ).length;
-    const closingSubscribers = existingKeyToAssets.filter(
-      (k) => !k.isHardcoded
-    ).length;
-    console.log(
-      `Dry run: would close ${existingKeyToAssets.length} accounts (${closingHardcoded} hardcoded, ${closingSubscribers} subscribers)`
-    );
-    console.log(`\nRe-run with --commit to execute`);
-    console.log(
-      `Then run close-all-subscriber-recipients to close RecipientV0 accounts`
-    );
-    return;
-  }
-
   console.log(
-    `Closing ${existingKeyToAssets.length.toLocaleString()} accounts...`
+    `Preparing to close ${existingKeyToAssets.length.toLocaleString()} accounts...`
   );
 
   // Build close instructions
@@ -905,7 +890,26 @@ export async function run(args: any = process.argv) {
 
   // Free memory - instructions now in transactions
   instructions.length = 0;
-  console.log(`\nSending ${closeTxns.length} transactions...`);
+  console.log(`\nPrepared ${closeTxns.length} transactions`);
+
+  if (!argv.commit) {
+    const closingHardcoded = existingKeyToAssets.filter(
+      (k) => k.isHardcoded
+    ).length;
+    const closingSubscribers = existingKeyToAssets.filter(
+      (k) => !k.isHardcoded
+    ).length;
+    console.log(
+      `\nDry run: would send ${closeTxns.length} transactions to close ${existingKeyToAssets.length} accounts (${closingHardcoded} hardcoded, ${closingSubscribers} subscribers)`
+    );
+    console.log(`\nRe-run with --commit to execute`);
+    console.log(
+      `Then run close-all-subscriber-recipients to close RecipientV0 accounts`
+    );
+    return;
+  }
+
+  console.log(`Sending ${closeTxns.length} transactions...`);
 
   // Sign with authority and send
   await bulkSendTransactions(
