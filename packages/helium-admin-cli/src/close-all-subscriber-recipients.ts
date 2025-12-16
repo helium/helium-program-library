@@ -66,7 +66,8 @@ export async function run(args: any = process.argv) {
   const approver = argv.approver ? loadKeypair(argv.approver as string) : null;
 
   const dao = daoKey(HNT_MINT)[0];
-  const lazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
+  const mobileLazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
+  const hntLazyDistributor = lazyDistributorKey(HNT_MINT)[0];
 
   // Fetch all subscriber collections
   console.log(
@@ -81,22 +82,15 @@ export async function run(args: any = process.argv) {
     `  Found ${subscriberCollections.size} subscriber collection(s) from ${carriers.length} carriers\n`
   );
 
-  console.log(
-    "Fetching RecipientV0 accounts for MOBILE lazy distributor using pagination..."
-  );
-
   const PAGE_SIZE = 5000; // Helius supports up to 5k per page for getProgramAccountsV2
   const BATCH_SIZE = 50000; // Process in 50k chunks to avoid memory issues
 
-  let paginationKey: string | null = null;
-  let page = 0;
-  let totalRecipientsFetched = 0;
-  let totalSkippedNonSubscriber = 0;
-  let currentBatch: any[] = [];
   const subscriberRecipients: {
     address: PublicKey;
     asset: any;
     recipientData: any;
+    lazyDistributor: PublicKey;
+    distributorType: "MOBILE" | "HNT";
   }[] = [];
 
   async function fetchAssetBatchWithRetry(chunk: PublicKey[], maxRetries = 5) {
@@ -126,7 +120,9 @@ export async function run(args: any = process.argv) {
 
   async function processBatch(
     batch: any[],
-    batchLabel: string
+    batchLabel: string,
+    lazyDistributor: PublicKey,
+    distributorType: "MOBILE" | "HNT"
   ): Promise<{ subscribers: number; nonSubscribers: number }> {
     console.log(`\n--- Processing ${batchLabel} ---`);
 
@@ -183,6 +179,8 @@ export async function run(args: any = process.argv) {
           address: recipient.publicKey,
           asset,
           recipientData: recipient.account,
+          lazyDistributor,
+          distributorType,
         });
         batchSubscribers++;
       } else {
@@ -196,104 +194,131 @@ export async function run(args: any = process.argv) {
     };
   }
 
-  // Pagination and batch processing loop
-  console.log(
-    "Fetching recipients with pagination and processing in batches...\n"
-  );
+  async function fetchAndProcessRecipients(
+    lazyDistributor: PublicKey,
+    distributorType: "MOBILE" | "HNT"
+  ) {
+    console.log(
+      `\n=== Fetching RecipientV0 accounts for ${distributorType} lazy distributor ===\n`
+    );
 
-  do {
-    page++;
+    let paginationKey: string | null = null;
+    let page = 0;
+    let totalRecipientsFetched = 0;
+    let totalSkippedNonSubscriber = 0;
+    let currentBatch: any[] = [];
 
-    // Fetch next page
-    const response = await fetch(provider.connection.rpcEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: `page-${page}`,
-        method: "getProgramAccountsV2",
-        params: [
-          lazyProgram.programId.toBase58(),
-          {
-            encoding: "base64",
-            filters: [
-              {
-                memcmp: {
-                  offset: 8,
-                  bytes: lazyDistributor.toBase58(),
+    do {
+      page++;
+
+      // Fetch next page
+      const response = await fetch(provider.connection.rpcEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: `page-${page}`,
+          method: "getProgramAccountsV2",
+          params: [
+            lazyProgram.programId.toBase58(),
+            {
+              encoding: "base64",
+              filters: [
+                {
+                  memcmp: {
+                    offset: 8,
+                    bytes: lazyDistributor.toBase58(),
+                  },
                 },
-              },
-            ],
-            limit: PAGE_SIZE,
-            ...(paginationKey && { paginationKey }),
-          },
-        ],
-      }),
-    });
+              ],
+              limit: PAGE_SIZE,
+              ...(paginationKey && { paginationKey }),
+            },
+          ],
+        }),
+      });
 
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(`RPC error: ${data.error.message}`);
-    }
-
-    const { result } = data;
-
-    // If no more results, set paginationKey to null to end pagination
-    if (!result || !result.accounts || result.accounts.length === 0) {
-      paginationKey = null;
-    } else {
-      // Decode and add to current batch
-      const pageRecipients = result.accounts.map((item: any) => ({
-        publicKey: new PublicKey(item.pubkey),
-        account: lazyProgram.coder.accounts.decode(
-          "recipientV0",
-          Buffer.from(item.account.data[0], "base64")
-        ),
-      }));
-
-      currentBatch.push(...pageRecipients);
-      totalRecipientsFetched += pageRecipients.length;
-
-      if (page % 10 === 0) {
-        console.log(
-          `  Fetched ${totalRecipientsFetched.toLocaleString()} recipients (batch size: ${currentBatch.length.toLocaleString()})...`
-        );
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(`RPC error: ${data.error.message}`);
       }
 
-      paginationKey = result.paginationKey || null;
-    }
+      const { result } = data;
 
-    // Process batch when we hit BATCH_SIZE or finished pagination
-    const shouldProcessBatch =
-      currentBatch.length >= BATCH_SIZE || !paginationKey;
+      // If no more results, set paginationKey to null to end pagination
+      if (!result || !result.accounts || result.accounts.length === 0) {
+        paginationKey = null;
+      } else {
+        // Decode and add to current batch
+        const pageRecipients = result.accounts.map((item: any) => ({
+          publicKey: new PublicKey(item.pubkey),
+          account: lazyProgram.coder.accounts.decode(
+            "recipientV0",
+            Buffer.from(item.account.data[0], "base64")
+          ),
+        }));
 
-    if (shouldProcessBatch && currentBatch.length > 0) {
-      const { subscribers, nonSubscribers } = await processBatch(
-        currentBatch,
-        `batch of ${currentBatch.length.toLocaleString()} recipients`
-      );
+        currentBatch.push(...pageRecipients);
+        totalRecipientsFetched += pageRecipients.length;
 
-      totalSkippedNonSubscriber += nonSubscribers;
+        if (page % 10 === 0) {
+          console.log(
+            `  Fetched ${totalRecipientsFetched.toLocaleString()} recipients (batch size: ${currentBatch.length.toLocaleString()})...`
+          );
+        }
 
-      console.log(
-        `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients so far (${subscribers} subscribers, ${nonSubscribers} non-subscribers in this batch)\n`
-      );
+        paginationKey = result.paginationKey || null;
+      }
 
-      // Clear current batch to free memory
-      currentBatch = [];
-    }
-  } while (paginationKey);
+      // Process batch when we hit BATCH_SIZE or finished pagination
+      const shouldProcessBatch =
+        currentBatch.length >= BATCH_SIZE || !paginationKey;
 
-  console.log(`\n=== Summary ===`);
+      if (shouldProcessBatch && currentBatch.length > 0) {
+        const { subscribers, nonSubscribers } = await processBatch(
+          currentBatch,
+          `batch of ${currentBatch.length.toLocaleString()} recipients`,
+          lazyDistributor,
+          distributorType
+        );
+
+        totalSkippedNonSubscriber += nonSubscribers;
+
+        console.log(
+          `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients so far (${subscribers} subscribers, ${nonSubscribers} non-subscribers in this batch)\n`
+        );
+
+        // Clear current batch to free memory
+        currentBatch = [];
+      }
+    } while (paginationKey);
+
+    console.log(`\n=== ${distributorType} Summary ===`);
+    console.log(
+      `Processed ${totalRecipientsFetched.toLocaleString()} total RecipientV0 accounts`
+    );
+    console.log(
+      `${totalSkippedNonSubscriber.toLocaleString()} skipped (non-subscriber assets)`
+    );
+  }
+
+  // Fetch recipients for both mobile and hnt lazy distributors
+  await fetchAndProcessRecipients(mobileLazyDistributor, "MOBILE");
+  await fetchAndProcessRecipients(hntLazyDistributor, "HNT");
+
+  const mobileRecipientCount = subscriberRecipients.filter(
+    (r) => r.distributorType === "MOBILE"
+  ).length;
+  const hntRecipientCount = subscriberRecipients.filter(
+    (r) => r.distributorType === "HNT"
+  ).length;
+
+  console.log(`\n=== Total Summary ===`);
   console.log(
-    `Processed ${totalRecipientsFetched.toLocaleString()} total RecipientV0 accounts`
+    `${subscriberRecipients.length.toLocaleString()} total subscriber recipients found`
   );
-  console.log(
-    `${subscriberRecipients.length.toLocaleString()} are for subscriber assets`
-  );
-  console.log(
-    `${totalSkippedNonSubscriber.toLocaleString()} skipped (non-subscriber assets)`
-  );
+  console.log(`  ${mobileRecipientCount.toLocaleString()} MOBILE recipients`);
+  console.log(`  ${hntRecipientCount.toLocaleString()} HNT recipients`);
 
   if (subscriberRecipients.length === 0) {
     console.log("\nNo subscriber recipient accounts to close.");
@@ -317,7 +342,11 @@ export async function run(args: any = process.argv) {
         const batchResults = await Promise.all(
           chunk.map(async (recipient) => {
             try {
-              const { address: recipientAddr, asset } = recipient;
+              const {
+                address: recipientAddr,
+                asset,
+                lazyDistributor,
+              } = recipient;
 
               // Compute the KeyToAssetV0 address
               const keyToAsset = keyToAssetForAsset(asset, dao);
@@ -412,7 +441,9 @@ export async function run(args: any = process.argv) {
 
   if (!argv.commit) {
     console.log(
-      `\nDry run: would send ${txns.length} transactions to close ${instructionCount} subscriber recipient accounts`
+      `\nDry run: would send ${
+        txns.length
+      } transactions to close ${instructionCount} subscriber recipient accounts (${mobileRecipientCount.toLocaleString()} mobile, ${hntRecipientCount.toLocaleString()} hnt)`
     );
     console.log(`\nRe-run with --commit to execute`);
     return;
@@ -439,8 +470,8 @@ export async function run(args: any = process.argv) {
   );
 
   console.log(
-    `\n✓ Complete: Closed ${instructionCount} recipient accounts${
-      failedCount > 0 ? ` (${failedCount} failed to build instructions)` : ""
+    `\n✓ Complete: Closed ${instructionCount} recipient accounts (${mobileRecipientCount.toLocaleString()} mobile, ${hntRecipientCount.toLocaleString()} hnt)${
+      failedCount > 0 ? ` - ${failedCount} failed to build instructions` : ""
     }`
   );
 }
