@@ -15,10 +15,12 @@ import {
   MOBILE_MINT,
   getAssetBatch,
   batchInstructionsToTxsWithPriorityFee,
-  bulkSendTransactions,
+  bulkSendRawTransactions,
+  toVersionedTx,
+  populateMissingDraftInfo,
   chunks,
 } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import bs58 from "bs58";
 import os from "os";
 import pLimit from "p-limit";
@@ -106,20 +108,14 @@ export async function run(args: any = process.argv) {
         );
         return result || [];
       } catch (err: any) {
-        const is429 = err.message?.includes("429") || err.status === 429;
-        if (attempt === maxRetries - 1 || !is429) {
-          console.error(
-            `Failed to fetch asset batch after ${maxRetries} attempts: ${err.message}`
-          );
-          return [];
+        if (attempt === maxRetries - 1) {
+          throw err;
         }
-        // Exponential backoff for rate limits
         const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
-        console.log(`  Rate limited, retrying in ${delay / 1000}s...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
-    return [];
+    throw new Error("Max retries exceeded");
   }
 
   async function processBatch(
@@ -133,9 +129,9 @@ export async function run(args: any = process.argv) {
     const assetIds = batch.map((r) => r.account.asset);
     console.log(`Fetching ${assetIds.length.toLocaleString()} assets...`);
 
-    // Fetch assets with concurrency control
-    const assetChunks = chunks(assetIds, 1000);
-    const assetLimiter = pLimit(10);
+    // Fetch assets with concurrency control (smaller batches to avoid connection resets)
+    const assetChunks = chunks(assetIds, 500);
+    const assetLimiter = pLimit(5);
     let fetchedCount = 0;
     let assetBatchIndex = 0;
 
@@ -175,7 +171,13 @@ export async function run(args: any = process.argv) {
         (g: any) => g.group_key === "collection"
       )?.group_value;
 
+      // Check both collection AND symbol to ensure it's a subscriber SIM
+      // (carrier collection may contain CARRIER, SERVICE_REWARDS, MAPPING_REWARDS NFTs too)
+      const assetSymbol = asset.content?.metadata?.symbol;
+      const isSubscriber = assetSymbol === "SUBSCRIBER";
+
       if (
+        isSubscriber &&
         assetCollection &&
         subscriberCollections.has(assetCollection.toBase58())
       ) {
@@ -559,26 +561,81 @@ export async function run(args: any = process.argv) {
 
   console.log(`Sending ${txns.length} transactions...`);
 
+  // Use fresh connection to avoid account-fetch-cache WebSocket issues
+  const sendConnection = new Connection(
+    provider.connection.rpcEndpoint,
+    "confirmed"
+  );
+
   // Sign with authority and approver (if present)
   const extraSigners = [authority];
   if (approver) {
     extraSigners.push(approver);
   }
 
-  await bulkSendTransactions(
-    provider,
-    txns,
-    (status) => {
-      console.log(
-        `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} in batch. ${status.totalProgress} / ${txns.length}`
+  // Retry loop for closing
+  const MAX_CLOSE_ITERATIONS = 5;
+  let closeIteration = 0;
+  let totalConfirmed = 0;
+  let remainingTxns = txns;
+
+  while (closeIteration < MAX_CLOSE_ITERATIONS && remainingTxns.length > 0) {
+    closeIteration++;
+    if (closeIteration > 1) {
+      console.log(`\nRetry ${closeIteration}/${MAX_CLOSE_ITERATIONS}...`);
+    }
+
+    const recentBlockhash = await sendConnection.getLatestBlockhash(
+      "confirmed"
+    );
+
+    const signedTxns = await Promise.all(
+      remainingTxns.map(async (draft) => {
+        await populateMissingDraftInfo(provider.connection, draft);
+        const tx = toVersionedTx({
+          ...draft,
+          recentBlockhash: recentBlockhash.blockhash,
+        });
+        tx.sign(extraSigners);
+        return tx;
+      })
+    );
+
+    try {
+      const confirmedTxs = await bulkSendRawTransactions(
+        sendConnection,
+        signedTxns.map((tx) => Buffer.from(tx.serialize())),
+        undefined,
+        recentBlockhash.lastValidBlockHeight
       );
-    },
-    10,
-    extraSigners
-  );
+
+      totalConfirmed += confirmedTxs.length;
+      console.log(
+        `  Confirmed ${confirmedTxs.length}/${remainingTxns.length} transactions (${totalConfirmed}/${txns.length} total)`
+      );
+
+      if (confirmedTxs.length === remainingTxns.length) {
+        break; // All done
+      }
+
+      // For simplicity, can't easily track which txns failed, so just report and break
+      // The script is idempotent so user can re-run
+      console.log(`  Some transactions may have failed, re-run to retry`);
+      break;
+    } catch (err: any) {
+      console.error(`  Error sending transactions: ${err.message}`);
+    }
+
+    // Wait before retry
+    if (closeIteration < MAX_CLOSE_ITERATIONS) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
 
   console.log(
-    `\n✓ Complete: Closed ${instructionCount} recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)${
+    `\n✓ Complete: Closed ${
+      totalConfirmed > 0 ? "~" : ""
+    }${instructionCount} recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)${
       failedCount > 0 ? ` - ${failedCount} failed to build instructions` : ""
     }`
   );

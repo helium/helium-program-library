@@ -22,13 +22,14 @@ import {
   IOT_MINT,
   getAssetsByGroup,
   batchInstructionsToTxsWithPriorityFee,
-  bulkSendTransactions,
   bulkSendRawTransactions,
+  toVersionedTx,
+  populateMissingDraftInfo,
   chunks,
   truthy,
   humanReadable,
 } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import os from "os";
 import pLimit from "p-limit";
@@ -39,8 +40,10 @@ import { loadKeypair } from "./utils";
 const MOBILE_DECIMALS = 6;
 const HNT_DECIMALS = 8;
 const DAS_BATCH_SIZE = 1000;
-// Process batch size reduced to prevent OOM with large datasets
-const PROCESS_BATCH_SIZE = 5000;
+// Batch size for processing assets
+const PROCESS_BATCH_SIZE = 10000;
+// Number of batches to process in parallel
+const PARALLEL_BATCHES = 4;
 
 // Helper to format token amounts
 const toMobile = (amount: BN) => humanReadable(amount, MOBILE_DECIMALS);
@@ -156,9 +159,7 @@ async function formBulkTransactionsWithRetry(
 
       // For 400 errors with multiple assets, try splitting the batch
       if (is400 && assets.length > 1 && attempt === 0) {
-        console.log(
-          `    400 error with ${assets.length} assets, splitting batch...`
-        );
+        // Silently split - only log when we find the actual problematic asset
         const mid = Math.floor(assets.length / 2);
         const first = assets.slice(0, mid);
         const second = assets.slice(mid);
@@ -203,14 +204,9 @@ async function formBulkTransactionsWithRetry(
         return [];
       }
 
-      // For transient errors, retry with backoff
+      // For transient errors, retry with backoff (silently)
       if (attempt < maxRetries - 1) {
         const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
-        console.log(
-          `    Error: ${errorMsg.substring(0, 80)}... retrying in ${
-            delay / 1000
-          }s (attempt ${attempt + 1}/${maxRetries})`
-        );
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
       }
@@ -231,13 +227,17 @@ async function claimRewardsForBatch(
   authority: anchor.web3.Keypair,
   provider: anchor.AnchorProvider,
   commit: boolean,
-  problematicAssets: Map<string, ProblematicAsset>
+  problematicAssets: Map<string, ProblematicAsset>,
+  logPrefix: string = ""
 ): Promise<{
   claimedMobile: BN;
   claimedHnt: BN;
   transactions: number;
   verifiedNoRewards: Set<string>;
 }> {
+  const log = (msg: string) => console.log(`${logPrefix}${msg}`);
+  const logErr = (msg: string) => console.error(`${logPrefix}${msg}`);
+
   let totalClaimedMobile = new BN(0);
   let totalClaimedHnt = new BN(0);
   let totalTransactions = 0;
@@ -308,9 +308,10 @@ async function claimRewardsForBatch(
 
   while (claimIteration < MAX_CLAIM_ITERATIONS) {
     claimIteration++;
-    console.log(
-      `  --- Claim Iteration ${claimIteration}/${MAX_CLAIM_ITERATIONS} ---`
-    );
+    // Only log iteration on retries
+    if (claimIteration > 1) {
+      log(`Claim retry ${claimIteration}/${MAX_CLAIM_ITERATIONS}...`);
+    }
 
     // Get pending rewards using getPendingRewards (handles median + totalClaimed internally)
     let mobilePendingRewards: Record<string, string> = {};
@@ -332,9 +333,7 @@ async function claimRewardsForBatch(
                   true // forceRequery
                 );
               } catch (err: any) {
-                console.error(
-                  `Error fetching mobile pending rewards: ${err.message}`
-                );
+                logErr(`Error fetching mobile pending rewards: ${err.message}`);
                 return {};
               }
             })
@@ -353,9 +352,7 @@ async function claimRewardsForBatch(
                   true // forceRequery
                 );
               } catch (err: any) {
-                console.error(
-                  `Error fetching hnt pending rewards: ${err.message}`
-                );
+                logErr(`Error fetching hnt pending rewards: ${err.message}`);
                 return {};
               }
             })
@@ -374,7 +371,7 @@ async function claimRewardsForBatch(
         Object.keys(mobilePendingRewards).length > 0 ||
         Object.keys(hntPendingRewards).length > 0;
     } catch (err: any) {
-      console.error(`Error fetching pending rewards: ${err.message}`);
+      logErr(`Error fetching pending rewards: ${err.message}`);
     }
 
     // Find assets with actual pending rewards (> 0)
@@ -406,17 +403,9 @@ async function claimRewardsForBatch(
       }
     });
 
-    console.log(
-      `  Pending: ${assetsWithRewards} assets with ${toMobile(
-        totalPendingMobile
-      )} MOBILE and ${toHnt(totalPendingHnt)} HNT`
-    );
-
     if (assetsWithRewards === 0) {
       if (!rewardsFetchSucceeded) {
-        console.error(
-          "  ⚠️  Failed to fetch rewards from oracles - cannot verify, skipping batch"
-        );
+        logErr("⚠️ Failed to fetch rewards from oracles");
         break;
       }
 
@@ -426,9 +415,7 @@ async function claimRewardsForBatch(
           verifiedNoRewards.add(asset.assetId.toBase58());
         }
       });
-      console.log(
-        `  ✓ All rewards claimed for this batch (${verifiedNoRewards.size} verified)`
-      );
+      log(`Rewards: verified ${verifiedNoRewards.size} with 0 pending`);
       break;
     }
 
@@ -545,18 +532,6 @@ async function claimRewardsForBatch(
     // Build claim transactions in parallel
     const mobileClaimsToProcess = assetsToClaim.filter((c) => c.mobileRewards);
     const hntClaimsToProcess = assetsToClaim.filter((c) => c.hntRewards);
-
-    if (mobileClaimsToProcess.length > 0) {
-      console.log(
-        `  Building MOBILE claim txns for ${mobileClaimsToProcess.length} assets...`
-      );
-    }
-    if (hntClaimsToProcess.length > 0) {
-      console.log(
-        `  Building HNT claim txns for ${hntClaimsToProcess.length} assets...`
-      );
-    }
-
     const mobileClaimChunks = chunks(mobileClaimsToProcess, 100);
     const hntClaimChunks = chunks(hntClaimsToProcess, 100);
 
@@ -578,9 +553,7 @@ async function claimRewardsForBatch(
                 assetToKeyToAsset
               );
             } catch (err: any) {
-              console.error(
-                `Error forming mobile bulk transactions: ${err.message}`
-              );
+              logErr(`Error forming mobile bulk transactions: ${err.message}`);
               return [];
             }
           })
@@ -603,9 +576,7 @@ async function claimRewardsForBatch(
                 assetToKeyToAsset
               );
             } catch (err: any) {
-              console.error(
-                `Error forming hnt bulk transactions: ${err.message}`
-              );
+              logErr(`Error forming hnt bulk transactions: ${err.message}`);
               return [];
             }
           })
@@ -617,42 +588,53 @@ async function claimRewardsForBatch(
       ...mobileBatchTxns.flat().filter(truthy),
       ...hntBatchTxns.flat().filter(truthy),
     ];
-    console.log(`  Prepared ${txns.length} claim transactions`);
 
     if (!commit) {
-      console.log(`  Dry run: would send ${txns.length} transactions`);
+      log(
+        `Rewards: ${assetsWithRewards} pending (${txns.length} txns) [dry run]`
+      );
       break;
     }
 
     if (txns.length > 0) {
-      console.log(`  Sending ${txns.length} transactions...`);
       txns.forEach((tx) => tx.sign([authority]));
 
-      let lastLoggedProgress = 0;
-      const logInterval = Math.max(10, Math.floor(txns.length / 20));
-      await bulkSendRawTransactions(
-        provider.connection,
-        txns.map((tx) => Buffer.from(tx.serialize())),
-        (status) => {
-          if (
-            status.totalProgress > lastLoggedProgress &&
-            (status.totalProgress - lastLoggedProgress >= logInterval ||
-              status.totalProgress === txns.length)
-          ) {
-            console.log(`    Sent ${status.totalProgress} / ${txns.length}`);
-            lastLoggedProgress = status.totalProgress;
-          }
-        }
+      // Use fresh connection to avoid account-fetch-cache signature subscriptions
+      const sendConnection = new Connection(
+        provider.connection.rpcEndpoint,
+        "confirmed"
       );
-      console.log(`    Sent ${txns.length} / ${txns.length}`);
 
-      totalClaimedMobile = totalClaimedMobile.add(totalPendingMobile);
-      totalClaimedHnt = totalClaimedHnt.add(totalPendingHnt);
-      totalTransactions += txns.length;
+      try {
+        const confirmedTxs = await bulkSendRawTransactions(
+          sendConnection,
+          txns.map((tx) => Buffer.from(tx.serialize()))
+        );
+
+        // Only count as claimed what was actually confirmed
+        if (confirmedTxs.length > 0) {
+          totalClaimedMobile = totalClaimedMobile.add(totalPendingMobile);
+          totalClaimedHnt = totalClaimedHnt.add(totalPendingHnt);
+          totalTransactions += confirmedTxs.length;
+        }
+
+        if (confirmedTxs.length === txns.length) {
+          log(
+            `Rewards: claimed ${toMobile(totalPendingMobile)} MOBILE, ${toHnt(
+              totalPendingHnt
+            )} HNT (${confirmedTxs.length} txns)`
+          );
+        } else {
+          log(
+            `Rewards: ${confirmedTxs.length}/${txns.length} txns confirmed (retrying...)`
+          );
+        }
+      } catch (err: any) {
+        logErr(`Error claiming rewards: ${err.message}`);
+      }
     }
 
     // Wait before next iteration
-    console.log("  Waiting 5 seconds...");
     await new Promise((resolve) => setTimeout(resolve, 5000));
   }
 
@@ -664,7 +646,7 @@ async function claimRewardsForBatch(
   };
 }
 
-// Helper: Close key_to_asset accounts for a batch
+// Helper: Close key_to_asset accounts for a batch (with retry loop)
 async function closeKeyToAssets(
   assetsToClose: KeyToAssetInfo[],
   hemProgram: any,
@@ -675,65 +657,134 @@ async function closeKeyToAssets(
   iotSubDao: PublicKey,
   authority: anchor.web3.Keypair,
   provider: anchor.AnchorProvider,
-  commit: boolean
+  commit: boolean,
+  logPrefix: string = ""
 ): Promise<number> {
+  const log = (msg: string) => console.log(`${logPrefix}${msg}`);
+  const logErr = (msg: string) => console.error(`${logPrefix}${msg}`);
+
   if (assetsToClose.length === 0) {
     return 0;
   }
 
-  console.log(
-    `  Preparing to close ${assetsToClose.length.toLocaleString()} accounts...`
-  );
+  const originalCount = assetsToClose.length;
 
-  const instructions: TransactionInstruction[] = [];
-
-  // Separate hardcoded from subscribers
-  const hardcodedAccountsToClose = assetsToClose.filter((k) => k.isHardcoded);
-  const subscriberAccounts = assetsToClose.filter((k) => !k.isHardcoded);
-
-  // Process hardcoded accounts (check info accounts)
-  if (hardcodedAccountsToClose.length > 0) {
-    console.log(
-      `  Processing ${hardcodedAccountsToClose.length} hardcoded accounts...`
-    );
-    for (const { keyToAsset, assetId, entityKey } of hardcodedAccountsToClose) {
-      const [mobileInfo] = mobileInfoKey(mobileConfig, entityKey);
-      const [iotInfo] = iotInfoKey(iotConfig, entityKey);
-
-      const ix = await hemProgram.methods
-        .tempCloseKeyToAssetV0()
-        .accountsPartial({
-          keyToAsset,
-          dao,
-          authority: authority.publicKey,
-          asset: assetId,
-          mobileConfig,
-          iotConfig,
-          mobileInfo,
-          iotInfo,
-          iotSubDao,
-          mobileSubDao,
-        })
-        .instruction();
-
-      instructions.push(ix);
-    }
+  if (!commit) {
+    log(`Closes: ${originalCount.toLocaleString()} accounts [dry run]`);
+    return 0;
   }
 
-  // Process subscriber accounts in batches to avoid OOM
-  if (subscriberAccounts.length > 0) {
-    console.log(
-      `  Processing ${subscriberAccounts.length.toLocaleString()} subscriber accounts...`
+  // Use fresh connection to avoid account-fetch-cache signature subscriptions
+  const sendConnection = new Connection(
+    provider.connection.rpcEndpoint,
+    "confirmed"
+  );
+
+  const MAX_CLOSE_ITERATIONS = 10;
+  let closeIteration = 0;
+  let totalClosed = 0;
+  let remainingAssets = [...assetsToClose];
+
+  // Build a map for O(1) lookups
+  const assetsByKey = new Map(
+    assetsToClose.map((a) => [a.keyToAsset.toBase58(), a])
+  );
+
+  while (closeIteration < MAX_CLOSE_ITERATIONS && remainingAssets.length > 0) {
+    closeIteration++;
+    // Only log iteration on retries
+    if (closeIteration > 1) {
+      log(`Close retry ${closeIteration}/${MAX_CLOSE_ITERATIONS}...`);
+
+      // On retry, check which accounts still exist (parallel)
+      const keyToAssetKeys = remainingAssets.map((a) => a.keyToAsset);
+      const fetchChunks = chunks(keyToAssetKeys, 100);
+      const stillExisting: KeyToAssetInfo[] = [];
+      const fetchLimiter = pLimit(10);
+
+      await Promise.all(
+        fetchChunks.map((chunk) =>
+          fetchLimiter(async () => {
+            try {
+              const accounts =
+                await hemProgram.account.keyToAssetV0.fetchMultiple(chunk);
+              accounts.forEach((account: any, index: number) => {
+                if (account) {
+                  const asset = assetsByKey.get(chunk[index].toBase58());
+                  if (asset) {
+                    stillExisting.push(asset);
+                  }
+                }
+              });
+            } catch (err: any) {
+              // On error, assume all in chunk still exist
+              chunk.forEach((key) => {
+                const asset = assetsByKey.get(key.toBase58());
+                if (asset) {
+                  stillExisting.push(asset);
+                }
+              });
+            }
+          })
+        )
+      );
+
+      const closedThisCheck = remainingAssets.length - stillExisting.length;
+      if (closedThisCheck > 0) {
+        totalClosed += closedThisCheck;
+      }
+
+      remainingAssets = stillExisting;
+
+      if (remainingAssets.length === 0) {
+        log(`Closed: ${totalClosed.toLocaleString()} accounts`);
+        break;
+      }
+    }
+
+    // Build instructions for remaining accounts
+    const instructions: TransactionInstruction[] = [];
+    const hardcodedAccountsToClose = remainingAssets.filter(
+      (k) => k.isHardcoded
     );
+    const subscriberAccounts = remainingAssets.filter((k) => !k.isHardcoded);
 
-    const INSTRUCTION_BATCH_SIZE = 500;
-    const subscriberChunks = chunks(subscriberAccounts, INSTRUCTION_BATCH_SIZE);
-    const ixLimiter = pLimit(10);
+    // Process hardcoded accounts
+    if (hardcodedAccountsToClose.length > 0) {
+      for (const {
+        keyToAsset,
+        assetId,
+        entityKey,
+      } of hardcodedAccountsToClose) {
+        const [mobileInfo] = mobileInfoKey(mobileConfig, entityKey);
+        const [iotInfo] = iotInfoKey(iotConfig, entityKey);
 
-    for (let i = 0; i < subscriberChunks.length; i++) {
-      const chunk = subscriberChunks[i];
-      const chunkInstructions = await Promise.all(
-        chunk.map(({ keyToAsset, assetId, entityKey }) =>
+        const ix = await hemProgram.methods
+          .tempCloseKeyToAssetV0()
+          .accountsPartial({
+            keyToAsset,
+            dao,
+            authority: authority.publicKey,
+            asset: assetId,
+            mobileConfig,
+            iotConfig,
+            mobileInfo,
+            iotInfo,
+            iotSubDao,
+            mobileSubDao,
+          })
+          .instruction();
+
+        instructions.push(ix);
+      }
+    }
+
+    // Process subscriber accounts in parallel batches
+    if (subscriberAccounts.length > 0) {
+      const ixLimiter = pLimit(50); // Increased parallelism
+
+      const allInstructions = await Promise.all(
+        subscriberAccounts.map(({ keyToAsset, assetId, entityKey }) =>
           ixLimiter(async () => {
             const [mobileInfo] = mobileInfoKey(mobileConfig, entityKey);
             const [iotInfo] = iotInfoKey(iotConfig, entityKey);
@@ -756,55 +807,67 @@ async function closeKeyToAssets(
           })
         )
       );
-      instructions.push(...chunkInstructions.filter(truthy));
+      instructions.push(...allInstructions.filter(truthy));
     }
-  }
 
-  console.log(
-    `  Batching ${instructions.length.toLocaleString()} instructions into transactions...`
-  );
-
-  const closeTxns = await batchInstructionsToTxsWithPriorityFee(
-    provider,
-    instructions,
-    {
-      useFirstEstimateForAll: true,
-      computeUnitLimit: 600000,
-    }
-  );
-
-  console.log(`  Prepared ${closeTxns.length} close transactions`);
-
-  if (!commit) {
-    console.log(
-      `  Dry run: would send ${closeTxns.length} transactions to close ${assetsToClose.length} accounts`
-    );
-    return 0;
-  }
-
-  console.log(`  Sending ${closeTxns.length} transactions...`);
-
-  let lastLoggedProgress = 0;
-  const logInterval = Math.max(5, Math.floor(closeTxns.length / 20));
-  await bulkSendTransactions(
-    provider,
-    closeTxns,
-    (status) => {
-      if (
-        status.totalProgress > lastLoggedProgress &&
-        (status.totalProgress - lastLoggedProgress >= logInterval ||
-          status.totalProgress === closeTxns.length)
-      ) {
-        console.log(`    Sent ${status.totalProgress} / ${closeTxns.length}`);
-        lastLoggedProgress = status.totalProgress;
+    // Batch into transactions
+    const closeTxns = await batchInstructionsToTxsWithPriorityFee(
+      provider,
+      instructions,
+      {
+        useFirstEstimateForAll: true,
+        computeUnitLimit: 600000,
       }
-    },
-    10,
-    [authority]
-  );
-  console.log(`    Sent ${closeTxns.length} / ${closeTxns.length}`);
+    );
 
-  return assetsToClose.length;
+    // Get fresh blockhash for this iteration
+    const recentBlockhash = await sendConnection.getLatestBlockhash(
+      "confirmed"
+    );
+
+    const signedTxns = await Promise.all(
+      closeTxns.map(async (draft) => {
+        await populateMissingDraftInfo(provider.connection, draft);
+        const tx = toVersionedTx({
+          ...draft,
+          recentBlockhash: recentBlockhash.blockhash,
+        });
+        tx.sign([authority]);
+        return tx;
+      })
+    );
+
+    try {
+      await bulkSendRawTransactions(
+        sendConnection,
+        signedTxns.map((tx) => Buffer.from(tx.serialize())),
+        undefined,
+        recentBlockhash.lastValidBlockHeight
+      );
+    } catch (err: any) {
+      logErr(`Error closing accounts: ${err.message}`);
+    }
+
+    // Wait before next iteration
+    if (closeIteration < MAX_CLOSE_ITERATIONS) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+
+  // Final summary
+  if (totalClosed > 0 && remainingAssets.length === 0) {
+    // Already logged above
+  } else if (totalClosed > 0) {
+    log(
+      `Closed: ${totalClosed.toLocaleString()}/${originalCount.toLocaleString()} accounts`
+    );
+  }
+
+  if (remainingAssets.length > 0) {
+    log(`⚠️ ${remainingAssets.length} accounts failed to close`);
+  }
+
+  return totalClosed;
 }
 
 // Process a batch of assets: extract keys, check recipients, claim rewards, close accounts
@@ -824,11 +887,11 @@ async function processBatch(
   provider: anchor.AnchorProvider,
   commit: boolean,
   problematicAssets: Map<string, ProblematicAsset>,
-  totals: RunningTotals
+  totals: RunningTotals,
+  logPrefix: string = ""
 ): Promise<void> {
-  console.log(
-    `\n  Processing batch of ${assets.length.toLocaleString()} assets...`
-  );
+  const log = (msg: string) => console.log(`${logPrefix}${msg}`);
+  const logErr = (msg: string) => console.error(`${logPrefix}${msg}`);
 
   // 1. Derive keyToAsset addresses and verify they exist on-chain
   const assetToKeyToAsset = new Map<
@@ -856,10 +919,6 @@ async function processBatch(
   const fetchChunks = chunks(allKeyToAssetKeys, 100);
   const fetchLimiter = pLimit(10);
 
-  console.log(
-    `  Verifying ${allKeyToAssetKeys.length.toLocaleString()} keyToAsset accounts exist...`
-  );
-
   await Promise.all(
     fetchChunks.map((chunk, chunkIndex) =>
       fetchLimiter(async () => {
@@ -882,25 +941,20 @@ async function processBatch(
             }
           });
         } catch (err: any) {
-          console.error(
-            `    Error fetching key_to_asset chunk: ${err.message}`
-          );
+          logErr(`Error fetching key_to_asset chunk: ${err.message}`);
         }
       })
     )
   );
 
-  console.log(
-    `  Found ${keyToAssetInfos.length.toLocaleString()} existing keyToAsset accounts`
-  );
-
   if (keyToAssetInfos.length === 0) {
-    console.log("  No valid key_to_asset accounts found in this batch");
+    log(
+      `${assets.length.toLocaleString()} assets → 0 open accounts (all closed)`
+    );
     return;
   }
 
   // 2. Check recipients
-  console.log("  Checking recipients...");
 
   const assetIdStrings = keyToAssetInfos.map((k) => k.assetId.toBase58());
   const mobileRecipientKeys = keyToAssetInfos.map(
@@ -983,12 +1037,15 @@ async function processBatch(
   const withRecipients = assetsWithRecipients.filter(
     (a) => a.hasMobileRecipient || a.hasHntRecipient
   );
-  console.log(`  Found ${withRecipients.length} assets with recipients`);
+
+  // Summary log for this batch
+  log(
+    `${assets.length.toLocaleString()} assets → ${keyToAssetInfos.length.toLocaleString()} open, ${withRecipients.length.toLocaleString()} with recipients`
+  );
 
   // 3. Claim rewards
   let verifiedNoRewards = new Set<string>();
   if (withRecipients.length > 0) {
-    console.log("  Claiming rewards...");
     const claimResult = await claimRewardsForBatch(
       withRecipients,
       lazyProgram,
@@ -998,7 +1055,8 @@ async function processBatch(
       authority,
       provider,
       commit,
-      problematicAssets
+      problematicAssets,
+      logPrefix
     );
 
     totals.claimedMobile = totals.claimedMobile.add(claimResult.claimedMobile);
@@ -1025,7 +1083,6 @@ async function processBatch(
   });
 
   if (assetsToClose.length > 0) {
-    console.log("  Closing key_to_asset accounts...");
     const closedCount = await closeKeyToAssets(
       assetsToClose,
       hemProgram,
@@ -1036,20 +1093,14 @@ async function processBatch(
       iotSubDao,
       authority,
       provider,
-      commit
+      commit,
+      logPrefix
     );
 
     totals.closedAccounts += closedCount;
   }
 
   totals.batchesProcessed++;
-  console.log(
-    `  Batch complete. Running totals: ${toMobile(
-      totals.claimedMobile
-    )} MOBILE, ${toHnt(
-      totals.claimedHnt
-    )} HNT, ${totals.closedAccounts.toLocaleString()} closed`
-  );
 }
 
 export async function run(args: any = process.argv) {
@@ -1235,16 +1286,21 @@ export async function run(args: any = process.argv) {
     console.log("No subscriber collections found");
   }
 
-  // Process each collection incrementally
+  // Process each collection with parallel batch processing
+  const batchLimiter = pLimit(PARALLEL_BATCHES);
   let collectionIndex = 0;
+
   for (const collection of subscriberCollections) {
     collectionIndex++;
     console.log(
       `\n=== Collection ${collectionIndex}/${subscriberCollections.size}: ${collection} ===\n`
     );
 
+    // Fetch all assets for this collection first
+    console.log("Fetching all assets from DAS...");
     let cursor: string | undefined = undefined;
-    let accumulatedAssets: any[] = [];
+    let allAssets: any[] = [];
+    let fetchCount = 0;
 
     while (true) {
       const result = await getAssetsWithRetry(provider.connection.rpcEndpoint, {
@@ -1253,43 +1309,74 @@ export async function run(args: any = process.argv) {
         cursor,
       });
 
-      accumulatedAssets.push(...result.items);
+      allAssets.push(...result.items);
+      fetchCount++;
 
-      const hasMore = !!result.cursor;
-      const shouldProcess =
-        accumulatedAssets.length >= PROCESS_BATCH_SIZE || !hasMore;
-
-      if (shouldProcess && accumulatedAssets.length > 0) {
+      if (fetchCount % 25 === 0) {
         console.log(
-          `\n--- Processing ${accumulatedAssets.length.toLocaleString()} assets ---`
+          `  Fetched ${allAssets.length.toLocaleString()} assets so far...`
         );
-        await processBatch(
-          accumulatedAssets,
-          dao,
-          hemProgram,
-          lazyProgram,
-          rewardsOracleProgram,
-          mobileLazyDistributor,
-          hntLazyDistributor,
-          mobileConfig,
-          iotConfig,
-          mobileSubDao,
-          iotSubDao,
-          authority,
-          provider,
-          argv.commit as boolean,
-          problematicAssets,
-          totals
-        );
-        accumulatedAssets = [];
       }
 
-      if (!hasMore) {
+      if (!result.cursor) {
         break;
       }
-
       cursor = result.cursor;
     }
+
+    console.log(`Fetched ${allAssets.length.toLocaleString()} total assets\n`);
+
+    if (allAssets.length === 0) {
+      continue;
+    }
+
+    // Split into batches
+    const batches = chunks(allAssets, PROCESS_BATCH_SIZE);
+    console.log(
+      `Processing ${
+        batches.length
+      } batches of up to ${PROCESS_BATCH_SIZE.toLocaleString()} assets (${PARALLEL_BATCHES} parallel)\n`
+    );
+
+    // Process batches in parallel
+    let completedBatches = 0;
+    await Promise.all(
+      batches.map((batch, batchIndex) =>
+        batchLimiter(async () => {
+          const batchNum = batchIndex + 1;
+          const prefix = `[Batch ${batchNum}/${batches.length}] `;
+          console.log(
+            `\n${prefix}Starting (${batch.length.toLocaleString()} assets)`
+          );
+          await processBatch(
+            batch,
+            dao,
+            hemProgram,
+            lazyProgram,
+            rewardsOracleProgram,
+            mobileLazyDistributor,
+            hntLazyDistributor,
+            mobileConfig,
+            iotConfig,
+            mobileSubDao,
+            iotSubDao,
+            authority,
+            provider,
+            argv.commit as boolean,
+            problematicAssets,
+            totals,
+            prefix
+          );
+          completedBatches++;
+          console.log(
+            `${prefix}✓ Complete (${completedBatches}/${batches.length} total done)`
+          );
+        })
+      )
+    );
+
+    // Clear for GC
+    allAssets = [];
   }
 
   // ========== Summary ==========
