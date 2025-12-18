@@ -86,6 +86,51 @@ export async function run(args: any = process.argv) {
   const mobileLazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
   const hntLazyDistributor = lazyDistributorKey(HNT_MINT)[0];
 
+  // Check if lazy distributors require an approver
+  console.log("Checking lazy distributor approver requirements...");
+  const [mobileLd, hntLd] = await Promise.all([
+    lazyProgram.account.lazyDistributorV0.fetch(mobileLazyDistributor),
+    lazyProgram.account.lazyDistributorV0.fetch(hntLazyDistributor),
+  ]);
+
+  const mobileNeedsApprover = mobileLd.approver !== null;
+  const hntNeedsApprover = hntLd.approver !== null;
+
+  if ((mobileNeedsApprover || hntNeedsApprover) && !approver) {
+    console.error(
+      `\nError: Lazy distributor(s) require an approver signature:`
+    );
+    if (mobileNeedsApprover) {
+      console.error(`  MOBILE: ${mobileLd.approver?.toBase58()}`);
+    }
+    if (hntNeedsApprover) {
+      console.error(`  HNT: ${hntLd.approver?.toBase58()}`);
+    }
+    console.error(
+      `\nPlease provide --approver flag with the approver keypair.`
+    );
+    process.exit(1);
+  }
+
+  if (approver) {
+    // Verify the approver matches what's expected
+    if (mobileNeedsApprover && !mobileLd.approver?.equals(approver.publicKey)) {
+      console.error(
+        `\nError: Provided approver ${approver.publicKey.toBase58()} does not match MOBILE lazy distributor approver ${mobileLd.approver?.toBase58()}`
+      );
+      process.exit(1);
+    }
+    if (hntNeedsApprover && !hntLd.approver?.equals(approver.publicKey)) {
+      console.error(
+        `\nError: Provided approver ${approver.publicKey.toBase58()} does not match HNT lazy distributor approver ${hntLd.approver?.toBase58()}`
+      );
+      process.exit(1);
+    }
+    console.log(`  Approver: ${approver.publicKey.toBase58()} ✓`);
+  } else {
+    console.log(`  No approver required ✓`);
+  }
+
   // Use fresh connection for sending
   const sendConnection = new Connection(
     provider.connection.rpcEndpoint,
