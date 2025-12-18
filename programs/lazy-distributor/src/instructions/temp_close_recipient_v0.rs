@@ -27,7 +27,7 @@ pub struct TempCloseRecipientV0<'info> {
   pub recipient: Box<Account<'info, RecipientV0>>,
 }
 
-pub fn handler(ctx: Context<TempCloseRecipientV0>) -> Result<()> {
+pub fn handler(_ctx: Context<TempCloseRecipientV0>) -> Result<()> {
   // Note: KeyToAssetV0 verification is done by the calling program (rewards-oracle)
   // before this instruction is invoked. The rewards_oracle_signer ensures this instruction
   // can only be called through the rewards-oracle wrapper program.
