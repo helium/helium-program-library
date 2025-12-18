@@ -69,6 +69,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | authority                | immut      | no     |      |
 | auto_top_off             | immut      | no     |      |
 | hnt_price_oracle         | immut      | no     |      |
+| dca_input_price_oracle   | immut      | no     |      |
 | dao                      | immut      | no     |      |
 | data_credits             | immut      | no     |      |
 | dc_mint                  | immut      | no     |      |
@@ -350,18 +351,16 @@ undefined
 
 ### InitializeAutoTopOffArgsV0
 
-| Field                  | Type   |
-| ---------------------- | ------ |
-| schedule               | string |
-| threshold              | u64    |
-| router_key             | string |
-| hnt_threshold          | u64    |
-| dca_mint               | pubkey |
-| dca_swap_amount        | u64    |
-| dca_interval_seconds   | u64    |
-| dca_input_price_oracle | pubkey |
-| dca_url                | string |
-| dca_signer             | pubkey |
+| Field                | Type   |
+| -------------------- | ------ |
+| schedule             | string |
+| threshold            | u64    |
+| router_key           | string |
+| hnt_threshold        | u64    |
+| dca_swap_amount      | u64    |
+| dca_interval_seconds | u64    |
+| dca_url              | string |
+| dca_signer           | pubkey |
 
 ### MintWindowedCircuitBreakerV0
 

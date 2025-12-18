@@ -1,5 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
-import { keyToAssetForAsset } from "@helium/helium-entity-manager-sdk";
+import {
+  init as initHem,
+  keyToAssetForAsset,
+} from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -12,15 +15,20 @@ import {
   MOBILE_MINT,
   getAssetBatch,
   batchInstructionsToTxsWithPriorityFee,
-  bulkSendTransactions,
+  bulkSendRawTransactions,
+  toVersionedTx,
+  populateMissingDraftInfo,
   chunks,
 } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import bs58 from "bs58";
 import os from "os";
 import pLimit from "p-limit";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
+
+const PAGE_SIZE = 5000;
+const BATCH_SIZE = 50000;
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -59,6 +67,7 @@ export async function run(args: any = process.argv) {
   const lazyProgram = await initLazy(provider);
   const rewardsOracleProgram = await initRewards(provider);
   const memProgram = await initMem(provider);
+  const hemProgram = await initHem(provider);
 
   const authority = argv.authority
     ? loadKeypair(argv.authority as string)
@@ -66,7 +75,8 @@ export async function run(args: any = process.argv) {
   const approver = argv.approver ? loadKeypair(argv.approver as string) : null;
 
   const dao = daoKey(HNT_MINT)[0];
-  const lazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
+  const mobileLazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
+  const hntLazyDistributor = lazyDistributorKey(HNT_MINT)[0];
 
   // Fetch all subscriber collections
   console.log(
@@ -81,22 +91,12 @@ export async function run(args: any = process.argv) {
     `  Found ${subscriberCollections.size} subscriber collection(s) from ${carriers.length} carriers\n`
   );
 
-  console.log(
-    "Fetching RecipientV0 accounts for MOBILE lazy distributor using pagination..."
-  );
-
-  const PAGE_SIZE = 5000; // Helius supports up to 5k per page for getProgramAccountsV2
-  const BATCH_SIZE = 50000; // Process in 50k chunks to avoid memory issues
-
-  let paginationKey: string | null = null;
-  let page = 0;
-  let totalRecipientsFetched = 0;
-  let totalSkippedNonSubscriber = 0;
-  let currentBatch: any[] = [];
   const subscriberRecipients: {
     address: PublicKey;
     asset: any;
     recipientData: any;
+    lazyDistributor: PublicKey;
+    distributorType: "MOBILE" | "HNT";
   }[] = [];
 
   async function fetchAssetBatchWithRetry(chunk: PublicKey[], maxRetries = 5) {
@@ -108,34 +108,30 @@ export async function run(args: any = process.argv) {
         );
         return result || [];
       } catch (err: any) {
-        const is429 = err.message?.includes("429") || err.status === 429;
-        if (attempt === maxRetries - 1 || !is429) {
-          console.error(
-            `Failed to fetch asset batch after ${maxRetries} attempts: ${err.message}`
-          );
-          return [];
+        if (attempt === maxRetries - 1) {
+          throw err;
         }
-        // Exponential backoff for rate limits
         const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
-        console.log(`  Rate limited, retrying in ${delay / 1000}s...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
-    return [];
+    throw new Error("Max retries exceeded");
   }
 
   async function processBatch(
     batch: any[],
-    batchLabel: string
+    batchLabel: string,
+    lazyDistributor: PublicKey,
+    distributorType: "MOBILE" | "HNT"
   ): Promise<{ subscribers: number; nonSubscribers: number }> {
     console.log(`\n--- Processing ${batchLabel} ---`);
 
     const assetIds = batch.map((r) => r.account.asset);
     console.log(`Fetching ${assetIds.length.toLocaleString()} assets...`);
 
-    // Fetch assets with concurrency control
-    const assetChunks = chunks(assetIds, 1000);
-    const assetLimiter = pLimit(10);
+    // Fetch assets with concurrency control (smaller batches to avoid connection resets)
+    const assetChunks = chunks(assetIds, 500);
+    const assetLimiter = pLimit(5);
     let fetchedCount = 0;
     let assetBatchIndex = 0;
 
@@ -175,7 +171,13 @@ export async function run(args: any = process.argv) {
         (g: any) => g.group_key === "collection"
       )?.group_value;
 
+      // Check both collection AND symbol to ensure it's a subscriber SIM
+      // (carrier collection may contain CARRIER, SERVICE_REWARDS, MAPPING_REWARDS NFTs too)
+      const assetSymbol = asset.content?.metadata?.symbol;
+      const isSubscriber = assetSymbol === "SUBSCRIBER";
+
       if (
+        isSubscriber &&
         assetCollection &&
         subscriberCollections.has(assetCollection.toBase58())
       ) {
@@ -183,6 +185,8 @@ export async function run(args: any = process.argv) {
           address: recipient.publicKey,
           asset,
           recipientData: recipient.account,
+          lazyDistributor,
+          distributorType,
         });
         batchSubscribers++;
       } else {
@@ -196,226 +200,262 @@ export async function run(args: any = process.argv) {
     };
   }
 
-  // Pagination and batch processing loop
-  console.log(
-    "Fetching recipients with pagination and processing in batches...\n"
-  );
+  async function fetchAndProcessRecipients(
+    lazyDistributor: PublicKey,
+    distributorType: "MOBILE" | "HNT"
+  ) {
+    console.log(
+      `\n=== Fetching RecipientV0 accounts for ${distributorType} lazy distributor ===\n`
+    );
 
-  do {
-    page++;
+    let paginationKey: string | null = null;
+    let page = 0;
+    let totalRecipientsFetched = 0;
+    let totalSkippedNonSubscriber = 0;
+    let currentBatch: any[] = [];
 
-    // Fetch next page
-    const response = await fetch(provider.connection.rpcEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: `page-${page}`,
-        method: "getProgramAccountsV2",
-        params: [
-          lazyProgram.programId.toBase58(),
-          {
-            encoding: "base64",
-            filters: [
-              {
-                memcmp: {
-                  offset: 8,
-                  bytes: lazyDistributor.toBase58(),
+    do {
+      page++;
+
+      // Fetch next page
+      const response = await fetch(provider.connection.rpcEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: `page-${page}`,
+          method: "getProgramAccountsV2",
+          params: [
+            lazyProgram.programId.toBase58(),
+            {
+              encoding: "base64",
+              filters: [
+                {
+                  memcmp: {
+                    offset: 8,
+                    bytes: lazyDistributor.toBase58(),
+                  },
                 },
-              },
-            ],
-            limit: PAGE_SIZE,
-            ...(paginationKey && { paginationKey }),
-          },
-        ],
-      }),
-    });
+              ],
+              limit: PAGE_SIZE,
+              ...(paginationKey && { paginationKey }),
+            },
+          ],
+        }),
+      });
 
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(`RPC error: ${data.error.message}`);
-    }
-
-    const { result } = data;
-
-    // If no more results, set paginationKey to null to end pagination
-    if (!result || !result.accounts || result.accounts.length === 0) {
-      paginationKey = null;
-    } else {
-      // Decode and add to current batch
-      const pageRecipients = result.accounts.map((item: any) => ({
-        publicKey: new PublicKey(item.pubkey),
-        account: lazyProgram.coder.accounts.decode(
-          "recipientV0",
-          Buffer.from(item.account.data[0], "base64")
-        ),
-      }));
-
-      currentBatch.push(...pageRecipients);
-      totalRecipientsFetched += pageRecipients.length;
-
-      if (page % 10 === 0) {
-        console.log(
-          `  Fetched ${totalRecipientsFetched.toLocaleString()} recipients (batch size: ${currentBatch.length.toLocaleString()})...`
-        );
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(`RPC error: ${data.error.message}`);
       }
 
-      paginationKey = result.paginationKey || null;
-    }
+      const { result } = data;
 
-    // Process batch when we hit BATCH_SIZE or finished pagination
-    const shouldProcessBatch =
-      currentBatch.length >= BATCH_SIZE || !paginationKey;
+      // If no more results, set paginationKey to null to end pagination
+      if (!result || !result.accounts || result.accounts.length === 0) {
+        paginationKey = null;
+      } else {
+        // Decode and add to current batch
+        const pageRecipients = result.accounts.map((item: any) => ({
+          publicKey: new PublicKey(item.pubkey),
+          account: lazyProgram.coder.accounts.decode(
+            "recipientV0",
+            Buffer.from(item.account.data[0], "base64")
+          ),
+        }));
 
-    if (shouldProcessBatch && currentBatch.length > 0) {
-      const { subscribers, nonSubscribers } = await processBatch(
-        currentBatch,
-        `batch of ${currentBatch.length.toLocaleString()} recipients`
-      );
+        currentBatch.push(...pageRecipients);
+        totalRecipientsFetched += pageRecipients.length;
 
-      totalSkippedNonSubscriber += nonSubscribers;
+        if (page % 10 === 0) {
+          console.log(
+            `  Fetched ${totalRecipientsFetched.toLocaleString()} recipients (batch size: ${currentBatch.length.toLocaleString()})...`
+          );
+        }
 
-      console.log(
-        `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients so far (${subscribers} subscribers, ${nonSubscribers} non-subscribers in this batch)\n`
-      );
+        paginationKey = result.paginationKey || null;
+      }
 
-      // Clear current batch to free memory
-      currentBatch = [];
-    }
-  } while (paginationKey);
+      // Process batch when we hit BATCH_SIZE or finished pagination
+      const shouldProcessBatch =
+        currentBatch.length >= BATCH_SIZE || !paginationKey;
 
-  console.log(`\n=== Summary ===`);
-  console.log(
-    `Processed ${totalRecipientsFetched.toLocaleString()} total RecipientV0 accounts`
-  );
-  console.log(
-    `${subscriberRecipients.length.toLocaleString()} are for subscriber assets`
-  );
-  console.log(
-    `${totalSkippedNonSubscriber.toLocaleString()} skipped (non-subscriber assets)`
-  );
+      if (shouldProcessBatch && currentBatch.length > 0) {
+        const { subscribers, nonSubscribers } = await processBatch(
+          currentBatch,
+          `batch of ${currentBatch.length.toLocaleString()} recipients`,
+          lazyDistributor,
+          distributorType
+        );
 
-  if (!argv.commit) {
+        totalSkippedNonSubscriber += nonSubscribers;
+
+        console.log(
+          `Found ${subscriberRecipients.length.toLocaleString()} subscriber recipients so far (${subscribers} subscribers, ${nonSubscribers} non-subscribers in this batch)\n`
+        );
+
+        // Clear current batch to free memory
+        currentBatch = [];
+      }
+    } while (paginationKey);
+
+    console.log(`\n=== ${distributorType} Summary ===`);
     console.log(
-      `\nDry run: would close ${subscriberRecipients.length} subscriber recipient accounts. Re-run with --commit to close recipients.`
+      `Processed ${totalRecipientsFetched.toLocaleString()} total RecipientV0 accounts`
     );
-    return;
+    console.log(
+      `${totalSkippedNonSubscriber.toLocaleString()} skipped (non-subscriber assets)`
+    );
   }
+
+  // Fetch recipients for both mobile and hnt lazy distributors
+  await fetchAndProcessRecipients(mobileLazyDistributor, "MOBILE");
+  await fetchAndProcessRecipients(hntLazyDistributor, "HNT");
+
+  const mobileRecipientCount = subscriberRecipients.filter(
+    (r) => r.distributorType === "MOBILE"
+  ).length;
+  const hntRecipientCount = subscriberRecipients.filter(
+    (r) => r.distributorType === "HNT"
+  ).length;
+
+  console.log(`\n=== Total Summary ===`);
+  console.log(
+    `${subscriberRecipients.length.toLocaleString()} total subscriber recipients found`
+  );
+  console.log(`  ${mobileRecipientCount.toLocaleString()} MOBILE recipients`);
+  console.log(`  ${hntRecipientCount.toLocaleString()} HNT recipients`);
 
   if (subscriberRecipients.length === 0) {
     console.log("\nNo subscriber recipient accounts to close.");
     return;
   }
 
+  // Verify recipients still exist (idempotent - skips already closed)
   console.log(
-    `\nClosing ${subscriberRecipients.length.toLocaleString()} recipient accounts...`
+    `\nVerifying ${subscriberRecipients.length.toLocaleString()} recipient accounts still exist...`
   );
 
-  // Build close instructions
-  let failedCount = 0;
-  let processed = 0;
+  const recipientAddresses = subscriberRecipients.map((r) => r.address);
+  const verifyChunks = chunks(recipientAddresses, 100);
+  const verifyLimiter = pLimit(10);
+  const existingRecipients = new Set<string>();
 
-  const recipientChunks = chunks(subscriberRecipients, 100);
-  const instructionLimiter = pLimit(50);
-
-  const allBatchResults = await Promise.all(
-    recipientChunks.map((chunk) =>
-      instructionLimiter(async () => {
-        const batchResults = await Promise.all(
-          chunk.map(async (recipient) => {
-            try {
-              const { address: recipientAddr, asset } = recipient;
-
-              // Compute the KeyToAssetV0 address
-              const keyToAsset = keyToAssetForAsset(asset, dao);
-
-              // Extract entity key from asset URI
-              const entityKeyStr =
-                asset.content.json_uri.split("/").pop() || "";
-              const cleanEntityKeyStr = entityKeyStr.split(/[.?#]/)[0];
-              const entityKeyBytes = Buffer.from(
-                bs58.decode(cleanEntityKeyStr)
-              );
-
-              // Get oracle_signer PDA
-              const [oracleSigner] = PublicKey.findProgramAddressSync(
-                [Buffer.from("oracle_signer", "utf-8")],
-                rewardsOracleProgram.programId
-              );
-
-              return await rewardsOracleProgram.methods
-                .tempCloseRecipientWrapperV0({
-                  entityKey: entityKeyBytes,
-                  asset: new PublicKey(asset.id),
-                })
-                .accountsPartial({
-                  lazyDistributor,
-                  recipient: recipientAddr,
-                  keyToAsset,
-                  dao,
-                  authority: authority.publicKey,
-                  approver: approver?.publicKey || null,
-                  oracleSigner,
-                  lazyDistributorProgram: lazyProgram.programId,
-                })
-                .instruction();
-            } catch (err: any) {
-              console.error(
-                `Error building instruction for recipient ${recipient.address.toBase58()}: ${
-                  err.message
-                }`
-              );
-              return null;
-            }
-          })
-        );
-
-        processed += chunk.length;
-        const validResults = batchResults.filter((i) => i !== null);
-        failedCount += chunk.length - validResults.length;
-
-        // Show progress every 1000 recipients or at end
-        if (
-          processed % 1000 === 0 ||
-          processed === subscriberRecipients.length
-        ) {
-          console.log(
-            `  Prepared ${
-              processed - failedCount
-            } / ${subscriberRecipients.length.toLocaleString()} instructions (${failedCount} failed)...`
+  await Promise.all(
+    verifyChunks.map((chunk) =>
+      verifyLimiter(async () => {
+        try {
+          const accounts = await lazyProgram.account.recipientV0.fetchMultiple(
+            chunk
           );
+          accounts.forEach((account: any, index: number) => {
+            if (account) {
+              existingRecipients.add(chunk[index].toBase58());
+            }
+          });
+        } catch (err: any) {
+          console.error(`Error verifying recipients: ${err.message}`);
         }
-
-        return batchResults;
       })
     )
   );
 
-  const instructions = allBatchResults
-    .flat()
-    .filter((i): i is TransactionInstruction => i !== null);
-
-  const instructionCount = instructions.length;
-
-  // Free memory
-  subscriberRecipients.length = 0;
+  const validRecipients = subscriberRecipients.filter((r) =>
+    existingRecipients.has(r.address.toBase58())
+  );
 
   console.log(
-    `\nBatching ${instructionCount.toLocaleString()} instructions into transactions...`
-  );
-  const txns = await batchInstructionsToTxsWithPriorityFee(
-    provider,
-    instructions,
-    {
-      useFirstEstimateForAll: true,
-      computeUnitLimit: 600000,
-    }
+    `  Found ${validRecipients.length.toLocaleString()} existing recipients (${
+      subscriberRecipients.length - validRecipients.length
+    } already closed)`
   );
 
-  // Free memory - instructions now in transactions
-  instructions.length = 0;
+  if (validRecipients.length === 0) {
+    console.log("\nNo recipient accounts to close.");
+    return;
+  }
 
-  console.log(`\nSending ${txns.length} transactions...`);
+  // Verify keyToAsset accounts are closed (required by tempCloseRecipientWrapperV0)
+  console.log(
+    `\nVerifying ${validRecipients.length.toLocaleString()} keyToAsset accounts are closed...`
+  );
+
+  const keyToAssetAddresses = validRecipients.map((r) => {
+    const keyToAsset = keyToAssetForAsset(r.asset, dao);
+    return typeof keyToAsset === "string"
+      ? new PublicKey(keyToAsset)
+      : keyToAsset;
+  });
+
+  const keyToAssetChunks = chunks(keyToAssetAddresses, 100);
+  const keyToAssetLimiter = pLimit(10);
+  const existingKeyToAssets = new Set<string>();
+
+  await Promise.all(
+    keyToAssetChunks.map((chunk) =>
+      keyToAssetLimiter(async () => {
+        try {
+          const accounts = await hemProgram.account.keyToAssetV0.fetchMultiple(
+            chunk
+          );
+          accounts.forEach((account: any, index: number) => {
+            if (account) {
+              existingKeyToAssets.add(chunk[index].toBase58());
+            }
+          });
+        } catch (err: any) {
+          console.error(`Error verifying keyToAsset accounts: ${err.message}`);
+        }
+      })
+    )
+  );
+
+  // Only process recipients where keyToAsset is CLOSED (instruction requires it)
+  const recipientsWithClosedKeyToAsset = validRecipients.filter(
+    (r, index) =>
+      !existingKeyToAssets.has(keyToAssetAddresses[index].toBase58())
+  );
+
+  const skippedDueToOpenKeyToAsset =
+    validRecipients.length - recipientsWithClosedKeyToAsset.length;
+  console.log(
+    `  Found ${recipientsWithClosedKeyToAsset.length.toLocaleString()} recipients with closed keyToAsset (${skippedDueToOpenKeyToAsset} skipped - keyToAsset not yet closed)`
+  );
+
+  if (recipientsWithClosedKeyToAsset.length === 0) {
+    console.log(
+      "\nNo recipient accounts to close (run claim-and-close-subscriber-key-to-assets first)."
+    );
+    return;
+  }
+
+  console.log(
+    `\nPreparing to close ${recipientsWithClosedKeyToAsset.length.toLocaleString()} recipient accounts...`
+  );
+
+  // Process in batches to avoid OOM
+  const PROCESS_BATCH_SIZE = 10000;
+  const processBatches = chunks(
+    recipientsWithClosedKeyToAsset,
+    PROCESS_BATCH_SIZE
+  );
+
+  let totalConfirmed = 0;
+  let totalFailed = 0;
+  let totalInstructions = 0;
+
+  const finalMobileCount = recipientsWithClosedKeyToAsset.filter(
+    (r) => r.distributorType === "MOBILE"
+  ).length;
+  const finalHntCount = recipientsWithClosedKeyToAsset.filter(
+    (r) => r.distributorType === "HNT"
+  ).length;
+
+  // Use fresh connection for sending
+  const sendConnection = new Connection(
+    provider.connection.rpcEndpoint,
+    "confirmed"
+  );
 
   // Sign with authority and approver (if present)
   const extraSigners = [authority];
@@ -423,21 +463,202 @@ export async function run(args: any = process.argv) {
     extraSigners.push(approver);
   }
 
-  await bulkSendTransactions(
-    provider,
-    txns,
-    (status) => {
-      console.log(
-        `Sending ${status.currentBatchProgress} / ${status.currentBatchSize} in batch. ${status.totalProgress} / ${txns.length}`
+  for (let batchIdx = 0; batchIdx < processBatches.length; batchIdx++) {
+    const batchRecipients = processBatches[batchIdx];
+    console.log(
+      `\n--- Batch ${batchIdx + 1}/${
+        processBatches.length
+      }: ${batchRecipients.length.toLocaleString()} recipients ---`
+    );
+
+    // Build close instructions for this batch
+    let failedCount = 0;
+    let processed = 0;
+
+    const recipientChunks = chunks(batchRecipients, 100);
+    const instructionLimiter = pLimit(50);
+
+    const allBatchResults = await Promise.all(
+      recipientChunks.map((chunk) =>
+        instructionLimiter(async () => {
+          const batchResults = await Promise.all(
+            chunk.map(async (recipient) => {
+              try {
+                const {
+                  address: recipientAddr,
+                  asset,
+                  lazyDistributor,
+                } = recipient;
+
+                // Compute the KeyToAssetV0 address
+                const keyToAsset = keyToAssetForAsset(asset, dao);
+
+                // Extract entity key from asset URI
+                const entityKeyStr =
+                  asset.content.json_uri.split("/").pop() || "";
+                const cleanEntityKeyStr = entityKeyStr.split(/[.?#]/)[0];
+                const entityKeyBytes = Buffer.from(
+                  bs58.decode(cleanEntityKeyStr)
+                );
+
+                // Get oracle_signer PDA
+                const [oracleSigner] = PublicKey.findProgramAddressSync(
+                  [Buffer.from("oracle_signer", "utf-8")],
+                  rewardsOracleProgram.programId
+                );
+
+                return await rewardsOracleProgram.methods
+                  .tempCloseRecipientWrapperV0({
+                    entityKey: entityKeyBytes,
+                    asset: new PublicKey(asset.id),
+                  })
+                  .accountsPartial({
+                    lazyDistributor,
+                    recipient: recipientAddr,
+                    keyToAsset,
+                    dao,
+                    authority: authority.publicKey,
+                    approver: approver?.publicKey || null,
+                    oracleSigner,
+                    lazyDistributorProgram: lazyProgram.programId,
+                  })
+                  .instruction();
+              } catch (err: any) {
+                console.error(
+                  `Error building instruction for recipient ${recipient.address.toBase58()}: ${
+                    err.message
+                  }`
+                );
+                return null;
+              }
+            })
+          );
+
+          processed += chunk.length;
+          const validResults = batchResults.filter((i) => i !== null);
+          failedCount += chunk.length - validResults.length;
+
+          // Show progress every 1000 recipients or at end
+          if (
+            processed % 1000 === 0 ||
+            processed === recipientsWithClosedKeyToAsset.length
+          ) {
+            console.log(
+              `  Prepared ${processed} / ${batchRecipients.length.toLocaleString()} instructions...`
+            );
+          }
+
+          return batchResults;
+        })
+      )
+    );
+
+    const instructions = allBatchResults
+      .flat()
+      .filter((i): i is TransactionInstruction => i !== null);
+
+    totalFailed += failedCount;
+    totalInstructions += instructions.length;
+
+    if (instructions.length === 0) {
+      console.log("  No valid instructions in this batch");
+      continue;
+    }
+
+    console.log(
+      `  Batching ${instructions.length.toLocaleString()} instructions into transactions...`
+    );
+    const txns = await batchInstructionsToTxsWithPriorityFee(
+      provider,
+      instructions,
+      {
+        useFirstEstimateForAll: true,
+        computeUnitLimit: 600000,
+      }
+    );
+
+    // Free memory
+    instructions.length = 0;
+
+    console.log(`  Prepared ${txns.length} transactions`);
+
+    if (!argv.commit) {
+      console.log(`  (dry run - would send ${txns.length} transactions)`);
+      continue;
+    }
+
+    // Send transactions for this batch
+    console.log(`  Sending ${txns.length} transactions...`);
+
+    const recentBlockhash = await sendConnection.getLatestBlockhash(
+      "confirmed"
+    );
+
+    // Sign transactions in chunks to avoid memory issues
+    const TX_SIGN_CHUNK = 1000;
+    const txChunks = chunks(txns, TX_SIGN_CHUNK);
+    let batchConfirmed = 0;
+
+    for (let txChunkIdx = 0; txChunkIdx < txChunks.length; txChunkIdx++) {
+      const txChunk = txChunks[txChunkIdx];
+
+      const signedTxns = await Promise.all(
+        txChunk.map(async (draft) => {
+          await populateMissingDraftInfo(provider.connection, draft);
+          const tx = toVersionedTx({
+            ...draft,
+            recentBlockhash: recentBlockhash.blockhash,
+          });
+          tx.sign(extraSigners);
+          return tx;
+        })
       );
-    },
-    10,
-    extraSigners
-  );
+
+      try {
+        const confirmedTxs = await bulkSendRawTransactions(
+          sendConnection,
+          signedTxns.map((tx) => Buffer.from(tx.serialize())),
+          undefined,
+          recentBlockhash.lastValidBlockHeight
+        );
+
+        batchConfirmed += confirmedTxs.length;
+
+        if (txChunks.length > 1) {
+          console.log(
+            `    Chunk ${txChunkIdx + 1}/${txChunks.length}: ${
+              confirmedTxs.length
+            }/${txChunk.length} confirmed`
+          );
+        }
+      } catch (err: any) {
+        console.error(`    Error sending chunk: ${err.message}`);
+      }
+    }
+
+    totalConfirmed += batchConfirmed;
+    console.log(
+      `  ✓ Batch complete: ${batchConfirmed}/${txns.length} confirmed`
+    );
+
+    // Free memory before next batch
+    txns.length = 0;
+  }
+
+  // Free memory
+  subscriberRecipients.length = 0;
+
+  if (!argv.commit) {
+    console.log(
+      `\nDry run: would close ${totalInstructions.toLocaleString()} recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)`
+    );
+    console.log(`\nRe-run with --commit to execute 🚀`);
+    return;
+  }
 
   console.log(
-    `\n✓ Complete: Closed ${instructionCount} recipient accounts${
-      failedCount > 0 ? ` (${failedCount} failed to build instructions)` : ""
+    `\n✓ Complete: Closed ~${totalInstructions.toLocaleString()} recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)${
+      totalFailed > 0 ? ` - ${totalFailed} failed to build instructions` : ""
     }`
   );
 }

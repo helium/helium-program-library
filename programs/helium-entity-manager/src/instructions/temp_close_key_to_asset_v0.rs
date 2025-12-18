@@ -13,7 +13,7 @@ const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY")
 
 // Hardcoded key_to_asset addresses from initial migration that can bypass info checks
 const ALLOWED_KEY_TO_ASSETS: [Pubkey; 4] = [
-  pubkey!("AcKpRTmy6YKpQaWfLDBUaduQU1kHhVLrPkW3TmEEqsc"),
+  pubkey!("AcKpRTmy6YKpQaWfLDBUaduQU1kHhNVLrPkW3TmEEqsc"),
   pubkey!("3stUgrUq4j5BbamGdy7X2Y3dee24EeY5u1F7RHrrmaoP"),
   pubkey!("4v7nfEN2Wj342Zm6V1Jwk9i5YCUHu6zBAJFENk6Gxzvr"),
   pubkey!("2RtR6aVt6QgCSdV8LEH6ogWtDXGJpL73aB72DevJKgFC"),
