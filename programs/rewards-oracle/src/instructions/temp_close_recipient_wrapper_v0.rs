@@ -21,8 +21,6 @@ pub struct TempCloseRecipientWrapperV0<'info> {
     address = AUTHORITY
   )]
   pub authority: Signer<'info>,
-  /// Optional approver - must sign if lazy_distributor.approver is set
-  pub approver: Option<Signer<'info>>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
     mut,
@@ -92,7 +90,6 @@ pub fn handler(
     TempCloseRecipientV0 {
       authority: ctx.accounts.authority.to_account_info(),
       rewards_oracle_signer: ctx.accounts.oracle_signer.to_account_info(),
-      approver: ctx.accounts.approver.as_ref().map(|a| a.to_account_info()),
       lazy_distributor: ctx.accounts.lazy_distributor.to_account_info(),
       recipient: ctx.accounts.recipient.to_account_info(),
     },

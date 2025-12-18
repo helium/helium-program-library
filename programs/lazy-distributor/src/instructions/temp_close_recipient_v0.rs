@@ -18,8 +18,6 @@ pub struct TempCloseRecipientV0<'info> {
     bump
   )]
   pub rewards_oracle_signer: Signer<'info>,
-  /// Optional approver - must sign if lazy_distributor.approver is set
-  pub approver: Option<Signer<'info>>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
     mut,
@@ -30,18 +28,6 @@ pub struct TempCloseRecipientV0<'info> {
 }
 
 pub fn handler(ctx: Context<TempCloseRecipientV0>) -> Result<()> {
-  // Verify approver signature if required
-  if let Some(approver_pubkey) = ctx.accounts.lazy_distributor.approver {
-    require!(
-      ctx.accounts.approver.is_some(),
-      crate::error::ErrorCode::MissingApprover
-    );
-    require!(
-      ctx.accounts.approver.as_ref().unwrap().key() == approver_pubkey,
-      crate::error::ErrorCode::InvalidApprover
-    );
-  }
-
   // Note: KeyToAssetV0 verification is done by the calling program (rewards-oracle)
   // before this instruction is invoked. The rewards_oracle_signer ensures this instruction
   // can only be called through the rewards-oracle wrapper program.

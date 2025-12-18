@@ -54,11 +54,6 @@ export async function run(args: any = process.argv) {
       type: "string",
       describe: "Path to the authority keypair. Defaults to wallet.",
     },
-    approver: {
-      type: "string",
-      describe:
-        "Path to the approver keypair (if lazy distributor has approver set)",
-    },
     commit: {
       type: "boolean",
       describe: "Actually close accounts. Otherwise dry-run",
@@ -80,56 +75,10 @@ export async function run(args: any = process.argv) {
   const authority = argv.authority
     ? loadKeypair(argv.authority as string)
     : loadKeypair(argv.wallet as string);
-  const approver = argv.approver ? loadKeypair(argv.approver as string) : null;
 
   const dao = daoKey(HNT_MINT)[0];
   const mobileLazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
   const hntLazyDistributor = lazyDistributorKey(HNT_MINT)[0];
-
-  // Check if lazy distributors require an approver
-  console.log("Checking lazy distributor approver requirements...");
-  const [mobileLd, hntLd] = await Promise.all([
-    lazyProgram.account.lazyDistributorV0.fetch(mobileLazyDistributor),
-    lazyProgram.account.lazyDistributorV0.fetch(hntLazyDistributor),
-  ]);
-
-  const mobileNeedsApprover = mobileLd.approver !== null;
-  const hntNeedsApprover = hntLd.approver !== null;
-
-  if ((mobileNeedsApprover || hntNeedsApprover) && !approver) {
-    console.error(
-      `\nError: Lazy distributor(s) require an approver signature:`
-    );
-    if (mobileNeedsApprover) {
-      console.error(`  MOBILE: ${mobileLd.approver?.toBase58()}`);
-    }
-    if (hntNeedsApprover) {
-      console.error(`  HNT: ${hntLd.approver?.toBase58()}`);
-    }
-    console.error(
-      `\nPlease provide --approver flag with the approver keypair.`
-    );
-    process.exit(1);
-  }
-
-  if (approver) {
-    // Verify the approver matches what's expected
-    if (mobileNeedsApprover && !mobileLd.approver?.equals(approver.publicKey)) {
-      console.error(
-        `\nError: Provided approver ${approver.publicKey.toBase58()} does not match MOBILE lazy distributor approver ${mobileLd.approver?.toBase58()}`
-      );
-      process.exit(1);
-    }
-    if (hntNeedsApprover && !hntLd.approver?.equals(approver.publicKey)) {
-      console.error(
-        `\nError: Provided approver ${approver.publicKey.toBase58()} does not match HNT lazy distributor approver ${hntLd.approver?.toBase58()}`
-      );
-      process.exit(1);
-    }
-    console.log(`  Approver: ${approver.publicKey.toBase58()} ✓`);
-  } else {
-    console.log(`  No approver required ✓`);
-  }
 
   // Use fresh connection for sending
   const sendConnection = new Connection(
@@ -137,11 +86,8 @@ export async function run(args: any = process.argv) {
     "confirmed"
   );
 
-  // Sign with authority and approver (if present)
+  // Sign with authority
   const extraSigners = [authority];
-  if (approver) {
-    extraSigners.push(approver);
-  }
 
   // Fetch all subscriber collections
   console.log(
@@ -365,11 +311,6 @@ export async function run(args: any = process.argv) {
     const instructionLimiter = pLimit(10);
     let failedCount = 0;
 
-    const [oracleSigner] = PublicKey.findProgramAddressSync(
-      [Buffer.from("oracle_signer", "utf-8")],
-      rewardsOracleProgram.programId
-    );
-
     const allInstructions = await Promise.all(
       recipientChunks.map((chunk) =>
         instructionLimiter(async () => {
@@ -391,8 +332,6 @@ export async function run(args: any = process.argv) {
                     keyToAsset,
                     dao,
                     authority: authority.publicKey,
-                    approver: approver?.publicKey || null,
-                    oracleSigner,
                     lazyDistributorProgram: lazyProgram.programId,
                   })
                   .instruction();
