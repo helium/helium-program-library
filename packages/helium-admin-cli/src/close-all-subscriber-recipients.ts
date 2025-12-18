@@ -433,95 +433,17 @@ export async function run(args: any = process.argv) {
     `\nPreparing to close ${recipientsWithClosedKeyToAsset.length.toLocaleString()} recipient accounts...`
   );
 
-  // Build close instructions
-  let failedCount = 0;
-  let processed = 0;
-
-  const recipientChunks = chunks(recipientsWithClosedKeyToAsset, 100);
-  const instructionLimiter = pLimit(50);
-
-  const allBatchResults = await Promise.all(
-    recipientChunks.map((chunk) =>
-      instructionLimiter(async () => {
-        const batchResults = await Promise.all(
-          chunk.map(async (recipient) => {
-            try {
-              const {
-                address: recipientAddr,
-                asset,
-                lazyDistributor,
-              } = recipient;
-
-              // Compute the KeyToAssetV0 address
-              const keyToAsset = keyToAssetForAsset(asset, dao);
-
-              // Extract entity key from asset URI
-              const entityKeyStr =
-                asset.content.json_uri.split("/").pop() || "";
-              const cleanEntityKeyStr = entityKeyStr.split(/[.?#]/)[0];
-              const entityKeyBytes = Buffer.from(
-                bs58.decode(cleanEntityKeyStr)
-              );
-
-              // Get oracle_signer PDA
-              const [oracleSigner] = PublicKey.findProgramAddressSync(
-                [Buffer.from("oracle_signer", "utf-8")],
-                rewardsOracleProgram.programId
-              );
-
-              return await rewardsOracleProgram.methods
-                .tempCloseRecipientWrapperV0({
-                  entityKey: entityKeyBytes,
-                  asset: new PublicKey(asset.id),
-                })
-                .accountsPartial({
-                  lazyDistributor,
-                  recipient: recipientAddr,
-                  keyToAsset,
-                  dao,
-                  authority: authority.publicKey,
-                  approver: approver?.publicKey || null,
-                  oracleSigner,
-                  lazyDistributorProgram: lazyProgram.programId,
-                })
-                .instruction();
-            } catch (err: any) {
-              console.error(
-                `Error building instruction for recipient ${recipient.address.toBase58()}: ${
-                  err.message
-                }`
-              );
-              return null;
-            }
-          })
-        );
-
-        processed += chunk.length;
-        const validResults = batchResults.filter((i) => i !== null);
-        failedCount += chunk.length - validResults.length;
-
-        // Show progress every 1000 recipients or at end
-        if (
-          processed % 1000 === 0 ||
-          processed === recipientsWithClosedKeyToAsset.length
-        ) {
-          console.log(
-            `  Prepared ${
-              processed - failedCount
-            } / ${recipientsWithClosedKeyToAsset.length.toLocaleString()} instructions (${failedCount} failed)...`
-          );
-        }
-
-        return batchResults;
-      })
-    )
+  // Process in batches to avoid OOM
+  const PROCESS_BATCH_SIZE = 10000;
+  const processBatches = chunks(
+    recipientsWithClosedKeyToAsset,
+    PROCESS_BATCH_SIZE
   );
 
-  const instructions = allBatchResults
-    .flat()
-    .filter((i): i is TransactionInstruction => i !== null);
+  let totalConfirmed = 0;
+  let totalFailed = 0;
+  let totalInstructions = 0;
 
-  const instructionCount = instructions.length;
   const finalMobileCount = recipientsWithClosedKeyToAsset.filter(
     (r) => r.distributorType === "MOBILE"
   ).length;
@@ -529,39 +451,7 @@ export async function run(args: any = process.argv) {
     (r) => r.distributorType === "HNT"
   ).length;
 
-  // Free memory
-  subscriberRecipients.length = 0;
-
-  console.log(
-    `\nBatching ${instructionCount.toLocaleString()} instructions into transactions...`
-  );
-  const txns = await batchInstructionsToTxsWithPriorityFee(
-    provider,
-    instructions,
-    {
-      useFirstEstimateForAll: true,
-      computeUnitLimit: 600000,
-    }
-  );
-
-  // Free memory - instructions now in transactions
-  instructions.length = 0;
-
-  console.log(`\nPrepared ${txns.length} transactions`);
-
-  if (!argv.commit) {
-    console.log(
-      `\nDry run: would send ${
-        txns.length
-      } transactions to close ${instructionCount} subscriber recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)`
-    );
-    console.log(`\nRe-run with --commit to execute 🚀`);
-    return;
-  }
-
-  console.log(`Sending ${txns.length} transactions...`);
-
-  // Use fresh connection to avoid account-fetch-cache WebSocket issues
+  // Use fresh connection for sending
   const sendConnection = new Connection(
     provider.connection.rpcEndpoint,
     "confirmed"
@@ -573,70 +463,202 @@ export async function run(args: any = process.argv) {
     extraSigners.push(approver);
   }
 
-  // Retry loop for closing
-  const MAX_CLOSE_ITERATIONS = 5;
-  let closeIteration = 0;
-  let totalConfirmed = 0;
-  let remainingTxns = txns;
+  for (let batchIdx = 0; batchIdx < processBatches.length; batchIdx++) {
+    const batchRecipients = processBatches[batchIdx];
+    console.log(
+      `\n--- Batch ${batchIdx + 1}/${
+        processBatches.length
+      }: ${batchRecipients.length.toLocaleString()} recipients ---`
+    );
 
-  while (closeIteration < MAX_CLOSE_ITERATIONS && remainingTxns.length > 0) {
-    closeIteration++;
-    if (closeIteration > 1) {
-      console.log(`\nRetry ${closeIteration}/${MAX_CLOSE_ITERATIONS}...`);
+    // Build close instructions for this batch
+    let failedCount = 0;
+    let processed = 0;
+
+    const recipientChunks = chunks(batchRecipients, 100);
+    const instructionLimiter = pLimit(50);
+
+    const allBatchResults = await Promise.all(
+      recipientChunks.map((chunk) =>
+        instructionLimiter(async () => {
+          const batchResults = await Promise.all(
+            chunk.map(async (recipient) => {
+              try {
+                const {
+                  address: recipientAddr,
+                  asset,
+                  lazyDistributor,
+                } = recipient;
+
+                // Compute the KeyToAssetV0 address
+                const keyToAsset = keyToAssetForAsset(asset, dao);
+
+                // Extract entity key from asset URI
+                const entityKeyStr =
+                  asset.content.json_uri.split("/").pop() || "";
+                const cleanEntityKeyStr = entityKeyStr.split(/[.?#]/)[0];
+                const entityKeyBytes = Buffer.from(
+                  bs58.decode(cleanEntityKeyStr)
+                );
+
+                // Get oracle_signer PDA
+                const [oracleSigner] = PublicKey.findProgramAddressSync(
+                  [Buffer.from("oracle_signer", "utf-8")],
+                  rewardsOracleProgram.programId
+                );
+
+                return await rewardsOracleProgram.methods
+                  .tempCloseRecipientWrapperV0({
+                    entityKey: entityKeyBytes,
+                    asset: new PublicKey(asset.id),
+                  })
+                  .accountsPartial({
+                    lazyDistributor,
+                    recipient: recipientAddr,
+                    keyToAsset,
+                    dao,
+                    authority: authority.publicKey,
+                    approver: approver?.publicKey || null,
+                    oracleSigner,
+                    lazyDistributorProgram: lazyProgram.programId,
+                  })
+                  .instruction();
+              } catch (err: any) {
+                console.error(
+                  `Error building instruction for recipient ${recipient.address.toBase58()}: ${
+                    err.message
+                  }`
+                );
+                return null;
+              }
+            })
+          );
+
+          processed += chunk.length;
+          const validResults = batchResults.filter((i) => i !== null);
+          failedCount += chunk.length - validResults.length;
+
+          // Show progress every 1000 recipients or at end
+          if (
+            processed % 1000 === 0 ||
+            processed === recipientsWithClosedKeyToAsset.length
+          ) {
+            console.log(
+              `  Prepared ${processed} / ${batchRecipients.length.toLocaleString()} instructions...`
+            );
+          }
+
+          return batchResults;
+        })
+      )
+    );
+
+    const instructions = allBatchResults
+      .flat()
+      .filter((i): i is TransactionInstruction => i !== null);
+
+    totalFailed += failedCount;
+    totalInstructions += instructions.length;
+
+    if (instructions.length === 0) {
+      console.log("  No valid instructions in this batch");
+      continue;
     }
+
+    console.log(
+      `  Batching ${instructions.length.toLocaleString()} instructions into transactions...`
+    );
+    const txns = await batchInstructionsToTxsWithPriorityFee(
+      provider,
+      instructions,
+      {
+        useFirstEstimateForAll: true,
+        computeUnitLimit: 600000,
+      }
+    );
+
+    // Free memory
+    instructions.length = 0;
+
+    console.log(`  Prepared ${txns.length} transactions`);
+
+    if (!argv.commit) {
+      console.log(`  (dry run - would send ${txns.length} transactions)`);
+      continue;
+    }
+
+    // Send transactions for this batch
+    console.log(`  Sending ${txns.length} transactions...`);
 
     const recentBlockhash = await sendConnection.getLatestBlockhash(
       "confirmed"
     );
 
-    const signedTxns = await Promise.all(
-      remainingTxns.map(async (draft) => {
-        await populateMissingDraftInfo(provider.connection, draft);
-        const tx = toVersionedTx({
-          ...draft,
-          recentBlockhash: recentBlockhash.blockhash,
-        });
-        tx.sign(extraSigners);
-        return tx;
-      })
+    // Sign transactions in chunks to avoid memory issues
+    const TX_SIGN_CHUNK = 1000;
+    const txChunks = chunks(txns, TX_SIGN_CHUNK);
+    let batchConfirmed = 0;
+
+    for (let txChunkIdx = 0; txChunkIdx < txChunks.length; txChunkIdx++) {
+      const txChunk = txChunks[txChunkIdx];
+
+      const signedTxns = await Promise.all(
+        txChunk.map(async (draft) => {
+          await populateMissingDraftInfo(provider.connection, draft);
+          const tx = toVersionedTx({
+            ...draft,
+            recentBlockhash: recentBlockhash.blockhash,
+          });
+          tx.sign(extraSigners);
+          return tx;
+        })
+      );
+
+      try {
+        const confirmedTxs = await bulkSendRawTransactions(
+          sendConnection,
+          signedTxns.map((tx) => Buffer.from(tx.serialize())),
+          undefined,
+          recentBlockhash.lastValidBlockHeight
+        );
+
+        batchConfirmed += confirmedTxs.length;
+
+        if (txChunks.length > 1) {
+          console.log(
+            `    Chunk ${txChunkIdx + 1}/${txChunks.length}: ${
+              confirmedTxs.length
+            }/${txChunk.length} confirmed`
+          );
+        }
+      } catch (err: any) {
+        console.error(`    Error sending chunk: ${err.message}`);
+      }
+    }
+
+    totalConfirmed += batchConfirmed;
+    console.log(
+      `  ✓ Batch complete: ${batchConfirmed}/${txns.length} confirmed`
     );
 
-    try {
-      const confirmedTxs = await bulkSendRawTransactions(
-        sendConnection,
-        signedTxns.map((tx) => Buffer.from(tx.serialize())),
-        undefined,
-        recentBlockhash.lastValidBlockHeight
-      );
+    // Free memory before next batch
+    txns.length = 0;
+  }
 
-      totalConfirmed += confirmedTxs.length;
-      console.log(
-        `  Confirmed ${confirmedTxs.length}/${remainingTxns.length} transactions (${totalConfirmed}/${txns.length} total)`
-      );
+  // Free memory
+  subscriberRecipients.length = 0;
 
-      if (confirmedTxs.length === remainingTxns.length) {
-        break; // All done
-      }
-
-      // For simplicity, can't easily track which txns failed, so just report and break
-      // The script is idempotent so user can re-run
-      console.log(`  Some transactions may have failed, re-run to retry`);
-      break;
-    } catch (err: any) {
-      console.error(`  Error sending transactions: ${err.message}`);
-    }
-
-    // Wait before retry
-    if (closeIteration < MAX_CLOSE_ITERATIONS) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
+  if (!argv.commit) {
+    console.log(
+      `\nDry run: would close ${totalInstructions.toLocaleString()} recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)`
+    );
+    console.log(`\nRe-run with --commit to execute 🚀`);
+    return;
   }
 
   console.log(
-    `\n✓ Complete: Closed ${
-      totalConfirmed > 0 ? "~" : ""
-    }${instructionCount} recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)${
-      failedCount > 0 ? ` - ${failedCount} failed to build instructions` : ""
+    `\n✓ Complete: Closed ~${totalInstructions.toLocaleString()} recipient accounts (${finalMobileCount.toLocaleString()} mobile, ${finalHntCount.toLocaleString()} hnt)${
+      totalFailed > 0 ? ` - ${totalFailed} failed to build instructions` : ""
     }`
   );
 }
