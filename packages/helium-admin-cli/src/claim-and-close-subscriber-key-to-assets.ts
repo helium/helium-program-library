@@ -893,13 +893,32 @@ async function processBatch(
   const log = (msg: string) => console.log(`${logPrefix}${msg}`);
   const logErr = (msg: string) => console.error(`${logPrefix}${msg}`);
 
-  // 1. Derive keyToAsset addresses and verify they exist on-chain
+  // 1. Filter to only SUBSCRIBER assets (carrier collections may contain CARRIER, SERVREWARD, MAPREWARD NFTs)
+  const subscriberAssets = assets.filter((asset) => {
+    const symbol = asset.content?.metadata?.symbol;
+    return symbol === "SUBSCRIBER";
+  });
+
+  if (subscriberAssets.length !== assets.length) {
+    log(
+      `Filtered ${
+        assets.length - subscriberAssets.length
+      } non-subscriber assets (${subscriberAssets.length} subscribers)`
+    );
+  }
+
+  if (subscriberAssets.length === 0) {
+    log("No subscriber assets to process");
+    return;
+  }
+
+  // 2. Derive keyToAsset addresses and verify they exist on-chain
   const assetToKeyToAsset = new Map<
     string,
     { asset: any; keyToAsset: PublicKey }
   >();
 
-  for (const asset of assets) {
+  for (const asset of subscriberAssets) {
     const keyToAssetAddr = keyToAssetForAsset(asset, dao);
     const keyToAssetPubkey =
       typeof keyToAssetAddr === "string"
@@ -911,7 +930,7 @@ async function processBatch(
     });
   }
 
-  // Fetch all keyToAsset accounts to verify they exist (idempotent - skips already closed)
+  // Fetch keyToAsset accounts to verify they exist (idempotent - skips already closed)
   const allKeyToAssetKeys = Array.from(assetToKeyToAsset.values()).map(
     (v) => v.keyToAsset
   );
