@@ -1,6 +1,6 @@
 [package]
 name = "lazy-distributor"
-version = "0.3.3"
+version = "0.3.4"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
