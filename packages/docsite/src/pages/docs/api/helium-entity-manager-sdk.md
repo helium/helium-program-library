@@ -576,6 +576,24 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | Name | Type | Docs |
 | ---- | ---- | ---- |
 
+### temp_recreate_key_to_asset_v0
+
+#### Accounts
+
+| Name           | Mutability | Signer | Docs |
+| -------------- | ---------- | ------ | ---- |
+| payer          | immut      | no     |      |
+| authority      | immut      | no     |      |
+| dao            | immut      | no     |      |
+| key_to_asset   | immut      | no     |      |
+| system_program | immut      | no     |      |
+
+#### Args
+
+| Name | Type            | Docs |
+| ---- | --------------- | ---- |
+| args | [object Object] |      |
+
 ### temp_standardize_entity
 
 #### Accounts
@@ -1175,6 +1193,14 @@ undefined
 | --------------- | --------------- |
 | location        | u64             |
 | deployment_info | [object Object] |
+
+### TempRecreateKeyToAssetArgsV0
+
+| Field             | Type            |
+| ----------------- | --------------- |
+| entity_key        | bytes           |
+| key_serialization | [object Object] |
+| asset             | pubkey          |
 
 ### TempStandardizeEntityArgs
 
