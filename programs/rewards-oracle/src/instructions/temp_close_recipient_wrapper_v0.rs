@@ -18,6 +18,7 @@ pub struct TempCloseRecipientWrapperArgsV0 {
 #[instruction(args: TempCloseRecipientWrapperArgsV0)]
 pub struct TempCloseRecipientWrapperV0<'info> {
   #[account(
+    mut,
     address = AUTHORITY
   )]
   pub authority: Signer<'info>,

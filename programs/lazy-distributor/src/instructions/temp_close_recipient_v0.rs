@@ -5,7 +5,10 @@ const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY")
 
 #[derive(Accounts)]
 pub struct TempCloseRecipientV0<'info> {
-  #[account(address = AUTHORITY)]
+  #[account(
+    mut,
+    address = AUTHORITY
+  )]
   pub authority: Signer<'info>,
   pub approver: Signer<'info>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
