@@ -39,12 +39,13 @@ newly_onboarded_hotspots AS (
     hs.asset,
     hs.last_block as block,
     encode(kta.entity_key, 'hex') as pub_key,
-    ao.owner,
-    'direct_owner' as owner_type,
+    CASE WHEN wp.address IS NOT NULL THEN wp.owner ELSE ao.owner END as owner,
+    CASE WHEN wp.address IS NOT NULL THEN 'welcome_pack_owner' ELSE 'direct_owner' END as owner_type,
     'entity_ownership' as change_type
   FROM hotspots_onboarded_in_range hs
   INNER JOIN key_to_assets kta ON kta.asset = hs.asset
   INNER JOIN asset_owners ao ON ao.asset = hs.asset
+  LEFT JOIN welcome_packs wp ON wp.address = ao.owner
   WHERE kta.entity_key IS NOT NULL
     AND ao.owner IS NOT NULL
     -- Asset owner was set before this block range (race condition case)
