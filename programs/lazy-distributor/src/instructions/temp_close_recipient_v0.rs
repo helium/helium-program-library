@@ -1,25 +1,13 @@
+use crate::{error::ErrorCode, state::*};
 use anchor_lang::prelude::*;
 
-use crate::state::*;
-
 const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY");
-const REWARDS_ORACLE_PROGRAM: Pubkey = pubkey!("rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF");
 
 #[derive(Accounts)]
 pub struct TempCloseRecipientV0<'info> {
-  #[account(
-    address = AUTHORITY
-  )]
+  #[account(address = AUTHORITY)]
   pub authority: Signer<'info>,
-  /// Rewards oracle PDA signer - ensures this can only be called through rewards-oracle
-  #[account(
-    seeds = [b"oracle_signer"],
-    seeds::program = REWARDS_ORACLE_PROGRAM,
-    bump
-  )]
-  pub rewards_oracle_signer: Signer<'info>,
-  /// Optional approver - must sign if lazy_distributor.approver is set
-  pub approver: Option<Signer<'info>>,
+  pub approver: Signer<'info>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
     mut,
@@ -27,18 +15,14 @@ pub struct TempCloseRecipientV0<'info> {
     has_one = lazy_distributor
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
+  pub system_program: Program<'info, System>,
 }
 
 pub fn handler(ctx: Context<TempCloseRecipientV0>) -> Result<()> {
-  // Verify approver signature if required
   if let Some(approver_pubkey) = ctx.accounts.lazy_distributor.approver {
     require!(
-      ctx.accounts.approver.is_some(),
-      crate::error::ErrorCode::MissingApprover
-    );
-    require!(
-      ctx.accounts.approver.as_ref().unwrap().key() == approver_pubkey,
-      crate::error::ErrorCode::InvalidApprover
+      ctx.accounts.approver.key() == approver_pubkey,
+      ErrorCode::InvalidApproverSignature
     );
   }
 
