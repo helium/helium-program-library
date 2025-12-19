@@ -21,8 +21,6 @@ pub struct TempCloseRecipientWrapperV0<'info> {
     address = AUTHORITY
   )]
   pub authority: Signer<'info>,
-  /// Optional approver - must sign if lazy_distributor.approver is set
-  pub approver: Option<Signer<'info>>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
     mut,
@@ -40,6 +38,7 @@ pub struct TempCloseRecipientWrapperV0<'info> {
   )]
   pub oracle_signer: AccountInfo<'info>,
   pub lazy_distributor_program: Program<'info, LazyDistributor>,
+  pub system_program: Program<'info, System>,
 }
 
 pub fn handler(
@@ -86,16 +85,17 @@ pub fn handler(
   // Now close the recipient via CPI to lazy-distributor
   // Use oracle_signer as a PDA signer to prove this is coming from rewards-oracle
   let signer_seeds: &[&[&[u8]]] = &[&[b"oracle_signer", &[ctx.bumps.oracle_signer]]];
+  let cpi_accounts = TempCloseRecipientV0 {
+    authority: ctx.accounts.authority.to_account_info(),
+    approver: ctx.accounts.oracle_signer.to_account_info(),
+    lazy_distributor: ctx.accounts.lazy_distributor.to_account_info(),
+    recipient: ctx.accounts.recipient.to_account_info(),
+    system_program: ctx.accounts.system_program.to_account_info(),
+  };
 
   temp_close_recipient_v0(CpiContext::new_with_signer(
     ctx.accounts.lazy_distributor_program.to_account_info(),
-    TempCloseRecipientV0 {
-      authority: ctx.accounts.authority.to_account_info(),
-      rewards_oracle_signer: ctx.accounts.oracle_signer.to_account_info(),
-      approver: ctx.accounts.approver.as_ref().map(|a| a.to_account_info()),
-      lazy_distributor: ctx.accounts.lazy_distributor.to_account_info(),
-      recipient: ctx.accounts.recipient.to_account_info(),
-    },
+    cpi_accounts,
     signer_seeds,
   ))?;
 

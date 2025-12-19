@@ -164,13 +164,13 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 
 #### Accounts
 
-| Name                  | Mutability | Signer | Docs                                                                               |
-| --------------------- | ---------- | ------ | ---------------------------------------------------------------------------------- |
-| authority             | immut      | no     |                                                                                    |
-| rewards_oracle_signer | immut      | no     | Rewards oracle PDA signer - ensures this can only be called through rewards-oracle |
-| approver              | immut      | no     | Optional approver - must sign if lazy_distributor.approver is set                  |
-| lazy_distributor      | immut      | no     |                                                                                    |
-| recipient             | immut      | no     |                                                                                    |
+| Name             | Mutability | Signer | Docs |
+| ---------------- | ---------- | ------ | ---- |
+| authority        | immut      | no     |      |
+| approver         | immut      | no     |      |
+| lazy_distributor | immut      | no     |      |
+| recipient        | immut      | no     |      |
+| system_program   | immut      | no     |      |
 
 #### Args
 
