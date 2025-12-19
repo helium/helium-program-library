@@ -80,6 +80,7 @@ If you are looking for a quick start guide, check out the [Getting Started](/doc
 | dao                      | immut      | no     |      |
 | oracle_signer            | immut      | no     |      |
 | lazy_distributor_program | immut      | no     |      |
+| system_program           | immut      | no     |      |
 
 #### Args
 

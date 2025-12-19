@@ -332,7 +332,6 @@ export async function run(args: any = process.argv) {
                     keyToAsset,
                     dao,
                     authority: authority.publicKey,
-                    lazyDistributorProgram: lazyProgram.programId,
                   })
                   .instruction();
               } catch (err: any) {

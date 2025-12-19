@@ -1,23 +1,13 @@
+use crate::{error::ErrorCode, state::*};
 use anchor_lang::prelude::*;
 
-use crate::state::*;
-
 const AUTHORITY: Pubkey = pubkey!("hrp7GncEa2fJbweaGU5vkbZGwsoNQieahETrXcyrbTY");
-const REWARDS_ORACLE_PROGRAM: Pubkey = pubkey!("rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF");
 
 #[derive(Accounts)]
 pub struct TempCloseRecipientV0<'info> {
-  #[account(
-    address = AUTHORITY
-  )]
+  #[account(address = AUTHORITY)]
   pub authority: Signer<'info>,
-  /// Rewards oracle PDA signer - ensures this can only be called through rewards-oracle
-  #[account(
-    seeds = [b"oracle_signer"],
-    seeds::program = REWARDS_ORACLE_PROGRAM,
-    bump
-  )]
-  pub rewards_oracle_signer: Signer<'info>,
+  pub approver: Signer<'info>,
   pub lazy_distributor: Box<Account<'info, LazyDistributorV0>>,
   #[account(
     mut,
@@ -25,9 +15,17 @@ pub struct TempCloseRecipientV0<'info> {
     has_one = lazy_distributor
   )]
   pub recipient: Box<Account<'info, RecipientV0>>,
+  pub system_program: Program<'info, System>,
 }
 
-pub fn handler(_ctx: Context<TempCloseRecipientV0>) -> Result<()> {
+pub fn handler(ctx: Context<TempCloseRecipientV0>) -> Result<()> {
+  if let Some(approver_pubkey) = ctx.accounts.lazy_distributor.approver {
+    require!(
+      ctx.accounts.approver.key() == approver_pubkey,
+      ErrorCode::InvalidApproverSignature
+    );
+  }
+
   // Note: KeyToAssetV0 verification is done by the calling program (rewards-oracle)
   // before this instruction is invoked. The rewards_oracle_signer ensures this instruction
   // can only be called through the rewards-oracle wrapper program.
