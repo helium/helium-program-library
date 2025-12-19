@@ -6,13 +6,13 @@
 
 WITH asset_owner_changes AS (
   -- Get asset owner changes in the block range
-  -- Excludes changes where the new owner is a welcome pack PDA
+  -- If owner is a welcome pack PDA, resolve to the wallet owner and mark as welcome_pack_owner
   SELECT
     ao.asset,
     ao.last_block as block,
     encode(kta.entity_key, 'hex') as pub_key,
-    ao.owner,
-    'direct_owner' as owner_type,
+    CASE WHEN wp_check.address IS NOT NULL THEN wp_check.owner ELSE ao.owner END as owner,
+    CASE WHEN wp_check.address IS NOT NULL THEN 'welcome_pack_owner' ELSE 'direct_owner' END as owner_type,
     'entity_ownership' as change_type
   FROM asset_owners ao
   INNER JOIN key_to_assets kta ON kta.asset = ao.asset
@@ -25,7 +25,8 @@ WITH asset_owner_changes AS (
     AND ao.owner IS NOT NULL
     AND ao.last_block > $1
     AND ao.last_block <= $2
-    AND wp_check.address IS NULL
+    -- Exclude if welcome pack was also created in this block range (let welcome_pack_changes handle it)
+    AND (wp_check.address IS NULL OR wp_check.last_block <= $1 OR wp_check.last_block > $2)
 ),
 welcome_pack_changes AS (
   -- Get welcome pack owner changes in the block range
