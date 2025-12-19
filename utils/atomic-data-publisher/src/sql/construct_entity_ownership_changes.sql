@@ -6,6 +6,7 @@
 
 WITH asset_owner_changes AS (
   -- Get asset owner changes in the block range
+  -- Excludes changes where the new owner is a welcome pack PDA
   SELECT
     ao.asset,
     ao.last_block as block,
@@ -17,12 +18,14 @@ WITH asset_owner_changes AS (
   INNER JOIN key_to_assets kta ON kta.asset = ao.asset
   LEFT JOIN iot_hotspot_infos ihi ON ihi.asset = ao.asset
   LEFT JOIN mobile_hotspot_infos mhi ON mhi.asset = ao.asset
+  LEFT JOIN welcome_packs wp_check ON wp_check.address = ao.owner
   WHERE (ihi.asset IS NOT NULL OR mhi.asset IS NOT NULL)
     AND kta.entity_key IS NOT NULL
     AND ao.asset IS NOT NULL
     AND ao.owner IS NOT NULL
     AND ao.last_block > $1
     AND ao.last_block <= $2
+    AND wp_check.address IS NULL
 ),
 welcome_pack_changes AS (
   -- Get welcome pack owner changes in the block range
