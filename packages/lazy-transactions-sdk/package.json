@@ -31,7 +31,7 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.26.0",
+    "@coral-xyz/anchor": "^0.29.0",
     "@helium/idls": "^0.0.40",
     "@helium/spl-utils": "^0.0.40",
     "bn.js": "^5.2.0",

@@ -16,16 +16,16 @@
   ],
   "private": true,
   "dependencies": {
-    "@coral-xyz/anchor": "0.26.0",
-    "@coral-xyz/anchor-cli": "^0.26.0",
-    "@coral-xyz/borsh": "^0.2.6",
+    "@coral-xyz/anchor": "^0.29.0",
+    "@coral-xyz/anchor-cli": "^0.29.0",
+    "@coral-xyz/borsh": "^0.3.0",
     "@helium/crypto": "^4.6.2",
-    "@metaplex-foundation/mpl-bubblegum": "^0.6.2",
-    "@pythnetwork/client": "^2.8.0",
-    "@solana/spl-account-compression": "^0.1.4",
+    "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
+    "@pythnetwork/client": "^2.22.0",
+    "@solana/spl-account-compression": "^0.2.0",
     "@switchboard-xyz/switchboard-v2": "^0.0.165",
     "angry-purple-tiger": "^1.0.5",
-    "lerna": "^5.5.4"
+    "lerna": "^8.1.0"
   },
   "devDependencies": {
     "@solana/spl-governance": "^0.3.17",

@@ -31,12 +31,12 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.26.0",
+    "@coral-xyz/anchor": "^0.29.0",
     "@helium/circuit-breaker-sdk": "^0.0.40",
     "@helium/helium-sub-daos-sdk": "^0.0.40",
     "@helium/idls": "^0.0.40",
     "@helium/spl-utils": "^0.0.40",
-    "@solana/spl-token": "^0.3.6",
+    "@solana/spl-token": "^0.4.9",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1",
     "crypto-js": "^4.1.1"

@@ -31,8 +31,8 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.26.0",
-    "@solana/web3.js": "^1.43.4",
+    "@coral-xyz/anchor": "^0.29.0",
+    "@solana/web3.js": "^1.98.0",
     "bn.js": "^5.2.0",
     "borsh": "^0.7.0",
     "bs58": "^4.0.1"

@@ -31,10 +31,10 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.26.0",
+    "@coral-xyz/anchor": "^0.29.0",
     "@helium/address": "^4.8.1",
-    "@solana/spl-token": "^0.3.6",
-    "@solana/web3.js": "^1.43.4",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.98.0",
     "bn.js": "^5.2.0",
     "borsh": "^0.7.0",
     "bs58": "^5.0.0"

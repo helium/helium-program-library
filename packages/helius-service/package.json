@@ -41,7 +41,7 @@
     "@helium/idls": "^0.0.40",
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
     "@solana/spl-token": "0.3.5",
-    "@solana/web3.js": "^1.43.4",
+    "@solana/web3.js": "^1.98.0",
     "angry-purple-tiger": "^1.0.5",
     "aws-sdk": "^2.1318.0",
     "axios": "^1.1.3",

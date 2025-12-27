@@ -23,7 +23,7 @@
     "@helium/idls": "^0.0.40",
     "@helium/lazy-distributor-sdk": "^0.0.40",
     "@helium/spl-utils": "^0.0.40",
-    "@solana/spl-token": "^0.3.6",
+    "@solana/spl-token": "^0.4.9",
     "assert": "^2.0.0",
     "bn.js": "^5.2.0",
     "classnames": "^2.3.2",

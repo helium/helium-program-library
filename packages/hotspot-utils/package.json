@@ -32,7 +32,7 @@
     "@helium/helium-sub-daos-sdk": "^0.0.40",
     "@helium/idls": "^0.0.40",
     "@helium/spl-utils": "^0.0.40",
-    "@solana/web3.js": "^1.73.0",
+    "@solana/web3.js": "^1.98.0",
     "bs58": "^5.0.0"
   }
 }

@@ -32,7 +32,7 @@
     "prebuild": "npm run clean && npm run package"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.26.0",
+    "@coral-xyz/anchor": "^0.29.0",
     "@helium/address": "^4.6.2",
     "@helium/circuit-breaker-sdk": "^0.0.40",
     "@helium/crypto": "^4.6.2",
@@ -45,8 +45,8 @@
     "@helium/treasury-management-sdk": "^0.0.40",
     "@solana/spl-account-compression": "^0.1.4",
     "@solana/spl-governance": "^0.3.18",
-    "@solana/spl-token": "^0.3.6",
-    "@solana/web3.js": "^1.66.2",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.98.0",
     "@sqds/sdk": "^2.0.3",
     "@switchboard-xyz/common": "^2.1.7",
     "@switchboard-xyz/solana.js": "^2.0.7",

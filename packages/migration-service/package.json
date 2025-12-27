@@ -32,7 +32,7 @@
     "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "0.26.0",
+    "@coral-xyz/anchor": "^0.29.0",
     "@fastify/cors": "^8.1.1",
     "@helium/address": "^4.6.2",
     "@helium/circuit-breaker-sdk": "^0.0.40",
@@ -50,7 +50,7 @@
     "@project-serum/borsh": "^0.2.5",
     "@solana/buffer-layout": "^4.0.0",
     "@solana/spl-token": "0.3.6",
-    "@solana/web3.js": "^1.66.2",
+    "@solana/web3.js": "^1.98.0",
     "@types/lowdb": "^1.0.11",
     "@types/pg-format": "^1.0.2",
     "@types/yargs": "^17.0.22",
