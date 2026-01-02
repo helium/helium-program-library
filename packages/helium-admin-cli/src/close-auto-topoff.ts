@@ -82,9 +82,10 @@ export async function run(args: any = process.argv) {
   );
   const closeIx = await dcAutoTopoffProgram.methods
     .closeAutoTopOffV0()
-    .accounts({
+    .accountsPartial({
       autoTopOff,
       rentRefund: authority,
+      authority,
     })
     .instruction();
 
