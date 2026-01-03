@@ -1,0 +1,84 @@
+{
+  "name": "@helium/helium-admin-cli",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "license": "Apache-2.0",
+  "version": "0.11.7",
+  "description": "CLI to bootstrap the network",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/helium/helium-program-libary"
+  },
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/src/index.js",
+  "types": "./lib/types/src/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "lib",
+    "bin"
+  ],
+  "bin": {
+    "helium-admin": "./bin/helium-admin.js"
+  },
+  "keywords": [
+    "cli"
+  ],
+  "exports": {
+    "import": "./lib/esm/src/index.js",
+    "require": "./lib/cjs/index.js",
+    "types": "./lib/types/src/index.d.ts"
+  },
+  "scripts": {
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
+    "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
+    "package": "npx shx mkdir -p lib/cjs lib/esm",
+    "prebuild": "npm run clean && npm run package"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@helium/address": "^4.12.0",
+    "@helium/circuit-breaker-sdk": "^0.11.7",
+    "@helium/crypto": "^4.10.2",
+    "@helium/data-credits-sdk": "^0.11.7",
+    "@helium/dc-auto-top-sdk": "^0.11.7",
+    "@helium/distributor-oracle": "^0.11.7",
+    "@helium/fanout-sdk": "^0.11.7",
+    "@helium/helium-entity-manager-sdk": "^0.11.7",
+    "@helium/helium-sub-daos-sdk": "^0.11.7",
+    "@helium/lazy-distributor-sdk": "^0.11.7",
+    "@helium/mini-fanout-sdk": "^0.11.7",
+    "@helium/mobile-entity-manager-sdk": "^0.11.7",
+    "@helium/nft-proxy-sdk": "^0.1.5-alpha.0",
+    "@helium/organization-sdk": "^0.1.5-alpha.0",
+    "@helium/price-oracle-sdk": "^0.11.7",
+    "@helium/proposal-sdk": "^0.1.5-alpha.0",
+    "@helium/spl-utils": "^0.11.7",
+    "@helium/treasury-management-sdk": "^0.11.7",
+    "@helium/tuktuk-sdk": "^0.0.9",
+    "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
+    "@solana/spl-account-compression": "^0.1.7",
+    "@solana/spl-governance": "^0.3.18",
+    "@solana/spl-token": "^0.3.8",
+    "@solana/web3.js": "^1.91.1",
+    "@sqds/multisig": "^2.1.4",
+    "@sqds/sdk": "2.0.4",
+    "axios": "^1.9.0",
+    "bn.js": "^5.2.0",
+    "bs58": "^4.0.1",
+    "fast-deep-equal": "^3.1.3",
+    "h3-js": "^4.1.0",
+    "yargs": "^17.7.1"
+  },
+  "devDependencies": {
+    "@types/yargs": "^17.0.24",
+    "git-format-staged": "^2.1.3",
+    "ts-loader": "^9.2.3",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  },
+  "author": "",
+  "gitHead": "fc5dab2875863281ec468cf4a5a416c9696d102f"
+}

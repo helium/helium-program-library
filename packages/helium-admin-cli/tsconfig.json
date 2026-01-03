@@ -1,0 +1,59 @@
+{
+  "extends": "../../tsconfig.root.json",
+  "references": [
+    {
+      "path": "../spl-utils"
+    },
+    {
+      "path": "../idls"
+    },
+    {
+      "path": "../fanout-sdk"
+    },
+    {
+      "path": "../distributor-oracle"
+    },
+    {
+      "path": "../dc-auto-top-sdk"
+    },
+    {
+      "path": "../mini-fanout-sdk"
+    },
+    {
+      "path": "../hpl-crons-sdk"
+    },
+    {
+      "path": "../data-credits-sdk"
+    },
+    {
+      "path": "../circuit-breaker-sdk"
+    },
+    {
+      "path": "../helium-sub-daos-sdk"
+    },
+    {
+      "path": "../lazy-distributor-sdk"
+    },
+    {
+      "path": "../helium-entity-manager-sdk"
+    },
+    {
+      "path": "../mobile-entity-manager-sdk"
+    },
+    {
+      "path": "../treasury-management-sdk"
+    },
+    {
+      "path": "../price-oracle-sdk"
+    },
+    {
+      "path": "../rewards-oracle-sdk"
+    },
+    {
+      "path": "./tsconfig.cjs.json"
+    },
+    {
+      "path": "./tsconfig.esm.json"
+    }
+  ]
+}
