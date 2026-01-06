@@ -17,7 +17,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Op, QueryTypes } from "sequelize";
 import { DAO } from "./constants";
 import { Database, DeviceType, RewardableEntity } from "./database";
-import { Reward, WalletClaimJob, sequelize } from "./model";
+import { KeyToAsset, Reward, WalletClaimJob, sequelize } from "./model";
 
 const ENTITY_CREATOR = entityCreatorKey(DAO)[0];
 
@@ -212,6 +212,12 @@ export class PgDatabase implements Database {
   async getTotalRewards(): Promise<string> {
     const totalRewards = (
       await Reward.findAll({
+        include: [
+          {
+            model: KeyToAsset,
+            required: true,
+          },
+        ],
         attributes: [
           [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
         ],
@@ -244,6 +250,12 @@ export class PgDatabase implements Database {
   async getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
     const rewards = await Reward.findAll({
       where: {
+        include: [
+          {
+            model: KeyToAsset,
+            required: true,
+          },
+        ],
         address: {
           [Op.in]: entityKeys,
         },
@@ -289,7 +301,17 @@ export class PgDatabase implements Database {
   }
 
   async getCurrentRewardsByEntity(entityKeyStr: string) {
-    const reward = (await Reward.findByPk(entityKeyStr)) as Reward;
+    const reward = (await Reward.findOne({
+      where: {
+        address: entityKeyStr,
+      },
+      include: [
+        {
+          model: KeyToAsset,
+          required: true,
+        },
+      ],
+    })) as Reward;
 
     return new BN(reward?.rewards).toString() || "0";
   }
