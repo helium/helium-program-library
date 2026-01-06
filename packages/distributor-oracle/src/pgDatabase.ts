@@ -249,13 +249,13 @@ export class PgDatabase implements Database {
 
   async getBulkRewards(entityKeys: string[]): Promise<Record<string, string>> {
     const rewards = await Reward.findAll({
+      include: [
+        {
+          model: KeyToAsset,
+          required: true,
+        },
+      ],
       where: {
-        include: [
-          {
-            model: KeyToAsset,
-            required: true,
-          },
-        ],
         address: {
           [Op.in]: entityKeys,
         },
