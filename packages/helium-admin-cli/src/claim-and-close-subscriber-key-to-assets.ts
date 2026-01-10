@@ -12,7 +12,6 @@ import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
   lazyDistributorKey,
-  recipientKey,
 } from "@helium/lazy-distributor-sdk";
 import { init as initRewards } from "@helium/rewards-oracle-sdk";
 import { init as initMem } from "@helium/mobile-entity-manager-sdk";
@@ -66,10 +65,6 @@ type KeyToAssetInfo = {
   isHardcoded: boolean;
 };
 
-type AssetWithRecipients = KeyToAssetInfo & {
-  hasMobileRecipient: boolean;
-  hasHntRecipient: boolean;
-};
 
 type RunningTotals = {
   claimedMobile: BN;
@@ -104,26 +99,6 @@ async function getAssetsWithRetry(
           delay / 1000
         }s (attempt ${attempt + 1}/${maxRetries})`
       );
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-  throw new Error("Max retries exceeded");
-}
-
-async function fetchRecipientsWithRetry(
-  lazyProgram: any,
-  chunk: PublicKey[],
-  maxRetries = 3
-) {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const accountInfos = await lazyProgram.account.recipientV0.fetchMultiple(
-        chunk
-      );
-      return accountInfos;
-    } catch (err: any) {
-      if (attempt === maxRetries - 1) throw err;
-      const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
@@ -219,7 +194,7 @@ async function formBulkTransactionsWithRetry(
 
 // Helper: Claim all rewards for a batch of assets
 async function claimRewardsForBatch(
-  assetsWithRecipients: AssetWithRecipients[],
+  assets: KeyToAssetInfo[],
   lazyProgram: any,
   rewardsOracleProgram: any,
   mobileLazyDistributor: PublicKey,
@@ -244,7 +219,7 @@ async function claimRewardsForBatch(
   // Track assets that have been verified to have 0 remaining rewards
   const verifiedNoRewards = new Set<string>();
 
-  if (assetsWithRecipients.length === 0) {
+  if (assets.length === 0) {
     return {
       claimedMobile: totalClaimedMobile,
       claimedHnt: totalClaimedHnt,
@@ -266,35 +241,23 @@ async function claimRewardsForBatch(
       assetId: PublicKey;
       keyToAsset: PublicKey;
       entityKey: Buffer;
-      hasMobileRecipient: boolean;
-      hasHntRecipient: boolean;
     }
   >();
 
   // Also build asset -> keyToAsset map for tracking problematic assets
   const assetToKeyToAsset = new Map<string, PublicKey>();
 
-  assetsWithRecipients.forEach(
-    ({
-      assetId,
-      keyToAsset,
-      entityKey,
-      hasMobileRecipient,
-      hasHntRecipient,
-    }) => {
-      const entityKeyStr = decodeEntityKey(entityKey, { b58: {} });
-      if (entityKeyStr) {
-        entityKeyToAsset.set(entityKeyStr, {
-          assetId,
-          keyToAsset,
-          entityKey,
-          hasMobileRecipient,
-          hasHntRecipient,
-        });
-        assetToKeyToAsset.set(assetId.toBase58(), keyToAsset);
-      }
+  assets.forEach(({ assetId, keyToAsset, entityKey }) => {
+    const entityKeyStr = decodeEntityKey(entityKey, { b58: {} });
+    if (entityKeyStr) {
+      entityKeyToAsset.set(entityKeyStr, {
+        assetId,
+        keyToAsset,
+        entityKey,
+      });
+      assetToKeyToAsset.set(assetId.toBase58(), keyToAsset);
     }
-  );
+  });
 
   const entityKeys = Array.from(entityKeyToAsset.keys());
   const rewardsChunks = chunks(entityKeys, 5000);
@@ -410,7 +373,7 @@ async function claimRewardsForBatch(
       }
 
       // All assets in this batch now have 0 rewards - mark them as verified
-      assetsWithRecipients.forEach((asset) => {
+      assets.forEach((asset) => {
         if (!problematicAssets.has(asset.assetId.toBase58())) {
           verifiedNoRewards.add(asset.assetId.toBase58());
         }
@@ -973,100 +936,16 @@ async function processBatch(
     return;
   }
 
-  // 2. Check recipients
-
-  const assetIdStrings = keyToAssetInfos.map((k) => k.assetId.toBase58());
-  const mobileRecipientKeys = keyToAssetInfos.map(
-    (k) => recipientKey(mobileLazyDistributor, k.assetId)[0]
-  );
-  const hntRecipientKeys = keyToAssetInfos.map(
-    (k) => recipientKey(hntLazyDistributor, k.assetId)[0]
-  );
-
-  const existingRecipients = new Map<
-    string,
-    { mobile: boolean; hnt: boolean }
-  >();
-  const limiter = pLimit(10);
-
-  // Fetch mobile and hnt recipients in parallel
-  const mobileRecipientChunks = chunks(mobileRecipientKeys, 1000);
-  const hntRecipientChunks = chunks(hntRecipientKeys, 1000);
-
-  await Promise.all([
-    // Mobile recipients
-    Promise.all(
-      mobileRecipientChunks.map((chunk, chunkIndex) =>
-        limiter(async () => {
-          const accountInfos = await fetchRecipientsWithRetry(
-            lazyProgram,
-            chunk
-          );
-          const chunkStartIndex = chunkIndex * 1000;
-          accountInfos.forEach((info: any, index: number) => {
-            if (info) {
-              const assetKey = assetIdStrings[chunkStartIndex + index];
-              const existing = existingRecipients.get(assetKey) || {
-                mobile: false,
-                hnt: false,
-              };
-              existing.mobile = true;
-              existingRecipients.set(assetKey, existing);
-            }
-          });
-        })
-      )
-    ),
-    // HNT recipients
-    Promise.all(
-      hntRecipientChunks.map((chunk, chunkIndex) =>
-        limiter(async () => {
-          const accountInfos = await fetchRecipientsWithRetry(
-            lazyProgram,
-            chunk
-          );
-          const chunkStartIndex = chunkIndex * 1000;
-          accountInfos.forEach((info: any, index: number) => {
-            if (info) {
-              const assetKey = assetIdStrings[chunkStartIndex + index];
-              const existing = existingRecipients.get(assetKey) || {
-                mobile: false,
-                hnt: false,
-              };
-              existing.hnt = true;
-              existingRecipients.set(assetKey, existing);
-            }
-          });
-        })
-      )
-    ),
-  ]);
-
-  // Build assets with recipients
-  const assetsWithRecipients: AssetWithRecipients[] = [];
-  keyToAssetInfos.forEach((asset, index) => {
-    const recipients = existingRecipients.get(assetIdStrings[index]);
-    assetsWithRecipients.push({
-      ...asset,
-      hasMobileRecipient: recipients?.mobile || false,
-      hasHntRecipient: recipients?.hnt || false,
-    });
-  });
-
-  const withRecipients = assetsWithRecipients.filter(
-    (a) => a.hasMobileRecipient || a.hasHntRecipient
-  );
-
   // Summary log for this batch
   log(
-    `${assets.length.toLocaleString()} assets → ${keyToAssetInfos.length.toLocaleString()} open, ${withRecipients.length.toLocaleString()} with recipients`
+    `${assets.length.toLocaleString()} assets → ${keyToAssetInfos.length.toLocaleString()} open`
   );
 
-  // 3. Claim rewards
+  // 2. Claim rewards for ALL assets (formBulkTransactions will init recipients as needed)
   let verifiedNoRewards = new Set<string>();
-  if (withRecipients.length > 0) {
+  if (keyToAssetInfos.length > 0) {
     const claimResult = await claimRewardsForBatch(
-      withRecipients,
+      keyToAssetInfos,
       lazyProgram,
       rewardsOracleProgram,
       mobileLazyDistributor,
@@ -1084,20 +963,13 @@ async function processBatch(
     verifiedNoRewards = claimResult.verifiedNoRewards;
   }
 
-  // 4. Close accounts - only close if:
-  //    - Asset has no recipients (no rewards to claim), OR
-  //    - Asset had recipients AND has been verified to have 0 remaining rewards
-  //    - AND is not a problematic asset
-  const assetsWithRecipientsSet = new Set(
-    withRecipients.map((a) => a.assetId.toBase58())
-  );
+  // 3. Close accounts - only close if verified to have 0 remaining rewards
+  //    (formBulkTransactions handles recipient init, so all assets go through claiming)
   const assetsToClose = keyToAssetInfos.filter((k) => {
     const assetStr = k.assetId.toBase58();
     // Never close problematic assets
     if (problematicAssets.has(assetStr)) return false;
-    // If asset has no recipients, it's safe to close (no rewards)
-    if (!assetsWithRecipientsSet.has(assetStr)) return true;
-    // If asset had recipients, only close if verified to have no remaining rewards
+    // Only close if verified to have no remaining rewards
     return verifiedNoRewards.has(assetStr);
   });
 
@@ -1208,63 +1080,33 @@ export async function run(args: any = process.argv) {
   if (hardcodedInfos.length > 0) {
     console.log(`Found ${hardcodedInfos.length} hardcoded accounts to process`);
 
-    // Check recipients for hardcoded
-    const hardcodedMobileRecipients = hardcodedInfos.map(
-      (k) => recipientKey(mobileLazyDistributor, k.assetId)[0]
-    );
-    const hardcodedHntRecipients = hardcodedInfos.map(
-      (k) => recipientKey(hntLazyDistributor, k.assetId)[0]
-    );
-
-    const [mobileAccounts, hntAccounts] = await Promise.all([
-      lazyProgram.account.recipientV0.fetchMultiple(hardcodedMobileRecipients),
-      lazyProgram.account.recipientV0.fetchMultiple(hardcodedHntRecipients),
-    ]);
-
-    const hardcodedWithRecipients: AssetWithRecipients[] = hardcodedInfos.map(
-      (info, index) => ({
-        ...info,
-        hasMobileRecipient: !!mobileAccounts[index],
-        hasHntRecipient: !!hntAccounts[index],
-      })
-    );
-
-    const withRecipients = hardcodedWithRecipients.filter(
-      (a) => a.hasMobileRecipient || a.hasHntRecipient
-    );
-
+    // Claim rewards for ALL hardcoded accounts (formBulkTransactions will init recipients as needed)
     let hardcodedVerifiedNoRewards = new Set<string>();
-    if (withRecipients.length > 0) {
-      console.log(
-        `Claiming rewards for ${withRecipients.length} hardcoded accounts...`
-      );
-      const claimResult = await claimRewardsForBatch(
-        withRecipients,
-        lazyProgram,
-        rewardsOracleProgram,
-        mobileLazyDistributor,
-        hntLazyDistributor,
-        authority,
-        provider,
-        argv.commit as boolean,
-        problematicAssets
-      );
-      totals.claimedMobile = totals.claimedMobile.add(
-        claimResult.claimedMobile
-      );
-      totals.claimedHnt = totals.claimedHnt.add(claimResult.claimedHnt);
-      totals.claimedTransactions += claimResult.transactions;
-      hardcodedVerifiedNoRewards = claimResult.verifiedNoRewards;
-    }
+    console.log(
+      `Claiming rewards for ${hardcodedInfos.length} hardcoded accounts...`
+    );
+    const claimResult = await claimRewardsForBatch(
+      hardcodedInfos,
+      lazyProgram,
+      rewardsOracleProgram,
+      mobileLazyDistributor,
+      hntLazyDistributor,
+      authority,
+      provider,
+      argv.commit as boolean,
+      problematicAssets
+    );
+    totals.claimedMobile = totals.claimedMobile.add(
+      claimResult.claimedMobile
+    );
+    totals.claimedHnt = totals.claimedHnt.add(claimResult.claimedHnt);
+    totals.claimedTransactions += claimResult.transactions;
+    hardcodedVerifiedNoRewards = claimResult.verifiedNoRewards;
 
     // Close hardcoded accounts - only those verified to have no remaining rewards
-    const hardcodedWithRecipientsSet = new Set(
-      withRecipients.map((a) => a.assetId.toBase58())
-    );
     const hardcodedToClose = hardcodedInfos.filter((k) => {
       const assetStr = k.assetId.toBase58();
       if (problematicAssets.has(assetStr)) return false;
-      if (!hardcodedWithRecipientsSet.has(assetStr)) return true;
       return hardcodedVerifiedNoRewards.has(assetStr);
     });
     if (hardcodedToClose.length > 0) {
