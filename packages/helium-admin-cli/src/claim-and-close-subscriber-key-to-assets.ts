@@ -527,112 +527,99 @@ async function claimRewardsForBatch(
 
     let totalConfirmed = 0;
     let totalTxns = 0;
-    const CLAIMS_PER_BATCH = 300; // Build and send 300 at a time to keep blockhashes fresh
+    const CLAIMS_PER_BATCH = 300;
+    const PARALLEL_CLAIM_BATCHES = 5; // Process 5 batches in parallel
+    const batchLimiter = pLimit(PARALLEL_CLAIM_BATCHES);
 
-    // Process MOBILE claims in batches
+    // Helper to process a single batch (build, sign, send)
+    const processBatch = async (
+      claims: typeof assetsToClaim,
+      lazyDist: PublicKey,
+      lazyDistAcc: any,
+      bulkRewards: client.BulkRewards[],
+      label: string
+    ): Promise<{ confirmed: number; total: number }> => {
+      const claimChunks = chunks(claims, 100);
+
+      const batchTxns = await Promise.all(
+        claimChunks.map((chunk) =>
+          claimTxLimiter(async () => {
+            try {
+              return await formBulkTransactionsWithRetry(
+                lazyProgram,
+                rewardsOracleProgram,
+                chunk.map((c) => c.asset),
+                lazyDist,
+                lazyDistAcc,
+                bulkRewards,
+                authority.publicKey,
+                problematicAssets,
+                assetToKeyToAsset
+              );
+            } catch (err: any) {
+              logErr(`    ${label} error: ${err.message}`);
+              return [];
+            }
+          })
+        )
+      );
+
+      const txns = batchTxns.flat().filter(truthy);
+      if (txns.length === 0) return { confirmed: 0, total: 0 };
+
+      txns.forEach((tx) => tx.sign([authority]));
+
+      try {
+        const confirmed = await bulkSendRawTransactions(
+          sendConnection,
+          txns.map((tx) => Buffer.from(tx.serialize()))
+        );
+        log(`    ${label}: ${confirmed.length}/${txns.length} confirmed`);
+        return { confirmed: confirmed.length, total: txns.length };
+      } catch (err: any) {
+        logErr(`    ${label} send error: ${err.message}`);
+        return { confirmed: 0, total: txns.length };
+      }
+    };
+
+    // Create all batch tasks
     const mobileBatches = chunks(mobileClaimsToProcess, CLAIMS_PER_BATCH);
-    for (let batchIdx = 0; batchIdx < mobileBatches.length; batchIdx++) {
-      const batch = mobileBatches[batchIdx];
-      const claimChunks = chunks(batch, 100); // formBulkTransactions max 100
-
-      log(
-        `  MOBILE ${batchIdx + 1}/${mobileBatches.length}: building ${
-          batch.length
-        } claims...`
-      );
-
-      const batchTxns = await Promise.all(
-        claimChunks.map((chunk) =>
-          claimTxLimiter(async () => {
-            try {
-              return await formBulkTransactionsWithRetry(
-                lazyProgram,
-                rewardsOracleProgram,
-                chunk.map((c) => c.asset),
-                mobileLazyDistributor,
-                mobileLazyDistributorAcc,
-                mergedMobileBulkRewards,
-                authority.publicKey,
-                problematicAssets,
-                assetToKeyToAsset
-              );
-            } catch (err: any) {
-              logErr(`    Error: ${err.message}`);
-              return [];
-            }
-          })
-        )
-      );
-
-      const txns = batchTxns.flat().filter(truthy);
-      if (txns.length > 0) {
-        txns.forEach((tx) => tx.sign([authority]));
-        totalTxns += txns.length;
-
-        try {
-          const confirmed = await bulkSendRawTransactions(
-            sendConnection,
-            txns.map((tx) => Buffer.from(tx.serialize()))
-          );
-          totalConfirmed += confirmed.length;
-          log(`    Sent: ${confirmed.length}/${txns.length} confirmed`);
-        } catch (err: any) {
-          logErr(`    Send error: ${err.message}`);
-        }
-      }
-    }
-
-    // Process HNT claims in batches
     const hntBatches = chunks(hntClaimsToProcess, CLAIMS_PER_BATCH);
-    for (let batchIdx = 0; batchIdx < hntBatches.length; batchIdx++) {
-      const batch = hntBatches[batchIdx];
-      const claimChunks = chunks(batch, 100);
 
-      log(
-        `  HNT ${batchIdx + 1}/${hntBatches.length}: building ${
-          batch.length
-        } claims...`
-      );
+    log(
+      `  Processing ${mobileBatches.length} MOBILE + ${hntBatches.length} HNT batches (${PARALLEL_CLAIM_BATCHES} parallel)...`
+    );
 
-      const batchTxns = await Promise.all(
-        claimChunks.map((chunk) =>
-          claimTxLimiter(async () => {
-            try {
-              return await formBulkTransactionsWithRetry(
-                lazyProgram,
-                rewardsOracleProgram,
-                chunk.map((c) => c.asset),
-                hntLazyDistributor,
-                hntLazyDistributorAcc,
-                mergedHntBulkRewards,
-                authority.publicKey,
-                problematicAssets,
-                assetToKeyToAsset
-              );
-            } catch (err: any) {
-              logErr(`    Error: ${err.message}`);
-              return [];
-            }
-          })
+    const allBatchTasks = [
+      ...mobileBatches.map((batch, idx) =>
+        batchLimiter(() =>
+          processBatch(
+            batch,
+            mobileLazyDistributor,
+            mobileLazyDistributorAcc,
+            mergedMobileBulkRewards,
+            `MOBILE ${idx + 1}/${mobileBatches.length}`
+          )
         )
-      );
+      ),
+      ...hntBatches.map((batch, idx) =>
+        batchLimiter(() =>
+          processBatch(
+            batch,
+            hntLazyDistributor,
+            hntLazyDistributorAcc,
+            mergedHntBulkRewards,
+            `HNT ${idx + 1}/${hntBatches.length}`
+          )
+        )
+      ),
+    ];
 
-      const txns = batchTxns.flat().filter(truthy);
-      if (txns.length > 0) {
-        txns.forEach((tx) => tx.sign([authority]));
-        totalTxns += txns.length;
+    const results = await Promise.all(allBatchTasks);
 
-        try {
-          const confirmed = await bulkSendRawTransactions(
-            sendConnection,
-            txns.map((tx) => Buffer.from(tx.serialize()))
-          );
-          totalConfirmed += confirmed.length;
-          log(`    Sent: ${confirmed.length}/${txns.length} confirmed`);
-        } catch (err: any) {
-          logErr(`    Send error: ${err.message}`);
-        }
-      }
+    for (const result of results) {
+      totalConfirmed += result.confirmed;
+      totalTxns += result.total;
     }
 
     // Track what was claimed
