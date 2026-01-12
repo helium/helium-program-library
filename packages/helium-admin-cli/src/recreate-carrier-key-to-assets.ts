@@ -22,7 +22,7 @@ interface JsonEntry {
   mobileRecipientKey: string;
   hntSignatureCount: number;
   mobileSignatureCount: number;
-  entityKey: string;
+  encodedEntityKey: string;
 }
 
 const BATCH_SIZE = 100;
@@ -131,7 +131,7 @@ export async function run(args: any = process.argv) {
             continue;
           }
 
-          const entityKeyStr = entry.entityKey;
+          const entityKeyStr = entry.encodedEntityKey;
           const symbol = asset.content.metadata.symbol;
           const isUtf8 = ["IOT OPS", "CARRIER"].includes(symbol);
           const keySerialization: "utf8" | "b58" = isUtf8 ? "utf8" : "b58";
