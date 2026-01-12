@@ -938,6 +938,10 @@ async function processBatch(
     return verifiedNoRewards.has(assetStr);
   });
 
+  log(
+    `Verified: ${verifiedNoRewards.size}, Problematic: ${problematicAssets.size}, To close: ${assetsToClose.length}`
+  );
+
   if (assetsToClose.length > 0) {
     const closedCount = await closeKeyToAssets(
       assetsToClose,

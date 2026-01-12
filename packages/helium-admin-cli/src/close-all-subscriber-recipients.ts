@@ -104,7 +104,9 @@ export async function run(args: any = process.argv) {
   console.log(`Reading input file: ${inputPath}\n`);
   const rawData = fs.readFileSync(inputPath, "utf-8");
   const entries: JsonEntry[] = JSON.parse(rawData);
-  console.log(`Loaded ${entries.length.toLocaleString()} entries from JSON file\n`);
+  console.log(
+    `Loaded ${entries.length.toLocaleString()} entries from JSON file\n`
+  );
 
   // Global counters
   let totalRecipientsProcessed = 0;
@@ -138,29 +140,33 @@ export async function run(args: any = process.argv) {
     }
   }
 
-  console.log(`Found ${mobileRecipients.length.toLocaleString()} MOBILE recipients`);
-  console.log(`Found ${hntRecipients.length.toLocaleString()} HNT recipients\n`);
+  console.log(
+    `Found ${mobileRecipients.length.toLocaleString()} MOBILE recipients`
+  );
+  console.log(
+    `Found ${hntRecipients.length.toLocaleString()} HNT recipients\n`
+  );
 
   async function processAndSendBatch(
     subscriberRecipients: SubscriberRecipient[],
     batchNum: number,
     distributorType: "MOBILE" | "HNT"
   ): Promise<void> {
-    console.log(
-      `\n--- ${distributorType} Batch ${batchNum}: ${subscriberRecipients.length.toLocaleString()} recipients ---`
-    );
-
+    const prefix = `[${distributorType} ${batchNum}]`;
     totalRecipientsProcessed += subscriberRecipients.length;
 
     if (subscriberRecipients.length === 0) {
       return;
     }
 
+    console.log(
+      `${prefix} Processing ${subscriberRecipients.length.toLocaleString()} recipients...`
+    );
+
     // 1. Verify recipients still exist (skip already closed)
-    console.log(`  Verifying ${subscriberRecipients.length.toLocaleString()} recipients exist...`);
     const recipientAddresses = subscriberRecipients.map((r) => r.address);
-    const verifyChunks = chunks(recipientAddresses, 50);
-    const verifyLimiter = pLimit(5);
+    const verifyChunks = chunks(recipientAddresses, 100);
+    const verifyLimiter = pLimit(10);
     const existingRecipients = new Set<string>();
 
     await Promise.all(
@@ -176,7 +182,7 @@ export async function run(args: any = process.argv) {
             });
           } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            console.error(`  Error verifying recipients: ${message}`);
+            console.error(`${prefix} Error verifying recipients: ${message}`);
           }
         })
       )
@@ -188,22 +194,18 @@ export async function run(args: any = process.argv) {
     const alreadyClosed = subscriberRecipients.length - validRecipients.length;
     totalAlreadyClosed += alreadyClosed;
 
-    if (alreadyClosed > 0) {
-      console.log(`  ${alreadyClosed.toLocaleString()} already closed`);
-    }
-
     if (validRecipients.length === 0) {
+      console.log(`${prefix} All ${alreadyClosed} already closed`);
       return;
     }
 
     // 2. Verify keyToAsset accounts are closed
-    console.log(`  Verifying ${validRecipients.length.toLocaleString()} keyToAsset accounts are closed...`);
     const keyToAssetAddresses = validRecipients.map((r) => {
       return keyToAssetKey(dao, r.entityKey, "b58")[0];
     });
 
-    const keyToAssetChunks = chunks(keyToAssetAddresses, 50);
-    const keyToAssetLimiter = pLimit(5);
+    const keyToAssetChunks = chunks(keyToAssetAddresses, 100);
+    const keyToAssetLimiter = pLimit(10);
     const existingKeyToAssets = new Set<string>();
 
     await Promise.all(
@@ -219,7 +221,7 @@ export async function run(args: any = process.argv) {
             });
           } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            console.error(`  Error verifying keyToAsset: ${message}`);
+            console.error(`${prefix} Error verifying keyToAsset: ${message}`);
           }
         })
       )
@@ -231,19 +233,14 @@ export async function run(args: any = process.argv) {
     const keyToAssetOpen = validRecipients.length - recipientsReady.length;
     totalKeyToAssetOpen += keyToAssetOpen;
 
-    if (keyToAssetOpen > 0) {
-      console.log(`  ${keyToAssetOpen.toLocaleString()} skipped (keyToAsset not yet closed)`);
-    }
-
     if (recipientsReady.length === 0) {
+      console.log(
+        `${prefix} ${keyToAssetOpen} skipped (keyToAsset not closed)`
+      );
       return;
     }
 
     // 3. Build instructions
-    console.log(
-      `  Building ${recipientsReady.length.toLocaleString()} instructions...`
-    );
-
     const recipientChunks = chunks(recipientsReady, 50);
     const instructionLimiter = pLimit(10);
     let failedCount = 0;
@@ -254,8 +251,14 @@ export async function run(args: any = process.argv) {
           const results = await Promise.all(
             chunk.map(async (recipient) => {
               try {
-                const entityKeyBytes = Buffer.from(bs58.decode(recipient.entityKey));
-                const keyToAsset = keyToAssetKey(dao, recipient.entityKey, "b58")[0];
+                const entityKeyBytes = Buffer.from(
+                  bs58.decode(recipient.entityKey)
+                );
+                const keyToAsset = keyToAssetKey(
+                  dao,
+                  recipient.entityKey,
+                  "b58"
+                )[0];
 
                 return await rewardsOracleProgram.methods
                   .tempCloseRecipientWrapperV0({
@@ -290,14 +293,11 @@ export async function run(args: any = process.argv) {
     totalInstructionsFailed += failedCount;
 
     if (instructions.length === 0) {
-      console.log(`  No valid instructions`);
+      console.log(`${prefix} No valid instructions`);
       return;
     }
 
     // 4. Batch into transactions
-    console.log(
-      `  Batching ${instructions.length.toLocaleString()} instructions...`
-    );
     const txns = await batchInstructionsToTxsWithPriorityFee(
       provider,
       instructions,
@@ -306,87 +306,71 @@ export async function run(args: any = process.argv) {
         computeUnitLimit: 600000,
       }
     );
-    instructions.length = 0;
-
-    console.log(`  Prepared ${txns.length} transactions`);
 
     if (!argv.commit) {
-      console.log(`  (dry run - would send ${txns.length} transactions)`);
+      console.log(
+        `${prefix} ${recipientsReady.length} ready, ${txns.length} txns [dry run]`
+      );
       return;
     }
 
     // 5. Sign and send transactions
-    console.log(`  Sending ${txns.length} transactions...`);
-
     const recentBlockhash = await sendConnection.getLatestBlockhash(
       "confirmed"
     );
 
-    const TX_SIGN_CHUNK = 100;
-    const txChunks = chunks(txns, TX_SIGN_CHUNK);
-    let batchConfirmed = 0;
+    const signedTxns = await Promise.all(
+      txns.map(async (draft) => {
+        await populateMissingDraftInfo(provider.connection, draft);
+        const tx = toVersionedTx({
+          ...draft,
+          recentBlockhash: recentBlockhash.blockhash,
+        });
+        tx.sign(extraSigners);
+        return tx;
+      })
+    );
 
-    for (let txChunkIdx = 0; txChunkIdx < txChunks.length; txChunkIdx++) {
-      const txChunk = txChunks[txChunkIdx];
-
-      const signedTxns = await Promise.all(
-        txChunk.map(async (draft) => {
-          await populateMissingDraftInfo(provider.connection, draft);
-          const tx = toVersionedTx({
-            ...draft,
-            recentBlockhash: recentBlockhash.blockhash,
-          });
-          tx.sign(extraSigners);
-          return tx;
-        })
+    try {
+      const confirmedTxs = await bulkSendRawTransactions(
+        sendConnection,
+        signedTxns.map((tx) => Buffer.from(tx.serialize())),
+        undefined,
+        recentBlockhash.lastValidBlockHeight
       );
 
-      try {
-        const confirmedTxs = await bulkSendRawTransactions(
-          sendConnection,
-          signedTxns.map((tx) => Buffer.from(tx.serialize())),
-          undefined,
-          recentBlockhash.lastValidBlockHeight
-        );
-
-        batchConfirmed += confirmedTxs.length;
-        totalTxnsConfirmed += confirmedTxs.length;
-
-        if (txChunks.length > 1) {
-          console.log(
-            `    Chunk ${txChunkIdx + 1}/${txChunks.length}: ${
-              confirmedTxs.length
-            }/${txChunk.length} confirmed`
-          );
-        }
-      } catch (err: unknown) {
-        totalTxnsFailed += txChunk.length;
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`    Error sending chunk: ${message}`);
-      }
-    }
-
-    console.log(`  ✓ ${batchConfirmed}/${txns.length} transactions confirmed`);
-    txns.length = 0;
-  }
-
-  // Process MOBILE recipients
-  if (mobileRecipients.length > 0) {
-    console.log(`\n=== Processing MOBILE recipients ===\n`);
-    const mobileBatches = chunks(mobileRecipients, BATCH_SIZE);
-    for (let i = 0; i < mobileBatches.length; i++) {
-      await processAndSendBatch(mobileBatches[i], i + 1, "MOBILE");
+      totalTxnsConfirmed += confirmedTxs.length;
+      console.log(
+        `${prefix} ✓ ${confirmedTxs.length}/${txns.length} txns confirmed`
+      );
+    } catch (err: unknown) {
+      totalTxnsFailed += txns.length;
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`${prefix} Send error: ${message}`);
     }
   }
 
-  // Process HNT recipients
-  if (hntRecipients.length > 0) {
-    console.log(`\n=== Processing HNT recipients ===\n`);
-    const hntBatches = chunks(hntRecipients, BATCH_SIZE);
-    for (let i = 0; i < hntBatches.length; i++) {
-      await processAndSendBatch(hntBatches[i], i + 1, "HNT");
-    }
-  }
+  // Process MOBILE and HNT recipients in parallel batches
+  const PARALLEL_BATCHES = 5;
+  const batchLimiter = pLimit(PARALLEL_BATCHES);
+
+  const mobileBatches = chunks(mobileRecipients, BATCH_SIZE);
+  const hntBatches = chunks(hntRecipients, BATCH_SIZE);
+
+  console.log(
+    `\n=== Processing ${mobileBatches.length} MOBILE + ${hntBatches.length} HNT batches (${PARALLEL_BATCHES} parallel) ===\n`
+  );
+
+  const allBatchTasks = [
+    ...mobileBatches.map((batch, idx) =>
+      batchLimiter(() => processAndSendBatch(batch, idx + 1, "MOBILE"))
+    ),
+    ...hntBatches.map((batch, idx) =>
+      batchLimiter(() => processAndSendBatch(batch, idx + 1, "HNT"))
+    ),
+  ];
+
+  await Promise.all(allBatchTasks);
 
   // Final summary
   console.log(`\n========================================`);
