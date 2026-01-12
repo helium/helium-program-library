@@ -65,7 +65,6 @@ type KeyToAssetInfo = {
   isHardcoded: boolean;
 };
 
-
 type RunningTotals = {
   claimedMobile: BN;
   claimedHnt: BN;
@@ -1096,9 +1095,7 @@ export async function run(args: any = process.argv) {
       argv.commit as boolean,
       problematicAssets
     );
-    totals.claimedMobile = totals.claimedMobile.add(
-      claimResult.claimedMobile
-    );
+    totals.claimedMobile = totals.claimedMobile.add(claimResult.claimedMobile);
     totals.claimedHnt = totals.claimedHnt.add(claimResult.claimedHnt);
     totals.claimedTransactions += claimResult.transactions;
     hardcodedVerifiedNoRewards = claimResult.verifiedNoRewards;
