@@ -146,6 +146,7 @@ export async function run(args: any = process.argv) {
             entityKeyStr,
             keySerialization
           );
+
           const expectedKeyToAsset = new PublicKey(entry.address);
 
           if (!derivedKeyToAsset.equals(expectedKeyToAsset)) {

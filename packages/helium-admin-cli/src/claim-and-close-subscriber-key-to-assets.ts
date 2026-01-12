@@ -2,11 +2,11 @@ import * as anchor from "@coral-xyz/anchor";
 import * as client from "@helium/distributor-oracle";
 import {
   init as initHem,
-  keyToAssetForAsset,
   rewardableEntityConfigKey,
   iotInfoKey,
   mobileInfoKey,
   decodeEntityKey,
+  keyToAssetKey,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
@@ -14,12 +14,10 @@ import {
   lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
 import { init as initRewards } from "@helium/rewards-oracle-sdk";
-import { init as initMem } from "@helium/mobile-entity-manager-sdk";
 import {
   HNT_MINT,
   MOBILE_MINT,
   IOT_MINT,
-  getAssetsByGroup,
   batchInstructionsToTxsWithPriorityFee,
   bulkSendRawTransactions,
   toVersionedTx,
@@ -30,6 +28,8 @@ import {
 } from "@helium/spl-utils";
 import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
+import bs58 from "bs58";
+import fs from "fs";
 import os from "os";
 import pLimit from "p-limit";
 import yargs from "yargs/yargs";
@@ -38,11 +38,20 @@ import { loadKeypair } from "./utils";
 // Token decimals
 const MOBILE_DECIMALS = 6;
 const HNT_DECIMALS = 8;
-const DAS_BATCH_SIZE = 1000;
 // Batch size for processing assets
 const PROCESS_BATCH_SIZE = 10000;
 // Number of batches to process in parallel
 const PARALLEL_BATCHES = 4;
+
+interface JsonEntry {
+  address: string;
+  asset: string;
+  hntRecipientKey: string;
+  mobileRecipientKey: string;
+  hntSignatureCount: number;
+  mobileSignatureCount: number;
+  encodedEntityKey: string;
+}
 
 // Helper to format token amounts
 const toMobile = (amount: BN) => humanReadable(amount, MOBILE_DECIMALS);
@@ -77,32 +86,6 @@ type ProblematicAsset = {
   asset: PublicKey;
   keyToAsset: PublicKey;
 };
-
-// Retry wrapper for DAS calls with exponential backoff
-async function getAssetsWithRetry(
-  endpoint: string,
-  params: any,
-  maxRetries = 5
-) {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await getAssetsByGroup(endpoint, params);
-    } catch (err: any) {
-      if (attempt === maxRetries - 1) {
-        throw err;
-      }
-      const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
-      const errorMsg = err.message || err.toString();
-      console.log(
-        `    Error: ${errorMsg.substring(0, 80)}... retrying in ${
-          delay / 1000
-        }s (attempt ${attempt + 1}/${maxRetries})`
-      );
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-  throw new Error("Max retries exceeded");
-}
 
 async function formBulkTransactionsWithRetry(
   lazyProgram: any,
@@ -246,6 +229,7 @@ async function claimRewardsForBatch(
   // Also build asset -> keyToAsset map for tracking problematic assets
   const assetToKeyToAsset = new Map<string, PublicKey>();
 
+  let decodeFailures = 0;
   assets.forEach(({ assetId, keyToAsset, entityKey }) => {
     const entityKeyStr = decodeEntityKey(entityKey, { b58: {} });
     if (entityKeyStr) {
@@ -255,8 +239,14 @@ async function claimRewardsForBatch(
         entityKey,
       });
       assetToKeyToAsset.set(assetId.toBase58(), keyToAsset);
+    } else {
+      decodeFailures++;
     }
   });
+
+  if (decodeFailures > 0) {
+    logErr(`⚠️ Failed to decode ${decodeFailures} entity keys`);
+  }
 
   const entityKeys = Array.from(entityKeyToAsset.keys());
   const rewardsChunks = chunks(entityKeys, 5000);
@@ -279,6 +269,8 @@ async function claimRewardsForBatch(
     let mobilePendingRewards: Record<string, string> = {};
     let hntPendingRewards: Record<string, string> = {};
     let rewardsFetchSucceeded = false;
+
+    log(`  Fetching pending rewards (${entityKeys.length} keys)...`);
 
     try {
       const pendingResults = await Promise.all([
@@ -365,6 +357,11 @@ async function claimRewardsForBatch(
       }
     });
 
+    const assetsWithZero = entityKeys.length - assetsWithRewards;
+    log(
+      `  Checked ${entityKeys.length}: ${assetsWithRewards} with rewards, ${assetsWithZero} with zero (${assetsToClaimMobile.length} MOBILE, ${assetsToClaimHnt.length} HNT)`
+    );
+
     if (assetsWithRewards === 0) {
       if (!rewardsFetchSucceeded) {
         logErr("⚠️ Failed to fetch rewards from oracles");
@@ -389,7 +386,10 @@ async function claimRewardsForBatch(
     let mergedHntBulkRewards: client.BulkRewards[] = [];
 
     if (mobileEntityKeysWithRewards.length > 0) {
-      const mobileChunks = chunks(mobileEntityKeysWithRewards, 5000);
+      log(
+        `  Fetching bulk rewards for ${mobileEntityKeysWithRewards.length} MOBILE assets...`
+      );
+      const mobileChunks = chunks(mobileEntityKeysWithRewards, 2500);
       const mobileBulkResults = await Promise.all(
         mobileChunks.map((chunk) =>
           rewardsLimiter(() =>
@@ -419,7 +419,10 @@ async function claimRewardsForBatch(
     }
 
     if (hntEntityKeysWithRewards.length > 0) {
-      const hntChunks = chunks(hntEntityKeysWithRewards, 5000);
+      log(
+        `  Fetching bulk rewards for ${hntEntityKeysWithRewards.length} HNT assets...`
+      );
+      const hntChunks = chunks(hntEntityKeysWithRewards, 2500);
       const hntBulkResults = await Promise.all(
         hntChunks.map((chunk) =>
           rewardsLimiter(() =>
@@ -497,6 +500,10 @@ async function claimRewardsForBatch(
     const mobileClaimChunks = chunks(mobileClaimsToProcess, 100);
     const hntClaimChunks = chunks(hntClaimsToProcess, 100);
 
+    log(
+      `  Building claim txns: ${mobileClaimChunks.length} MOBILE chunks, ${hntClaimChunks.length} HNT chunks...`
+    );
+
     const [mobileBatchTxns, hntBatchTxns] = await Promise.all([
       Promise.all(
         mobileClaimChunks.map((chunk) =>
@@ -553,7 +560,10 @@ async function claimRewardsForBatch(
 
     if (!commit) {
       log(
-        `Rewards: ${assetsWithRewards} pending (${txns.length} txns) [dry run]`
+        `Rewards: ${assetsWithRewards} with pending, ${assetsWithZero} with zero (${txns.length} claim txns) [dry run]`
+      );
+      log(
+        `  With --commit: would claim ${assetsWithRewards}, then close all ${entityKeys.length} after verification`
       );
       break;
     }
@@ -832,9 +842,9 @@ async function closeKeyToAssets(
   return totalClosed;
 }
 
-// Process a batch of assets: extract keys, check recipients, claim rewards, close accounts
+// Process a batch of KeyToAssetInfo entries: claim rewards, close accounts
 async function processBatch(
-  assets: any[],
+  keyToAssetInfos: KeyToAssetInfo[],
   dao: PublicKey,
   hemProgram: any,
   lazyProgram: any,
@@ -853,122 +863,39 @@ async function processBatch(
   logPrefix: string = ""
 ): Promise<void> {
   const log = (msg: string) => console.log(`${logPrefix}${msg}`);
-  const logErr = (msg: string) => console.error(`${logPrefix}${msg}`);
-
-  // 1. Filter to only SUBSCRIBER assets (carrier collections may contain CARRIER, SERVREWARD, MAPREWARD NFTs)
-  const subscriberAssets = assets.filter((asset) => {
-    const symbol = asset.content?.metadata?.symbol;
-    return symbol === "SUBSCRIBER";
-  });
-
-  if (subscriberAssets.length !== assets.length) {
-    log(
-      `Filtered ${
-        assets.length - subscriberAssets.length
-      } non-subscriber assets (${subscriberAssets.length} subscribers)`
-    );
-  }
-
-  if (subscriberAssets.length === 0) {
-    log("No subscriber assets to process");
-    return;
-  }
-
-  // 2. Derive keyToAsset addresses and verify they exist on-chain
-  const assetToKeyToAsset = new Map<
-    string,
-    { asset: any; keyToAsset: PublicKey }
-  >();
-
-  for (const asset of subscriberAssets) {
-    const keyToAssetAddr = keyToAssetForAsset(asset, dao);
-    const keyToAssetPubkey =
-      typeof keyToAssetAddr === "string"
-        ? new PublicKey(keyToAssetAddr)
-        : keyToAssetAddr;
-    assetToKeyToAsset.set(keyToAssetPubkey.toBase58(), {
-      asset,
-      keyToAsset: keyToAssetPubkey,
-    });
-  }
-
-  // Fetch keyToAsset accounts to verify they exist (idempotent - skips already closed)
-  const allKeyToAssetKeys = Array.from(assetToKeyToAsset.values()).map(
-    (v) => v.keyToAsset
-  );
-  const keyToAssetInfos: KeyToAssetInfo[] = [];
-  const fetchChunks = chunks(allKeyToAssetKeys, 100);
-  const fetchLimiter = pLimit(10);
-
-  await Promise.all(
-    fetchChunks.map((chunk, chunkIndex) =>
-      fetchLimiter(async () => {
-        try {
-          const accounts = await hemProgram.account.keyToAssetV0.fetchMultiple(
-            chunk
-          );
-          accounts.forEach((account: any, index: number) => {
-            if (account) {
-              const keyToAssetKey = chunk[index];
-              const info = assetToKeyToAsset.get(keyToAssetKey.toBase58());
-              if (info) {
-                keyToAssetInfos.push({
-                  keyToAsset: keyToAssetKey,
-                  assetId: info.asset.id,
-                  entityKey: Buffer.from(account.entityKey),
-                  isHardcoded: false,
-                });
-              }
-            }
-          });
-        } catch (err: any) {
-          logErr(`Error fetching key_to_asset chunk: ${err.message}`);
-        }
-      })
-    )
-  );
 
   if (keyToAssetInfos.length === 0) {
-    log(
-      `${assets.length.toLocaleString()} assets → 0 open accounts (all closed)`
-    );
+    log("No entries to process");
     return;
   }
 
   // Summary log for this batch
-  log(
-    `${assets.length.toLocaleString()} assets → ${keyToAssetInfos.length.toLocaleString()} open`
+  log(`Processing ${keyToAssetInfos.length.toLocaleString()} entries`);
+
+  // Claim rewards for ALL entries (formBulkTransactions will init recipients as needed)
+  let verifiedNoRewards = new Set<string>();
+  const claimResult = await claimRewardsForBatch(
+    keyToAssetInfos,
+    lazyProgram,
+    rewardsOracleProgram,
+    mobileLazyDistributor,
+    hntLazyDistributor,
+    authority,
+    provider,
+    commit,
+    problematicAssets,
+    logPrefix
   );
 
-  // 2. Claim rewards for ALL assets (formBulkTransactions will init recipients as needed)
-  let verifiedNoRewards = new Set<string>();
-  if (keyToAssetInfos.length > 0) {
-    const claimResult = await claimRewardsForBatch(
-      keyToAssetInfos,
-      lazyProgram,
-      rewardsOracleProgram,
-      mobileLazyDistributor,
-      hntLazyDistributor,
-      authority,
-      provider,
-      commit,
-      problematicAssets,
-      logPrefix
-    );
+  totals.claimedMobile = totals.claimedMobile.add(claimResult.claimedMobile);
+  totals.claimedHnt = totals.claimedHnt.add(claimResult.claimedHnt);
+  totals.claimedTransactions += claimResult.transactions;
+  verifiedNoRewards = claimResult.verifiedNoRewards;
 
-    totals.claimedMobile = totals.claimedMobile.add(claimResult.claimedMobile);
-    totals.claimedHnt = totals.claimedHnt.add(claimResult.claimedHnt);
-    totals.claimedTransactions += claimResult.transactions;
-    verifiedNoRewards = claimResult.verifiedNoRewards;
-  }
-
-  // 3. Close accounts - only close if verified to have 0 remaining rewards
-  //    (formBulkTransactions handles recipient init, so all assets go through claiming)
+  // Close accounts - only close if verified to have 0 remaining rewards
   const assetsToClose = keyToAssetInfos.filter((k) => {
     const assetStr = k.assetId.toBase58();
-    // Never close problematic assets
     if (problematicAssets.has(assetStr)) return false;
-    // Only close if verified to have no remaining rewards
     return verifiedNoRewards.has(assetStr);
   });
 
@@ -1005,6 +932,12 @@ export async function run(args: any = process.argv) {
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
     },
+    inputFile: {
+      alias: "i",
+      type: "string",
+      required: true,
+      describe: "Path to JSON file with subscriber entries",
+    },
     authority: {
       type: "string",
       describe: "Path to the authority keypair. Defaults to wallet.",
@@ -1025,7 +958,6 @@ export async function run(args: any = process.argv) {
   const lazyProgram = await initLazy(provider);
   const hemProgram = await initHem(provider);
   const rewardsOracleProgram = await initRewards(provider);
-  const memProgram = await initMem(provider);
 
   const authority = argv.authority
     ? loadKeypair(argv.authority as string)
@@ -1051,10 +983,17 @@ export async function run(args: any = process.argv) {
   // Track problematic assets that fail claiming
   const problematicAssets = new Map<string, ProblematicAsset>();
 
-  console.log("=== INCREMENTAL BATCH PROCESSING ===\n");
+  // Read input file
+  const inputPath = argv.inputFile as string;
+  console.log(`Reading input file: ${inputPath}\n`);
+  const rawData = fs.readFileSync(inputPath, "utf-8");
+  const entries: JsonEntry[] = JSON.parse(rawData);
   console.log(
-    `DAS fetch size: ${DAS_BATCH_SIZE.toLocaleString()}, Process batch size: ${PROCESS_BATCH_SIZE.toLocaleString()}\n`
+    `Loaded ${entries.length.toLocaleString()} entries from JSON file\n`
   );
+
+  console.log("=== BATCH PROCESSING ===\n");
+  console.log(`Process batch size: ${PROCESS_BATCH_SIZE.toLocaleString()}\n`);
 
   // ========== Process hardcoded accounts first ==========
   console.log("--- Processing hardcoded accounts ---\n");
@@ -1079,7 +1018,6 @@ export async function run(args: any = process.argv) {
   if (hardcodedInfos.length > 0) {
     console.log(`Found ${hardcodedInfos.length} hardcoded accounts to process`);
 
-    // Claim rewards for ALL hardcoded accounts (formBulkTransactions will init recipients as needed)
     let hardcodedVerifiedNoRewards = new Set<string>();
     console.log(
       `Claiming rewards for ${hardcodedInfos.length} hardcoded accounts...`
@@ -1100,7 +1038,6 @@ export async function run(args: any = process.argv) {
     totals.claimedTransactions += claimResult.transactions;
     hardcodedVerifiedNoRewards = claimResult.verifiedNoRewards;
 
-    // Close hardcoded accounts - only those verified to have no remaining rewards
     const hardcodedToClose = hardcodedInfos.filter((k) => {
       const assetStr = k.assetId.toBase58();
       if (problematicAssets.has(assetStr)) return false;
@@ -1126,85 +1063,79 @@ export async function run(args: any = process.argv) {
     console.log("All hardcoded accounts already closed");
   }
 
-  // ========== Process subscriber collections incrementally ==========
-  console.log("\n--- Processing subscriber collections ---\n");
+  // ========== Process subscriber entries from input file ==========
+  console.log("\n--- Processing subscriber entries from input file ---\n");
 
-  // Fetch all CarrierV0 accounts to get subscriber collections
-  console.log("Fetching CarrierV0 accounts...");
-  const carriers = await memProgram.account.carrierV0.all();
-  const subscriberCollections = new Set<string>();
-  for (const carrier of carriers) {
-    subscriberCollections.add(carrier.account.collection.toBase58());
-  }
+  // Convert entries to KeyToAssetInfo, filtering to only those that exist on-chain
+  console.log("Verifying KeyToAsset accounts exist on-chain...");
+
+  const allKeyToAssetInfos: KeyToAssetInfo[] = [];
+  const entryChunks = chunks(entries, 100);
+  const fetchLimiter = pLimit(10);
+  let verifiedCount = 0;
+
+  await Promise.all(
+    entryChunks.map((chunk) =>
+      fetchLimiter(async () => {
+        const keyToAssetKeys = chunk.map((e) => new PublicKey(e.address));
+        try {
+          const accounts = await hemProgram.account.keyToAssetV0.fetchMultiple(
+            keyToAssetKeys
+          );
+          accounts.forEach((account: any, index: number) => {
+            if (account) {
+              const entry = chunk[index];
+              allKeyToAssetInfos.push({
+                keyToAsset: new PublicKey(entry.address),
+                assetId: new PublicKey(entry.asset),
+                entityKey: Buffer.from(bs58.decode(entry.encodedEntityKey)),
+                isHardcoded: HARDCODED_KEY_TO_ASSETS.some((h) =>
+                  h.equals(new PublicKey(entry.address))
+                ),
+              });
+            }
+          });
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`Error fetching keyToAsset chunk: ${message}`);
+        }
+        verifiedCount += chunk.length;
+        if (verifiedCount % 1000 === 0 || verifiedCount >= entries.length) {
+          process.stdout.write(
+            `\r  Verified ${verifiedCount.toLocaleString()} / ${entries.length.toLocaleString()} entries`
+          );
+        }
+      })
+    )
+  );
+  console.log(); // newline
+
   console.log(
-    `Found ${subscriberCollections.size} subscriber collection(s) from ${carriers.length} carriers\n`
+    `\nFound ${allKeyToAssetInfos.length.toLocaleString()} open KeyToAsset accounts\n`
   );
 
-  if (subscriberCollections.size === 0) {
-    console.log("No subscriber collections found");
-  }
-
-  // Process each collection with parallel batch processing
-  const batchLimiter = pLimit(PARALLEL_BATCHES);
-  let collectionIndex = 0;
-
-  for (const collection of subscriberCollections) {
-    collectionIndex++;
-    console.log(
-      `\n=== Collection ${collectionIndex}/${subscriberCollections.size}: ${collection} ===\n`
-    );
-
-    // Fetch all assets for this collection first
-    console.log("Fetching all assets from DAS...");
-    let cursor: string | undefined = undefined;
-    let allAssets: any[] = [];
-    let fetchCount = 0;
-
-    while (true) {
-      const result = await getAssetsWithRetry(provider.connection.rpcEndpoint, {
-        groupValue: collection,
-        limit: DAS_BATCH_SIZE,
-        cursor,
-      });
-
-      allAssets.push(...result.items);
-      fetchCount++;
-
-      if (fetchCount % 25 === 0) {
-        console.log(
-          `  Fetched ${allAssets.length.toLocaleString()} assets so far...`
-        );
-      }
-
-      if (!result.cursor) {
-        break;
-      }
-      cursor = result.cursor;
-    }
-
-    console.log(`Fetched ${allAssets.length.toLocaleString()} total assets\n`);
-
-    if (allAssets.length === 0) {
-      continue;
-    }
-
+  if (allKeyToAssetInfos.length === 0) {
+    console.log("No open KeyToAsset accounts to process");
+  } else {
     // Split into batches
-    const batches = chunks(allAssets, PROCESS_BATCH_SIZE);
+    const batches = chunks(allKeyToAssetInfos, PROCESS_BATCH_SIZE);
     console.log(
       `Processing ${
         batches.length
-      } batches of up to ${PROCESS_BATCH_SIZE.toLocaleString()} assets (${PARALLEL_BATCHES} parallel)\n`
+      } batches of up to ${PROCESS_BATCH_SIZE.toLocaleString()} entries (${PARALLEL_BATCHES} parallel)\n`
     );
 
     // Process batches in parallel
+    const batchLimiter = pLimit(PARALLEL_BATCHES);
     let completedBatches = 0;
+
     await Promise.all(
       batches.map((batch, batchIndex) =>
         batchLimiter(async () => {
           const batchNum = batchIndex + 1;
           const prefix = `[Batch ${batchNum}/${batches.length}] `;
           console.log(
-            `\n${prefix}Starting (${batch.length.toLocaleString()} assets)`
+            `\n${prefix}Starting (${batch.length.toLocaleString()} entries)`
           );
           await processBatch(
             batch,
@@ -1232,9 +1163,6 @@ export async function run(args: any = process.argv) {
         })
       )
     );
-
-    // Clear for GC
-    allAssets = [];
   }
 
   // ========== Summary ==========
@@ -1258,7 +1186,7 @@ export async function run(args: any = process.argv) {
   }
 
   if (!argv.commit) {
-    console.log("\nDry run complete. Re-run with --commit to execute 🚀");
+    console.log("\nDry run complete. Re-run with --commit to execute");
   } else {
     console.log("\n✓ Complete!");
   }

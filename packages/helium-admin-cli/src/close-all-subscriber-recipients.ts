@@ -9,11 +9,9 @@ import {
   lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
 import { init as initRewards } from "@helium/rewards-oracle-sdk";
-import { init as initMem } from "@helium/mobile-entity-manager-sdk";
 import {
   HNT_MINT,
   MOBILE_MINT,
-  getAssetBatch,
   batchInstructionsToTxsWithPriorityFee,
   bulkSendRawTransactions,
   toVersionedTx,
@@ -22,19 +20,28 @@ import {
 } from "@helium/spl-utils";
 import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import bs58 from "bs58";
+import fs from "fs";
 import os from "os";
 import pLimit from "p-limit";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
 
-const PAGE_SIZE = 1000;
 const BATCH_SIZE = 2500;
 
-// Minimal data type for recipients
+interface JsonEntry {
+  address: string;
+  asset: string;
+  hntRecipientKey: string;
+  mobileRecipientKey: string;
+  hntSignatureCount: number;
+  mobileSignatureCount: number;
+  encodedEntityKey: string;
+}
+
 type SubscriberRecipient = {
   address: PublicKey;
   assetId: string;
-  assetJsonUri: string;
+  entityKey: string;
   lazyDistributor: PublicKey;
 };
 
@@ -49,6 +56,12 @@ export async function run(args: any = process.argv) {
       alias: "u",
       default: "http://127.0.0.1:8899",
       describe: "The solana url",
+    },
+    inputFile: {
+      alias: "i",
+      type: "string",
+      required: true,
+      describe: "Path to JSON file with subscriber entries",
     },
     authority: {
       type: "string",
@@ -69,7 +82,6 @@ export async function run(args: any = process.argv) {
 
   const lazyProgram = await initLazy(provider);
   const rewardsOracleProgram = await initRewards(provider);
-  const memProgram = await initMem(provider);
   const hemProgram = await initHem(provider);
 
   const authority = argv.authority
@@ -80,32 +92,22 @@ export async function run(args: any = process.argv) {
   const mobileLazyDistributor = lazyDistributorKey(MOBILE_MINT)[0];
   const hntLazyDistributor = lazyDistributorKey(HNT_MINT)[0];
 
-  // Use fresh connection for sending
   const sendConnection = new Connection(
     provider.connection.rpcEndpoint,
     "confirmed"
   );
 
-  // Sign with authority
   const extraSigners = [authority];
 
-  // Fetch all subscriber collections
-  console.log(
-    "Fetching CarrierV0 accounts to identify subscriber collections..."
-  );
-  const carriers = await memProgram.account.carrierV0.all();
-  const subscriberCollections = new Set<string>();
-  for (const carrier of carriers) {
-    subscriberCollections.add(carrier.account.collection.toBase58());
-  }
-  console.log(
-    `  Found ${subscriberCollections.size} subscriber collection(s) from ${carriers.length} carriers\n`
-  );
+  // Read input file
+  const inputPath = argv.inputFile as string;
+  console.log(`Reading input file: ${inputPath}\n`);
+  const rawData = fs.readFileSync(inputPath, "utf-8");
+  const entries: JsonEntry[] = JSON.parse(rawData);
+  console.log(`Loaded ${entries.length.toLocaleString()} entries from JSON file\n`);
 
   // Global counters
-  let totalRecipientsFetched = 0;
-  let totalSubscribersFound = 0;
-  let totalNonSubscribers = 0;
+  let totalRecipientsProcessed = 0;
   let totalAlreadyClosed = 0;
   let totalKeyToAssetOpen = 0;
   let totalInstructionsBuilt = 0;
@@ -113,116 +115,49 @@ export async function run(args: any = process.argv) {
   let totalTxnsConfirmed = 0;
   let totalTxnsFailed = 0;
 
-  // Helper to extract entity key from json_uri
-  const getEntityKeyFromUri = (jsonUri: string): string => {
-    const entityKeyStr = jsonUri.split("/").pop() || "";
-    return entityKeyStr.split(/[.?#]/)[0];
-  };
+  // Build recipient lists from input file
+  const mobileRecipients: SubscriberRecipient[] = [];
+  const hntRecipients: SubscriberRecipient[] = [];
 
-  async function fetchAssetBatchWithRetry(chunk: PublicKey[], maxRetries = 5) {
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const result = await getAssetBatch(
-          provider.connection.rpcEndpoint,
-          chunk
-        );
-        return result || [];
-      } catch (err: any) {
-        if (attempt === maxRetries - 1) {
-          throw err;
-        }
-        const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
+  for (const entry of entries) {
+    if (entry.mobileRecipientKey && entry.mobileRecipientKey !== "") {
+      mobileRecipients.push({
+        address: new PublicKey(entry.mobileRecipientKey),
+        assetId: entry.asset,
+        entityKey: entry.encodedEntityKey,
+        lazyDistributor: mobileLazyDistributor,
+      });
     }
-    throw new Error("Max retries exceeded");
+    if (entry.hntRecipientKey && entry.hntRecipientKey !== "") {
+      hntRecipients.push({
+        address: new PublicKey(entry.hntRecipientKey),
+        assetId: entry.asset,
+        entityKey: entry.encodedEntityKey,
+        lazyDistributor: hntLazyDistributor,
+      });
+    }
   }
 
-  // Process a batch: filter subscribers, verify, build instructions, send transactions
+  console.log(`Found ${mobileRecipients.length.toLocaleString()} MOBILE recipients`);
+  console.log(`Found ${hntRecipients.length.toLocaleString()} HNT recipients\n`);
+
   async function processAndSendBatch(
-    batch: any[],
+    subscriberRecipients: SubscriberRecipient[],
     batchNum: number,
-    lazyDistributor: PublicKey,
     distributorType: "MOBILE" | "HNT"
   ): Promise<void> {
     console.log(
-      `\n--- ${distributorType} Batch ${batchNum}: ${batch.length.toLocaleString()} recipients ---`
+      `\n--- ${distributorType} Batch ${batchNum}: ${subscriberRecipients.length.toLocaleString()} recipients ---`
     );
 
-    // 1. Fetch assets for this batch
-    const assetIds = batch.map((r) => r.account.asset);
-    console.log(`  Fetching ${assetIds.length.toLocaleString()} assets...`);
-
-    const assetChunks = chunks(assetIds, 100);
-    const assetLimiter = pLimit(3);
-    let fetchedCount = 0;
-
-    const assetResults = await Promise.all(
-      assetChunks.map((chunk) =>
-        assetLimiter(async () => {
-          const result = await fetchAssetBatchWithRetry(chunk);
-          fetchedCount += chunk.length;
-          if (fetchedCount % 500 === 0 || fetchedCount >= assetIds.length) {
-            process.stdout.write(
-              `\r  Fetched ${fetchedCount.toLocaleString()} / ${assetIds.length.toLocaleString()} assets`
-            );
-          }
-          return result;
-        })
-      )
-    );
-    console.log(); // newline after progress
-
-    const assets = assetResults.flat();
-    assetResults.length = 0;
-
-    // 2. Filter for SUBSCRIBER assets only
-    const subscriberRecipients: SubscriberRecipient[] = [];
-    let batchNonSubscribers = 0;
-
-    batch.forEach((recipient, index) => {
-      const asset = assets[index];
-      if (!asset) {
-        batchNonSubscribers++;
-        return;
-      }
-
-      const assetCollection = asset.grouping?.find(
-        (g: any) => g.group_key === "collection"
-      )?.group_value;
-
-      const assetSymbol = asset.content?.metadata?.symbol;
-      const isSubscriber = assetSymbol === "SUBSCRIBER";
-
-      if (
-        isSubscriber &&
-        assetCollection &&
-        subscriberCollections.has(assetCollection.toBase58())
-      ) {
-        subscriberRecipients.push({
-          address: recipient.publicKey,
-          assetId:
-            typeof asset.id === "string" ? asset.id : asset.id.toBase58(),
-          assetJsonUri: asset.content?.json_uri || "",
-          lazyDistributor,
-        });
-      } else {
-        batchNonSubscribers++;
-      }
-    });
-
-    totalNonSubscribers += batchNonSubscribers;
-    totalSubscribersFound += subscriberRecipients.length;
-
-    console.log(
-      `  Found ${subscriberRecipients.length.toLocaleString()} subscribers, ${batchNonSubscribers.toLocaleString()} non-subscribers`
-    );
+    totalRecipientsProcessed += subscriberRecipients.length;
 
     if (subscriberRecipients.length === 0) {
       return;
     }
 
-    // 3. Verify recipients still exist (skip already closed)
+    // 1. Verify recipients still exist (skip already closed)
+    console.log(`  Verifying ${subscriberRecipients.length.toLocaleString()} recipients exist...`);
     const recipientAddresses = subscriberRecipients.map((r) => r.address);
     const verifyChunks = chunks(recipientAddresses, 50);
     const verifyLimiter = pLimit(5);
@@ -239,8 +174,9 @@ export async function run(args: any = process.argv) {
                 existingRecipients.add(chunk[idx].toBase58());
               }
             });
-          } catch (err: any) {
-            console.error(`  Error verifying recipients: ${err.message}`);
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`  Error verifying recipients: ${message}`);
           }
         })
       )
@@ -253,17 +189,17 @@ export async function run(args: any = process.argv) {
     totalAlreadyClosed += alreadyClosed;
 
     if (alreadyClosed > 0) {
-      console.log(`  ${alreadyClosed} already closed`);
+      console.log(`  ${alreadyClosed.toLocaleString()} already closed`);
     }
 
     if (validRecipients.length === 0) {
       return;
     }
 
-    // 4. Verify keyToAsset accounts are closed
+    // 2. Verify keyToAsset accounts are closed
+    console.log(`  Verifying ${validRecipients.length.toLocaleString()} keyToAsset accounts are closed...`);
     const keyToAssetAddresses = validRecipients.map((r) => {
-      const entityKey = getEntityKeyFromUri(r.assetJsonUri);
-      return keyToAssetKey(dao, entityKey, "b58")[0];
+      return keyToAssetKey(dao, r.entityKey, "b58")[0];
     });
 
     const keyToAssetChunks = chunks(keyToAssetAddresses, 50);
@@ -281,8 +217,9 @@ export async function run(args: any = process.argv) {
                 existingKeyToAssets.add(chunk[idx].toBase58());
               }
             });
-          } catch (err: any) {
-            console.error(`  Error verifying keyToAsset: ${err.message}`);
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`  Error verifying keyToAsset: ${message}`);
           }
         })
       )
@@ -295,14 +232,14 @@ export async function run(args: any = process.argv) {
     totalKeyToAssetOpen += keyToAssetOpen;
 
     if (keyToAssetOpen > 0) {
-      console.log(`  ${keyToAssetOpen} skipped (keyToAsset not yet closed)`);
+      console.log(`  ${keyToAssetOpen.toLocaleString()} skipped (keyToAsset not yet closed)`);
     }
 
     if (recipientsReady.length === 0) {
       return;
     }
 
-    // 5. Build instructions
+    // 3. Build instructions
     console.log(
       `  Building ${recipientsReady.length.toLocaleString()} instructions...`
     );
@@ -317,9 +254,8 @@ export async function run(args: any = process.argv) {
           const results = await Promise.all(
             chunk.map(async (recipient) => {
               try {
-                const entityKey = getEntityKeyFromUri(recipient.assetJsonUri);
-                const entityKeyBytes = Buffer.from(bs58.decode(entityKey));
-                const keyToAsset = keyToAssetKey(dao, entityKey, "b58")[0];
+                const entityKeyBytes = Buffer.from(bs58.decode(recipient.entityKey));
+                const keyToAsset = keyToAssetKey(dao, recipient.entityKey, "b58")[0];
 
                 return await rewardsOracleProgram.methods
                   .tempCloseRecipientWrapperV0({
@@ -334,7 +270,7 @@ export async function run(args: any = process.argv) {
                     authority: authority.publicKey,
                   })
                   .instruction();
-              } catch (err: any) {
+              } catch {
                 return null;
               }
             })
@@ -358,7 +294,7 @@ export async function run(args: any = process.argv) {
       return;
     }
 
-    // 6. Batch into transactions
+    // 4. Batch into transactions
     console.log(
       `  Batching ${instructions.length.toLocaleString()} instructions...`
     );
@@ -379,7 +315,7 @@ export async function run(args: any = process.argv) {
       return;
     }
 
-    // 7. Sign and send transactions
+    // 5. Sign and send transactions
     console.log(`  Sending ${txns.length} transactions...`);
 
     const recentBlockhash = await sendConnection.getLatestBlockhash(
@@ -423,9 +359,10 @@ export async function run(args: any = process.argv) {
             }/${txChunk.length} confirmed`
           );
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         totalTxnsFailed += txChunk.length;
-        console.error(`    Error sending chunk: ${err.message}`);
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`    Error sending chunk: ${message}`);
       }
     }
 
@@ -433,117 +370,30 @@ export async function run(args: any = process.argv) {
     txns.length = 0;
   }
 
-  // Main processing loop for a distributor
-  async function fetchAndProcessRecipients(
-    lazyDistributor: PublicKey,
-    distributorType: "MOBILE" | "HNT"
-  ) {
-    console.log(`\n=== Processing ${distributorType} lazy distributor ===\n`);
-
-    let paginationKey: string | null = null;
-    let page = 0;
-    let distributorRecipientsFetched = 0;
-    let currentBatch: any[] = [];
-    let batchNum = 0;
-
-    do {
-      page++;
-
-      const response = await fetch(provider.connection.rpcEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: `page-${page}`,
-          method: "getProgramAccountsV2",
-          params: [
-            lazyProgram.programId.toBase58(),
-            {
-              encoding: "base64",
-              filters: [
-                {
-                  memcmp: {
-                    offset: 8,
-                    bytes: lazyDistributor.toBase58(),
-                  },
-                },
-              ],
-              limit: PAGE_SIZE,
-              ...(paginationKey && { paginationKey }),
-            },
-          ],
-        }),
-      });
-
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(`RPC error: ${data.error.message}`);
-      }
-
-      const { result } = data;
-
-      if (!result || !result.accounts || result.accounts.length === 0) {
-        paginationKey = null;
-      } else {
-        const pageRecipients = result.accounts.map((item: any) => ({
-          publicKey: new PublicKey(item.pubkey),
-          account: lazyProgram.coder.accounts.decode(
-            "recipientV0",
-            Buffer.from(item.account.data[0], "base64")
-          ),
-        }));
-
-        currentBatch.push(...pageRecipients);
-        distributorRecipientsFetched += pageRecipients.length;
-        totalRecipientsFetched += pageRecipients.length;
-
-        if (page % 10 === 0) {
-          console.log(
-            `  Fetched ${distributorRecipientsFetched.toLocaleString()} recipients...`
-          );
-        }
-
-        paginationKey = result.paginationKey || null;
-      }
-
-      // Process batch when full or finished
-      const shouldProcessBatch =
-        currentBatch.length >= BATCH_SIZE || !paginationKey;
-
-      if (shouldProcessBatch && currentBatch.length > 0) {
-        batchNum++;
-        await processAndSendBatch(
-          currentBatch,
-          batchNum,
-          lazyDistributor,
-          distributorType
-        );
-        currentBatch = [];
-      }
-    } while (paginationKey);
-
-    console.log(`\n=== ${distributorType} Complete ===`);
-    console.log(
-      `  Processed ${distributorRecipientsFetched.toLocaleString()} total recipients`
-    );
+  // Process MOBILE recipients
+  if (mobileRecipients.length > 0) {
+    console.log(`\n=== Processing MOBILE recipients ===\n`);
+    const mobileBatches = chunks(mobileRecipients, BATCH_SIZE);
+    for (let i = 0; i < mobileBatches.length; i++) {
+      await processAndSendBatch(mobileBatches[i], i + 1, "MOBILE");
+    }
   }
 
-  // Process both distributors
-  await fetchAndProcessRecipients(mobileLazyDistributor, "MOBILE");
-  await fetchAndProcessRecipients(hntLazyDistributor, "HNT");
+  // Process HNT recipients
+  if (hntRecipients.length > 0) {
+    console.log(`\n=== Processing HNT recipients ===\n`);
+    const hntBatches = chunks(hntRecipients, BATCH_SIZE);
+    for (let i = 0; i < hntBatches.length; i++) {
+      await processAndSendBatch(hntBatches[i], i + 1, "HNT");
+    }
+  }
 
   // Final summary
   console.log(`\n========================================`);
   console.log(`           FINAL SUMMARY`);
   console.log(`========================================`);
   console.log(
-    `Total recipients fetched:    ${totalRecipientsFetched.toLocaleString()}`
-  );
-  console.log(
-    `  Subscribers found:         ${totalSubscribersFound.toLocaleString()}`
-  );
-  console.log(
-    `  Non-subscribers skipped:   ${totalNonSubscribers.toLocaleString()}`
+    `Total recipients processed:  ${totalRecipientsProcessed.toLocaleString()}`
   );
   console.log(
     `  Already closed:            ${totalAlreadyClosed.toLocaleString()}`
@@ -561,7 +411,7 @@ export async function run(args: any = process.argv) {
   }
 
   if (!argv.commit) {
-    console.log(`\nDry run complete. Re-run with --commit to execute 🚀`);
+    console.log(`\nDry run complete. Re-run with --commit to execute`);
   } else {
     console.log(
       `Transactions confirmed:      ${totalTxnsConfirmed.toLocaleString()}`
@@ -571,6 +421,6 @@ export async function run(args: any = process.argv) {
         `  Failed:                    ${totalTxnsFailed.toLocaleString()}`
       );
     }
-    console.log(`\n✓ Complete 🎉`);
+    console.log(`\n✓ Complete`);
   }
 }
