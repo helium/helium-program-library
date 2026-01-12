@@ -359,7 +359,12 @@ async function claimRewardsForBatch(
 
     const assetsWithZero = entityKeys.length - assetsWithRewards;
     log(
-      `  Checked ${entityKeys.length}: ${assetsWithRewards} with rewards, ${assetsWithZero} with zero (${assetsToClaimMobile.length} MOBILE, ${assetsToClaimHnt.length} HNT)`
+      `  Checked ${entityKeys.length}: ${assetsWithRewards} with rewards, ${assetsWithZero} with zero`
+    );
+    log(
+      `    Claims needed: ${assetsToClaimMobile.length} MOBILE + ${
+        assetsToClaimHnt.length
+      } HNT = ${assetsToClaimMobile.length + assetsToClaimHnt.length} total`
     );
 
     if (assetsWithRewards === 0) {
@@ -494,26 +499,56 @@ async function claimRewardsForBatch(
       });
     });
 
-    // Build claim transactions in parallel
+    // Build and send in small batches to keep blockhashes fresh
+    // formBulkTransactions creates txns with blockhash - must send before they expire (~60s)
     const mobileClaimsToProcess = assetsToClaim.filter((c) => c.mobileRewards);
     const hntClaimsToProcess = assetsToClaim.filter((c) => c.hntRewards);
-    const mobileClaimChunks = chunks(mobileClaimsToProcess, 100);
-    const hntClaimChunks = chunks(hntClaimsToProcess, 100);
 
+    const totalClaims =
+      mobileClaimsToProcess.length + hntClaimsToProcess.length;
     log(
-      `  Building claim txns: ${mobileClaimChunks.length} MOBILE chunks, ${hntClaimChunks.length} HNT chunks...`
+      `  Claims to process: ${mobileClaimsToProcess.length} MOBILE + ${hntClaimsToProcess.length} HNT = ${totalClaims} total`
     );
 
-    const [mobileBatchTxns, hntBatchTxns] = await Promise.all([
-      Promise.all(
-        mobileClaimChunks.map((chunk) =>
+    if (!commit) {
+      log(
+        `Rewards: ${assetsWithRewards} with pending, ${assetsWithZero} with zero (${totalClaims} claim txns) [dry run]`
+      );
+      log(
+        `  With --commit: would claim ${assetsWithRewards}, then close all ${entityKeys.length} after verification`
+      );
+      break;
+    }
+
+    const sendConnection = new Connection(
+      provider.connection.rpcEndpoint,
+      "confirmed"
+    );
+
+    let totalConfirmed = 0;
+    let totalTxns = 0;
+    const CLAIMS_PER_BATCH = 300; // Build and send 300 at a time to keep blockhashes fresh
+
+    // Process MOBILE claims in batches
+    const mobileBatches = chunks(mobileClaimsToProcess, CLAIMS_PER_BATCH);
+    for (let batchIdx = 0; batchIdx < mobileBatches.length; batchIdx++) {
+      const batch = mobileBatches[batchIdx];
+      const claimChunks = chunks(batch, 100); // formBulkTransactions max 100
+
+      log(
+        `  MOBILE ${batchIdx + 1}/${mobileBatches.length}: building ${
+          batch.length
+        } claims...`
+      );
+
+      const batchTxns = await Promise.all(
+        claimChunks.map((chunk) =>
           claimTxLimiter(async () => {
             try {
-              const assets = chunk.map((c) => c.asset);
               return await formBulkTransactionsWithRetry(
                 lazyProgram,
                 rewardsOracleProgram,
-                assets,
+                chunk.map((c) => c.asset),
                 mobileLazyDistributor,
                 mobileLazyDistributorAcc,
                 mergedMobileBulkRewards,
@@ -522,21 +557,51 @@ async function claimRewardsForBatch(
                 assetToKeyToAsset
               );
             } catch (err: any) {
-              logErr(`Error forming mobile bulk transactions: ${err.message}`);
+              logErr(`    Error: ${err.message}`);
               return [];
             }
           })
         )
-      ),
-      Promise.all(
-        hntClaimChunks.map((chunk) =>
+      );
+
+      const txns = batchTxns.flat().filter(truthy);
+      if (txns.length > 0) {
+        txns.forEach((tx) => tx.sign([authority]));
+        totalTxns += txns.length;
+
+        try {
+          const confirmed = await bulkSendRawTransactions(
+            sendConnection,
+            txns.map((tx) => Buffer.from(tx.serialize()))
+          );
+          totalConfirmed += confirmed.length;
+          log(`    Sent: ${confirmed.length}/${txns.length} confirmed`);
+        } catch (err: any) {
+          logErr(`    Send error: ${err.message}`);
+        }
+      }
+    }
+
+    // Process HNT claims in batches
+    const hntBatches = chunks(hntClaimsToProcess, CLAIMS_PER_BATCH);
+    for (let batchIdx = 0; batchIdx < hntBatches.length; batchIdx++) {
+      const batch = hntBatches[batchIdx];
+      const claimChunks = chunks(batch, 100);
+
+      log(
+        `  HNT ${batchIdx + 1}/${hntBatches.length}: building ${
+          batch.length
+        } claims...`
+      );
+
+      const batchTxns = await Promise.all(
+        claimChunks.map((chunk) =>
           claimTxLimiter(async () => {
             try {
-              const assets = chunk.map((c) => c.asset);
               return await formBulkTransactionsWithRetry(
                 lazyProgram,
                 rewardsOracleProgram,
-                assets,
+                chunk.map((c) => c.asset),
                 hntLazyDistributor,
                 hntLazyDistributorAcc,
                 mergedHntBulkRewards,
@@ -545,65 +610,52 @@ async function claimRewardsForBatch(
                 assetToKeyToAsset
               );
             } catch (err: any) {
-              logErr(`Error forming hnt bulk transactions: ${err.message}`);
+              logErr(`    Error: ${err.message}`);
               return [];
             }
           })
         )
-      ),
-    ]);
-
-    const txns = [
-      ...mobileBatchTxns.flat().filter(truthy),
-      ...hntBatchTxns.flat().filter(truthy),
-    ];
-
-    if (!commit) {
-      log(
-        `Rewards: ${assetsWithRewards} with pending, ${assetsWithZero} with zero (${txns.length} claim txns) [dry run]`
       );
-      log(
-        `  With --commit: would claim ${assetsWithRewards}, then close all ${entityKeys.length} after verification`
-      );
-      break;
+
+      const txns = batchTxns.flat().filter(truthy);
+      if (txns.length > 0) {
+        txns.forEach((tx) => tx.sign([authority]));
+        totalTxns += txns.length;
+
+        try {
+          const confirmed = await bulkSendRawTransactions(
+            sendConnection,
+            txns.map((tx) => Buffer.from(tx.serialize()))
+          );
+          totalConfirmed += confirmed.length;
+          log(`    Sent: ${confirmed.length}/${txns.length} confirmed`);
+        } catch (err: any) {
+          logErr(`    Send error: ${err.message}`);
+        }
+      }
     }
 
-    if (txns.length > 0) {
-      txns.forEach((tx) => tx.sign([authority]));
-
-      // Use fresh connection to avoid account-fetch-cache signature subscriptions
-      const sendConnection = new Connection(
-        provider.connection.rpcEndpoint,
-        "confirmed"
+    // Track what was claimed
+    if (totalConfirmed > 0 && totalTxns > 0) {
+      totalClaimedMobile = totalClaimedMobile.add(
+        totalPendingMobile.mul(new BN(totalConfirmed)).div(new BN(totalTxns))
       );
+      totalClaimedHnt = totalClaimedHnt.add(
+        totalPendingHnt.mul(new BN(totalConfirmed)).div(new BN(totalTxns))
+      );
+      totalTransactions += totalConfirmed;
+    }
 
-      try {
-        const confirmedTxs = await bulkSendRawTransactions(
-          sendConnection,
-          txns.map((tx) => Buffer.from(tx.serialize()))
-        );
-
-        // Only count as claimed what was actually confirmed
-        if (confirmedTxs.length > 0) {
-          totalClaimedMobile = totalClaimedMobile.add(totalPendingMobile);
-          totalClaimedHnt = totalClaimedHnt.add(totalPendingHnt);
-          totalTransactions += confirmedTxs.length;
-        }
-
-        if (confirmedTxs.length === txns.length) {
-          log(
-            `Rewards: claimed ${toMobile(totalPendingMobile)} MOBILE, ${toHnt(
-              totalPendingHnt
-            )} HNT (${confirmedTxs.length} txns)`
-          );
-        } else {
-          log(
-            `Rewards: ${confirmedTxs.length}/${txns.length} txns confirmed (retrying...)`
-          );
-        }
-      } catch (err: any) {
-        logErr(`Error claiming rewards: ${err.message}`);
-      }
+    if (totalConfirmed === totalTxns && totalTxns > 0) {
+      log(
+        `Rewards: claimed ${toMobile(totalPendingMobile)} MOBILE, ${toHnt(
+          totalPendingHnt
+        )} HNT (${totalConfirmed} txns)`
+      );
+    } else if (totalTxns > 0) {
+      log(
+        `Rewards: ${totalConfirmed}/${totalTxns} txns confirmed (retrying...)`
+      );
     }
 
     // Wait before next iteration
