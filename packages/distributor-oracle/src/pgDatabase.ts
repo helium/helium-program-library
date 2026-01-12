@@ -216,6 +216,9 @@ export class PgDatabase implements Database {
           {
             model: KeyToAsset,
             required: true,
+            where: {
+              dao: DAO.toBase58(),
+            },
           },
         ],
         attributes: [
@@ -253,6 +256,9 @@ export class PgDatabase implements Database {
         {
           model: KeyToAsset,
           required: true,
+          where: {
+            dao: DAO.toBase58(),
+          },
         },
       ],
       where: {
@@ -309,6 +315,9 @@ export class PgDatabase implements Database {
         {
           model: KeyToAsset,
           required: true,
+          where: {
+            dao: DAO.toBase58(),
+          },
         },
       ],
     })) as Reward;
