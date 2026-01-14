@@ -205,25 +205,9 @@ async function run() {
   );
   await monitorSolBalance(mobileAutoTopOff, "helium_mobile_auto_topoff");
 
-  const mobileRevAutoTopOff = new PublicKey(
-    process.env.MOBILE_REV_AUTO_TOPOFF_KEY ||
-      "2j65rdW1jZvrEUx1xzC9ctcVbDW9smw2TUMhp3REFhNR"
-  );
-  await monitorSolBalance(mobileRevAutoTopOff, "helium_mobile_rev_auto_topoff");
-
   await monitorTokenBalance(
     getAssociatedTokenAddressSync(dao.hntMint, mobileAutoTopOff, true),
     "helium_mobile_auto_topoff_hnt"
-  );
-
-  await monitorTokenBalance(
-    getAssociatedTokenAddressSync(dao.hntMint, mobileRevAutoTopOff, true),
-    "helium_mobile_rev_auto_topoff_hnt"
-  );
-
-  await monitorTokenBalance(
-    getAssociatedTokenAddressSync(USDC_MINT, mobileRevAutoTopOff, true),
-    "helium_mobile_rev_auto_topoff_usdc"
   );
 
   await monitorTokenBalance(

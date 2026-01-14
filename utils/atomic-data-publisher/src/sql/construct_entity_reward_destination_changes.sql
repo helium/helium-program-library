@@ -9,7 +9,8 @@ WITH asset_reward_destination_changes AS (
   kta.asset as asset,
   GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) as block,
   encode(kta.entity_key, 'hex') as pub_key,
-  ao.owner as rewards_recipient,
+  -- If owner is a welcome pack PDA, resolve to the wallet owner
+  CASE WHEN wp.address IS NOT NULL THEN wp.owner ELSE ao.owner END as rewards_recipient,
   CASE WHEN mf.address IS NULL THEN NULL::json ELSE JSON_BUILD_OBJECT(
     'pub_key', mf.address,
     'schedule', mf.schedule,
@@ -34,6 +35,7 @@ FROM
   JOIN asset_owners ao ON ao.asset = kta.asset
   LEFT JOIN iot_hotspot_infos ihi ON ihi.asset = kta.asset
   LEFT JOIN mobile_hotspot_infos mhi ON mhi.asset = kta.asset
+  LEFT JOIN welcome_packs wp ON wp.address = ao.owner
   LEFT OUTER JOIN recipients r ON r.asset = ao.asset
   AND r.lazy_distributor = '6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq' -- Exclude hotspots that have rewards recipients, as they're in the other query.
   LEFT OUTER JOIN mini_fanouts mf ON mf.address = r.destination

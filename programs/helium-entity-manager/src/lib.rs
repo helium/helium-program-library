@@ -197,15 +197,4 @@ pub mod helium_entity_manager {
   pub fn swap_maker_stake(ctx: Context<SwapMakerStake>) -> Result<()> {
     swap_maker_stake::handler(ctx)
   }
-
-  pub fn temp_close_key_to_asset_v0(ctx: Context<TempCloseKeyToAssetV0>) -> Result<()> {
-    temp_close_key_to_asset_v0::handler(ctx)
-  }
-
-  pub fn temp_recreate_key_to_asset_v0(
-    ctx: Context<TempRecreateKeyToAssetV0>,
-    args: TempRecreateKeyToAssetArgsV0,
-  ) -> Result<()> {
-    temp_recreate_key_to_asset_v0::handler(ctx, args)
-  }
 }
