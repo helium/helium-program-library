@@ -983,7 +983,7 @@ dependencies = [
 
 [[package]]
 name = "hpl-crons"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
