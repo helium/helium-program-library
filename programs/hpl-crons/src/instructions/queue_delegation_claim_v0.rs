@@ -15,7 +15,9 @@ use tuktuk_program::{
 };
 use voter_stake_registry::state::PositionV0;
 
-use crate::{hpl_crons::CIRCUIT_BREAKER_PROGRAM, DelegationClaimBotV0, EPOCH_LENGTH};
+use crate::{
+  current_epoch, hpl_crons::CIRCUIT_BREAKER_PROGRAM, DelegationClaimBotV0, EPOCH_LENGTH,
+};
 
 pub const FIFTEEN_MINUTES: i64 = 60 * 15;
 
@@ -96,11 +98,31 @@ pub fn handler(ctx: Context<QueueDelegationClaimV0>) -> Result<RunTaskReturnV0> 
     });
   }
 
-  let curr_epoch = max(
+  let mut curr_epoch = max(
     ctx.accounts.delegated_position.last_claimed_epoch + 1,
     ctx.accounts.delegation_claim_bot.last_claimed_epoch + 1,
   );
-  ctx.accounts.delegation_claim_bot.last_claimed_epoch = curr_epoch;
+  // If we're in the current epoch and there's a gap in claimed epochs, find the first unclaimed one
+  if curr_epoch == current_epoch(Clock::get()?.unix_timestamp) - 1
+    && curr_epoch > ctx.accounts.delegated_position.last_claimed_epoch + 1
+  {
+    // Find the soonest unclaimed epoch by iterating through 128 bits of the claimed_epochs_bitmap
+    let start_epoch = ctx.accounts.delegated_position.last_claimed_epoch + 1;
+    for i in 0..128 {
+      let check_epoch = start_epoch + i;
+      if !ctx
+        .accounts
+        .delegated_position
+        .is_claimed(check_epoch)
+        .unwrap_or(true)
+      {
+        curr_epoch = check_epoch;
+        break;
+      }
+    }
+  } else {
+    ctx.accounts.delegation_claim_bot.last_claimed_epoch = curr_epoch
+  }
   let bump = ctx.bumps.payer;
   let seeds = vec![
     vec![b"helium".to_vec(), bump.to_le_bytes().to_vec()],
