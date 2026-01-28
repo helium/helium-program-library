@@ -153,7 +153,7 @@ export const formPositionClaims = async ({
           bucketedEpochsByPosition[position.pubkey.toBase58()].push(
             await Promise.all(
               chunk.map((epoch, index) => {
-                const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
+                const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index]!;
                 const subDaoEpochInfoData = hsdProgram.coder.accounts.decode(
                   "subDaoEpochInfoV0",
                   subDaoEpochInfoAccount?.data
@@ -262,10 +262,13 @@ export const formPositionClaims = async ({
 async function getMultipleAccounts({
   connection,
   keys,
-}): Promise<AccountInfo<Buffer>[]> {
+}: {
+  connection: Connection;
+  keys: PublicKey[];
+}): Promise<(AccountInfo<Buffer> | null)[]> {
   const batchSize = 100;
   const batches = Math.ceil(keys.length / batchSize);
-  const results: AccountInfo<Buffer>[] = [];
+  const results: (AccountInfo<Buffer> | null)[] = [];
 
   for (let i = 0; i < batches; i++) {
     const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);

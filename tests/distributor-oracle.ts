@@ -115,6 +115,9 @@ export class DatabaseMock implements Database {
       byHotspot: {},
     };
   }
+  getRewardableEntitiesByDestination(destination: PublicKey, limit: number, batchNumber?: number): Promise<{ entities: Pick<RewardableEntity, "keyToAsset">[]; nextBatchNumber: number; }> {
+    throw new Error("Method not implemented.");
+  }
   async getRewardsByOwner(owner: string): Promise<{ lifetime: string; pending: string; }> {
     return { lifetime: "0", pending: "0" };
   }
