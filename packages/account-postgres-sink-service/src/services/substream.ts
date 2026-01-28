@@ -43,6 +43,7 @@ export const setupSubstream = async (
   if (!SUBSTREAM_API_KEY) throw new Error("SUBSTREAM_API_KEY undefined");
   if (!SUBSTREAM_URL) throw new Error("SUBSTREAM_URL undefined");
   if (!SUBSTREAM) throw new Error("SUBSTREAM undefined");
+  console.log("SUBSTREAM_API_KEY", SUBSTREAM_API_KEY);
   const { token } = await authIssue(SUBSTREAM_API_KEY!);
   const substream = await fetchSubstream(SUBSTREAM!);
   const registry = createRegistry(substream);
