@@ -1,4 +1,4 @@
-import { AddressLookupTableAccount, Connection, PublicKey, Signer, TransactionInstruction } from "@solana/web3.js";
+import { AddressLookupTableAccount, Commitment, Connection, PublicKey, Signer, TransactionInstruction } from "@solana/web3.js";
 import { getAddressLookupTableAccounts } from "./transaction";
 
 export type TransactionDraft = {
@@ -13,7 +13,8 @@ export type TransactionDraft = {
 
 export async function populateMissingDraftInfo(
   connection: Connection,
-  tx: TransactionDraft
+  tx: TransactionDraft,
+  commitment?: Commitment
 ): Promise<TransactionDraft> {
   if (!tx.addressLookupTables) {
     tx.addressLookupTables = await getAddressLookupTableAccounts(
@@ -23,7 +24,7 @@ export async function populateMissingDraftInfo(
   }
 
   if (!tx.recentBlockhash) {
-    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    tx.recentBlockhash = (await connection.getLatestBlockhash(commitment)).blockhash;
   }
 
   return tx;
