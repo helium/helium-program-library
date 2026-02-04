@@ -57,6 +57,13 @@ export function getSingleton(conn: Connection): AccountFetchCache {
   return singletons[endp + commitment]!;
 }
 
+export function closeSingleton(conn: Connection) {
+  const commitment = conn.commitment || "confirmed";
+  const endp = conn.rpcEndpoint;
+  singletons[endp + commitment]?.close();
+  delete singletons[endp + commitment];
+}
+
 function setSingleton(conn: Connection, cache: AccountFetchCache) {
   const commitment = conn.commitment || "confirmed";
   const endp = conn.rpcEndpoint;
