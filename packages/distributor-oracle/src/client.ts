@@ -38,11 +38,28 @@ import {
 } from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
+  Connection,
   PublicKey,
   TransactionInstruction,
   VersionedTransaction,
 } from "@solana/web3.js";
 import axios from "axios";
+
+const GET_MULTIPLE_ACCOUNTS_LIMIT = 100;
+
+async function batchGetMultipleAccountsInfo(
+  connection: Connection,
+  keys: PublicKey[]
+) {
+  const batches: PublicKey[][] = []
+  for (let i = 0; i < keys.length; i += GET_MULTIPLE_ACCOUNTS_LIMIT) {
+    batches.push(keys.slice(i, i + GET_MULTIPLE_ACCOUNTS_LIMIT))
+  }
+  const results = await Promise.all(
+    batches.map((batch) => connection.getMultipleAccountsInfo(batch))
+  )
+  return results.flat()
+}
 
 const HNT = process.env.HNT_MINT
   ? new PublicKey(process.env.HNT_MINT)
@@ -270,6 +287,7 @@ export async function formBulkTransactions({
   getAssetProofBatchFn = getAssetProofBatch,
   basePriorityFee,
   isDevnet: isDevnetIn,
+  useCache = true,
 }: {
   program: Program<LazyDistributor>;
   rewardsOracleProgram?: Program<RewardsOracle>;
@@ -294,6 +312,7 @@ export async function formBulkTransactions({
     assetIds: PublicKey[]
   ) => Promise<Record<string, AssetProof> | undefined>;
   isDevnet?: boolean;
+  useCache?: boolean; // defaults to true, set to false to use getMultipleAccountsInfo instead
 }) {
   if (assets.length > 100) {
     throw new Error("Too many assets, max 100");
@@ -330,18 +349,28 @@ export async function formBulkTransactions({
   let recipientKeys = assets.map(
     (asset) => recipientKey(lazyDistributor, asset)[0]
   );
-  const cache = await getSingleton(
-    heliumEntityManagerProgram!.provider.connection
-  );
-  const recipientAccs = (
-    await cache.searchMultiple(recipientKeys, (pubkey, account) => ({
-      pubkey,
-      account,
-      info: lazyDistributorProgram.coder.accounts.decode<
+  const connection = heliumEntityManagerProgram!.provider.connection
+  const cache = useCache ? await getSingleton(connection) : null;
+  let recipientAccs: (IdlAccounts<LazyDistributor>["recipientV0"] | null | undefined)[]
+  if (cache) {
+    recipientAccs = (
+      await cache.searchMultiple(recipientKeys, (pubkey, account) => ({
+        pubkey,
+        account,
+        info: lazyDistributorProgram.coder.accounts.decode<
+          IdlAccounts<LazyDistributor>["recipientV0"]
+        >("recipientV0", account.data),
+      }))
+    ).map((x) => x?.info)
+  } else {
+    const accountInfos = await batchGetMultipleAccountsInfo(connection, recipientKeys)
+    recipientAccs = accountInfos.map((accountInfo) => {
+      if (!accountInfo) return null
+      return lazyDistributorProgram.coder.accounts.decode<
         IdlAccounts<LazyDistributor>["recipientV0"]
-      >("recipientV0", account.data),
-    }))
-  ).map((x) => x?.info);
+      >("recipientV0", accountInfo.data)
+    })
+  }
   const assetProofsById = await getAssetProofBatchFn(
     assetEndpoint || provider.connection.rpcEndpoint,
     assets
@@ -381,18 +410,32 @@ export async function formBulkTransactions({
   const keyToAssetKs = compressionAssetAccs.map((assetAcc, idx) => {
     return keyToAssetForAsset(assetAcc);
   });
-  const keyToAssets = await cache.searchMultiple(
-    keyToAssetKs,
-    (pubkey, account) => ({
-      pubkey,
-      account,
-      info: heliumEntityManagerProgram!.coder.accounts.decode<
-        IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
-      >("keyToAssetV0", account.data),
-    }),
-    true,
-    false
-  );
+  let keyToAssets: ({ pubkey: PublicKey; info: IdlAccounts<HeliumEntityManager>["keyToAssetV0"] | undefined } | null | undefined)[]
+  if (cache) {
+    keyToAssets = (await cache.searchMultiple(
+      keyToAssetKs,
+      (pubkey, account) => ({
+        pubkey,
+        account,
+        info: heliumEntityManagerProgram!.coder.accounts.decode<
+          IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
+        >("keyToAssetV0", account.data),
+      }),
+      true,
+      false
+    )).map((x) => x ? { pubkey: x.pubkey, info: x.info } : null)
+  } else {
+    const accountInfos = await batchGetMultipleAccountsInfo(connection, keyToAssetKs)
+    keyToAssets = accountInfos.map((accountInfo, idx) => {
+      if (!accountInfo) return null
+      return {
+        pubkey: keyToAssetKs[idx],
+        info: heliumEntityManagerProgram!.coder.accounts.decode<
+          IdlAccounts<HeliumEntityManager>["keyToAssetV0"]
+        >("keyToAssetV0", accountInfo.data),
+      }
+    })
+  }
   // construct the set and distribute ixs
   const setAndDistributeIxs = await Promise.all(
     compressionAssetAccs.map(async (assetAcc, idx) => {
