@@ -5,7 +5,7 @@
   "description": "Track asset ownership",
   "repository": {
     "type": "git",
-    "url": "https://github.com/helium/helium-program-libary"
+    "url": "https://github.com/helium/helium-program-library"
   },
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/src/index.js",
