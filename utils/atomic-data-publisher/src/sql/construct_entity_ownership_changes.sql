@@ -51,12 +51,40 @@ newly_onboarded_hotspots AS (
     -- Asset owner was set before this block range (race condition case)
     AND ao.last_block <= $1
 ),
+welcome_pack_changes AS (
+  -- Detect welcome pack creation/update when asset_owners hasn't caught up yet.
+  -- Covers the race condition where account-postgres-sink-service (welcome_packs)
+  -- processes faster than asset-ownership-service (asset_owners).
+  SELECT
+    wp.asset,
+    wp.last_block as block,
+    encode(kta.entity_key, 'hex') as pub_key,
+    wp.owner as owner,
+    'welcome_pack_owner' as owner_type,
+    'entity_ownership' as change_type
+  FROM welcome_packs wp
+  INNER JOIN key_to_assets kta ON kta.asset = wp.asset
+  INNER JOIN asset_owners ao ON ao.asset = wp.asset
+  LEFT JOIN iot_hotspot_infos ihi ON ihi.asset = wp.asset
+  LEFT JOIN mobile_hotspot_infos mhi ON mhi.asset = wp.asset
+  WHERE (ihi.asset IS NOT NULL OR mhi.asset IS NOT NULL)
+    AND kta.entity_key IS NOT NULL
+    AND ao.owner IS NOT NULL
+    AND wp.last_block > $1
+    AND wp.last_block <= $2
+    -- Only when asset_owners wasn't also updated in this range
+    -- (asset_owner_changes CTE already handles that case with welcome_pack resolution)
+    AND ao.last_block <= $1
+),
 ownership_changes AS (
   SELECT asset, block, pub_key, owner, owner_type, change_type
   FROM asset_owner_changes
   UNION ALL
   SELECT asset, block, pub_key, owner, owner_type, change_type
   FROM newly_onboarded_hotspots
+  UNION ALL
+  SELECT asset, block, pub_key, owner, owner_type, change_type
+  FROM welcome_pack_changes
 )
 SELECT
   'entity_ownership_changes' as job_name,
