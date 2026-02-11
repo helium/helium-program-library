@@ -1090,7 +1090,6 @@ impl DatabaseClient {
           r#"
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
-            COALESCE((SELECT MAX(last_block) FROM welcome_packs), -1),
             COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1),
             COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)
           )::bigint as block
@@ -1099,7 +1098,6 @@ impl DatabaseClient {
           r#"
           SELECT LEAST(
             COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM welcome_packs WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block >= 0), -1)
           )::bigint as block
@@ -1202,8 +1200,6 @@ impl DatabaseClient {
         let query = r#"
           SELECT MIN(next_block)::bigint as block FROM (
             SELECT MIN(last_block) as next_block FROM asset_owners WHERE last_block > $1
-            UNION ALL
-            SELECT MIN(last_block) as next_block FROM welcome_packs WHERE last_block > $1
           ) combined WHERE next_block IS NOT NULL
         "#;
 
