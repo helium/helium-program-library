@@ -2,19 +2,19 @@ name: Manual Devnet Program Deploy
 
 env:
   SOLANA_CLI_VERSION: 2.1.6
-  NODE_VERSION: 22.19.0
+  NODE_VERSION: 24.13.1
 
 on:
   workflow_dispatch:
     inputs:
       program:
-        description: 'Program to deploy (e.g. helium-sub-daos)'
+        description: "Program to deploy (e.g. helium-sub-daos)"
         required: true
         type: string
       branch:
-        description: 'Branch to deploy from'
+        description: "Branch to deploy from"
         required: true
-        default: 'develop'
+        default: "develop"
         type: string
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
           path: |
             ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}-v0002
-          
+
       - run: (cargo install toml-cli || true)
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
@@ -90,4 +90,4 @@ jobs:
           spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
           authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
           name: "Deploy ${{ inputs.program }}"
-          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }} 
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
