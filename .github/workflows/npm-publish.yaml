@@ -32,7 +32,23 @@ jobs:
           testing: false
           devnet: false
       - uses: ./.github/actions/setup-ts/
-      - name: Lerna Publish
-        run: yarn release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish packages
+        run: |
+          for pkg in packages/*/; do
+            [ -f "$pkg/package.json" ] || continue
+
+            is_private=$(node -p "require('./$pkg/package.json').private || false")
+            [ "$is_private" = "true" ] && continue
+
+            name=$(node -p "require('./$pkg/package.json').name")
+            version=$(node -p "require('./$pkg/package.json').version")
+
+            published=$(npm view "$name@$version" version 2>/dev/null || echo "")
+            if [ "$version" = "$published" ]; then
+              echo "Skipping $name@$version (already published)"
+              continue
+            fi
+
+            echo "Publishing $name@$version..."
+            npm publish "$pkg" --provenance --access public
+          done
