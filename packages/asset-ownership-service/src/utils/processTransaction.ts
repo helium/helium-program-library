@@ -10,7 +10,7 @@ import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import { BubblegumIdl } from "../bubblegum";
 import { PG_CARRIER_TABLE, PG_DATA_ONLY_TABLE, PG_MAKER_TABLE } from "../env";
 import { QueryTypes, Transaction } from "sequelize";
-import database from "./database";
+import database, { AssetOwner } from "./database";
 import { provider } from "./solana";
 import retry from "async-retry";
 
@@ -62,28 +62,6 @@ export class TransactionProcessor {
       ...this.treeConfigs.update_data_only_tree_v0.merkleTrees,
       ...this.treeConfigs.update_carrier_tree_v0.merkleTrees,
     ]);
-  }
-
-  private async upsertOwnership(
-    asset: string,
-    owner: string,
-    lastBlock: number,
-    transaction: Transaction
-  ): Promise<void> {
-    await database.query(
-      `INSERT INTO asset_owners (asset, owner, last_block, created_at, updated_at)
-       VALUES (:asset, :owner, :lastBlock, NOW(), NOW())
-       ON CONFLICT (asset) DO UPDATE SET
-         owner = EXCLUDED.owner,
-         last_block = EXCLUDED.last_block,
-         updated_at = NOW()
-       WHERE asset_owners.last_block <= EXCLUDED.last_block`,
-      {
-        replacements: { asset, owner, lastBlock },
-        type: QueryTypes.INSERT,
-        transaction,
-      }
-    );
   }
 
   private async getCurrentblock(): Promise<number> {
@@ -234,11 +212,13 @@ export class TransactionProcessor {
 
           if (keyToAsset) {
             const lastBlock = block ?? (await this.getCurrentblock());
-            await this.upsertOwnership(
-              keyToAsset.asset.toBase58(),
-              recipientAccount.toBase58(),
-              lastBlock,
-              transaction
+            await AssetOwner.upsert(
+              {
+                asset: keyToAsset.asset.toBase58(),
+                owner: recipientAccount.toBase58(),
+                lastBlock,
+              },
+              { transaction }
             );
           }
         }
@@ -266,11 +246,13 @@ export class TransactionProcessor {
           );
 
           const lastBlock = block ?? (await this.getCurrentblock());
-          await this.upsertOwnership(
-            assetId.toBase58(),
-            newOwnerAccount.toBase58(),
-            lastBlock,
-            transaction
+          await AssetOwner.upsert(
+            {
+              asset: assetId.toBase58(),
+              owner: newOwnerAccount.toBase58(),
+              lastBlock,
+            },
+            { transaction }
           );
         }
         break;

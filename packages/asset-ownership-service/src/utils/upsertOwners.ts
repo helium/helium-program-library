@@ -91,34 +91,10 @@ export const upsertOwners = async ({
             });
 
             if (assetsToUpdate.length > 0) {
-              const values = assetsToUpdate
-                .map(
-                  (_, i) =>
-                    `(:asset_${i}, :owner_${i}, :lastBlock_${i}, NOW(), NOW())`
-                )
-                .join(", ");
-
-              const replacements: Record<string, string | number> = {};
-              assetsToUpdate.forEach((a, i) => {
-                replacements[`asset_${i}`] = a.asset;
-                replacements[`owner_${i}`] = a.owner;
-                replacements[`lastBlock_${i}`] = a.lastBlock;
+              await AssetOwner.bulkCreate(assetsToUpdate, {
+                transaction,
+                updateOnDuplicate: ["owner", "lastBlock", "updatedAt"],
               });
-
-              await sequelize.query(
-                `INSERT INTO asset_owners (asset, owner, last_block, created_at, updated_at)
-                 VALUES ${values}
-                 ON CONFLICT (asset) DO UPDATE SET
-                   owner = EXCLUDED.owner,
-                   last_block = EXCLUDED.last_block,
-                   updated_at = NOW()
-                 WHERE asset_owners.last_block <= EXCLUDED.last_block`,
-                {
-                  replacements,
-                  type: QueryTypes.INSERT,
-                  transaction,
-                }
-              );
             }
 
             await transaction.commit();
