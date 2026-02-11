@@ -1120,7 +1120,7 @@ impl DatabaseClient {
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
             COALESCE((SELECT MAX(last_block) FROM recipients), -1),
-            COALESCE((SELECT MAX(last_block) FROM rewards_recipients), -1)
+            COALESCE((SELECT MAX(last_block) FROM mini_fanouts), -1)
           )::bigint as block
           "#
         } else {
@@ -1128,7 +1128,7 @@ impl DatabaseClient {
           SELECT LEAST(
             COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM recipients WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM rewards_recipients WHERE last_block >= 0), -1)
+            COALESCE((SELECT MIN(last_block) FROM mini_fanouts WHERE last_block >= 0), -1)
           )::bigint as block
           "#
         };
@@ -1221,7 +1221,7 @@ impl DatabaseClient {
             UNION ALL
             SELECT MIN(last_block) as next_block FROM recipients WHERE last_block > $1
             UNION ALL
-            SELECT MIN(last_block) as next_block FROM rewards_recipients WHERE last_block > $1
+            SELECT MIN(last_block) as next_block FROM mini_fanouts WHERE last_block > $1
           ) combined WHERE next_block IS NOT NULL
         "#;
 
