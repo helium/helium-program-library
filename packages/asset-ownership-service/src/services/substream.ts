@@ -209,12 +209,22 @@ export const setupSubstream = async (server: FastifyInstance) => {
               const dbTx = await database.transaction();
 
               try {
-                await Promise.all(
-                  filteredTransactions.map(async (transactionInfo) => {
+                for (const transactionInfo of filteredTransactions) {
+                  try {
                     const converted = await convertSubstreamTransaction(
                       transactionInfo
                     );
-                    if (!converted) return;
+                    if (!converted) {
+                      console.warn(
+                        `Failed to convert substream transaction in block ${block}`,
+                        {
+                          logMessages:
+                            transactionInfo.meta?.logMessages?.slice(0, 5),
+                        }
+                      );
+                      server.customMetrics.conversionFailureCounter.inc();
+                      continue;
+                    }
 
                     const { tx, addressLookupTableAccounts } = converted;
                     const { message } = tx;
@@ -229,28 +239,31 @@ export const setupSubstream = async (server: FastifyInstance) => {
                       ...(accountKeysFromLookups?.readonly || []),
                     ];
 
-                    const { updatedTrees } = await processor.processTransaction(
-                      {
-                        accountKeys,
-                        instructions: message.compiledInstructions,
-                        innerInstructions:
-                          transactionInfo.meta.innerInstructions?.map(
-                            (inner) => ({
-                              index: inner.index,
-                              instructions: inner.instructions.map((ix) => ({
-                                programIdIndex: ix.programIdIndex,
-                                accountKeyIndexes: Buffer.from(
-                                  ix.accounts,
-                                  "base64"
-                                ).toJSON().data,
-                                data: Buffer.from(ix.data, "base64"),
-                              })),
-                            })
-                          ),
-                      },
-                      dbTx,
-                      block
-                    );
+                    const { updatedTrees } =
+                      await processor.processTransaction(
+                        {
+                          accountKeys,
+                          instructions: message.compiledInstructions,
+                          innerInstructions:
+                            transactionInfo.meta.innerInstructions?.map(
+                              (inner: any) => ({
+                                index: inner.index,
+                                instructions: inner.instructions.map(
+                                  (ix: any) => ({
+                                    programIdIndex: ix.programIdIndex,
+                                    accountKeyIndexes: Buffer.from(
+                                      ix.accounts,
+                                      "base64"
+                                    ).toJSON().data,
+                                    data: Buffer.from(ix.data, "base64"),
+                                  })
+                                ),
+                              })
+                            ),
+                        },
+                        dbTx,
+                        block
+                      );
 
                     if (updatedTrees) {
                       console.log("Trees updated");
@@ -262,10 +275,17 @@ export const setupSubstream = async (server: FastifyInstance) => {
                         force: true,
                       });
                     }
-                  })
-                );
+                  } catch (txErr) {
+                    console.error(
+                      `Failed to process transaction in block ${block}:`,
+                      txErr
+                    );
+                    server.customMetrics.transactionFailureCounter.inc();
+                  }
+                }
 
                 await dbTx.commit();
+                server.customMetrics.blocksProcessedCounter.inc();
               } catch (err) {
                 await dbTx.rollback();
                 throw err;
@@ -287,6 +307,11 @@ export const setupSubstream = async (server: FastifyInstance) => {
       }
     } catch (err) {
       cursorManager.stopStalenessCheck();
+      try {
+        await cursorManager.flushCursor();
+      } catch (flushErr) {
+        console.error("Failed to flush cursor during reconnect:", flushErr);
+      }
       console.log("Substream connection error:", err);
       isConnecting = false;
       handleReconnect(currentAttemptCount + 1);

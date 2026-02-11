@@ -115,6 +115,20 @@ if (PG_POOL_SIZE < 5) {
       });
     });
 
+    server.get("/health", async (_req, res) => {
+      try {
+        await database.query("SELECT 1");
+        res.code(StatusCodes.OK).send({ status: "ok" });
+      } catch (err) {
+        res
+          .code(StatusCodes.SERVICE_UNAVAILABLE)
+          .send({
+            status: "unhealthy",
+            error: err instanceof Error ? err.message : String(err),
+          });
+      }
+    });
+
     server.post<{ Body: { signature: string; password: string } }>(
       "/process-transaction",
       async (req, res) => {
