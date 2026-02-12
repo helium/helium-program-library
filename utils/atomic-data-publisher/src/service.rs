@@ -8,7 +8,7 @@ use tracing::{debug, error, info, warn};
 use triggered::{trigger, Listener, Trigger};
 
 use crate::{
-  config::{ServiceConfig, Settings},
+  config::Settings,
   database::DatabaseClient,
   errors::AtomicDataError,
   health_service::HealthService,
@@ -41,15 +41,6 @@ impl AtomicDataPublisher {
     Ok(())
   }
 
-  async fn init_database(
-    service_config: &ServiceConfig,
-  ) -> Result<(), AtomicDataError> {
-    if service_config.polling_jobs.is_empty() {
-      warn!("No polling jobs configured");
-    }
-    Ok(())
-  }
-
   pub async fn new(config: Settings) -> Result<Self, AtomicDataError> {
     info!("Initializing Atomic Data Publisher service");
 
@@ -63,7 +54,6 @@ impl AtomicDataPublisher {
     );
 
     Self::validate_tables(&database, &config.database.required_tables).await?;
-    Self::init_database(&config.service).await?;
     database.init_polling_state().await?;
     database.cleanup_stale_jobs().await?;
 

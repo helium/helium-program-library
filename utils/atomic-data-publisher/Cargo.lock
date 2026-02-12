@@ -92,7 +92,6 @@ dependencies = [
  "helium-crypto",
  "helium-proto",
  "hex",
- "hmac",
  "metrics",
  "metrics-exporter-prometheus",
  "prost",

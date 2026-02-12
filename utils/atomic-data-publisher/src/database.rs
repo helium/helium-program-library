@@ -38,6 +38,10 @@ pub struct DatabaseClient {
 }
 
 impl DatabaseClient {
+  async fn get_pool(&self) -> Arc<PgPool> {
+    Arc::clone(&*self.pool.read().await)
+  }
+
   pub async fn new(config: &DatabaseConfig, polling_jobs: Vec<PollingJob>, dry_run: bool) -> Result<Self> {
     Self::validate_database_config(config)?;
     Self::validate_polling_jobs(&polling_jobs)?;
@@ -302,10 +306,7 @@ impl DatabaseClient {
   }
 
   pub async fn create_state_tables(&self) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let create_table_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
         job_name VARCHAR(255) NOT NULL UNIQUE,
@@ -377,10 +378,7 @@ impl DatabaseClient {
   }
 
   pub async fn table_exists(&self, table_name: &str) -> Result<bool> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let query = r#"
       SELECT EXISTS (
         SELECT FROM information_schema.tables
@@ -404,10 +402,7 @@ impl DatabaseClient {
     query_name: &str,
     queue_position: i32,
   ) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let existing_state = sqlx::query(
       r#"
       SELECT
@@ -585,10 +580,7 @@ impl DatabaseClient {
   /// Get the polling bounds (last processed block and max available block) for a job
   /// Returns (last_processed_block as Option<i64> from DB, max_available_block as u64)
   async fn get_polling_bounds(&self, job: &PollingJob) -> Result<(Option<i64>, u64), AtomicDataError> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let current_state_row = sqlx::query(
       r#"
       SELECT
@@ -641,10 +633,7 @@ impl DatabaseClient {
     query_name: &str,
     max_block: u64,
   ) -> Result<(), AtomicDataError> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     // last_max_block tracks the source data state, shared across both modes
     sqlx::query(
       r#"
@@ -682,10 +671,7 @@ impl DatabaseClient {
     last_processed_block: i64,
     target_block: u64,
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
 
     crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name).map_err(|e| {
       AtomicDataError::QueryValidationError(format!(
@@ -729,6 +715,13 @@ impl DatabaseClient {
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
     let mut rows = Vec::with_capacity(BATCH_SIZE);
 
+    let blocks_span = if last_processed_block < 0 {
+      target_block + 1
+    } else {
+      target_block.saturating_sub(last_processed_block as u64)
+    };
+    let last_block_display = if last_processed_block < 0 { "NULL".to_string() } else { last_processed_block.to_string() };
+
     if job.query_name == "construct_atomic_hotspots" {
       let hotspot_type = job
         .parameters
@@ -750,13 +743,6 @@ impl DatabaseClient {
         }
       }
 
-      let blocks_span = if last_processed_block < 0 {
-        target_block + 1
-      } else {
-        target_block.saturating_sub(last_processed_block as u64)
-      };
-
-      let last_block_display = if last_processed_block < 0 { "NULL".to_string() } else { last_processed_block.to_string() };
       info!(
         "Querying job '{}' with query '{}' for hotspot_type '{}', processing blocks > {} to {} ({} blocks)",
         job.name, job.query_name, hotspot_type, last_block_display, target_block, blocks_span
@@ -768,34 +754,11 @@ impl DatabaseClient {
         .bind(target_block as i64)
         .fetch(pool);
 
-      let mut row_count = 0;
-      while let Some(row_result) = stream.next().await {
-        rows.push(row_result?);
-        row_count += 1;
-
-        if row_count % 10_000 == 0 {
-          debug!("Streamed {} rows for job '{}'", row_count, job.name);
-        }
-      }
-
-      if row_count > 0 {
-        debug!("Streamed {} total rows for job '{}'", row_count, job.name);
-      }
+      Self::consume_stream(&mut stream, &mut rows, &job.name).await?;
     } else {
-      let blocks_span = if last_processed_block < 0 {
-        target_block + 1
-      } else {
-        target_block.saturating_sub(last_processed_block as u64)
-      };
-
-      let last_block_display = if last_processed_block < 0 { "NULL".to_string() } else { last_processed_block.to_string() };
       info!(
         "Querying job '{}' with query '{}', processing blocks > {} to {} ({} blocks)",
-        job.name,
-        job.query_name,
-        last_block_display,
-        target_block,
-        blocks_span
+        job.name, job.query_name, last_block_display, target_block, blocks_span
       );
 
       let mut stream = sqlx::query(query)
@@ -803,22 +766,31 @@ impl DatabaseClient {
         .bind(target_block as i64)
         .fetch(pool);
 
-      let mut row_count = 0;
-      while let Some(row_result) = stream.next().await {
-        rows.push(row_result?);
-        row_count += 1;
-
-        if row_count % 10_000 == 0 {
-          debug!("Streamed {} rows for job '{}'", row_count, job.name);
-        }
-      }
-
-      if row_count > 0 {
-        debug!("Streamed {} total rows for job '{}'", row_count, job.name);
-      }
+      Self::consume_stream(&mut stream, &mut rows, &job.name).await?;
     }
 
     Ok(rows)
+  }
+
+  async fn consume_stream(
+    stream: &mut (impl futures::Stream<Item = Result<sqlx::postgres::PgRow, sqlx::Error>> + Unpin),
+    rows: &mut Vec<sqlx::postgres::PgRow>,
+    job_name: &str,
+  ) -> Result<(), AtomicDataError> {
+    let mut row_count = 0;
+    while let Some(row_result) = stream.next().await {
+      rows.push(row_result?);
+      row_count += 1;
+
+      if row_count % 10_000 == 0 {
+        debug!("Streamed {} rows for job '{}'", row_count, job_name);
+      }
+    }
+
+    if row_count > 0 {
+      debug!("Streamed {} total rows for job '{}'", row_count, job_name);
+    }
+    Ok(())
   }
 
   fn process_query_results(
@@ -843,11 +815,7 @@ impl DatabaseClient {
       return self.advance_block_for_active_job(target_block).await;
     }
 
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
-    let mut processed_tables = std::collections::HashSet::new();
+    let mut processed_jobs = std::collections::HashSet::new();
 
     debug!(
       "Marking {} changes as processed with Solana height {}",
@@ -855,35 +823,13 @@ impl DatabaseClient {
       target_block
     );
     for change in changes {
-      processed_tables.insert(change.job_name.clone());
+      processed_jobs.insert(change.job_name.clone());
     }
 
-    for job_name in processed_tables {
+    for job_name in processed_jobs {
       if let Some(job) = self.polling_jobs.iter().find(|j| j.name == job_name) {
-        // Update the appropriate block counter based on dry_run mode
-        let update_query = if self.dry_run {
-          r#"
-          UPDATE atomic_data_polling_state
-          SET
-            dry_run_last_processed_block = $1,
-            updated_at = NOW()
-          WHERE job_name = $2 AND query_name = $3
-          "#
-        } else {
-          r#"
-          UPDATE atomic_data_polling_state
-          SET
-            last_processed_block = $1,
-            updated_at = NOW()
-          WHERE job_name = $2 AND query_name = $3
-          "#
-        };
-
-        sqlx::query(update_query)
-          .bind(target_block as i64)
-          .bind(&job.name)
-          .bind(&job.query_name)
-          .execute(&*pool)
+        self
+          .advance_block_for_job(&job.name, &job.query_name, target_block)
           .await?;
 
         let block_type = if self.dry_run { "dry_run_last_processed_block" } else { "last_processed_block" };
@@ -913,10 +859,7 @@ impl DatabaseClient {
     query_name: &str,
     target_block: u64,
   ) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     // Update the appropriate block counter based on dry_run mode
     let update_query = if self.dry_run {
       r#"
@@ -953,10 +896,7 @@ impl DatabaseClient {
   }
 
   async fn advance_block_for_active_job(&self, target_block: u64) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let active_job = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -981,10 +921,7 @@ impl DatabaseClient {
   }
 
   pub async fn health_check(&self) -> Result<(), sqlx::Error> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     // Test basic connectivity
     sqlx::query("SELECT 1").execute(&*pool).await?;
 
@@ -1002,10 +939,7 @@ impl DatabaseClient {
   }
 
   pub async fn test_connection(&self) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     tokio::time::timeout(
       std::time::Duration::from_secs(5),
       sqlx::query("SELECT 1").execute(&*pool)
@@ -1029,10 +963,7 @@ impl DatabaseClient {
     parameters: &serde_json::Value,
     use_max: bool,
   ) -> Result<Option<u64>> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let block = match query_name {
       "construct_atomic_hotspots" => {
         let hotspot_type = parameters
@@ -1044,7 +975,7 @@ impl DatabaseClient {
             ))
           })?;
 
-        let (_table_name, block, has_data) = match hotspot_type {
+        let (block, has_data) = match hotspot_type {
           "mobile" => {
             let query = if use_max {
               r#"SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
@@ -1053,7 +984,7 @@ impl DatabaseClient {
             };
             let row = sqlx::query(query).fetch_one(&*pool).await?;
             let block_value = row.get::<i64, _>("block");
-            ("mobile_hotspot_infos", block_value, block_value >= 0)
+            (block_value, block_value >= 0)
           }
           "iot" => {
             let query = if use_max {
@@ -1063,7 +994,7 @@ impl DatabaseClient {
             };
             let row = sqlx::query(query).fetch_one(&*pool).await?;
             let block_value = row.get::<i64, _>("block");
-            ("iot_hotspot_infos", block_value, block_value >= 0)
+            (block_value, block_value >= 0)
           }
           _ => {
             return Err(anyhow::anyhow!(
@@ -1090,7 +1021,6 @@ impl DatabaseClient {
           r#"
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
-            COALESCE((SELECT MAX(last_block) FROM welcome_packs), -1),
             COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1),
             COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)
           )::bigint as block
@@ -1099,7 +1029,6 @@ impl DatabaseClient {
           r#"
           SELECT LEAST(
             COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM welcome_packs WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block >= 0), -1)
           )::bigint as block
@@ -1120,7 +1049,9 @@ impl DatabaseClient {
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
             COALESCE((SELECT MAX(last_block) FROM recipients), -1),
-            COALESCE((SELECT MAX(last_block) FROM mini_fanouts), -1)
+            COALESCE((SELECT MAX(last_block) FROM mini_fanouts), -1),
+            COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1),
+            COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)
           )::bigint as block
           "#
         } else {
@@ -1128,7 +1059,9 @@ impl DatabaseClient {
           SELECT LEAST(
             COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM recipients WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM mini_fanouts WHERE last_block >= 0), -1)
+            COALESCE((SELECT MIN(last_block) FROM mini_fanouts WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block >= 0), -1),
+            COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block >= 0), -1)
           )::bigint as block
           "#
         };
@@ -1161,10 +1094,7 @@ impl DatabaseClient {
     job: &PollingJob,
     after_block: u64,
   ) -> Result<Option<u64>> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let block = match job.query_name.as_str() {
       "construct_atomic_hotspots" => {
         let hotspot_type = job.parameters
@@ -1203,7 +1133,9 @@ impl DatabaseClient {
           SELECT MIN(next_block)::bigint as block FROM (
             SELECT MIN(last_block) as next_block FROM asset_owners WHERE last_block > $1
             UNION ALL
-            SELECT MIN(last_block) as next_block FROM welcome_packs WHERE last_block > $1
+            SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block > $1
+            UNION ALL
+            SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block > $1
           ) combined WHERE next_block IS NOT NULL
         "#;
 
@@ -1219,9 +1151,13 @@ impl DatabaseClient {
           SELECT MIN(next_block)::bigint as block FROM (
             SELECT MIN(last_block) as next_block FROM asset_owners WHERE last_block > $1
             UNION ALL
-            SELECT MIN(last_block) as next_block FROM recipients WHERE last_block > $1
+            SELECT MIN(last_block) FROM recipients WHERE last_block > $1
             UNION ALL
-            SELECT MIN(last_block) as next_block FROM mini_fanouts WHERE last_block > $1
+            SELECT MIN(last_block) FROM mini_fanouts WHERE last_block > $1
+            UNION ALL
+            SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block > $1
+            UNION ALL
+            SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block > $1
           ) combined WHERE next_block IS NOT NULL
         "#;
 
@@ -1249,10 +1185,7 @@ impl DatabaseClient {
   }
 
   pub async fn any_job_running(&self) -> Result<bool> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let row = sqlx::query(
       r#"
       SELECT COUNT(*) as running_count
@@ -1274,10 +1207,7 @@ impl DatabaseClient {
   }
 
   pub async fn mark_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let mut tx = pool.begin().await?;
     let existing = sqlx::query(
       r#"
@@ -1337,10 +1267,7 @@ impl DatabaseClient {
   }
 
   pub async fn mark_job_not_running(&self, job_name: &str, query_name: &str) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1364,10 +1291,7 @@ impl DatabaseClient {
   }
 
   async fn get_next_queue_job(&self) -> Result<Option<PollingJob>> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let row = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -1399,10 +1323,7 @@ impl DatabaseClient {
   }
 
   pub async fn mark_completed(&self, job_name: &str, query_name: &str) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1425,13 +1346,10 @@ impl DatabaseClient {
   }
 
   async fn reset_job_queue(&self) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     sqlx::query(
       r#"
-      update atomic_data_polling_state
+      UPDATE atomic_data_polling_state
       SET
         queue_completed_at = NULL,
         updated_at = NOW()
@@ -1445,10 +1363,7 @@ impl DatabaseClient {
   }
 
   pub async fn cleanup_stale_jobs(&self) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
 
     // Adaptive stale job detection (backup safety net):
     // - If job is caught up (within 10% of max_block), use 10 min threshold (likely stuck)
@@ -1593,10 +1508,7 @@ impl DatabaseClient {
   }
 
   pub async fn cleanup_all_jobs(&self) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let result = sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1651,10 +1563,7 @@ impl DatabaseClient {
     error_type: &str,
     error_message: &str,
   ) -> Result<()> {
-    let pool = {
-      let pool_guard = self.pool.read().await;
-      Arc::clone(&*pool_guard)
-    };
+    let pool = self.get_pool().await;
     let record_hash = Self::generate_record_hash(record);
 
     // Use INSERT ... ON CONFLICT to update failure count if already exists
