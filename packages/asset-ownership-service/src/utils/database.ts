@@ -155,4 +155,33 @@ export async function upsertAssetOwner(
   );
 }
 
+export async function bulkUpsertAssetOwners(
+  rows: { asset: string; owner: string; lastBlock: number }[],
+  { transaction }: { transaction?: Transaction } = {}
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  const bind: unknown[] = [];
+  const valueClauses = rows.map((r, i) => {
+    const offset = i * 3;
+    bind.push(r.asset, r.owner, r.lastBlock);
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, NOW(), NOW())`;
+  });
+
+  await database.query(
+    `INSERT INTO asset_owners (asset, owner, last_block, created_at, updated_at)
+     VALUES ${valueClauses.join(", ")}
+     ON CONFLICT (asset) DO UPDATE SET
+       owner = EXCLUDED.owner,
+       last_block = EXCLUDED.last_block,
+       updated_at = NOW()
+     WHERE asset_owners.last_block <= EXCLUDED.last_block`,
+    {
+      bind,
+      type: QueryTypes.INSERT,
+      transaction,
+    }
+  );
+}
+
 export default database;
