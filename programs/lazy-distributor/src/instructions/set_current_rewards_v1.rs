@@ -133,14 +133,14 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
   }
 
   // if lazy distributor has an approver, expect 1 remaining_account
-  if ctx.accounts.lazy_distributor.approver.is_some() {
+  if let Some(expected_approver) = ctx.accounts.lazy_distributor.approver {
     require!(
       ctx.remaining_accounts.len() == 1,
       ErrorCode::InvalidApproverSignature
     );
     let approver = &ctx.remaining_accounts[0];
     require!(
-      approver.key() == ctx.accounts.lazy_distributor.approver.unwrap(),
+      approver.key() == expected_approver,
       ErrorCode::InvalidApproverSignature
     );
     require!(approver.is_signer, ErrorCode::InvalidApproverSignature);

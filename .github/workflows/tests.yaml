@@ -52,6 +52,43 @@ jobs:
       - run: cargo build --locked
       - run: cargo test --lib
 
+  test-atomic-data-publisher:
+    name: Atomic Data Publisher Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: atomic_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup/
+      - name: Install protobuf compiler
+        run: sudo apt-get install -y protobuf-compiler
+      - uses: actions/cache@v4
+        name: Cache Cargo registry + index
+        id: cache-cargo-build
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo test --locked
+        working-directory: utils/atomic-data-publisher
+        env:
+          DATABASE_URL: postgres://test:test@localhost:5432/atomic_test
+
   build:
     name: Build Anchor
     runs-on: ubuntu-latest

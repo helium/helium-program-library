@@ -6,8 +6,9 @@ pub fn calculate_current_price(oracles: &[OracleV0], curr_ts: i64) -> Option<u64
     .iter()
     .filter(|oracle| {
       oracle.last_submitted_price.is_some()
-        && oracle.last_submitted_timestamp.is_some()
-        && curr_ts - oracle.last_submitted_timestamp.unwrap() <= SECONDS_PER_DAY
+        && oracle
+          .last_submitted_timestamp
+          .is_some_and(|ts| curr_ts - ts <= SECONDS_PER_DAY)
     })
     .filter_map(|oracle| oracle.last_submitted_price)
     .collect();

@@ -16,27 +16,32 @@ const decodeBase64ToPublicKey = (str: string): PublicKey => {
   return new PublicKey(decodeBase64ToBuffer(str));
 };
 
-const getAdressLookupTableAccounts = async (
+const getAddressLookupTableAccounts = async (
   keys: string[]
-): Promise<AddressLookupTableAccount[]> => {
+): Promise<Map<string, AddressLookupTableAccount>> => {
   const connection = provider.connection;
   const addressLookupTableAccountInfos =
     await connection.getMultipleAccountsInfo(
       keys.map((key) => new PublicKey(key))
     );
 
-  return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
-    const addressLookupTableAddress = keys[index];
+  const result = new Map<string, AddressLookupTableAccount>();
+  addressLookupTableAccountInfos.forEach((accountInfo, index) => {
+    const address = keys[index];
     if (accountInfo) {
-      const addressLookupTableAccount = new AddressLookupTableAccount({
-        key: new PublicKey(addressLookupTableAddress),
-        state: AddressLookupTableAccount.deserialize(accountInfo.data),
-      });
-      acc.push(addressLookupTableAccount);
+      result.set(
+        address,
+        new AddressLookupTableAccount({
+          key: new PublicKey(address),
+          state: AddressLookupTableAccount.deserialize(accountInfo.data),
+        })
+      );
+    } else {
+      console.warn(`Lookup table ${address} returned null from RPC`);
     }
+  });
 
-    return acc;
-  }, new Array<AddressLookupTableAccount>());
+  return result;
 };
 
 export async function convertSubstreamTransaction(txInfo: any): Promise<
@@ -47,6 +52,11 @@ export async function convertSubstreamTransaction(txInfo: any): Promise<
   | undefined
 > {
   if (!txInfo || !txInfo.transaction || !txInfo.transaction.message) {
+    console.warn("convertSubstreamTransaction: malformed input", {
+      hasTxInfo: !!txInfo,
+      hasTransaction: !!txInfo?.transaction,
+      hasMessage: !!txInfo?.transaction?.message,
+    });
     return undefined;
   }
 
@@ -63,23 +73,25 @@ export async function convertSubstreamTransaction(txInfo: any): Promise<
     }
   });
 
-  let addressLookupTableAccounts: AddressLookupTableAccount[] = [];
-  let lookupTableAddresses: string[] = [];
+  let lookupTableMap = new Map<string, AddressLookupTableAccount>();
   if (message.addressTableLookups && message.addressTableLookups.length > 0) {
-    lookupTableAddresses = message.addressTableLookups.map((lookup: any) =>
-      decodeBase64ToPublicKey(lookup.accountKey).toBase58()
+    const lookupTableAddresses = message.addressTableLookups.map(
+      (lookup: any) => decodeBase64ToPublicKey(lookup.accountKey).toBase58()
     );
-    addressLookupTableAccounts = await getAdressLookupTableAccounts(
-      lookupTableAddresses
-    );
+    lookupTableMap = await getAddressLookupTableAccounts(lookupTableAddresses);
   }
+
+  const addressLookupTableAccounts = Array.from(lookupTableMap.values());
 
   let extendedAccountKeys = [...accountKeys];
   if (message.addressTableLookups && message.addressTableLookups.length > 0) {
-    message.addressTableLookups.forEach((lookup: any, i: number) => {
-      const table = addressLookupTableAccounts[i];
+    message.addressTableLookups.forEach((lookup: any) => {
+      const tableAddress = decodeBase64ToPublicKey(
+        lookup.accountKey
+      ).toBase58();
+      const table = lookupTableMap.get(tableAddress);
       if (!table) {
-        throw new Error(`Missing lookup table for index ${i}`);
+        throw new Error(`Missing lookup table ${tableAddress}`);
       }
       const writableIndexes = Array.from(
         decodeBase64ToBuffer(lookup.writableIndexes)
@@ -91,7 +103,7 @@ export async function convertSubstreamTransaction(txInfo: any): Promise<
         const addr = table.state.addresses[idx];
         if (!addr)
           throw new Error(
-            `No address at writable index ${idx} in lookup table ${i}`
+            `No address at writable index ${idx} in lookup table ${tableAddress}`
           );
         extendedAccountKeys.push(addr);
       });
@@ -99,7 +111,7 @@ export async function convertSubstreamTransaction(txInfo: any): Promise<
         const addr = table.state.addresses[idx];
         if (!addr)
           throw new Error(
-            `No address at readonly index ${idx} in lookup table ${i}`
+            `No address at readonly index ${idx} in lookup table ${tableAddress}`
           );
         extendedAccountKeys.push(addr);
       });

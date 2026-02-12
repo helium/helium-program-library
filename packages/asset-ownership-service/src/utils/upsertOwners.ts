@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { Sequelize, Transaction, QueryTypes } from "sequelize";
+import { QueryTypes, Sequelize, Transaction } from "sequelize";
 import { PG_ASSET_TABLE, SOLANA_URL } from "../env";
 import database, { AssetOwner } from "./database";
 import { chunks, getAssetBatch, truthy } from "@helium/spl-utils";

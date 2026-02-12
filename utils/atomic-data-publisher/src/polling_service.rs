@@ -110,17 +110,7 @@ impl PollingService {
       }
       Ok(_) => {}
       Err(e) => {
-        // Check if this is an auth error and attempt pool refresh
-        if let Some(sqlx_err) = e.downcast_ref::<sqlx::Error>() {
-          if DatabaseClient::is_auth_error(sqlx_err) {
-            warn!("Database authentication error detected, attempting pool refresh");
-            if let Err(refresh_err) = self.database.refresh_pool().await {
-              error!("Failed to refresh database pool: {}", refresh_err);
-            } else {
-              info!("Database pool refreshed successfully after auth error");
-            }
-          }
-        }
+        self.try_refresh_on_auth_error(&e).await;
         return Err(e.into());
       }
     }
@@ -136,17 +126,7 @@ impl PollingService {
       let change_records = match self.database.get_pending_changes().await {
         Ok(records) => records,
         Err(e) => {
-          // Check if this is an auth error and attempt pool refresh
-          if let Some(sqlx_err) = e.downcast_ref::<sqlx::Error>() {
-            if DatabaseClient::is_auth_error(sqlx_err) {
-              warn!("Database authentication error detected, attempting pool refresh");
-              if let Err(refresh_err) = self.database.refresh_pool().await {
-                error!("Failed to refresh database pool: {}", refresh_err);
-              } else {
-                info!("Database pool refreshed successfully after auth error");
-              }
-            }
-          }
+          self.try_refresh_on_auth_error(&e).await;
           return Err(e.into());
         }
       };
@@ -353,6 +333,18 @@ impl PollingService {
         // Publish failure - transient (network, ingestor issues)
         // Return PublishError to retry next cycle (don't mark as permanently failed)
         Ok(ProcessResult::PublishError)
+      }
+    }
+  }
+
+  async fn try_refresh_on_auth_error(&self, err: &anyhow::Error) {
+    if let Some(sqlx_err) = err.downcast_ref::<sqlx::Error>() {
+      if DatabaseClient::is_auth_error(sqlx_err) {
+        warn!("Database authentication error detected, attempting pool refresh");
+        match self.database.refresh_pool().await {
+          Ok(_) => info!("Database pool refreshed after auth error"),
+          Err(e) => error!("Failed to refresh database pool: {}", e),
+        }
       }
     }
   }

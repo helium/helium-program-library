@@ -8,10 +8,9 @@ import { PROGRAM_ID as MEM_PROGRAM_ID } from "@helium/mobile-entity-manager-sdk"
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import { BubblegumIdl } from "../bubblegum";
-import { AssetOwner } from "./database";
 import { PG_CARRIER_TABLE, PG_DATA_ONLY_TABLE, PG_MAKER_TABLE } from "../env";
 import { QueryTypes, Transaction } from "sequelize";
-import database from "./database";
+import database, { AssetOwner } from "./database";
 import { provider } from "./solana";
 import retry from "async-retry";
 
