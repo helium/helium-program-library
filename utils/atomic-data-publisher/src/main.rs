@@ -8,6 +8,8 @@ mod protobuf;
 mod publisher;
 mod queries;
 mod service;
+#[cfg(test)]
+mod test_fixtures;
 
 use anyhow::{Context, Result};
 use config::{LoggingConfig, Settings};
