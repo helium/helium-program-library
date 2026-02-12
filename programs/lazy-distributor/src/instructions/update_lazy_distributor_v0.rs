@@ -29,11 +29,11 @@ pub fn handler(
   args: UpdateLazyDistributorArgsV0,
 ) -> Result<()> {
   let ld = &mut ctx.accounts.lazy_distributor;
-  if args.oracles.is_some() {
-    ld.oracles = args.oracles.unwrap();
+  if let Some(oracles) = args.oracles {
+    ld.oracles = oracles;
   }
-  if args.authority.is_some() {
-    ld.authority = args.authority.unwrap();
+  if let Some(authority) = args.authority {
+    ld.authority = authority;
   }
 
   if let Some(approver) = args.approver {
