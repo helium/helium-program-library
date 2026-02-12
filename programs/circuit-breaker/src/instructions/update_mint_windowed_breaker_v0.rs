@@ -23,8 +23,8 @@ pub fn handler(
   args: UpdateMintWindowedBreakerArgsV0,
 ) -> Result<()> {
   let circuit_breaker = &mut ctx.accounts.circuit_breaker;
-  if args.new_authority.is_some() {
-    circuit_breaker.authority = args.new_authority.unwrap();
+  if let Some(new_authority) = args.new_authority {
+    circuit_breaker.authority = new_authority;
   }
   if let Some(config) = args.config {
     require!(config.is_valid(), ErrorCode::InvalidConfig);
