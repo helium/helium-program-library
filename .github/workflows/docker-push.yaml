@@ -81,6 +81,6 @@ jobs:
           CONTAINER_PATH: ${{ env.CONTAINER_PATH }}
           IMAGE_TAG: ${{ env.VERSION }}
         run: |
-          REGISTRY_ALIAS=$(aws ecr-public describe-registries | jq --raw-output .registries[0].registryId)
+          REGISTRY_ALIAS=$(aws ecr-public describe-registries | jq --raw-output '.registries[0].aliases[0].name')
           docker build -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
           docker push $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG
