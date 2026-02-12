@@ -125,12 +125,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@npm:^0.11.7":
-  version: 0.11.7
-  resolution: "@helium/account-fetch-cache@npm:0.11.7"
+"@helium/account-fetch-cache@npm:^0.11.11":
+  version: 0.11.11
+  resolution: "@helium/account-fetch-cache@npm:0.11.11"
   dependencies:
     "@solana/web3.js": ^1.91.1
-  checksum: fb33a99bda395402f02145b372887112b88cd173c731488461f82e26f2fd0955e999882677860c2611cea8be12ed9341685d7f7d26f12773a525733b6b53a2b7
+  checksum: 50141aae58b7755aede2f6411459a54616f802d4b3b76897a6929b58ae191dd957f29b021bc9f42797921c84a610e1db3024adde554f6e0fa7e8998f31a932b5
   languageName: node
   linkType: hard
 
@@ -145,15 +145,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@npm:^0.11.7":
-  version: 0.11.7
-  resolution: "@helium/anchor-resolvers@npm:0.11.7"
+"@helium/anchor-resolvers@npm:^0.11.11":
+  version: 0.11.11
+  resolution: "@helium/anchor-resolvers@npm:0.11.11"
   dependencies:
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
   peerDependencies:
     "@coral-xyz/anchor": ^0.31.0
-  checksum: b1fa2253f5c29e95ea013b10e2e0406aecd239836443f2901fcc57af7c73c7385be638b28383fe63fa16326c2e361b1b7d3c979cc389ed6918b423e25ecd07d0
+  checksum: 50c73275d75a0d0ac02513b95c7372be464b10632cf66837bfb65b40c1586266564db64b96d9038bd5449cb735bcfb7f1bddf625d09ecbd533dfd505ce7c79aa
   languageName: node
   linkType: hard
 
@@ -163,8 +163,8 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@fastify/cors": ^8.1.1
-    "@helium/idls": ^0.11.7
-    "@helium/spl-utils": ^0.11.7
+    "@helium/idls": ^0.11.11
+    "@helium/spl-utils": ^0.11.11
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
@@ -184,27 +184,27 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/idls@npm:^0.11.7":
-  version: 0.11.7
-  resolution: "@helium/idls@npm:0.11.7"
+"@helium/idls@npm:^0.11.11":
+  version: 0.11.11
+  resolution: "@helium/idls@npm:0.11.11"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@solana/web3.js": ^1.91.1
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: e10e01d77dd9a8e7b27e2a773ec95ab391a19b0506f3e64c39742b5b9f807e94efebeca96429a968e05e624000dca7363b761ea0bb1301adc85458f5fd2d9ee0
+  checksum: ebd69f63ad37ad74f4e386416192899c6cf18a2b1887dcf31c0b9fa00dd2da7dc57f1f316191ade698d5aa42604c2e21baa644fdfadf792d1c84c7048716a5b1
   languageName: node
   linkType: hard
 
-"@helium/spl-utils@npm:^0.11.7":
-  version: 0.11.7
-  resolution: "@helium/spl-utils@npm:0.11.7"
+"@helium/spl-utils@npm:^0.11.11":
+  version: 0.11.11
+  resolution: "@helium/spl-utils@npm:0.11.11"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/account-fetch-cache": ^0.11.7
+    "@helium/account-fetch-cache": ^0.11.11
     "@helium/address": ^4.12.0
-    "@helium/anchor-resolvers": ^0.11.7
+    "@helium/anchor-resolvers": ^0.11.11
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -213,7 +213,7 @@ __metadata:
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: f566f746f4ca605de2ec7fed2b0f867fa17fab1c56eaf8efd214b60d8e88a1105ef20baed86b077526391b68aca385b0b1a3078fdffe77cfe3f7e06c6954e7d8
+  checksum: 40d927f94254844b68770f3b7432444d5edd6a4e17569e6d564e17c60cdf76afc464726c2d528cec0cd9a84ded3b57d815d91a2a20ad7f56cf132103e38260d5
   languageName: node
   linkType: hard
 
