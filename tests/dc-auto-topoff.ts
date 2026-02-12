@@ -173,12 +173,12 @@ describe("dc-auto-topoff", () => {
       SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: dcaSigner.publicKey,
-        lamports: 10 * LAMPORTS_PER_SOL,
+        lamports: 100 * LAMPORTS_PER_SOL,
       }),
       SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: crankTurner.publicKey,
-        lamports: 10 * LAMPORTS_PER_SOL,
+        lamports: 100 * LAMPORTS_PER_SOL,
       }),
     ]);
 
@@ -215,7 +215,7 @@ describe("dc-auto-topoff", () => {
       SystemProgram.transfer({
         fromPubkey: me,
         toPubkey: swapPayer,
-        lamports: 10 * LAMPORTS_PER_SOL,
+        lamports: 100 * LAMPORTS_PER_SOL,
       }),
     ]);
 
@@ -264,10 +264,10 @@ describe("dc-auto-topoff", () => {
     await createAtaAndTransfer(
       provider,
       hntMint,
-      new anchor.BN(1000_00000000),
+      new anchor.BN(10000_00000000),
       me,
       swapPayer
-    ); // 1000 HNT
+    ); // 10000 HNT
   });
 
   it("should initialize an auto topoff", async () => {
@@ -355,7 +355,7 @@ describe("dc-auto-topoff", () => {
         SystemProgram.transfer({
           fromPubkey: me,
           toPubkey: autoTopOff,
-          lamports: LAMPORTS_PER_SOL * 10,
+          lamports: LAMPORTS_PER_SOL * 100,
         }),
       ]);
 
@@ -457,10 +457,10 @@ describe("dc-auto-topoff", () => {
       await createAtaAndTransfer(
         provider,
         hntMint,
-        10000000000,
+        1000_00000000,
         me,
         autoTopOff
-      );
+      ); // 1000 HNT - enough to mint 10M DC at any reasonable HNT price
       await new Promise((resolve) => setTimeout(resolve, 3000));
       await runAllTasks();
       const delegatedDataCreditsAcc =
