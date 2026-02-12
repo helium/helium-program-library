@@ -1,4 +1,4 @@
-import { Model, STRING, INTEGER, Sequelize } from "sequelize";
+import { Model, STRING, INTEGER, Sequelize, QueryTypes, Transaction } from "sequelize";
 import AWS from "aws-sdk";
 import * as pg from "pg";
 import { PG_POOL_SIZE } from "../env";
@@ -130,5 +130,29 @@ Cursor.init(
     timestamps: true,
   }
 );
+
+/**
+ * Conditional upsert that only writes when the incoming last_block is >= the
+ * existing value, preventing stale replays from overwriting newer data.
+ */
+export async function upsertAssetOwner(
+  { asset, owner, lastBlock }: { asset: string; owner: string; lastBlock: number },
+  { transaction }: { transaction?: Transaction } = {}
+): Promise<void> {
+  await database.query(
+    `INSERT INTO asset_owners (asset, owner, last_block, created_at, updated_at)
+     VALUES (:asset, :owner, :lastBlock, NOW(), NOW())
+     ON CONFLICT (asset) DO UPDATE SET
+       owner = EXCLUDED.owner,
+       last_block = EXCLUDED.last_block,
+       updated_at = NOW()
+     WHERE asset_owners.last_block <= EXCLUDED.last_block`,
+    {
+      replacements: { asset, owner, lastBlock },
+      type: QueryTypes.INSERT,
+      transaction,
+    }
+  );
+}
 
 export default database;
