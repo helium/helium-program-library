@@ -560,3 +560,379 @@ pub fn build_entity_change_request(
     ))),
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::test_fixtures::*;
+  use helium_crypto::Verify;
+  use helium_proto::services::chain_rewardable_entities::{
+    entity_reward_destination_change_v1, split_recipient_info_v1, MobileHotspotDeviceType,
+  };
+  use serde_json::json;
+
+  // --- Mobile Hotspot ---
+
+  #[test]
+  fn build_mobile_hotspot_wifi_outdoor() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let asset = test_solana_pubkey();
+    let data = mobile_hotspot_json(
+      &pub_key_hex,
+      &asset,
+      "wifiOutdoor",
+      json!({
+        "wifiInfoV0": {
+          "serial": "test-serial-123",
+          "azimuth": 180
+        }
+      }),
+      100,
+    );
+    let record = make_change_record("job", "query", 100, data);
+    let result = ProtobufBuilder::build_mobile_hotspot_change(&record, &kp, true).unwrap();
+    let change = result.change.unwrap();
+    let metadata = change.metadata.unwrap();
+
+    assert_eq!(metadata.device_type, i32::from(MobileHotspotDeviceType::WifiOutdoor));
+    assert_eq!(metadata.serial_number, "test-serial-123");
+    assert_eq!(metadata.azimuth, 180);
+    assert_eq!(change.block, 100);
+    let expected_pub_key: Vec<u8> = PublicKeyBinary::from(kp.public_key().clone()).into();
+    assert_eq!(change.pub_key.unwrap().value, expected_pub_key);
+    assert_eq!(
+      change.asset.unwrap().value,
+      bs58::decode(&asset).into_vec().unwrap()
+    );
+  }
+
+  #[test]
+  fn parse_mobile_device_type_all_variants() {
+    assert_eq!(
+      ProtobufBuilder::parse_mobile_device_type("wifiIndoor").unwrap(),
+      MobileHotspotDeviceType::WifiIndoor
+    );
+    assert_eq!(
+      ProtobufBuilder::parse_mobile_device_type("wifiOutdoor").unwrap(),
+      MobileHotspotDeviceType::WifiOutdoor
+    );
+    assert_eq!(
+      ProtobufBuilder::parse_mobile_device_type("wifiDataOnly").unwrap(),
+      MobileHotspotDeviceType::WifiDataOnly
+    );
+    assert_eq!(
+      ProtobufBuilder::parse_mobile_device_type("cbrs").unwrap(),
+      MobileHotspotDeviceType::Cbrs
+    );
+    assert!(ProtobufBuilder::parse_mobile_device_type("banana").is_err());
+  }
+
+  // --- IoT Hotspot ---
+
+  #[test]
+  fn build_iot_hotspot_with_location_and_elevation() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let asset = test_solana_pubkey();
+    let data = iot_hotspot_json(
+      &pub_key_hex,
+      &asset,
+      500,
+      Some("8c2ab38b6e899ff"),
+      Some(42),
+      Some(12),
+      true,
+    );
+    let record = make_change_record("job", "query", 500, data);
+    let result = ProtobufBuilder::build_iot_hotspot_change(&record, &kp, true).unwrap();
+    let change = result.change.unwrap();
+    let metadata = change.metadata.unwrap();
+
+    assert_eq!(metadata.asserted_hex, "8c2ab38b6e899ff");
+    assert_eq!(metadata.elevation, 42);
+    assert!(!metadata.is_data_only);
+    assert_eq!(change.block, 500);
+  }
+
+  #[test]
+  fn build_iot_hotspot_without_location() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let asset = test_solana_pubkey();
+    let data = iot_hotspot_json(&pub_key_hex, &asset, 600, None, None, None, true);
+    let record = make_change_record("job", "query", 600, data);
+    let result = ProtobufBuilder::build_iot_hotspot_change(&record, &kp, true).unwrap();
+    let metadata = result.change.unwrap().metadata.unwrap();
+
+    assert_eq!(metadata.asserted_hex, "");
+    assert_eq!(metadata.elevation, 0);
+    assert!(!metadata.is_data_only);
+  }
+
+  #[test]
+  fn build_iot_hotspot_data_only() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let asset = test_solana_pubkey();
+    let data = iot_hotspot_json(&pub_key_hex, &asset, 700, None, None, None, false);
+    let record = make_change_record("job", "query", 700, data);
+    let result = ProtobufBuilder::build_iot_hotspot_change(&record, &kp, true).unwrap();
+    let metadata = result.change.unwrap().metadata.unwrap();
+
+    assert!(metadata.is_data_only);
+    assert_eq!(metadata.asserted_hex, "");
+    assert_eq!(metadata.elevation, 0);
+  }
+
+  // --- Entity Ownership ---
+
+  fn build_ownership(
+    kp: &Keypair,
+    pub_key_hex: &str,
+    asset: &str,
+    owner: &str,
+    owner_type: &str,
+    block: u64,
+  ) -> EntityOwnerInfo {
+    let data = entity_ownership_json(pub_key_hex, asset, owner, owner_type, block);
+    let record = make_change_record("job", "query", block, data);
+    ProtobufBuilder::build_entity_ownership_change(&record, kp, true)
+      .unwrap()
+      .change
+      .unwrap()
+      .owner
+      .unwrap()
+  }
+
+  fn assert_owner_info(info: &EntityOwnerInfo, expected_type: EntityOwnerType, wallet_b58: &str) {
+    assert_eq!(info.r#type, i32::from(expected_type));
+    let expected_bytes = bs58::decode(wallet_b58).into_vec().unwrap();
+    assert_eq!(info.wallet.as_ref().unwrap().value, expected_bytes);
+  }
+
+  #[test]
+  fn build_entity_ownership_direct_owner() {
+    let kp = test_keypair();
+    let owner = test_solana_pubkey_n(2);
+    let info = build_ownership(
+      &kp, &test_entity_key_hex(&kp), &test_solana_pubkey(), &owner, "direct_owner", 800,
+    );
+    assert_owner_info(&info, EntityOwnerType::DirectOwner, &owner);
+  }
+
+  #[test]
+  fn build_entity_ownership_welcome_pack() {
+    let kp = test_keypair();
+    let owner = test_solana_pubkey_n(3);
+    let info = build_ownership(
+      &kp, &test_entity_key_hex(&kp), &test_solana_pubkey(), &owner, "welcome_pack_owner", 900,
+    );
+    assert_owner_info(&info, EntityOwnerType::WelcomePackOwner, &owner);
+  }
+
+  #[test]
+  fn ownership_transition_welcome_pack_to_direct() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let asset = test_solana_pubkey();
+    let welcome_wallet = test_solana_pubkey_n(10);
+    let user_wallet = test_solana_pubkey_n(11);
+
+    let pack = build_ownership(&kp, &pub_key_hex, &asset, &welcome_wallet, "welcome_pack_owner", 800);
+    assert_owner_info(&pack, EntityOwnerType::WelcomePackOwner, &welcome_wallet);
+
+    let direct = build_ownership(&kp, &pub_key_hex, &asset, &user_wallet, "direct_owner", 900);
+    assert_owner_info(&direct, EntityOwnerType::DirectOwner, &user_wallet);
+  }
+
+  #[test]
+  fn unknown_owner_type_defaults_to_direct_owner() {
+    let kp = test_keypair();
+    let wallet = test_solana_pubkey_n(12);
+    let info = build_ownership(
+      &kp, &test_entity_key_hex(&kp), &test_solana_pubkey(),
+      &wallet, "some_unknown_type", 1000,
+    );
+    assert_owner_info(&info, EntityOwnerType::DirectOwner, &wallet);
+  }
+
+  // --- Reward Destination ---
+
+  #[test]
+  fn build_reward_destination_direct_recipient() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let asset = test_solana_pubkey();
+    let recipient = test_solana_pubkey_n(4);
+    let data = reward_destination_direct_json(&pub_key_hex, &asset, &recipient, 1000);
+    let record = make_change_record("job", "query", 1000, data);
+    let result =
+      ProtobufBuilder::build_entity_reward_destination_change(&record, &kp, true).unwrap();
+    let change = result.change.unwrap();
+
+    match change.rewards_destination {
+      Some(entity_reward_destination_change_v1::RewardsDestination::RewardsRecipient(
+        solana_pk,
+      )) => {
+        let expected = bs58::decode(&recipient).into_vec().unwrap();
+        assert_eq!(solana_pk.value, expected);
+      }
+      other => panic!("expected RewardsRecipient, got {:?}", other),
+    }
+  }
+
+  #[test]
+  fn build_reward_destination_mini_fanout() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let asset = test_solana_pubkey();
+    let fanout = test_solana_pubkey_n(5);
+    let authority1 = test_solana_pubkey_n(6);
+    let recipient1 = test_solana_pubkey_n(7);
+    let authority2 = test_solana_pubkey_n(8);
+    let recipient2 = test_solana_pubkey_n(9);
+
+    let recipients = vec![
+      json!({
+        "authority": authority1,
+        "recipient": recipient1,
+        "shares": 6000
+      }),
+      json!({
+        "authority": authority2,
+        "recipient": recipient2,
+        "shares": 4000
+      }),
+    ];
+
+    let data =
+      reward_destination_fanout_json(&pub_key_hex, &asset, &fanout, recipients, 1100);
+    let record = make_change_record("job", "query", 1100, data);
+    let result =
+      ProtobufBuilder::build_entity_reward_destination_change(&record, &kp, true).unwrap();
+    let change = result.change.unwrap();
+
+    match change.rewards_destination {
+      Some(entity_reward_destination_change_v1::RewardsDestination::RewardsSplitV1(split)) => {
+        assert_eq!(split.schedule, "daily");
+        assert_eq!(split.total_shares, 10000);
+        assert_eq!(split.recipients.len(), 2);
+
+        let r0 = &split.recipients[0];
+        assert_eq!(
+          r0.reward_amount,
+          Some(split_recipient_info_v1::RewardAmount::Shares(6000))
+        );
+        assert_eq!(
+          r0.authority.as_ref().unwrap().value,
+          bs58::decode(&authority1).into_vec().unwrap()
+        );
+        assert_eq!(
+          r0.recipient.as_ref().unwrap().value,
+          bs58::decode(&recipient1).into_vec().unwrap()
+        );
+
+        let r1 = &split.recipients[1];
+        assert_eq!(
+          r1.reward_amount,
+          Some(split_recipient_info_v1::RewardAmount::Shares(4000))
+        );
+        assert_eq!(
+          r1.authority.as_ref().unwrap().value,
+          bs58::decode(&authority2).into_vec().unwrap()
+        );
+        assert_eq!(
+          r1.recipient.as_ref().unwrap().value,
+          bs58::decode(&recipient2).into_vec().unwrap()
+        );
+      }
+      other => panic!("expected RewardsSplitV1, got {:?}", other),
+    }
+  }
+
+  // --- Dispatcher ---
+
+  #[test]
+  fn dispatch_unknown_type_errors() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let asset = test_solana_pubkey();
+    let data = mobile_hotspot_json(&pub_key_hex, &asset, "wifiOutdoor", json!({}), 70);
+    let record = make_change_record("job", "query", 70, data);
+    let result = build_entity_change_request(&record, "banana", &kp, true);
+    assert!(result.is_err());
+  }
+
+  // --- Signing ---
+
+  #[test]
+  fn signing_produces_valid_signature() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let asset = test_solana_pubkey();
+    let data = mobile_hotspot_json(&pub_key_hex, &asset, "wifiOutdoor", json!({}), 80);
+    let record = make_change_record("job", "query", 80, data);
+    let result = ProtobufBuilder::build_mobile_hotspot_change(&record, &kp, false).unwrap();
+
+    let mut unsigned = result.clone();
+    unsigned.signature = vec![];
+    let message_bytes = unsigned.encode_to_vec();
+
+    kp.public_key()
+      .verify(&message_bytes, &result.signature)
+      .expect("signature should be cryptographically valid");
+  }
+
+  // --- Error Paths ---
+
+  #[test]
+  fn missing_pub_key_errors() {
+    let kp = test_keypair();
+    let data = json!({
+      "asset": test_solana_pubkey(),
+      "device_type": "wifiOutdoor",
+      "block": 1
+    });
+    let record = make_change_record("job", "query", 1, data);
+    let err = ProtobufBuilder::build_mobile_hotspot_change(&record, &kp, true).unwrap_err();
+    assert!(
+      matches!(&err, AtomicDataError::InvalidData(msg) if msg.contains("pub_key")),
+      "expected InvalidData mentioning pub_key, got: {err}"
+    );
+  }
+
+  #[test]
+  fn invalid_hex_pub_key_errors() {
+    let kp = test_keypair();
+    let data = json!({
+      "pub_key": "not_valid_hex!!!",
+      "asset": test_solana_pubkey(),
+      "device_type": "wifiOutdoor",
+      "block": 1
+    });
+    let record = make_change_record("job", "query", 1, data);
+    let err = ProtobufBuilder::build_mobile_hotspot_change(&record, &kp, true).unwrap_err();
+    assert!(
+      matches!(&err, AtomicDataError::InvalidData(msg) if msg.contains("hex")),
+      "expected InvalidData mentioning hex, got: {err}"
+    );
+  }
+
+  #[test]
+  fn no_reward_destination_errors() {
+    let kp = test_keypair();
+    let pub_key_hex = test_entity_key_hex(&kp);
+    let data = json!({
+      "pub_key": pub_key_hex,
+      "asset": test_solana_pubkey(),
+      "block": 1
+    });
+    let record = make_change_record("job", "query", 1, data);
+    let err = ProtobufBuilder::build_entity_reward_destination_change(&record, &kp, true).unwrap_err();
+    assert!(
+      matches!(&err, AtomicDataError::InvalidData(msg) if msg.contains("reward")),
+      "expected InvalidData mentioning reward, got: {err}"
+    );
+  }
+}

@@ -37,6 +37,18 @@ pub struct DatabaseClient {
   dry_run: bool,
 }
 
+fn calculate_target_block(last_processed_block: u64, max_available_block: u64) -> u64 {
+  let block_diff = max_available_block.saturating_sub(last_processed_block);
+
+  let chunk_size = if block_diff <= MIN_CHUNK_SIZE {
+    block_diff
+  } else {
+    block_diff.min(MAX_CHUNK_SIZE)
+  };
+
+  std::cmp::min(last_processed_block + chunk_size, max_available_block)
+}
+
 impl DatabaseClient {
   async fn get_pool(&self) -> Arc<PgPool> {
     Arc::clone(&*self.pool.read().await)
@@ -654,15 +666,7 @@ impl DatabaseClient {
   }
 
   fn calculate_target_block(&self, last_processed_block: u64, max_available_block: u64) -> u64 {
-    let block_diff = max_available_block.saturating_sub(last_processed_block);
-
-    let chunk_size = if block_diff <= MIN_CHUNK_SIZE {
-      block_diff
-    } else {
-      block_diff.min(MAX_CHUNK_SIZE)
-    };
-
-    std::cmp::min(last_processed_block + chunk_size, max_available_block)
+    calculate_target_block(last_processed_block, max_available_block)
   }
 
   async fn execute_query(
@@ -1556,6 +1560,11 @@ impl DatabaseClient {
     format!("{:x}", hasher.finalize())
   }
 
+  #[cfg(test)]
+  fn generate_record_hash_public(record: &ChangeRecord) -> String {
+    Self::generate_record_hash(record)
+  }
+
   /// Mark a record as failed
   pub async fn mark_record_failed(
     &self,
@@ -1599,3 +1608,195 @@ impl DatabaseClient {
   }
 }
 
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::test_fixtures::*;
+  use serde_json::json;
+
+  // --- Block Calculation ---
+
+  #[test]
+  fn target_block_small_gap() {
+    let result = calculate_target_block(100_000, 130_000);
+    assert_eq!(result, 130_000);
+  }
+
+  #[test]
+  fn target_block_large_gap() {
+    let result = calculate_target_block(100_000, 700_000);
+    assert_eq!(result, 600_000);
+  }
+
+  #[test]
+  fn target_block_at_min_chunk() {
+    let result = calculate_target_block(100_000, 150_000);
+    assert_eq!(result, 150_000);
+  }
+
+  #[test]
+  fn target_block_no_gap() {
+    let result = calculate_target_block(100_000, 100_000);
+    assert_eq!(result, 100_000);
+  }
+
+  #[test]
+  fn target_block_capped_to_max_chunk() {
+    let result = calculate_target_block(0, 1_000_000);
+    assert_eq!(result, 500_000);
+  }
+
+  // --- Record Hashing ---
+
+  #[test]
+  fn hash_uses_pub_key_and_asset() {
+    let record = make_change_record(
+      "job",
+      "query",
+      100,
+      json!({"pub_key": "abc123", "asset": "xyz789"}),
+    );
+    let hash = DatabaseClient::generate_record_hash_public(&record);
+    assert_eq!(
+      hash,
+      "eeb168ca58e76ea84bad9388f38342b848ad0f19a8ca29825cea062184755876"
+    );
+  }
+
+  #[test]
+  fn hash_deterministic_same_data() {
+    let data = json!({"pub_key": "abc123", "asset": "xyz789", "extra": "field"});
+    let record1 = make_change_record("job", "query", 100, data.clone());
+    let record2 = make_change_record("job", "query", 999, data);
+    let hash1 = DatabaseClient::generate_record_hash_public(&record1);
+    let hash2 = DatabaseClient::generate_record_hash_public(&record2);
+    assert_eq!(hash1, hash2);
+
+    let different = make_change_record(
+      "job",
+      "query",
+      100,
+      json!({"pub_key": "different_key", "asset": "xyz789"}),
+    );
+    let hash3 = DatabaseClient::generate_record_hash_public(&different);
+    assert_ne!(hash1, hash3);
+  }
+
+  #[test]
+  fn hash_fallback_without_asset() {
+    let record = make_change_record("job", "query", 100, json!({"pub_key": "abc123"}));
+    let hash = DatabaseClient::generate_record_hash_public(&record);
+    assert_eq!(
+      hash,
+      "d3ba8f5ce2ee8ae99faa87e522c9d1a9a08ea909bf4c7099b4282411f658f7f4"
+    );
+    let with_asset = DatabaseClient::generate_record_hash_public(&make_change_record(
+      "job",
+      "query",
+      100,
+      json!({"pub_key": "abc123", "asset": "xyz789"}),
+    ));
+    assert_ne!(hash, with_asset);
+  }
+
+  #[test]
+  fn hash_fallback_without_pub_key() {
+    let record = make_change_record("job", "query", 100, json!({"something": "else"}));
+    let hash = DatabaseClient::generate_record_hash_public(&record);
+    assert_eq!(
+      hash,
+      "7d9408655f38da15be8eb96f66033b3ee7d625fe7bc0dac34664a7e49fdfff27"
+    );
+    let with_pub_key = DatabaseClient::generate_record_hash_public(&make_change_record(
+      "job",
+      "query",
+      100,
+      json!({"pub_key": "abc123", "asset": "xyz789"}),
+    ));
+    let without_asset = DatabaseClient::generate_record_hash_public(&make_change_record(
+      "job",
+      "query",
+      100,
+      json!({"pub_key": "abc123"}),
+    ));
+    assert_ne!(hash, with_pub_key);
+    assert_ne!(hash, without_asset);
+  }
+
+  // --- Config Validation ---
+
+  #[test]
+  fn validate_config_rejects_empty_host() {
+    let mut config = valid_test_db_config();
+    config.host = String::new();
+    assert!(DatabaseClient::validate_database_config(&config).is_err());
+  }
+
+  #[test]
+  fn validate_config_rejects_zero_port() {
+    let mut config = valid_test_db_config();
+    config.port = 0;
+    assert!(DatabaseClient::validate_database_config(&config).is_err());
+  }
+
+  #[test]
+  fn validate_config_rejects_max_lt_min_connections() {
+    let mut config = valid_test_db_config();
+    config.max_connections = 1;
+    config.min_connections = 5;
+    assert!(DatabaseClient::validate_database_config(&config).is_err());
+  }
+
+  #[test]
+  fn validate_config_accepts_valid() {
+    let config = valid_test_db_config();
+    assert!(DatabaseClient::validate_database_config(&config).is_ok());
+  }
+
+  // --- Job Validation ---
+
+  #[test]
+  fn validate_jobs_empty_is_ok() {
+    assert!(DatabaseClient::validate_polling_jobs(&[]).is_ok());
+  }
+
+  #[test]
+  fn validate_jobs_rejects_empty_name() {
+    let jobs = vec![make_polling_job(
+      "",
+      "construct_atomic_hotspots",
+      json!({"change_type": "mobile_hotspot", "hotspot_type": "mobile"}),
+    )];
+    assert!(DatabaseClient::validate_polling_jobs(&jobs).is_err());
+  }
+
+  #[test]
+  fn validate_jobs_rejects_missing_change_type() {
+    let jobs = vec![make_polling_job(
+      "test_job",
+      "construct_atomic_hotspots",
+      json!({"hotspot_type": "mobile"}),
+    )];
+    assert!(DatabaseClient::validate_polling_jobs(&jobs).is_err());
+  }
+
+  #[test]
+  fn validate_jobs_rejects_hotspot_without_hotspot_type() {
+    let jobs = vec![make_polling_job(
+      "test_job",
+      "construct_atomic_hotspots",
+      json!({"change_type": "mobile_hotspot"}),
+    )];
+    assert!(DatabaseClient::validate_polling_jobs(&jobs).is_err());
+  }
+
+  #[test]
+  fn validate_jobs_accepts_valid_mobile_job() {
+    let jobs = vec![make_polling_job(
+      "mobile_hotspots",
+      "construct_atomic_hotspots",
+      json!({"change_type": "mobile_hotspot", "hotspot_type": "mobile"}),
+    )];
+    assert!(DatabaseClient::validate_polling_jobs(&jobs).is_ok());
+  }
+}
