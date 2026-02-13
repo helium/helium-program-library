@@ -34,14 +34,26 @@ const RELEVANT_INSTRUCTIONS_REGEX = new RegExp(
 );
 
 interface IOutputTransaction {
-  message: {
-    accountKeys: string[];
-    recentBlockhash: string;
-    instructions: Array<{
-      programIdIndex: number;
-      accounts: string;
-      data: string;
-    }>;
+  transaction: {
+    signatures: string[];
+    message: {
+      accountKeys: string[];
+      header: {
+        numRequiredSignatures: number;
+        numReadonlySignedAccounts: number;
+        numReadonlyUnsignedAccounts: number;
+      };
+      instructions: Array<{
+        programIdIndex: number;
+        accounts: string;
+        data: string;
+      }>;
+      addressTableLookups?: Array<{
+        accountKey: string;
+        writableIndexes: string;
+        readonlyIndexes: string;
+      }>;
+    };
   };
   meta: {
     logMessages: string[];
@@ -158,12 +170,14 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
       for await (const response of streamBlocks(transport, request)) {
         if (currentAbortController.signal.aborted) {
+          await cursorManager.flushCursor();
           return;
         }
 
         if (shouldRestart) {
           shouldRestart = false;
           currentAbortController.abort();
+          await cursorManager.flushCursor();
           return;
         }
 
@@ -176,15 +190,20 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
         if (message.case === "blockScopedData") {
           staleAttemptCount = 0;
+          server.customMetrics.blocksReceivedCounter.inc();
 
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
           // Despite the name "finalBlockHeight", this is actually the final SLOT height
           // In Substreams terminology, a Solana slot is referred to as a "block"
           // This represents the number of the slot that is finalized (rooted)
-          const block = message.value.finalBlockHeight
-            ? Number(message.value.finalBlockHeight)
-            : 0;
+          const block =
+            message.value.finalBlockHeight != null
+              ? Number(message.value.finalBlockHeight)
+              : 0;
+          if (block > 0) {
+            server.customMetrics.lastBlockHeightGauge.set(block);
+          }
 
           const hasTransactions =
             output !== undefined &&
@@ -210,77 +229,61 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
               try {
                 for (const transactionInfo of filteredTransactions) {
-                  try {
-                    const converted = await convertSubstreamTransaction(
-                      transactionInfo
+                  const converted = await convertSubstreamTransaction(
+                    transactionInfo
+                  );
+                  if (!converted) {
+                    console.warn(
+                      `Failed to convert substream transaction in block ${block}`,
+                      {
+                        logMessages:
+                          transactionInfo.meta?.logMessages?.slice(0, 5),
+                      }
                     );
-                    if (!converted) {
-                      console.warn(
-                        `Failed to convert substream transaction in block ${block}`,
-                        {
-                          logMessages:
-                            transactionInfo.meta?.logMessages?.slice(0, 5),
-                        }
-                      );
-                      server.customMetrics.conversionFailureCounter.inc();
-                      continue;
-                    }
+                    server.customMetrics.conversionFailureCounter.inc();
+                    continue;
+                  }
 
-                    const { tx, addressLookupTableAccounts } = converted;
-                    const { message } = tx;
-                    const { staticAccountKeys, accountKeysFromLookups } =
-                      message.getAccountKeys({
-                        addressLookupTableAccounts,
-                      });
+                  const { accountKeys, instructions } = converted;
 
-                    const accountKeys = [
-                      ...staticAccountKeys,
-                      ...(accountKeysFromLookups?.writable || []),
-                      ...(accountKeysFromLookups?.readonly || []),
-                    ];
-
-                    const { updatedTrees } =
-                      await processor.processTransaction(
-                        {
-                          accountKeys,
-                          instructions: message.compiledInstructions,
-                          innerInstructions:
-                            transactionInfo.meta.innerInstructions?.map(
-                              (inner: any) => ({
-                                index: inner.index,
-                                instructions: inner.instructions.map(
-                                  (ix: any) => ({
-                                    programIdIndex: ix.programIdIndex,
-                                    accountKeyIndexes: Buffer.from(
-                                      ix.accounts,
-                                      "base64"
-                                    ).toJSON().data,
-                                    data: Buffer.from(ix.data, "base64"),
-                                  })
-                                ),
-                              })
-                            ),
-                        },
-                        dbTx,
-                        block
-                      );
-
-                    if (updatedTrees) {
-                      console.log("Trees updated");
-                      shouldRestart = true;
-                      restartCursor = cursor;
-                      await cursorManager.updateCursor({
-                        cursor,
-                        block: block?.toString() || "unknown",
-                        force: true,
-                      });
-                    }
-                  } catch (txErr) {
-                    console.error(
-                      `Failed to process transaction in block ${block}:`,
-                      txErr
+                  const { updatedTrees } =
+                    await processor.processTransaction(
+                      {
+                        accountKeys,
+                        instructions,
+                        innerInstructions:
+                          transactionInfo.meta.innerInstructions?.map(
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            (inner: any) => ({
+                              index: inner.index,
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              instructions: inner.instructions.map(
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                (ix: any) => ({
+                                  programIdIndex: ix.programIdIndex,
+                                  accountKeyIndexes: Buffer.from(
+                                    ix.accounts,
+                                    "base64"
+                                  ).toJSON().data,
+                                  data: Buffer.from(ix.data, "base64"),
+                                })
+                              ),
+                            })
+                          ),
+                      },
+                      dbTx,
+                      block
                     );
-                    server.customMetrics.transactionFailureCounter.inc();
+
+                  if (updatedTrees) {
+                    console.log("Trees updated");
+                    shouldRestart = true;
+                    restartCursor = cursor;
+                    await cursorManager.updateCursor({
+                      cursor,
+                      block: block?.toString() || "unknown",
+                      force: true,
+                    });
                   }
                 }
 
@@ -288,7 +291,11 @@ export const setupSubstream = async (server: FastifyInstance) => {
                 server.customMetrics.blocksProcessedCounter.inc();
               } catch (err) {
                 await dbTx.rollback();
-                throw err;
+                server.customMetrics.transactionFailureCounter.inc();
+                console.error(
+                  `Failed to process block ${block}, rolled back:`,
+                  err
+                );
               }
             }
           }
@@ -334,7 +341,10 @@ export const setupSubstream = async (server: FastifyInstance) => {
       console.log(
         `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
       );
-      connect(nextAttempt);
+      connect(nextAttempt).catch((err) => {
+        console.error("Reconnect failed:", err);
+        process.exit(1);
+      });
     }, delay);
   };
 

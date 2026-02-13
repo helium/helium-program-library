@@ -24,13 +24,13 @@ interface TreeConfigs {
   [key: string]: TreeConfig;
 }
 
-interface ProcessableInstruction {
+export interface ProcessableInstruction {
   programIdIndex: number;
   accountKeyIndexes: number[];
   data: Buffer | Uint8Array;
 }
 
-interface ProcessableTransaction {
+export interface ProcessableTransaction {
   accountKeys: PublicKey[];
   instructions: ProcessableInstruction[];
   innerInstructions?: {
@@ -65,17 +65,12 @@ export class TransactionProcessor {
   }
 
   private async getCurrentblock(): Promise<number> {
-    try {
-      return await retry(() => provider.connection.getSlot("finalized"), {
-        retries: 3,
-        factor: 2,
-        minTimeout: 1000,
-        maxTimeout: 5000,
-      });
-    } catch (error) {
-      console.warn("Failed to fetch block after retries:", error);
-      return 0;
-    }
+    return await retry(() => provider.connection.getSlot("finalized"), {
+      retries: 3,
+      factor: 2,
+      minTimeout: 1000,
+      maxTimeout: 5000,
+    });
   }
 
   static async create(): Promise<TransactionProcessor> {
@@ -148,8 +143,8 @@ export class TransactionProcessor {
       decodedInstruction,
       instruction.accountKeyIndexes.map((idx) => ({
         pubkey: new PublicKey(tx.accountKeys[idx]),
-        isSigner: false, // These will be set correctly by the caller
-        isWritable: false, // These will be set correctly by the caller
+        isSigner: false,
+        isWritable: false,
       }))
     );
 
