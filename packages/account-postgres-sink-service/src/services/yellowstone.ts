@@ -168,7 +168,12 @@ export const setupYellowstone = async (
     );
 
     const delay = nextAttempt === 1 ? 0 : 1000;
-    setTimeout(() => connect(nextAttempt), delay);
+    setTimeout(() => {
+      connect(nextAttempt).catch((err) => {
+        console.error("Fatal reconnect error:", err);
+        process.exit(1);
+      });
+    }, delay);
   };
 
   await connect();

@@ -28,12 +28,14 @@ export const USE_SUBSTREAM = getEnvBoolean("USE_SUBSTREAM");
 export const SUBSTREAM_API_KEY = process.env.SUBSTREAM_API_KEY;
 export const SUBSTREAM_URL = process.env.SUBSTREAM_URL;
 export const SUBSTREAM = process.env.SUBSTREAM;
+export const SUBSTREAM_PRODUCTION_MODE =
+  process.env.SUBSTREAM_PRODUCTION_MODE !== "false";
 export const SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS =
   Number(process.env.SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS) || 5 * 60 * 1000; // 5 minutes default
 
 export const USE_KAFKA = getEnvBoolean("USE_KAFKA");
 export const KAFKA_USER = process.env.KAFKA_USER;
-export const KAFKA_GROUP_ID = process.env.KAFKA_CROUP_ID;
+export const KAFKA_GROUP_ID = process.env.KAFKA_GROUP_ID;
 export const KAFKA_BROKERS = process.env.KAFKA_BROKERS?.split(",");
 export const KAFKA_TOPIC = process.env.KAFKA_TOPIC;
 export const KAFKA_PASSWORD = process.env.KAFKA_PASSWORD?.replace(
