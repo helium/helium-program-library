@@ -13,10 +13,10 @@ import {
 import { FastifyInstance } from "fastify";
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import {
+  PRODUCTION,
   SUBSTREAM,
   SUBSTREAM_API_KEY,
   SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
-  SUBSTREAM_PRODUCTION_MODE,
   SUBSTREAM_URL,
 } from "../env";
 import { convertSubstreamTransaction } from "../utils/convertSubstreamTransaction";
@@ -159,7 +159,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
-        productionMode: SUBSTREAM_PRODUCTION_MODE,
+        productionMode: PRODUCTION,
         startBlockNum: cursor ? undefined : startBlock,
         startCursor: cursor,
         finalBlocksOnly: true,

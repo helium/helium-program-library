@@ -19,7 +19,5 @@ export const REFRESH_ON_BOOT = getEnvBoolean("REFRESH_ON_BOOT");
 export const SUBSTREAM_API_KEY = process.env.SUBSTREAM_API_KEY;
 export const SUBSTREAM_URL = process.env.SUBSTREAM_URL;
 export const SUBSTREAM = process.env.SUBSTREAM;
-export const SUBSTREAM_PRODUCTION_MODE =
-  process.env.SUBSTREAM_PRODUCTION_MODE !== "false";
 export const SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS =
   Number(process.env.SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS) || 5 * 60 * 1000; // 5 minutes default

@@ -13,10 +13,10 @@ import {
 } from "@substreams/core";
 import { FastifyInstance } from "fastify";
 import {
+  PRODUCTION,
   SUBSTREAM,
   SUBSTREAM_API_KEY,
   SUBSTREAM_CURSOR_STALENESS_THRESHOLD_MS,
-  SUBSTREAM_PRODUCTION_MODE,
   SUBSTREAM_URL,
 } from "../env";
 import { getPluginsByAccountTypeByProgram } from "../plugins";
@@ -119,7 +119,7 @@ export const setupSubstream = async (
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
-        productionMode: SUBSTREAM_PRODUCTION_MODE,
+        productionMode: PRODUCTION,
         startBlockNum: cursor ? undefined : startBlock,
         startCursor: cursor,
         finalBlocksOnly: true,
