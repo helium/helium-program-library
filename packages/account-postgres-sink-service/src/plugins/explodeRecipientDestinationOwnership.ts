@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { IPlugin } from "../types";
+import { conditionalUpsert, database } from "../utils/database";
 import {
   handleMiniFanout,
   MiniFanout,
@@ -79,7 +80,9 @@ export const ExplodeRecipientDestinationOwnershipPlugin = ((): IPlugin => {
 
           // Only create the rewards recipient if we have the required KeyToAsset data
           if (kta && kta.entityKey && kta.keySerialization) {
-            await RewardsRecipient.upsert(
+            await conditionalUpsert(
+              database,
+              RewardsRecipient,
               {
                 asset: account.asset,
                 owner: newDestination,

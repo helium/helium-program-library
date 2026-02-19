@@ -9,6 +9,9 @@ const getEnvBoolean = (key: string): boolean => process.env[key] === "true";
 export const PRODUCTION = process.env.NODE_ENV === "production" || false;
 export const SOLANA_URL = process.env.SOLANA_URL || "http://127.0.0.1:8899";
 export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+if (PRODUCTION && !ADMIN_PASSWORD) {
+  throw new Error("ADMIN_PASSWORD must be set in production");
+}
 export const PG_POOL_SIZE = Number(process.env.PG_POOL_SIZE) || 20;
 export const PG_MAKER_TABLE = process.env.PG_MAKER_TABLE;
 export const PG_DATA_ONLY_TABLE = process.env.PG_DATA_ONLY_TABLE;

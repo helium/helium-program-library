@@ -21,8 +21,9 @@ import {
 } from "../env";
 import { getPluginsByAccountTypeByProgram } from "../plugins";
 import { IConfig } from "../types";
+import { Transaction } from "sequelize";
 import { CursorManager } from "../utils/cursor";
-import { Cursor } from "../utils/database";
+import database, { Cursor } from "../utils/database";
 import { handleAccountWebhook } from "../utils/handleAccountWebhook";
 import { provider } from "../utils/solana";
 
@@ -44,16 +45,8 @@ export const setupSubstream = async (
   if (!SUBSTREAM_URL) throw new Error("SUBSTREAM_URL undefined");
   if (!SUBSTREAM) throw new Error("SUBSTREAM undefined");
 
-  const { token } = await authIssue(SUBSTREAM_API_KEY!);
   const substream = await fetchSubstream(SUBSTREAM!);
   const registry = createRegistry(substream);
-  const transport = createGrpcTransport({
-    baseUrl: SUBSTREAM_URL!,
-    httpVersion: "2",
-    interceptors: [createAuthInterceptor(token)],
-    useBinaryFormat: true,
-    jsonOptions: { typeRegistry: registry },
-  });
 
   applyParams(
     [
@@ -92,6 +85,8 @@ export const setupSubstream = async (
     configs
   );
 
+  await Cursor.sync({ alter: true });
+
   const connect = async (attemptCount = 1) => {
     currentAttemptCount = attemptCount;
 
@@ -106,17 +101,29 @@ export const setupSubstream = async (
     isConnecting = true;
 
     try {
-      await Cursor.sync({ alter: true });
+      // Fresh token on each connection to survive token expiry across reconnects
+      const { token } = await authIssue(SUBSTREAM_API_KEY!);
+      const transport = createGrpcTransport({
+        baseUrl: SUBSTREAM_URL!,
+        httpVersion: "2",
+        interceptors: [createAuthInterceptor(token)],
+        useBinaryFormat: true,
+        jsonOptions: { typeRegistry: registry },
+      });
+
       const cursor = await cursorManager.checkStaleness();
       cursorManager.startStalenessCheck();
       console.log("Connected to Substream");
-      const startBlock = await provider.connection.getSlot("finalized");
+      const startBlock = cursor
+        ? undefined
+        : await provider.connection.getSlot("finalized");
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
         productionMode: PRODUCTION,
         startBlockNum: cursor ? undefined : startBlock,
         startCursor: cursor,
+        finalBlocksOnly: true,
       });
 
       console.log(
@@ -126,6 +133,7 @@ export const setupSubstream = async (
       );
 
       currentAttemptCount = 0;
+      staleAttemptCount = 0;
       isConnecting = false;
 
       for await (const response of streamBlocks(transport, request)) {
@@ -138,15 +146,20 @@ export const setupSubstream = async (
 
         if (message.case === "blockScopedData") {
           staleAttemptCount = 0;
+          server.customMetrics.blocksReceivedCounter.inc();
 
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
-          // Despite the name "finalBlockHeight", this is actually the final SLOT height
-          // In Substreams terminology, a Solana slot is referred to as a "block"
-          // This represents the number of the slot that is finalized (rooted)
-          const block = message.value.finalBlockHeight
-            ? Number(message.value.finalBlockHeight)
-            : null;
+          // clock.number is the actual slot that produced the change;
+          // finalBlockHeight is only the last finalized slot at processing time
+          const block =
+            message.value.clock?.number != null
+              ? Number(message.value.clock.number)
+              : 0;
+
+          if (block > 0) {
+            server.customMetrics.lastBlockHeightGauge.set(block);
+          }
 
           const hasAccountChanges =
             output !== undefined &&
@@ -154,54 +167,63 @@ export const setupSubstream = async (
             (output as any).accounts.length > 0;
 
           if (hasAccountChanges) {
-            // Group accounts by owner
-            const accountsByOwner = (output as any).accounts.reduce(
-              (
-                acc: { [key: string]: IOutputAccount[] },
-                account: IOutputAccount
-              ) => {
-                const ownerKey = new PublicKey(account.owner).toBase58();
-                if (!acc[ownerKey]) {
-                  acc[ownerKey] = [];
-                }
-                acc[ownerKey].push(account);
-                return acc;
-              },
-              {}
-            );
+            const t = await database.transaction({
+              isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+            });
 
-            // Process each owner's accounts sequentially, but accounts within an owner in parallel
-            // This prevents race conditions in plugins that rely on bidirectional relationships
-            for (const [ownerStr, accounts] of Object.entries(
-              accountsByOwner
-            ) as [string, IOutputAccount[]][]) {
-              const ownerKey = new PublicKey(ownerStr);
-              const config = configs.find((x) => x.programId === ownerStr);
-
-              if (!config) continue;
-
-              const accountPromises = accounts.map(
-                async (account: IOutputAccount) => {
-                  const { address, data, deleted } = account;
-                  const addressKey = new PublicKey(address);
-
-                  return handleAccountWebhook({
-                    fastify: server,
-                    programId: ownerKey,
-                    accounts: config.accounts,
-                    account: {
-                      pubkey: addressKey.toBase58(),
-                      data: [data, undefined],
-                    },
-                    isDelete: deleted,
-                    pluginsByAccountType:
-                      pluginsByAccountTypeByProgram[ownerStr] || {},
-                    block,
-                  });
-                }
+            try {
+              const accountsByOwner = (output as any).accounts.reduce(
+                (
+                  acc: { [key: string]: IOutputAccount[] },
+                  account: IOutputAccount
+                ) => {
+                  const ownerKey = new PublicKey(account.owner).toBase58();
+                  if (!acc[ownerKey]) {
+                    acc[ownerKey] = [];
+                  }
+                  acc[ownerKey].push(account);
+                  return acc;
+                },
+                {}
               );
 
-              await Promise.all(accountPromises);
+              for (const [ownerStr, accounts] of Object.entries(
+                accountsByOwner
+              ) as [string, IOutputAccount[]][]) {
+                const ownerKey = new PublicKey(ownerStr);
+                const config = configs.find((x) => x.programId === ownerStr);
+
+                if (!config) continue;
+
+                const accountPromises = accounts.map(
+                  async (account: IOutputAccount) => {
+                    const { address, data, deleted } = account;
+                    const addressKey = new PublicKey(address);
+
+                    return handleAccountWebhook({
+                      fastify: server,
+                      programId: ownerKey,
+                      accounts: config.accounts,
+                      account: {
+                        pubkey: addressKey.toBase58(),
+                        data: [data, undefined],
+                      },
+                      isDelete: deleted,
+                      pluginsByAccountType:
+                        pluginsByAccountTypeByProgram[ownerStr] || {},
+                      block,
+                      transaction: t,
+                    });
+                  }
+                );
+
+                await Promise.all(accountPromises);
+              }
+
+              await t.commit();
+            } catch (err) {
+              await t.rollback();
+              throw err;
             }
           }
 
@@ -212,8 +234,15 @@ export const setupSubstream = async (
           });
         }
       }
+
+      // Stream ended normally (server closed gracefully), reconnect
+      cursorManager.stopStalenessCheck();
+      await cursorManager.flushCursor();
+      isConnecting = false;
+      handleReconnect(1);
     } catch (err) {
       cursorManager.stopStalenessCheck();
+      await cursorManager.flushCursor();
       console.log("Substream connection error:", err);
       isConnecting = false;
       handleReconnect(currentAttemptCount + 1);
@@ -236,7 +265,10 @@ export const setupSubstream = async (
       console.log(
         `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
       );
-      connect(nextAttempt);
+      connect(nextAttempt).catch((err) => {
+        console.error("Fatal reconnect error:", err);
+        process.exit(1);
+      });
     }, delay);
   };
 

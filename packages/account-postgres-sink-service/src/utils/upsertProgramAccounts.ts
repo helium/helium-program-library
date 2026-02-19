@@ -6,7 +6,7 @@ import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
-import { database, limit } from "./database";
+import { conditionalBulkUpsert, database, limit } from "./database";
 import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
@@ -468,15 +468,13 @@ export const upsertProgramAccounts = async ({
                 .map((r) => r.record);
 
               if (toUpdate.length > 0) {
-                await model.bulkCreate(toUpdate, {
-                  transaction,
-                  updateOnDuplicate: [
-                    "address",
-                    "refreshedAt",
-                    "lastBlock",
-                    ...updateOnDuplicateFields,
-                  ],
-                });
+                await conditionalBulkUpsert(
+                  sequelize,
+                  model,
+                  toUpdate,
+                  ["address", "refreshedAt", "lastBlock", ...updateOnDuplicateFields],
+                  { transaction }
+                );
               }
 
               if (toTouch.length > 0) {

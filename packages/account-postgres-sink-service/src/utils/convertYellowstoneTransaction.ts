@@ -48,13 +48,25 @@ export const convertYellowstoneTransaction = async (
     ...(meta?.loadedReadonlyAddresses || []),
   ].map((key) => new PublicKey(key));
 
+  const staticKeyCount = message.accountKeys.length;
+  const loadedWritableCount = (meta?.loadedWritableAddresses || []).length;
+  const { numRequiredSignatures, numReadonlySignedAccounts, numReadonlyUnsignedAccounts } =
+    message.header!;
+
   const instructions = message.instructions.map((instr) => {
     const keys: AccountMeta[] = Array.from(instr.accounts).map(
-      (accIndex, i) => ({
-        pubkey: accountKeys[accIndex],
-        isSigner: i < message.header!.numRequiredSignatures,
-        isWritable: i < message.header!.numReadonlySignedAccounts,
-      })
+      (accIndex) => {
+        const isSigner = accIndex < numRequiredSignatures;
+        let isWritable: boolean;
+        if (accIndex < numRequiredSignatures) {
+          isWritable = accIndex < numRequiredSignatures - numReadonlySignedAccounts;
+        } else if (accIndex < staticKeyCount) {
+          isWritable = accIndex < staticKeyCount - numReadonlyUnsignedAccounts;
+        } else {
+          isWritable = accIndex < staticKeyCount + loadedWritableCount;
+        }
+        return { pubkey: accountKeys[accIndex], isSigner, isWritable };
+      }
     );
 
     return new TransactionInstruction({

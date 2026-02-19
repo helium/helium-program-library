@@ -72,16 +72,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
   if (!SUBSTREAM_API_KEY) throw new Error("SUBSTREAM_API_KEY undefined");
   if (!SUBSTREAM_URL) throw new Error("SUBSTREAM_URL undefined");
   if (!SUBSTREAM) throw new Error("SUBSTREAM undefined");
-  const { token } = await authIssue(SUBSTREAM_API_KEY!);
   const substream = await fetchSubstream(SUBSTREAM!);
   const registry = createRegistry(substream);
-  const transport = createGrpcTransport({
-    baseUrl: SUBSTREAM_URL!,
-    httpVersion: "2",
-    interceptors: [createAuthInterceptor(token)],
-    useBinaryFormat: true,
-    jsonOptions: { typeRegistry: registry },
-  });
 
   let isConnecting = false;
   let currentAttemptCount = 0;
@@ -110,6 +102,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
       }
     }
   );
+
+  await Cursor.sync({ alter: true });
 
   const connect = async (attemptCount = 1, overrideCursor?: string) => {
     currentAttemptCount = attemptCount;
@@ -146,17 +140,29 @@ export const setupSubstream = async (server: FastifyInstance) => {
     isConnecting = true;
 
     try {
-      await Cursor.sync({ alter: true });
+      // Fresh token on each connection to survive token expiry across reconnects
+      const { token } = await authIssue(SUBSTREAM_API_KEY!);
+      const transport = createGrpcTransport({
+        baseUrl: SUBSTREAM_URL!,
+        httpVersion: "2",
+        interceptors: [createAuthInterceptor(token)],
+        useBinaryFormat: true,
+        jsonOptions: { typeRegistry: registry },
+      });
+
       const cursor = overrideCursor ?? (await cursorManager.checkStaleness());
       cursorManager.startStalenessCheck();
       console.log("Connected to Substream");
-      const startBlock = await provider.connection.getSlot("finalized");
+      const startBlock = cursor
+        ? undefined
+        : await provider.connection.getSlot("finalized");
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
         productionMode: PRODUCTION,
         startBlockNum: cursor ? undefined : startBlock,
         startCursor: cursor,
+        finalBlocksOnly: true,
       });
 
       console.log(
@@ -166,6 +172,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
       );
 
       currentAttemptCount = 0;
+      staleAttemptCount = 0;
       isConnecting = false;
 
       for await (const response of streamBlocks(transport, request)) {
@@ -194,12 +201,11 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
           const output = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
-          // Despite the name "finalBlockHeight", this is actually the final SLOT height
-          // In Substreams terminology, a Solana slot is referred to as a "block"
-          // This represents the number of the slot that is finalized (rooted)
+          // clock.number is the actual slot that produced the change;
+          // finalBlockHeight is only the last finalized slot at processing time
           const block =
-            message.value.finalBlockHeight != null
-              ? Number(message.value.finalBlockHeight)
+            message.value.clock?.number != null
+              ? Number(message.value.clock.number)
               : 0;
           if (block > 0) {
             server.customMetrics.lastBlockHeightGauge.set(block);
@@ -311,6 +317,12 @@ export const setupSubstream = async (server: FastifyInstance) => {
       if (shouldRestart) {
         shouldRestart = false;
         await connect(1, restartCursor);
+      } else {
+        // Stream ended normally (server closed gracefully), reconnect
+        cursorManager.stopStalenessCheck();
+        await cursorManager.flushCursor();
+        isConnecting = false;
+        handleReconnect(1);
       }
     } catch (err) {
       cursorManager.stopStalenessCheck();

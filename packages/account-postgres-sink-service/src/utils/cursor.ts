@@ -95,12 +95,34 @@ export const CursorManager = (
     }
   };
 
+  const flushCursor = async (): Promise<void> => {
+    if (pendingCursor) {
+      await database.transaction(async (t) => {
+        await Cursor.upsert(pendingCursor!, {
+          conflictFields: ["service"],
+          transaction: t,
+        });
+
+        await Cursor.destroy({
+          where: {
+            service,
+            cursor: { [Op.ne]: pendingCursor!.cursor },
+          },
+          transaction: t,
+        });
+      });
+      lastCursorUpdate = Date.now();
+      pendingCursor = null;
+    }
+  };
+
   return {
     getLatestCursor,
     updateCursor,
     checkStaleness,
     startStalenessCheck,
     stopStalenessCheck,
+    flushCursor,
     recordBlockReceived,
   };
 };
