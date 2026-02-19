@@ -1,6 +1,5 @@
 import cors from "@fastify/cors";
 import { AccountInfo, PublicKey, TransactionResponse } from "@solana/web3.js";
-import { BloomFilter } from "bloom-filters";
 import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyCron, { Params as CronConfig } from "fastify-cron";
@@ -272,8 +271,6 @@ if (PG_POOL_SIZE < 5) {
       }
     });
 
-    // Assume 10 million accounts we might not want to watch (token accounts, etc)
-    const nonWatchedAccountsFilter = BloomFilter.create(10000000, 0.05);
     async function insertTransactionAccounts(
       accounts: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[],
       block: number | undefined
@@ -309,7 +306,6 @@ if (PG_POOL_SIZE < 5) {
           const owner = account.owner.toBase58();
           const config = configs.find((x) => x.programId === owner);
           if (!config) {
-            if (owner) nonWatchedAccountsFilter.add(pubkey.toBase58());
             continue;
           }
 
@@ -444,9 +440,7 @@ if (PG_POOL_SIZE < 5) {
               );
 
               if (!config) {
-                // exit early if account doesn't need to be saved
-                res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-                return;
+                continue;
               }
 
               await handleAccountWebhook({

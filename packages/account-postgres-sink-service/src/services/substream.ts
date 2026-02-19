@@ -21,8 +21,9 @@ import {
 } from "../env";
 import { getPluginsByAccountTypeByProgram } from "../plugins";
 import { IConfig } from "../types";
+import { Transaction } from "sequelize";
 import { CursorManager } from "../utils/cursor";
-import { Cursor } from "../utils/database";
+import database, { Cursor } from "../utils/database";
 import { handleAccountWebhook } from "../utils/handleAccountWebhook";
 import { provider } from "../utils/solana";
 
@@ -166,53 +167,63 @@ export const setupSubstream = async (
             (output as any).accounts.length > 0;
 
           if (hasAccountChanges) {
-            const accountsByOwner = (output as any).accounts.reduce(
-              (
-                acc: { [key: string]: IOutputAccount[] },
-                account: IOutputAccount
-              ) => {
-                const ownerKey = new PublicKey(account.owner).toBase58();
-                if (!acc[ownerKey]) {
-                  acc[ownerKey] = [];
-                }
-                acc[ownerKey].push(account);
-                return acc;
-              },
-              {}
-            );
+            const t = await database.transaction({
+              isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+            });
 
-            // Process owners sequentially to prevent race conditions in plugins
-            // that rely on bidirectional relationships
-            for (const [ownerStr, accounts] of Object.entries(
-              accountsByOwner
-            ) as [string, IOutputAccount[]][]) {
-              const ownerKey = new PublicKey(ownerStr);
-              const config = configs.find((x) => x.programId === ownerStr);
-
-              if (!config) continue;
-
-              const accountPromises = accounts.map(
-                async (account: IOutputAccount) => {
-                  const { address, data, deleted } = account;
-                  const addressKey = new PublicKey(address);
-
-                  return handleAccountWebhook({
-                    fastify: server,
-                    programId: ownerKey,
-                    accounts: config.accounts,
-                    account: {
-                      pubkey: addressKey.toBase58(),
-                      data: [data, undefined],
-                    },
-                    isDelete: deleted,
-                    pluginsByAccountType:
-                      pluginsByAccountTypeByProgram[ownerStr] || {},
-                    block,
-                  });
-                }
+            try {
+              const accountsByOwner = (output as any).accounts.reduce(
+                (
+                  acc: { [key: string]: IOutputAccount[] },
+                  account: IOutputAccount
+                ) => {
+                  const ownerKey = new PublicKey(account.owner).toBase58();
+                  if (!acc[ownerKey]) {
+                    acc[ownerKey] = [];
+                  }
+                  acc[ownerKey].push(account);
+                  return acc;
+                },
+                {}
               );
 
-              await Promise.all(accountPromises);
+              for (const [ownerStr, accounts] of Object.entries(
+                accountsByOwner
+              ) as [string, IOutputAccount[]][]) {
+                const ownerKey = new PublicKey(ownerStr);
+                const config = configs.find((x) => x.programId === ownerStr);
+
+                if (!config) continue;
+
+                const accountPromises = accounts.map(
+                  async (account: IOutputAccount) => {
+                    const { address, data, deleted } = account;
+                    const addressKey = new PublicKey(address);
+
+                    return handleAccountWebhook({
+                      fastify: server,
+                      programId: ownerKey,
+                      accounts: config.accounts,
+                      account: {
+                        pubkey: addressKey.toBase58(),
+                        data: [data, undefined],
+                      },
+                      isDelete: deleted,
+                      pluginsByAccountType:
+                        pluginsByAccountTypeByProgram[ownerStr] || {},
+                      block,
+                      transaction: t,
+                    });
+                  }
+                );
+
+                await Promise.all(accountPromises);
+              }
+
+              await t.commit();
+            } catch (err) {
+              await t.rollback();
+              throw err;
             }
           }
 

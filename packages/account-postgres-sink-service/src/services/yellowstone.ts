@@ -69,13 +69,17 @@ export const setupYellowstone = async (
           }
 
           if (data.account) {
-            const account = (data.account as SubscribeUpdateAccount)?.account;
+            const accountUpdate = data.account as SubscribeUpdateAccount;
+            const account = accountUpdate?.account;
             if (account && configs) {
               const owner = new PublicKey(account.owner).toBase58();
               const config = configs.find((x) => x.programId === owner);
 
               if (config) {
                 try {
+                  const slot = accountUpdate.slot
+                    ? Number(accountUpdate.slot)
+                    : undefined;
                   await handleAccountWebhook({
                     fastify: server,
                     programId: new PublicKey(config.programId),
@@ -87,7 +91,7 @@ export const setupYellowstone = async (
                     },
                     pluginsByAccountType:
                       pluginsByAccountTypeByProgram[owner] || {},
-                    block: undefined,
+                    block: slot,
                   });
                 } catch (err) {
                   console.error(err);
@@ -167,7 +171,9 @@ export const setupYellowstone = async (
       `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
     );
 
-    const delay = nextAttempt === 1 ? 0 : 1000;
+    const baseDelay = 1000;
+    const delay =
+      nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
     setTimeout(() => {
       connect(nextAttempt).catch((err) => {
         console.error("Fatal reconnect error:", err);

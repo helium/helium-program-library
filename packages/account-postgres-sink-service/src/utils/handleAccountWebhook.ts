@@ -6,7 +6,7 @@ import _omit from "lodash/omit";
 import { Sequelize, Transaction } from "sequelize";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
-import database, { limit } from "./database";
+import database, { conditionalUpsert, limit } from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
 import { OMIT_KEYS } from "../constants";
@@ -25,6 +25,7 @@ interface HandleAccountWebhookArgs {
   sequelize?: Sequelize;
   pluginsByAccountType: Record<string, IInitedPlugin[]>;
   block?: number | null;
+  transaction?: Transaction;
 }
 
 export const handleAccountWebhook = async ({
@@ -36,6 +37,7 @@ export const handleAccountWebhook = async ({
   pluginsByAccountType,
   isDelete = false,
   block,
+  transaction: externalTx,
 }: HandleAccountWebhookArgs) => {
   return limit(async () => {
     const idl = await cachedIdlFetch.fetchIdl({
@@ -55,7 +57,8 @@ export const handleAccountWebhook = async ({
       throw new Error("idl does not have every account type");
     }
 
-    const t = await sequelize.transaction({
+    const ownsTransaction = !externalTx;
+    const t = externalTx ?? await sequelize.transaction({
       isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
     });
 
@@ -78,7 +81,7 @@ export const handleAccountWebhook = async ({
         });
 
         await Promise.all(deletePromises);
-        await t.commit();
+        if (ownsTransaction) await t.commit();
         fastify.customMetrics.accountWebhookCounter.inc();
         return;
       }
@@ -95,7 +98,7 @@ export const handleAccountWebhook = async ({
       })?.type;
 
       if (!accName) {
-        await t.rollback();
+        if (ownsTransaction) await t.rollback();
         return;
       }
 
@@ -110,7 +113,6 @@ export const handleAccountWebhook = async ({
 
       let sanitized = sanitizeAccount(decodedAcc);
 
-      // Use provided block or fetch from RPC if not available
       let lastBlock: number = block ?? 0;
       const hasPlugins = (pluginsByAccountType[accName] || []).length > 0;
 
@@ -143,7 +145,6 @@ export const handleAccountWebhook = async ({
               `Plugin processing failed for account ${account.pubkey}`,
               err
             );
-            // Continue with unmodified sanitized data instead of failing
             continue;
           }
         }
@@ -161,7 +162,6 @@ export const handleAccountWebhook = async ({
       );
 
       if (shouldUpdate) {
-        // Use the block we already have, or fetch it now if we haven't and it wasn't provided
         if (lastBlock === 0) {
           try {
             lastBlock = await retry(
@@ -178,19 +178,18 @@ export const handleAccountWebhook = async ({
           }
         }
 
-        await model.upsert(
-          {
-            ...sanitized,
-            lastBlock,
-          },
+        await conditionalUpsert(
+          sequelize,
+          model,
+          { ...sanitized, lastBlock },
           { transaction: t }
         );
       }
 
-      await t.commit();
+      if (ownsTransaction) await t.commit();
       fastify.customMetrics.accountWebhookCounter.inc();
     } catch (err) {
-      await t.rollback();
+      if (ownsTransaction) await t.rollback();
       console.error("While inserting, err", err);
       throw err;
     }
