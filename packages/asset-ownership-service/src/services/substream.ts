@@ -106,7 +106,11 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
   await Cursor.sync({ alter: true });
 
-  const connect = async (attemptCount = 1, overrideCursor?: string, overrideStartBlock?: number) => {
+  const connect = async (
+    attemptCount = 1,
+    overrideCursor?: string,
+    overrideStartBlock?: number
+  ) => {
     currentAttemptCount = attemptCount;
 
     if (currentAbortController) {
@@ -156,7 +160,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
       console.log("Connected to Substream");
       const startBlock = cursor
         ? undefined
-        : overrideStartBlock ?? await provider.connection.getSlot("finalized");
+        : overrideStartBlock ??
+          (await provider.connection.getSlot("finalized"));
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
@@ -197,7 +202,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
           if (cursor && !hasAttemptedCursorReset) {
             hasAttemptedCursorReset = true;
             const existingCursor = await cursorManager.getLatestCursor();
-            const blockStr = existingCursor?.getDataValue("block") as string | undefined;
+            const blockStr = existingCursor?.getDataValue("block") as
+              | string
+              | undefined;
             const recoveryBlock = blockStr ? parseInt(blockStr) : NaN;
 
             console.log(
@@ -209,7 +216,11 @@ export const setupSubstream = async (server: FastifyInstance) => {
             await Cursor.destroy({ where: { service: "asset_ownership" } });
             cursorManager.stopStalenessCheck();
             isConnecting = false;
-            await connect(1, undefined, isNaN(recoveryBlock) ? undefined : recoveryBlock);
+            await connect(
+              1,
+              undefined,
+              isNaN(recoveryBlock) ? undefined : recoveryBlock
+            );
             return;
           }
 
@@ -263,8 +274,10 @@ export const setupSubstream = async (server: FastifyInstance) => {
                     console.warn(
                       `Failed to convert substream transaction in block ${block}`,
                       {
-                        logMessages:
-                          transactionInfo.meta?.logMessages?.slice(0, 5),
+                        logMessages: transactionInfo.meta?.logMessages?.slice(
+                          0,
+                          5
+                        ),
                       }
                     );
                     server.customMetrics.conversionFailureCounter.inc();
@@ -273,34 +286,33 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
                   const { accountKeys, instructions } = converted;
 
-                  const { updatedTrees } =
-                    await processor.processTransaction(
-                      {
-                        accountKeys,
-                        instructions,
-                        innerInstructions:
-                          transactionInfo.meta.innerInstructions?.map(
+                  const { updatedTrees } = await processor.processTransaction(
+                    {
+                      accountKeys,
+                      instructions,
+                      innerInstructions:
+                        transactionInfo.meta.innerInstructions?.map(
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          (inner: any) => ({
+                            index: inner.index,
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            (inner: any) => ({
-                              index: inner.index,
+                            instructions: inner.instructions.map(
                               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                              instructions: inner.instructions.map(
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                (ix: any) => ({
-                                  programIdIndex: ix.programIdIndex,
-                                  accountKeyIndexes: Buffer.from(
-                                    ix.accounts,
-                                    "base64"
-                                  ).toJSON().data,
-                                  data: Buffer.from(ix.data, "base64"),
-                                })
-                              ),
-                            })
-                          ),
-                      },
-                      dbTx,
-                      block
-                    );
+                              (ix: any) => ({
+                                programIdIndex: ix.programIdIndex,
+                                accountKeyIndexes: Buffer.from(
+                                  ix.accounts,
+                                  "base64"
+                                ).toJSON().data,
+                                data: Buffer.from(ix.data, "base64"),
+                              })
+                            ),
+                          })
+                        ),
+                    },
+                    dbTx,
+                    block
+                  );
 
                   if (updatedTrees) {
                     console.log("Trees updated");
@@ -356,8 +368,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
       isConnecting = false;
 
       const isCursorIncompat =
-        err instanceof Error &&
-        err.message.includes("invalid_argument");
+        err instanceof Error && err.message.includes("invalid_argument");
 
       if (isCursorIncompat && !hasAttemptedCursorReset) {
         hasAttemptedCursorReset = true;
@@ -374,7 +385,11 @@ export const setupSubstream = async (server: FastifyInstance) => {
         );
 
         await Cursor.destroy({ where: { service: "asset_ownership" } });
-        await connect(1, undefined, isNaN(recoveryBlock) ? undefined : recoveryBlock);
+        await connect(
+          1,
+          undefined,
+          isNaN(recoveryBlock) ? undefined : recoveryBlock
+        );
         return;
       }
 
