@@ -2,7 +2,7 @@ import { camelize } from "inflection";
 import _omit from "lodash/omit";
 import { DataTypes, Model, QueryTypes } from "sequelize";
 import { IPlugin } from "../types";
-import { conditionalUpsert, database } from "../utils/database";
+import { database } from "../utils/database";
 import { PublicKey } from "@solana/web3.js";
 import { syncTableWithViews } from "../utils/syncTableWithViews";
 
@@ -359,7 +359,7 @@ export async function handleMiniFanout(
       lastBlock,
     };
 
-    await conditionalUpsert(database, RewardsRecipient, toCreate, { transaction });
+    await RewardsRecipient.upsert(toCreate, { transaction });
   }
 
   return account;

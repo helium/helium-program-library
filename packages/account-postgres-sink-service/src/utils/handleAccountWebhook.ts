@@ -6,7 +6,7 @@ import _omit from "lodash/omit";
 import { Sequelize, Transaction } from "sequelize";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
-import database, { conditionalUpsert, limit } from "./database";
+import database, { limit } from "./database";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
 import { OMIT_KEYS } from "../constants";
@@ -178,9 +178,7 @@ export const handleAccountWebhook = async ({
           }
         }
 
-        await conditionalUpsert(
-          sequelize,
-          model,
+        await model.upsert(
           { ...sanitized, lastBlock },
           { transaction: t }
         );

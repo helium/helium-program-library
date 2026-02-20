@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { QueryTypes, Sequelize, Transaction } from "sequelize";
 import { PG_ASSET_TABLE, SOLANA_URL } from "../env";
-import database, { AssetOwner, bulkUpsertAssetOwners } from "./database";
+import database, { AssetOwner } from "./database";
 import { chunks, getAssetBatch, truthy } from "@helium/spl-utils";
 import retry from "async-retry";
 import pLimit from "p-limit";
@@ -91,7 +91,10 @@ export const upsertOwners = async ({
             });
 
             if (assetsToUpdate.length > 0) {
-              await bulkUpsertAssetOwners(assetsToUpdate, { transaction });
+              await AssetOwner.bulkCreate(assetsToUpdate, {
+                updateOnDuplicate: ['owner', 'lastBlock'],
+                transaction,
+              });
             }
 
             await transaction.commit();

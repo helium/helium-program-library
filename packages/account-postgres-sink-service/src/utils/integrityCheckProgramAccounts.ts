@@ -10,7 +10,7 @@ import { SOLANA_URL, INTEGRITY_CHECK_REFRESH_THRESHOLD_MS } from "../env";
 import { initPlugins } from "../plugins";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import { chunks } from "./chunks";
-import database, { conditionalBulkUpsert } from "./database";
+import database from "./database";
 import { getBlockTimeWithRetry } from "./getBlockTimeWithRetry";
 import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignaturesUpToBlock";
 import { sanitizeAccount } from "./sanitizeAccount";
@@ -424,13 +424,10 @@ export const integrityCheckProgramAccounts = async ({
               );
 
               if (upserts.length > 0) {
-                await conditionalBulkUpsert(
-                  sequelize,
-                  model,
-                  upserts,
-                  Object.keys(upserts[0]),
-                  { transaction: t }
-                );
+                await model.bulkCreate(upserts, {
+                  updateOnDuplicate: Object.keys(upserts[0]),
+                  transaction: t,
+                });
               }
 
               await t.commit();
