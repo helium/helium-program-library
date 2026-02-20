@@ -61,6 +61,7 @@ export const setupSubstream = async (
   let currentAttemptCount = 0;
   let staleAttemptCount = 0;
   let reconnectTimeoutId: NodeJS.Timeout | null = null;
+  let hasAttemptedCursorReset = false;
 
   const cursorManager = CursorManager(
     "account_sink",
@@ -87,7 +88,7 @@ export const setupSubstream = async (
 
   await Cursor.sync({ alter: true });
 
-  const connect = async (attemptCount = 1) => {
+  const connect = async (attemptCount = 1, overrideStartBlock?: number) => {
     currentAttemptCount = attemptCount;
 
     if (attemptCount >= MAX_RECONNECT_ATTEMPTS) {
@@ -116,7 +117,8 @@ export const setupSubstream = async (
       console.log("Connected to Substream");
       const startBlock = cursor
         ? undefined
-        : await provider.connection.getSlot("finalized");
+        : overrideStartBlock ??
+          (await provider.connection.getSlot("finalized"));
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
@@ -141,6 +143,28 @@ export const setupSubstream = async (
 
         if (message.case === "fatalError") {
           console.error("Substream error:", message.value);
+
+          if (cursor && !hasAttemptedCursorReset) {
+            hasAttemptedCursorReset = true;
+            const existingCursor = await cursorManager.getLatestCursor();
+            const blockStr = existingCursor?.getDataValue("block") as
+              | string
+              | undefined;
+            const recoveryBlock = blockStr ? parseInt(blockStr) : NaN;
+
+            console.log(
+              `Cursor incompatible with finalBlocksOnly. Resetting and restarting from ${
+                isNaN(recoveryBlock) ? "latest block" : `block ${recoveryBlock}`
+              }...`
+            );
+
+            await Cursor.destroy({ where: { service: "account_sink" } });
+            cursorManager.stopStalenessCheck();
+            isConnecting = false;
+            await connect(1, isNaN(recoveryBlock) ? undefined : recoveryBlock);
+            return;
+          }
+
           throw new Error("Received fatal error from substream");
         }
 
@@ -245,6 +269,29 @@ export const setupSubstream = async (
       await cursorManager.flushCursor();
       console.log("Substream connection error:", err);
       isConnecting = false;
+
+      const isCursorIncompat =
+        err instanceof Error && err.message.includes("invalid_argument");
+
+      if (isCursorIncompat && !hasAttemptedCursorReset) {
+        hasAttemptedCursorReset = true;
+        const existingCursor = await cursorManager.getLatestCursor();
+        const blockStr = existingCursor?.getDataValue("block") as
+          | string
+          | undefined;
+        const recoveryBlock = blockStr ? parseInt(blockStr) : NaN;
+
+        console.log(
+          `Cursor incompatible with finalBlocksOnly. Resetting and restarting from ${
+            isNaN(recoveryBlock) ? "latest block" : `block ${recoveryBlock}`
+          }...`
+        );
+
+        await Cursor.destroy({ where: { service: "account_sink" } });
+        await connect(1, isNaN(recoveryBlock) ? undefined : recoveryBlock);
+        return;
+      }
+
       handleReconnect(currentAttemptCount + 1);
     }
   };
