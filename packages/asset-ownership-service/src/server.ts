@@ -89,6 +89,9 @@ if (PG_POOL_SIZE < 5) {
     }
 
     await Cursor.sync({ alter: true });
+
+    const processor = await TransactionProcessor.create();
+
     server.get("/refresh-owners", async (req, res) => {
       const { password } = req.query as any;
       if (password !== ADMIN_PASSWORD) {
@@ -154,7 +157,6 @@ if (PG_POOL_SIZE < 5) {
             return;
           }
 
-          const processor = await TransactionProcessor.create();
           const dbTx = await database.transaction();
 
           try {

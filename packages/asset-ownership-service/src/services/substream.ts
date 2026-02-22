@@ -83,6 +83,10 @@ export const setupSubstream = async (server: FastifyInstance) => {
   let restartCursor: string | undefined = undefined;
   let currentAbortController: AbortController | null = null;
   let hasAttemptedCursorReset = false;
+  let pendingReconnect: {
+    startBlock?: number;
+    cursor?: string;
+  } | null = null;
 
   const cursorManager = CursorManager(
     "asset_ownership",
@@ -106,6 +110,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
   await Cursor.sync({ alter: true });
 
+  const processor = await TransactionProcessor.create();
+
   const connect = async (
     attemptCount = 1,
     overrideCursor?: string,
@@ -118,7 +124,6 @@ export const setupSubstream = async (server: FastifyInstance) => {
     }
 
     currentAbortController = new AbortController();
-    const processor = await TransactionProcessor.create();
 
     console.log("Trees", processor.getTrees());
 
@@ -145,7 +150,6 @@ export const setupSubstream = async (server: FastifyInstance) => {
     isConnecting = true;
 
     try {
-      // Fresh token on each connection to survive token expiry across reconnects
       const { token } = await authIssue(SUBSTREAM_API_KEY!);
       const transport = createGrpcTransport({
         baseUrl: SUBSTREAM_URL!,
@@ -188,10 +192,7 @@ export const setupSubstream = async (server: FastifyInstance) => {
         }
 
         if (shouldRestart) {
-          shouldRestart = false;
-          currentAbortController.abort();
-          await cursorManager.flushCursor();
-          return;
+          break;
         }
 
         const message = response.message;
@@ -216,11 +217,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
             await Cursor.destroy({ where: { service: "asset_ownership" } });
             cursorManager.stopStalenessCheck();
             isConnecting = false;
-            await connect(
-              1,
-              undefined,
-              isNaN(recoveryBlock) ? undefined : recoveryBlock
-            );
+            pendingReconnect = {
+              startBlock: isNaN(recoveryBlock) ? undefined : recoveryBlock,
+            };
             return;
           }
 
@@ -336,6 +335,10 @@ export const setupSubstream = async (server: FastifyInstance) => {
                   err
                 );
               }
+
+              if (global.gc) {
+                global.gc();
+              }
             }
           }
 
@@ -349,9 +352,22 @@ export const setupSubstream = async (server: FastifyInstance) => {
 
       if (shouldRestart) {
         shouldRestart = false;
-        await connect(1, restartCursor);
+        await cursorManager.flushCursor();
+        await processor.refreshTrees();
+        applyParams(
+          [
+            `${MODULE}=${[...processor.getTrees()]
+              .map(
+                (merkleTree) =>
+                  `program:${BUBBLEGUM_PROGRAM_ID} && account:${merkleTree}`
+              )
+              .join(" || ")}`,
+          ],
+          substream.modules!.modules
+        );
+        pendingReconnect = { cursor: restartCursor };
+        return;
       } else {
-        // Stream ended normally (server closed gracefully), reconnect
         cursorManager.stopStalenessCheck();
         await cursorManager.flushCursor();
         isConnecting = false;
@@ -385,11 +401,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
         );
 
         await Cursor.destroy({ where: { service: "asset_ownership" } });
-        await connect(
-          1,
-          undefined,
-          isNaN(recoveryBlock) ? undefined : recoveryBlock
-        );
+        pendingReconnect = {
+          startBlock: isNaN(recoveryBlock) ? undefined : recoveryBlock,
+        };
         return;
       }
 
@@ -421,4 +435,9 @@ export const setupSubstream = async (server: FastifyInstance) => {
   };
 
   await connect();
+  while (pendingReconnect) {
+    const { startBlock, cursor } = pendingReconnect;
+    pendingReconnect = null;
+    await connect(1, cursor, startBlock);
+  }
 };

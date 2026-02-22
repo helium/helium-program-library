@@ -62,6 +62,7 @@ export const setupSubstream = async (
   let staleAttemptCount = 0;
   let reconnectTimeoutId: NodeJS.Timeout | null = null;
   let hasAttemptedCursorReset = false;
+  let pendingReconnect: { startBlock?: number } | null = null;
 
   const cursorManager = CursorManager(
     "account_sink",
@@ -161,7 +162,9 @@ export const setupSubstream = async (
             await Cursor.destroy({ where: { service: "account_sink" } });
             cursorManager.stopStalenessCheck();
             isConnecting = false;
-            await connect(1, isNaN(recoveryBlock) ? undefined : recoveryBlock);
+            pendingReconnect = {
+              startBlock: isNaN(recoveryBlock) ? undefined : recoveryBlock,
+            };
             return;
           }
 
@@ -288,7 +291,9 @@ export const setupSubstream = async (
         );
 
         await Cursor.destroy({ where: { service: "account_sink" } });
-        await connect(1, isNaN(recoveryBlock) ? undefined : recoveryBlock);
+        pendingReconnect = {
+          startBlock: isNaN(recoveryBlock) ? undefined : recoveryBlock,
+        };
         return;
       }
 
@@ -320,4 +325,9 @@ export const setupSubstream = async (
   };
 
   await connect();
+  while (pendingReconnect) {
+    const { startBlock } = pendingReconnect;
+    pendingReconnect = null;
+    await connect(1, startBlock);
+  }
 };

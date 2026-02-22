@@ -44,7 +44,7 @@ export class TransactionProcessor {
   private readonly coders: {
     [programId: string]: anchor.BorshInstructionCoder;
   };
-  private readonly treeConfigs: TreeConfigs;
+  private treeConfigs: TreeConfigs;
 
   private constructor(
     hemProgram: Awaited<ReturnType<typeof initHem>>,
@@ -73,6 +73,36 @@ export class TransactionProcessor {
     });
   }
 
+  private static async getMerkleTreeSet(tableName: string): Promise<Set<string>> {
+    return new Set(
+      (
+        (await database.query(`SELECT merkle_tree FROM ${tableName};`, {
+          type: QueryTypes.SELECT,
+        })) as { merkle_tree: string }[]
+      ).map((row) => row.merkle_tree)
+    );
+  }
+
+  async refreshTrees(): Promise<void> {
+    this.treeConfigs = {
+      update_maker_tree_v0: {
+        accountKey: "Maker",
+        tableName: PG_MAKER_TABLE!,
+        merkleTrees: await TransactionProcessor.getMerkleTreeSet(PG_MAKER_TABLE!),
+      },
+      update_carrier_tree_v0: {
+        accountKey: "Carrier",
+        tableName: PG_CARRIER_TABLE!,
+        merkleTrees: await TransactionProcessor.getMerkleTreeSet(PG_CARRIER_TABLE!),
+      },
+      update_data_only_tree_v0: {
+        accountKey: "Data_only_config",
+        tableName: PG_DATA_ONLY_TABLE!,
+        merkleTrees: await TransactionProcessor.getMerkleTreeSet(PG_DATA_ONLY_TABLE!),
+      },
+    };
+  }
+
   static async create(): Promise<TransactionProcessor> {
     const hemProgram = await initHem(provider);
     const coders = {
@@ -87,19 +117,9 @@ export class TransactionProcessor {
       ),
     };
 
-    const getMerkleTreeSet = async (tableName: string) => {
-      return new Set(
-        (
-          (await database.query(`SELECT merkle_tree FROM ${tableName};`, {
-            type: QueryTypes.SELECT,
-          })) as { merkle_tree: string }[]
-        ).map((row) => row.merkle_tree)
-      );
-    };
-
-    const makerTrees = await getMerkleTreeSet(PG_MAKER_TABLE!);
-    const dataOnlyTrees = await getMerkleTreeSet(PG_DATA_ONLY_TABLE!);
-    const carrierTrees = await getMerkleTreeSet(PG_CARRIER_TABLE!);
+    const makerTrees = await TransactionProcessor.getMerkleTreeSet(PG_MAKER_TABLE!);
+    const dataOnlyTrees = await TransactionProcessor.getMerkleTreeSet(PG_DATA_ONLY_TABLE!);
+    const carrierTrees = await TransactionProcessor.getMerkleTreeSet(PG_CARRIER_TABLE!);
 
     const treeConfigs: TreeConfigs = {
       update_maker_tree_v0: {
