@@ -29,4 +29,4 @@ RUN echo "[124,96,181,146,132,165,175,182,60,194,167,230,29,91,110,109,226,38,41
 
 ENV ANCHOR_WALLET=/usr/src/app/id.json
 
-CMD ["yarn", "node", "--expose-gc", "lib/src/server.js"]
+CMD ["yarn", "node", "lib/src/server.js"]

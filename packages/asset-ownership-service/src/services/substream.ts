@@ -344,10 +344,6 @@ export const setupSubstream = async (server: FastifyInstance) => {
             block: block?.toString() || "unknown",
             force: hasFilteredTransactions,
           });
-
-          if (global.gc) {
-            global.gc();
-          }
         }
       }
 
