@@ -336,9 +336,6 @@ export const setupSubstream = async (server: FastifyInstance) => {
                 );
               }
 
-              if (global.gc) {
-                global.gc();
-              }
             }
           }
 
@@ -347,6 +344,10 @@ export const setupSubstream = async (server: FastifyInstance) => {
             block: block?.toString() || "unknown",
             force: hasFilteredTransactions,
           });
+
+          if (global.gc) {
+            global.gc();
+          }
         }
       }
 
