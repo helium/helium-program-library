@@ -72,6 +72,15 @@ export const setupSubstream = async (server: FastifyInstance) => {
   if (!SUBSTREAM_API_KEY) throw new Error("SUBSTREAM_API_KEY undefined");
   if (!SUBSTREAM_URL) throw new Error("SUBSTREAM_URL undefined");
   if (!SUBSTREAM) throw new Error("SUBSTREAM undefined");
+
+  let gcIntervalId: NodeJS.Timeout | undefined;
+  if (global.gc) {
+    gcIntervalId = setInterval(() => {
+      global.gc!();
+    }, 30_000);
+    gcIntervalId.unref();
+  }
+
   const substream = await fetchSubstream(SUBSTREAM!);
   const registry = createRegistry(substream);
 
