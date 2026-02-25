@@ -184,7 +184,6 @@ __metadata:
     "@connectrpc/connect-node": ^1.4.0
     "@coral-xyz/anchor": ^0.31.0
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.11.11
     "@helium/spl-utils": ^0.11.11
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@mongodb-js/zstd": ^2.0.1
