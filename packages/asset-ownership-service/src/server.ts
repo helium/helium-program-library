@@ -232,7 +232,7 @@ if (PG_POOL_SIZE < 5) {
     }
 
     if (USE_SUBSTREAM) {
-      await setupSubstream(server).catch((err: any) => {
+      await setupSubstream(server, processor).catch((err: any) => {
         console.error("Fatal error in Substream connection:", err);
         process.exit(1);
       });

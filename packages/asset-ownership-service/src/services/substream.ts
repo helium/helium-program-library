@@ -68,18 +68,13 @@ interface IOutputTransaction {
   };
 }
 
-export const setupSubstream = async (server: FastifyInstance) => {
+export const setupSubstream = async (
+  server: FastifyInstance,
+  processor: TransactionProcessor
+) => {
   if (!SUBSTREAM_API_KEY) throw new Error("SUBSTREAM_API_KEY undefined");
   if (!SUBSTREAM_URL) throw new Error("SUBSTREAM_URL undefined");
   if (!SUBSTREAM) throw new Error("SUBSTREAM undefined");
-
-  let gcIntervalId: NodeJS.Timeout | undefined;
-  if (global.gc) {
-    gcIntervalId = setInterval(() => {
-      global.gc!();
-    }, 30_000);
-    gcIntervalId.unref();
-  }
 
   const substream = await fetchSubstream(SUBSTREAM!);
   const registry = createRegistry(substream);
@@ -118,8 +113,6 @@ export const setupSubstream = async (server: FastifyInstance) => {
   );
 
   await Cursor.sync({ alter: true });
-
-  const processor = await TransactionProcessor.create();
 
   const connect = async (
     attemptCount = 1,
@@ -239,7 +232,8 @@ export const setupSubstream = async (server: FastifyInstance) => {
           staleAttemptCount = 0;
           server.customMetrics.blocksReceivedCounter.inc();
 
-          const output = unpackMapOutput(response, registry);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let output: any = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
           // clock.number is the actual slot that produced the change;
           // finalBlockHeight is only the last finalized slot at processing time
@@ -259,93 +253,96 @@ export const setupSubstream = async (server: FastifyInstance) => {
           let hasFilteredTransactions = false;
 
           if (hasTransactions) {
-            const outputTransactions = (output as any)
+            const outputTransactions = output
               .transactions as IOutputTransaction[];
+            output = null;
 
-            const filteredTransactions = outputTransactions.filter((tx) =>
-              tx.meta.logMessages.some((log) =>
-                RELEVANT_INSTRUCTIONS_REGEX.test(log)
-              )
-            );
+            const dbTx = await database.transaction();
 
-            if (filteredTransactions.length > 0) {
-              hasFilteredTransactions = true;
+            try {
+              for (const transactionInfo of outputTransactions) {
+                if (
+                  !transactionInfo.meta.logMessages.some((log) =>
+                    RELEVANT_INSTRUCTIONS_REGEX.test(log)
+                  )
+                )
+                  continue;
 
-              const dbTx = await database.transaction();
+                hasFilteredTransactions = true;
 
-              try {
-                for (const transactionInfo of filteredTransactions) {
-                  const converted = await convertSubstreamTransaction(
-                    transactionInfo
-                  );
-                  if (!converted) {
-                    console.warn(
-                      `Failed to convert substream transaction in block ${block}`,
-                      {
-                        logMessages: transactionInfo.meta?.logMessages?.slice(
-                          0,
-                          5
-                        ),
-                      }
-                    );
-                    server.customMetrics.conversionFailureCounter.inc();
-                    continue;
-                  }
-
-                  const { accountKeys, instructions } = converted;
-
-                  const { updatedTrees } = await processor.processTransaction(
+                const converted = await convertSubstreamTransaction(
+                  transactionInfo
+                );
+                if (!converted) {
+                  console.warn(
+                    `Failed to convert substream transaction in block ${block}`,
                     {
-                      accountKeys,
-                      instructions,
-                      innerInstructions:
-                        transactionInfo.meta.innerInstructions?.map(
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          (inner: any) => ({
-                            index: inner.index,
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            instructions: inner.instructions.map(
-                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                              (ix: any) => ({
-                                programIdIndex: ix.programIdIndex,
-                                accountKeyIndexes: Buffer.from(
-                                  ix.accounts,
-                                  "base64"
-                                ).toJSON().data,
-                                data: Buffer.from(ix.data, "base64"),
-                              })
-                            ),
-                          })
-                        ),
-                    },
-                    dbTx,
-                    block
+                      logMessages: transactionInfo.meta?.logMessages?.slice(
+                        0,
+                        5
+                      ),
+                    }
                   );
-
-                  if (updatedTrees) {
-                    console.log("Trees updated");
-                    shouldRestart = true;
-                    restartCursor = cursor;
-                    await cursorManager.updateCursor({
-                      cursor,
-                      block: block?.toString() || "unknown",
-                      force: true,
-                    });
-                  }
+                  server.customMetrics.conversionFailureCounter.inc();
+                  continue;
                 }
 
-                await dbTx.commit();
-                server.customMetrics.blocksProcessedCounter.inc();
-              } catch (err) {
-                await dbTx.rollback();
-                server.customMetrics.transactionFailureCounter.inc();
-                console.error(
-                  `Failed to process block ${block}, rolled back:`,
-                  err
+                const { accountKeys, instructions } = converted;
+
+                const { updatedTrees } = await processor.processTransaction(
+                  {
+                    accountKeys,
+                    instructions,
+                    innerInstructions:
+                      transactionInfo.meta.innerInstructions?.map(
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (inner: any) => ({
+                          index: inner.index,
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          instructions: inner.instructions.map(
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            (ix: any) => ({
+                              programIdIndex: ix.programIdIndex,
+                              accountKeyIndexes: Buffer.from(
+                                ix.accounts,
+                                "base64"
+                              ).toJSON().data,
+                              data: Buffer.from(ix.data, "base64"),
+                            })
+                          ),
+                        })
+                      ),
+                  },
+                  dbTx,
+                  block
                 );
+
+                if (updatedTrees) {
+                  console.log("Trees updated");
+                  shouldRestart = true;
+                  restartCursor = cursor;
+                  await cursorManager.updateCursor({
+                    cursor,
+                    block: block?.toString() || "unknown",
+                    force: true,
+                  });
+                }
               }
 
+              await dbTx.commit();
+              server.customMetrics.blocksProcessedCounter.inc();
+            } catch (err) {
+              await dbTx.rollback();
+              server.customMetrics.transactionFailureCounter.inc();
+              console.error(
+                `Failed to process block ${block}, rolled back:`,
+                err
+              );
             }
+          }
+
+          if (hasFilteredTransactions && global.gc) {
+            global.gc();
           }
 
           await cursorManager.updateCursor({

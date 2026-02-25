@@ -175,7 +175,8 @@ export const setupSubstream = async (
           staleAttemptCount = 0;
           server.customMetrics.blocksReceivedCounter.inc();
 
-          const output = unpackMapOutput(response, registry);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let output: any = unpackMapOutput(response, registry);
           const cursor = message.value.cursor;
           // clock.number is the actual slot that produced the change;
           // finalBlockHeight is only the last finalized slot at processing time
@@ -194,57 +195,48 @@ export const setupSubstream = async (
             (output as any).accounts.length > 0;
 
           if (hasAccountChanges) {
+            const accounts = (output as any)
+              .accounts as IOutputAccount[];
+            output = null;
+
             const t = await database.transaction({
               isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
             });
 
             try {
-              const accountsByOwner = (output as any).accounts.reduce(
-                (
-                  acc: { [key: string]: IOutputAccount[] },
-                  account: IOutputAccount
-                ) => {
-                  const ownerKey = new PublicKey(account.owner).toBase58();
-                  if (!acc[ownerKey]) {
-                    acc[ownerKey] = [];
-                  }
-                  acc[ownerKey].push(account);
-                  return acc;
-                },
-                {}
-              );
+              const configsByOwner = new Map<string, IConfig>();
+              for (const account of accounts) {
+                const ownerStr = new PublicKey(account.owner).toBase58();
+                if (!configsByOwner.has(ownerStr)) {
+                  const config = configs.find(
+                    (x) => x.programId === ownerStr
+                  );
+                  if (config) configsByOwner.set(ownerStr, config);
+                }
+              }
 
-              for (const [ownerStr, accounts] of Object.entries(
-                accountsByOwner
-              ) as [string, IOutputAccount[]][]) {
-                const ownerKey = new PublicKey(ownerStr);
-                const config = configs.find((x) => x.programId === ownerStr);
-
+              for (const account of accounts) {
+                const ownerStr = new PublicKey(account.owner).toBase58();
+                const config = configsByOwner.get(ownerStr);
                 if (!config) continue;
 
-                const accountPromises = accounts.map(
-                  async (account: IOutputAccount) => {
-                    const { address, data, deleted } = account;
-                    const addressKey = new PublicKey(address);
+                const { address, data, deleted } = account;
+                const addressKey = new PublicKey(address);
 
-                    return handleAccountWebhook({
-                      fastify: server,
-                      programId: ownerKey,
-                      accounts: config.accounts,
-                      account: {
-                        pubkey: addressKey.toBase58(),
-                        data: [data, undefined],
-                      },
-                      isDelete: deleted,
-                      pluginsByAccountType:
-                        pluginsByAccountTypeByProgram[ownerStr] || {},
-                      block,
-                      transaction: t,
-                    });
-                  }
-                );
-
-                await Promise.all(accountPromises);
+                await handleAccountWebhook({
+                  fastify: server,
+                  programId: new PublicKey(ownerStr),
+                  accounts: config.accounts,
+                  account: {
+                    pubkey: addressKey.toBase58(),
+                    data: [data, undefined],
+                  },
+                  isDelete: deleted,
+                  pluginsByAccountType:
+                    pluginsByAccountTypeByProgram[ownerStr] || {},
+                  block,
+                  transaction: t,
+                });
               }
 
               await t.commit();
@@ -252,6 +244,12 @@ export const setupSubstream = async (
               await t.rollback();
               throw err;
             }
+          } else {
+            output = null;
+          }
+
+          if (hasAccountChanges && global.gc) {
+            global.gc();
           }
 
           await cursorManager.updateCursor({
