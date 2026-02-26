@@ -61,6 +61,7 @@ export const setupSubstream = async (
   let currentAttemptCount = 0;
   let staleAttemptCount = 0;
   let reconnectTimeoutId: NodeJS.Timeout | null = null;
+  let gcIntervalId: NodeJS.Timeout | undefined;
   let hasAttemptedCursorReset = false;
   let pendingReconnect: { startBlock?: number } | null = null;
 
@@ -105,6 +106,11 @@ export const setupSubstream = async (
     try {
       // Fresh token on each connection to survive token expiry across reconnects
       const { token } = await authIssue(SUBSTREAM_API_KEY!);
+      if (gcIntervalId) {
+        clearInterval(gcIntervalId);
+        gcIntervalId = undefined;
+      }
+
       const transport = createGrpcTransport({
         baseUrl: SUBSTREAM_URL!,
         httpVersion: "2",
@@ -112,6 +118,11 @@ export const setupSubstream = async (
         useBinaryFormat: true,
         jsonOptions: { typeRegistry: registry },
       });
+
+      if (global.gc) {
+        gcIntervalId = setInterval(() => { global.gc!(); }, 300_000);
+        gcIntervalId.unref();
+      }
 
       const cursor = await cursorManager.checkStaleness();
       cursorManager.startStalenessCheck();
@@ -195,7 +206,8 @@ export const setupSubstream = async (
             (output as any).accounts.length > 0;
 
           if (hasAccountChanges) {
-            const accounts = (output as any)
+            // eslint-disable-next-line prefer-const
+            let accounts = (output as any)
               .accounts as IOutputAccount[];
             output = null;
 
@@ -244,6 +256,8 @@ export const setupSubstream = async (
               await t.rollback();
               throw err;
             }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            accounts = null as any;
           } else {
             output = null;
           }
@@ -262,11 +276,13 @@ export const setupSubstream = async (
 
       // Stream ended normally (server closed gracefully), reconnect
       cursorManager.stopStalenessCheck();
+      if (gcIntervalId) { clearInterval(gcIntervalId); gcIntervalId = undefined; }
       await cursorManager.flushCursor();
       isConnecting = false;
       handleReconnect(1);
     } catch (err) {
       cursorManager.stopStalenessCheck();
+      if (gcIntervalId) { clearInterval(gcIntervalId); gcIntervalId = undefined; }
       await cursorManager.flushCursor();
       console.log("Substream connection error:", err);
       isConnecting = false;
