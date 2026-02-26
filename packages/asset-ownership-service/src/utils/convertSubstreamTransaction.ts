@@ -5,6 +5,9 @@ import {
 import { provider } from "./solana";
 import { ProcessableInstruction } from "./processTransaction";
 
+const MAX_LOOKUP_TABLE_CACHE_SIZE = 500;
+const lookupTableCache = new Map<string, AddressLookupTableAccount>();
+
 const decodeBase64ToBuffer = (str: string): Buffer => {
   return Buffer.from(str, "base64");
 };
@@ -16,27 +19,42 @@ const decodeBase64ToPublicKey = (str: string): PublicKey => {
 const getAddressLookupTableAccounts = async (
   keys: string[]
 ): Promise<Map<string, AddressLookupTableAccount>> => {
-  const connection = provider.connection;
-  const addressLookupTableAccountInfos =
-    await connection.getMultipleAccountsInfo(
-      keys.map((key) => new PublicKey(key))
+  const result = new Map<string, AddressLookupTableAccount>();
+  const uncachedKeys: string[] = [];
+
+  for (const key of keys) {
+    const cached = lookupTableCache.get(key);
+    if (cached) {
+      result.set(key, cached);
+    } else {
+      uncachedKeys.push(key);
+    }
+  }
+
+  if (uncachedKeys.length > 0) {
+    const connection = provider.connection;
+    const accountInfos = await connection.getMultipleAccountsInfo(
+      uncachedKeys.map((key) => new PublicKey(key))
     );
 
-  const result = new Map<string, AddressLookupTableAccount>();
-  addressLookupTableAccountInfos.forEach((accountInfo, index) => {
-    const address = keys[index];
-    if (accountInfo) {
-      result.set(
-        address,
-        new AddressLookupTableAccount({
+    accountInfos.forEach((accountInfo, index) => {
+      const address = uncachedKeys[index];
+      if (accountInfo) {
+        const account = new AddressLookupTableAccount({
           key: new PublicKey(address),
           state: AddressLookupTableAccount.deserialize(accountInfo.data),
-        })
-      );
-    } else {
-      console.warn(`Lookup table ${address} returned null from RPC`);
-    }
-  });
+        });
+        result.set(address, account);
+
+        if (lookupTableCache.size >= MAX_LOOKUP_TABLE_CACHE_SIZE) {
+          lookupTableCache.clear();
+        }
+        lookupTableCache.set(address, account);
+      } else {
+        console.warn(`Lookup table ${address} returned null from RPC`);
+      }
+    });
+  }
 
   return result;
 };

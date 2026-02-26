@@ -86,6 +86,7 @@ export const setupSubstream = async (
   let shouldRestart = false;
   let restartCursor: string | undefined = undefined;
   let currentAbortController: AbortController | null = null;
+  let gcIntervalId: NodeJS.Timeout | undefined;
   let hasAttemptedCursorReset = false;
   let pendingReconnect: {
     startBlock?: number;
@@ -124,6 +125,10 @@ export const setupSubstream = async (
     if (currentAbortController) {
       currentAbortController.abort();
     }
+    if (gcIntervalId) {
+      clearInterval(gcIntervalId);
+      gcIntervalId = undefined;
+    }
 
     currentAbortController = new AbortController();
 
@@ -160,6 +165,11 @@ export const setupSubstream = async (
         useBinaryFormat: true,
         jsonOptions: { typeRegistry: registry },
       });
+
+      if (global.gc) {
+        gcIntervalId = setInterval(() => { global.gc!(); }, 300_000);
+        gcIntervalId.unref();
+      }
 
       const cursor = overrideCursor ?? (await cursorManager.checkStaleness());
       cursorManager.startStalenessCheck();
@@ -253,7 +263,8 @@ export const setupSubstream = async (
           let hasFilteredTransactions = false;
 
           if (hasTransactions) {
-            const outputTransactions = output
+            // eslint-disable-next-line prefer-const
+            let outputTransactions: IOutputTransaction[] = output
               .transactions as IOutputTransaction[];
             output = null;
 
@@ -339,6 +350,8 @@ export const setupSubstream = async (
                 err
               );
             }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            outputTransactions = null as any;
           }
 
           if (hasFilteredTransactions && global.gc) {
@@ -372,12 +385,14 @@ export const setupSubstream = async (
         return;
       } else {
         cursorManager.stopStalenessCheck();
+        if (gcIntervalId) { clearInterval(gcIntervalId); gcIntervalId = undefined; }
         await cursorManager.flushCursor();
         isConnecting = false;
         handleReconnect(1);
       }
     } catch (err) {
       cursorManager.stopStalenessCheck();
+      if (gcIntervalId) { clearInterval(gcIntervalId); gcIntervalId = undefined; }
       try {
         await cursorManager.flushCursor();
       } catch (flushErr) {
