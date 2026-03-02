@@ -120,6 +120,7 @@ export const setupSubstream = async (
     overrideCursor?: string,
     overrideStartBlock?: number
   ) => {
+    let blocksSinceGc = 0;
     currentAttemptCount = attemptCount;
 
     if (currentAbortController) {
@@ -240,6 +241,7 @@ export const setupSubstream = async (
 
         if (message.case === "blockScopedData") {
           staleAttemptCount = 0;
+          blocksSinceGc++;
           server.customMetrics.blocksReceivedCounter.inc();
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -352,10 +354,13 @@ export const setupSubstream = async (
             }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputTransactions = null as any;
+          } else {
+            output = null;
           }
 
-          if (hasFilteredTransactions && global.gc) {
+          if (blocksSinceGc >= 500 && global.gc) {
             global.gc();
+            blocksSinceGc = 0;
           }
 
           await cursorManager.updateCursor({
