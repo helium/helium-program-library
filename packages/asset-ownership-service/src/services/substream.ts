@@ -197,9 +197,8 @@ export const setupSubstream = async (
         }`
       );
 
-      currentAttemptCount = 0;
-      staleAttemptCount = 0;
       isConnecting = false;
+      let hasReceivedBlock = false;
 
       for await (const response of streamBlocks(transport, request)) {
         if (currentAbortController.signal.aborted) {
@@ -243,6 +242,10 @@ export const setupSubstream = async (
         }
 
         if (message.case === "blockScopedData") {
+          if (!hasReceivedBlock) {
+            hasReceivedBlock = true;
+            currentAttemptCount = 0;
+          }
           staleAttemptCount = 0;
           blocksSinceGc++;
           blocksSinceConnect++;
@@ -449,6 +452,24 @@ export const setupSubstream = async (
         return;
       }
 
+      const isResourceExhausted =
+        err instanceof Error && err.message.includes("resource_exhausted");
+
+      if (isResourceExhausted) {
+        const exhaustedDelay = 15_000 + Math.random() * 5_000;
+        console.log(
+          `Resource exhausted, waiting ${Math.round(exhaustedDelay / 1000)}s before reconnect...`
+        );
+        reconnectTimeoutId = setTimeout(() => {
+          reconnectTimeoutId = null;
+          connect(currentAttemptCount + 1).catch((err) => {
+            console.error("Reconnect failed:", err);
+            process.exit(1);
+          });
+        }, exhaustedDelay);
+        return;
+      }
+
       handleReconnect(currentAttemptCount + 1);
     }
   };
@@ -461,8 +482,8 @@ export const setupSubstream = async (
     }
 
     const baseDelay = 1000;
-    const delay =
-      nextAttempt === 1 ? 0 : baseDelay * Math.pow(2, nextAttempt - 1);
+    const MIN_DELAY = 2000;
+    const delay = Math.max(MIN_DELAY, baseDelay * Math.pow(2, nextAttempt - 1));
 
     reconnectTimeoutId = setTimeout(() => {
       reconnectTimeoutId = null;
@@ -476,10 +497,16 @@ export const setupSubstream = async (
     }, delay);
   };
 
+  const RECONNECT_DELAY_MS = 5_000;
+
   await connect();
   while (pendingReconnect) {
     const { startBlock, cursor } = pendingReconnect;
     pendingReconnect = null;
+    console.log(
+      `Waiting ${RECONNECT_DELAY_MS / 1000}s before planned reconnect...`
+    );
+    await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
     await connect(1, cursor, startBlock);
   }
 };
