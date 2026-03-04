@@ -27,7 +27,6 @@ import { provider } from "../utils/solana";
 
 const MODULE = "transactions_by_programid_and_account_without_votes";
 const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_EVERY_N_BLOCKS = 10_000;
 const RELEVANT_INSTRUCTIONS = ["MintToCollectionV1", "Transfer", "CreateTree"];
 const RELEVANT_INSTRUCTIONS_REGEX = new RegExp(
   RELEVANT_INSTRUCTIONS.join("|"),
@@ -122,8 +121,6 @@ export const setupSubstream = async (
     overrideStartBlock?: number
   ) => {
     let blocksSinceGc = 0;
-    let blocksSinceConnect = 0;
-    let reconnectCursor: string | undefined;
     currentAttemptCount = attemptCount;
 
     if (currentAbortController) {
@@ -248,7 +245,6 @@ export const setupSubstream = async (
           }
           staleAttemptCount = 0;
           blocksSinceGc++;
-          blocksSinceConnect++;
           server.customMetrics.blocksReceivedCounter.inc();
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -365,7 +361,7 @@ export const setupSubstream = async (
             output = null;
           }
 
-          if (blocksSinceGc >= 100 && global.gc) {
+          if (blocksSinceGc >= 500 && global.gc) {
             global.gc();
             blocksSinceGc = 0;
           }
@@ -376,21 +372,7 @@ export const setupSubstream = async (
             force: hasFilteredTransactions,
           });
 
-          if (blocksSinceConnect >= RECONNECT_EVERY_N_BLOCKS) {
-            console.log(`Reconnecting after ${RECONNECT_EVERY_N_BLOCKS} blocks to release transport state`);
-            reconnectCursor = cursor;
-            break;
-          }
         }
-      }
-
-      if (reconnectCursor !== undefined) {
-        cursorManager.stopStalenessCheck();
-        if (gcIntervalId) { clearInterval(gcIntervalId); gcIntervalId = undefined; }
-        await cursorManager.flushCursor();
-        isConnecting = false;
-        pendingReconnect = { cursor: reconnectCursor };
-        return;
       }
 
       if (shouldRestart) {
@@ -456,7 +438,7 @@ export const setupSubstream = async (
         err instanceof Error && err.message.includes("resource_exhausted");
 
       if (isResourceExhausted) {
-        const exhaustedDelay = 15_000 + Math.random() * 5_000;
+        const exhaustedDelay = 60_000 + Math.random() * 30_000;
         console.log(
           `Resource exhausted, waiting ${Math.round(exhaustedDelay / 1000)}s before reconnect...`
         );
