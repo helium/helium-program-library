@@ -1022,21 +1022,9 @@ impl DatabaseClient {
       }
       "construct_entity_ownership_changes" => {
         let query = if use_max {
-          r#"
-          SELECT GREATEST(
-            COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
-            COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1),
-            COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)
-          )::bigint as block
-          "#
+          r#"SELECT COALESCE((SELECT MAX(last_block) FROM asset_owners), -1)::bigint as block"#
         } else {
-          r#"
-          SELECT LEAST(
-            COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block >= 0), -1)
-          )::bigint as block
-          "#
+          r#"SELECT COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1)::bigint as block"#
         };
         let row = sqlx::query(query).fetch_one(&*pool).await?;
 
@@ -1053,9 +1041,7 @@ impl DatabaseClient {
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
             COALESCE((SELECT MAX(last_block) FROM recipients), -1),
-            COALESCE((SELECT MAX(last_block) FROM mini_fanouts), -1),
-            COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1),
-            COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)
+            COALESCE((SELECT MAX(last_block) FROM mini_fanouts), -1)
           )::bigint as block
           "#
         } else {
@@ -1063,9 +1049,7 @@ impl DatabaseClient {
           SELECT LEAST(
             COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
             COALESCE((SELECT MIN(last_block) FROM recipients WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM mini_fanouts WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block >= 0), -1)
+            COALESCE((SELECT MIN(last_block) FROM mini_fanouts WHERE last_block >= 0), -1)
           )::bigint as block
           "#
         };
@@ -1134,13 +1118,7 @@ impl DatabaseClient {
       }
       "construct_entity_ownership_changes" => {
         let query = r#"
-          SELECT MIN(next_block)::bigint as block FROM (
-            SELECT MIN(last_block) as next_block FROM asset_owners WHERE last_block > $1
-            UNION ALL
-            SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block > $1
-            UNION ALL
-            SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block > $1
-          ) combined WHERE next_block IS NOT NULL
+          SELECT MIN(last_block)::bigint as block FROM asset_owners WHERE last_block > $1
         "#;
 
         let row = sqlx::query(query)
@@ -1158,10 +1136,6 @@ impl DatabaseClient {
             SELECT MIN(last_block) FROM recipients WHERE last_block > $1
             UNION ALL
             SELECT MIN(last_block) FROM mini_fanouts WHERE last_block > $1
-            UNION ALL
-            SELECT MIN(last_block) FROM iot_hotspot_infos WHERE last_block > $1
-            UNION ALL
-            SELECT MIN(last_block) FROM mobile_hotspot_infos WHERE last_block > $1
           ) combined WHERE next_block IS NOT NULL
         "#;
 

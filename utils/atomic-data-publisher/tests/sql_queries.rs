@@ -14,7 +14,6 @@ async fn ownership_direct_owner(pool: PgPool) {
 
     seed_key_to_asset(&pool, "kta_1", &entity_key, asset).await;
     seed_asset_owner(&pool, asset, wallet_a, 200).await;
-    seed_iot_hotspot(&pool, "ihi_1", asset, 100, None, None, None, true).await;
 
     let results = run_ownership_query(&pool, 150, 250).await;
 
@@ -35,7 +34,6 @@ async fn ownership_welcome_pack_resolution(pool: PgPool) {
 
     seed_key_to_asset(&pool, "kta_2", &entity_key, asset).await;
     seed_asset_owner(&pool, asset, wp_pda, 200).await;
-    seed_iot_hotspot(&pool, "ihi_2", asset, 100, None, None, None, true).await;
     seed_welcome_pack(&pool, wp_pda, real_wallet_b).await;
 
     let results = run_ownership_query(&pool, 150, 250).await;
@@ -52,10 +50,7 @@ async fn ownership_claimed_welcome_pack_becomes_direct(pool: PgPool) {
     let entity_key: Vec<u8> = vec![0x04, 0x05, 0x06];
 
     seed_key_to_asset(&pool, "kta_3", &entity_key, asset).await;
-    // Owner is the user's wallet, not a welcome pack PDA
     seed_asset_owner(&pool, asset, user_wallet_c, 200).await;
-    seed_iot_hotspot(&pool, "ihi_3", asset, 100, None, None, None, true).await;
-    // A welcome pack exists at a different address (not matching ao.owner)
     seed_welcome_pack(&pool, "some_other_pda", "some_other_wallet").await;
 
     let results = run_ownership_query(&pool, 150, 250).await;
@@ -63,40 +58,6 @@ async fn ownership_claimed_welcome_pack_becomes_direct(pool: PgPool) {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0]["owner_type"], "direct_owner");
     assert_eq!(results[0]["owner"], user_wallet_c);
-}
-
-#[sqlx::test(migrations = "tests/migrations")]
-async fn ownership_newly_onboarded_race_condition(pool: PgPool) {
-    let asset = "asset_race";
-    let wallet_d = "wallet_D";
-    let entity_key: Vec<u8> = vec![0x07, 0x08, 0x09];
-
-    seed_key_to_asset(&pool, "kta_4", &entity_key, asset).await;
-    // Asset owner set BEFORE the query range
-    seed_asset_owner(&pool, asset, wallet_d, 100).await;
-    // Hotspot onboarded WITHIN the query range
-    seed_iot_hotspot(&pool, "ihi_4", asset, 200, None, None, None, true).await;
-
-    // Query range: (150, 250] -- asset_owner at 100 is outside, hotspot at 200 is inside
-    let results = run_ownership_query(&pool, 150, 250).await;
-
-    assert_eq!(results.len(), 1, "newly_onboarded_hotspots CTE should catch this");
-    assert_eq!(results[0]["owner"], wallet_d);
-    assert_eq!(results[0]["owner_type"], "direct_owner");
-}
-
-#[sqlx::test(migrations = "tests/migrations")]
-async fn ownership_excludes_non_hotspot_assets(pool: PgPool) {
-    let asset = "asset_no_hotspot";
-    let entity_key: Vec<u8> = vec![0x0A, 0x0B, 0x0C];
-
-    seed_key_to_asset(&pool, "kta_5", &entity_key, asset).await;
-    seed_asset_owner(&pool, asset, "some_wallet", 200).await;
-    // No iot_hotspot_infos or mobile_hotspot_infos entry
-
-    let results = run_ownership_query(&pool, 150, 250).await;
-
-    assert!(results.is_empty());
 }
 
 // --- Reward Destination Resolution ---
@@ -109,11 +70,6 @@ async fn reward_direct_when_no_recipient(pool: PgPool) {
 
     seed_key_to_asset(&pool, "kta_6", &entity_key, asset).await;
     seed_asset_owner(&pool, asset, wallet_e, 200).await;
-    seed_mobile_hotspot(
-        &pool, "mhi_1", asset, 100, None, "wifiOutdoor", true, None,
-    )
-    .await;
-    // No recipients row
 
     let results = run_reward_query(&pool, 150, 250).await;
 
@@ -130,11 +86,6 @@ async fn reward_system_program_destination_treated_as_direct(pool: PgPool) {
 
     seed_key_to_asset(&pool, "kta_7", &entity_key, asset).await;
     seed_asset_owner(&pool, asset, wallet_f, 200).await;
-    seed_mobile_hotspot(
-        &pool, "mhi_2", asset, 100, None, "wifiOutdoor", true, None,
-    )
-    .await;
-    // Recipient with system program destination (treated as "no recipient")
     seed_recipient(
         &pool,
         "recip_1",
@@ -162,7 +113,6 @@ async fn reward_mini_fanout_produces_split(pool: PgPool) {
 
     seed_key_to_asset(&pool, "kta_8", &entity_key, asset).await;
     seed_asset_owner(&pool, asset, owner_wallet, 100).await;
-    seed_iot_hotspot(&pool, "ihi_8", asset, 100, None, None, None, true).await;
     seed_recipient(
         &pool,
         "recip_2",
@@ -217,7 +167,6 @@ async fn reward_welcome_pack_resolves_owner(pool: PgPool) {
 
     seed_key_to_asset(&pool, "kta_9", &entity_key, asset).await;
     seed_asset_owner(&pool, asset, wp_pda, 200).await;
-    seed_iot_hotspot(&pool, "ihi_9", asset, 100, None, None, None, true).await;
     seed_welcome_pack(&pool, wp_pda, real_wallet_g).await;
     // No recipients, no mini_fanout
 
