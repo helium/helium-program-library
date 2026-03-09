@@ -1,0 +1,5 @@
+require:
+  - dotenv/config
+  - "@swc-node/register"
+timeout: 100000
+spec: "tests/e2e/**/*.test.ts"

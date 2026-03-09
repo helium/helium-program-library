@@ -1,0 +1,122 @@
+{
+  "configs": [
+    {
+      "programId": "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8",
+      "accounts": [
+        {
+          "type": "DataOnlyConfigV0",
+          "table": "data_only_configs",
+          "schema": "public"
+        },
+        { "type": "MakerV0", "table": "makers", "schema": "public" },
+        {
+          "type": "KeyToAssetV0",
+          "table": "key_to_assets",
+          "schema": "public",
+          "batchSize": 20000,
+          "plugins": [
+            {
+              "type": "EncodeEntityKey",
+              "config": {
+                "field": "entity_key"
+              }
+            }
+          ]
+        },
+        {
+          "type": "IotHotspotInfoV0",
+          "table": "iot_hotspot_infos",
+          "schema": "public",
+          "batchSize": 20000,
+          "plugins": [
+            {
+              "type": "ExtractHexLocation",
+              "config": {
+                "field": "location"
+              }
+            }
+          ]
+        },
+        {
+          "type": "MobileHotspotInfoV0",
+          "table": "mobile_hotspot_infos",
+          "schema": "public",
+          "batchSize": 20000,
+          "plugins": [
+            {
+              "type": "ExtractHexLocation",
+              "config": {
+                "field": "location"
+              }
+            }
+          ]
+        }
+      ],
+      "crons": [{ "schedule": "10 0 * * *", "type": "integrity-check" }]
+    },
+    {
+      "programId": "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr",
+      "accounts": [
+        {
+          "type": "CarrierV0",
+          "table": "carriers",
+          "schema": "public"
+        },
+        {
+          "type": "IncentiveEscrowProgramV0",
+          "table": "incentive_escrow_programs",
+          "schema": "public"
+        }
+      ]
+    },
+    {
+      "programId": "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w",
+      "accounts": [
+        {
+          "type": "RecipientV0",
+          "table": "recipients",
+          "schema": "public",
+          "batchSize": 10000,
+          "plugins": [
+            {
+              "type": "ExplodeRecipientDestinationOwnership",
+              "config": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "programId": "we1cGnTxTkDP9Sk49dw1d3T7ik7V2NfnY4qDGCDHXfC",
+      "accounts": [
+        {
+          "type": "WelcomePackV0",
+          "table": "welcome_packs",
+          "schema": "public"
+        }
+      ]
+    },
+    {
+      "programId": "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn",
+      "accounts": [
+        {
+          "type": "MiniFanoutV0",
+          "table": "mini_fanouts",
+          "schema": "public",
+          "plugins": [
+            {
+              "type": "ExplodeMiniFanoutOwnership",
+              "config": {}
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "indexConfigs": [
+    "CREATE INDEX IF NOT EXISTS idx_key_to_asset_asset ON key_to_assets(asset);",
+    "CREATE INDEX IF NOT EXISTS idx_recipients_asset_index ON recipients(asset);",
+    "CREATE INDEX IF NOT EXISTS idx_recipients_destination_index ON recipients(destination);",
+    "CREATE INDEX IF NOT EXISTS idx_recipients_lazy_distributor ON recipients(lazy_distributor);"
+  ]
+}

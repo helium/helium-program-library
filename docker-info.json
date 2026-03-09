@@ -1,5 +1,6 @@
 {
   "web": {
+    "blockchain-api": "./packages/blockchain-api",
     "helium-vote-service": "./packages/helium-vote-service",
     "solana-monitor": "./packages/monitor-service",
     "ecc-verifier": "./utils/ecc-sig-verifier",

@@ -1,0 +1,149 @@
+name: Blockchain API E2E Tests
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "packages/blockchain-api/**"
+      - "packages/blockchain-api-client/**"
+  pull_request:
+    paths:
+      - "packages/blockchain-api/**"
+      - "packages/blockchain-api-client/**"
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - name: hotspot-transfer
+            file: hotspot-transfer.test.ts
+          - name: token-transfer
+            file: token-transfer.test.ts
+          - name: update-rewards
+            file: update-rewards-destination.test.ts
+          - name: welcome-pack
+            file: welcome-pack.test.ts
+          - name: rewards
+            file: rewards.test.ts
+          - name: automation
+            file: automation.test.ts
+          - name: hotspot-updates
+            file: hotspot-updates.test.ts
+          - name: reward-contract
+            file: reward-contract.test.ts
+          - name: estimate-creation-cost
+            file: estimate-creation-cost.test.ts
+          - name: governance
+            file: governance.test.ts
+          - name: migration
+            file: migration.test.ts
+
+    name: ${{ matrix.test.name }}
+
+    env:
+      NODE_ENV: test
+      NEXT_PORT: 3000
+      SURFPOOL_RPC_URL: http://127.0.0.1:8899
+      ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
+      NEXT_PUBLIC_SOLANA_CLUSTER: mainnet
+      SURFPOOL_SHOW_LOGS: "0"
+      SURFPOOL_HEALTH_TIMEOUT_MS: "180000"
+
+    defaults:
+      run:
+        working-directory: packages/blockchain-api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "yarn"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache surfpool binary
+        id: cache-surfpool
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/surfpool
+            ~/.cargo/.crates2.json
+            ~/.cargo/.crates.toml
+          key: ${{ runner.os }}-surfpool-bin-v1
+
+      - name: Install Surfpool CLI
+        if: steps.cache-surfpool.outputs.cache-hit != 'true'
+        run: |
+          cargo install --git https://github.com/txtx/surfpool --locked --force
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/node_modules
+          key: ${{ runner.os }}-node_modules-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node_modules-
+
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        working-directory: .
+        run: |
+          corepack enable
+          yarn install --immutable
+
+      - name: Build packages
+        working-directory: .
+        run: yarn build
+
+      - name: Write TESTING_KEY to file
+        run: |
+          echo "${{ secrets.TESTING_KEY }}" > testing_key.json
+          test -s testing_key.json || (echo 'TESTING_KEY is empty' && exit 1)
+
+      - name: Write TESTING_KEY_2 to file
+        run: |
+          echo "${{ secrets.TESTING_KEY_2 }}" > testing_key_2.json
+          test -s testing_key_2.json || (echo 'TESTING_KEY_2 is empty' && exit 1)
+
+      - name: Validate ASSET_ENDPOINT secret
+        run: |
+          if [ -z "${ASSET_ENDPOINT}" ]; then
+            echo "ASSET_ENDPOINT secret is not set. Please add it in repository secrets." >&2
+            exit 1
+          fi
+
+      - name: Run ${{ matrix.test.name }} tests
+        env:
+          TEST_WALLET_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json
+          TEST_WALLET_2_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key_2.json
+          FEE_PAYER_WALLET_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json
+          SURFPOOL_CMD: ${{ runner.tool_cache }}/cargo/bin/surfpool
+        run: |
+          # Fallback if cached path not present
+          if [ ! -x "$SURFPOOL_CMD" ]; then
+            export SURFPOOL_CMD="$HOME/.cargo/bin/surfpool"
+          fi
+          echo "Using SURFPOOL_CMD=$SURFPOOL_CMD"
+          yarn test:e2e:file tests/e2e/${{ matrix.test.file }}
