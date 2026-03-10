@@ -111,7 +111,7 @@ jobs:
         working-directory: .
         run: |
           corepack enable
-          yarn install --immutable
+          yarn install
 
       - name: Build packages
         working-directory: .
