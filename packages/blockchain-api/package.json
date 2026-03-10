@@ -18,7 +18,7 @@
     "lint": "yarn format:fix && eslint src/",
     "background-service": "node scripts/start-background-service.js",
     "test:e2e": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register \"tests/e2e/**/*.test.ts\" --timeout 100000",
-    "test:e2e:file": "DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register --timeout 100000",
+    "test:e2e:file": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register --timeout 100000",
     "sequelize-cli": "sequelize-cli"
   },
   "dependencies": {
