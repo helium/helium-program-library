@@ -324,7 +324,7 @@ export const useAutomateHotspotClaims = ({
         )
       }
 
-      if (pdaWalletSolFee > 0) {
+      if (pdaWalletSolFee > 0 && pdaWallet) {
         instructions.push(
           SystemProgram.transfer({
             fromPubkey: wallet,
