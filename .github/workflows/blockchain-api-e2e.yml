@@ -95,27 +95,10 @@ jobs:
         if: steps.cache-surfpool.outputs.cache-hit != 'true'
         run: |
           cargo install --git https://github.com/txtx/surfpool --locked --force
-
-      - name: Cache node_modules
-        id: cache-node-modules
-        uses: actions/cache@v4
+      - uses: ./.github/actions/build-anchor/
         with:
-          path: |
-            **/node_modules
-          key: ${{ runner.os }}-node_modules-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-node_modules-
-
-      - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        working-directory: .
-        run: |
-          corepack enable
-          yarn install
-
-      - name: Build packages
-        working-directory: .
-        run: yarn build
+          testing: true
+      - uses: ./.github/actions/setup-ts/
 
       - name: Write TESTING_KEY to file
         run: |
