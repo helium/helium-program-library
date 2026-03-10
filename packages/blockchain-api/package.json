@@ -88,7 +88,6 @@
     "react-jazzicon": "^1.0.4",
     "sequelize": "^6.37.7",
     "sonner": "^2.0.5",
-    "sqlite3": "^5.1.7",
     "tailwind-merge": "^3.3.1",
     "uuid": "^11.1.0",
     "zod": "^4.3.5"
@@ -120,6 +119,9 @@
     "typescript": "^5",
     "why-is-node-running": "^3.2.2",
     "yaml": "^2.8.1"
+  },
+  "optionalDependencies": {
+    "sqlite3": "^5.1.7"
   },
   "resolutions": {
     "@solana/web3.js": "1.98.2"

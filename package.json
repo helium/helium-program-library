@@ -31,6 +31,11 @@
     "fmt"
   ],
   "private": true,
+  "dependenciesMeta": {
+    "sqlite3": {
+      "built": false
+    }
+  },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
     "@coral-xyz/borsh": "^0.2.6",

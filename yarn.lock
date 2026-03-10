@@ -2090,7 +2090,7 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.31.1
     "@eslint/eslintrc": ^3.3.3
-    "@helium/blockchain-api": ^0.3.13
+    "@helium/blockchain-api": ^0.11.11
     "@helium/cron-sdk": ^0.0.10
     "@helium/distributor-oracle": ^0.11.11
     "@helium/helium-entity-manager-sdk": ^0.11.11
@@ -2184,20 +2184,13 @@ __metadata:
     why-is-node-running: ^3.2.2
     yaml: ^2.8.1
     zod: ^4.3.5
+  dependenciesMeta:
+    sqlite3:
+      optional: true
   languageName: unknown
   linkType: soft
 
-"@helium/blockchain-api@npm:^0.3.13":
-  version: 0.3.13
-  resolution: "@helium/blockchain-api@npm:0.3.13"
-  dependencies:
-    "@orpc/contract": ^1.13.2
-    zod: ^4.3.5
-  checksum: 04bcfda0cd6b9b0c846801323cfd13c548a218771f2ea37c067a1281d86a41bcc53ccfe65555cd9102d1d2c67e14accd7a222979fbd2d3cfac7cae450c66ed75
-  languageName: node
-  linkType: hard
-
-"@helium/blockchain-api@workspace:packages/blockchain-api-client":
+"@helium/blockchain-api@^0.11.11, @helium/blockchain-api@workspace:packages/blockchain-api-client":
   version: 0.0.0-use.local
   resolution: "@helium/blockchain-api@workspace:packages/blockchain-api-client"
   dependencies:
@@ -27162,6 +27155,9 @@ __metadata:
     ts-node: ^10.4.0
     tweetnacl: ^1.0.3
     typescript: ^5.2.2
+  dependenciesMeta:
+    sqlite3:
+      built: false
   languageName: unknown
   linkType: soft
 
