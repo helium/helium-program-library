@@ -79,7 +79,7 @@ export async function runAllTasks(
       await sendAndConfirmRawTransaction(
         provider.connection,
         Buffer.from(tx.serialize()),
-        { skipPreflight: false }
+        { skipPreflight: true }
       )
     );
   }
