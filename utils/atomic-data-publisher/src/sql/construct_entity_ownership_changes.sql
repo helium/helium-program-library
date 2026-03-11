@@ -5,8 +5,6 @@
 -- Returns: job_name, atomic_data (JSON)
 
 WITH asset_owner_changes AS (
-  -- Get asset owner changes in the block range
-  -- If owner is a welcome pack PDA, resolve to the wallet owner and mark as welcome_pack_owner
   SELECT
     ao.asset,
     ao.last_block as block,
@@ -16,47 +14,12 @@ WITH asset_owner_changes AS (
     'entity_ownership' as change_type
   FROM asset_owners ao
   INNER JOIN key_to_assets kta ON kta.asset = ao.asset
-  LEFT JOIN iot_hotspot_infos ihi ON ihi.asset = ao.asset
-  LEFT JOIN mobile_hotspot_infos mhi ON mhi.asset = ao.asset
   LEFT JOIN welcome_packs wp ON wp.address = ao.owner
-  WHERE (ihi.asset IS NOT NULL OR mhi.asset IS NOT NULL)
-    AND kta.entity_key IS NOT NULL
+  WHERE kta.entity_key IS NOT NULL
     AND ao.asset IS NOT NULL
     AND ao.owner IS NOT NULL
     AND ao.last_block > $1
     AND ao.last_block <= $2
-),
-hotspots_onboarded_in_range AS (
-  -- Get hotspots onboarded in this block range
-  SELECT asset, last_block FROM iot_hotspot_infos WHERE last_block > $1 AND last_block <= $2
-  UNION ALL
-  SELECT asset, last_block FROM mobile_hotspot_infos WHERE last_block > $1 AND last_block <= $2
-),
-newly_onboarded_hotspots AS (
-  -- Catch entities that were issued before this block range but onboarded as hotspots within it
-  -- This handles the race condition where IssueEntity and OnboardHotspot happen in different blocks
-  SELECT
-    hs.asset,
-    hs.last_block as block,
-    encode(kta.entity_key, 'hex') as pub_key,
-    CASE WHEN wp.address IS NOT NULL THEN wp.owner ELSE ao.owner END as owner,
-    CASE WHEN wp.address IS NOT NULL THEN 'welcome_pack_owner' ELSE 'direct_owner' END as owner_type,
-    'entity_ownership' as change_type
-  FROM hotspots_onboarded_in_range hs
-  INNER JOIN key_to_assets kta ON kta.asset = hs.asset
-  INNER JOIN asset_owners ao ON ao.asset = hs.asset
-  LEFT JOIN welcome_packs wp ON wp.address = ao.owner
-  WHERE kta.entity_key IS NOT NULL
-    AND ao.owner IS NOT NULL
-    -- Asset owner was set before this block range (race condition case)
-    AND ao.last_block <= $1
-),
-ownership_changes AS (
-  SELECT asset, block, pub_key, owner, owner_type, change_type
-  FROM asset_owner_changes
-  UNION ALL
-  SELECT asset, block, pub_key, owner, owner_type, change_type
-  FROM newly_onboarded_hotspots
 )
 SELECT
   'entity_ownership_changes' as job_name,
@@ -68,5 +31,5 @@ SELECT
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM ownership_changes
+FROM asset_owner_changes
 ORDER BY block DESC;

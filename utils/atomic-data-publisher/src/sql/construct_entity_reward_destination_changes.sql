@@ -9,7 +9,6 @@ WITH asset_reward_destination_changes AS (
   kta.asset as asset,
   GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) as block,
   encode(kta.entity_key, 'hex') as pub_key,
-  -- If owner is a welcome pack PDA, resolve to the wallet owner
   CASE WHEN wp.address IS NOT NULL THEN wp.owner ELSE ao.owner END as rewards_recipient,
   CASE WHEN mf.address IS NULL THEN NULL::json ELSE JSON_BUILD_OBJECT(
     'pub_key', mf.address,
@@ -33,15 +32,12 @@ WITH asset_reward_destination_changes AS (
 FROM
   key_to_assets kta
   JOIN asset_owners ao ON ao.asset = kta.asset
-  LEFT JOIN iot_hotspot_infos ihi ON ihi.asset = kta.asset
-  LEFT JOIN mobile_hotspot_infos mhi ON mhi.asset = kta.asset
   LEFT JOIN welcome_packs wp ON wp.address = ao.owner
   LEFT OUTER JOIN recipients r ON r.asset = ao.asset
-  AND r.lazy_distributor = '6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq' -- Exclude hotspots that have rewards recipients, as they're in the other query.
+  AND r.lazy_distributor = '6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq'
   LEFT OUTER JOIN mini_fanouts mf ON mf.address = r.destination
   WHERE
-    (ihi.asset IS NOT NULL OR mhi.asset IS NOT NULL)
-    AND kta.entity_key IS NOT NULL
+    kta.entity_key IS NOT NULL
     AND kta.asset IS NOT NULL
     AND ao.owner IS NOT NULL
     AND (
@@ -59,40 +55,6 @@ FROM
         AND mf.last_block <= $2
       )
     )
-),
-hotspots_onboarded_in_range AS (
-  SELECT asset, last_block FROM iot_hotspot_infos WHERE last_block > $1 AND last_block <= $2
-  UNION ALL
-  SELECT asset, last_block FROM mobile_hotspot_infos WHERE last_block > $1 AND last_block <= $2
-),
-newly_onboarded_reward_destinations AS (
-  -- Catch entities that were issued before this block range but onboarded as hotspots within it.
-  -- Mirrors the newly_onboarded_hotspots CTE in construct_entity_ownership_changes.sql
-  -- to handle the race condition where IssueEntity and OnboardHotspot happen in different blocks.
-  SELECT
-    kta.asset,
-    hs.last_block as block,
-    encode(kta.entity_key, 'hex') as pub_key,
-    CASE WHEN wp.address IS NOT NULL THEN wp.owner ELSE ao.owner END as rewards_recipient,
-    NULL::json as rewards_split,
-    'entity_reward_destination' as change_type
-  FROM hotspots_onboarded_in_range hs
-  INNER JOIN key_to_assets kta ON kta.asset = hs.asset
-  INNER JOIN asset_owners ao ON ao.asset = hs.asset
-  LEFT JOIN welcome_packs wp ON wp.address = ao.owner
-  LEFT OUTER JOIN recipients r ON r.asset = ao.asset
-    AND r.lazy_distributor = '6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq'
-  WHERE kta.entity_key IS NOT NULL
-    AND ao.owner IS NOT NULL
-    AND ao.last_block <= $1
-    AND (r.asset IS NULL OR r.destination = '11111111111111111111111111111111')
-),
-reward_destination_changes AS (
-  SELECT asset, block, pub_key, rewards_recipient, rewards_split, change_type
-  FROM asset_reward_destination_changes
-  UNION ALL
-  SELECT asset, block, pub_key, rewards_recipient, rewards_split, change_type
-  FROM newly_onboarded_reward_destinations
 )
 SELECT
   'entity_reward_destination_changes' as job_name,
@@ -104,5 +66,5 @@ SELECT
     'change_type', change_type,
     'block', block
   ) as atomic_data
-FROM reward_destination_changes
+FROM asset_reward_destination_changes
 ORDER BY block DESC;
