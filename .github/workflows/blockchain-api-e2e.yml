@@ -89,12 +89,17 @@ jobs:
             ~/.cargo/bin/surfpool
             ~/.cargo/.crates2.json
             ~/.cargo/.crates.toml
-          key: ${{ runner.os }}-surfpool-bin-v1
+          key: ${{ runner.os }}-surfpool-bin-v2
 
       - name: Install Surfpool CLI
         if: steps.cache-surfpool.outputs.cache-hit != 'true'
         run: |
           cargo install --git https://github.com/txtx/surfpool --locked --force
+
+      - name: Log Surfpool version
+        run: |
+          ~/.cargo/bin/surfpool --version || echo "surfpool --version not supported"
+
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
