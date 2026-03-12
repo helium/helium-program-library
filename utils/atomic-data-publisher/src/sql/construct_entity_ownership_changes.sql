@@ -16,6 +16,7 @@ WITH asset_owner_changes AS (
   INNER JOIN key_to_assets kta ON kta.asset = ao.asset
   LEFT JOIN welcome_packs wp ON wp.address = ao.owner
   WHERE kta.entity_key IS NOT NULL
+    AND kta.key_serialization = '"b58"'
     AND ao.asset IS NOT NULL
     AND ao.owner IS NOT NULL
     AND ao.last_block > $1

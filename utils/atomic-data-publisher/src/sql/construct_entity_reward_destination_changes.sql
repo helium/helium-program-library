@@ -38,6 +38,7 @@ FROM
   LEFT OUTER JOIN mini_fanouts mf ON mf.address = r.destination
   WHERE
     kta.entity_key IS NOT NULL
+    AND kta.key_serialization = '"b58"'
     AND kta.asset IS NOT NULL
     AND ao.owner IS NOT NULL
     AND (

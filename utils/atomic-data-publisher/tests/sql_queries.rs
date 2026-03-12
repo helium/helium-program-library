@@ -60,6 +60,19 @@ async fn ownership_claimed_welcome_pack_becomes_direct(pool: PgPool) {
     assert_eq!(results[0]["owner"], user_wallet_c);
 }
 
+#[sqlx::test(migrations = "tests/migrations")]
+async fn ownership_utf8_key_excluded(pool: PgPool) {
+    let asset = "asset_utf8";
+    let entity_key: Vec<u8> = b"not_emitted".to_vec();
+
+    seed_key_to_asset_with_serialization(&pool, "kta_utf8", &entity_key, asset, "\"utf8\"").await;
+    seed_asset_owner(&pool, asset, "wallet_utf8", 200).await;
+
+    let results = run_ownership_query(&pool, 150, 250).await;
+
+    assert!(results.is_empty());
+}
+
 // --- Reward Destination Resolution ---
 
 #[sqlx::test(migrations = "tests/migrations")]
@@ -177,6 +190,20 @@ async fn reward_welcome_pack_resolves_owner(pool: PgPool) {
     assert!(results[0]["rewards_split"].is_null());
 }
 
+#[sqlx::test(migrations = "tests/migrations")]
+async fn reward_utf8_key_excluded(pool: PgPool) {
+    let asset = "asset_reward_utf8";
+    let entity_key: Vec<u8> = b"iot_operations_fund".to_vec();
+
+    seed_key_to_asset_with_serialization(&pool, "kta_utf8_r", &entity_key, asset, "\"utf8\"")
+        .await;
+    seed_asset_owner(&pool, asset, "wallet_utf8_r", 200).await;
+
+    let results = run_reward_query(&pool, 150, 250).await;
+
+    assert!(results.is_empty());
+}
+
 // --- Hotspot Metadata ---
 
 #[sqlx::test(migrations = "tests/migrations")]
@@ -243,6 +270,30 @@ async fn hotspot_iot_produces_correct_json(pool: PgPool) {
     assert_eq!(results[0]["location"], "8c2ab38b6e899ff");
     assert_eq!(results[0]["is_full_hotspot"], true);
     assert_eq!(results[0]["hotspot_type"], "iot");
+}
+
+#[sqlx::test(migrations = "tests/migrations")]
+async fn hotspot_utf8_key_excluded(pool: PgPool) {
+    let asset = "asset_hotspot_utf8";
+    let entity_key: Vec<u8> = b"not_emitted".to_vec();
+
+    seed_key_to_asset_with_serialization(&pool, "kta_utf8_h", &entity_key, asset, "\"utf8\"")
+        .await;
+    seed_mobile_hotspot(
+        &pool,
+        "mhi_utf8",
+        asset,
+        200,
+        Some("8c2ab38b6e899ff"),
+        "wifiOutdoor",
+        true,
+        None,
+    )
+    .await;
+
+    let results = run_hotspot_query(&pool, "mobile", 150, 250).await;
+
+    assert!(results.is_empty());
 }
 
 #[sqlx::test(migrations = "tests/migrations")]

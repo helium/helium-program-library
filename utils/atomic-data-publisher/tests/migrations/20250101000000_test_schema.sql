@@ -1,7 +1,8 @@
 CREATE TABLE key_to_assets (
     address TEXT PRIMARY KEY,
     entity_key BYTEA,
-    asset TEXT
+    asset TEXT,
+    key_serialization JSONB
 );
 
 CREATE TABLE asset_owners (

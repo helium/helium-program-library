@@ -24,12 +24,23 @@ const HOTSPOT_SQL: &str = include_str!(concat!(
 // --- Seed functions ---
 
 pub async fn seed_key_to_asset(pool: &PgPool, address: &str, entity_key: &[u8], asset: &str) {
+    seed_key_to_asset_with_serialization(pool, address, entity_key, asset, "\"b58\"").await;
+}
+
+pub async fn seed_key_to_asset_with_serialization(
+    pool: &PgPool,
+    address: &str,
+    entity_key: &[u8],
+    asset: &str,
+    key_serialization: &str,
+) {
     sqlx::query(
-        "INSERT INTO key_to_assets (address, entity_key, asset) VALUES ($1, $2, $3)",
+        "INSERT INTO key_to_assets (address, entity_key, asset, key_serialization) VALUES ($1, $2, $3, $4::jsonb)",
     )
     .bind(address)
     .bind(entity_key)
     .bind(asset)
+    .bind(key_serialization)
     .execute(pool)
     .await
     .expect("seed key_to_asset");
