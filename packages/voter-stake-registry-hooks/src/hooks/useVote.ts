@@ -333,7 +333,7 @@ export const useVote = (proposalKey: PublicKey) => {
         } else {
           await batchParallelInstructions({
             provider,
-            instructions: [proxyVoteInstructions, ...normalVoteInstructions],
+            instructions: [...proxyVoteInstructions, ...normalVoteInstructions.flat()],
             onProgress,
             triesRemaining: 10,
             extraSigners: [],

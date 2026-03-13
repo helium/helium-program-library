@@ -1,0 +1,222 @@
+import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { env } from "../env";
+import { v4 as uuidv4 } from "uuid";
+import bs58 from "bs58";
+import * as Sentry from "@sentry/nextjs";
+import { getExplorerUrl } from "./explorer";
+import { getCluster } from "../solana";
+import {
+  shouldUseJitoBundle,
+  simulateJitoBundle,
+  submitJitoBundle,
+} from "./jito";
+
+export interface TransactionBatchPayload {
+  parallel: boolean;
+  transactions: string[];
+}
+
+export interface BatchSubmissionResult {
+  batchId: string;
+  submissionType: "single" | "parallel" | "sequential" | "jito_bundle";
+  signatures?: string[];
+  jitoBundleId?: string;
+  error?: string;
+}
+
+// Submit single transaction
+export async function submitSingleTransaction(
+  connection: Connection,
+  serializedTransaction: string,
+): Promise<string> {
+  let transaction: VersionedTransaction;
+  try {
+    transaction = VersionedTransaction.deserialize(
+      Buffer.from(serializedTransaction, "base64"),
+    );
+  } catch (error) {
+    // Capture deserialization error
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        error_type: "transaction_deserialization_failed",
+      },
+      extra: {
+        error_message: error instanceof Error ? error.message : "Unknown error",
+      },
+    });
+    throw error;
+  }
+
+  try {
+    const signature = await connection.sendRawTransaction(
+      transaction.serialize(),
+      {
+        skipPreflight: true,
+      },
+    );
+
+    return signature;
+  } catch (error) {
+    // Capture submission error with explorer link
+    const explorerUrl = getExplorerUrl(transaction);
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        error_type: "transaction_submission_failed",
+        submission_type: "single",
+      },
+      extra: {
+        error_message: error instanceof Error ? error.message : "Unknown error",
+        explorer_link: explorerUrl,
+      },
+      contexts: {
+        transaction: {
+          explorer_link: explorerUrl,
+          submission_type: "single",
+        },
+      },
+    });
+    throw error;
+  }
+}
+
+// Submit transactions in parallel
+export async function submitTransactionsParallel(
+  connection: Connection,
+  serializedTransactions: string[],
+): Promise<string[]> {
+  const submissions = serializedTransactions.map(async (serializedTx) => {
+    return await submitSingleTransaction(connection, serializedTx);
+  });
+
+  return await Promise.all(submissions);
+}
+
+// Submit transactions sequentially
+export async function submitTransactionsSequential(
+  connection: Connection,
+  serializedTransactions: string[],
+): Promise<string[]> {
+  const signatures: string[] = [];
+
+  for (const serializedTx of serializedTransactions) {
+    const signature = await submitSingleTransaction(connection, serializedTx);
+    signatures.push(signature);
+  }
+
+  return signatures;
+}
+
+// Main submission function that handles all types
+export async function submitTransactionBatch(
+  payload: TransactionBatchPayload,
+): Promise<BatchSubmissionResult> {
+  const batchId = uuidv4();
+  const connection = new Connection(env.SOLANA_RPC_URL);
+  const cluster = getCluster();
+
+  try {
+    // Single transaction case
+    if (payload.transactions.length === 1) {
+      const signature = await submitSingleTransaction(
+        connection,
+        payload.transactions[0],
+      );
+      return {
+        batchId,
+        submissionType: "single",
+        signatures: [signature],
+      };
+    }
+
+    // Multiple transactions
+    if (shouldUseJitoBundle(payload.transactions.length, cluster)) {
+      // Mainnet: use Jito bundle
+      await simulateJitoBundle(payload.transactions);
+
+      const jitoBundleId = await submitJitoBundle(payload.transactions);
+      return {
+        batchId,
+        submissionType: "jito_bundle",
+        jitoBundleId,
+        signatures: payload.transactions.map((tx) =>
+          bs58.encode(
+            VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
+              .signatures[0],
+          ),
+        ),
+      };
+    } else {
+      // Devnet/Localnet: use parallel or sequential based on payload.parallel
+      if (payload.parallel) {
+        const signatures = await submitTransactionsParallel(
+          connection,
+          payload.transactions,
+        );
+        return {
+          batchId,
+          submissionType: "parallel",
+          signatures,
+        };
+      } else {
+        const signatures = await submitTransactionsSequential(
+          connection,
+          payload.transactions,
+        );
+        return {
+          batchId,
+          submissionType: "sequential",
+          signatures,
+        };
+      }
+    }
+  } catch (error) {
+    // Capture batch submission error
+    // Try to get explorer links for transactions if possible
+    const explorerLinks: string[] = [];
+    try {
+      for (const serializedTx of payload.transactions.slice(0, 3)) {
+        // Limit to first 3 to avoid too much data
+        const tx = VersionedTransaction.deserialize(
+          Buffer.from(serializedTx, "base64"),
+        );
+        explorerLinks.push(getExplorerUrl(tx));
+      }
+    } catch {
+      // Ignore errors when generating explorer links
+    }
+
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        error_type: "transaction_batch_submission_failed",
+        submission_type: "batch",
+        cluster,
+      },
+      extra: {
+        error_message: error instanceof Error ? error.message : "Unknown error",
+        batch_id: batchId,
+        batch_size: payload.transactions.length,
+        parallel: payload.parallel,
+        cluster,
+        explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
+      },
+      contexts: {
+        transaction: {
+          batch_id: batchId,
+          batch_size: payload.transactions.length,
+          parallel: payload.parallel,
+          cluster,
+          explorer_links: explorerLinks,
+        },
+      },
+    });
+
+    return {
+      batchId,
+      submissionType: "single", // fallback
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}

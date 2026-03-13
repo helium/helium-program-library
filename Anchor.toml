@@ -134,7 +134,10 @@ address = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"
 address = "HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ"
 
 [[test.validator.clone]]
-address = "5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn"
+address = "5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn" # Wormhole guardian set index 4
+
+[[test.validator.clone]]
+address = "HTczusLJSAhMJKYrxLjSUUyW7YDsBuyfBG8Tj1KJsgni" # Wormhole guardian set index 5
 
 [[test.validator.clone]]
 address = "DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b"
