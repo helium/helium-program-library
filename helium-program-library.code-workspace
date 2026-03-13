@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "helium-program-library"
+    },
+    {
+      "path": "./packages/blockchain-api",
+      "name": "blockchain-api"
+    }
+  ],
+  "settings": {}
+}

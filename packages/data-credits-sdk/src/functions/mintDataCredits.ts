@@ -3,8 +3,8 @@ import BN from "bn.js";
 import { DataCredits } from "@helium/idls/lib/types/data_credits";
 import { DC_MINT, HNT_PRICE_FEED_ID } from "@helium/spl-utils";
 import { InstructionWithEphemeralSigners, PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
-import { PublicKey } from "@solana/web3.js";
-import { HermesClient } from "@pythnetwork/hermes-client";
+import { PublicKey, Signer, VersionedTransaction } from "@solana/web3.js";
+import { HermesClient, PriceUpdate } from "@pythnetwork/hermes-client";
 
 export const PYTH_HERMES_URL = "https://hermes.pyth.network/"
 
@@ -20,7 +20,7 @@ export async function mintDataCredits({
   hntAmount?: BN,
   program: Program<DataCredits>,
   recipient?: PublicKey,
-}) {
+}): Promise<{ txs: { tx: VersionedTransaction; signers: Signer[] }[]; priceUpdates: PriceUpdate }> {
 
   if (!hntAmount && !dcAmount) {
     throw new Error("Either hntAmount or dcAmount must be provided");

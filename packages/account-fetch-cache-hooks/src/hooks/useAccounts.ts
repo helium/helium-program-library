@@ -178,13 +178,22 @@ export function useAccounts<T>(
     }
   }, [error]);
 
+  const sanitizedAccounts = useMemo(() => {
+    return (accounts || [])
+      .filter(
+        (a): a is typeof a & { publicKey: PublicKey } =>
+          a.publicKey != null
+      )
+      .map(({ info, account, publicKey }) => ({ info, account, publicKey }));
+  }, [accounts]);
+
   // Start watchers
   useEffect(() => {
-    if (accounts) {
-      const disposers = accounts.map((account) => {
+    if (sanitizedAccounts.length > 0) {
+      const disposers = sanitizedAccounts.map((account) => {
         return cache.watch(
           account.publicKey,
-          account.parser,
+          parsedAccountBaseParser,
           !!account.account
         );
       });
@@ -193,7 +202,7 @@ export function useAccounts<T>(
         disposers?.forEach((disposer) => disposer());
       };
     }
-  }, [accounts]);
+  }, [sanitizedAccounts]);
 
   const [watchedAccounts, setWatchedAccounts] = useState<
     {
@@ -201,23 +210,23 @@ export function useAccounts<T>(
       info?: T;
       publicKey: PublicKey;
     }[]
-  >(accounts || []);
+  >(sanitizedAccounts);
 
   useEffect(() => {
-    if (watchedAccounts != accounts) {
-      setWatchedAccounts(accounts);
+    if (watchedAccounts != sanitizedAccounts) {
+      setWatchedAccounts(sanitizedAccounts);
     }
-  }, [accounts]);
+  }, [sanitizedAccounts]);
 
   useEffect(() => {
-    const accountsByKey = accounts.reduce((acc, account, index) => {
+    const accountsByKey = sanitizedAccounts.reduce((acc, account, index) => {
       acc[account.publicKey.toBase58()] = {
         index,
         account: account.account,
         info: account.info,
       };
       return acc;
-    }, {} as Record<string, { index: number; account: AccountInfo<Buffer>; info: T }>);
+    }, {} as Record<string, { index: number; account?: AccountInfo<Buffer>; info?: T }>);
 
     const disposeEmitter = cache.emitter.onCache(async (e) => {
       const event = e;
@@ -231,14 +240,13 @@ export function useAccounts<T>(
             : parsed;
           const index = accountsByKey[event.id].index;
           const newAccounts = [
-            ...accounts.slice(0, index),
+            ...sanitizedAccounts.slice(0, index),
             {
               info: newParsed,
               account: acc.account,
               publicKey: acc.pubkey,
-              parser: parsedAccountBaseParser,
             },
-            ...accounts.slice(index + 1),
+            ...sanitizedAccounts.slice(index + 1),
           ];
           setWatchedAccounts(newAccounts);
         }
@@ -247,7 +255,7 @@ export function useAccounts<T>(
     return () => {
       disposeEmitter();
     };
-  }, [accounts, keys, parsedAccountBaseParser, parser]);
+  }, [sanitizedAccounts, keys, parsedAccountBaseParser, parser]);
 
   return {
     status,
