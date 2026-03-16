@@ -1,5 +1,6 @@
 import { IdlTypes, Program } from "@coral-xyz/anchor";
 import { WelcomePack } from "@helium/idls/lib/types/welcome_pack";
+import { recipientKey, PROGRAM_ID as LAZY_DISTRIBUTOR_PROGRAM_ID } from "@helium/lazy-distributor-sdk";
 import { Asset, AssetProof, proofArgsAndAccounts } from "@helium/spl-utils";
 import { SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
@@ -28,6 +29,7 @@ export async function closeWelcomePack({
 }) {
   const welcomePackAcc = await program.account.welcomePackV0.fetch(welcomePack)
   const assetId = welcomePackAcc.asset
+  const recipient = recipientKey(welcomePackAcc.lazyDistributor, assetId)[0]
   const {
     args,
     accounts,
@@ -53,7 +55,9 @@ export async function closeWelcomePack({
       compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
-      userWelcomePacks: userWelcomePacksKey(welcomePackAcc.owner)[0]
+      userWelcomePacks: userWelcomePacksKey(welcomePackAcc.owner)[0],
+      recipient,
+      lazyDistributorProgram: LAZY_DISTRIBUTOR_PROGRAM_ID,
     })
     .remainingAccounts(remainingAccounts);
 }

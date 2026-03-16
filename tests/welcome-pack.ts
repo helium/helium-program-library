@@ -358,6 +358,11 @@ describe("welcome-pack", () => {
 
       const welcomePackAccount = await welcomePackProgram.account.welcomePackV0.fetchNullable(welcomePack)
       expect(welcomePackAccount).to.be.null
+
+      const recipientAccount = await lazyDistributorProgram.account.recipientV0.fetch(
+        recipientKey(lazyDistributor, hotspot)[0]
+      )
+      expect(recipientAccount.destination.toBase58()).to.equal(PublicKey.default.toBase58())
     })
   })
 })
