@@ -8,7 +8,7 @@ use anchor_spl::{
 use crate::{position_seeds, state::*};
 
 #[derive(Accounts)]
-pub struct LedgerTransferPositionV0<'info> {
+pub struct TransferPositionV0<'info> {
   #[account(mut)]
   pub payer: Signer<'info>,
 
@@ -49,7 +49,7 @@ pub struct LedgerTransferPositionV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-impl<'info> LedgerTransferPositionV0<'info> {
+impl<'info> TransferPositionV0<'info> {
   fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
     let cpi_accounts = Transfer {
       from: self.from_token_account.to_account_info(),
@@ -80,7 +80,7 @@ impl<'info> LedgerTransferPositionV0<'info> {
 
 /// NOTE: This endpoint must only be used by those transferring a position from one wallet
 /// they own to another wallet they own. The approver checks this legal requirement.
-pub fn handler(ctx: Context<LedgerTransferPositionV0>) -> Result<()> {
+pub fn handler(ctx: Context<TransferPositionV0>) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[position_seeds!(ctx.accounts.position)];
 
   // Thaw the source
