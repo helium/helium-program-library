@@ -39,7 +39,7 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
     "@coral-xyz/borsh": "^0.2.6",
-    "@helium/crypto": "^4.10.2",
+    "@helium/crypto": "^4.14.2",
     "@helium/modular-governance-idls": "^0.1.5-alpha.0",
     "@helium/nft-proxy-sdk": "^0.1.5-alpha.0",
     "@helium/proposal-sdk": "^0.1.5-alpha.0",
@@ -74,6 +74,11 @@
     "ts-node": "^10.4.0",
     "tweetnacl": "^1.0.3",
     "typescript": "^5.2.2"
+  },
+  "resolutions": {
+    "cipher-base": "^1.0.6",
+    "sha.js": "^2.4.12",
+    "@helium/crypto": "^4.14.2"
   },
   "packageManager": "yarn@3.6.4"
 }
