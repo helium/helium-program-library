@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: helium
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    entrypoint:
+      - "docker-entrypoint.sh"
+      - "postgres"
+    command: ["-c", "max_connections=200", "-c", "shared_buffers=256MB"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  account-postgres-sink:
+    image: public.ecr.aws/v0j6k5v6/account-postgres-sink-service:0.4.16
+
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - SOLANA_URL=${SOLANA_URL}
+      - USE_YELLOWSTONE=false
+      - NODE_ENV=production
+      - PROGRAM_ACCOUNT_CONFIGS=/usr/src/app/program_account_configs.json
+      - ANCHOR_WALLET=/usr/src/app/id.json
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=postgres
+      - PG_PASSWORD=postgres
+      - PG_DATABASE=helium
+      - USE_SUBSTREAMS=false
+      - REFRESH_ON_BOOT=false
+      - PHOTON_URL=https://photon.komoot.io
+      - ADMIN_PASSWORD=foo
+    volumes:
+      - ./program_account_configs.json:/usr/src/app/program_account_configs.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  asset-ownership:
+    image: public.ecr.aws/v0j6k5v6/asset-ownership-service:0.2.20
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - SOLANA_URL=${SOLANA_URL}
+      - NODE_ENV=production
+      - ANCHOR_WALLET=/usr/src/app/id.json
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=postgres
+      - PG_PASSWORD=postgres
+      - PG_DATABASE=helium
+      - PG_MAKER_TABLE=makers
+      - PG_ASSET_TABLE=key_to_assets
+      - PG_DATA_ONLY_TABLE=data_only_configs
+      - PG_CARRIER_TABLE=carriers
+      - ADMIN_PASSWORD=foo
+      - REFRESH_ON_BOOT=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

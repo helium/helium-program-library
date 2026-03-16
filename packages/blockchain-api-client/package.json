@@ -1,0 +1,59 @@
+{
+  "name": "@helium/blockchain-api",
+  "version": "0.11.11",
+  "type": "module",
+  "description": "TypeScript client and schemas for the Helium Blockchain API",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/helium/helium-program-library.git",
+    "directory": "packages/blockchain-api-client"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./contracts": {
+      "import": "./dist/contracts.js",
+      "types": "./dist/contracts.d.ts"
+    },
+    "./schemas": {
+      "import": "./dist/schemas.js",
+      "types": "./dist/schemas.d.ts"
+    },
+    "./schemas/*": {
+      "import": "./dist/schemas/*.js",
+      "types": "./dist/schemas/*.d.ts"
+    },
+    "./errors": {
+      "import": "./dist/errors.js",
+      "types": "./dist/errors.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@orpc/contract": "^1.13.2",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}

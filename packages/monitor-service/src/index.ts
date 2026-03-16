@@ -60,6 +60,11 @@ function debounce(func: any, wait: number = 10000) {
   };
 }
 
+async function exists(account: PublicKey) {
+  const acc = await provider.connection.getAccountInfo(account);
+  return !!acc;
+}
+
 async function setTotalRewards(mint: PublicKey) {
   const lazyDistributor = lazyDistributorKey(mint)[0].toBase58();
   const sum = (
@@ -205,15 +210,18 @@ async function run() {
   );
   await monitorSolBalance(mobileAutoTopOff, "helium_mobile_auto_topoff");
 
-  await monitorTokenBalance(
-    getAssociatedTokenAddressSync(dao.hntMint, mobileAutoTopOff, true),
-    "helium_mobile_auto_topoff_hnt"
-  );
+  const mobileAutoTopoffTokenAccount = getAssociatedTokenAddressSync(dao.hntMint, mobileAutoTopOff, true);
+  const carrierAutoTopOffTokenAccount = getAssociatedTokenAddressSync(dao.hntMint, carrierAutoTopOff, true);
 
-  await monitorTokenBalance(
-    getAssociatedTokenAddressSync(dao.hntMint, carrierAutoTopOff, true),
-    "carrier_auto_topoff_hnt"
-  );
+  if (await exists(mobileAutoTopoffTokenAccount)) {
+    await monitorTokenBalance(
+      mobileAutoTopoffTokenAccount,
+      "helium_mobile_auto_topoff_hnt"
+    );
+  }
+  if (await exists(carrierAutoTopOffTokenAccount)) {
+    await monitorTokenBalance(carrierAutoTopOffTokenAccount, "carrier_auto_topoff_hnt");
+  }
 
   for (const maker of makers) {
     await monitorSolBalance(

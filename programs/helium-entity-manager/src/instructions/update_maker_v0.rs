@@ -22,11 +22,11 @@ pub struct UpdateMakerV0<'info> {
 pub fn handler(ctx: Context<UpdateMakerV0>, args: UpdateMakerArgsV0) -> Result<()> {
   let maker = &mut ctx.accounts.maker;
 
-  if args.issuing_authority.is_some() {
-    maker.issuing_authority = args.issuing_authority.unwrap();
+  if let Some(issuing_authority) = args.issuing_authority {
+    maker.issuing_authority = issuing_authority;
   }
-  if args.update_authority.is_some() {
-    maker.update_authority = args.update_authority.unwrap();
+  if let Some(update_authority) = args.update_authority {
+    maker.update_authority = update_authority;
   }
   Ok(())
 }

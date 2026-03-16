@@ -31,9 +31,11 @@ aws-config = "1.8"
 aws-credential-types = "1.2.4"
 aws-sdk-rds = "1.112.1"
 sha2 = "0.10.9"
-hmac = "0.12.1"
 hex = "0.4"
 urlencoding = "2.1"
+
+[dev-dependencies]
+sqlx = { version = "0.8.6", features = ["migrate"] }
 
 #[patch.'https://github.com/helium/proto']
 #helium-proto = { git = "https://www.github.com/helium/proto", branch = "mj/chain-rewardable-entities" }

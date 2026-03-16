@@ -468,15 +468,13 @@ export const upsertProgramAccounts = async ({
                 .map((r) => r.record);
 
               if (toUpdate.length > 0) {
-                await model.bulkCreate(toUpdate, {
-                  transaction,
-                  updateOnDuplicate: [
-                    "address",
-                    "refreshedAt",
-                    "lastBlock",
-                    ...updateOnDuplicateFields,
-                  ],
-                });
+                const UPSERT_CHUNK_SIZE = 5000;
+                for (let i = 0; i < toUpdate.length; i += UPSERT_CHUNK_SIZE) {
+                  await model.bulkCreate(toUpdate.slice(i, i + UPSERT_CHUNK_SIZE), {
+                    updateOnDuplicate: ["address", "refreshedAt", "lastBlock", ...updateOnDuplicateFields],
+                    transaction,
+                  });
+                }
               }
 
               if (toTouch.length > 0) {

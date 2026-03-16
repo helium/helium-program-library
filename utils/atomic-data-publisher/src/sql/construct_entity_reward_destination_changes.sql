@@ -9,7 +9,6 @@ WITH asset_reward_destination_changes AS (
   kta.asset as asset,
   GREATEST(COALESCE(ao.last_block, 0), COALESCE(r.last_block, 0), COALESCE(mf.last_block, 0)) as block,
   encode(kta.entity_key, 'hex') as pub_key,
-  -- If owner is a welcome pack PDA, resolve to the wallet owner
   CASE WHEN wp.address IS NOT NULL THEN wp.owner ELSE ao.owner END as rewards_recipient,
   CASE WHEN mf.address IS NULL THEN NULL::json ELSE JSON_BUILD_OBJECT(
     'pub_key', mf.address,
@@ -33,15 +32,13 @@ WITH asset_reward_destination_changes AS (
 FROM
   key_to_assets kta
   JOIN asset_owners ao ON ao.asset = kta.asset
-  LEFT JOIN iot_hotspot_infos ihi ON ihi.asset = kta.asset
-  LEFT JOIN mobile_hotspot_infos mhi ON mhi.asset = kta.asset
   LEFT JOIN welcome_packs wp ON wp.address = ao.owner
   LEFT OUTER JOIN recipients r ON r.asset = ao.asset
-  AND r.lazy_distributor = '6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq' -- Exclude hotspots that have rewards recipients, as they're in the other query.
+  AND r.lazy_distributor = '6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq'
   LEFT OUTER JOIN mini_fanouts mf ON mf.address = r.destination
   WHERE
-    (ihi.asset IS NOT NULL OR mhi.asset IS NOT NULL)
-    AND kta.entity_key IS NOT NULL
+    kta.entity_key IS NOT NULL
+    AND kta.key_serialization = '"b58"'
     AND kta.asset IS NOT NULL
     AND ao.owner IS NOT NULL
     AND (

@@ -2,7 +2,7 @@ name: Deploy Programs to devnet
 
 env:
   SOLANA_CLI_VERSION: 2.1.6
-  NODE_VERSION: 22.19.0
+  NODE_VERSION: 24.13.1
 
 on:
   push:
@@ -57,7 +57,7 @@ jobs:
           path: |
             ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}-v0002
-          
+
       - run: (cargo install toml-cli || true)
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
@@ -100,7 +100,6 @@ jobs:
           name: ${{matrix.program}}-idl
           path: |
             ./target/idl/${{env.PROGRAM_NAME}}.json
-
 
   publish_programs:
     needs: [detect_changed_programs, build_programs]

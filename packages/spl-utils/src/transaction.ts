@@ -157,7 +157,7 @@ export async function sendInstructions(
 
   let tx = new Transaction();
   tx.recentBlockhash = (
-    await provider.connection.getLatestBlockhash()
+    await provider.connection.getLatestBlockhash(commitment)
   ).blockhash;
   tx.feePayer = payer || provider.wallet.publicKey;
   tx.add(...instructions);
@@ -208,7 +208,7 @@ export async function sendMultipleInstructions(
   idlErrors: Map<number, string> = new Map()
 ): Promise<Iterable<string>> {
   const recentBlockhash = (
-    await provider.connection.getLatestBlockhash("confirmed")
+    await provider.connection.getLatestBlockhash(finality)
   ).blockhash;
 
   const ixAndSigners = instructionGroups
@@ -483,7 +483,7 @@ export async function bulkSendTransactions(
   onProgress?: (status: Status) => void,
   triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
   extraSigners: Keypair[] = [],
-  maxSignatureBatch: number = TX_BATCH_SIZE
+  maxSignatureBatch: number = TX_BATCH_SIZE,
 ): Promise<string[]> {
   let ret: string[] = [];
 
@@ -804,7 +804,9 @@ export async function batchInstructionsToTxsWithPriorityFee(
     extraSigners = [],
     useFirstEstimateForAll = false,
     maxInstructionsPerTx,
+    commitment = "confirmed",
   }: {
+    commitment?: Commitment;
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
     // Manually specify max tx size, useful to leave room for multisigs
@@ -822,7 +824,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
-  const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
+  const blockhash = (await provider.connection.getLatestBlockhash(commitment)).blockhash;
   const transactions: TransactionDraft[] = [];
   const addressLookupTables = await getAddressLookupTableAccounts(
     provider.connection,

@@ -5,11 +5,11 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.7",
+  "version": "0.11.11",
   "description": "Interface to the data-credits smart contract",
   "repository": {
     "type": "git",
-    "url": "https://github.com/helium/helium-program-libary"
+    "url": "https://github.com/helium/helium-program-library"
   },
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/src/index.js",
@@ -32,11 +32,11 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
-    "@helium/anchor-resolvers": "^0.11.7",
-    "@helium/circuit-breaker-sdk": "^0.11.7",
-    "@helium/helium-sub-daos-sdk": "^0.11.7",
-    "@helium/idls": "^0.11.7",
-    "@helium/spl-utils": "^0.11.7",
+    "@helium/anchor-resolvers": "^0.11.11",
+    "@helium/circuit-breaker-sdk": "^0.11.11",
+    "@helium/helium-sub-daos-sdk": "^0.11.11",
+    "@helium/idls": "^0.11.11",
+    "@helium/spl-utils": "^0.11.11",
     "@pythnetwork/hermes-client": "^2.0.0",
     "@pythnetwork/pyth-solana-receiver": "^0.10.2",
     "bn.js": "^5.2.0",

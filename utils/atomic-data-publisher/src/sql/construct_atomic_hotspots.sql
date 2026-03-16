@@ -60,4 +60,5 @@ SELECT
 FROM hotspot_metadata_changes hmc
 INNER JOIN key_to_assets kta ON kta.asset = hmc.asset
 WHERE kta.entity_key IS NOT NULL
+  AND kta.key_serialization = '"b58"'
 ORDER BY hmc.last_block DESC;

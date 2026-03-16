@@ -1,6 +1,5 @@
 import cors from "@fastify/cors";
 import { AccountInfo, PublicKey, TransactionResponse } from "@solana/web3.js";
-import { BloomFilter } from "bloom-filters";
 import { EventEmitter } from "events";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyCron, { Params as CronConfig } from "fastify-cron";
@@ -89,13 +88,15 @@ if (PG_POOL_SIZE < 5) {
   await server.register(metrics);
   const eventHandler = new EventEmitter();
   let processingJob = false;
-  const jobQueue: {
+  type Job = {
     type: "integrity-check" | "refresh-accounts";
     programId: string;
     accountType?: string;
     resolve: () => void;
     reject: (err: any) => void;
-  }[] = [];
+  };
+  let currentJob: Job | null = null;
+  const jobQueue: Job[] = [];
 
   const processJobQueue = async () => {
     if (processingJob || jobQueue.length === 0) {
@@ -107,8 +108,11 @@ if (PG_POOL_SIZE < 5) {
 
     if (!job) {
       processingJob = false;
+      currentJob = null;
       return;
     }
+
+    currentJob = job;
 
     const jobDesc =
       job.type === "refresh-accounts" && job.accountType
@@ -146,6 +150,7 @@ if (PG_POOL_SIZE < 5) {
       job.reject(err);
     } finally {
       processingJob = false;
+      currentJob = null;
       setImmediate(() => processJobQueue());
     }
   };
@@ -266,8 +271,6 @@ if (PG_POOL_SIZE < 5) {
       }
     });
 
-    // Assume 10 million accounts we might not want to watch (token accounts, etc)
-    const nonWatchedAccountsFilter = BloomFilter.create(10000000, 0.05);
     async function insertTransactionAccounts(
       accounts: { pubkey: PublicKey; account: AccountInfo<Buffer> | null }[],
       block: number | undefined
@@ -301,27 +304,22 @@ if (PG_POOL_SIZE < 5) {
 
           // If the owner isn't of a program we're watching, break
           const owner = account.owner.toBase58();
-          const config = configs.find((x) => x.programId == owner);
+          const config = configs.find((x) => x.programId === owner);
           if (!config) {
-            if (owner) nonWatchedAccountsFilter.add(pubkey.toBase58());
             continue;
           }
 
-          try {
-            await handleAccountWebhook({
-              fastify: server,
-              programId: new PublicKey(config.programId),
-              accounts: config.accounts,
-              account: {
-                pubkey: pubkey.toBase58(),
-                data: [account.data, undefined],
-              },
-              pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
-              block,
-            });
-          } catch (err) {
-            throw err;
-          }
+          await handleAccountWebhook({
+            fastify: server,
+            programId: new PublicKey(config.programId),
+            accounts: config.accounts,
+            account: {
+              pubkey: pubkey.toBase58(),
+              data: [account.data, undefined],
+            },
+            pluginsByAccountType: pluginsByAccountTypeByProgram[owner] || {},
+            block,
+          });
         }
       }
     }
@@ -375,14 +373,14 @@ if (PG_POOL_SIZE < 5) {
       }
 
       server.post<{ Body: any[] }>("/transaction-webhook", async (req, res) => {
-        if (req.headers.authorization != HELIUS_AUTH_SECRET) {
+        if (req.headers.authorization !== HELIUS_AUTH_SECRET) {
           res.code(StatusCodes.FORBIDDEN).send({
             message: "Invalid authorization",
           });
           return;
         }
         const hasRefreshJob =
-          (processingJob && jobQueue[0]?.type === "refresh-accounts") ||
+          currentJob?.type === "refresh-accounts" ||
           jobQueue.some((job) => job.type === "refresh-accounts");
         if (hasRefreshJob) {
           res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
@@ -415,14 +413,14 @@ if (PG_POOL_SIZE < 5) {
       });
 
       server.post("/account-webhook", async (req, res) => {
-        if (req.headers.authorization != HELIUS_AUTH_SECRET) {
+        if (req.headers.authorization !== HELIUS_AUTH_SECRET) {
           res.code(StatusCodes.FORBIDDEN).send({
             message: "Invalid authorization",
           });
           return;
         }
         const hasRefreshJob =
-          (processingJob && jobQueue[0]?.type === "refresh-accounts") ||
+          currentJob?.type === "refresh-accounts" ||
           jobQueue.some((job) => job.type === "refresh-accounts");
         if (hasRefreshJob) {
           res.code(StatusCodes.SERVICE_UNAVAILABLE).send({
@@ -438,28 +436,22 @@ if (PG_POOL_SIZE < 5) {
             for (const account of accounts) {
               const parsed = account["account"]["parsed"];
               const config = configs.find(
-                (x) => x.programId == parsed["owner"]
+                (x) => x.programId === parsed["owner"]
               );
 
               if (!config) {
-                // exit early if account doesn't need to be saved
-                res.code(StatusCodes.OK).send(ReasonPhrases.OK);
-                return;
+                continue;
               }
 
-              try {
-                await handleAccountWebhook({
-                  fastify: server,
-                  programId: new PublicKey(config.programId),
-                  accounts: config.accounts,
-                  account: parsed,
-                  pluginsByAccountType:
-                    pluginsByAccountTypeByProgram[parsed["owner"]] || {},
-                  block: undefined,
-                });
-              } catch (err) {
-                throw err;
-              }
+              await handleAccountWebhook({
+                fastify: server,
+                programId: new PublicKey(config.programId),
+                accounts: config.accounts,
+                account: parsed,
+                pluginsByAccountType:
+                  pluginsByAccountTypeByProgram[parsed["owner"]] || {},
+                block: undefined,
+              });
             }
           }
           res.code(StatusCodes.OK).send(ReasonPhrases.OK);
@@ -543,7 +535,7 @@ if (PG_POOL_SIZE < 5) {
               isDelete,
             } = JSON.parse(message.value.toString());
 
-            const config = configs.find((x) => x.programId == programId);
+            const config = configs.find((x) => x.programId === programId);
 
             if (config) {
               await handleAccountWebhook({

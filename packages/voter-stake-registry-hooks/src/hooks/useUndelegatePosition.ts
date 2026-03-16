@@ -28,7 +28,8 @@ export const useUndelegatePosition = ({
     [position.pubkey]
   );
   const delegationClaimBotK = useMemo(
-    () => delegationClaimBotKey(TASK_QUEUE, delegatedPosKey)[0]
+    () => delegationClaimBotKey(TASK_QUEUE, delegatedPosKey)[0],
+    [delegatedPosKey]
   );
   const { info: delegationClaimBot } =
     useDelegationClaimBot(delegationClaimBotK);

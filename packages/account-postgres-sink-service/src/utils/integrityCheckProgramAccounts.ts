@@ -425,7 +425,7 @@ export const integrityCheckProgramAccounts = async ({
 
               if (upserts.length > 0) {
                 await model.bulkCreate(upserts, {
-                  updateOnDuplicate: [...Object.keys(upserts[0])],
+                  updateOnDuplicate: Object.keys(upserts[0]),
                   transaction: t,
                 });
               }

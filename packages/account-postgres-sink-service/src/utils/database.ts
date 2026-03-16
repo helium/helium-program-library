@@ -20,14 +20,6 @@ export const database = new Sequelize({
     min: 5,
     acquire: 120000,
     idle: 30000,
-    validate: (client: any) => {
-      try {
-        client.query("SELECT 1");
-        return true;
-      } catch (err) {
-        return false;
-      }
-    },
   },
   dialectOptions: {
     statement_timeout: 300000,

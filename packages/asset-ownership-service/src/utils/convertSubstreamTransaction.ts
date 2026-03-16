@@ -1,12 +1,12 @@
 import {
-  AccountMeta,
   AddressLookupTableAccount,
   PublicKey,
-  TransactionInstruction,
-  TransactionMessage,
-  VersionedTransaction,
 } from "@solana/web3.js";
 import { provider } from "./solana";
+import { ProcessableInstruction } from "./processTransaction";
+
+const MAX_LOOKUP_TABLE_CACHE_SIZE = 500;
+const lookupTableCache = new Map<string, AddressLookupTableAccount>();
 
 const decodeBase64ToBuffer = (str: string): Buffer => {
   return Buffer.from(str, "base64");
@@ -16,45 +16,67 @@ const decodeBase64ToPublicKey = (str: string): PublicKey => {
   return new PublicKey(decodeBase64ToBuffer(str));
 };
 
-const getAdressLookupTableAccounts = async (
+const getAddressLookupTableAccounts = async (
   keys: string[]
-): Promise<AddressLookupTableAccount[]> => {
-  const connection = provider.connection;
-  const addressLookupTableAccountInfos =
-    await connection.getMultipleAccountsInfo(
-      keys.map((key) => new PublicKey(key))
+): Promise<Map<string, AddressLookupTableAccount>> => {
+  const result = new Map<string, AddressLookupTableAccount>();
+  const uncachedKeys: string[] = [];
+
+  for (const key of keys) {
+    const cached = lookupTableCache.get(key);
+    if (cached) {
+      result.set(key, cached);
+    } else {
+      uncachedKeys.push(key);
+    }
+  }
+
+  if (uncachedKeys.length > 0) {
+    const connection = provider.connection;
+    const accountInfos = await connection.getMultipleAccountsInfo(
+      uncachedKeys.map((key) => new PublicKey(key))
     );
 
-  return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
-    const addressLookupTableAddress = keys[index];
-    if (accountInfo) {
-      const addressLookupTableAccount = new AddressLookupTableAccount({
-        key: new PublicKey(addressLookupTableAddress),
-        state: AddressLookupTableAccount.deserialize(accountInfo.data),
-      });
-      acc.push(addressLookupTableAccount);
-    }
+    accountInfos.forEach((accountInfo, index) => {
+      const address = uncachedKeys[index];
+      if (accountInfo) {
+        const account = new AddressLookupTableAccount({
+          key: new PublicKey(address),
+          state: AddressLookupTableAccount.deserialize(accountInfo.data),
+        });
+        result.set(address, account);
 
-    return acc;
-  }, new Array<AddressLookupTableAccount>());
+        if (lookupTableCache.size >= MAX_LOOKUP_TABLE_CACHE_SIZE) {
+          lookupTableCache.clear();
+        }
+        lookupTableCache.set(address, account);
+      } else {
+        console.warn(`Lookup table ${address} returned null from RPC`);
+      }
+    });
+  }
+
+  return result;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function convertSubstreamTransaction(txInfo: any): Promise<
   | {
-      tx: VersionedTransaction;
-      addressLookupTableAccounts: AddressLookupTableAccount[];
+      accountKeys: PublicKey[];
+      instructions: ProcessableInstruction[];
     }
   | undefined
 > {
   if (!txInfo || !txInfo.transaction || !txInfo.transaction.message) {
+    console.warn("convertSubstreamTransaction: malformed input", {
+      hasTxInfo: !!txInfo,
+      hasTransaction: !!txInfo?.transaction,
+      hasMessage: !!txInfo?.transaction?.message,
+    });
     return undefined;
   }
 
-  const { signatures, message } = txInfo.transaction;
-  const sigs = signatures.map((sig: string) => decodeBase64ToBuffer(sig));
-  const recentBlockhash = decodeBase64ToBuffer(
-    message.recentBlockhash
-  ).toString("hex");
+  const { message } = txInfo.transaction;
 
   const accountKeys = message.accountKeys.map(decodeBase64ToPublicKey);
   accountKeys.forEach((key: PublicKey, idx: number) => {
@@ -63,23 +85,22 @@ export async function convertSubstreamTransaction(txInfo: any): Promise<
     }
   });
 
-  let addressLookupTableAccounts: AddressLookupTableAccount[] = [];
-  let lookupTableAddresses: string[] = [];
-  if (message.addressTableLookups && message.addressTableLookups.length > 0) {
-    lookupTableAddresses = message.addressTableLookups.map((lookup: any) =>
-      decodeBase64ToPublicKey(lookup.accountKey).toBase58()
-    );
-    addressLookupTableAccounts = await getAdressLookupTableAccounts(
-      lookupTableAddresses
-    );
-  }
-
   let extendedAccountKeys = [...accountKeys];
   if (message.addressTableLookups && message.addressTableLookups.length > 0) {
-    message.addressTableLookups.forEach((lookup: any, i: number) => {
-      const table = addressLookupTableAccounts[i];
+    const lookupTableAddresses = message.addressTableLookups.map(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (lookup: any) => decodeBase64ToPublicKey(lookup.accountKey).toBase58()
+    );
+    const lookupTableMap = await getAddressLookupTableAccounts(lookupTableAddresses);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    message.addressTableLookups.forEach((lookup: any) => {
+      const tableAddress = decodeBase64ToPublicKey(
+        lookup.accountKey
+      ).toBase58();
+      const table = lookupTableMap.get(tableAddress);
       if (!table) {
-        throw new Error(`Missing lookup table for index ${i}`);
+        throw new Error(`Missing lookup table ${tableAddress}`);
       }
       const writableIndexes = Array.from(
         decodeBase64ToBuffer(lookup.writableIndexes)
@@ -91,7 +112,7 @@ export async function convertSubstreamTransaction(txInfo: any): Promise<
         const addr = table.state.addresses[idx];
         if (!addr)
           throw new Error(
-            `No address at writable index ${idx} in lookup table ${i}`
+            `No address at writable index ${idx} in lookup table ${tableAddress}`
           );
         extendedAccountKeys.push(addr);
       });
@@ -99,72 +120,40 @@ export async function convertSubstreamTransaction(txInfo: any): Promise<
         const addr = table.state.addresses[idx];
         if (!addr)
           throw new Error(
-            `No address at readonly index ${idx} in lookup table ${i}`
+            `No address at readonly index ${idx} in lookup table ${tableAddress}`
           );
         extendedAccountKeys.push(addr);
       });
     });
   }
 
-  const instructions = message.instructions.map(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const instructions: ProcessableInstruction[] = message.instructions.map(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (instr: any, instrIdx: number) => {
-      const accountIndices: number[] = [];
+      const accountKeyIndexes: number[] = [];
       if (instr.accounts) {
         const buf = decodeBase64ToBuffer(instr.accounts);
         for (let i = 0; i < buf.length; i++) {
-          accountIndices.push(buf[i]);
+          accountKeyIndexes.push(buf[i]);
         }
       }
 
-      const keys: AccountMeta[] = accountIndices.map(
-        (accIndex: number, i: number) => {
-          if (accIndex < 0 || accIndex >= extendedAccountKeys.length) {
-            console.error(
-              `Instruction[${instrIdx}] accIndex ${accIndex} out of bounds (extendedAccountKeys.length=${extendedAccountKeys.length})`,
-              { accountIndices, extendedAccountKeys, instr }
-            );
-            throw new Error(
-              `Instruction[${instrIdx}] AccountMeta accIndex ${accIndex} out of bounds (extendedAccountKeys.length=${extendedAccountKeys.length})`
-            );
-          }
-          const pubkey = extendedAccountKeys[accIndex];
-          if (!pubkey) {
-            throw new Error(
-              `Instruction[${instrIdx}] AccountMeta pubkey is undefined for accIdx ${accIndex}`
-            );
-          }
-
-          return {
-            pubkey: pubkey,
-            isSigner: i < message.header.numRequiredSignatures,
-            isWritable: i < message.header.numReadonlySignedAccounts,
-          };
+      for (const accIndex of accountKeyIndexes) {
+        if (accIndex < 0 || accIndex >= extendedAccountKeys.length) {
+          throw new Error(
+            `Instruction[${instrIdx}] accountKeyIndex ${accIndex} out of bounds (extendedAccountKeys.length=${extendedAccountKeys.length})`
+          );
         }
-      );
-
-      const programId = extendedAccountKeys[instr.programIdIndex];
-      if (!programId) {
-        throw new Error(
-          `Instruction[${instrIdx}] programId is undefined for programIdIndex ${instr.programIdIndex}`
-        );
       }
 
-      return new TransactionInstruction({
-        keys,
-        programId,
+      return {
+        programIdIndex: instr.programIdIndex,
+        accountKeyIndexes,
         data: decodeBase64ToBuffer(instr.data),
-      });
+      };
     }
   );
 
-  const tx = new VersionedTransaction(
-    new TransactionMessage({
-      payerKey: provider.wallet.publicKey,
-      recentBlockhash,
-      instructions,
-    }).compileToV0Message(addressLookupTableAccounts)
-  );
-
-  tx.signatures = sigs;
-  return { tx, addressLookupTableAccounts };
+  return { accountKeys: extendedAccountKeys, instructions };
 }

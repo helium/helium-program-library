@@ -3,3 +3,4 @@ keypair.bin
 .env.local
 settings.toml
 target
+local.toml

@@ -34,8 +34,8 @@ export async function syncTableWithViews(
      JOIN pg_rewrite r ON r.oid = d.objid
      JOIN pg_class v ON v.oid = r.ev_class AND v.relkind = 'v'
      JOIN pg_namespace vn ON v.relnamespace = vn.oid
-     WHERE t.relname = '${tableName}'
-     AND tn.nspname = '${schemaName}'
+     WHERE t.relname = ${sequelize.escape(tableName)}
+     AND tn.nspname = ${sequelize.escape(schemaName)}
      AND t.relkind = 'r'
      AND vn.nspname NOT IN ('pg_catalog', 'information_schema')`,
     { type: QueryTypes.SELECT }
@@ -53,8 +53,8 @@ export async function syncTableWithViews(
      JOIN pg_rewrite r ON r.oid = d.objid
      JOIN pg_class v ON v.oid = r.ev_class AND v.relkind = 'm'
      JOIN pg_namespace vn ON v.relnamespace = vn.oid
-     WHERE t.relname = '${tableName}'
-     AND tn.nspname = '${schemaName}'
+     WHERE t.relname = ${sequelize.escape(tableName)}
+     AND tn.nspname = ${sequelize.escape(schemaName)}
      AND t.relkind = 'r'
      AND vn.nspname NOT IN ('pg_catalog', 'information_schema')`,
     { type: QueryTypes.SELECT }

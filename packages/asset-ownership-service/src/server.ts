@@ -89,6 +89,9 @@ if (PG_POOL_SIZE < 5) {
     }
 
     await Cursor.sync({ alter: true });
+
+    const processor = await TransactionProcessor.create();
+
     server.get("/refresh-owners", async (req, res) => {
       const { password } = req.query as any;
       if (password !== ADMIN_PASSWORD) {
@@ -113,6 +116,20 @@ if (PG_POOL_SIZE < 5) {
       res.code(StatusCodes.OK).send({
         refreshing: !!refreshing,
       });
+    });
+
+    server.get("/health", async (_req, res) => {
+      try {
+        await database.query("SELECT 1");
+        res.code(StatusCodes.OK).send({ status: "ok" });
+      } catch (err) {
+        res
+          .code(StatusCodes.SERVICE_UNAVAILABLE)
+          .send({
+            status: "unhealthy",
+            error: err instanceof Error ? err.message : String(err),
+          });
+      }
     });
 
     server.post<{ Body: { signature: string; password: string } }>(
@@ -140,7 +157,6 @@ if (PG_POOL_SIZE < 5) {
             return;
           }
 
-          const processor = await TransactionProcessor.create();
           const dbTx = await database.transaction();
 
           try {
@@ -216,7 +232,7 @@ if (PG_POOL_SIZE < 5) {
     }
 
     if (USE_SUBSTREAM) {
-      await setupSubstream(server).catch((err: any) => {
+      await setupSubstream(server, processor).catch((err: any) => {
         console.error("Fatal error in Substream connection:", err);
         process.exit(1);
       });

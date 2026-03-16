@@ -3,7 +3,12 @@ use anchor_lang::{
   prelude::*,
   solana_program::{instruction::Instruction, program::invoke_signed},
 };
-use bubblegum_cpi::bubblegum::program::Bubblegum;
+use bubblegum_cpi::{bubblegum::program::Bubblegum, get_asset_id};
+use lazy_distributor::{
+  cpi::{accounts::UpdateCompressionDestinationV0, update_compression_destination_v0},
+  program::LazyDistributor,
+  RecipientV0, UpdateCompressionDestinationArgsV0,
+};
 
 use crate::{error::ErrorCode, welcome_pack_seeds, UserWelcomePacksV0, WelcomePackV0};
 
@@ -16,6 +21,7 @@ pub struct CloseWelcomePackArgsV0 {
 }
 
 #[derive(Accounts)]
+#[instruction(args: CloseWelcomePackArgsV0)]
 pub struct CloseWelcomePackV0<'info> {
   pub owner: Signer<'info>,
   #[account(
@@ -49,6 +55,12 @@ pub struct CloseWelcomePackV0<'info> {
   pub compression_program: Program<'info, SplAccountCompression>,
   pub system_program: Program<'info, System>,
   pub bubblegum_program: Program<'info, Bubblegum>,
+  #[account(
+    mut,
+    constraint = recipient.asset == get_asset_id(&merkle_tree.key(), args.index as u64) @ ErrorCode::InvalidAsset
+  )]
+  pub recipient: Box<Account<'info, RecipientV0>>,
+  pub lazy_distributor_program: Program<'info, LazyDistributor>,
 }
 
 pub fn handler<'info>(
@@ -61,6 +73,29 @@ pub fn handler<'info>(
   }
 
   let welcome_pack = &mut ctx.accounts.welcome_pack;
+
+  // Reset reward destination to Pubkey::default() (system_program key) so rewards
+  // go back to the asset owner via the standard distribution path.
+  update_compression_destination_v0(
+    CpiContext::new_with_signer(
+      ctx.accounts.lazy_distributor_program.to_account_info(),
+      UpdateCompressionDestinationV0 {
+        owner: welcome_pack.to_account_info().clone(),
+        destination: ctx.accounts.system_program.to_account_info(),
+        merkle_tree: ctx.accounts.merkle_tree.clone(),
+        compression_program: ctx.accounts.compression_program.to_account_info(),
+        recipient: ctx.accounts.recipient.to_account_info(),
+      },
+      &[welcome_pack_seeds!(welcome_pack)],
+    )
+    .with_remaining_accounts(ctx.remaining_accounts.to_vec()),
+    UpdateCompressionDestinationArgsV0 {
+      data_hash: args.data_hash,
+      creator_hash: args.creator_hash,
+      root: args.root,
+      index: args.index,
+    },
+  )?;
 
   let remaining_accounts = ctx.remaining_accounts.to_vec();
   let transfer_accounts = bubblegum_cpi::bubblegum::cpi::accounts::Transfer {

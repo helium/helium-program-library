@@ -1,0 +1,1 @@
+export { governanceRouter } from "./router";

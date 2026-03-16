@@ -1,6 +1,6 @@
 [package]
 name = "welcome-pack"
-version = "0.0.2"
+version = "0.0.3"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -35,3 +35,4 @@ account-compression-cpi = { workspace = true }
 lazy-distributor = { workspace = true }
 tuktuk-program = { workspace = true }
 clockwork-cron = { workspace = true }
+
