@@ -177,20 +177,29 @@ pub async fn seed_mini_fanout(
 
 // --- Query runners ---
 
+async fn run_block_range_query(
+  pool: &PgPool,
+  sql: &str,
+  last_processed_block: i64,
+  max_block: i64,
+) -> Vec<Value> {
+  sqlx::query(sql)
+    .bind(last_processed_block)
+    .bind(max_block)
+    .fetch_all(pool)
+    .await
+    .expect("run query")
+    .into_iter()
+    .map(|row| row.get::<Value, _>("atomic_data"))
+    .collect()
+}
+
 pub async fn run_ownership_query(
   pool: &PgPool,
   last_processed_block: i64,
   max_block: i64,
 ) -> Vec<Value> {
-  sqlx::query(OWNERSHIP_SQL)
-    .bind(last_processed_block)
-    .bind(max_block)
-    .fetch_all(pool)
-    .await
-    .expect("run ownership query")
-    .into_iter()
-    .map(|row| row.get::<Value, _>("atomic_data"))
-    .collect()
+  run_block_range_query(pool, OWNERSHIP_SQL, last_processed_block, max_block).await
 }
 
 pub async fn run_reward_query(
@@ -198,15 +207,7 @@ pub async fn run_reward_query(
   last_processed_block: i64,
   max_block: i64,
 ) -> Vec<Value> {
-  sqlx::query(REWARD_SQL)
-    .bind(last_processed_block)
-    .bind(max_block)
-    .fetch_all(pool)
-    .await
-    .expect("run reward query")
-    .into_iter()
-    .map(|row| row.get::<Value, _>("atomic_data"))
-    .collect()
+  run_block_range_query(pool, REWARD_SQL, last_processed_block, max_block).await
 }
 
 pub async fn run_hotspot_query(
@@ -232,15 +233,7 @@ pub async fn run_wp_ownership_query(
   last_processed_block: i64,
   max_block: i64,
 ) -> Vec<Value> {
-  sqlx::query(WP_OWNERSHIP_SQL)
-    .bind(last_processed_block)
-    .bind(max_block)
-    .fetch_all(pool)
-    .await
-    .expect("run wp ownership query")
-    .into_iter()
-    .map(|row| row.get::<Value, _>("atomic_data"))
-    .collect()
+  run_block_range_query(pool, WP_OWNERSHIP_SQL, last_processed_block, max_block).await
 }
 
 pub async fn run_wp_reward_query(
@@ -248,13 +241,5 @@ pub async fn run_wp_reward_query(
   last_processed_block: i64,
   max_block: i64,
 ) -> Vec<Value> {
-  sqlx::query(WP_REWARD_SQL)
-    .bind(last_processed_block)
-    .bind(max_block)
-    .fetch_all(pool)
-    .await
-    .expect("run wp reward query")
-    .into_iter()
-    .map(|row| row.get::<Value, _>("atomic_data"))
-    .collect()
+  run_block_range_query(pool, WP_REWARD_SQL, last_processed_block, max_block).await
 }

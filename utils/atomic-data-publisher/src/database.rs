@@ -1010,15 +1010,6 @@ impl DatabaseClient {
     query_name: &str,
     parameters: &serde_json::Value,
   ) -> Result<Option<u64>> {
-    self.get_block_for_query(query_name, parameters, true).await
-  }
-
-  async fn get_block_for_query(
-    &self,
-    query_name: &str,
-    parameters: &serde_json::Value,
-    use_max: bool,
-  ) -> Result<Option<u64>> {
     let pool = self.get_pool().await;
     let block = match query_name {
       "construct_atomic_hotspots" => {
@@ -1031,26 +1022,12 @@ impl DatabaseClient {
             ))
           })?;
 
-        let (block, has_data) = match hotspot_type {
+        let query = match hotspot_type {
           "mobile" => {
-            let query = if use_max {
-              r#"SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
-            } else {
-              r#"SELECT COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
-            };
-            let row = sqlx::query(query).fetch_one(&*pool).await?;
-            let block_value = row.get::<i64, _>("block");
-            (block_value, block_value >= 0)
+            r#"SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
           }
           "iot" => {
-            let query = if use_max {
-              r#"SELECT COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1)::bigint as block"#
-            } else {
-              r#"SELECT COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos), -1)::bigint as block"#
-            };
-            let row = sqlx::query(query).fetch_one(&*pool).await?;
-            let block_value = row.get::<i64, _>("block");
-            (block_value, block_value >= 0)
+            r#"SELECT COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1)::bigint as block"#
           }
           _ => {
             return Err(anyhow::anyhow!(
@@ -1059,68 +1036,41 @@ impl DatabaseClient {
             ))
           }
         };
+        let row = sqlx::query(query).fetch_one(&*pool).await?;
+        let block_value = row.get::<i64, _>("block");
 
-        let operation = if use_max { "Max" } else { "Min" };
         debug!(
-          "{} last_block for {} hotspots: {}",
-          operation, hotspot_type, block
+          "Max last_block for {} hotspots: {}",
+          hotspot_type, block_value
         );
 
-        if has_data {
-          Some(block as u64)
+        if block_value >= 0 {
+          Some(block_value as u64)
         } else {
           None
         }
       }
-      "construct_entity_ownership_changes" => {
-        let query = if use_max {
-          r#"SELECT COALESCE((SELECT MAX(last_block) FROM asset_owners), -1)::bigint as block"#
-        } else {
-          r#"SELECT COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1)::bigint as block"#
+      "construct_entity_ownership_changes"
+      | "construct_welcome_pack_ownership"
+      | "construct_welcome_pack_reward_destination" => {
+        let table = match query_name {
+          "construct_entity_ownership_changes" => "asset_owners",
+          _ => "welcome_packs",
         };
-        let row = sqlx::query(query).fetch_one(&*pool).await?;
-
-        let block: i64 = row.get("block");
-        if block >= 0 {
-          Some(block as u64)
-        } else {
-          None
-        }
+        Self::max_block_for_table(&pool, table).await?
       }
       "construct_entity_reward_destination_changes" => {
-        let query = if use_max {
+        let row = sqlx::query(
           r#"
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
             COALESCE((SELECT MAX(last_block) FROM recipients), -1),
             COALESCE((SELECT MAX(last_block) FROM mini_fanouts), -1)
           )::bigint as block
-          "#
-        } else {
-          r#"
-          SELECT LEAST(
-            COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM recipients WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM mini_fanouts WHERE last_block >= 0), -1)
-          )::bigint as block
-          "#
-        };
-        let row = sqlx::query(query).fetch_one(&*pool).await?;
-
-        let block: i64 = row.get("block");
-        if block >= 0 {
-          Some(block as u64)
-        } else {
-          None
-        }
-      }
-      "construct_welcome_pack_ownership" | "construct_welcome_pack_reward_destination" => {
-        let query = if use_max {
-          r#"SELECT COALESCE((SELECT MAX(last_block) FROM welcome_packs), -1)::bigint as block"#
-        } else {
-          r#"SELECT COALESCE((SELECT MIN(last_block) FROM welcome_packs WHERE last_block >= 0), -1)::bigint as block"#
-        };
-        let row = sqlx::query(query).fetch_one(&*pool).await?;
+          "#,
+        )
+        .fetch_one(&*pool)
+        .await?;
 
         let block: i64 = row.get("block");
         if block >= 0 {
@@ -1135,13 +1085,34 @@ impl DatabaseClient {
       }
     };
 
-    let operation = if use_max { "Max" } else { "Min" };
     debug!(
-      "{} last_block for query '{}': {:?}",
-      operation, query_name, block
+      "Max last_block for query '{}': {:?}",
+      query_name, block
     );
 
     Ok(block)
+  }
+
+  async fn max_block_for_table(pool: &PgPool, table: &str) -> Result<Option<u64>> {
+    let query =
+      format!(r#"SELECT COALESCE((SELECT MAX(last_block) FROM {table}), -1)::bigint as block"#);
+    let row = sqlx::query(&query).fetch_one(pool).await?;
+    let block: i64 = row.get("block");
+    Ok(if block >= 0 { Some(block as u64) } else { None })
+  }
+
+  async fn next_block_for_table(
+    pool: &PgPool,
+    table: &str,
+    after_block: u64,
+  ) -> Result<Option<u64>> {
+    let query =
+      format!(r#"SELECT MIN(last_block)::bigint as block FROM {table} WHERE last_block > $1"#);
+    let row = sqlx::query(&query)
+      .bind(after_block as i64)
+      .fetch_one(pool)
+      .await?;
+    Ok(row.get::<Option<i64>, _>("block").map(|b| b as u64))
   }
 
   async fn get_next_data_block_after(
@@ -1187,17 +1158,14 @@ impl DatabaseClient {
 
         row.get::<Option<i64>, _>("block").map(|b| b as u64)
       }
-      "construct_entity_ownership_changes" => {
-        let query = r#"
-          SELECT MIN(last_block)::bigint as block FROM asset_owners WHERE last_block > $1
-        "#;
-
-        let row = sqlx::query(query)
-          .bind(after_block as i64)
-          .fetch_one(&*pool)
-          .await?;
-
-        row.get::<Option<i64>, _>("block").map(|b| b as u64)
+      "construct_entity_ownership_changes"
+      | "construct_welcome_pack_ownership"
+      | "construct_welcome_pack_reward_destination" => {
+        let table = match job.query_name.as_str() {
+          "construct_entity_ownership_changes" => "asset_owners",
+          _ => "welcome_packs",
+        };
+        Self::next_block_for_table(&pool, table, after_block).await?
       }
       "construct_entity_reward_destination_changes" => {
         let query = r#"
@@ -1209,17 +1177,6 @@ impl DatabaseClient {
             SELECT MIN(last_block) FROM mini_fanouts WHERE last_block > $1
           ) combined WHERE next_block IS NOT NULL
         "#;
-
-        let row = sqlx::query(query)
-          .bind(after_block as i64)
-          .fetch_one(&*pool)
-          .await?;
-
-        row.get::<Option<i64>, _>("block").map(|b| b as u64)
-      }
-      "construct_welcome_pack_ownership" | "construct_welcome_pack_reward_destination" => {
-        let query =
-          r#"SELECT MIN(last_block)::bigint as block FROM welcome_packs WHERE last_block > $1"#;
 
         let row = sqlx::query(query)
           .bind(after_block as i64)
