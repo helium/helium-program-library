@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.12](https://github.com/helium/helium-program-library/compare/v0.11.11...v0.11.12) (2026-03-17)
+
+
+### Bug Fixes
+
+* add periodic GC and null references in account-postgres-sink-service ([515686f](https://github.com/helium/helium-program-library/commit/515686f680086cd54f5b960345d631f3a401a570))
+* add throttled periodic GC to prevent OOM in asset-ownership-service ([c0a2ee8](https://github.com/helium/helium-program-library/commit/c0a2ee8abc61f7932f988b7c6b062e94c0d4960b))
+* address audit findings in asset-ownership-service ([066ae3c](https://github.com/helium/helium-program-library/commit/066ae3c8372bde1931f2257a5ec7e8d52bb87af3))
+* address remaining OOM in asset-ownership-service ([4829bd7](https://github.com/helium/helium-program-library/commit/4829bd7485094e8f9939e3e73cad125b0a8fe985))
+* filter out UTF-8 key_serialization KTAs in atomic-data-publisher ([a2529db](https://github.com/helium/helium-program-library/commit/a2529db922e911cbcc14495dd668cca8123f6ed1))
+* fire GC every 500 blocks unconditionally in asset-ownership-service ([448e894](https://github.com/helium/helium-program-library/commit/448e8945bb5cb02975f6e9d132421c7d28d86183))
+* guard asset_owners upserts with last_block check to prevent stale overwrites ([ccb16ea](https://github.com/helium/helium-program-library/commit/ccb16ea098509e0baf29f5610d04e4bf888a013e))
+* periodic stream reconnection and more frequent GC in asset-ownership-service ([40823b3](https://github.com/helium/helium-program-library/commit/40823b31e6652e045f8130791eb6d3e36c151bfe))
+* reduce memory pressure in asset-ownership and account-postgres-sink services ([2979240](https://github.com/helium/helium-program-library/commit/297924040ab088db4d4a8c8dee617257e3559253))
+* remove forced GC causing CPU throttle in asset-ownership-service ([b326a48](https://github.com/helium/helium-program-library/commit/b326a4880398b74b872783febe24f7deb4f65c9a))
+* remove hotspot table dependencies from entity ownership/reward destination queries ([#1144](https://github.com/helium/helium-program-library/issues/1144)) ([a1211b2](https://github.com/helium/helium-program-library/commit/a1211b2901ee5b3fdf36774ea97c680ea1e121af))
+* remove periodic reconnect causing session exhaustion in asset-ownership-service ([2872c83](https://github.com/helium/helium-program-library/commit/2872c831a504b42b68a6cb3f8e3a75564f52472a))
+* remove unbounded AccountFetchCache causing memory leak ([24cf9ea](https://github.com/helium/helium-program-library/commit/24cf9ea56a2d4aaacfddb6ace0e1c98108e9dad8))
+* resolve OOM in asset-ownership-service ([61c70de](https://github.com/helium/helium-program-library/commit/61c70ded334e73c64b67cb92c0450536b8de428a))
+
+
+### Features
+
+* add welcome pack correction jobs and integration tests ([#1151](https://github.com/helium/helium-program-library/issues/1151)) ([b9c97de](https://github.com/helium/helium-program-library/commit/b9c97dedeb5f21b32933eb232adb8240ad483630))
+* bulk conditional upsert for asset_owners in upsertOwners ([33681c2](https://github.com/helium/helium-program-library/commit/33681c2c9a2270bbeeedc2dd5633052e72c022f8))
+
+
+
+
+
 ## [0.11.11](https://github.com/helium/helium-program-library/compare/v0.11.10...v0.11.11) (2026-02-11)
 
 **Note:** Version bump only for package helium-program-library
