@@ -1336,6 +1336,9 @@ __metadata:
     why-is-node-running: ^3.2.2
     yaml: ^2.8.1
     zod: ^4.3.5
+  dependenciesMeta:
+    sqlite3:
+      optional: true
   languageName: unknown
   linkType: soft
 
