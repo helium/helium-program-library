@@ -25,6 +25,14 @@ impl AtomicHotspotQueries {
         "construct_entity_reward_destination_changes",
         include_str!("sql/construct_entity_reward_destination_changes.sql"),
       );
+      queries.insert(
+        "construct_welcome_pack_ownership",
+        include_str!("sql/construct_welcome_pack_ownership.sql"),
+      );
+      queries.insert(
+        "construct_welcome_pack_reward_destination",
+        include_str!("sql/construct_welcome_pack_reward_destination.sql"),
+      );
       queries
     })
   }
