@@ -4,17 +4,17 @@ use chrono::{Duration, Utc};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions},
-    PgPool, Row,
+  postgres::{PgConnectOptions, PgPoolOptions},
+  PgPool, Row,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    config::{DatabaseConfig, PollingJob},
-    errors::AtomicDataError,
-    metrics,
+  config::{DatabaseConfig, PollingJob},
+  errors::AtomicDataError,
+  metrics,
 };
 
 const MIN_CHUNK_SIZE: u64 = 50_000;
@@ -54,7 +54,11 @@ impl DatabaseClient {
     Arc::clone(&*self.pool.read().await)
   }
 
-  pub async fn new(config: &DatabaseConfig, polling_jobs: Vec<PollingJob>, dry_run: bool) -> Result<Self> {
+  pub async fn new(
+    config: &DatabaseConfig,
+    polling_jobs: Vec<PollingJob>,
+    dry_run: bool,
+  ) -> Result<Self> {
     Self::validate_database_config(config)?;
     Self::validate_polling_jobs(&polling_jobs)?;
 
@@ -97,7 +101,10 @@ impl DatabaseClient {
     connect_options = connect_options
       .application_name("atomic-data-publisher")
       .options([
-        ("statement_timeout", statement_timeout_ms.to_string().as_str()),
+        (
+          "statement_timeout",
+          statement_timeout_ms.to_string().as_str(),
+        ),
         ("lock_timeout", lock_timeout_ms.to_string().as_str()),
         ("tcp_keepalives_idle", "60"),
         ("tcp_keepalives_interval", "10"),
@@ -113,7 +120,7 @@ impl DatabaseClient {
             iam_safe_lifetime, iam_safe_idle);
       (
         std::cmp::min(config.max_lifetime_seconds, iam_safe_lifetime),
-        std::cmp::min(config.idle_timeout_seconds, iam_safe_idle)
+        std::cmp::min(config.idle_timeout_seconds, iam_safe_idle),
       )
     } else {
       (config.max_lifetime_seconds, config.idle_timeout_seconds)
@@ -166,11 +173,17 @@ impl DatabaseClient {
               debug!("Old database pool closed");
             });
 
-            info!("Database pool refreshed successfully on attempt {}", attempt);
+            info!(
+              "Database pool refreshed successfully on attempt {}",
+              attempt
+            );
             return Ok(());
           }
           Err(e) => {
-            warn!("Failed to refresh database pool (attempt {}): {}", attempt, e);
+            warn!(
+              "Failed to refresh database pool (attempt {}): {}",
+              attempt, e
+            );
             last_error = Some(e);
             if attempt < 3 {
               tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
@@ -243,7 +256,10 @@ impl DatabaseClient {
       anyhow::bail!("Database port cannot be zero");
     }
     if config.max_connections == 0 {
-      anyhow::bail!("Database max_connections must be greater than 0, got: {}", config.max_connections);
+      anyhow::bail!(
+        "Database max_connections must be greater than 0, got: {}",
+        config.max_connections
+      );
     }
     if config.max_connections < config.min_connections {
       anyhow::bail!(
@@ -282,7 +298,12 @@ impl DatabaseClient {
 
       // Validate query name exists
       if let Err(e) = crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name) {
-        anyhow::bail!("Job '{}' (index {}): query validation failed: {}", job.name, index, e);
+        anyhow::bail!(
+          "Job '{}' (index {}): query validation failed: {}",
+          job.name,
+          index,
+          e
+        );
       }
 
       // Query-specific parameter validation
@@ -295,7 +316,11 @@ impl DatabaseClient {
 
       // Validate change_type parameter exists for all jobs
       if job.parameters.get("change_type").is_none() {
-        anyhow::bail!("Job '{}' (index {}): change_type parameter is required", job.name, index);
+        anyhow::bail!(
+          "Job '{}' (index {}): change_type parameter is required",
+          job.name,
+          index
+        );
       }
     }
 
@@ -370,19 +395,25 @@ impl DatabaseClient {
       )
     "#;
 
-    sqlx::query(create_failed_records_table).execute(&*pool).await?;
+    sqlx::query(create_failed_records_table)
+      .execute(&*pool)
+      .await?;
 
     let create_failed_records_index = r#"
       CREATE INDEX IF NOT EXISTS idx_failed_records_lookup
       ON atomic_data_failed_records (job_name, query_name, record_hash)
     "#;
-    sqlx::query(create_failed_records_index).execute(&*pool).await?;
+    sqlx::query(create_failed_records_index)
+      .execute(&*pool)
+      .await?;
 
     let create_failed_records_time_index = r#"
       CREATE INDEX IF NOT EXISTS idx_failed_records_last_failed
       ON atomic_data_failed_records (last_failed_at)
     "#;
-    sqlx::query(create_failed_records_time_index).execute(&*pool).await?;
+    sqlx::query(create_failed_records_time_index)
+      .execute(&*pool)
+      .await?;
 
     info!("Created or verified atomic_data_failed_records table");
 
@@ -545,7 +576,9 @@ impl DatabaseClient {
     }
 
     let last_processed_block_u64 = last_processed_block_opt.unwrap_or(0) as u64;
-    let next_data_block = self.get_next_data_block_after(job, last_processed_block_u64).await?;
+    let next_data_block = self
+      .get_next_data_block_after(job, last_processed_block_u64)
+      .await?;
 
     let target_block = if let Some(next_block) = next_data_block {
       let gap_size = next_block.saturating_sub(last_processed_block_u64);
@@ -591,7 +624,10 @@ impl DatabaseClient {
 
   /// Get the polling bounds (last processed block and max available block) for a job
   /// Returns (last_processed_block as Option<i64> from DB, max_available_block as u64)
-  async fn get_polling_bounds(&self, job: &PollingJob) -> Result<(Option<i64>, u64), AtomicDataError> {
+  async fn get_polling_bounds(
+    &self,
+    job: &PollingJob,
+  ) -> Result<(Option<i64>, u64), AtomicDataError> {
     let pool = self.get_pool().await;
     let current_state_row = sqlx::query(
       r#"
@@ -692,13 +728,17 @@ impl DatabaseClient {
     let query_start = std::time::Instant::now();
     let rows = tokio::time::timeout(
       std::time::Duration::from_secs(self.config.statement_timeout_seconds),
-      self.execute_query_inner(job, query, last_processed_block, target_block, &pool)
+      self.execute_query_inner(job, query, last_processed_block, target_block, &pool),
     )
     .await
     .map_err(|_| {
       error!(
         "Query timeout after {}s for job '{}' query '{}' (blocks {} to {})",
-        self.config.statement_timeout_seconds, job.name, job.query_name, last_processed_block, target_block
+        self.config.statement_timeout_seconds,
+        job.name,
+        job.query_name,
+        last_processed_block,
+        target_block
       );
       AtomicDataError::DatabaseError(sqlx::Error::PoolTimedOut)
     })??;
@@ -724,7 +764,11 @@ impl DatabaseClient {
     } else {
       target_block.saturating_sub(last_processed_block as u64)
     };
-    let last_block_display = if last_processed_block < 0 { "NULL".to_string() } else { last_processed_block.to_string() };
+    let last_block_display = if last_processed_block < 0 {
+      "NULL".to_string()
+    } else {
+      last_processed_block.to_string()
+    };
 
     if job.query_name == "construct_atomic_hotspots" {
       let hotspot_type = job
@@ -836,7 +880,11 @@ impl DatabaseClient {
           .advance_block_for_job(&job.name, &job.query_name, target_block)
           .await?;
 
-        let block_type = if self.dry_run { "dry_run_last_processed_block" } else { "last_processed_block" };
+        let block_type = if self.dry_run {
+          "dry_run_last_processed_block"
+        } else {
+          "last_processed_block"
+        };
         info!(
           "Updated polling state for job '{}' query '{}': {} -> {} (target height)",
           job.name, job.query_name, block_type, target_block
@@ -890,7 +938,11 @@ impl DatabaseClient {
       .execute(&*pool)
       .await?;
 
-    let block_type = if self.dry_run { "dry_run_last_processed_block" } else { "last_processed_block" };
+    let block_type = if self.dry_run {
+      "dry_run_last_processed_block"
+    } else {
+      "last_processed_block"
+    };
     debug!(
       "Advanced {} to {} for job '{}' query '{}' (no changes found, skipping gap)",
       block_type, target_block, job_name, query_name
@@ -946,7 +998,7 @@ impl DatabaseClient {
     let pool = self.get_pool().await;
     tokio::time::timeout(
       std::time::Duration::from_secs(5),
-      sqlx::query("SELECT 1").execute(&*pool)
+      sqlx::query("SELECT 1").execute(&*pool),
     )
     .await
     .map_err(|_| anyhow::anyhow!("Database connection test timed out"))??;
@@ -957,15 +1009,6 @@ impl DatabaseClient {
     &self,
     query_name: &str,
     parameters: &serde_json::Value,
-  ) -> Result<Option<u64>> {
-    self.get_block_for_query(query_name, parameters, true).await
-  }
-
-  async fn get_block_for_query(
-    &self,
-    query_name: &str,
-    parameters: &serde_json::Value,
-    use_max: bool,
   ) -> Result<Option<u64>> {
     let pool = self.get_pool().await;
     let block = match query_name {
@@ -979,26 +1022,12 @@ impl DatabaseClient {
             ))
           })?;
 
-        let (block, has_data) = match hotspot_type {
+        let query = match hotspot_type {
           "mobile" => {
-            let query = if use_max {
-              r#"SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
-            } else {
-              r#"SELECT COALESCE((SELECT MIN(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
-            };
-            let row = sqlx::query(query).fetch_one(&*pool).await?;
-            let block_value = row.get::<i64, _>("block");
-            (block_value, block_value >= 0)
+            r#"SELECT COALESCE((SELECT MAX(last_block) FROM mobile_hotspot_infos), -1)::bigint as block"#
           }
           "iot" => {
-            let query = if use_max {
-              r#"SELECT COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1)::bigint as block"#
-            } else {
-              r#"SELECT COALESCE((SELECT MIN(last_block) FROM iot_hotspot_infos), -1)::bigint as block"#
-            };
-            let row = sqlx::query(query).fetch_one(&*pool).await?;
-            let block_value = row.get::<i64, _>("block");
-            (block_value, block_value >= 0)
+            r#"SELECT COALESCE((SELECT MAX(last_block) FROM iot_hotspot_infos), -1)::bigint as block"#
           }
           _ => {
             return Err(anyhow::anyhow!(
@@ -1007,53 +1036,41 @@ impl DatabaseClient {
             ))
           }
         };
+        let row = sqlx::query(query).fetch_one(&*pool).await?;
+        let block_value = row.get::<i64, _>("block");
 
-        let operation = if use_max { "Max" } else { "Min" };
         debug!(
-          "{} last_block for {} hotspots: {}",
-          operation, hotspot_type, block
+          "Max last_block for {} hotspots: {}",
+          hotspot_type, block_value
         );
 
-        if has_data {
-          Some(block as u64)
+        if block_value >= 0 {
+          Some(block_value as u64)
         } else {
           None
         }
       }
-      "construct_entity_ownership_changes" => {
-        let query = if use_max {
-          r#"SELECT COALESCE((SELECT MAX(last_block) FROM asset_owners), -1)::bigint as block"#
-        } else {
-          r#"SELECT COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1)::bigint as block"#
+      "construct_entity_ownership_changes"
+      | "construct_welcome_pack_ownership"
+      | "construct_welcome_pack_reward_destination" => {
+        let table = match query_name {
+          "construct_entity_ownership_changes" => "asset_owners",
+          _ => "welcome_packs",
         };
-        let row = sqlx::query(query).fetch_one(&*pool).await?;
-
-        let block: i64 = row.get("block");
-        if block >= 0 {
-          Some(block as u64)
-        } else {
-          None
-        }
+        Self::max_block_for_table(&pool, table).await?
       }
       "construct_entity_reward_destination_changes" => {
-        let query = if use_max {
+        let row = sqlx::query(
           r#"
           SELECT GREATEST(
             COALESCE((SELECT MAX(last_block) FROM asset_owners), -1),
             COALESCE((SELECT MAX(last_block) FROM recipients), -1),
             COALESCE((SELECT MAX(last_block) FROM mini_fanouts), -1)
           )::bigint as block
-          "#
-        } else {
-          r#"
-          SELECT LEAST(
-            COALESCE((SELECT MIN(last_block) FROM asset_owners WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM recipients WHERE last_block >= 0), -1),
-            COALESCE((SELECT MIN(last_block) FROM mini_fanouts WHERE last_block >= 0), -1)
-          )::bigint as block
-          "#
-        };
-        let row = sqlx::query(query).fetch_one(&*pool).await?;
+          "#,
+        )
+        .fetch_one(&*pool)
+        .await?;
 
         let block: i64 = row.get("block");
         if block >= 0 {
@@ -1068,13 +1085,34 @@ impl DatabaseClient {
       }
     };
 
-    let operation = if use_max { "Max" } else { "Min" };
     debug!(
-      "{} last_block for query '{}': {:?}",
-      operation, query_name, block
+      "Max last_block for query '{}': {:?}",
+      query_name, block
     );
 
     Ok(block)
+  }
+
+  async fn max_block_for_table(pool: &PgPool, table: &str) -> Result<Option<u64>> {
+    let query =
+      format!(r#"SELECT COALESCE((SELECT MAX(last_block) FROM {table}), -1)::bigint as block"#);
+    let row = sqlx::query(&query).fetch_one(pool).await?;
+    let block: i64 = row.get("block");
+    Ok(if block >= 0 { Some(block as u64) } else { None })
+  }
+
+  async fn next_block_for_table(
+    pool: &PgPool,
+    table: &str,
+    after_block: u64,
+  ) -> Result<Option<u64>> {
+    let query =
+      format!(r#"SELECT MIN(last_block)::bigint as block FROM {table} WHERE last_block > $1"#);
+    let row = sqlx::query(&query)
+      .bind(after_block as i64)
+      .fetch_one(pool)
+      .await?;
+    Ok(row.get::<Option<i64>, _>("block").map(|b| b as u64))
   }
 
   async fn get_next_data_block_after(
@@ -1085,7 +1123,8 @@ impl DatabaseClient {
     let pool = self.get_pool().await;
     let block = match job.query_name.as_str() {
       "construct_atomic_hotspots" => {
-        let hotspot_type = job.parameters
+        let hotspot_type = job
+          .parameters
           .get("hotspot_type")
           .and_then(|v| v.as_str())
           .ok_or_else(|| {
@@ -1102,10 +1141,13 @@ impl DatabaseClient {
             r#"SELECT MIN(last_block)::bigint as block FROM iot_hotspot_infos WHERE last_block > $1"#
           }
           _ => {
-            return Err(anyhow::anyhow!(
-              "Invalid hotspot_type: '{}'. Must be 'mobile' or 'iot'",
-              hotspot_type
-            ).into())
+            return Err(
+              anyhow::anyhow!(
+                "Invalid hotspot_type: '{}'. Must be 'mobile' or 'iot'",
+                hotspot_type
+              )
+              .into(),
+            )
           }
         };
 
@@ -1116,17 +1158,14 @@ impl DatabaseClient {
 
         row.get::<Option<i64>, _>("block").map(|b| b as u64)
       }
-      "construct_entity_ownership_changes" => {
-        let query = r#"
-          SELECT MIN(last_block)::bigint as block FROM asset_owners WHERE last_block > $1
-        "#;
-
-        let row = sqlx::query(query)
-          .bind(after_block as i64)
-          .fetch_one(&*pool)
-          .await?;
-
-        row.get::<Option<i64>, _>("block").map(|b| b as u64)
+      "construct_entity_ownership_changes"
+      | "construct_welcome_pack_ownership"
+      | "construct_welcome_pack_reward_destination" => {
+        let table = match job.query_name.as_str() {
+          "construct_entity_ownership_changes" => "asset_owners",
+          _ => "welcome_packs",
+        };
+        Self::next_block_for_table(&pool, table, after_block).await?
       }
       "construct_entity_reward_destination_changes" => {
         let query = r#"
@@ -1147,7 +1186,10 @@ impl DatabaseClient {
         row.get::<Option<i64>, _>("block").map(|b| b as u64)
       }
       _ => {
-        debug!("Unknown query name for next block lookup: {}", job.query_name);
+        debug!(
+          "Unknown query name for next block lookup: {}",
+          job.query_name
+        );
         None
       }
     };
@@ -1411,7 +1453,11 @@ impl DatabaseClient {
           backfill_count += 1;
         }
 
-        let job_type = if is_caught_up { "caught up" } else { "backfilling" };
+        let job_type = if is_caught_up {
+          "caught up"
+        } else {
+          "backfilling"
+        };
         warn!(
           "Marking job '{}' query '{}' for cleanup - {} but running for {:.1}min (last_processed: {:?}, last_max: {:?})",
           job_name, query_name, job_type, minutes_running.unwrap_or(0.0), last_processed, last_max
@@ -1441,7 +1487,9 @@ impl DatabaseClient {
 
       warn!(
         "Cleaned up {} stale job(s): {} caught-up (>10min), {} backfilling (>30min)",
-        jobs_to_cleanup.len(), caught_up_count, backfill_count
+        jobs_to_cleanup.len(),
+        caught_up_count,
+        backfill_count
       );
     }
 
@@ -1575,7 +1623,9 @@ impl DatabaseClient {
 
     debug!(
       "Logged failed record for job '{}' (hash: {}, error: {})",
-      record.job_name, &record_hash[..8], error_type
+      record.job_name,
+      &record_hash[..8],
+      error_type
     );
 
     Ok(())

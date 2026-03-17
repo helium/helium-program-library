@@ -8,12 +8,8 @@ use tracing::{debug, error, info, warn};
 use triggered::{trigger, Listener, Trigger};
 
 use crate::{
-  config::Settings,
-  database::DatabaseClient,
-  errors::AtomicDataError,
-  health_service::HealthService,
-  metrics,
-  polling_service::PollingService,
+  config::Settings, database::DatabaseClient, errors::AtomicDataError,
+  health_service::HealthService, metrics, polling_service::PollingService,
   publisher::AtomicDataPublisher as Publisher,
 };
 
