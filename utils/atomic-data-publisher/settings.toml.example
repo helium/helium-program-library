@@ -37,3 +37,13 @@ name = "entity_reward_destination_changes"
 query_name = "construct_entity_reward_destination_changes"
 parameters = { change_type = "entity_reward_destination" }
 
+[[service.polling_jobs]]
+name = "welcome_pack_ownership"
+query_name = "construct_welcome_pack_ownership"
+parameters = { change_type = "entity_ownership" }
+
+[[service.polling_jobs]]
+name = "welcome_pack_reward_destination"
+query_name = "construct_welcome_pack_reward_destination"
+parameters = { change_type = "entity_reward_destination" }
+

@@ -1,4 +1,4 @@
-# ===================================
+e# ===================================
 # Static Configuration
 # ===================================
 # This file defines polling jobs and required database tables.
@@ -46,4 +46,3 @@ parameters = { change_type = "entity_ownership" }
 name = "welcome_pack_reward_destination"
 query_name = "construct_welcome_pack_reward_destination"
 parameters = { change_type = "entity_reward_destination" }
-
