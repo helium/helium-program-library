@@ -125,12 +125,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@npm:^0.11.11":
-  version: 0.11.11
-  resolution: "@helium/account-fetch-cache@npm:0.11.11"
+"@helium/account-fetch-cache@npm:^0.11.12":
+  version: 0.11.12
+  resolution: "@helium/account-fetch-cache@npm:0.11.12"
   dependencies:
     "@solana/web3.js": ^1.91.1
-  checksum: 50141aae58b7755aede2f6411459a54616f802d4b3b76897a6929b58ae191dd957f29b021bc9f42797921c84a610e1db3024adde554f6e0fa7e8998f31a932b5
+  checksum: 1a8f774bfbf185ba0e13d3614460eb102d13be45c6fbc66b51fbf1586b2ce203fc2884bfa132dfd6ffa402321ecf7011a2a11c81c244fa09810e4e0a30b67a1d
   languageName: node
   linkType: hard
 
@@ -145,15 +145,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@npm:^0.11.11":
-  version: 0.11.11
-  resolution: "@helium/anchor-resolvers@npm:0.11.11"
+"@helium/anchor-resolvers@npm:^0.11.12":
+  version: 0.11.12
+  resolution: "@helium/anchor-resolvers@npm:0.11.12"
   dependencies:
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
   peerDependencies:
     "@coral-xyz/anchor": ^0.31.0
-  checksum: 50c73275d75a0d0ac02513b95c7372be464b10632cf66837bfb65b40c1586266564db64b96d9038bd5449cb735bcfb7f1bddf625d09ecbd533dfd505ce7c79aa
+  checksum: 8fdb53e89c6c2c78da57a9b1aa108f56117b06626b06fdda04f2e9b44e78b5192b788a866fca5bdff85204646997bc556d449cd40a73236ce9760f12dc07b4d4
   languageName: node
   linkType: hard
 
@@ -163,10 +163,10 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.11.11
+    "@helium/account-fetch-cache": ^0.11.12
     "@helium/address": ^4.12.0
-    "@helium/fanout-sdk": ^0.11.11
-    "@helium/spl-utils": ^0.11.11
+    "@helium/fanout-sdk": ^0.11.12
+    "@helium/spl-utils": ^0.11.12
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -184,41 +184,41 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@helium/fanout-sdk@npm:^0.11.11":
-  version: 0.11.11
-  resolution: "@helium/fanout-sdk@npm:0.11.11"
+"@helium/fanout-sdk@npm:^0.11.12":
+  version: 0.11.12
+  resolution: "@helium/fanout-sdk@npm:0.11.12"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.11.11
-    "@helium/idls": ^0.11.11
-    "@helium/spl-utils": ^0.11.11
+    "@helium/anchor-resolvers": ^0.11.12
+    "@helium/idls": ^0.11.12
+    "@helium/spl-utils": ^0.11.12
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 0a7deea95c3fd2df711fe1ab4cabe6405b7c7fb70a45c0575f31e9ea81b7fae096a116c63e397e20027ef0b0969d93535c62c443eaaf65e199a8a56a48d3d0eb
+  checksum: e314950615d78a3fef2abf08b65a56313d772d6cfd9e3cffe1d8a222aeacfc3840cf620bfb106102676ea57ee3c835861dad4023e4badacefde57f975be87b98
   languageName: node
   linkType: hard
 
-"@helium/idls@npm:^0.11.11":
-  version: 0.11.11
-  resolution: "@helium/idls@npm:0.11.11"
+"@helium/idls@npm:^0.11.12":
+  version: 0.11.12
+  resolution: "@helium/idls@npm:0.11.12"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@solana/web3.js": ^1.91.1
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: ebd69f63ad37ad74f4e386416192899c6cf18a2b1887dcf31c0b9fa00dd2da7dc57f1f316191ade698d5aa42604c2e21baa644fdfadf792d1c84c7048716a5b1
+  checksum: dc7c847b1a8e3d81278b76d6273ce4ce06eb9fecdfa81bed87ae2c53ea1719159e1deb2b7139255b3f65720a56a37ab97d4c552fe582da6cc57b4775c7bfe10a
   languageName: node
   linkType: hard
 
-"@helium/spl-utils@npm:^0.11.11":
-  version: 0.11.11
-  resolution: "@helium/spl-utils@npm:0.11.11"
+"@helium/spl-utils@npm:^0.11.12":
+  version: 0.11.12
+  resolution: "@helium/spl-utils@npm:0.11.12"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/account-fetch-cache": ^0.11.11
+    "@helium/account-fetch-cache": ^0.11.12
     "@helium/address": ^4.12.0
-    "@helium/anchor-resolvers": ^0.11.11
+    "@helium/anchor-resolvers": ^0.11.12
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -227,7 +227,7 @@ __metadata:
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: 40d927f94254844b68770f3b7432444d5edd6a4e17569e6d564e17c60cdf76afc464726c2d528cec0cd9a84ded3b57d815d91a2a20ad7f56cf132103e38260d5
+  checksum: 8f2f58489dc95825fe71b52da82c3e2e7dfe510bbd2083dc1406b57ce326cc129975169000d3bb31f57c2b9d9d4f73b7845c4d9eac15beeb1d194fae065fda7c
   languageName: node
   linkType: hard
 
