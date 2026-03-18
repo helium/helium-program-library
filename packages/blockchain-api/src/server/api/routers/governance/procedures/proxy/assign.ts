@@ -342,6 +342,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         transactions,
         parallel: true,
         tag,
+        actionMetadata: { type: "proxy_assign", proxyKey, positionCount: positionMints.length },
       },
       hasMore,
       estimatedSolFee: toTokenAmountOutput(

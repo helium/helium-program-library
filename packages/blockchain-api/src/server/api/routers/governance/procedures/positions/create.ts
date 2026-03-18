@@ -342,6 +342,7 @@ export const create = publicProcedure.governance.createPosition.handler(
         transactions,
         parallel: false,
         tag,
+        actionMetadata: { type: "position_create", tokenMint: tokenAmount.mint, amount: tokenAmount.amount, lockupKind, lockupPeriodDays: lockupPeriodsInDays },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

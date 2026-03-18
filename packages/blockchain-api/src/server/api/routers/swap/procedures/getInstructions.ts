@@ -152,11 +152,16 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
           metadata: {
             type: "swap",
             description: `Swap ${quoteResponse.inAmount} ${quoteResponse.inputMint} for ${quoteResponse.outAmount} ${quoteResponse.outputMint}`,
+            inputMint: quoteResponse.inputMint,
+            outputMint: quoteResponse.outputMint,
+            inputAmount: quoteResponse.inAmount,
+            outputAmount: quoteResponse.outAmount,
           },
         },
       ],
       parallel: false,
       tag,
+      actionMetadata: { type: "swap", inputMint: quoteResponse.inputMint, outputMint: quoteResponse.outputMint, inputAmount: quoteResponse.inAmount, outputAmount: quoteResponse.outAmount },
     };
   },
 );

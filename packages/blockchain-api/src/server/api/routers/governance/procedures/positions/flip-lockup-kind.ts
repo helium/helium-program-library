@@ -132,6 +132,7 @@ export const flipLockupKind = publicProcedure.governance.flipLockupKind.handler(
         ],
         parallel: false,
         tag,
+        actionMetadata: { type: "position_flip_lockup", positionMint },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFee),

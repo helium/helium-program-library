@@ -284,6 +284,7 @@ export const updateHotspotInfo =
           transactions,
           parallel: false,
           tag,
+          actionMetadata: { type: "hotspot_update", hotspotKey: entityPubKey, deviceType: input.info?.type },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(totalFee),

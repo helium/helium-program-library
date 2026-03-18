@@ -133,6 +133,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
         })),
         parallel: false,
         tag: `close_automation:${walletAddress}`,
+        actionMetadata: { type: "close_automation" },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFees),

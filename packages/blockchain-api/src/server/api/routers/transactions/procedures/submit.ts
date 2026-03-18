@@ -15,8 +15,14 @@ import { publicProcedure } from "../../../procedures";
  */
 export const submit = publicProcedure.transactions.submit.handler(
   async ({ input, errors }) => {
-    const { transactions, parallel, tag, simulationCommitment, simulate } =
-      input;
+    const {
+      transactions,
+      parallel,
+      tag,
+      actionMetadata,
+      simulationCommitment,
+      simulate,
+    } = input;
 
     if (
       !transactions ||
@@ -207,6 +213,12 @@ export const submit = publicProcedure.transactions.submit.handler(
 
     try {
       // Create the batch record
+      // Derive actionType from first transaction metadata or actionMetadata
+      const actionType =
+        (actionMetadata?.type as string) ||
+        transactions[0]?.metadata?.type ||
+        undefined;
+
       await TransactionBatch.create(
         {
           id: result.batchId,
@@ -217,6 +229,8 @@ export const submit = publicProcedure.transactions.submit.handler(
           cluster,
           tag,
           payer,
+          actionType,
+          actionMetadata,
         },
         { transaction: dbTransaction },
       );

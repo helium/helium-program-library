@@ -66,6 +66,12 @@ describe("welcome-pack", () => {
       result?.transactionData?.transactions?.[0]?.serializedTransaction,
     ).to.be.a("string");
     expect(result?.welcomePack?.address).to.be.a("string");
+
+    // Verify batch-level actionMetadata
+    expect(result.transactionData.actionMetadata).to.deep.include({
+      type: "welcome_pack_create",
+      assetId: "CKesVwoY6mfc7iyjzYTKvigjcWoGZgnvEAX1UaGr7o89",
+    });
     // Verify response welcomePack shape matches request expectations
     expect(result.welcomePack.owner).to.equal(walletAddress);
     expect(result.welcomePack.asset).to.equal(

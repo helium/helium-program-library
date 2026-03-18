@@ -80,6 +80,17 @@ describe("update-rewards-destination", () => {
       "Update rewards destination"
     );
 
+    // Verify enriched per-transaction metadata
+    expect(txData.metadata?.hotspotKey).to.equal(assetId);
+    expect(txData.metadata?.destination).to.equal(destination);
+
+    // Verify batch-level actionMetadata
+    expect(result.transactionData.actionMetadata).to.deep.include({
+      type: "update_rewards_destination",
+      hotspotKey: assetId,
+      destination,
+    });
+
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,

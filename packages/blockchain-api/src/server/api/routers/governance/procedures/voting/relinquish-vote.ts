@@ -241,6 +241,7 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
         transactions,
         parallel: true,
         tag,
+        actionMetadata: { type: "voting_relinquish", proposalKey, choice, positionCount: positionMints.length },
       },
       hasMore,
       estimatedSolFee: toTokenAmountOutput(

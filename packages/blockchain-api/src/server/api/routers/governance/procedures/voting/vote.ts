@@ -388,6 +388,7 @@ export const vote = publicProcedure.governance.vote.handler(
         transactions,
         parallel: true,
         tag,
+        actionMetadata: { type: "voting_vote", proposalKey, choice, positionCount: positionMints.length },
       },
       hasMore,
       estimatedSolFee: toTokenAmountOutput(

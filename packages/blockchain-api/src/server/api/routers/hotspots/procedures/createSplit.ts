@@ -247,10 +247,13 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
           metadata: {
             type: "add_split",
             description: "Create split",
+            hotspotKey: assetId,
+            recipients: rewardsSplit.map((s) => s.address),
           },
         })),
         parallel: true,
         tag,
+        actionMetadata: { type: "add_split", hotspotKey: assetId, recipientCount: rewardsSplit.length },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

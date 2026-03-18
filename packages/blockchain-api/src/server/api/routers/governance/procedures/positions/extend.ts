@@ -105,6 +105,7 @@ export const extend = publicProcedure.governance.extendPosition.handler(
         ],
         parallel: false,
         tag,
+        actionMetadata: { type: "position_extend", positionMint, lockupPeriodDays: lockupPeriodsInDays },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFee),

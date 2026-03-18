@@ -135,6 +135,7 @@ export const claimRewards =
           transactions,
           parallel: false,
           tag,
+          actionMetadata: { type: "delegation_claim_rewards", positionCount: positionMints.length },
         },
         hasMore: claimResult.hasMore || batchHasMore,
         estimatedSolFee: toTokenAmountOutput(

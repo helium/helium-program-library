@@ -37,6 +37,7 @@ import {
 import axios from "axios";
 import { inflate } from "pako";
 import { convertLegacyIdl } from "./convertLegacyIdl";
+export { convertLegacyIdl } from "./convertLegacyIdl";
 
 const BUBBLEGUM_PROGRAM_ID = new PublicKey(
   "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"

@@ -106,6 +106,7 @@ export const deletePack = publicProcedure.welcomePacks.delete.handler(
         ],
         parallel: true,
         tag,
+        actionMetadata: { type: "welcome_pack_delete", packId },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFee),
