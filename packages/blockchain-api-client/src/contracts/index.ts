@@ -36,6 +36,7 @@ export const apiContract = oc.router({
   swap: swapContract,
   transactions: transactionsContract,
   welcomePacks: welcomePacksContract,
+  migration: migrationContract,
 });
 
 /**
