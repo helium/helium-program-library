@@ -1274,6 +1274,7 @@ __metadata:
     "@helium/mini-fanout-sdk": ^0.11.12
     "@helium/onboarding": ^5.0.4
     "@helium/spl-utils": ^0.11.12
+    "@helium/sus": ^0.11.12
     "@helium/tuktuk-idls": ^0.0.10
     "@helium/tuktuk-sdk": ^0.0.10
     "@helium/welcome-pack-sdk": ^0.11.12
@@ -1841,6 +1842,21 @@ __metadata:
     "@helium/anchor-resolvers": ^0.10.0-alpha.6
     "@helium/modular-governance-idls": ^0.1.6
   checksum: 249fd66704ccd93e356398c43f9a7db125a63ce93d0b3be9654ae30af03056a9854fceea40faf743e103015f34bd337c9f4b8ca3143bb85d4ea1748d209644de
+  languageName: node
+  linkType: hard
+
+"@helium/sus@npm:^0.11.12":
+  version: 0.11.12
+  resolution: "@helium/sus@npm:0.11.12"
+  dependencies:
+    "@coral-xyz/anchor": ^0.31.0
+    "@metaplex-foundation/mpl-token-metadata": ^2.10.0
+    "@solana/spl-token": ^0.3.8
+    "@solana/web3.js": ^1.91.1
+    axios: ^1.9.0
+    bn.js: ^5.2.0
+    bs58: ^4.0.1
+  checksum: c1d2a8acb2816e29bb1a10cbfc18a6578de4cede7b0ab1cf039ce9ab8c1eeff2d1ce8e6ff4ed69cb780d461ec009ac68da32083da36da054c8b133fe69c9007d
   languageName: node
   linkType: hard
 
