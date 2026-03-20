@@ -160,12 +160,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/account-fetch-cache@npm:^0.11.12":
-  version: 0.11.12
-  resolution: "@helium/account-fetch-cache@npm:0.11.12"
+"@helium/account-fetch-cache@npm:^0.11.13":
+  version: 0.11.13
+  resolution: "@helium/account-fetch-cache@npm:0.11.13"
   dependencies:
     "@solana/web3.js": ^1.91.1
-  checksum: 1a8f774bfbf185ba0e13d3614460eb102d13be45c6fbc66b51fbf1586b2ce203fc2884bfa132dfd6ffa402321ecf7011a2a11c81c244fa09810e4e0a30b67a1d
+  checksum: abd3795718abef2340a03f8f8bdb90d45e98a7aa8a79c516e4d36022c11454514496f2aceacde73e0ac265844003e404b4958dafe000f032bbd15e9b8c6d5647
   languageName: node
   linkType: hard
 
@@ -192,28 +192,28 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/anchor-resolvers@npm:^0.11.12":
-  version: 0.11.12
-  resolution: "@helium/anchor-resolvers@npm:0.11.12"
+"@helium/anchor-resolvers@npm:^0.11.13":
+  version: 0.11.13
+  resolution: "@helium/anchor-resolvers@npm:0.11.13"
   dependencies:
     "@solana/spl-token": ^0.3.8
     "@solana/web3.js": ^1.91.1
   peerDependencies:
     "@coral-xyz/anchor": ^0.31.0
-  checksum: 8fdb53e89c6c2c78da57a9b1aa108f56117b06626b06fdda04f2e9b44e78b5192b788a866fca5bdff85204646997bc556d449cd40a73236ce9760f12dc07b4d4
+  checksum: 64084c158fe711daecbd3793ceb715a7f476f377753c4e851746c13e9bc63e47cfa6fca4fd8a7f7c90585ece4123cb0c8f3eda56fac063361e46a1b2c9fb7d79
   languageName: node
   linkType: hard
 
-"@helium/idls@npm:^0.11.12":
-  version: 0.11.12
-  resolution: "@helium/idls@npm:0.11.12"
+"@helium/idls@npm:^0.11.13":
+  version: 0.11.13
+  resolution: "@helium/idls@npm:0.11.13"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@solana/web3.js": ^1.91.1
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: dc7c847b1a8e3d81278b76d6273ce4ce06eb9fecdfa81bed87ae2c53ea1719159e1deb2b7139255b3f65720a56a37ab97d4c552fe582da6cc57b4775c7bfe10a
+  checksum: 228a257efcaf6942202ba35a25ccf67cd767896c0c6bb399846c8a89621244ec524f45304b586fc285629af4e20a2c004e8ef55dde1ba06e5a389f1e6aa9ea98
   languageName: node
   linkType: hard
 
@@ -239,14 +239,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@helium/spl-utils@npm:^0.11.12":
-  version: 0.11.12
-  resolution: "@helium/spl-utils@npm:0.11.12"
+"@helium/spl-utils@npm:^0.11.13":
+  version: 0.11.13
+  resolution: "@helium/spl-utils@npm:0.11.13"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/account-fetch-cache": ^0.11.12
+    "@helium/account-fetch-cache": ^0.11.13
     "@helium/address": ^4.12.0
-    "@helium/anchor-resolvers": ^0.11.12
+    "@helium/anchor-resolvers": ^0.11.13
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
@@ -255,24 +255,24 @@ __metadata:
     bn.js: ^5.2.0
     borsh: ^0.7.0
     bs58: ^4.0.1
-  checksum: 8f2f58489dc95825fe71b52da82c3e2e7dfe510bbd2083dc1406b57ce326cc129975169000d3bb31f57c2b9d9d4f73b7845c4d9eac15beeb1d194fae065fda7c
+  checksum: 29334e9fce74f27ab418e8bbe5353c9cc8878c028da49cd5ea0f6853c64a57a50d8a3dd983d9579a74f08daf3840abe3e24a313e642ab17988a4a1548a25868c
   languageName: node
   linkType: hard
 
-"@helium/voter-stake-registry-sdk@npm:^0.11.12":
-  version: 0.11.12
-  resolution: "@helium/voter-stake-registry-sdk@npm:0.11.12"
+"@helium/voter-stake-registry-sdk@npm:^0.11.13":
+  version: 0.11.13
+  resolution: "@helium/voter-stake-registry-sdk@npm:0.11.13"
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
-    "@helium/anchor-resolvers": ^0.11.12
-    "@helium/idls": ^0.11.12
+    "@helium/anchor-resolvers": ^0.11.13
+    "@helium/idls": ^0.11.13
     "@helium/nft-proxy-sdk": ^0.1.5-alpha.0
-    "@helium/spl-utils": ^0.11.12
+    "@helium/spl-utils": ^0.11.13
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-token": ^0.3.8
     bn.js: ^5.2.0
     bs58: ^4.0.1
-  checksum: 95b72e30ee4c42a2b3d365aeae4c5c652ba72cc625898ae0768508db343464535c9c657fc4735314f3021d3b14419aa4c2ed5809adec2dcb412e7082f9b66681
+  checksum: 0a2a6656db1674c4bf42f782cdd792e9865fcc6d4df5b4a35de5f3787135e58163ca75cbe8de13f2a6b2c73113929cf1356f5bb6070ea470fa98c609b41c2ac4
   languageName: node
   linkType: hard
 
@@ -282,10 +282,10 @@ __metadata:
   dependencies:
     "@coral-xyz/anchor": ^0.31.0
     "@fastify/cors": ^8.1.1
-    "@helium/account-fetch-cache": ^0.11.12
+    "@helium/account-fetch-cache": ^0.11.13
     "@helium/address": ^4.12.0
-    "@helium/spl-utils": ^0.11.12
-    "@helium/voter-stake-registry-sdk": ^0.11.12
+    "@helium/spl-utils": ^0.11.13
+    "@helium/voter-stake-registry-sdk": ^0.11.13
     "@metaplex-foundation/mpl-token-metadata": ^2.10.0
     "@solana/spl-account-compression": ^0.1.7
     "@solana/spl-token": ^0.3.8
