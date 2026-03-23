@@ -61,7 +61,7 @@ export async function syncWalletHistory(wallet: string): Promise<void> {
       }
 
       // Classify using IDL-based decoding
-      const classified = await classifyTransaction(tx, connection);
+      const classified = await classifyTransaction(tx, connection, wallet);
       if (!classified) {
         continue;
       }
