@@ -14,6 +14,7 @@ import {
   BASE_TX_FEE_LAMPORTS,
   RENT_COSTS,
 } from "@/lib/utils/balance-validation";
+import { NATIVE_MINT } from "@solana/spl-token";
 
 /**
  * Get swap transaction instructions from Jupiter and build a transaction.
@@ -76,7 +77,15 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       new PublicKey(userPublicKey),
     );
     const rentCost = destinationTokenAccount ? 0 : RENT_COSTS.ATA;
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
+    // When swapping SOL, the input amount also comes from the wallet balance
+    const solInputAmount =
+      quoteResponse.inputMint === NATIVE_MINT.toBase58()
+        ? Number(quoteResponse.inAmount)
+        : 0;
+    const required = calculateRequiredBalance(
+      BASE_TX_FEE_LAMPORTS,
+      rentCost + solInputAmount,
+    );
 
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
