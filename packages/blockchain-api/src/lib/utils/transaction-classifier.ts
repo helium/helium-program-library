@@ -138,21 +138,14 @@ function getAccountKeys(tx: HeliusTransaction): string[] {
 }
 
 function getInvolvedProgramIds(tx: HeliusTransaction): Set<string> {
-  const programIds = new Set<string>();
   const instructions = (tx.transaction?.message as any)?.instructions || [];
-  for (const ix of instructions) {
-    const pid = getIxProgramId(ix);
-    if (pid) programIds.add(pid);
-  }
-  if (tx.meta?.innerInstructions) {
-    for (const inner of tx.meta.innerInstructions) {
-      for (const ix of inner.instructions) {
-        const pid = getIxProgramId(ix);
-        if (pid) programIds.add(pid);
-      }
-    }
-  }
-  return programIds;
+  const allIxs = [
+    ...instructions,
+    ...(tx.meta?.innerInstructions ?? []).flatMap(
+      (inner) => inner.instructions,
+    ),
+  ];
+  return new Set(allIxs.map(getIxProgramId).filter(Boolean));
 }
 
 function getTokenTransfers(tx: HeliusTransaction): Array<{
@@ -164,36 +157,38 @@ function getTokenTransfers(tx: HeliusTransaction): Array<{
   const meta = tx.meta;
   if (!meta?.preTokenBalances || !meta?.postTokenBalances) return [];
 
-  const transfers: Array<{ mint: string; amount: number; from: string; to: string }> = [];
-  const mintChanges = new Map<string, Array<{ owner: string; change: number }>>();
+  const { preTokenBalances, postTokenBalances } = meta;
+  const mintChanges = postTokenBalances.reduce(
+    (acc, post) => {
+      const pre = preTokenBalances.find(
+        (p) => p.accountIndex === post.accountIndex && p.mint === post.mint,
+      );
+      const change =
+        (post.uiTokenAmount?.uiAmount ?? 0) -
+        (pre?.uiTokenAmount?.uiAmount ?? 0);
+      if (change !== 0) {
+        const existing = acc.get(post.mint) ?? [];
+        acc.set(post.mint, [...existing, { owner: post.owner || "", change }]);
+      }
+      return acc;
+    },
+    new Map<string, Array<{ owner: string; change: number }>>(),
+  );
 
-  for (const post of meta.postTokenBalances) {
-    const pre = meta.preTokenBalances.find(
-      (p) => p.accountIndex === post.accountIndex && p.mint === post.mint,
-    );
-    const preAmount = pre?.uiTokenAmount?.uiAmount ?? 0;
-    const postAmount = post.uiTokenAmount?.uiAmount ?? 0;
-    const change = postAmount - preAmount;
-    if (change !== 0) {
-      const owner = post.owner || "";
-      if (!mintChanges.has(post.mint)) mintChanges.set(post.mint, []);
-      mintChanges.get(post.mint)!.push({ owner, change });
-    }
-  }
-
-  for (const [mint, changes] of mintChanges) {
+  return Array.from(mintChanges.entries()).flatMap(([mint, changes]) => {
     const senders = changes.filter((c) => c.change < 0);
     const receivers = changes.filter((c) => c.change > 0);
-    if (senders.length > 0 && receivers.length > 0) {
-      transfers.push({
-        mint,
-        amount: Math.abs(receivers[0].change),
-        from: senders[0].owner,
-        to: receivers[0].owner,
-      });
-    }
-  }
-  return transfers;
+    return senders.length > 0 && receivers.length > 0
+      ? [
+          {
+            mint,
+            amount: Math.abs(receivers[0].change),
+            from: senders[0].owner,
+            to: receivers[0].owner,
+          },
+        ]
+      : [];
+  });
 }
 
 /**
@@ -302,13 +297,12 @@ export async function classifyTransaction(
     topLevelPrograms.delete("ComputeBudget111111111111111111111111111111");
 
     if (topLevelPrograms.size === 1 && topLevelPrograms.has(SYSTEM_PROGRAM_ID)) {
-      const changes: Array<{ account: string; change: number }> = [];
-      for (let i = 0; i < meta.preBalances.length; i++) {
-        const change = meta.postBalances[i] - meta.preBalances[i];
-        if (Math.abs(change) > 5000) {
-          changes.push({ account: accountKeys[i] || "", change });
-        }
-      }
+      const changes = meta.preBalances
+        .map((pre, i) => ({
+          account: accountKeys[i] || "",
+          change: meta.postBalances[i] - pre,
+        }))
+        .filter(({ change }) => Math.abs(change) > 5000);
       const senders = changes.filter((c) => c.change < 0);
       const receivers = changes.filter((c) => c.change > 0);
       if (senders.length > 0 && receivers.length > 0) {

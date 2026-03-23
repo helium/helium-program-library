@@ -69,12 +69,10 @@ export const history = publicProcedure.transactions.history.handler(
     ]);
 
     // Merge into unified actions
-    const actions: HistoryAction[] = [];
-
-    for (const batch of batches) {
-      actions.push({
+    const actions: HistoryAction[] = [
+      ...batches.map((batch) => ({
         id: batch.id,
-        source: "blockchain_api",
+        source: "blockchain_api" as const,
         actionType: batch.actionType || batch.tag || "unknown",
         actionMetadata: batch.actionMetadata || null,
         status: batch.status,
@@ -87,26 +85,23 @@ export const history = publicProcedure.transactions.history.handler(
         timestamp: (
           batch.confirmedAt || batch.createdAt
         ).toISOString(),
-      });
-    }
-
-    for (const row of historyRows) {
-      actions.push({
+      })),
+      ...historyRows.map((row) => ({
         id: String(row.id),
-        source: "on_chain",
+        source: "on_chain" as const,
         actionType: row.actionType,
         actionMetadata: row.actionMetadata || null,
-        status: "confirmed",
+        status: "confirmed" as const,
         transactions: [
           {
             signature: row.signature,
-            status: "confirmed",
+            status: "confirmed" as const,
             type: row.actionType,
           },
         ],
         timestamp: row.timestamp.toISOString(),
-      });
-    }
+      })),
+    ];
 
     // Sort merged results by timestamp descending and take page
     actions.sort(
