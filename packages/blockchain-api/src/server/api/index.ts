@@ -22,6 +22,7 @@ const sharedRouters = {
   swap: swapRouter,
   transactions: transactionsRouter,
   welcomePacks: welcomePacksRouter,
+  migration: migrationRouter,
 };
 
 export const publicRouter = implement(apiContract).router(sharedRouters);

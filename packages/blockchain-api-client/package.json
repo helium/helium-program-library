@@ -1,6 +1,6 @@
 {
   "name": "@helium/blockchain-api",
-  "version": "0.11.12",
+  "version": "0.11.13",
   "type": "module",
   "description": "TypeScript client and schemas for the Helium Blockchain API",
   "license": "Apache-2.0",
