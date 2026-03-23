@@ -38,6 +38,7 @@ WalletHistoryCursor.init(
   {
     sequelize,
     modelName: "wallet_history_cursors",
+    tableName: "wallet_history_cursors",
     underscored: true,
     createdAt: false,
   },

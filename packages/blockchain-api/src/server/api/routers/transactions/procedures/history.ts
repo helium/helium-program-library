@@ -3,12 +3,15 @@ import TransactionBatch from "@/lib/models/transaction-batch";
 import PendingTransaction from "@/lib/models/pending-transaction";
 import WalletHistory from "@/lib/models/wallet-history";
 import { syncWalletHistory } from "@/lib/utils/wallet-history-sync";
+import { connectToDb } from "@/lib/utils/db";
 import { Op } from "sequelize";
 import type { HistoryAction } from "@helium/blockchain-api/schemas/transactions";
 
 export const history = publicProcedure.transactions.history.handler(
   async ({ input, errors }) => {
     const { payer, page, limit, actionType } = input;
+
+    await connectToDb();
 
     // Refresh on-chain cache from Helius
     try {

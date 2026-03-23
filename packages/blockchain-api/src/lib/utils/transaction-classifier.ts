@@ -20,7 +20,6 @@ const LAZY_DISTRIBUTOR_PROGRAM_ID =
   "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w";
 const MINI_FANOUT_PROGRAM_ID =
   "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn";
-const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 
 const KNOWN_TOKEN_NAMES: Record<string, string> = {
@@ -32,21 +31,40 @@ const KNOWN_TOKEN_NAMES: Record<string, string> = {
   So11111111111111111111111111111111111111112: "SOL",
 };
 
-// Lazy-distributor instruction names that indicate a claim
-const LD_CLAIM_INSTRUCTIONS = new Set([
-  "distributeCompressionRewardsV0",
-  "distributeCustomDestinationV0",
-  "distributeRewardsV0",
+// Programs that fetchBackwardsCompatibleIdl has bundled IDLs for
+const HELIUM_PROGRAMS: Record<string, string> = {
+  "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w": "lazy_distributor",
+  hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR: "helium_sub_daos",
+  credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT: "data_credits",
+  hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8: "helium_entity_manager",
+  circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g: "circuit_breaker",
+  treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5: "treasury_management",
+  porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy: "price_oracle",
+  rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF: "rewards_oracle",
+  hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8: "voter_stake_registry",
+  fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6: "fanout",
+  memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr: "mobile_entity_manager",
+  hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ: "hexboosting",
+  noEmmgLmQdk6DLiPV8CSwQv3qQDyGEhz9m5A4zhtByv: "no_emit",
+  propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs: "proposal",
+  stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM: "state_controller",
+  nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p: "nft_proxy",
+  orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f: "organization",
+  mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn: "mini_fanout",
+};
+
+// Programs we always skip (infrastructure, not user-facing actions)
+const SKIP_PROGRAMS = new Set([
+  "ComputeBudget111111111111111111111111111111",
+  SYSTEM_PROGRAM_ID,
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV",
+  "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK",
 ]);
 
 // Cache fetched IDLs
 const idlCache = new Map<string, Idl | null>();
-
-// Helium program IDs that fetchBackwardsCompatibleIdl knows about
-const HELIUM_PROGRAM_IDS = new Set([
-  LAZY_DISTRIBUTOR_PROGRAM_ID,
-  MINI_FANOUT_PROGRAM_ID,
-]);
 
 async function fetchIdl(
   programId: string,
@@ -61,17 +79,14 @@ async function fetchIdl(
     const provider = { connection } as any;
     let idl: Idl | null;
 
-    if (HELIUM_PROGRAM_IDS.has(programId)) {
-      // Use spl-utils which has bundled fallback IDLs for Helium programs
+    if (programId in HELIUM_PROGRAMS) {
       idl = (await fetchBackwardsCompatibleIdl(pubkey, provider)) as Idl | null;
     } else {
-      // Fetch from chain, converting legacy IDL format if needed
       const idlRaw = await Program.fetchIdl(pubkey, provider);
       if (!idlRaw) {
         idlCache.set(programId, null);
         return null;
       }
-      // Legacy IDLs lack .address — convert them to new format
       if (!idlRaw.address) {
         idl = convertIdlToCamelCase(
           convertLegacyIdl(idlRaw as any, programId),
@@ -102,46 +117,44 @@ function decodeInstruction(
   }
 }
 
-/**
- * Extract program IDs from the transaction's account keys and instructions.
- */
+function getIxProgramId(ix: any): string {
+  return typeof ix.programId === "string"
+    ? ix.programId
+    : ix.programId?.toBase58?.() || "";
+}
+
+function getAccountKeys(tx: HeliusTransaction): string[] {
+  const message = tx.transaction?.message as any;
+  if (!message) return [];
+  if (message.accountKeys?.[0]?.pubkey) {
+    return message.accountKeys.map((k: any) =>
+      typeof k.pubkey === "string" ? k.pubkey : k.pubkey?.toBase58?.() || "",
+    );
+  }
+  if (typeof message.accountKeys?.[0] === "string") {
+    return message.accountKeys;
+  }
+  return [];
+}
+
 function getInvolvedProgramIds(tx: HeliusTransaction): Set<string> {
   const programIds = new Set<string>();
-  const message = tx.transaction?.message;
-  if (!message) return programIds;
-
-  // From top-level instructions
-  const instructions = (message as any).instructions;
-  if (instructions) {
-    for (const ix of instructions) {
-      const pid =
-        typeof ix.programId === "string"
-          ? ix.programId
-          : ix.programId?.toBase58?.();
-      if (pid) programIds.add(pid);
-    }
+  const instructions = (tx.transaction?.message as any)?.instructions || [];
+  for (const ix of instructions) {
+    const pid = getIxProgramId(ix);
+    if (pid) programIds.add(pid);
   }
-
-  // From inner instructions (jsonParsed format has programId on inner ixs)
   if (tx.meta?.innerInstructions) {
     for (const inner of tx.meta.innerInstructions) {
       for (const ix of inner.instructions) {
-        const ixAny = ix as any;
-        const pid =
-          typeof ixAny.programId === "string"
-            ? ixAny.programId
-            : ixAny.programId?.toBase58?.();
+        const pid = getIxProgramId(ix);
         if (pid) programIds.add(pid);
       }
     }
   }
-
   return programIds;
 }
 
-/**
- * Extract token balance changes from pre/postTokenBalances.
- */
 function getTokenTransfers(tx: HeliusTransaction): Array<{
   mint: string;
   amount: number;
@@ -151,33 +164,19 @@ function getTokenTransfers(tx: HeliusTransaction): Array<{
   const meta = tx.meta;
   if (!meta?.preTokenBalances || !meta?.postTokenBalances) return [];
 
-  const accountKeys = getAccountKeys(tx);
-  const transfers: Array<{
-    mint: string;
-    amount: number;
-    from: string;
-    to: string;
-  }> = [];
-
-  // Group by mint
-  const mintChanges = new Map<
-    string,
-    Array<{ owner: string; change: number }>
-  >();
+  const transfers: Array<{ mint: string; amount: number; from: string; to: string }> = [];
+  const mintChanges = new Map<string, Array<{ owner: string; change: number }>>();
 
   for (const post of meta.postTokenBalances) {
     const pre = meta.preTokenBalances.find(
-      (p) =>
-        p.accountIndex === post.accountIndex && p.mint === post.mint,
+      (p) => p.accountIndex === post.accountIndex && p.mint === post.mint,
     );
     const preAmount = pre?.uiTokenAmount?.uiAmount ?? 0;
     const postAmount = post.uiTokenAmount?.uiAmount ?? 0;
     const change = postAmount - preAmount;
     if (change !== 0) {
-      const owner = post.owner || accountKeys[post.accountIndex] || "";
-      if (!mintChanges.has(post.mint)) {
-        mintChanges.set(post.mint, []);
-      }
+      const owner = post.owner || "";
+      if (!mintChanges.has(post.mint)) mintChanges.set(post.mint, []);
       mintChanges.get(post.mint)!.push({ owner, change });
     }
   }
@@ -194,168 +193,92 @@ function getTokenTransfers(tx: HeliusTransaction): Array<{
       });
     }
   }
-
   return transfers;
 }
 
 /**
- * Extract native SOL transfer from pre/postBalances.
- */
-function getNativeTransfer(
-  tx: HeliusTransaction,
-): { from: string; to: string; amount: number } | null {
-  const meta = tx.meta;
-  if (!meta?.preBalances || !meta?.postBalances) return null;
-
-  const accountKeys = getAccountKeys(tx);
-  const changes: Array<{ account: string; change: number }> = [];
-
-  for (let i = 0; i < meta.preBalances.length; i++) {
-    const change = meta.postBalances[i] - meta.preBalances[i];
-    // Ignore fee payer's fee deduction and tiny changes
-    if (Math.abs(change) > 5000) {
-      changes.push({ account: accountKeys[i] || "", change });
-    }
-  }
-
-  const senders = changes.filter((c) => c.change < 0);
-  const receivers = changes.filter((c) => c.change > 0);
-  if (senders.length > 0 && receivers.length > 0) {
-    return {
-      from: senders[0].account,
-      to: receivers[0].account,
-      amount: receivers[0].change,
-    };
-  }
-  return null;
-}
-
-function getAccountKeys(tx: HeliusTransaction): string[] {
-  const message = tx.transaction?.message as any;
-  if (!message) return [];
-
-  // jsonParsed format: accountKeys is array of { pubkey, signer, writable, source }
-  if (message.accountKeys?.[0]?.pubkey) {
-    return message.accountKeys.map((k: any) =>
-      typeof k.pubkey === "string" ? k.pubkey : k.pubkey?.toBase58?.() || "",
-    );
-  }
-  // Fallback: array of strings
-  if (typeof message.accountKeys?.[0] === "string") {
-    return message.accountKeys;
-  }
-  return [];
-}
-
-/**
  * Classify a raw Solana transaction using IDL-based instruction decoding.
+ *
+ * Priority:
+ * 1. Decode the primary (non-infra) program instruction via IDL → use program name + instruction name
+ * 2. Bubblegum transfer (special case since it's Metaplex, not Helium)
+ * 3. SPL token transfer from balance changes
+ * 4. Native SOL transfer
  */
 export async function classifyTransaction(
   tx: HeliusTransaction,
   connection?: Connection,
 ): Promise<ClassifiedTransaction | null> {
+  const instructions = (tx.transaction?.message as any)?.instructions || [];
   const programIds = getInvolvedProgramIds(tx);
-
-  // 1. Bubblegum Transfer — check for bubblegum program in involved programs
-  if (programIds.has(BUBBLEGUM_PROGRAM_ID)) {
-    const idl = connection ? await fetchIdl(BUBBLEGUM_PROGRAM_ID, connection) : null;
-    if (idl) {
-      const instructions = (tx.transaction?.message as any)?.instructions || [];
-      for (const ix of instructions) {
-        const pid =
-          typeof ix.programId === "string"
-            ? ix.programId
-            : ix.programId?.toBase58?.();
-        if (pid !== BUBBLEGUM_PROGRAM_ID) continue;
-        const decoded = decodeInstruction(idl, ix.data);
-        if (decoded && decoded.name === "transfer") {
-          const accountKeys = getAccountKeys(tx);
-          const ixAccounts = ix.accounts || [];
-          // Bubblegum transfer accounts: [treeAuthority, leafOwner, leafDelegate, newLeafOwner, ...]
-          const leafOwner =
-            typeof ixAccounts[1] === "string"
-              ? ixAccounts[1]
-              : ixAccounts[1]?.toBase58?.() || "";
-          const newLeafOwner =
-            typeof ixAccounts[3] === "string"
-              ? ixAccounts[3]
-              : ixAccounts[3]?.toBase58?.() || "";
-          return {
-            actionType: "bubblegum_transfer",
-            actionMetadata: {
-              from: leafOwner,
-              to: newLeafOwner,
-            },
-          };
-        }
-      }
-    }
-  }
-
-  // 2. Lazy Distributor Claim
-  if (programIds.has(LAZY_DISTRIBUTOR_PROGRAM_ID)) {
-    const idl = connection ? await fetchIdl(LAZY_DISTRIBUTOR_PROGRAM_ID, connection) : null;
-    if (idl) {
-      const instructions = (tx.transaction?.message as any)?.instructions || [];
-      for (const ix of instructions) {
-        const pid =
-          typeof ix.programId === "string"
-            ? ix.programId
-            : ix.programId?.toBase58?.();
-        if (pid !== LAZY_DISTRIBUTOR_PROGRAM_ID) continue;
-        const decoded = decodeInstruction(idl, ix.data);
-        if (decoded && LD_CLAIM_INSTRUCTIONS.has(decoded.name)) {
-          const tokenTransfers = getTokenTransfers(tx);
-          const transfer = tokenTransfers[0];
-          return {
-            actionType: "lazy_distributor_claim",
-            actionMetadata: {
-              instructionName: decoded.name,
-              mint: transfer?.mint,
-              amount: transfer?.amount,
-              tokenName: transfer?.mint
-                ? KNOWN_TOKEN_NAMES[transfer.mint]
-                : undefined,
-            },
-          };
-        }
-      }
-    }
-  }
-
-  // 3. Mini Fanout Distribution
-  if (programIds.has(MINI_FANOUT_PROGRAM_ID)) {
-    const idl = connection ? await fetchIdl(MINI_FANOUT_PROGRAM_ID, connection) : null;
-    if (idl) {
-      const instructions = (tx.transaction?.message as any)?.instructions || [];
-      for (const ix of instructions) {
-        const pid =
-          typeof ix.programId === "string"
-            ? ix.programId
-            : ix.programId?.toBase58?.();
-        if (pid !== MINI_FANOUT_PROGRAM_ID) continue;
-        const decoded = decodeInstruction(idl, ix.data);
-        if (decoded) {
-          const tokenTransfers = getTokenTransfers(tx);
-          const transfer = tokenTransfers[0];
-          return {
-            actionType: "mini_fanout_claim",
-            actionMetadata: {
-              instructionName: decoded.name,
-              mint: transfer?.mint,
-              amount: transfer?.amount,
-              tokenName: transfer?.mint
-                ? KNOWN_TOKEN_NAMES[transfer.mint]
-                : undefined,
-            },
-          };
-        }
-      }
-    }
-  }
-
-  // 4. SPL Token Transfer (no Helium-specific program involved)
   const tokenTransfers = getTokenTransfers(tx);
+
+  // 1. Try IDL-based decoding for any known program
+  if (connection) {
+    for (const ix of instructions) {
+      const pid = getIxProgramId(ix);
+      if (SKIP_PROGRAMS.has(pid) || !ix.data) continue;
+
+      const idl = await fetchIdl(pid, connection);
+      if (!idl) continue;
+
+      const decoded = decodeInstruction(idl, ix.data);
+      if (!decoded) continue;
+
+      const programLabel = HELIUM_PROGRAMS[pid] || pid;
+      const transfer = tokenTransfers[0];
+
+      return {
+        actionType: `${programLabel}.${decoded.name}`,
+        actionMetadata: {
+          program: programLabel,
+          instruction: decoded.name,
+          ...(transfer
+            ? {
+                mint: transfer.mint,
+                amount: transfer.amount,
+                tokenName: KNOWN_TOKEN_NAMES[transfer.mint],
+              }
+            : {}),
+        },
+      };
+    }
+
+    // 2. Bubblegum transfer (Metaplex program, not in HELIUM_PROGRAMS)
+    if (programIds.has(BUBBLEGUM_PROGRAM_ID)) {
+      const idl = await fetchIdl(BUBBLEGUM_PROGRAM_ID, connection);
+      if (idl) {
+        for (const ix of instructions) {
+          if (getIxProgramId(ix) !== BUBBLEGUM_PROGRAM_ID) continue;
+          const decoded = decodeInstruction(idl, ix.data);
+          if (decoded) {
+            const ixAccounts = ix.accounts || [];
+            return {
+              actionType: `bubblegum.${decoded.name}`,
+              actionMetadata: {
+                program: "bubblegum",
+                instruction: decoded.name,
+                ...(decoded.name === "transfer"
+                  ? {
+                      from:
+                        typeof ixAccounts[1] === "string"
+                          ? ixAccounts[1]
+                          : ixAccounts[1]?.toBase58?.() || "",
+                      to:
+                        typeof ixAccounts[3] === "string"
+                          ? ixAccounts[3]
+                          : ixAccounts[3]?.toBase58?.() || "",
+                    }
+                  : {}),
+              },
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // 3. SPL Token Transfer from balance changes
   if (tokenTransfers.length > 0) {
     const transfer = tokenTransfers[0];
     return {
@@ -370,36 +293,38 @@ export async function classifyTransaction(
     };
   }
 
-  // 5. Native SOL Transfer
-  const nativeTransfer = getNativeTransfer(tx);
-  if (nativeTransfer) {
-    // Only classify as SOL transfer if the only top-level program is system program
-    const topLevelPrograms = new Set<string>();
-    const instructions = (tx.transaction?.message as any)?.instructions || [];
-    for (const ix of instructions) {
-      const pid =
-        typeof ix.programId === "string"
-          ? ix.programId
-          : ix.programId?.toBase58?.();
-      if (pid) topLevelPrograms.add(pid);
-    }
-    if (
-      topLevelPrograms.size === 1 &&
-      topLevelPrograms.has(SYSTEM_PROGRAM_ID)
-    ) {
-      return {
-        actionType: "spl_transfer",
-        actionMetadata: {
-          mint: "So11111111111111111111111111111111111111112",
-          amount: nativeTransfer.amount,
-          from: nativeTransfer.from,
-          to: nativeTransfer.to,
-          tokenName: "SOL",
-        },
-      };
+  // 4. Native SOL Transfer (only if sole top-level program is system)
+  const meta = tx.meta;
+  if (meta?.preBalances && meta?.postBalances) {
+    const accountKeys = getAccountKeys(tx);
+    const topLevelPrograms = new Set(instructions.map(getIxProgramId));
+    // Remove compute budget — it's always there
+    topLevelPrograms.delete("ComputeBudget111111111111111111111111111111");
+
+    if (topLevelPrograms.size === 1 && topLevelPrograms.has(SYSTEM_PROGRAM_ID)) {
+      const changes: Array<{ account: string; change: number }> = [];
+      for (let i = 0; i < meta.preBalances.length; i++) {
+        const change = meta.postBalances[i] - meta.preBalances[i];
+        if (Math.abs(change) > 5000) {
+          changes.push({ account: accountKeys[i] || "", change });
+        }
+      }
+      const senders = changes.filter((c) => c.change < 0);
+      const receivers = changes.filter((c) => c.change > 0);
+      if (senders.length > 0 && receivers.length > 0) {
+        return {
+          actionType: "spl_transfer",
+          actionMetadata: {
+            mint: "So11111111111111111111111111111111111111112",
+            amount: receivers[0].change,
+            from: senders[0].account,
+            to: receivers[0].account,
+            tokenName: "SOL",
+          },
+        };
+      }
     }
   }
 
-  // Unknown — skip
   return null;
 }

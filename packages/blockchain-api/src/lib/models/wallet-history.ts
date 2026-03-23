@@ -63,6 +63,7 @@ WalletHistory.init(
   {
     sequelize,
     modelName: "wallet_history",
+    tableName: "wallet_history",
     underscored: true,
   },
 );
