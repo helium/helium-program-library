@@ -112,7 +112,7 @@ describe("governance", () => {
       // Verify batch-level actionMetadata
       expect(data?.transactionData?.actionMetadata).to.deep.include({
         type: "position_create",
-        lockupKind: "constant",
+        lockupKind: "cliff",
         lockupPeriodDays: 30,
       });
 
