@@ -88,6 +88,7 @@ export async function submitSingleTransaction(
       contexts: {
         transaction: {
           explorer_link: explorerUrl,
+          chewing_glass_explorer_link: chewingGlassExplorerUrl,
           submission_type: "single",
         },
       },

@@ -106,6 +106,7 @@ export async function resubmitSingleTransaction(
         transaction_type: pendingTx.type,
         blockhash: pendingTx.blockhash,
         explorer_link: explorerUrl,
+        chewing_glass_explorer_link: chewingGlassExplorerUrl,
       },
       contexts: {
         transaction: {
@@ -113,6 +114,7 @@ export async function resubmitSingleTransaction(
           transaction_signature: pendingTx.signature,
           transaction_type: pendingTx.type,
           explorer_link: explorerUrl,
+          chewing_glass_explorer_link: chewingGlassExplorerUrl,
         },
       },
     });
