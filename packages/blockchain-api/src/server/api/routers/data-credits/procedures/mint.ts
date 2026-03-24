@@ -1,12 +1,13 @@
 import { publicProcedure } from "../../../procedures";
 import { PublicKey } from "@solana/web3.js";
-import { createSolanaConnection } from "@/lib/solana";
+import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { init as initDc, mintDataCredits } from "@helium/data-credits-sdk";
 import { serializeTransaction } from "@/lib/utils/build-transaction";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
+import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
 import BN from "bn.js";
 
 export const mint = publicProcedure.dataCredits.mint.handler(
@@ -43,16 +44,29 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       hntAmount: hntAmount || undefined,
     });
 
-    return {
-      transactions: txs.map((t) => ({
-        serializedTransaction: serializeTransaction(t.tx),
+    const transactions = txs.map((t) => ({
+      serializedTransaction: serializeTransaction(t.tx),
+      metadata: {
+        type: "mint_data_credits",
+        description: dcAmount
+          ? `Mint ${dcAmount} data credits`
+          : `Burn ${hntAmount} HNT bones for data credits`,
+      },
+    }));
+
+    if (shouldUseJitoBundle(txs.length, getCluster())) {
+      const tipTx = await getJitoTipTransaction(new PublicKey(owner));
+      transactions.push({
+        serializedTransaction: serializeTransaction(tipTx),
         metadata: {
-          type: "mint_data_credits",
-          description: dcAmount
-            ? `Mint ${dcAmount} data credits`
-            : `Burn ${hntAmount} HNT bones for data credits`,
+          type: "jito_tip",
+          description: "Jito bundle tip",
         },
-      })),
+      });
+    }
+
+    return {
+      transactions,
       parallel: false,
       tag,
     };
