@@ -3,7 +3,7 @@ import { env } from "../env";
 import { v4 as uuidv4 } from "uuid";
 import bs58 from "bs58";
 import * as Sentry from "@sentry/nextjs";
-import { getExplorerUrl } from "./explorer";
+import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { getCluster } from "../solana";
 import {
   shouldUseJitoBundle,
@@ -60,6 +60,7 @@ export async function submitSingleTransaction(
   } catch (error) {
     // Capture submission error with explorer link
     const explorerUrl = getExplorerUrl(transaction);
+    const chewingGlassExplorerUrl = getChewingGlassExplorerUrl(transaction);
     Sentry.captureException(error, {
       level: "error",
       tags: {
@@ -69,6 +70,7 @@ export async function submitSingleTransaction(
       extra: {
         error_message: error instanceof Error ? error.message : "Unknown error",
         explorer_link: explorerUrl,
+        chewing_glass_explorer_link: chewingGlassExplorerUrl,
       },
       contexts: {
         transaction: {
@@ -175,6 +177,7 @@ export async function submitTransactionBatch(
     // Capture batch submission error
     // Try to get explorer links for transactions if possible
     const explorerLinks: string[] = [];
+    const chewingGlassExplorerLinks: string[] = [];
     try {
       for (const serializedTx of payload.transactions.slice(0, 3)) {
         // Limit to first 3 to avoid too much data
@@ -182,6 +185,7 @@ export async function submitTransactionBatch(
           Buffer.from(serializedTx, "base64"),
         );
         explorerLinks.push(getExplorerUrl(tx));
+        chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(tx));
       }
     } catch {
       // Ignore errors when generating explorer links
@@ -201,6 +205,7 @@ export async function submitTransactionBatch(
         parallel: payload.parallel,
         cluster,
         explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
+        chewing_glass_explorer_links: chewingGlassExplorerLinks.length > 0 ? chewingGlassExplorerLinks : undefined,
       },
       contexts: {
         transaction: {
@@ -209,6 +214,7 @@ export async function submitTransactionBatch(
           parallel: payload.parallel,
           cluster,
           explorer_links: explorerLinks,
+          chewing_glass_explorer_links: chewingGlassExplorerLinks,
         },
       },
     });
