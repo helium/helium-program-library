@@ -9,11 +9,24 @@ import {
   shouldUseJitoBundle,
   simulateJitoBundle,
   submitJitoBundle,
+  JitoBundleContext,
 } from "./jito";
+
+function isBlockhashNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("Blockhash not found") || message.includes("blockhash not found");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface TransactionBatchPayload {
   parallel: boolean;
   transactions: string[];
+  tag?: string;
+  payer?: string;
+  transactionMetadata?: Array<Record<string, unknown> | undefined>;
 }
 
 export interface BatchSubmissionResult {
@@ -117,8 +130,13 @@ export async function submitTransactionBatch(
   const batchId = uuidv4();
   const connection = new Connection(env.SOLANA_RPC_URL);
   const cluster = getCluster();
+  const bundleContext: JitoBundleContext = {
+    tag: payload.tag,
+    payer: payload.payer,
+    transactionMetadata: payload.transactionMetadata,
+  };
 
-  try {
+  const attempt = async (): Promise<BatchSubmissionResult> => {
     // Single transaction case
     if (payload.transactions.length === 1) {
       const signature = await submitSingleTransaction(
@@ -135,9 +153,9 @@ export async function submitTransactionBatch(
     // Multiple transactions
     if (shouldUseJitoBundle(payload.transactions.length, cluster)) {
       // Mainnet: use Jito bundle
-      await simulateJitoBundle(payload.transactions);
+      await simulateJitoBundle(payload.transactions, bundleContext);
 
-      const jitoBundleId = await submitJitoBundle(payload.transactions);
+      const jitoBundleId = await submitJitoBundle(payload.transactions, bundleContext);
       return {
         batchId,
         submissionType: "jito_bundle",
@@ -173,6 +191,27 @@ export async function submitTransactionBatch(
         };
       }
     }
+  };
+
+  try {
+    const MAX_BLOCKHASH_RETRIES = 5;
+    let lastError: unknown;
+    for (let i = 0; i <= MAX_BLOCKHASH_RETRIES; i++) {
+      try {
+        return await attempt();
+      } catch (error) {
+        if (isBlockhashNotFoundError(error) && i < MAX_BLOCKHASH_RETRIES) {
+          console.warn(
+            `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
+          );
+          await sleep(2000);
+          lastError = error;
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError;
   } catch (error) {
     // Capture batch submission error
     // Try to get explorer links for transactions if possible
@@ -197,6 +236,7 @@ export async function submitTransactionBatch(
         error_type: "transaction_batch_submission_failed",
         submission_type: "batch",
         cluster,
+        tag: payload.tag,
       },
       extra: {
         error_message: error instanceof Error ? error.message : "Unknown error",
@@ -204,6 +244,9 @@ export async function submitTransactionBatch(
         batch_size: payload.transactions.length,
         parallel: payload.parallel,
         cluster,
+        tag: payload.tag,
+        payer: payload.payer,
+        transaction_metadata: payload.transactionMetadata,
         explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
         chewing_glass_explorer_links: chewingGlassExplorerLinks.length > 0 ? chewingGlassExplorerLinks : undefined,
       },
@@ -213,6 +256,8 @@ export async function submitTransactionBatch(
           batch_size: payload.transactions.length,
           parallel: payload.parallel,
           cluster,
+          tag: payload.tag,
+          payer: payload.payer,
           explorer_links: explorerLinks,
           chewing_glass_explorer_links: chewingGlassExplorerLinks,
         },

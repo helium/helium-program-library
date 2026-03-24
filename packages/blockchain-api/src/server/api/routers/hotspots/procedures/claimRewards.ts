@@ -299,6 +299,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             ? HELIUM_COMMON_LUT_DEVNET
             : HELIUM_COMMON_LUT,
         ],
+        commitment: "finalized",
       })
     ).map((tx) => toVersionedTx(tx));
 
