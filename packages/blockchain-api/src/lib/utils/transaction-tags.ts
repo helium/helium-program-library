@@ -43,6 +43,8 @@ export const TRANSACTION_TYPES = {
   REWARD_CONTRACT_DELETE: "reward_contract_delete",
   REWARD_CONTRACT_CLAIM: "reward_contract_claim",
   MIGRATION: "migration",
+  MINT_DATA_CREDITS: "mint_data_credits",
+  DELEGATE_DATA_CREDITS: "delegate_data_credits",
 
   // Governance - Position Management
   POSITION_CREATE: "position_create",
