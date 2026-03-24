@@ -80,7 +80,15 @@ jobs:
           ECR_REPOSITORY: ${{ env.CONTAINER }}
           CONTAINER_PATH: ${{ env.CONTAINER_PATH }}
           IMAGE_TAG: ${{ env.VERSION }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         run: |
           REGISTRY_ALIAS=$(aws ecr-public describe-registries | jq --raw-output '.registries[0].aliases[0].name')
-          docker build -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
+          docker build \
+            --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
+            --build-arg SENTRY_ORG=$SENTRY_ORG \
+            --build-arg SENTRY_PROJECT=$SENTRY_PROJECT \
+            --build-arg SENTRY_RELEASE=$ECR_REPOSITORY@$IMAGE_TAG \
+            -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
           docker push $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG

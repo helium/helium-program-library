@@ -160,6 +160,9 @@ export const submit = publicProcedure.transactions.submit.handler(
       result = await submitTransactionBatch({
         transactions: serializedTransactions,
         parallel,
+        tag,
+        payer,
+        transactionMetadata: transactions.map((tx) => tx.metadata),
       });
     } catch (error) {
       if (error instanceof BundleSimulationError) {
