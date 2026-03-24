@@ -23,3 +23,23 @@ export const MintDataCreditsInputSchema = z.object({
 });
 
 export type MintDataCreditsInput = z.infer<typeof MintDataCreditsInputSchema>;
+
+export const DelegateDataCreditsInputSchema = z.object({
+  owner: PublicKeySchema.describe(
+    "Wallet address of the DC owner (signer and fee payer)"
+  ),
+  routerKey: z
+    .string()
+    .min(1)
+    .describe("Router key string to delegate data credits to"),
+  amount: z
+    .string()
+    .regex(/^\d+$/, "Amount must be a whole number")
+    .describe("Amount of DC to delegate (in smallest unit, DC has 0 decimals)"),
+  mint: PublicKeySchema.describe(
+    "SubDAO token mint (e.g. MOBILE or IOT mint) to determine which subDAO to delegate to"
+  ),
+  memo: z.string().optional().describe("Optional memo to include in the transaction"),
+});
+
+export type DelegateDataCreditsInput = z.infer<typeof DelegateDataCreditsInputSchema>;
