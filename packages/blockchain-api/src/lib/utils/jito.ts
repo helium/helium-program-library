@@ -102,6 +102,10 @@ async function resolveJitoTipAccount(): Promise<string> {
   }
 }
 
+export function getJitoTipAmountLamports(): number {
+  return env.JITO_TIP_AMOUNT ? parseInt(env.JITO_TIP_AMOUNT) : 10000;
+}
+
 export async function getJitoTipInstruction(
   wallet: PublicKey,
 ): Promise<TransactionInstruction> {

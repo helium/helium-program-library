@@ -44,15 +44,20 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       hntAmount: hntAmount || undefined,
     });
 
-    const transactions = txs.map((t) => ({
-      serializedTransaction: serializeTransaction(t.tx),
-      metadata: {
-        type: "mint_data_credits",
-        description: dcAmount
-          ? `Mint ${dcAmount} data credits`
-          : `Burn ${hntAmount} HNT bones for data credits`,
-      },
-    }));
+    const transactions = txs.map((t) => {
+      if (t.signers.length > 0) {
+        t.tx.sign(t.signers);
+      }
+      return {
+        serializedTransaction: serializeTransaction(t.tx),
+        metadata: {
+          type: "mint_data_credits",
+          description: dcAmount
+            ? `Mint ${dcAmount} data credits`
+            : `Burn ${hntAmount} HNT bones for data credits`,
+        },
+      };
+    });
 
     if (shouldUseJitoBundle(txs.length, getCluster())) {
       const tipTx = await getJitoTipTransaction(new PublicKey(owner));
