@@ -5,7 +5,7 @@ import {
 } from "@/lib/queries/hotspots";
 import { env } from "@/lib/env";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
-import { init as initLd } from "@helium/lazy-distributor-sdk";
+import { init as initLd, recipientKey } from "@helium/lazy-distributor-sdk";
 import { init as initMiniFanout } from "@helium/mini-fanout-sdk";
 import { filterHotspotsWithoutMiniFanout } from "@/lib/utils/mini-fanout-helpers";
 import {
@@ -37,7 +37,11 @@ import {
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
-import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
+import {
+  getTotalTransactionFees,
+  calculateRequiredBalance,
+  BASE_TX_FEE_LAMPORTS,
+} from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
@@ -143,6 +147,28 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
 
       const txFees = getTotalTransactionFees(vtxs);
 
+      // Check wallet has sufficient balance for tx fees + recipient creation rent
+      const recipientKeys = assets.map(
+        (asset) => recipientKey(lazyDistributor, asset)[0],
+      );
+      const recipientAccounts =
+        await ldProgram.account.recipientV0.fetchMultiple(recipientKeys);
+      const numRecipientsNeeded = recipientAccounts.filter((r) => !r).length;
+      const rentCost = numRecipientsNeeded * RECIPIENT_RENT_LAMPORTS;
+      const requiredLamports = calculateRequiredBalance(txFees, rentCost);
+      const senderBalance = await connection.getBalance(
+        new PublicKey(walletAddress),
+      );
+      if (senderBalance < requiredLamports) {
+        throw errors.INSUFFICIENT_FUNDS({
+          message: "Insufficient SOL balance to claim rewards",
+          data: {
+            available: senderBalance,
+            required: requiredLamports,
+          },
+        });
+      }
+
       return {
         transactionData: {
           transactions: txs.map((serialized, i) => ({
@@ -158,7 +184,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           actionMetadata: { type: "claim_rewards", hotspotCount: claimable.length, network: "all" },
         },
         estimatedSolFee: toTokenAmountOutput(
-          new BN(txFees),
+          new BN(txFees + rentCost),
           NATIVE_MINT.toBase58(),
         ),
       };
@@ -225,12 +251,16 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const senderBalance = await provider.connection.getBalance(
         new PublicKey(walletAddress),
       );
-      if (senderBalance < requiredLamports) {
+      const totalRequired = calculateRequiredBalance(
+        BASE_TX_FEE_LAMPORTS,
+        requiredLamports,
+      );
+      if (senderBalance < totalRequired) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance to fund claim task",
           data: {
             available: senderBalance,
-            required: requiredLamports,
+            required: totalRequired,
           },
         });
       }
