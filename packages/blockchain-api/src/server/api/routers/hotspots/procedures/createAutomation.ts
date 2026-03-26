@@ -274,6 +274,7 @@ export const createAutomation =
               : HELIUM_COMMON_LUT,
           ],
           computeUnitLimit: 500000,
+          commitment: "finalized",
         })
       ).map((tx) => toVersionedTx(tx));
 

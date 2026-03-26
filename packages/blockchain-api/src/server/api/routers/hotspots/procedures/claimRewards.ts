@@ -36,7 +36,7 @@ import {
 } from "@helium/spl-utils";
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import { getJitoTipAmountLamports, getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
 import {
   getTotalTransactionFees,
   calculateRequiredBalance,
@@ -154,8 +154,16 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const recipientAccounts =
         await ldProgram.account.recipientV0.fetchMultiple(recipientKeys);
       const numRecipientsNeeded = recipientAccounts.filter((r) => !r).length;
+      const jitoTipCost = shouldUseJitoBundle(vtxs.length, getCluster())
+        ? getJitoTipAmountLamports()
+        : 0;
+      // SetCurrentRewardsV0 may resize recipient accounts (~200K lamports each)
+      const estimatedResizeCost = assets.length * 200_000;
       const rentCost = numRecipientsNeeded * RECIPIENT_RENT_LAMPORTS;
-      const requiredLamports = calculateRequiredBalance(txFees, rentCost);
+      const requiredLamports = calculateRequiredBalance(
+        txFees + jitoTipCost + estimatedResizeCost,
+        rentCost,
+      );
       const senderBalance = await connection.getBalance(
         new PublicKey(walletAddress),
       );
@@ -251,8 +259,12 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const senderBalance = await provider.connection.getBalance(
         new PublicKey(walletAddress),
       );
+      const tuktukJitoTipCost =
+        getCluster() === "mainnet" || getCluster() === "mainnet-beta"
+          ? getJitoTipAmountLamports()
+          : 0;
       const totalRequired = calculateRequiredBalance(
-        BASE_TX_FEE_LAMPORTS,
+        BASE_TX_FEE_LAMPORTS + tuktukJitoTipCost,
         requiredLamports,
       );
       if (senderBalance < totalRequired) {
@@ -302,6 +314,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             ? HELIUM_COMMON_LUT_DEVNET
             : HELIUM_COMMON_LUT,
         ],
+        commitment: "finalized",
       })
     ).map((tx) => toVersionedTx(tx));
 

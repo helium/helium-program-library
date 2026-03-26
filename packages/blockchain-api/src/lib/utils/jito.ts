@@ -102,6 +102,10 @@ async function resolveJitoTipAccount(): Promise<string> {
   }
 }
 
+export function getJitoTipAmountLamports(): number {
+  return env.JITO_TIP_AMOUNT ? parseInt(env.JITO_TIP_AMOUNT) : 10000;
+}
+
 export async function getJitoTipInstruction(
   wallet: PublicKey,
 ): Promise<TransactionInstruction> {
@@ -131,8 +135,15 @@ export class BundleSimulationError extends Error {
   }
 }
 
+export interface JitoBundleContext {
+  tag?: string;
+  payer?: string;
+  transactionMetadata?: Array<Record<string, unknown> | undefined>;
+}
+
 export async function simulateJitoBundle(
   serializedTransactions: string[],
+  context?: JitoBundleContext,
 ): Promise<void> {
   const base64Txs = serializedTransactions.map((tx) => {
     const transaction = VersionedTransaction.deserialize(
@@ -210,12 +221,16 @@ export async function simulateJitoBundle(
       level: "error",
       tags: {
         error_type: "jito_bundle_simulation_failed",
+        tag: context?.tag,
       },
       extra: {
         summary: simulation.summary,
         transaction_results: txResults,
         logs: allLogs,
         bundle_size: serializedTransactions.length,
+        tag: context?.tag,
+        payer: context?.payer,
+        transaction_metadata: context?.transactionMetadata,
       },
     });
     throw err;
@@ -224,6 +239,7 @@ export async function simulateJitoBundle(
 
 export async function submitJitoBundle(
   serializedTransactions: string[],
+  context?: JitoBundleContext,
 ): Promise<string> {
   const transactions = serializedTransactions.map((tx) => {
     const transaction = VersionedTransaction.deserialize(
@@ -248,7 +264,7 @@ export async function submitJitoBundle(
 
     if (result.error) {
       throw new Error(
-        `Jito API error: ${result.error.message || result.error}`,
+        `Jito API error: ${result.error.message || JSON.stringify(result.error)}`,
       );
     }
 
@@ -261,11 +277,15 @@ export async function submitJitoBundle(
       tags: {
         error_type: "jito_bundle_submission_failed",
         submission_type: "jito_bundle",
+        tag: context?.tag,
       },
       extra: {
         error_message: error instanceof Error ? error.message : "Unknown error",
         bundle_size: serializedTransactions.length,
         jito_block_engine_url: env.JITO_BLOCK_ENGINE_URL,
+        tag: context?.tag,
+        payer: context?.payer,
+        transaction_metadata: context?.transactionMetadata,
       },
     });
 

@@ -117,11 +117,13 @@ export const submit = publicProcedure.transactions.submit.handler(
               tag,
               payer,
               explorer_link: ff?.link,
+              chewing_glass_explorer_link: ff?.chewingGlassLink,
               simulation_logs: ff?.logs,
             },
             contexts: {
               transaction: {
                 explorer_link: ff?.link,
+                chewing_glass_explorer_link: ff?.chewingGlassLink,
                 transaction_index: ff.index,
                 batch_size: transactions.length,
               },
@@ -166,6 +168,9 @@ export const submit = publicProcedure.transactions.submit.handler(
       result = await submitTransactionBatch({
         transactions: serializedTransactions,
         parallel,
+        tag,
+        payer,
+        transactionMetadata: transactions.map((tx) => tx.metadata),
       });
     } catch (error) {
       if (error instanceof BundleSimulationError) {

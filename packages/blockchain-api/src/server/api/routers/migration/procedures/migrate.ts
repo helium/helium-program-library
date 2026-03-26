@@ -598,7 +598,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     const batchOpts = {
       addressLookupTableAddresses: [lut],
-      commitment: "confirmed" as const,
+      commitment: "finalized" as const,
     };
 
     // Step 1: Batch token transfers (always included — typically small)
