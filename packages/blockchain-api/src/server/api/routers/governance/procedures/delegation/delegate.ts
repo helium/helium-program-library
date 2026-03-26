@@ -1,5 +1,5 @@
 import { publicProcedure } from "@/server/api/procedures";
-import { createSolanaConnection } from "@/lib/solana";
+import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
@@ -29,6 +29,7 @@ import {
 } from "@solana/web3.js";
 import BN from "bn.js";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
+import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
   requirePositionOwnershipWithMessage,
@@ -264,12 +265,19 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         });
 
         const claimTxFee = getTotalTransactionFees(claimVersionedTxs);
+        const claimCluster = getCluster();
+        const claimJitoTipCost =
+          (claimCluster === "mainnet" || claimCluster === "mainnet-beta") &&
+          claimVersionedTxs.length > 1
+            ? getJitoTipAmountLamports()
+            : 0;
+        const claimRequired = claimTxFee + claimJitoTipCost;
 
         const claimWalletBalance = await connection.getBalance(walletPubkey);
-        if (claimWalletBalance < claimTxFee) {
+        if (claimWalletBalance < claimRequired) {
           throw errors.INSUFFICIENT_FUNDS({
             message: "Insufficient SOL balance for transaction fees",
-            data: { required: claimTxFee, available: claimWalletBalance },
+            data: { required: claimRequired, available: claimWalletBalance },
           });
         }
 
@@ -606,10 +614,16 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     });
 
     const txFees = getTotalTransactionFees(versionedTransactions);
+    const cluster = getCluster();
+    const jitoTipCost =
+      (cluster === "mainnet" || cluster === "mainnet-beta") &&
+      versionedTransactions.length > 1
+        ? getJitoTipAmountLamports()
+        : 0;
     const automationCost = automationEnabled
       ? positionMints.length * PREPAID_TX_FEES * LAMPORTS_PER_SOL
       : 0;
-    const estimatedSolFeeLamports = txFees + automationCost;
+    const estimatedSolFeeLamports = txFees + jitoTipCost + automationCost;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < estimatedSolFeeLamports) {

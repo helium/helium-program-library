@@ -7,7 +7,15 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipAmountLamports,
+  getJitoTipTransaction,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
+import {
+  calculateRequiredBalance,
+  getTotalTransactionFees,
+} from "@/lib/utils/balance-validation";
 import BN from "bn.js";
 
 export const mint = publicProcedure.dataCredits.mint.handler(
@@ -26,7 +34,7 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       });
     }
 
-    const { provider } = createSolanaConnection(owner);
+    const { provider, connection } = createSolanaConnection(owner);
 
     const program = await initDc(provider);
 
@@ -36,6 +44,20 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       hntAmount: hntAmount ? new BN(hntAmount) : undefined,
       recipient: recipient ? new PublicKey(recipient) : undefined,
     });
+
+    const useJito = shouldUseJitoBundle(txs.length, getCluster());
+    const txFees = getTotalTransactionFees(txs.map((t) => t.tx));
+    const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
+    const requiredBalance = calculateRequiredBalance(txFees + jitoTipCost, 0);
+
+    const ownerPubkey = new PublicKey(owner);
+    const walletBalance = await connection.getBalance(ownerPubkey);
+    if (walletBalance < requiredBalance) {
+      throw errors.INSUFFICIENT_FUNDS({
+        message: "Insufficient SOL balance to mint data credits",
+        data: { required: requiredBalance, available: walletBalance },
+      });
+    }
 
     const tag = generateTransactionTag({
       type: TRANSACTION_TYPES.MINT_DATA_CREDITS,
@@ -59,8 +81,8 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       };
     });
 
-    if (shouldUseJitoBundle(txs.length, getCluster())) {
-      const tipTx = await getJitoTipTransaction(new PublicKey(owner));
+    if (useJito) {
+      const tipTx = await getJitoTipTransaction(ownerPubkey);
       transactions.push({
         serializedTransaction: serializeTransaction(tipTx),
         metadata: {

@@ -11,6 +11,7 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
+import { getTransactionFee } from "@/lib/utils/balance-validation";
 import BN from "bn.js";
 
 const MEMO_PROGRAM_ID = new PublicKey(
@@ -57,6 +58,15 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
         feePayer,
       },
     });
+
+    const txFee = getTransactionFee(tx);
+    const walletBalance = await connection.getBalance(feePayer);
+    if (walletBalance < txFee) {
+      throw errors.INSUFFICIENT_FUNDS({
+        message: "Insufficient SOL balance to delegate data credits",
+        data: { required: txFee, available: walletBalance },
+      });
+    }
 
     const tag = generateTransactionTag({
       type: TRANSACTION_TYPES.DELEGATE_DATA_CREDITS,

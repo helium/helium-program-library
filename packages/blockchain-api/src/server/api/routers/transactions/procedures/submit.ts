@@ -8,6 +8,7 @@ import { BundleSimulationError } from "@/lib/utils/jito";
 import { submitTransactionBatch } from "@/lib/utils/transaction-submission";
 import * as Sentry from "@sentry/nextjs";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { classifySimulationLogs } from "@/lib/utils/simulation-classifier";
 import { publicProcedure } from "../../../procedures";
 
 /**
@@ -92,19 +93,41 @@ export const submit = publicProcedure.transactions.submit.handler(
 
       const ff = failures.at(0);
       if (ff) {
-        // Capture simulation failure in Sentry with explorer link
+        const failedTxMeta = transactions[ff.index]?.metadata;
+        const firstRealMeta = transactions.find(
+          (t) => t.metadata?.type && t.metadata.type !== "jito_tip",
+        )?.metadata;
+        const actionType =
+          (failedTxMeta?.type as string | undefined) ??
+          (firstRealMeta?.type as string | undefined) ??
+          "unknown";
+        const { category, detail } = classifySimulationLogs(
+          ff.error ?? "",
+          ff.logs ?? [],
+        );
+
         Sentry.captureException(
-          new Error(ff.error ?? "Transaction simulation failed"),
+          new Error(
+            `Transaction simulation failed [${category}] (${actionType}): ${detail}`,
+          ),
           {
             level: "error",
+            fingerprint: [
+              "transaction_simulation_failed",
+              category,
+              actionType,
+            ],
             tags: {
               error_type: "transaction_simulation_failed",
+              simulation_failure_category: category,
+              action_type: actionType,
               transaction_index: ff.index,
               batch_size: transactions.length,
               parallel,
             },
             extra: {
               error_message: ff.error,
+              failure_detail: detail,
               transaction_index: ff.index,
               batch_size: transactions.length,
               parallel,
@@ -113,14 +136,6 @@ export const submit = publicProcedure.transactions.submit.handler(
               explorer_link: ff?.link,
               chewing_glass_explorer_link: ff?.chewingGlassLink,
               simulation_logs: ff?.logs,
-            },
-            contexts: {
-              transaction: {
-                explorer_link: ff?.link,
-                chewing_glass_explorer_link: ff?.chewingGlassLink,
-                transaction_index: ff.index,
-                batch_size: transactions.length,
-              },
             },
           },
         );

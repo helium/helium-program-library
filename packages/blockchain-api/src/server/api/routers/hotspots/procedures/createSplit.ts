@@ -36,7 +36,11 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipAmountLamports,
+  getJitoTipTransaction,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
 import {
   getTotalTransactionFees,
   RENT_COSTS,
@@ -225,7 +229,13 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     const rentCost =
       RENT_COSTS.MINI_FANOUT + RENT_COSTS.TUKTUK_TASK * 2 + recipientRent;
     const txFees = getTotalTransactionFees(txs);
-    const estimatedSolFeeLamports = txFees + rentCost + FANOUT_FUNDING_AMOUNT;
+    const cluster = getCluster();
+    const jitoTipCost =
+      (cluster === "mainnet" || cluster === "mainnet-beta") && txs.length > 1
+        ? getJitoTipAmountLamports()
+        : 0;
+    const estimatedSolFeeLamports =
+      txFees + jitoTipCost + rentCost + FANOUT_FUNDING_AMOUNT;
 
     const walletBalance = await provider.connection.getBalance(
       new PublicKey(walletAddress),

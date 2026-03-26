@@ -1,5 +1,5 @@
 import { publicProcedure } from "@/server/api/procedures";
-import { createSolanaConnection } from "@/lib/solana";
+import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
@@ -37,6 +37,7 @@ import {
 } from "@solana/web3.js";
 import BN from "bn.js";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
+import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import {
   toTokenAmountOutput,
   resolveTokenAmountInput,
@@ -324,8 +325,15 @@ export const create = publicProcedure.governance.createPosition.handler(
         feePayer: walletPubkey,
       });
 
+    const cluster = getCluster();
+    const jitoTipCost =
+      (cluster === "mainnet" || cluster === "mainnet-beta") &&
+      versionedTransactions.length > 1
+        ? getJitoTipAmountLamports()
+        : 0;
     const estimatedSolFeeLamports =
       getTotalTransactionFees(versionedTransactions) +
+      jitoTipCost +
       mintRent +
       (automationEnabled ? PREPAID_TX_FEES * LAMPORTS_PER_SOL : 0);
 

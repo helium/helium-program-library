@@ -1,10 +1,11 @@
 import { publicProcedure } from "@/server/api/procedures";
-import { createSolanaConnection } from "@/lib/solana";
+import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
+import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
   requirePositionOwnershipWithMessage,
@@ -155,7 +156,13 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
         feePayer: walletPubkey,
       });
 
-    const totalFee = getTotalTransactionFees(versionedTransactions);
+    const cluster = getCluster();
+    const jitoTipCost =
+      (cluster === "mainnet" || cluster === "mainnet-beta") &&
+      versionedTransactions.length > 1
+        ? getJitoTipAmountLamports()
+        : 0;
+    const totalFee = getTotalTransactionFees(versionedTransactions) + jitoTipCost;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < totalFee) {
