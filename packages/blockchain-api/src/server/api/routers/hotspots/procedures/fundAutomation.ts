@@ -12,7 +12,11 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipAmountLamports,
+  getJitoTipTransaction,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
 import { publicProcedure } from "../../../procedures";
 import { fetchAutomationData } from "./automation-data-helpers";
 import {
@@ -75,9 +79,15 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
       cronJobFundingLamports + pdaWalletFundingLamports;
 
     const walletBalance = await provider.connection.getBalance(wallet);
-    // Add estimated transaction fees (~5000 lamports per transaction)
-    const estimatedTxFees = 5000 * 2; // Estimate for 2 potential transfers
-    const totalNeededWithFees = totalFundingNeeded + estimatedTxFees;
+    // Add estimated transaction fees + Jito tip for mainnet bundles
+    const estimatedTxFees = BASE_TX_FEE_LAMPORTS * 2; // Estimate for 2 potential transfers
+    const cluster = getCluster();
+    const estimatedJitoTipCost =
+      cluster === "mainnet" || cluster === "mainnet-beta"
+        ? getJitoTipAmountLamports()
+        : 0;
+    const totalNeededWithFees =
+      totalFundingNeeded + estimatedTxFees + estimatedJitoTipCost;
 
     if (walletBalance < totalNeededWithFees) {
       throw errors.INSUFFICIENT_FUNDS({

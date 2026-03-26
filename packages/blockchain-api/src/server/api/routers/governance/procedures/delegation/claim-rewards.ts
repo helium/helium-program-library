@@ -1,6 +1,7 @@
 import { publicProcedure } from "@/server/api/procedures";
-import { createSolanaConnection } from "@/lib/solana";
+import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
+import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
   generateTransactionTag,
@@ -120,7 +121,13 @@ export const claimRewards =
         feePayer: walletPubkey,
       });
 
-      const txFee = getTotalTransactionFees(versionedTransactions);
+      const cluster = getCluster();
+      const jitoTipCost =
+        (cluster === "mainnet" || cluster === "mainnet-beta") &&
+        versionedTransactions.length > 1
+          ? getJitoTipAmountLamports()
+          : 0;
+      const txFee = getTotalTransactionFees(versionedTransactions) + jitoTipCost;
 
       const walletBalance = await connection.getBalance(walletPubkey);
       if (walletBalance < txFee) {

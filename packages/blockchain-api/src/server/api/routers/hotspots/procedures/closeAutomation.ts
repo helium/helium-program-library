@@ -17,7 +17,11 @@ import {
   toVersionedTx,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipAmountLamports,
+  getJitoTipTransaction,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
 import { publicProcedure } from "../../../procedures";
 import {
   calculateRequiredBalance,
@@ -57,9 +61,17 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       });
     }
 
-    // Check wallet has sufficient balance for transaction fees
+    // Check wallet has sufficient balance for transaction fees + potential Jito tip
     const walletBalance = await provider.connection.getBalance(wallet);
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
+    const cluster = getCluster();
+    const estimatedJitoTipCost =
+      cluster === "mainnet" || cluster === "mainnet-beta"
+        ? getJitoTipAmountLamports()
+        : 0;
+    const required = calculateRequiredBalance(
+      BASE_TX_FEE_LAMPORTS + estimatedJitoTipCost,
+      0,
+    );
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",

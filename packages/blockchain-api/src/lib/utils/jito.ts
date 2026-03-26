@@ -8,6 +8,7 @@ import {
 import { populateMissingDraftInfo, toVersionedTx } from "@helium/spl-utils";
 import * as Sentry from "@sentry/nextjs";
 import { env } from "../env";
+import { classifySimulationLogs } from "./simulation-classifier";
 
 export function shouldUseJitoBundle(
   transactionsLength: number,
@@ -54,7 +55,10 @@ async function jitoRpcRequest(
   });
 }
 
+// Tip account cache with TTL (5 minutes)
+const TIP_ACCOUNTS_TTL_MS = 5 * 60 * 1000;
 let cachedTipAccounts: string[] | null = null;
+let tipAccountsCachedAt = 0;
 
 async function fetchJitoTipAccounts(): Promise<string[]> {
   const response = await jitoBlockEngineRequest("getTipAccounts", []);
@@ -76,8 +80,12 @@ async function fetchJitoTipAccounts(): Promise<string[]> {
 }
 
 async function getJitoTipAccount(): Promise<string> {
-  if (!cachedTipAccounts) {
+  if (
+    !cachedTipAccounts ||
+    Date.now() - tipAccountsCachedAt > TIP_ACCOUNTS_TTL_MS
+  ) {
     cachedTipAccounts = await fetchJitoTipAccounts();
+    tipAccountsCachedAt = Date.now();
   }
 
   return cachedTipAccounts[
@@ -141,6 +149,46 @@ export interface JitoBundleContext {
   transactionMetadata?: Array<Record<string, unknown> | undefined>;
 }
 
+function stringifySummary(summary: unknown): string {
+  if (typeof summary === "string") return summary;
+  try {
+    return JSON.stringify(summary);
+  } catch {
+    return String(summary);
+  }
+}
+
+/**
+ * Classify bundle simulation failure using the shared classifier.
+ */
+function classifyBundleSimulationFailure(
+  txResults: Array<{ logs?: string[]; err?: unknown }>,
+): { category: string; detail: string } {
+  const allLogs = txResults.flatMap((r) => r.logs ?? []);
+  const firstErr = txResults.find((r) => r.err);
+  const errStr = firstErr?.err
+    ? typeof firstErr.err === "string"
+      ? firstErr.err
+      : JSON.stringify(firstErr.err)
+    : "";
+  return classifySimulationLogs(errStr, allLogs);
+}
+
+/**
+ * Derive the action type from the bundle's transaction metadata
+ * (e.g. "claim_rewards", "position_create", "mint_data_credits").
+ */
+function deriveActionType(
+  context?: JitoBundleContext,
+): string {
+  const meta = context?.transactionMetadata;
+  if (!meta) return "unknown";
+  const firstReal = meta.find(
+    (m) => m && m.type && m.type !== "jito_tip",
+  );
+  return (firstReal?.type as string) ?? "unknown";
+}
+
 export async function simulateJitoBundle(
   serializedTransactions: string[],
   context?: JitoBundleContext,
@@ -165,7 +213,7 @@ export async function simulateJitoBundle(
   ]);
 
   type SimulationResult = {
-    summary: string;
+    summary: unknown;
     transactionResults: Array<{
       logs?: string[];
       unitsConsumed?: number;
@@ -196,11 +244,15 @@ export async function simulateJitoBundle(
       : (rpcResponse.result as SimulationResult | undefined);
 
   if (simulation && simulation.summary !== "succeeded") {
+    const summaryStr = stringifySummary(simulation.summary);
     const txResults = simulation.transactionResults;
     const allLogs = txResults.flatMap((r) => r.logs ?? []);
+    const { category, detail } = classifyBundleSimulationFailure(txResults);
+    const actionType = deriveActionType(context);
 
     console.error(
-      `[simulateBundle] Bundle simulation failed: ${simulation.summary}\n` +
+      `[simulateBundle] Bundle simulation failed: ${summaryStr}\n` +
+        `Category: ${category} | Action: ${actionType}\n` +
         `Bundle size: ${serializedTransactions.length}\n` +
         `Transaction results:\n` +
         txResults
@@ -214,17 +266,25 @@ export async function simulateJitoBundle(
     );
 
     const err = new BundleSimulationError(
-      `Jito bundle simulation failed: ${simulation.summary}`,
+      `Jito bundle simulation failed [${category}] (${actionType}): ${detail}`,
       txResults,
     );
     Sentry.captureException(err, {
       level: "error",
+      fingerprint: [
+        "jito_bundle_simulation_failed",
+        category,
+        actionType,
+      ],
       tags: {
         error_type: "jito_bundle_simulation_failed",
+        simulation_failure_category: category,
+        action_type: actionType,
         tag: context?.tag,
       },
       extra: {
-        summary: simulation.summary,
+        summary: summaryStr,
+        failure_detail: detail,
         transaction_results: txResults,
         logs: allLogs,
         bundle_size: serializedTransactions.length,
@@ -289,9 +349,7 @@ export async function submitJitoBundle(
       },
     });
 
-    throw new Error(
-      `Jito bundle submission failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
+    throw error;
   }
 }
 
