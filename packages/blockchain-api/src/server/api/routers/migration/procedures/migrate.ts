@@ -810,6 +810,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
         })),
         parallel: false,
         tag,
+        actionMetadata: { type: "migration", sourceWallet, destinationWallet, hotspotCount: hotspots?.length ?? 0 },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFees),

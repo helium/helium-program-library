@@ -6,7 +6,7 @@ import { stopNextServer } from "./helpers/next"
 import { stopSurfpool } from "./helpers/surfpool"
 import { signAndSubmitTransactionData } from "./helpers/tx"
 import { setupTestCtx, TestCtx } from "./helpers/context"
-import { TEST_HOTSPOT_ENTITY_KEY } from "./helpers/constants"
+import { TEST_HOTSPOT_ENTITY_KEY, TEST_HOTSPOT_ASSET_ID } from "./helpers/constants"
 import { ensureNoContract } from "./helpers/reward-contract"
 import { verifyEstimatedSolFee } from "./helpers/estimate"
 
@@ -183,6 +183,18 @@ describe("hotspot-transfer", () => {
     const txData = result.transactionData.transactions[0]
     expect(txData.metadata?.type).to.equal("hotspot_transfer")
     expect(txData.metadata?.description).to.include("Transfer")
+
+    // Verify enriched per-transaction metadata
+    expect(txData.metadata?.hotspotKey).to.equal(TEST_HOTSPOT_ASSET_ID)
+    expect(txData.metadata?.hotspotName).to.be.a("string").and.not.be.empty
+    expect(txData.metadata?.recipient).to.equal(recipient.publicKey.toBase58())
+
+    // Verify batch-level actionMetadata
+    expect(result.transactionData.actionMetadata).to.deep.include({
+      type: "hotspot_transfer",
+      hotspotKey: TEST_HOTSPOT_ASSET_ID,
+      recipient: recipient.publicKey.toBase58(),
+    })
 
     // Verify estimate accuracy
     await verifyEstimatedSolFee(ctx, result.transactionData, result.estimatedSolFee)

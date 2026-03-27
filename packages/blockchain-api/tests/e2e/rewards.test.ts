@@ -117,6 +117,13 @@ describe("rewards endpoints", () => {
       result?.transactionData?.transactions?.[0]?.serializedTransaction
     ).to.be.a("string");
 
+    // Verify batch-level actionMetadata
+    expect(result.transactionData.actionMetadata).to.deep.include({
+      type: "queue_wallet_claim",
+      network: "all",
+    });
+    expect(result.transactionData.actionMetadata?.hotspotCount).to.be.a("number").and.be.greaterThan(0);
+
     // Submit transactions
     await signAndSubmitTransactionData(
       connection,

@@ -23,6 +23,9 @@ export interface TransactionBatchAttributes {
   cluster: string;
   tag?: string;
   payer: string;
+  actionType?: string;
+  actionMetadata?: Record<string, unknown>;
+  confirmedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   transactions?: PendingTransaction[];
@@ -37,6 +40,9 @@ class TransactionBatch extends Model implements TransactionBatchAttributes {
   declare cluster: string;
   declare tag?: string;
   declare payer: string;
+  declare actionType?: string;
+  declare actionMetadata?: Record<string, unknown>;
+  declare confirmedAt?: Date;
   declare createdAt: Date;
   declare updatedAt: Date;
   declare transactions?: PendingTransaction[];
@@ -79,6 +85,21 @@ TransactionBatch.init(
     payer: {
       type: DataTypes.STRING,
       allowNull: false,
+    },
+    actionType: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: "action_type",
+    },
+    actionMetadata: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: "action_metadata",
+    },
+    confirmedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "confirmed_at",
     },
   },
   {

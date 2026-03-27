@@ -26,6 +26,7 @@ export const TransactionDataSchema = z.object({
   transactions: z.array(TransactionItemSchema),
   parallel: z.boolean(),
   tag: z.string().optional(),
+  actionMetadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
@@ -168,6 +169,7 @@ export function typedTransactionData<T extends z.ZodTypeAny>(
     ),
     parallel: z.boolean(),
     tag: z.string().optional(),
+    actionMetadata: z.record(z.string(), z.unknown()).optional(),
   });
 }
 

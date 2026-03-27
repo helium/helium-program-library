@@ -642,6 +642,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         transactions: allTransactions,
         parallel: !hasClaimTransactions,
         tag,
+        actionMetadata: { type: "delegation_delegate", subDaoMint, positionCount: positionMints.length },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

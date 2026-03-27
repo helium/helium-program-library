@@ -180,6 +180,7 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
         ],
         parallel: false,
         tag,
+        actionMetadata: { type: "delegation_extend", positionMint },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFee),

@@ -190,6 +190,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
         ],
         parallel: false,
         tag,
+        actionMetadata: { type: "position_split", positionMint, amount },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

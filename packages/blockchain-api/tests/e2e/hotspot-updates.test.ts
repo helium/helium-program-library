@@ -48,6 +48,12 @@ describe("hotspot-updates", () => {
       expect(data?.appliedTo?.mobile).to.equal(true);
       expect(data?.appliedTo?.iot).to.equal(false);
 
+      // Verify batch-level actionMetadata
+      expect(data?.transactionData?.actionMetadata).to.deep.include({
+        type: "hotspot_update",
+        hotspotKey: entityPubKey,
+      });
+
       // #then tx submits successfully
       await signAndSubmitTransactionData(
         ctx.connection,

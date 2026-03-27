@@ -96,6 +96,7 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       transactions,
       parallel: false,
       tag,
+      actionMetadata: { type: "mint_data_credits", dcAmount: dcAmount || undefined, hntAmount: hntAmount || undefined, recipient: recipient || undefined },
     };
   }
 );

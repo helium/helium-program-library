@@ -5,6 +5,7 @@ export const SubmitInputSchema = z.object({
   transactions: z.array(TransactionItemSchema),
   parallel: z.boolean(),
   tag: z.string().optional(),
+  actionMetadata: z.record(z.string(), z.unknown()).optional(),
   simulationCommitment: z.enum(["confirmed", "finalized"]).optional().default("confirmed"),
   simulate: z.boolean().optional().default(true),
 });
@@ -143,3 +144,45 @@ export const EstimateOutputSchema = z.object({
 
 export type EstimateInput = z.infer<typeof EstimateInputSchema>;
 export type EstimateOutput = z.infer<typeof EstimateOutputSchema>;
+
+// History endpoint schemas
+
+export const GetHistoryInputSchema = z.object({
+  payer: z.string().min(32),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  actionType: z.string().optional(),
+});
+
+export const HistoryTransactionSchema = z.object({
+  signature: z.string(),
+  status: z.string(),
+  type: z.string(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const HistoryActionSchema = z.object({
+  id: z.string(),
+  source: z.enum(["blockchain_api", "on_chain"]),
+  actionType: z.string(),
+  actionMetadata: z.record(z.string(), z.unknown()).nullable(),
+  status: z.string(),
+  transactions: z.array(HistoryTransactionSchema),
+  timestamp: z.string(),
+});
+
+export const HistoryOutputSchema = z.object({
+  payer: z.string(),
+  actions: z.array(HistoryActionSchema),
+  pagination: z.object({
+    page: z.number(),
+    limit: z.number(),
+    total: z.number(),
+    totalPages: z.number(),
+  }),
+});
+
+export type GetHistoryInput = z.infer<typeof GetHistoryInputSchema>;
+export type HistoryTransaction = z.infer<typeof HistoryTransactionSchema>;
+export type HistoryAction = z.infer<typeof HistoryActionSchema>;
+export type HistoryOutput = z.infer<typeof HistoryOutputSchema>;

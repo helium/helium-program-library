@@ -105,6 +105,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             transactions: [],
             parallel: true,
             tag: `claim_rewards:${walletAddress}`,
+            actionMetadata: { type: "claim_rewards", hotspotCount: 0, network: "all" },
           },
           estimatedSolFee: toTokenAmountOutput(
             new BN(0),
@@ -178,15 +179,17 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
 
       return {
         transactionData: {
-          transactions: txs.map((serialized) => ({
+          transactions: txs.map((serialized, i) => ({
             serializedTransaction: serialized,
             metadata: {
               type: "claim_rewards",
               description: "Claim hotspot rewards",
+              hotspotKeys: claimable.map((h) => h.asset.toBase58()),
             },
           })),
           parallel: true,
           tag: `claim_rewards:${walletAddress}`,
+          actionMetadata: { type: "claim_rewards", hotspotCount: claimable.length, network: "all" },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(txFees + rentCost),
@@ -342,6 +345,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         })),
         parallel: true,
         tag: `claim_rewards_tuktuk:${walletAddress}`,
+        actionMetadata: { type: "queue_wallet_claim", hotspotCount: total, network: "all" },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFees + rentCost),

@@ -88,6 +88,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
       ],
       parallel: false,
       tag,
+      actionMetadata: { type: "delegate_data_credits", routerKey, amount, mint },
     };
   }
 );

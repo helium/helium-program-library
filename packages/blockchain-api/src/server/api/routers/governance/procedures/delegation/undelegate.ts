@@ -228,6 +228,7 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
         transactions: allTransactions,
         parallel: false,
         tag,
+        actionMetadata: { type: "delegation_undelegate", positionMint },
       },
       hasMore: batchHasMore,
       estimatedSolFee: toTokenAmountOutput(

@@ -158,6 +158,7 @@ export const relinquishPositionVotes =
           transactions,
           parallel: false,
           tag,
+          actionMetadata: { type: "voting_relinquish_position", positionMint, organization },
         },
         hasMore,
         estimatedSolFee: toTokenAmountOutput(
