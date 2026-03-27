@@ -79,8 +79,7 @@
     "cipher-base": "^1.0.6",
     "sha.js": "^2.4.12",
     "@helium/crypto": "^4.14.2",
-    "@types/bn.js": "^5.2.0",
-    "@coral-xyz/anchor": "^0.31.1"
+    "@types/bn.js": "^5.2.0"
   },
   "packageManager": "yarn@3.6.4"
 }
