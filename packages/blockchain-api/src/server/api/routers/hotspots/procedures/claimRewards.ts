@@ -59,7 +59,7 @@ const HPL_CRONS_PROGRAM_ID = new PublicKey(
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
 // Max hotspots to process per direct claim call for non-HNT networks
-const MAX_DIRECT_CLAIM_HOTSPOTS = 5;
+const MAX_DIRECT_CLAIM_HOTSPOTS = 4;
 
 /**
  * Create transactions to claim rewards for all hotspots in a wallet.
