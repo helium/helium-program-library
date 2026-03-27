@@ -1,6 +1,6 @@
 import { expect } from "chai"
 import type { TestCtx } from "./context"
-import type { TransactionData, TokenAmountOutput } from "../../../packages/api/src/schemas/common"
+import type { TransactionData, TokenAmountOutput } from "@helium/blockchain-api/schemas/common"
 
 const ESTIMATE_TOLERANCE_LAMPORTS = 1000000 // 0.001 SOL
 
