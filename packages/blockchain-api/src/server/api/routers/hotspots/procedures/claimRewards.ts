@@ -34,7 +34,6 @@ import {
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
 } from "@helium/spl-utils";
-import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { getJitoTipAmountLamports, getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
 import {
@@ -45,6 +44,7 @@ import {
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
+import { getMintForNetwork, getLazyDistributorForNetwork } from "@/lib/utils/network-mint";
 
 const MIN_RENT = 0.00089088;
 const RECIPIENT_RENT = 0.00242208;
@@ -58,38 +58,44 @@ const HPL_CRONS_PROGRAM_ID = new PublicKey(
 );
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
+// Max hotspots to process per direct claim call for non-HNT networks
+const MAX_DIRECT_CLAIM_HOTSPOTS = 5;
+
 /**
  * Create transactions to claim rewards for all hotspots in a wallet.
- * For wallets with 3 or fewer hotspots, returns direct claim transactions.
- * For larger wallets, creates a Tuktuk task to process claims.
+ * For HNT: wallets with ≤3 hotspots get direct claim, larger wallets use Tuktuk.
+ * For IOT/MOBILE: always uses direct claim with hasMore pagination for large wallets.
  */
 export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
   async ({ input, errors }) => {
-    const { walletAddress } = input;
+    const { walletAddress, network } = input;
+    const mint = getMintForNetwork(network);
+    const lazyDistributor = getLazyDistributorForNetwork(network);
+    const lazyDistributorAddress = lazyDistributor.toBase58();
+    const isHnt = network === "hnt";
 
-    // Single query: fetch up to 3 hotspots and total count
+    // For non-HNT, fetch more hotspots since we use direct claim
+    const limit = isHnt ? 3 : MAX_DIRECT_CLAIM_HOTSPOTS;
     const hotspotsData = await getHotspotsByOwner({
       owner: walletAddress,
       page: 1,
-      limit: 3,
+      limit,
     });
     const { total } = hotspotsData;
 
-    // For small wallets, request direct claim transactions
-    if (total <= 3) {
-      // Initialize programs
+    // Use direct claim path for: small wallets (any network) or non-HNT networks
+    const useDirectClaim = !isHnt || total <= 3;
+
+    if (useDirectClaim) {
       const { provider, connection } = createSolanaConnection(walletAddress);
       const ldProgram = await initLd(provider);
       const mfProgram = await initMiniFanout(provider);
 
-      // Map hotspots to asset/entityKey pairs
       const allHotspots = hotspotsData.hotspots.map((h) => ({
         asset: new PublicKey(h.asset),
         entityKey: h.entityKey,
       }));
 
-      // Filter out hotspots with mini fanout destinations
-      const lazyDistributor = new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS);
       const { claimable } = await filterHotspotsWithoutMiniFanout(
         ldProgram,
         mfProgram,
@@ -98,7 +104,6 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         allHotspots,
       );
 
-      // If all hotspots have mini fanouts, return empty transactions
       if (claimable.length === 0) {
         return {
           transactionData: {
@@ -110,20 +115,19 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             new BN(0),
             NATIVE_MINT.toBase58(),
           ),
+          hasMore: !isHnt && total > hotspotsData.hotspots.length,
         };
       }
 
       const assets = claimable.map((h) => h.asset);
       const entityKeys = claimable.map((h) => h.entityKey);
 
-      // Fetch oracle rewards for these entity keys
       const rewards = await getBulkRewards(
         ldProgram,
         lazyDistributor,
         entityKeys,
       );
 
-      // Build and sign transactions via oracle
       const vtxs: VersionedTransaction[] = await formBulkTransactions({
         program: ldProgram,
         rewards,
@@ -135,7 +139,6 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         skipOracleSign: false,
       });
 
-      // Add Jito tip if needed for mainnet bundles
       if (shouldUseJitoBundle(vtxs.length, getCluster())) {
         vtxs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
       }
@@ -146,7 +149,6 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
 
       const txFees = getTotalTransactionFees(vtxs);
 
-      // Check wallet has sufficient balance for tx fees + recipient creation rent
       const recipientKeys = assets.map(
         (asset) => recipientKey(lazyDistributor, asset)[0],
       );
@@ -156,7 +158,6 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const jitoTipCost = shouldUseJitoBundle(vtxs.length, getCluster())
         ? getJitoTipAmountLamports()
         : 0;
-      // SetCurrentRewardsV0 may resize recipient accounts (~200K lamports each)
       const estimatedResizeCost = assets.length * 200_000;
       const rentCost = numRecipientsNeeded * RECIPIENT_RENT_LAMPORTS;
       const requiredLamports = calculateRequiredBalance(
@@ -176,6 +177,9 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         });
       }
 
+      // For non-HNT, there may be more hotspots to process in subsequent calls
+      const hasMore = !isHnt && total > hotspotsData.hotspots.length;
+
       return {
         transactionData: {
           transactions: txs.map((serialized) => ({
@@ -192,10 +196,11 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           new BN(txFees + rentCost),
           NATIVE_MINT.toBase58(),
         ),
+        hasMore,
       };
     }
 
-    // For larger wallets, queue a Tuktuk claim task via HPL Crons
+    // HNT with >3 hotspots: queue a Tuktuk claim task via HPL Crons
     const { provider } = createSolanaConnection(walletAddress);
     anchor.setProvider(provider);
 
@@ -243,7 +248,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     );
 
     const hotspotsNeedingRecipient =
-      await getNumRecipientsNeeded(walletAddress);
+      await getNumRecipientsNeeded(walletAddress, lazyDistributorAddress);
     console.log(
       `[PDA WALLET ${pdaWallet.toBase58()}] Hotspots needing recipient: ${hotspotsNeedingRecipient}, shortfall: ${pdaWalletLamportsShortfall}`,
     );
@@ -347,6 +352,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         new BN(txFees + rentCost),
         NATIVE_MINT.toBase58(),
       ),
+      hasMore: false,
     };
   },
 );

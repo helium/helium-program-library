@@ -11,13 +11,13 @@ import { getBulkRewards } from "@/utils/distributorOracle";
 import type { BulkRewards } from "@helium/distributor-oracle";
 import { entityCronAuthorityKey } from "@helium/hpl-crons-sdk";
 import { cronJobKey, init as initCron } from "@helium/cron-sdk";
-import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
-import { HNT_MINT, truthy } from "@helium/spl-utils";
+import { truthy } from "@helium/spl-utils";
 import type { TokenAmountOutput } from "@helium/blockchain-api/schemas/common";
 import { unpackAccount } from "@solana/spl-token";
+import { getMintForNetwork, getLazyDistributorForNetwork } from "@/lib/utils/network-mint";
 
 interface MiniFanoutShare {
   wallet: PublicKey;
@@ -28,22 +28,24 @@ interface MiniFanoutShare {
   };
 }
 
-function hntOutput(bn: BN): TokenAmountOutput {
-  return toTokenAmountOutput(bn, HNT_MINT.toBase58());
-}
-
-function zeroPending(): {
+function zeroPending(mintAddress: string): {
   total: TokenAmountOutput;
   claimable: TokenAmountOutput;
   automated: TokenAmountOutput;
 } {
-  const zero = hntOutput(new BN(0));
+  const zero = toTokenAmountOutput(new BN(0), mintAddress);
   return { total: zero, claimable: zero, automated: zero };
 }
 
 export const getPendingRewards =
   publicProcedure.hotspots.getPendingRewards.handler(async ({ input }) => {
-    const { walletAddress } = input;
+    const { walletAddress, network } = input;
+    const mint = getMintForNetwork(network);
+    const mintAddress = mint.toBase58();
+    const lazyDistributor = getLazyDistributorForNetwork(network);
+
+    const tokenOutput = (bn: BN): TokenAmountOutput =>
+      toTokenAmountOutput(bn, mintAddress);
 
     const hotspotsData = await getHotspotsByOwner({
       owner: walletAddress,
@@ -51,7 +53,7 @@ export const getPendingRewards =
     });
 
     if (hotspotsData.hotspots.length === 0) {
-      return { pending: zeroPending(), byHotspot: [] };
+      return { pending: zeroPending(mintAddress), byHotspot: [] };
     }
 
     // Deduplicate hotspots by asset to prevent double-counting
@@ -69,8 +71,6 @@ export const getPendingRewards =
     const ldProgram = await initLd(provider);
     const cronProgram = await initCron(provider);
     const mfProgram = await initMiniFanout(provider);
-
-    const lazyDistributor = new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS);
 
     // Fetch oracle rewards, recipient accounts, cron job, and mini-fanouts in parallel
     const [oracleRewards, recipients, cronJobAccount] = await Promise.all([
@@ -231,7 +231,7 @@ export const getPendingRewards =
         const ataPendingBn = ataBalancePerHotspot[idx]!;
         const totalPendingBn = oraclePendingBn.add(ataPendingBn);
         const miniFanout = miniFanouts[idx];
-        const zeroOut = hntOutput(new BN(0));
+        const zeroOut = tokenOutput(new BN(0));
 
         const isAutomated = hasAutomation || !!miniFanout;
         if (isAutomated) {
@@ -242,7 +242,7 @@ export const getPendingRewards =
 
         if (totalPendingBn.isZero()) return null;
 
-        const totalOut = hntOutput(totalPendingBn);
+        const totalOut = tokenOutput(totalPendingBn);
         return {
           hotspotPubKey: hotspot.entityKey,
           pending: {
@@ -256,13 +256,13 @@ export const getPendingRewards =
 
     closeSingleton(connection);
 
-    const totalOut = hntOutput(totalPendingBn);
+    const totalOut = tokenOutput(totalPendingBn);
 
     return {
       pending: {
         total: totalOut,
-        claimable: hntOutput(claimableBn),
-        automated: hntOutput(automatedBn),
+        claimable: tokenOutput(claimableBn),
+        automated: tokenOutput(automatedBn),
       },
       byHotspot,
     };

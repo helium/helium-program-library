@@ -435,129 +435,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@coral-xyz/anchor-errors@npm:^0.31.0":
-  version: 0.31.0
-  resolution: "@coral-xyz/anchor-errors@npm:0.31.0"
-  checksum: beb42facd19f2c8f32478eed76e2fa20c3cee8be6a2790b4c8cb8eeaca88b5f1da1a2b14d38ac662f23788fcb3bd9573a90285397425621b740a4b422e4e214b
-  languageName: node
-  linkType: hard
-
 "@coral-xyz/anchor-errors@npm:^0.31.1":
   version: 0.31.1
   resolution: "@coral-xyz/anchor-errors@npm:0.31.1"
   checksum: 5f13a8599856149774605f934b8dcff3d660c5504f4c2c31eb3509249c90906cf667e1dd170436464f605137e9fb23503eb67f80cfa2476f1fbf8e8afac17b7b
-  languageName: node
-  linkType: hard
-
-"@coral-xyz/anchor@npm:^0.26.0":
-  version: 0.26.0
-  resolution: "@coral-xyz/anchor@npm:0.26.0"
-  dependencies:
-    "@coral-xyz/borsh": "npm:^0.26.0"
-    "@solana/web3.js": "npm:^1.68.0"
-    base64-js: "npm:^1.5.1"
-    bn.js: "npm:^5.1.2"
-    bs58: "npm:^4.0.1"
-    buffer-layout: "npm:^1.2.2"
-    camelcase: "npm:^6.3.0"
-    cross-fetch: "npm:^3.1.5"
-    crypto-hash: "npm:^1.3.0"
-    eventemitter3: "npm:^4.0.7"
-    js-sha256: "npm:^0.9.0"
-    pako: "npm:^2.0.3"
-    snake-case: "npm:^3.0.4"
-    superstruct: "npm:^0.15.4"
-    toml: "npm:^3.0.0"
-  checksum: 1e637b28181a42ce0aa4ed2853b7c563d4763f01e330cd12572b70d5dc830956e33d19a83afba09846b265db615f8ef1dc4a67d77865418c44ca8839d375a56f
-  languageName: node
-  linkType: hard
-
-"@coral-xyz/anchor@npm:^0.28.0":
-  version: 0.28.0
-  resolution: "@coral-xyz/anchor@npm:0.28.0"
-  dependencies:
-    "@coral-xyz/borsh": "npm:^0.28.0"
-    "@solana/web3.js": "npm:^1.68.0"
-    base64-js: "npm:^1.5.1"
-    bn.js: "npm:^5.1.2"
-    bs58: "npm:^4.0.1"
-    buffer-layout: "npm:^1.2.2"
-    camelcase: "npm:^6.3.0"
-    cross-fetch: "npm:^3.1.5"
-    crypto-hash: "npm:^1.3.0"
-    eventemitter3: "npm:^4.0.7"
-    js-sha256: "npm:^0.9.0"
-    pako: "npm:^2.0.3"
-    snake-case: "npm:^3.0.4"
-    superstruct: "npm:^0.15.4"
-    toml: "npm:^3.0.0"
-  checksum: 58b3677b5b2ce2c779045184ce4a0ef696966a6a58f41c1c56f6f178db0491acecb6ec677ce0502f0b382a2c724f9c2860d82cc88601784d556d95fbeda415e5
-  languageName: node
-  linkType: hard
-
-"@coral-xyz/anchor@npm:^0.28.1-beta.1":
-  version: 0.28.1-beta.2
-  resolution: "@coral-xyz/anchor@npm:0.28.1-beta.2"
-  dependencies:
-    "@coral-xyz/borsh": "npm:^0.28.0"
-    "@noble/hashes": "npm:^1.3.1"
-    "@solana/web3.js": "npm:^1.68.0"
-    base64-js: "npm:^1.5.1"
-    bn.js: "npm:^5.1.2"
-    bs58: "npm:^4.0.1"
-    buffer-layout: "npm:^1.2.2"
-    camelcase: "npm:^6.3.0"
-    cross-fetch: "npm:^3.1.5"
-    crypto-hash: "npm:^1.3.0"
-    eventemitter3: "npm:^4.0.7"
-    pako: "npm:^2.0.3"
-    snake-case: "npm:^3.0.4"
-    superstruct: "npm:^0.15.4"
-    toml: "npm:^3.0.0"
-  checksum: 5d286277b7401105c77cea2c83758e0dedbf583377593e4546a97024d83dd1279d43cef37c7162c948d79421bfd995fb19e11680581aa1e00ddf20221411aaa8
-  languageName: node
-  linkType: hard
-
-"@coral-xyz/anchor@npm:^0.29.0":
-  version: 0.29.0
-  resolution: "@coral-xyz/anchor@npm:0.29.0"
-  dependencies:
-    "@coral-xyz/borsh": ^0.29.0
-    "@noble/hashes": ^1.3.1
-    "@solana/web3.js": ^1.68.0
-    bn.js: ^5.1.2
-    bs58: ^4.0.1
-    buffer-layout: ^1.2.2
-    camelcase: ^6.3.0
-    cross-fetch: ^3.1.5
-    crypto-hash: ^1.3.0
-    eventemitter3: ^4.0.7
-    pako: ^2.0.3
-    snake-case: ^3.0.4
-    superstruct: ^0.15.4
-    toml: ^3.0.0
-  checksum: 10c4e6c5557653419683f5ae22ec47ac266b64e5b422d466885cf2dc7efa8f836239bdf321495d3e2b3ce03e766667c0e2192cc573fbd66bc12cc652f5146e10
-  languageName: node
-  linkType: hard
-
-"@coral-xyz/anchor@npm:^0.31.0":
-  version: 0.31.0
-  resolution: "@coral-xyz/anchor@npm:0.31.0"
-  dependencies:
-    "@coral-xyz/anchor-errors": ^0.31.0
-    "@coral-xyz/borsh": ^0.31.0
-    "@noble/hashes": ^1.3.1
-    "@solana/web3.js": ^1.69.0
-    bn.js: ^5.1.2
-    bs58: ^4.0.1
-    buffer-layout: ^1.2.2
-    camelcase: ^6.3.0
-    cross-fetch: ^3.1.5
-    eventemitter3: ^4.0.7
-    pako: ^2.0.3
-    superstruct: ^0.15.4
-    toml: ^3.0.0
-  checksum: b74942b4066567640ad224de3a1d7d49f6d1e246f10508ed6e765981d3b0766a73ab0fd2ec6f21f3c3baacdf776eb569fc73bd9a3690790c20bdc8f6d237bad4
   languageName: node
   linkType: hard
 
@@ -594,18 +475,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@coral-xyz/borsh@npm:^0.26.0":
-  version: 0.26.0
-  resolution: "@coral-xyz/borsh@npm:0.26.0"
-  dependencies:
-    bn.js: "npm:^5.1.2"
-    buffer-layout: "npm:^1.2.0"
-  peerDependencies:
-    "@solana/web3.js": ^1.68.0
-  checksum: 8418264ec64f926264adfaa9cff2323a7675b0df3b06b30043d256f1f3ed8fa68d6268f93600656a1ddcb953032ab41674f04e2387504f32d041b75fa3152a30
-  languageName: node
-  linkType: hard
-
 "@coral-xyz/borsh@npm:^0.28.0":
   version: 0.28.0
   resolution: "@coral-xyz/borsh@npm:0.28.0"
@@ -615,30 +484,6 @@ __metadata:
   peerDependencies:
     "@solana/web3.js": ^1.68.0
   checksum: bc2b06b777f9ed43d3b886d2350826bd44d5b932c4fd4471af5956e8755236f5854938c890ee4986d88f61d1439e1d84e715c43dcb6dca4e76198c1ce8dc7a58
-  languageName: node
-  linkType: hard
-
-"@coral-xyz/borsh@npm:^0.29.0":
-  version: 0.29.0
-  resolution: "@coral-xyz/borsh@npm:0.29.0"
-  dependencies:
-    bn.js: ^5.1.2
-    buffer-layout: ^1.2.0
-  peerDependencies:
-    "@solana/web3.js": ^1.68.0
-  checksum: 37006c75cd012672adf48e10234062624634da2a9335e34b7ff30969f58aff78cc3073b66a3edc806b52f038469f0c477a5a3ed35aaa075f3cbd44d7133ac218
-  languageName: node
-  linkType: hard
-
-"@coral-xyz/borsh@npm:^0.31.0":
-  version: 0.31.0
-  resolution: "@coral-xyz/borsh@npm:0.31.0"
-  dependencies:
-    bn.js: ^5.1.2
-    buffer-layout: ^1.2.0
-  peerDependencies:
-    "@solana/web3.js": ^1.69.0
-  checksum: 73d6d838662182c39f2230366d9bfbb5bb8120cc31fa6141ddf6dd445a6c719a920dd40d475c64ecaa953eda7e0516a05fc134c08e344350d4a284374a4edb94
   languageName: node
   linkType: hard
 
@@ -10947,7 +10792,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/web3.js@npm:^1.21.0, @solana/web3.js@npm:^1.22.0, @solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.50.1, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.68.0, @solana/web3.js@npm:^1.73.2, @solana/web3.js@npm:^1.78.4":
+"@solana/web3.js@npm:^1.21.0, @solana/web3.js@npm:^1.22.0, @solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.50.1, @solana/web3.js@npm:^1.56.2, @solana/web3.js@npm:^1.66.2, @solana/web3.js@npm:^1.73.2, @solana/web3.js@npm:^1.78.4":
   version: 1.78.4
   resolution: "@solana/web3.js@npm:1.78.4"
   dependencies:
@@ -11678,24 +11523,6 @@ __metadata:
   version: 3.5.38
   resolution: "@types/bluebird@npm:3.5.38"
   checksum: 8d1b04261e8e58816ec84ffa616c9e641c9416d0ab10c915ddb9cd8a0e7070af16df4f2eec243a3809cbed8ecee2fb3f45600ae43b3ab0ceea563aa18ceb6ab1
-  languageName: node
-  linkType: hard
-
-"@types/bn.js@npm:^4.11.5":
-  version: 4.11.6
-  resolution: "@types/bn.js@npm:4.11.6"
-  dependencies:
-    "@types/node": "npm:*"
-  checksum: 7f66f2c7b7b9303b3205a57184261974b114495736b77853af5b18d857c0b33e82ce7146911e86e87a87837de8acae28986716fd381ac7c301fd6e8d8b6c811f
-  languageName: node
-  linkType: hard
-
-"@types/bn.js@npm:^5.1.0, @types/bn.js@npm:^5.1.1":
-  version: 5.1.1
-  resolution: "@types/bn.js@npm:5.1.1"
-  dependencies:
-    "@types/node": "npm:*"
-  checksum: e50ed2dd3abe997e047caf90e0352c71e54fc388679735217978b4ceb7e336e51477791b715f49fd77195ac26dd296c7bad08a3be9750e235f9b2e1edb1b51c2
   languageName: node
   linkType: hard
 
@@ -27111,7 +26938,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "root-workspace-0b6124@workspace:."
   dependencies:
-    "@coral-xyz/anchor": ^0.31.0
+    "@coral-xyz/anchor": ^0.31.1
     "@coral-xyz/borsh": ^0.2.6
     "@helium/crypto": ^4.14.2
     "@helium/modular-governance-idls": ^0.1.5-alpha.0
@@ -27124,7 +26951,7 @@ __metadata:
     "@pythnetwork/pyth-solana-receiver": ^0.9.1
     "@solana/spl-account-compression": ^0.1.5-alpha.0
     "@solana/spl-governance": ^0.3.17
-    "@types/bn.js": ^5.1.0
+    "@types/bn.js": ^5.2.0
     "@types/chai": ^4.3.0
     "@types/chai-as-promised": ^7.1.5
     "@types/mocha": ^9.0.0

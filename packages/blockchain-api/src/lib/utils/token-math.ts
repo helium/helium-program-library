@@ -5,17 +5,11 @@ import type {
   TokenAmountInput,
   TokenAmountOutput,
 } from "@helium/blockchain-api/schemas/common";
-import { TOKEN_DECIMALS } from "@/lib/constants/tokens";
+import { TOKEN_DECIMALS, TOKEN_MINTS } from "@/lib/constants/tokens";
 
-export const HNT_DECIMALS = 8;
+export const HNT_DECIMALS = TOKEN_DECIMALS[TOKEN_MINTS.HNT];
 const HNT_DIVISOR = new BN(10).pow(new BN(HNT_DECIMALS));
-const SOL_DECIMALS = 9;
-
-const KNOWN_DECIMALS: Record<string, number> = {
-  [HNT_MINT.toBase58()]: HNT_DECIMALS,
-  [NATIVE_MINT.toBase58()]: SOL_DECIMALS,
-  ...TOKEN_DECIMALS,
-};
+const SOL_DECIMALS = TOKEN_DECIMALS[TOKEN_MINTS.WSOL];
 
 export function bnToHnt(value: BN): number {
   const integerPart = value.div(HNT_DIVISOR);
@@ -42,7 +36,7 @@ export function resolveTokenAmountInput(
       `Mint mismatch: expected ${expectedMint}, got ${input.mint}`,
     );
   }
-  const decimals = KNOWN_DECIMALS[input.mint];
+  const decimals = TOKEN_DECIMALS[input.mint];
   if (decimals === undefined) {
     throw new Error(`Unknown mint: ${input.mint}`);
   }
@@ -64,7 +58,7 @@ export function toTokenAmountOutput(
   rawAmount: BN,
   mint: string,
 ): TokenAmountOutput {
-  const decimals = KNOWN_DECIMALS[mint];
+  const decimals = TOKEN_DECIMALS[mint];
   if (decimals === undefined) {
     throw new Error(`Unknown mint: ${mint}`);
   }
