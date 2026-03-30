@@ -91,20 +91,79 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const ldProgram = await initLd(provider);
       const mfProgram = await initMiniFanout(provider);
 
-      const allHotspots = hotspotsData.hotspots.map((h) => ({
-        asset: new PublicKey(h.asset),
-        entityKey: h.entityKey,
-      }));
+      const matchesNetwork = (h: { type: string }) =>
+        isHnt || h.type === network || h.type === "all";
 
-      const { claimable } = await filterHotspotsWithoutMiniFanout(
-        ldProgram,
-        mfProgram,
-        connection,
-        lazyDistributor,
-        allHotspots,
-      );
+      // Accumulate transactions across pages until we hit MAX_DIRECT_CLAIM_HOTSPOTS + 1
+      // (the +1 lets us know there are more). Then slice off the extra and set hasMore.
+      let allVtxs: VersionedTransaction[] = [];
+      let allClaimable: Array<{ asset: PublicKey; entityKey: string }> = [];
+      let currentPage = 1;
+      const totalPages = Math.ceil(total / limit);
 
-      if (claimable.length === 0) {
+      while (allVtxs.length <= MAX_DIRECT_CLAIM_HOTSPOTS && currentPage <= totalPages) {
+        // Step 1: Fetch a chunk of hotspots, filter by network
+        const pageData = currentPage === 1
+          ? hotspotsData
+          : await getHotspotsByOwner({ owner: walletAddress, page: currentPage, limit });
+        currentPage++;
+
+        const pageHotspots = pageData.hotspots
+          .filter(matchesNetwork)
+          .map((h) => ({ asset: new PublicKey(h.asset), entityKey: h.entityKey }));
+
+        if (pageHotspots.length === 0) continue;
+
+        // Step 2: Filter for ones with pending rewards
+        const entityKeys = pageHotspots.map((h) => h.entityKey);
+        const rewards = await getBulkRewards(ldProgram, lazyDistributor, entityKeys);
+        const rKeys = pageHotspots.map((h) => recipientKey(lazyDistributor, h.asset)[0]);
+        const recipientAccs = await ldProgram.account.recipientV0.fetchMultiple(rKeys);
+        const withPending = pageHotspots.filter((_, idx) => {
+          const sortedOracleRewards = rewards
+            .map((rew) => new BN(rew.currentRewards[entityKeys[idx]] || 0))
+            .sort((a, b) => a.sub(b).toNumber());
+          const oracleMedian = sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)];
+          const alreadyDistributed = recipientAccs[idx]?.totalRewards || new BN(0);
+          return oracleMedian.sub(alreadyDistributed).gtn(0);
+        });
+
+        if (withPending.length === 0) continue;
+
+        // Step 3: Filter out ones with mini-fanouts
+        const { claimable: pageClaimable } = await filterHotspotsWithoutMiniFanout(
+          ldProgram,
+          mfProgram,
+          connection,
+          lazyDistributor,
+          withPending,
+        );
+
+        if (pageClaimable.length === 0) continue;
+
+        // Step 4: Build transactions
+        const pageVtxs = await formBulkTransactions({
+          program: ldProgram,
+          rewards,
+          assets: pageClaimable.map((h) => h.asset),
+          lazyDistributor,
+          assetEndpoint: env.ASSET_ENDPOINT,
+          isDevnet: getCluster() === "devnet",
+          useCache: false,
+          skipOracleSign: false,
+        });
+
+        allVtxs.push(...pageVtxs);
+        allClaimable.push(...pageClaimable);
+      }
+
+      // Step 5: Determine hasMore
+      const hasMore = allVtxs.length > MAX_DIRECT_CLAIM_HOTSPOTS;
+      if (hasMore) {
+        allVtxs = allVtxs.slice(0, MAX_DIRECT_CLAIM_HOTSPOTS);
+      }
+
+      if (allVtxs.length === 0) {
         return {
           transactionData: {
             transactions: [],
@@ -116,39 +175,20 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             new BN(0),
             NATIVE_MINT.toBase58(),
           ),
-          hasMore: !isHnt && total > hotspotsData.hotspots.length,
+          hasMore: false,
         };
       }
 
-      const assets = claimable.map((h) => h.asset);
-      const entityKeys = claimable.map((h) => h.entityKey);
-
-      const rewards = await getBulkRewards(
-        ldProgram,
-        lazyDistributor,
-        entityKeys,
-      );
-
-      const vtxs: VersionedTransaction[] = await formBulkTransactions({
-        program: ldProgram,
-        rewards,
-        assets,
-        lazyDistributor,
-        assetEndpoint: env.ASSET_ENDPOINT,
-        isDevnet: getCluster() === "devnet",
-        useCache: false,
-        skipOracleSign: false,
-      });
-
-      if (shouldUseJitoBundle(vtxs.length, getCluster())) {
-        vtxs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
+      if (shouldUseJitoBundle(allVtxs.length, getCluster())) {
+        allVtxs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
       }
 
-      const txs = vtxs.map((tx) =>
+      const txs = allVtxs.map((tx) =>
         Buffer.from(tx.serialize()).toString("base64"),
       );
 
-      const txFees = getTotalTransactionFees(vtxs);
+      const txFees = getTotalTransactionFees(allVtxs);
+      const assets = allClaimable.map((h) => h.asset);
 
       const recipientKeys = assets.map(
         (asset) => recipientKey(lazyDistributor, asset)[0],
@@ -156,7 +196,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const recipientAccounts =
         await ldProgram.account.recipientV0.fetchMultiple(recipientKeys);
       const numRecipientsNeeded = recipientAccounts.filter((r) => !r).length;
-      const jitoTipCost = shouldUseJitoBundle(vtxs.length, getCluster())
+      const jitoTipCost = shouldUseJitoBundle(allVtxs.length, getCluster())
         ? getJitoTipAmountLamports()
         : 0;
       const estimatedResizeCost = assets.length * 200_000;
@@ -178,9 +218,6 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         });
       }
 
-      // For non-HNT, there may be more hotspots to process in subsequent calls
-      const hasMore = !isHnt && total > hotspotsData.hotspots.length;
-
       return {
         transactionData: {
           transactions: txs.map((serialized, i) => ({
@@ -188,12 +225,12 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             metadata: {
               type: "claim_rewards",
               description: "Claim hotspot rewards",
-              hotspotKeys: claimable.map((h) => h.asset.toBase58()),
+              hotspotKeys: allClaimable.map((h) => h.asset.toBase58()),
             },
           })),
           parallel: true,
           tag: `claim_rewards:${walletAddress}`,
-          actionMetadata: { type: "claim_rewards", hotspotCount: claimable.length, network: "all" },
+          actionMetadata: { type: "claim_rewards", hotspotCount: allClaimable.length, network: "all" },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(txFees + rentCost),
