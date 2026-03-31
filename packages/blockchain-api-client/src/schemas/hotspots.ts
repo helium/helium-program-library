@@ -23,6 +23,7 @@ export const GetHotspotsInputSchema = z.object({
 export const ClaimRewardsInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   network: RewardNetworkSchema,
+  tuktuk: z.boolean().optional(),
 });
 
 export const GetPendingRewardsInputSchema = z.object({

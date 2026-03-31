@@ -24,6 +24,7 @@ const TIP_ACCOUNTS_TTL_MS = 5 * 60 * 1000;
  */
 async function requireBundleHasTipAccount(
   serializedTransactions: string[],
+  tag?: string,
 ): Promise<void> {
   if (
     !cachedTipAccountSet ||
@@ -62,14 +63,18 @@ async function requireBundleHasTipAccount(
     }
   }
 
-  const err = new Error(
+  let err = new Error(
     "Jito bundle is missing a tip transaction — no transaction write-locks a recognized tip account",
   );
-  Sentry.captureException(err, {
-    level: "error",
-    tags: { error_type: "jito_bundle_missing_tip" },
-    extra: { bundle_size: serializedTransactions.length },
-  });
+  if (tag?.includes("implicit-burn") || tag?.includes("claim-rewards")) {
+    err = new Error("Bundle missing Jito tip. Please upgrade your Helium Wallet app and try again.")
+  } else {
+    Sentry.captureException(err, {
+      level: "error",
+      tags: { error_type: "jito_bundle_missing_tip" },
+      extra: { bundle_size: serializedTransactions.length },
+    });
+  }
   throw err;
 }
 
@@ -215,7 +220,7 @@ export async function submitTransactionBatch(
     // Multiple transactions
     if (shouldUseJitoBundle(payload.transactions.length, cluster)) {
       // Mainnet: use Jito bundle — verify tip is present before submitting
-      await requireBundleHasTipAccount(payload.transactions);
+      await requireBundleHasTipAccount(payload.transactions, payload.tag);
       await simulateJitoBundle(payload.transactions, bundleContext);
 
       const jitoBundleId = await submitJitoBundle(payload.transactions, bundleContext);

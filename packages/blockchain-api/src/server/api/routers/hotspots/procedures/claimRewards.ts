@@ -30,11 +30,9 @@ import {
 import {
   HELIUM_COMMON_LUT,
   HELIUM_COMMON_LUT_DEVNET,
-  HNT_MINT,
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
 } from "@helium/spl-utils";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { getJitoTipAmountLamports, getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
 import {
   getTotalTransactionFees,
@@ -46,36 +44,39 @@ import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 import { getMintForNetwork, getLazyDistributorForNetwork } from "@/lib/utils/network-mint";
 
-const MIN_RENT = 0.00089088;
+// Minimum lamports the on-chain program requires in the PDA wallet before
+// queuing a wallet claim task. Matches CLAIMER_MIN_LAMPORTS in
+// programs/hpl-crons/src/instructions/queue_wallet_claim_v0.rs
+const CLAIMER_MIN_LAMPORTS = 40_000_000;
+
 const RECIPIENT_RENT = 0.00242208;
-const ATA_RENT = 0.002039 * LAMPORTS_PER_SOL;
-const MIN_RENT_LAMPORTS = Math.ceil(MIN_RENT * LAMPORTS_PER_SOL);
 const RECIPIENT_RENT_LAMPORTS = Math.ceil(RECIPIENT_RENT * LAMPORTS_PER_SOL);
-const ATA_RENT_LAMPORTS = Math.ceil(ATA_RENT);
 
 const HPL_CRONS_PROGRAM_ID = new PublicKey(
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu",
 );
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
-// Max hotspots to process per direct claim call for non-HNT networks
+// Max hotspots to process per direct claim call (applies to all networks)
 const MAX_DIRECT_CLAIM_HOTSPOTS = 4;
+// HNT wallets with more than this many hotspots use Tuktuk instead of direct claim
+const MAX_HNT_DIRECT_CLAIM_TOTAL = 12;
 
 /**
  * Create transactions to claim rewards for all hotspots in a wallet.
- * For HNT: wallets with ≤3 hotspots get direct claim, larger wallets use Tuktuk.
- * For IOT/MOBILE: always uses direct claim with hasMore pagination for large wallets.
+ * For HNT: wallets with ≤12 hotspots get direct claim with hasMore pagination,
+ *          larger wallets use Tuktuk.
+ * For IOT/MOBILE: always uses direct claim with hasMore pagination.
  */
 export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
   async ({ input, errors }) => {
-    const { walletAddress, network } = input;
+    const { walletAddress, network, tuktuk: forceTuktuk } = input;
     const mint = getMintForNetwork(network);
     const lazyDistributor = getLazyDistributorForNetwork(network);
     const lazyDistributorAddress = lazyDistributor.toBase58();
     const isHnt = network === "hnt";
 
-    // For non-HNT, fetch more hotspots since we use direct claim
-    const limit = isHnt ? 3 : MAX_DIRECT_CLAIM_HOTSPOTS;
+    const limit = MAX_DIRECT_CLAIM_HOTSPOTS;
     const hotspotsData = await getHotspotsByOwner({
       owner: walletAddress,
       page: 1,
@@ -83,8 +84,9 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     });
     const { total } = hotspotsData;
 
-    // Use direct claim path for: small wallets (any network) or non-HNT networks
-    const useDirectClaim = !isHnt || total <= 3;
+    // Use direct claim path for: non-HNT networks or HNT wallets with ≤12 hotspots
+    // Can be overridden with tuktuk: true to force Tuktuk path
+    const useDirectClaim = !forceTuktuk && (!isHnt || total <= MAX_HNT_DIRECT_CLAIM_TOTAL);
 
     if (useDirectClaim) {
       const { provider, connection } = createSolanaConnection(walletAddress);
@@ -240,7 +242,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       };
     }
 
-    // HNT with >3 hotspots: queue a Tuktuk claim task via HPL Crons
+    // HNT with >12 hotspots: queue a Tuktuk claim task via HPL Crons
     const { provider } = createSolanaConnection(walletAddress);
     anchor.setProvider(provider);
 
@@ -268,61 +270,50 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     ])[0];
     const pdaWalletBalanceLamports =
       await provider.connection.getBalance(pdaWallet);
-    const ata = getAssociatedTokenAddressSync(
-      HNT_MINT,
-      new PublicKey(walletAddress),
-      true,
-    );
-    const minCrankReward = taskQueueAcc?.minCrankReward?.toNumber() || 10000;
-    const account = await provider.connection.getAccountInfo(ata);
+    const hotspotsNeedingRecipient =
+      await getNumRecipientsNeeded(walletAddress, lazyDistributorAddress);
+
+    // PDA wallet needs CLAIMER_MIN_LAMPORTS (on-chain check) plus rent for any new recipients
     const pdaWalletFundingNeededLamports =
-      MIN_RENT_LAMPORTS +
-      (account ? 0 : ATA_RENT_LAMPORTS) +
-      // Actual claim txs
-      20000 * (total || 1) +
-      // Requeue transactions (5 queues per tx)
-      minCrankReward * Math.ceil((total || 1) / 5);
+      CLAIMER_MIN_LAMPORTS +
+      hotspotsNeedingRecipient * RECIPIENT_RENT_LAMPORTS;
     const pdaWalletLamportsShortfall = Math.max(
       0,
       pdaWalletFundingNeededLamports - pdaWalletBalanceLamports,
     );
 
-    const hotspotsNeedingRecipient =
-      await getNumRecipientsNeeded(walletAddress, lazyDistributorAddress);
     console.log(
       `[PDA WALLET ${pdaWallet.toBase58()}] Hotspots needing recipient: ${hotspotsNeedingRecipient}, shortfall: ${pdaWalletLamportsShortfall}`,
     );
 
-    if (pdaWalletLamportsShortfall > 0 || hotspotsNeedingRecipient > 0) {
-      const requiredLamports =
-        pdaWalletLamportsShortfall +
-        hotspotsNeedingRecipient * RECIPIENT_RENT_LAMPORTS;
-      // Ensure the user's wallet has enough SOL to fund PDA and recipients before returning tx
-      const senderBalance = await provider.connection.getBalance(
-        new PublicKey(walletAddress),
-      );
-      const tuktukJitoTipCost =
-        getCluster() === "mainnet" || getCluster() === "mainnet-beta"
-          ? getJitoTipAmountLamports()
-          : 0;
-      const totalRequired = calculateRequiredBalance(
-        BASE_TX_FEE_LAMPORTS + tuktukJitoTipCost,
-        requiredLamports,
-      );
-      if (senderBalance < totalRequired) {
-        throw errors.INSUFFICIENT_FUNDS({
-          message: "Insufficient SOL balance to fund claim task",
-          data: {
-            available: senderBalance,
-            required: totalRequired,
-          },
-        });
-      }
+    // Always check balance - tx fees + PDA wallet funding
+    const senderBalance = await provider.connection.getBalance(
+      new PublicKey(walletAddress),
+    );
+    const tuktukJitoTipCost =
+      getCluster() === "mainnet" || getCluster() === "mainnet-beta"
+        ? getJitoTipAmountLamports()
+        : 0;
+    const totalRequired = calculateRequiredBalance(
+      BASE_TX_FEE_LAMPORTS + tuktukJitoTipCost,
+      pdaWalletLamportsShortfall,
+    );
+    if (senderBalance < totalRequired) {
+      throw errors.INSUFFICIENT_FUNDS({
+        message: "Insufficient SOL balance to fund claim task",
+        data: {
+          available: senderBalance,
+          required: totalRequired,
+        },
+      });
+    }
+
+    if (pdaWalletLamportsShortfall > 0) {
       instructions.push(
         SystemProgram.transfer({
           fromPubkey: new PublicKey(walletAddress),
           toPubkey: pdaWallet,
-          lamports: requiredLamports,
+          lamports: pdaWalletLamportsShortfall,
         }),
       );
     }
@@ -369,11 +360,9 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       Buffer.from(tx.serialize()).toString("base64"),
     );
 
-    // For Tuktuk claims: tx fees + PDA wallet funding + recipient rent
+    // For Tuktuk claims: tx fees + PDA wallet funding (already includes recipient rent)
     const txFees = getTotalTransactionFees(vtxs);
-    const rentCost =
-      pdaWalletLamportsShortfall +
-      hotspotsNeedingRecipient * RECIPIENT_RENT_LAMPORTS;
+    const rentCost = pdaWalletLamportsShortfall;
 
     return {
       transactionData: {

@@ -4,7 +4,6 @@ import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
 import {
   init as initTuktuk,
   nextAvailableTaskIds,
-  taskKey,
 } from "@helium/tuktuk-sdk";
 import {
   Connection,
@@ -89,7 +88,7 @@ describe("rewards endpoints", () => {
     expect(result.pending.total).to.have.property("mint");
   });
 
-  it("claims and rewards via tuktuk", async () => {
+  it("claims rewards via tuktuk", async () => {
     const recipientAddress = "V8bBcfi1ygYXop6cTwtFauUyTvLXXWxRxmBwwfJ7mdC";
     const provider = new AnchorProvider(
       connection,
@@ -110,7 +109,7 @@ describe("rewards endpoints", () => {
     const beforeTotal = BigInt(beforeAcc.totalRewards.toString());
 
     const walletAddress = payer.publicKey.toBase58();
-    const result = await client.hotspots.claimRewards({ walletAddress });
+    const result = await client.hotspots.claimRewards({ walletAddress, tuktuk: true });
     const taskId = (result?.transactionData?.transactions?.[0]?.metadata as any)
       ?.taskIds?.[0];
     expect(
