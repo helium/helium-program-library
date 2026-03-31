@@ -32,6 +32,8 @@ const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const LAZY_DISTRIBUTOR_PROGRAM_ID =
   "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w";
+const HELIUM_SUB_DAOS_PROGRAM_ID =
+  "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR";
 const MINI_FANOUT_PROGRAM_ID =
   "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn";
 
@@ -40,6 +42,10 @@ const LAZY_DISTRIBUTOR_DISTRIBUTE_INSTRUCTIONS = new Set([
   "distributeCustomDestinationV0",
   "distributeRewardsV0",
 ]);
+
+const HSD_INSTRUCTIONS = new Set([
+  "claimRewardsV1"
+])
 
 const MINI_FANOUT_DISTRIBUTE_INSTRUCTION = "distributeV0";
 
@@ -568,6 +574,40 @@ export async function classifyTransaction(
           actionType: "rewards_distribution",
           actionMetadata: {
             program: "lazy_distributor",
+            instruction: decoded.name,
+            transfers,
+          },
+        };
+      }
+
+      // --- HSD claim rewards instructions ---
+      if (pid === HELIUM_SUB_DAOS_PROGRAM_ID) {
+        const idl = await fetchIdl(pid, connection);
+        if (!idl) continue;
+
+        const decoded = decodeInstruction(idl, ix.data);
+        if (
+          !decoded ||
+          !HSD_INSTRUCTIONS.has(decoded.name)
+        )
+          continue;
+
+        const directTransfers = wallet
+          ? tokenTransfers.filter((t) => t.to === wallet)
+          : tokenTransfers;
+        let transfers: TokenTransfer[];
+        if (directTransfers.length > 0 || !wallet) {
+          transfers = directTransfers;
+        } else {
+          const balanceChanges = getWalletBalanceChanges(tx, wallet);
+          if (!balanceChanges) return null;
+          transfers = balanceChanges;
+        }
+
+        return {
+          actionType: "delegation_rewards_distribution",
+          actionMetadata: {
+            program: "helium_sub_daos",
             instruction: decoded.name,
             transfers,
           },

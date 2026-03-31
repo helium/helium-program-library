@@ -369,6 +369,35 @@ describe("transaction-classifier", () => {
     });
   });
 
+  describe("tuktuk-wrapped delegation rewards claim (real mainnet data)", () => {
+    const hsdClaimTx = require("./fixtures/hsd_claim_rewards.json") as HeliusTransaction;
+
+    it("classifies HSD claimRewardsV1 as delegation_rewards_distribution", async () => {
+      const { Connection } = await import("@solana/web3.js");
+      const connection = new Connection(
+        process.env.SOLANA_RPC_URL || "https://solana-rpc.web.helium.io",
+      );
+
+      const result = await classifyTransaction(hsdClaimTx, connection);
+      expect(result).to.not.be.null;
+      expect(result!.actionType).to.equal("delegation_rewards_distribution");
+      expect(result!.actionMetadata.program).to.equal("helium_sub_daos");
+      expect(result!.actionMetadata.instruction).to.equal("claimRewardsV1");
+      const transfers = result!.actionMetadata.transfers as any[];
+      expect(transfers).to.be.an("array");
+    });
+
+    it("returns null for delegation claim when wallet is not in token balances", async () => {
+      const { Connection } = await import("@solana/web3.js");
+      const connection = new Connection(
+        process.env.SOLANA_RPC_URL || "https://solana-rpc.web.helium.io",
+      );
+
+      const result = await classifyTransaction(hsdClaimTx, connection, "someRandomWallet123");
+      expect(result).to.be.null;
+    });
+  });
+
   describe("wallet-filtered rewards detection", () => {
     it("skips rewards when wallet is not a recipient (no connection fallthrough)", async () => {
       // wallet="crankTurner" is not receiving tokens
