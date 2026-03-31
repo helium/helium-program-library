@@ -70,7 +70,7 @@ const MAX_HNT_DIRECT_CLAIM_TOTAL = 12;
  */
 export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
   async ({ input, errors }) => {
-    const { walletAddress, network } = input;
+    const { walletAddress, network, tuktuk: forceTuktuk } = input;
     const mint = getMintForNetwork(network);
     const lazyDistributor = getLazyDistributorForNetwork(network);
     const lazyDistributorAddress = lazyDistributor.toBase58();
@@ -85,7 +85,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     const { total } = hotspotsData;
 
     // Use direct claim path for: non-HNT networks or HNT wallets with ≤12 hotspots
-    const useDirectClaim = !isHnt || total <= MAX_HNT_DIRECT_CLAIM_TOTAL;
+    // Can be overridden with tuktuk: true to force Tuktuk path
+    const useDirectClaim = !forceTuktuk && (!isHnt || total <= MAX_HNT_DIRECT_CLAIM_TOTAL);
 
     if (useDirectClaim) {
       const { provider, connection } = createSolanaConnection(walletAddress);
