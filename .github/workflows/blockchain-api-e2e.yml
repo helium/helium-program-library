@@ -64,7 +64,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20.x"
-          cache: "yarn"
+          cache: "pnpm"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -130,4 +134,4 @@ jobs:
             export SURFPOOL_CMD="$HOME/.cargo/bin/surfpool"
           fi
           echo "Using SURFPOOL_CMD=$SURFPOOL_CMD"
-          yarn test:e2e:file tests/e2e/${{ matrix.test.file }}
+          pnpm test:e2e:file tests/e2e/${{ matrix.test.file }}

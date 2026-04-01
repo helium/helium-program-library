@@ -29,10 +29,11 @@
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
-    "prebuild": "npm run clean && npm run package"
+    "prebuild": "npm run clean && npm run package",
+    "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
-    "@helium/spl-utils": "^0.11.16",
+    "@helium/spl-utils": "workspace:^",
     "@pythnetwork/hermes-client": "^2.0.0",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1"

@@ -85,10 +85,22 @@ jobs:
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         run: |
           REGISTRY_ALIAS=$(aws ecr-public describe-registries | jq --raw-output '.registries[0].aliases[0].name')
-          docker build \
-            --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
-            --build-arg SENTRY_ORG=$SENTRY_ORG \
-            --build-arg SENTRY_PROJECT=$SENTRY_PROJECT \
-            --build-arg SENTRY_RELEASE=$ECR_REPOSITORY@$IMAGE_TAG \
-            -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
+          # JS services (packages/*) build from repo root with turbo prune
+          # Rust/other services (utils/*) keep package-dir context
+          if [[ "$CONTAINER_PATH" == ./packages/* ]]; then
+            docker build \
+              --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
+              --build-arg SENTRY_ORG=$SENTRY_ORG \
+              --build-arg SENTRY_PROJECT=$SENTRY_PROJECT \
+              --build-arg SENTRY_RELEASE=$ECR_REPOSITORY@$IMAGE_TAG \
+              -f $CONTAINER_PATH/Dockerfile \
+              -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG .
+          else
+            docker build \
+              --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
+              --build-arg SENTRY_ORG=$SENTRY_ORG \
+              --build-arg SENTRY_PROJECT=$SENTRY_PROJECT \
+              --build-arg SENTRY_RELEASE=$ECR_REPOSITORY@$IMAGE_TAG \
+              -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
+          fi
           docker push $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG

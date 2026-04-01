@@ -10,7 +10,6 @@ packages/helium-admin-cli/keypairs-prod/
 **/*.tsbuildinfo
 .parcel-cache
 .vscode
-yarn-error.log
 **/*/transactions.json
 **/*/transactions-with-lut.json
 data/
@@ -19,12 +18,7 @@ packages/migration-service/export.json
 packages/migration-service/failures.json
 migration-docker/data
 accounts
-.yarn/*
-!.yarn/patches
-!.yarn/releases
-!.yarn/plugins
-!.yarn/sdks
-!.yarn/versions
 packages/helium-vote-service/helium-vote-proxies/
 !packages/docsite/src/data
 .cursor/*
+.turbo/

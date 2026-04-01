@@ -143,7 +143,13 @@ jobs:
           - packages/recent-helium-transactions-service
     steps:
       - uses: actions/checkout@v3
-      - run: cd $DOCKER_PATH && docker build .
+      - name: Build Docker image
+        run: |
+          if [[ "$DOCKER_PATH" == packages/* ]]; then
+            docker build -f $DOCKER_PATH/Dockerfile .
+          else
+            cd $DOCKER_PATH && docker build .
+          fi
         env:
           DOCKER_PATH: ${{ matrix.test }}
 
@@ -208,7 +214,7 @@ jobs:
             echo "Waiting for local Anchor network to start..."
             sleep 5
           done
-      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
+      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json pnpm run ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
         env:
           TESTING: true
           TEST: ${{ matrix.test }}

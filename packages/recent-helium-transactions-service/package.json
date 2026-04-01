@@ -9,7 +9,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "clean": "rm -rf lib",
@@ -20,8 +20,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
-    "@helium/lazy-distributor-sdk": "^0.11.16",
-    "@helium/spl-utils": "^0.11.16",
+    "@helium/lazy-distributor-sdk": "workspace:^",
+    "@helium/spl-utils": "workspace:^",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
     "axios": "^1.9.0",

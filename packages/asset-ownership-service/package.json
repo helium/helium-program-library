@@ -22,7 +22,7 @@
   "scripts": {
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node lib/esm/server.js",
     "dev": "ts-node-dev --inspect --respawn --project tsconfig.cjs.json src/server.ts"
   },
@@ -32,9 +32,9 @@
     "@connectrpc/connect-node": "^1.4.0",
     "@coral-xyz/anchor": "^0.31.0",
     "@fastify/cors": "^8.1.1",
-    "@helium/helium-entity-manager-sdk": "^0.11.16",
-    "@helium/mobile-entity-manager-sdk": "^0.11.16",
-    "@helium/spl-utils": "^0.11.16",
+    "@helium/helium-entity-manager-sdk": "workspace:^",
+    "@helium/mobile-entity-manager-sdk": "workspace:^",
+    "@helium/spl-utils": "workspace:^",
     "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
     "@solana/web3.js": "^1.91.1",
     "@substreams/core": "^0.16.0",
