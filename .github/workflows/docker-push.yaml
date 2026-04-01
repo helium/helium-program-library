@@ -74,6 +74,17 @@ jobs:
         with:
           registry-type: public
 
+      - name: Build IDLs for JS service Docker builds
+        if: startsWith(env.CONTAINER_PATH, './packages/')
+        uses: ./.github/actions/build-anchor/
+        with:
+          testing: false
+      - uses: ./.github/actions/setup-ts/
+        if: startsWith(env.CONTAINER_PATH, './packages/')
+      - name: Build idls package
+        if: startsWith(env.CONTAINER_PATH, './packages/')
+        run: pnpm turbo run build --filter=@helium/idls
+
       - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

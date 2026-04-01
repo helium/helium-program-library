@@ -143,6 +143,15 @@ jobs:
           - packages/recent-helium-transactions-service
     steps:
       - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        if: startsWith(matrix.test, 'packages/')
+        with:
+          testing: true
+      - uses: ./.github/actions/setup-ts/
+        if: startsWith(matrix.test, 'packages/')
+      - name: Build idls package
+        if: startsWith(matrix.test, 'packages/')
+        run: pnpm turbo run build --filter=@helium/idls
       - name: Build Docker image
         run: |
           if [[ "$DOCKER_PATH" == packages/* ]]; then
