@@ -42,7 +42,7 @@ const getAddressLookupTableAccounts = async (
       if (accountInfo) {
         const account = new AddressLookupTableAccount({
           key: new PublicKey(address),
-          state: AddressLookupTableAccount.deserialize(accountInfo.data),
+          state: AddressLookupTableAccount.deserialize(Uint8Array.from(accountInfo.data)),
         });
         result.set(address, account);
 

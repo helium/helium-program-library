@@ -168,7 +168,7 @@ export class TransactionProcessor {
     if (!instructionCoder) return { updatedTrees: false };
 
     const decodedInstruction = instructionCoder.decode(
-      Buffer.from(instruction.data)
+      Buffer.from(instruction.data as any)
     );
 
     if (!decodedInstruction) return { updatedTrees: false };
