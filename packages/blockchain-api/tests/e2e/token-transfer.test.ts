@@ -9,7 +9,11 @@ import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
 import { ensureNextServer, stopNextServer } from "./helpers/next";
-import { ensureSurfpool, getSurfpoolRpcUrl, stopSurfpool } from "./helpers/surfpool";
+import {
+  ensureSurfpool,
+  getSurfpoolRpcUrl,
+  stopSurfpool,
+} from "./helpers/surfpool";
 import {
   ensureFunds,
   ensureTokenBalance,
@@ -74,19 +78,22 @@ describe("token-transfer", () => {
     expect(txData.metadata?.description).to.include("Transfer");
 
     // Verify enriched per-transaction metadata
-    expect(txData.metadata?.mint).to.equal(TOKEN_MINTS.WSOL);
-    expect(txData.metadata?.amount).to.equal(String(lamports));
-    expect(txData.metadata?.recipient).to.equal(
-      recipient.publicKey.toBase58()
-    );
+    expect(txData.metadata?.tokenAmount).to.deep.include({
+      amount: String(lamports),
+      mint: TOKEN_MINTS.WSOL,
+    });
+    expect(txData.metadata?.tokenName).to.equal("WSOL");
+    expect(txData.metadata?.recipient).to.equal(recipient.publicKey.toBase58());
 
     // Verify batch-level actionMetadata
-    expect(result.transactionData.actionMetadata).to.deep.include({
-      type: "token_transfer",
-      mint: TOKEN_MINTS.WSOL,
+    const actionMeta = result.transactionData.actionMetadata as any;
+    expect(actionMeta.type).to.equal("token_transfer");
+    expect(actionMeta.tokenAmount).to.deep.include({
       amount: String(lamports),
-      recipient: recipient.publicKey.toBase58(),
+      mint: TOKEN_MINTS.WSOL,
     });
+    expect(actionMeta.tokenName).to.equal("WSOL");
+    expect(actionMeta.recipient).to.equal(recipient.publicKey.toBase58());
 
     await signAndSubmitTransactionData(
       connection,
@@ -118,19 +125,22 @@ describe("token-transfer", () => {
     expect(txData.metadata?.type).to.equal("token_transfer");
 
     // Verify enriched per-transaction metadata
-    expect(txData.metadata?.mint).to.equal(TOKEN_MINTS.USDC);
-    expect(txData.metadata?.amount).to.equal(String(rawAmount));
-    expect(txData.metadata?.recipient).to.equal(
-      recipient.publicKey.toBase58()
-    );
+    expect(txData.metadata?.tokenAmount).to.deep.include({
+      amount: String(rawAmount),
+      mint: TOKEN_MINTS.USDC,
+    });
+    expect(txData.metadata?.tokenName).to.equal("USDC");
+    expect(txData.metadata?.recipient).to.equal(recipient.publicKey.toBase58());
 
     // Verify batch-level actionMetadata
-    expect(result.transactionData.actionMetadata).to.deep.include({
-      type: "token_transfer",
-      mint: TOKEN_MINTS.USDC,
+    const actionMeta = result.transactionData.actionMetadata as any;
+    expect(actionMeta.type).to.equal("token_transfer");
+    expect(actionMeta.tokenAmount).to.deep.include({
       amount: String(rawAmount),
-      recipient: recipient.publicKey.toBase58(),
+      mint: TOKEN_MINTS.USDC,
     });
+    expect(actionMeta.tokenName).to.equal("USDC");
+    expect(actionMeta.recipient).to.equal(recipient.publicKey.toBase58());
 
     await signAndSubmitTransactionData(
       connection,
