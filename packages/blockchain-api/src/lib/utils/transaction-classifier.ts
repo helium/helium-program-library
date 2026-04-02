@@ -11,6 +11,7 @@ import { convertLegacyIdl } from "@helium/sus";
 import { recipientKey } from "@helium/lazy-distributor-sdk";
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "../constants/lazy-distributor";
 import bs58 from "bs58";
+import { TOKEN_NAMES } from "../constants/tokens";
 import type { HeliusTransaction } from "./helius";
 
 export interface TokenTransfer {
@@ -26,16 +27,14 @@ export interface ClassifiedTransaction {
   actionMetadata: Record<string, unknown>;
 }
 
-const BUBBLEGUM_PROGRAM_ID =
-  "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY";
+const BUBBLEGUM_PROGRAM_ID = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY";
 const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const LAZY_DISTRIBUTOR_PROGRAM_ID =
   "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w";
 const HELIUM_SUB_DAOS_PROGRAM_ID =
   "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR";
-const MINI_FANOUT_PROGRAM_ID =
-  "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn";
+const MINI_FANOUT_PROGRAM_ID = "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn";
 
 const LAZY_DISTRIBUTOR_DISTRIBUTE_INSTRUCTIONS = new Set([
   "distributeCompressionRewardsV0",
@@ -43,20 +42,9 @@ const LAZY_DISTRIBUTOR_DISTRIBUTE_INSTRUCTIONS = new Set([
   "distributeRewardsV0",
 ]);
 
-const HSD_INSTRUCTIONS = new Set([
-  "claimRewardsV1"
-])
+const HSD_INSTRUCTIONS = new Set(["claimRewardsV1"]);
 
 const MINI_FANOUT_DISTRIBUTE_INSTRUCTION = "distributeV0";
-
-const KNOWN_TOKEN_NAMES: Record<string, string> = {
-  hntyVP6YFm1Hg25TN9WGLqM12b8TQv3XP931pR9s263: "HNT",
-  "11111111111111111111111111111111": "SOL",
-  EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: "USDC",
-  iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9o2t: "IOT",
-  mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6: "MOBILE",
-  So11111111111111111111111111111111111111112: "SOL",
-};
 
 // Programs that fetchBackwardsCompatibleIdl has bundled IDLs for
 const HELIUM_PROGRAMS: Record<string, string> = {
@@ -95,7 +83,7 @@ const idlCache = new Map<string, Idl | null>();
 
 async function fetchIdl(
   programId: string,
-  connection: Connection,
+  connection: Connection
 ): Promise<Idl | null> {
   if (idlCache.has(programId)) {
     return idlCache.get(programId)!;
@@ -107,7 +95,10 @@ async function fetchIdl(
     let idl: Idl | null;
 
     if (programId in HELIUM_PROGRAMS) {
-      const raw = (await fetchBackwardsCompatibleIdl(pubkey, provider)) as Idl | null;
+      const raw = (await fetchBackwardsCompatibleIdl(
+        pubkey,
+        provider
+      )) as Idl | null;
       // fetchBackwardsCompatibleIdl may return a new-format IDL (with address field,
       // snake_case names) from the on-chain account. Normalize to camelCase.
       if (raw?.address) {
@@ -124,9 +115,7 @@ async function fetchIdl(
         return null;
       }
       if (!idlRaw.address) {
-        idl = convertIdlToCamelCase(
-          convertLegacyIdl(idlRaw as any, programId),
-        );
+        idl = convertIdlToCamelCase(convertLegacyIdl(idlRaw as any, programId));
       } else {
         idl = convertIdlToCamelCase(idlRaw);
       }
@@ -143,7 +132,7 @@ async function fetchIdl(
 
 function decodeInstruction(
   idl: Idl,
-  data: string,
+  data: string
 ): { name: string; data: Record<string, any> } | null {
   try {
     const coder = new BorshInstructionCoder(idl);
@@ -166,7 +155,7 @@ function getAccountKeys(tx: HeliusTransaction): string[] {
   let staticKeys: string[];
   if (message.accountKeys?.[0]?.pubkey) {
     staticKeys = message.accountKeys.map((k: any) =>
-      typeof k.pubkey === "string" ? k.pubkey : k.pubkey?.toBase58?.() || "",
+      typeof k.pubkey === "string" ? k.pubkey : k.pubkey?.toBase58?.() || ""
     );
   } else if (typeof message.accountKeys?.[0] === "string") {
     staticKeys = message.accountKeys;
@@ -217,7 +206,7 @@ function getIxProgramId(ix: any, accountKeys?: string[]): string {
 function resolveIxAccount(
   ix: any,
   accountIndex: number,
-  tx: HeliusTransaction,
+  tx: HeliusTransaction
 ): string {
   const accounts = ix.accounts || [];
   const value = accounts[accountIndex];
@@ -234,7 +223,7 @@ function getAllInstructions(tx: HeliusTransaction): any[] {
   return [
     ...instructions,
     ...(tx.meta?.innerInstructions ?? []).flatMap(
-      (inner) => inner.instructions,
+      (inner) => inner.instructions
     ),
   ];
 }
@@ -244,7 +233,7 @@ function getInvolvedProgramIds(tx: HeliusTransaction): Set<string> {
   return new Set(
     getAllInstructions(tx)
       .map((ix) => getIxProgramId(ix, accountKeys))
-      .filter(Boolean),
+      .filter(Boolean)
   );
 }
 
@@ -257,11 +246,14 @@ const SPL_TRANSFER_CHECKED = 12;
  * using the transaction's pre/post token balance entries.
  */
 function buildAtaOwnerMap(
-  tx: HeliusTransaction,
+  tx: HeliusTransaction
 ): Map<string, { owner: string; mint: string; decimals: number }> {
   const accountKeys = getAccountKeys(tx);
   const meta = tx.meta;
-  const map = new Map<string, { owner: string; mint: string; decimals: number }>();
+  const map = new Map<
+    string,
+    { owner: string; mint: string; decimals: number }
+  >();
   if (!meta) return map;
 
   // Use both pre and post balances to cover newly-created ATAs
@@ -317,8 +309,7 @@ function getTokenTransfers(tx: HeliusTransaction): TokenTransfer[] {
         amount = info.tokenAmount.uiAmount ?? 0;
         mint = info.mint || sourceEntry.mint;
       } else {
-        amount =
-          parseInt(info.amount, 10) / Math.pow(10, sourceEntry.decimals);
+        amount = parseInt(info.amount, 10) / Math.pow(10, sourceEntry.decimals);
         mint = sourceEntry.mint;
       }
 
@@ -328,7 +319,7 @@ function getTokenTransfers(tx: HeliusTransaction): TokenTransfer[] {
           amount,
           from: sourceEntry.owner,
           to: destEntry.owner,
-          tokenName: KNOWN_TOKEN_NAMES[mint],
+          tokenName: TOKEN_NAMES[mint],
         },
       ];
     }
@@ -345,7 +336,10 @@ function getTokenTransfers(tx: HeliusTransaction): TokenTransfer[] {
 
     if (data.length < 9) return [];
     const discriminator = data[0];
-    if (discriminator !== SPL_TRANSFER && discriminator !== SPL_TRANSFER_CHECKED)
+    if (
+      discriminator !== SPL_TRANSFER &&
+      discriminator !== SPL_TRANSFER_CHECKED
+    )
       return [];
 
     const rawAmount = data.readBigUInt64LE(1);
@@ -378,7 +372,7 @@ function getTokenTransfers(tx: HeliusTransaction): TokenTransfer[] {
         amount,
         from: sourceEntry.owner,
         to: destEntry.owner,
-        tokenName: KNOWN_TOKEN_NAMES[mint],
+        tokenName: TOKEN_NAMES[mint],
       },
     ];
   });
@@ -396,12 +390,12 @@ function getTokenTransfers(tx: HeliusTransaction): TokenTransfer[] {
 async function isHotspotMiniFanout(
   miniFanoutAddress: string,
   miniFanoutIdl: Idl,
-  connection: Connection,
+  connection: Connection
 ): Promise<boolean> {
   try {
     // 1. Fetch and decode the mini fanout account
     const fanoutInfo = await connection.getAccountInfo(
-      new PublicKey(miniFanoutAddress),
+      new PublicKey(miniFanoutAddress)
     );
     if (!fanoutInfo?.data) return false;
 
@@ -414,7 +408,7 @@ async function isHotspotMiniFanout(
     const assetPubkey = new PublicKey(Buffer.from(seed));
     const [recipientPda] = recipientKey(
       new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS),
-      assetPubkey,
+      assetPubkey
     );
 
     // 3. Fetch and decode the recipient to verify destination
@@ -444,7 +438,7 @@ async function isHotspotMiniFanout(
  */
 function getWalletBalanceChanges(
   tx: HeliusTransaction,
-  wallet: string,
+  wallet: string
 ): TokenTransfer[] | null {
   const meta = tx.meta;
   if (!meta?.preTokenBalances || !meta?.postTokenBalances) return null;
@@ -463,7 +457,7 @@ function getWalletBalanceChanges(
     const mintDeltas = deltasByMint.get(bal.mint) ?? new Map<string, number>();
     mintDeltas.set(
       bal.owner,
-      (mintDeltas.get(bal.owner) ?? 0) - (bal.uiTokenAmount?.uiAmount ?? 0),
+      (mintDeltas.get(bal.owner) ?? 0) - (bal.uiTokenAmount?.uiAmount ?? 0)
     );
     deltasByMint.set(bal.mint, mintDeltas);
   }
@@ -475,7 +469,7 @@ function getWalletBalanceChanges(
     const mintDeltas = deltasByMint.get(bal.mint) ?? new Map<string, number>();
     mintDeltas.set(
       bal.owner,
-      (mintDeltas.get(bal.owner) ?? 0) + (bal.uiTokenAmount?.uiAmount ?? 0),
+      (mintDeltas.get(bal.owner) ?? 0) + (bal.uiTokenAmount?.uiAmount ?? 0)
     );
     deltasByMint.set(bal.mint, mintDeltas);
   }
@@ -502,10 +496,11 @@ function getWalletBalanceChanges(
 
     return {
       mint,
-      amount: (walletPostByMint.get(mint) ?? 0) - (walletPreByMint.get(mint) ?? 0),
+      amount:
+        (walletPostByMint.get(mint) ?? 0) - (walletPreByMint.get(mint) ?? 0),
       from,
       to: wallet,
-      tokenName: KNOWN_TOKEN_NAMES[mint],
+      tokenName: TOKEN_NAMES[mint],
     };
   });
 }
@@ -527,7 +522,7 @@ function getWalletBalanceChanges(
 export async function classifyTransaction(
   tx: HeliusTransaction,
   connection?: Connection,
-  wallet?: string,
+  wallet?: string
 ): Promise<ClassifiedTransaction | null> {
   const instructions = (tx.transaction?.message as any)?.instructions || [];
   const accountKeys = getAccountKeys(tx);
@@ -586,11 +581,7 @@ export async function classifyTransaction(
         if (!idl) continue;
 
         const decoded = decodeInstruction(idl, ix.data);
-        if (
-          !decoded ||
-          !HSD_INSTRUCTIONS.has(decoded.name)
-        )
-          continue;
+        if (!decoded || !HSD_INSTRUCTIONS.has(decoded.name)) continue;
 
         const directTransfers = wallet
           ? tokenTransfers.filter((t) => t.to === wallet)
@@ -667,19 +658,18 @@ export async function classifyTransaction(
 
       const programLabel = HELIUM_PROGRAMS[pid] || pid;
       const transfer = tokenTransfers[0];
+      const transfers = transfer
+        ? [transfer]
+        : wallet
+        ? getWalletBalanceChanges(tx, wallet) ?? []
+        : [];
 
       return {
         actionType: `${programLabel}.${decoded.name}`,
         actionMetadata: {
           program: programLabel,
           instruction: decoded.name,
-          ...(transfer
-            ? {
-                mint: transfer.mint,
-                amount: transfer.amount,
-                tokenName: transfer.tokenName,
-              }
-            : {}),
+          ...(transfers.length > 0 ? { transfers } : {}),
         },
       };
     }
@@ -689,7 +679,8 @@ export async function classifyTransaction(
       const idl = await fetchIdl(BUBBLEGUM_PROGRAM_ID, connection);
       if (idl) {
         for (const ix of instructions) {
-          if (getIxProgramId(ix, accountKeys) !== BUBBLEGUM_PROGRAM_ID) continue;
+          if (getIxProgramId(ix, accountKeys) !== BUBBLEGUM_PROGRAM_ID)
+            continue;
           const decoded = decodeInstruction(idl, ix.data);
           if (decoded) {
             const ixAccounts = ix.accounts || [];
@@ -738,7 +729,7 @@ export async function classifyTransaction(
   if (meta?.preBalances && meta?.postBalances) {
     const accountKeys = getAccountKeys(tx);
     const topLevelPrograms = new Set(
-      instructions.map((ix: any) => getIxProgramId(ix, accountKeys)),
+      instructions.map((ix: any) => getIxProgramId(ix, accountKeys))
     );
     topLevelPrograms.delete("ComputeBudget111111111111111111111111111111");
 

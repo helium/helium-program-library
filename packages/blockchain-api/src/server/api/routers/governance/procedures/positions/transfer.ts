@@ -6,6 +6,7 @@ import {
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { TOKEN_NAMES } from "@/lib/constants/tokens";
 import {
   buildVersionedTransaction,
   serializeTransaction,
@@ -51,12 +52,12 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
       validatePositionOwnership(
         connection,
         sourcePositionMintPubkey,
-        walletPubkey,
+        walletPubkey
       ),
       validatePositionOwnership(
         connection,
         targetPositionMintPubkey,
-        walletPubkey,
+        walletPubkey
       ),
     ]);
 
@@ -83,7 +84,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
     }
 
     const registrar = await vsrProgram.account.registrar.fetch(
-      sourcePositionAcc.registrar,
+      sourcePositionAcc.registrar
     );
     const depositMint =
       registrar.votingMints[sourcePositionAcc.votingMintConfigIdx].mint;
@@ -106,8 +107,8 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
         sourcePositionPubkey,
         targetPositionPubkey,
         depositMint,
-        { amount: amountBN },
-      ),
+        { amount: amountBN }
+      )
     );
 
     if (amountBN.eq(sourcePositionAcc.amountDepositedNative)) {
@@ -117,7 +118,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
           .accountsPartial({
             position: sourcePositionPubkey,
           })
-          .instruction(),
+          .instruction()
       );
     }
 
@@ -157,12 +158,18 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "position_transfer", positionMint, targetPositionMint, amount },
+        actionMetadata: {
+          type: "position_transfer",
+          positionMint,
+          targetPositionMint,
+          tokenAmount: toTokenAmountOutput(amountBN, depositMint.toBase58()),
+          tokenName: TOKEN_NAMES[depositMint.toBase58()],
+        },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

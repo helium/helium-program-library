@@ -15,6 +15,9 @@ import {
   RENT_COSTS,
 } from "@/lib/utils/balance-validation";
 import { NATIVE_MINT } from "@solana/spl-token";
+import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { TOKEN_NAMES } from "@/lib/constants/tokens";
+import BN from "bn.js";
 
 /**
  * Get swap transaction instructions from Jupiter and build a transaction.
@@ -50,7 +53,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
             },
           },
         }),
-      },
+      }
     );
 
     if (!instructionsResponse.ok) {
@@ -74,7 +77,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     // If destinationTokenAccount is provided, assume it exists; otherwise assume ATA creation
     const connection = new Connection(process.env.SOLANA_RPC_URL!);
     const walletBalance = await connection.getBalance(
-      new PublicKey(userPublicKey),
+      new PublicKey(userPublicKey)
     );
     const rentCost = destinationTokenAccount ? 0 : RENT_COSTS.ATA;
     // When swapping SOL, the input amount also comes from the wallet balance
@@ -84,7 +87,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
         : 0;
     const required = calculateRequiredBalance(
       BASE_TX_FEE_LAMPORTS,
-      rentCost + solInputAmount,
+      rentCost + solInputAmount
     );
 
     if (walletBalance < required) {
@@ -122,7 +125,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
                 isWritable: boolean;
               }[];
               data: string;
-            }) => deserializeInstruction(instruction),
+            }) => deserializeInstruction(instruction)
           )
         : []),
       // Swap instruction
@@ -140,7 +143,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
         feePayer: new PublicKey(userPublicKey),
         addressLookupTableAddresses:
           instructions.addressLookupTableAddresses.map(
-            (address: string) => new PublicKey(address),
+            (address: string) => new PublicKey(address)
           ),
       },
     });
@@ -170,7 +173,19 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       ],
       parallel: false,
       tag,
-      actionMetadata: { type: "swap", inputMint: quoteResponse.inputMint, outputMint: quoteResponse.outputMint, inputAmount: quoteResponse.inAmount, outputAmount: quoteResponse.outAmount },
+      actionMetadata: {
+        type: "swap",
+        inputTokenAmount: toTokenAmountOutput(
+          new BN(quoteResponse.inAmount),
+          quoteResponse.inputMint
+        ),
+        outputTokenAmount: toTokenAmountOutput(
+          new BN(quoteResponse.outAmount),
+          quoteResponse.outputMint
+        ),
+        inputTokenName: TOKEN_NAMES[quoteResponse.inputMint],
+        outputTokenName: TOKEN_NAMES[quoteResponse.outputMint],
+      },
     };
-  },
+  }
 );

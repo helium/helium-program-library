@@ -49,7 +49,7 @@ type InputDeploymentInfo = Extract<
 
 // Convert input deploymentInfo to onboarding format (partial)
 function inputToOnboardingDeploymentInfo(
-  info: InputDeploymentInfo | undefined,
+  info: InputDeploymentInfo | undefined
 ): MobileDeploymentInfoV0 | undefined {
   if (!info) return undefined;
 
@@ -70,7 +70,7 @@ function inputToOnboardingDeploymentInfo(
 // null = unset the field, undefined = use the prior value
 function mergeDeploymentInfo(
   existing: MobileDeploymentInfoV0 | null | undefined,
-  newInfo: InputDeploymentInfo | undefined,
+  newInfo: InputDeploymentInfo | undefined
 ): MobileDeploymentInfoV0 | undefined {
   if (!newInfo) return existing ?? undefined;
   if (!existing) return inputToOnboardingDeploymentInfo(newInfo);
@@ -111,7 +111,7 @@ function mergeDeploymentInfo(
             ? serial === null
               ? null
               : serial
-            : (existingWifi.serial ?? null),
+            : existingWifi.serial ?? null,
       },
     };
   }
@@ -161,7 +161,7 @@ export const updateHotspotInfo =
 
       // Check wallet has sufficient balance for transaction fees
       const walletBalance = await connection.getBalance(
-        new PublicKey(walletAddress),
+        new PublicKey(walletAddress)
       );
       const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
       if (walletBalance < required) {
@@ -174,11 +174,11 @@ export const updateHotspotInfo =
       const hemProgram = await initHemLocal(provider);
       const [keyToAssetK] = keyToAssetKey(HNT_DAO, entityPubKey);
       const keyToAsset = await (hemProgram.account as any).keyToAssetV0.fetch(
-        keyToAssetK,
+        keyToAssetK
       );
       const entityKey = decodeEntityKey(
         keyToAsset.entityKey,
-        keyToAsset.keySerialization,
+        keyToAsset.keySerialization
       );
 
       if (!entityKey) {
@@ -235,7 +235,7 @@ export const updateHotspotInfo =
         // Merge existing with new deploymentInfo
         const mergedDeploymentInfo = mergeDeploymentInfo(
           existingDeploymentInfo,
-          input.deploymentInfo,
+          input.deploymentInfo
         );
 
         const response = await onboardingClient.updateMobileMetadata({
@@ -284,13 +284,26 @@ export const updateHotspotInfo =
           transactions,
           parallel: false,
           tag,
-          actionMetadata: { type: "hotspot_update", hotspotKey: entityPubKey, deviceType: input.deviceType },
+          actionMetadata: {
+            type: "hotspot_update",
+            hotspotKey: entityPubKey,
+            deviceType: input.deviceType,
+            ...(location && { location }),
+            ...(input.deviceType === "iot" &&
+              input.gain !== undefined && { gain: input.gain }),
+            ...(input.deviceType === "iot" &&
+              input.elevation !== undefined && { elevation: input.elevation }),
+            ...(input.deviceType === "mobile" &&
+              input.deploymentInfo && {
+                deploymentType: input.deploymentInfo.type,
+              }),
+          },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(totalFee),
-          NATIVE_MINT.toBase58(),
+          NATIVE_MINT.toBase58()
         ),
         appliedTo,
       };
-    },
+    }
   );
