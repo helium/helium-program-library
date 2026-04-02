@@ -107,7 +107,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
           fromPubkey: wallet,
           toPubkey: cronJob,
           lamports: cronJobFundingLamports,
-        })
+        }),
       );
     }
 
@@ -118,7 +118,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
           fromPubkey: wallet,
           toPubkey: pdaWallet,
           lamports: pdaWalletFundingLamports,
-        })
+        }),
       );
     }
 
@@ -132,7 +132,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
           fromPubkey: wallet,
           toPubkey: cronJob,
           lamports: minFunding,
-        })
+        }),
       );
     }
 
@@ -155,7 +155,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
     }
 
     const txs: Array<string> = vtxs.map((tx) =>
-      Buffer.from(tx.serialize()).toString("base64")
+      Buffer.from(tx.serialize()).toString("base64"),
     );
 
     // Estimated fee includes tx fees + funding amounts
@@ -178,8 +178,8 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

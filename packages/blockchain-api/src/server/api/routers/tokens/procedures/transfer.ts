@@ -62,7 +62,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
           fromPubkey: feePayer,
           toPubkey: destKey,
           lamports,
-        })
+        }),
       );
     } else {
       const mintKey = new PublicKey(tokenAmount.mint);
@@ -79,8 +79,8 @@ export const transfer = publicProcedure.tokens.transfer.handler(
           feePayer,
           destAta,
           destKey,
-          mintKey
-        )
+          mintKey,
+        ),
       );
 
       instructions.push(
@@ -90,8 +90,8 @@ export const transfer = publicProcedure.tokens.transfer.handler(
           destAta,
           feePayer,
           rawAmount,
-          mintInfo.decimals
-        )
+          mintInfo.decimals,
+        ),
       );
     }
 
@@ -128,7 +128,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
 
     const transferTokenAmount = toTokenAmountOutput(
       new BN(tokenAmount.amount),
-      tokenAmount.mint
+      tokenAmount.mint,
     );
     const tokenName = TOKEN_NAMES[tokenAmount.mint];
 
@@ -157,8 +157,8 @@ export const transfer = publicProcedure.tokens.transfer.handler(
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

@@ -70,9 +70,8 @@ export const createAutomation =
       const authority = entityCronAuthorityKey(wallet)[0];
       const cronJob = cronJobKey(authority, 0)[0];
 
-      const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
-        cronJob
-      );
+      const cronJobAccount =
+        await cronProgram.account.cronJobV0.fetchNullable(cronJob);
 
       const instructions: TransactionInstruction[] = [];
 
@@ -99,8 +98,8 @@ export const createAutomation =
                     rentRefund: wallet,
                     cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
                   })
-                  .instruction()
-              )
+                  .instruction(),
+              ),
             )),
             await hplCronsProgram.methods
               .closeEntityClaimCronV0()
@@ -109,22 +108,21 @@ export const createAutomation =
                 rentRefund: wallet,
                 cronJobNameMapping: cronJobNameMappingKey(
                   authority,
-                  "entity_claim"
+                  "entity_claim",
                 )[0],
               })
-              .instruction()
+              .instruction(),
           );
         }
 
         // Create new cron job
         // Fetch task queue fresh to ensure we have the latest state
-        const freshTaskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-          TASK_QUEUE_ID
-        );
+        const freshTaskQueueAcc =
+          await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID);
         const freshAvailableTaskIds = nextAvailableTaskIds(
           freshTaskQueueAcc.taskBitmap,
           1,
-          false
+          false,
         );
         if (freshAvailableTaskIds.length === 0) {
           throw new Error("No available task IDs in task queue");
@@ -144,21 +142,20 @@ export const createAutomation =
               task: freshTask,
               cronJobNameMapping: cronJobNameMappingKey(
                 authority,
-                "entity_claim"
+                "entity_claim",
               )[0],
             })
-            .instruction()
+            .instruction(),
         );
       } else if (cronJobAccount?.removedFromQueue) {
         // If cron exists but was removed from queue due to insufficient SOL, requeue it
         // Fetch task queue fresh to ensure we have the latest state
-        const freshTaskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-          TASK_QUEUE_ID
-        );
+        const freshTaskQueueAcc =
+          await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID);
         const freshAvailableTaskIds = nextAvailableTaskIds(
           freshTaskQueueAcc.taskBitmap,
           1,
-          false
+          false,
         );
         if (freshAvailableTaskIds.length === 0) {
           throw new Error("No available task IDs in task queue");
@@ -175,10 +172,10 @@ export const createAutomation =
               task: freshTask,
               cronJobNameMapping: cronJobNameMappingKey(
                 authority,
-                "entity_claim"
+                "entity_claim",
               )[0],
             })
-            .instruction()
+            .instruction(),
         );
       }
 
@@ -264,7 +261,7 @@ export const createAutomation =
             fromPubkey: wallet,
             toPubkey: cronJob,
             lamports: minCrankSolFee,
-          })
+          }),
         );
       }
 
@@ -274,7 +271,7 @@ export const createAutomation =
             fromPubkey: wallet,
             toPubkey: pdaWallet,
             lamports: minPdaWalletSolFee,
-          })
+          }),
         );
       }
 
@@ -297,7 +294,7 @@ export const createAutomation =
       }
 
       const txs: Array<string> = vtxs.map((tx) =>
-        Buffer.from(tx.serialize()).toString("base64")
+        Buffer.from(tx.serialize()).toString("base64"),
       );
 
       // Estimated fee includes tx fees + operational funding (cronJob + pdaWallet)
@@ -321,8 +318,8 @@ export const createAutomation =
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
-    }
+    },
   );

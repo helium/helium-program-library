@@ -109,11 +109,10 @@ export const create = publicProcedure.welcomePacks.create.handler(
 
     const recipientK = recipientKey(
       new PublicKey(lazyDistributor),
-      new PublicKey(assetId)
+      new PublicKey(assetId),
     )[0];
-    const recipient = await ldProgram.account.recipientV0.fetchNullable(
-      recipientK
-    );
+    const recipient =
+      await ldProgram.account.recipientV0.fetchNullable(recipientK);
 
     // Check wallet has sufficient balance
     const walletBalance = await connection.getBalance(wallet.publicKey);
@@ -124,7 +123,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
     // Add gifted SOL amount
     rentCost += resolveTokenAmountInput(
       solAmount,
-      NATIVE_MINT.toBase58()
+      NATIVE_MINT.toBase58(),
     ).toNumber();
 
     const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
@@ -147,7 +146,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
             assetEndpoint: env.ASSET_ENDPOINT,
             lazyDistributor: new PublicKey(lazyDistributor),
           })
-        ).instruction()
+        ).instruction(),
       );
     }
 
@@ -170,23 +169,23 @@ export const create = publicProcedure.welcomePacks.create.handler(
                   fixed: {
                     amount: resolveTokenAmountInput(
                       split.tokenAmount,
-                      HNT_MINT.toBase58()
+                      HNT_MINT.toBase58(),
                     ),
                   },
                 },
                 wallet: new PublicKey(split.address),
-              }
+              },
         ),
         rewardsSchedule,
         getAssetFn: (_, assetId) =>
           getAsset(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId
+            assetId,
           ),
         getAssetProofFn: (_, assetId) =>
           getAssetProof(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId
+            assetId,
           ),
         assetEndpoint: env.ASSET_ENDPOINT,
         lazyDistributor: new PublicKey(lazyDistributor),
@@ -204,11 +203,10 @@ export const create = publicProcedure.welcomePacks.create.handler(
 
     const userWelcomePacksAccount =
       await program.account.userWelcomePacksV0.fetchNullable(
-        new PublicKey(pubkeys.userWelcomePacks!)
+        new PublicKey(pubkeys.userWelcomePacks!),
       );
-    const lazyDistributorAcc = await ldProgram.account.lazyDistributorV0.fetch(
-      lazyDistributor
-    );
+    const lazyDistributorAcc =
+      await ldProgram.account.lazyDistributorV0.fetch(lazyDistributor);
 
     const welcomePack: WelcomePackWithStatus = {
       address: pubkeys.welcomePack!.toBase58(),
@@ -222,7 +220,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
               address: split.address,
               type: split.type,
               tokenAmount: split.tokenAmount,
-            }
+            },
       ),
       rewardsSchedule,
       solAmount: solAmount.amount,
@@ -264,15 +262,15 @@ export const create = publicProcedure.welcomePacks.create.handler(
           assetId,
           solAmount: toTokenAmountOutput(
             new BN(input.solAmount.amount),
-            input.solAmount.mint
+            input.solAmount.mint,
           ),
           recipientCount: input.rewardsSplit.length,
         },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );
