@@ -22,7 +22,7 @@ export const AccountContext = createContext<AccountFetchCache | undefined>(
 );
 
 export function usePrevious<T>(state: T): T | undefined {
-  const ref = useRef<T>();
+  const ref = useRef<T>(undefined);
 
   useEffect(() => {
     ref.current = state;
