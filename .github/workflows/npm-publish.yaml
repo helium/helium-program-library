@@ -1,0 +1,68 @@
+name: NPM Publish
+
+env:
+  SOLANA_CLI_VERSION: 2.1.6
+  NODE_VERSION: 24.13.1
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: ./.github/actions/setup/
+      - uses: ./.github/actions/setup-anchor/
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: false
+          devnet: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Version packages from changesets
+        run: pnpm run version-packages
+
+      - name: Build all packages
+        run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
+
+      - name: Publish to npm
+        run: |
+          for pkg in packages/*/; do
+            [ -f "$pkg/package.json" ] || continue
+
+            is_private=$(node -p "require('./$pkg/package.json').private || false")
+            [ "$is_private" = "true" ] && continue
+
+            name=$(node -p "require('./$pkg/package.json').name")
+            version=$(node -p "require('./$pkg/package.json').version")
+
+            published=$(npm view "$name@$version" version 2>/dev/null || echo "")
+            if [ "$version" = "$published" ]; then
+              echo "Skipping $name@$version (already published)"
+              continue
+            fi
+
+            echo "Publishing $name@$version..."
+            npm publish "$pkg" --provenance --access public
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

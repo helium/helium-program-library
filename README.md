@@ -156,26 +156,28 @@ The client should:
 
 ## Local Setup
 
-1. Make sure you're using Node 18+
+1. Make sure you're using Node 22+ and have pnpm installed via corepack
+
+```
+corepack enable
+```
 
 2. Install dependencies
 
 ```
-corepack enable
-yarn set version 3.6.4
-yarn
+pnpm install
 ```
 
-3. Start localnet
+3. Build all packages
+
+```
+pnpm run build
+```
+
+4. Start localnet
 
 ```
 $: TESTING=true anchor localnet
-```
-
-4. Start watcher
-
-```
-$: yarn watch
 ```
 
 5. Bootstrap localnet
@@ -193,37 +195,75 @@ $: anchor test --provider.cluster localnet --skip-deploy --skip-local-validator 
 If you run into trouble with your installation, run the following command to rebuild everything from scratch.
 
 ```
-$: yarn clean && yarn && TESTING=true anchor build && yarn build
+$: pnpm run clean && pnpm install && TESTING=true anchor build && pnpm run build
 ```
 
+## Publishing npm packages
+
+This repo uses [Changesets](https://github.com/changesets/changesets) for versioning and npm publishing.
+
+1. When you make changes to packages that should be published, create a changeset:
+
+```
+pnpm changeset
+```
+
+This will prompt you to select which packages changed and whether the change is a patch, minor, or major bump. It creates a markdown file in `.changeset/` describing the change.
+
+2. When you're ready to publish, apply the changesets to bump versions:
+
+```
+pnpm run version-packages
+```
+
+3. Commit the version bumps and push a version tag:
+
+```
+git add .
+git commit -m "chore(release): vX.Y.Z"
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push && git push --tags
+```
+
+4. The `v*` tag triggers the [NPM Publish workflow](.github/workflows/npm-publish.yaml) which builds and publishes all changed packages to npm.
+
+Note: `workspace:^` dependencies are automatically replaced with real version ranges during publish, so external consumers get the correct versions.
+
+## Deploying Docker services
+
+Docker deployments are **decoupled from npm publishing**. You don't need to wait for npm publish to deploy a service.
+
+1. Create a git tag following the pattern `docker-{env}-{service}-{version}`:
+
+```
+git tag docker-web-blockchain-api-0.11.17
+git push origin docker-web-blockchain-api-0.11.17
+```
+
+2. The [Deploy to ECR workflow](.github/workflows/docker-push.yaml) builds and pushes the Docker image to AWS ECR.
+
+Available environments and services are defined in [docker-info.json](docker-info.json).
+
+The Dockerfiles use [Turborepo](https://turbo.build/repo) `turbo prune` to create minimal Docker contexts containing only the workspace packages each service needs, then builds them from source inside Docker.
+
 ## Running packages
-There's several packages that can be run as servers or applications. The individual instructions for them are included below.
+
+There are several packages that can be run as servers or applications:
 
 - Start monitor
 
 ```
-$: cd packages/monitor-service && yarn dev
-$: cd packages/monitor-service/docker-compose && docker-compose up -d
-```
-
-- Start breakpoint demo ui
-
-```
-$: cd packages/breakpoint-demo-ui && yarn start
+$: cd packages/monitor-service && pnpm dev
 ```
 
 - Start oracle server
 
 ```
-$: cd packages/distributor-oracle && yarn start
+$: cd packages/distributor-oracle && pnpm dev
 ```
 
-- Start xNFT
+- Start blockchain API
 
 ```
-$: cd packages/xnft-hotspot && yarn dev
+$: cd packages/blockchain-api && pnpm dev
 ```
-
-Important urls:
-  * localhost:3000 // demo ui
-  * localhost:3001 // grafana
