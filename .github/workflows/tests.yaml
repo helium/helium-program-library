@@ -223,7 +223,7 @@ jobs:
             echo "Waiting for local Anchor network to start..."
             sleep 5
           done
-      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json pnpm run ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
+      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json pnpm exec ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
         env:
           TESTING: true
           TEST: ${{ matrix.test }}
