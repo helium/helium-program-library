@@ -28,13 +28,14 @@
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
-    "prebuild": "npm run clean && npm run package"
+    "prebuild": "npm run clean && npm run package",
+    "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
-    "@helium/account-fetch-cache": "^0.11.16",
+    "@helium/account-fetch-cache": "workspace:^",
     "@helium/address": "^4.12.0",
-    "@helium/anchor-resolvers": "^0.11.16",
+    "@helium/anchor-resolvers": "workspace:^",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.8",

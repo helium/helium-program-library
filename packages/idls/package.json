@@ -23,7 +23,8 @@
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "clean": "npx shx rm -rf **/tsconfig*.tsbuildinfo && npx shx rm -rf lib && npx shx mkdir -p lib/cjs lib/esm",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
-    "prebuild": "npm run clean && npm run package"
+    "prebuild": "test -f lib/cjs/circuit_breaker.js || (npm run clean && npm run package)",
+    "build": "test -f lib/cjs/circuit_breaker.js && echo 'idls already built, skipping' || tsc -b tsconfig.json"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",

@@ -1,3 +1,3 @@
 #!/bin/bash
 
-yarn clean && yarn && TESTING=true anchor build && yarn build
+pnpm run clean && pnpm install && TESTING=true anchor build && pnpm run build

@@ -143,7 +143,24 @@ jobs:
           - packages/recent-helium-transactions-service
     steps:
       - uses: actions/checkout@v3
-      - run: cd $DOCKER_PATH && docker build .
+      - uses: ./.github/actions/build-anchor/
+        if: startsWith(matrix.test, 'packages/')
+        with:
+          testing: true
+      - uses: ./.github/actions/setup-ts/
+        if: startsWith(matrix.test, 'packages/')
+      - name: Build idls package
+        if: startsWith(matrix.test, 'packages/')
+        run: pnpm turbo run build --filter=@helium/idls
+      - name: Build Docker image
+        run: |
+          # JS services with turbo prune build from repo root
+          # Other services (utils/*, geocoder) build from their own directory
+          if grep -q "turbo prune" "$DOCKER_PATH/Dockerfile" 2>/dev/null; then
+            docker build -f $DOCKER_PATH/Dockerfile .
+          else
+            cd $DOCKER_PATH && docker build .
+          fi
         env:
           DOCKER_PATH: ${{ matrix.test }}
 
@@ -208,7 +225,7 @@ jobs:
             echo "Waiting for local Anchor network to start..."
             sleep 5
           done
-      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json yarn run ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
+      - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json pnpm exec ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
         env:
           TESTING: true
           TEST: ${{ matrix.test }}

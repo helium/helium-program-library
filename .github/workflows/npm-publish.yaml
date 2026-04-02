@@ -5,34 +5,46 @@ env:
   NODE_VERSION: 24.13.1
 
 permissions:
-  id-token: write # Required for OIDC
+  id-token: write
   contents: read
 
 on:
   push:
-    # Sequence of patterns matched against refs/tags
     tags:
-      - "v*" # Push events to matching v*, i.e. v0.0.1
+      - "v*"
 
 jobs:
   release:
+    name: Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: "https://registry.npmjs.org"
+
       - uses: ./.github/actions/setup/
       - uses: ./.github/actions/setup-anchor/
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
       - uses: ./.github/actions/build-anchor/
         with:
           testing: false
           devnet: false
-      - uses: ./.github/actions/setup-ts/
-      - name: Publish packages
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Version packages from changesets
+        run: pnpm run version-packages
+
+      - name: Build all packages
+        run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
+
+      - name: Publish to npm
         run: |
           for pkg in packages/*/; do
             [ -f "$pkg/package.json" ] || continue
@@ -52,3 +64,5 @@ jobs:
             echo "Publishing $name@$version..."
             npm publish "$pkg" --provenance --access public
           done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
