@@ -6,6 +6,7 @@ import {
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { TOKEN_NAMES } from "@/lib/constants/tokens";
 import {
   buildVersionedTransaction,
   serializeTransaction,
@@ -87,6 +88,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
     );
     const depositMint =
       registrar.votingMints[sourcePositionAcc.votingMintConfigIdx].mint;
+    const depositMintStr = depositMint.toBase58();
 
     const amountBN = new BN(amount);
 
@@ -157,7 +159,13 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "position_transfer", positionMint, targetPositionMint, amount },
+        actionMetadata: {
+          type: "position_transfer",
+          positionMint,
+          targetPositionMint,
+          tokenAmount: toTokenAmountOutput(amountBN, depositMintStr),
+          tokenName: TOKEN_NAMES[depositMintStr],
+        },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFee),

@@ -9,7 +9,11 @@ import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
 import { ensureNextServer, stopNextServer } from "./helpers/next";
-import { ensureSurfpool, getSurfpoolRpcUrl, stopSurfpool } from "./helpers/surfpool";
+import {
+  ensureSurfpool,
+  getSurfpoolRpcUrl,
+  stopSurfpool,
+} from "./helpers/surfpool";
 import {
   ensureFunds,
   ensureTokenBalance,
@@ -64,7 +68,7 @@ describe("token-transfer", () => {
     });
 
     expect(
-      result?.transactionData?.transactions?.[0]?.serializedTransaction
+      result?.transactionData?.transactions?.[0]?.serializedTransaction,
     ).to.be.a("string");
     expect(result?.transactionData?.tag).to.be.a("string");
     expect(result?.transactionData?.parallel).to.equal(false);
@@ -74,24 +78,27 @@ describe("token-transfer", () => {
     expect(txData.metadata?.description).to.include("Transfer");
 
     // Verify enriched per-transaction metadata
-    expect(txData.metadata?.mint).to.equal(TOKEN_MINTS.WSOL);
-    expect(txData.metadata?.amount).to.equal(String(lamports));
-    expect(txData.metadata?.recipient).to.equal(
-      recipient.publicKey.toBase58()
-    );
+    expect(txData.metadata?.tokenAmount).to.deep.include({
+      amount: String(lamports),
+      mint: TOKEN_MINTS.WSOL,
+    });
+    expect(txData.metadata?.tokenName).to.equal("SOL");
+    expect(txData.metadata?.recipient).to.equal(recipient.publicKey.toBase58());
 
     // Verify batch-level actionMetadata
-    expect(result.transactionData.actionMetadata).to.deep.include({
-      type: "token_transfer",
-      mint: TOKEN_MINTS.WSOL,
+    const actionMeta = result.transactionData.actionMetadata as any;
+    expect(actionMeta.type).to.equal("token_transfer");
+    expect(actionMeta.tokenAmount).to.deep.include({
       amount: String(lamports),
-      recipient: recipient.publicKey.toBase58(),
+      mint: TOKEN_MINTS.WSOL,
     });
+    expect(actionMeta.tokenName).to.equal("SOL");
+    expect(actionMeta.recipient).to.equal(recipient.publicKey.toBase58());
 
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer
+      payer,
     );
 
     const afterBalance = await connection.getBalance(recipient.publicKey);
@@ -110,7 +117,7 @@ describe("token-transfer", () => {
     });
 
     expect(
-      result?.transactionData?.transactions?.[0]?.serializedTransaction
+      result?.transactionData?.transactions?.[0]?.serializedTransaction,
     ).to.be.a("string");
     expect(result?.transactionData?.tag).to.be.a("string");
 
@@ -118,31 +125,34 @@ describe("token-transfer", () => {
     expect(txData.metadata?.type).to.equal("token_transfer");
 
     // Verify enriched per-transaction metadata
-    expect(txData.metadata?.mint).to.equal(TOKEN_MINTS.USDC);
-    expect(txData.metadata?.amount).to.equal(String(rawAmount));
-    expect(txData.metadata?.recipient).to.equal(
-      recipient.publicKey.toBase58()
-    );
+    expect(txData.metadata?.tokenAmount).to.deep.include({
+      amount: String(rawAmount),
+      mint: TOKEN_MINTS.USDC,
+    });
+    expect(txData.metadata?.tokenName).to.equal("USDC");
+    expect(txData.metadata?.recipient).to.equal(recipient.publicKey.toBase58());
 
     // Verify batch-level actionMetadata
-    expect(result.transactionData.actionMetadata).to.deep.include({
-      type: "token_transfer",
-      mint: TOKEN_MINTS.USDC,
+    const actionMeta = result.transactionData.actionMetadata as any;
+    expect(actionMeta.type).to.equal("token_transfer");
+    expect(actionMeta.tokenAmount).to.deep.include({
       amount: String(rawAmount),
-      recipient: recipient.publicKey.toBase58(),
+      mint: TOKEN_MINTS.USDC,
     });
+    expect(actionMeta.tokenName).to.equal("USDC");
+    expect(actionMeta.recipient).to.equal(recipient.publicKey.toBase58());
 
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer
+      payer,
     );
 
     const mintKey = new PublicKey(TOKEN_MINTS.USDC);
     const recipientAta = getAssociatedTokenAddressSync(
       mintKey,
       recipient.publicKey,
-      true
+      true,
     );
     const tokenAccount = await getAccount(connection, recipientAta);
     expect(Number(tokenAccount.amount)).to.equal(rawAmount);

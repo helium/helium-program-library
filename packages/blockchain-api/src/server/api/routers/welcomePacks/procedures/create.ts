@@ -257,7 +257,15 @@ export const create = publicProcedure.welcomePacks.create.handler(
         ],
         parallel: true,
         tag,
-        actionMetadata: { type: "welcome_pack_create", assetId },
+        actionMetadata: {
+          type: "welcome_pack_create",
+          assetId,
+          solAmount: toTokenAmountOutput(
+            new BN(input.solAmount.amount),
+            input.solAmount.mint,
+          ),
+          recipientCount: input.rewardsSplit.length,
+        },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
