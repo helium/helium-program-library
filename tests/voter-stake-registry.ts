@@ -972,6 +972,28 @@ describe("voter-stake-registry", () => {
       expect(toBalance.value.uiAmount).to.equal(1);
     });
 
+    it("allows position transfers", async () => {
+      const to = Keypair.generate();
+
+      const positionAccount = await program.account.positionV0.fetch(position);
+      const mint = positionAccount.mint;
+
+      await program.methods
+        .transferPositionV0()
+        .accountsPartial({
+          to: to.publicKey,
+          position,
+          mint,
+        })
+        .signers([to])
+        .rpc({ skipPreflight: true });
+
+      const toBalance = await provider.connection.getTokenAccountBalance(
+        getAssociatedTokenAddressSync(mint, to.publicKey)
+      );
+      expect(toBalance.value.uiAmount).to.equal(1);
+    });
+
     it("should not allow me to withdraw a position before lockup", async () => {
       await expect(
         program.methods
