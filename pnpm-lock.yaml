@@ -72,6 +72,51 @@ importers:
       '@changesets/cli':
         specifier: ^2.27.0
         version: 2.30.0(@types/node@20.19.37)
+      '@helium/anchor-resolvers':
+        specifier: workspace:^
+        version: link:packages/anchor-resolvers
+      '@helium/circuit-breaker-sdk':
+        specifier: workspace:^
+        version: link:packages/circuit-breaker-sdk
+      '@helium/data-credits-sdk':
+        specifier: workspace:^
+        version: link:packages/data-credits-sdk
+      '@helium/helium-entity-manager-sdk':
+        specifier: workspace:^
+        version: link:packages/helium-entity-manager-sdk
+      '@helium/helium-sub-daos-sdk':
+        specifier: workspace:^
+        version: link:packages/helium-sub-daos-sdk
+      '@helium/idls':
+        specifier: workspace:^
+        version: link:packages/idls
+      '@helium/lazy-distributor-sdk':
+        specifier: workspace:^
+        version: link:packages/lazy-distributor-sdk
+      '@helium/mini-fanout-sdk':
+        specifier: workspace:^
+        version: link:packages/mini-fanout-sdk
+      '@helium/mobile-entity-manager-sdk':
+        specifier: workspace:^
+        version: link:packages/mobile-entity-manager-sdk
+      '@helium/no-emit-sdk':
+        specifier: workspace:^
+        version: link:packages/no-emit-sdk
+      '@helium/spl-utils':
+        specifier: workspace:^
+        version: link:packages/spl-utils
+      '@helium/sus':
+        specifier: workspace:^
+        version: link:packages/sus
+      '@helium/tuktuk-dca-sdk':
+        specifier: workspace:^
+        version: link:packages/tuktuk-dca-sdk
+      '@helium/voter-stake-registry-sdk':
+        specifier: workspace:^
+        version: link:packages/voter-stake-registry-sdk
+      '@helium/welcome-pack-sdk':
+        specifier: workspace:^
+        version: link:packages/welcome-pack-sdk
       '@solana/spl-governance':
         specifier: ^0.3.17
         version: 0.3.28(typescript@5.9.3)
