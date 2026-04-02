@@ -14,7 +14,8 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9 --activate
 COPY --from=pruner /app/out/json/ .
-RUN pnpm install --frozen-lockfile
+ENV PNPM_STORE_DIR=/pnpm/store
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 FROM deps AS build
 COPY --from=pruner /app/out/full/ .
