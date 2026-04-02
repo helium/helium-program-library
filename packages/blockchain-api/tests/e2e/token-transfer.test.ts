@@ -82,7 +82,7 @@ describe("token-transfer", () => {
       amount: String(lamports),
       mint: TOKEN_MINTS.WSOL,
     });
-    expect(txData.metadata?.tokenName).to.equal("WSOL");
+    expect(txData.metadata?.tokenName).to.equal("SOL");
     expect(txData.metadata?.recipient).to.equal(recipient.publicKey.toBase58());
 
     // Verify batch-level actionMetadata
@@ -92,7 +92,7 @@ describe("token-transfer", () => {
       amount: String(lamports),
       mint: TOKEN_MINTS.WSOL,
     });
-    expect(actionMeta.tokenName).to.equal("WSOL");
+    expect(actionMeta.tokenName).to.equal("SOL");
     expect(actionMeta.recipient).to.equal(recipient.publicKey.toBase58());
 
     await signAndSubmitTransactionData(
