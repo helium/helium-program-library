@@ -134,7 +134,7 @@ function toHotspotFromAsset(owner: string, asset: any): Hotspot {
   };
 }
 
-export async function getNumRecipientsNeeded(owner: string): Promise<number> {
+export async function getNumRecipientsNeeded(owner: string, lazyDistributorAddress: string = HNT_LAZY_DISTRIBUTOR_ADDRESS): Promise<number> {
   if (env.NO_PG === "true") {
     const allAssets = await searchAssetsWithPageInfo(env.ASSET_ENDPOINT!, {
       ownerAddress: owner,
@@ -154,7 +154,7 @@ export async function getNumRecipientsNeeded(owner: string): Promise<number> {
     const recipientKeys = allAssets.items.map(
       (asset) =>
         recipientKey(
-          new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS),
+          new PublicKey(lazyDistributorAddress),
           new PublicKey(asset.id),
         )[0],
     );
@@ -164,7 +164,7 @@ export async function getNumRecipientsNeeded(owner: string): Promise<number> {
   } else {
     await connectToDb();
     // Count distinct assets owned by `owner` that do NOT have a recipient
-    // for the HNT lazy distributor
+    // for the given lazy distributor
     const count = await HotspotOwnership.count({
       distinct: true,
       col: "asset",
@@ -178,7 +178,7 @@ export async function getNumRecipientsNeeded(owner: string): Promise<number> {
           as: "recipient",
           required: false,
           where: {
-            lazyDistributor: HNT_LAZY_DISTRIBUTOR_ADDRESS,
+            lazyDistributor: lazyDistributorAddress,
           },
           attributes: [],
         },

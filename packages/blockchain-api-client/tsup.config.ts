@@ -15,6 +15,7 @@ export default defineConfig({
     "schemas/swap": "src/schemas/swap.ts",
     "schemas/tokens": "src/schemas/tokens.ts",
     "schemas/transactions": "src/schemas/transactions.ts",
+    "schemas/data-credits": "src/schemas/data-credits.ts",
     "schemas/webhooks": "src/schemas/webhooks.ts",
     "schemas/welcome-packs": "src/schemas/welcome-packs.ts",
     errors: "src/errors/index.ts",

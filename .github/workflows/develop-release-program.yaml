@@ -31,7 +31,11 @@ jobs:
           changed_files=$(git diff --name-only ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || github.event.before }} ${{ github.event.after }})
           changed_programs=($(echo "$changed_files" | grep "^programs/" | grep -v "/shared-utils/" | cut -d '/' -f 2 | sort -u))
           echo "${changed_programs[@]}"
-          json="[$(printf "'%s'", "${changed_programs[@]}" | sed 's/,$//')]"
+          if [ ${#changed_programs[@]} -eq 0 ]; then
+            json="[]"
+          else
+            json="[$(printf '"%s",' "${changed_programs[@]}" | sed 's/,$//')]"
+          fi
           echo $json
           echo "programs_with_changes=$json" >> $GITHUB_OUTPUT
   build_programs:

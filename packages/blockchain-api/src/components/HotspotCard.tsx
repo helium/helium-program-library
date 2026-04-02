@@ -183,7 +183,7 @@ export default function HotspotCard({
                     {Number(hotspot.shares.percentage) > 0
                       ? `${(hotspot.shares.percentage || 0) * 100}% Rewards`
                       : `${humanReadable(
-                          new BN(hotspot.shares.fixed || "0"),
+                          new BN(hotspot.shares.fixed || "0") as any,
                           8,
                         )} HNT/Period`}
                   </button>

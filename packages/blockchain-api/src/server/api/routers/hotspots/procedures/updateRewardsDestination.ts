@@ -204,11 +204,14 @@ export const updateRewardsDestination =
                     )}...${destination.slice(
                       -4,
                     )} (Warning: destination account does not exist)`,
+                hotspotKey: assetId,
+                destination,
               },
             },
           ],
           parallel: false,
           tag,
+          actionMetadata: { type: TRANSACTION_TYPES.UPDATE_REWARDS_DESTINATION, hotspotKey: assetId, destination },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),

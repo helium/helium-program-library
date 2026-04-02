@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.11",
+  "version": "0.11.16",
   "description": "React hooks and context for account-fetch-cache",
   "repository": {
     "type": "git",
@@ -28,10 +28,11 @@
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
-    "prebuild": "npm run clean && npm run package"
+    "prebuild": "npm run clean && npm run package",
+    "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
-    "@helium/account-fetch-cache": "^0.11.11",
+    "@helium/account-fetch-cache": "workspace:^",
     "@solana/web3.js": "^1.91.1",
     "react-async-hook": "^4.0.0"
   },

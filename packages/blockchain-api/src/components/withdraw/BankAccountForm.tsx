@@ -104,7 +104,7 @@ export function BankAccountForm({
 
   const form = useForm<FormData>({
     resolver: zodResolver(
-      isBusinessAccount ? businessSchema : individualSchema,
+      (isBusinessAccount ? businessSchema : individualSchema) as any,
     ),
     defaultValues: {
       accountType: "checking",

@@ -132,11 +132,15 @@ export const transfer = publicProcedure.tokens.transfer.handler(
             metadata: {
               type: "token_transfer",
               description: `Transfer ${isSol ? "SOL" : "Token"}`,
+              mint: tokenAmount.mint,
+              amount: tokenAmount.amount,
+              recipient: destination,
             },
           },
         ],
         parallel: false,
         tag,
+        actionMetadata: { type: "token_transfer", mint: tokenAmount.mint, amount: tokenAmount.amount, recipient: destination },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

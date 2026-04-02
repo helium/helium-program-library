@@ -3,17 +3,96 @@ import { env } from "../env";
 import { v4 as uuidv4 } from "uuid";
 import bs58 from "bs58";
 import * as Sentry from "@sentry/nextjs";
-import { getExplorerUrl } from "./explorer";
+import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { getCluster } from "../solana";
 import {
   shouldUseJitoBundle,
   simulateJitoBundle,
   submitJitoBundle,
+  JitoBundleContext,
+  jitoBlockEngineRequest,
 } from "./jito";
+
+let cachedTipAccountSet: Set<string> | null = null;
+let tipAccountSetCachedAt = 0;
+const TIP_ACCOUNTS_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Verify that a bundle contains at least one transaction that write-locks
+ * a Jito tip account. Throws if no tip is found — this should never happen
+ * since all server-crafted bundles include a tip transaction.
+ */
+async function requireBundleHasTipAccount(
+  serializedTransactions: string[],
+  tag?: string,
+): Promise<void> {
+  if (
+    !cachedTipAccountSet ||
+    Date.now() - tipAccountSetCachedAt > TIP_ACCOUNTS_TTL_MS
+  ) {
+    const response = await jitoBlockEngineRequest("getTipAccounts", []);
+    if (response.ok) {
+      const result = await response.json();
+      if (Array.isArray(result.result) && result.result.length > 0) {
+        cachedTipAccountSet = new Set(result.result as string[]);
+        tipAccountSetCachedAt = Date.now();
+      }
+    }
+  }
+
+  if (!cachedTipAccountSet || cachedTipAccountSet.size === 0) {
+    // Can't validate — allow submission and let Jito reject if needed
+    return;
+  }
+
+  for (const serialized of serializedTransactions) {
+    const tx = VersionedTransaction.deserialize(
+      Buffer.from(serialized, "base64"),
+    );
+    const keys = tx.message.staticAccountKeys;
+    const { numRequiredSignatures, numReadonlySignedAccounts, numReadonlyUnsignedAccounts } = tx.message.header;
+    const writableSignedCount = numRequiredSignatures - numReadonlySignedAccounts;
+    const unsignedStart = numRequiredSignatures;
+    const writableUnsignedCount = keys.length - numRequiredSignatures - numReadonlyUnsignedAccounts;
+
+    for (let i = 0; i < writableSignedCount; i++) {
+      if (cachedTipAccountSet.has(keys[i].toBase58())) return;
+    }
+    for (let i = 0; i < writableUnsignedCount; i++) {
+      if (cachedTipAccountSet.has(keys[unsignedStart + i].toBase58())) return;
+    }
+  }
+
+  let err = new Error(
+    "Jito bundle is missing a tip transaction — no transaction write-locks a recognized tip account",
+  );
+  if (tag?.includes("implicit-burn") || tag?.includes("claim-rewards")) {
+    err = new Error("Bundle missing Jito tip. Please upgrade your Helium Wallet app and try again.")
+  } else {
+    Sentry.captureException(err, {
+      level: "error",
+      tags: { error_type: "jito_bundle_missing_tip" },
+      extra: { bundle_size: serializedTransactions.length },
+    });
+  }
+  throw err;
+}
+
+function isBlockhashNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("Blockhash not found") || message.includes("blockhash not found");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface TransactionBatchPayload {
   parallel: boolean;
   transactions: string[];
+  tag?: string;
+  payer?: string;
+  transactionMetadata?: Array<Record<string, unknown> | undefined>;
 }
 
 export interface BatchSubmissionResult {
@@ -60,6 +139,7 @@ export async function submitSingleTransaction(
   } catch (error) {
     // Capture submission error with explorer link
     const explorerUrl = getExplorerUrl(transaction);
+    const chewingGlassExplorerUrl = getChewingGlassExplorerUrl(transaction);
     Sentry.captureException(error, {
       level: "error",
       tags: {
@@ -69,10 +149,12 @@ export async function submitSingleTransaction(
       extra: {
         error_message: error instanceof Error ? error.message : "Unknown error",
         explorer_link: explorerUrl,
+        chewing_glass_explorer_link: chewingGlassExplorerUrl,
       },
       contexts: {
         transaction: {
           explorer_link: explorerUrl,
+          chewing_glass_explorer_link: chewingGlassExplorerUrl,
           submission_type: "single",
         },
       },
@@ -115,8 +197,13 @@ export async function submitTransactionBatch(
   const batchId = uuidv4();
   const connection = new Connection(env.SOLANA_RPC_URL);
   const cluster = getCluster();
+  const bundleContext: JitoBundleContext = {
+    tag: payload.tag,
+    payer: payload.payer,
+    transactionMetadata: payload.transactionMetadata,
+  };
 
-  try {
+  const attempt = async (): Promise<BatchSubmissionResult> => {
     // Single transaction case
     if (payload.transactions.length === 1) {
       const signature = await submitSingleTransaction(
@@ -132,10 +219,11 @@ export async function submitTransactionBatch(
 
     // Multiple transactions
     if (shouldUseJitoBundle(payload.transactions.length, cluster)) {
-      // Mainnet: use Jito bundle
-      await simulateJitoBundle(payload.transactions);
+      // Mainnet: use Jito bundle — verify tip is present before submitting
+      await requireBundleHasTipAccount(payload.transactions, payload.tag);
+      await simulateJitoBundle(payload.transactions, bundleContext);
 
-      const jitoBundleId = await submitJitoBundle(payload.transactions);
+      const jitoBundleId = await submitJitoBundle(payload.transactions, bundleContext);
       return {
         batchId,
         submissionType: "jito_bundle",
@@ -171,10 +259,32 @@ export async function submitTransactionBatch(
         };
       }
     }
+  };
+
+  try {
+    const MAX_BLOCKHASH_RETRIES = 5;
+    let lastError: unknown;
+    for (let i = 0; i <= MAX_BLOCKHASH_RETRIES; i++) {
+      try {
+        return await attempt();
+      } catch (error) {
+        if (isBlockhashNotFoundError(error) && i < MAX_BLOCKHASH_RETRIES) {
+          console.warn(
+            `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
+          );
+          await sleep(2000);
+          lastError = error;
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError;
   } catch (error) {
     // Capture batch submission error
     // Try to get explorer links for transactions if possible
     const explorerLinks: string[] = [];
+    const chewingGlassExplorerLinks: string[] = [];
     try {
       for (const serializedTx of payload.transactions.slice(0, 3)) {
         // Limit to first 3 to avoid too much data
@@ -182,6 +292,7 @@ export async function submitTransactionBatch(
           Buffer.from(serializedTx, "base64"),
         );
         explorerLinks.push(getExplorerUrl(tx));
+        chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(tx));
       }
     } catch {
       // Ignore errors when generating explorer links
@@ -193,6 +304,7 @@ export async function submitTransactionBatch(
         error_type: "transaction_batch_submission_failed",
         submission_type: "batch",
         cluster,
+        tag: payload.tag,
       },
       extra: {
         error_message: error instanceof Error ? error.message : "Unknown error",
@@ -200,7 +312,11 @@ export async function submitTransactionBatch(
         batch_size: payload.transactions.length,
         parallel: payload.parallel,
         cluster,
+        tag: payload.tag,
+        payer: payload.payer,
+        transaction_metadata: payload.transactionMetadata,
         explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
+        chewing_glass_explorer_links: chewingGlassExplorerLinks.length > 0 ? chewingGlassExplorerLinks : undefined,
       },
       contexts: {
         transaction: {
@@ -208,7 +324,10 @@ export async function submitTransactionBatch(
           batch_size: payload.transactions.length,
           parallel: payload.parallel,
           cluster,
+          tag: payload.tag,
+          payer: payload.payer,
           explorer_links: explorerLinks,
+          chewing_glass_explorer_links: chewingGlassExplorerLinks,
         },
       },
     });

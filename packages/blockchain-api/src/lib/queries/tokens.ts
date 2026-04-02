@@ -15,7 +15,7 @@ import { TOKEN_MINTS } from "@/lib/constants/tokens";
 // Well-known token info for common Solana tokens
 const KNOWN_TOKENS: Record<
   string,
-  { symbol: string; name: string; coingeckoId: string }
+  { symbol: string; name: string; coingeckoId: string; fixedPriceUsd?: number }
 > = {
   [TOKEN_MINTS.WSOL]: {
     symbol: "SOL",
@@ -47,6 +47,12 @@ const KNOWN_TOKENS: Record<
     name: "Helium IoT",
     coingeckoId: "helium-iot",
   },
+  [TOKEN_MINTS.DC]: {
+    symbol: "DC",
+    name: "Data Credits",
+    coingeckoId: "",
+    fixedPriceUsd: 0.00001,
+  },
 };
 
 // Metadata cache and helper functions
@@ -73,7 +79,7 @@ function getMetadata(uriIn: string | undefined): Promise<any | undefined> {
 function getMetadataId(mint: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("metadata", "utf-8"), MPL_PID.toBuffer(), mint.toBuffer()],
-    MPL_PID,
+    MPL_PID
   )[0];
 }
 
@@ -85,7 +91,7 @@ const tokenMetadataCache = new Map<
 
 async function fetchTokenMetadata(
   connection: any,
-  mint: string,
+  mint: string
 ): Promise<{ symbol?: string; name?: string; logoURI?: string }> {
   const cached = tokenMetadataCache.get(mint);
   if (cached && Date.now() < cached.expiry) {
@@ -166,28 +172,25 @@ async function fetchTokenMetadata(
 }
 
 async function fetchTokenPrices(
-  coingeckoIds: string[],
+  coingeckoIds: string[]
 ): Promise<Record<string, number>> {
   if (coingeckoIds.length === 0) return {};
 
   try {
     const response = await fetch(
       `https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoIds.join(
-        ",",
+        ","
       )}&vs_currencies=usd`,
-      { next: { revalidate: 300 } }, // Cache for 5 minutes
+      { next: { revalidate: 300 } } // Cache for 5 minutes
     );
 
     if (!response.ok) return {};
 
     const data = await response.json();
-    return Object.keys(data).reduce(
-      (acc, key) => {
-        acc[key] = data[key].usd;
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
+    return Object.keys(data).reduce((acc, key) => {
+      acc[key] = data[key].usd;
+      return acc;
+    }, {} as Record<string, number>);
   } catch (error) {
     console.error("Failed to fetch token prices:", error);
     return {};
@@ -205,7 +208,7 @@ export async function getTokenBalances({
 
   const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
     publicKey,
-    { programId: TOKEN_PROGRAM_ID },
+    { programId: TOKEN_PROGRAM_ID }
   );
 
   const tokens: TokenAccount[] = [];
@@ -235,8 +238,10 @@ export async function getTokenBalances({
           name: knownToken.name,
         };
 
-        coingeckoIds.push(knownToken.coingeckoId);
-        mintToCoingeckoId[mint] = knownToken.coingeckoId;
+        if (knownToken.coingeckoId) {
+          coingeckoIds.push(knownToken.coingeckoId);
+          mintToCoingeckoId[mint] = knownToken.coingeckoId;
+        }
         tokens.push(token);
       }
     }
@@ -256,7 +261,7 @@ export async function getTokenBalances({
         name: metadata.name || token.name,
         logoURI: metadata.logoURI || token.logoURI,
       };
-    }),
+    })
   );
 
   // Apply prices to enhanced tokens
@@ -265,13 +270,19 @@ export async function getTokenBalances({
     if (coingeckoId && prices[coingeckoId]) {
       token.priceUsd = prices[coingeckoId];
       token.balanceUsd = token.uiAmount * prices[coingeckoId];
+    } else {
+      const fixedPrice = KNOWN_TOKENS[token.mint]?.fixedPriceUsd;
+      if (fixedPrice !== undefined) {
+        token.priceUsd = fixedPrice;
+        token.balanceUsd = token.uiAmount * fixedPrice;
+      }
     }
   });
 
   const solBalanceUsd = solBalanceInSol * solPriceUsd;
   const tokenBalanceUsd = enhancedTokens.reduce(
     (sum, token) => sum + (token.balanceUsd || 0),
-    0,
+    0
   );
   const totalBalanceUsd = tokenBalanceUsd;
 

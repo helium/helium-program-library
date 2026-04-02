@@ -595,7 +595,10 @@ mod tests {
     let change = result.change.unwrap();
     let metadata = change.metadata.unwrap();
 
-    assert_eq!(metadata.device_type, i32::from(MobileHotspotDeviceType::WifiOutdoor));
+    assert_eq!(
+      metadata.device_type,
+      i32::from(MobileHotspotDeviceType::WifiOutdoor)
+    );
     assert_eq!(metadata.serial_number, "test-serial-123");
     assert_eq!(metadata.azimuth, 180);
     assert_eq!(change.block, 100);
@@ -716,7 +719,12 @@ mod tests {
     let kp = test_keypair();
     let owner = test_solana_pubkey_n(2);
     let info = build_ownership(
-      &kp, &test_entity_key_hex(&kp), &test_solana_pubkey(), &owner, "direct_owner", 800,
+      &kp,
+      &test_entity_key_hex(&kp),
+      &test_solana_pubkey(),
+      &owner,
+      "direct_owner",
+      800,
     );
     assert_owner_info(&info, EntityOwnerType::DirectOwner, &owner);
   }
@@ -726,7 +734,12 @@ mod tests {
     let kp = test_keypair();
     let owner = test_solana_pubkey_n(3);
     let info = build_ownership(
-      &kp, &test_entity_key_hex(&kp), &test_solana_pubkey(), &owner, "welcome_pack_owner", 900,
+      &kp,
+      &test_entity_key_hex(&kp),
+      &test_solana_pubkey(),
+      &owner,
+      "welcome_pack_owner",
+      900,
     );
     assert_owner_info(&info, EntityOwnerType::WelcomePackOwner, &owner);
   }
@@ -739,7 +752,14 @@ mod tests {
     let welcome_wallet = test_solana_pubkey_n(10);
     let user_wallet = test_solana_pubkey_n(11);
 
-    let pack = build_ownership(&kp, &pub_key_hex, &asset, &welcome_wallet, "welcome_pack_owner", 800);
+    let pack = build_ownership(
+      &kp,
+      &pub_key_hex,
+      &asset,
+      &welcome_wallet,
+      "welcome_pack_owner",
+      800,
+    );
     assert_owner_info(&pack, EntityOwnerType::WelcomePackOwner, &welcome_wallet);
 
     let direct = build_ownership(&kp, &pub_key_hex, &asset, &user_wallet, "direct_owner", 900);
@@ -751,8 +771,12 @@ mod tests {
     let kp = test_keypair();
     let wallet = test_solana_pubkey_n(12);
     let info = build_ownership(
-      &kp, &test_entity_key_hex(&kp), &test_solana_pubkey(),
-      &wallet, "some_unknown_type", 1000,
+      &kp,
+      &test_entity_key_hex(&kp),
+      &test_solana_pubkey(),
+      &wallet,
+      "some_unknown_type",
+      1000,
     );
     assert_owner_info(&info, EntityOwnerType::DirectOwner, &wallet);
   }
@@ -806,8 +830,7 @@ mod tests {
       }),
     ];
 
-    let data =
-      reward_destination_fanout_json(&pub_key_hex, &asset, &fanout, recipients, 1100);
+    let data = reward_destination_fanout_json(&pub_key_hex, &asset, &fanout, recipients, 1100);
     let record = make_change_record("job", "query", 1100, data);
     let result =
       ProtobufBuilder::build_entity_reward_destination_change(&record, &kp, true).unwrap();
@@ -929,7 +952,8 @@ mod tests {
       "block": 1
     });
     let record = make_change_record("job", "query", 1, data);
-    let err = ProtobufBuilder::build_entity_reward_destination_change(&record, &kp, true).unwrap_err();
+    let err =
+      ProtobufBuilder::build_entity_reward_destination_change(&record, &kp, true).unwrap_err();
     assert!(
       matches!(&err, AtomicDataError::InvalidData(msg) if msg.contains("reward")),
       "expected InvalidData mentioning reward, got: {err}"

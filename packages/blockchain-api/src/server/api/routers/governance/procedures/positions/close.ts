@@ -139,11 +139,13 @@ export const close = publicProcedure.governance.closePosition.handler(
             metadata: {
               type: "position_close",
               description: "Close staking position and withdraw funds",
+              positionMint,
             },
           },
         ],
         parallel: false,
         tag,
+        actionMetadata: { type: "position_close", positionMint },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFee),

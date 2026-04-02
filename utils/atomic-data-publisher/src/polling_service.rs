@@ -19,8 +19,8 @@ const POLLING_ERROR_RETRY_SECONDS: u64 = 5;
 
 enum ProcessResult {
   Published,
-  DataError,      // Bad data - permanently failed, logged to DB
-  PublishError,   // Transient infrastructure error - retry next cycle
+  DataError,    // Bad data - permanently failed, logged to DB
+  PublishError, // Transient infrastructure error - retry next cycle
 }
 
 #[derive(Debug, Clone)]
@@ -95,7 +95,10 @@ impl PollingService {
 
   async fn process_changes(&self, shutdown_listener: Listener) -> Result<(), AtomicDataError> {
     if let Err(e) = self.database.test_connection().await {
-      warn!("Database connection test failed: {}, attempting pool refresh", e);
+      warn!(
+        "Database connection test failed: {}, attempting pool refresh",
+        e
+      );
       if let Err(refresh_err) = self.database.refresh_pool().await {
         error!("Failed to refresh database pool: {}", refresh_err);
         return Err(refresh_err.into());
@@ -151,15 +154,25 @@ impl PollingService {
         job_name, item_count, target_block
       );
 
-      match self.process_job(&change_records, shutdown_listener.clone()).await {
+      match self
+        .process_job(&change_records, shutdown_listener.clone())
+        .await
+      {
         Ok((job_published, job_data_errors, job_publish_errors, was_interrupted)) => {
           total_changes_published += job_published;
           total_changes_failed += job_data_errors + job_publish_errors;
 
           // Only pass publish errors to finalize_job (data errors are logged and don't block)
-          if let Err(e) = self.database.finalize_job(&change_records[0], job_publish_errors).await {
+          if let Err(e) = self
+            .database
+            .finalize_job(&change_records[0], job_publish_errors)
+            .await
+          {
             error!("Failed to finalize job '{}': {}", job_name, e);
-            let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
+            let _ = self
+              .database
+              .mark_job_not_running(&job_name, &query_name)
+              .await;
             continue;
           }
 
@@ -177,13 +190,19 @@ impl PollingService {
 
           if was_interrupted {
             // Shutdown signal received - mark as not running to retry on restart
-            let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
+            let _ = self
+              .database
+              .mark_job_not_running(&job_name, &query_name)
+              .await;
             return Ok(());
           }
         }
         Err(e) => {
           error!("Job '{}' failed: {}", job_name, e);
-          let _ = self.database.mark_job_not_running(&job_name, &query_name).await;
+          let _ = self
+            .database
+            .mark_job_not_running(&job_name, &query_name)
+            .await;
           continue;
         }
       }
@@ -216,7 +235,12 @@ impl PollingService {
           total_items
         );
         // Return was_interrupted=true so we can retry this batch on restart
-        return Ok((total_published, total_data_errors, total_publish_errors, true));
+        return Ok((
+          total_published,
+          total_data_errors,
+          total_publish_errors,
+          true,
+        ));
       }
 
       if Self::should_log_progress(item_index, total_items) {
@@ -276,7 +300,12 @@ impl PollingService {
 
     // Return was_interrupted=false since we completed normally
     // (publish errors are retried next cycle, not interruptions)
-    Ok((total_published, total_data_errors, total_publish_errors, false))
+    Ok((
+      total_published,
+      total_data_errors,
+      total_publish_errors,
+      false,
+    ))
   }
 
   async fn process_single_item(
@@ -295,7 +324,11 @@ impl PollingService {
         error!("{}", error_msg);
 
         // Data error - log to DB and move on
-        if let Err(db_err) = self.database.mark_record_failed(record, "protobuf_build_failure", &error_msg).await {
+        if let Err(db_err) = self
+          .database
+          .mark_record_failed(record, "protobuf_build_failure", &error_msg)
+          .await
+        {
           warn!("Failed to log failed record to database: {}", db_err);
         }
         metrics::increment_protobuf_build_failures();
@@ -319,7 +352,10 @@ impl PollingService {
       Ok(()) => {
         metrics::increment_published();
         metrics::observe_publish_duration(publish_duration);
-        debug!("Successfully published change (duration: {:.2}s)", publish_duration);
+        debug!(
+          "Successfully published change (duration: {:.2}s)",
+          publish_duration
+        );
         Ok(ProcessResult::Published)
       }
       Err(e) => {

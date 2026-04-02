@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  createPaginatedTransactionResponse,
   createTransactionResponse,
   HeliumPublicKeySchema,
   RewardSplitInputSchema,
@@ -7,6 +8,8 @@ import {
   TokenAmountOutputSchema,
   WalletAddressSchema,
 } from "./common";
+
+export const RewardNetworkSchema = z.enum(["hnt", "iot", "mobile"]).default("hnt");
 
 export const HotspotTypeSchema = z.enum(["iot", "mobile", "all"]);
 
@@ -19,10 +22,13 @@ export const GetHotspotsInputSchema = z.object({
 
 export const ClaimRewardsInputSchema = z.object({
   walletAddress: WalletAddressSchema,
+  network: RewardNetworkSchema,
+  tuktuk: z.boolean().optional(),
 });
 
 export const GetPendingRewardsInputSchema = z.object({
   walletAddress: WalletAddressSchema,
+  network: RewardNetworkSchema,
 });
 
 const PendingRewards = z.object({
@@ -138,7 +144,7 @@ export const HotspotsDataSchema = z.object({
   totalPages: z.number(),
 });
 
-export const ClaimRewardsOutputSchema = createTransactionResponse();
+export const ClaimRewardsOutputSchema = createPaginatedTransactionResponse();
 export const TransferHotspotOutputSchema = createTransactionResponse();
 export const UpdateRewardsDestinationOutputSchema = createTransactionResponse();
 export const CreateSplitOutputSchema = createTransactionResponse();

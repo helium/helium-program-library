@@ -73,7 +73,9 @@ export class TransactionProcessor {
     });
   }
 
-  private static async getMerkleTreeSet(tableName: string): Promise<Set<string>> {
+  private static async getMerkleTreeSet(
+    tableName: string
+  ): Promise<Set<string>> {
     return new Set(
       (
         (await database.query(`SELECT merkle_tree FROM ${tableName};`, {
@@ -88,17 +90,23 @@ export class TransactionProcessor {
       update_maker_tree_v0: {
         accountKey: "Maker",
         tableName: PG_MAKER_TABLE!,
-        merkleTrees: await TransactionProcessor.getMerkleTreeSet(PG_MAKER_TABLE!),
+        merkleTrees: await TransactionProcessor.getMerkleTreeSet(
+          PG_MAKER_TABLE!
+        ),
       },
       update_carrier_tree_v0: {
         accountKey: "Carrier",
         tableName: PG_CARRIER_TABLE!,
-        merkleTrees: await TransactionProcessor.getMerkleTreeSet(PG_CARRIER_TABLE!),
+        merkleTrees: await TransactionProcessor.getMerkleTreeSet(
+          PG_CARRIER_TABLE!
+        ),
       },
       update_data_only_tree_v0: {
         accountKey: "Data_only_config",
         tableName: PG_DATA_ONLY_TABLE!,
-        merkleTrees: await TransactionProcessor.getMerkleTreeSet(PG_DATA_ONLY_TABLE!),
+        merkleTrees: await TransactionProcessor.getMerkleTreeSet(
+          PG_DATA_ONLY_TABLE!
+        ),
       },
     };
   }
@@ -117,9 +125,15 @@ export class TransactionProcessor {
       ),
     };
 
-    const makerTrees = await TransactionProcessor.getMerkleTreeSet(PG_MAKER_TABLE!);
-    const dataOnlyTrees = await TransactionProcessor.getMerkleTreeSet(PG_DATA_ONLY_TABLE!);
-    const carrierTrees = await TransactionProcessor.getMerkleTreeSet(PG_CARRIER_TABLE!);
+    const makerTrees = await TransactionProcessor.getMerkleTreeSet(
+      PG_MAKER_TABLE!
+    );
+    const dataOnlyTrees = await TransactionProcessor.getMerkleTreeSet(
+      PG_DATA_ONLY_TABLE!
+    );
+    const carrierTrees = await TransactionProcessor.getMerkleTreeSet(
+      PG_CARRIER_TABLE!
+    );
 
     const treeConfigs: TreeConfigs = {
       update_maker_tree_v0: {
@@ -154,7 +168,7 @@ export class TransactionProcessor {
     if (!instructionCoder) return { updatedTrees: false };
 
     const decodedInstruction = instructionCoder.decode(
-      Buffer.from(instruction.data)
+      Buffer.from(instruction.data as any)
     );
 
     if (!decodedInstruction) return { updatedTrees: false };
@@ -282,10 +296,9 @@ export class TransactionProcessor {
     transaction: Transaction,
     block?: number
   ): Promise<{ updatedTrees: boolean }> {
-    // Process main instructions
-    for (const instruction of tx.instructions) {
+    for (let i = 0; i < tx.instructions.length; i++) {
       const { updatedTrees } = await this.processInstruction(
-        instruction,
+        tx.instructions[i],
         tx,
         transaction,
         block
@@ -293,19 +306,19 @@ export class TransactionProcessor {
       if (updatedTrees) {
         return { updatedTrees: true };
       }
-    }
 
-    // Process inner instructions
-    if (tx.innerInstructions) {
-      for (const innerSet of tx.innerInstructions) {
-        for (const instruction of innerSet.instructions) {
-          const { updatedTrees } = await this.processInstruction(
-            instruction,
+      // Process inner instructions for this index before moving to the next
+      // main instruction — matches Solana's actual execution order
+      const innerSet = tx.innerInstructions?.find((s) => s.index === i);
+      if (innerSet) {
+        for (const innerIx of innerSet.instructions) {
+          const result = await this.processInstruction(
+            innerIx,
             tx,
             transaction,
             block
           );
-          if (updatedTrees) {
+          if (result.updatedTrees) {
             return { updatedTrees: true };
           }
         }

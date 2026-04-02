@@ -13,7 +13,7 @@ export const carrierCollectionKey = (
     programId
   );
 
-export const carrierKey = (subDao: PublicKey, name: String, programId: PublicKey = PROGRAM_ID) =>
+export const carrierKey = (subDao: PublicKey, name: string, programId: PublicKey = PROGRAM_ID) =>
   PublicKey.findProgramAddressSync(
     [Buffer.from("carrier", "utf-8"), subDao.toBuffer(), Buffer.from(name, "utf-8")],
     programId

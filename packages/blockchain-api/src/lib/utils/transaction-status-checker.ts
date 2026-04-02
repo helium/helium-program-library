@@ -163,7 +163,8 @@ export async function checkAndUpdateBatchStatus(
             pendingTx.status = result.status;
 
             if (result.status === "confirmed") {
-              await pendingTx.destroy({ transaction: dbTransaction });
+              pendingTx.serializedTransaction = undefined;
+              await pendingTx.save({ transaction: dbTransaction });
             } else {
               await pendingTx.save({ transaction: dbTransaction });
             }
@@ -209,8 +210,15 @@ export async function checkAndUpdateBatchStatus(
     }
 
     // Update batch status in database
+    const isTerminal =
+      batchStatus === "confirmed" ||
+      batchStatus === "failed" ||
+      batchStatus === "partial";
     if (batchStatus !== batch.status) {
       batch.status = batchStatus;
+      if (isTerminal && !batch.confirmedAt) {
+        batch.confirmedAt = new Date();
+      }
       await batch.save({ transaction: dbTransaction });
     }
 

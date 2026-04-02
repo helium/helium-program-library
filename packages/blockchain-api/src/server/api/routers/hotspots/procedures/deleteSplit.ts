@@ -142,11 +142,13 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
             metadata: {
               type: "remove_split",
               description: "Remove split",
+              hotspotKey: assetId,
             },
           },
         ],
         parallel: true,
         tag,
+        actionMetadata: { type: "remove_split", hotspotKey: assetId },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFee),

@@ -1,43 +1,23 @@
 {
   "scripts": {
-    "versionup": "lerna version --force-publish--conventional-commits --no-git-tag-version",
-    "versionup:patch": "lerna version patch --force-publish --conventional-commits --no-git-tag-version",
-    "versionup:minor": "lerna version minor --force-publish --conventional-commits --no-git-tag-version",
-    "versionup:major": "lerna version major --force-publish --conventional-commits --no-git-tag-version",
-    "versionup:pre": "lerna version prerelease --force-publish --conventional-commits --no-git-tag-version",
-    "postversionup": "npm run commit-version",
-    "postversionup:patch": "npm run commit-version",
-    "postversionup:minor": "npm run commit-version",
-    "postversionup:major": "npm run commit-version",
-    "commit-version": "git add . && git commit -m \"chore(release): publish `node -p 'require(\"./lerna.json\").version'`\"",
-    "release": "git stash && lerna publish from-package --no-verify-access --force-publish='*' --no-push --no-git-tag-version --no-verify-access --yes",
-    "release:canary": "git stash && lerna publish --canary --preid next --dist-tag next --force-publish='*' --no-push --no-git-tag-version --no-verify-access --yes",
+    "build": "turbo run build",
+    "dev": "turbo run dev",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
-    "build": "lerna run --parallel prebuild && tsc --build && yarn generate-idl-docs",
-    "watch": "lerna run --parallel prebuild && tsc --build --watch",
     "clean": "npx shx rm -rf {.,packages/*}/{node_modules,lib,dist}",
     "fmt": "cargo fmt --check",
     "clippy": "cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments -A ambiguous_glob_reexports -A unexpected-cfgs",
     "generate-idl-docs": "ts-node -T scripts/generate-idl-docs.ts",
-    "regenerate-deploy-lockfiles": "./scripts/regenerate-deploy-lockfiles.sh",
-    "heroku-postbuild": "npm run build -w hpl-docs",
-    "docs-dev": "yarn workspace hpl-docs dev"
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "turbo run build && changeset publish"
   },
-  "workspaces": [
-    "packages/*"
-  ],
   "pre-commit": [
     "fmt"
   ],
   "private": true,
-  "dependenciesMeta": {
-    "sqlite3": {
-      "built": false
-    }
-  },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
+    "@coral-xyz/anchor": "^0.31.1",
     "@coral-xyz/borsh": "^0.2.6",
     "@helium/crypto": "^4.14.2",
     "@helium/modular-governance-idls": "^0.1.5-alpha.0",
@@ -51,34 +31,59 @@
     "@solana/spl-account-compression": "^0.1.5-alpha.0",
     "angry-purple-tiger": "^1.0.5",
     "camelcase": "6.3.0",
-    "lerna": "^5.5.4",
     "long": "^5.2.1"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.5.0",
+    "@changesets/cli": "^2.27.0",
+    "@helium/anchor-resolvers": "workspace:^",
+    "@helium/circuit-breaker-sdk": "workspace:^",
+    "@helium/data-credits-sdk": "workspace:^",
+    "@helium/helium-entity-manager-sdk": "workspace:^",
+    "@helium/helium-sub-daos-sdk": "workspace:^",
+    "@helium/idls": "workspace:^",
+    "@helium/lazy-distributor-sdk": "workspace:^",
+    "@helium/mini-fanout-sdk": "workspace:^",
+    "@helium/mobile-entity-manager-sdk": "workspace:^",
+    "@helium/no-emit-sdk": "workspace:^",
+    "@helium/spl-utils": "workspace:^",
+    "@helium/sus": "workspace:^",
+    "@helium/tuktuk-dca-sdk": "workspace:^",
+    "@helium/voter-stake-registry-sdk": "workspace:^",
+    "@helium/welcome-pack-sdk": "workspace:^",
     "@solana/spl-governance": "^0.3.17",
-    "@types/bn.js": "^5.1.0",
+    "@types/bn.js": "^5.2.0",
     "@types/chai": "^4.3.0",
     "@types/chai-as-promised": "^7.1.5",
     "@types/mocha": "^9.0.0",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
     "chai-http": "^4.3.0",
     "long": "^5.2.1",
     "mocha": "^9.0.3",
-    "pre-commit": "^1.2.2",
     "prettier": "^2.6.2",
     "shx": "^0.3.4",
     "ts-mocha": "^10.0.0",
     "ts-node": "^10.4.0",
+    "turbo": "^2.3.0",
     "tweetnacl": "^1.0.3",
     "typescript": "^5.2.2"
   },
-  "resolutions": {
-    "cipher-base": "^1.0.6",
-    "sha.js": "^2.4.12",
-    "@helium/crypto": "^4.14.2"
+  "pnpm": {
+    "neverBuiltDependencies": [
+      "@mongodb-js/zstd",
+      "grpc-tools",
+      "sqlite3"
+    ],
+    "overrides": {
+      "cipher-base": "^1.0.6",
+      "sha.js": "^2.4.12",
+      "@helium/crypto": "^4.14.2",
+      "@types/bn.js": "^5.2.0",
+      "@solana/web3.js": "1.98.2"
+    }
   },
-  "packageManager": "yarn@3.6.4"
+  "packageManager": "pnpm@9.15.4"
 }

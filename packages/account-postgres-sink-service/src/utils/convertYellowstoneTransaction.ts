@@ -23,7 +23,7 @@ const getAdressLookupTableAccounts = async (
     if (accountInfo) {
       const addressLookupTableAccount = new AddressLookupTableAccount({
         key: new PublicKey(addressLookupTableAddress),
-        state: AddressLookupTableAccount.deserialize(accountInfo.data),
+        state: AddressLookupTableAccount.deserialize(Uint8Array.from(accountInfo.data)),
       });
       acc.push(addressLookupTableAccount);
     }
@@ -40,7 +40,7 @@ export const convertYellowstoneTransaction = async (
 
   const { meta } = txInfo;
   const { signatures, message } = txInfo.transaction;
-  const sigs = signatures.map((sig) => Buffer.from(sig));
+  const sigs = signatures.map((sig) => Uint8Array.from(Buffer.from(sig)));
   const recentBlockhash = Buffer.from(message.recentBlockhash).toString("hex");
   const accountKeys = [
     ...message.accountKeys,

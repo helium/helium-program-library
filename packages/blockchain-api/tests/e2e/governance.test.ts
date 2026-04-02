@@ -109,6 +109,13 @@ describe("governance", () => {
       expect(data!.estimatedSolFee!.mint).to.equal(NATIVE_MINT.toBase58());
       expect(Number(data!.estimatedSolFee!.amount)).to.be.greaterThan(0);
 
+      // Verify batch-level actionMetadata
+      expect(data?.transactionData?.actionMetadata).to.deep.include({
+        type: "position_create",
+        lockupKind: "cliff",
+        lockupPeriodDays: 30,
+      });
+
       // Sign and submit
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,

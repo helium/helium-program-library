@@ -160,4 +160,8 @@ pub mod voter_stake_registry {
   ) -> Result<()> {
     instructions::clear_recent_proposals_v0::handler(ctx, args)
   }
+
+  pub fn transfer_position_v0(ctx: Context<TransferPositionV0>) -> Result<()> {
+    instructions::transfer_position_v0::handler(ctx)
+  }
 }

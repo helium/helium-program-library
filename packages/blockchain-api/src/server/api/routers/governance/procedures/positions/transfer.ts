@@ -157,6 +157,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
         ],
         parallel: false,
         tag,
+        actionMetadata: { type: "position_transfer", positionMint, targetPositionMint, amount },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFee),

@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::error::Error;
+use std::sync::Arc;
 
 use anyhow::Result;
 use helium_crypto::{Keypair, Sign};
@@ -31,7 +31,13 @@ impl std::fmt::Debug for AtomicDataPublisher {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_struct("AtomicDataPublisher")
       .field("polling_jobs", &self.polling_jobs)
-      .field("client", &self.client.as_ref().map(|_| "ChainRewardableEntitiesClient { .. }"))
+      .field(
+        "client",
+        &self
+          .client
+          .as_ref()
+          .map(|_| "ChainRewardableEntitiesClient { .. }"),
+      )
       .field("service_config", &self.service_config)
       .field("ingestor_config", &self.ingestor_config)
       .finish()
@@ -108,7 +114,9 @@ impl AtomicDataPublisher {
       return Ok(());
     }
 
-    let mut client = self.client.as_ref()
+    let mut client = self
+      .client
+      .as_ref()
       .ok_or_else(|| AtomicDataError::NetworkError("No client configured".to_string()))?
       .clone();
 
@@ -123,22 +131,38 @@ impl AtomicDataPublisher {
     let max_retries = self.ingestor_config.max_retries;
 
     for attempt in 1..=max_retries + 1 {
-      debug!("Publishing entity change request (attempt {}/{})", attempt, max_retries + 1);
+      debug!(
+        "Publishing entity change request (attempt {}/{})",
+        attempt,
+        max_retries + 1
+      );
 
       match self.publish_entity_change(client, request.clone()).await {
         Ok(_) => {
-          debug!("Successfully published entity change request on attempt {}", attempt);
+          debug!(
+            "Successfully published entity change request on attempt {}",
+            attempt
+          );
           return Ok(());
         }
         Err(e) if attempt <= max_retries => {
           metrics::increment_ingestor_retry_attempts();
-          warn!("Failed to publish (attempt {}/{}): {}. Retrying...", attempt, max_retries, e);
-          tokio::time::sleep(std::time::Duration::from_secs(self.ingestor_config.retry_delay_seconds)).await;
+          warn!(
+            "Failed to publish (attempt {}/{}): {}. Retrying...",
+            attempt, max_retries, e
+          );
+          tokio::time::sleep(std::time::Duration::from_secs(
+            self.ingestor_config.retry_delay_seconds,
+          ))
+          .await;
         }
         Err(e) => {
           metrics::increment_ingestor_publish_failures();
           error!("Failed to publish after {} attempts: {}", attempt, e);
-          return Err(AtomicDataError::NetworkError(format!("Failed after {} retries: {}", max_retries, e)));
+          return Err(AtomicDataError::NetworkError(format!(
+            "Failed after {} retries: {}",
+            max_retries, e
+          )));
         }
       }
     }
@@ -147,7 +171,11 @@ impl AtomicDataPublisher {
   }
 
   fn handle_grpc_error(e: tonic::Status, request_type: &str) -> AtomicDataError {
-    error!("gRPC error - code: {:?}, message: {}", e.code(), e.message());
+    error!(
+      "gRPC error - code: {:?}, message: {}",
+      e.code(),
+      e.message()
+    );
     if let Some(source) = e.source() {
       error!("gRPC error source: {}", source);
     }
@@ -175,12 +203,14 @@ impl AtomicDataPublisher {
   async fn publish_entity_change(
     &self,
     client: &mut ChainRewardableEntitiesClient<Channel>,
-    request: EntityChangeRequest
+    request: EntityChangeRequest,
   ) -> Result<(), AtomicDataError> {
-
     match request {
       EntityChangeRequest::MobileHotspot(mobile_req) => {
-        debug!("Sending mobile hotspot change request to {}", self.ingestor_config.endpoint);
+        debug!(
+          "Sending mobile hotspot change request to {}",
+          self.ingestor_config.endpoint
+        );
         let response = client
           .submit_mobile_hotspot_change(mobile_req)
           .await
@@ -265,7 +295,10 @@ impl AtomicDataPublisher {
         debug!("DRY RUN: Entity ownership change: {:?}", ownership_req);
       }
       EntityChangeRequest::EntityRewardDestination(reward_req) => {
-        debug!("DRY RUN: Entity reward destination change: {:?}", reward_req);
+        debug!(
+          "DRY RUN: Entity reward destination change: {:?}",
+          reward_req
+        );
       }
     }
 
@@ -295,7 +328,7 @@ impl AtomicDataPublisher {
 
       if self.client.is_none() {
         return Err(AtomicDataError::NetworkError(
-          "No gRPC client configured".to_string()
+          "No gRPC client configured".to_string(),
         ));
       }
 

@@ -10,6 +10,7 @@ import { welcomePacksRouter } from "./routers/welcomePacks/router";
 import { fiatRouter } from "./routers/fiat/router";
 import { webhooksRouter } from "./routers/webhooks/router";
 import { migrationRouter } from "./routers/migration/router";
+import { dataCreditsRouter } from "./routers/data-credits/router";
 import { implement } from "@orpc/server";
 import { fullApiContract, apiContract } from "@helium/blockchain-api";
 
@@ -22,6 +23,8 @@ const sharedRouters = {
   swap: swapRouter,
   transactions: transactionsRouter,
   welcomePacks: welcomePacksRouter,
+  migration: migrationRouter,
+  dataCredits: dataCreditsRouter,
 };
 
 export const publicRouter = implement(apiContract).router(sharedRouters);

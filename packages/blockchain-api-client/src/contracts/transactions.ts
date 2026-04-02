@@ -11,6 +11,8 @@ import {
   GetByPayerAndTagInputSchema,
   EstimateInputSchema,
   EstimateOutputSchema,
+  GetHistoryInputSchema,
+  HistoryOutputSchema,
 } from "../schemas/transactions";
 import { BAD_REQUEST, CONFLICT, NOT_FOUND } from "../errors/common";
 import { SIMULATION_FAILED } from "../errors/solana";
@@ -63,5 +65,12 @@ export const transactionsContract = oc
       .errors({
         BAD_REQUEST,
         SIMULATION_FAILED
+      }),
+    history: oc
+      .route({ method: "GET", path: "/transactions/history/{payer}", summary: "Get unified transaction history" })
+      .input(GetHistoryInputSchema)
+      .output(HistoryOutputSchema)
+      .errors({
+        BAD_REQUEST,
       }),
   });

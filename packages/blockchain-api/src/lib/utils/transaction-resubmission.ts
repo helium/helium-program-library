@@ -6,7 +6,7 @@ import { env } from "../env";
 import { defineAssociations } from "../models/associations";
 import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
-import { getExplorerUrl } from "./explorer";
+import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { submitTransactionBatch } from "./transaction-submission";
 
 export interface ResubmissionResult {
@@ -80,12 +80,14 @@ export async function resubmitSingleTransaction(
 
     // Capture resubmission error with explorer link if available
     let explorerUrl: string | undefined;
+    let chewingGlassExplorerUrl: string | undefined;
     try {
       if (pendingTx.serializedTransaction) {
         const transaction = VersionedTransaction.deserialize(
           Buffer.from(pendingTx.serializedTransaction, "base64"),
         );
         explorerUrl = getExplorerUrl(transaction);
+        chewingGlassExplorerUrl = getChewingGlassExplorerUrl(transaction);
       }
     } catch {
       // Ignore errors when generating explorer link
@@ -104,6 +106,7 @@ export async function resubmitSingleTransaction(
         transaction_type: pendingTx.type,
         blockhash: pendingTx.blockhash,
         explorer_link: explorerUrl,
+        chewing_glass_explorer_link: chewingGlassExplorerUrl,
       },
       contexts: {
         transaction: {
@@ -111,6 +114,7 @@ export async function resubmitSingleTransaction(
           transaction_signature: pendingTx.signature,
           transaction_type: pendingTx.type,
           explorer_link: explorerUrl,
+          chewing_glass_explorer_link: chewingGlassExplorerUrl,
         },
       },
     });
@@ -244,6 +248,7 @@ export async function resubmitTransactionBatch(
 
     // Capture resubmission error with explorer links if available
     const explorerLinks: string[] = [];
+    const chewingGlassExplorerLinks: string[] = [];
     try {
       for (const pendingTx of pendingTransactions.slice(0, 3)) {
         // Limit to first 3 to avoid too much data
@@ -252,6 +257,7 @@ export async function resubmitTransactionBatch(
             Buffer.from(pendingTx.serializedTransaction, "base64"),
           );
           explorerLinks.push(getExplorerUrl(transaction));
+          chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(transaction));
         }
       }
     } catch {
@@ -274,6 +280,7 @@ export async function resubmitTransactionBatch(
         cluster: batch.cluster,
         tag: batch.tag,
         explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
+        chewing_glass_explorer_links: chewingGlassExplorerLinks.length > 0 ? chewingGlassExplorerLinks : undefined,
       },
       contexts: {
         transaction: {
@@ -282,6 +289,7 @@ export async function resubmitTransactionBatch(
           parallel: batch.parallel,
           submission_type: batch.submissionType,
           explorer_links: explorerLinks,
+          chewing_glass_explorer_links: chewingGlassExplorerLinks,
         },
       },
     });

@@ -74,13 +74,44 @@ jobs:
         with:
           registry-type: public
 
+      - name: Build IDLs for JS service Docker builds
+        if: startsWith(env.CONTAINER_PATH, './packages/')
+        uses: ./.github/actions/build-anchor/
+        with:
+          testing: false
+      - uses: ./.github/actions/setup-ts/
+        if: startsWith(env.CONTAINER_PATH, './packages/')
+      - name: Build idls package
+        if: startsWith(env.CONTAINER_PATH, './packages/')
+        run: pnpm turbo run build --filter=@helium/idls
+
       - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ env.CONTAINER }}
           CONTAINER_PATH: ${{ env.CONTAINER_PATH }}
           IMAGE_TAG: ${{ env.VERSION }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         run: |
           REGISTRY_ALIAS=$(aws ecr-public describe-registries | jq --raw-output '.registries[0].aliases[0].name')
-          docker build -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
+          # JS services with turbo prune build from repo root
+          # Other services (utils/*, geocoder) build from their own directory
+          if grep -q "turbo prune" "$CONTAINER_PATH/Dockerfile" 2>/dev/null; then
+            docker build \
+              --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
+              --build-arg SENTRY_ORG=$SENTRY_ORG \
+              --build-arg SENTRY_PROJECT=$SENTRY_PROJECT \
+              --build-arg SENTRY_RELEASE=$ECR_REPOSITORY@$IMAGE_TAG \
+              -f $CONTAINER_PATH/Dockerfile \
+              -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG .
+          else
+            docker build \
+              --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
+              --build-arg SENTRY_ORG=$SENTRY_ORG \
+              --build-arg SENTRY_PROJECT=$SENTRY_PROJECT \
+              --build-arg SENTRY_RELEASE=$ECR_REPOSITORY@$IMAGE_TAG \
+              -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
+          fi
           docker push $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG

@@ -182,6 +182,11 @@ describe("automation endpoints", () => {
       expect(txData.metadata?.duration).to.equal(duration);
       expect(txData.serializedTransaction.length).to.be.greaterThan(100);
 
+      // Verify batch-level actionMetadata
+      expect(result.transactionData.actionMetadata).to.deep.include({
+        type: "setup_automation",
+      });
+
       // Submit transaction
       const signatures = await signAndSubmitTransactionData(
         connection,

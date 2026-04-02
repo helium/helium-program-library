@@ -40,7 +40,11 @@ import {
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipAmountLamports,
+  getJitoTipTransaction,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
 import { publicProcedure } from "../../../procedures";
 import { fetchAutomationData } from "./automation-data-helpers";
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
@@ -218,7 +222,13 @@ export const createAutomation =
       const totalFundingNeeded = minCrankSolFee + minPdaWalletSolFee;
       const walletBalance = await provider.connection.getBalance(wallet);
       const estimatedTxFees = BASE_TX_FEE_LAMPORTS * 2; // Estimate for multiple potential txs
-      const totalNeededWithFees = totalFundingNeeded + estimatedTxFees;
+      const cluster = getCluster();
+      const estimatedJitoTipCost =
+        cluster === "mainnet" || cluster === "mainnet-beta"
+          ? getJitoTipAmountLamports()
+          : 0;
+      const totalNeededWithFees =
+        totalFundingNeeded + estimatedTxFees + estimatedJitoTipCost;
 
       if (walletBalance < totalNeededWithFees) {
         throw errors.INSUFFICIENT_FUNDS({
@@ -274,6 +284,7 @@ export const createAutomation =
               : HELIUM_COMMON_LUT,
           ],
           computeUnitLimit: 500000,
+          commitment: "finalized",
         })
       ).map((tx) => toVersionedTx(tx));
 
@@ -303,6 +314,7 @@ export const createAutomation =
           })),
           parallel: false,
           tag: `setup_automation:${walletAddress}`,
+          actionMetadata: { type: "setup_automation" },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),

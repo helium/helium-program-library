@@ -13,7 +13,8 @@ CREATE TABLE asset_owners (
 
 CREATE TABLE welcome_packs (
     address TEXT PRIMARY KEY,
-    owner TEXT
+    owner TEXT,
+    last_block BIGINT
 );
 
 CREATE TABLE iot_hotspot_infos (

@@ -9,3 +9,4 @@ export * from "./swap";
 export * from "./transactions";
 export * from "./welcome-packs";
 export * from "./migration";
+export * from "./data-credits";

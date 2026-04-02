@@ -1,6 +1,7 @@
 import { publicProcedure } from "@/server/api/procedures";
-import { createSolanaConnection } from "@/lib/solana";
+import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
+import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
@@ -104,7 +105,13 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
         feePayer: walletPubkey,
       });
 
-      const txFee = getTotalTransactionFees(claimVersionedTxs);
+      const cluster = getCluster();
+      const claimJitoTipCost =
+        (cluster === "mainnet" || cluster === "mainnet-beta") &&
+        claimVersionedTxs.length > 1
+          ? getJitoTipAmountLamports()
+          : 0;
+      const txFee = getTotalTransactionFees(claimVersionedTxs) + claimJitoTipCost;
 
       const walletBalance = await connection.getBalance(walletPubkey);
       if (walletBalance < txFee) {
@@ -200,7 +207,13 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
       feePayer: walletPubkey,
     });
 
-    const txFee = getTotalTransactionFees(allVersionedTxs);
+    const undelegateCluster = getCluster();
+    const undelegateJitoTipCost =
+      (undelegateCluster === "mainnet" || undelegateCluster === "mainnet-beta") &&
+      allVersionedTxs.length > 1
+        ? getJitoTipAmountLamports()
+        : 0;
+    const txFee = getTotalTransactionFees(allVersionedTxs) + undelegateJitoTipCost;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < txFee) {
@@ -215,6 +228,7 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
         transactions: allTransactions,
         parallel: false,
         tag,
+        actionMetadata: { type: "delegation_undelegate", positionMint },
       },
       hasMore: batchHasMore,
       estimatedSolFee: toTokenAmountOutput(

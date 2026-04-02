@@ -1,6 +1,6 @@
 {
   "name": "@helium/account-fetch-cache",
-  "version": "0.11.11",
+  "version": "0.11.16",
   "description": "Solana account fetch cache to eliminate reduntant fetching, and batch fetches",
   "publishConfig": {
     "access": "public",
@@ -28,7 +28,8 @@
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
-    "prebuild": "npm run clean && npm run package"
+    "prebuild": "npm run clean && npm run package",
+    "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
     "@solana/web3.js": "^1.91.1"

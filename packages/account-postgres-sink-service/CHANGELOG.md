@@ -3,6 +3,56 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.11.16](https://github.com/helium/helium-program-library/compare/v0.11.15...v0.11.16) (2026-03-31)
+
+**Note:** Version bump only for package @helium/account-postgres-sink-service
+
+
+
+
+
+## [0.11.15](https://github.com/helium/helium-program-library/compare/v0.11.14...v0.11.15) (2026-03-27)
+
+**Note:** Version bump only for package @helium/account-postgres-sink-service
+
+
+
+
+
+## [0.11.14](https://github.com/helium/helium-program-library/compare/v0.11.13...v0.11.14) (2026-03-24)
+
+
+### Bug Fixes
+
+* process inner instructions in Solana execution order ([#1153](https://github.com/helium/helium-program-library/issues/1153)) ([6162ddf](https://github.com/helium/helium-program-library/commit/6162ddf3658c91fe853e5826c41f55bbf2be046a))
+
+
+
+
+
+## [0.11.13](https://github.com/helium/helium-program-library/compare/v0.11.12...v0.11.13) (2026-03-19)
+
+**Note:** Version bump only for package @helium/account-postgres-sink-service
+
+
+
+
+
+## [0.11.12](https://github.com/helium/helium-program-library/compare/v0.11.11...v0.11.12) (2026-03-17)
+
+
+### Bug Fixes
+
+* add periodic GC and null references in account-postgres-sink-service ([515686f](https://github.com/helium/helium-program-library/commit/515686f680086cd54f5b960345d631f3a401a570))
+* reduce memory pressure in asset-ownership and account-postgres-sink services ([2979240](https://github.com/helium/helium-program-library/commit/297924040ab088db4d4a8c8dee617257e3559253))
+* remove forced GC causing CPU throttle in asset-ownership-service ([b326a48](https://github.com/helium/helium-program-library/commit/b326a4880398b74b872783febe24f7deb4f65c9a))
+* remove unbounded AccountFetchCache causing memory leak ([24cf9ea](https://github.com/helium/helium-program-library/commit/24cf9ea56a2d4aaacfddb6ace0e1c98108e9dad8))
+* resolve OOM in asset-ownership-service ([61c70de](https://github.com/helium/helium-program-library/commit/61c70ded334e73c64b67cb92c0450536b8de428a))
+
+
+
+
+
 ## [0.11.11](https://github.com/helium/helium-program-libary/compare/v0.11.10...v0.11.11) (2026-02-11)
 
 **Note:** Version bump only for package @helium/account-postgres-sink-service

@@ -2,12 +2,13 @@ import { sequelize } from "@/lib/db";
 import { env } from "@/lib/env";
 import PendingTransaction from "@/lib/models/pending-transaction";
 import TransactionBatch from "@/lib/models/transaction-batch";
-import { getExplorerUrl } from "@/lib/utils/explorer";
+import { getChewingGlassExplorerUrl, getExplorerUrl } from "@/lib/utils/explorer";
 import { getCluster } from "@/lib/solana";
 import { BundleSimulationError } from "@/lib/utils/jito";
 import { submitTransactionBatch } from "@/lib/utils/transaction-submission";
 import * as Sentry from "@sentry/nextjs";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { classifySimulationLogs } from "@/lib/utils/simulation-classifier";
 import { publicProcedure } from "../../../procedures";
 
 /**
@@ -15,8 +16,14 @@ import { publicProcedure } from "../../../procedures";
  */
 export const submit = publicProcedure.transactions.submit.handler(
   async ({ input, errors }) => {
-    const { transactions, parallel, tag, simulationCommitment, simulate } =
-      input;
+    const {
+      transactions,
+      parallel,
+      tag,
+      actionMetadata,
+      simulationCommitment,
+      simulate,
+    } = input;
 
     if (
       !transactions ||
@@ -73,6 +80,7 @@ export const submit = publicProcedure.transactions.submit.handler(
               } simulation failed: ${errorMessage}`,
               logs: simulation.value.logs,
               link: getExplorerUrl(transaction),
+              chewingGlassLink: getChewingGlassExplorerUrl(transaction),
             };
           }
           return { index, success: true };
@@ -91,33 +99,49 @@ export const submit = publicProcedure.transactions.submit.handler(
 
       const ff = failures.at(0);
       if (ff) {
-        // Capture simulation failure in Sentry with explorer link
+        const failedTxMeta = transactions[ff.index]?.metadata;
+        const firstRealMeta = transactions.find(
+          (t) => t.metadata?.type && t.metadata.type !== "jito_tip",
+        )?.metadata;
+        const actionType =
+          (failedTxMeta?.type as string | undefined) ??
+          (firstRealMeta?.type as string | undefined) ??
+          "unknown";
+        const { category, detail } = classifySimulationLogs(
+          ff.error ?? "",
+          ff.logs ?? [],
+        );
+
         Sentry.captureException(
-          new Error(ff.error ?? "Transaction simulation failed"),
+          new Error(
+            `Transaction simulation failed [${category}] (${actionType}): ${detail}`,
+          ),
           {
             level: "error",
+            fingerprint: [
+              "transaction_simulation_failed",
+              category,
+              actionType,
+            ],
             tags: {
               error_type: "transaction_simulation_failed",
+              simulation_failure_category: category,
+              action_type: actionType,
               transaction_index: ff.index,
               batch_size: transactions.length,
               parallel,
             },
             extra: {
               error_message: ff.error,
+              failure_detail: detail,
               transaction_index: ff.index,
               batch_size: transactions.length,
               parallel,
               tag,
               payer,
               explorer_link: ff?.link,
+              chewing_glass_explorer_link: ff?.chewingGlassLink,
               simulation_logs: ff?.logs,
-            },
-            contexts: {
-              transaction: {
-                explorer_link: ff?.link,
-                transaction_index: ff.index,
-                batch_size: transactions.length,
-              },
             },
           },
         );
@@ -159,6 +183,9 @@ export const submit = publicProcedure.transactions.submit.handler(
       result = await submitTransactionBatch({
         transactions: serializedTransactions,
         parallel,
+        tag,
+        payer,
+        transactionMetadata: transactions.map((tx) => tx.metadata),
       });
     } catch (error) {
       if (error instanceof BundleSimulationError) {
@@ -207,6 +234,12 @@ export const submit = publicProcedure.transactions.submit.handler(
 
     try {
       // Create the batch record
+      // Derive actionType from first transaction metadata or actionMetadata
+      const actionType =
+        (actionMetadata?.type as string) ||
+        transactions[0]?.metadata?.type ||
+        undefined;
+
       await TransactionBatch.create(
         {
           id: result.batchId,
@@ -217,6 +250,8 @@ export const submit = publicProcedure.transactions.submit.handler(
           cluster,
           tag,
           payer,
+          actionType,
+          actionMetadata,
         },
         { transaction: dbTransaction },
       );

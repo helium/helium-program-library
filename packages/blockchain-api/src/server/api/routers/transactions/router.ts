@@ -4,6 +4,7 @@ import { resubmit } from "./procedures/resubmit";
 import { getByPayer } from "./procedures/getByPayer";
 import { getByPayerAndTag } from "./procedures/getByPayerAndTag";
 import { estimate } from "./procedures/estimate";
+import { history } from "./procedures/history";
 import { transactionsContract } from "@helium/blockchain-api/contracts";
 import { implement } from "@orpc/server";
 
@@ -23,4 +24,6 @@ export const transactionsRouter = implement(transactionsContract).router({
   getByPayerAndTag,
   /** Estimate transaction costs */
   estimate,
+  /** Get unified transaction history */
+  history,
 });
