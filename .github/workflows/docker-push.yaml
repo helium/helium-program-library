@@ -96,9 +96,9 @@ jobs:
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         run: |
           REGISTRY_ALIAS=$(aws ecr-public describe-registries | jq --raw-output '.registries[0].aliases[0].name')
-          # JS services (packages/*) build from repo root with turbo prune
-          # Rust/other services (utils/*) keep package-dir context
-          if [[ "$CONTAINER_PATH" == ./packages/* ]]; then
+          # JS services with turbo prune build from repo root
+          # Other services (utils/*, geocoder) build from their own directory
+          if grep -q "turbo prune" "$CONTAINER_PATH/Dockerfile" 2>/dev/null; then
             docker build \
               --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
               --build-arg SENTRY_ORG=$SENTRY_ORG \

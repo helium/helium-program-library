@@ -154,7 +154,9 @@ jobs:
         run: pnpm turbo run build --filter=@helium/idls
       - name: Build Docker image
         run: |
-          if [[ "$DOCKER_PATH" == packages/* ]]; then
+          # JS services with turbo prune build from repo root
+          # Other services (utils/*, geocoder) build from their own directory
+          if grep -q "turbo prune" "$DOCKER_PATH/Dockerfile" 2>/dev/null; then
             docker build -f $DOCKER_PATH/Dockerfile .
           else
             cd $DOCKER_PATH && docker build .
