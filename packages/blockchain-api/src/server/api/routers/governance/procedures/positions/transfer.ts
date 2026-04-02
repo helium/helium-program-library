@@ -88,6 +88,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
     );
     const depositMint =
       registrar.votingMints[sourcePositionAcc.votingMintConfigIdx].mint;
+    const depositMintStr = depositMint.toBase58();
 
     const amountBN = new BN(amount);
 
@@ -162,8 +163,8 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
           type: "position_transfer",
           positionMint,
           targetPositionMint,
-          tokenAmount: toTokenAmountOutput(amountBN, depositMint.toBase58()),
-          tokenName: TOKEN_NAMES[depositMint.toBase58()],
+          tokenAmount: toTokenAmountOutput(amountBN, depositMintStr),
+          tokenName: TOKEN_NAMES[depositMintStr],
         },
       },
       estimatedSolFee: toTokenAmountOutput(
