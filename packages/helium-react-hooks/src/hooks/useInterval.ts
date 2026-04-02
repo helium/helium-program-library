@@ -5,7 +5,7 @@ export function useInterval(
   delay: number | null,
   deps: any[] = []
 ) {
-  const savedCallbackRef = useRef<(...args: any[]) => void>();
+  const savedCallbackRef = useRef<((...args: any[]) => void) | undefined>(undefined);
 
   useEffect(() => {
     savedCallbackRef.current = callback;
