@@ -3,17 +3,17 @@
 FROM node:22-alpine AS pruner
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN pnpm add -g turbo
+RUN pnpm add -g turbo@2.9.3
 COPY . .
 RUN turbo prune @helium/blockchain-api-service --docker
 
 FROM node:22-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 COPY --from=pruner /app/out/json/ .
 ENV PNPM_STORE_DIR=/pnpm/store
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
@@ -21,37 +21,30 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 FROM deps AS build
 COPY --from=pruner /app/out/full/ .
 COPY tsconfig*.json ./
-# Copy pre-built idls (requires Rust build output not available in Docker)
 COPY packages/idls/lib/ packages/idls/lib/
 RUN mkdir -p target/types && echo 'export {}' > target/types/_placeholder.ts
 
-# Sentry build args for sourcemap upload during build
 ARG SENTRY_AUTH_TOKEN
 ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 ARG SENTRY_RELEASE
 
-
+# NEXT_PUBLIC_ vars are inlined by webpack at compile time; placeholders
+# get replaced at runtime by docker-entrypoint.sh
 ENV NEXT_PUBLIC_PRIVY_APP_ID="__NEXT_PUBLIC_PRIVY_APP_ID__" \
     NEXT_PUBLIC_SOLANA_CLUSTER="__NEXT_PUBLIC_SOLANA_CLUSTER__" \
     NEXT_PUBLIC_SOLANA_URL="__NEXT_PUBLIC_SOLANA_URL__" \
     NEXT_PUBLIC_WORLD_HELIUM_URL="__NEXT_PUBLIC_WORLD_HELIUM_URL__" \
-    PG_USER="build_placeholder" \
-    PG_NAME="build_placeholder" \
-    PG_HOST="build_placeholder" \
-    PG_PORT="5432" \
-    PRIVY_APP_SECRET="build_placeholder" \
-    BRIDGE_API_KEY="build_placeholder" \
-    JUPITER_API_KEY="build_placeholder" \
     NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=4096"
 
-# Sentry env vars for automatic sourcemap upload during build
 ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN} \
     SENTRY_ORG=${SENTRY_ORG} \
     SENTRY_PROJECT=${SENTRY_PROJECT} \
     SENTRY_RELEASE=${SENTRY_RELEASE}
 
+# Server env vars don't reach Next.js 15 worker threads via Docker ENV,
+# so write dummy values to .env for the build to read from disk
 RUN printf '%s\n' \
     'SKIP_ENV_VALIDATION=1' \
     'PG_USER=build' \
@@ -64,52 +57,48 @@ RUN printf '%s\n' \
     > packages/blockchain-api/.env && \
     pnpm turbo run build --filter=@helium/blockchain-api-service
 
-# Production image, copy all the files and run next
+# Production image
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Re-declare build arg to make it available in this stage
 ARG SENTRY_RELEASE
 
 ENV NODE_ENV=production
-# Persist SENTRY_RELEASE for runtime error tagging
 ENV SENTRY_RELEASE=${SENTRY_RELEASE}
 
-# Install tools needed for the entrypoint script
 RUN apk add --no-cache jq sed
 
-# Create the nextjs user and group
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs && \
     mkdir -p /app/.next/cache && \
     chown -R nextjs:nodejs /app
 
-# Copy built files with correct ownership
-# In a monorepo, standalone output mirrors the repo structure:
-#   .next/standalone/packages/blockchain-api/server.js  (the entrypoint)
-#   .next/standalone/node_modules/                       (shared deps)
-#   .next/standalone/packages/blockchain-api/.next/      (server chunks)
+# Standalone output: in a monorepo, server.js is nested under the package path
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/standalone/packages/blockchain-api/ ./
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/static ./.next/static
-# Copy server source maps for Sentry (injected with Debug IDs during build)
+
+# Sentry source maps (server chunks with debug IDs injected during build)
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/server ./.next/server
 
-# Copy migration files and dependencies
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/package.json ./package.json
+# Standalone node_modules (pruned by Next.js to runtime deps only)
+COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/standalone/node_modules ./node_modules
+
+# Migration and background service files
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.sequelizerc ./.sequelizerc
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/scripts ./scripts
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/src/lib ./src/lib
 
-# Copy all node_modules to preserve dependencies
-COPY --from=build --chown=nextjs:nodejs /app/node_modules ./node_modules
+# Extra deps needed by migrations/background service but not in standalone bundle
+COPY --from=build --chown=nextjs:nodejs /app/node_modules/sequelize-cli ./node_modules/sequelize-cli
+COPY --from=build --chown=nextjs:nodejs /app/node_modules/.bin/sequelize-cli ./node_modules/.bin/sequelize-cli
+COPY --from=build --chown=nextjs:nodejs /app/node_modules/@swc-node ./node_modules/@swc-node
+COPY --from=build --chown=nextjs:nodejs /app/node_modules/dotenv ./node_modules/dotenv
 
-# Ensure static files are readable
 RUN chmod -R 755 /app/.next/static
 
-# Create and copy the entrypoint script
-COPY packages/blockchain-api/docker-entrypoint.sh /usr/local/bin/
+COPY --from=build /app/packages/blockchain-api/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 3000
