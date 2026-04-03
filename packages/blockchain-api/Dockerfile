@@ -32,11 +32,20 @@ ARG SENTRY_PROJECT
 ARG SENTRY_RELEASE
 
 # Skip server env validation at build time — real values injected at runtime
+# Dummy values are required because Next.js inlines process.env.* at compile time,
+# so SKIP_ENV_VALIDATION alone isn't sufficient during static page generation.
 ENV SKIP_ENV_VALIDATION=1 \
     NEXT_PUBLIC_PRIVY_APP_ID="__NEXT_PUBLIC_PRIVY_APP_ID__" \
     NEXT_PUBLIC_SOLANA_CLUSTER="__NEXT_PUBLIC_SOLANA_CLUSTER__" \
     NEXT_PUBLIC_SOLANA_URL="__NEXT_PUBLIC_SOLANA_URL__" \
     NEXT_PUBLIC_WORLD_HELIUM_URL="__NEXT_PUBLIC_WORLD_HELIUM_URL__" \
+    PG_USER="build_placeholder" \
+    PG_NAME="build_placeholder" \
+    PG_HOST="build_placeholder" \
+    PG_PORT="5432" \
+    PRIVY_APP_SECRET="build_placeholder" \
+    BRIDGE_API_KEY="build_placeholder" \
+    JUPITER_API_KEY="build_placeholder" \
     NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=4096"
 
