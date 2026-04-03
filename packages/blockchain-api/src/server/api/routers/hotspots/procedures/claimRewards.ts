@@ -33,7 +33,11 @@ import {
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
 } from "@helium/spl-utils";
-import { getJitoTipAmountLamports, getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipAmountLamports,
+  getJitoTipTransaction,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
 import {
   getTotalTransactionFees,
   calculateRequiredBalance,
@@ -42,7 +46,10 @@ import {
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
-import { getMintForNetwork, getLazyDistributorForNetwork } from "@/lib/utils/network-mint";
+import {
+  getMintForNetwork,
+  getLazyDistributorForNetwork,
+} from "@/lib/utils/network-mint";
 
 // Minimum lamports the on-chain program requires in the PDA wallet before
 // queuing a wallet claim task. Matches CLAIMER_MIN_LAMPORTS in
@@ -86,7 +93,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
 
     // Use direct claim path for: non-HNT networks or HNT wallets with ≤12 hotspots
     // Can be overridden with tuktuk: true to force Tuktuk path
-    const useDirectClaim = !forceTuktuk && (!isHnt || total <= MAX_HNT_DIRECT_CLAIM_TOTAL);
+    const useDirectClaim =
+      !forceTuktuk && (!isHnt || total <= MAX_HNT_DIRECT_CLAIM_TOTAL);
 
     if (useDirectClaim) {
       const { provider, connection } = createSolanaConnection(walletAddress);
@@ -103,43 +111,64 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       let currentPage = 1;
       const totalPages = Math.ceil(total / limit);
 
-      while (allVtxs.length <= MAX_DIRECT_CLAIM_HOTSPOTS && currentPage <= totalPages) {
+      while (
+        allVtxs.length <= MAX_DIRECT_CLAIM_HOTSPOTS &&
+        currentPage <= totalPages
+      ) {
         // Step 1: Fetch a chunk of hotspots, filter by network
-        const pageData = currentPage === 1
-          ? hotspotsData
-          : await getHotspotsByOwner({ owner: walletAddress, page: currentPage, limit });
+        const pageData =
+          currentPage === 1
+            ? hotspotsData
+            : await getHotspotsByOwner({
+                owner: walletAddress,
+                page: currentPage,
+                limit,
+              });
         currentPage++;
 
         const pageHotspots = pageData.hotspots
           .filter(matchesNetwork)
-          .map((h) => ({ asset: new PublicKey(h.asset), entityKey: h.entityKey }));
+          .map((h) => ({
+            asset: new PublicKey(h.asset),
+            entityKey: h.entityKey,
+          }));
 
         if (pageHotspots.length === 0) continue;
 
         // Step 2: Filter for ones with pending rewards
         const entityKeys = pageHotspots.map((h) => h.entityKey);
-        const rewards = await getBulkRewards(ldProgram, lazyDistributor, entityKeys);
-        const rKeys = pageHotspots.map((h) => recipientKey(lazyDistributor, h.asset)[0]);
-        const recipientAccs = await ldProgram.account.recipientV0.fetchMultiple(rKeys);
+        const rewards = await getBulkRewards(
+          ldProgram,
+          lazyDistributor,
+          entityKeys,
+        );
+        const rKeys = pageHotspots.map(
+          (h) => recipientKey(lazyDistributor, h.asset)[0],
+        );
+        const recipientAccs =
+          await ldProgram.account.recipientV0.fetchMultiple(rKeys);
         const withPending = pageHotspots.filter((_, idx) => {
           const sortedOracleRewards = rewards
             .map((rew) => new BN(rew.currentRewards[entityKeys[idx]] || 0))
             .sort((a, b) => a.sub(b).toNumber());
-          const oracleMedian = sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)];
-          const alreadyDistributed = recipientAccs[idx]?.totalRewards || new BN(0);
+          const oracleMedian =
+            sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)];
+          const alreadyDistributed =
+            recipientAccs[idx]?.totalRewards || new BN(0);
           return oracleMedian.sub(alreadyDistributed).gtn(0);
         });
 
         if (withPending.length === 0) continue;
 
         // Step 3: Filter out ones with mini-fanouts
-        const { claimable: pageClaimable } = await filterHotspotsWithoutMiniFanout(
-          ldProgram,
-          mfProgram,
-          connection,
-          lazyDistributor,
-          withPending,
-        );
+        const { claimable: pageClaimable } =
+          await filterHotspotsWithoutMiniFanout(
+            ldProgram,
+            mfProgram,
+            connection,
+            lazyDistributor,
+            withPending,
+          );
 
         if (pageClaimable.length === 0) continue;
 
@@ -171,7 +200,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             transactions: [],
             parallel: true,
             tag: `claim_rewards:${walletAddress}`,
-            actionMetadata: { type: "claim_rewards", hotspotCount: 0, network: "all" },
+            actionMetadata: { type: "claim_rewards", hotspotCount: 0, network },
           },
           estimatedSolFee: toTokenAmountOutput(
             new BN(0),
@@ -232,7 +261,11 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           })),
           parallel: true,
           tag: `claim_rewards:${walletAddress}`,
-          actionMetadata: { type: "claim_rewards", hotspotCount: allClaimable.length, network: "all" },
+          actionMetadata: {
+            type: "claim_rewards",
+            hotspotCount: allClaimable.length,
+            network,
+          },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(txFees + rentCost),
@@ -270,13 +303,14 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     ])[0];
     const pdaWalletBalanceLamports =
       await provider.connection.getBalance(pdaWallet);
-    const hotspotsNeedingRecipient =
-      await getNumRecipientsNeeded(walletAddress, lazyDistributorAddress);
+    const hotspotsNeedingRecipient = await getNumRecipientsNeeded(
+      walletAddress,
+      lazyDistributorAddress,
+    );
 
     // PDA wallet needs CLAIMER_MIN_LAMPORTS (on-chain check) plus rent for any new recipients
     const pdaWalletFundingNeededLamports =
-      CLAIMER_MIN_LAMPORTS +
-      hotspotsNeedingRecipient * RECIPIENT_RENT_LAMPORTS;
+      CLAIMER_MIN_LAMPORTS + hotspotsNeedingRecipient * RECIPIENT_RENT_LAMPORTS;
     const pdaWalletLamportsShortfall = Math.max(
       0,
       pdaWalletFundingNeededLamports - pdaWalletBalanceLamports,
@@ -376,7 +410,11 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         })),
         parallel: true,
         tag: `claim_rewards_tuktuk:${walletAddress}`,
-        actionMetadata: { type: "queue_wallet_claim", hotspotCount: total, network: "all" },
+        actionMetadata: {
+          type: "queue_wallet_claim",
+          hotspotCount: total,
+          network,
+        },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFees + rentCost),
