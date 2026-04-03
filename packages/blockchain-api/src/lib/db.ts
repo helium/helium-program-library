@@ -12,7 +12,7 @@ if (!POSTGRES_URL) {
     throw new Error("POSTGRES_URL environment variable is not set");
   } else {
     console.warn(
-      "POSTGRES_URL environment variable is not set. Using default for development.",
+      "POSTGRES_URL environment variable is not set. Using default for development."
     );
   }
 }
@@ -20,16 +20,19 @@ if (!POSTGRES_URL) {
 // For serverless environments, we want to limit the pool size
 // For Docker/standalone, we can use a larger pool
 export const isServerless = process.env.VERCEL === "1";
-const poolConfig = isServerless
+const noPg = process.env.NO_PG === "true";
+const poolConfig = noPg
+  ? { max: 1, min: 0, acquire: 1000, idle: 1000 }
+  : isServerless
   ? {
-      max: 1, // Serverless should use minimal connections
-      acquire: 30000, // Time to wait for a connection (30 seconds)
-      idle: 10000, // Time before connection is released (10 seconds)
+      max: 1,
+      acquire: 30000,
+      idle: 10000,
     }
   : {
-      max: 20, // Docker can use more connections
+      max: 20,
       min: 5,
-      acquire: 60000, // More generous timeouts for Docker
+      acquire: 60000,
       idle: 10000,
     };
 
@@ -61,7 +64,7 @@ export const sequelize = new Sequelize(POSTGRES_URL, {
               return reject(err);
             }
             resolve(token);
-          }),
+          })
         );
         config.dialectOptions = {
           ssl: {

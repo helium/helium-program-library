@@ -31,11 +31,8 @@ ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 ARG SENTRY_RELEASE
 
-# Skip server env validation at build time — real values injected at runtime
-# Dummy values are required because Next.js inlines process.env.* at compile time,
-# so SKIP_ENV_VALIDATION alone isn't sufficient during static page generation.
-ENV SKIP_ENV_VALIDATION=1 \
-    NEXT_PUBLIC_PRIVY_APP_ID="__NEXT_PUBLIC_PRIVY_APP_ID__" \
+
+ENV NEXT_PUBLIC_PRIVY_APP_ID="__NEXT_PUBLIC_PRIVY_APP_ID__" \
     NEXT_PUBLIC_SOLANA_CLUSTER="__NEXT_PUBLIC_SOLANA_CLUSTER__" \
     NEXT_PUBLIC_SOLANA_URL="__NEXT_PUBLIC_SOLANA_URL__" \
     NEXT_PUBLIC_WORLD_HELIUM_URL="__NEXT_PUBLIC_WORLD_HELIUM_URL__" \
@@ -55,7 +52,17 @@ ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN} \
     SENTRY_PROJECT=${SENTRY_PROJECT} \
     SENTRY_RELEASE=${SENTRY_RELEASE}
 
-RUN pnpm turbo run build --filter=@helium/blockchain-api-service
+RUN printf '%s\n' \
+    'SKIP_ENV_VALIDATION=1' \
+    'PG_USER=build' \
+    'PG_NAME=build' \
+    'PG_HOST=localhost' \
+    'PG_PORT=5432' \
+    'PRIVY_APP_SECRET=build' \
+    'BRIDGE_API_KEY=build' \
+    'JUPITER_API_KEY=build' \
+    > packages/blockchain-api/.env && \
+    pnpm turbo run build --filter=@helium/blockchain-api-service
 
 # Production image, copy all the files and run next
 FROM node:22-alpine
