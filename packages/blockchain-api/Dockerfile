@@ -79,22 +79,18 @@ COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/public ./pu
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/standalone/packages/blockchain-api/ ./
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/static ./.next/static
 
-# Sentry source maps (server chunks with debug IDs injected during build)
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/server ./.next/server
+# Sentry source maps only — copy .map files without overwriting standalone server chunks
+COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/server/*.js.map ./.next/server/
 
-# Standalone node_modules (pruned by Next.js to runtime deps only)
+# node_modules: standalone deps + full workspace deps for migrations/background service
+# Standalone goes first (180MB, pruned), then full workspace overlays missing deps
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/standalone/node_modules ./node_modules
+COPY --from=build --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Migration and background service files
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.sequelizerc ./.sequelizerc
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/scripts ./scripts
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/src/lib ./src/lib
-
-# Extra deps needed by migrations/background service but not in standalone bundle
-COPY --from=build --chown=nextjs:nodejs /app/node_modules/sequelize-cli ./node_modules/sequelize-cli
-COPY --from=build --chown=nextjs:nodejs /app/node_modules/.bin/sequelize-cli ./node_modules/.bin/sequelize-cli
-COPY --from=build --chown=nextjs:nodejs /app/node_modules/@swc-node ./node_modules/@swc-node
-COPY --from=build --chown=nextjs:nodejs /app/node_modules/dotenv ./node_modules/dotenv
 
 RUN chmod -R 755 /app/.next/static
 
