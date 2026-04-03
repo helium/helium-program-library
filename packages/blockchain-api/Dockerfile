@@ -55,7 +55,8 @@ RUN printf '%s\n' \
     'BRIDGE_API_KEY=build' \
     'JUPITER_API_KEY=build' \
     > packages/blockchain-api/.env && \
-    pnpm turbo run build --filter=@helium/blockchain-api-service
+    pnpm turbo run build --filter=@helium/blockchain-api-service && \
+    rm -f packages/blockchain-api/.env packages/blockchain-api/.next/standalone/packages/blockchain-api/.env
 
 # Production image
 FROM node:22-alpine
