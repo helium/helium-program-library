@@ -31,23 +31,12 @@ ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 ARG SENTRY_RELEASE
 
-# Set dummy environment variables for build time
-ENV PG_USER=dummy \
-    PG_NAME=dummy \
-    PG_HOST=dummy \
-    PG_PORT=5432 \
-    BRIDGE_API_KEY=dummy \
-    ORACLE_API_KEY=dummy \
-    BRIDGE_API_URL=https://api.sandbox.bridge.xyz/v0 \
-    PRIVY_APP_SECRET=dummy \
+# Skip server env validation at build time — real values injected at runtime
+ENV SKIP_ENV_VALIDATION=1 \
     NEXT_PUBLIC_PRIVY_APP_ID="__NEXT_PUBLIC_PRIVY_APP_ID__" \
     NEXT_PUBLIC_SOLANA_CLUSTER="__NEXT_PUBLIC_SOLANA_CLUSTER__" \
     NEXT_PUBLIC_SOLANA_URL="__NEXT_PUBLIC_SOLANA_URL__" \
     NEXT_PUBLIC_WORLD_HELIUM_URL="__NEXT_PUBLIC_WORLD_HELIUM_URL__" \
-    JITO_BLOCK_ENGINE_URL="__JITO_BLOCK_ENGINE_URL__" \
-    JITO_API_KEY="__JITO_API_KEY__" \
-    JUPITER_API_KEY="__JUPITER_API_KEY__" \
-    SENTRY_DSN="__SENTRY_DSN__" \
     NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=4096"
 
