@@ -14,7 +14,7 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
-import { TOKEN_MINTS } from "@/lib/constants/tokens";
+import { TOKEN_MINTS, TOKEN_NAMES } from "@/lib/constants/tokens";
 import { getTransactionFee, RENT_COSTS } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -34,7 +34,9 @@ export const transfer = publicProcedure.tokens.transfer.handler(
       rawAmount = BigInt(tokenAmount.amount);
     } catch (e) {
       throw errors.BAD_REQUEST({
-        message: `Invalid amount: ${e instanceof Error ? e.message : "could not parse amount"}`,
+        message: `Invalid amount: ${
+          e instanceof Error ? e.message : "could not parse amount"
+        }`,
       });
     }
 
@@ -124,6 +126,12 @@ export const transfer = publicProcedure.tokens.transfer.handler(
       });
     }
 
+    const transferTokenAmount = toTokenAmountOutput(
+      new BN(tokenAmount.amount),
+      tokenAmount.mint,
+    );
+    const tokenName = TOKEN_NAMES[tokenAmount.mint];
+
     return {
       transactionData: {
         transactions: [
@@ -131,16 +139,21 @@ export const transfer = publicProcedure.tokens.transfer.handler(
             serializedTransaction: serializeTransaction(tx),
             metadata: {
               type: "token_transfer",
-              description: `Transfer ${isSol ? "SOL" : "Token"}`,
-              mint: tokenAmount.mint,
-              amount: tokenAmount.amount,
+              description: `Transfer ${tokenName ?? "Token"}`,
+              tokenAmount: transferTokenAmount,
+              tokenName,
               recipient: destination,
             },
           },
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "token_transfer", mint: tokenAmount.mint, amount: tokenAmount.amount, recipient: destination },
+        actionMetadata: {
+          type: "token_transfer",
+          tokenAmount: transferTokenAmount,
+          tokenName,
+          recipient: destination,
+        },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

@@ -42,6 +42,7 @@ import {
   toTokenAmountOutput,
   resolveTokenAmountInput,
 } from "@/lib/utils/token-math";
+import { TOKEN_NAMES } from "@/lib/constants/tokens";
 import { NATIVE_MINT } from "@solana/spl-token";
 import {
   SECS_PER_DAY,
@@ -313,7 +314,9 @@ export const create = publicProcedure.governance.createPosition.handler(
         instructions: delegateInstructions,
         metadata: {
           type: "position_delegate",
-          description: `Delegate position to sub-DAO${automationEnabled ? " and set up claim automation" : ""}`,
+          description: `Delegate position to sub-DAO${
+            automationEnabled ? " and set up claim automation" : ""
+          }`,
         },
       });
     }
@@ -350,7 +353,16 @@ export const create = publicProcedure.governance.createPosition.handler(
         transactions,
         parallel: false,
         tag,
-        actionMetadata: { type: "position_create", tokenMint: tokenAmount.mint, amount: tokenAmount.amount, lockupKind, lockupPeriodDays: lockupPeriodsInDays },
+        actionMetadata: {
+          type: "position_create",
+          tokenAmount: toTokenAmountOutput(
+            new BN(tokenAmount.amount),
+            tokenAmount.mint,
+          ),
+          tokenName: TOKEN_NAMES[tokenAmount.mint],
+          lockupKind,
+          lockupPeriodDays: lockupPeriodsInDays,
+        },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

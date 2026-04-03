@@ -284,7 +284,20 @@ export const updateHotspotInfo =
           transactions,
           parallel: false,
           tag,
-          actionMetadata: { type: "hotspot_update", hotspotKey: entityPubKey, deviceType: input.deviceType },
+          actionMetadata: {
+            type: "hotspot_update",
+            hotspotKey: entityPubKey,
+            deviceType: input.deviceType,
+            ...(location && { location }),
+            ...(input.deviceType === "iot" &&
+              input.gain !== undefined && { gain: input.gain }),
+            ...(input.deviceType === "iot" &&
+              input.elevation !== undefined && { elevation: input.elevation }),
+            ...(input.deviceType === "mobile" &&
+              input.deploymentInfo && {
+                deploymentType: input.deploymentInfo.type,
+              }),
+          },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(totalFee),

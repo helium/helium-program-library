@@ -17,6 +17,13 @@ export const TOKEN_MINTS = {
   DC: "dcuc8Amr83Wz27ZkQ2K9NS6r8zRpf1J6cvArEBDZDmm",
 } as const;
 
+export const TOKEN_NAMES: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(TOKEN_MINTS).map(([name, mint]) => [mint, name]),
+  ),
+  [TOKEN_MINTS.WSOL]: "SOL",
+};
+
 export const TOKEN_DECIMALS: Record<string, number> = {
   [TOKEN_MINTS.WSOL]: 9,
   [TOKEN_MINTS.USDC]: 6,

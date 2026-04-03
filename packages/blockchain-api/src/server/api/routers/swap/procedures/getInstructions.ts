@@ -15,6 +15,9 @@ import {
   RENT_COSTS,
 } from "@/lib/utils/balance-validation";
 import { NATIVE_MINT } from "@solana/spl-token";
+import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { TOKEN_NAMES } from "@/lib/constants/tokens";
+import BN from "bn.js";
 
 /**
  * Get swap transaction instructions from Jupiter and build a transaction.
@@ -170,7 +173,19 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       ],
       parallel: false,
       tag,
-      actionMetadata: { type: "swap", inputMint: quoteResponse.inputMint, outputMint: quoteResponse.outputMint, inputAmount: quoteResponse.inAmount, outputAmount: quoteResponse.outAmount },
+      actionMetadata: {
+        type: "swap",
+        inputTokenAmount: toTokenAmountOutput(
+          new BN(quoteResponse.inAmount),
+          quoteResponse.inputMint,
+        ),
+        outputTokenAmount: toTokenAmountOutput(
+          new BN(quoteResponse.outAmount),
+          quoteResponse.outputMint,
+        ),
+        inputTokenName: TOKEN_NAMES[quoteResponse.inputMint],
+        outputTokenName: TOKEN_NAMES[quoteResponse.outputMint],
+      },
     };
   },
 );

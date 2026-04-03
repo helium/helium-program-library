@@ -174,7 +174,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
         })),
         parallel: false,
         tag: `fund_automation:${walletAddress}`,
-        actionMetadata: { type: "fund_automation" },
+        actionMetadata: { type: "fund_automation", additionalDuration },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

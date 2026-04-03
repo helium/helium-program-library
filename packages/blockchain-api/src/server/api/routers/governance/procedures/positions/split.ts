@@ -24,6 +24,7 @@ import {
 import BN from "bn.js";
 import { getTransactionFee } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { TOKEN_NAMES } from "@/lib/constants/tokens";
 import { NATIVE_MINT } from "@solana/spl-token";
 import {
   requirePositionOwnership,
@@ -69,6 +70,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
     );
     const depositMint =
       registrar.votingMints[sourcePositionAcc.votingMintConfigIdx].mint;
+    const depositMintStr = depositMint.toBase58();
 
     const amountBN = new BN(amount);
 
@@ -190,7 +192,12 @@ export const split = publicProcedure.governance.splitPosition.handler(
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "position_split", positionMint, amount },
+        actionMetadata: {
+          type: "position_split",
+          positionMint,
+          tokenAmount: toTokenAmountOutput(amountBN, depositMintStr),
+          tokenName: TOKEN_NAMES[depositMintStr],
+        },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

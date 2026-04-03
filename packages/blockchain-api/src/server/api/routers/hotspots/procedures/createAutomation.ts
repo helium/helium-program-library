@@ -314,7 +314,7 @@ export const createAutomation =
           })),
           parallel: false,
           tag: `setup_automation:${walletAddress}`,
-          actionMetadata: { type: "setup_automation" },
+          actionMetadata: { type: "setup_automation", schedule, duration },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),
