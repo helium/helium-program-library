@@ -141,6 +141,7 @@ jobs:
           - packages/crons
           - packages/geocoder-service
           - packages/recent-helium-transactions-service
+          - packages/blockchain-api
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
