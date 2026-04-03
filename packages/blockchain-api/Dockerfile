@@ -86,8 +86,12 @@ RUN addgroup --system --gid 1001 nodejs && \
     chown -R nextjs:nodejs /app
 
 # Copy built files with correct ownership
+# In a monorepo, standalone output mirrors the repo structure:
+#   .next/standalone/packages/blockchain-api/server.js  (the entrypoint)
+#   .next/standalone/node_modules/                       (shared deps)
+#   .next/standalone/packages/blockchain-api/.next/      (server chunks)
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/public ./public
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/standalone ./
+COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/standalone/packages/blockchain-api/ ./
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/static ./.next/static
 # Copy server source maps for Sentry (injected with Debug IDs during build)
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/server ./.next/server
