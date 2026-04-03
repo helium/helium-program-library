@@ -3,13 +3,15 @@ import * as Sentry from "@sentry/nextjs";
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("../sentry.server.config");
-    try {
-      const { transactionResubmissionService } = await import(
-        "./lib/background-jobs/transaction-resubmission"
-      );
-      transactionResubmissionService.start();
-    } catch (e) {
-      console.error("Failed to start transaction resubmission service:", e);
+    if (process.env.NO_PG !== "true") {
+      try {
+        const { transactionResubmissionService } = await import(
+          "./lib/background-jobs/transaction-resubmission"
+        );
+        transactionResubmissionService.start();
+      } catch (e) {
+        console.error("Failed to start transaction resubmission service:", e);
+      }
     }
   }
 
