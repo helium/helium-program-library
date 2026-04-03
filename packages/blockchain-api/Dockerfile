@@ -31,9 +31,7 @@ ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 ARG SENTRY_RELEASE
 
-# Skip server env validation at build time — real values injected at runtime
-ENV SKIP_ENV_VALIDATION=1 \
-    NEXT_PUBLIC_PRIVY_APP_ID="__NEXT_PUBLIC_PRIVY_APP_ID__" \
+ENV NEXT_PUBLIC_PRIVY_APP_ID="__NEXT_PUBLIC_PRIVY_APP_ID__" \
     NEXT_PUBLIC_SOLANA_CLUSTER="__NEXT_PUBLIC_SOLANA_CLUSTER__" \
     NEXT_PUBLIC_SOLANA_URL="__NEXT_PUBLIC_SOLANA_URL__" \
     NEXT_PUBLIC_WORLD_HELIUM_URL="__NEXT_PUBLIC_WORLD_HELIUM_URL__" \
@@ -46,7 +44,21 @@ ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN} \
     SENTRY_PROJECT=${SENTRY_PROJECT} \
     SENTRY_RELEASE=${SENTRY_RELEASE}
 
-RUN pnpm turbo run build --filter=@helium/blockchain-api-service
+# Docker ENV vars don't reach Next.js 15 worker threads during page data collection,
+# so write dummy values to .env for the build to read from disk
+RUN printf '%s\n' \
+    'SKIP_ENV_VALIDATION=1' \
+    'PG_USER=dummy' \
+    'PG_NAME=dummy' \
+    'PG_HOST=dummy' \
+    'PG_PORT=5432' \
+    'BRIDGE_API_KEY=dummy' \
+    'ORACLE_API_KEY=dummy' \
+    'BRIDGE_API_URL=https://api.sandbox.bridge.xyz/v0' \
+    'PRIVY_APP_SECRET=dummy' \
+    'JUPITER_API_KEY=dummy' \
+    > packages/blockchain-api/.env && \
+    pnpm turbo run build --filter=@helium/blockchain-api-service
 
 # Production image, copy all the files and run next
 FROM node:22-alpine
