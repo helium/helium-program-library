@@ -44,7 +44,16 @@ ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN} \
     SENTRY_PROJECT=${SENTRY_PROJECT} \
     SENTRY_RELEASE=${SENTRY_RELEASE}
 
-RUN echo 'SKIP_ENV_VALIDATION=1' > packages/blockchain-api/.env && \
+RUN printf '%s\n' \
+    'SKIP_ENV_VALIDATION=1' \
+    'PG_USER=build' \
+    'PG_NAME=build' \
+    'PG_HOST=localhost' \
+    'PG_PORT=5432' \
+    'PRIVY_APP_SECRET=build' \
+    'BRIDGE_API_KEY=build' \
+    'JUPITER_API_KEY=build' \
+    > packages/blockchain-api/.env && \
     pnpm turbo run build --filter=@helium/blockchain-api-service
 
 # Production image, copy all the files and run next
