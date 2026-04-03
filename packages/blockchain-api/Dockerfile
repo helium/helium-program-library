@@ -44,20 +44,7 @@ ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN} \
     SENTRY_PROJECT=${SENTRY_PROJECT} \
     SENTRY_RELEASE=${SENTRY_RELEASE}
 
-# Docker ENV vars don't reach Next.js 15 worker threads during page data collection,
-# so write dummy values to .env for the build to read from disk
-RUN printf '%s\n' \
-    'SKIP_ENV_VALIDATION=1' \
-    'PG_USER=dummy' \
-    'PG_NAME=dummy' \
-    'PG_HOST=dummy' \
-    'PG_PORT=5432' \
-    'BRIDGE_API_KEY=dummy' \
-    'ORACLE_API_KEY=dummy' \
-    'BRIDGE_API_URL=https://api.sandbox.bridge.xyz/v0' \
-    'PRIVY_APP_SECRET=dummy' \
-    'JUPITER_API_KEY=dummy' \
-    > packages/blockchain-api/.env && \
+RUN echo 'SKIP_ENV_VALIDATION=1' > packages/blockchain-api/.env && \
     pnpm turbo run build --filter=@helium/blockchain-api-service
 
 # Production image, copy all the files and run next
