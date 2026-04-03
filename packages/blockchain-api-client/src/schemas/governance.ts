@@ -111,6 +111,16 @@ export const TransferPositionInputSchema = z.object({
     .describe("Raw token amount to transfer (in smallest unit)"),
 });
 
+export const TransferPositionOwnershipInputSchema = z.object({
+  from: WalletAddressSchema.describe(
+    "Wallet address that currently owns the position"
+  ),
+  to: WalletAddressSchema.describe(
+    "Wallet address that will receive the position"
+  ),
+  positionMint: PublicKeySchema.describe("Mint address of the position NFT"),
+});
+
 export const DelegatePositionInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
     "Wallet address that owns the positions"
@@ -251,6 +261,7 @@ export const SplitPositionResponseSchema = createTypedTransactionResponse(
   SplitPositionMetadataSchema,
 );
 export const TransferPositionResponseSchema = createTransactionResponse();
+export const TransferPositionOwnershipResponseSchema = createTransactionResponse();
 export const ExtendDelegationResponseSchema = createTransactionResponse();
 
 // ---------------------------------------------------------------------------
@@ -285,6 +296,7 @@ export type FlipLockupKindInput = z.infer<typeof FlipLockupKindInputSchema>;
 export type ResetLockupInput = z.infer<typeof ResetLockupInputSchema>;
 export type SplitPositionInput = z.infer<typeof SplitPositionInputSchema>;
 export type TransferPositionInput = z.infer<typeof TransferPositionInputSchema>;
+export type TransferPositionOwnershipInput = z.infer<typeof TransferPositionOwnershipInputSchema>;
 export type DelegatePositionInput = z.infer<typeof DelegatePositionInputSchema>;
 export type ExtendDelegationInput = z.infer<typeof ExtendDelegationInputSchema>;
 export type UndelegateInput = z.infer<typeof UndelegateInputSchema>;
@@ -313,6 +325,9 @@ export type ResetLockupResponse = z.infer<typeof ResetLockupResponseSchema>;
 export type SplitPositionResponse = z.infer<typeof SplitPositionResponseSchema>;
 export type TransferPositionResponse = z.infer<
   typeof TransferPositionResponseSchema
+>;
+export type TransferPositionOwnershipResponse = z.infer<
+  typeof TransferPositionOwnershipResponseSchema
 >;
 export type DelegatePositionsResponse = z.infer<
   typeof DelegatePositionsResponseSchema

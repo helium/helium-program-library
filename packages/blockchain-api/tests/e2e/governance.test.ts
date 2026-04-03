@@ -10,8 +10,8 @@ import {
   positionKey,
   voteMarkerKey,
 } from "@helium/voter-stake-registry-sdk";
-import { Keypair, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { NATIVE_MINT } from "@solana/spl-token";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, SYSVAR_CLOCK_PUBKEY, VersionedTransaction } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync, NATIVE_MINT } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
@@ -19,7 +19,7 @@ import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
 import { signAndSubmitTransactionData } from "./helpers/tx";
-import { ensureTokenBalance } from "./helpers/wallet";
+import { ensureFunds, ensureTokenBalance } from "./helpers/wallet";
 import {
   DEFAULT_HPL_CRONS_TASK_QUEUE,
   TEST_PROXY_ADDRESS,
@@ -428,6 +428,89 @@ describe("governance", () => {
       expect(targetAfter.amountDepositedNative.toNumber()).to.equal(
         targetAmountBefore + transferAmount
       );
+    });
+  });
+
+  describe("position ownership transfer", () => {
+    let walletAddress: string;
+
+    before(async () => {
+      walletAddress = ctx.payer.publicKey.toBase58();
+    });
+
+    it("transfers position ownership to another wallet", async () => {
+      // #given a position owned by ctx.payer and a recipient keypair
+      const result = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 30,
+      });
+      const recipient = Keypair.generate();
+      await ensureFunds(recipient.publicKey, 0.01 * LAMPORTS_PER_SOL);
+
+      // #when transferring position ownership
+      const { data, error } =
+        await ctx.safeClient.governance.transferPositionOwnership({
+          from: walletAddress,
+          to: recipient.publicKey.toBase58(),
+          positionMint: result.positionMint,
+        });
+
+      // #then transaction builds with correct metadata
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data?.transactionData?.transactions).to.have.length(1);
+      expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
+        "position_transfer_ownership"
+      );
+      expect(data?.transactionData?.actionMetadata).to.deep.include({
+        type: "position_transfer_ownership",
+        positionMint: result.positionMint,
+        from: walletAddress,
+        to: recipient.publicKey.toBase58(),
+      });
+
+      // Sign with both from and to, then submit
+      const { blockhash, lastValidBlockHeight } =
+        await ctx.connection.getLatestBlockhash("confirmed");
+      const tx = VersionedTransaction.deserialize(
+        Buffer.from(
+          data.transactionData.transactions[0].serializedTransaction,
+          "base64"
+        )
+      );
+      tx.message.recentBlockhash = blockhash;
+      tx.sign([ctx.payer, recipient]);
+      const sig = await ctx.connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+      });
+      await ctx.connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
+
+      // Verify ownership transferred on-chain: recipient now holds the position NFT
+      const recipientAta = getAssociatedTokenAddressSync(
+        new PublicKey(result.positionMint),
+        recipient.publicKey,
+        true
+      );
+      const recipientTokenAccount =
+        await ctx.connection.getAccountInfo(recipientAta);
+      expect(recipientTokenAccount).to.not.be.null;
+
+      // Original owner no longer holds it
+      const originalAta = getAssociatedTokenAddressSync(
+        new PublicKey(result.positionMint),
+        ctx.payer.publicKey,
+        true
+      );
+      const originalTokenAccount =
+        await ctx.connection.getTokenAccountBalance(originalAta).catch(() => null);
+      const recipientBalance =
+        await ctx.connection.getTokenAccountBalance(recipientAta);
+      expect(recipientBalance.value.uiAmount).to.equal(1);
     });
   });
 

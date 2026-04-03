@@ -54,6 +54,7 @@ export const TRANSACTION_TYPES = {
   POSITION_RESET_LOCKUP: "position_reset_lockup",
   POSITION_SPLIT: "position_split",
   POSITION_TRANSFER: "position_transfer",
+  POSITION_TRANSFER_OWNERSHIP: "position_transfer_ownership",
 
   // Governance - Delegation
   DELEGATION_DELEGATE: "delegation_delegate",

@@ -7,6 +7,7 @@ import { flipLockupKind } from "./procedures/positions/flip-lockup-kind";
 import { resetLockup } from "./procedures/positions/reset-lockup";
 import { split as splitPosition } from "./procedures/positions/split";
 import { transfer as transferPosition } from "./procedures/positions/transfer";
+import { transferOwnership as transferPositionOwnership } from "./procedures/positions/transfer-ownership";
 import { delegate } from "./procedures/delegation/delegate";
 import { extend as extendDelegation } from "./procedures/delegation/extend";
 import { undelegate } from "./procedures/delegation/undelegate";
@@ -25,6 +26,7 @@ export const governanceRouter = implement(governanceContract).router({
   resetLockup,
   splitPosition,
   transferPosition,
+  transferPositionOwnership,
   delegatePositions: delegate,
   claimDelegationRewards: claimRewards,
   undelegatePosition: undelegate,
