@@ -9,6 +9,9 @@ export async function register() {
           "./lib/background-jobs/transaction-resubmission"
         );
         transactionResubmissionService.start();
+        console.log(
+          "[instrumentation] Transaction resubmission service started"
+        );
       } catch (e) {
         console.error("Failed to start transaction resubmission service:", e);
       }

@@ -33,10 +33,8 @@ replace_next_public_vars
 echo "Running database migrations..."
 NODE_ENV=production ./node_modules/.bin/sequelize-cli db:migrate
 
-# Start the background service
-echo "Starting background service..."
-node scripts/start-background-service.js &
-BACKGROUND_SERVICE_PID=$!
+# Background service (transaction resubmission) runs inside the Next.js
+# process via instrumentation.ts — no separate process needed
 
 # Execute the main container command
-exec "$@" 
+exec "$@"

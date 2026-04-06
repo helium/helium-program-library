@@ -9,7 +9,9 @@ import {
   WalletAddressSchema,
 } from "./common";
 
-export const RewardNetworkSchema = z.enum(["hnt", "iot", "mobile"]).default("hnt");
+export const RewardNetworkSchema = z
+  .enum(["hnt", "iot", "mobile"])
+  .default("hnt");
 
 export const HotspotTypeSchema = z.enum(["iot", "mobile", "all"]);
 
@@ -24,6 +26,7 @@ export const ClaimRewardsInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   network: RewardNetworkSchema,
   tuktuk: z.boolean().optional(),
+  estimatedPendingRewards: TokenAmountOutputSchema.optional(),
 });
 
 export const GetPendingRewardsInputSchema = z.object({
@@ -32,17 +35,27 @@ export const GetPendingRewardsInputSchema = z.object({
 });
 
 const PendingRewards = z.object({
-  total: TokenAmountOutputSchema.describe("Total rewards pending for the requested wallet, including rewards which may be directly claimable or paid indirectly through automation to this wallet."),
-  claimable: TokenAmountOutputSchema.describe("Total rewards that can be manually claimed now. Should be a subset of total."),
-  automated: TokenAmountOutputSchema.describe("Total rewards that are pending but will be automatically claimed in the future based on existing automation setups. Should be a subset of total."),
-})
+  total: TokenAmountOutputSchema.describe(
+    "Total rewards pending for the requested wallet, including rewards which may be directly claimable or paid indirectly through automation to this wallet."
+  ),
+  claimable: TokenAmountOutputSchema.describe(
+    "Total rewards that can be manually claimed now. Should be a subset of total."
+  ),
+  automated: TokenAmountOutputSchema.describe(
+    "Total rewards that are pending but will be automatically claimed in the future based on existing automation setups. Should be a subset of total."
+  ),
+});
 export const GetPendingRewardsOutputSchema = z.object({
-  pending: PendingRewards.describe("Total rewards pending for the requested wallet - across all relevant hotspots."),
-  byHotspot: z.array(z.object({
-    hotspotPubKey: HeliumPublicKeySchema,
-    pending: PendingRewards,
-  }))
-})
+  pending: PendingRewards.describe(
+    "Total rewards pending for the requested wallet - across all relevant hotspots."
+  ),
+  byHotspot: z.array(
+    z.object({
+      hotspotPubKey: HeliumPublicKeySchema,
+      pending: PendingRewards,
+    })
+  ),
+});
 
 export const TransferHotspotInputSchema = z.object({
   walletAddress: WalletAddressSchema,
@@ -144,7 +157,30 @@ export const HotspotsDataSchema = z.object({
   totalPages: z.number(),
 });
 
-export const ClaimRewardsOutputSchema = createPaginatedTransactionResponse();
+const ClaimRewardsActionMetadataSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("claim_rewards"),
+    hotspotCount: z.number(),
+    network: z.string(),
+    hotspotKeys: z.array(z.string()).optional(),
+    hotspotNames: z.array(z.string()).optional(),
+    estimatedPendingRewards: TokenAmountOutputSchema.optional(),
+  }),
+  z.object({
+    type: z.literal("queue_wallet_claim"),
+    hotspotCount: z.number(),
+    network: z.literal("all"),
+    estimatedPendingRewards: TokenAmountOutputSchema.optional(),
+  }),
+]);
+
+export const ClaimRewardsOutputSchema =
+  createPaginatedTransactionResponse().extend({
+    transactionData:
+      createPaginatedTransactionResponse().shape.transactionData.extend({
+        actionMetadata: ClaimRewardsActionMetadataSchema.optional(),
+      }),
+  });
 export const TransferHotspotOutputSchema = createTransactionResponse();
 export const UpdateRewardsDestinationOutputSchema = createTransactionResponse();
 export const CreateSplitOutputSchema = createTransactionResponse();
@@ -260,12 +296,14 @@ export const UpdateHotspotInfoInputSchema = z.discriminatedUnion("deviceType", [
   MobileUpdateSchema,
 ]);
 
-export const UpdateHotspotInfoOutputSchema = createTransactionResponse().extend({
-  appliedTo: z.object({
-    iot: z.boolean(),
-    mobile: z.boolean(),
-  }),
-});
+export const UpdateHotspotInfoOutputSchema = createTransactionResponse().extend(
+  {
+    appliedTo: z.object({
+      iot: z.boolean(),
+      mobile: z.boolean(),
+    }),
+  }
+);
 
 export type HotspotType = z.infer<typeof HotspotTypeSchema>;
 export type DeviceType = z.infer<typeof DeviceTypeSchema>;
@@ -274,10 +312,16 @@ export type Hotspot = z.infer<typeof HotspotSchema>;
 export type HotspotsData = z.infer<typeof HotspotsDataSchema>;
 export type GetHotspotsInput = z.infer<typeof GetHotspotsInputSchema>;
 export type ClaimRewardsInput = z.infer<typeof ClaimRewardsInputSchema>;
-export type GetPendingRewardsInput = z.infer<typeof GetPendingRewardsInputSchema>;
+export type GetPendingRewardsInput = z.infer<
+  typeof GetPendingRewardsInputSchema
+>;
 export type TransferHotspotInput = z.infer<typeof TransferHotspotInputSchema>;
-export type GetPendingRewardsOutput = z.infer<typeof GetPendingRewardsOutputSchema>;
-export type UpdateRewardsDestinationInput = z.infer<typeof UpdateRewardsDestinationInputSchema>;
+export type GetPendingRewardsOutput = z.infer<
+  typeof GetPendingRewardsOutputSchema
+>;
+export type UpdateRewardsDestinationInput = z.infer<
+  typeof UpdateRewardsDestinationInputSchema
+>;
 export type GetSplitInput = z.infer<typeof GetSplitInputSchema>;
 export type CreateSplitInput = z.infer<typeof CreateSplitInputSchema>;
 export type DeleteSplitInput = z.infer<typeof DeleteSplitInputSchema>;

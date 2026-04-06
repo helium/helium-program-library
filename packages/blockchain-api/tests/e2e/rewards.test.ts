@@ -1,10 +1,7 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { init as initLd } from "@helium/lazy-distributor-sdk";
 import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
-import {
-  init as initTuktuk,
-  nextAvailableTaskIds,
-} from "@helium/tuktuk-sdk";
+import { init as initTuktuk, nextAvailableTaskIds } from "@helium/tuktuk-sdk";
 import {
   Connection,
   Keypair,
@@ -15,7 +12,11 @@ import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
 import { ensureNextServer, stopNextServer } from "./helpers/next";
-import { ensureSurfpool, getSurfpoolRpcUrl, stopSurfpool } from "./helpers/surfpool";
+import {
+  ensureSurfpool,
+  getSurfpoolRpcUrl,
+  stopSurfpool,
+} from "./helpers/surfpool";
 import {
   ensureFunds,
   loadKeypair2FromEnv,
@@ -109,9 +110,23 @@ describe("rewards endpoints", () => {
     const beforeTotal = BigInt(beforeAcc.totalRewards.toString());
 
     const walletAddress = payer.publicKey.toBase58();
-    const result = await client.hotspots.claimRewards({ walletAddress, tuktuk: true });
+
+    // #given — fetch pending rewards to pass as estimated amount
+    const pendingResult = await client.hotspots.getPendingRewards({
+      walletAddress,
+    });
+    const estimatedPendingRewards = pendingResult.pending.claimable;
+
+    // #when
+    const result = await client.hotspots.claimRewards({
+      walletAddress,
+      tuktuk: true,
+      estimatedPendingRewards,
+    });
     const taskId = (result?.transactionData?.transactions?.[0]?.metadata as any)
       ?.taskIds?.[0];
+
+    // #then
     expect(
       result?.transactionData?.transactions?.[0]?.serializedTransaction
     ).to.be.a("string");
@@ -121,7 +136,13 @@ describe("rewards endpoints", () => {
       type: "queue_wallet_claim",
       network: "all",
     });
-    expect(result.transactionData.actionMetadata?.hotspotCount).to.be.a("number").and.be.greaterThan(0);
+    expect(result.transactionData.actionMetadata?.hotspotCount)
+      .to.be.a("number")
+      .and.be.greaterThan(0);
+
+    // Verify estimatedPendingRewards is passed through
+    const meta = result.transactionData.actionMetadata as any;
+    expect(meta.estimatedPendingRewards).to.deep.equal(estimatedPendingRewards);
 
     // Submit transactions
     await signAndSubmitTransactionData(
@@ -190,11 +211,27 @@ describe("rewards endpoints", () => {
     const beforeTotal = BigInt(beforeAcc?.totalRewards.toString() || "0");
 
     const walletAddress = payer2.publicKey.toBase58();
-    const result = await client.hotspots.claimRewards({ walletAddress });
 
+    // #given — fetch pending rewards to pass as estimated amount
+    const pendingResult = await client.hotspots.getPendingRewards({
+      walletAddress,
+    });
+    const estimatedPendingRewards = pendingResult.pending.claimable;
+
+    // #when
+    const result = await client.hotspots.claimRewards({
+      walletAddress,
+      estimatedPendingRewards,
+    });
+
+    // #then
     expect(
       result?.transactionData?.transactions?.[0]?.serializedTransaction
     ).to.be.a("string");
+
+    // Verify estimatedPendingRewards is passed through
+    const meta = result.transactionData.actionMetadata as any;
+    expect(meta.estimatedPendingRewards).to.deep.equal(estimatedPendingRewards);
 
     // Submit transactions
     await signAndSubmitTransactionData(

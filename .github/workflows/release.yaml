@@ -1,0 +1,83 @@
+name: Release
+
+env:
+  SOLANA_CLI_VERSION: 2.1.6
+  NODE_VERSION: 24.13.1
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+on:
+  push:
+    branches:
+      - develop
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: "https://registry.npmjs.org"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check for changesets
+        id: check
+        run: |
+          if ls .changeset/*.md 1>/dev/null 2>&1 && [ "$(ls .changeset/*.md 2>/dev/null | wc -l)" -gt 0 ]; then
+            # Exclude README.md which changesets always keeps
+            non_readme=$(ls .changeset/*.md | grep -v README.md | head -1 || true)
+            if [ -n "$non_readme" ]; then
+              echo "has_changesets=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_changesets=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release PR
+        if: steps.check.outputs.has_changesets == 'true'
+        uses: changesets/action@v1
+        with:
+          version: pnpm run version-packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Anchor
+        if: steps.check.outputs.has_changesets == 'false'
+        uses: ./.github/actions/setup-anchor/
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build Anchor
+        if: steps.check.outputs.has_changesets == 'false'
+        uses: ./.github/actions/build-anchor/
+        with:
+          testing: false
+          devnet: false
+
+      - name: Build all packages
+        if: steps.check.outputs.has_changesets == 'false'
+        run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
+
+      - name: Publish to npm
+        if: steps.check.outputs.has_changesets == 'false'
+        uses: changesets/action@v1
+        with:
+          publish: pnpm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

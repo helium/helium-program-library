@@ -10,6 +10,7 @@ import {
   initHemLocal,
 } from "@/lib/utils/hotspot-helpers";
 import { detectHotspotNetworks, getHotspotInfo } from "@/lib/queries/hotspots";
+import animalName from "angry-purple-tiger";
 import { latLngToH3 } from "@/lib/location/h3";
 import OnboardingClient from "@helium/onboarding";
 import { getAsset } from "@helium/spl-utils";
@@ -49,7 +50,7 @@ type InputDeploymentInfo = Extract<
 
 // Convert input deploymentInfo to onboarding format (partial)
 function inputToOnboardingDeploymentInfo(
-  info: InputDeploymentInfo | undefined
+  info: InputDeploymentInfo | undefined,
 ): MobileDeploymentInfoV0 | undefined {
   if (!info) return undefined;
 
@@ -70,7 +71,7 @@ function inputToOnboardingDeploymentInfo(
 // null = unset the field, undefined = use the prior value
 function mergeDeploymentInfo(
   existing: MobileDeploymentInfoV0 | null | undefined,
-  newInfo: InputDeploymentInfo | undefined
+  newInfo: InputDeploymentInfo | undefined,
 ): MobileDeploymentInfoV0 | undefined {
   if (!newInfo) return existing ?? undefined;
   if (!existing) return inputToOnboardingDeploymentInfo(newInfo);
@@ -111,7 +112,7 @@ function mergeDeploymentInfo(
             ? serial === null
               ? null
               : serial
-            : existingWifi.serial ?? null,
+            : (existingWifi.serial ?? null),
       },
     };
   }
@@ -162,11 +163,11 @@ export const updateHotspotInfo =
       const hemProgram = await initHemLocal(provider);
       const [keyToAssetK] = keyToAssetKey(HNT_DAO, entityPubKey);
       const keyToAsset = await (hemProgram.account as any).keyToAssetV0.fetch(
-        keyToAssetK
+        keyToAssetK,
       );
       const entityKey = decodeEntityKey(
         keyToAsset.entityKey,
-        keyToAsset.keySerialization
+        keyToAsset.keySerialization,
       );
 
       if (!entityKey) {
@@ -223,7 +224,7 @@ export const updateHotspotInfo =
         // Merge existing with new deploymentInfo
         const mergedDeploymentInfo = mergeDeploymentInfo(
           existingDeploymentInfo,
-          input.deploymentInfo
+          input.deploymentInfo,
         );
 
         const response = await onboardingClient.updateMobileMetadata({
@@ -287,6 +288,7 @@ export const updateHotspotInfo =
           actionMetadata: {
             type: "hotspot_update",
             hotspotKey: entityPubKey,
+            hotspotName: entityKey ? animalName(entityKey) : undefined,
             deviceType: input.deviceType,
             ...(location && { location }),
             ...(h3 && { h3Index: h3.mobile ?? h3.iot }),
@@ -312,9 +314,9 @@ export const updateHotspotInfo =
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(totalFee),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
         appliedTo,
       };
-    }
+    },
   );
