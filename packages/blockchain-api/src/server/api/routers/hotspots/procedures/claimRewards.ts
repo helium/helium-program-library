@@ -195,16 +195,37 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const recipientKeys = assets.map(
         (asset) => recipientKey(lazyDistributor, asset)[0],
       );
-      const recipientAccounts =
-        await ldProgram.account.recipientV0.fetchMultiple(recipientKeys);
-      const numRecipientsNeeded = recipientAccounts.filter((r) => !r).length;
+      const [recipientAccountInfos, ldAcc] = await Promise.all([
+        connection.getMultipleAccountsInfo(recipientKeys),
+        ldProgram.account.lazyDistributorV0.fetch(lazyDistributor),
+      ]);
+      const numRecipientsNeeded = recipientAccountInfos.filter((r: unknown) => !r).length;
       const jitoTipCost = shouldUseJitoBundle(allVtxs.length, getCluster())
         ? getJitoTipAmountLamports()
         : 0;
-      const estimatedResizeCost = assets.length * 500_000;
+
+      // Compute resize cost for existing recipients.
+      // resize_to_fit sets new_size = serialized_size + 64 (padding).
+      // RecipientV0 serialized = 8 (discriminator) + 32 + 32 + 8 + 2
+      //   + 4 + 9*num_oracles + 1 + 8 + 32 = 127 + 9*num_oracles
+      // new_size = 127 + 9*num_oracles + 64 = 191 + 9*num_oracles
+      const numOracles = ldAcc.oracles.length;
+      const newRecipientSize = 191 + 9 * numOracles;
+      // Solana rent: 19.055441478 lamports per byte-year * 2 years + 128 bytes base
+      // rent.minimum_balance(size) = (size + 128) * 6960 (approx, but use exact formula)
+      const LAMPORTS_PER_BYTE_YEAR = 3480;
+      const rentExemptForNewSize = (newRecipientSize + 128) * LAMPORTS_PER_BYTE_YEAR * 2;
+      const resizeCost = recipientAccountInfos.reduce(
+        (sum: number, info: { lamports: number } | null) => {
+          if (!info) return sum; // New recipients handled by RECIPIENT_RENT_LAMPORTS
+          const deficit = rentExemptForNewSize - info.lamports;
+          return sum + Math.max(0, deficit);
+        },
+        0,
+      );
       const rentCost = numRecipientsNeeded * RECIPIENT_RENT_LAMPORTS;
       const requiredLamports = calculateRequiredBalance(
-        txFees + jitoTipCost + estimatedResizeCost,
+        txFees + jitoTipCost + resizeCost,
         rentCost,
       );
       const senderBalance = await connection.getBalance(

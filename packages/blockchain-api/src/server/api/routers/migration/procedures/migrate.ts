@@ -210,7 +210,18 @@ export const migrate = publicProcedure.migration.migrate.handler(
           ),
         );
 
-        const mintInfo = await getMint(connection, mintKey);
+        const [mintInfo, sourceAtaInfo] = await Promise.all([
+          getMint(connection, mintKey),
+          getAccount(connection, sourceAta).catch(() => null),
+        ]);
+
+        // Skip frozen token accounts (e.g. DC tokens are frozen by the data credits program)
+        if (sourceAtaInfo?.isFrozen) {
+          warnings.push(
+            `Skipping ${token.mint}: token account is frozen and cannot be transferred`,
+          );
+          continue;
+        }
 
         tokenTransferInstructions.push(
           createTransferCheckedInstruction(
@@ -224,9 +235,6 @@ export const migrate = publicProcedure.migration.migrate.handler(
         );
 
         // Close source ATA if transferring full balance (rent → fee payer)
-        const sourceAtaInfo = await getAccount(connection, sourceAta).catch(
-          () => null,
-        );
         if (
           sourceAtaInfo &&
           BigInt(sourceAtaInfo.amount.toString()) === rawAmount
