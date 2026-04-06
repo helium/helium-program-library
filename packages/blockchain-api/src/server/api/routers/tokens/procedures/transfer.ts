@@ -15,7 +15,7 @@ import {
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import { TOKEN_MINTS, TOKEN_NAMES } from "@/lib/constants/tokens";
-import { getTransactionFee, RENT_COSTS } from "@/lib/utils/balance-validation";
+import { getTransactionFee, calculateRequiredBalance, RENT_COSTS } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
@@ -111,7 +111,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
     // For SOL transfers, no rent. For SPL, ATA rent if needed
     const rentCost = needsAta ? RENT_COSTS.ATA : 0;
     const txFee = getTransactionFee(tx);
-    const estimatedSolFeeLamports = txFee + rentCost;
+    const estimatedSolFeeLamports = calculateRequiredBalance(txFee, rentCost);
 
     const walletBalance = await connection.getBalance(feePayer);
     const totalCost = isSol

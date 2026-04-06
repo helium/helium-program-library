@@ -1,6 +1,6 @@
 import { publicProcedure } from "@/server/api/procedures";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
-import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
+import { getTotalTransactionFees, calculateRequiredBalance, RENT_COSTS } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
@@ -12,7 +12,7 @@ import {
   init as initHsd,
 } from "@helium/helium-sub-daos-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
-import { NATIVE_MINT } from "@solana/spl-token";
+import { NATIVE_MINT, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import {
@@ -129,11 +129,20 @@ export const claimRewards =
           : 0;
       const txFee = getTotalTransactionFees(versionedTransactions) + jitoTipCost;
 
+      // Check which reward ATAs need creation
+      const rewardAtaKeys = claimResult.rewardMints.map((mint) =>
+        getAssociatedTokenAddressSync(mint, walletPubkey),
+      );
+      const rewardAtaAccounts = await connection.getMultipleAccountsInfo(rewardAtaKeys);
+      const missingAtaCount = rewardAtaAccounts.filter((a) => !a).length;
+      const ataRent = missingAtaCount * RENT_COSTS.ATA;
+
       const walletBalance = await connection.getBalance(walletPubkey);
-      if (walletBalance < txFee) {
+      const totalRequired = calculateRequiredBalance(txFee, ataRent);
+      if (walletBalance < totalRequired) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance for transaction fees",
-          data: { required: txFee, available: walletBalance },
+          data: { required: totalRequired, available: walletBalance },
         });
       }
 

@@ -27,7 +27,7 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       const errorText = await quoteResponse.text();
       console.error("Jupiter API error:", errorText);
       throw errors.JUPITER_ERROR({
-        message: `Failed to get quote from Jupiter: HTTP ${quoteResponse.status}`,
+        message: `Failed to get quote from Jupiter: HTTP ${quoteResponse.status}: ${errorText.slice(0, 500)}`,
       });
     }
 

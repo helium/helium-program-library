@@ -160,18 +160,6 @@ export const updateHotspotInfo =
         });
       }
 
-      // Check wallet has sufficient balance for transaction fees
-      const walletBalance = await connection.getBalance(
-        new PublicKey(walletAddress),
-      );
-      const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
-      if (walletBalance < required) {
-        throw errors.INSUFFICIENT_FUNDS({
-          message: "Insufficient SOL balance for transaction fees",
-          data: { required, available: walletBalance },
-        });
-      }
-
       const hemProgram = await initHemLocal(provider);
       const [keyToAssetK] = keyToAssetKey(HNT_DAO, entityPubKey);
       const keyToAsset = await (hemProgram.account as any).keyToAssetV0.fetch(
@@ -279,6 +267,18 @@ export const updateHotspotInfo =
         const vtx = VersionedTransaction.deserialize(bytes);
         return sum + getTransactionFee(vtx);
       }, 0);
+
+      // Check wallet has sufficient balance using actual transaction fees
+      const walletBalance = await connection.getBalance(
+        new PublicKey(walletAddress)
+      );
+      const required = calculateRequiredBalance(totalFee, 0);
+      if (walletBalance < required) {
+        throw errors.INSUFFICIENT_FUNDS({
+          message: "Insufficient SOL balance for transaction fees",
+          data: { required, available: walletBalance },
+        });
+      }
 
       return {
         transactionData: {
