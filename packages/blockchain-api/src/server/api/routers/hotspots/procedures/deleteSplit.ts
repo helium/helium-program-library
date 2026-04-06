@@ -4,9 +4,10 @@ import { AssetOwner } from "@/lib/models/hotspot";
 import { MiniFanout } from "@/lib/models/mini-fanout";
 import { Recipient } from "@/lib/models/recipient";
 import { createSolanaConnection } from "@/lib/solana";
-import { env } from "@/lib/env";
-import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
-import { getAsset } from "@helium/spl-utils";
+import {
+  getAssetIdFromPubkey,
+  resolveHotspotName,
+} from "@/lib/utils/hotspot-helpers";
 import {
   init as initLd,
   updateCompressionDestination,
@@ -46,13 +47,7 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
       throw errors.NOT_FOUND({ message: "Hotspot not found" });
     }
 
-    let hotspotName: string | undefined;
-    try {
-      const asset = await getAsset(env.SOLANA_RPC_URL, new PublicKey(assetId));
-      hotspotName = asset?.content?.metadata?.name;
-    } catch {
-      // Non-critical
-    }
+    const hotspotName = await resolveHotspotName(assetId);
 
     // Find the hotspot
     const assetOwner = await AssetOwner.findOne({

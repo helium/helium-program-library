@@ -132,7 +132,8 @@ export const history = publicProcedure.transactions.history.handler(
           if (action.source !== "blockchain_api" || !action.actionMetadata)
             continue;
           if (
-            Array.isArray(action.actionMetadata.transfers) ||
+            (Array.isArray(action.actionMetadata.transfers) &&
+              action.actionMetadata.transfers.length > 0) ||
             action.actionMetadata.tokenAmount
           )
             continue;

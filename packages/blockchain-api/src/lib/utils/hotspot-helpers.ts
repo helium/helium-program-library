@@ -1,7 +1,7 @@
 import KeyToAsset from "@/lib/models/key-to-asset";
 import { init, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
-import { HNT_MINT } from "@helium/spl-utils";
+import { getAsset, HNT_MINT } from "@helium/spl-utils";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { env } from "../env";
@@ -98,3 +98,14 @@ export const getAssetIdFromPubkey = async (
     return keyToAsset?.asset || null;
   }
 };
+
+export async function resolveHotspotName(
+  assetId: string,
+): Promise<string | undefined> {
+  try {
+    const asset = await getAsset(env.SOLANA_RPC_URL, new PublicKey(assetId));
+    return asset?.content?.metadata?.name;
+  } catch {
+    return undefined;
+  }
+}

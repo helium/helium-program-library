@@ -3,8 +3,10 @@ import { env } from "@/lib/env";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { connectToDb } from "@/lib/utils/db";
 import { scheduleToUtcCron } from "@/lib/utils/misc";
-import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
-import { getAsset } from "@helium/spl-utils";
+import {
+  getAssetIdFromPubkey,
+  resolveHotspotName,
+} from "@/lib/utils/hotspot-helpers";
 import {
   initializeCompressionRecipient,
   init as initLd,
@@ -74,13 +76,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
       throw errors.NOT_FOUND({ message: "Hotspot not found" });
     }
 
-    let hotspotName: string | undefined;
-    try {
-      const asset = await getAsset(env.SOLANA_RPC_URL, new PublicKey(assetId));
-      hotspotName = asset?.content?.metadata?.name;
-    } catch {
-      // Non-critical — continue without name
-    }
+    const hotspotName = await resolveHotspotName(assetId);
 
     if (!rewardsSplit?.length) {
       throw errors.BAD_REQUEST({

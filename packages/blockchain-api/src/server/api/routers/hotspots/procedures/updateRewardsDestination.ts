@@ -8,7 +8,7 @@ import {
   buildVersionedTransaction,
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
-import { getAsset, proofArgsAndAccounts } from "@helium/spl-utils";
+import { proofArgsAndAccounts } from "@helium/spl-utils";
 import {
   init as initLazy,
   initializeCompressionRecipient,
@@ -16,7 +16,10 @@ import {
 } from "@helium/lazy-distributor-sdk";
 import { createSolanaConnection } from "@/lib/solana";
 import { env } from "@/lib/env";
-import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
+import {
+  getAssetIdFromPubkey,
+  resolveHotspotName,
+} from "@/lib/utils/hotspot-helpers";
 import {
   calculateRequiredBalance,
   getTransactionFee,
@@ -49,16 +52,7 @@ export const updateRewardsDestination =
         throw errors.NOT_FOUND({ message: "Hotspot not found" });
       }
 
-      let hotspotName: string | undefined;
-      try {
-        const assetData = await getAsset(
-          env.SOLANA_RPC_URL,
-          new PublicKey(assetId),
-        );
-        hotspotName = assetData?.content?.metadata?.name;
-      } catch {
-        // Non-critical
-      }
+      const hotspotName = await resolveHotspotName(assetId);
 
       // Validate public keys
       let assetPubkey: PublicKey;
