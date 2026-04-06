@@ -30,25 +30,52 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: "https://registry.npmjs.org"
 
-      - uses: ./.github/actions/setup/
-      - uses: ./.github/actions/setup-anchor/
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check for changesets
+        id: check
+        run: |
+          if ls .changeset/*.md 1>/dev/null 2>&1 && [ "$(ls .changeset/*.md 2>/dev/null | wc -l)" -gt 0 ]; then
+            # Exclude README.md which changesets always keeps
+            non_readme=$(ls .changeset/*.md | grep -v README.md | head -1 || true)
+            if [ -n "$non_readme" ]; then
+              echo "has_changesets=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_changesets=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release PR
+        if: steps.check.outputs.has_changesets == 'true'
+        uses: changesets/action@v1
+        with:
+          version: pnpm run version-packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Anchor
+        if: steps.check.outputs.has_changesets == 'false'
+        uses: ./.github/actions/setup-anchor/
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - uses: ./.github/actions/build-anchor/
+
+      - name: Build Anchor
+        if: steps.check.outputs.has_changesets == 'false'
+        uses: ./.github/actions/build-anchor/
         with:
           testing: false
           devnet: false
 
-      - run: pnpm install --frozen-lockfile
-
       - name: Build all packages
+        if: steps.check.outputs.has_changesets == 'false'
         run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
 
-      - name: Create release PR or publish
-        id: changesets
+      - name: Publish to npm
+        if: steps.check.outputs.has_changesets == 'false'
         uses: changesets/action@v1
         with:
-          version: pnpm run version-packages
           publish: pnpm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
