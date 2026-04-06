@@ -199,6 +199,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const hasMore = allVtxs.length > MAX_DIRECT_CLAIM_HOTSPOTS;
       if (hasMore) {
         allVtxs = allVtxs.slice(0, MAX_DIRECT_CLAIM_HOTSPOTS);
+        allClaimable = allClaimable.slice(0, MAX_DIRECT_CLAIM_HOTSPOTS);
       }
 
       if (allVtxs.length === 0) {
@@ -207,7 +208,12 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             transactions: [],
             parallel: true,
             tag: `claim_rewards:${walletAddress}`,
-            actionMetadata: { type: "claim_rewards", hotspotCount: 0, network },
+            actionMetadata: {
+              type: "claim_rewards",
+              hotspotCount: 0,
+              network,
+              ...(estimatedPendingRewards && { estimatedPendingRewards }),
+            },
           },
           estimatedSolFee: toTokenAmountOutput(
             new BN(0),
