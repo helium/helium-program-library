@@ -262,13 +262,13 @@ export async function submitTransactionBatch(
   };
 
   try {
-    const MAX_BLOCKHASH_RETRIES = 5;
+    const MAX_BLOCKHASH_RETRIES = 3;
     let lastError: unknown;
     for (let i = 0; i <= MAX_BLOCKHASH_RETRIES; i++) {
       try {
         return await attempt();
       } catch (error) {
-        if (isBlockhashNotFoundError(error) && i < MAX_BLOCKHASH_RETRIES) {
+        if (isBlockhashNotFoundError(error) && i < MAX_BLOCKHASH_RETRIES && payload.transactions.length > 1) {
           console.warn(
             `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
           );

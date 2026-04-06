@@ -201,7 +201,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const jitoTipCost = shouldUseJitoBundle(allVtxs.length, getCluster())
         ? getJitoTipAmountLamports()
         : 0;
-      const estimatedResizeCost = assets.length * 200_000;
+      const estimatedResizeCost = assets.length * 500_000;
       const rentCost = numRecipientsNeeded * RECIPIENT_RENT_LAMPORTS;
       const requiredLamports = calculateRequiredBalance(
         txFees + jitoTipCost + estimatedResizeCost,
@@ -286,28 +286,6 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       `[PDA WALLET ${pdaWallet.toBase58()}] Hotspots needing recipient: ${hotspotsNeedingRecipient}, shortfall: ${pdaWalletLamportsShortfall}`,
     );
 
-    // Always check balance - tx fees + PDA wallet funding
-    const senderBalance = await provider.connection.getBalance(
-      new PublicKey(walletAddress),
-    );
-    const tuktukJitoTipCost =
-      getCluster() === "mainnet" || getCluster() === "mainnet-beta"
-        ? getJitoTipAmountLamports()
-        : 0;
-    const totalRequired = calculateRequiredBalance(
-      BASE_TX_FEE_LAMPORTS + tuktukJitoTipCost,
-      pdaWalletLamportsShortfall,
-    );
-    if (senderBalance < totalRequired) {
-      throw errors.INSUFFICIENT_FUNDS({
-        message: "Insufficient SOL balance to fund claim task",
-        data: {
-          available: senderBalance,
-          required: totalRequired,
-        },
-      });
-    }
-
     if (pdaWalletLamportsShortfall > 0) {
       instructions.push(
         SystemProgram.transfer({
@@ -354,6 +332,24 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     // Add Jito tip if needed for mainnet bundles
     if (shouldUseJitoBundle(vtxs.length, getCluster())) {
       vtxs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
+    }
+
+    // Check balance with actual transaction fees
+    const senderBalance = await provider.connection.getBalance(
+      new PublicKey(walletAddress),
+    );
+    const totalRequired = calculateRequiredBalance(
+      getTotalTransactionFees(vtxs),
+      pdaWalletLamportsShortfall,
+    );
+    if (senderBalance < totalRequired) {
+      throw errors.INSUFFICIENT_FUNDS({
+        message: "Insufficient SOL balance to fund claim task",
+        data: {
+          available: senderBalance,
+          required: totalRequired,
+        },
+      });
     }
 
     const txs: Array<string> = vtxs.map((tx) =>

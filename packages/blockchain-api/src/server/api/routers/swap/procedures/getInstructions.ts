@@ -11,7 +11,7 @@ import {
 } from "@/lib/utils/transaction-tags";
 import {
   calculateRequiredBalance,
-  BASE_TX_FEE_LAMPORTS,
+  getTransactionFee,
   RENT_COSTS,
 } from "@/lib/utils/balance-validation";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -60,7 +60,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       const errorText = await instructionsResponse.text();
       console.error("Jupiter API error:", errorText);
       throw errors.JUPITER_ERROR({
-        message: `Failed to get swap instructions from Jupiter: HTTP ${instructionsResponse.status}`,
+        message: `Failed to get swap instructions from Jupiter: HTTP ${instructionsResponse.status}: ${errorText.slice(0, 500)}`,
       });
     }
 
@@ -72,30 +72,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       });
     }
 
-    // Check wallet has sufficient balance
-    // Estimate: Jupiter may create output token ATA
-    // If destinationTokenAccount is provided, assume it exists; otherwise assume ATA creation
     const connection = new Connection(process.env.SOLANA_RPC_URL!);
-    const walletBalance = await connection.getBalance(
-      new PublicKey(userPublicKey),
-    );
-    const rentCost = destinationTokenAccount ? 0 : RENT_COSTS.ATA;
-    // When swapping SOL, the input amount also comes from the wallet balance
-    const solInputAmount =
-      quoteResponse.inputMint === NATIVE_MINT.toBase58()
-        ? Number(quoteResponse.inAmount)
-        : 0;
-    const required = calculateRequiredBalance(
-      BASE_TX_FEE_LAMPORTS,
-      rentCost + solInputAmount,
-    );
-
-    if (walletBalance < required) {
-      throw errors.INSUFFICIENT_FUNDS({
-        message: "Insufficient SOL balance to execute swap",
-        data: { required, available: walletBalance },
-      });
-    }
 
     // Build the transaction using the same pattern
     const deserializeInstruction = (instruction: {
@@ -147,6 +124,25 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
           ),
       },
     });
+
+    // Check wallet has sufficient balance using actual transaction fees
+    const walletBalance = await connection.getBalance(
+      new PublicKey(userPublicKey),
+    );
+    const rentCost = destinationTokenAccount ? 0 : RENT_COSTS.ATA;
+    const solInputAmount =
+      quoteResponse.inputMint === NATIVE_MINT.toBase58()
+        ? Number(quoteResponse.inAmount)
+        : 0;
+    const txFee = getTransactionFee(tx);
+    const required = calculateRequiredBalance(txFee, rentCost + solInputAmount);
+
+    if (walletBalance < required) {
+      throw errors.INSUFFICIENT_FUNDS({
+        message: "Insufficient SOL balance to execute swap",
+        data: { required, available: walletBalance },
+      });
+    }
 
     // Generate transaction tag
     const tag = generateTransactionTag({
