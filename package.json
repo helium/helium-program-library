@@ -10,7 +10,7 @@
     "generate-idl-docs": "ts-node -T scripts/generate-idl-docs.ts",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "turbo run build && changeset publish"
+    "release": "changeset publish"
   },
   "pre-commit": [
     "fmt"

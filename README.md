@@ -2,9 +2,7 @@
 
 A collection of solana programs used for Helium's Solana integration
 
-
 ## Overall Design
-
 
 ```mermaid
 flowchart TD
@@ -95,12 +93,10 @@ Data credits manages the soulbound helium data credits, and how they can be burn
 
 Helium Entity Manager is responsible for issuing the various types of hotspots and rewardable entities that Helium supports (wifi, iot, mobile hotspots, mobile mappers, etc)
 
-
 ## Lazy Distributor
 
 The lazy distributor is an oracle-powered token distributor that distributes tokens to holders
 of particular NFTs as specified by oracles.
-
 
 ### Oracle Architecture
 
@@ -122,6 +118,7 @@ Which should return
 #### POST Request
 
 Sign transaction to set rewards and distribute
+
 ```
 {
   transaction: ... // serialized transaction
@@ -138,21 +135,19 @@ Which should return
 
 Before signing the transaction, the oracle should validate (1) that the transaction contains only
 
-  * `setCurrentRewards` instructions from other validators
-  * distribute instructions
+- `setCurrentRewards` instructions from other validators
+- distribute instructions
 
 and (2) that the amount set for `setCurrentRewards` for itself is correct.
-
 
 #### Client Side
 
 The client should:
 
-  * Submit requests to all oracles to get the current total rewards amount
-  * Form instructions to set rewards from all oracles using their specified rewards amount
-  * Submit a sign transaction request to all oracles sequentially
-  * Submit the signed transaction to Solana
-
+- Submit requests to all oracles to get the current total rewards amount
+- Form instructions to set rewards from all oracles using their specified rewards amount
+- Submit a sign transaction request to all oracles sequentially
+- Submit the signed transaction to Solana
 
 ## Local Setup
 
@@ -210,22 +205,16 @@ pnpm changeset
 
 This will prompt you to select which packages changed and whether the change is a patch, minor, or major bump. It creates a markdown file in `.changeset/` describing the change.
 
-2. When you're ready to publish, apply the changesets to bump versions:
+2. Commit the changeset file and merge to `develop`:
 
 ```
-pnpm run version-packages
+git add .changeset/
+git commit -m "chore: add changeset"
 ```
 
-3. Commit the version bumps and push a version tag:
+3. When changesets are present on `develop`, the [NPM Publish workflow](.github/workflows/npm-publish.yaml) automatically opens a **"Version Packages"** PR that bumps versions and updates CHANGELOGs.
 
-```
-git add .
-git commit -m "chore(release): vX.Y.Z"
-git tag -a vX.Y.Z -m "vX.Y.Z"
-git push && git push --tags
-```
-
-4. The `v*` tag triggers the [NPM Publish workflow](.github/workflows/npm-publish.yaml) which builds and publishes all changed packages to npm.
+4. Merge the "Version Packages" PR to publish all changed packages to npm. Per-package git tags (e.g. `@helium/blockchain-api@0.11.17`) are created automatically.
 
 Note: `workspace:^` dependencies are automatically replaced with real version ranges during publish, so external consumers get the correct versions.
 
