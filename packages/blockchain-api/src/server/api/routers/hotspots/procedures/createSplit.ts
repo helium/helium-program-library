@@ -280,8 +280,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
           shares: rewardsSplit.map((s) => ({
             address: s.address,
             type: s.type,
-            amount:
-              s.type === "fixed" ? s.tokenAmount?.uiAmountString : s.amount,
+            amount: s.type === "fixed" ? s.tokenAmount?.amount : s.amount,
           })),
           schedule,
         },
