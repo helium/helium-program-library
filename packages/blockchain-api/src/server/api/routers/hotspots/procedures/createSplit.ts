@@ -4,6 +4,7 @@ import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { connectToDb } from "@/lib/utils/db";
 import { scheduleToUtcCron } from "@/lib/utils/misc";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
+import { getAsset } from "@helium/spl-utils";
 import {
   initializeCompressionRecipient,
   init as initLd,
@@ -71,6 +72,14 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     const assetId = await getAssetIdFromPubkey(hotspotPubkey);
     if (!assetId) {
       throw errors.NOT_FOUND({ message: "Hotspot not found" });
+    }
+
+    let hotspotName: string | undefined;
+    try {
+      const asset = await getAsset(env.SOLANA_RPC_URL, new PublicKey(assetId));
+      hotspotName = asset?.content?.metadata?.name;
+    } catch {
+      // Non-critical — continue without name
     }
 
     if (!rewardsSplit?.length) {
@@ -263,7 +272,19 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
         })),
         parallel: true,
         tag,
-        actionMetadata: { type: "add_split", hotspotKey: assetId, recipientCount: rewardsSplit.length },
+        actionMetadata: {
+          type: "add_split",
+          hotspotKey: assetId,
+          hotspotName,
+          recipientCount: rewardsSplit.length,
+          shares: rewardsSplit.map((s) => ({
+            address: s.address,
+            type: s.type,
+            amount:
+              s.type === "fixed" ? s.tokenAmount?.uiAmountString : s.amount,
+          })),
+          schedule,
+        },
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
