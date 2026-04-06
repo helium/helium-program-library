@@ -1,4 +1,4 @@
-name: NPM Publish
+name: Release
 
 env:
   SOLANA_CLI_VERSION: 2.1.6
