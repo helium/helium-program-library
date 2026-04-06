@@ -8,7 +8,7 @@ import {
   buildVersionedTransaction,
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
-import { proofArgsAndAccounts } from "@helium/spl-utils";
+import { proofArgsAndAccounts, type Asset } from "@helium/spl-utils";
 import {
   init as initLazy,
   initializeCompressionRecipient,
@@ -16,10 +16,7 @@ import {
 } from "@helium/lazy-distributor-sdk";
 import { createSolanaConnection } from "@/lib/solana";
 import { env } from "@/lib/env";
-import {
-  getAssetIdFromPubkey,
-  resolveHotspotName,
-} from "@/lib/utils/hotspot-helpers";
+import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
 import {
   calculateRequiredBalance,
   getTransactionFee,
@@ -32,7 +29,7 @@ import BN from "bn.js";
 
 async function exists(
   connection: { getAccountInfo: (account: PublicKey) => Promise<unknown> },
-  account: PublicKey,
+  account: PublicKey
 ): Promise<boolean> {
   return Boolean(await connection.getAccountInfo(account));
 }
@@ -51,8 +48,6 @@ export const updateRewardsDestination =
       if (!assetId) {
         throw errors.NOT_FOUND({ message: "Hotspot not found" });
       }
-
-      const hotspotName = await resolveHotspotName(assetId);
 
       // Validate public keys
       let assetPubkey: PublicKey;
@@ -94,7 +89,7 @@ export const updateRewardsDestination =
         const rentCost = RENT_COSTS.RECIPIENT * recipientsNeeded;
         const required = calculateRequiredBalance(
           BASE_TX_FEE_LAMPORTS,
-          rentCost,
+          rentCost
         );
         if (walletBalance < required) {
           throw errors.INSUFFICIENT_FUNDS({
@@ -108,18 +103,15 @@ export const updateRewardsDestination =
       const assetEndpoint =
         env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint;
 
-      const {
-        asset: {
-          ownership: { owner },
-        },
-        args,
-        accounts,
-        remainingAccounts,
-      } = await proofArgsAndAccounts({
-        connection: program.provider.connection,
-        assetId: assetPubkey,
-        assetEndpoint,
-      });
+      const { asset, args, accounts, remainingAccounts } =
+        await proofArgsAndAccounts({
+          connection: program.provider.connection,
+          assetId: assetPubkey,
+          assetEndpoint,
+        });
+
+      const { owner } = asset.ownership;
+      const hotspotName = (asset as Asset).content?.metadata?.name;
 
       // Build instructions for each lazy distributor
       const instructions: TransactionInstruction[] = (
@@ -140,7 +132,7 @@ export const updateRewardsDestination =
                     lazyDistributor: lazy,
                     payer: wallet.publicKey,
                   })
-                ).instruction(),
+                ).instruction()
               );
             }
 
@@ -160,11 +152,11 @@ export const updateRewardsDestination =
                       : destinationPubkey,
                 })
                 .remainingAccounts(remainingAccounts)
-                .instruction(),
+                .instruction()
             );
 
             return ixs;
-          }),
+          })
         )
       ).flat();
 
@@ -201,13 +193,13 @@ export const updateRewardsDestination =
                 description: destinationExists
                   ? `Update rewards destination to ${destination.slice(
                       0,
-                      4,
+                      4
                     )}...${destination.slice(-4)}`
                   : `Update rewards destination to ${destination.slice(
                       0,
-                      4,
+                      4
                     )}...${destination.slice(
-                      -4,
+                      -4
                     )} (Warning: destination account does not exist)`,
                 hotspotKey: assetId,
                 destination,
@@ -226,8 +218,8 @@ export const updateRewardsDestination =
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),
-          NATIVE_MINT.toBase58(),
+          NATIVE_MINT.toBase58()
         ),
       };
-    },
+    }
   );
