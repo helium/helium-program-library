@@ -61,7 +61,7 @@ const RECIPIENT_RENT = 0.00242208;
 const RECIPIENT_RENT_LAMPORTS = Math.ceil(RECIPIENT_RENT * LAMPORTS_PER_SOL);
 
 const HPL_CRONS_PROGRAM_ID = new PublicKey(
-  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu"
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu",
 );
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
@@ -108,7 +108,11 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       // Accumulate transactions across pages until we hit MAX_DIRECT_CLAIM_HOTSPOTS + 1
       // (the +1 lets us know there are more). Then slice off the extra and set hasMore.
       let allVtxs: VersionedTransaction[] = [];
-      let allClaimable: Array<{ asset: PublicKey; entityKey: string }> = [];
+      let allClaimable: Array<{
+        asset: PublicKey;
+        entityKey: string;
+        pendingRewards: BN;
+      }> = [];
       let currentPage = 1;
       const totalPages = Math.ceil(total / limit);
 
@@ -141,35 +145,40 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         const rewards = await getBulkRewards(
           ldProgram,
           lazyDistributor,
-          entityKeys
+          entityKeys,
         );
         const rKeys = pageHotspots.map(
-          (h) => recipientKey(lazyDistributor, h.asset)[0]
+          (h) => recipientKey(lazyDistributor, h.asset)[0],
         );
-        const recipientAccs = await ldProgram.account.recipientV0.fetchMultiple(
-          rKeys
-        );
-        const withPending = pageHotspots.filter((_, idx) => {
-          const sortedOracleRewards = rewards
-            .map((rew) => new BN(rew.currentRewards[entityKeys[idx]] || 0))
-            .sort((a, b) => a.sub(b).toNumber());
-          const oracleMedian =
-            sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)];
-          const alreadyDistributed =
-            recipientAccs[idx]?.totalRewards || new BN(0);
-          return oracleMedian.sub(alreadyDistributed).gtn(0);
-        });
+        const recipientAccs =
+          await ldProgram.account.recipientV0.fetchMultiple(rKeys);
+        const withPending = pageHotspots
+          .map((h, idx) => {
+            const sortedOracleRewards = rewards
+              .map((rew) => new BN(rew.currentRewards[entityKeys[idx]] || 0))
+              .sort((a, b) => a.sub(b).toNumber());
+            const oracleMedian =
+              sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)];
+            const alreadyDistributed =
+              recipientAccs[idx]?.totalRewards || new BN(0);
+            const pendingRewards = oracleMedian.sub(alreadyDistributed);
+            return { ...h, pendingRewards };
+          })
+          .filter((h) => h.pendingRewards.gtn(0));
 
         if (withPending.length === 0) continue;
 
         // Step 3: Filter out ones with mini-fanouts
+        const pendingByAsset = new Map(
+          withPending.map((h) => [h.asset.toBase58(), h.pendingRewards]),
+        );
         const { claimable: pageClaimable } =
           await filterHotspotsWithoutMiniFanout(
             ldProgram,
             mfProgram,
             connection,
             lazyDistributor,
-            withPending
+            withPending,
           );
 
         if (pageClaimable.length === 0) continue;
@@ -187,13 +196,19 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         });
 
         allVtxs.push(...pageVtxs);
-        allClaimable.push(...pageClaimable);
+        allClaimable.push(
+          ...pageClaimable.map((h) => ({
+            ...h,
+            pendingRewards: pendingByAsset.get(h.asset.toBase58()) ?? new BN(0),
+          })),
+        );
       }
 
       // Step 5: Determine hasMore
       const hasMore = allVtxs.length > MAX_DIRECT_CLAIM_HOTSPOTS;
       if (hasMore) {
         allVtxs = allVtxs.slice(0, MAX_DIRECT_CLAIM_HOTSPOTS);
+        allClaimable = allClaimable.slice(0, MAX_DIRECT_CLAIM_HOTSPOTS);
       }
 
       if (allVtxs.length === 0) {
@@ -206,7 +221,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           },
           estimatedSolFee: toTokenAmountOutput(
             new BN(0),
-            NATIVE_MINT.toBase58()
+            NATIVE_MINT.toBase58(),
           ),
           hasMore: false,
         };
@@ -217,14 +232,14 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       }
 
       const txs = allVtxs.map((tx) =>
-        Buffer.from(tx.serialize()).toString("base64")
+        Buffer.from(tx.serialize()).toString("base64"),
       );
 
       const txFees = getTotalTransactionFees(allVtxs);
       const assets = allClaimable.map((h) => h.asset);
 
       const recipientKeys = assets.map(
-        (asset) => recipientKey(lazyDistributor, asset)[0]
+        (asset) => recipientKey(lazyDistributor, asset)[0],
       );
       const recipientAccounts =
         await ldProgram.account.recipientV0.fetchMultiple(recipientKeys);
@@ -236,10 +251,10 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const rentCost = numRecipientsNeeded * RECIPIENT_RENT_LAMPORTS;
       const requiredLamports = calculateRequiredBalance(
         txFees + jitoTipCost + estimatedResizeCost,
-        rentCost
+        rentCost,
       );
       const senderBalance = await connection.getBalance(
-        new PublicKey(walletAddress)
+        new PublicKey(walletAddress),
       );
       if (senderBalance < requiredLamports) {
         throw errors.INSUFFICIENT_FUNDS({
@@ -269,11 +284,18 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             network,
             hotspotKeys: allClaimable.map((h) => h.asset.toBase58()),
             hotspotNames: allClaimable.map((h) => animalName(h.entityKey)),
+            estimatedPendingRewards: toTokenAmountOutput(
+              allClaimable.reduce(
+                (sum, h) => sum.add(h.pendingRewards),
+                new BN(0),
+              ),
+              mint.toBase58(),
+            ),
           },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(txFees + rentCost),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
         hasMore,
       };
@@ -284,20 +306,19 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     anchor.setProvider(provider);
 
     const tuktukProgram = await initTuktuk(provider);
-    const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-      TASK_QUEUE_ID
-    );
+    const taskQueueAcc =
+      await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID);
     const [taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1);
 
     const queueAuthority = PublicKey.findProgramAddressSync(
       [Buffer.from("queue_authority")],
-      HPL_CRONS_PROGRAM_ID
+      HPL_CRONS_PROGRAM_ID,
     )[0];
 
     const idl = await anchor.Program.fetchIdl(HPL_CRONS_PROGRAM_ID, provider);
     const hplCronsProgram = new anchor.Program(
       idl as anchor.Idl,
-      provider
+      provider,
     ) as anchor.Program<anchor.Idl>;
 
     const instructions: TransactionInstruction[] = [];
@@ -306,12 +327,11 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       Buffer.from("claim_payer"),
       new PublicKey(walletAddress).toBuffer(),
     ])[0];
-    const pdaWalletBalanceLamports = await provider.connection.getBalance(
-      pdaWallet
-    );
+    const pdaWalletBalanceLamports =
+      await provider.connection.getBalance(pdaWallet);
     const hotspotsNeedingRecipient = await getNumRecipientsNeeded(
       walletAddress,
-      lazyDistributorAddress
+      lazyDistributorAddress,
     );
 
     // PDA wallet needs CLAIMER_MIN_LAMPORTS (on-chain check) plus rent for any new recipients
@@ -319,16 +339,16 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       CLAIMER_MIN_LAMPORTS + hotspotsNeedingRecipient * RECIPIENT_RENT_LAMPORTS;
     const pdaWalletLamportsShortfall = Math.max(
       0,
-      pdaWalletFundingNeededLamports - pdaWalletBalanceLamports
+      pdaWalletFundingNeededLamports - pdaWalletBalanceLamports,
     );
 
     console.log(
-      `[PDA WALLET ${pdaWallet.toBase58()}] Hotspots needing recipient: ${hotspotsNeedingRecipient}, shortfall: ${pdaWalletLamportsShortfall}`
+      `[PDA WALLET ${pdaWallet.toBase58()}] Hotspots needing recipient: ${hotspotsNeedingRecipient}, shortfall: ${pdaWalletLamportsShortfall}`,
     );
 
     // Always check balance - tx fees + PDA wallet funding
     const senderBalance = await provider.connection.getBalance(
-      new PublicKey(walletAddress)
+      new PublicKey(walletAddress),
     );
     const tuktukJitoTipCost =
       getCluster() === "mainnet" || getCluster() === "mainnet-beta"
@@ -336,7 +356,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         : 0;
     const totalRequired = calculateRequiredBalance(
       BASE_TX_FEE_LAMPORTS + tuktukJitoTipCost,
-      pdaWalletLamportsShortfall
+      pdaWalletLamportsShortfall,
     );
     if (senderBalance < totalRequired) {
       throw errors.INSUFFICIENT_FUNDS({
@@ -354,7 +374,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           fromPubkey: new PublicKey(walletAddress),
           toPubkey: pdaWallet,
           lamports: pdaWalletLamportsShortfall,
-        })
+        }),
       );
     }
 
@@ -374,7 +394,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         ])[0],
         taskQueueAuthority: taskQueueAuthorityKey(
           TASK_QUEUE_ID,
-          queueAuthority
+          queueAuthority,
         )[0],
       })
       .instruction();
@@ -397,7 +417,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     }
 
     const txs: Array<string> = vtxs.map((tx) =>
-      Buffer.from(tx.serialize()).toString("base64")
+      Buffer.from(tx.serialize()).toString("base64"),
     );
 
     // For Tuktuk claims: tx fees + PDA wallet funding (already includes recipient rent)
@@ -424,9 +444,9 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFees + rentCost),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
       hasMore: false,
     };
-  }
+  },
 );
