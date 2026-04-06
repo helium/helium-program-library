@@ -157,7 +157,30 @@ export const HotspotsDataSchema = z.object({
   totalPages: z.number(),
 });
 
-export const ClaimRewardsOutputSchema = createPaginatedTransactionResponse();
+const ClaimRewardsActionMetadataSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("claim_rewards"),
+    hotspotCount: z.number(),
+    network: z.string(),
+    hotspotKeys: z.array(z.string()).optional(),
+    hotspotNames: z.array(z.string()).optional(),
+    estimatedPendingRewards: TokenAmountOutputSchema.optional(),
+  }),
+  z.object({
+    type: z.literal("queue_wallet_claim"),
+    hotspotCount: z.number(),
+    network: z.literal("all"),
+    estimatedPendingRewards: TokenAmountOutputSchema.optional(),
+  }),
+]);
+
+export const ClaimRewardsOutputSchema =
+  createPaginatedTransactionResponse().extend({
+    transactionData:
+      createPaginatedTransactionResponse().shape.transactionData.extend({
+        actionMetadata: ClaimRewardsActionMetadataSchema.optional(),
+      }),
+  });
 export const TransferHotspotOutputSchema = createTransactionResponse();
 export const UpdateRewardsDestinationOutputSchema = createTransactionResponse();
 export const CreateSplitOutputSchema = createTransactionResponse();
