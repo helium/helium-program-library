@@ -45,6 +45,7 @@ import {
   BASE_TX_FEE_LAMPORTS,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import type { TokenAmountOutput } from "@helium/blockchain-api/schemas/common";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 import {
@@ -69,6 +70,22 @@ import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 const MAX_DIRECT_CLAIM_HOTSPOTS = 4;
 // HNT wallets with more than this many hotspots use Tuktuk instead of direct claim
 const MAX_HNT_DIRECT_CLAIM_TOTAL = 12;
+
+interface ClaimRewardsMetadata {
+  type: "claim_rewards";
+  hotspotCount: number;
+  network: string;
+  hotspotKeys?: string[];
+  hotspotNames?: string[];
+  estimatedPendingRewards?: TokenAmountOutput;
+}
+
+interface QueueWalletClaimMetadata {
+  type: "queue_wallet_claim";
+  hotspotCount: number;
+  network: "all";
+  estimatedPendingRewards?: TokenAmountOutput;
+}
 
 /**
  * Create transactions to claim rewards for all hotspots in a wallet.
@@ -212,8 +229,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
               type: "claim_rewards",
               hotspotCount: 0,
               network,
-              ...(estimatedPendingRewards && { estimatedPendingRewards }),
-            },
+              estimatedPendingRewards,
+            } satisfies ClaimRewardsMetadata,
           },
           estimatedSolFee: toTokenAmountOutput(
             new BN(0),
@@ -280,8 +297,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             network,
             hotspotKeys: allClaimable.map((h) => h.asset.toBase58()),
             hotspotNames: allClaimable.map((h) => animalName(h.entityKey)),
-            ...(estimatedPendingRewards && { estimatedPendingRewards }),
-          },
+            estimatedPendingRewards,
+          } satisfies ClaimRewardsMetadata,
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(txFees + rentCost),
@@ -432,8 +449,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           type: "queue_wallet_claim",
           hotspotCount: total,
           network: "all",
-          ...(estimatedPendingRewards && { estimatedPendingRewards }),
-        },
+          estimatedPendingRewards,
+        } satisfies QueueWalletClaimMetadata,
       },
       estimatedSolFee: toTokenAmountOutput(
         new BN(txFees + rentCost),
