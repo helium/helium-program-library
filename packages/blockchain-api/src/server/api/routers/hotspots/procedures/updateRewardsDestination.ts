@@ -103,18 +103,15 @@ export const updateRewardsDestination =
       const assetEndpoint =
         env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint;
 
-      const {
-        asset: {
-          ownership: { owner },
-        },
-        args,
-        accounts,
-        remainingAccounts,
-      } = await proofArgsAndAccounts({
-        connection: program.provider.connection,
-        assetId: assetPubkey,
-        assetEndpoint,
-      });
+      const { asset, args, accounts, remainingAccounts } =
+        await proofArgsAndAccounts({
+          connection: program.provider.connection,
+          assetId: assetPubkey,
+          assetEndpoint,
+        });
+
+      const { owner } = asset.ownership;
+      const hotspotName = asset.content?.metadata?.name;
 
       // Build instructions for each lazy distributor
       const instructions: TransactionInstruction[] = (
@@ -211,7 +208,13 @@ export const updateRewardsDestination =
           ],
           parallel: false,
           tag,
-          actionMetadata: { type: TRANSACTION_TYPES.UPDATE_REWARDS_DESTINATION, hotspotKey: assetId, destination },
+          actionMetadata: {
+            type: TRANSACTION_TYPES.UPDATE_REWARDS_DESTINATION,
+            hotspotKey: assetId,
+            hotspotName,
+            destination,
+            lazyDistributors,
+          },
         },
         estimatedSolFee: toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),

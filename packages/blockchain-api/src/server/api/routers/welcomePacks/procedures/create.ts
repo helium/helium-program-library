@@ -265,6 +265,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
             input.solAmount.mint,
           ),
           recipientCount: input.rewardsSplit.length,
+          recipients: input.rewardsSplit.map((s) => s.address),
         },
       },
       estimatedSolFee: toTokenAmountOutput(
