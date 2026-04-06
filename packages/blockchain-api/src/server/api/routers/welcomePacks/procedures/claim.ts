@@ -125,7 +125,11 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
         ],
         parallel: true,
         tag,
-        actionMetadata: { type: "welcome_pack_claim", packAddress },
+        actionMetadata: {
+          type: "welcome_pack_claim",
+          packAddress,
+          rewardsMint: rewardsMint?.toBase58(),
+        },
       },
       estimatedSolFee: toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
     };
