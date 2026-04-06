@@ -1,3 +1,4 @@
+import animalName from "angry-purple-tiger";
 import { publicProcedure } from "../../../procedures";
 import {
   getHotspotsByOwner,
@@ -265,6 +266,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             type: "claim_rewards",
             hotspotCount: allClaimable.length,
             network,
+            hotspotKeys: allClaimable.map((h) => h.asset.toBase58()),
+            hotspotNames: allClaimable.map((h) => animalName(h.entityKey)),
           },
         },
         estimatedSolFee: toTokenAmountOutput(
