@@ -72,48 +72,27 @@ jobs:
         if: steps.check.outputs.has_changesets == 'false'
         run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
 
-      - name: Publish to npm
+      - name: Debug npm auth
         if: steps.check.outputs.has_changesets == 'false'
         run: |
-          for pkg in packages/*/; do
-            [ -f "$pkg/package.json" ] || continue
-
-            is_private=$(node -p "require('./$pkg/package.json').private || false")
-            [ "$is_private" = "true" ] && continue
-
-            name=$(node -p "require('./$pkg/package.json').name")
-            version=$(node -p "require('./$pkg/package.json').version")
-
-            published=$(npm view "$name@$version" version 2>/dev/null || echo "")
-            if [ "$version" = "$published" ]; then
-              echo "Skipping $name@$version (already published)"
-              continue
-            fi
-
-            echo "Publishing $name@$version..."
-            npm publish "$pkg" --provenance --access public
-          done
+          echo "--- npm whoami ---"
+          npm whoami --registry https://registry.npmjs.org
+          echo "--- npm config list ---"
+          npm config list
+          echo "--- .npmrc files ---"
+          echo "Project .npmrc:"
+          cat .npmrc 2>/dev/null || echo "(none)"
+          echo "Home .npmrc:"
+          cat "$HOME/.npmrc" 2>/dev/null || echo "(none)"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create git tags
+      - name: Publish to npm
         if: steps.check.outputs.has_changesets == 'false'
-        run: |
-          for pkg in packages/*/; do
-            [ -f "$pkg/package.json" ] || continue
-
-            is_private=$(node -p "require('./$pkg/package.json').private || false")
-            [ "$is_private" = "true" ] && continue
-
-            name=$(node -p "require('./$pkg/package.json').name")
-            version=$(node -p "require('./$pkg/package.json').version")
-
-            tag="${name}@${version}"
-            if ! git rev-parse "$tag" >/dev/null 2>&1; then
-              echo "Tagging $tag"
-              git tag "$tag"
-            fi
-          done
-          git push --tags
+        uses: changesets/action@v1
+        with:
+          publish: pnpm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
