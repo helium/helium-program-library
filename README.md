@@ -212,7 +212,7 @@ git add .changeset/
 git commit -m "chore: add changeset"
 ```
 
-3. When changesets are present on `develop`, the [Release workflow](.github/workflows/release.yaml) automatically opens a **"Version Packages"** PR that bumps versions and updates CHANGELOGs.
+3. When changesets are present on `develop`, the [NPM Publish workflow](.github/workflows/npm-publish.yaml) automatically opens a **"Version Packages"** PR that bumps versions and updates CHANGELOGs.
 
 4. Merge the "Version Packages" PR to publish all changed packages to npm. Per-package git tags (e.g. `@helium/blockchain-api@0.11.17`) are created automatically.
 

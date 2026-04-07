@@ -1,4 +1,4 @@
-name: Release
+name: NPM Publish
 
 env:
   SOLANA_CLI_VERSION: 2.1.6
@@ -36,7 +36,6 @@ jobs:
         id: check
         run: |
           if ls .changeset/*.md 1>/dev/null 2>&1 && [ "$(ls .changeset/*.md 2>/dev/null | wc -l)" -gt 0 ]; then
-            # Exclude README.md which changesets always keeps
             non_readme=$(ls .changeset/*.md | grep -v README.md | head -1 || true)
             if [ -n "$non_readme" ]; then
               echo "has_changesets=true" >> $GITHUB_OUTPUT
@@ -71,21 +70,6 @@ jobs:
       - name: Build all packages
         if: steps.check.outputs.has_changesets == 'false'
         run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
-
-      - name: Debug npm auth
-        if: steps.check.outputs.has_changesets == 'false'
-        run: |
-          echo "--- npm whoami ---"
-          npm whoami --registry https://registry.npmjs.org
-          echo "--- npm config list ---"
-          npm config list
-          echo "--- .npmrc files ---"
-          echo "Project .npmrc:"
-          cat .npmrc 2>/dev/null || echo "(none)"
-          echo "Home .npmrc:"
-          cat "$HOME/.npmrc" 2>/dev/null || echo "(none)"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm
         if: steps.check.outputs.has_changesets == 'false'
