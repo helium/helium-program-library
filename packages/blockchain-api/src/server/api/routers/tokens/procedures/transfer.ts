@@ -126,7 +126,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
       });
     }
 
-    const transferTokenAmount = toTokenAmountOutput(
+    const transferTokenAmount = await toTokenAmountOutput(
       new BN(tokenAmount.amount),
       tokenAmount.mint,
     );
@@ -155,7 +155,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
           recipient: destination,
         },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
         NATIVE_MINT.toBase58(),
       ),

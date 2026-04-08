@@ -138,10 +138,10 @@ export const create = publicProcedure.rewardContract.create.handler(
       rentCost += RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS;
       const claimableRecipient = recipients.find((r) => r.type === "CLAIMABLE");
       if (claimableRecipient?.type === "CLAIMABLE") {
-        rentCost += resolveTokenAmountInput(
+        rentCost += (await resolveTokenAmountInput(
           claimableRecipient.giftedCurrency,
           NATIVE_MINT.toBase58(),
-        ).toNumber();
+        )).toNumber();
       }
     } else {
       // Mini-fanout path - add funding amount
@@ -181,13 +181,13 @@ export const create = publicProcedure.rewardContract.create.handler(
       const claimableRecipient = recipients.find((r) => r.type === "CLAIMABLE");
       const solAmount =
         claimableRecipient?.type === "CLAIMABLE"
-          ? resolveTokenAmountInput(
+          ? await resolveTokenAmountInput(
               claimableRecipient.giftedCurrency,
               NATIVE_MINT.toBase58(),
             )
           : new BN(0);
 
-      const rewardsSplit = recipients.map((r) => {
+      const rewardsSplit = await Promise.all(recipients.map(async (r) => {
         const wallet =
           r.type === "PRESET"
             ? new PublicKey(r.walletAddress)
@@ -197,7 +197,7 @@ export const create = publicProcedure.rewardContract.create.handler(
           return {
             share: {
               fixed: {
-                amount: resolveTokenAmountInput(
+                amount: await resolveTokenAmountInput(
                   r.receives.tokenAmount,
                   HNT_MINT.toBase58(),
                 ),
@@ -210,7 +210,7 @@ export const create = publicProcedure.rewardContract.create.handler(
           share: { share: { amount: r.receives.shares } },
           wallet,
         };
-      });
+      }));
 
       const { instruction: ix } = await (
         await initializeWelcomePack({
@@ -250,7 +250,7 @@ export const create = publicProcedure.rewardContract.create.handler(
       const oracleSigner = new PublicKey(env.ORACLE_SIGNER);
       const oracleUrl = env.ORACLE_URL;
 
-      const shares = recipients.map((r) => {
+      const shares = await Promise.all(recipients.map(async (r) => {
         const wallet =
           r.type === "PRESET"
             ? new PublicKey(r.walletAddress)
@@ -261,7 +261,7 @@ export const create = publicProcedure.rewardContract.create.handler(
             wallet,
             share: {
               fixed: {
-                amount: resolveTokenAmountInput(
+                amount: await resolveTokenAmountInput(
                   r.receives.tokenAmount,
                   HNT_MINT.toBase58(),
                 ),
@@ -273,7 +273,7 @@ export const create = publicProcedure.rewardContract.create.handler(
           wallet,
           share: { share: { amount: r.receives.shares } },
         };
-      });
+      }));
 
       const { instruction: initIx, pubkeys } = await miniFanoutProgram.methods
         .initializeMiniFanoutV0({
@@ -377,7 +377,7 @@ export const create = publicProcedure.rewardContract.create.handler(
         parallel: false,
         tag,
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
         NATIVE_MINT.toBase58(),
       ),

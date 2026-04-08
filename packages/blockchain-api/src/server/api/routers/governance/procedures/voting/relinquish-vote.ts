@@ -251,7 +251,7 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
         actionMetadata: { type: "voting_relinquish", proposalKey, choice, positionCount: positionMints.length },
       },
       hasMore,
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
         NATIVE_MINT.toBase58(),
       ),

@@ -214,7 +214,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
               estimatedPendingRewards,
             },
           },
-          estimatedSolFee: toTokenAmountOutput(
+          estimatedSolFee: await toTokenAmountOutput(
             new BN(0),
             NATIVE_MINT.toBase58(),
           ),
@@ -303,7 +303,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             estimatedPendingRewards,
           },
         },
-        estimatedSolFee: toTokenAmountOutput(
+        estimatedSolFee: await toTokenAmountOutput(
           new BN(txFees + rentCost),
           NATIVE_MINT.toBase58(),
         ),
@@ -449,7 +449,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           estimatedPendingRewards,
         },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(txFees + rentCost),
         NATIVE_MINT.toBase58(),
       ),

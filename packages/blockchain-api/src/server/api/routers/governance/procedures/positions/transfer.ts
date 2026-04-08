@@ -163,11 +163,11 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
           type: "position_transfer",
           positionMint,
           targetPositionMint,
-          tokenAmount: toTokenAmountOutput(amountBN, depositMintStr),
+          tokenAmount: await toTokenAmountOutput(amountBN, depositMintStr),
           tokenName: TOKEN_NAMES[depositMintStr],
         },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
         NATIVE_MINT.toBase58(),
       ),

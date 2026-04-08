@@ -1,3 +1,7 @@
+import { Connection, PublicKey } from "@solana/web3.js";
+import { getMint } from "@solana/spl-token";
+import { env } from "@/lib/env";
+
 /**
  * Common token mint addresses on Solana mainnet
  */
@@ -33,3 +37,19 @@ export const TOKEN_DECIMALS: Record<string, number> = {
   [TOKEN_MINTS.IOT]: 6,
   [TOKEN_MINTS.DC]: 0,
 };
+
+const decimalsCache = new Map<string, number>(Object.entries(TOKEN_DECIMALS));
+
+/**
+ * Get decimals for a token mint. Returns from static map for known tokens,
+ * otherwise fetches from RPC and caches the result.
+ */
+export async function getTokenDecimals(mint: string): Promise<number> {
+  const cached = decimalsCache.get(mint);
+  if (cached !== undefined) return cached;
+
+  const connection = new Connection(env.SOLANA_RPC_URL);
+  const mintInfo = await getMint(connection, new PublicKey(mint));
+  decimalsCache.set(mint, mintInfo.decimals);
+  return mintInfo.decimals;
+}

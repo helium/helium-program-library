@@ -288,7 +288,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
             tag,
           },
           hasMore: true,
-          estimatedSolFee: toTokenAmountOutput(
+          estimatedSolFee: await toTokenAmountOutput(
             new BN(claimTxFee),
             NATIVE_MINT.toBase58(),
           ),
@@ -599,7 +599,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       return {
         transactionData: { transactions: [], parallel: false, tag },
         hasMore: false,
-        estimatedSolFee: toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+        estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
       };
     }
 
@@ -644,7 +644,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         tag,
         actionMetadata: { type: "delegation_delegate", subDaoMint, positionCount: positionMints.length },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
         NATIVE_MINT.toBase58(),
       ),

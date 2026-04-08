@@ -118,7 +118,7 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
     if (delegatedPositionAcc.expirationTs.gte(newExpirationTs)) {
       return {
         transactionData: { transactions: [], parallel: false, tag },
-        estimatedSolFee: toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+        estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
       };
     }
 
@@ -182,7 +182,7 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
         tag,
         actionMetadata: { type: "delegation_extend", positionMint },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
         NATIVE_MINT.toBase58(),
       ),

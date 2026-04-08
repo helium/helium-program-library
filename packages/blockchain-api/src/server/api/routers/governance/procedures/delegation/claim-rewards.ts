@@ -94,7 +94,7 @@ export const claimRewards =
         return {
           transactionData: { transactions: [], parallel: false, tag },
           hasMore: false,
-          estimatedSolFee: toTokenAmountOutput(
+          estimatedSolFee: await toTokenAmountOutput(
             new BN(0),
             NATIVE_MINT.toBase58(),
           ),
@@ -154,7 +154,7 @@ export const claimRewards =
           actionMetadata: { type: "delegation_claim_rewards", positionCount: positionMints.length },
         },
         hasMore: claimResult.hasMore || batchHasMore,
-        estimatedSolFee: toTokenAmountOutput(
+        estimatedSolFee: await toTokenAmountOutput(
           new BN(txFee),
           NATIVE_MINT.toBase58(),
         ),

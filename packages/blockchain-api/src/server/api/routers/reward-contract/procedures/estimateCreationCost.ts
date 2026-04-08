@@ -58,7 +58,7 @@ export const estimateCreationCost =
           (r) => r.type === "CLAIMABLE",
         );
         if (claimableRecipient?.type === "CLAIMABLE") {
-          recipientGift = resolveTokenAmountInput(
+          recipientGift = await resolveTokenAmountInput(
             claimableRecipient.giftedCurrency,
             NATIVE_MINT.toBase58(),
           );
@@ -76,11 +76,11 @@ export const estimateCreationCost =
       const solMint = NATIVE_MINT.toBase58();
 
       return {
-        total: toTokenAmountOutput(total, solMint),
+        total: await toTokenAmountOutput(total, solMint),
         lineItems: {
-          transactionFees: toTokenAmountOutput(transactionFees, solMint),
-          rentFee: toTokenAmountOutput(rentFee, solMint),
-          recipientGift: toTokenAmountOutput(recipientGift, solMint),
+          transactionFees: await toTokenAmountOutput(transactionFees, solMint),
+          rentFee: await toTokenAmountOutput(rentFee, solMint),
+          recipientGift: await toTokenAmountOutput(recipientGift, solMint),
         },
       };
     },

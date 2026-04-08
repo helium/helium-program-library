@@ -312,7 +312,7 @@ export const updateHotspotInfo =
               }),
           },
         },
-        estimatedSolFee: toTokenAmountOutput(
+        estimatedSolFee: await toTokenAmountOutput(
           new BN(totalFee),
           NATIVE_MINT.toBase58(),
         ),

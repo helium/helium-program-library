@@ -206,7 +206,7 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
         tag,
         actionMetadata: { type: TRANSACTION_TYPES.HOTSPOT_TRANSFER, hotspotKey: assetId, hotspotName, recipient },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
         NATIVE_MINT.toBase58(),
       ),

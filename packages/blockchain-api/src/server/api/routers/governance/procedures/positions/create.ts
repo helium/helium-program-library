@@ -68,7 +68,7 @@ export const create = publicProcedure.governance.createPosition.handler(
     const { connection, provider } = createSolanaConnection(walletAddress);
     const walletPubkey = new PublicKey(walletAddress);
     const mintPubkey = new PublicKey(tokenAmount.mint);
-    const amount = resolveTokenAmountInput(tokenAmount);
+    const amount = await resolveTokenAmountInput(tokenAmount);
 
     const hsdProgram = await initHsd(provider);
     const vsrProgram = await initVsr(provider);
@@ -355,7 +355,7 @@ export const create = publicProcedure.governance.createPosition.handler(
         tag,
         actionMetadata: {
           type: "position_create",
-          tokenAmount: toTokenAmountOutput(
+          tokenAmount: await toTokenAmountOutput(
             new BN(tokenAmount.amount),
             tokenAmount.mint,
           ),
@@ -364,7 +364,7 @@ export const create = publicProcedure.governance.createPosition.handler(
           lockupPeriodDays: lockupPeriodsInDays,
         },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
         NATIVE_MINT.toBase58(),
       ),

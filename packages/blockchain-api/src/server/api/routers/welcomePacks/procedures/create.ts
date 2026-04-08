@@ -121,10 +121,10 @@ export const create = publicProcedure.welcomePacks.create.handler(
       rentCost += RENT_COSTS.RECIPIENT;
     }
     // Add gifted SOL amount
-    rentCost += resolveTokenAmountInput(
+    rentCost += (await resolveTokenAmountInput(
       solAmount,
       NATIVE_MINT.toBase58(),
-    ).toNumber();
+    )).toNumber();
 
     const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
     if (walletBalance < required) {
@@ -155,10 +155,10 @@ export const create = publicProcedure.welcomePacks.create.handler(
         program,
         assetId: new PublicKey(assetId),
         owner: new PublicKey(walletAddress),
-        solAmount: resolveTokenAmountInput(solAmount, NATIVE_MINT.toBase58()),
+        solAmount: await resolveTokenAmountInput(solAmount, NATIVE_MINT.toBase58()),
         rentRefund: new PublicKey(rentRefund),
         assetReturnAddress: new PublicKey(assetReturnAddress),
-        rewardsSplit: rewardsSplit.map((split) =>
+        rewardsSplit: await Promise.all(rewardsSplit.map(async (split) =>
           split.type === "percentage"
             ? {
                 share: { share: { amount: split.amount } },
@@ -167,7 +167,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
             : {
                 share: {
                   fixed: {
-                    amount: resolveTokenAmountInput(
+                    amount: await resolveTokenAmountInput(
                       split.tokenAmount,
                       HNT_MINT.toBase58(),
                     ),
@@ -175,7 +175,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
                 },
                 wallet: new PublicKey(split.address),
               },
-        ),
+        )),
         rewardsSchedule,
         getAssetFn: (_, assetId) =>
           getAsset(
@@ -260,7 +260,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
         actionMetadata: {
           type: "welcome_pack_create",
           assetId,
-          solAmount: toTokenAmountOutput(
+          solAmount: await toTokenAmountOutput(
             new BN(input.solAmount.amount),
             input.solAmount.mint,
           ),
@@ -268,7 +268,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
           recipients: input.rewardsSplit.map((s) => s.address),
         },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
         NATIVE_MINT.toBase58(),
       ),

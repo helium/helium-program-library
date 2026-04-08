@@ -128,7 +128,7 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
           tag,
         },
         hasMore: true,
-        estimatedSolFee: toTokenAmountOutput(
+        estimatedSolFee: await toTokenAmountOutput(
           new BN(txFee),
           NATIVE_MINT.toBase58(),
         ),
@@ -231,7 +231,7 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
         actionMetadata: { type: "delegation_undelegate", positionMint },
       },
       hasMore: batchHasMore,
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
         NATIVE_MINT.toBase58(),
       ),
