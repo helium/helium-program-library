@@ -1,6 +1,5 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getMint } from "@solana/spl-token";
-import { env } from "@/lib/env";
 
 /**
  * Common token mint addresses on Solana mainnet
@@ -48,6 +47,7 @@ export async function getTokenDecimals(mint: string): Promise<number> {
   const cached = decimalsCache.get(mint);
   if (cached !== undefined) return cached;
 
+  const { env } = await import("@/lib/env");
   const connection = new Connection(env.SOLANA_RPC_URL);
   const mintInfo = await getMint(connection, new PublicKey(mint));
   decimalsCache.set(mint, mintInfo.decimals);
