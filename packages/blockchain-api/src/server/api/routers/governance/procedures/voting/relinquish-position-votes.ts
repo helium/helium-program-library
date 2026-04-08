@@ -161,7 +161,7 @@ export const relinquishPositionVotes =
           actionMetadata: { type: "voting_relinquish_position", positionMint, organization },
         },
         hasMore,
-        estimatedSolFee: toTokenAmountOutput(
+        estimatedSolFee: await toTokenAmountOutput(
           new BN(totalFee),
           NATIVE_MINT.toBase58(),
         ),

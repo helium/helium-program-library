@@ -216,7 +216,7 @@ export const updateRewardsDestination =
             lazyDistributors,
           },
         },
-        estimatedSolFee: toTokenAmountOutput(
+        estimatedSolFee: await toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),
           NATIVE_MINT.toBase58(),
         ),

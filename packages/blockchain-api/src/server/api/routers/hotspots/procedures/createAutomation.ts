@@ -316,7 +316,7 @@ export const createAutomation =
           tag: `setup_automation:${walletAddress}`,
           actionMetadata: { type: "setup_automation", schedule, duration },
         },
-        estimatedSolFee: toTokenAmountOutput(
+        estimatedSolFee: await toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),
           NATIVE_MINT.toBase58(),
         ),

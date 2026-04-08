@@ -171,11 +171,11 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       tag,
       actionMetadata: {
         type: "swap",
-        inputTokenAmount: toTokenAmountOutput(
+        inputTokenAmount: await toTokenAmountOutput(
           new BN(quoteResponse.inAmount),
           quoteResponse.inputMint,
         ),
-        outputTokenAmount: toTokenAmountOutput(
+        outputTokenAmount: await toTokenAmountOutput(
           new BN(quoteResponse.outAmount),
           quoteResponse.outputMint,
         ),

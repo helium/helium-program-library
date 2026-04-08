@@ -7,7 +7,7 @@ import { getCluster } from "@/lib/solana";
 import { BundleSimulationError } from "@/lib/utils/jito";
 import { submitTransactionBatch } from "@/lib/utils/transaction-submission";
 import * as Sentry from "@sentry/nextjs";
-import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { classifySimulationLogs } from "@/lib/utils/simulation-classifier";
 import { publicProcedure } from "../../../procedures";
 
@@ -146,6 +146,19 @@ export const submit = publicProcedure.transactions.submit.handler(
           },
         );
 
+        if (category === "account_not_found") {
+          const balance = await connection.getBalance(new PublicKey(payer));
+          if (balance === 0) {
+            throw errors.SIMULATION_FAILED({
+              message: `Transaction payer ${payer} has 0 SOL`,
+              data: {
+                logs: ff?.logs ?? undefined,
+                link: ff?.link ?? undefined,
+              },
+            });
+          }
+        }
+
         throw errors.SIMULATION_FAILED({
           message: ff.error ?? "Transaction simulation failed",
           data: {
@@ -189,6 +202,18 @@ export const submit = publicProcedure.transactions.submit.handler(
       });
     } catch (error) {
       if (error instanceof BundleSimulationError) {
+        if (error.message.includes("AccountNotFound")) {
+          const connection = new Connection(env.SOLANA_RPC_URL);
+          const balance = await connection.getBalance(new PublicKey(payer));
+          if (balance === 0) {
+            throw errors.SIMULATION_FAILED({
+              message: `Transaction payer ${payer} has 0 SOL`,
+              data: {
+                logs: error.logs,
+              },
+            });
+          }
+        }
         throw errors.SIMULATION_FAILED({
           message: error.message,
           data: {

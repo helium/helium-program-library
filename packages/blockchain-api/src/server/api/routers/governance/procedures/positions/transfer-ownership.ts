@@ -96,7 +96,7 @@ export const transferOwnership =
           tag,
           actionMetadata: { type: "position_transfer_ownership", positionMint, from, to },
         },
-        estimatedSolFee: toTokenAmountOutput(
+        estimatedSolFee: await toTokenAmountOutput(
           new BN(txFee),
           NATIVE_MINT.toBase58(),
         ),

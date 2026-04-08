@@ -87,7 +87,7 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
         ],
         parallel: false,
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
         NATIVE_MINT.toBase58(),
       ),

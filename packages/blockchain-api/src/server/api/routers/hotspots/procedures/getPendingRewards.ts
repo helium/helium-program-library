@@ -28,12 +28,12 @@ interface MiniFanoutShare {
   };
 }
 
-function zeroPending(mintAddress: string): {
+async function zeroPending(mintAddress: string): Promise<{
   total: TokenAmountOutput;
   claimable: TokenAmountOutput;
   automated: TokenAmountOutput;
-} {
-  const zero = toTokenAmountOutput(new BN(0), mintAddress);
+}> {
+  const zero = await toTokenAmountOutput(new BN(0), mintAddress);
   return { total: zero, claimable: zero, automated: zero };
 }
 
@@ -44,7 +44,7 @@ export const getPendingRewards =
     const mintAddress = mint.toBase58();
     const lazyDistributor = getLazyDistributorForNetwork(network);
 
-    const tokenOutput = (bn: BN): TokenAmountOutput =>
+    const tokenOutput = (bn: BN): Promise<TokenAmountOutput> =>
       toTokenAmountOutput(bn, mintAddress);
 
     const hotspotsData = await getHotspotsByOwner({
@@ -53,7 +53,7 @@ export const getPendingRewards =
     });
 
     if (hotspotsData.hotspots.length === 0) {
-      return { pending: zeroPending(mintAddress), byHotspot: [] };
+      return { pending: await zeroPending(mintAddress), byHotspot: [] };
     }
 
     // Deduplicate hotspots by asset to prevent double-counting
@@ -225,13 +225,13 @@ export const getPendingRewards =
     let claimableBn = new BN(0);
     let automatedBn = pendingInMiniFanoutATAs; // ATA balance is always automated
 
-    const byHotspot = uniqueHotspots
-      .map((hotspot, idx) => {
+    const byHotspot = (await Promise.all(uniqueHotspots
+      .map(async (hotspot, idx) => {
         const oraclePendingBn = netPendingPerHotspot[idx]!;
         const ataPendingBn = ataBalancePerHotspot[idx]!;
         const totalPendingBn = oraclePendingBn.add(ataPendingBn);
         const miniFanout = miniFanouts[idx];
-        const zeroOut = tokenOutput(new BN(0));
+        const zeroOut = await tokenOutput(new BN(0));
 
         const isAutomated = hasAutomation || !!miniFanout;
         if (isAutomated) {
@@ -242,7 +242,7 @@ export const getPendingRewards =
 
         if (totalPendingBn.isZero()) return null;
 
-        const totalOut = tokenOutput(totalPendingBn);
+        const totalOut = await tokenOutput(totalPendingBn);
         return {
           hotspotPubKey: hotspot.entityKey,
           pending: {
@@ -251,18 +251,18 @@ export const getPendingRewards =
             automated: isAutomated ? totalOut : zeroOut,
           },
         };
-      })
-      .filter(truthy);
+      }),
+    )).filter(truthy);
 
     closeSingleton(connection);
 
-    const totalOut = tokenOutput(totalPendingBn);
+    const totalOut = await tokenOutput(totalPendingBn);
 
     return {
       pending: {
         total: totalOut,
-        claimable: tokenOutput(claimableBn),
-        automated: tokenOutput(automatedBn),
+        claimable: await tokenOutput(claimableBn),
+        automated: await tokenOutput(automatedBn),
       },
       byHotspot,
     };

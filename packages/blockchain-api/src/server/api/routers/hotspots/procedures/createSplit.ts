@@ -127,20 +127,20 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     const { instruction: initIx, pubkeys } = await miniFanoutProgram.methods
       .initializeMiniFanoutV0({
         seed: new PublicKey(assetId).toBuffer(),
-        shares: rewardsSplit.map((split) => ({
+        shares: await Promise.all(rewardsSplit.map(async (split) => ({
           wallet: new PublicKey(split.address),
           share:
             split.type === "fixed"
               ? {
                   fixed: {
-                    amount: resolveTokenAmountInput(
+                    amount: await resolveTokenAmountInput(
                       split.tokenAmount,
                       HNT_MINT.toBase58()
                     ),
                   },
                 }
               : { share: { amount: split.amount } },
-        })),
+        }))),
         schedule: rewardsSchedule,
         preTask: {
           remoteV0: {
@@ -281,7 +281,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
           schedule,
         },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
         NATIVE_MINT.toBase58()
       ),

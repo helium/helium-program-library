@@ -244,6 +244,6 @@ async function buildClaimTransaction({
       parallel: false,
       tag,
     },
-    estimatedSolFee: toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+    estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
   };
 }

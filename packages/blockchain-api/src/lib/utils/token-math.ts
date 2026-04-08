@@ -5,7 +5,11 @@ import type {
   TokenAmountInput,
   TokenAmountOutput,
 } from "@helium/blockchain-api/schemas/common";
-import { TOKEN_DECIMALS, TOKEN_MINTS } from "@/lib/constants/tokens";
+import {
+  TOKEN_DECIMALS,
+  TOKEN_MINTS,
+  getTokenDecimals,
+} from "@/lib/constants/tokens";
 
 export const HNT_DECIMALS = TOKEN_DECIMALS[TOKEN_MINTS.HNT];
 const HNT_DIVISOR = new BN(10).pow(new BN(HNT_DECIMALS));
@@ -27,19 +31,16 @@ export function solToLamportsBN(sol: number): BN {
   return new BN(Math.round(sol * 10 ** SOL_DECIMALS));
 }
 
-export function resolveTokenAmountInput(
+export async function resolveTokenAmountInput(
   input: TokenAmountInput,
   expectedMint?: string,
-): BN {
+): Promise<BN> {
   if (expectedMint && input.mint !== expectedMint) {
     throw new Error(
       `Mint mismatch: expected ${expectedMint}, got ${input.mint}`,
     );
   }
-  const decimals = TOKEN_DECIMALS[input.mint];
-  if (decimals === undefined) {
-    throw new Error(`Unknown mint: ${input.mint}`);
-  }
+  await getTokenDecimals(input.mint);
   return new BN(input.amount);
 }
 
@@ -54,14 +55,11 @@ function formatTokenAmount(raw: string, decimals: number): string {
   return isNegative ? `-${result}` : result;
 }
 
-export function toTokenAmountOutput(
+export async function toTokenAmountOutput(
   rawAmount: BN,
   mint: string,
-): TokenAmountOutput {
-  const decimals = TOKEN_DECIMALS[mint];
-  if (decimals === undefined) {
-    throw new Error(`Unknown mint: ${mint}`);
-  }
+): Promise<TokenAmountOutput> {
+  const decimals = await getTokenDecimals(mint);
 
   const amount = rawAmount.toString();
 

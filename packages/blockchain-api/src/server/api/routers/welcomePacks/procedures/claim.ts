@@ -131,7 +131,7 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
           rewardsMint: rewardsMint?.toBase58(),
         },
       },
-      estimatedSolFee: toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+      estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
     };
   },
 );

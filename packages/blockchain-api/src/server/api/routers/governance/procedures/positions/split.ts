@@ -195,11 +195,11 @@ export const split = publicProcedure.governance.splitPosition.handler(
         actionMetadata: {
           type: "position_split",
           positionMint,
-          tokenAmount: toTokenAmountOutput(amountBN, depositMintStr),
+          tokenAmount: await toTokenAmountOutput(amountBN, depositMintStr),
           tokenName: TOKEN_NAMES[depositMintStr],
         },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
         NATIVE_MINT.toBase58(),
       ),

@@ -398,7 +398,7 @@ export const vote = publicProcedure.governance.vote.handler(
         actionMetadata: { type: "voting_vote", proposalKey, choice, positionCount: positionMints.length },
       },
       hasMore,
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
         NATIVE_MINT.toBase58(),
       ),

@@ -353,7 +353,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         actionMetadata: { type: "proxy_assign", proxyKey, positionCount: positionMints.length },
       },
       hasMore,
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
         NATIVE_MINT.toBase58(),
       ),

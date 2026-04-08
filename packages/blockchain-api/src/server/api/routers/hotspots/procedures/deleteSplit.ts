@@ -158,7 +158,7 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
           hotspotName,
         },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
         NATIVE_MINT.toBase58()
       ),

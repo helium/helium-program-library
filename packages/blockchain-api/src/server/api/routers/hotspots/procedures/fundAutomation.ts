@@ -176,7 +176,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
         tag: `fund_automation:${walletAddress}`,
         actionMetadata: { type: "fund_automation", additionalDuration },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
         NATIVE_MINT.toBase58(),
       ),

@@ -26,6 +26,15 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
     if (!quoteResponse.ok) {
       const errorText = await quoteResponse.text();
       console.error("Jupiter API error:", errorText);
+
+      // TOKEN_NOT_TRADABLE is a client issue (e.g. wallet requesting a non-tradable token),
+      // not a server error — return 400 so it doesn't get sent to Sentry.
+      if (errorText.includes("TOKEN_NOT_TRADABLE")) {
+        throw errors.BAD_REQUEST({
+          message: `Token is not tradable`,
+        });
+      }
+
       throw errors.JUPITER_ERROR({
         message: `Failed to get quote from Jupiter: HTTP ${quoteResponse.status}: ${errorText.slice(0, 500)}`,
       });
