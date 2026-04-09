@@ -985,7 +985,6 @@ describe("voter-stake-registry", () => {
           position,
           mint,
         })
-        .signers([to])
         .rpc({ skipPreflight: true });
 
       const toBalance = await provider.connection.getTokenAccountBalance(
