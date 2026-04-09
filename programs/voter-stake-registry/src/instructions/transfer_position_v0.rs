@@ -42,7 +42,8 @@ pub struct TransferPositionV0<'info> {
   pub to_token_account: Box<Account<'info, TokenAccount>>,
 
   pub from: Signer<'info>,
-  pub to: Signer<'info>,
+  /// CHECK: Destination may be any address.
+  pub to: UncheckedAccount<'info>,
 
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
