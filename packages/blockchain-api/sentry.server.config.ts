@@ -15,6 +15,11 @@ if (process.env.NODE_ENV === "production") {
     // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
     tracesSampleRate: 1,
 
+    // Default is 3; our extras (e.g. bundle simulation transaction_results with
+    // nested err/logs) need more depth or Sentry shows [Object]/[Array]
+    normalizeDepth: 10,
+    normalizeMaxBreadth: 2000,
+
     // Enable sending user PII (Personally Identifiable Information)
     // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
     sendDefaultPii: true,

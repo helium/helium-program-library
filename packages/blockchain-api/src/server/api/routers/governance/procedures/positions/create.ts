@@ -348,6 +348,25 @@ export const create = publicProcedure.governance.createPosition.handler(
       });
     }
 
+    // depositV0 CPIs a token transfer of `amount` from the user's ATA —
+    // verify the user actually holds enough of the deposit mint, otherwise
+    // the on-chain tx fails with an opaque SPL token Custom(1) instead of
+    // a clean INSUFFICIENT_FUNDS response.
+    const depositAta = getAssociatedTokenAddressSync(mintPubkey, walletPubkey);
+    const depositAtaInfo = await connection
+      .getTokenAccountBalance(depositAta)
+      .catch(() => null);
+    const depositAvailable = new BN(depositAtaInfo?.value.amount ?? "0");
+    if (depositAvailable.lt(amount)) {
+      throw errors.INSUFFICIENT_FUNDS({
+        message: `Insufficient ${TOKEN_NAMES[tokenAmount.mint] ?? "token"} balance to create position`,
+        data: {
+          required: amount.toNumber(),
+          available: depositAvailable.toNumber(),
+        },
+      });
+    }
+
     return {
       transactionData: {
         transactions,

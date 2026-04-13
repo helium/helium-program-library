@@ -9,6 +9,7 @@ import { populateMissingDraftInfo, toVersionedTx } from "@helium/spl-utils";
 import * as Sentry from "@sentry/nextjs";
 import { env } from "../env";
 import { classifySimulationLogs } from "./simulation-classifier";
+import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 
 export function shouldUseJitoBundle(
   transactionsLength: number,
@@ -193,12 +194,12 @@ export async function simulateJitoBundle(
   serializedTransactions: string[],
   context?: JitoBundleContext,
 ): Promise<void> {
-  const base64Txs = serializedTransactions.map((tx) => {
-    const transaction = VersionedTransaction.deserialize(
-      Buffer.from(tx, "base64"),
-    );
-    return Buffer.from(transaction.serialize()).toString("base64");
-  });
+  const deserializedTxs = serializedTransactions.map((tx) =>
+    VersionedTransaction.deserialize(Buffer.from(tx, "base64")),
+  );
+  const base64Txs = deserializedTxs.map((transaction) =>
+    Buffer.from(transaction.serialize()).toString("base64"),
+  );
 
   const nullConfigs = base64Txs.map(() => null);
   const response = await jitoRpcRequest("simulateBundle", [
@@ -245,7 +246,16 @@ export async function simulateJitoBundle(
 
   if (simulation && simulation.summary !== "succeeded") {
     const summaryStr = stringifySummary(simulation.summary);
-    const txResults = simulation.transactionResults;
+    // Drop pre/postExecutionAccounts: we requested null configs, so these are
+    // noise that just clutters Sentry's normalized depth budget.
+    const txResults = simulation.transactionResults.map((r) => {
+      const {
+        preExecutionAccounts: _pre,
+        postExecutionAccounts: _post,
+        ...rest
+      } = r as Record<string, unknown>;
+      return rest as typeof r;
+    });
     const allLogs = txResults.flatMap((r) => r.logs ?? []);
     const { category, detail } = classifyBundleSimulationFailure(txResults);
     const actionType = deriveActionType(context);
@@ -291,6 +301,20 @@ export async function simulateJitoBundle(
         tag: context?.tag,
         payer: context?.payer,
         transaction_metadata: context?.transactionMetadata,
+        explorer_links: deserializedTxs.map((tx) => {
+          try {
+            return getExplorerUrl(tx);
+          } catch {
+            return null;
+          }
+        }),
+        chewing_glass_explorer_links: deserializedTxs.map((tx) => {
+          try {
+            return getChewingGlassExplorerUrl(tx);
+          } catch {
+            return null;
+          }
+        }),
       },
     });
     throw err;

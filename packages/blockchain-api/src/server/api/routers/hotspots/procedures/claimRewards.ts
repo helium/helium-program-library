@@ -68,7 +68,7 @@ import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 // Max hotspots to process per direct claim call (applies to all networks)
 const MAX_DIRECT_CLAIM_HOTSPOTS = 4;
 // HNT wallets with more than this many hotspots use Tuktuk instead of direct claim
-const MAX_HNT_DIRECT_CLAIM_TOTAL = 12;
+const MAX_HNT_DIRECT_CLAIM_TOTAL = 50;
 
 /**
  * Create transactions to claim rewards for all hotspots in a wallet.

@@ -14,7 +14,7 @@ import {
   UpdateTransferInputSchema,
   UpdateTransferOutputSchema,
 } from "../schemas/fiat";
-import { BAD_REQUEST, NOT_FOUND, UNAUTHENTICATED, UNAUTHORIZED } from "../errors/common";
+import { BAD_REQUEST, NOT_FOUND, RATE_LIMITED, UNAUTHENTICATED, UNAUTHORIZED } from "../errors/common";
 import { INSUFFICIENT_FUNDS } from "../errors/solana";
 import { oc } from "@orpc/contract";
 
@@ -72,6 +72,7 @@ export const fiatContract = oc
       .errors({
         BAD_REQUEST,
         JUPITER_ERROR: { message: "Failed to get quote from Jupiter", status: 500 },
+        RATE_LIMITED,
       }),
     sendFunds: oc
       .route({ method: "POST", path: "/fiat/send" })
@@ -82,6 +83,7 @@ export const fiatContract = oc
         BRIDGE_ERROR: { message: "Failed to create Bridge transfer", status: 500 },
         JUPITER_ERROR: { message: "Failed to get quote from Jupiter", status: 500 },
         INSUFFICIENT_FUNDS,
+        RATE_LIMITED,
       }),
     updateTransfer: oc
       .route({ method: "PUT", path: "/fiat/transfer/{id}" })
