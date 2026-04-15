@@ -481,7 +481,7 @@ describe("governance", () => {
         )
       );
       tx.message.recentBlockhash = blockhash;
-      tx.sign([ctx.payer, recipient]);
+      tx.sign([ctx.payer]);
       const sig = await ctx.connection.sendRawTransaction(tx.serialize(), {
         skipPreflight: false,
       });
