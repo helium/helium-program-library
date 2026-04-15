@@ -35,6 +35,12 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
         });
       }
 
+      // Surface Jupiter rate limiting as a 429 so clients can back off instead
+      // of us spamming Sentry with JUPITER_ERROR 500s.
+      if (quoteResponse.status === 429) {
+        throw errors.RATE_LIMITED();
+      }
+
       throw errors.JUPITER_ERROR({
         message: `Failed to get quote from Jupiter: HTTP ${quoteResponse.status}: ${errorText.slice(0, 500)}`,
       });

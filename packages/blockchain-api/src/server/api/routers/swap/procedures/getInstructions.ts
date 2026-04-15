@@ -59,6 +59,9 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     if (!instructionsResponse.ok) {
       const errorText = await instructionsResponse.text();
       console.error("Jupiter API error:", errorText);
+      if (instructionsResponse.status === 429) {
+        throw errors.RATE_LIMITED();
+      }
       throw errors.JUPITER_ERROR({
         message: `Failed to get swap instructions from Jupiter: HTTP ${instructionsResponse.status}: ${errorText.slice(0, 500)}`,
       });

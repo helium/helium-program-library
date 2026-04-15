@@ -380,6 +380,9 @@ const getSendQuote = publicProcedure.fiat.getSendQuote.handler(
     );
 
     if (!quoteResponse.ok) {
+      if (quoteResponse.status === 429) {
+        throw errors.RATE_LIMITED();
+      }
       throw errors.JUPITER_ERROR({
         message: "Failed to get quote from Jupiter",
       });
@@ -548,6 +551,9 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
       },
     );
 
+    if (!instructionsResponse.ok && instructionsResponse.status === 429) {
+      throw errors.RATE_LIMITED();
+    }
     const instructions = await instructionsResponse.json();
     if (instructions.error) {
       throw errors.JUPITER_ERROR({
