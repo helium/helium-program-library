@@ -6,7 +6,6 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { populateMissingDraftInfo, toVersionedTx } from "@helium/spl-utils";
-import * as Sentry from "@sentry/nextjs";
 import { env } from "../env";
 import { classifySimulationLogs } from "./simulation-classifier";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
@@ -127,22 +126,96 @@ export async function getJitoTipInstruction(
   });
 }
 
+export interface BundleSimulationErrorFields {
+  category: string;
+  actionType: string;
+  detail: string;
+  summary: string;
+  transactionResults: Array<{
+    logs?: string[];
+    unitsConsumed?: number;
+    err?: unknown;
+  }>;
+  explorerLinks: (string | null)[];
+  chewingGlassExplorerLinks: (string | null)[];
+  bundleSize: number;
+  tag?: string;
+  payer?: string;
+  transactionMetadata?: Array<Record<string, unknown> | undefined>;
+}
+
 export class BundleSimulationError extends Error {
-  public logs: string[];
+  public readonly logs: string[];
+  public readonly category: string;
+  public readonly actionType: string;
+  public readonly detail: string;
+  public readonly summary: string;
+  public readonly transactionResults: BundleSimulationErrorFields["transactionResults"];
+  public readonly explorerLinks: (string | null)[];
+  public readonly chewingGlassExplorerLinks: (string | null)[];
+  public readonly bundleSize: number;
+  public readonly tag?: string;
+  public readonly payer?: string;
+  public readonly transactionMetadata?: Array<
+    Record<string, unknown> | undefined
+  >;
+
+  constructor(fields: BundleSimulationErrorFields) {
+    super(
+      `Jito bundle simulation failed [${fields.category}] (${fields.actionType}): ${fields.detail}`,
+    );
+    this.name = "BundleSimulationError";
+    this.category = fields.category;
+    this.actionType = fields.actionType;
+    this.detail = fields.detail;
+    this.summary = fields.summary;
+    this.transactionResults = fields.transactionResults;
+    this.explorerLinks = fields.explorerLinks;
+    this.chewingGlassExplorerLinks = fields.chewingGlassExplorerLinks;
+    this.bundleSize = fields.bundleSize;
+    this.tag = fields.tag;
+    this.payer = fields.payer;
+    this.transactionMetadata = fields.transactionMetadata;
+    this.logs = fields.transactionResults.flatMap((r) => r.logs ?? []);
+  }
+}
+
+export class JitoBundleSubmissionError extends Error {
+  public readonly explorerLinks: (string | null)[];
+  public readonly chewingGlassExplorerLinks: (string | null)[];
+  public readonly bundleSize: number;
+  public readonly tag?: string;
+  public readonly payer?: string;
+  public readonly transactionMetadata?: Array<
+    Record<string, unknown> | undefined
+  >;
 
   constructor(
     message: string,
-    public transactionResults: Array<{
-      logs?: string[];
-      unitsConsumed?: number;
-      err?: unknown;
-    }>,
+    fields: {
+      explorerLinks: (string | null)[];
+      chewingGlassExplorerLinks: (string | null)[];
+      bundleSize: number;
+      tag?: string;
+      payer?: string;
+      transactionMetadata?: Array<Record<string, unknown> | undefined>;
+    },
+    cause?: unknown,
   ) {
     super(message);
-    this.name = "BundleSimulationError";
-    this.logs = transactionResults.flatMap((r) => r.logs ?? []);
+    this.name = "JitoBundleSubmissionError";
+    this.explorerLinks = fields.explorerLinks;
+    this.chewingGlassExplorerLinks = fields.chewingGlassExplorerLinks;
+    this.bundleSize = fields.bundleSize;
+    this.tag = fields.tag;
+    this.payer = fields.payer;
+    this.transactionMetadata = fields.transactionMetadata;
+    if (cause !== undefined) {
+      (this as { cause?: unknown }).cause = cause;
+    }
   }
 }
+
 
 export interface JitoBundleContext {
   tag?: string;
@@ -256,7 +329,6 @@ export async function simulateJitoBundle(
       } = r as Record<string, unknown>;
       return rest as typeof r;
     });
-    const allLogs = txResults.flatMap((r) => r.logs ?? []);
     const { category, detail } = classifyBundleSimulationFailure(txResults);
     const actionType = deriveActionType(context);
 
@@ -275,49 +347,31 @@ export async function simulateJitoBundle(
           .join("\n"),
     );
 
-    const err = new BundleSimulationError(
-      `Jito bundle simulation failed [${category}] (${actionType}): ${detail}`,
-      txResults,
-    );
-    Sentry.captureException(err, {
-      level: "error",
-      fingerprint: [
-        "jito_bundle_simulation_failed",
-        category,
-        actionType,
-      ],
-      tags: {
-        error_type: "jito_bundle_simulation_failed",
-        simulation_failure_category: category,
-        action_type: actionType,
-        tag: context?.tag,
-      },
-      extra: {
-        summary: summaryStr,
-        failure_detail: detail,
-        transaction_results: txResults,
-        logs: allLogs,
-        bundle_size: serializedTransactions.length,
-        tag: context?.tag,
-        payer: context?.payer,
-        transaction_metadata: context?.transactionMetadata,
-        explorer_links: deserializedTxs.map((tx) => {
-          try {
-            return getExplorerUrl(tx);
-          } catch {
-            return null;
-          }
-        }),
-        chewing_glass_explorer_links: deserializedTxs.map((tx) => {
-          try {
-            return getChewingGlassExplorerUrl(tx);
-          } catch {
-            return null;
-          }
-        }),
-      },
+    throw new BundleSimulationError({
+      category,
+      actionType,
+      detail,
+      summary: summaryStr,
+      transactionResults: txResults,
+      explorerLinks: deserializedTxs.map((tx) => {
+        try {
+          return getExplorerUrl(tx);
+        } catch {
+          return null;
+        }
+      }),
+      chewingGlassExplorerLinks: deserializedTxs.map((tx) => {
+        try {
+          return getChewingGlassExplorerUrl(tx);
+        } catch {
+          return null;
+        }
+      }),
+      bundleSize: serializedTransactions.length,
+      tag: context?.tag,
+      payer: context?.payer,
+      transactionMetadata: context?.transactionMetadata,
     });
-    throw err;
   }
 }
 
@@ -325,12 +379,12 @@ export async function submitJitoBundle(
   serializedTransactions: string[],
   context?: JitoBundleContext,
 ): Promise<string> {
-  const transactions = serializedTransactions.map((tx) => {
-    const transaction = VersionedTransaction.deserialize(
-      Buffer.from(tx, "base64"),
-    );
-    return Buffer.from(transaction.serialize()).toString("base64");
-  });
+  const deserializedTxs = serializedTransactions.map((tx) =>
+    VersionedTransaction.deserialize(Buffer.from(tx, "base64")),
+  );
+  const transactions = deserializedTxs.map((transaction) =>
+    Buffer.from(transaction.serialize()).toString("base64"),
+  );
 
   try {
     const response = await jitoBlockEngineRequest("sendBundle", [
@@ -356,24 +410,30 @@ export async function submitJitoBundle(
   } catch (error) {
     console.error("Jito bundle submission failed:", error);
 
-    Sentry.captureException(error, {
-      level: "error",
-      tags: {
-        error_type: "jito_bundle_submission_failed",
-        submission_type: "jito_bundle",
-        tag: context?.tag,
-      },
-      extra: {
-        error_message: error instanceof Error ? error.message : "Unknown error",
-        bundle_size: serializedTransactions.length,
-        jito_block_engine_url: env.JITO_BLOCK_ENGINE_URL,
+    throw new JitoBundleSubmissionError(
+      `Jito bundle submission failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      {
+        explorerLinks: deserializedTxs.map((tx) => {
+          try {
+            return getExplorerUrl(tx);
+          } catch {
+            return null;
+          }
+        }),
+        chewingGlassExplorerLinks: deserializedTxs.map((tx) => {
+          try {
+            return getChewingGlassExplorerUrl(tx);
+          } catch {
+            return null;
+          }
+        }),
+        bundleSize: serializedTransactions.length,
         tag: context?.tag,
         payer: context?.payer,
-        transaction_metadata: context?.transactionMetadata,
+        transactionMetadata: context?.transactionMetadata,
       },
-    });
-
-    throw error;
+      error,
+    );
   }
 }
 
