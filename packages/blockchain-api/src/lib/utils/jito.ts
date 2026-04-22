@@ -179,14 +179,10 @@ function classifyBundleSimulationFailure(
  * Derive the action type from the bundle's transaction metadata
  * (e.g. "claim_rewards", "position_create", "mint_data_credits").
  */
-function deriveActionType(
-  context?: JitoBundleContext,
-): string {
+function deriveActionType(context?: JitoBundleContext): string {
   const meta = context?.transactionMetadata;
   if (!meta) return "unknown";
-  const firstReal = meta.find(
-    (m) => m && m.type && m.type !== "jito_tip",
-  );
+  const firstReal = meta.find((m) => m && m.type && m.type !== "jito_tip");
   return (firstReal?.type as string) ?? "unknown";
 }
 
@@ -281,11 +277,7 @@ export async function simulateJitoBundle(
     );
     Sentry.captureException(err, {
       level: "error",
-      fingerprint: [
-        "jito_bundle_simulation_failed",
-        category,
-        actionType,
-      ],
+      fingerprint: ["jito_bundle_simulation_failed", category, actionType],
       tags: {
         error_type: "jito_bundle_simulation_failed",
         simulation_failure_category: category,

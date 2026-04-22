@@ -50,10 +50,16 @@ async function requireBundleHasTipAccount(
       Buffer.from(serialized, "base64"),
     );
     const keys = tx.message.staticAccountKeys;
-    const { numRequiredSignatures, numReadonlySignedAccounts, numReadonlyUnsignedAccounts } = tx.message.header;
-    const writableSignedCount = numRequiredSignatures - numReadonlySignedAccounts;
+    const {
+      numRequiredSignatures,
+      numReadonlySignedAccounts,
+      numReadonlyUnsignedAccounts,
+    } = tx.message.header;
+    const writableSignedCount =
+      numRequiredSignatures - numReadonlySignedAccounts;
     const unsignedStart = numRequiredSignatures;
-    const writableUnsignedCount = keys.length - numRequiredSignatures - numReadonlyUnsignedAccounts;
+    const writableUnsignedCount =
+      keys.length - numRequiredSignatures - numReadonlyUnsignedAccounts;
 
     for (let i = 0; i < writableSignedCount; i++) {
       if (cachedTipAccountSet.has(keys[i].toBase58())) return;
@@ -67,7 +73,9 @@ async function requireBundleHasTipAccount(
     "Jito bundle is missing a tip transaction — no transaction write-locks a recognized tip account",
   );
   if (tag?.includes("implicit-burn") || tag?.includes("claim-rewards")) {
-    err = new Error("Bundle missing Jito tip. Please upgrade your Helium Wallet app and try again.")
+    err = new Error(
+      "Bundle missing Jito tip. Please upgrade your Helium Wallet app and try again.",
+    );
   } else {
     Sentry.captureException(err, {
       level: "error",
@@ -80,7 +88,10 @@ async function requireBundleHasTipAccount(
 
 function isBlockhashNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes("Blockhash not found") || message.includes("blockhash not found");
+  return (
+    message.includes("Blockhash not found") ||
+    message.includes("blockhash not found")
+  );
 }
 
 function sleep(ms: number): Promise<void> {
@@ -223,7 +234,10 @@ export async function submitTransactionBatch(
       await requireBundleHasTipAccount(payload.transactions, payload.tag);
       await simulateJitoBundle(payload.transactions, bundleContext);
 
-      const jitoBundleId = await submitJitoBundle(payload.transactions, bundleContext);
+      const jitoBundleId = await submitJitoBundle(
+        payload.transactions,
+        bundleContext,
+      );
       return {
         batchId,
         submissionType: "jito_bundle",
@@ -268,7 +282,11 @@ export async function submitTransactionBatch(
       try {
         return await attempt();
       } catch (error) {
-        if (isBlockhashNotFoundError(error) && i < MAX_BLOCKHASH_RETRIES && payload.transactions.length > 1) {
+        if (
+          isBlockhashNotFoundError(error) &&
+          i < MAX_BLOCKHASH_RETRIES &&
+          payload.transactions.length > 1
+        ) {
           console.warn(
             `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
           );
@@ -316,7 +334,10 @@ export async function submitTransactionBatch(
         payer: payload.payer,
         transaction_metadata: payload.transactionMetadata,
         explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
-        chewing_glass_explorer_links: chewingGlassExplorerLinks.length > 0 ? chewingGlassExplorerLinks : undefined,
+        chewing_glass_explorer_links:
+          chewingGlassExplorerLinks.length > 0
+            ? chewingGlassExplorerLinks
+            : undefined,
       },
       contexts: {
         transaction: {

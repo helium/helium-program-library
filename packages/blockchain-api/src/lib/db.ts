@@ -12,7 +12,7 @@ if (!POSTGRES_URL) {
     throw new Error("POSTGRES_URL environment variable is not set");
   } else {
     console.warn(
-      "POSTGRES_URL environment variable is not set. Using default for development."
+      "POSTGRES_URL environment variable is not set. Using default for development.",
     );
   }
 }
@@ -24,17 +24,17 @@ const noPg = process.env.NO_PG === "true";
 const poolConfig = noPg
   ? { max: 1, min: 0, acquire: 1000, idle: 1000 }
   : isServerless
-  ? {
-      max: 1,
-      acquire: 30000,
-      idle: 10000,
-    }
-  : {
-      max: 20,
-      min: 5,
-      acquire: 60000,
-      idle: 10000,
-    };
+    ? {
+        max: 1,
+        acquire: 30000,
+        idle: 10000,
+      }
+    : {
+        max: 20,
+        min: 5,
+        acquire: 60000,
+        idle: 10000,
+      };
 
 const host = process.env.PG_HOST || "localhost";
 const port = Number(process.env.PG_PORT) || 5432;
@@ -64,7 +64,7 @@ export const sequelize = new Sequelize(POSTGRES_URL, {
               return reject(err);
             }
             resolve(token);
-          })
+          }),
         );
         config.dialectOptions = {
           ssl: {

@@ -138,10 +138,12 @@ export const create = publicProcedure.rewardContract.create.handler(
       rentCost += RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS;
       const claimableRecipient = recipients.find((r) => r.type === "CLAIMABLE");
       if (claimableRecipient?.type === "CLAIMABLE") {
-        rentCost += (await resolveTokenAmountInput(
-          claimableRecipient.giftedCurrency,
-          NATIVE_MINT.toBase58(),
-        )).toNumber();
+        rentCost += (
+          await resolveTokenAmountInput(
+            claimableRecipient.giftedCurrency,
+            NATIVE_MINT.toBase58(),
+          )
+        ).toNumber();
       }
     } else {
       // Mini-fanout path - add funding amount
@@ -187,30 +189,32 @@ export const create = publicProcedure.rewardContract.create.handler(
             )
           : new BN(0);
 
-      const rewardsSplit = await Promise.all(recipients.map(async (r) => {
-        const wallet =
-          r.type === "PRESET"
-            ? new PublicKey(r.walletAddress)
-            : PublicKey.default;
+      const rewardsSplit = await Promise.all(
+        recipients.map(async (r) => {
+          const wallet =
+            r.type === "PRESET"
+              ? new PublicKey(r.walletAddress)
+              : PublicKey.default;
 
-        if (r.receives.type === "FIXED") {
-          return {
-            share: {
-              fixed: {
-                amount: await resolveTokenAmountInput(
-                  r.receives.tokenAmount,
-                  HNT_MINT.toBase58(),
-                ),
+          if (r.receives.type === "FIXED") {
+            return {
+              share: {
+                fixed: {
+                  amount: await resolveTokenAmountInput(
+                    r.receives.tokenAmount,
+                    HNT_MINT.toBase58(),
+                  ),
+                },
               },
-            },
+              wallet,
+            };
+          }
+          return {
+            share: { share: { amount: r.receives.shares } },
             wallet,
           };
-        }
-        return {
-          share: { share: { amount: r.receives.shares } },
-          wallet,
-        };
-      }));
+        }),
+      );
 
       const { instruction: ix } = await (
         await initializeWelcomePack({
@@ -250,30 +254,32 @@ export const create = publicProcedure.rewardContract.create.handler(
       const oracleSigner = new PublicKey(env.ORACLE_SIGNER);
       const oracleUrl = env.ORACLE_URL;
 
-      const shares = await Promise.all(recipients.map(async (r) => {
-        const wallet =
-          r.type === "PRESET"
-            ? new PublicKey(r.walletAddress)
-            : PublicKey.default;
+      const shares = await Promise.all(
+        recipients.map(async (r) => {
+          const wallet =
+            r.type === "PRESET"
+              ? new PublicKey(r.walletAddress)
+              : PublicKey.default;
 
-        if (r.receives.type === "FIXED") {
+          if (r.receives.type === "FIXED") {
+            return {
+              wallet,
+              share: {
+                fixed: {
+                  amount: await resolveTokenAmountInput(
+                    r.receives.tokenAmount,
+                    HNT_MINT.toBase58(),
+                  ),
+                },
+              },
+            };
+          }
           return {
             wallet,
-            share: {
-              fixed: {
-                amount: await resolveTokenAmountInput(
-                  r.receives.tokenAmount,
-                  HNT_MINT.toBase58(),
-                ),
-              },
-            },
+            share: { share: { amount: r.receives.shares } },
           };
-        }
-        return {
-          wallet,
-          share: { share: { amount: r.receives.shares } },
-        };
-      }));
+        }),
+      );
 
       const { instruction: initIx, pubkeys } = await miniFanoutProgram.methods
         .initializeMiniFanoutV0({

@@ -270,7 +270,7 @@ export const updateHotspotInfo =
 
       // Check wallet has sufficient balance using actual transaction fees
       const walletBalance = await connection.getBalance(
-        new PublicKey(walletAddress)
+        new PublicKey(walletAddress),
       );
       const required = calculateRequiredBalance(totalFee, 0);
       if (walletBalance < required) {

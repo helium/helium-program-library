@@ -51,6 +51,14 @@ export const env = createEnv({
       .default("https://onboarding.dewi.org/api/v3"),
     FEE_PAYER_WALLET_PATH: z.string().optional(),
     MIGRATION_PASSWORD: z.string().optional(),
+    DUNE_API_KEY: z.string().optional(),
+    HELIUM_VOTE_PROXY_REPO: z
+      .string()
+      .default("https://github.com/helium/helium-vote-proxies.git"),
+    ANCHOR_WALLET: z.string().optional(),
+    MODIFY_DB: z.string().optional(),
+    HELIUM_VOTE_PROXIES_DIR: z.string().optional(),
+    PROXY_SYNC_ENABLED: z.string().optional(),
   },
   /**
    * Specify your client-side environment variables schema here. This way you can ensure the app
@@ -101,6 +109,12 @@ export const env = createEnv({
     FEE_PAYER_WALLET_PATH: process.env.FEE_PAYER_WALLET_PATH,
     MIGRATION_PASSWORD: process.env.MIGRATION_PASSWORD,
     NEXT_PUBLIC_WORLD_HELIUM_URL: process.env.NEXT_PUBLIC_WORLD_HELIUM_URL,
+    DUNE_API_KEY: process.env.DUNE_API_KEY,
+    HELIUM_VOTE_PROXY_REPO: process.env.HELIUM_VOTE_PROXY_REPO,
+    ANCHOR_WALLET: process.env.ANCHOR_WALLET,
+    MODIFY_DB: process.env.MODIFY_DB,
+    HELIUM_VOTE_PROXIES_DIR: process.env.HELIUM_VOTE_PROXIES_DIR,
+    PROXY_SYNC_ENABLED: process.env.PROXY_SYNC_ENABLED,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

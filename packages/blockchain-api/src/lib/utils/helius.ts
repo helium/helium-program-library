@@ -1,7 +1,5 @@
 import { env } from "../env";
-import type {
-  VersionedTransactionResponse,
-} from "@solana/web3.js";
+import type { VersionedTransactionResponse } from "@solana/web3.js";
 
 export interface HeliusTransaction {
   signature: string;

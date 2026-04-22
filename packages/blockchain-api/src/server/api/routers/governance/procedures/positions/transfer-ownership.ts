@@ -94,7 +94,12 @@ export const transferOwnership =
           ],
           parallel: false,
           tag,
-          actionMetadata: { type: "position_transfer_ownership", positionMint, from, to },
+          actionMetadata: {
+            type: "position_transfer_ownership",
+            positionMint,
+            from,
+            to,
+          },
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(txFee),

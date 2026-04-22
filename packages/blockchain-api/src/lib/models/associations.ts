@@ -1,6 +1,7 @@
 import { BankAccount } from "./bank-account";
 import { BridgeTransfer } from "./bridge-transfer";
 import { BridgeUser } from "./bridge-user";
+import { Position, Proxy, ProxyAssignment, ProxyRegistrar } from "./governance";
 import {
   AssetOwner,
   HotspotOwnership,
@@ -165,5 +166,27 @@ export function defineAssociations() {
   PendingTransaction.belongsTo(TransactionBatch, {
     foreignKey: "batchId",
     as: "batch",
+  });
+
+  // Governance associations
+  ProxyAssignment.belongsTo(Position, {
+    foreignKey: "asset",
+    targetKey: "asset",
+  });
+  Position.hasMany(ProxyAssignment, {
+    foreignKey: "asset",
+    sourceKey: "asset",
+  });
+  Proxy.hasMany(ProxyAssignment, {
+    foreignKey: "voter",
+    sourceKey: "wallet",
+  });
+  ProxyRegistrar.hasMany(Proxy, {
+    foreignKey: "wallet",
+    sourceKey: "wallet",
+  });
+  Proxy.hasMany(ProxyRegistrar, {
+    foreignKey: "wallet",
+    sourceKey: "wallet",
   });
 }

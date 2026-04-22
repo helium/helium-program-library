@@ -107,7 +107,12 @@ export const resetLockup = publicProcedure.governance.resetLockup.handler(
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "position_reset_lockup", positionMint, lockupKind, lockupPeriodDays: lockupPeriodsInDays },
+        actionMetadata: {
+          type: "position_reset_lockup",
+          positionMint,
+          lockupKind,
+          lockupPeriodDays: lockupPeriodsInDays,
+        },
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),

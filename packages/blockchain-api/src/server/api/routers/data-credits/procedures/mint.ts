@@ -53,11 +53,19 @@ export const mint = publicProcedure.dataCredits.mint.handler(
     const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
 
     // Check if recipient's DC ATA needs creation (init_if_needed on-chain)
-    const recipientPubkey = recipient ? new PublicKey(recipient) : new PublicKey(owner);
-    const recipientDcAta = getAssociatedTokenAddressSync(DC_MINT, recipientPubkey);
+    const recipientPubkey = recipient
+      ? new PublicKey(recipient)
+      : new PublicKey(owner);
+    const recipientDcAta = getAssociatedTokenAddressSync(
+      DC_MINT,
+      recipientPubkey,
+    );
     const recipientDcAtaInfo = await connection.getAccountInfo(recipientDcAta);
     const ataRent = recipientDcAtaInfo ? 0 : RENT_COSTS.ATA;
-    const requiredBalance = calculateRequiredBalance(txFees + jitoTipCost, ataRent);
+    const requiredBalance = calculateRequiredBalance(
+      txFees + jitoTipCost,
+      ataRent,
+    );
 
     const ownerPubkey = new PublicKey(owner);
     const walletBalance = await connection.getBalance(ownerPubkey);
@@ -105,7 +113,12 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       transactions,
       parallel: false,
       tag,
-      actionMetadata: { type: "mint_data_credits", dcAmount: dcAmount || undefined, hntAmount: hntAmount || undefined, recipient: recipient || undefined },
+      actionMetadata: {
+        type: "mint_data_credits",
+        dcAmount: dcAmount || undefined,
+        hntAmount: hntAmount || undefined,
+        recipient: recipient || undefined,
+      },
     };
-  }
+  },
 );

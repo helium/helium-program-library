@@ -372,7 +372,8 @@ export const vote = publicProcedure.governance.vote.handler(
       versionedTransactions.length > 1
         ? getJitoTipAmountLamports()
         : 0;
-    const totalFee = getTotalTransactionFees(versionedTransactions) + jitoTipCost;
+    const totalFee =
+      getTotalTransactionFees(versionedTransactions) + jitoTipCost;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < totalFee) {
@@ -395,7 +396,12 @@ export const vote = publicProcedure.governance.vote.handler(
         transactions,
         parallel: true,
         tag,
-        actionMetadata: { type: "voting_vote", proposalKey, choice, positionCount: positionMints.length },
+        actionMetadata: {
+          type: "voting_vote",
+          proposalKey,
+          choice,
+          positionCount: positionMints.length,
+        },
       },
       hasMore,
       estimatedSolFee: await toTokenAmountOutput(

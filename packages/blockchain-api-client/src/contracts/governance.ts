@@ -10,6 +10,7 @@ import {
   ClosePositionResponseSchema,
   CreatePositionInputSchema,
   CreatePositionResponseSchema,
+  DataBurnResponseSchema,
   DelegatePositionInputSchema,
   DelegatePositionsResponseSchema,
   ExtendDelegationInputSchema,
@@ -18,6 +19,20 @@ import {
   ExtendPositionResponseSchema,
   FlipLockupKindInputSchema,
   FlipLockupKindResponseSchema,
+  GetProposalVotesInputSchema,
+  GetProposalVotesResponseSchema,
+  GetProxiesInputSchema,
+  GetProxiesResponseSchema,
+  GetProxyAssignmentsInputSchema,
+  GetProxyAssignmentsResponseSchema,
+  GetProxyInputSchema,
+  GetProxyRegistrarsInputSchema,
+  GetProxyRegistrarsResponseSchema,
+  GetProxyResponseSchema,
+  GetVotesByWalletInputSchema,
+  GetVotesByWalletResponseSchema,
+  ProxyVoteInputSchema,
+  ProxyVoteResponseSchema,
   RelinquishPositionVotesInputSchema,
   RelinquishPositionVotesResponseSchema,
   RelinquishVoteInputSchema,
@@ -26,6 +41,7 @@ import {
   ResetLockupResponseSchema,
   SplitPositionInputSchema,
   SplitPositionResponseSchema,
+  SubdaoDelegationsResponseSchema,
   TransferPositionInputSchema,
   TransferPositionResponseSchema,
   TransferPositionOwnershipInputSchema,
@@ -245,4 +261,108 @@ export const governanceContract = oc
       .input(UnassignProxiesInputSchema)
       .errors({ BAD_REQUEST, NOT_FOUND, INSUFFICIENT_FUNDS })
       .output(UnassignProxiesResponseSchema),
+
+    getDataBurn: oc
+      .route({
+        method: "GET",
+        path: "/data-burn",
+        summary: "Get DC burned per subdao",
+        description:
+          "Returns data credits burned per subdao over the last 24h from Dune Analytics. Cached for one day.",
+      })
+      .output(DataBurnResponseSchema),
+
+    getSubdaoDelegations: oc
+      .route({
+        method: "GET",
+        path: "/subdao-delegations",
+        summary: "Get total veTokens delegated per subdao",
+        description:
+          "Returns total veTokens currently delegated to each subdao. Values are BN strings. Cached for one day.",
+      })
+      .output(SubdaoDelegationsResponseSchema),
+
+    getProxyAssignments: oc
+      .route({
+        method: "GET",
+        path: "/registrars/{registrar}/proxy-assignments",
+        summary: "List proxy assignments",
+        description:
+          "Returns proxy assignments for a registrar with optional filters on voter/position/index.",
+      })
+      .input(GetProxyAssignmentsInputSchema)
+      .errors({ BAD_REQUEST, NOT_FOUND })
+      .output(GetProxyAssignmentsResponseSchema),
+
+    getProxies: oc
+      .route({
+        method: "GET",
+        path: "/registrars/{registrar}/proxies",
+        summary: "List proxies for a registrar",
+        description:
+          "Returns proxies for a registrar with aggregated vote statistics and veToken delegations. Cached for 10 minutes.",
+      })
+      .input(GetProxiesInputSchema)
+      .errors({ BAD_REQUEST, NOT_FOUND })
+      .output(GetProxiesResponseSchema),
+
+    getProxy: oc
+      .route({
+        method: "GET",
+        path: "/registrars/{registrar}/proxies/{wallet}",
+        summary: "Get single proxy details",
+        description:
+          "Returns details for a single proxy including rank within the registrar and aggregated vote statistics.",
+      })
+      .input(GetProxyInputSchema)
+      .errors({ BAD_REQUEST, NOT_FOUND })
+      .output(GetProxyResponseSchema),
+
+    getProxyRegistrars: oc
+      .route({
+        method: "GET",
+        path: "/proxies/{wallet}/registrars",
+        summary: "List registrars for a proxy wallet",
+        description:
+          "Returns the registrar addresses this proxy wallet is registered for.",
+      })
+      .input(GetProxyRegistrarsInputSchema)
+      .errors({ BAD_REQUEST, NOT_FOUND })
+      .output(GetProxyRegistrarsResponseSchema),
+
+    getVotesByWallet: oc
+      .route({
+        method: "GET",
+        path: "/registrars/{registrar}/votes/{wallet}",
+        summary: "List proposals with a wallet's votes",
+        description:
+          "Returns proposals in the registrar's organization, each annotated with the wallet's votes (if any).",
+      })
+      .input(GetVotesByWalletInputSchema)
+      .errors({ BAD_REQUEST, NOT_FOUND })
+      .output(GetVotesByWalletResponseSchema),
+
+    getProposalVotes: oc
+      .route({
+        method: "GET",
+        path: "/proposals/{proposalKey}/votes",
+        summary: "List votes for a proposal",
+        description:
+          "Returns every vote marker for the proposal, expanded per choice, joined with proxy names.",
+      })
+      .input(GetProposalVotesInputSchema)
+      .errors({ BAD_REQUEST, NOT_FOUND })
+      .output(GetProposalVotesResponseSchema),
+
+    proxyVote: oc
+      .route({
+        method: "POST",
+        path: "/proposals/{proposalKey}/proxy-vote/{wallet}",
+        summary: "Build + sign proxy-vote crank transaction",
+        description:
+          "Builds the next proxy-vote crank transaction for the given wallet and proposal. Returns a base64 RemoteTaskTransactionV0 with an ed25519 signature from the service keypair. Returns 503 if the indexer has not yet caught up.",
+      })
+      .input(ProxyVoteInputSchema)
+      .errors({ BAD_REQUEST, NOT_FOUND })
+      .output(ProxyVoteResponseSchema),
   });

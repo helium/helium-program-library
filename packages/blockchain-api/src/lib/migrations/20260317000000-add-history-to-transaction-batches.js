@@ -26,49 +26,53 @@ module.exports = {
       });
     }
 
-    await queryInterface.addIndex(
-      "transaction_batches",
-      ["payer", "confirmed_at"],
-      {
+    await queryInterface
+      .addIndex("transaction_batches", ["payer", "confirmed_at"], {
         name: "idx_tx_batches_payer_confirmed_at",
         order: [["confirmed_at", "DESC NULLS LAST"]],
         where: { confirmed_at: { [Sequelize.Op.ne]: null } },
-      },
-    ).catch(() => {});
+      })
+      .catch(() => {});
 
-    await queryInterface.addIndex(
-      "transaction_batches",
-      ["payer", "status"],
-      {
+    await queryInterface
+      .addIndex("transaction_batches", ["payer", "status"], {
         name: "idx_tx_batches_payer_status",
-      },
-    ).catch(() => {});
+      })
+      .catch(() => {});
 
-    await queryInterface.addIndex(
-      "transaction_batches",
-      ["payer", "action_type", "confirmed_at"],
-      {
-        name: "idx_tx_batches_payer_action_type_confirmed_at",
-      },
-    ).catch(() => {});
+    await queryInterface
+      .addIndex(
+        "transaction_batches",
+        ["payer", "action_type", "confirmed_at"],
+        {
+          name: "idx_tx_batches_payer_action_type_confirmed_at",
+        },
+      )
+      .catch(() => {});
   },
 
   async down(queryInterface) {
-    await queryInterface.removeIndex(
-      "transaction_batches",
-      "idx_tx_batches_payer_confirmed_at",
-    ).catch(() => {});
-    await queryInterface.removeIndex(
-      "transaction_batches",
-      "idx_tx_batches_payer_status",
-    ).catch(() => {});
-    await queryInterface.removeIndex(
-      "transaction_batches",
-      "idx_tx_batches_payer_action_type_confirmed_at",
-    ).catch(() => {});
+    await queryInterface
+      .removeIndex("transaction_batches", "idx_tx_batches_payer_confirmed_at")
+      .catch(() => {});
+    await queryInterface
+      .removeIndex("transaction_batches", "idx_tx_batches_payer_status")
+      .catch(() => {});
+    await queryInterface
+      .removeIndex(
+        "transaction_batches",
+        "idx_tx_batches_payer_action_type_confirmed_at",
+      )
+      .catch(() => {});
 
-    await queryInterface.removeColumn("transaction_batches", "action_type").catch(() => {});
-    await queryInterface.removeColumn("transaction_batches", "action_metadata").catch(() => {});
-    await queryInterface.removeColumn("transaction_batches", "confirmed_at").catch(() => {});
+    await queryInterface
+      .removeColumn("transaction_batches", "action_type")
+      .catch(() => {});
+    await queryInterface
+      .removeColumn("transaction_batches", "action_metadata")
+      .catch(() => {});
+    await queryInterface
+      .removeColumn("transaction_batches", "confirmed_at")
+      .catch(() => {});
   },
 };

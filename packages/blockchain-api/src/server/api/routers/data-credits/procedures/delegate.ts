@@ -15,7 +15,7 @@ import { getTransactionFee } from "@/lib/utils/balance-validation";
 import BN from "bn.js";
 
 const MEMO_PROGRAM_ID = new PublicKey(
-  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
 );
 
 export const delegate = publicProcedure.dataCredits.delegate.handler(
@@ -35,7 +35,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
           keys: [{ pubkey: feePayer, isSigner: true, isWritable: false }],
           programId: MEMO_PROGRAM_ID,
           data: Buffer.from(memo, "utf-8"),
-        })
+        }),
       );
     }
 
@@ -48,7 +48,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
         .accountsPartial({
           subDao,
         })
-        .instruction()
+        .instruction(),
     );
 
     const tx = await buildVersionedTransaction({
@@ -88,7 +88,12 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
       ],
       parallel: false,
       tag,
-      actionMetadata: { type: "delegate_data_credits", routerKey, amount, mint },
+      actionMetadata: {
+        type: "delegate_data_credits",
+        routerKey,
+        amount,
+        mint,
+      },
     };
-  }
+  },
 );

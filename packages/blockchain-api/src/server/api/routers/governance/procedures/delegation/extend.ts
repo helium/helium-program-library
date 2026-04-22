@@ -118,7 +118,10 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
     if (delegatedPositionAcc.expirationTs.gte(newExpirationTs)) {
       return {
         transactionData: { transactions: [], parallel: false, tag },
-        estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+        estimatedSolFee: await toTokenAmountOutput(
+          new BN(0),
+          NATIVE_MINT.toBase58(),
+        ),
       };
     }
 

@@ -15,7 +15,11 @@ import {
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import { TOKEN_MINTS, TOKEN_NAMES } from "@/lib/constants/tokens";
-import { getTransactionFee, calculateRequiredBalance, RENT_COSTS } from "@/lib/utils/balance-validation";
+import {
+  getTransactionFee,
+  calculateRequiredBalance,
+  RENT_COSTS,
+} from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";

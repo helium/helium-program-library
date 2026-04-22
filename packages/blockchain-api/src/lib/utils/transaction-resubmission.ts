@@ -257,7 +257,9 @@ export async function resubmitTransactionBatch(
             Buffer.from(pendingTx.serializedTransaction, "base64"),
           );
           explorerLinks.push(getExplorerUrl(transaction));
-          chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(transaction));
+          chewingGlassExplorerLinks.push(
+            getChewingGlassExplorerUrl(transaction),
+          );
         }
       }
     } catch {
@@ -280,7 +282,10 @@ export async function resubmitTransactionBatch(
         cluster: batch.cluster,
         tag: batch.tag,
         explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
-        chewing_glass_explorer_links: chewingGlassExplorerLinks.length > 0 ? chewingGlassExplorerLinks : undefined,
+        chewing_glass_explorer_links:
+          chewingGlassExplorerLinks.length > 0
+            ? chewingGlassExplorerLinks
+            : undefined,
       },
       contexts: {
         transaction: {

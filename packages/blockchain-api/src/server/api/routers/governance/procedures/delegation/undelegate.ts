@@ -111,7 +111,8 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
         claimVersionedTxs.length > 1
           ? getJitoTipAmountLamports()
           : 0;
-      const txFee = getTotalTransactionFees(claimVersionedTxs) + claimJitoTipCost;
+      const txFee =
+        getTotalTransactionFees(claimVersionedTxs) + claimJitoTipCost;
 
       const walletBalance = await connection.getBalance(walletPubkey);
       if (walletBalance < txFee) {
@@ -209,11 +210,13 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
 
     const undelegateCluster = getCluster();
     const undelegateJitoTipCost =
-      (undelegateCluster === "mainnet" || undelegateCluster === "mainnet-beta") &&
+      (undelegateCluster === "mainnet" ||
+        undelegateCluster === "mainnet-beta") &&
       allVersionedTxs.length > 1
         ? getJitoTipAmountLamports()
         : 0;
-    const txFee = getTotalTransactionFees(allVersionedTxs) + undelegateJitoTipCost;
+    const txFee =
+      getTotalTransactionFees(allVersionedTxs) + undelegateJitoTipCost;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < txFee) {

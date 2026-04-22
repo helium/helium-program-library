@@ -134,7 +134,10 @@ function toHotspotFromAsset(owner: string, asset: any): Hotspot {
   };
 }
 
-export async function getNumRecipientsNeeded(owner: string, lazyDistributorAddress: string = HNT_LAZY_DISTRIBUTOR_ADDRESS): Promise<number> {
+export async function getNumRecipientsNeeded(
+  owner: string,
+  lazyDistributorAddress: string = HNT_LAZY_DISTRIBUTOR_ADDRESS,
+): Promise<number> {
   if (env.NO_PG === "true") {
     const allAssets = await searchAssetsWithPageInfo(env.ASSET_ENDPOINT!, {
       ownerAddress: owner,

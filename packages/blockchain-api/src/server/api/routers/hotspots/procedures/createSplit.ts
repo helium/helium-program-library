@@ -100,11 +100,10 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     // Ensure Lazy Distributor Recipient exists for the asset
     const recipientK = recipientKey(
       new PublicKey(lazyDistributor),
-      new PublicKey(assetId)
+      new PublicKey(assetId),
     )[0];
-    const recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
-      recipientK
-    );
+    const recipientAcc =
+      await ldProgram.account.recipientV0.fetchNullable(recipientK);
     const instructions: TransactionInstruction[] = [];
 
     if (!recipientAcc) {
@@ -117,7 +116,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
             assetEndpoint: env.SOLANA_RPC_URL,
             lazyDistributor: new PublicKey(lazyDistributor),
           })
-        ).instruction()
+        ).instruction(),
       );
     }
 
@@ -127,20 +126,22 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     const { instruction: initIx, pubkeys } = await miniFanoutProgram.methods
       .initializeMiniFanoutV0({
         seed: new PublicKey(assetId).toBuffer(),
-        shares: await Promise.all(rewardsSplit.map(async (split) => ({
-          wallet: new PublicKey(split.address),
-          share:
-            split.type === "fixed"
-              ? {
-                  fixed: {
-                    amount: await resolveTokenAmountInput(
-                      split.tokenAmount,
-                      HNT_MINT.toBase58()
-                    ),
-                  },
-                }
-              : { share: { amount: split.amount } },
-        }))),
+        shares: await Promise.all(
+          rewardsSplit.map(async (split) => ({
+            wallet: new PublicKey(split.address),
+            share:
+              split.type === "fixed"
+                ? {
+                    fixed: {
+                      amount: await resolveTokenAmountInput(
+                        split.tokenAmount,
+                        HNT_MINT.toBase58(),
+                      ),
+                    },
+                  }
+                : { share: { amount: split.amount } },
+          })),
+        ),
         schedule: rewardsSchedule,
         preTask: {
           remoteV0: {
@@ -164,15 +165,14 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
         fromPubkey: wallet.publicKey,
         toPubkey: pubkeys.miniFanout!,
         lamports: FANOUT_FUNDING_AMOUNT,
-      })
+      }),
     );
 
-    const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetchNullable(
-      TASK_QUEUE_ID
-    );
+    const taskQueueAcc =
+      await tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE_ID);
     const [taskId, preTaskId] = nextAvailableTaskIds(
       taskQueueAcc!.taskBitmap,
-      2
+      2,
     );
 
     // Schedule a task for the mini fanout
@@ -243,7 +243,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
       txFees + jitoTipCost + rentCost + FANOUT_FUNDING_AMOUNT;
 
     const walletBalance = await provider.connection.getBalance(
-      new PublicKey(walletAddress)
+      new PublicKey(walletAddress),
     );
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({
@@ -283,8 +283,8 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

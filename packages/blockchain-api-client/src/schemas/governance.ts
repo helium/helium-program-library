@@ -352,3 +352,186 @@ export type AssignProxiesResponse = z.infer<typeof AssignProxiesResponseSchema>;
 export type UnassignProxiesResponse = z.infer<
   typeof UnassignProxiesResponseSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Read-side governance endpoints (ported from helium-vote-service)
+// ---------------------------------------------------------------------------
+
+export const DataBurnResponseSchema = z
+  .record(z.string(), z.number())
+  .describe("DC burned per subdao, keyed by subdao name");
+
+export const SubdaoDelegationsResponseSchema = z
+  .object({
+    mobile: z.string().optional(),
+    iot: z.string().optional(),
+  })
+  .describe("Total veTokens delegated per subdao, as BN strings");
+
+export const GetProxyAssignmentsInputSchema = z.object({
+  registrar: PublicKeySchema.describe("Registrar public key"),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(1000).default(1000),
+  voter: PublicKeySchema.optional().describe("Filter by voter wallet"),
+  nextVoter: PublicKeySchema.optional().describe("Filter by next voter"),
+  minIndex: z.coerce.number().int().optional(),
+  position: PublicKeySchema.optional().describe("Filter by position address"),
+});
+
+export const ProxyAssignmentSchema = z.object({
+  address: z.string(),
+  voter: z.string(),
+  nextVoter: z.string(),
+  index: z.number(),
+  asset: z.string(),
+  proxyConfig: z.string(),
+  rentRefund: z.string().nullable().optional(),
+  bumpSeed: z.number().nullable().optional(),
+  expirationTime: z.string().nullable().optional(),
+});
+
+export const GetProxyAssignmentsResponseSchema = z.array(ProxyAssignmentSchema);
+
+export const GetProxiesInputSchema = z.object({
+  registrar: PublicKeySchema.describe("Registrar public key"),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(1000).default(1000),
+  query: z.string().optional().describe("Fuzzy name/wallet search"),
+});
+
+export const ProxyListItemSchema = z.object({
+  name: z.string().nullable(),
+  image: z.string().nullable(),
+  wallet: z.string(),
+  description: z.string().nullable(),
+  detail: z.string().nullable(),
+  numAssignments: z.string().nullable(),
+  proxiedVeTokens: z.string().nullable(),
+  percent: z.string().nullable(),
+  numProposalsVoted: z.string().nullable(),
+  lastVotedAt: z.string().nullable(),
+});
+
+export const GetProxiesResponseSchema = z.array(ProxyListItemSchema);
+
+export const GetProxyInputSchema = z.object({
+  registrar: PublicKeySchema,
+  wallet: WalletAddressSchema,
+});
+
+export const ProxyDetailSchema = ProxyListItemSchema.extend({
+  numProxies: z.string().nullable(),
+  rank: z.string().nullable(),
+});
+
+export const GetProxyResponseSchema = ProxyDetailSchema.nullable();
+
+export const GetProxyRegistrarsInputSchema = z.object({
+  wallet: WalletAddressSchema,
+});
+
+export const GetProxyRegistrarsResponseSchema = z.array(z.string());
+
+export const GetVotesByWalletInputSchema = z.object({
+  registrar: PublicKeySchema,
+  wallet: WalletAddressSchema,
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(1000).default(1000),
+});
+
+export const ProposalWithVotesSchema = z
+  .object({
+    address: z.string(),
+    namespace: z.string().nullable(),
+    owner: z.string().nullable(),
+    state: z.unknown().nullable(),
+    createdAt: z.union([z.string(), z.number()]).nullable(),
+    proposalConfig: z.string().nullable(),
+    maxChoicesPerVoter: z.number().nullable(),
+    name: z.string().nullable(),
+    uri: z.string().nullable(),
+    tags: z.array(z.string()).nullable(),
+    choices: z.array(z.unknown()).nullable(),
+    refreshedAt: z.string().nullable(),
+    votes: z.array(
+      z.object({
+        voter: z.string().nullable(),
+        registrar: z.string().nullable(),
+        weight: z.string().nullable(),
+        choice: z.number().nullable(),
+        choiceName: z.string().nullable(),
+      }),
+    ),
+  })
+  .loose();
+
+export const GetVotesByWalletResponseSchema = z.array(ProposalWithVotesSchema);
+
+export const GetProposalVotesInputSchema = z.object({
+  proposalKey: PublicKeySchema,
+});
+
+export const ProposalVoteSchema = z.object({
+  voter: z.string(),
+  registrar: z.string(),
+  proposal: z.string(),
+  weight: z.string().nullable(),
+  choice: z.number(),
+  choiceName: z.string().nullable(),
+  proxyName: z.string().nullable(),
+});
+
+export const GetProposalVotesResponseSchema = z.array(ProposalVoteSchema);
+
+export const ProxyVoteInputSchema = z.object({
+  proposalKey: PublicKeySchema,
+  wallet: WalletAddressSchema,
+  taskQueue: PublicKeySchema.describe("Task queue public key"),
+  task: PublicKeySchema.describe("Task public key"),
+  taskQueuedAt: z
+    .union([z.string(), z.number()])
+    .describe("Unix epoch timestamp when the task was queued"),
+});
+
+export const ProxyVoteResponseSchema = z.object({
+  transaction: z.string().describe("Base64-encoded RemoteTaskTransactionV0"),
+  signature: z.string().describe("Base64-encoded ed25519 signature"),
+  remainingAccounts: z.array(
+    z.object({
+      pubkey: z.string(),
+      isSigner: z.boolean(),
+      isWritable: z.boolean(),
+    }),
+  ),
+});
+
+export type DataBurnResponse = z.infer<typeof DataBurnResponseSchema>;
+export type SubdaoDelegationsResponse = z.infer<
+  typeof SubdaoDelegationsResponseSchema
+>;
+export type GetProxyAssignmentsInput = z.infer<
+  typeof GetProxyAssignmentsInputSchema
+>;
+export type GetProxyAssignmentsResponse = z.infer<
+  typeof GetProxyAssignmentsResponseSchema
+>;
+export type GetProxiesInput = z.infer<typeof GetProxiesInputSchema>;
+export type GetProxiesResponse = z.infer<typeof GetProxiesResponseSchema>;
+export type GetProxyInput = z.infer<typeof GetProxyInputSchema>;
+export type GetProxyResponse = z.infer<typeof GetProxyResponseSchema>;
+export type GetProxyRegistrarsInput = z.infer<
+  typeof GetProxyRegistrarsInputSchema
+>;
+export type GetProxyRegistrarsResponse = z.infer<
+  typeof GetProxyRegistrarsResponseSchema
+>;
+export type GetVotesByWalletInput = z.infer<typeof GetVotesByWalletInputSchema>;
+export type GetVotesByWalletResponse = z.infer<
+  typeof GetVotesByWalletResponseSchema
+>;
+export type GetProposalVotesInput = z.infer<typeof GetProposalVotesInputSchema>;
+export type GetProposalVotesResponse = z.infer<
+  typeof GetProposalVotesResponseSchema
+>;
+export type ProxyVoteInput = z.infer<typeof ProxyVoteInputSchema>;
+export type ProxyVoteResponse = z.infer<typeof ProxyVoteResponseSchema>;

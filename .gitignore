@@ -19,6 +19,7 @@ packages/migration-service/failures.json
 migration-docker/data
 accounts
 packages/helium-vote-service/helium-vote-proxies/
+packages/blockchain-api/helium-vote-proxies/
 !packages/docsite/src/data
 .cursor/*
 .turbo/

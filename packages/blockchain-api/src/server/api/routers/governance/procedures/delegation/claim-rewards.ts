@@ -1,6 +1,10 @@
 import { publicProcedure } from "@/server/api/procedures";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
-import { getTotalTransactionFees, calculateRequiredBalance, RENT_COSTS } from "@/lib/utils/balance-validation";
+import {
+  getTotalTransactionFees,
+  calculateRequiredBalance,
+  RENT_COSTS,
+} from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
@@ -127,13 +131,15 @@ export const claimRewards =
         versionedTransactions.length > 1
           ? getJitoTipAmountLamports()
           : 0;
-      const txFee = getTotalTransactionFees(versionedTransactions) + jitoTipCost;
+      const txFee =
+        getTotalTransactionFees(versionedTransactions) + jitoTipCost;
 
       // Check which reward ATAs need creation
       const rewardAtaKeys = claimResult.rewardMints.map((mint) =>
         getAssociatedTokenAddressSync(mint, walletPubkey),
       );
-      const rewardAtaAccounts = await connection.getMultipleAccountsInfo(rewardAtaKeys);
+      const rewardAtaAccounts =
+        await connection.getMultipleAccountsInfo(rewardAtaKeys);
       const missingAtaCount = rewardAtaAccounts.filter((a) => !a).length;
       const ataRent = missingAtaCount * RENT_COSTS.ATA;
 
@@ -151,7 +157,10 @@ export const claimRewards =
           transactions,
           parallel: false,
           tag,
-          actionMetadata: { type: "delegation_claim_rewards", positionCount: positionMints.length },
+          actionMetadata: {
+            type: "delegation_claim_rewards",
+            positionCount: positionMints.length,
+          },
         },
         hasMore: claimResult.hasMore || batchHasMore,
         estimatedSolFee: await toTokenAmountOutput(

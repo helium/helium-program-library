@@ -240,7 +240,9 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         connection.getMultipleAccountsInfo(recipientKeys),
         ldProgram.account.lazyDistributorV0.fetch(lazyDistributor),
       ]);
-      const numRecipientsNeeded = recipientAccountInfos.filter((r: unknown) => !r).length;
+      const numRecipientsNeeded = recipientAccountInfos.filter(
+        (r: unknown) => !r,
+      ).length;
       const jitoTipCost = shouldUseJitoBundle(allVtxs.length, getCluster())
         ? getJitoTipAmountLamports()
         : 0;
@@ -255,7 +257,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       // Solana rent: 19.055441478 lamports per byte-year * 2 years + 128 bytes base
       // rent.minimum_balance(size) = (size + 128) * 6960 (approx, but use exact formula)
       const LAMPORTS_PER_BYTE_YEAR = 3480;
-      const rentExemptForNewSize = (newRecipientSize + 128) * LAMPORTS_PER_BYTE_YEAR * 2;
+      const rentExemptForNewSize =
+        (newRecipientSize + 128) * LAMPORTS_PER_BYTE_YEAR * 2;
       const resizeCost = recipientAccountInfos.reduce(
         (sum: number, info: { lamports: number } | null) => {
           if (!info) return sum; // New recipients handled by RECIPIENT_RENT_LAMPORTS

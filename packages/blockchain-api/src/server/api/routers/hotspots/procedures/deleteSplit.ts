@@ -77,9 +77,8 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
     const { provider, connection } = createSolanaConnection(walletAddress);
     const program = await initMiniFanout(provider);
     const miniFanoutK = new PublicKey(assetOwner.recipient.split.address);
-    const miniFanout = await program.account.miniFanoutV0.fetchNullable(
-      miniFanoutK
-    );
+    const miniFanout =
+      await program.account.miniFanoutV0.fetchNullable(miniFanoutK);
 
     if (!miniFanout) {
       throw errors.NOT_FOUND({ message: "Fanout not found" });
@@ -87,7 +86,7 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
 
     // Check wallet has sufficient balance for transaction fees
     const walletBalance = await connection.getBalance(
-      new PublicKey(walletAddress)
+      new PublicKey(walletAddress),
     );
     const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
     if (walletBalance < required) {
@@ -160,8 +159,8 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

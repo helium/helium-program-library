@@ -33,7 +33,14 @@ export const AuthRouter = ({ children }: { children: React.ReactNode }) => {
         router.replace("/");
       }
     }
-  }, [ready, authenticated, user?.wallet?.address, viewAsAddress, router, pathname]);
+  }, [
+    ready,
+    authenticated,
+    user?.wallet?.address,
+    viewAsAddress,
+    router,
+    pathname,
+  ]);
 
   return <>{children}</>;
 };

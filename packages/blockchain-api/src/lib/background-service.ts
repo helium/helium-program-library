@@ -1,3 +1,5 @@
+import { bootstrapGovernanceSchema } from "./db/bootstrap-schema";
+import { proxySyncService } from "./background-jobs/proxy-sync";
 import { transactionResubmissionService } from "./background-jobs/transaction-resubmission";
 import { defineAssociations } from "./models/associations"; // Load model associations
 
@@ -15,5 +17,9 @@ export function startBackgroundService(): void {
   }
 
   console.log("Starting background service...");
+  bootstrapGovernanceSchema().catch((err) => {
+    console.error("Governance schema bootstrap failed:", err);
+  });
   transactionResubmissionService.start();
+  proxySyncService.start();
 }

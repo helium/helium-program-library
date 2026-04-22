@@ -162,7 +162,8 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
       versionedTransactions.length > 1
         ? getJitoTipAmountLamports()
         : 0;
-    const totalFee = getTotalTransactionFees(versionedTransactions) + jitoTipCost;
+    const totalFee =
+      getTotalTransactionFees(versionedTransactions) + jitoTipCost;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < totalFee) {
@@ -184,7 +185,11 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
         transactions,
         parallel: true,
         tag,
-        actionMetadata: { type: "proxy_unassign", proxyKey, positionCount: positionMints.length },
+        actionMetadata: {
+          type: "proxy_unassign",
+          proxyKey,
+          positionCount: positionMints.length,
+        },
       },
       hasMore,
       estimatedSolFee: await toTokenAmountOutput(

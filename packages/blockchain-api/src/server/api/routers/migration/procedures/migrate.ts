@@ -126,7 +126,9 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     // 3a. Validation — either wallet can be in the allowlist, or password bypasses it
     const passwordValid =
-      !!password && !!env.MIGRATION_PASSWORD && password === env.MIGRATION_PASSWORD;
+      !!password &&
+      !!env.MIGRATION_PASSWORD &&
+      password === env.MIGRATION_PASSWORD;
     if (
       !passwordValid &&
       !isInMigrationAllowlist(sourceWallet) &&
@@ -637,7 +639,10 @@ export const migrate = publicProcedure.migration.migrate.handler(
         batchOpts,
       );
 
-      if (allDrafts.length + simpleHotspotDrafts.length <= MAX_JITO_BUNDLE_TXS) {
+      if (
+        allDrafts.length + simpleHotspotDrafts.length <=
+        MAX_JITO_BUNDLE_TXS
+      ) {
         // All fit — add them all
         for (const draft of simpleHotspotDrafts) {
           allDrafts.push(draft);
@@ -657,14 +662,16 @@ export const migrate = publicProcedure.migration.migrate.handler(
               ...accumulatedIxs,
               ...simpleHotspotWorkList[i].instructions,
             ];
-            const candidateDrafts =
-              await batchInstructionsToTxsWithPriorityFee(
-                provider,
-                nextIxs,
-                batchOpts,
-              );
+            const candidateDrafts = await batchInstructionsToTxsWithPriorityFee(
+              provider,
+              nextIxs,
+              batchOpts,
+            );
 
-            if (allDrafts.length + candidateDrafts.length > MAX_JITO_BUNDLE_TXS) {
+            if (
+              allDrafts.length + candidateDrafts.length >
+              MAX_JITO_BUNDLE_TXS
+            ) {
               break;
             }
             accumulatedIxs.push(...simpleHotspotWorkList[i].instructions);
@@ -818,7 +825,12 @@ export const migrate = publicProcedure.migration.migrate.handler(
         })),
         parallel: false,
         tag,
-        actionMetadata: { type: "migration", sourceWallet, destinationWallet, hotspotCount: hotspots?.length ?? 0 },
+        actionMetadata: {
+          type: "migration",
+          sourceWallet,
+          destinationWallet,
+          hotspotCount: hotspots?.length ?? 0,
+        },
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFees),

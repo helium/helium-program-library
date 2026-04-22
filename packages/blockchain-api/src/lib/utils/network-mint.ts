@@ -14,6 +14,8 @@ export function getMintForNetwork(network: RewardNetwork): PublicKey {
   return NETWORK_TO_MINT[network];
 }
 
-export function getLazyDistributorForNetwork(network: RewardNetwork): PublicKey {
+export function getLazyDistributorForNetwork(
+  network: RewardNetwork,
+): PublicKey {
   return lazyDistributorKey(NETWORK_TO_MINT[network])[0];
 }

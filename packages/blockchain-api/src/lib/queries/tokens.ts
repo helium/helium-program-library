@@ -79,7 +79,7 @@ function getMetadata(uriIn: string | undefined): Promise<any | undefined> {
 function getMetadataId(mint: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("metadata", "utf-8"), MPL_PID.toBuffer(), mint.toBuffer()],
-    MPL_PID
+    MPL_PID,
   )[0];
 }
 
@@ -91,7 +91,7 @@ const tokenMetadataCache = new Map<
 
 async function fetchTokenMetadata(
   connection: any,
-  mint: string
+  mint: string,
 ): Promise<{ symbol?: string; name?: string; logoURI?: string }> {
   const cached = tokenMetadataCache.get(mint);
   if (cached && Date.now() < cached.expiry) {
@@ -172,25 +172,28 @@ async function fetchTokenMetadata(
 }
 
 async function fetchTokenPrices(
-  coingeckoIds: string[]
+  coingeckoIds: string[],
 ): Promise<Record<string, number>> {
   if (coingeckoIds.length === 0) return {};
 
   try {
     const response = await fetch(
       `https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoIds.join(
-        ","
+        ",",
       )}&vs_currencies=usd`,
-      { next: { revalidate: 300 } } // Cache for 5 minutes
+      { next: { revalidate: 300 } }, // Cache for 5 minutes
     );
 
     if (!response.ok) return {};
 
     const data = await response.json();
-    return Object.keys(data).reduce((acc, key) => {
-      acc[key] = data[key].usd;
-      return acc;
-    }, {} as Record<string, number>);
+    return Object.keys(data).reduce(
+      (acc, key) => {
+        acc[key] = data[key].usd;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
   } catch (error) {
     console.error("Failed to fetch token prices:", error);
     return {};
@@ -208,7 +211,7 @@ export async function getTokenBalances({
 
   const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
     publicKey,
-    { programId: TOKEN_PROGRAM_ID }
+    { programId: TOKEN_PROGRAM_ID },
   );
 
   const tokens: TokenAccount[] = [];
@@ -261,7 +264,7 @@ export async function getTokenBalances({
         name: metadata.name || token.name,
         logoURI: metadata.logoURI || token.logoURI,
       };
-    })
+    }),
   );
 
   // Apply prices to enhanced tokens
@@ -282,7 +285,7 @@ export async function getTokenBalances({
   const solBalanceUsd = solBalanceInSol * solPriceUsd;
   const tokenBalanceUsd = enhancedTokens.reduce(
     (sum, token) => sum + (token.balanceUsd || 0),
-    0
+    0,
   );
   const totalBalanceUsd = tokenBalanceUsd;
 
