@@ -1,21 +1,28 @@
+# geocoder-service
+
+Helium-operated deployment of [Komoot's Photon](https://photon.komoot.io/) geocoder. Powers location search in Helium apps (e.g. asserting a hotspot's address → lat/long). Mostly this is used in wallet-app
+
+The container is a thin wrapper around the upstream `photon` jar — see Photon's docs for the query API.
+
 ## Search
 
 ```
 http://localhost:8000/api?q=berlin
 ```
 
-_For more details on the API check the photon [github repository](https://github.com/komoot/photon)._
+For full query options see the [Photon GitHub repo](https://github.com/komoot/photon).
+
+## Deployments
+
+Image: `public.ecr.aws/v0j6k5v6/geocoder-service`
+
+| Cluster / env | Manifest |
+| --- | --- |
+| web-cluster / prod | [manifests/web-cluster/prod/helium/geocoder-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/geocoder-service.yaml) |
+
+Deploy: push a `docker-web-geocoder-service-<version>` git tag.
 
 ## FAQ
 
-- How do I pass arguments to the `photon.jar` ?
-
-  _The entrypoint accepts arguments for the `photon.jar`, you can invoke it by using `docker exec`_
-
-- Do I need to have nominatim ?
-
-  _The container downloads the latest prebuilt search index, there is no immediate need to have nominatim installed._
-
-- What is photon ?
-
-  _photon is a geocoder, check out [their website](https://photon.komoot.io/) and their [github repository](https://github.com/komoot/photon)_
+- **How do I pass arguments to `photon.jar`?** The entrypoint forwards args — invoke via `docker exec`.
+- **Do I need Nominatim?** No. The container downloads the latest prebuilt search index at startup.

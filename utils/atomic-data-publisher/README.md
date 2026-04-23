@@ -2,6 +2,17 @@
 
 Rust service that polls PostgreSQL for hotspot data changes and publishes them to the Helium oracles ingestor via gRPC.
 
+## Deployments
+
+Image: `public.ecr.aws/v0j6k5v6/atomic-data-publisher-service`
+
+| Cluster / env | Manifest |
+| --- | --- |
+| web-cluster / prod | [manifests/web-cluster/prod/helium/atomic-data-publisher-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/atomic-data-publisher-service.yaml) |
+| web-cluster / sdlc | [manifests/web-cluster/sdlc/helium/atomic-data-publisher-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/sdlc/helium/atomic-data-publisher-service.yaml) |
+
+Deploy: push a `docker-web-atomic-data-publisher-service-<version>` git tag (see the [repo README](../../README.md#deploying-docker-services)).
+
 ## What it does
 
 - Polls PostgreSQL tables for entity data changes using block tracking
