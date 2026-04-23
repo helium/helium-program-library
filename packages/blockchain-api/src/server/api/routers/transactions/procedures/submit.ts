@@ -4,12 +4,168 @@ import PendingTransaction from "@/lib/models/pending-transaction";
 import TransactionBatch from "@/lib/models/transaction-batch";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "@/lib/utils/explorer";
 import { getCluster } from "@/lib/solana";
-import { BundleSimulationError } from "@/lib/utils/jito";
-import { submitTransactionBatch } from "@/lib/utils/transaction-submission";
+import {
+  BundleSimulationError,
+  JitoBundleSubmissionError,
+} from "@/lib/utils/jito";
+import {
+  JitoMissingTipError,
+  SingleTransactionSubmissionError,
+  submitTransactionBatch,
+} from "@/lib/utils/transaction-submission";
 import * as Sentry from "@sentry/nextjs";
 import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { classifySimulationLogs } from "@/lib/utils/simulation-classifier";
 import { publicProcedure } from "../../../procedures";
+
+type SubmitInputTx = {
+  serializedTransaction: string;
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * Single Sentry capture point for all submission/simulation failures. Builds
+ * a rich payload (logs, explorer links, bundle metadata) from whichever error
+ * class was thrown so the Sentry issue always has the info needed to debug.
+ */
+function captureSubmissionError(
+  error: unknown,
+  context: {
+    batchSize: number;
+    parallel: boolean;
+    tag?: string;
+    payer: string;
+    transactions: SubmitInputTx[];
+  },
+): void {
+  const baseTags: Record<string, unknown> = {
+    batch_size: context.batchSize,
+    parallel: context.parallel,
+    tag: context.tag,
+  };
+
+  const baseExtra: Record<string, unknown> = {
+    error_message: error instanceof Error ? error.message : "Unknown error",
+    batch_size: context.batchSize,
+    parallel: context.parallel,
+    tag: context.tag,
+    payer: context.payer,
+    transaction_metadata: context.transactions.map((tx) => tx.metadata),
+  };
+
+  if (error instanceof JitoMissingTipError) {
+    if (error.skipSentry) {
+      return;
+    }
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        ...baseTags,
+        error_type: "jito_bundle_missing_tip",
+        submission_type: "jito_bundle",
+      },
+      extra: {
+        ...baseExtra,
+        bundle_size: error.bundleSize,
+      },
+    });
+    return;
+  }
+
+  if (error instanceof BundleSimulationError) {
+    Sentry.captureException(error, {
+      level: "error",
+      fingerprint: [
+        "jito_bundle_simulation_failed",
+        error.category,
+        error.actionType,
+      ],
+      tags: {
+        ...baseTags,
+        error_type: "jito_bundle_simulation_failed",
+        submission_type: "jito_bundle",
+        simulation_failure_category: error.category,
+        action_type: error.actionType,
+      },
+      extra: {
+        ...baseExtra,
+        failure_detail: error.detail,
+        summary: error.summary,
+        simulation_logs: error.logs,
+        transaction_results: error.transactionResults,
+        explorer_links: error.explorerLinks,
+        chewing_glass_explorer_links: error.chewingGlassExplorerLinks,
+        bundle_size: error.bundleSize,
+      },
+    });
+    return;
+  }
+
+  if (error instanceof JitoBundleSubmissionError) {
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        ...baseTags,
+        error_type: "jito_bundle_submission_failed",
+        submission_type: "jito_bundle",
+      },
+      extra: {
+        ...baseExtra,
+        explorer_links: error.explorerLinks,
+        chewing_glass_explorer_links: error.chewingGlassExplorerLinks,
+        bundle_size: error.bundleSize,
+      },
+    });
+    return;
+  }
+
+  if (error instanceof SingleTransactionSubmissionError) {
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        ...baseTags,
+        error_type: "transaction_submission_failed",
+        submission_type: "single",
+      },
+      extra: {
+        ...baseExtra,
+        explorer_link: error.explorerLink,
+        chewing_glass_explorer_link: error.chewingGlassExplorerLink,
+      },
+    });
+    return;
+  }
+
+  // Fallback: unknown error type — attach best-effort explorer links for the
+  // first few transactions so Sentry has *something* to work with.
+  const explorerLinks: (string | null)[] = [];
+  const chewingGlassExplorerLinks: (string | null)[] = [];
+  for (const tx of context.transactions.slice(0, 3)) {
+    try {
+      const deserialized = VersionedTransaction.deserialize(
+        Buffer.from(tx.serializedTransaction, "base64"),
+      );
+      explorerLinks.push(getExplorerUrl(deserialized));
+      chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(deserialized));
+    } catch {
+      explorerLinks.push(null);
+      chewingGlassExplorerLinks.push(null);
+    }
+  }
+
+  Sentry.captureException(error, {
+    level: "error",
+    tags: {
+      ...baseTags,
+      error_type: "transaction_submission_failed",
+    },
+    extra: {
+      ...baseExtra,
+      explorer_links: explorerLinks,
+      chewing_glass_explorer_links: chewingGlassExplorerLinks,
+    },
+  });
+}
 
 /**
  * Submit a batch of transactions for processing.
@@ -201,8 +357,16 @@ export const submit = publicProcedure.transactions.submit.handler(
         transactionMetadata: transactions.map((tx) => tx.metadata),
       });
     } catch (error) {
+      captureSubmissionError(error, {
+        batchSize: serializedTransactions.length,
+        parallel,
+        tag,
+        payer,
+        transactions,
+      });
+
       if (error instanceof BundleSimulationError) {
-        if (error.message.includes("AccountNotFound")) {
+        if (error.category === "account_not_found") {
           const connection = new Connection(env.SOLANA_RPC_URL);
           const balance = await connection.getBalance(new PublicKey(payer));
           if (balance === 0) {
@@ -221,31 +385,10 @@ export const submit = publicProcedure.transactions.submit.handler(
           },
         });
       }
-      throw error;
-    }
 
-    if (result.error) {
-      // Capture submission failure in Sentry
-      Sentry.captureException(new Error(result.error), {
-        level: "error",
-        tags: {
-          error_type: "transaction_submission_failed",
-          submission_type: result.submissionType,
-          batch_size: serializedTransactions.length,
-          parallel,
-        },
-        extra: {
-          error_message: result.error,
-          batch_id: result.batchId,
-          submission_type: result.submissionType,
-          batch_size: serializedTransactions.length,
-          parallel,
-          tag,
-          payer,
-        },
+      throw errors.BAD_REQUEST({
+        message: error instanceof Error ? error.message : "Unknown error",
       });
-
-      throw errors.BAD_REQUEST({ message: result.error });
     }
 
     const cluster = getCluster();

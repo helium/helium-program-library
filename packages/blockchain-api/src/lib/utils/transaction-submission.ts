@@ -2,7 +2,6 @@ import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { env } from "../env";
 import { v4 as uuidv4 } from "uuid";
 import bs58 from "bs58";
-import * as Sentry from "@sentry/nextjs";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { getCluster } from "../solana";
 import {
@@ -12,6 +11,45 @@ import {
   JitoBundleContext,
   jitoBlockEngineRequest,
 } from "./jito";
+
+export class SingleTransactionSubmissionError extends Error {
+  public readonly explorerLink: string | null;
+  public readonly chewingGlassExplorerLink: string | null;
+
+  constructor(
+    message: string,
+    fields: {
+      explorerLink: string | null;
+      chewingGlassExplorerLink: string | null;
+    },
+    cause?: unknown,
+  ) {
+    super(message);
+    this.name = "SingleTransactionSubmissionError";
+    this.explorerLink = fields.explorerLink;
+    this.chewingGlassExplorerLink = fields.chewingGlassExplorerLink;
+    if (cause !== undefined) {
+      (this as { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
+export class JitoMissingTipError extends Error {
+  public readonly bundleSize: number;
+  // When true, the top-level handler should not capture this to Sentry —
+  // this is used for expected, user-facing errors (e.g. stale wallet versions).
+  public readonly skipSentry: boolean;
+
+  constructor(
+    message: string,
+    fields: { bundleSize: number; skipSentry: boolean },
+  ) {
+    super(message);
+    this.name = "JitoMissingTipError";
+    this.bundleSize = fields.bundleSize;
+    this.skipSentry = fields.skipSentry;
+  }
+}
 
 let cachedTipAccountSet: Set<string> | null = null;
 let tipAccountSetCachedAt = 0;
@@ -63,19 +101,18 @@ async function requireBundleHasTipAccount(
     }
   }
 
-  let err = new Error(
-    "Jito bundle is missing a tip transaction — no transaction write-locks a recognized tip account",
+  const isFriendlyUpgradeError =
+    tag?.includes("implicit-burn") || tag?.includes("claim-rewards");
+
+  throw new JitoMissingTipError(
+    isFriendlyUpgradeError
+      ? "Bundle missing Jito tip. Please upgrade your Helium Wallet app and try again."
+      : "Jito bundle is missing a tip transaction — no transaction write-locks a recognized tip account",
+    {
+      bundleSize: serializedTransactions.length,
+      skipSentry: Boolean(isFriendlyUpgradeError),
+    },
   );
-  if (tag?.includes("implicit-burn") || tag?.includes("claim-rewards")) {
-    err = new Error("Bundle missing Jito tip. Please upgrade your Helium Wallet app and try again.")
-  } else {
-    Sentry.captureException(err, {
-      level: "error",
-      tags: { error_type: "jito_bundle_missing_tip" },
-      extra: { bundle_size: serializedTransactions.length },
-    });
-  }
-  throw err;
 }
 
 function isBlockhashNotFoundError(error: unknown): boolean {
@@ -100,7 +137,6 @@ export interface BatchSubmissionResult {
   submissionType: "single" | "parallel" | "sequential" | "jito_bundle";
   signatures?: string[];
   jitoBundleId?: string;
-  error?: string;
 }
 
 // Submit single transaction
@@ -108,58 +144,28 @@ export async function submitSingleTransaction(
   connection: Connection,
   serializedTransaction: string,
 ): Promise<string> {
-  let transaction: VersionedTransaction;
-  try {
-    transaction = VersionedTransaction.deserialize(
-      Buffer.from(serializedTransaction, "base64"),
-    );
-  } catch (error) {
-    // Capture deserialization error
-    Sentry.captureException(error, {
-      level: "error",
-      tags: {
-        error_type: "transaction_deserialization_failed",
-      },
-      extra: {
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      },
-    });
-    throw error;
-  }
+  const transaction = VersionedTransaction.deserialize(
+    Buffer.from(serializedTransaction, "base64"),
+  );
 
   try {
-    const signature = await connection.sendRawTransaction(
-      transaction.serialize(),
-      {
-        skipPreflight: true,
-      },
-    );
-
-    return signature;
-  } catch (error) {
-    // Capture submission error with explorer link
-    const explorerUrl = getExplorerUrl(transaction);
-    const chewingGlassExplorerUrl = getChewingGlassExplorerUrl(transaction);
-    Sentry.captureException(error, {
-      level: "error",
-      tags: {
-        error_type: "transaction_submission_failed",
-        submission_type: "single",
-      },
-      extra: {
-        error_message: error instanceof Error ? error.message : "Unknown error",
-        explorer_link: explorerUrl,
-        chewing_glass_explorer_link: chewingGlassExplorerUrl,
-      },
-      contexts: {
-        transaction: {
-          explorer_link: explorerUrl,
-          chewing_glass_explorer_link: chewingGlassExplorerUrl,
-          submission_type: "single",
-        },
-      },
+    return await connection.sendRawTransaction(transaction.serialize(), {
+      skipPreflight: true,
     });
-    throw error;
+  } catch (error) {
+    let explorerLink: string | null = null;
+    let chewingGlassExplorerLink: string | null = null;
+    try {
+      explorerLink = getExplorerUrl(transaction);
+      chewingGlassExplorerLink = getChewingGlassExplorerUrl(transaction);
+    } catch {
+      // ignore — links are best-effort
+    }
+    throw new SingleTransactionSubmissionError(
+      error instanceof Error ? error.message : "Unknown error",
+      { explorerLink, chewingGlassExplorerLink },
+      error,
+    );
   }
 }
 
@@ -261,81 +267,26 @@ export async function submitTransactionBatch(
     }
   };
 
-  try {
-    const MAX_BLOCKHASH_RETRIES = 3;
-    let lastError: unknown;
-    for (let i = 0; i <= MAX_BLOCKHASH_RETRIES; i++) {
-      try {
-        return await attempt();
-      } catch (error) {
-        if (isBlockhashNotFoundError(error) && i < MAX_BLOCKHASH_RETRIES && payload.transactions.length > 1) {
-          console.warn(
-            `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
-          );
-          await sleep(2000);
-          lastError = error;
-          continue;
-        }
-        throw error;
-      }
-    }
-    throw lastError;
-  } catch (error) {
-    // Capture batch submission error
-    // Try to get explorer links for transactions if possible
-    const explorerLinks: string[] = [];
-    const chewingGlassExplorerLinks: string[] = [];
+  const MAX_BLOCKHASH_RETRIES = 3;
+  let lastError: unknown;
+  for (let i = 0; i <= MAX_BLOCKHASH_RETRIES; i++) {
     try {
-      for (const serializedTx of payload.transactions.slice(0, 3)) {
-        // Limit to first 3 to avoid too much data
-        const tx = VersionedTransaction.deserialize(
-          Buffer.from(serializedTx, "base64"),
+      return await attempt();
+    } catch (error) {
+      if (
+        isBlockhashNotFoundError(error) &&
+        i < MAX_BLOCKHASH_RETRIES &&
+        payload.transactions.length > 1
+      ) {
+        console.warn(
+          `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
         );
-        explorerLinks.push(getExplorerUrl(tx));
-        chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(tx));
+        await sleep(2000);
+        lastError = error;
+        continue;
       }
-    } catch {
-      // Ignore errors when generating explorer links
+      throw error;
     }
-
-    Sentry.captureException(error, {
-      level: "error",
-      tags: {
-        error_type: "transaction_batch_submission_failed",
-        submission_type: "batch",
-        cluster,
-        tag: payload.tag,
-      },
-      extra: {
-        error_message: error instanceof Error ? error.message : "Unknown error",
-        batch_id: batchId,
-        batch_size: payload.transactions.length,
-        parallel: payload.parallel,
-        cluster,
-        tag: payload.tag,
-        payer: payload.payer,
-        transaction_metadata: payload.transactionMetadata,
-        explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
-        chewing_glass_explorer_links: chewingGlassExplorerLinks.length > 0 ? chewingGlassExplorerLinks : undefined,
-      },
-      contexts: {
-        transaction: {
-          batch_id: batchId,
-          batch_size: payload.transactions.length,
-          parallel: payload.parallel,
-          cluster,
-          tag: payload.tag,
-          payer: payload.payer,
-          explorer_links: explorerLinks,
-          chewing_glass_explorer_links: chewingGlassExplorerLinks,
-        },
-      },
-    });
-
-    return {
-      batchId,
-      submissionType: "single", // fallback
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
   }
+  throw lastError;
 }

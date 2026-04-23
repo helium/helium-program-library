@@ -176,41 +176,6 @@ export async function resubmitTransactionBatch(
       parallel: batch.parallel,
     });
 
-    if (submissionResult.error) {
-      // Capture resubmission error
-      Sentry.captureException(new Error(submissionResult.error), {
-        level: "error",
-        tags: {
-          error_type: "transaction_batch_resubmission_failed",
-          resubmission_type: "batch",
-          submission_type: batch.submissionType,
-        },
-        extra: {
-          error_message: submissionResult.error,
-          batch_id: batch.id,
-          batch_size: pendingTransactions.length,
-          parallel: batch.parallel,
-          submission_type: batch.submissionType,
-          cluster: batch.cluster,
-          tag: batch.tag,
-        },
-        contexts: {
-          transaction: {
-            batch_id: batch.id,
-            batch_size: pendingTransactions.length,
-            parallel: batch.parallel,
-            submission_type: batch.submissionType,
-          },
-        },
-      });
-
-      return {
-        success: false,
-        error: submissionResult.error,
-        batchId: batch.id,
-      };
-    }
-
     // Update the pending transactions with new signatures
     const dbTransaction = await sequelize.transaction();
 
