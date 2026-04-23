@@ -1,12 +1,6 @@
 # @helium/welcome-pack-sdk
 
-Interface to the welcome-pack smart contract.
-
-## Installation
-
-```sh
-npm install @helium/welcome-pack-sdk
-```
+TypeScript SDK for the [welcome-pack program](../../programs/welcome-pack), which distributes a one-time token bundle to newly-onboarded wallets (HNT dust + a hotspot claim code, etc.).
 
 ## Usage
 
@@ -14,10 +8,5 @@ npm install @helium/welcome-pack-sdk
 import { init } from "@helium/welcome-pack-sdk"
 import { AnchorProvider } from "@coral-xyz/anchor"
 
-const provider = AnchorProvider.env()
-const program = await init(provider)
+const program = await init(AnchorProvider.env())
 ```
-
-## License
-
-Apache-2.0 
