@@ -4,6 +4,7 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/.*\.helium\.io$/,
   /^https?:\/\/.*\.test-helium\.com$/,
+  /^https?:\/\/.*\.heliumvote\.com$/,
 ];
 
 function isAllowedOrigin(origin: string): boolean {
