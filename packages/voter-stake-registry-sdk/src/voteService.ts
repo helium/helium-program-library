@@ -85,6 +85,7 @@ export type DataBurnSplit = {
 
 export class VoteService {
   private client: AxiosInstance | undefined;
+  private baseURL: string | undefined;
   private program: Program<VoterStakeRegistry> | undefined;
   private nftProxyProgram: Program<NftProxy> | undefined;
   registrar: PublicKey;
@@ -92,7 +93,7 @@ export class VoteService {
   get config() {
     return {
       registrar: this.registrar.toBase58(),
-      baseUrl: this.client?.getUri(),
+      baseUrl: this.baseURL,
       rpcEndpoint: this.provider?.connection.rpcEndpoint,
     };
   }
@@ -101,8 +102,10 @@ export class VoteService {
     return this.nftProxyProgram?.provider;
   }
 
-  // Wrapper arÍound vsr bulk operations that either uses
-  // an API or gPA calls
+  // Wrapper around vsr bulk operations that either uses
+  // the blockchain-api OpenAPI endpoints or gPA calls.
+  // baseURL is the blockchain-api root (e.g. https://api.helium.io); the SDK
+  // appends /api/v1/governance for API calls and /helium-vote-proxies for assets.
   constructor({
     baseURL,
     program,
@@ -115,7 +118,10 @@ export class VoteService {
     nftProxyProgram?: Program<NftProxy>;
   }) {
     if (baseURL) {
-      this.client = axios.create({ baseURL: baseURL });
+      this.baseURL = baseURL.replace(/\/$/, "");
+      this.client = axios.create({
+        baseURL: `${this.baseURL}/api/v1/governance`,
+      });
     }
     this.program = program;
     this.nftProxyProgram = nftProxyProgram;
@@ -125,12 +131,12 @@ export class VoteService {
   }
 
   assetUrl(url: string) {
-    return url.replace("./", `${this.client!.getUri()}/helium-vote-proxies/`);
+    return url.replace("./", `${this.baseURL}/helium-vote-proxies/`);
   }
 
   async getSubDaoDelegationSplit(): Promise<SubDaoDelegationSplit> {
     if (this.client) {
-      return (await this.client.get(`/v1/subdao-delegations`)).data;
+      return (await this.client.get(`/subdao-delegations`)).data;
     } else {
       throw new Error("This is not supported without an indexer");
     }
@@ -138,7 +144,7 @@ export class VoteService {
 
   async getDataBurnSplit(): Promise<DataBurnSplit> {
     if (this.client) {
-      return (await this.client.get(`/v1/data-burn`)).data;
+      return (await this.client.get(`/data-burn`)).data;
     } else {
       throw new Error("This is not supported without an indexer");
     }
@@ -156,7 +162,7 @@ export class VoteService {
     if (this.client) {
       return (
         await this.client.get(
-          `/v1/registrars/${this.registrar.toBase58()}/votes/${wallet.toBase58()}`,
+          `/registrars/${this.registrar.toBase58()}/votes/${wallet.toBase58()}`,
           {
             params: { limit, page },
           }
@@ -170,7 +176,7 @@ export class VoteService {
   async getVotesForProposal(proposal: PublicKey): Promise<Vote[]> {
     if (this.client) {
       return (
-        await this.client.get(`/v1/proposals/${proposal.toBase58()}/votes`)
+        await this.client.get(`/proposals/${proposal.toBase58()}/votes`)
       ).data;
     } else {
       throw new Error("This is not supported without an indexer");
@@ -180,7 +186,7 @@ export class VoteService {
   async getRegistrarsForProxy(wallet: PublicKey): Promise<string[]> {
     if (this.client) {
       return (
-        await this.client.get(`/v1/proxies/${wallet.toBase58()}/registrars`)
+        await this.client.get(`/proxies/${wallet.toBase58()}/registrars`)
       ).data;
     } else {
       throw new Error("This is not supported without an indexer");
@@ -194,7 +200,7 @@ export class VoteService {
     if (this.client) {
       return (
         await this.client.get(
-          `/v1/registrars/${this.registrar.toBase58()}/proxy-assignments`,
+          `/registrars/${this.registrar.toBase58()}/proxy-assignments`,
           {
             params: {
               limit: 10000,
@@ -252,7 +258,7 @@ export class VoteService {
     if (this.client) {
       return (
         await this.client.get(
-          `/v1/registrars/${this.registrar.toBase58()}/proxy-assignments`,
+          `/registrars/${this.registrar.toBase58()}/proxy-assignments`,
           {
             params: {
               limit: 10000,
@@ -307,9 +313,16 @@ export class VoteService {
   ): Promise<ProxyAssignment[]> {
     if (this.client) {
       return (
-        await this.client.get(`/v1/proxy-assignments`, {
-          params: { limit: 10000, position, minIndex },
-        })
+        await this.client.get(
+          `/registrars/${this.registrar.toBase58()}/proxy-assignments`,
+          {
+            params: {
+              limit: 10000,
+              position: position.toBase58(),
+              minIndex,
+            },
+          }
+        )
       ).data;
     }
 
@@ -365,7 +378,7 @@ export class VoteService {
       throw new Error("This operation is not supported without an API");
     }
     const response = await this.client.get(
-      `/v1/registrars/${this.registrar.toBase58()}/proxies`,
+      `/registrars/${this.registrar.toBase58()}/proxies`,
       {
         params: { page, limit, query },
       }
@@ -378,7 +391,7 @@ export class VoteService {
       throw new Error("This operation is not supported without an API");
     }
     const response = await this.client.get(
-      `/v1/registrars/${this.registrar.toBase58()}/proxies/${wallet.toBase58()}`
+      `/registrars/${this.registrar.toBase58()}/proxies/${wallet.toBase58()}`
     );
     return this.mapRoutes(response.data);
   }

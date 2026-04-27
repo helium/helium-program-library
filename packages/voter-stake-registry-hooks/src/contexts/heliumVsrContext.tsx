@@ -72,8 +72,8 @@ export const HeliumVsrStateProvider: React.FC<{
   wallet: Wallet | undefined;
   mint: PublicKey | undefined;
   children: React.ReactNode;
-  heliumVoteUri?: string;
-}> = ({ heliumVoteUri, wallet, mint, connection, children }) => {
+  blockchainApiUrl?: string;
+}> = ({ blockchainApiUrl, wallet, mint, connection, children }) => {
   const me = useMemo(() => wallet?.publicKey, [wallet?.publicKey?.toBase58()]);
   const now = useSolanaUnixNow(60 * 5 * 1000);
 
@@ -92,13 +92,13 @@ export const HeliumVsrStateProvider: React.FC<{
   const { info: registrar } = useRegistrar(registrarKey);
 
   const urlVoteService = useMemo(() => {
-    return heliumVoteUri && registrarKey
+    return blockchainApiUrl && registrarKey
       ? new VoteService({
-          baseURL: heliumVoteUri,
+          baseURL: blockchainApiUrl,
           registrar: registrarKey,
         })
       : undefined;
-  }, [heliumVoteUri, registrarKey]);
+  }, [blockchainApiUrl, registrarKey]);
 
   // Allow vote service either from native rpc or from api
   const { result: programVoteService } = useAsync(async () => {
