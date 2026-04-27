@@ -108,7 +108,7 @@ export async function run(args: any = process.argv) {
       cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'lockupSaturationSecs' as numeric) as lockup_saturation_seconds,
       cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'maxExtraLockupVoteWeightScaledFactor' as numeric) / 1000000000 as max_extra_lockup_vote_weight_scaled_factor,
       -- Exclude genesis multiplers for the current epoch since those will have been purged.
-      CASE WHEN (floor(p.genesis_end / (60 * 60 * 24)) * (60 * 60 * 24) + 60 * 60 * 24) > current_ts THEN cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'genesisVotePowerMultiplier' as numeric) ELSE 1 END as genesis_multiplier,
+      CASE WHEN floor(p.genesis_end / (60 * 60 * 24)) * (60 * 60 * 24) > current_ts THEN cast(r.voting_mints[p.voting_mint_config_idx + 1]->>'genesisVotePowerMultiplier' as numeric) ELSE 1 END as genesis_multiplier,
       GREATEST(
         cast(
           p.end_ts - 
