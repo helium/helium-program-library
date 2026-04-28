@@ -1,64 +1,37 @@
-# Tuktuk DCA Service
+# tuktuk-dca-service
 
-A service that handles DCA (Dollar Cost Averaging) swaps using Jupiter's API for the Helium ecosystem.
+This is no longer used, as we are no longer burning Helium Mobile Revenue
 
-## Overview
+HTTP endpoint the tuktuk cranker calls when it's time to execute a scheduled DCA swap. Fetches a Jupiter Lite quote, builds the swap transaction, wires it into the [tuktuk-dca program](../../programs/tuktuk-dca), signs, and returns it for the cranker to submit.
 
-This service provides an API endpoint that processes DCA swap requests by:
-1. Fetching quotes from Jupiter API
-2. Creating swap transactions using Jupiter's routing
-3. Integrating with the Tuktuk DCA program
+## Environment
 
-## Environment Variables
+- `SOLANA_URL` — RPC (default `https://api.mainnet-beta.solana.com`)
+- `JUPITER_API_URL` — default `https://lite-api.jup.ag`
+- `PORT` — default `8123`
+- `DCA_SIGNER_SECRET` — base58-encoded signer keypair
 
-- `SOLANA_URL`: Solana RPC endpoint (default: https://api.mainnet-beta.solana.com)
-- `JUPITER_API_URL`: Jupiter Lite API endpoint (default: https://lite-api.jup.ag)
-- `PORT`: Service port (default: 8123)
-- `DCA_SIGNER_SECRET`: Base58 encoded secret key for the DCA signer
+## API
 
-## API Endpoints
-
-### Health Check
 ```
-GET /health
-```
-
-### DCA Swap
-```
-POST /dca/:dcaKey
-```
-
-Body:
-```json
-{
-  "task_queue": "string",
-  "task": "string", 
-  "task_queued_at": "string"
-}
+GET  /health
+POST /dca/:dcaKey      body: { task_queue, task, task_queued_at }
 ```
 
 ## Development
 
 ```bash
-# Install dependencies
-yarn install
-
-# Start development server
-yarn dev
-
-# Build for production
-yarn build
-
-# Start production server
-yarn start
+pnpm install
+pnpm dev
+pnpm build && pnpm start
 ```
 
-## Docker
+## Deployments
 
-```bash
-# Build image
-docker build -t tuktuk-dca-service .
+Image: `public.ecr.aws/v0j6k5v6/tuktuk-dca-service`
 
-# Run container
-docker run -p 8123:8123 -e DCA_SIGNER_SECRET=your_secret_key tuktuk-dca-service
-```
+| Cluster / env | Manifest |
+| --- | --- |
+| web-cluster / prod | [manifests/web-cluster/prod/helium/tuktuk-dca-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/tuktuk-dca-service.yaml) |
+
+Deploy: push a `docker-web-tuktuk-dca-service-<version>` git tag.
