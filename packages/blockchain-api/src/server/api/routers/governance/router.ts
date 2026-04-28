@@ -1,6 +1,12 @@
 import { governanceContract } from "@helium/blockchain-api/contracts";
 import { implement } from "@orpc/server";
+import { defineAssociations } from "@/lib/models/associations";
 import { create as createPosition } from "./procedures/positions/create";
+
+// Sequelize `include`s in governance queries (e.g. proxy-assignments → positions)
+// require associations to be registered. Procedures don't call connectToDb, so
+// trigger it here on first import. defineAssociations is idempotent.
+defineAssociations();
 import { close as closePosition } from "./procedures/positions/close";
 import { extend as extendPosition } from "./procedures/positions/extend";
 import { flipLockupKind } from "./procedures/positions/flip-lockup-kind";

@@ -111,12 +111,91 @@
           ]
         }
       ]
+    },
+    {
+      "programId": "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8",
+      "accounts": [
+        { "type": "PositionV0", "table": "positions", "schema": "public" },
+        { "type": "Registrar", "table": "registrars", "schema": "public" },
+        {
+          "type": "VoteMarkerV0",
+          "table": "vote_markers",
+          "schema": "public"
+        }
+      ],
+      "crons": [
+        { "schedule": "*/15 * * * *", "type": "refresh-accounts" },
+        { "schedule": "*/15 * * * *", "type": "integrity-check" }
+      ]
+    },
+    {
+      "programId": "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p",
+      "accounts": [
+        {
+          "type": "ProxyConfigV0",
+          "table": "proxy_configs",
+          "schema": "public"
+        },
+        {
+          "type": "ProxyAssignmentV0",
+          "table": "proxy_assignments",
+          "schema": "public",
+          "ix_side_effects": [
+            {
+              "ix": "unassign_proxy_v0",
+              "acc": "proxy_assignment",
+              "action": "delete"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "programId": "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs",
+      "accounts": [
+        { "type": "ProposalV0", "table": "proposals", "schema": "public" },
+        {
+          "type": "ProposalConfigV0",
+          "table": "proposal_configs",
+          "schema": "public"
+        }
+      ]
+    },
+    {
+      "programId": "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM",
+      "accounts": [
+        {
+          "type": "ResolutionSettingsV0",
+          "table": "resolution_settings",
+          "schema": "public"
+        }
+      ]
+    },
+    {
+      "programId": "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR",
+      "accounts": [
+        {
+          "type": "DelegatedPositionV0",
+          "table": "delegated_positions",
+          "schema": "public"
+        }
+      ]
     }
   ],
   "indexConfigs": [
     "CREATE INDEX IF NOT EXISTS idx_key_to_asset_asset ON key_to_assets(asset);",
     "CREATE INDEX IF NOT EXISTS idx_recipients_asset_index ON recipients(asset);",
     "CREATE INDEX IF NOT EXISTS idx_recipients_destination_index ON recipients(destination);",
-    "CREATE INDEX IF NOT EXISTS idx_recipients_lazy_distributor ON recipients(lazy_distributor);"
+    "CREATE INDEX IF NOT EXISTS idx_recipients_lazy_distributor ON recipients(lazy_distributor);",
+    "CREATE INDEX IF NOT EXISTS idx_positions_registrar ON positions(registrar);",
+    "CREATE INDEX IF NOT EXISTS idx_positions_mint ON positions(mint);",
+    "CREATE INDEX IF NOT EXISTS idx_proxy_assignments_voter ON proxy_assignments(voter);",
+    "CREATE INDEX IF NOT EXISTS idx_proxy_assignments_next_voter ON proxy_assignments(next_voter);",
+    "CREATE INDEX IF NOT EXISTS idx_proxy_assignments_asset ON proxy_assignments(asset);",
+    "CREATE INDEX IF NOT EXISTS idx_proxy_assignments_proxy_config ON proxy_assignments(proxy_config);",
+    "CREATE INDEX IF NOT EXISTS idx_vote_markers_voter ON vote_markers(voter);",
+    "CREATE INDEX IF NOT EXISTS idx_vote_markers_proposal ON vote_markers(proposal);",
+    "CREATE INDEX IF NOT EXISTS idx_vote_markers_registrar ON vote_markers(registrar);",
+    "CREATE INDEX IF NOT EXISTS idx_delegated_positions_position ON delegated_positions(position);"
   ]
 }
