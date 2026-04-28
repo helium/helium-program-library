@@ -1,8 +1,16 @@
 {
-     "extends": "../../tsconfig.esm.json",
-    "include": ["src"],
-    "compilerOptions": {
-        "outDir": "lib/esm",
-        "declarationDir": "lib/types"
+  "extends": "../../tsconfig.esm.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "outDir": "lib/esm",
+    "declarationDir": "lib/types",
+    "paths": {
+      "@orpc/client": ["../../node_modules/@orpc/client/dist/index.d.mts"],
+      "@orpc/client/fetch": [
+        "../../node_modules/@orpc/client/dist/adapters/fetch/index.d.mts"
+      ],
+      "@orpc/contract": ["../../node_modules/@orpc/contract/dist/index.d.mts"],
+      "@helium/blockchain-api": ["../blockchain-api-client/dist/index.d.ts"]
     }
+  }
 }

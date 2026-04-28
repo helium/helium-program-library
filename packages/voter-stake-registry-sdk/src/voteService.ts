@@ -1,77 +1,29 @@
 import { Program } from "@coral-xyz/anchor";
+import type {
+  apiContract,
+  DataBurnResponse,
+  GetProposalVotesResponse,
+  GetProxiesResponse,
+  GetProxyAssignmentsResponse,
+  GetProxyResponse,
+  GetVotesByWalletResponse,
+  SubdaoDelegationsResponse,
+} from "@helium/blockchain-api";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import type { ContractRouterClient } from "@orpc/contract";
 import { PublicKey } from "@solana/web3.js";
-import axios, { AxiosInstance } from "axios";
 
-export type ProxyAssignment = {
-  voter: string;
-  nextVoter: string;
-  index: number;
-  address: string;
-  asset: string;
-  proxyConfig: string;
-  bumpSeed: number;
-  rentRefund: string;
-  expirationTime: string;
-};
+type ApiClient = ContractRouterClient<typeof apiContract>;
+type GovernanceClient = ApiClient["governance"];
 
-export type Proxy = {
-  name: string;
-  image: string;
-  wallet: string;
-  description: string;
-  detail: string;
-};
-
-export type EnhancedProxyData = {
-  proxiedVeTokens: string;
-  percent: string;
-  numProposalsVoted: string;
-  numAssignments: string;
-  lastVotedAt: Date | null;
-};
-
-export type WithRank = {
-  numProxies: string;
-  rank: string;
-};
-
-export type EnhancedProxy = Proxy & EnhancedProxyData;
-export type PartialEnhancedProxy = Partial<Proxy> & {
-  wallet: string;
-} & EnhancedProxyData &
-  WithRank;
-
-export type Proposal = {
-  address: string;
-  namespace: string;
-  owner: string;
-  state: object;
-  createdAt: number;
-  proposalConfig: string;
-  maxChoicesPerVoter: number;
-  seed: Buffer;
-  name: string;
-  uri: string;
-  tags: string[];
-  choices: { name: string; weight: string; uri: string }[];
-  bumpSeed: number;
-  refreshedAt: Date;
-};
-
-export type ProposalWithVotes = Proposal & {
-  votes: Vote[];
-};
-
-export type Vote = {
-  voter: string;
-  registrar: string;
-  weight: string;
-  choice: number;
-  choiceName: string;
-  proxyName: string;
-};
+export type Vote = GetProposalVotesResponse[number];
+export type ProposalWithVotes = GetVotesByWalletResponse[number];
+export type ProxyAssignment = GetProxyAssignmentsResponse[number];
+export type EnhancedProxy = GetProxiesResponse[number];
+export type PartialEnhancedProxy = NonNullable<GetProxyResponse>;
 
 export type SubDaoDelegationSplit = {
   mobile: number;
@@ -84,7 +36,7 @@ export type DataBurnSplit = {
 };
 
 export class VoteService {
-  private client: AxiosInstance | undefined;
+  private governance: GovernanceClient | undefined;
   private baseURL: string | undefined;
   private program: Program<VoterStakeRegistry> | undefined;
   private nftProxyProgram: Program<NftProxy> | undefined;
@@ -103,9 +55,9 @@ export class VoteService {
   }
 
   // Wrapper around vsr bulk operations that either uses
-  // the blockchain-api OpenAPI endpoints or gPA calls.
+  // the blockchain-api oRPC endpoints or gPA calls.
   // baseURL is the blockchain-api root (e.g. https://api.helium.io); the SDK
-  // appends /api/v1/governance for API calls and /helium-vote-proxies for assets.
+  // appends /rpc for the oRPC client and /helium-vote-proxies for proxy assets.
   constructor({
     baseURL,
     program,
@@ -119,15 +71,15 @@ export class VoteService {
   }) {
     if (baseURL) {
       this.baseURL = baseURL.replace(/\/$/, "");
-      this.client = axios.create({
-        baseURL: `${this.baseURL}/api/v1/governance`,
-      });
+      const link = new RPCLink({ url: `${this.baseURL}/rpc` });
+      const client = createORPCClient<ApiClient>(link);
+      this.governance = client.governance;
     }
     this.program = program;
     this.nftProxyProgram = nftProxyProgram;
     this.registrar = registrar;
 
-    this.mapRoutes = this.mapRoutes.bind(this);
+    this.mapAssetUrls = this.mapAssetUrls.bind(this);
   }
 
   assetUrl(url: string) {
@@ -135,19 +87,26 @@ export class VoteService {
   }
 
   async getSubDaoDelegationSplit(): Promise<SubDaoDelegationSplit> {
-    if (this.client) {
-      return (await this.client.get(`/subdao-delegations`)).data;
-    } else {
-      throw new Error("This is not supported without an indexer");
+    if (this.governance) {
+      const result: SubdaoDelegationsResponse =
+        await this.governance.getSubdaoDelegations();
+      return {
+        mobile: Number(result.mobile ?? 0),
+        iot: Number(result.iot ?? 0),
+      };
     }
+    throw new Error("This is not supported without an indexer");
   }
 
   async getDataBurnSplit(): Promise<DataBurnSplit> {
-    if (this.client) {
-      return (await this.client.get(`/data-burn`)).data;
-    } else {
-      throw new Error("This is not supported without an indexer");
+    if (this.governance) {
+      const result: DataBurnResponse = await this.governance.getDataBurn();
+      return {
+        mobile: Number(result.mobile ?? 0),
+        iot: Number(result.iot ?? 0),
+      };
     }
+    throw new Error("This is not supported without an indexer");
   }
 
   async getVotesForWallet({
@@ -159,57 +118,46 @@ export class VoteService {
     page: number;
     limit: number;
   }): Promise<ProposalWithVotes[]> {
-    if (this.client) {
-      return (
-        await this.client.get(
-          `/registrars/${this.registrar.toBase58()}/votes/${wallet.toBase58()}`,
-          {
-            params: { limit, page },
-          }
-        )
-      ).data;
-    } else {
-      throw new Error("This is not supported without an indexer");
+    if (this.governance) {
+      return await this.governance.getVotesByWallet({
+        registrar: this.registrar.toBase58(),
+        wallet: wallet.toBase58(),
+        page,
+        limit,
+      });
     }
+    throw new Error("This is not supported without an indexer");
   }
 
   async getVotesForProposal(proposal: PublicKey): Promise<Vote[]> {
-    if (this.client) {
-      return (
-        await this.client.get(`/proposals/${proposal.toBase58()}/votes`)
-      ).data;
-    } else {
-      throw new Error("This is not supported without an indexer");
+    if (this.governance) {
+      return await this.governance.getProposalVotes({
+        proposalKey: proposal.toBase58(),
+      });
     }
+    throw new Error("This is not supported without an indexer");
   }
 
   async getRegistrarsForProxy(wallet: PublicKey): Promise<string[]> {
-    if (this.client) {
-      return (
-        await this.client.get(`/proxies/${wallet.toBase58()}/registrars`)
-      ).data;
-    } else {
-      throw new Error("This is not supported without an indexer");
+    if (this.governance) {
+      return await this.governance.getProxyRegistrars({
+        wallet: wallet.toBase58(),
+      });
     }
+    throw new Error("This is not supported without an indexer");
   }
 
   async getProxyAssignmentsForPosition(
     position: PublicKey,
     minProxyIndex: number = 0
   ): Promise<ProxyAssignment[]> {
-    if (this.client) {
-      return (
-        await this.client.get(
-          `/registrars/${this.registrar.toBase58()}/proxy-assignments`,
-          {
-            params: {
-              limit: 10000,
-              position: position.toBase58(),
-              minIndex: minProxyIndex,
-            },
-          }
-        )
-      ).data;
+    if (this.governance) {
+      return await this.governance.getProxyAssignments({
+        registrar: this.registrar.toBase58(),
+        limit: 1000,
+        position: position.toBase58(),
+        minIndex: minProxyIndex,
+      });
     }
 
     if (this.nftProxyProgram && this.program) {
@@ -246,28 +194,21 @@ export class VoteService {
           bumpSeed: a.account.bumpSeed,
           expirationTime: a.account.expirationTime.toString(),
         }));
-    } else {
-      throw new Error("No nft proxy program or api url");
     }
+    throw new Error("No nft proxy program or api url");
   }
 
   async getProxyAssignmentsForWallet(
     wallet: PublicKey,
     minProxyIndex: number = 0
   ): Promise<ProxyAssignment[]> {
-    if (this.client) {
-      return (
-        await this.client.get(
-          `/registrars/${this.registrar.toBase58()}/proxy-assignments`,
-          {
-            params: {
-              limit: 10000,
-              voter: wallet.toBase58(),
-              minIndex: minProxyIndex,
-            },
-          }
-        )
-      ).data;
+    if (this.governance) {
+      return await this.governance.getProxyAssignments({
+        registrar: this.registrar.toBase58(),
+        limit: 1000,
+        voter: wallet.toBase58(),
+        minIndex: minProxyIndex,
+      });
     }
 
     if (this.nftProxyProgram && this.program) {
@@ -302,28 +243,21 @@ export class VoteService {
           bumpSeed: a.account.bumpSeed,
           expirationTime: a.account.expirationTime.toString(),
         }));
-    } else {
-      throw new Error("No nft proxy program or api url");
     }
+    throw new Error("No nft proxy program or api url");
   }
 
   async getPositionProxies(
     position: PublicKey,
     minIndex: number
   ): Promise<ProxyAssignment[]> {
-    if (this.client) {
-      return (
-        await this.client.get(
-          `/registrars/${this.registrar.toBase58()}/proxy-assignments`,
-          {
-            params: {
-              limit: 10000,
-              position: position.toBase58(),
-              minIndex,
-            },
-          }
-        )
-      ).data;
+    if (this.governance) {
+      return await this.governance.getProxyAssignments({
+        registrar: this.registrar.toBase58(),
+        limit: 1000,
+        position: position.toBase58(),
+        minIndex,
+      });
     }
 
     if (this.nftProxyProgram && this.program) {
@@ -360,9 +294,8 @@ export class VoteService {
           bumpSeed: a.account.bumpSeed,
           expirationTime: a.account.expirationTime.toString(),
         }));
-    } else {
-      throw new Error("No nft proxy program or api url");
     }
+    throw new Error("No nft proxy program or api url");
   }
 
   async getProxies({
@@ -374,33 +307,39 @@ export class VoteService {
     limit: number;
     query?: string;
   }): Promise<EnhancedProxy[]> {
-    if (!this.client) {
+    if (!this.governance) {
       throw new Error("This operation is not supported without an API");
     }
-    const response = await this.client.get(
-      `/registrars/${this.registrar.toBase58()}/proxies`,
-      {
-        params: { page, limit, query },
-      }
-    );
-    return response.data.map(this.mapRoutes);
+    const result = await this.governance.getProxies({
+      registrar: this.registrar.toBase58(),
+      page,
+      limit,
+      query,
+    });
+    return result.map(this.mapAssetUrls);
   }
 
   async getProxy(wallet: PublicKey): Promise<PartialEnhancedProxy> {
-    if (!this.client) {
+    if (!this.governance) {
       throw new Error("This operation is not supported without an API");
     }
-    const response = await this.client.get(
-      `/registrars/${this.registrar.toBase58()}/proxies/${wallet.toBase58()}`
-    );
-    return this.mapRoutes(response.data);
+    const result = await this.governance.getProxy({
+      registrar: this.registrar.toBase58(),
+      wallet: wallet.toBase58(),
+    });
+    if (!result) {
+      throw new Error(`No proxy found for wallet ${wallet.toBase58()}`);
+    }
+    return this.mapAssetUrls(result);
   }
 
-  mapRoutes<T extends Proxy>(data: T): T {
+  private mapAssetUrls<T extends { image: string | null; detail: string | null }>(
+    data: T
+  ): T {
     return {
       ...data,
-      image: data.image && this.assetUrl(data.image),
-      detail: data.detail && this.assetUrl(data.detail),
+      image: data.image ? this.assetUrl(data.image) : data.image,
+      detail: data.detail ? this.assetUrl(data.detail) : data.detail,
     };
   }
 }

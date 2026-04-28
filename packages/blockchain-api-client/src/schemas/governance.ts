@@ -385,9 +385,9 @@ export const ProxyAssignmentSchema = z.object({
   index: z.number(),
   asset: z.string(),
   proxyConfig: z.string(),
-  rentRefund: z.string().nullable().optional(),
-  bumpSeed: z.number().nullable().optional(),
-  expirationTime: z.string().nullable().optional(),
+  rentRefund: z.string(),
+  bumpSeed: z.number(),
+  expirationTime: z.string(),
 });
 
 export const GetProxyAssignmentsResponseSchema = z.array(ProxyAssignmentSchema);

@@ -10,8 +10,13 @@ export * from "./pdas";
 export * from "./resolvers";
 export { VoteService } from "./voteService";
 export type {
-  EnhancedProxy, EnhancedProxyData, PartialEnhancedProxy, ProposalWithVotes,
-  ProxyAssignment, WithRank
+  DataBurnSplit,
+  EnhancedProxy,
+  PartialEnhancedProxy,
+  ProposalWithVotes,
+  ProxyAssignment,
+  SubDaoDelegationSplit,
+  Vote,
 } from "./voteService";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
