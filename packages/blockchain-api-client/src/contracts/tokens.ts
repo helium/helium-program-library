@@ -5,6 +5,8 @@ import {
   TokenBalanceDataSchema,
   TransferInputSchema,
   TransferOutputSchema,
+  MultiTransferInputSchema,
+  MultiTransferOutputSchema,
   CreateHntAccountInputSchema,
   CreateHntAccountOutputSchema,
 } from "../schemas/tokens";
@@ -27,6 +29,20 @@ export const tokensContract = oc
       .route({ method: "POST", path: "/tokens/transfer", summary: "Transfer tokens" })
       .input(TransferInputSchema)
       .output(TransferOutputSchema)
+      .errors({
+        BAD_REQUEST,
+        INSUFFICIENT_FUNDS,
+      }),
+
+    /** Protected: Transfer the same token mint to multiple recipients, packed into as few txs as possible */
+    multiTransfer: oc
+      .route({
+        method: "POST",
+        path: "/tokens/multi-transfer",
+        summary: "Transfer the same token to multiple recipients",
+      })
+      .input(MultiTransferInputSchema)
+      .output(MultiTransferOutputSchema)
       .errors({
         BAD_REQUEST,
         INSUFFICIENT_FUNDS,
