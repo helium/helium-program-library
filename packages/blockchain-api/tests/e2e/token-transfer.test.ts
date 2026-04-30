@@ -224,4 +224,132 @@ describe("token-transfer", () => {
       expect(error.code).to.equal("BAD_REQUEST");
     }
   });
+
+  describe("multi-transfer", () => {
+    it("transfers SOL to multiple recipients in a single tx", async () => {
+      const walletAddress = payer.publicKey.toBase58();
+      const recipients = [
+        Keypair.generate(),
+        Keypair.generate(),
+        Keypair.generate(),
+      ];
+      const amounts = [1_000_000, 2_000_000, 3_000_000];
+
+      const beforeBalances = await Promise.all(
+        recipients.map((r) => connection.getBalance(r.publicKey)),
+      );
+
+      const result = await client.tokens.multiTransfer({
+        walletAddress,
+        mint: TOKEN_MINTS.WSOL,
+        recipients: recipients.map((r, i) => ({
+          destination: r.publicKey.toBase58(),
+          amount: String(amounts[i]),
+        })),
+      });
+
+      expect(result.transactionData.transactions).to.have.lengthOf(1);
+      expect(result.transactionData.parallel).to.equal(false);
+      expect(result.transactionData.tag).to.be.a("string");
+
+      const actionMeta = result.transactionData.actionMetadata as any;
+      expect(actionMeta.type).to.equal("token_transfer");
+      expect(actionMeta.mint).to.equal(TOKEN_MINTS.WSOL);
+      expect(actionMeta.tokenName).to.equal("SOL");
+      expect(actionMeta.recipientCount).to.equal(3);
+      expect(actionMeta.totalAmount.amount).to.equal(
+        String(amounts.reduce((a, b) => a + b, 0)),
+      );
+
+      await signAndSubmitTransactionData(
+        connection,
+        result.transactionData,
+        payer,
+      );
+
+      const afterBalances = await Promise.all(
+        recipients.map((r) => connection.getBalance(r.publicKey)),
+      );
+      afterBalances.forEach((after, i) => {
+        expect(after - beforeBalances[i]).to.equal(amounts[i]);
+      });
+    });
+
+    it("transfers SPL token to multiple recipients in a single tx", async () => {
+      const walletAddress = payer.publicKey.toBase58();
+      const recipients = [Keypair.generate(), Keypair.generate()];
+      const amounts = [500_000, 750_000]; // 0.5, 0.75 USDC
+
+      const result = await client.tokens.multiTransfer({
+        walletAddress,
+        mint: TOKEN_MINTS.USDC,
+        recipients: recipients.map((r, i) => ({
+          destination: r.publicKey.toBase58(),
+          amount: String(amounts[i]),
+        })),
+      });
+
+      expect(result.transactionData.transactions).to.have.lengthOf(1);
+      const actionMeta = result.transactionData.actionMetadata as any;
+      expect(actionMeta.type).to.equal("token_transfer");
+      expect(actionMeta.mint).to.equal(TOKEN_MINTS.USDC);
+      expect(actionMeta.tokenName).to.equal("USDC");
+      expect(actionMeta.recipientCount).to.equal(2);
+
+      await signAndSubmitTransactionData(
+        connection,
+        result.transactionData,
+        payer,
+      );
+
+      const mintKey = new PublicKey(TOKEN_MINTS.USDC);
+      const balances = await Promise.all(
+        recipients.map(async (r) => {
+          const ata = getAssociatedTokenAddressSync(
+            mintKey,
+            r.publicKey,
+            true,
+          );
+          const acc = await getAccount(connection, ata);
+          return Number(acc.amount);
+        }),
+      );
+      balances.forEach((bal, i) => expect(bal).to.equal(amounts[i]));
+    });
+
+    it("returns 400 for empty recipients", async () => {
+      const walletAddress = payer.publicKey.toBase58();
+      try {
+        await client.tokens.multiTransfer({
+          walletAddress,
+          mint: TOKEN_MINTS.WSOL,
+          recipients: [],
+        });
+        expect.fail("Should have thrown an error");
+      } catch (error: any) {
+        expect(error).to.be.instanceOf(ORPCError);
+        expect(error.code).to.equal("BAD_REQUEST");
+      }
+    });
+
+    it("returns 400 for zero amount in any recipient", async () => {
+      const walletAddress = payer.publicKey.toBase58();
+      const r1 = Keypair.generate().publicKey.toBase58();
+      const r2 = Keypair.generate().publicKey.toBase58();
+      try {
+        await client.tokens.multiTransfer({
+          walletAddress,
+          mint: TOKEN_MINTS.WSOL,
+          recipients: [
+            { destination: r1, amount: "1000000" },
+            { destination: r2, amount: "0" },
+          ],
+        });
+        expect.fail("Should have thrown an error");
+      } catch (error: any) {
+        expect(error).to.be.instanceOf(ORPCError);
+        expect(error.code).to.equal("BAD_REQUEST");
+      }
+    });
+  });
 });
