@@ -8,7 +8,7 @@ import { compileTransaction, customSignerKey, init, RemoteTaskTransactionV0 } fr
 import { HermesClient } from "@pythnetwork/hermes-client";
 import { parseAccumulatorUpdateData } from "@pythnetwork/price-service-sdk";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
-import { getConfigPda, getGuardianSetPda, getTreasuryPda } from "@pythnetwork/pyth-solana-receiver/lib/address";
+import { getConfigPda, getGuardianSetPda, getTreasuryPda } from "@pythnetwork/pyth-solana-receiver/address";
 import { Connection, Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
