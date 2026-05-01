@@ -368,8 +368,10 @@ server.post<{
 
   const existingUpdate = await PythPriceUpdate.findByPk(priceUpdateId)
   if (existingUpdate) {
-    // Fresh price within 30 seconds
-    if (index === 0 && existingUpdate.updatedAt > new Date(Date.now() - 1000 * 30)) {
+    // Refetch on the first attempt when the cached VAA is older than 30s. Stale
+    // VAAs can reference a rotated guardian set, which fails on-chain with
+    // GuardianSetExpired. Continuation indices reuse whatever VAA we started with.
+    if (index === 0 && existingUpdate.updatedAt < new Date(Date.now() - 1000 * 30)) {
       await PythPriceUpdate.update({
         priceUpdate: await getData(),
       }, { where: { priceUpdateId } })
