@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- [`ba422c6`](https://github.com/helium/helium-program-library/commit/ba422c6b74f8b493b042b6f9de7315961cbd05b2) Thanks [@ChewingGlass](https://github.com/ChewingGlass)! - Add multi transfer token endpoint
+
 ## 0.11.17
 
 ### Patch Changes
