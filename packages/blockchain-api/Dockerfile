@@ -46,7 +46,9 @@ ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN} \
 
 # Server env vars don't reach Next.js 15 worker threads via Docker ENV,
 # so write dummy values to .env for the build to read from disk
-RUN printf '%s\n' \
+RUN --mount=type=cache,id=turbo,target=/app/.turbo \
+    --mount=type=cache,id=nextjs,target=/app/packages/blockchain-api/.next/cache \
+    printf '%s\n' \
     'SKIP_ENV_VALIDATION=1' \
     'PG_USER=build' \
     'PG_NAME=build' \

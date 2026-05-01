@@ -3,16 +3,16 @@
 FROM node:22-alpine AS pruner
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN pnpm add -g turbo
+RUN pnpm add -g turbo@2.9.3
 COPY . .
 RUN turbo prune @helium/account-postgres-sink-service --docker
 
 FROM node:22-alpine AS deps
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 COPY --from=pruner /app/out/json/ .
 ENV PNPM_STORE_DIR=/pnpm/store
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
@@ -23,7 +23,7 @@ COPY tsconfig*.json ./
 # Copy pre-built idls (requires Rust build output not available in Docker)
 COPY packages/idls/lib/ packages/idls/lib/
 RUN mkdir -p target/types && echo 'export {}' > target/types/_placeholder.ts
-RUN pnpm turbo run build --filter=@helium/account-postgres-sink-service
+RUN --mount=type=cache,id=turbo,target=/app/.turbo pnpm turbo run build --filter=@helium/account-postgres-sink-service
 
 FROM node:22-alpine
 WORKDIR /app
