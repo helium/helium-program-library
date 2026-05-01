@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- [`f290e9b`](https://github.com/helium/helium-program-library/commit/f290e9bd0fe4fe92b1848983aeee80547de1fd2c) Thanks [@ChewingGlass](https://github.com/ChewingGlass)! - Add multi transfer
+
 ## 0.11.17
 
 ### Patch Changes
