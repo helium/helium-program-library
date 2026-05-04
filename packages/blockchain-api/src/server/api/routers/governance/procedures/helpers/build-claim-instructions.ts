@@ -143,7 +143,7 @@ export async function buildClaimInstructions(
     const bitmapWindowEnd = lastClaimedEpoch.add(new BN(129)).toNumber();
     const rawEndEpoch = isDecayed
       ? decayedEpoch.add(new BN(1)).toNumber()
-      : currentEpoch.sub(new BN(1)).toNumber();
+      : currentEpoch.toNumber();
     const endEpoch = Math.min(rawEndEpoch, bitmapWindowEnd);
 
     if (rawEndEpoch > bitmapWindowEnd) {
