@@ -15,6 +15,8 @@ import { getAssociatedTokenAddressSync, NATIVE_MINT } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
+import BN from "bn.js";
+import { getCurrentSeasonEnd } from "../../src/server/api/routers/governance/procedures/helpers/get-current-season";
 import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
@@ -52,6 +54,38 @@ async function getPrograms(ctx: TestCtx) {
   const proxyProgram = await initProxy(provider);
 
   return { vsrProgram, hsdProgram, proxyProgram, provider };
+}
+
+const PROXY_ASSIGNMENT_DURATION_SECONDS = 86400 * 90;
+const PROXY_EXPIRATION_BUFFER_SECONDS = 60;
+
+async function getSeasonBoundedProxyExpirationTime(
+  ctx: TestCtx,
+  positionMint: string
+): Promise<number> {
+  const { vsrProgram, proxyProgram } = await getPrograms(ctx);
+  const now = Math.floor(Date.now() / 1000);
+  const [positionPubkey] = positionKey(new PublicKey(positionMint));
+  const positionAcc = await vsrProgram.account.positionV0.fetch(positionPubkey);
+  const registrar = await vsrProgram.account.registrar.fetch(
+    positionAcc.registrar
+  );
+  const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
+    registrar.proxyConfig
+  );
+  const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, new BN(now));
+
+  if (!seasonEnd) {
+    throw new Error("No current proxy season found");
+  }
+
+  const maxExpiration =
+    seasonEnd.toNumber() - PROXY_EXPIRATION_BUFFER_SECONDS;
+  if (maxExpiration <= now) {
+    throw new Error("Current proxy season has already ended");
+  }
+
+  return Math.min(now + PROXY_ASSIGNMENT_DURATION_SECONDS, maxExpiration);
 }
 
 describe("governance", () => {
@@ -865,7 +899,10 @@ describe("governance", () => {
     it("assigns proxy to position", async () => {
       // #given position with no proxy
       // #when assigning proxy
-      const expirationTime = Math.floor(Date.now() / 1000) + 86400 * 90; // 90 days
+      const expirationTime = await getSeasonBoundedProxyExpirationTime(
+        ctx,
+        positionMint
+      );
 
       const { data, error } = await ctx.safeClient.governance.assignProxies({
         walletAddress,
@@ -920,7 +957,10 @@ describe("governance", () => {
       });
       const unassignMint = unassignResult.positionMint;
 
-      const expirationTime = Math.floor(Date.now() / 1000) + 86400 * 90;
+      const expirationTime = await getSeasonBoundedProxyExpirationTime(
+        ctx,
+        unassignMint
+      );
       const { data: assignData, error: assignError } =
         await ctx.safeClient.governance.assignProxies({
           walletAddress,
@@ -1000,7 +1040,10 @@ describe("governance", () => {
 
     it("re-assigns proxy from one recipient to another", async () => {
       // #given position with proxy assigned to TEST_PROXY_ADDRESS
-      const expirationTime = Math.floor(Date.now() / 1000) + 86400 * 90;
+      const expirationTime = await getSeasonBoundedProxyExpirationTime(
+        ctx,
+        positionMint
+      );
 
       const { data: assignData, error: assignError } =
         await ctx.safeClient.governance.assignProxies({

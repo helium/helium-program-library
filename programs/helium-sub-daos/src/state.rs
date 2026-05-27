@@ -148,7 +148,9 @@ impl DaoV0 {
       self.recent_proposals[self.recent_proposals.len() - 1] = new_proposal;
     }
     // Re-sort the array to ensure it's in descending order by timestamp
-    self.recent_proposals.sort_by(|a, b| b.ts.cmp(&a.ts));
+    self
+      .recent_proposals
+      .sort_by_key(|proposal| std::cmp::Reverse(proposal.ts));
   }
 }
 

@@ -9,14 +9,17 @@ import {
 } from "@/lib/utils/transaction-tags";
 import { init as initOrg, proposalKey } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
-import { truthy } from "@helium/spl-utils";
 import {
   init as initVsr,
   positionKey,
   voteMarkerKey,
 } from "@helium/voter-stake-registry-sdk";
 import { NATIVE_MINT } from "@solana/spl-token";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import BN from "bn.js";
 import { requirePositionOwnership, buildBatchedTransactions } from "../helpers";
 import type { InstructionGroup } from "../helpers";
@@ -73,51 +76,82 @@ export const relinquishPositionVotes =
       const proposalAccounts =
         await proposalProgram.account.proposalV0.fetchMultiple(proposalKeys);
 
-      const activeProposals = proposalKeys
-        .map((pubkey, idx) => ({ account: proposalAccounts[idx], pubkey }))
-        .filter(
-          (p) =>
-            p.account &&
-            typeof p.account.state.voting !== "undefined" &&
-            typeof p.account.state.resolved === "undefined",
+      const proposals = proposalKeys.flatMap((pubkey, index) => {
+        const account = proposalAccounts[index];
+        return account
+          ? [
+              {
+                account,
+                pubkey,
+                markerPubkey: voteMarkerKey(positionMintPubkey, pubkey)[0],
+              },
+            ]
+          : [];
+      });
+
+      const markerAccounts =
+        await vsrProgram.account.voteMarkerV0.fetchMultiple(
+          proposals.map(({ markerPubkey }) => markerPubkey),
         );
 
-      const markerKeys = activeProposals.map(
-        (p) => voteMarkerKey(positionMintPubkey, p.pubkey)[0],
-      );
+      const markersWithChoices = proposals.flatMap((proposal, index) => {
+        const marker = markerAccounts[index];
+        return marker && marker.choices.length > 0
+          ? [{ ...proposal, marker }]
+          : [];
+      });
 
-      const markers = (
-        await vsrProgram.account.voteMarkerV0.fetchMultiple(markerKeys)
-      ).filter(truthy);
-
-      if (markers.length === 0) {
+      if (markersWithChoices.length === 0) {
         throw errors.BAD_REQUEST({
-          message: "No active vote markers found for this position",
+          message: "No vote markers found for this position",
         });
       }
 
       const groups: InstructionGroup[] = [];
 
-      for (const marker of markers) {
+      for (const {
+        marker,
+        markerPubkey,
+        pubkey,
+        account,
+      } of markersWithChoices) {
         const instructions: TransactionInstruction[] = [];
-        for (const choice of marker.choices) {
+
+        if (typeof account.state.voting !== "undefined") {
+          for (const choice of marker.choices) {
+            instructions.push(
+              await vsrProgram.methods
+                .relinquishVoteV1({ choice })
+                .accountsPartial({
+                  marker: markerPubkey,
+                  proposal: marker.proposal,
+                  voter: walletPubkey,
+                  position: positionPubkey,
+                })
+                .instruction(),
+            );
+          }
+        } else {
           instructions.push(
             await vsrProgram.methods
-              .relinquishVoteV1({ choice })
-              .accountsPartial({
-                proposal: marker.proposal,
-                voter: walletPubkey,
+              .relinquishExpiredVoteV0()
+              .accountsStrict({
+                rentRefund: marker.rentRefund,
+                marker: markerPubkey,
                 position: positionPubkey,
+                proposal: pubkey,
+                systemProgram: SystemProgram.programId,
               })
               .instruction(),
           );
         }
+
         groups.push({
           instructions,
           metadata: {
             type: "voting_relinquish_all",
             description: "Relinquish all votes from position",
-            votesRelinquished: instructions.length,
+            votesRelinquished: marker.choices.length,
           },
         });
       }
@@ -158,7 +192,11 @@ export const relinquishPositionVotes =
           transactions,
           parallel: false,
           tag,
-          actionMetadata: { type: "voting_relinquish_position", positionMint, organization },
+          actionMetadata: {
+            type: "voting_relinquish_position",
+            positionMint,
+            organization,
+          },
         },
         hasMore,
         estimatedSolFee: await toTokenAmountOutput(
