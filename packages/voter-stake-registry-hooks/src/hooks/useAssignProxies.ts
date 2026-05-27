@@ -339,6 +339,26 @@ export const useAssignProxies = () => {
                   })
                   .instruction()
               );
+
+              const endTs =
+                endTsByProposal[proxyMarker.account!.proposal.toBase58()];
+              if (endTs && nextAvailable.length > 0) {
+                const freeTaskId = nextAvailable.pop()!;
+                subInstructions.push(
+                  await hplCronsProgram.methods
+                    .queueRelinquishExpiredVoteMarkerV0({
+                      freeTaskId,
+                      triggerTs: endTs,
+                    })
+                    .accountsPartial({
+                      marker: voteMarkerK,
+                      position: positionKey(position.mint)[0],
+                      task: taskKey(TASK_QUEUE_ID, freeTaskId)[0],
+                      taskQueue: TASK_QUEUE_ID,
+                    })
+                    .instruction()
+                );
+              }
             }
           }
           instructions.push(subInstructions);
