@@ -183,6 +183,16 @@ export const assign = publicProcedure.governance.assignProxies.handler(
       Awaited<ReturnType<typeof vsrProgram.account.registrar.fetch>>
     >();
 
+    const taskQueueAcc =
+      activeProxyVotes.length > 0
+        ? await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE)
+        : null;
+    const maxTaskIds = positionMints.length * activeProxyVotes.length;
+    const nextAvailable =
+      taskQueueAcc && maxTaskIds > 0
+        ? nextAvailableTaskIds(taskQueueAcc.taskBitmap, maxTaskIds)
+        : [];
+
     for (const positionMint of positionMints) {
       const positionMintPubkey = new PublicKey(positionMint);
       const [positionPubkey] = positionKey(positionMintPubkey);
