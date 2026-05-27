@@ -7,6 +7,7 @@ import {
 import {
   requirePositionOwnershipWithMessage,
   buildBatchedTransactions,
+  TASK_QUEUE,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
 import { delegatedPositionKey } from "@helium/helium-sub-daos-sdk";
@@ -16,8 +17,15 @@ import {
   organizationKey,
   proposalKey,
 } from "@helium/organization-sdk";
+import { init as initHplCrons } from "@helium/hpl-crons-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
 import { truthy } from "@helium/spl-utils";
+import { init as initStateController } from "@helium/state-controller-sdk";
+import {
+  nextAvailableTaskIds,
+  taskKey,
+  init as initTuktuk,
+} from "@helium/tuktuk-sdk";
 import {
   init as initVsr,
   positionKey,
@@ -48,10 +56,14 @@ export const assign = publicProcedure.governance.assignProxies.handler(
     const proxyProgram = await initProxy(provider);
     const orgProgram = await initOrg(provider);
     const proposalProgram = await initProposal(provider);
+    const stateControllerProgram = await initStateController(provider);
+    const hplCronsProgram = await initHplCrons(provider);
+    const tuktukProgram = await initTuktuk(provider);
 
     const hntOrg = organizationKey("Helium")[0];
-    const organization =
-      await orgProgram.account.organizationV0.fetchNullable(hntOrg);
+    const organization = await orgProgram.account.organizationV0.fetchNullable(
+      hntOrg
+    );
 
     type ProposalVoteData = {
       proposalPubkey: PublicKey;
@@ -73,7 +85,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         .fill(0)
         .map(
           (_, index) =>
-            proposalKey(hntOrg, organization.numProposals - index - 1)[0],
+            proposalKey(hntOrg, organization.numProposals - index - 1)[0]
         );
 
       const proposals = (
@@ -82,12 +94,12 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         .map((account, index) => ({ account, pubkey: proposalKeys[index] }))
         .filter(
           (p): p is typeof p & { account: NonNullable<typeof p.account> } =>
-            !!p.account?.state.voting,
+            !!p.account?.state.voting
         );
 
       if (proposals.length > 0) {
         const proxyVoteKeys = proposals.map(
-          (p) => proxyVoteMarkerKey(proxyKeyPubkey, p.pubkey)[0],
+          (p) => proxyVoteMarkerKey(proxyKeyPubkey, p.pubkey)[0]
         );
         const proxyVoteAccounts =
           await vsrProgram.account.proxyMarkerV0.fetchMultiple(proxyVoteKeys);
@@ -96,29 +108,17 @@ export const assign = publicProcedure.governance.assignProxies.handler(
           ...new Set(
             proposals
               .map((p) => p.account.proposalConfig.toBase58())
-              .filter(truthy),
+              .filter(truthy)
           ),
         ];
         const proposalConfigs = (
           await proposalProgram.account.proposalConfigV0.fetchMultiple(
-            proposalConfigKeys,
+            proposalConfigKeys
           )
-        ).reduce(
-          (acc, pc, index) => {
-            if (pc) acc[proposalConfigKeys[index]] = pc;
-            return acc;
-          },
-          {} as Record<
-            string,
-            NonNullable<
-              Awaited<
-                ReturnType<
-                  typeof proposalProgram.account.proposalConfigV0.fetchNullable
-                >
-              >
-            >
-          >,
-        );
+        ).reduce((acc, pc, index) => {
+          if (pc) acc[proposalConfigKeys[index]] = pc;
+          return acc;
+        }, {} as Record<string, NonNullable<Awaited<ReturnType<typeof proposalProgram.account.proposalConfigV0.fetchNullable>>>>);
 
         for (let i = 0; i < proposals.length; i++) {
           const proxyMarkerAcc = proxyVoteAccounts[i];
@@ -151,8 +151,9 @@ export const assign = publicProcedure.governance.assignProxies.handler(
       const positionMintPubkey = new PublicKey(positionMint);
       const [positionPubkey] = positionKey(positionMintPubkey);
 
-      const positionAcc =
-        await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
+      const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
+        positionPubkey
+      );
 
       if (!positionAcc) {
         throw errors.NOT_FOUND({
@@ -165,14 +166,14 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         positionMintPubkey,
         walletPubkey,
         positionMint,
-        errors,
+        errors
       );
 
       const registrarKey = positionAcc.registrar.toBase58();
       let registrar = registrarCache.get(registrarKey);
       if (!registrar) {
         registrar = await vsrProgram.account.registrar.fetch(
-          positionAcc.registrar,
+          positionAcc.registrar
         );
         registrarCache.set(registrarKey, registrar);
       }
@@ -181,12 +182,12 @@ export const assign = publicProcedure.governance.assignProxies.handler(
       const ownedAssetProxyAssignmentAddress = proxyAssignmentKey(
         proxyConfig,
         positionMintPubkey,
-        PublicKey.default,
+        PublicKey.default
       )[0];
 
       const existingProxyAssignment =
         await proxyProgram.account.proxyAssignmentV0.fetchNullable(
-          ownedAssetProxyAssignmentAddress,
+          ownedAssetProxyAssignmentAddress
         );
 
       const instructions: TransactionInstruction[] = [];
@@ -202,7 +203,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
           const addr = proxyAssignmentKey(
             proxyConfig,
             positionMintPubkey,
-            currentVoter,
+            currentVoter
           )[0];
           chain.push({ address: addr, voter: currentVoter });
           const acc =
@@ -227,10 +228,10 @@ export const assign = publicProcedure.governance.assignProxies.handler(
                 approver: walletPubkey,
                 tokenAccount: getAssociatedTokenAddressSync(
                   positionMintPubkey,
-                  walletPubkey,
+                  walletPubkey
                 ),
               })
-              .instruction(),
+              .instruction()
           );
         }
       }
@@ -248,7 +249,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
           approver: walletPubkey,
           tokenAccount: getAssociatedTokenAddressSync(
             positionMintPubkey,
-            walletPubkey,
+            walletPubkey
           ),
         })
         .prepare();
@@ -257,12 +258,13 @@ export const assign = publicProcedure.governance.assignProxies.handler(
 
       if (activeProxyVotes.length > 0 && nextProxyAssignment) {
         const [delegatedPosKey] = delegatedPositionKey(positionPubkey);
-        const isDelegated =
-          !!(await connection.getAccountInfo(delegatedPosKey));
+        const isDelegated = !!(await connection.getAccountInfo(
+          delegatedPosKey
+        ));
 
         if (isDelegated) {
           const voteMarkerKeys = activeProxyVotes.map(
-            (v) => voteMarkerKey(positionMintPubkey, v.proposalPubkey)[0],
+            (v) => voteMarkerKey(positionMintPubkey, v.proposalPubkey)[0]
           );
           const existingMarkers =
             await vsrProgram.account.voteMarkerV0.fetchMultiple(voteMarkerKeys);
@@ -289,7 +291,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
                   proposalProgram: proposalProgram.programId,
                   systemProgram: SystemProgram.programId,
                 })
-                .instruction(),
+                .instruction()
             );
           }
         }
@@ -350,13 +352,17 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         transactions,
         parallel: true,
         tag,
-        actionMetadata: { type: "proxy_assign", proxyKey, positionCount: positionMints.length },
+        actionMetadata: {
+          type: "proxy_assign",
+          proxyKey,
+          positionCount: positionMints.length,
+        },
       },
       hasMore,
       estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );
