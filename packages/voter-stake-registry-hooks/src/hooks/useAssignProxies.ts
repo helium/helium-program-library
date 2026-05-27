@@ -5,9 +5,18 @@ import {
   fetchBackwardsCompatibleIdl,
   truthy,
 } from "@helium/spl-utils";
-import { positionKey, ProxyAssignment, proxyVoteMarkerKey, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
+import {
+  positionKey,
+  ProxyAssignment,
+  proxyVoteMarkerKey,
+  voteMarkerKey,
+} from "@helium/voter-stake-registry-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import BN from "bn.js";
 import { INDEXER_WAIT } from "../constants";
@@ -23,7 +32,17 @@ import {
   init as proposalInit,
   PROGRAM_ID as PROPOSAL_PROGRAM_ID,
 } from "@helium/proposal-sdk";
-import { init as initVsr, PROGRAM_ID as VSR_PROGRAM_ID } from "@helium/voter-stake-registry-sdk";
+import {
+  init as initVsr,
+  PROGRAM_ID as VSR_PROGRAM_ID,
+} from "@helium/voter-stake-registry-sdk";
+import { init as hplCronsInit, TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
+import { init as initStateController } from "@helium/state-controller-sdk";
+import {
+  nextAvailableTaskIds,
+  taskKey,
+  init as tuktukInit,
+} from "@helium/tuktuk-sdk";
 
 export const useAssignProxies = () => {
   const { provider, registrar, voteService, refetch } = useHeliumVsrState();
@@ -63,6 +82,9 @@ export const useAssignProxies = () => {
         proposalProgramId
       );
       const vsrProgram = await initVsr(provider as any, vsrProgramId);
+      const hplCronsProgram = await hplCronsInit(provider as any);
+      const stateControllerProgram = await initStateController(provider as any);
+      const tuktukProgram = await tuktukInit(provider as any);
       const hntOrg = organizationKey("Helium")[0];
       const organization = await orgProgram.account.organizationV0.fetch(
         hntOrg
@@ -79,23 +101,39 @@ export const useAssignProxies = () => {
       )
         .map((account, index) => ({ account, pubkey: proposalKeys[index] }))
         .filter((prop) => !!prop?.account?.state.voting);
-      const proxyVoteKeys = openProposals.map((prop) => proxyVoteMarkerKey(recipient, prop.pubkey)[0]);
-      const proxyVoteAccounts = (await vsrProgram.account.proxyMarkerV0.fetchMultiple(proxyVoteKeys)).map((account, index) => ({ account, pubkey: proxyVoteKeys[index] } )).filter(v => v.account);
+      const proxyVoteKeys = openProposals.map(
+        (prop) => proxyVoteMarkerKey(recipient, prop.pubkey)[0]
+      );
+      const proxyVoteAccounts = (
+        await vsrProgram.account.proxyMarkerV0.fetchMultiple(proxyVoteKeys)
+      )
+        .map((account, index) => ({ account, pubkey: proxyVoteKeys[index] }))
+        .filter((v) => v.account);
       const proposalsByPubkey = openProposals.reduce((acc, prop) => {
         acc[prop.pubkey.toBase58()] = prop.account;
         return acc;
       }, {} as Record<string, any>);
-      const proposalConfigKeys = [...new Set(
-        openProposals
-          .map((prop) => prop.account?.proposalConfig)
-          .map((p) => p?.toBase58())
-          .filter(truthy)
-      )];
-      const proposalConfigsByPubkey = (await proposalProgram.account.proposalConfigV0.fetchMultiple(proposalConfigKeys)).reduce((acc, pc, index) => {
+      const proposalConfigKeys = [
+        ...new Set(
+          openProposals
+            .map((prop) => prop.account?.proposalConfig)
+            .map((p) => p?.toBase58())
+            .filter(truthy)
+        ),
+      ];
+      const proposalConfigsByPubkey = (
+        await proposalProgram.account.proposalConfigV0.fetchMultiple(
+          proposalConfigKeys
+        )
+      ).reduce((acc, pc, index) => {
         acc[proposalConfigKeys[index]] = pc;
         return acc;
       }, {} as Record<string, any>);
-      const myVoteMarkerKeys = positions.map(position => openProposals.map(op => voteMarkerKey(position.mint, op.pubkey)[0])).flat();
+      const myVoteMarkerKeys = positions
+        .map((position) =>
+          openProposals.map((op) => voteMarkerKey(position.mint, op.pubkey)[0])
+        )
+        .flat();
       const myVoteMarkerAccounts = (
         await vsrProgram.account.voteMarkerV0.fetchMultiple(myVoteMarkerKeys)
       )
@@ -104,7 +142,7 @@ export const useAssignProxies = () => {
         .reduce((acc, v) => {
           acc[v.pubkey.toBase58()] = v.account;
           return acc;
-        }, {} as Record<string, any>) ;
+        }, {} as Record<string, any>);
 
       let resultingAssignments: ProxyAssignment[] = [];
       let undelegated: ProxyAssignment[] = [];
@@ -233,7 +271,11 @@ export const useAssignProxies = () => {
               proxyMarker.account!.proposal
             )[0];
             const voteMarker = myVoteMarkerAccounts[voteMarkerK.toBase58()];
-            if (position.isDelegated && !voteMarker && (proxyMarker.account?.choices?.length || 0) > 0) {
+            if (
+              position.isDelegated &&
+              !voteMarker &&
+              (proxyMarker.account?.choices?.length || 0) > 0
+            ) {
               subInstructions.push(
                 await vsrProgram.methods
                   .countProxyVoteV0()
