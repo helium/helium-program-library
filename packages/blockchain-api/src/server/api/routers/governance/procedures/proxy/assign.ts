@@ -76,6 +76,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
       proposalConfig: PublicKey;
       stateController: PublicKey;
       onVoteHook: PublicKey;
+      endTs: BN;
     };
 
     let activeProxyVotes: ProposalVoteData[] = [];
@@ -111,14 +112,37 @@ export const assign = publicProcedure.governance.assignProxies.handler(
               .filter(truthy)
           ),
         ];
-        const proposalConfigs = (
+        type ProposalConfigV0 = NonNullable<
+          Awaited<
+            ReturnType<
+              typeof proposalProgram.account.proposalConfigV0.fetchNullable
+            >
+          >
+        >;
+        const proposalConfigs: Record<string, ProposalConfigV0> = (
           await proposalProgram.account.proposalConfigV0.fetchMultiple(
             proposalConfigKeys
           )
         ).reduce((acc, pc, index) => {
           if (pc) acc[proposalConfigKeys[index]] = pc;
           return acc;
-        }, {} as Record<string, NonNullable<Awaited<ReturnType<typeof proposalProgram.account.proposalConfigV0.fetchNullable>>>>);
+        }, {} as Record<string, ProposalConfigV0>);
+
+        const stateControllerKeys = [
+          ...new Set(
+            Object.values(proposalConfigs)
+              .map((pc) => pc.stateController.toBase58())
+              .filter(truthy)
+          ),
+        ];
+        const resolutionSettings = (
+          await stateControllerProgram.account.resolutionSettingsV0.fetchMultiple(
+            stateControllerKeys
+          )
+        ).reduce((acc, rs, index) => {
+          if (rs) acc[stateControllerKeys[index]] = rs;
+          return acc;
+        }, {} as Record<string, NonNullable<Awaited<ReturnType<typeof stateControllerProgram.account.resolutionSettingsV0.fetchNullable>>>>);
 
         for (let i = 0; i < proposals.length; i++) {
           const proxyMarkerAcc = proxyVoteAccounts[i];
@@ -129,6 +153,17 @@ export const assign = publicProcedure.governance.assignProxies.handler(
             proposalConfigs[proposal.account.proposalConfig.toBase58()];
           if (!config) continue;
 
+          const rs = resolutionSettings[config.stateController.toBase58()];
+          if (!rs) continue;
+
+          const startTs = new BN(proposal.account.state.voting!.startTs);
+          const offsetNode = rs.settings.nodes.find(
+            (node: { offsetFromStartTs?: { offset: BN } }) =>
+              typeof node.offsetFromStartTs !== "undefined"
+          );
+          const offset = offsetNode?.offsetFromStartTs?.offset ?? new BN(0);
+          const endTs = startTs.add(offset);
+
           activeProxyVotes.push({
             proposalPubkey: proposal.pubkey,
             proxyMarkerPubkey: proxyVoteKeys[i],
@@ -136,6 +171,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
             proposalConfig: proposal.account.proposalConfig,
             stateController: config.stateController,
             onVoteHook: config.onVoteHook,
+            endTs,
           });
         }
       }
