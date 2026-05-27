@@ -129,6 +129,40 @@ export const useAssignProxies = () => {
         acc[proposalConfigKeys[index]] = pc;
         return acc;
       }, {} as Record<string, any>);
+      const stateControllerKeys = [
+        ...new Set(
+          Object.values(proposalConfigsByPubkey)
+            .map((pc: any) => pc?.stateController?.toBase58())
+            .filter(truthy)
+        ),
+      ];
+      const resolutionSettingsByStateController = (
+        await stateControllerProgram.account.resolutionSettingsV0.fetchMultiple(
+          stateControllerKeys
+        )
+      ).reduce((acc, rs, index) => {
+        if (rs) acc[stateControllerKeys[index]] = rs;
+        return acc;
+      }, {} as Record<string, any>);
+
+      const endTsByProposal: Record<string, BN> = {};
+      for (const op of openProposals) {
+        const config =
+          proposalConfigsByPubkey[op.account!.proposalConfig.toBase58()];
+        if (!config) continue;
+        const rs =
+          resolutionSettingsByStateController[
+            config.stateController.toBase58()
+          ];
+        if (!rs) continue;
+        const startTs = new BN((op.account as any).state.voting.startTs);
+        const offsetNode = rs.settings.nodes.find(
+          (node: { offsetFromStartTs?: { offset: BN } }) =>
+            typeof node.offsetFromStartTs !== "undefined"
+        );
+        const offset = offsetNode?.offsetFromStartTs?.offset ?? new BN(0);
+        endTsByProposal[op.pubkey.toBase58()] = startTs.add(offset);
+      }
       const myVoteMarkerKeys = positions
         .map((position) =>
           openProposals.map((op) => voteMarkerKey(position.mint, op.pubkey)[0])
