@@ -163,13 +163,14 @@ export const useAssignProxies = () => {
         const offset = offsetNode?.offsetFromStartTs?.offset ?? new BN(0);
         endTsByProposal[op.pubkey.toBase58()] = startTs.add(offset);
       }
-      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-        TASK_QUEUE_ID
-      );
+      const taskQueueAcc =
+        proxyVoteAccounts.length > 0
+          ? await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID)
+          : null;
       // Worst case: every (position, openProposal) pair needs one task id.
       const maxTaskIds = positions.length * proxyVoteAccounts.length;
       const nextAvailable =
-        maxTaskIds > 0
+        taskQueueAcc && maxTaskIds > 0
           ? nextAvailableTaskIds(taskQueueAcc.taskBitmap, maxTaskIds)
           : [];
       const myVoteMarkerKeys = positions
@@ -342,7 +343,12 @@ export const useAssignProxies = () => {
 
               const endTs =
                 endTsByProposal[proxyMarker.account!.proposal.toBase58()];
-              if (endTs && nextAvailable.length > 0) {
+              if (endTs) {
+                if (nextAvailable.length === 0) {
+                  throw new Error(
+                    "No available tuktuk task IDs to queue relinquish"
+                  );
+                }
                 const freeTaskId = nextAvailable.pop()!;
                 subInstructions.push(
                   await hplCronsProgram.methods
