@@ -163,6 +163,15 @@ export const useAssignProxies = () => {
         const offset = offsetNode?.offsetFromStartTs?.offset ?? new BN(0);
         endTsByProposal[op.pubkey.toBase58()] = startTs.add(offset);
       }
+      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
+        TASK_QUEUE_ID
+      );
+      // Worst case: every (position, openProposal) pair needs one task id.
+      const maxTaskIds = positions.length * proxyVoteAccounts.length;
+      const nextAvailable =
+        maxTaskIds > 0
+          ? nextAvailableTaskIds(taskQueueAcc.taskBitmap, maxTaskIds)
+          : [];
       const myVoteMarkerKeys = positions
         .map((position) =>
           openProposals.map((op) => voteMarkerKey(position.mint, op.pubkey)[0])
