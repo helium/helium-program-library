@@ -76,28 +76,30 @@ export const relinquishPositionVotes =
       const proposalAccounts =
         await proposalProgram.account.proposalV0.fetchMultiple(proposalKeys);
 
-      const proposals = proposalKeys.flatMap((pubkey, idx) => {
-        const account = proposalAccounts[idx];
-        return account ? [{ account, pubkey }] : [];
+      const proposals = proposalKeys.flatMap((pubkey, index) => {
+        const account = proposalAccounts[index];
+        return account
+          ? [
+              {
+                account,
+                pubkey,
+                markerPubkey: voteMarkerKey(positionMintPubkey, pubkey)[0],
+              },
+            ]
+          : [];
       });
 
-      const markerKeys = proposals.map(
-        (p) => voteMarkerKey(positionMintPubkey, p.pubkey)[0],
-      );
+      const markerAccounts =
+        await vsrProgram.account.voteMarkerV0.fetchMultiple(
+          proposals.map(({ markerPubkey }) => markerPubkey),
+        );
 
-      const markers = (
-        await vsrProgram.account.voteMarkerV0.fetchMultiple(markerKeys)
-      ).map((marker, index) => ({
-        marker,
-        markerPubkey: markerKeys[index],
-        proposal: proposals[index],
-      }));
-
-      const markersWithChoices = markers.flatMap((entry) =>
-        entry.marker && entry.marker.choices.length > 0
-          ? [{ ...entry, marker: entry.marker }]
-          : [],
-      );
+      const markersWithChoices = proposals.flatMap((proposal, index) => {
+        const marker = markerAccounts[index];
+        return marker && marker.choices.length > 0
+          ? [{ ...proposal, marker }]
+          : [];
+      });
 
       if (markersWithChoices.length === 0) {
         throw errors.BAD_REQUEST({
@@ -107,10 +109,15 @@ export const relinquishPositionVotes =
 
       const groups: InstructionGroup[] = [];
 
-      for (const { marker, markerPubkey, proposal } of markersWithChoices) {
+      for (const {
+        marker,
+        markerPubkey,
+        pubkey,
+        account,
+      } of markersWithChoices) {
         const instructions: TransactionInstruction[] = [];
 
-        if (typeof proposal.account.state.voting !== "undefined") {
+        if (typeof account.state.voting !== "undefined") {
           for (const choice of marker.choices) {
             instructions.push(
               await vsrProgram.methods
@@ -132,7 +139,7 @@ export const relinquishPositionVotes =
                 rentRefund: marker.rentRefund,
                 marker: markerPubkey,
                 position: positionPubkey,
-                proposal: proposal.pubkey,
+                proposal: pubkey,
                 systemProgram: SystemProgram.programId,
               })
               .instruction(),
