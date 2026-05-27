@@ -339,6 +339,25 @@ export const assign = publicProcedure.governance.assignProxies.handler(
                 })
                 .instruction()
             );
+
+            if (nextAvailable.length === 0) {
+              throw errors.BAD_REQUEST({ message: "No available task IDs" });
+            }
+            const freeTaskId = nextAvailable.pop()!;
+            instructions.push(
+              await hplCronsProgram.methods
+                .queueRelinquishExpiredVoteMarkerV0({
+                  freeTaskId,
+                  triggerTs: vote.endTs,
+                })
+                .accountsPartial({
+                  marker: voteMarkerKeys[i],
+                  position: positionPubkey,
+                  task: taskKey(TASK_QUEUE, freeTaskId)[0],
+                  taskQueue: TASK_QUEUE,
+                })
+                .instruction()
+            );
           }
         }
       }
