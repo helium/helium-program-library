@@ -315,8 +315,11 @@ export const useAssignProxies = () => {
               proxyMarker.account!.proposal
             )[0];
             const voteMarker = myVoteMarkerAccounts[voteMarkerK.toBase58()];
+            const endTs =
+              endTsByProposal[proxyMarker.account!.proposal.toBase58()];
             if (
               position.isDelegated &&
+              endTs &&
               !voteMarker &&
               (proxyMarker.account?.choices?.length || 0) > 0
             ) {
@@ -341,30 +344,26 @@ export const useAssignProxies = () => {
                   .instruction()
               );
 
-              const endTs =
-                endTsByProposal[proxyMarker.account!.proposal.toBase58()];
-              if (endTs) {
-                if (nextAvailable.length === 0) {
-                  throw new Error(
-                    "No available tuktuk task IDs to queue relinquish"
-                  );
-                }
-                const freeTaskId = nextAvailable.pop()!;
-                subInstructions.push(
-                  await hplCronsProgram.methods
-                    .queueRelinquishExpiredVoteMarkerV0({
-                      freeTaskId,
-                      triggerTs: endTs,
-                    })
-                    .accountsPartial({
-                      marker: voteMarkerK,
-                      position: positionKey(position.mint)[0],
-                      task: taskKey(TASK_QUEUE_ID, freeTaskId)[0],
-                      taskQueue: TASK_QUEUE_ID,
-                    })
-                    .instruction()
+              if (nextAvailable.length === 0) {
+                throw new Error(
+                  "No available tuktuk task IDs to queue relinquish"
                 );
               }
+              const freeTaskId = nextAvailable.pop()!;
+              subInstructions.push(
+                await hplCronsProgram.methods
+                  .queueRelinquishExpiredVoteMarkerV0({
+                    freeTaskId,
+                    triggerTs: endTs,
+                  })
+                  .accountsPartial({
+                    marker: voteMarkerK,
+                    position: positionKey(position.mint)[0],
+                    task: taskKey(TASK_QUEUE_ID, freeTaskId)[0],
+                    taskQueue: TASK_QUEUE_ID,
+                  })
+                  .instruction()
+              );
             }
           }
           instructions.push(subInstructions);
