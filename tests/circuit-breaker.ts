@@ -19,6 +19,30 @@ import {
   ThresholdType,
 } from "../packages/circuit-breaker-sdk";
 
+const CIRCUIT_BREAKER_TRIGGERED_MESSAGE = "The circuit breaker was triggered";
+const CIRCUIT_BREAKER_TRIGGERED_CODE = 6000;
+
+function expectCircuitBreakerTriggered(error: any) {
+  const errorText = [
+    error?.toString?.(),
+    error?.message,
+    error?.msg,
+    error?.error?.errorMessage,
+    ...(error?.logs || []),
+    ...(error?.errorLogs || []),
+    ...(error?.transactionLogs || []),
+    ...(error?.simulationResponse?.value?.logs || []),
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const errorCode = Number(error?.code ?? error?.error?.errorCode?.number);
+  expect(
+    errorCode === CIRCUIT_BREAKER_TRIGGERED_CODE ||
+      errorText.includes(CIRCUIT_BREAKER_TRIGGERED_MESSAGE)
+  ).to.eq(true, errorText);
+}
+
 describe("circuit-breaker", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
@@ -179,7 +203,7 @@ describe("circuit-breaker", () => {
           .rpc({ skipPreflight: true });
         throw new Error("should not get here");
       } catch (e: any) {
-        expect(e.toString()).to.include("The circuit breaker was triggered");
+        expectCircuitBreakerTriggered(e);
       }
 
       // Wait til the window passes
@@ -313,8 +337,7 @@ describe("circuit-breaker", () => {
           .rpc({ skipPreflight: true });
         throw new Error("should not get here");
       } catch (e: any) {
-        console.error(e);
-        expect(e.toString()).to.include("The circuit breaker was triggered");
+        expectCircuitBreakerTriggered(e);
       }
 
       // Wait til the window passes
