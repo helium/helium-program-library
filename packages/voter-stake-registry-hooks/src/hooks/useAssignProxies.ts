@@ -346,7 +346,7 @@ export const useAssignProxies = () => {
 
               if (nextAvailable.length === 0) {
                 throw new Error(
-                  "No available tuktuk task IDs to queue relinquish"
+                  "Cannot safely assign proxy; no task IDs are available for vote marker cleanup"
                 );
               }
               const freeTaskId = nextAvailable.pop()!;

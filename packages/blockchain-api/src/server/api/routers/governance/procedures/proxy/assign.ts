@@ -341,7 +341,10 @@ export const assign = publicProcedure.governance.assignProxies.handler(
             );
 
             if (nextAvailable.length === 0) {
-              throw errors.BAD_REQUEST({ message: "No available task IDs" });
+              throw errors.BAD_REQUEST({
+                message:
+                  "Cannot safely assign proxy; no task IDs are available for vote marker cleanup",
+              });
             }
             const freeTaskId = nextAvailable.pop()!;
             instructions.push(
