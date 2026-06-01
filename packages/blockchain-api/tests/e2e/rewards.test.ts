@@ -26,6 +26,7 @@ import { signAndSubmitTransactionData } from "./helpers/tx";
 import { runAllTasks } from "./helpers/tuktuk";
 import { sleep } from "@helium/spl-utils";
 import { createORPCClient } from "@orpc/client";
+import { batchTag } from "@/lib/utils/claim-rewards-tag";
 import { RPCLink } from "@orpc/client/fetch";
 import type { appRouter } from "@/server/api";
 import type { RouterClient } from "@orpc/server";
@@ -246,5 +247,35 @@ describe("rewards endpoints", () => {
     const afterTotal = BigInt(afterAcc.totalRewards.toString());
     const delta = afterTotal - beforeTotal;
     expect(delta).to.equal(BigInt(502501516));
+  });
+});
+
+describe("batchTag", () => {
+  const wallet = "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin";
+  const a = new PublicKey("11111111111111111111111111111111");
+  const b = new PublicKey("So11111111111111111111111111111111111111112");
+  const c = new PublicKey("SysvarC1ock11111111111111111111111111111111");
+
+  it("is order-independent for the same hotspot set", () => {
+    expect(batchTag(wallet, [a, b, c])).to.equal(batchTag(wallet, [c, a, b]));
+  });
+
+  it("is stable across calls", () => {
+    expect(batchTag(wallet, [a, b])).to.equal(batchTag(wallet, [a, b]));
+  });
+
+  it("produces distinct tags for distinct hotspot sets", () => {
+    expect(batchTag(wallet, [a, b])).to.not.equal(batchTag(wallet, [a, c]));
+  });
+
+  it("namespaces by wallet", () => {
+    const otherWallet = "FtPNpkqU7n8X9rTBrL7DkN1Pi9wQ9Pr1Y9HoYxXyo7Mc";
+    expect(batchTag(wallet, [a])).to.not.equal(batchTag(otherWallet, [a]));
+  });
+
+  it("includes the claim_rewards prefix and wallet", () => {
+    expect(batchTag(wallet, [a])).to.match(
+      new RegExp(`^claim_rewards:${wallet}:[0-9a-f]{16}$`),
+    );
   });
 });
