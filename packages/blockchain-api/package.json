@@ -19,6 +19,7 @@
     "background-service": "node scripts/start-background-service.js",
     "test:e2e": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register \"tests/e2e/**/*.test.ts\" --timeout 100000",
     "test:e2e:file": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register --timeout 100000",
+    "test:unit": "mocha -r @swc-node/register \"tests/unit/**/*.test.ts\"",
     "sequelize-cli": "sequelize-cli"
   },
   "dependencies": {

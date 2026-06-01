@@ -8,6 +8,13 @@ import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { submitTransactionBatch } from "./transaction-submission";
+import { checkAndUpdateBatchStatus } from "./transaction-status-checker";
+
+// A batch that has been pending this long has either landed/failed on-chain
+// (and will be resolved by the status check) or is a leaked reservation. Either
+// way it must leave "pending" so the (tag, payer) submission lock is released.
+// Comfortably longer than a blockhash lifetime (~60-90s).
+const STALE_PENDING_BATCH_MS = 2 * 60 * 1000;
 
 export interface ResubmissionResult {
   success: boolean;
@@ -222,7 +229,9 @@ export async function resubmitTransactionBatch(
             Buffer.from(pendingTx.serializedTransaction, "base64"),
           );
           explorerLinks.push(getExplorerUrl(transaction));
-          chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(transaction));
+          chewingGlassExplorerLinks.push(
+            getChewingGlassExplorerUrl(transaction),
+          );
         }
       }
     } catch {
@@ -245,7 +254,10 @@ export async function resubmitTransactionBatch(
         cluster: batch.cluster,
         tag: batch.tag,
         explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
-        chewing_glass_explorer_links: chewingGlassExplorerLinks.length > 0 ? chewingGlassExplorerLinks : undefined,
+        chewing_glass_explorer_links:
+          chewingGlassExplorerLinks.length > 0
+            ? chewingGlassExplorerLinks
+            : undefined,
       },
       contexts: {
         transaction: {
@@ -304,4 +316,76 @@ export async function getPendingTransactionsForResubmission(): Promise<{
   }));
 
   return { batches };
+}
+
+/**
+ * Force a stale batch and its still-pending transactions to "expired" so the
+ * partial unique index on (tag, payer) where status='pending' no longer blocks
+ * new submissions for that tag.
+ */
+async function expirePendingBatch(batch: TransactionBatch): Promise<void> {
+  const dbTransaction = await sequelize.transaction();
+  try {
+    await PendingTransaction.update(
+      { status: "expired" },
+      {
+        where: { batchId: batch.id, status: "pending" },
+        transaction: dbTransaction,
+      },
+    );
+    batch.status = "expired";
+    await batch.save({ transaction: dbTransaction });
+    await dbTransaction.commit();
+  } catch (error) {
+    await dbTransaction.rollback();
+    throw error;
+  }
+}
+
+/**
+ * Reap batches stuck in "pending" past STALE_PENDING_BATCH_MS.
+ *
+ * The tag-based submission lock keys off pending batches, and Jito batches are
+ * never advanced by the resubmission loop (it excludes them) — they only resolve
+ * when a client polls their status. A batch can therefore leak as pending if a
+ * client stops polling, or if a submission crashes/rolls back after the batch
+ * row was reserved. With deterministic tags (e.g. claim_rewards:<wallet>) a leak
+ * would permanently block that tag, so this releases the lock.
+ *
+ * Includes Jito batches (unlike resubmission). Batches with real transactions get
+ * one last on-chain/bundle status check that can resolve them to confirmed/failed;
+ * anything still pending after that (including leaked reservations that never
+ * recorded transactions) is expired.
+ */
+export async function reapStalePendingBatches(): Promise<void> {
+  defineAssociations();
+
+  const cutoff = new Date(Date.now() - STALE_PENDING_BATCH_MS);
+  const staleBatches = await TransactionBatch.findAll({
+    where: {
+      status: "pending",
+      updatedAt: { [Op.lt]: cutoff },
+    },
+    include: [
+      {
+        model: PendingTransaction,
+        as: "transactions",
+        required: false,
+      },
+    ],
+  });
+
+  for (const batch of staleBatches) {
+    try {
+      if ((batch.transactions ?? []).length > 0) {
+        const result = await checkAndUpdateBatchStatus(batch, "confirmed");
+        if (result.batchStatus !== "pending") {
+          continue;
+        }
+      }
+      await expirePendingBatch(batch);
+    } catch (error) {
+      console.error(`Error reaping stale batch ${batch.id}:`, error);
+    }
+  }
 }
