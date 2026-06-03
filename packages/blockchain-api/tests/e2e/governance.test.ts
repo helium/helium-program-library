@@ -56,7 +56,7 @@ async function getPrograms(ctx: TestCtx) {
   const provider = new AnchorProvider(
     ctx.connection,
     wallet,
-    AnchorProvider.defaultOptions(),
+    AnchorProvider.defaultOptions()
   );
 
   const vsrProgram = await initVsr(provider);
@@ -71,17 +71,17 @@ const PROXY_EXPIRATION_BUFFER_SECONDS = 60;
 
 async function getSeasonBoundedProxyExpirationTime(
   ctx: TestCtx,
-  positionMint: string,
+  positionMint: string
 ): Promise<number> {
   const { vsrProgram, proxyProgram } = await getPrograms(ctx);
   const now = Math.floor(Date.now() / 1000);
   const [positionPubkey] = positionKey(new PublicKey(positionMint));
   const positionAcc = await vsrProgram.account.positionV0.fetch(positionPubkey);
   const registrar = await vsrProgram.account.registrar.fetch(
-    positionAcc.registrar,
+    positionAcc.registrar
   );
   const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
-    registrar.proxyConfig,
+    registrar.proxyConfig
   );
   const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, new BN(now));
 
@@ -162,7 +162,7 @@ describe("governance", () => {
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
@@ -188,8 +188,9 @@ describe("governance", () => {
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
 
       // Read clock before operation for exact endTs computation
-      const clockInfo =
-        await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
       const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
 
       // #when extending the lockup to 60 days
@@ -205,19 +206,20 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "position_extend",
+        "position_extend"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify lockup endTs matches expected: clockTimestamp + 60 days
-      const positionAfter =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAfter = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       const expectedEndTs = clockTimestamp + 60 * 86400;
       const actualEndTs = positionAfter.lockup.endTs.toNumber();
       expect(actualEndTs).to.be.within(expectedEndTs, expectedEndTs + 3);
@@ -243,21 +245,22 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "position_flip_lockup",
+        "position_flip_lockup"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify lockup kind changed to constant on-chain
       const { vsrProgram } = await getPrograms(ctx);
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
-      const positionAfter =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAfter = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       expect(Object.keys(positionAfter.lockup.kind)[0]).to.equal("constant");
     });
 
@@ -270,8 +273,9 @@ describe("governance", () => {
       });
 
       // Read clock before operation for exact endTs computation
-      const clockInfo =
-        await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
       const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
 
       // #when resetting lockup to cliff with new period
@@ -288,21 +292,22 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "position_reset_lockup",
+        "position_reset_lockup"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify lockup kind is cliff and endTs matches expected
       const { vsrProgram } = await getPrograms(ctx);
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
-      const positionAfter =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAfter = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       expect(Object.keys(positionAfter.lockup.kind)[0]).to.equal("cliff");
       const expectedEndTs = clockTimestamp + 90 * 86400;
       expect(positionAfter.lockup.endTs.toNumber()).to.be.oneOf([
@@ -341,7 +346,7 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "position_close",
+        "position_close"
       );
     });
   });
@@ -376,13 +381,13 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "position_split",
+        "position_split"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
@@ -417,7 +422,7 @@ describe("governance", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         splitData!.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       const targetPositionMint = splitData!.transactionData.transactions[0]
         .metadata?.newPositionMint as string;
@@ -425,10 +430,12 @@ describe("governance", () => {
       const { vsrProgram } = await getPrograms(ctx);
       const [sourcePubkey] = positionKey(new PublicKey(source.positionMint));
       const [targetPubkey] = positionKey(new PublicKey(targetPositionMint));
-      const sourceBefore =
-        await vsrProgram.account.positionV0.fetch(sourcePubkey);
-      const targetBefore =
-        await vsrProgram.account.positionV0.fetch(targetPubkey);
+      const sourceBefore = await vsrProgram.account.positionV0.fetch(
+        sourcePubkey
+      );
+      const targetBefore = await vsrProgram.account.positionV0.fetch(
+        targetPubkey
+      );
       const sourceAmountBefore = sourceBefore.amountDepositedNative.toNumber();
       const targetAmountBefore = targetBefore.amountDepositedNative.toNumber();
 
@@ -447,26 +454,28 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "position_transfer",
+        "position_transfer"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify amounts changed on-chain
-      const sourceAfter =
-        await vsrProgram.account.positionV0.fetch(sourcePubkey);
-      const targetAfter =
-        await vsrProgram.account.positionV0.fetch(targetPubkey);
+      const sourceAfter = await vsrProgram.account.positionV0.fetch(
+        sourcePubkey
+      );
+      const targetAfter = await vsrProgram.account.positionV0.fetch(
+        targetPubkey
+      );
       expect(sourceAfter.amountDepositedNative.toNumber()).to.equal(
-        sourceAmountBefore - transferAmount,
+        sourceAmountBefore - transferAmount
       );
       expect(targetAfter.amountDepositedNative.toNumber()).to.equal(
-        targetAmountBefore + transferAmount,
+        targetAmountBefore + transferAmount
       );
     });
   });
@@ -502,7 +511,7 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "position_transfer_ownership",
+        "position_transfer_ownership"
       );
       expect(data?.transactionData?.actionMetadata).to.deep.include({
         type: "position_transfer_ownership",
@@ -517,8 +526,8 @@ describe("governance", () => {
       const tx = VersionedTransaction.deserialize(
         Buffer.from(
           data.transactionData.transactions[0].serializedTransaction,
-          "base64",
-        ),
+          "base64"
+        )
       );
       tx.message.recentBlockhash = blockhash;
       tx.sign([ctx.payer]);
@@ -527,30 +536,32 @@ describe("governance", () => {
       });
       await ctx.connection.confirmTransaction(
         { signature: sig, blockhash, lastValidBlockHeight },
-        "confirmed",
+        "confirmed"
       );
 
       // Verify ownership transferred on-chain: recipient now holds the position NFT
       const recipientAta = getAssociatedTokenAddressSync(
         new PublicKey(result.positionMint),
         recipient.publicKey,
-        true,
+        true
       );
-      const recipientTokenAccount =
-        await ctx.connection.getAccountInfo(recipientAta);
+      const recipientTokenAccount = await ctx.connection.getAccountInfo(
+        recipientAta
+      );
       expect(recipientTokenAccount).to.not.be.null;
 
       // Original owner no longer holds it
       const originalAta = getAssociatedTokenAddressSync(
         new PublicKey(result.positionMint),
         ctx.payer.publicKey,
-        true,
+        true
       );
       const originalTokenAccount = await ctx.connection
         .getTokenAccountBalance(originalAta)
         .catch(() => null);
-      const recipientBalance =
-        await ctx.connection.getTokenAccountBalance(recipientAta);
+      const recipientBalance = await ctx.connection.getTokenAccountBalance(
+        recipientAta
+      );
       expect(recipientBalance.value.uiAmount).to.equal(1);
     });
   });
@@ -577,7 +588,7 @@ describe("governance", () => {
           positionMints: [result.positionMint],
           subDaoMint: MOBILE_MINT.toBase58(),
           automationEnabled: false,
-        },
+        }
       );
 
       // #then transaction builds and delegation is created
@@ -586,21 +597,22 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "delegation_delegate",
+        "delegation_delegate"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify delegated position exists on-chain
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
       const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
-      const delegatedInfo =
-        await ctx.connection.getAccountInfo(delegatedPosPubkey);
+      const delegatedInfo = await ctx.connection.getAccountInfo(
+        delegatedPosPubkey
+      );
       expect(delegatedInfo).to.not.be.null;
     });
 
@@ -617,14 +629,15 @@ describe("governance", () => {
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
       const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
 
-      const clockInfo =
-        await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
       const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
       const shortExpiration = clockTimestamp + 3600;
       await setDelegatedPositionExpiration(
         ctx,
         delegatedPosPubkey,
-        shortExpiration,
+        shortExpiration
       );
 
       const delegatedBefore =
@@ -643,21 +656,22 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "delegation_extend",
+        "delegation_extend"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify delegated position expiration increased
-      const delegatedAfter =
-        await hsdProgram.account.delegatedPositionV0.fetch(delegatedPosPubkey);
+      const delegatedAfter = await hsdProgram.account.delegatedPositionV0.fetch(
+        delegatedPosPubkey
+      );
       expect(delegatedAfter.expirationTs.toNumber()).to.be.greaterThan(
-        delegatedBefore.expirationTs.toNumber(),
+        delegatedBefore.expirationTs.toNumber()
       );
     });
 
@@ -683,21 +697,22 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "delegation_undelegate",
+        "delegation_undelegate"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify delegated position account is closed on-chain
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
       const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
-      const delegatedInfo =
-        await ctx.connection.getAccountInfo(delegatedPosPubkey);
+      const delegatedInfo = await ctx.connection.getAccountInfo(
+        delegatedPosPubkey
+      );
       expect(delegatedInfo).to.be.null;
     });
   });
@@ -728,7 +743,7 @@ describe("governance", () => {
           positionMints: [positionMint],
           subDaoMint: MOBILE_MINT.toBase58(),
           automationEnabled: false,
-        },
+        }
       );
 
       // #then transaction builds and delegation changes
@@ -740,15 +755,16 @@ describe("governance", () => {
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify delegation changed to MOBILE sub-DAO
       const [positionPubkey] = positionKey(new PublicKey(positionMint));
       const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
-      const delegatedInfo =
-        await ctx.connection.getAccountInfo(delegatedPosPubkey);
+      const delegatedInfo = await ctx.connection.getAccountInfo(
+        delegatedPosPubkey
+      );
       expect(delegatedInfo).to.not.be.null;
     });
   });
@@ -775,7 +791,7 @@ describe("governance", () => {
           positionMints: [result.positionMint],
           subDaoMint: MOBILE_MINT.toBase58(),
           automationEnabled: false,
-        },
+        }
       );
 
       // #then only delegation transaction is returned (no claims needed)
@@ -784,13 +800,13 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data.transactionData.transactions[0].metadata?.type).to.equal(
-        "delegation_delegate",
+        "delegation_delegate"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
     });
@@ -864,7 +880,7 @@ describe("governance", () => {
           positionMints: [mint1, mint2],
           subDaoMint: MOBILE_MINT.toBase58(),
           automationEnabled: false,
-        },
+        }
       );
 
       // #then response contains transactions for both positions
@@ -876,7 +892,7 @@ describe("governance", () => {
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs.length).to.equal(data.transactionData.transactions.length);
 
@@ -914,7 +930,7 @@ describe("governance", () => {
       // #when assigning proxy
       const expirationTime = await getSeasonBoundedProxyExpirationTime(
         ctx,
-        positionMint,
+        positionMint
       );
 
       const { data, error } = await ctx.safeClient.governance.assignProxies({
@@ -930,13 +946,13 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "proxy_assign",
+        "proxy_assign"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
@@ -944,19 +960,20 @@ describe("governance", () => {
       const { vsrProgram, proxyProgram } = await getPrograms(ctx);
       const positionMintPubkey = new PublicKey(positionMint);
       const [positionPubkey] = positionKey(positionMintPubkey);
-      const positionAcc =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAcc = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       const registrar = await vsrProgram.account.registrar.fetch(
-        positionAcc.registrar,
+        positionAcc.registrar
       );
       const [proxyAssignment] = proxyAssignmentKey(
         registrar.proxyConfig,
         positionMintPubkey,
-        new PublicKey(TEST_PROXY_ADDRESS),
+        new PublicKey(TEST_PROXY_ADDRESS)
       );
       const proxyAssignmentAcc =
         await proxyProgram.account.proxyAssignmentV0.fetchNullable(
-          proxyAssignment,
+          proxyAssignment
         );
       expect(proxyAssignmentAcc).to.not.be.null;
     });
@@ -972,7 +989,7 @@ describe("governance", () => {
 
       const expirationTime = await getSeasonBoundedProxyExpirationTime(
         ctx,
-        unassignMint,
+        unassignMint
       );
       const { data: assignData, error: assignError } =
         await ctx.safeClient.governance.assignProxies({
@@ -983,13 +1000,13 @@ describe("governance", () => {
         });
       if (assignError) {
         throw new Error(
-          `Failed to assign proxy: ${JSON.stringify(assignError)}`,
+          `Failed to assign proxy: ${JSON.stringify(assignError)}`
         );
       }
       await signAndSubmitTransactionData(
         ctx.connection,
         assignData!.transactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #when unassigning proxy
@@ -1005,13 +1022,13 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "proxy_unassign",
+        "proxy_unassign"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
@@ -1019,19 +1036,20 @@ describe("governance", () => {
       const { vsrProgram, proxyProgram } = await getPrograms(ctx);
       const positionMintPubkey = new PublicKey(unassignMint);
       const [positionPubkey] = positionKey(positionMintPubkey);
-      const positionAcc =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAcc = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       const registrar = await vsrProgram.account.registrar.fetch(
-        positionAcc.registrar,
+        positionAcc.registrar
       );
       const [proxyAssignment] = proxyAssignmentKey(
         registrar.proxyConfig,
         positionMintPubkey,
-        new PublicKey(TEST_PROXY_ADDRESS),
+        new PublicKey(TEST_PROXY_ADDRESS)
       );
       const proxyAssignmentAcc =
         await proxyProgram.account.proxyAssignmentV0.fetchNullable(
-          proxyAssignment,
+          proxyAssignment
         );
       expect(proxyAssignmentAcc).to.be.null;
     });
@@ -1057,7 +1075,7 @@ describe("governance", () => {
       // #given position with proxy assigned to TEST_PROXY_ADDRESS
       const expirationTime = await getSeasonBoundedProxyExpirationTime(
         ctx,
-        positionMint,
+        positionMint
       );
 
       const { data: assignData, error: assignError } =
@@ -1069,13 +1087,13 @@ describe("governance", () => {
         });
       if (assignError) {
         throw new Error(
-          `Failed to assign proxy: ${JSON.stringify(assignError)}`,
+          `Failed to assign proxy: ${JSON.stringify(assignError)}`
         );
       }
       await signAndSubmitTransactionData(
         ctx.connection,
         assignData!.transactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #when re-assigning proxy to a new address
@@ -1093,13 +1111,13 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "proxy_assign",
+        "proxy_assign"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
@@ -1107,16 +1125,17 @@ describe("governance", () => {
       const { vsrProgram, proxyProgram } = await getPrograms(ctx);
       const positionMintPubkey = new PublicKey(positionMint);
       const [positionPubkey] = positionKey(positionMintPubkey);
-      const positionAcc =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAcc = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       const registrar = await vsrProgram.account.registrar.fetch(
-        positionAcc.registrar,
+        positionAcc.registrar
       );
 
       const [oldProxy] = proxyAssignmentKey(
         registrar.proxyConfig,
         positionMintPubkey,
-        new PublicKey(TEST_PROXY_ADDRESS),
+        new PublicKey(TEST_PROXY_ADDRESS)
       );
       const oldProxyAcc =
         await proxyProgram.account.proxyAssignmentV0.fetchNullable(oldProxy);
@@ -1126,7 +1145,7 @@ describe("governance", () => {
       const [newProxy] = proxyAssignmentKey(
         registrar.proxyConfig,
         positionMintPubkey,
-        new PublicKey(newRecipient),
+        new PublicKey(newRecipient)
       );
       const newProxyAcc =
         await proxyProgram.account.proxyAssignmentV0.fetchNullable(newProxy);
@@ -1151,7 +1170,7 @@ describe("governance", () => {
       const names: string[] = [];
       for (const t of txData.transactions) {
         const tx = VersionedTransaction.deserialize(
-          Buffer.from(t.serializedTransaction, "base64"),
+          Buffer.from(t.serializedTransaction, "base64")
         );
         const keys = tx.message.staticAccountKeys;
         for (const ix of tx.message.compiledInstructions) {
@@ -1182,7 +1201,7 @@ describe("governance", () => {
       const { vsrProgram } = await getPrograms(ctx);
       const [proxyVoteMarker] = proxyVoteMarkerKey(
         proxyKp.publicKey,
-        proposalSetup.proposal,
+        proposalSetup.proposal
       );
       const proxiedVoteIx = await vsrProgram.methods
         .proxiedVoteV1({ choice: 0 })
@@ -1200,17 +1219,18 @@ describe("governance", () => {
       proxiedVoteTx.add(proxiedVoteIx);
       proxiedVoteTx.sign(ctx.payer, proxyKp);
       const proxiedVoteSig = await ctx.connection.sendRawTransaction(
-        proxiedVoteTx.serialize(),
+        proxiedVoteTx.serialize()
       );
       await ctx.connection.confirmTransaction(
         { signature: proxiedVoteSig, blockhash, lastValidBlockHeight },
-        "confirmed",
+        "confirmed"
       );
 
-      // Sanity: the proxy marker now records a choice.
-      const proxyMarkerAcc =
-        await vsrProgram.account.proxyMarkerV0.fetch(proxyVoteMarker);
-      expect(proxyMarkerAcc.choices).to.include(0);
+      // Sanity: the proxy marker now records the cast choice.
+      const proxyMarkerAcc = await vsrProgram.account.proxyMarkerV0.fetch(
+        proxyVoteMarker
+      );
+      expect(proxyMarkerAcc.choices).to.deep.equal([0]);
 
       // #given a delegated position owned by the wallet, not yet proxied
       const { positionMint } = await createAndFundPosition(ctx, {
@@ -1227,19 +1247,19 @@ describe("governance", () => {
         });
       if (delegateError) {
         throw new Error(
-          `Failed to delegate position: ${JSON.stringify(delegateError)}`,
+          `Failed to delegate position: ${JSON.stringify(delegateError)}`
         );
       }
       await signAndSubmitTransactionData(
         ctx.connection,
         delegateData!.transactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #when assigning the delegated position to the proxy that already voted
       const expirationTime = await getSeasonBoundedProxyExpirationTime(
         ctx,
-        positionMint,
+        positionMint
       );
       const { data, error } = await ctx.safeClient.governance.assignProxies({
         walletAddress,
@@ -1248,8 +1268,7 @@ describe("governance", () => {
         expirationTime,
       });
 
-      // #then it builds successfully (the old inline relinquish required the
-      // proxy to sign, which is impossible from a wallet-signed assign tx)
+      // #then the call succeeds
       if (error) {
         expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
       }
@@ -1265,7 +1284,7 @@ describe("governance", () => {
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data!.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs.length).to.be.greaterThan(0);
 
@@ -1273,19 +1292,20 @@ describe("governance", () => {
       const { proxyProgram } = await getPrograms(ctx);
       const positionMintPubkey = new PublicKey(positionMint);
       const [positionPubkey] = positionKey(positionMintPubkey);
-      const positionAcc =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAcc = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       const registrar = await vsrProgram.account.registrar.fetch(
-        positionAcc.registrar,
+        positionAcc.registrar
       );
       const [proxyAssignment] = proxyAssignmentKey(
         registrar.proxyConfig,
         positionMintPubkey,
-        proxyKp.publicKey,
+        proxyKp.publicKey
       );
       const proxyAssignmentAcc =
         await proxyProgram.account.proxyAssignmentV0.fetchNullable(
-          proxyAssignment,
+          proxyAssignment
         );
       expect(proxyAssignmentAcc).to.not.be.null;
     });
@@ -1320,20 +1340,20 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "voting_vote",
+        "voting_vote"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify vote marker exists
       const [voteMarker] = voteMarkerKey(
         new PublicKey(result.positionMint),
-        proposalSetup.proposal,
+        proposalSetup.proposal
       );
       const markerInfo = await ctx.connection.getAccountInfo(voteMarker);
       expect(markerInfo).to.not.be.null;
@@ -1360,7 +1380,7 @@ describe("governance", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         voteData!.transactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #when relinquishing vote
@@ -1377,13 +1397,13 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "voting_relinquish",
+        "voting_relinquish"
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
@@ -1391,10 +1411,11 @@ describe("governance", () => {
       const { vsrProgram } = await getPrograms(ctx);
       const [voteMarker] = voteMarkerKey(
         new PublicKey(result.positionMint),
-        proposalSetup.proposal,
+        proposalSetup.proposal
       );
-      const markerAfter =
-        await vsrProgram.account.voteMarkerV0.fetchNullable(voteMarker);
+      const markerAfter = await vsrProgram.account.voteMarkerV0.fetchNullable(
+        voteMarker
+      );
       if (markerAfter) {
         expect(markerAfter.choices).to.not.include(0);
       }
@@ -1421,7 +1442,7 @@ describe("governance", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         voteData!.transactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #when second vote on same choice
@@ -1435,7 +1456,7 @@ describe("governance", () => {
       // #then should fail - already voted for this choice
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("BAD_REQUEST");
@@ -1471,7 +1492,7 @@ describe("governance", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         data!.transactionData,
-        ctx.payer,
+        ctx.payer
       );
     });
 
@@ -1491,26 +1512,27 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(1);
       expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "voting_relinquish_all",
+        "voting_relinquish_all"
       );
       expect(
-        data?.transactionData?.transactions[0].metadata?.votesRelinquished,
+        data?.transactionData?.transactions[0].metadata?.votesRelinquished
       ).to.equal(1);
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
       expect(sigs).to.have.length(1);
 
       // Verify vote marker is cleared on-chain
       const [voteMarker] = voteMarkerKey(
         new PublicKey(positionMint),
-        orgProposalSetup.proposal,
+        orgProposalSetup.proposal
       );
       const { vsrProgram } = await getPrograms(ctx);
-      const markerAfter =
-        await vsrProgram.account.voteMarkerV0.fetchNullable(voteMarker);
+      const markerAfter = await vsrProgram.account.voteMarkerV0.fetchNullable(
+        voteMarker
+      );
       if (markerAfter) {
         expect(markerAfter.choices).to.have.length(0);
       }
@@ -1541,7 +1563,7 @@ describe("governance", () => {
         await signAndSubmitTransactionData(
           ctx.connection,
           voteData!.transactionData,
-          ctx.payer,
+          ctx.payer
         );
 
         // #when trying to close position with active votes
@@ -1553,7 +1575,7 @@ describe("governance", () => {
         // #then returns BAD_REQUEST
         if (!isDefinedError(error)) {
           expect.fail(
-            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
           );
         }
         expect(error.code).to.equal("BAD_REQUEST");
@@ -1578,7 +1600,7 @@ describe("governance", () => {
         // #then returns BAD_REQUEST about lockup not expired
         if (!isDefinedError(error)) {
           expect.fail(
-            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
           );
         }
         expect(error.code).to.equal("BAD_REQUEST");
@@ -1606,7 +1628,7 @@ describe("governance", () => {
         // #then returns BAD_REQUEST
         if (!isDefinedError(error)) {
           expect.fail(
-            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
           );
         }
         expect(error.code).to.equal("BAD_REQUEST");
@@ -1637,7 +1659,7 @@ describe("governance", () => {
         await signAndSubmitTransactionData(
           ctx.connection,
           splitData!.transactionData,
-          ctx.payer,
+          ctx.payer
         );
         const targetMint = splitData!.transactionData.transactions[0].metadata
           ?.newPositionMint as string;
@@ -1656,7 +1678,7 @@ describe("governance", () => {
         await signAndSubmitTransactionData(
           ctx.connection,
           voteData!.transactionData,
-          ctx.payer,
+          ctx.payer
         );
 
         // #when trying to transfer from position with active votes
@@ -1670,7 +1692,7 @@ describe("governance", () => {
         // #then returns BAD_REQUEST
         if (!isDefinedError(error)) {
           expect.fail(
-            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
           );
         }
         expect(error.code).to.equal("BAD_REQUEST");
@@ -1697,7 +1719,7 @@ describe("governance", () => {
         // #then returns BAD_REQUEST
         if (!isDefinedError(error)) {
           expect.fail(
-            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
           );
         }
         expect(error.code).to.equal("BAD_REQUEST");
@@ -1722,7 +1744,7 @@ describe("governance", () => {
         // #then returns BAD_REQUEST
         if (!isDefinedError(error)) {
           expect.fail(
-            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
           );
         }
         expect(error.code).to.equal("BAD_REQUEST");
@@ -1739,16 +1761,17 @@ describe("governance", () => {
         });
 
         const [positionPubkey] = positionKey(
-          new PublicKey(result.positionMint),
+          new PublicKey(result.positionMint)
         );
 
-        const clockInfo =
-          await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+        const clockInfo = await ctx.connection.getAccountInfo(
+          SYSVAR_CLOCK_PUBKEY
+        );
         const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
         await setPositionLockupEndTs(
           ctx,
           positionPubkey,
-          clockTimestamp - 3600,
+          clockTimestamp - 3600
         );
 
         // #when attempting to delegate
@@ -1762,12 +1785,12 @@ describe("governance", () => {
         // #then returns BAD_REQUEST with decay message
         if (!isDefinedError(error)) {
           expect.fail(
-            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
           );
         }
         expect(error.code).to.equal("BAD_REQUEST");
         expect(error.message).to.equal(
-          "Position lockup has fully decayed and cannot be delegated",
+          "Position lockup has fully decayed and cannot be delegated"
         );
       });
 
@@ -1782,16 +1805,17 @@ describe("governance", () => {
         });
 
         const [positionPubkey] = positionKey(
-          new PublicKey(result.positionMint),
+          new PublicKey(result.positionMint)
         );
 
-        const clockInfo =
-          await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+        const clockInfo = await ctx.connection.getAccountInfo(
+          SYSVAR_CLOCK_PUBKEY
+        );
         const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
         await setPositionLockupEndTs(
           ctx,
           positionPubkey,
-          clockTimestamp - 3600,
+          clockTimestamp - 3600
         );
 
         // #when attempting to extend delegation
@@ -1803,12 +1827,12 @@ describe("governance", () => {
         // #then returns BAD_REQUEST with decay message
         if (!isDefinedError(error)) {
           expect.fail(
-            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
           );
         }
         expect(error.code).to.equal("BAD_REQUEST");
         expect(error.message).to.equal(
-          "Position lockup has fully decayed and cannot be extended",
+          "Position lockup has fully decayed and cannot be extended"
         );
       });
     });
@@ -1833,7 +1857,7 @@ describe("governance", () => {
         // #then returns BAD_REQUEST
         if (!isDefinedError(error)) {
           expect.fail(
-            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+            `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
           );
         }
         expect(error.code).to.equal("BAD_REQUEST");
