@@ -2,12 +2,18 @@ import { sequelize } from "@/lib/db";
 import { env } from "@/lib/env";
 import PendingTransaction from "@/lib/models/pending-transaction";
 import TransactionBatch from "@/lib/models/transaction-batch";
-import { getChewingGlassExplorerUrl, getExplorerUrl } from "@/lib/utils/explorer";
+import {
+  getChewingGlassExplorerUrl,
+  getExplorerUrl,
+} from "@/lib/utils/explorer";
 import { getCluster } from "@/lib/solana";
 import {
   BundleSimulationError,
   JitoBundleSubmissionError,
+  shouldUseJitoBundle,
 } from "@/lib/utils/jito";
+import { predictSubmissionType } from "@/lib/utils/submission-helpers";
+import { v4 as uuidv4 } from "uuid";
 import {
   JitoMissingTipError,
   SingleTransactionSubmissionError,
@@ -325,27 +331,61 @@ export const submit = publicProcedure.transactions.submit.handler(
       }
     }
 
-    // Check for existing pending transaction with same tag+payer
-    if (tag) {
-      const existingBatch = await TransactionBatch.findOne({
-        where: {
-          tag,
-          payer,
-          status: "pending",
-        },
-      });
-
-      if (existingBatch) {
-        return {
-          batchId: existingBatch.id,
-          message: `Transaction with tag "${tag}" already exists and is pending`,
-        };
-      }
-    }
-
+    const cluster = getCluster();
     const serializedTransactions = transactions.map(
       (tx) => tx.serializedTransaction,
     );
+    // Derive actionType from first transaction metadata or actionMetadata
+    const actionType =
+      (actionMetadata?.type as string) ||
+      transactions[0]?.metadata?.type ||
+      undefined;
+
+    const batchId = uuidv4();
+
+    // Reserve the (tag, payer) slot BEFORE submitting so we never have more
+    // than one bundle in flight per tag. The partial unique index on
+    // (tag, payer) where status='pending' makes this atomic across concurrent
+    // or duplicate requests — the loser short-circuits to the in-flight batch
+    // instead of submitting a second, identical bundle (which Jito rejects with
+    // -32602 "already processed transaction").
+    if (tag) {
+      const predictedSubmissionType = predictSubmissionType({
+        transactionCount: transactions.length,
+        useJitoBundle: shouldUseJitoBundle(transactions.length, cluster),
+        parallel,
+      });
+
+      try {
+        await TransactionBatch.create({
+          id: batchId,
+          parallel,
+          status: "pending",
+          submissionType: predictedSubmissionType,
+          cluster,
+          tag,
+          payer,
+          actionType,
+          actionMetadata,
+        });
+      } catch (error) {
+        if (
+          (error as { name?: string })?.name ===
+          "SequelizeUniqueConstraintError"
+        ) {
+          const existingBatch = await TransactionBatch.findOne({
+            where: { tag, payer, status: "pending" },
+          });
+          if (existingBatch) {
+            return {
+              batchId: existingBatch.id,
+              message: `Transaction with tag "${tag}" already exists and is pending`,
+            };
+          }
+        }
+        throw error;
+      }
+    }
 
     let result;
     try {
@@ -357,6 +397,14 @@ export const submit = publicProcedure.transactions.submit.handler(
         transactionMetadata: transactions.map((tx) => tx.metadata),
       });
     } catch (error) {
+      // Release the reservation so a failed submission doesn't leave the tag
+      // locked as pending forever.
+      if (tag) {
+        await TransactionBatch.destroy({ where: { id: batchId } }).catch(
+          () => {},
+        );
+      }
+
       captureSubmissionError(error, {
         batchSize: serializedTransactions.length,
         parallel,
@@ -391,7 +439,6 @@ export const submit = publicProcedure.transactions.submit.handler(
       });
     }
 
-    const cluster = getCluster();
     const connection = new Connection(env.SOLANA_RPC_URL);
     const { lastValidBlockHeight } = await connection.getLatestBlockhash({
       commitment: "finalized",
@@ -401,28 +448,33 @@ export const submit = publicProcedure.transactions.submit.handler(
     const dbTransaction = await sequelize.transaction();
 
     try {
-      // Create the batch record
-      // Derive actionType from first transaction metadata or actionMetadata
-      const actionType =
-        (actionMetadata?.type as string) ||
-        transactions[0]?.metadata?.type ||
-        undefined;
-
-      await TransactionBatch.create(
-        {
-          id: result.batchId,
-          parallel,
-          status: "pending",
-          submissionType: result.submissionType,
-          jitoBundleId: result.jitoBundleId,
-          cluster,
-          tag,
-          payer,
-          actionType,
-          actionMetadata,
-        },
-        { transaction: dbTransaction },
-      );
+      if (tag) {
+        // Finalize the reservation created above with the real submission
+        // details now that the bundle/transactions have been submitted.
+        await TransactionBatch.update(
+          {
+            submissionType: result.submissionType,
+            jitoBundleId: result.jitoBundleId,
+          },
+          { where: { id: batchId }, transaction: dbTransaction },
+        );
+      } else {
+        await TransactionBatch.create(
+          {
+            id: batchId,
+            parallel,
+            status: "pending",
+            submissionType: result.submissionType,
+            jitoBundleId: result.jitoBundleId,
+            cluster,
+            tag,
+            payer,
+            actionType,
+            actionMetadata,
+          },
+          { transaction: dbTransaction },
+        );
+      }
 
       // Create individual transaction records
       const pendingTransactionPromises = transactions.map(async (txData, i) => {
@@ -435,12 +487,12 @@ export const submit = publicProcedure.transactions.submit.handler(
 
         return PendingTransaction.create(
           {
-            signature: signature || `${result.batchId}-${i}`,
+            signature: signature || `${batchId}-${i}`,
             blockhash: transaction.message.recentBlockhash,
             lastValidBlockHeight,
             status: "pending",
             type: txData.metadata?.type || "batch",
-            batchId: result.batchId,
+            batchId,
             payer,
             metadata: txData.metadata,
             serializedTransaction: txData.serializedTransaction,
@@ -456,20 +508,9 @@ export const submit = publicProcedure.transactions.submit.handler(
     } catch (error: unknown) {
       // Rollback the transaction on any error
       await dbTransaction.rollback();
-
-      // Handle unique constraint violation for tag+payer when status is pending
-      if (
-        (error as { name?: string })?.name ===
-          "SequelizeUniqueConstraintError" &&
-        tag
-      ) {
-        throw errors.CONFLICT({
-          message: `A pending transaction with tag "${tag}" already exists for this payer`,
-        });
-      }
       throw error;
     }
 
-    return { batchId: result.batchId };
+    return { batchId };
   },
 );

@@ -11,6 +11,7 @@ import {
   JitoBundleContext,
   jitoBlockEngineRequest,
 } from "./jito";
+import { isBundleLanded } from "./submission-helpers";
 
 export class SingleTransactionSubmissionError extends Error {
   public readonly explorerLink: string | null;
@@ -88,10 +89,16 @@ async function requireBundleHasTipAccount(
       Buffer.from(serialized, "base64"),
     );
     const keys = tx.message.staticAccountKeys;
-    const { numRequiredSignatures, numReadonlySignedAccounts, numReadonlyUnsignedAccounts } = tx.message.header;
-    const writableSignedCount = numRequiredSignatures - numReadonlySignedAccounts;
+    const {
+      numRequiredSignatures,
+      numReadonlySignedAccounts,
+      numReadonlyUnsignedAccounts,
+    } = tx.message.header;
+    const writableSignedCount =
+      numRequiredSignatures - numReadonlySignedAccounts;
     const unsignedStart = numRequiredSignatures;
-    const writableUnsignedCount = keys.length - numRequiredSignatures - numReadonlyUnsignedAccounts;
+    const writableUnsignedCount =
+      keys.length - numRequiredSignatures - numReadonlyUnsignedAccounts;
 
     for (let i = 0; i < writableSignedCount; i++) {
       if (cachedTipAccountSet.has(keys[i].toBase58())) return;
@@ -117,11 +124,32 @@ async function requireBundleHasTipAccount(
 
 function isBlockhashNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes("Blockhash not found") || message.includes("blockhash not found");
+  return (
+    message.includes("Blockhash not found") ||
+    message.includes("blockhash not found")
+  );
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Check whether the real (non-tip) transactions of a Jito bundle are already
+ * confirmed on-chain. Lets us treat a bundle rejection (e.g. -32602 "already
+ * processed transaction") as success when the transactions actually landed,
+ * without coupling to Jito's error text.
+ */
+async function bundleTransactionsLanded(
+  connection: Connection,
+  signatures: string[],
+  transactionMetadata?: Array<Record<string, unknown> | undefined>,
+): Promise<boolean> {
+  const { value } = await connection.getSignatureStatuses(signatures, {
+    searchTransactionHistory: true,
+  });
+
+  return isBundleLanded(value, transactionMetadata);
 }
 
 export interface TransactionBatchPayload {
@@ -229,18 +257,40 @@ export async function submitTransactionBatch(
       await requireBundleHasTipAccount(payload.transactions, payload.tag);
       await simulateJitoBundle(payload.transactions, bundleContext);
 
-      const jitoBundleId = await submitJitoBundle(payload.transactions, bundleContext);
-      return {
-        batchId,
-        submissionType: "jito_bundle",
-        jitoBundleId,
-        signatures: payload.transactions.map((tx) =>
-          bs58.encode(
-            VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
-              .signatures[0],
-          ),
+      const signatures = payload.transactions.map((tx) =>
+        bs58.encode(
+          VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
+            .signatures[0],
         ),
-      };
+      );
+
+      try {
+        const jitoBundleId = await submitJitoBundle(
+          payload.transactions,
+          bundleContext,
+        );
+        return {
+          batchId,
+          submissionType: "jito_bundle",
+          jitoBundleId,
+          signatures,
+        };
+      } catch (error) {
+        // Jito rejects a bundle (e.g. -32602 "already processed transaction")
+        // when a transaction in it has already landed. Trust the ledger, not the
+        // error text: if the real (non-tip) transactions are confirmed on-chain,
+        // the work succeeded and the rejection is moot.
+        if (
+          await bundleTransactionsLanded(
+            connection,
+            signatures,
+            payload.transactionMetadata,
+          )
+        ) {
+          return { batchId, submissionType: "jito_bundle", signatures };
+        }
+        throw error;
+      }
     } else {
       // Devnet/Localnet: use parallel or sequential based on payload.parallel
       if (payload.parallel) {

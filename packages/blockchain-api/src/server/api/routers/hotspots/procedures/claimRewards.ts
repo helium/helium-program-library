@@ -51,6 +51,7 @@ import {
   getMintForNetwork,
   getLazyDistributorForNetwork,
 } from "@/lib/utils/network-mint";
+import { batchTag } from "@/lib/utils/claim-rewards-tag";
 
 // Minimum lamports the on-chain program requires in the PDA wallet before
 // queuing a wallet claim task. Matches CLAIMER_MIN_LAMPORTS in
@@ -209,7 +210,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           transactionData: {
             transactions: [],
             parallel: false,
-            tag: `claim_rewards:${walletAddress}`,
+            tag: `claim_rewards:${walletAddress}:empty`,
             actionMetadata: {
               type: "claim_rewards",
               hotspotCount: 0,
@@ -300,7 +301,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           // Sequential: init and distribute ixs for the same recipient may land
           // in different packed txs; parallel submission races them.
           parallel: false,
-          tag: `claim_rewards:${walletAddress}`,
+          tag: batchTag(walletAddress, assets),
           actionMetadata: {
             type: "claim_rewards",
             hotspotCount: allClaimable.length,

@@ -2,24 +2,28 @@ import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
 import {
   getPendingTransactionsForResubmission,
+  reapStalePendingBatches,
   resubmitTransactionBatch,
 } from "../utils/transaction-resubmission";
 import { checkAndUpdateBatchStatus } from "../utils/transaction-status-checker";
 
 interface ResubmissionServiceConfig {
   intervalMs: number;
+  reaperIntervalMs: number;
   maxRetries: number;
   enabled: boolean;
 }
 
 class TransactionResubmissionService {
   private intervalId: NodeJS.Timeout | null = null;
+  private reaperIntervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private config: ResubmissionServiceConfig;
 
   constructor(
     config: ResubmissionServiceConfig = {
       intervalMs: 2000, // 2 seconds
+      reaperIntervalMs: 30000, // 30 seconds
       maxRetries: 10,
       enabled: true,
     },
@@ -53,6 +57,14 @@ class TransactionResubmissionService {
         console.error("Error in transaction resubmission service:", error);
       }
     }, this.config.intervalMs);
+
+    this.reaperIntervalId = setInterval(async () => {
+      try {
+        await reapStalePendingBatches();
+      } catch (error) {
+        console.error("Error in stale batch reaper:", error);
+      }
+    }, this.config.reaperIntervalMs);
   }
 
   /**
@@ -62,6 +74,10 @@ class TransactionResubmissionService {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (this.reaperIntervalId) {
+      clearInterval(this.reaperIntervalId);
+      this.reaperIntervalId = null;
     }
     this.isRunning = false;
     console.log("Transaction resubmission service stopped");
