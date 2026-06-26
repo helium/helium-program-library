@@ -96,6 +96,11 @@ jobs:
 
       - name: Install Surfpool CLI
         if: steps.cache-surfpool.outputs.cache-hit != 'true'
+        env:
+          # crates.io downloads intermittently fail with "HTTP2 framing layer";
+          # fetch via git CLI and disable HTTP/2 multiplexing to avoid it.
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_HTTP_MULTIPLEXING: "false"
         run: |
           cargo install --git https://github.com/txtx/surfpool --tag v0.11.2 --locked --force
 
