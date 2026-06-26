@@ -46,6 +46,7 @@ jobs:
     env:
       NODE_ENV: test
       NEXT_PORT: 3000
+      SOLANA_CLI_VERSION: 2.1.6
       SURFPOOL_RPC_URL: http://127.0.0.1:8899
       ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
       NEXT_PUBLIC_SOLANA_CLUSTER: mainnet
