@@ -33,7 +33,7 @@ import {
 import BN from "bn.js";
 import {
   TASK_QUEUE,
-  validatePositionOwnership,
+  validatePositionOwnershipBatch,
   buildBatchedTransactions,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
@@ -128,10 +128,69 @@ export const vote = publicProcedure.governance.vote.handler(
       vsrProgram.account.voteMarkerV0.fetchMultiple(markerKeys),
     ]);
 
-    const registrarCache = new Map<
-      string,
-      Awaited<ReturnType<typeof vsrProgram.account.registrar.fetch>>
+    // Ownership for every position in one batched call (ceil(N/100) round-trips
+    // instead of one getAccountInfo per position).
+    const isOwnerByIndex = await validatePositionOwnershipBatch(
+      connection,
+      positionMintPubkeys,
+      walletPubkey,
+    );
+
+    // For non-owned positions we must confirm a proxy assignment exists. Resolve
+    // each position's registrar (→ proxyConfig), then fetch all proxy assignments
+    // in one batched call instead of one fetchNullable per position. Without this,
+    // a large proxied voter triggers ~2 sequential RPCs per position and the
+    // request exceeds the gateway timeout.
+    const registrarKeySet = new Set<string>();
+    positionAccounts.forEach(
+      (acc: (typeof positionAccounts)[number], i: number) => {
+        if (acc && !isOwnerByIndex[i]) {
+          registrarKeySet.add(acc.registrar.toBase58());
+        }
+      },
+    );
+    const registrarKeysToFetch: string[] = Array.from(registrarKeySet);
+    const registrarAccounts = registrarKeysToFetch.length
+      ? await vsrProgram.account.registrar.fetchMultiple(
+          registrarKeysToFetch.map((k: string) => new PublicKey(k)),
+        )
+      : [];
+    const registrarByKey = new Map<string, (typeof registrarAccounts)[number]>(
+      registrarKeysToFetch.map(
+        (k: string, i: number) => [k, registrarAccounts[i]] as const,
+      ),
+    );
+
+    const proxyAssignmentIndexes: number[] = [];
+    const proxyAssignmentKeys: PublicKey[] = [];
+    for (let i = 0; i < positionMints.length; i++) {
+      const acc = positionAccounts[i];
+      if (acc && !isOwnerByIndex[i]) {
+        const registrar = registrarByKey.get(acc.registrar.toBase58());
+        if (registrar) {
+          proxyAssignmentIndexes.push(i);
+          proxyAssignmentKeys.push(
+            proxyAssignmentKey(
+              registrar.proxyConfig,
+              positionMintPubkeys[i],
+              walletPubkey,
+            )[0],
+          );
+        }
+      }
+    }
+    const proxyAssignmentAccounts = proxyAssignmentKeys.length
+      ? await proxyProgram.account.proxyAssignmentV0.fetchMultiple(
+          proxyAssignmentKeys,
+        )
+      : [];
+    const proxyAssignmentByIndex = new Map<
+      number,
+      (typeof proxyAssignmentAccounts)[number]
     >();
+    proxyAssignmentIndexes.forEach((idx, j) => {
+      proxyAssignmentByIndex.set(idx, proxyAssignmentAccounts[j]);
+    });
 
     for (let i = 0; i < positionMints.length; i++) {
       const positionMint = positionMints[i];
@@ -145,33 +204,11 @@ export const vote = publicProcedure.governance.vote.handler(
         });
       }
 
-      const { isOwner } = await validatePositionOwnership(
-        connection,
-        positionMintPubkey,
-        walletPubkey,
-      );
+      const isOwner = isOwnerByIndex[i];
 
       let isProxied = false;
       if (!isOwner) {
-        const registrarKey = positionAcc.registrar.toBase58();
-        let registrar = registrarCache.get(registrarKey);
-        if (!registrar) {
-          registrar = await vsrProgram.account.registrar.fetch(
-            positionAcc.registrar,
-          );
-          registrarCache.set(registrarKey, registrar);
-        }
-        const proxyConfig = registrar.proxyConfig;
-        const proxyAssignmentAddr = proxyAssignmentKey(
-          proxyConfig,
-          positionMintPubkey,
-          walletPubkey,
-        )[0];
-        const proxyAssignment =
-          await proxyProgram.account.proxyAssignmentV0.fetchNullable(
-            proxyAssignmentAddr,
-          );
-
+        const proxyAssignment = proxyAssignmentByIndex.get(i);
         if (!proxyAssignment) {
           throw errors.BAD_REQUEST({
             message: `Wallet does not own or have proxy for position ${positionMint}`,

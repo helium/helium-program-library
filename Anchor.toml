@@ -143,6 +143,9 @@ address = "HTczusLJSAhMJKYrxLjSUUyW7YDsBuyfBG8Tj1KJsgni" # Wormhole guardian set
 address = "HstYgN21fgNmutTVXjBw54n4ryvP3WrCFbMAjnbdbTzf" # Wormhole guardian set index 6
 
 [[test.validator.clone]]
+address = "6GaHgiaQg9Pg346xHq9m7vQ9rJtnH83gQKqJoiAxQa7D" # Wormhole guardian set index 7
+
+[[test.validator.clone]]
 address = "DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b"
 
 # Squads multisig program
