@@ -5,7 +5,7 @@ use helium_sub_daos::{
   accounts::CalculateUtilityScoreV0, instruction::IssueRewardsV0, CalculateUtilityScoreArgsV0,
   DaoV0, IssueRewardsArgsV0, SubDaoV0,
 };
-use spl_token::solana_program::instruction::Instruction;
+use spl_token::solana_program::instruction::{AccountMeta, Instruction};
 use tuktuk_program::{
   compile_transaction,
   write_return_tasks::{write_return_tasks, AccountWithSeeds, PayerInfo, WriteReturnTasksArgs},
@@ -33,6 +33,10 @@ pub struct QueueEndEpoch<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   pub iot_sub_dao: Box<Account<'info, SubDaoV0>>,
   pub mobile_sub_dao: Box<Account<'info, SubDaoV0>>,
+  /// CHECK: The HNT/USD Pyth price account, forwarded into each
+  /// calculate_utility_score_v0 for the HIP 149 backstop. Its feed id and
+  /// verification level are validated by that instruction's constraints.
+  pub hnt_price_oracle: UncheckedAccount<'info>,
   /// CHECK: We init this when writing
   #[account(
     mut,
@@ -125,31 +129,59 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
     })
     .collect();
 
+  // HIP 149 backstop: every calculate_utility_score_v0 (both the IoT and Mobile pass)
+  // reads the Mobile sub-DAO's current- and previous-epoch info to size the deployer
+  // top-up, so total_rewards is independent of sub-DAO ordering. These are passed as
+  // read-only remaining accounts and located on-chain by PDA.
+  let mobile_sub_dao_key = ctx.accounts.mobile_sub_dao.key();
+  let mobile_curr_epoch_info = Pubkey::find_program_address(
+    &[
+      b"sub_dao_epoch_info",
+      mobile_sub_dao_key.as_ref(),
+      &curr_epoch.to_le_bytes(),
+    ],
+    &helium_sub_daos::ID,
+  )
+  .0;
+  let mobile_prev_epoch_info = Pubkey::find_program_address(
+    &[
+      b"sub_dao_epoch_info",
+      mobile_sub_dao_key.as_ref(),
+      &prev_epoch.to_le_bytes(),
+    ],
+    &helium_sub_daos::ID,
+  )
+  .0;
+
   // Add all calculate instructions
   for (_, sub_dao_key, prev_sub_dao_epoch_info, sub_dao_epoch_info) in sub_dao_infos.iter() {
+    let mut accounts = CalculateUtilityScoreV0 {
+      payer: ctx.accounts.payer.key(),
+      registrar: ctx.accounts.dao.registrar,
+      dao: dao_key,
+      hnt_mint,
+      sub_dao: *sub_dao_key,
+      prev_dao_epoch_info,
+      dao_epoch_info,
+      sub_dao_epoch_info: *sub_dao_epoch_info,
+      system_program: system_program::ID,
+      token_program: spl_token::ID,
+      circuit_breaker_program: CIRCUIT_BREAKER_PROGRAM,
+      prev_sub_dao_epoch_info: *prev_sub_dao_epoch_info,
+      not_emitted_counter: Pubkey::find_program_address(
+        &[b"not_emitted_counter", hnt_mint.as_ref()],
+        &no_emit::ID,
+      )
+      .0,
+      no_emit_program: no_emit::ID,
+      hnt_price_oracle: Some(ctx.accounts.hnt_price_oracle.key()),
+    }
+    .to_account_metas(None);
+    accounts.push(AccountMeta::new_readonly(mobile_curr_epoch_info, false));
+    accounts.push(AccountMeta::new_readonly(mobile_prev_epoch_info, false));
     ixs.push(Instruction {
       program_id: helium_sub_daos::ID,
-      accounts: CalculateUtilityScoreV0 {
-        payer: ctx.accounts.payer.key(),
-        registrar: ctx.accounts.dao.registrar,
-        dao: dao_key,
-        hnt_mint,
-        sub_dao: *sub_dao_key,
-        prev_dao_epoch_info,
-        dao_epoch_info,
-        sub_dao_epoch_info: *sub_dao_epoch_info,
-        system_program: system_program::ID,
-        token_program: spl_token::ID,
-        circuit_breaker_program: CIRCUIT_BREAKER_PROGRAM,
-        prev_sub_dao_epoch_info: *prev_sub_dao_epoch_info,
-        not_emitted_counter: Pubkey::find_program_address(
-          &[b"not_emitted_counter", hnt_mint.as_ref()],
-          &no_emit::ID,
-        )
-        .0,
-        no_emit_program: no_emit::ID,
-      }
-      .to_account_metas(None),
+      accounts,
       data: calc_args.data(),
     });
   }
@@ -173,6 +205,12 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
         treasury: sub_dao.treasury,
         rewards_escrow: ctx.accounts.dao.rewards_escrow,
         delegator_pool: ctx.accounts.dao.delegator_pool,
+        // HIP 149 Decision 2 supplement vault + Decision 4 Council fanout. None while the
+        // supplement window is inactive (the default). At patch-time activation, set these to
+        // the Receiving Entity vault's HNT ATA and the Council fanout's HNT token account
+        // before rescheduling the cron.
+        supplement_vault: None,
+        council_vault: None,
       }
       .to_account_metas(None),
       data: reward_args.data(),
@@ -215,6 +253,7 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
       dao: ctx.accounts.dao.to_account_info(),
       iot_sub_dao: ctx.accounts.iot_sub_dao.to_account_info(),
       mobile_sub_dao: ctx.accounts.mobile_sub_dao.to_account_info(),
+      hnt_price_oracle: ctx.accounts.hnt_price_oracle.to_account_info(),
       task_return_account: ctx.accounts.task_return_account.to_account_info(),
       task_queue: ctx.accounts.task_queue.to_account_info(),
       epoch_tracker: ctx.accounts.epoch_tracker.to_account_info(),

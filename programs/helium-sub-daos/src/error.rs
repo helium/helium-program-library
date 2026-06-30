@@ -64,4 +64,16 @@ pub enum ErrorCode {
 
   #[msg("Cannot extend an expired position")]
   CannotExtendExpiredPosition,
+
+  #[msg("Supplement window is active but no supplement vault was provided")]
+  SupplementVaultMissing,
+
+  #[msg("Supplement vault is not owned by the configured supplement vault owner")]
+  InvalidSupplementVault,
+
+  #[msg("Supplement window is active but no Council compensation vault was provided")]
+  CouncilVaultMissing,
+
+  #[msg("Council compensation vault does not match the configured Council fanout token account")]
+  InvalidCouncilVault,
 }
