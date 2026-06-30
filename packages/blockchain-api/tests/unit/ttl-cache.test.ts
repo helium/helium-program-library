@@ -140,4 +140,32 @@ describe("createTtlCache", () => {
     });
     expect(refetched).to.equal(true);
   });
+
+  it("stays bounded by evicting oldest-first when entries are all fresh", async () => {
+    let clock = 1000;
+    const cache = createTtlCache<string>({
+      ttlMs: 10_000, // long TTL: nothing expires during the test
+      maxEntries: 2,
+      now: () => clock,
+    });
+
+    await cache("a", async () => "A");
+    clock += 1;
+    await cache("b", async () => "B");
+    clock += 1;
+    // Inserting c is over capacity with nothing expired, so the oldest (a) is evicted.
+    await cache("c", async () => "C");
+
+    // b and c remain cached (these are hits and don't touch the write path).
+    expect(await cache("b", async () => "OTHER")).to.equal("B");
+    expect(await cache("c", async () => "OTHER")).to.equal("C");
+
+    // a was evicted and must refetch.
+    let aRefetched = false;
+    await cache("a", async () => {
+      aRefetched = true;
+      return "A2";
+    });
+    expect(aRefetched).to.equal(true);
+  });
 });
