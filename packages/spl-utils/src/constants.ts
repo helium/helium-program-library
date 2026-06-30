@@ -12,7 +12,8 @@ export const MOBILE_MINT = new PublicKey(
 
 export const IOT_MINT = new PublicKey("iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns");
 
-// TODO: Replace with actual HNT feed
+// Mainnet HNT/USD Pyth pull-oracle push account (shard 0 for HNT_PRICE_FEED_ID),
+// kept continuously fresh on-chain.
 export const HNT_PYTH_PRICE_FEED = new PublicKey(
   "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
 );
