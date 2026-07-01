@@ -216,8 +216,15 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   // claims already key off the DAO-level delegation_rewards_issued. A zero ceiling
   // (no carrier burn this epoch, or no price oracle) disables the redirect.
   let is_mobile = TESTING || ctx.accounts.sub_dao.key() == crate::backstop::MOBILE_SUB_DAO;
+  let escrow_before_overflow = rewards_amount
+    .checked_sub(delegation_rewards_amount)
+    .unwrap();
   let staker_overflow: u64 = if is_mobile {
-    crate::backstop::staker_overflow(rewards_amount, ctx.accounts.dao_epoch_info.deployer_cap_hnt)
+    crate::backstop::staker_overflow(
+      rewards_amount,
+      ctx.accounts.dao_epoch_info.deployer_cap_hnt,
+      escrow_before_overflow,
+    )
   } else {
     0
   };
@@ -239,11 +246,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     )?;
   }
 
-  let escrow_amount = rewards_amount
-    .checked_sub(delegation_rewards_amount)
-    .unwrap()
-    .checked_sub(staker_overflow)
-    .unwrap();
+  let escrow_amount = escrow_before_overflow.checked_sub(staker_overflow).unwrap();
   msg!("Minting {} to rewards escrow", escrow_amount);
   mint_v0(
     ctx

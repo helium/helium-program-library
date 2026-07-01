@@ -161,7 +161,12 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
 /// `rewards_amount` is the Mobile sub-DAO's emission this epoch; the data bucket is 0.70
 /// of it. A zero ceiling (no carrier burn / no price oracle this epoch) disables the
 /// redirect, so the full data bucket flows to deployers as before.
-pub fn staker_overflow(rewards_amount: u64, deployer_cap_hnt: u64) -> u64 {
+///
+/// Clamped to `escrow` (the deployer portion, `rewards_amount - delegator slice`) so the
+/// redirect can never draw more than the escrow holds: with a high `delegator_rewards_percent`
+/// the 70% data bucket can exceed the escrow, and without this the caller's escrow subtraction
+/// would underflow and panic.
+pub fn staker_overflow(rewards_amount: u64, deployer_cap_hnt: u64, escrow: u64) -> u64 {
   if deployer_cap_hnt == 0 {
     return 0;
   }
@@ -169,7 +174,7 @@ pub fn staker_overflow(rewards_amount: u64, deployer_cap_hnt: u64) -> u64 {
     .saturating_mul(MOBILE_DATA_BUCKET_PERCENT)
     .checked_div(100)
     .unwrap_or(0) as u64;
-  data_bucket.saturating_sub(deployer_cap_hnt)
+  data_bucket.saturating_sub(deployer_cap_hnt).min(escrow)
 }
 
 #[cfg(test)]
@@ -294,7 +299,7 @@ mod tests {
     // rewards_amount such that the data bucket (70%) is 13,870 HNT; cap 10,920 HNT.
     let rewards_amount = (13_870_00000000_u64 * 100) / 70; // data bucket = 13,870 HNT
     let cap = 10_920_00000000;
-    let overflow = staker_overflow(rewards_amount, cap);
+    let overflow = staker_overflow(rewards_amount, cap, rewards_amount);
     assert!(
       (hnt(overflow) - 2_950.0).abs() < 5.0,
       "overflow {} HNT should be ~2,950",
@@ -306,14 +311,25 @@ mod tests {
   fn staker_overflow_none_inside_band() {
     let rewards_amount = (13_870_00000000_u64 * 100) / 70;
     // cap well above the bucket (HNT cheap): no redirect.
-    assert_eq!(staker_overflow(rewards_amount, 27_300_00000000), 0);
+    assert_eq!(staker_overflow(rewards_amount, 27_300_00000000, rewards_amount), 0);
   }
 
   #[test]
   fn staker_overflow_disabled_when_cap_zero() {
     // No carrier burn / no price oracle => ceiling 0 => the whole bucket stays with
     // deployers (no accidental redirect of everything to stakers).
-    assert_eq!(staker_overflow(20_000_00000000, 0), 0);
+    assert_eq!(staker_overflow(20_000_00000000, 0, 20_000_00000000), 0);
+  }
+
+  #[test]
+  fn staker_overflow_clamped_to_escrow() {
+    // Tiny ceiling would push the redirect to ~the whole 70% data bucket, but a high
+    // delegator slice leaves a smaller escrow. The redirect clamps to the escrow so the
+    // caller's escrow subtraction can't underflow.
+    let rewards_amount = 100_000_00000000_u64;
+    let escrow = 10_000_00000000; // delegators took 90% this epoch
+    let overflow = staker_overflow(rewards_amount, 1, escrow);
+    assert_eq!(overflow, escrow, "redirect never exceeds the escrow");
   }
 
   #[test]
