@@ -56,6 +56,7 @@ import {
 import {
   createDcaServer,
   runAllTasks as runAllTasksUtil,
+  calculateExpectedOutput,
 } from "./utils/dca-test-server";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { customSignerKey } from "@helium/tuktuk-sdk";
@@ -671,7 +672,19 @@ describe("dc-auto-topoff", () => {
         provider.connection,
         getAssociatedTokenAddressSync(hntMint, autoTopOff, true)
       );
-      const expectedAfterFirstSwap = startingHnt.add(hntPerSwap);
+      // The swap output is derived forward from dcaSwapAmount (the same way the
+      // DCA server computes it), not the idealized hntPerSwap target. Because
+      // dcaSwapAmount is rounded (truncate + `+1`) with a *100 decimal scaling,
+      // the roundtrip overshoots hntPerSwap by up to ~inputPrice/outputPrice*100
+      // bones, which varies with the live (cloned) oracle price ratio. Assert
+      // against the actual server output so the test is price-independent.
+      const expectedAfterFirstSwap = startingHnt.add(
+        calculateExpectedOutput(
+          dcaSwapAmount,
+          inputPriceUpdate,
+          outputPriceUpdate
+        )
+      );
       // Allow for 1 bone tolerance due to rounding in DCA calculations
       const actualAmount = new anchor.BN(
         hntAccountAfterFirstSwap.amount.toString()
