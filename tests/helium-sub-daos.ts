@@ -14,6 +14,7 @@ import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal";
 import { init as initProposal } from "@helium/proposal-sdk";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
 import {
+  HNT_PYTH_PRICE_FEED,
   createAtaAndMint,
   createAtaAndTransfer,
   createMint,
@@ -375,7 +376,7 @@ describe("helium-sub-daos", () => {
 
         const method = program.methods
           .calculateUtilityScoreV0({ epoch })
-          .accountsPartial({ subDao, dao });
+          .accountsPartial({ subDao, dao, hntPriceOracle: null });
 
         const { daoEpochInfo } = await method.pubkeys();
         await method.rpc({ skipPreflight: true });
@@ -408,6 +409,65 @@ describe("helium-sub-daos", () => {
       expect(firstEpoch.daoEpochInfoAcc.currentHntSupply.toString()).to.eq(
         new BN(supply.toString()).add(new BN(expectedRewards)).toString()
       );
+    });
+
+    describe("HIP 149 backstop", () => {
+      it("computes the deployer cap when an oracle is supplied", async () => {
+        await vsrProgram.methods
+          .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
+          .accountsPartial({ registrar })
+          .rpc({ skipPreflight: true });
+
+        // Carrier-paid DC burn for the epoch; drives the 3x earnings-cap ceiling.
+        const { subDaoEpochInfo } = await burnDc(50000);
+        const epoch = (
+          await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+        ).epoch;
+
+        const method = program.methods
+          .calculateUtilityScoreV0({ epoch })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+          ])
+          .accountsPartial({
+            subDao,
+            dao,
+            // HNT/USD Pyth push account, cloned from mainnet by the test validator.
+            hntPriceOracle: HNT_PYTH_PRICE_FEED,
+          });
+        const { daoEpochInfo } = await method.pubkeys();
+        await method.rpc({ skipPreflight: true });
+
+        const acc = await program.account.daoEpochInfoV0.fetch(daoEpochInfo!);
+        // 3x-carrier-paid earnings ceiling computed from dc_burned + price.
+        expect(acc.deployerCapHnt.toNumber()).to.be.greaterThan(0);
+      });
+
+      it("stays dormant (no cap) when no oracle is supplied", async () => {
+        await vsrProgram.methods
+          .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
+          .accountsPartial({ registrar })
+          .rpc({ skipPreflight: true });
+
+        const { subDaoEpochInfo } = await burnDc(50000);
+        const epoch = (
+          await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+        ).epoch;
+
+        const method = program.methods
+          .calculateUtilityScoreV0({ epoch })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+          ])
+          .accountsPartial({ subDao, dao, hntPriceOracle: null });
+        const { daoEpochInfo } = await method.pubkeys();
+        await method.rpc({ skipPreflight: true });
+
+        const acc = await program.account.daoEpochInfoV0.fetch(daoEpochInfo!);
+        // No oracle => backstop dormant: no ceiling.
+        expect(acc.deployerCapHnt.toNumber()).to.eq(0);
+      });
+
     });
 
     describe("with position", () => {
@@ -445,6 +505,7 @@ describe("helium-sub-daos", () => {
           .accountsPartial({
             subDao,
             dao,
+            hntPriceOracle: null,
           })
           .rpc({ skipPreflight: true });
 
@@ -670,6 +731,7 @@ describe("helium-sub-daos", () => {
             .accountsPartial({
               subDao,
               dao,
+              hntPriceOracle: null,
             });
 
           const pubkeys = await instr.pubkeys();
@@ -889,6 +951,137 @@ describe("helium-sub-daos", () => {
             );
           });
 
+          describe("HIP 149 cap redirect", () => {
+            it("redirects data-bucket overflow above the cap to the delegator pool", async () => {
+              await vsrProgram.methods
+                .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
+                .accountsPartial({ registrar })
+                .rpc({ skipPreflight: true });
+
+              // Tiny carrier burn => a very low 3x earnings ceiling, so almost the
+              // entire Mobile data bucket sits above the cap and must overflow to
+              // stakers (escrow -> delegator pool) in issue_rewards_v0.
+              const { subDaoEpochInfo } = await burnDc(10);
+              const epoch = (
+                await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+              ).epoch;
+
+              await program.methods
+                .calculateUtilityScoreV0({ epoch })
+                .preInstructions([
+                  ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+                ])
+                .accountsPartial({
+                  subDao,
+                  dao,
+                  hntPriceOracle: HNT_PYTH_PRICE_FEED,
+                })
+                .rpc({ skipPreflight: true });
+
+              await program.methods
+                .issueRewardsV0({ epoch })
+                .accountsPartial({ subDao, supplementVault: null, councilVault: null })
+                .rpc({ skipPreflight: true });
+
+              const acc = await program.account.subDaoEpochInfoV0.fetch(
+                subDaoEpochInfo
+              );
+              // Cap binding hard: the redirected overflow makes the delegator-pool
+              // mint exceed the trimmed rewards escrow (normally escrow >> the 6%
+              // delegator slice), proving the escrow->delegator redirect fired.
+              expect(acc.delegationRewardsIssued.toNumber()).to.be.greaterThan(
+                acc.hntRewardsIssued.toNumber()
+              );
+              expect(acc.hntRewardsIssued.toNumber()).to.be.greaterThan(0);
+            });
+          });
+
+          describe("HIP 149 floor delivery", () => {
+            it("tops deployers up to the price-derived 0.5x-carrier target", async () => {
+              // Set net_emissions_cap = 0 so the top-up's burn budget is just
+              // smoothed_hnt_burned; then a real HNT burn (below) makes that budget far
+              // exceed demand, so the top-up is the full price-derived amount (unclamped).
+              await program.methods
+                .updateDaoV0({
+                  authority: null,
+                  emissionSchedule: null,
+                  hstEmissionSchedule: null,
+                  hstPool: null,
+                  netEmissionsCap: new BN(0),
+                  proposalNamespace: null,
+                  delegatorRewardsPercent: null,
+                  rewardsEscrow: null,
+                })
+                .accountsPartial({ dao })
+                .rpc({ skipPreflight: true });
+
+              // Epoch 1: calculate to record supply and give the sub-DAO a utility score
+              // (so epoch 2's bootstrap sets a non-zero Mobile percent share).
+              await vsrProgram.methods
+                .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
+                .accountsPartial({ registrar })
+                .rpc({ skipPreflight: true });
+              const epoch1 = (
+                await burnDc(1)
+              ).subDaoEpochInfo;
+              const e1 = (
+                await program.account.subDaoEpochInfoV0.fetch(epoch1)
+              ).epoch;
+              await program.methods
+                .calculateUtilityScoreV0({ epoch: e1 })
+                .preInstructions([
+                  ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+                ])
+                .accountsPartial({ subDao, dao, hntPriceOracle: HNT_PYTH_PRICE_FEED })
+                .rpc({ skipPreflight: true });
+
+              // Epoch 2: a large carrier burn drives a 0.5x-carrier target well above the
+              // deployer baseline, and burns ~100k HNT so smoothed_hnt_burned (the budget)
+              // dwarfs demand. The same Mobile sub-DAO epoch-info account is its prev next.
+              await vsrProgram.methods
+                .setTimeOffsetV0(new BN(2 * 60 * 60 * 24))
+                .accountsPartial({ registrar })
+                .rpc({ skipPreflight: true });
+              const { subDaoEpochInfo } = await burnDc(100000);
+              const epoch = (
+                await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo)
+              ).epoch;
+
+              const calc = () =>
+                program.methods
+                  .calculateUtilityScoreV0({ epoch })
+                  .preInstructions([
+                    ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+                  ])
+                  .accountsPartial({
+                    subDao,
+                    dao,
+                    hntPriceOracle: HNT_PYTH_PRICE_FEED,
+                  });
+              const { daoEpochInfo, prevSubDaoEpochInfo } =
+                await calc().pubkeys();
+              // First pass bootstraps the prev-epoch Mobile share to non-zero; recalc
+              // (TESTING) then sizes the top-up against it.
+              await calc().rpc({ skipPreflight: true });
+              await calc().rpc({ skipPreflight: true });
+
+              const di = await program.account.daoEpochInfoV0.fetch(daoEpochInfo!);
+              const mobileShare = (
+                await program.account.subDaoEpochInfoV0.fetch(prevSubDaoEpochInfo)
+              ).previousPercentage;
+
+              // Delivered Mobile data deployer HNT = total_rewards x mobile_share x 0.70.
+              const alpha = (mobileShare / 0xffffffff) * 0.7;
+              const delivered = di.totalRewards.toNumber() * alpha;
+              // Price-derived target: deployer_cap_hnt is 3x carrier-paid USD in HNT, the
+              // floor target is 0.5x => target == cap / 6. The floor should deliver it.
+              const target = di.deployerCapHnt.toNumber() / 6;
+
+              expect(mobileShare).to.be.greaterThan(0);
+              expect(delivered).to.be.closeTo(target, target * 0.02);
+            });
+          });
+
           describe("with multiple delegated vehnt", () => {
             let basePosition: PublicKey;
             let basePositionOptions = {
@@ -945,13 +1138,7 @@ describe("helium-sub-daos", () => {
                 })
                 .signers([positionAuthorityKp]);
 
-              const { delegatedPosition, subDaoEpochInfo } =
-                await method.pubkeys();
-              // const sed = await program.account.subDaoEpochInfoV0.fetch(
-              //   subDaoEpochInfo!
-              // );
-              // console.log(sed.fallRatesFromClosingPositions.toString());
-              // console.log(sed.vehntInClosingPositions.toString());
+              const { delegatedPosition } = await method.pubkeys();
               await method.rpc({ skipPreflight: true });
 
               const sdAcc = await program.account.subDaoV0.fetch(subDao);
@@ -1015,6 +1202,7 @@ describe("helium-sub-daos", () => {
                 .accountsPartial({
                   subDao,
                   dao,
+                  hntPriceOracle: null,
                 })
                 .rpc({ skipPreflight: true });
             });
@@ -1029,31 +1217,16 @@ describe("helium-sub-daos", () => {
               const preHntBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
-              const {
-                pubkeys: { prevSubDaoEpochInfo, daoEpochInfo },
-              } = await program.methods
+              await program.methods
                 .issueRewardsV0({
                   epoch,
                 })
                 .accountsPartial({
                   subDao,
+                  supplementVault: null,
+                  councilVault: null,
                 })
-                .rpcAndKeys({ skipPreflight: true });
-
-              console.log(
-                "subDaoEpochInfo",
-                await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo!)
-              );
-              console.log(
-                "prevSubDaoEpochInfo",
-                await program.account.subDaoEpochInfoV0.fetch(
-                  prevSubDaoEpochInfo!
-                )
-              );
-              console.log(
-                "daoEpochInfo",
-                await program.account.daoEpochInfoV0.fetch(daoEpochInfo!)
-              );
+                .rpc({ skipPreflight: true });
 
               const postTreasuryBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
@@ -1160,6 +1333,8 @@ describe("helium-sub-daos", () => {
                   })
                   .accountsPartial({
                     subDao,
+                    supplementVault: null,
+                    councilVault: null,
                   })
                   .instruction(),
               ]);
