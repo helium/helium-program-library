@@ -96,40 +96,33 @@ fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
 }
 
 impl<'info> IssueRewardsV0<'info> {
-  pub fn mint_delegation_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+  /// CpiContext to mint HNT (through the HNT circuit breaker, signed by the DAO) to
+  /// `to`. All HNT mints in this instruction differ only in the destination.
+  fn mint_hnt_to_ctx(
+    &self,
+    to: AccountInfo<'info>,
+  ) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
     let cpi_accounts = MintV0 {
       mint: self.hnt_mint.to_account_info(),
-      to: self.delegator_pool.to_account_info(),
+      to,
       mint_authority: self.dao.to_account_info(),
       circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
     };
 
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+  }
+
+  pub fn mint_delegation_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+    self.mint_hnt_to_ctx(self.delegator_pool.to_account_info())
   }
 
   pub fn mint_treasury_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
-    let cpi_accounts = MintV0 {
-      mint: self.hnt_mint.to_account_info(),
-      to: self.treasury.to_account_info(),
-      mint_authority: self.dao.to_account_info(),
-      circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
-      token_program: self.token_program.to_account_info(),
-    };
-
-    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+    self.mint_hnt_to_ctx(self.treasury.to_account_info())
   }
 
   pub fn mint_rewards_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
-    let cpi_accounts = MintV0 {
-      mint: self.hnt_mint.to_account_info(),
-      to: self.rewards_escrow.to_account_info(),
-      mint_authority: self.dao.to_account_info(),
-      circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
-      token_program: self.token_program.to_account_info(),
-    };
-
-    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+    self.mint_hnt_to_ctx(self.rewards_escrow.to_account_info())
   }
 }
 
@@ -307,27 +300,25 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     );
 
     msg!("Minting {vault_amount} supplement, {council_amount} Council compensation");
-    let mint_supplement = |to, amount: u64| -> Result<()> {
-      let cpi_accounts = MintV0 {
-        mint: ctx.accounts.hnt_mint.to_account_info(),
-        to,
-        mint_authority: ctx.accounts.dao.to_account_info(),
-        circuit_breaker: ctx.accounts.hnt_circuit_breaker.to_account_info(),
-        token_program: ctx.accounts.token_program.to_account_info(),
-      };
-      mint_v0(
-        CpiContext::new(
-          ctx.accounts.circuit_breaker_program.to_account_info(),
-          cpi_accounts,
-        )
+    mint_v0(
+      ctx
+        .accounts
+        .mint_hnt_to_ctx(vault.to_account_info())
         .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
-        MintArgsV0 { amount },
-      )
-    };
-
-    mint_supplement(vault.to_account_info(), vault_amount)?;
+      MintArgsV0 {
+        amount: vault_amount,
+      },
+    )?;
     if council_amount > 0 {
-      mint_supplement(council.to_account_info(), council_amount)?;
+      mint_v0(
+        ctx
+          .accounts
+          .mint_hnt_to_ctx(council.to_account_info())
+          .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
+        MintArgsV0 {
+          amount: council_amount,
+        },
+      )?;
     }
   }
 

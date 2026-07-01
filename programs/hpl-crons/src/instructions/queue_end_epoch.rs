@@ -50,6 +50,18 @@ pub struct QueueEndEpoch<'info> {
   pub system_program: Program<'info, System>,
 }
 
+fn sub_dao_epoch_info_pda(sub_dao: &Pubkey, epoch: u64) -> Pubkey {
+  Pubkey::find_program_address(
+    &[
+      b"sub_dao_epoch_info",
+      sub_dao.as_ref(),
+      &epoch.to_le_bytes(),
+    ],
+    &helium_sub_daos::ID,
+  )
+  .0
+}
+
 pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
   let sub_daos = [&ctx.accounts.iot_sub_dao, &ctx.accounts.mobile_sub_dao];
   let prev_epoch = ctx.accounts.epoch_tracker.epoch;
@@ -100,25 +112,8 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
     .iter()
     .map(|sub_dao| {
       let sub_dao_key = sub_dao.key();
-      let prev_sub_dao_epoch_info = Pubkey::find_program_address(
-        &[
-          b"sub_dao_epoch_info",
-          sub_dao_key.as_ref(),
-          &prev_epoch.to_le_bytes(),
-        ],
-        &helium_sub_daos::ID,
-      )
-      .0;
-
-      let sub_dao_epoch_info = Pubkey::find_program_address(
-        &[
-          b"sub_dao_epoch_info",
-          sub_dao_key.as_ref(),
-          &curr_epoch.to_le_bytes(),
-        ],
-        &helium_sub_daos::ID,
-      )
-      .0;
+      let prev_sub_dao_epoch_info = sub_dao_epoch_info_pda(&sub_dao_key, prev_epoch);
+      let sub_dao_epoch_info = sub_dao_epoch_info_pda(&sub_dao_key, curr_epoch);
 
       (
         sub_dao,
@@ -134,24 +129,8 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
   // top-up, so total_rewards is independent of sub-DAO ordering. These are passed as
   // read-only remaining accounts and located on-chain by PDA.
   let mobile_sub_dao_key = ctx.accounts.mobile_sub_dao.key();
-  let mobile_curr_epoch_info = Pubkey::find_program_address(
-    &[
-      b"sub_dao_epoch_info",
-      mobile_sub_dao_key.as_ref(),
-      &curr_epoch.to_le_bytes(),
-    ],
-    &helium_sub_daos::ID,
-  )
-  .0;
-  let mobile_prev_epoch_info = Pubkey::find_program_address(
-    &[
-      b"sub_dao_epoch_info",
-      mobile_sub_dao_key.as_ref(),
-      &prev_epoch.to_le_bytes(),
-    ],
-    &helium_sub_daos::ID,
-  )
-  .0;
+  let mobile_curr_epoch_info = sub_dao_epoch_info_pda(&mobile_sub_dao_key, curr_epoch);
+  let mobile_prev_epoch_info = sub_dao_epoch_info_pda(&mobile_sub_dao_key, prev_epoch);
 
   // Add all calculate instructions
   for (_, sub_dao_key, prev_sub_dao_epoch_info, sub_dao_epoch_info) in sub_dao_infos.iter() {

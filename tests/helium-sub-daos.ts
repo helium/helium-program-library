@@ -1138,13 +1138,7 @@ describe("helium-sub-daos", () => {
                 })
                 .signers([positionAuthorityKp]);
 
-              const { delegatedPosition, subDaoEpochInfo } =
-                await method.pubkeys();
-              // const sed = await program.account.subDaoEpochInfoV0.fetch(
-              //   subDaoEpochInfo!
-              // );
-              // console.log(sed.fallRatesFromClosingPositions.toString());
-              // console.log(sed.vehntInClosingPositions.toString());
+              const { delegatedPosition } = await method.pubkeys();
               await method.rpc({ skipPreflight: true });
 
               const sdAcc = await program.account.subDaoV0.fetch(subDao);
@@ -1223,9 +1217,7 @@ describe("helium-sub-daos", () => {
               const preHntBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(rewardsEscrow))?.data!
               ).amount;
-              const {
-                pubkeys: { prevSubDaoEpochInfo, daoEpochInfo },
-              } = await program.methods
+              await program.methods
                 .issueRewardsV0({
                   epoch,
                 })
@@ -1234,22 +1226,7 @@ describe("helium-sub-daos", () => {
                   supplementVault: null,
                   councilVault: null,
                 })
-                .rpcAndKeys({ skipPreflight: true });
-
-              console.log(
-                "subDaoEpochInfo",
-                await program.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo!)
-              );
-              console.log(
-                "prevSubDaoEpochInfo",
-                await program.account.subDaoEpochInfoV0.fetch(
-                  prevSubDaoEpochInfo!
-                )
-              );
-              console.log(
-                "daoEpochInfo",
-                await program.account.daoEpochInfoV0.fetch(daoEpochInfo!)
-              );
+                .rpc({ skipPreflight: true });
 
               const postTreasuryBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(treasury))?.data!
