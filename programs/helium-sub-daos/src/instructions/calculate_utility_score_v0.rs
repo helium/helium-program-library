@@ -221,7 +221,6 @@ pub fn handler<'info>(
   };
 
   ctx.accounts.dao_epoch_info.total_rewards = backstop.total_rewards;
-  ctx.accounts.dao_epoch_info.hnt_price_used = hnt_price.map(|(_, p)| p).unwrap_or(0);
   ctx.accounts.dao_epoch_info.deployer_cap_hnt = backstop.deployer_cap_hnt;
 
   ctx.accounts.dao_epoch_info.epoch = args.epoch;

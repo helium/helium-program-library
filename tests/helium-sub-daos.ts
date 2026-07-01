@@ -412,7 +412,7 @@ describe("helium-sub-daos", () => {
     });
 
     describe("HIP 149 backstop", () => {
-      it("computes the deployer cap and stores the price when an oracle is supplied", async () => {
+      it("computes the deployer cap when an oracle is supplied", async () => {
         await vsrProgram.methods
           .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
           .accountsPartial({ registrar })
@@ -439,13 +439,11 @@ describe("helium-sub-daos", () => {
         await method.rpc({ skipPreflight: true });
 
         const acc = await program.account.daoEpochInfoV0.fetch(daoEpochInfo!);
-        // Pyth price decoded and stored for audit.
-        expect(acc.hntPriceUsed.toNumber()).to.be.greaterThan(0);
         // 3x-carrier-paid earnings ceiling computed from dc_burned + price.
         expect(acc.deployerCapHnt.toNumber()).to.be.greaterThan(0);
       });
 
-      it("stays dormant (no cap, no stored price) when no oracle is supplied", async () => {
+      it("stays dormant (no cap) when no oracle is supplied", async () => {
         await vsrProgram.methods
           .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
           .accountsPartial({ registrar })
@@ -466,9 +464,8 @@ describe("helium-sub-daos", () => {
         await method.rpc({ skipPreflight: true });
 
         const acc = await program.account.daoEpochInfoV0.fetch(daoEpochInfo!);
-        // No oracle => backstop dormant: no ceiling, no stored price.
+        // No oracle => backstop dormant: no ceiling.
         expect(acc.deployerCapHnt.toNumber()).to.eq(0);
-        expect(acc.hntPriceUsed.toNumber()).to.eq(0);
       });
 
     });

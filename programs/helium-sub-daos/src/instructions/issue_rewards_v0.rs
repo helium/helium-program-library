@@ -229,19 +229,19 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     0
   };
 
-  let delegation_mint = delegation_rewards_amount
+  let delegation_pool_amount = delegation_rewards_amount
     .checked_add(staker_overflow)
     .unwrap();
 
-  if delegation_mint > 0 {
-    msg!("Minting {} delegation rewards", delegation_mint);
+  if delegation_pool_amount > 0 {
+    msg!("Minting {} delegation rewards", delegation_pool_amount);
     mint_v0(
       ctx
         .accounts
         .mint_delegation_rewards_ctx()
         .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
       MintArgsV0 {
-        amount: delegation_mint, // delegator slice + any HIP 149 earnings-cap overflow
+        amount: delegation_pool_amount, // delegator slice + any HIP 149 earnings-cap overflow
       },
     )?;
   }
@@ -265,8 +265,8 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   ctx.accounts.sub_dao_epoch_info.hnt_rewards_issued = escrow_amount;
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(Clock::get()?.unix_timestamp);
-  ctx.accounts.dao_epoch_info.delegation_rewards_issued += delegation_mint;
-  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = delegation_mint;
+  ctx.accounts.dao_epoch_info.delegation_rewards_issued += delegation_pool_amount;
+  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = delegation_pool_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
 
