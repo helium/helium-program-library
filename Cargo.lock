@@ -937,6 +937,7 @@ dependencies = [
  "modular-governance",
  "mpl-token-metadata",
  "no-emit",
+ "pyth-solana-receiver-sdk",
  "rust_decimal",
  "shared-utils",
  "solana-program",

@@ -34,6 +34,7 @@ treasury-management = { path = "../treasury-management", features = ["cpi"] }
 modular-governance = { workspace = true }
 solana-program = { workspace = true }
 default-env = { workspace = true }
+pyth-solana-receiver-sdk = { workspace = true }
 
 time = "0.3.17"
 solana-security-txt = { workspace = true }
