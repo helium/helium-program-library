@@ -8,13 +8,10 @@ export function generateTransactionTag(params: {
 
   const sortedParams = Object.keys(otherParams)
     .sort()
-    .reduce(
-      (acc, key) => {
-        acc[key] = otherParams[key];
-        return acc;
-      },
-      {} as Record<string, any>,
-    );
+    .reduce((acc, key) => {
+      acc[key] = otherParams[key];
+      return acc;
+    }, {} as Record<string, any>);
 
   const paramString = JSON.stringify({ type, ...sortedParams });
 
@@ -33,6 +30,8 @@ export const TRANSACTION_TYPES = {
   REMOVE_SPLIT: "remove_split",
   ADD_SPLIT: "add_split",
   TOKEN_TRANSFER: "token_transfer",
+  TOKEN_BURN: "token_burn",
+  MEMO: "memo",
   HOTSPOT_TRANSFER: "hotspot_transfer",
   HOTSPOT_REASSERT: "hotspot_reassert",
   HOTSPOT_UPDATE: "hotspot_update",
