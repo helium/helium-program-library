@@ -1,4 +1,8 @@
-import { BAD_REQUEST, INVALID_WALLET_ADDRESS } from "../errors/common";
+import {
+  BAD_REQUEST,
+  INVALID_WALLET_ADDRESS,
+  NOT_FOUND,
+} from "../errors/common";
 import { INSUFFICIENT_FUNDS } from "../errors/solana";
 import {
   GetBalancesInputSchema,
@@ -42,6 +46,7 @@ export const tokensContract = oc.tag("Tokens").router({
     .errors({
       BAD_REQUEST,
       INSUFFICIENT_FUNDS,
+      NOT_FOUND,
     }),
 
   /** Protected: Transfer the same token mint to multiple recipients, packed into as few txs as possible */

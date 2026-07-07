@@ -1,4 +1,10 @@
-import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  AddressLookupTableAccount,
+  Connection,
+  PublicKey,
+  TransactionInstruction,
+  TransactionMessage,
+} from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import {
   buildVersionedTransaction,
@@ -135,4 +141,61 @@ export async function nextTransactionIndex(
     multisigPda
   );
   return BigInt(info.transactionIndex.toString()) + BigInt(1);
+}
+
+/** Default vault (index 0) of a multisig — the authority for proposed actions. */
+export function vaultPda(multisigPda: PublicKey): PublicKey {
+  return multisig.getVaultPda({ multisigPda, index: 0 })[0];
+}
+
+/**
+ * Wrap action instructions (built with the vault as their authority) into a
+ * Squads v4 vault-transaction proposal: vaultTransactionCreate + proposalCreate,
+ * both created and paid for by `member`. This is the "build as proposal" mode
+ * of the action endpoints, mirroring the wallet's propose_ixs_with_luts.
+ *
+ * Pure/synchronous: resolve `transactionIndex` via nextTransactionIndex first so
+ * a missing multisig maps to NOT_FOUND before any instruction is built.
+ */
+export function wrapAsVaultProposal({
+  multisigPda,
+  transactionIndex,
+  member,
+  vault,
+  instructions,
+  memo,
+  addressLookupTableAccounts = [],
+}: {
+  multisigPda: PublicKey;
+  transactionIndex: bigint;
+  member: PublicKey;
+  vault: PublicKey;
+  instructions: TransactionInstruction[];
+  memo?: string;
+  addressLookupTableAccounts?: AddressLookupTableAccount[];
+}): TransactionInstruction[] {
+  const transactionMessage = new TransactionMessage({
+    payerKey: vault,
+    // Placeholder blockhash: Squads stores the inner message, not a live tx.
+    recentBlockhash: PublicKey.default.toBase58(),
+    instructions,
+  });
+
+  const createIx = multisig.instructions.vaultTransactionCreate({
+    multisigPda,
+    transactionIndex,
+    creator: member,
+    vaultIndex: 0,
+    ephemeralSigners: 0,
+    transactionMessage,
+    addressLookupTableAccounts,
+    memo,
+  });
+  const proposalIx = multisig.instructions.proposalCreate({
+    multisigPda,
+    creator: member,
+    transactionIndex,
+  });
+
+  return [createIx, proposalIx];
 }

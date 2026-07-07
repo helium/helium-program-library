@@ -32,6 +32,8 @@ jobs:
             file: hotspot-burn.test.ts
           - name: squads-lifecycle
             file: squads-lifecycle.test.ts
+          - name: squads-propose
+            file: squads-propose.test.ts
           - name: update-rewards
             file: update-rewards-destination.test.ts
           - name: welcome-pack
