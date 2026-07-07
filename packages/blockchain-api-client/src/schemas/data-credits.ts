@@ -9,7 +9,9 @@ export const MintDataCreditsInputSchema = z.object({
     .string()
     .regex(/^\d+$/, "Amount must be a whole number")
     .optional()
-    .describe("Amount of DC to mint (in smallest unit). Provide either dcAmount or hntAmount."),
+    .describe(
+      "Amount of DC to mint (in smallest unit). Provide either dcAmount or hntAmount."
+    ),
   hntAmount: z
     .string()
     .regex(/^\d+$/, "Amount must be a whole number in bones")
@@ -39,7 +41,24 @@ export const DelegateDataCreditsInputSchema = z.object({
   mint: PublicKeySchema.describe(
     "SubDAO token mint (e.g. MOBILE or IOT mint) to determine which subDAO to delegate to"
   ),
-  memo: z.string().optional().describe("Optional memo to include in the transaction"),
+  memo: z
+    .string()
+    .optional()
+    .describe("Optional memo to include in the transaction"),
 });
 
-export type DelegateDataCreditsInput = z.infer<typeof DelegateDataCreditsInputSchema>;
+export type DelegateDataCreditsInput = z.infer<
+  typeof DelegateDataCreditsInputSchema
+>;
+
+export const BurnDataCreditsInputSchema = z.object({
+  owner: PublicKeySchema.describe(
+    "Wallet address burning the data credits (signer and fee payer)"
+  ),
+  amount: z
+    .string()
+    .regex(/^\d+$/, "Amount must be a whole number")
+    .describe("Amount of DC to burn (smallest unit, DC has 0 decimals)"),
+});
+
+export type BurnDataCreditsInput = z.infer<typeof BurnDataCreditsInputSchema>;

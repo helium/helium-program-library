@@ -2,6 +2,7 @@ import { oc } from "@orpc/contract";
 import {
   MintDataCreditsInputSchema,
   DelegateDataCreditsInputSchema,
+  BurnDataCreditsInputSchema,
 } from "../schemas/data-credits";
 import { TransactionDataSchema } from "../schemas/common";
 import { BAD_REQUEST } from "../errors/common";
@@ -27,6 +28,18 @@ export const dataCreditsContract = oc.tag("Data Credits").router({
       summary: "Delegate data credits to a router key",
     })
     .input(DelegateDataCreditsInputSchema)
+    .output(TransactionDataSchema)
+    .errors({
+      BAD_REQUEST,
+      INSUFFICIENT_FUNDS,
+    }),
+  burn: oc
+    .route({
+      method: "POST",
+      path: "/data-credits/burn",
+      summary: "Burn data credits",
+    })
+    .input(BurnDataCreditsInputSchema)
     .output(TransactionDataSchema)
     .errors({
       BAD_REQUEST,

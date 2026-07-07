@@ -22,6 +22,8 @@ jobs:
             file: hotspot-transfer.test.ts
           - name: token-transfer
             file: token-transfer.test.ts
+          - name: data-credits-burn
+            file: data-credits-burn.test.ts
           - name: token-burn-memo
             file: token-burn-memo.test.ts
           - name: update-rewards

@@ -44,6 +44,7 @@ export const TRANSACTION_TYPES = {
   MIGRATION: "migration",
   MINT_DATA_CREDITS: "mint_data_credits",
   DELEGATE_DATA_CREDITS: "delegate_data_credits",
+  BURN_DATA_CREDITS: "burn_data_credits",
 
   // Governance - Position Management
   POSITION_CREATE: "position_create",
