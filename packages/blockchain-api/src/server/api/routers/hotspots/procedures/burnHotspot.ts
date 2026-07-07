@@ -30,6 +30,7 @@ import {
 import { entityCreatorKey } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
+import { buildActionProposal, vaultPda } from "../../squads/procedures/helpers";
 
 const DAO_KEY = daoKey(HNT_MINT)[0];
 
@@ -100,9 +101,18 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
       typeof asset.ownership.owner === "string"
         ? asset.ownership.owner
         : asset.ownership.owner.toBase58();
-    if (ownerAddress !== walletAddress) {
+
+    // In Squads propose mode the on-chain owner must be the multisig's vault
+    // (walletAddress is only the proposing member); otherwise the wallet itself.
+    const multisigPda = input.multisig
+      ? new PublicKey(input.multisig)
+      : undefined;
+    const expectedOwner = multisigPda ? vaultPda(multisigPda) : payerPubkey;
+    if (ownerAddress !== expectedOwner.toBase58()) {
       throw errors.UNAUTHORIZED({
-        message: "Wallet is not the owner of this hotspot",
+        message: multisigPda
+          ? "Multisig vault is not the owner of this hotspot"
+          : "Wallet is not the owner of this hotspot",
       });
     }
 
@@ -115,19 +125,7 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
       });
     }
 
-    const walletBalance = await connection.getBalance(payerPubkey);
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
-    if (walletBalance < required) {
-      throw errors.INSUFFICIENT_FUNDS({
-        message: "Insufficient SOL balance for transaction fees",
-        data: { required, available: walletBalance },
-      });
-    }
-
-    const leafOwner =
-      typeof asset.ownership.owner === "string"
-        ? new PublicKey(asset.ownership.owner)
-        : asset.ownership.owner;
+    const leafOwner = new PublicKey(ownerAddress);
     const leafDelegate = asset.ownership.delegate
       ? typeof asset.ownership.delegate === "string"
         ? new PublicKey(asset.ownership.delegate)
@@ -153,6 +151,78 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
       }
     );
 
+    const hotspotName = asset.content?.metadata?.name || "Hotspot";
+
+    // ---- Squads propose mode ----
+    // UNVERIFIED: this path cannot be exercised on a mainnet fork. The proof and
+    // ownership come from the real DAS index, so the vault must actually own the
+    // hotspot on-chain — a fork-created vault never does, and surfpool can't set
+    // cNFT ownership. Verify against a live multisig vault that owns a test
+    // hotspot before relying on this in production.
+    if (multisigPda) {
+      const { serializedTransaction, transactionIndex, feeLamports } =
+        await buildActionProposal({
+          connection,
+          multisigPda,
+          member: payerPubkey,
+          memo: input.memo,
+          buildInstructions: () => [burnInstruction],
+          insufficientFunds: ({ required, available }) =>
+            errors.INSUFFICIENT_FUNDS({
+              message: "Insufficient SOL balance to create the burn proposal",
+              data: { required, available },
+            }),
+          notFound: () =>
+            errors.NOT_FOUND({
+              message: `Multisig ${input.multisig} not found`,
+            }),
+        });
+
+      return {
+        transactionData: {
+          transactions: [
+            {
+              serializedTransaction,
+              metadata: {
+                type: "hotspot_burn_proposal",
+                description: `Propose burn of ${hotspotName}`,
+                hotspotKey: assetId,
+                hotspotName,
+              },
+            },
+          ],
+          parallel: false,
+          tag: generateTransactionTag({
+            type: TRANSACTION_TYPES.HOTSPOT_BURN,
+            walletAddress,
+            assetId,
+            multisig: input.multisig,
+          }),
+          actionMetadata: {
+            type: "hotspot_burn_proposal",
+            multisig: input.multisig,
+            transactionIndex,
+            hotspotKey: assetId,
+            hotspotName,
+          },
+        },
+        estimatedSolFee: await toTokenAmountOutput(
+          new BN(feeLamports),
+          NATIVE_MINT.toBase58()
+        ),
+      };
+    }
+
+    // ---- Direct burn from the wallet ----
+    const walletBalance = await connection.getBalance(payerPubkey);
+    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
+    if (walletBalance < required) {
+      throw errors.INSUFFICIENT_FUNDS({
+        message: "Insufficient SOL balance for transaction fees",
+        data: { required, available: walletBalance },
+      });
+    }
+
     const tx = await buildVersionedTransaction({
       connection,
       draft: { instructions: [burnInstruction], feePayer: payerPubkey },
@@ -165,7 +235,6 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
       timestamp: Date.now(),
     });
 
-    const hotspotName = asset.content?.metadata?.name || "Hotspot";
     const txFee = getTransactionFee(tx);
 
     return {

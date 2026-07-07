@@ -30,15 +30,16 @@ import {
 import { entityCreatorKey } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
+import { buildActionProposal, vaultPda } from "../../squads/procedures/helpers";
 
 const DAO_KEY = daoKey(HNT_MINT)[0];
 
 async function getBubblegumAuthorityPDA(
-  merkleRollPubKey: PublicKey,
+  merkleRollPubKey: PublicKey
 ): Promise<PublicKey> {
   const [bubblegumAuthorityPDAKey] = await PublicKey.findProgramAddress(
     [merkleRollPubKey.toBuffer()],
-    BUBBLEGUM_PROGRAM_ID,
+    BUBBLEGUM_PROGRAM_ID
   );
   return bubblegumAuthorityPDAKey;
 }
@@ -109,19 +110,17 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
         ? asset.ownership.owner
         : asset.ownership.owner.toBase58();
 
-    if (ownerAddress !== walletAddress) {
+    // In Squads propose mode the on-chain owner must be the multisig's vault
+    // (walletAddress is only the proposing member); otherwise the wallet itself.
+    const multisigPda = input.multisig
+      ? new PublicKey(input.multisig)
+      : undefined;
+    const expectedOwner = multisigPda ? vaultPda(multisigPda) : payerPubkey;
+    if (ownerAddress !== expectedOwner.toBase58()) {
       throw errors.UNAUTHORIZED({
-        message: "Wallet is not the owner of this hotspot",
-      });
-    }
-
-    // Check wallet has sufficient balance for transaction fees
-    const walletBalance = await connection.getBalance(payerPubkey);
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
-    if (walletBalance < required) {
-      throw errors.INSUFFICIENT_FUNDS({
-        message: "Insufficient SOL balance for transaction fees",
-        data: { required, available: walletBalance },
+        message: multisigPda
+          ? "Multisig vault is not the owner of this hotspot"
+          : "Wallet is not the owner of this hotspot",
       });
     }
 
@@ -134,11 +133,7 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
       });
     }
 
-    const leafOwner =
-      typeof asset.ownership.owner === "string"
-        ? new PublicKey(asset.ownership.owner)
-        : asset.ownership.owner;
-
+    const leafOwner = new PublicKey(ownerAddress);
     const leafDelegate = asset.ownership.delegate
       ? typeof asset.ownership.delegate === "string"
         ? new PublicKey(asset.ownership.delegate)
@@ -162,8 +157,85 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
       {
         ...args,
         nonce: args.index,
-      },
+      }
     );
+
+    const hotspotName = asset.content?.metadata?.name || "Hotspot";
+    const shortRecipient = `${recipient.slice(0, 4)}...${recipient.slice(-4)}`;
+
+    // ---- Squads propose mode ----
+    // UNVERIFIED: this path cannot be exercised on a mainnet fork. The proof and
+    // ownership come from the real DAS index, so the vault must actually own the
+    // hotspot on-chain — a fork-created vault never does, and surfpool can't set
+    // cNFT ownership. Verify against a live multisig vault that owns a test
+    // hotspot before relying on this in production.
+    if (multisigPda) {
+      const { serializedTransaction, transactionIndex, feeLamports } =
+        await buildActionProposal({
+          connection,
+          multisigPda,
+          member: payerPubkey,
+          memo: input.memo,
+          buildInstructions: () => [transferInstruction],
+          insufficientFunds: ({ required, available }) =>
+            errors.INSUFFICIENT_FUNDS({
+              message:
+                "Insufficient SOL balance to create the transfer proposal",
+              data: { required, available },
+            }),
+          notFound: () =>
+            errors.NOT_FOUND({
+              message: `Multisig ${input.multisig} not found`,
+            }),
+        });
+
+      return {
+        transactionData: {
+          transactions: [
+            {
+              serializedTransaction,
+              metadata: {
+                type: "hotspot_transfer_proposal",
+                description: `Propose transfer of ${hotspotName} to ${shortRecipient}`,
+                hotspotKey: assetId,
+                hotspotName,
+                recipient,
+              },
+            },
+          ],
+          parallel: false,
+          tag: generateTransactionTag({
+            type: TRANSACTION_TYPES.HOTSPOT_TRANSFER,
+            walletAddress,
+            assetId,
+            recipient,
+            multisig: input.multisig,
+          }),
+          actionMetadata: {
+            type: "hotspot_transfer_proposal",
+            multisig: input.multisig,
+            transactionIndex,
+            hotspotKey: assetId,
+            hotspotName,
+            recipient,
+          },
+        },
+        estimatedSolFee: await toTokenAmountOutput(
+          new BN(feeLamports),
+          NATIVE_MINT.toBase58()
+        ),
+      };
+    }
+
+    // ---- Direct transfer from the wallet ----
+    const walletBalance = await connection.getBalance(payerPubkey);
+    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
+    if (walletBalance < required) {
+      throw errors.INSUFFICIENT_FUNDS({
+        message: "Insufficient SOL balance for transaction fees",
+        data: { required, available: walletBalance },
+      });
+    }
 
     const tx = await buildVersionedTransaction({
       connection,
@@ -182,7 +254,6 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
       timestamp: Date.now(),
     });
 
-    const hotspotName = asset.content?.metadata?.name || "Hotspot";
     const txFee = getTransactionFee(tx);
 
     return {
@@ -192,10 +263,7 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
             serializedTransaction,
             metadata: {
               type: TRANSACTION_TYPES.HOTSPOT_TRANSFER,
-              description: `Transfer ${hotspotName} to ${recipient.slice(
-                0,
-                4,
-              )}...${recipient.slice(-4)}`,
+              description: `Transfer ${hotspotName} to ${shortRecipient}`,
               hotspotKey: assetId,
               hotspotName,
               recipient,
@@ -204,12 +272,17 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: TRANSACTION_TYPES.HOTSPOT_TRANSFER, hotspotKey: assetId, hotspotName, recipient },
+        actionMetadata: {
+          type: TRANSACTION_TYPES.HOTSPOT_TRANSFER,
+          hotspotKey: assetId,
+          hotspotName,
+          recipient,
+        },
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

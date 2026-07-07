@@ -10,6 +10,7 @@ import {
   loadKeypair2FromEnv,
 } from "./helpers/wallet";
 import { signAndSubmitTransactionData } from "./helpers/tx";
+import { TEST_HOTSPOT_ENTITY_KEY } from "./helpers/constants";
 
 /**
  * Exercises the token-transfer endpoint's Squads propose mode end to end: the
@@ -240,6 +241,24 @@ describe("squads v4 propose-mode (token transfer)", function () {
       (before - (await tokenBalance(vault, DC_MINT))).toString(),
       amount,
       "vault DC should be reduced by the burned amount"
+    );
+  });
+
+  // The cNFT propose happy path can't run on a fork (the vault would have to
+  // actually own the hotspot per the real DAS index, which surfpool can't set
+  // up). This negative case still confirms the propose-mode branch is reached
+  // and the ownership guard compares against the vault rather than walletAddress.
+  it("rejects a hotspot burn proposal when the vault does not own the hotspot", async () => {
+    await assert.rejects(
+      ctx.client.hotspots.burnHotspot({
+        walletAddress: base58(ctx.payer.publicKey),
+        hotspotPubkey: TEST_HOTSPOT_ENTITY_KEY,
+        multisig: base58(multisigPda),
+      }),
+      (err: unknown) => {
+        assert.match(String((err as Error)?.message ?? err), /owner/i);
+        return true;
+      }
     );
   });
 });
