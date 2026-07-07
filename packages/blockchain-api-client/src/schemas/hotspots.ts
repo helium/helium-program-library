@@ -29,6 +29,14 @@ export const ClaimRewardsInputSchema = z.object({
   estimatedPendingRewards: TokenAmountOutputSchema.optional(),
 });
 
+export const ClaimHotspotRewardsInputSchema = z.object({
+  entityPubKey: HeliumPublicKeySchema.describe(
+    "The hotspot to claim rewards for."
+  ),
+  walletAddress: WalletAddressSchema,
+  network: RewardNetworkSchema,
+});
+
 export const GetPendingRewardsInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   network: RewardNetworkSchema,
@@ -181,6 +189,16 @@ export const ClaimRewardsOutputSchema =
         actionMetadata: ClaimRewardsActionMetadataSchema.optional(),
       }),
   });
+
+// A single-hotspot claim is one action with no pagination, so it uses the
+// standard (non-paginated) transaction response.
+export const ClaimHotspotRewardsOutputSchema = createTransactionResponse();
+
+export const HotspotBurnInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  hotspotPubkey: HeliumPublicKeySchema,
+});
+export const HotspotBurnOutputSchema = createTransactionResponse();
 export const TransferHotspotOutputSchema = createTransactionResponse();
 export const UpdateRewardsDestinationOutputSchema = createTransactionResponse();
 export const CreateSplitOutputSchema = createTransactionResponse();

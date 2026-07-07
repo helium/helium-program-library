@@ -33,6 +33,7 @@ export const TRANSACTION_TYPES = {
   TOKEN_BURN: "token_burn",
   MEMO: "memo",
   HOTSPOT_TRANSFER: "hotspot_transfer",
+  HOTSPOT_BURN: "hotspot_burn",
   HOTSPOT_REASSERT: "hotspot_reassert",
   HOTSPOT_UPDATE: "hotspot_update",
   BANK_SEND: "bank_send",

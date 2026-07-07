@@ -1,5 +1,7 @@
 import { getHotspots } from "./procedures/getHotspots";
 import { claimRewards } from "./procedures/claimRewards";
+import { claimHotspotRewards } from "./procedures/claimHotspotRewards";
+import { burnHotspot } from "./procedures/burnHotspot";
 import { getPendingRewards } from "./procedures/getPendingRewards";
 import { transferHotspot } from "./procedures/transferHotspot";
 import { updateRewardsDestination } from "./procedures/updateRewardsDestination";
@@ -23,6 +25,10 @@ export const hotspotsRouter = implement(hotspotsContract).router({
   getHotspots,
   /** Create transactions to claim rewards for hotspots */
   claimRewards,
+  /** Create transactions to claim rewards for a single hotspot */
+  claimHotspotRewards,
+  /** Create a transaction to burn (destroy) a hotspot */
+  burnHotspot,
   /** Get pending rewards for all hotspots in a wallet */
   getPendingRewards,
   /** Create a transaction to transfer a hotspot to a new owner */

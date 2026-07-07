@@ -26,6 +26,10 @@ jobs:
             file: data-credits-burn.test.ts
           - name: token-burn-memo
             file: token-burn-memo.test.ts
+          - name: claim-hotspot-rewards
+            file: claim-hotspot-rewards.test.ts
+          - name: hotspot-burn
+            file: hotspot-burn.test.ts
           - name: update-rewards
             file: update-rewards-destination.test.ts
           - name: welcome-pack
