@@ -47,6 +47,13 @@ export const TRANSACTION_TYPES = {
   DELEGATE_DATA_CREDITS: "delegate_data_credits",
   BURN_DATA_CREDITS: "burn_data_credits",
 
+  // Squads v4 multisig
+  SQUADS_PROPOSAL_APPROVE: "squads_proposal_approve",
+  SQUADS_PROPOSAL_REJECT: "squads_proposal_reject",
+  SQUADS_PROPOSAL_CANCEL: "squads_proposal_cancel",
+  SQUADS_PROPOSAL_EXECUTE: "squads_proposal_execute",
+  SQUADS_CONFIG_CHANGE: "squads_config_change",
+
   // Governance - Position Management
   POSITION_CREATE: "position_create",
   POSITION_CLOSE: "position_close",

@@ -30,6 +30,8 @@ jobs:
             file: claim-hotspot-rewards.test.ts
           - name: hotspot-burn
             file: hotspot-burn.test.ts
+          - name: squads-lifecycle
+            file: squads-lifecycle.test.ts
           - name: update-rewards
             file: update-rewards-destination.test.ts
           - name: welcome-pack
