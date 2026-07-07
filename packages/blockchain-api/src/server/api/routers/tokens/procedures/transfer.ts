@@ -27,11 +27,7 @@ import {
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
-import {
-  nextTransactionIndex,
-  vaultPda,
-  wrapAsVaultProposal,
-} from "../../squads/procedures/helpers";
+import { buildActionProposal } from "../../squads/procedures/helpers";
 import BN from "bn.js";
 
 /**
@@ -128,53 +124,35 @@ export const transfer = publicProcedure.tokens.transfer.handler(
     // ---- Squads propose mode: build the transfer from the vault, wrap it ----
     if (input.multisig) {
       const multisigPda = new PublicKey(input.multisig);
-      const transactionIndex = await nextTransactionIndex(
-        connection,
-        multisigPda
-      ).catch(() => {
-        throw errors.NOT_FOUND({
-          message: `Multisig ${input.multisig} not found`,
+      const { serializedTransaction, transactionIndex, feeLamports } =
+        await buildActionProposal({
+          connection,
+          multisigPda,
+          member: feePayer,
+          memo: input.memo,
+          buildInstructions: async (vault) =>
+            (
+              await buildTransferInstructions({
+                connection,
+                authority: vault,
+                destination: destKey,
+                mint: tokenAmount.mint,
+                rawAmount,
+                isSol,
+              })
+            ).instructions,
+          insufficientFunds: ({ required, available }) =>
+            errors.INSUFFICIENT_FUNDS({
+              message:
+                "Insufficient SOL balance to create the transfer proposal",
+              data: { required, available },
+            }),
+          notFound: () =>
+            errors.NOT_FOUND({
+              message: `Multisig ${input.multisig} not found`,
+            }),
         });
-      });
-      const vault = vaultPda(multisigPda);
 
-      const { instructions: actionIxs } = await buildTransferInstructions({
-        connection,
-        authority: vault,
-        destination: destKey,
-        mint: tokenAmount.mint,
-        rawAmount,
-        isSol,
-      });
-
-      const proposalIxs = wrapAsVaultProposal({
-        multisigPda,
-        transactionIndex,
-        member: feePayer,
-        vault,
-        instructions: actionIxs,
-        memo: input.memo,
-      });
-
-      const tx = await buildVersionedTransaction({
-        connection,
-        draft: {
-          instructions: proposalIxs,
-          feePayer,
-          addressLookupTableAddresses: [],
-        },
-      });
-
-      const txFee = getTransactionFee(tx);
-      const walletBalance = await connection.getBalance(feePayer);
-      if (walletBalance < txFee) {
-        throw errors.INSUFFICIENT_FUNDS({
-          message: "Insufficient SOL balance to create the transfer proposal",
-          data: { required: txFee, available: walletBalance },
-        });
-      }
-
-      const indexStr = transactionIndex.toString();
       const tag = generateTransactionTag({
         type: TRANSACTION_TYPES.TOKEN_TRANSFER,
         walletAddress,
@@ -188,7 +166,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
         transactionData: {
           transactions: [
             {
-              serializedTransaction: serializeTransaction(tx),
+              serializedTransaction,
               metadata: {
                 type: "token_transfer_proposal",
                 description: `Propose transfer of ${tokenName ?? "Token"}`,
@@ -203,14 +181,14 @@ export const transfer = publicProcedure.tokens.transfer.handler(
           actionMetadata: {
             type: "token_transfer_proposal",
             multisig: input.multisig,
-            transactionIndex: indexStr,
+            transactionIndex,
             tokenAmount: transferTokenAmount,
             tokenName,
             recipient: destination,
           },
         },
         estimatedSolFee: await toTokenAmountOutput(
-          new BN(calculateRequiredBalance(txFee, 0)),
+          new BN(calculateRequiredBalance(feeLamports, 0)),
           NATIVE_MINT.toBase58()
         ),
       };

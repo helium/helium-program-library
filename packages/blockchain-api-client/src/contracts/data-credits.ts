@@ -5,7 +5,7 @@ import {
   BurnDataCreditsInputSchema,
 } from "../schemas/data-credits";
 import { TransactionDataSchema } from "../schemas/common";
-import { BAD_REQUEST } from "../errors/common";
+import { BAD_REQUEST, NOT_FOUND } from "../errors/common";
 import { INSUFFICIENT_FUNDS } from "../errors/solana";
 
 export const dataCreditsContract = oc.tag("Data Credits").router({
@@ -44,5 +44,6 @@ export const dataCreditsContract = oc.tag("Data Credits").router({
     .errors({
       BAD_REQUEST,
       INSUFFICIENT_FUNDS,
+      NOT_FOUND,
     }),
 });

@@ -75,7 +75,7 @@ export const proposeConfigChange =
         transactionIndex,
       });
 
-      const serializedTransaction = await buildSquadsTransaction({
+      const { serializedTransaction } = await buildSquadsTransaction({
         connection,
         member: memberKey,
         instructions: [createIx, proposalIx],

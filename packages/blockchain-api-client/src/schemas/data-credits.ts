@@ -59,6 +59,13 @@ export const BurnDataCreditsInputSchema = z.object({
     .string()
     .regex(/^\d+$/, "Amount must be a whole number")
     .describe("Amount of DC to burn (smallest unit, DC has 0 decimals)"),
+  multisig: PublicKeySchema.optional().describe(
+    "If set, burn from this multisig's vault as a Squads v4 proposal. `owner` is the proposing member and outer fee payer."
+  ),
+  memo: z
+    .string()
+    .optional()
+    .describe("Optional memo recorded on the Squads proposal (multisig mode)"),
 });
 
 export type BurnDataCreditsInput = z.infer<typeof BurnDataCreditsInputSchema>;

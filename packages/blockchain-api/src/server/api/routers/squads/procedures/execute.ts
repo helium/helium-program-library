@@ -67,7 +67,7 @@ export const executeProposal = publicProcedure.squads.executeProposal.handler(
       ];
     }
 
-    const serializedTransaction = await buildSquadsTransaction({
+    const { serializedTransaction } = await buildSquadsTransaction({
       connection,
       member: memberKey,
       instructions,

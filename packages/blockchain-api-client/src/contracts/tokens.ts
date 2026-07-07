@@ -71,6 +71,7 @@ export const tokensContract = oc.tag("Tokens").router({
     .errors({
       BAD_REQUEST,
       INSUFFICIENT_FUNDS,
+      NOT_FOUND,
     }),
 
   /** Protected: Emit a memo transaction */

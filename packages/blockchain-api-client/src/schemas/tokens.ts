@@ -49,6 +49,13 @@ export const MultiTransferInputSchema = z.object({
 export const BurnInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   tokenAmount: TokenAmountInputSchema,
+  multisig: PublicKeySchema.optional().describe(
+    "If set, build the burn as a Squads v4 proposal from this multisig's vault. walletAddress is the proposing member and outer fee payer."
+  ),
+  memo: z
+    .string()
+    .optional()
+    .describe("Optional memo recorded on the Squads proposal (multisig mode)"),
 });
 
 export const MemoInputSchema = z.object({

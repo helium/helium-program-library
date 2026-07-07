@@ -1,6 +1,6 @@
 import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { HNT_MINT } from "@helium/spl-utils";
+import { DC_MINT, HNT_MINT } from "@helium/spl-utils";
 import * as multisig from "@sqds/multisig";
 import assert from "assert";
 import { setupTestCtx, TestCtx } from "./helpers/context";
@@ -30,12 +30,52 @@ describe("squads v4 propose-mode (token transfer)", function () {
 
   const base58 = (k: PublicKey) => k.toBase58();
 
-  async function hntBalance(owner: PublicKey): Promise<bigint> {
-    const ata = getAssociatedTokenAddressSync(HNT_MINT, owner, true);
+  async function tokenBalance(
+    owner: PublicKey,
+    mint: PublicKey
+  ): Promise<bigint> {
+    const ata = getAssociatedTokenAddressSync(mint, owner, true);
     const res = await ctx.connection
       .getTokenAccountBalance(ata)
       .catch(() => null);
     return res ? BigInt(res.value.amount) : BigInt(0);
+  }
+
+  const hntBalance = (owner: PublicKey) => tokenBalance(owner, HNT_MINT);
+
+  /**
+   * Sign+submit the proposal, then approve and execute it as the sole member
+   * (1-of-1), asserting the proposal ends Executed. Returns nothing.
+   */
+  async function approveAndExecute(index: string): Promise<void> {
+    const approve = await ctx.client.squads.approveProposal({
+      member: base58(ctx.payer.publicKey),
+      multisig: base58(multisigPda),
+      transactionIndex: index,
+    });
+    await signAndSubmitTransactionData(ctx.connection, approve, ctx.payer);
+
+    const execute = await ctx.client.squads.executeProposal({
+      member: base58(ctx.payer.publicKey),
+      multisig: base58(multisigPda),
+      transactionIndex: index,
+    });
+    assert.equal(
+      (execute.actionMetadata as Record<string, unknown>).kind,
+      "vault",
+      "execute should detect a vault transaction"
+    );
+    await signAndSubmitTransactionData(ctx.connection, execute, ctx.payer);
+
+    const [proposalPda] = multisig.getProposalPda({
+      multisigPda,
+      transactionIndex: BigInt(index),
+    });
+    const proposal = await multisig.accounts.Proposal.fromAccountAddress(
+      ctx.connection,
+      proposalPda
+    );
+    assert.equal(proposal.status.__kind, "Executed");
   }
 
   before(async () => {
@@ -148,6 +188,58 @@ describe("squads v4 propose-mode (token transfer)", function () {
       (vaultBefore - vaultAfter).toString(),
       amount,
       "vault should be debited 2 HNT"
+    );
+  });
+
+  it("proposes, approves, and executes a token burn from the vault", async () => {
+    const amount = "100000000"; // 1 HNT
+    const before = await hntBalance(vault);
+
+    const propose = await ctx.client.tokens.burn({
+      walletAddress: base58(ctx.payer.publicKey),
+      tokenAmount: { amount, mint: base58(HNT_MINT) },
+      multisig: base58(multisigPda),
+    });
+    const meta = propose.transactionData.actionMetadata as Record<
+      string,
+      unknown
+    >;
+    assert.equal(meta.type, "token_burn_proposal");
+    await signAndSubmitTransactionData(
+      ctx.connection,
+      propose.transactionData,
+      ctx.payer
+    );
+    await approveAndExecute(String(meta.transactionIndex));
+
+    assert.equal(
+      (before - (await hntBalance(vault))).toString(),
+      amount,
+      "vault HNT should be reduced by the burned amount"
+    );
+  });
+
+  it("proposes, approves, and executes a DC burn from the vault", async () => {
+    await ensureFunds(vault, 0.05 * LAMPORTS_PER_SOL);
+    await ensureTokenBalance(vault, DC_MINT, 100); // DC has 0 decimals
+    const amount = "10";
+    const before = await tokenBalance(vault, DC_MINT);
+
+    // dataCredits/burn returns the bare TransactionData (no envelope).
+    const propose = await ctx.client.dataCredits.burn({
+      owner: base58(ctx.payer.publicKey),
+      amount,
+      multisig: base58(multisigPda),
+    });
+    const meta = propose.actionMetadata as Record<string, unknown>;
+    assert.equal(meta.type, "burn_data_credits_proposal");
+    await signAndSubmitTransactionData(ctx.connection, propose, ctx.payer);
+    await approveAndExecute(String(meta.transactionIndex));
+
+    assert.equal(
+      (before - (await tokenBalance(vault, DC_MINT))).toString(),
+      amount,
+      "vault DC should be reduced by the burned amount"
     );
   });
 });

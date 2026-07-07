@@ -21,7 +21,8 @@ export type InsufficientFundsReporter = (info: {
 
 /**
  * Build an unsigned Squads transaction from a set of instructions, verify the
- * acting member can cover the fee, and return the base64-serialized tx.
+ * acting member can cover the fee, and return the base64-serialized tx plus the
+ * estimated fee in lamports.
  *
  * Passes `addressLookupTableAddresses` through verbatim (default empty) so the
  * common Helium LUT is not auto-attached to these small governance txns; a
@@ -39,7 +40,7 @@ export async function buildSquadsTransaction({
   instructions: TransactionInstruction[];
   addressLookupTableAddresses?: PublicKey[];
   insufficientFunds: InsufficientFundsReporter;
-}): Promise<string> {
+}): Promise<{ serializedTransaction: string; feeLamports: number }> {
   const tx = await buildVersionedTransaction({
     connection,
     draft: { instructions, feePayer: member, addressLookupTableAddresses },
@@ -51,7 +52,10 @@ export async function buildSquadsTransaction({
     throw insufficientFunds({ required, available });
   }
 
-  return serializeTransaction(tx);
+  return {
+    serializedTransaction: serializeTransaction(tx),
+    feeLamports: required,
+  };
 }
 
 type VoteIxBuilder = (args: {
@@ -97,7 +101,7 @@ export async function buildProposalVote({
     memo: input.memo,
   });
 
-  const serializedTransaction = await buildSquadsTransaction({
+  const { serializedTransaction } = await buildSquadsTransaction({
     connection,
     member,
     instructions: [ix],
@@ -198,4 +202,66 @@ export function wrapAsVaultProposal({
   });
 
   return [createIx, proposalIx];
+}
+
+/**
+ * Full "build as proposal" path for an action endpoint: resolve the next
+ * transaction index (mapping a missing multisig to the caller's NOT_FOUND),
+ * build the action instructions with the vault as authority, wrap them into a
+ * proposal, and produce the base64 outer transaction paid for by `member`.
+ *
+ * `buildInstructions` receives the vault pubkey to use as the action's
+ * authority/owner. Returns the serialized proposal transaction and the assigned
+ * transaction index (as a string, for metadata).
+ */
+export async function buildActionProposal({
+  connection,
+  multisigPda,
+  member,
+  buildInstructions,
+  memo,
+  insufficientFunds,
+  notFound,
+}: {
+  connection: Connection;
+  multisigPda: PublicKey;
+  member: PublicKey;
+  buildInstructions: (
+    vault: PublicKey
+  ) => Promise<TransactionInstruction[]> | TransactionInstruction[];
+  memo?: string;
+  insufficientFunds: InsufficientFundsReporter;
+  notFound: () => Error;
+}): Promise<{
+  serializedTransaction: string;
+  transactionIndex: string;
+  feeLamports: number;
+}> {
+  const transactionIndex = await nextTransactionIndex(
+    connection,
+    multisigPda
+  ).catch(() => {
+    throw notFound();
+  });
+  const vault = vaultPda(multisigPda);
+  const instructions = await buildInstructions(vault);
+  const proposalIxs = wrapAsVaultProposal({
+    multisigPda,
+    transactionIndex,
+    member,
+    vault,
+    instructions,
+    memo,
+  });
+  const { serializedTransaction, feeLamports } = await buildSquadsTransaction({
+    connection,
+    member,
+    instructions: proposalIxs,
+    insufficientFunds,
+  });
+  return {
+    serializedTransaction,
+    transactionIndex: transactionIndex.toString(),
+    feeLamports,
+  };
 }

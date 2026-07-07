@@ -1,5 +1,5 @@
 import { publicProcedure } from "../../../procedures";
-import { PublicKey, Connection } from "@solana/web3.js";
+import { PublicKey, Connection, TransactionInstruction } from "@solana/web3.js";
 import {
   createBurnCheckedInstruction,
   getAssociatedTokenAddressSync,
@@ -20,7 +20,27 @@ import {
   calculateRequiredBalance,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { buildActionProposal } from "../../squads/procedures/helpers";
 import BN from "bn.js";
+
+/** Burn `rawAmount` of `mint` from `authority`'s associated token account. */
+async function buildBurnInstruction(
+  connection: Connection,
+  authority: PublicKey,
+  mint: string,
+  rawAmount: bigint
+): Promise<TransactionInstruction> {
+  const mintKey = new PublicKey(mint);
+  const senderAta = getAssociatedTokenAddressSync(mintKey, authority, true);
+  const mintInfo = await getMint(connection, mintKey);
+  return createBurnCheckedInstruction(
+    senderAta,
+    mintKey,
+    authority,
+    rawAmount,
+    mintInfo.decimals
+  );
+}
 
 export const burn = publicProcedure.tokens.burn.handler(
   async ({ input, errors }) => {
@@ -48,17 +68,85 @@ export const burn = publicProcedure.tokens.burn.handler(
       throw errors.BAD_REQUEST({ message: "Cannot burn native SOL" });
     }
 
-    const mintKey = new PublicKey(tokenAmount.mint);
-    const senderAta = getAssociatedTokenAddressSync(mintKey, feePayer, true);
-    const mintInfo = await getMint(connection, mintKey);
+    const burnTokenAmount = await toTokenAmountOutput(
+      new BN(tokenAmount.amount),
+      tokenAmount.mint
+    );
+    const tokenName = TOKEN_NAMES[tokenAmount.mint];
 
+    // ---- Squads propose mode: burn from the vault, wrapped as a proposal ----
+    if (input.multisig) {
+      const multisigPda = new PublicKey(input.multisig);
+      const { serializedTransaction, transactionIndex, feeLamports } =
+        await buildActionProposal({
+          connection,
+          multisigPda,
+          member: feePayer,
+          memo: input.memo,
+          buildInstructions: async (vault) => [
+            await buildBurnInstruction(
+              connection,
+              vault,
+              tokenAmount.mint,
+              rawAmount
+            ),
+          ],
+          insufficientFunds: ({ required, available }) =>
+            errors.INSUFFICIENT_FUNDS({
+              message: "Insufficient SOL balance to create the burn proposal",
+              data: { required, available },
+            }),
+          notFound: () =>
+            errors.NOT_FOUND({
+              message: `Multisig ${input.multisig} not found`,
+            }),
+        });
+
+      const tag = generateTransactionTag({
+        type: TRANSACTION_TYPES.TOKEN_BURN,
+        walletAddress,
+        mint: tokenAmount.mint,
+        amount: tokenAmount.amount,
+        multisig: input.multisig,
+      });
+
+      return {
+        transactionData: {
+          transactions: [
+            {
+              serializedTransaction,
+              metadata: {
+                type: "token_burn_proposal",
+                description: `Propose burn of ${tokenName ?? "Token"}`,
+                tokenAmount: burnTokenAmount,
+                tokenName,
+              },
+            },
+          ],
+          parallel: false,
+          tag,
+          actionMetadata: {
+            type: "token_burn_proposal",
+            multisig: input.multisig,
+            transactionIndex,
+            tokenAmount: burnTokenAmount,
+            tokenName,
+          },
+        },
+        estimatedSolFee: await toTokenAmountOutput(
+          new BN(calculateRequiredBalance(feeLamports, 0)),
+          NATIVE_MINT.toBase58()
+        ),
+      };
+    }
+
+    // ---- Direct burn from the wallet ----
     const instructions = [
-      createBurnCheckedInstruction(
-        senderAta,
-        mintKey,
+      await buildBurnInstruction(
+        connection,
         feePayer,
-        rawAmount,
-        mintInfo.decimals
+        tokenAmount.mint,
+        rawAmount
       ),
     ];
 
@@ -85,12 +173,6 @@ export const burn = publicProcedure.tokens.burn.handler(
         data: { required: estimatedSolFeeLamports, available: walletBalance },
       });
     }
-
-    const burnTokenAmount = await toTokenAmountOutput(
-      new BN(tokenAmount.amount),
-      tokenAmount.mint
-    );
-    const tokenName = TOKEN_NAMES[tokenAmount.mint];
 
     return {
       transactionData: {
