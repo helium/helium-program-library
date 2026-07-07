@@ -1,6 +1,6 @@
 import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { DC_MINT, HNT_MINT } from "@helium/spl-utils";
+import { DC_MINT, HNT_MINT, IOT_MINT } from "@helium/spl-utils";
 import * as multisig from "@sqds/multisig";
 import assert from "assert";
 import { setupTestCtx, TestCtx } from "./helpers/context";
@@ -241,6 +241,30 @@ describe("squads v4 propose-mode (token transfer)", function () {
       (before - (await tokenBalance(vault, DC_MINT))).toString(),
       amount,
       "vault DC should be reduced by the burned amount"
+    );
+  });
+
+  it("proposes, approves, and executes a DC delegation from the vault", async () => {
+    await ensureTokenBalance(vault, DC_MINT, 100);
+    const dcBefore = await tokenBalance(vault, DC_MINT);
+    const delegateAmount = "5";
+
+    const propose = await ctx.client.dataCredits.delegate({
+      owner: base58(ctx.payer.publicKey),
+      routerKey: "test-router-squads",
+      amount: delegateAmount,
+      mint: base58(IOT_MINT),
+      multisig: base58(multisigPda),
+    });
+    const meta = propose.actionMetadata as Record<string, unknown>;
+    assert.equal(meta.type, "delegate_data_credits_proposal");
+    await signAndSubmitTransactionData(ctx.connection, propose, ctx.payer);
+    await approveAndExecute(String(meta.transactionIndex));
+
+    assert.equal(
+      (dcBefore - (await tokenBalance(vault, DC_MINT))).toString(),
+      delegateAmount,
+      "vault DC should be reduced by the delegated amount"
     );
   });
 

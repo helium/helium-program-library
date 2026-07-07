@@ -32,6 +32,7 @@ export const dataCreditsContract = oc.tag("Data Credits").router({
     .errors({
       BAD_REQUEST,
       INSUFFICIENT_FUNDS,
+      NOT_FOUND,
     }),
   burn: oc
     .route({

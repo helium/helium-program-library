@@ -22,6 +22,9 @@ export const MintDataCreditsInputSchema = z.object({
   recipient: PublicKeySchema.optional().describe(
     "Recipient wallet for the minted DC. Defaults to the owner."
   ),
+  // No Squads propose mode: minting requires a fresh Pyth price in the same
+  // transaction, which a deferred proposal can't satisfy (see the mint
+  // procedure). Delegation and burns are proposable.
 });
 
 export type MintDataCreditsInput = z.infer<typeof MintDataCreditsInputSchema>;
@@ -44,7 +47,12 @@ export const DelegateDataCreditsInputSchema = z.object({
   memo: z
     .string()
     .optional()
-    .describe("Optional memo to include in the transaction"),
+    .describe(
+      "In direct mode, a memo instruction included in the transaction. In multisig mode, the memo recorded on the Squads proposal."
+    ),
+  multisig: PublicKeySchema.optional().describe(
+    "If set, delegate from this multisig's vault as a Squads v4 proposal. `owner` is the proposing member and outer fee payer."
+  ),
 });
 
 export type DelegateDataCreditsInput = z.infer<
