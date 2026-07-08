@@ -319,6 +319,16 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:c2d0b1ae6462c4d9": 70495,
   // tuktuk_dca.initialize_dca_nested_v0 (n=1, med=88794, max=88794) [localnet]
   "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:50afa90952dcb70a": 88794,
+  // circuit_breaker.update_account_windowed_breaker_v0 (n=1, med=2115, max=2115) [localnet]
+  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:1b38455f49685612": 2115,
+  // treasury_management.update_treasury_management_v0 (n=1, med=2035, max=2035) [localnet]
+  "treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5:d18b5ae2f99559d9": 2035,
+  // fanout.stake_v0 (n=5, med=262516, max=268386) [localnet]
+  "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6:04cd34efdfa711d3": 268386,
+  // fanout.initialize_fanout_v0 (n=4, med=200250, max=204750) [localnet]
+  "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6:f49b9aa5eb7f2cbb": 204750,
+  // fanout.unstake_v0 (n=1, med=65264, max=65264) [localnet]
+  "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6:c72b785167076870": 65264,
 };
 
 export const MAX_COMPUTE_UNITS = 1400000;
