@@ -118,12 +118,15 @@ export const GetAutomationStatusInputSchema = z.object({
   walletAddress: WalletAddressSchema,
 });
 
+// Best-effort classification of a raw cron string, surfaced on the status
+// output for display only. Funding math is per-firing and never depends on it.
 export const AutomationScheduleSchema = z.enum(["daily", "weekly", "monthly"]);
 
 export const SetupAutomationInputSchema = z.object({
   walletAddress: WalletAddressSchema,
-  schedule: AutomationScheduleSchema,
-  duration: z.number().int().min(1), // Number of claims
+  // Raw crontab string (clockwork format) the cron fires on.
+  cronSchedule: z.string().min(1),
+  duration: z.number().int().min(1), // Number of claims to pre-fund
   totalHotspots: z.number().int().min(1),
 });
 
@@ -139,6 +142,37 @@ export const GetFundingEstimateInputSchema = z.object({
 
 export const CloseAutomationInputSchema = z.object({
   walletAddress: WalletAddressSchema,
+});
+
+export const RequeueAutomationInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+});
+
+// Add a whole-wallet claim (claims every hotspot the wallet owns) to the cron.
+export const AddWalletToAutomationInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+});
+
+// Add a single hotspot/entity claim to the cron.
+export const AddEntityToAutomationInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  entityKey: HeliumPublicKeySchema,
+});
+
+// Remove a single claim entry (by its cron transaction index) from the cron.
+export const RemoveEntityFromAutomationInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  index: z.number().int().min(0),
+});
+
+// Operator-run floor top-up: for each target wallet whose pool balance is at or
+// below `floorLamports`, the operator funds it with `fundLamports`. The operator
+// is the fee payer and funding source (mirrors the off-chain funder pattern).
+export const TopUpAutomationInputSchema = z.object({
+  operatorAddress: WalletAddressSchema,
+  floorLamports: z.coerce.number().int().min(0),
+  fundLamports: z.coerce.number().int().min(1),
+  targets: z.array(WalletAddressSchema).min(1).max(50),
 });
 
 // ============================================================================
@@ -225,6 +259,12 @@ export const DeleteSplitOutputSchema = createTransactionResponse();
 export const SetupAutomationOutputSchema = createTransactionResponse();
 export const FundAutomationOutputSchema = createTransactionResponse();
 export const CloseAutomationOutputSchema = createTransactionResponse();
+export const RequeueAutomationOutputSchema = createTransactionResponse();
+export const AddWalletToAutomationOutputSchema = createTransactionResponse();
+export const AddEntityToAutomationOutputSchema = createTransactionResponse();
+export const RemoveEntityFromAutomationOutputSchema =
+  createTransactionResponse();
+export const TopUpAutomationOutputSchema = createTransactionResponse();
 
 export const SplitShareSchema = z.object({
   wallet: z.string(),
@@ -245,7 +285,8 @@ export const AutomationStatusOutputSchema = z.object({
   isOutOfSol: z.boolean(),
   currentSchedule: z
     .object({
-      schedule: AutomationScheduleSchema,
+      cron: z.string(), // raw crontab string the cron fires on
+      schedule: AutomationScheduleSchema, // best-effort classification (display only)
       time: z.string(),
       nextRun: z.string(), // ISO date string
     })
@@ -375,3 +416,16 @@ export type GetFundingEstimateInput = z.infer<
   typeof GetFundingEstimateInputSchema
 >;
 export type FundingEstimate = z.infer<typeof FundingEstimateOutputSchema>;
+export type RequeueAutomationInput = z.infer<
+  typeof RequeueAutomationInputSchema
+>;
+export type AddWalletToAutomationInput = z.infer<
+  typeof AddWalletToAutomationInputSchema
+>;
+export type AddEntityToAutomationInput = z.infer<
+  typeof AddEntityToAutomationInputSchema
+>;
+export type RemoveEntityFromAutomationInput = z.infer<
+  typeof RemoveEntityFromAutomationInputSchema
+>;
+export type TopUpAutomationInput = z.infer<typeof TopUpAutomationInputSchema>;

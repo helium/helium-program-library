@@ -36,6 +36,16 @@ import {
   SetupAutomationInputSchema,
   FundingEstimateOutputSchema,
   GetFundingEstimateInputSchema,
+  RequeueAutomationInputSchema,
+  RequeueAutomationOutputSchema,
+  AddWalletToAutomationInputSchema,
+  AddWalletToAutomationOutputSchema,
+  AddEntityToAutomationInputSchema,
+  AddEntityToAutomationOutputSchema,
+  RemoveEntityFromAutomationInputSchema,
+  RemoveEntityFromAutomationOutputSchema,
+  TopUpAutomationInputSchema,
+  TopUpAutomationOutputSchema,
   UpdateHotspotInfoInputSchema,
   UpdateHotspotInfoOutputSchema,
 } from "../schemas/hotspots";
@@ -248,6 +258,71 @@ export const hotspotsContract = oc
       .input(GetFundingEstimateInputSchema)
       .output(FundingEstimateOutputSchema)
       .errors({}),
+    /** Protected: Requeue an automation that ran out of SOL */
+    requeueAutomation: oc
+      .route({
+        method: "POST",
+        path: "/wallet/{walletAddress}/automation/requeue",
+        summary: "Requeue automation",
+      })
+      .input(RequeueAutomationInputSchema)
+      .output(RequeueAutomationOutputSchema)
+      .errors({
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+      }),
+    /** Protected: Add a whole-wallet claim to an automation */
+    addWalletToAutomation: oc
+      .route({
+        method: "POST",
+        path: "/wallet/{walletAddress}/automation/add-wallet",
+        summary: "Add wallet claim to automation",
+      })
+      .input(AddWalletToAutomationInputSchema)
+      .output(AddWalletToAutomationOutputSchema)
+      .errors({
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+      }),
+    /** Protected: Add a single hotspot claim to an automation */
+    addEntityToAutomation: oc
+      .route({
+        method: "POST",
+        path: "/wallet/{walletAddress}/automation/add-entity",
+        summary: "Add hotspot claim to automation",
+      })
+      .input(AddEntityToAutomationInputSchema)
+      .output(AddEntityToAutomationOutputSchema)
+      .errors({
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+      }),
+    /** Protected: Remove a claim entry from an automation */
+    removeEntityFromAutomation: oc
+      .route({
+        method: "POST",
+        path: "/wallet/{walletAddress}/automation/remove-entity",
+        summary: "Remove claim from automation",
+      })
+      .input(RemoveEntityFromAutomationInputSchema)
+      .output(RemoveEntityFromAutomationOutputSchema)
+      .errors({
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+      }),
+    /** Protected: Operator floor top-up for a batch of automations */
+    topUpAutomation: oc
+      .route({
+        method: "POST",
+        path: "/automation/top-up",
+        summary: "Operator floor top-up of automation funding",
+      })
+      .input(TopUpAutomationInputSchema)
+      .output(TopUpAutomationOutputSchema)
+      .errors({
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+      }),
     updateHotspotInfo: oc
       .route({
         method: "POST",
