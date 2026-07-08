@@ -42,8 +42,9 @@ export const flipLockupKind = publicProcedure.governance.flipLockupKind.handler(
     const hsdProgram = await initHsd(provider);
     const [positionPubkey] = positionKey(positionMintPubkey);
 
-    const positionAcc =
-      await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
+    const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
+      positionPubkey
+    );
 
     if (!positionAcc) {
       throw errors.NOT_FOUND({ message: "Position not found" });
@@ -53,7 +54,7 @@ export const flipLockupKind = publicProcedure.governance.flipLockupKind.handler(
       connection,
       positionMintPubkey,
       walletPubkey,
-      errors,
+      errors
     );
 
     const lockupKind = getLockupKind(positionAcc.lockup);
@@ -64,7 +65,7 @@ export const flipLockupKind = publicProcedure.governance.flipLockupKind.handler(
     const unixNow = Number(clock!.data.readBigInt64LE(8 * 4));
 
     const registrar = await vsrProgram.account.registrar.fetch(
-      positionAcc.registrar,
+      positionAcc.registrar
     );
     const depositMint =
       registrar.votingMints[positionAcc.votingMintConfigIdx].mint;
@@ -77,9 +78,9 @@ export const flipLockupKind = publicProcedure.governance.flipLockupKind.handler(
             ? positionAcc.lockup.endTs
                 .sub(positionAcc.lockup.startTs)
                 .toNumber()
-            : positionAcc.lockup.endTs.sub(new BN(unixNow)).toNumber(),
-        ),
-      ),
+            : positionAcc.lockup.endTs.sub(new BN(unixNow)).toNumber()
+        )
+      )
     );
 
     const instructions: TransactionInstruction[] = [];
@@ -94,8 +95,8 @@ export const flipLockupKind = publicProcedure.governance.flipLockupKind.handler(
         {
           kind: toLockupKindArg(newLockupKind),
           periods: positionLockupPeriodInDays,
-        },
-      ),
+        }
+      )
     );
 
     const tx = await buildVersionedTransaction({
@@ -103,7 +104,7 @@ export const flipLockupKind = publicProcedure.governance.flipLockupKind.handler(
       draft: { instructions, feePayer: walletPubkey },
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < txFee) {
@@ -136,8 +137,8 @@ export const flipLockupKind = publicProcedure.governance.flipLockupKind.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

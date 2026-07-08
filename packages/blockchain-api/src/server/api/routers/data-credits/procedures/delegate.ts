@@ -106,7 +106,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
       },
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
     const walletBalance = await connection.getBalance(feePayer);
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({

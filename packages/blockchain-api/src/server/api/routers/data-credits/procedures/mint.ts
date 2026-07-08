@@ -54,7 +54,10 @@ export const mint = publicProcedure.dataCredits.mint.handler(
     });
 
     const useJito = shouldUseJitoBundle(txs.length, getCluster());
-    const txFees = getTotalTransactionFees(txs.map((t) => t.tx));
+    const txFees = await getTotalTransactionFees(
+      connection,
+      txs.map((t) => t.tx)
+    );
     const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
 
     // Check if recipient's DC ATA needs creation (init_if_needed on-chain)

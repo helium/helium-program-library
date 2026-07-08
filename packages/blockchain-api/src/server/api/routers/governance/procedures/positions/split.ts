@@ -51,8 +51,9 @@ export const split = publicProcedure.governance.splitPosition.handler(
     const hsdProgram = await initHsd(provider);
     const [sourcePositionPubkey] = positionKey(sourcePositionMintPubkey);
 
-    const sourcePositionAcc =
-      await vsrProgram.account.positionV0.fetchNullable(sourcePositionPubkey);
+    const sourcePositionAcc = await vsrProgram.account.positionV0.fetchNullable(
+      sourcePositionPubkey
+    );
 
     if (!sourcePositionAcc) {
       throw errors.NOT_FOUND({ message: "Source position not found" });
@@ -62,11 +63,11 @@ export const split = publicProcedure.governance.splitPosition.handler(
       connection,
       sourcePositionMintPubkey,
       walletPubkey,
-      errors,
+      errors
     );
 
     const registrar = await vsrProgram.account.registrar.fetch(
-      sourcePositionAcc.registrar,
+      sourcePositionAcc.registrar
     );
     const depositMint =
       registrar.votingMints[sourcePositionAcc.votingMintConfigIdx].mint;
@@ -90,7 +91,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
     const [targetPositionPubkey] = positionKey(newMintKeypair.publicKey);
 
     const mintRent = await connection.getMinimumBalanceForRentExemption(
-      MintLayout.span,
+      MintLayout.span
     );
 
     const instructions: TransactionInstruction[] = [];
@@ -102,7 +103,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
         lamports: mintRent,
         space: MintLayout.span,
         programId: TOKEN_PROGRAM_ID,
-      }),
+      })
     );
 
     instructions.push(
@@ -110,8 +111,8 @@ export const split = publicProcedure.governance.splitPosition.handler(
         newMintKeypair.publicKey,
         0,
         targetPositionPubkey,
-        targetPositionPubkey,
-      ),
+        targetPositionPubkey
+      )
     );
 
     instructions.push(
@@ -128,7 +129,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
           depositMint,
           recipient: walletPubkey,
         })
-        .instruction(),
+        .instruction()
     );
 
     instructions.push(
@@ -139,8 +140,8 @@ export const split = publicProcedure.governance.splitPosition.handler(
         sourcePositionPubkey,
         targetPositionPubkey,
         depositMint,
-        { amount: amountBN },
-      ),
+        { amount: amountBN }
+      )
     );
 
     if (amountBN.eq(sourcePositionAcc.amountDepositedNative)) {
@@ -150,7 +151,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
           .accountsPartial({
             position: sourcePositionPubkey,
           })
-          .instruction(),
+          .instruction()
       );
     }
 
@@ -167,7 +168,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
       amount,
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
     const estimatedSolFeeLamports = txFee + mintRent;
 
     const walletBalance = await connection.getBalance(walletPubkey);
@@ -201,8 +202,8 @@ export const split = publicProcedure.governance.splitPosition.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

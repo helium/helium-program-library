@@ -52,10 +52,7 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
       return raw;
     });
 
-    const totalAmount = parsedAmounts.reduce(
-      (sum, a) => sum + a,
-      BigInt(0),
-    );
+    const totalAmount = parsedAmounts.reduce((sum, a) => sum + a, BigInt(0));
 
     const tokenName = TOKEN_NAMES[mint];
     const isSol = mint === TOKEN_MINTS.WSOL;
@@ -85,7 +82,7 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
       const senderAta = getAssociatedTokenAddressSync(mintKey, feePayer, true);
       const destKeys = recipients.map((r) => new PublicKey(r.destination));
       const destAtas = destKeys.map((d) =>
-        getAssociatedTokenAddressSync(mintKey, d, true),
+        getAssociatedTokenAddressSync(mintKey, d, true)
       );
 
       const [mintInfo, destAtaInfos] = await Promise.all([
@@ -101,7 +98,7 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
             feePayer,
             destAtas[i],
             destKeys[i],
-            mintKey,
+            mintKey
           ),
           createTransferCheckedInstruction(
             senderAta,
@@ -109,7 +106,7 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
             destAtas[i],
             feePayer,
             parsedAmounts[i],
-            mintInfo.decimals,
+            mintInfo.decimals
           ),
         ],
         metadata: {
@@ -146,7 +143,10 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
     const isMainnet = cluster === "mainnet" || cluster === "mainnet-beta";
     const jitoTipIncluded = isMainnet && versionedTransactions.length > 1;
 
-    const txFee = getTotalTransactionFees(versionedTransactions);
+    const txFee = await getTotalTransactionFees(
+      connection,
+      versionedTransactions
+    );
     const jitoTipCost = jitoTipIncluded ? getJitoTipAmountLamports() : 0;
     const ataRent = needsAtaCount * RENT_COSTS.ATA;
     const tokenCost = isSol ? Number(totalAmount) : 0;
@@ -175,7 +175,7 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
 
     const totalAmountOutput = await toTokenAmountOutput(
       new BN(totalAmount.toString()),
-      mint,
+      mint
     );
 
     return {
@@ -193,8 +193,8 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee + jitoTipCost + ataRent),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

@@ -32,8 +32,9 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
     const positionMintPubkeys = positionMints.map((m) => new PublicKey(m));
     const positionPubkeys = positionMintPubkeys.map((m) => positionKey(m)[0]);
 
-    const positionAccounts =
-      await vsrProgram.account.positionV0.fetchMultiple(positionPubkeys);
+    const positionAccounts = await vsrProgram.account.positionV0.fetchMultiple(
+      positionPubkeys
+    );
 
     const registrarCache = new Map<
       string,
@@ -57,14 +58,14 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
         positionMintPubkey,
         walletPubkey,
         positionMints[i],
-        errors,
+        errors
       );
 
       const registrarKey = positionAcc.registrar.toBase58();
       let registrar = registrarCache.get(registrarKey);
       if (!registrar) {
         registrar = await vsrProgram.account.registrar.fetch(
-          positionAcc.registrar,
+          positionAcc.registrar
         );
         registrarCache.set(registrarKey, registrar);
       }
@@ -73,12 +74,12 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
       const ownedAssetProxyAssignmentAddress = proxyAssignmentKey(
         proxyConfig,
         positionMintPubkey,
-        PublicKey.default,
+        PublicKey.default
       )[0];
 
       const baseAssignment =
         await proxyProgram.account.proxyAssignmentV0.fetchNullable(
-          ownedAssetProxyAssignmentAddress,
+          ownedAssetProxyAssignmentAddress
         );
 
       if (
@@ -94,17 +95,18 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
         const addr = proxyAssignmentKey(
           proxyConfig,
           positionMintPubkey,
-          currentVoter,
+          currentVoter
         )[0];
         chain.push({ address: addr, voter: currentVoter });
-        const acc =
-          await proxyProgram.account.proxyAssignmentV0.fetchNullable(addr);
+        const acc = await proxyProgram.account.proxyAssignmentV0.fetchNullable(
+          addr
+        );
         if (!acc) break;
         currentVoter = acc.nextVoter;
       }
 
       const targetIndex = chain.findIndex((c) =>
-        c.voter.equals(proxyKeyPubkey),
+        c.voter.equals(proxyKeyPubkey)
       );
       if (targetIndex === -1) {
         continue;
@@ -127,7 +129,7 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
             approver: walletPubkey,
             tokenAccount: getAssociatedTokenAddressSync(
               positionMintPubkey,
-              walletPubkey,
+              walletPubkey
             ),
           })
           .instruction(),
@@ -162,7 +164,9 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
       versionedTransactions.length > 1
         ? getJitoTipAmountLamports()
         : 0;
-    const totalFee = getTotalTransactionFees(versionedTransactions) + jitoTipCost;
+    const totalFee =
+      (await getTotalTransactionFees(connection, versionedTransactions)) +
+      jitoTipCost;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < totalFee) {
@@ -184,13 +188,17 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
         transactions,
         parallel: true,
         tag,
-        actionMetadata: { type: "proxy_unassign", proxyKey, positionCount: positionMints.length },
+        actionMetadata: {
+          type: "proxy_unassign",
+          proxyKey,
+          positionCount: positionMints.length,
+        },
       },
       hasMore,
       estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

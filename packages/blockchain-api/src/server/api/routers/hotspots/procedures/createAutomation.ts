@@ -2,13 +2,14 @@ import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
   BASE_AUTOMATION_RENT,
   calculateFundingForAdditionalDuration,
-  ENTITY_CLAIM_CRON_NAME,
-  resolveScheduleToCron,
+  getScheduleCronString,
+  interpretCronString,
 } from "@/lib/utils/automation-helpers";
 import * as anchor from "@coral-xyz/anchor";
 import {
   cronJobKey,
   cronJobNameMappingKey,
+  cronJobTransactionKey,
   init as initCron,
 } from "@helium/cron-sdk";
 import {
@@ -21,7 +22,11 @@ import {
   HELIUM_COMMON_LUT_DEVNET,
   toVersionedTx,
 } from "@helium/spl-utils";
-import { init as initTuktuk } from "@helium/tuktuk-sdk";
+import {
+  init as initTuktuk,
+  nextAvailableTaskIds,
+  taskKey,
+} from "@helium/tuktuk-sdk";
 import {
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -41,11 +46,7 @@ import {
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import { publicProcedure } from "../../../procedures";
-import {
-  buildTeardownInstructions,
-  fetchAutomationData,
-  nextFreeTaskKey,
-} from "./automation-data-helpers";
+import { fetchAutomationData } from "./automation-data-helpers";
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
 /**
@@ -55,9 +56,6 @@ export const createAutomation =
   publicProcedure.hotspots.createAutomation.handler(
     async ({ input, errors }) => {
       const { walletAddress, schedule, duration } = input;
-      // Accept a preset (daily/weekly/monthly) or a raw crontab; presets map to
-      // a crontab here so everything downstream deals in a single cron string.
-      const cronSchedule = resolveScheduleToCron(schedule);
 
       const wallet = new PublicKey(walletAddress);
       const { provider } = createSolanaConnection(walletAddress);
@@ -68,8 +66,7 @@ export const createAutomation =
       const cronProgram = await initCron(provider);
       const tuktukProgram = await initTuktuk(provider);
 
-      // Derive keys. hpl_crons pins a single entity-claim cron per wallet
-      // (id 0, name "entity_claim"), so both are fixed.
+      // Derive keys
       const authority = entityCronAuthorityKey(wallet)[0];
       const cronJob = cronJobKey(authority, 0)[0];
 
@@ -82,30 +79,64 @@ export const createAutomation =
       // If cronJob doesn't exist or schedule changed, create/recreate it
       if (
         !cronJobAccount ||
-        (cronJobAccount.schedule && cronJobAccount.schedule !== cronSchedule)
+        (cronJobAccount.schedule &&
+          interpretCronString(cronJobAccount.schedule).schedule !== schedule)
       ) {
-        // If it exists but schedule changed, remove it first. Skip holes left
-        // by individually-removed claims (nextTransactionId is monotonic).
+        // If it exists but schedule changed, remove it first
         if (cronJobAccount) {
+          const maxTxId = cronJobAccount.nextTransactionId || 0;
+          const txIds = Array.from({ length: maxTxId }, (_, i) => i);
+
           instructions.push(
-            ...(await buildTeardownInstructions(
-              provider.connection,
-              hplCronsProgram,
-              cronJob,
-              authority,
-              wallet,
-              cronJobAccount.nextTransactionId || 0
-            ))
+            ...(await Promise.all(
+              txIds.map((txId) =>
+                hplCronsProgram.methods
+                  .removeEntityFromCronV0({
+                    index: txId,
+                  })
+                  .accounts({
+                    cronJob,
+                    rentRefund: wallet,
+                    cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
+                  })
+                  .instruction()
+              )
+            )),
+            await hplCronsProgram.methods
+              .closeEntityClaimCronV0()
+              .accounts({
+                cronJob,
+                rentRefund: wallet,
+                cronJobNameMapping: cronJobNameMappingKey(
+                  authority,
+                  "entity_claim"
+                )[0],
+              })
+              .instruction()
           );
         }
 
-        // Create new cron job. Fetch the task queue fresh to get the latest state.
-        const freshTask = await nextFreeTaskKey(tuktukProgram);
+        // Create new cron job
+        // Fetch task queue fresh to ensure we have the latest state
+        const freshTaskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
+          TASK_QUEUE_ID
+        );
+        const freshAvailableTaskIds = nextAvailableTaskIds(
+          freshTaskQueueAcc.taskBitmap,
+          1,
+          false
+        );
+        if (freshAvailableTaskIds.length === 0) {
+          throw new Error("No available task IDs in task queue");
+        }
+        const freshTaskId = freshAvailableTaskIds[0];
+        const [freshTask] = taskKey(TASK_QUEUE_ID, freshTaskId);
 
+        const cronString = getScheduleCronString(schedule);
         instructions.push(
           await hplCronsProgram.methods
             .initEntityClaimCronV0({
-              schedule: cronSchedule,
+              schedule: cronString,
             })
             .accounts({
               taskQueue: TASK_QUEUE_ID,
@@ -113,15 +144,27 @@ export const createAutomation =
               task: freshTask,
               cronJobNameMapping: cronJobNameMappingKey(
                 authority,
-                ENTITY_CLAIM_CRON_NAME
+                "entity_claim"
               )[0],
             })
             .instruction()
         );
       } else if (cronJobAccount?.removedFromQueue) {
-        // If cron exists but was removed from queue due to insufficient SOL,
-        // requeue it. Fetch the task queue fresh to get the latest state.
-        const freshTask = await nextFreeTaskKey(tuktukProgram);
+        // If cron exists but was removed from queue due to insufficient SOL, requeue it
+        // Fetch task queue fresh to ensure we have the latest state
+        const freshTaskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
+          TASK_QUEUE_ID
+        );
+        const freshAvailableTaskIds = nextAvailableTaskIds(
+          freshTaskQueueAcc.taskBitmap,
+          1,
+          false
+        );
+        if (freshAvailableTaskIds.length === 0) {
+          throw new Error("No available task IDs in task queue");
+        }
+        const freshTaskId = freshAvailableTaskIds[0];
+        const [freshTask] = taskKey(TASK_QUEUE_ID, freshTaskId);
 
         instructions.push(
           await hplCronsProgram.methods
@@ -132,7 +175,7 @@ export const createAutomation =
               task: freshTask,
               cronJobNameMapping: cronJobNameMappingKey(
                 authority,
-                ENTITY_CLAIM_CRON_NAME
+                "entity_claim"
               )[0],
             })
             .instruction()
@@ -200,9 +243,20 @@ export const createAutomation =
         });
       }
 
-      // Note: this only sets up (and funds) the cron itself. Claims are added
-      // separately via addWalletToAutomation / addEntityToAutomation, so the
-      // same cron can mix whole-wallet and per-hotspot claims.
+      if (!cronJobAccount) {
+        const { instruction } = await hplCronsProgram.methods
+          .addWalletToEntityCronV0({
+            index: 0,
+          })
+          .accounts({
+            wallet,
+            cronJob,
+            cronJobTransaction: cronJobTransactionKey(cronJob, 0)[0],
+          })
+          .prepare();
+
+        instructions.push(instruction);
+      }
 
       if (minCrankSolFee > 0) {
         instructions.push(
@@ -232,7 +286,6 @@ export const createAutomation =
               ? HELIUM_COMMON_LUT_DEVNET
               : HELIUM_COMMON_LUT,
           ],
-          computeUnitLimit: 500000,
           commitment: "finalized",
         })
       ).map((tx) => toVersionedTx(tx));
@@ -247,7 +300,7 @@ export const createAutomation =
       );
 
       // Estimated fee includes tx fees + operational funding (cronJob + pdaWallet)
-      const txFees = getTotalTransactionFees(vtxs);
+      const txFees = await getTotalTransactionFees(provider.connection, vtxs);
       const estimatedSolFeeLamports = txFees + totalFundingNeeded;
 
       return {
@@ -257,13 +310,13 @@ export const createAutomation =
             metadata: {
               type: "setup_automation",
               description: "Set up hotspot claim automation",
-              cronSchedule,
+              schedule,
               duration,
             },
           })),
           parallel: false,
           tag: `setup_automation:${walletAddress}`,
-          actionMetadata: { type: "setup_automation", cronSchedule, duration },
+          actionMetadata: { type: "setup_automation", schedule, duration },
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),

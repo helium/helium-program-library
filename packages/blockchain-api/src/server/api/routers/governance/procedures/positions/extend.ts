@@ -32,8 +32,9 @@ export const extend = publicProcedure.governance.extendPosition.handler(
     const hsdProgram = await initHsd(provider);
     const [positionPubkey] = positionKey(positionMintPubkey);
 
-    const positionAcc =
-      await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
+    const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
+      positionPubkey
+    );
 
     if (!positionAcc) {
       throw errors.NOT_FOUND({ message: "Position not found" });
@@ -43,11 +44,11 @@ export const extend = publicProcedure.governance.extendPosition.handler(
       connection,
       positionMintPubkey,
       walletPubkey,
-      errors,
+      errors
     );
 
     const registrar = await vsrProgram.account.registrar.fetch(
-      positionAcc.registrar,
+      positionAcc.registrar
     );
     const depositMint =
       registrar.votingMints[positionAcc.votingMintConfigIdx].mint;
@@ -66,8 +67,8 @@ export const extend = publicProcedure.governance.extendPosition.handler(
             | { constant: Record<string, never> }
             | { cliff: Record<string, never> },
           periods: lockupPeriodsInDays,
-        },
-      ),
+        }
+      )
     );
 
     const tx = await buildVersionedTransaction({
@@ -75,7 +76,7 @@ export const extend = publicProcedure.governance.extendPosition.handler(
       draft: { instructions, feePayer: walletPubkey },
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < txFee) {
@@ -105,12 +106,16 @@ export const extend = publicProcedure.governance.extendPosition.handler(
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "position_extend", positionMint, lockupPeriodDays: lockupPeriodsInDays },
+        actionMetadata: {
+          type: "position_extend",
+          positionMint,
+          lockupPeriodDays: lockupPeriodsInDays,
+        },
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

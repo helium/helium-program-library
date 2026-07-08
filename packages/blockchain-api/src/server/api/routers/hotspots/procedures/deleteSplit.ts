@@ -136,7 +136,7 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
       assetId,
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
 
     return {
       transactionData: {

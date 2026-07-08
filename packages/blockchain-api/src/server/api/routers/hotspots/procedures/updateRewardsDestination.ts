@@ -29,7 +29,7 @@ import BN from "bn.js";
 
 async function exists(
   connection: { getAccountInfo: (account: PublicKey) => Promise<unknown> },
-  account: PublicKey,
+  account: PublicKey
 ): Promise<boolean> {
   return Boolean(await connection.getAccountInfo(account));
 }
@@ -89,7 +89,7 @@ export const updateRewardsDestination =
         const rentCost = RENT_COSTS.RECIPIENT * recipientsNeeded;
         const required = calculateRequiredBalance(
           BASE_TX_FEE_LAMPORTS,
-          rentCost,
+          rentCost
         );
         if (walletBalance < required) {
           throw errors.INSUFFICIENT_FUNDS({
@@ -132,7 +132,7 @@ export const updateRewardsDestination =
                     lazyDistributor: lazy,
                     payer: wallet.publicKey,
                   })
-                ).instruction(),
+                ).instruction()
               );
             }
 
@@ -152,11 +152,11 @@ export const updateRewardsDestination =
                       : destinationPubkey,
                 })
                 .remainingAccounts(remainingAccounts)
-                .instruction(),
+                .instruction()
             );
 
             return ixs;
-          }),
+          })
         )
       ).flat();
 
@@ -180,7 +180,7 @@ export const updateRewardsDestination =
       });
 
       const rentCost = RENT_COSTS.RECIPIENT * recipientsNeeded;
-      const txFee = getTransactionFee(tx);
+      const txFee = await getTransactionFee(connection, tx);
       const estimatedSolFeeLamports = txFee + rentCost;
 
       return {
@@ -193,13 +193,13 @@ export const updateRewardsDestination =
                 description: destinationExists
                   ? `Update rewards destination to ${destination.slice(
                       0,
-                      4,
+                      4
                     )}...${destination.slice(-4)}`
                   : `Update rewards destination to ${destination.slice(
                       0,
-                      4,
+                      4
                     )}...${destination.slice(
-                      -4,
+                      -4
                     )} (Warning: destination account does not exist)`,
                 hotspotKey: assetId,
                 destination,
@@ -218,8 +218,8 @@ export const updateRewardsDestination =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),
-          NATIVE_MINT.toBase58(),
+          NATIVE_MINT.toBase58()
         ),
       };
-    },
+    }
   );
