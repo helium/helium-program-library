@@ -76,5 +76,5 @@ export const getFundingEstimate =
         currentCronJobBalance: cronJobBalanceLamports.toString(),
         currentPdaWalletBalance: pdaWalletBalanceLamports.toString(),
       };
-    },
+    }
   );

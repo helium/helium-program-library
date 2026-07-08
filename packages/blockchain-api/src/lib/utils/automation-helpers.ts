@@ -2,6 +2,14 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 export type Schedule = "daily" | "weekly" | "monthly";
 
+/**
+ * Cron-job name-mapping alias. hpl_crons hardcodes this in
+ * init_entity_claim_cron_v0, and the name-mapping PDA is keyed by
+ * (authority, name) — so a wallet has exactly one entity-claim cron. close and
+ * requeue must pass this same name mapping.
+ */
+export const ENTITY_CLAIM_CRON_NAME = "entity_claim";
+
 // Constants from useAutomateHotspotClaims hook
 export const BASE_AUTOMATION_RENT = 0.02098095;
 export const TASK_RETURN_ACCOUNT_SIZE = 0.01;
@@ -66,8 +74,8 @@ export function interpretCronString(cronString: string): CronScheduleInfo {
       now.getUTCDate(),
       parseInt(hours, 10),
       parseInt(minutes, 10),
-      parseInt(seconds, 10),
-    ),
+      parseInt(seconds, 10)
+    )
   );
 
   // Convert UTC to local time for display
@@ -97,7 +105,7 @@ export function interpretCronString(cronString: string): CronScheduleInfo {
     const targetDay = parseInt(dayOfWeek, 10);
     const daysUntil = targetDay - currentDay;
     nextRunUTC.setUTCDate(
-      now.getUTCDate() + (daysUntil >= 0 ? daysUntil : 7 + daysUntil),
+      now.getUTCDate() + (daysUntil >= 0 ? daysUntil : 7 + daysUntil)
     );
     nextRun.setTime(nextRunUTC.getTime());
   } else {
@@ -122,7 +130,7 @@ export function interpretCronString(cronString: string): CronScheduleInfo {
  */
 export function calculateCronJobCostPerClaim(
   minCrankReward: number,
-  numCronTransactions: number,
+  numCronTransactions: number
 ): number {
   return (1 + numCronTransactions) * minCrankReward;
 }
@@ -142,7 +150,7 @@ export function calculatePdaWalletCostPerClaim(totalHotspots: number): number {
  */
 export function calculatePoolPeriods(
   balanceLamports: number,
-  costPerClaimLamports: number,
+  costPerClaimLamports: number
 ): number {
   return Math.max(0, Math.floor(balanceLamports / costPerClaimLamports));
 }
@@ -169,7 +177,7 @@ export interface CalculatePeriodsRemainingParams {
  * - Recipient rent: already committed rent for recipients
  */
 export function calculatePeriodsRemaining(
-  params: CalculatePeriodsRemainingParams,
+  params: CalculatePeriodsRemainingParams
 ): {
   periodLength: Schedule;
   periodsRemaining: number; // Minimum of both pools
@@ -192,9 +200,7 @@ export function calculatePeriodsRemaining(
   // Cron job must maintain rent for the account and task return account
   const availableCronJobBalance = Math.max(
     0,
-    cronJobBalanceLamports -
-      cronJobRentLamports -
-      taskReturnAccountRentLamports,
+    cronJobBalanceLamports - cronJobRentLamports - taskReturnAccountRentLamports
   );
 
   // PDA wallet must maintain minimum rent, plus any recipient rent and ATA rent
@@ -203,24 +209,24 @@ export function calculatePeriodsRemaining(
     pdaWalletBalanceLamports -
       PDA_WALLET_RENT_LAMPORTS -
       recipientRentLamports -
-      ataRentLamports,
+      ataRentLamports
   );
 
   // Calculate periods remaining for each pool independently
   const cronJobPeriodsRemaining = calculatePoolPeriods(
     availableCronJobBalance,
-    cronJobCostPerClaimLamports,
+    cronJobCostPerClaimLamports
   );
   const pdaWalletPeriodsRemaining = calculatePoolPeriods(
     availablePdaWalletBalance,
-    pdaWalletCostPerClaimLamports,
+    pdaWalletCostPerClaimLamports
   );
 
   // The effective periods remaining is the minimum of both pools
   // since both are required for each claim
   const periodsRemaining = Math.min(
     cronJobPeriodsRemaining,
-    pdaWalletPeriodsRemaining,
+    pdaWalletPeriodsRemaining
   );
 
   return {
@@ -245,7 +251,7 @@ export interface CalculateFundingNeededParams {
  * Returns funding needed in lamports for each pool.
  */
 export function calculateFundingNeededForTargetPeriods(
-  params: CalculateFundingNeededParams,
+  params: CalculateFundingNeededParams
 ): {
   cronJobFundingLamports: number;
   pdaWalletFundingLamports: number;
@@ -260,11 +266,11 @@ export function calculateFundingNeededForTargetPeriods(
 
   const cronJobPeriods = calculatePoolPeriods(
     availableCronJobBalanceLamports,
-    cronJobCostPerClaimLamports,
+    cronJobCostPerClaimLamports
   );
   const pdaWalletPeriods = calculatePoolPeriods(
     availablePdaWalletBalanceLamports,
-    pdaWalletCostPerClaimLamports,
+    pdaWalletCostPerClaimLamports
   );
 
   // Calculate funding needed for each pool independently to reach target periods
@@ -299,7 +305,7 @@ export interface CalculateFundingForAdditionalDurationParams {
  * Handles all the logic for calculating available balances, current periods, and target periods.
  */
 export function calculateFundingForAdditionalDuration(
-  params: CalculateFundingForAdditionalDurationParams,
+  params: CalculateFundingForAdditionalDurationParams
 ): {
   cronJobFundingLamports: number;
   pdaWalletFundingLamports: number;
@@ -337,7 +343,7 @@ export function calculateFundingForAdditionalDuration(
   const pdaWalletRentShortfall = Math.max(0, -pdaWalletBalanceAfterRent);
   const availablePdaWalletBalanceLamports = Math.max(
     0,
-    pdaWalletBalanceAfterRent,
+    pdaWalletBalanceAfterRent
   );
 
   // Calculate how much of the shortfall covers recipient rent
@@ -347,17 +353,17 @@ export function calculateFundingForAdditionalDuration(
     pdaWalletBalanceLamports - PDA_WALLET_RENT_LAMPORTS;
   const pdaWalletRentShortfallOnly = Math.max(
     0,
-    -pdaWalletBalanceAfterPdaRentOnly,
+    -pdaWalletBalanceAfterPdaRentOnly
   );
   // The remaining shortfall (after covering PDA wallet rent) goes to recipient rent and ATA rent
   // Recipient rent covered = min(remaining shortfall, recipientRentLamports)
   const shortfallAfterPdaRent = Math.max(
     0,
-    pdaWalletRentShortfall - pdaWalletRentShortfallOnly,
+    pdaWalletRentShortfall - pdaWalletRentShortfallOnly
   );
   const recipientRentCoveredByShortfall = Math.min(
     shortfallAfterPdaRent,
-    recipientRentLamports,
+    recipientRentLamports
   );
 
   // If there's no shortfall, the balance covers all rent including recipient rent,
@@ -367,11 +373,11 @@ export function calculateFundingForAdditionalDuration(
   // Calculate current periods for each pool
   const cronJobPeriods = calculatePoolPeriods(
     availableCronJobBalanceLamports,
-    cronJobCostPerClaimLamports,
+    cronJobCostPerClaimLamports
   );
   const pdaWalletPeriods = calculatePoolPeriods(
     availablePdaWalletBalanceLamports,
-    pdaWalletCostPerClaimLamports,
+    pdaWalletCostPerClaimLamports
   );
   const currentMinPeriods = Math.min(cronJobPeriods, pdaWalletPeriods);
 

@@ -17,6 +17,8 @@ import {
   toVersionedTx,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { ENTITY_CLAIM_CRON_NAME } from "@/lib/utils/automation-helpers";
+import { liveCronTransactionIds } from "./automation-data-helpers";
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
@@ -52,8 +54,9 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
     const cronJob = cronJobKey(authority, 0)[0];
 
     // Fetch cron job account using fetchNullable
-    const cronJobAccount =
-      await cronProgram.account.cronJobV0.fetchNullable(cronJob);
+    const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
+      cronJob
+    );
 
     if (!cronJobAccount) {
       throw errors.NOT_FOUND({
@@ -70,7 +73,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
         : 0;
     const required = calculateRequiredBalance(
       BASE_TX_FEE_LAMPORTS + estimatedJitoTipCost,
-      0,
+      0
     );
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
@@ -79,13 +82,18 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       });
     }
 
-    // Build instructions to remove all entities and close cron job
-    const maxTxId = cronJobAccount.nextTransactionId || 0;
-    const txIds = Array.from({ length: maxTxId }, (_, i) => i);
+    // Build instructions to remove all entities and close cron job.
+    // nextTransactionId is a monotonic counter, so individually-removed claims
+    // leave holes: only remove slots whose transaction account still exists.
+    const liveTxIds = await liveCronTransactionIds(
+      provider.connection,
+      cronJob,
+      cronJobAccount.nextTransactionId || 0
+    );
 
     const instructions: TransactionInstruction[] = [
       ...(await Promise.all(
-        txIds.map((txId) =>
+        liveTxIds.map((txId) =>
           hplCronsProgram.methods
             .removeEntityFromCronV0({
               index: txId,
@@ -95,8 +103,8 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
               rentRefund: wallet,
               cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
             })
-            .instruction(),
-        ),
+            .instruction()
+        )
       )),
       await hplCronsProgram.methods
         .closeEntityClaimCronV0()
@@ -105,7 +113,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
           rentRefund: wallet,
           cronJobNameMapping: cronJobNameMappingKey(
             authority,
-            "entity_claim",
+            ENTITY_CLAIM_CRON_NAME
           )[0],
         })
         .instruction(),
@@ -130,7 +138,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
     }
 
     const txs: Array<string> = vtxs.map((tx) =>
-      Buffer.from(tx.serialize()).toString("base64"),
+      Buffer.from(tx.serialize()).toString("base64")
     );
 
     const txFees = getTotalTransactionFees(vtxs);
@@ -150,8 +158,8 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFees),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

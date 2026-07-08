@@ -13,6 +13,11 @@ import { createAutomation } from "./procedures/createAutomation";
 import { fundAutomation } from "./procedures/fundAutomation";
 import { closeAutomation } from "./procedures/closeAutomation";
 import { getFundingEstimate } from "./procedures/getFundingEstimate";
+import { requeueAutomation } from "./procedures/requeueAutomation";
+import { addWalletToAutomation } from "./procedures/addWalletToAutomation";
+import { addEntityToAutomation } from "./procedures/addEntityToAutomation";
+import { removeEntityFromAutomation } from "./procedures/removeEntityFromAutomation";
+import { topUpAutomation } from "./procedures/topUpAutomation";
 import { updateHotspotInfo } from "./procedures/updateHotspotInfo";
 import { hotspotsContract } from "@helium/blockchain-api/contracts";
 import { implement } from "@orpc/server";
@@ -51,6 +56,16 @@ export const hotspotsRouter = implement(hotspotsContract).router({
   getFundingEstimate,
   /** Create transactions to close and remove automation */
   closeAutomation,
+  /** Requeue an automation that ran out of SOL */
+  requeueAutomation,
+  /** Add a whole-wallet claim to an automation */
+  addWalletToAutomation,
+  /** Add a single hotspot claim to an automation */
+  addEntityToAutomation,
+  /** Remove a claim entry from an automation */
+  removeEntityFromAutomation,
+  /** Operator floor top-up for a batch of automations */
+  topUpAutomation,
   /** Update hotspot info (location, gain, elevation, deployment info) */
   updateHotspotInfo,
 });
