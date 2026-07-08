@@ -46,18 +46,19 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5:9503c96c823838d2": 97294,
   // circuit_breaker.initialize_mint_windowed_breaker_v0 (n=1, med=14620, max=14620) [localnet]
   "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:556cf6d2f8039fa7": 14620,
-  // circuit_breaker.burn_v0 (n=621, med=9509, max=9509)
-  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:adf6f0eae5b2f939": 9509,
-  // circuit_breaker.mint_v0 (n=68, med=9522, max=9523)
-  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:d2a4a1d34780dff4": 9523,
+  // circuit_breaker.burn_v0 (n=3221, med=9509, max=14188);
+  // fat tail (p95 9509) — some calls cost more, so use max
+  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:adf6f0eae5b2f939": 14188,
+  // circuit_breaker.mint_v0 (n=434, med=13940, max=13994)
+  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:d2a4a1d34780dff4": 13994,
   // circuit_breaker.transfer_v0 (n=548, med=9889, max=10507)
   "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:a2b6c16166557fbd": 10507,
   // data_credits.burn_delegated_data_credits_v0 — localnet p95 52793 (incl. account init);
   // mainnet (n=165, med=36574, max=38094) never hit the init path, so keep the higher value
   "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:9223fefc22ccdd85": 52793,
-  // data_credits.burn_without_tracking_v0 — localnet p95 35034 (incl. account init);
-  // mainnet (n=59, med=14602, max=22084) never hit the init path, so keep the higher value
-  "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:816a2b04348f66d0": 35034,
+  // data_credits.burn_without_tracking_v0 (n=367, med=14602, max=70681);
+  // fat tail (p95 20602) — some mainnet calls now hit the account-init path, so use max
+  "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:816a2b04348f66d0": 70681,
   // data_credits.change_delegated_sub_dao_v0 (n=1, med=58802, max=58802) [localnet]
   "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:33b6f3246bf2b0b2": 58802,
   // data_credits.delegate_data_credits_v0 — localnet p95 63244 (incl. account init);
@@ -65,15 +66,16 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:9a38e280a273e205": 63244,
   // data_credits.initialize_data_credits_v0 (n=4, med=43866, max=63366) [localnet]
   "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:17c173cadc9d4498": 63366,
-  // data_credits.issue_data_credits_v0 (n=2, med=55963, max=55963)
-  "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:08ad2a3d9d5835b6": 55963,
+  // data_credits.issue_data_credits_v0 (n=5, med=55963, max=69839);
+  // p95 × 1.2 undershoots observed max, so use max
+  "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:08ad2a3d9d5835b6": 69839,
   // data_credits.mint_data_credits_v0 — localnet p95 92991 (incl. account init);
   // mainnet (n=56, med=36033, max=59101) never hit the init path, so keep the higher value
   "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:4e6da984905edd39": 92991,
   // data_credits.update_data_credits_v0 (n=1, med=4470, max=4470) [localnet]
   "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:ad3d5fa348074519": 4470,
-  // dc_auto_top.top_off_dc_v0 (n=54, med=177839, max=182306)
-  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:b23a1aa0d17d480e": 178532,
+  // dc_auto_top.top_off_dc_v0 (n=405, med=207465, max=219706)
+  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:b23a1aa0d17d480e": 219706,
   // dc_auto_top.top_off_hnt_v0 — localnet p95 222223; account structures grew,
   // so the prior mainnet reading (n=114, med=105577, max=110200) is stale and
   // under-requests. Re-measure via `pnpm run sample-cu` once it has mainnet volume.
@@ -103,8 +105,9 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:466172e2219650d9": 213537,
   // helium_entity_manager.onboard_data_only_iot_hotspot_v0 (n=2, med=89343, max=89343)
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:62b37f333abfaebc": 89343,
-  // helium_entity_manager.onboard_data_only_mobile_hotspot_v0 (n=1, med=99651, max=99651)
-  "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:1ebde5db7b773e98": 99651,
+  // helium_entity_manager.onboard_data_only_mobile_hotspot_v0 (n=43, med=96693, max=130123);
+  // p95 × 1.2 undershoots observed max, so use max
+  "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:1ebde5db7b773e98": 130123,
   // helium_entity_manager.onboard_iot_hotspot_v0 (n=4, med=109809, max=136021)
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:2d1881260e41070f": 136021,
   // helium_entity_manager.onboard_mobile_hotspot_v0 (n=2, med=111987, max=111987)
@@ -309,14 +312,16 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h:5cbdb0f581ada6a9": 2765,
   // lazy_transactions.set_canopy_v0 (n=1, med=2872, max=2872) [localnet]
   "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h:1956817cb8c38659": 2872,
+  // lazy_transactions.update_lazy_transactions_v0 (n=1, med=3604, max=3604)
+  "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h:38dfa5f596ecad25": 3604,
   // mobile_entity_manager.initialize_incentive_program_v0 (n=1, med=182270, max=182270) [localnet]
   "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:ddec50737de071a8": 182270,
   // mobile_entity_manager.update_incentive_program_v0 (n=1, med=3320, max=3320) [localnet]
   "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:c9012eb54fbf43f4": 3320,
   // hexboosting.close_boost_v1 (n=1, med=3130, max=3130) [localnet]
   "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ:dc96b2aac596d965": 3130,
-  // dc_auto_top.close_auto_top_off_v0 (n=1, med=70495, max=70495) [localnet]
-  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:c2d0b1ae6462c4d9": 70495,
+  // dc_auto_top.close_auto_top_off_v0 (n=1, med=106264, max=106264)
+  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:c2d0b1ae6462c4d9": 106264,
   // tuktuk_dca.initialize_dca_nested_v0 (n=1, med=88794, max=88794) [localnet]
   "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:50afa90952dcb70a": 88794,
   // circuit_breaker.update_account_windowed_breaker_v0 (n=1, med=2115, max=2115) [localnet]
