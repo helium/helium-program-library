@@ -74,8 +74,10 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:ad3d5fa348074519": 4470,
   // dc_auto_top.top_off_dc_v0 (n=54, med=177839, max=182306)
   "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:b23a1aa0d17d480e": 178532,
-  // dc_auto_top.top_off_hnt_v0 (n=114, med=105577, max=110200)
-  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:cc744535507a208c": 105949,
+  // dc_auto_top.top_off_hnt_v0 — localnet p95 222223; account structures grew,
+  // so the prior mainnet reading (n=114, med=105577, max=110200) is stale and
+  // under-requests. Re-measure via `pnpm run sample-cu` once it has mainnet volume.
+  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:cc744535507a208c": 222223,
   // fanout.distribute_v0 (n=433, med=33555, max=43145)
   "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6:6de6e02f28465a94": 41055,
   // helium_entity_manager.approve_maker_v0 — localnet p95 35576 (CI run 28893311292);
@@ -293,6 +295,30 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "we1cGnTxTkDP9Sk49dw1d3T7ik7V2NfnY4qDGCDHXfC:1e0bda1830c6205a": 216491,
   // tuktuk_dca.initialize_dca_v0 (n=1, med=115475, max=115475) [localnet]
   "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:8b8f316cfb0cd23b": 115475,
+  // helium_entity_manager.update_maker_v0 (n=1, med=2485, max=2485) [localnet]
+  "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:5ee3f08543e0196d": 2485,
+  // price_oracle.initialize_price_oracle_v0 (n=5, med=7150, max=7150) [localnet]
+  "porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy:7f38af8e33d815f2": 7150,
+  // price_oracle.update_price_oracle_v0 (n=1, med=50973, max=50973) [localnet]
+  "porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy:786faf77c4d879c0": 50973,
+  // voter_stake_registry.transfer_position_v0 (n=1, med=67083, max=67083) [localnet]
+  "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:0d13701bf8d02691": 67083,
+  // voter_stake_registry.ledger_transfer_position_v0 (n=1, med=75364, max=75364) [localnet]
+  "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:060b33935de72723": 75364,
+  // lazy_transactions.close_canopy_v0 (n=1, med=2765, max=2765) [localnet]
+  "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h:5cbdb0f581ada6a9": 2765,
+  // lazy_transactions.set_canopy_v0 (n=1, med=2872, max=2872) [localnet]
+  "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h:1956817cb8c38659": 2872,
+  // mobile_entity_manager.initialize_incentive_program_v0 (n=1, med=182270, max=182270) [localnet]
+  "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:ddec50737de071a8": 182270,
+  // mobile_entity_manager.update_incentive_program_v0 (n=1, med=3320, max=3320) [localnet]
+  "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:c9012eb54fbf43f4": 3320,
+  // hexboosting.close_boost_v1 (n=1, med=3130, max=3130) [localnet]
+  "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ:dc96b2aac596d965": 3130,
+  // dc_auto_top.close_auto_top_off_v0 (n=1, med=70495, max=70495) [localnet]
+  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:c2d0b1ae6462c4d9": 70495,
+  // tuktuk_dca.initialize_dca_nested_v0 (n=1, med=88794, max=88794) [localnet]
+  "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:50afa90952dcb70a": 88794,
 };
 
 export const MAX_COMPUTE_UNITS = 1400000;
