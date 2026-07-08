@@ -31,10 +31,21 @@ export {
   searchAssetsWithPageInfo,
 } from "./mplAssetAPI";
 export {
+  COMPUTE_BUDGET_IX_DATA_SIZE,
+  COMPUTE_BUDGET_IX_LIMIT,
+  COMPUTE_BUDGET_IX_PRICE,
+  DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
+  estimateComputeBudget,
   estimatePrioritizationFee,
+  prependComputeBudgetIxs,
+  setLoadedAccountsDataSizeLimit,
   withPriorityFees,
   sleep,
 } from "./priorityFees";
+export {
+  MAX_COMPUTE_UNITS,
+  tableComputeUnitsForInstructions,
+} from "./computeUnitTable";
 
 export { proofArgsAndAccounts } from "./proofArgsAndAccounts";
 export type { ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";

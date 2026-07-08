@@ -29,7 +29,9 @@
     "clean": "npx shx mkdir -p lib && npx shx rm -rf lib",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
     "prebuild": "npm run clean && npm run package",
-    "build": "tsc -b tsconfig.json"
+    "build": "tsc -b tsconfig.json",
+    "sample-cu": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/sample-cu.ts",
+    "check-cu-table": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/check-cu-table.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",

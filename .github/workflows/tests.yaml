@@ -258,6 +258,7 @@ jobs:
           - tests/welcome-pack.ts
           - tests/dc-auto-topoff.ts
           - tests/tuktuk-dca.ts
+          - tests/priority-fees.ts
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
@@ -277,3 +278,8 @@ jobs:
           TESTING: true
           TEST: ${{ matrix.test }}
           ANCHOR_PROVIDER_URL: http://localhost:8899
+      - name: Check CU table covers test traffic
+        run: pnpm run check-cu-table
+        working-directory: packages/spl-utils
+        env:
+          RPC_URL: http://localhost:8899
