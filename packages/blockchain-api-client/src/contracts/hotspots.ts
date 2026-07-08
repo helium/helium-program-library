@@ -46,6 +46,10 @@ import {
   RemoveEntityFromAutomationOutputSchema,
   TopUpAutomationInputSchema,
   TopUpAutomationOutputSchema,
+  IssueDataOnlyHotspotInputSchema,
+  IssueDataOnlyHotspotOutputSchema,
+  OnboardDataOnlyHotspotInputSchema,
+  OnboardDataOnlyHotspotOutputSchema,
   UpdateHotspotInfoInputSchema,
   UpdateHotspotInfoOutputSchema,
 } from "../schemas/hotspots";
@@ -306,6 +310,32 @@ export const hotspotsContract = oc
       })
       .input(RemoveEntityFromAutomationInputSchema)
       .output(RemoveEntityFromAutomationOutputSchema)
+      .errors({
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+      }),
+    /** Protected: Issue a data-only hotspot (relays the onboarding server) */
+    issueDataOnlyHotspot: oc
+      .route({
+        method: "POST",
+        path: "/data-only/issue",
+        summary: "Issue a data-only hotspot",
+      })
+      .input(IssueDataOnlyHotspotInputSchema)
+      .output(IssueDataOnlyHotspotOutputSchema)
+      .errors({
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+      }),
+    /** Protected: Onboard a data-only hotspot (relays the onboarding server) */
+    onboardDataOnlyHotspot: oc
+      .route({
+        method: "POST",
+        path: "/data-only/onboard",
+        summary: "Onboard a data-only hotspot",
+      })
+      .input(OnboardDataOnlyHotspotInputSchema)
+      .output(OnboardDataOnlyHotspotOutputSchema)
       .errors({
         NOT_FOUND,
         INSUFFICIENT_FUNDS,

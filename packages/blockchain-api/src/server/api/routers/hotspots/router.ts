@@ -18,6 +18,8 @@ import { addWalletToAutomation } from "./procedures/addWalletToAutomation";
 import { addEntityToAutomation } from "./procedures/addEntityToAutomation";
 import { removeEntityFromAutomation } from "./procedures/removeEntityFromAutomation";
 import { topUpAutomation } from "./procedures/topUpAutomation";
+import { issueDataOnlyHotspot } from "./procedures/issueDataOnlyHotspot";
+import { onboardDataOnlyHotspot } from "./procedures/onboardDataOnlyHotspot";
 import { updateHotspotInfo } from "./procedures/updateHotspotInfo";
 import { hotspotsContract } from "@helium/blockchain-api/contracts";
 import { implement } from "@orpc/server";
@@ -66,6 +68,10 @@ export const hotspotsRouter = implement(hotspotsContract).router({
   removeEntityFromAutomation,
   /** Operator floor top-up for a batch of automations */
   topUpAutomation,
+  /** Issue a data-only hotspot (relays the onboarding server) */
+  issueDataOnlyHotspot,
+  /** Onboard a data-only hotspot (relays the onboarding server) */
+  onboardDataOnlyHotspot,
   /** Update hotspot info (location, gain, elevation, deployment info) */
   updateHotspotInfo,
 });

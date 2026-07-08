@@ -165,6 +165,26 @@ export const RemoveEntityFromAutomationInputSchema = z.object({
   index: z.number().int().min(0),
 });
 
+// ---- Data-only hotspot onboarding ----
+// The onboarding server builds the issue (via the ECC verifier) and onboard
+// transactions; these endpoints relay them for local signing.
+
+export const IssueDataOnlyHotspotInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  // Base64 add-gateway token (BlockchainTxnAddGatewayV1 envelope) from the hotspot.
+  addGatewayTxn: z.string().min(1),
+});
+
+export const OnboardDataOnlyHotspotInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  network: z.enum(["iot", "mobile"]),
+  hotspotAddress: HeliumPublicKeySchema,
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+  elevation: z.number().optional(), // IoT only
+  gain: z.number().optional(), // IoT only
+});
+
 // Operator-run floor top-up: for each target wallet whose pool balance is at or
 // below `floorLamports`, the operator funds it with `fundLamports`. The operator
 // is the fee payer and funding source (mirrors the off-chain funder pattern).
@@ -260,6 +280,8 @@ export const SetupAutomationOutputSchema = createTransactionResponse();
 export const FundAutomationOutputSchema = createTransactionResponse();
 export const CloseAutomationOutputSchema = createTransactionResponse();
 export const RequeueAutomationOutputSchema = createTransactionResponse();
+export const IssueDataOnlyHotspotOutputSchema = createTransactionResponse();
+export const OnboardDataOnlyHotspotOutputSchema = createTransactionResponse();
 export const AddWalletToAutomationOutputSchema = createTransactionResponse();
 export const AddEntityToAutomationOutputSchema = createTransactionResponse();
 export const RemoveEntityFromAutomationOutputSchema =
@@ -429,3 +451,9 @@ export type RemoveEntityFromAutomationInput = z.infer<
   typeof RemoveEntityFromAutomationInputSchema
 >;
 export type TopUpAutomationInput = z.infer<typeof TopUpAutomationInputSchema>;
+export type IssueDataOnlyHotspotInput = z.infer<
+  typeof IssueDataOnlyHotspotInputSchema
+>;
+export type OnboardDataOnlyHotspotInput = z.infer<
+  typeof OnboardDataOnlyHotspotInputSchema
+>;
