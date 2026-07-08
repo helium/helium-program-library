@@ -25,8 +25,12 @@ import { formatTableEntry, loadIxNames, PROGRAMS } from "./cuTableHelpers";
 const BUMP_GRIND_SLACK = 10 * 1500;
 
 const main = async () => {
+  // "confirmed", not the web3.js default "finalized": this runs seconds after
+  // the test suite and short suites' traffic hasn't finalized yet, so a
+  // finalized query returns 0 signatures and the gate false-fails.
   const connection = new Connection(
-    process.env.RPC_URL || "http://127.0.0.1:8899"
+    process.env.RPC_URL || "http://127.0.0.1:8899",
+    "confirmed"
   );
   const names = loadIxNames();
   // With no IDLs every sampled key would be skipped as unlabeled and the

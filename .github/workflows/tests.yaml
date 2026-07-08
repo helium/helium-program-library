@@ -279,6 +279,9 @@ jobs:
           TEST: ${{ matrix.test }}
           ANCHOR_PROVIDER_URL: http://localhost:8899
       - name: Check CU table covers test traffic
+        # priority-fees.ts (mocked) and sus.ts (remote RPC) never commit
+        # localnet traffic, so the CU sampler legitimately sees 0 — don't gate them.
+        if: matrix.test != 'tests/priority-fees.ts' && matrix.test != 'tests/sus.ts'
         run: pnpm run check-cu-table
         working-directory: packages/spl-utils
         env:
