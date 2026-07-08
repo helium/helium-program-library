@@ -24,6 +24,28 @@ import {
 // against the localnet the anchor tests just exercised, failing on missing
 // entries or drift beyond FALLBACK_CU_MARGIN.
 export const INSTRUCTION_CU_TABLE: Record<string, number> = {
+  // dc_auto_top.schedule_task_v0 (n=5, med=225550, max=230071) [localnet]
+  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:eaccb3f1f9b4986e": 230071,
+  // dc_auto_top.update_auto_top_off_v0 (n=2, med=52423, max=52423) [localnet]
+  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:d973e6aa442fafc7": 52423,
+  // dc_auto_top.initialize_auto_top_off_v0 (n=4, med=149418, max=152410) [localnet]
+  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:1b878c374c515333": 152410,
+  // tuktuk_dca.close_dca_v0 (n=1, med=69738, max=69738) [localnet]
+  "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:34871f9c70464b03": 69738,
+  // tuktuk_dca.lend_v0 (n=4, med=17431, max=17431) [localnet]
+  "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:e10f950c9015525e": 17431,
+  // tuktuk_dca.check_repay_v0 (n=4, med=44115, max=44115) [localnet]
+  "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:98c73c1c865777ea": 44115,
+  // circuit_breaker.update_mint_windowed_breaker_v0 (n=1, med=2118, max=2118) [localnet]
+  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:fa7a4d3065fef3a8": 2118,
+  // circuit_breaker.remove_mint_authority_v0 (n=1, med=8245, max=8245) [localnet]
+  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:c2d1a80365b0691e": 8245,
+  // circuit_breaker.initialize_account_windowed_breaker_v0 (n=3, med=23002, max=26000) [localnet]
+  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:1e406323709f29b1": 26000,
+  // treasury_management.initialize_treasury_management_v0 (n=1, med=97294, max=97294) [localnet]
+  "treaf4wWBBty3fHdyBpo35Mz84M8k3heKXmjmi9vFt5:9503c96c823838d2": 97294,
+  // circuit_breaker.initialize_mint_windowed_breaker_v0 (n=1, med=14620, max=14620) [localnet]
+  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:556cf6d2f8039fa7": 14620,
   // circuit_breaker.burn_v0 (n=621, med=9509, max=9509)
   "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:adf6f0eae5b2f939": 9509,
   // circuit_breaker.mint_v0 (n=68, med=9522, max=9523)
@@ -186,6 +208,8 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w:c4edd0b26807240e": 3494,
   // lazy_distributor.update_lazy_distributor_v0 (n=1, med=6303, max=6303) [localnet]
   "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w:4976a7ecd3d59ed6": 6303,
+  // lazy_transactions.initialize_lazy_transactions_v0 (n=1, med=11374, max=11374) [localnet]
+  "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h:20e3cf7f70321f9d": 11374,
   // lazy_transactions.execute_transaction_v0 (n=137, med=114219, max=172656)
   "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h:d95dae6182b77e2c": 156774,
   // mini_fanout.close_mini_fanout_v0 (n=4, med=47983, max=79084)
@@ -267,6 +291,8 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "we1cGnTxTkDP9Sk49dw1d3T7ik7V2NfnY4qDGCDHXfC:dcdeb87d64f3f3ac": 160147,
   // welcome_pack.initialize_welcome_pack_v0 (n=64, med=181642, max=223708)
   "we1cGnTxTkDP9Sk49dw1d3T7ik7V2NfnY4qDGCDHXfC:1e0bda1830c6205a": 216491,
+  // tuktuk_dca.initialize_dca_v0 (n=1, med=115475, max=115475) [localnet]
+  "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:8b8f316cfb0cd23b": 115475,
 };
 
 export const MAX_COMPUTE_UNITS = 1400000;
