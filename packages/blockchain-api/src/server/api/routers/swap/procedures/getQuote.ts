@@ -26,6 +26,11 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       quoteUrl.searchParams.set("amount", amount);
       quoteUrl.searchParams.set("swapMode", swapMode);
       quoteUrl.searchParams.set("slippageBps", slippageBps.toString());
+      // Exclude RFQ (JupiterZ) routes: those return maker-co-signed transactions
+      // the requesting wallet cannot sign on its own, so a self-signed swap can't
+      // be completed. The paid api-key host respects `excludeRouters=jupiterz` but
+      // ignores `excludeRfq` (only the keyless lite-api host respects the latter).
+      quoteUrl.searchParams.set("excludeRouters", "jupiterz");
 
       const quoteResponse = await fetch(quoteUrl.toString(), {
         headers: {
