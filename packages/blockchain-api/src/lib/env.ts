@@ -49,6 +49,13 @@ export const env = createEnv({
       .string()
       .url()
       .default("https://onboarding.dewi.org/api/v3"),
+    // ECC verifier service that co-signs data-only hotspot issue transactions
+    // after verifying the gateway's ECC key signature. Base URL; the issue
+    // procedure POSTs to `${ECC_VERIFIER_URL}/verify`.
+    ECC_VERIFIER_URL: z
+      .string()
+      .url()
+      .default("https://ecc-verifier.web.helium.io"),
     FEE_PAYER_WALLET_PATH: z.string().optional(),
     MIGRATION_PASSWORD: z.string().optional(),
   },
@@ -98,6 +105,7 @@ export const env = createEnv({
     JUPITER_API_KEY: process.env.JUPITER_API_KEY,
     SENTRY_DSN: process.env.SENTRY_DSN,
     ONBOARDING_ENDPOINT: process.env.ONBOARDING_ENDPOINT,
+    ECC_VERIFIER_URL: process.env.ECC_VERIFIER_URL,
     FEE_PAYER_WALLET_PATH: process.env.FEE_PAYER_WALLET_PATH,
     MIGRATION_PASSWORD: process.env.MIGRATION_PASSWORD,
     NEXT_PUBLIC_WORLD_HELIUM_URL: process.env.NEXT_PUBLIC_WORLD_HELIUM_URL,

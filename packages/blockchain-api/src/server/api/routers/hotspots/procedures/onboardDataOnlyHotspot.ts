@@ -1,21 +1,41 @@
-import OnboardingClient from "@helium/onboarding";
-import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { publicProcedure } from "../../../procedures";
+import { PublicKey } from "@solana/web3.js";
 import { env } from "@/lib/env";
 import { createSolanaConnection } from "@/lib/solana";
 import { latLngToH3 } from "@/lib/location/h3";
 import {
-  getTransactionFee,
+  init,
+  iotInfoKey,
+  mobileInfoKey,
+  keyToAssetKey,
+  rewardableEntityConfigKey,
+} from "@helium/helium-entity-manager-sdk";
+import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import {
+  HNT_MINT,
+  IOT_MINT,
+  MOBILE_MINT,
+  proofArgsAndAccounts,
+} from "@helium/spl-utils";
+import {
+  buildVersionedTransaction,
+  serializeTransaction,
+} from "@/lib/utils/build-transaction";
+import {
   calculateRequiredBalance,
+  getTransactionFee,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 
 /**
  * Onboard a previously-issued data-only hotspot into a sub-DAO, asserting its
- * location (and, for IoT, gain/elevation). The onboarding server builds the
- * onboard transaction; we relay it for local signing.
+ * location (and, for IoT, gain/elevation). Data-only onboarding is permissionless:
+ * we build the OnboardDataOnly{Iot,Mobile}HotspotV0 instruction locally with the
+ * hotspot's compressed-NFT merkle proof, and the wallet (the sole signer, payer,
+ * and DC fee payer) signs and submits. No onboarding server or maker is involved.
  */
 export const onboardDataOnlyHotspot =
   publicProcedure.hotspots.onboardDataOnlyHotspot.handler(
@@ -29,50 +49,102 @@ export const onboardDataOnlyHotspot =
         elevation,
         gain,
       } = input;
+      const owner = new PublicKey(walletAddress);
+      const { connection, provider } = createSolanaConnection(walletAddress);
 
-      const { connection } = createSolanaConnection(walletAddress);
-      const onboardingClient = new OnboardingClient(env.ONBOARDING_ENDPOINT);
+      // The hotspot must already be issued (its cNFT must exist) before it can
+      // be onboarded.
+      const assetId = await getAssetIdFromPubkey(hotspotAddress);
+      if (!assetId) {
+        throw errors.NOT_FOUND({
+          message: "Hotspot not found on-chain; issue it before onboarding",
+        });
+      }
 
+      const program = await init(provider);
+      const dao = daoKey(HNT_MINT)[0];
+      const keyToAsset = keyToAssetKey(dao, hotspotAddress)[0];
+
+      const assetEndpoint = env.ASSET_ENDPOINT || connection.rpcEndpoint;
+      const { args, accounts, remainingAccounts } = await proofArgsAndAccounts({
+        connection,
+        assetId: new PublicKey(assetId),
+        assetEndpoint,
+      });
+
+      // Assert a location only when both coordinates are given; the on-chain
+      // location is the H3 cell index as a u64.
       const h3 =
         lat !== undefined && lng !== undefined
           ? latLngToH3({ lat, lng })
           : null;
 
-      const response =
-        network === "iot"
-          ? await onboardingClient.onboardIot({
+      let onboardIx;
+      if (network === "iot") {
+        const subDao = subDaoKey(IOT_MINT)[0];
+        const rewardableEntityConfig = rewardableEntityConfigKey(
+          subDao,
+          "IOT",
+        )[0];
+        onboardIx = await program.methods
+          .onboardDataOnlyIotHotspotV0({
+            ...args,
+            location: h3 ? new BN(h3.iot, "hex") : null,
+            // On-chain gain is tenths of a dBi (i32); elevation is whole meters.
+            elevation: elevation !== undefined ? Math.trunc(elevation) : null,
+            gain: gain !== undefined ? Math.trunc(gain * 10) : null,
+          })
+          .accountsPartial({
+            payer: owner,
+            dcFeePayer: owner,
+            hotspotOwner: owner,
+            rewardableEntityConfig,
+            keyToAsset,
+            iotInfo: iotInfoKey(rewardableEntityConfig, hotspotAddress)[0],
+            subDao,
+            merkleTree: accounts.merkleTree,
+          })
+          .remainingAccounts(remainingAccounts)
+          .instruction();
+      } else {
+        const subDao = subDaoKey(MOBILE_MINT)[0];
+        const rewardableEntityConfig = rewardableEntityConfigKey(
+          subDao,
+          "MOBILE",
+        )[0];
+        onboardIx = await program.methods
+          .onboardDataOnlyMobileHotspotV0({
+            ...args,
+            location: h3 ? new BN(h3.mobile, "hex") : null,
+          })
+          .accountsPartial({
+            payer: owner,
+            dcFeePayer: owner,
+            hotspotOwner: owner,
+            rewardableEntityConfig,
+            keyToAsset,
+            mobileInfo: mobileInfoKey(
+              rewardableEntityConfig,
               hotspotAddress,
-              payer: walletAddress,
-              format: "v0",
-              location: h3?.iot,
-              elevation,
-              gain,
-            })
-          : await onboardingClient.onboardMobile({
-              hotspotAddress,
-              payer: walletAddress,
-              format: "v0",
-              location: h3?.mobile,
-            });
-
-      const rawTxs = response.data?.solanaTransactions ?? [];
-      if (rawTxs.length === 0) {
-        throw errors.NOT_FOUND({
-          message:
-            "Onboarding server returned no transactions to onboard this hotspot",
-        });
+            )[0],
+            subDao,
+            merkleTree: accounts.merkleTree,
+          })
+          .remainingAccounts(remainingAccounts)
+          .instruction();
       }
 
-      const rawTxBytes = rawTxs.map((t) => Buffer.from(t));
-      const totalFee = rawTxBytes.reduce(
-        (sum, bytes) =>
-          sum + getTransactionFee(VersionedTransaction.deserialize(bytes)),
-        0
-      );
+      const tx = await buildVersionedTransaction({
+        connection,
+        draft: {
+          instructions: [onboardIx],
+          feePayer: owner,
+          addressLookupTableAddresses: [],
+        },
+      });
 
-      const walletBalance = await connection.getBalance(
-        new PublicKey(walletAddress)
-      );
+      const totalFee = getTransactionFee(tx);
+      const walletBalance = await connection.getBalance(owner);
       const required = calculateRequiredBalance(totalFee, 0);
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
@@ -83,22 +155,24 @@ export const onboardDataOnlyHotspot =
 
       return {
         transactionData: {
-          transactions: rawTxBytes.map((bytes) => ({
-            serializedTransaction: bytes.toString("base64"),
-            metadata: {
-              type: "onboard_data_only_hotspot",
-              description: "Onboard a data-only hotspot",
-              network,
+          transactions: [
+            {
+              serializedTransaction: serializeTransaction(tx),
+              metadata: {
+                type: "onboard_data_only_hotspot",
+                description: "Onboard a data-only hotspot",
+                network,
+              },
             },
-          })),
+          ],
           parallel: false,
           tag: `onboard_data_only_hotspot:${walletAddress}:${hotspotAddress}`,
           actionMetadata: { type: "onboard_data_only_hotspot", network },
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(totalFee),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
-    }
+    },
   );

@@ -314,7 +314,7 @@ export const hotspotsContract = oc
         NOT_FOUND,
         INSUFFICIENT_FUNDS,
       }),
-    /** Protected: Issue a data-only hotspot (relays the onboarding server) */
+    /** Protected: Issue a data-only hotspot */
     issueDataOnlyHotspot: oc
       .route({
         method: "POST",
@@ -326,8 +326,12 @@ export const hotspotsContract = oc
       .errors({
         NOT_FOUND,
         INSUFFICIENT_FUNDS,
+        BAD_REQUEST: {
+          message: "Invalid add-gateway transaction",
+          status: 400,
+        },
       }),
-    /** Protected: Onboard a data-only hotspot (relays the onboarding server) */
+    /** Protected: Onboard a data-only hotspot */
     onboardDataOnlyHotspot: oc
       .route({
         method: "POST",
@@ -339,6 +343,7 @@ export const hotspotsContract = oc
       .errors({
         NOT_FOUND,
         INSUFFICIENT_FUNDS,
+        BAD_REQUEST: { message: "Invalid onboard parameters", status: 400 },
       }),
     /** Protected: Operator floor top-up for a batch of automations */
     topUpAutomation: oc
