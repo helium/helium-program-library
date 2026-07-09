@@ -153,6 +153,15 @@ jobs:
       - name: Build idls package
         if: startsWith(matrix.test, 'packages/')
         run: pnpm turbo run build --filter=@helium/idls
+      - name: Free disk space
+        # Hosted runners ship ~14GB free but waste tens of GB on toolchains the
+        # Docker build never uses; the heavier images (e.g. blockchain-api) hit
+        # "No space left on device". Reclaim it before building.
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+                      /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
       - name: Build Docker image
         run: |
           # JS services with turbo prune build from repo root
