@@ -146,7 +146,6 @@ describe("automation endpoints", () => {
 
   describe("lifecycle", () => {
     let walletAddress: string;
-    let totalHotspots: number;
     let firstEntityKey: string | undefined;
     const duration = 5;
 
@@ -154,17 +153,15 @@ describe("automation endpoints", () => {
       walletAddress = payer.publicKey.toBase58();
       await closeIfExists(walletAddress);
 
-      totalHotspots = 1;
       try {
         const hotspotsResult = await client.hotspots.getHotspots({
           walletAddress,
           page: 1,
           limit: 5,
         });
-        totalHotspots = hotspotsResult.total || 1;
         firstEntityKey = hotspotsResult.hotspots[0]?.entityKey;
       } catch {
-        console.log("getHotspots failed, using default totalHotspots=1");
+        console.log("getHotspots failed; skipping the per-hotspot add case");
       }
 
       // Create the cron itself (init-only, raw cron, pre-funded for `duration`).
@@ -172,7 +169,6 @@ describe("automation endpoints", () => {
         walletAddress,
         cronSchedule: DAILY_CRON,
         duration,
-        totalHotspots,
       });
 
       expect(result.transactionData.tag).to.equal(
@@ -353,7 +349,6 @@ describe("automation endpoints", () => {
           walletAddress,
           cronSchedule: "",
           duration: 5,
-          totalHotspots: 1,
         });
         expect.fail("Should have thrown a validation error");
       } catch (error: any) {

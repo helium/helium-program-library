@@ -127,7 +127,6 @@ export const SetupAutomationInputSchema = z.object({
   // Raw crontab string (clockwork format) the cron fires on.
   cronSchedule: z.string().min(1),
   duration: z.number().int().min(1), // Number of claims to pre-fund
-  totalHotspots: z.number().int().min(1),
 });
 
 export const FundAutomationInputSchema = z.object({
