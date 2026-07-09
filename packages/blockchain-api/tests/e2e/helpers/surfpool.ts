@@ -27,6 +27,14 @@ export function getSurfpoolRpcUrl(): string {
   return process.env.SURFPOOL_RPC_URL || "http://127.0.0.1:8899";
 }
 
+// Per-request timeout for health probes. Without this the fetch has no timeout,
+// so a surfpool RPC that accepts the connection but never responds hangs the
+// await forever, blocking the health-wait loop below and defeating its
+// healthTimeoutMs deadline (the loop only re-checks between iterations) — the
+// difference between a clean "did not become healthy in time" failure and a job
+// that hangs until the CI timeout.
+const HEALTH_REQUEST_TIMEOUT_MS = 5000;
+
 async function jsonRpc<T = unknown>(
   method: string,
   params?: unknown,
@@ -36,6 +44,7 @@ async function jsonRpc<T = unknown>(
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    signal: AbortSignal.timeout(HEALTH_REQUEST_TIMEOUT_MS),
   });
   return res.json() as Promise<JsonRpcResponse<T>>;
 }

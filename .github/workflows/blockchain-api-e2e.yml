@@ -14,6 +14,9 @@ on:
 jobs:
   e2e-tests:
     runs-on: ubuntu-latest
+    # Backstop so a hung test (e.g. a stalled RPC) fails fast instead of running
+    # until GitHub's default 6h job timeout and holding a runner.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
