@@ -51,10 +51,12 @@ export const env = createEnv({
       .default("https://onboarding.dewi.org/api/v3"),
     // ECC verifier service that co-signs data-only hotspot issue transactions
     // after verifying the gateway's ECC key signature. Base URL; the issue
-    // procedure POSTs to `${ECC_VERIFIER_URL}/verify`.
+    // procedure POSTs to `${ECC_VERIFIER_URL}/verify`. Require https so the
+    // transaction to be co-signed is never sent over a cleartext channel.
     ECC_VERIFIER_URL: z
       .string()
       .url()
+      .refine((u) => u.startsWith("https://"), "ECC_VERIFIER_URL must be https")
       .default("https://ecc-verifier.web.helium.io"),
     FEE_PAYER_WALLET_PATH: z.string().optional(),
     MIGRATION_PASSWORD: z.string().optional(),

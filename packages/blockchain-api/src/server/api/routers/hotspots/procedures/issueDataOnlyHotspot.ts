@@ -64,7 +64,14 @@ export const issueDataOnlyHotspot =
       }
       const gatewaySignature = addGateway.gatewaySignature;
       // The gateway is a Helium public key; its entity key is the base58 form.
-      const entityKey = Address.fromBin(Buffer.from(addGateway.gateway)).b58;
+      // Address.fromBin throws on an unsupported net-/key-type byte, so treat a
+      // bad gateway as a client error rather than letting it surface as a 500.
+      let entityKey: string;
+      try {
+        entityKey = Address.fromBin(Buffer.from(addGateway.gateway)).b58;
+      } catch {
+        throw errors.BAD_REQUEST({ message: "Invalid gateway public key" });
+      }
 
       const program = await init(provider);
       const dao = daoKey(HNT_MINT)[0];
@@ -126,19 +133,33 @@ export const issueDataOnlyHotspot =
         });
         eccSignedBytes = Buffer.from(data.transaction, "hex");
       } catch (e) {
-        const detail = axios.isAxiosError(e)
-          ? JSON.stringify(e.response?.data) || e.message
-          : e instanceof Error
-            ? e.message
-            : "unknown error";
+        // Log the verifier's detail server-side; don't reflect it to the caller.
+        console.error(
+          "ECC verifier /verify failed",
+          axios.isAxiosError(e) ? (e.response?.data ?? e.message) : e,
+        );
         throw errors.BAD_REQUEST({
-          message: `ECC verifier could not co-sign the issue transaction: ${detail}`,
+          message: "ECC verifier could not co-sign the issue transaction",
         });
       }
 
       // The verifier returns the legacy transaction co-signed with the ECC
       // verifier key; the wallet fills the remaining owner signature.
       const eccSignedTx = VersionedTransaction.deserialize(eccSignedBytes);
+
+      // Defense in depth: the verifier must return the exact transaction we
+      // built with only signatures added. Reject any message difference so a
+      // compromised or on-path verifier cannot substitute a transaction the
+      // wallet would sign (under --commit it signs without re-simulating).
+      const builtMessage = tx.compileMessage().serialize();
+      const returnedMessage = Buffer.from(eccSignedTx.message.serialize());
+      if (!builtMessage.equals(returnedMessage)) {
+        throw errors.BAD_REQUEST({
+          message:
+            "ECC verifier returned a modified transaction; refusing to relay it",
+        });
+      }
+
       const totalFee = getTransactionFee(eccSignedTx);
       const walletBalance = await connection.getBalance(owner);
       const required = calculateRequiredBalance(totalFee, 0);
