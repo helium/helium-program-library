@@ -66,6 +66,7 @@
     "@sentry/nextjs": "^10",
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.2",
+    "@sqds/multisig": "^2.1.4",
     "@t3-oss/env-nextjs": "^0.13.8",
     "@tanstack/react-query": "^5.80.10",
     "@types/bn.js": "^5.2.0",
