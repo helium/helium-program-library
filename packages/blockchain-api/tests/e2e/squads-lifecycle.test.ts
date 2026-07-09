@@ -4,6 +4,8 @@ import assert from "assert";
 import { setupTestCtx, TestCtx } from "./helpers/context";
 import { ensureFunds, loadKeypair2FromEnv } from "./helpers/wallet";
 import { signAndSubmitTransactionData } from "./helpers/tx";
+import { stopNextServer } from "./helpers/next";
+import { stopSurfpool } from "./helpers/surfpool";
 
 /**
  * Drives the Squads v4 proposal lifecycle endpoints against a freshly created
@@ -119,6 +121,11 @@ describe("squads v4 proposal lifecycle", function () {
       2,
       "multisig should start at 2-of-2"
     );
+  });
+
+  after(async () => {
+    await stopNextServer();
+    await stopSurfpool();
   });
 
   it("proposes a config change and rejects it", async () => {

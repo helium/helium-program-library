@@ -11,6 +11,8 @@ import {
 } from "./helpers/wallet";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import { TEST_HOTSPOT_ENTITY_KEY } from "./helpers/constants";
+import { stopNextServer } from "./helpers/next";
+import { stopSurfpool } from "./helpers/surfpool";
 
 /**
  * Exercises the token-transfer endpoint's Squads propose mode end to end: the
@@ -124,6 +126,11 @@ describe("squads v4 propose-mode (token transfer)", function () {
     await ensureFunds(vault, 0.05 * LAMPORTS_PER_SOL);
     await ensureTokenBalance(vault, HNT_MINT, 5);
     await ensureTokenBalance(recipient.publicKey, HNT_MINT, 1);
+  });
+
+  after(async () => {
+    await stopNextServer();
+    await stopSurfpool();
   });
 
   it("proposes, approves, and executes a transfer from the vault", async () => {
