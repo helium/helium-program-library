@@ -1,11 +1,6 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import * as anchor from "@coral-xyz/anchor";
-import {
-  cronJobKey,
-  cronJobNameMappingKey,
-  cronJobTransactionKey,
-  init as initCron,
-} from "@helium/cron-sdk";
+import { cronJobKey, init as initCron } from "@helium/cron-sdk";
 import {
   entityCronAuthorityKey,
   init as initHplCrons,
@@ -16,9 +11,8 @@ import {
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
 } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import { ENTITY_CLAIM_CRON_NAME } from "@/lib/utils/automation-helpers";
-import { liveCronTransactionIds } from "./automation-data-helpers";
+import { PublicKey } from "@solana/web3.js";
+import { buildTeardownInstructions } from "./automation-data-helpers";
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
@@ -82,42 +76,15 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       });
     }
 
-    // Build instructions to remove all entities and close cron job.
-    // nextTransactionId is a monotonic counter, so individually-removed claims
-    // leave holes: only remove slots whose transaction account still exists.
-    const liveTxIds = await liveCronTransactionIds(
+    // Remove all entities and close the cron job.
+    const instructions = await buildTeardownInstructions(
       provider.connection,
+      hplCronsProgram,
       cronJob,
+      authority,
+      wallet,
       cronJobAccount.nextTransactionId || 0
     );
-
-    const instructions: TransactionInstruction[] = [
-      ...(await Promise.all(
-        liveTxIds.map((txId) =>
-          hplCronsProgram.methods
-            .removeEntityFromCronV0({
-              index: txId,
-            })
-            .accounts({
-              cronJob,
-              rentRefund: wallet,
-              cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
-            })
-            .instruction()
-        )
-      )),
-      await hplCronsProgram.methods
-        .closeEntityClaimCronV0()
-        .accounts({
-          cronJob,
-          rentRefund: wallet,
-          cronJobNameMapping: cronJobNameMappingKey(
-            authority,
-            ENTITY_CLAIM_CRON_NAME
-          )[0],
-        })
-        .instruction(),
-    ];
 
     // Build and serialize transactions
     const vtxs = (

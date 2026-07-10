@@ -1,7 +1,4 @@
 import { publicProcedure } from "../../../procedures";
-import { Connection, PublicKey } from "@solana/web3.js";
-import { env } from "@/lib/env";
-import { hasRewardContract } from "@/lib/queries/hotspots";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
@@ -18,22 +15,16 @@ import {
   buildVersionedTransaction,
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
-import { proofArgsAndAccounts } from "@helium/spl-utils";
 import { createBurnInstruction } from "@metaplex-foundation/mpl-bubblegum";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   SPL_NOOP_PROGRAM_ID,
 } from "@solana/spl-account-compression";
 import {
-  getAssetIdFromPubkey,
-  getBubblegumAuthorityPDA,
-  validateHeliumHotspot,
-} from "@/lib/utils/hotspot-helpers";
-import {
   buildActionProposal,
   proposalTransactionData,
-  vaultPda,
 } from "../../squads/procedures/helpers";
+import { resolveOwnedHotspotCnft } from "./hotspot-cnft";
 
 /**
  * Create a transaction to permanently burn (destroy) a hotspot cNFT, using the
@@ -43,74 +34,26 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
   async ({ input, errors }) => {
     const { walletAddress, hotspotPubkey } = input;
 
-    const assetId = await getAssetIdFromPubkey(hotspotPubkey);
-    if (!assetId) {
-      throw errors.NOT_FOUND({ message: "Hotspot not found" });
-    }
-
-    let payerPubkey: PublicKey;
-    try {
-      payerPubkey = new PublicKey(walletAddress);
-    } catch {
-      throw errors.BAD_REQUEST({ message: "Invalid public key format" });
-    }
-
-    const connection = new Connection(env.SOLANA_RPC_URL);
-    const assetEndpoint = env.ASSET_ENDPOINT || connection.rpcEndpoint;
-
-    const { asset, args, accounts, remainingAccounts } =
-      await proofArgsAndAccounts({
-        connection,
-        assetId: new PublicKey(assetId),
-        assetEndpoint,
-      });
-
-    if (!asset) {
-      throw errors.NOT_FOUND({ message: "Asset not found" });
-    }
-    if (!validateHeliumHotspot(asset)) {
-      throw errors.BAD_REQUEST({
-        message: "Asset is not a valid Helium hotspot",
-      });
-    }
-
-    const ownerAddress =
-      typeof asset.ownership.owner === "string"
-        ? asset.ownership.owner
-        : asset.ownership.owner.toBase58();
-
-    // In Squads propose mode the on-chain owner must be the multisig's vault
-    // (walletAddress is only the proposing member); otherwise the wallet itself.
-    const multisigPda = input.multisig
-      ? new PublicKey(input.multisig)
-      : undefined;
-    const expectedOwner = multisigPda ? vaultPda(multisigPda) : payerPubkey;
-    if (ownerAddress !== expectedOwner.toBase58()) {
-      throw errors.UNAUTHORIZED({
-        message: multisigPda
-          ? "Multisig vault is not the owner of this hotspot"
-          : "Wallet is not the owner of this hotspot",
-      });
-    }
-
-    // Refuse to burn a hotspot with an active reward contract, matching the
-    // transfer guard — burning it would orphan the contract.
-    if (await hasRewardContract(hotspotPubkey)) {
-      throw errors.CONFLICT({
-        message:
-          "Cannot burn hotspot with active reward contract. Delete the contract first.",
-      });
-    }
-
-    const leafOwner = new PublicKey(ownerAddress);
-    const leafDelegate = asset.ownership.delegate
-      ? typeof asset.ownership.delegate === "string"
-        ? new PublicKey(asset.ownership.delegate)
-        : asset.ownership.delegate
-      : leafOwner;
-
-    const merkleTree = accounts.merkleTree;
-    const treeAuthority = await getBubblegumAuthorityPDA(merkleTree);
+    const {
+      connection,
+      payerPubkey,
+      multisigPda,
+      assetId,
+      args,
+      remainingAccounts,
+      merkleTree,
+      treeAuthority,
+      leafOwner,
+      leafDelegate,
+      hotspotName,
+    } = await resolveOwnedHotspotCnft({
+      walletAddress,
+      hotspotPubkey,
+      multisig: input.multisig,
+      conflictMessage:
+        "Cannot burn hotspot with active reward contract. Delete the contract first.",
+      errors,
+    });
 
     const burnInstruction = createBurnInstruction(
       {
@@ -125,10 +68,8 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
       {
         ...args,
         nonce: args.index,
-      },
+      }
     );
-
-    const hotspotName = asset.content?.metadata?.name || "Hotspot";
 
     // ---- Squads propose mode ----
     // UNVERIFIED: this path cannot be exercised on a mainnet fork. The proof and
@@ -144,15 +85,8 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
           member: payerPubkey,
           memo: input.memo,
           buildInstructions: () => [burnInstruction],
-          insufficientFunds: ({ required, available }) =>
-            errors.INSUFFICIENT_FUNDS({
-              message: "Insufficient SOL balance to create the burn proposal",
-              data: { required, available },
-            }),
-          notFound: () =>
-            errors.NOT_FOUND({
-              message: `Multisig ${input.multisig} not found`,
-            }),
+          errors,
+          action: "burn",
         });
 
       return {
@@ -169,11 +103,10 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
           multisig: multisigPda.toBase58(),
           transactionIndex,
           metadata: { hotspotKey: assetId, hotspotName },
-          actionMetadata: { hotspotKey: assetId, hotspotName },
         }),
         estimatedSolFee: await toTokenAmountOutput(
           new BN(feeLamports),
-          NATIVE_MINT.toBase58(),
+          NATIVE_MINT.toBase58()
         ),
       };
     }
@@ -225,8 +158,8 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

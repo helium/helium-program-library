@@ -24,6 +24,18 @@ export type InsufficientFundsReporter = (info: {
 }) => Error;
 
 /**
+ * The subset of a procedure's typed `errors` builders the squads helpers need.
+ * The full oRPC `errors` object satisfies this structurally.
+ */
+export type ProposalErrors = {
+  INSUFFICIENT_FUNDS: (opts: {
+    message: string;
+    data: { required: number; available: number };
+  }) => Error;
+  NOT_FOUND: (opts: { message: string }) => Error;
+};
+
+/**
  * Build an unsigned Squads transaction from a set of instructions, verify the
  * acting member can cover the fee, and return the base64-serialized tx plus the
  * estimated fee in lamports.
@@ -78,17 +90,31 @@ export type ProposalRef = {
 
 /**
  * Per-vote-action descriptor. `type` is the single transaction type that keys
- * both the tag and the metadata; `verb` is its human-readable label.
+ * both the tag and the metadata; `verb` is its human-readable label; `buildIx`
+ * is the Squads instruction builder for the vote.
  */
 export type ProposalVoteAction = {
   type: TransactionType;
   verb: string;
+  buildIx: VoteIxBuilder;
 };
 
 export const SQUADS_VOTE_ACTIONS = {
-  approve: { type: TRANSACTION_TYPES.SQUADS_PROPOSAL_APPROVE, verb: "Approve" },
-  reject: { type: TRANSACTION_TYPES.SQUADS_PROPOSAL_REJECT, verb: "Reject" },
-  cancel: { type: TRANSACTION_TYPES.SQUADS_PROPOSAL_CANCEL, verb: "Cancel" },
+  approve: {
+    type: TRANSACTION_TYPES.SQUADS_PROPOSAL_APPROVE,
+    verb: "Approve",
+    buildIx: multisig.instructions.proposalApprove,
+  },
+  reject: {
+    type: TRANSACTION_TYPES.SQUADS_PROPOSAL_REJECT,
+    verb: "Reject",
+    buildIx: multisig.instructions.proposalReject,
+  },
+  cancel: {
+    type: TRANSACTION_TYPES.SQUADS_PROPOSAL_CANCEL,
+    verb: "Cancel",
+    buildIx: multisig.instructions.proposalCancel,
+  },
 } as const satisfies Record<string, ProposalVoteAction>;
 
 /**
@@ -98,20 +124,18 @@ export const SQUADS_VOTE_ACTIONS = {
 export async function buildProposalVote({
   input,
   connection,
-  buildIx,
   action,
-  insufficientFunds,
+  errors,
 }: {
   input: ProposalRef & { memo?: string };
   connection: Connection;
-  buildIx: VoteIxBuilder;
   action: ProposalVoteAction;
-  insufficientFunds: InsufficientFundsReporter;
+  errors: ProposalErrors;
 }) {
   const member = new PublicKey(input.member);
   const multisigPda = new PublicKey(input.multisig);
 
-  const ix = buildIx({
+  const ix = action.buildIx({
     multisigPda,
     transactionIndex: BigInt(input.transactionIndex),
     member,
@@ -122,7 +146,11 @@ export async function buildProposalVote({
     connection,
     member,
     instructions: [ix],
-    insufficientFunds,
+    insufficientFunds: ({ required, available }) =>
+      errors.INSUFFICIENT_FUNDS({
+        message: `Insufficient SOL balance to ${action.verb.toLowerCase()} the proposal`,
+        data: { required, available },
+      }),
   });
 
   const tag = generateTransactionTag({
@@ -166,7 +194,7 @@ export function proposalTransactionData({
   multisig,
   transactionIndex,
   metadata = {},
-  actionMetadata = {},
+  actionMetadata = metadata,
 }: {
   serializedTransaction: string;
   type: TransactionType;
@@ -193,11 +221,11 @@ export function proposalTransactionData({
 /** Fetch the multisig's next (unused) transaction index. */
 export async function nextTransactionIndex(
   connection: Connection,
-  multisigPda: PublicKey,
+  multisigPda: PublicKey
 ): Promise<bigint> {
   const info = await multisig.accounts.Multisig.fromAccountAddress(
     connection,
-    multisigPda,
+    multisigPda
   );
   return BigInt(info.transactionIndex.toString()) + BigInt(1);
 }
@@ -275,18 +303,19 @@ export async function buildActionProposal({
   member,
   buildInstructions,
   memo,
-  insufficientFunds,
-  notFound,
+  errors,
+  action,
 }: {
   connection: Connection;
   multisigPda: PublicKey;
   member: PublicKey;
   buildInstructions: (
-    vault: PublicKey,
+    vault: PublicKey
   ) => Promise<TransactionInstruction[]> | TransactionInstruction[];
   memo?: string;
-  insufficientFunds: InsufficientFundsReporter;
-  notFound: () => Error;
+  errors: ProposalErrors;
+  /** Noun for the insufficient-funds message: "create the ${action} proposal". */
+  action: string;
 }): Promise<{
   serializedTransaction: string;
   transactionIndex: string;
@@ -294,9 +323,11 @@ export async function buildActionProposal({
 }> {
   const transactionIndex = await nextTransactionIndex(
     connection,
-    multisigPda,
+    multisigPda
   ).catch(() => {
-    throw notFound();
+    throw errors.NOT_FOUND({
+      message: `Multisig ${multisigPda.toBase58()} not found`,
+    });
   });
   const vault = vaultPda(multisigPda);
   const instructions = await buildInstructions(vault);
@@ -312,7 +343,11 @@ export async function buildActionProposal({
     connection,
     member,
     instructions: proposalIxs,
-    insufficientFunds,
+    insufficientFunds: ({ required, available }) =>
+      errors.INSUFFICIENT_FUNDS({
+        message: `Insufficient SOL balance to create the ${action} proposal`,
+        data: { required, available },
+      }),
   });
   return {
     serializedTransaction,

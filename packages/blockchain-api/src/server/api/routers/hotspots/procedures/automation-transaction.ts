@@ -11,7 +11,8 @@ import {
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
-import { createSolanaConnection, getCluster, getCommonLut } from "@/lib/solana";
+import { createSolanaConnection, getCluster } from "@/lib/solana";
+import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
 import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -35,14 +36,17 @@ export const resolveEntityClaimCronJob = async ({
   const { provider } = createSolanaConnection(walletAddress);
   anchor.setProvider(provider);
 
-  const hplCronsProgram = await initHplCrons(provider);
-  const cronProgram = await initCron(provider);
+  const [hplCronsProgram, cronProgram] = await Promise.all([
+    initHplCrons(provider),
+    initCron(provider),
+  ]);
 
   const authority = entityCronAuthorityKey(wallet)[0];
   const cronJob = cronJobKey(authority, 0)[0];
 
-  const cronJobAccount =
-    await cronProgram.account.cronJobV0.fetchNullable(cronJob);
+  const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
+    cronJob
+  );
   if (!cronJobAccount) {
     throw errors.NOT_FOUND({ message: notFoundMessage });
   }
@@ -88,7 +92,7 @@ export const buildAutomationTransactionResponse = async ({
 }) => {
   const vtxs = (
     await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-      addressLookupTableAddresses: [getCommonLut()],
+      addressLookupTableAddresses: [getHeliumLookupTable()],
       computeUnitLimit: 500000,
       commitment: "finalized",
     })
@@ -113,7 +117,7 @@ export const buildAutomationTransactionResponse = async ({
     },
     estimatedSolFee: await toTokenAmountOutput(
       new BN(txFees + extraFeeLamports),
-      NATIVE_MINT.toBase58(),
+      NATIVE_MINT.toBase58()
     ),
   };
 };

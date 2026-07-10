@@ -9,7 +9,7 @@ import {
   formBulkTransactions,
   getBulkRewards,
 } from "@/utils/distributorOracle";
-import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
@@ -18,15 +18,14 @@ import {
 import {
   getTotalTransactionFees,
   calculateRequiredBalance,
+  RENT_COSTS,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 import { getLazyDistributorForNetwork } from "@/lib/utils/network-mint";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
-
-const RECIPIENT_RENT = 0.00242208;
-const RECIPIENT_RENT_LAMPORTS = Math.ceil(RECIPIENT_RENT * LAMPORTS_PER_SOL);
+import { pendingOracleRewards } from "@/lib/utils/pending-rewards";
 
 /**
  * Create transactions to claim the full pending rewards for a single hotspot.
@@ -49,26 +48,23 @@ export const claimHotspotRewards =
       const entityKey = entityPubKey;
 
       const { provider, connection } = createSolanaConnection(walletAddress);
-      const ldProgram = await initLd(provider);
-      const mfProgram = await initMiniFanout(provider);
-
-      const rewards = await getBulkRewards(ldProgram, lazyDistributor, [
-        entityKey,
+      const [ldProgram, mfProgram] = await Promise.all([
+        initLd(provider),
+        initMiniFanout(provider),
       ]);
+
       const [recipientPk] = recipientKey(lazyDistributor, asset);
-      const recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
-        recipientPk
-      );
+      const [rewards, recipientAcc] = await Promise.all([
+        getBulkRewards(ldProgram, lazyDistributor, [entityKey]),
+        ldProgram.account.recipientV0.fetchNullable(recipientPk),
+      ]);
 
       // Positive pending = oracle median minus what's already been distributed.
-      const sortedOracleRewards = rewards
-        .map((rew) => new BN(rew.currentRewards[entityKey] || 0))
-        .sort((a, b) => a.sub(b).toNumber());
-      const oracleMedian =
-        sortedOracleRewards[Math.floor(sortedOracleRewards.length / 2)] ||
-        new BN(0);
-      const alreadyDistributed = recipientAcc?.totalRewards || new BN(0);
-      const hasPending = oracleMedian.sub(alreadyDistributed).gtn(0);
+      const hasPending = pendingOracleRewards(
+        rewards,
+        entityKey,
+        recipientAcc
+      ).gtn(0);
 
       const emptyResponse = async () => ({
         transactionData: {
@@ -123,7 +119,7 @@ export const claimHotspotRewards =
 
       const txFees = getTotalTransactionFees(vtxs);
       const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
-      const rentCost = recipientAcc ? 0 : RECIPIENT_RENT_LAMPORTS;
+      const rentCost = recipientAcc ? 0 : RENT_COSTS.RECIPIENT;
       const requiredLamports = calculateRequiredBalance(
         txFees + jitoTipCost,
         rentCost

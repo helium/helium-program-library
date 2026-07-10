@@ -27,39 +27,39 @@ export const topUpAutomation = publicProcedure.hotspots.topUpAutomation.handler(
     const { provider } = createSolanaConnection(operatorAddress);
     anchor.setProvider(provider);
 
-    const instructions: TransactionInstruction[] = [];
-    let funded = 0;
+    // Check every target's pools in parallel; flatten back in target order so
+    // the produced instructions stay deterministic.
+    const perTargetInstructions = await Promise.all(
+      targets.map(async (targetWallet) => {
+        const wallet = new PublicKey(targetWallet);
+        const authority = entityCronAuthorityKey(wallet)[0];
+        const cronJob = cronJobKey(authority, 0)[0];
+        const pdaWallet = customSignerKey(TASK_QUEUE_ID, [
+          Buffer.from("claim_payer"),
+          wallet.toBuffer(),
+        ])[0];
 
-    for (const targetWallet of targets) {
-      const wallet = new PublicKey(targetWallet);
-      const authority = entityCronAuthorityKey(wallet)[0];
-      const cronJob = cronJobKey(authority, 0)[0];
-      const pdaWallet = customSignerKey(TASK_QUEUE_ID, [
-        Buffer.from("claim_payer"),
-        wallet.toBuffer(),
-      ])[0];
+        const [cronJobBalance, pdaWalletBalance] = await Promise.all([
+          provider.connection.getBalance(cronJob),
+          provider.connection.getBalance(pdaWallet),
+        ]);
 
-      const [cronJobBalance, pdaWalletBalance] = await Promise.all([
-        provider.connection.getBalance(cronJob),
-        provider.connection.getBalance(pdaWallet),
-      ]);
-
-      for (const [pool, balance] of [
-        [cronJob, cronJobBalance] as const,
-        [pdaWallet, pdaWalletBalance] as const,
-      ]) {
-        if (balance <= floorLamports) {
-          instructions.push(
+        return [
+          [cronJob, cronJobBalance] as const,
+          [pdaWallet, pdaWalletBalance] as const,
+        ]
+          .filter(([, balance]) => balance <= floorLamports)
+          .map(([pool]) =>
             SystemProgram.transfer({
               fromPubkey: operator,
               toPubkey: pool,
               lamports: fundLamports,
-            }),
+            })
           );
-          funded++;
-        }
-      }
-    }
+      })
+    );
+
+    const instructions: TransactionInstruction[] = perTargetInstructions.flat();
 
     if (instructions.length === 0) {
       throw errors.NOT_FOUND({
@@ -67,7 +67,8 @@ export const topUpAutomation = publicProcedure.hotspots.topUpAutomation.handler(
       });
     }
 
-    const totalFundingNeeded = funded * fundLamports;
+    const poolsFunded = instructions.length;
+    const totalFundingNeeded = poolsFunded * fundLamports;
     const operatorBalance = await provider.connection.getBalance(operator);
     if (operatorBalance < totalFundingNeeded) {
       throw errors.INSUFFICIENT_FUNDS({
@@ -84,10 +85,10 @@ export const topUpAutomation = publicProcedure.hotspots.topUpAutomation.handler(
       transactionMetadata: {
         type: "top_up_automation",
         description: "Operator floor top-up of automation funding",
-        poolsFunded: funded,
+        poolsFunded,
       },
-      actionMetadata: { type: "top_up_automation", poolsFunded: funded },
+      actionMetadata: { type: "top_up_automation", poolsFunded },
       extraFeeLamports: totalFundingNeeded,
     });
-  },
+  }
 );

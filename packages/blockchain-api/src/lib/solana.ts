@@ -1,6 +1,5 @@
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
-import { HELIUM_COMMON_LUT, HELIUM_COMMON_LUT_DEVNET } from "@helium/spl-utils";
 import { env } from "./env";
 import fs from "fs";
 
@@ -18,15 +17,9 @@ export function getCluster(): string {
   return process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "mainnet";
 }
 
-/** The Helium common address-lookup table for the active cluster. */
-export const getCommonLut = (): PublicKey =>
-  process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
-    ? HELIUM_COMMON_LUT_DEVNET
-    : HELIUM_COMMON_LUT;
-
 export function loadKeypair(keypair: string): Keypair {
   return Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString())),
+    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
   );
 }
 
@@ -40,7 +33,7 @@ function getConnection(): Connection {
 }
 
 export function createSolanaConnection(
-  walletAddress: string,
+  walletAddress: string
 ): SolanaConnection {
   const connection = getConnection();
   const wallet = {
@@ -55,7 +48,7 @@ export function createSolanaConnection(
   const provider = new AnchorProvider(
     connection,
     wallet,
-    AnchorProvider.defaultOptions(),
+    AnchorProvider.defaultOptions()
   );
 
   return {

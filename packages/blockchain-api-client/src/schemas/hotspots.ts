@@ -3,28 +3,12 @@ import {
   createPaginatedTransactionResponse,
   createTransactionResponse,
   HeliumPublicKeySchema,
-  PublicKeySchema,
   RewardSplitInputSchema,
   ScheduleInputSchema,
+  squadsProposeFields,
   TokenAmountOutputSchema,
   WalletAddressSchema,
 } from "./common";
-
-/**
- * Optional Squads v4 propose-mode fields shared by the hotspot action schemas.
- * When `multisig` is set the action is built from that multisig's vault (which
- * must own the hotspot) and wrapped as a proposal; `walletAddress` is the
- * proposing member and outer fee payer.
- */
-const squadsProposeFields = {
-  multisig: PublicKeySchema.optional().describe(
-    "If set, build the action as a Squads v4 proposal from this multisig's vault (which must own the hotspot)."
-  ),
-  memo: z
-    .string()
-    .optional()
-    .describe("Optional memo recorded on the Squads proposal (multisig mode)"),
-};
 
 export const RewardNetworkSchema = z
   .enum(["hnt", "iot", "mobile"])

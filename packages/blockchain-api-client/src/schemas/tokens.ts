@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   createTransactionResponse,
   PublicKeySchema,
+  squadsProposeFields,
   TokenAmountInputSchema,
   WalletAddressSchema,
 } from "./common";
@@ -14,13 +15,7 @@ export const TransferInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   destination: z.string().min(32),
   tokenAmount: TokenAmountInputSchema,
-  multisig: PublicKeySchema.optional().describe(
-    "If set, build the transfer as a Squads v4 proposal from this multisig's vault instead of a direct transfer. walletAddress is the proposing member and outer fee payer."
-  ),
-  memo: z
-    .string()
-    .optional()
-    .describe("Optional memo recorded on the Squads proposal (multisig mode)"),
+  ...squadsProposeFields,
 });
 
 export const MultiTransferRecipientSchema = z.object({
@@ -49,13 +44,7 @@ export const MultiTransferInputSchema = z.object({
 export const BurnInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   tokenAmount: TokenAmountInputSchema,
-  multisig: PublicKeySchema.optional().describe(
-    "If set, build the burn as a Squads v4 proposal from this multisig's vault. walletAddress is the proposing member and outer fee payer."
-  ),
-  memo: z
-    .string()
-    .optional()
-    .describe("Optional memo recorded on the Squads proposal (multisig mode)"),
+  ...squadsProposeFields,
 });
 
 export const MemoInputSchema = z.object({

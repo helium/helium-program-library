@@ -31,23 +31,25 @@ export const executeProposal = publicProcedure.squads.executeProposal.handler(
       });
     }
 
-    let isVault = true;
-    try {
-      multisig.accounts.VaultTransaction.fromAccountInfo(account);
-    } catch {
-      isVault = false;
-      try {
-        multisig.accounts.ConfigTransaction.fromAccountInfo(account);
-      } catch {
-        throw errors.BAD_REQUEST({
-          message: `Transaction at index ${transactionIndex} is neither a vault nor a config transaction`,
-        });
-      }
+    const discriminator = account.data.subarray(0, 8);
+    const kind = discriminator.equals(
+      Buffer.from(multisig.accounts.vaultTransactionDiscriminator)
+    )
+      ? "vault"
+      : discriminator.equals(
+          Buffer.from(multisig.accounts.configTransactionDiscriminator)
+        )
+      ? "config"
+      : null;
+    if (!kind) {
+      throw errors.BAD_REQUEST({
+        message: `Transaction at index ${transactionIndex} is neither a vault nor a config transaction`,
+      });
     }
 
     let instructions: TransactionInstruction[];
     let addressLookupTableAddresses: PublicKey[] = [];
-    if (isVault) {
+    if (kind === "vault") {
       const { instruction, lookupTableAccounts } =
         await multisig.instructions.vaultTransactionExecute({
           connection,
@@ -102,8 +104,8 @@ export const executeProposal = publicProcedure.squads.executeProposal.handler(
         type: TRANSACTION_TYPES.SQUADS_PROPOSAL_EXECUTE,
         multisig: multisigAddress,
         transactionIndex,
-        kind: isVault ? "vault" : "config",
+        kind,
       },
     };
-  },
+  }
 );

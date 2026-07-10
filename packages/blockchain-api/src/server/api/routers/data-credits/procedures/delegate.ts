@@ -19,7 +19,7 @@ import {
 import BN from "bn.js";
 
 const MEMO_PROGRAM_ID = new PublicKey(
-  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
 );
 
 export const delegate = publicProcedure.dataCredits.delegate.handler(
@@ -32,9 +32,9 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
     const subDao = subDaoKey(new PublicKey(mint))[0];
 
     // ---- Squads propose mode: delegate the vault's DC, wrapped as a proposal.
-    // The delegate authority (owner) is resolved by anchor from the provider
-    // wallet, so build the instruction with a vault-scoped provider. `memo` is
-    // recorded on the proposal rather than as an in-tx memo here.
+    // The vault is both the DC owner (authority) and the payer for the escrow
+    // init, passed explicitly so anchor resolves `fromAccount` to the vault's DC
+    // ATA. `memo` is recorded on the proposal rather than as an in-tx memo here.
     if (input.multisig) {
       const multisigPda = new PublicKey(input.multisig);
       const { serializedTransaction, transactionIndex } =
@@ -43,28 +43,14 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
           multisigPda,
           member: feePayer,
           memo,
-          buildInstructions: async (vault) => {
-            const { provider: vaultProvider } = createSolanaConnection(
-              vault.toBase58(),
-            );
-            const vaultProgram = await initDc(vaultProvider);
-            return [
-              await vaultProgram.methods
-                .delegateDataCreditsV0({ amount: new BN(amount), routerKey })
-                .accountsPartial({ subDao })
-                .instruction(),
-            ];
-          },
-          insufficientFunds: ({ required, available }) =>
-            errors.INSUFFICIENT_FUNDS({
-              message:
-                "Insufficient SOL balance to create the delegate proposal",
-              data: { required, available },
-            }),
-          notFound: () =>
-            errors.NOT_FOUND({
-              message: `Multisig ${input.multisig} not found`,
-            }),
+          buildInstructions: async (vault) => [
+            await program.methods
+              .delegateDataCreditsV0({ amount: new BN(amount), routerKey })
+              .accountsPartial({ subDao, owner: vault, payer: vault })
+              .instruction(),
+          ],
+          errors,
+          action: "delegate",
         });
 
       return proposalTransactionData({
@@ -72,7 +58,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
         type: TRANSACTION_TYPES.DELEGATE_DATA_CREDITS_PROPOSAL,
         description: `Propose delegation of ${amount} DC to router ${routerKey.substring(
           0,
-          8,
+          8
         )}...`,
         tag: generateTransactionTag({
           type: TRANSACTION_TYPES.DELEGATE_DATA_CREDITS,
@@ -96,7 +82,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
           keys: [{ pubkey: feePayer, isSigner: true, isWritable: false }],
           programId: MEMO_PROGRAM_ID,
           data: Buffer.from(memo, "utf-8"),
-        }),
+        })
       );
     }
 
@@ -109,7 +95,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
         .accountsPartial({
           subDao,
         })
-        .instruction(),
+        .instruction()
     );
 
     const tx = await buildVersionedTransaction({
@@ -145,7 +131,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
             type: "delegate_data_credits",
             description: `Delegate ${amount} DC to router ${routerKey.substring(
               0,
-              8,
+              8
             )}...`,
           },
         },
@@ -159,5 +145,5 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
         mint,
       },
     };
-  },
+  }
 );

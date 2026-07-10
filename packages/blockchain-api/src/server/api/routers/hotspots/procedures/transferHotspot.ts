@@ -1,7 +1,5 @@
 import { publicProcedure } from "../../../procedures";
-import { Connection, PublicKey } from "@solana/web3.js";
-import { env } from "@/lib/env";
-import { hasRewardContract } from "@/lib/queries/hotspots";
+import { PublicKey } from "@solana/web3.js";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
@@ -18,22 +16,16 @@ import {
   buildVersionedTransaction,
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
-import { proofArgsAndAccounts } from "@helium/spl-utils";
 import { createTransferInstruction } from "@metaplex-foundation/mpl-bubblegum";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   SPL_NOOP_PROGRAM_ID,
 } from "@solana/spl-account-compression";
 import {
-  getAssetIdFromPubkey,
-  getBubblegumAuthorityPDA,
-  validateHeliumHotspot,
-} from "@/lib/utils/hotspot-helpers";
-import {
   buildActionProposal,
   proposalTransactionData,
-  vaultPda,
 } from "../../squads/procedures/helpers";
+import { resolveOwnedHotspotCnft } from "./hotspot-cnft";
 
 /**
  * Create a transaction to transfer a hotspot to a new owner.
@@ -42,83 +34,33 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
   async ({ input, errors }) => {
     const { walletAddress, hotspotPubkey, recipient } = input;
 
-    // Resolve hotspot pubkey to asset ID
-    const assetId = await getAssetIdFromPubkey(hotspotPubkey);
-    if (!assetId) {
-      throw errors.NOT_FOUND({ message: "Hotspot not found" });
-    }
+    const {
+      connection,
+      payerPubkey,
+      multisigPda,
+      assetId,
+      args,
+      remainingAccounts,
+      merkleTree,
+      treeAuthority,
+      leafOwner,
+      leafDelegate,
+      hotspotName,
+    } = await resolveOwnedHotspotCnft({
+      walletAddress,
+      hotspotPubkey,
+      multisig: input.multisig,
+      conflictMessage:
+        "Cannot transfer hotspot with active reward contract. Delete the contract first.",
+      errors,
+    });
 
-    // Validate public keys
-    let payerPubkey: PublicKey;
     let recipientPubkey: PublicKey;
-
     try {
-      payerPubkey = new PublicKey(walletAddress);
       recipientPubkey = new PublicKey(recipient);
     } catch {
       throw errors.BAD_REQUEST({ message: "Invalid public key format" });
     }
-
-    const connection = new Connection(env.SOLANA_RPC_URL);
-    const assetEndpoint = env.ASSET_ENDPOINT || connection.rpcEndpoint;
-    const assetPubkey = new PublicKey(assetId);
-
-    const { asset, args, accounts, remainingAccounts } =
-      await proofArgsAndAccounts({
-        connection,
-        assetId: assetPubkey,
-        assetEndpoint,
-      });
-
-    if (!asset) {
-      throw errors.NOT_FOUND({ message: "Asset not found" });
-    }
-
-    // Validate asset is a Helium hotspot
-    if (!validateHeliumHotspot(asset)) {
-      throw errors.BAD_REQUEST({
-        message: "Asset is not a valid Helium hotspot",
-      });
-    }
-
-    // Validate ownership
-    const ownerAddress =
-      typeof asset.ownership.owner === "string"
-        ? asset.ownership.owner
-        : asset.ownership.owner.toBase58();
-
-    // In Squads propose mode the on-chain owner must be the multisig's vault
-    // (walletAddress is only the proposing member); otherwise the wallet itself.
-    const multisigPda = input.multisig
-      ? new PublicKey(input.multisig)
-      : undefined;
-    const expectedOwner = multisigPda ? vaultPda(multisigPda) : payerPubkey;
-    if (ownerAddress !== expectedOwner.toBase58()) {
-      throw errors.UNAUTHORIZED({
-        message: multisigPda
-          ? "Multisig vault is not the owner of this hotspot"
-          : "Wallet is not the owner of this hotspot",
-      });
-    }
-
-    // Check if a contract exists for this hotspot
-    const contractExists = await hasRewardContract(hotspotPubkey);
-    if (contractExists) {
-      throw errors.CONFLICT({
-        message:
-          "Cannot transfer hotspot with active reward contract. Delete the contract first.",
-      });
-    }
-
-    const leafOwner = new PublicKey(ownerAddress);
-    const leafDelegate = asset.ownership.delegate
-      ? typeof asset.ownership.delegate === "string"
-        ? new PublicKey(asset.ownership.delegate)
-        : asset.ownership.delegate
-      : leafOwner;
-
-    const merkleTree = accounts.merkleTree;
-    const treeAuthority = await getBubblegumAuthorityPDA(merkleTree);
 
     const transferInstruction = createTransferInstruction(
       {
@@ -134,10 +76,9 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
       {
         ...args,
         nonce: args.index,
-      },
+      }
     );
 
-    const hotspotName = asset.content?.metadata?.name || "Hotspot";
     const shortRecipient = `${recipient.slice(0, 4)}...${recipient.slice(-4)}`;
 
     // ---- Squads propose mode ----
@@ -154,16 +95,8 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
           member: payerPubkey,
           memo: input.memo,
           buildInstructions: () => [transferInstruction],
-          insufficientFunds: ({ required, available }) =>
-            errors.INSUFFICIENT_FUNDS({
-              message:
-                "Insufficient SOL balance to create the transfer proposal",
-              data: { required, available },
-            }),
-          notFound: () =>
-            errors.NOT_FOUND({
-              message: `Multisig ${input.multisig} not found`,
-            }),
+          errors,
+          action: "transfer",
         });
 
       return {
@@ -181,11 +114,10 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
           multisig: multisigPda.toBase58(),
           transactionIndex,
           metadata: { hotspotKey: assetId, hotspotName, recipient },
-          actionMetadata: { hotspotKey: assetId, hotspotName, recipient },
         }),
         estimatedSolFee: await toTokenAmountOutput(
           new BN(feeLamports),
-          NATIVE_MINT.toBase58(),
+          NATIVE_MINT.toBase58()
         ),
       };
     }
@@ -244,8 +176,8 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

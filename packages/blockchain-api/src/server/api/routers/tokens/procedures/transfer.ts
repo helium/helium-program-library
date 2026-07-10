@@ -9,7 +9,6 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
-  getMint,
 } from "@solana/spl-token";
 import {
   buildVersionedTransaction,
@@ -19,7 +18,11 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
-import { TOKEN_MINTS, TOKEN_NAMES } from "@/lib/constants/tokens";
+import {
+  TOKEN_MINTS,
+  TOKEN_NAMES,
+  getTokenDecimals,
+} from "@/lib/constants/tokens";
 import {
   getTransactionFee,
   calculateRequiredBalance,
@@ -70,8 +73,11 @@ async function buildTransferInstructions({
   const mintKey = new PublicKey(mint);
   const senderAta = getAssociatedTokenAddressSync(mintKey, authority, true);
   const destAta = getAssociatedTokenAddressSync(mintKey, destination, true);
-  const needsAta = !(await connection.getAccountInfo(destAta));
-  const mintInfo = await getMint(connection, mintKey);
+  const [destAtaInfo, decimals] = await Promise.all([
+    connection.getAccountInfo(destAta),
+    getTokenDecimals(mint),
+  ]);
+  const needsAta = !destAtaInfo;
 
   return {
     instructions: [
@@ -79,7 +85,7 @@ async function buildTransferInstructions({
         authority,
         destAta,
         destination,
-        mintKey,
+        mintKey
       ),
       createTransferCheckedInstruction(
         senderAta,
@@ -87,7 +93,7 @@ async function buildTransferInstructions({
         destAta,
         authority,
         rawAmount,
-        mintInfo.decimals,
+        decimals
       ),
     ],
     needsAta,
@@ -120,7 +126,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
     const isSol = tokenAmount.mint === TOKEN_MINTS.WSOL;
     const transferTokenAmount = await toTokenAmountOutput(
       new BN(tokenAmount.amount),
-      tokenAmount.mint,
+      tokenAmount.mint
     );
     const tokenName = TOKEN_NAMES[tokenAmount.mint];
 
@@ -144,16 +150,8 @@ export const transfer = publicProcedure.tokens.transfer.handler(
                 isSol,
               })
             ).instructions,
-          insufficientFunds: ({ required, available }) =>
-            errors.INSUFFICIENT_FUNDS({
-              message:
-                "Insufficient SOL balance to create the transfer proposal",
-              data: { required, available },
-            }),
-          notFound: () =>
-            errors.NOT_FOUND({
-              message: `Multisig ${input.multisig} not found`,
-            }),
+          errors,
+          action: "transfer",
         });
 
       const tag = generateTransactionTag({
@@ -178,15 +176,10 @@ export const transfer = publicProcedure.tokens.transfer.handler(
             tokenName,
             recipient: destination,
           },
-          actionMetadata: {
-            tokenAmount: transferTokenAmount,
-            tokenName,
-            recipient: destination,
-          },
         }),
         estimatedSolFee: await toTokenAmountOutput(
           new BN(calculateRequiredBalance(feeLamports, 0)),
-          NATIVE_MINT.toBase58(),
+          NATIVE_MINT.toBase58()
         ),
       };
     }
@@ -257,8 +250,8 @@ export const transfer = publicProcedure.tokens.transfer.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

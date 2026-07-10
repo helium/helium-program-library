@@ -23,7 +23,7 @@ import BN from "bn.js";
 async function buildBurnDcInstruction(
   program: Awaited<ReturnType<typeof initDc>>,
   authority: PublicKey,
-  amount: string,
+  amount: string
 ): Promise<TransactionInstruction> {
   return program.methods
     .burnWithoutTrackingV0({ amount: new BN(amount) })
@@ -65,16 +65,8 @@ export const burn = publicProcedure.dataCredits.burn.handler(
           buildInstructions: async (vault) => [
             await buildBurnDcInstruction(program, vault, amount),
           ],
-          insufficientFunds: ({ required, available }) =>
-            errors.INSUFFICIENT_FUNDS({
-              message:
-                "Insufficient SOL balance to create the DC burn proposal",
-              data: { required, available },
-            }),
-          notFound: () =>
-            errors.NOT_FOUND({
-              message: `Multisig ${input.multisig} not found`,
-            }),
+          errors,
+          action: "DC burn",
         });
 
       return proposalTransactionData({
@@ -130,5 +122,5 @@ export const burn = publicProcedure.dataCredits.burn.handler(
       tag,
       actionMetadata: { type: "burn_data_credits", amount },
     };
-  },
+  }
 );
