@@ -25,8 +25,9 @@ type HotspotCnftErrors = {
  * instruction. `conflictMessage` is the reward-contract guard message — the only
  * wording that differs between the two endpoints.
  *
- * The reward-contract lookup is independent of the Merkle proof, so the two run
- * concurrently and are awaited together at the guard.
+ * The reward-contract lookup runs only after the ownership check passes, so an
+ * unauthorized caller never triggers the DB query and a lookup failure can't
+ * mask an UNAUTHORIZED response.
  */
 export const resolveOwnedHotspotCnft = async ({
   walletAddress,
@@ -58,15 +59,12 @@ export const resolveOwnedHotspotCnft = async ({
   const connection = new Connection(env.SOLANA_RPC_URL);
   const assetEndpoint = env.ASSET_ENDPOINT || connection.rpcEndpoint;
 
-  const [{ asset, args, accounts, remainingAccounts }, contractExists] =
-    await Promise.all([
-      proofArgsAndAccounts({
-        connection,
-        assetId: new PublicKey(assetId),
-        assetEndpoint,
-      }),
-      hasRewardContract(hotspotPubkey),
-    ]);
+  const { asset, args, accounts, remainingAccounts } =
+    await proofArgsAndAccounts({
+      connection,
+      assetId: new PublicKey(assetId),
+      assetEndpoint,
+    });
 
   if (!asset) {
     throw errors.NOT_FOUND({ message: "Asset not found" });
@@ -93,6 +91,7 @@ export const resolveOwnedHotspotCnft = async ({
     });
   }
 
+  const contractExists = await hasRewardContract(hotspotPubkey);
   if (contractExists) {
     throw errors.CONFLICT({ message: conflictMessage });
   }

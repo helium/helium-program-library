@@ -34,6 +34,13 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
   async ({ input, errors }) => {
     const { walletAddress, hotspotPubkey, recipient } = input;
 
+    let recipientPubkey: PublicKey;
+    try {
+      recipientPubkey = new PublicKey(recipient);
+    } catch {
+      throw errors.BAD_REQUEST({ message: "Invalid public key format" });
+    }
+
     const {
       connection,
       payerPubkey,
@@ -54,13 +61,6 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
         "Cannot transfer hotspot with active reward contract. Delete the contract first.",
       errors,
     });
-
-    let recipientPubkey: PublicKey;
-    try {
-      recipientPubkey = new PublicKey(recipient);
-    } catch {
-      throw errors.BAD_REQUEST({ message: "Invalid public key format" });
-    }
 
     const transferInstruction = createTransferInstruction(
       {
