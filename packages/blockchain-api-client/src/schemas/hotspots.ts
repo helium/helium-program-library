@@ -124,8 +124,13 @@ export const AutomationScheduleSchema = z.enum(["daily", "weekly", "monthly"]);
 
 export const SetupAutomationInputSchema = z.object({
   walletAddress: WalletAddressSchema,
-  // Raw crontab string (clockwork format) the cron fires on.
-  cronSchedule: z.string().min(1),
+  // How often the cron fires: a preset cadence (daily/weekly/monthly) or a raw
+  // clockwork crontab string. Presets are resolved to a crontab server-side.
+  schedule: z
+    .union([AutomationScheduleSchema, z.string().min(1)])
+    .describe(
+      "A preset cadence (daily/weekly/monthly) or a raw clockwork crontab string."
+    ),
   duration: z.number().int().min(1), // Number of claims to pre-fund
 });
 

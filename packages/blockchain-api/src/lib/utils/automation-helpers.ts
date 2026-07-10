@@ -52,6 +52,20 @@ export function getScheduleCronString(schedule: Schedule): string {
   }
 }
 
+const SCHEDULE_PRESETS: readonly Schedule[] = ["daily", "weekly", "monthly"];
+
+/**
+ * Resolve a setup input into a raw crontab string. The preset cadences
+ * (daily/weekly/monthly) map through getScheduleCronString; any other value is
+ * treated as an already-raw clockwork crontab and returned unchanged. Lets
+ * callers pass either a convenient preset or a full crontab.
+ */
+export function resolveScheduleToCron(scheduleOrCron: string): string {
+  return (SCHEDULE_PRESETS as readonly string[]).includes(scheduleOrCron)
+    ? getScheduleCronString(scheduleOrCron as Schedule)
+    : scheduleOrCron;
+}
+
 export interface CronScheduleInfo {
   schedule: Schedule;
   time: string;

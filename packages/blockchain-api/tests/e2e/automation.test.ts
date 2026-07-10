@@ -167,7 +167,7 @@ describe("automation endpoints", () => {
       // Create the cron itself (init-only, raw cron, pre-funded for `duration`).
       const result = await client.hotspots.createAutomation({
         walletAddress,
-        cronSchedule: DAILY_CRON,
+        schedule: DAILY_CRON,
         duration,
       });
 
@@ -342,12 +342,12 @@ describe("automation endpoints", () => {
   });
 
   describe("validation", () => {
-    it("rejects an empty cron schedule", async () => {
+    it("rejects an empty schedule", async () => {
       const walletAddress = payer.publicKey.toBase58();
       try {
         await (client.hotspots.createAutomation as any)({
           walletAddress,
-          cronSchedule: "",
+          schedule: "",
           duration: 5,
         });
         expect.fail("Should have thrown a validation error");

@@ -3,6 +3,7 @@ import {
   BASE_AUTOMATION_RENT,
   calculateFundingForAdditionalDuration,
   ENTITY_CLAIM_CRON_NAME,
+  resolveScheduleToCron,
 } from "@/lib/utils/automation-helpers";
 import * as anchor from "@coral-xyz/anchor";
 import {
@@ -57,7 +58,10 @@ import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 export const createAutomation =
   publicProcedure.hotspots.createAutomation.handler(
     async ({ input, errors }) => {
-      const { walletAddress, cronSchedule, duration } = input;
+      const { walletAddress, schedule, duration } = input;
+      // Accept a preset (daily/weekly/monthly) or a raw crontab; presets map to
+      // a crontab here so everything downstream deals in a single cron string.
+      const cronSchedule = resolveScheduleToCron(schedule);
 
       const wallet = new PublicKey(walletAddress);
       const { provider } = createSolanaConnection(walletAddress);
