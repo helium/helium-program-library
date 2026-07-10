@@ -1,30 +1,12 @@
-import { createSolanaConnection, getCluster } from "@/lib/solana";
-import * as anchor from "@coral-xyz/anchor";
-import {
-  cronJobKey,
-  cronJobTransactionKey,
-  init as initCron,
-} from "@helium/cron-sdk";
-import {
-  entityCronAuthorityKey,
-  init as initHplCrons,
-} from "@helium/hpl-crons-sdk";
+import { cronJobTransactionKey } from "@helium/cron-sdk";
 import { keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
-import {
-  HELIUM_COMMON_LUT,
-  HELIUM_COMMON_LUT_DEVNET,
-  HNT_MINT,
-  batchInstructionsToTxsWithPriorityFee,
-  toVersionedTx,
-} from "@helium/spl-utils";
-import { PublicKey } from "@solana/web3.js";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import { HNT_MINT } from "@helium/spl-utils";
 import { publicProcedure } from "../../../procedures";
-import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
-import { toTokenAmountOutput } from "@/lib/utils/token-math";
-import { NATIVE_MINT } from "@solana/spl-token";
-import BN from "bn.js";
+import {
+  buildAutomationTransactionResponse,
+  resolveEntityClaimCronJob,
+} from "./automation-transaction";
 
 const HNT_DAO = daoKey(HNT_MINT)[0];
 
@@ -37,24 +19,13 @@ export const addEntityToAutomation =
     async ({ input, errors }) => {
       const { walletAddress, entityKey } = input;
 
-      const wallet = new PublicKey(walletAddress);
-      const { provider } = createSolanaConnection(walletAddress);
-      anchor.setProvider(provider);
-
-      const hplCronsProgram = await initHplCrons(provider);
-      const cronProgram = await initCron(provider);
-
-      const authority = entityCronAuthorityKey(wallet)[0];
-      const cronJob = cronJobKey(authority, 0)[0];
-
-      const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
-        cronJob
-      );
-      if (!cronJobAccount) {
-        throw errors.NOT_FOUND({
-          message: "Automation not found. Please set up automation first.",
+      const { provider, hplCronsProgram, cronJob, cronJobAccount, wallet } =
+        await resolveEntityClaimCronJob({
+          walletAddress,
+          notFoundMessage:
+            "Automation not found. Please set up automation first.",
+          errors,
         });
-      }
 
       const [keyToAsset] = keyToAssetKey(HNT_DAO, entityKey);
 
@@ -68,50 +39,22 @@ export const addEntityToAutomation =
         })
         .prepare();
 
-      const vtxs = (
-        await batchInstructionsToTxsWithPriorityFee(provider, [instruction], {
-          addressLookupTableAddresses: [
-            process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
-              ? HELIUM_COMMON_LUT_DEVNET
-              : HELIUM_COMMON_LUT,
-          ],
-          computeUnitLimit: 500000,
-          commitment: "finalized",
-        })
-      ).map((tx) => toVersionedTx(tx));
-
-      if (shouldUseJitoBundle(vtxs.length, getCluster())) {
-        vtxs.push(await getJitoTipTransaction(wallet));
-      }
-
-      const txs = vtxs.map((tx) =>
-        Buffer.from(tx.serialize()).toString("base64")
-      );
-      const txFees = getTotalTransactionFees(vtxs);
-
-      return {
-        transactionData: {
-          transactions: txs.map((serialized) => ({
-            serializedTransaction: serialized,
-            metadata: {
-              type: "add_entity_to_automation",
-              description: "Add hotspot claim to automation",
-              entityKey,
-              index,
-            },
-          })),
-          parallel: false,
-          tag: `add_entity_to_automation:${walletAddress}`,
-          actionMetadata: {
-            type: "add_entity_to_automation",
-            entityKey,
-            index,
-          },
+      return buildAutomationTransactionResponse({
+        provider,
+        instructions: [instruction],
+        feePayer: wallet,
+        tag: `add_entity_to_automation:${walletAddress}`,
+        transactionMetadata: {
+          type: "add_entity_to_automation",
+          description: "Add hotspot claim to automation",
+          entityKey,
+          index,
         },
-        estimatedSolFee: await toTokenAmountOutput(
-          new BN(txFees),
-          NATIVE_MINT.toBase58()
-        ),
-      };
-    }
+        actionMetadata: {
+          type: "add_entity_to_automation",
+          entityKey,
+          index,
+        },
+      });
+    },
   );

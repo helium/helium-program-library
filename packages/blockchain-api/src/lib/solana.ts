@@ -1,5 +1,6 @@
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
+import { HELIUM_COMMON_LUT, HELIUM_COMMON_LUT_DEVNET } from "@helium/spl-utils";
 import { env } from "./env";
 import fs from "fs";
 
@@ -16,6 +17,12 @@ export interface SolanaConnection {
 export function getCluster(): string {
   return process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "mainnet";
 }
+
+/** The Helium common address-lookup table for the active cluster. */
+export const getCommonLut = (): PublicKey =>
+  process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
+    ? HELIUM_COMMON_LUT_DEVNET
+    : HELIUM_COMMON_LUT;
 
 export function loadKeypair(keypair: string): Keypair {
   return Keypair.fromSecretKey(
