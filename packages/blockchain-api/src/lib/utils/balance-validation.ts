@@ -93,17 +93,14 @@ function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
 
     // SetComputeUnitLimit, data format: [discriminator, u32 limit]
     if (discriminator === COMPUTE_BUDGET_IX_LIMIT && data.length >= 5) {
-      computeUnitLimit =
-        data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24);
+      computeUnitLimit = Buffer.from(data).readUInt32LE(1);
     }
 
     // SetComputeUnitPrice, data format: [discriminator, u64 price (microlamports)]
     if (discriminator === COMPUTE_BUDGET_IX_PRICE && data.length >= 9) {
-      // Read u64 as two u32s (little endian)
-      const low = data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24);
-      const high = data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24);
-      // Price is in microlamports per CU
-      computeUnitPrice = low + high * 0x100000000;
+      // readBigUInt64LE parses the full u64 without the signed-shift overflow a
+      // manual `<< 24` hits once a byte's high bit is set (price >= 2^31).
+      computeUnitPrice = Number(Buffer.from(data).readBigUInt64LE(1));
     }
   }
 

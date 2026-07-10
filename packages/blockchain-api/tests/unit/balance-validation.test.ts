@@ -65,6 +65,18 @@ describe("getTransactionFee", () => {
     const tx = compile([transfer]);
     expect(await getTransactionFee(rpcError(), tx)).to.eq(5_000);
   });
+
+  it("parses a compute-unit price above the 2^31 signed-int boundary", async () => {
+    // 3_000_000_000 microlamports/CU exceeds 2^31; a signed 32-bit parse would
+    // read it as negative and produce a bogus (negative) fee.
+    const tx = compile([
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 3_000_000_000 }),
+      transfer,
+    ]);
+    // priority = ceil(3e9 * 1 / 1e6) = 3000; base 5000 (1 sig)
+    expect(await getTransactionFee(rpcFee(null), tx)).to.eq(8_000);
+  });
 });
 
 describe("getTotalTransactionFees", () => {

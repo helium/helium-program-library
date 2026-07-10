@@ -63,10 +63,13 @@ const verifyTable = (
       continue;
     }
     const max = Math.max(...vals);
-    if (Math.floor(entry * FALLBACK_CU_MARGIN) < max) {
+    // Match the runtime request (Math.ceil(total × FALLBACK_CU_MARGIN)) so the
+    // gate flags an entry only when the CU it would actually request falls short.
+    // floor rounded the ceiling down and over-flagged by up to one CU.
+    if (Math.ceil(entry * FALLBACK_CU_MARGIN) < max) {
       // Store the observed max so entry × margin regains full headroom.
       under.push(
-        `  // ${name}: mainnet max=${max} exceeded ceiling ${Math.floor(
+        `  // ${name}: mainnet max=${max} exceeded ceiling ${Math.ceil(
           entry * FALLBACK_CU_MARGIN
         )} (was ${entry})\n  "${key}": ${max},`
       );
