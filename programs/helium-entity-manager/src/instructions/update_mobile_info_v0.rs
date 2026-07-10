@@ -155,7 +155,11 @@ pub fn handler<'info>(
     }
   }
 
-  if let Some(deployment_info) = args.deployment_info {
+  if let Some(mut deployment_info) = args.deployment_info {
+    preserve_wifi_serial(
+      &mut deployment_info,
+      &ctx.accounts.mobile_info.deployment_info,
+    );
     ctx.accounts.mobile_info.deployment_info = Some(deployment_info);
   }
 
@@ -166,4 +170,103 @@ pub fn handler<'info>(
   )?;
 
   Ok(())
+}
+
+/// A location re-assert ships a fresh `WifiInfoV0` that often omits the serial
+/// (`serial: None`). This instruction replaces `deployment_info` wholesale, so
+/// without this the re-assert would wipe a serial that was set at onboard time.
+/// Carry the existing on-chain serial forward whenever the incoming update
+/// doesn't provide one. Non-wifi deployment info is left untouched.
+fn preserve_wifi_serial(
+  incoming: &mut MobileDeploymentInfoV0,
+  existing: &Option<MobileDeploymentInfoV0>,
+) {
+  let MobileDeploymentInfoV0::WifiInfoV0 { serial, .. } = incoming else {
+    return;
+  };
+  // Treat both an omitted (`None`) and an empty-string serial as "not provided",
+  // so a re-assert that ships either form can't wipe a real serial.
+  if serial.as_deref().is_some_and(|s| !s.is_empty()) {
+    return;
+  }
+  if let Some(MobileDeploymentInfoV0::WifiInfoV0 {
+    serial: existing_serial,
+    ..
+  }) = existing
+  {
+    *serial = existing_serial.clone();
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn wifi(serial: Option<&str>) -> MobileDeploymentInfoV0 {
+    MobileDeploymentInfoV0::WifiInfoV0 {
+      antenna: 1,
+      elevation: 2,
+      azimuth: 3,
+      mechanical_down_tilt: 4,
+      electrical_down_tilt: 5,
+      serial: serial.map(|s| s.to_string()),
+    }
+  }
+
+  fn serial_of(info: &MobileDeploymentInfoV0) -> Option<String> {
+    match info {
+      MobileDeploymentInfoV0::WifiInfoV0 { serial, .. } => serial.clone(),
+      MobileDeploymentInfoV0::CbrsInfoV0 { .. } => None,
+    }
+  }
+
+  #[test]
+  fn preserves_existing_serial_when_update_omits_it() {
+    // The re-assert bug: incoming has no serial, existing on-chain does.
+    let mut incoming = wifi(None);
+    preserve_wifi_serial(&mut incoming, &Some(wifi(Some("SERIAL-123"))));
+    assert_eq!(serial_of(&incoming), Some("SERIAL-123".to_string()));
+  }
+
+  #[test]
+  fn preserves_existing_serial_when_update_sends_empty_string() {
+    // Some clients serialize an omitted serial as "" rather than None.
+    let mut incoming = wifi(Some(""));
+    preserve_wifi_serial(&mut incoming, &Some(wifi(Some("SERIAL-123"))));
+    assert_eq!(serial_of(&incoming), Some("SERIAL-123".to_string()));
+  }
+
+  #[test]
+  fn keeps_incoming_serial_when_provided() {
+    // A caller that does supply a serial is authoritative; don't override it.
+    let mut incoming = wifi(Some("NEW-456"));
+    preserve_wifi_serial(&mut incoming, &Some(wifi(Some("OLD-123"))));
+    assert_eq!(serial_of(&incoming), Some("NEW-456".to_string()));
+  }
+
+  #[test]
+  fn leaves_serial_none_when_no_existing_serial() {
+    let mut incoming = wifi(None);
+    preserve_wifi_serial(&mut incoming, &Some(wifi(None)));
+    assert_eq!(serial_of(&incoming), None);
+  }
+
+  #[test]
+  fn no_existing_deployment_info_leaves_incoming_untouched() {
+    let mut incoming = wifi(None);
+    preserve_wifi_serial(&mut incoming, &None);
+    assert_eq!(serial_of(&incoming), None);
+  }
+
+  #[test]
+  fn cbrs_incoming_is_untouched() {
+    let mut incoming = MobileDeploymentInfoV0::CbrsInfoV0 {
+      radio_infos: vec![],
+    };
+    preserve_wifi_serial(&mut incoming, &Some(wifi(Some("SERIAL-123"))));
+    assert!(matches!(
+      incoming,
+      MobileDeploymentInfoV0::CbrsInfoV0 { .. }
+    ));
+  }
 }
