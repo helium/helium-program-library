@@ -10,6 +10,7 @@ import {
   loadKeypair2FromEnv,
 } from "./helpers/wallet";
 import { signAndSubmitTransactionData } from "./helpers/tx";
+import { createTestMultisig } from "./helpers/squads";
 import { TEST_HOTSPOT_ENTITY_KEY } from "./helpers/constants";
 import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
@@ -86,21 +87,9 @@ describe("squads v4 propose-mode (token transfer)", function () {
     recipient = loadKeypair2FromEnv();
     await ensureFunds(ctx.payer.publicKey, 0.2 * LAMPORTS_PER_SOL);
 
-    const createKey = Keypair.generate();
-    [multisigPda] = multisig.getMultisigPda({ createKey: createKey.publicKey });
-    const [programConfigPda] = multisig.getProgramConfigPda({});
-    const programConfig =
-      await multisig.accounts.ProgramConfig.fromAccountAddress(
-        ctx.connection,
-        programConfigPda
-      );
-    await multisig.rpc.multisigCreateV2({
+    multisigPda = await createTestMultisig({
       connection: ctx.connection,
-      treasury: programConfig.treasury,
-      createKey,
       creator: ctx.payer,
-      multisigPda,
-      configAuthority: null,
       threshold: 1,
       members: [
         {
@@ -108,17 +97,7 @@ describe("squads v4 propose-mode (token transfer)", function () {
           permissions: multisig.types.Permissions.all(),
         },
       ],
-      timeLock: 0,
-      rentCollector: null,
-      sendOptions: { skipPreflight: false },
     });
-
-    let created = false;
-    for (let i = 0; i < 30 && !created; i++) {
-      created = (await ctx.connection.getAccountInfo(multisigPda)) !== null;
-      if (!created) await new Promise((r) => setTimeout(r, 1000));
-    }
-    assert.ok(created, "multisig account was not created on the fork");
 
     vault = multisig.getVaultPda({ multisigPda, index: 0 })[0];
     // Fund the vault with HNT (+ a little SOL), and pre-create the recipient's

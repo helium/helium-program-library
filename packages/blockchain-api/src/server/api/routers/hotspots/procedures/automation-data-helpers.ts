@@ -1,18 +1,34 @@
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  AccountInfo,
+  Connection,
+  PublicKey,
+  LAMPORTS_PER_SOL,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
-import { entityCronAuthorityKey } from "@helium/hpl-crons-sdk";
+import {
+  entityCronAuthorityKey,
+  init as initHplCrons,
+} from "@helium/hpl-crons-sdk";
 import {
   cronJobKey,
+  cronJobNameMappingKey,
   cronJobTransactionKey,
   init as initCron,
   PROGRAM_ID,
 } from "@helium/cron-sdk";
-import { init as initTuktuk, customSignerKey } from "@helium/tuktuk-sdk";
+import {
+  init as initTuktuk,
+  customSignerKey,
+  nextAvailableTaskIds,
+  taskKey,
+} from "@helium/tuktuk-sdk";
 import { getHotspotsByOwner } from "@/lib/queries/hotspots";
 import { getNumRecipientsNeeded } from "@/lib/queries/hotspots";
 import {
   calculateCronJobCostPerClaim,
   calculatePdaWalletCostPerClaim,
+  ENTITY_CLAIM_CRON_NAME,
   RECIPIENT_RENT,
   ATA_RENT,
   TASK_RETURN_ACCOUNT_SIZE,
@@ -38,8 +54,81 @@ export async function liveCronTransactionIds(
     { length: nextTransactionId },
     (_, i) => cronJobTransactionKey(cronJob, i)[0]
   );
-  const infos = await connection.getMultipleAccountsInfo(keys);
+  // We only need existence, so fetch no account data. getMultipleAccountsInfo
+  // caps at 100 keys per call, so chunk the list.
+  const infos: (AccountInfo<Buffer> | null)[] = [];
+  for (let i = 0; i < keys.length; i += 100) {
+    infos.push(
+      ...(await connection.getMultipleAccountsInfo(keys.slice(i, i + 100), {
+        dataSlice: { offset: 0, length: 0 },
+      }))
+    );
+  }
   return keys.map((_, i) => i).filter((i) => infos[i] != null);
+}
+
+/**
+ * Build the instructions that tear down a wallet's entity-claim cron: remove
+ * every live claim (skipping the holes individually-removed claims leave in the
+ * monotonic nextTransactionId counter) then close the cron and its name
+ * mapping. All freed rent is refunded to `rentRefund`.
+ */
+export async function buildTeardownInstructions(
+  connection: Connection,
+  hplCronsProgram: Awaited<ReturnType<typeof initHplCrons>>,
+  cronJob: PublicKey,
+  authority: PublicKey,
+  rentRefund: PublicKey,
+  nextTransactionId: number
+): Promise<TransactionInstruction[]> {
+  const liveTxIds = await liveCronTransactionIds(
+    connection,
+    cronJob,
+    nextTransactionId
+  );
+
+  return [
+    ...(await Promise.all(
+      liveTxIds.map((txId) =>
+        hplCronsProgram.methods
+          .removeEntityFromCronV0({ index: txId })
+          .accounts({
+            cronJob,
+            rentRefund,
+            cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
+          })
+          .instruction()
+      )
+    )),
+    await hplCronsProgram.methods
+      .closeEntityClaimCronV0()
+      .accounts({
+        cronJob,
+        rentRefund,
+        cronJobNameMapping: cronJobNameMappingKey(
+          authority,
+          ENTITY_CLAIM_CRON_NAME
+        )[0],
+      })
+      .instruction(),
+  ];
+}
+
+/**
+ * Fetch the task queue fresh and return the key of the next free task slot.
+ * Throws when the queue has no free slots.
+ */
+export async function nextFreeTaskKey(
+  tuktukProgram: Awaited<ReturnType<typeof initTuktuk>>
+): Promise<PublicKey> {
+  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
+    TASK_QUEUE_ID
+  );
+  const [taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1, false);
+  if (taskId == null) {
+    throw new Error("No available task IDs in task queue");
+  }
+  return taskKey(TASK_QUEUE_ID, taskId)[0];
 }
 
 export interface AutomationData {
@@ -66,8 +155,7 @@ export interface AutomationData {
  */
 export async function fetchAutomationData(
   walletAddress: string,
-  provider: anchor.AnchorProvider,
-  cronId: number = 0
+  provider: anchor.AnchorProvider
 ): Promise<AutomationData> {
   const wallet = new PublicKey(walletAddress);
 
@@ -77,7 +165,7 @@ export async function fetchAutomationData(
 
   // Derive keys
   const authority = entityCronAuthorityKey(wallet)[0];
-  const cronJob = cronJobKey(authority, cronId)[0];
+  const cronJob = cronJobKey(authority, 0)[0];
   const pdaWallet = customSignerKey(TASK_QUEUE_ID, [
     Buffer.from("claim_payer"),
     wallet.toBuffer(),

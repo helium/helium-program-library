@@ -4,6 +4,7 @@ import assert from "assert";
 import { setupTestCtx, TestCtx } from "./helpers/context";
 import { ensureFunds, loadKeypair2FromEnv } from "./helpers/wallet";
 import { signAndSubmitTransactionData } from "./helpers/tx";
+import { createTestMultisig } from "./helpers/squads";
 import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 
@@ -78,22 +79,9 @@ describe("squads v4 proposal lifecycle", function () {
 
     // Create a fresh 2-of-2 multisig on the fork so proposal cutoffs are
     // deterministic and we never touch a real mainnet multisig.
-    const createKey = Keypair.generate();
-    [multisigPda] = multisig.getMultisigPda({ createKey: createKey.publicKey });
-    const [programConfigPda] = multisig.getProgramConfigPda({});
-    const programConfig =
-      await multisig.accounts.ProgramConfig.fromAccountAddress(
-        ctx.connection,
-        programConfigPda
-      );
-
-    await multisig.rpc.multisigCreateV2({
+    multisigPda = await createTestMultisig({
       connection: ctx.connection,
-      treasury: programConfig.treasury,
-      createKey,
       creator: ctx.payer,
-      multisigPda,
-      configAuthority: null,
       threshold: 2,
       members: [
         {
@@ -105,17 +93,7 @@ describe("squads v4 proposal lifecycle", function () {
           permissions: multisig.types.Permissions.all(),
         },
       ],
-      timeLock: 0,
-      rentCollector: null,
-      sendOptions: { skipPreflight: false },
     });
-
-    let created = false;
-    for (let i = 0; i < 30 && !created; i++) {
-      created = (await ctx.connection.getAccountInfo(multisigPda)) !== null;
-      if (!created) await new Promise((r) => setTimeout(r, 1000));
-    }
-    assert.ok(created, "multisig account was not created on the fork");
     assert.equal(
       await currentThreshold(),
       2,

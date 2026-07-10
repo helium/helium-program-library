@@ -13,7 +13,10 @@ import {
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import { getTransactionFee } from "@/lib/utils/balance-validation";
-import { buildActionProposal } from "../../squads/procedures/helpers";
+import {
+  buildActionProposal,
+  proposalTransactionData,
+} from "../../squads/procedures/helpers";
 import BN from "bn.js";
 
 /** Burn `amount` DC (burnWithoutTrackingV0) from `authority`'s DC account. */
@@ -62,42 +65,24 @@ export const burn = publicProcedure.dataCredits.burn.handler(
           buildInstructions: async (vault) => [
             await buildBurnDcInstruction(program, vault, amount),
           ],
-          insufficientFunds: ({ required, available }) =>
-            errors.INSUFFICIENT_FUNDS({
-              message:
-                "Insufficient SOL balance to create the DC burn proposal",
-              data: { required, available },
-            }),
-          notFound: () =>
-            errors.NOT_FOUND({
-              message: `Multisig ${input.multisig} not found`,
-            }),
+          errors,
+          action: "DC burn",
         });
 
-      return {
-        transactions: [
-          {
-            serializedTransaction,
-            metadata: {
-              type: "burn_data_credits_proposal",
-              description: `Propose burn of ${amount} DC`,
-            },
-          },
-        ],
-        parallel: false,
+      return proposalTransactionData({
+        serializedTransaction,
+        type: TRANSACTION_TYPES.BURN_DATA_CREDITS_PROPOSAL,
+        description: `Propose burn of ${amount} DC`,
         tag: generateTransactionTag({
           type: TRANSACTION_TYPES.BURN_DATA_CREDITS,
           userAddress: owner,
           amount,
           multisig: input.multisig,
         }),
-        actionMetadata: {
-          type: "burn_data_credits_proposal",
-          multisig: input.multisig,
-          transactionIndex,
-          amount,
-        },
-      };
+        multisig: input.multisig,
+        transactionIndex,
+        actionMetadata: { amount },
+      });
     }
 
     // ---- Direct burn from the owner ----

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PublicKeySchema } from "./common";
+import { PublicKeySchema, squadsProposeFields } from "./common";
 
 export const MintDataCreditsInputSchema = z.object({
   owner: PublicKeySchema.describe(
@@ -44,15 +44,7 @@ export const DelegateDataCreditsInputSchema = z.object({
   mint: PublicKeySchema.describe(
     "SubDAO token mint (e.g. MOBILE or IOT mint) to determine which subDAO to delegate to"
   ),
-  memo: z
-    .string()
-    .optional()
-    .describe(
-      "In direct mode, a memo instruction included in the transaction. In multisig mode, the memo recorded on the Squads proposal."
-    ),
-  multisig: PublicKeySchema.optional().describe(
-    "If set, delegate from this multisig's vault as a Squads v4 proposal. `owner` is the proposing member and outer fee payer."
-  ),
+  ...squadsProposeFields,
 });
 
 export type DelegateDataCreditsInput = z.infer<
@@ -67,13 +59,7 @@ export const BurnDataCreditsInputSchema = z.object({
     .string()
     .regex(/^\d+$/, "Amount must be a whole number")
     .describe("Amount of DC to burn (smallest unit, DC has 0 decimals)"),
-  multisig: PublicKeySchema.optional().describe(
-    "If set, burn from this multisig's vault as a Squads v4 proposal. `owner` is the proposing member and outer fee payer."
-  ),
-  memo: z
-    .string()
-    .optional()
-    .describe("Optional memo recorded on the Squads proposal (multisig mode)"),
+  ...squadsProposeFields,
 });
 
 export type BurnDataCreditsInput = z.infer<typeof BurnDataCreditsInputSchema>;

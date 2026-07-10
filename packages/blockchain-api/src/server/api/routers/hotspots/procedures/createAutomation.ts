@@ -9,7 +9,6 @@ import * as anchor from "@coral-xyz/anchor";
 import {
   cronJobKey,
   cronJobNameMappingKey,
-  cronJobTransactionKey,
   init as initCron,
 } from "@helium/cron-sdk";
 import {
@@ -22,11 +21,7 @@ import {
   HELIUM_COMMON_LUT_DEVNET,
   toVersionedTx,
 } from "@helium/spl-utils";
-import {
-  init as initTuktuk,
-  nextAvailableTaskIds,
-  taskKey,
-} from "@helium/tuktuk-sdk";
+import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import {
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -47,8 +42,9 @@ import {
 } from "@/lib/utils/jito";
 import { publicProcedure } from "../../../procedures";
 import {
+  buildTeardownInstructions,
   fetchAutomationData,
-  liveCronTransactionIds,
+  nextFreeTaskKey,
 } from "./automation-data-helpers";
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
@@ -91,56 +87,20 @@ export const createAutomation =
         // If it exists but schedule changed, remove it first. Skip holes left
         // by individually-removed claims (nextTransactionId is monotonic).
         if (cronJobAccount) {
-          const liveTxIds = await liveCronTransactionIds(
-            provider.connection,
-            cronJob,
-            cronJobAccount.nextTransactionId || 0
-          );
-
           instructions.push(
-            ...(await Promise.all(
-              liveTxIds.map((txId) =>
-                hplCronsProgram.methods
-                  .removeEntityFromCronV0({
-                    index: txId,
-                  })
-                  .accounts({
-                    cronJob,
-                    rentRefund: wallet,
-                    cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
-                  })
-                  .instruction()
-              )
-            )),
-            await hplCronsProgram.methods
-              .closeEntityClaimCronV0()
-              .accounts({
-                cronJob,
-                rentRefund: wallet,
-                cronJobNameMapping: cronJobNameMappingKey(
-                  authority,
-                  ENTITY_CLAIM_CRON_NAME
-                )[0],
-              })
-              .instruction()
+            ...(await buildTeardownInstructions(
+              provider.connection,
+              hplCronsProgram,
+              cronJob,
+              authority,
+              wallet,
+              cronJobAccount.nextTransactionId || 0
+            ))
           );
         }
 
-        // Create new cron job
-        // Fetch task queue fresh to ensure we have the latest state
-        const freshTaskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-          TASK_QUEUE_ID
-        );
-        const freshAvailableTaskIds = nextAvailableTaskIds(
-          freshTaskQueueAcc.taskBitmap,
-          1,
-          false
-        );
-        if (freshAvailableTaskIds.length === 0) {
-          throw new Error("No available task IDs in task queue");
-        }
-        const freshTaskId = freshAvailableTaskIds[0];
-        const [freshTask] = taskKey(TASK_QUEUE_ID, freshTaskId);
+        // Create new cron job. Fetch the task queue fresh to get the latest state.
+        const freshTask = await nextFreeTaskKey(tuktukProgram);
 
         instructions.push(
           await hplCronsProgram.methods
@@ -159,21 +119,9 @@ export const createAutomation =
             .instruction()
         );
       } else if (cronJobAccount?.removedFromQueue) {
-        // If cron exists but was removed from queue due to insufficient SOL, requeue it
-        // Fetch task queue fresh to ensure we have the latest state
-        const freshTaskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-          TASK_QUEUE_ID
-        );
-        const freshAvailableTaskIds = nextAvailableTaskIds(
-          freshTaskQueueAcc.taskBitmap,
-          1,
-          false
-        );
-        if (freshAvailableTaskIds.length === 0) {
-          throw new Error("No available task IDs in task queue");
-        }
-        const freshTaskId = freshAvailableTaskIds[0];
-        const [freshTask] = taskKey(TASK_QUEUE_ID, freshTaskId);
+        // If cron exists but was removed from queue due to insufficient SOL,
+        // requeue it. Fetch the task queue fresh to get the latest state.
+        const freshTask = await nextFreeTaskKey(tuktukProgram);
 
         instructions.push(
           await hplCronsProgram.methods
