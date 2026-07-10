@@ -27,7 +27,10 @@ import {
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
-import { buildActionProposal } from "../../squads/procedures/helpers";
+import {
+  buildActionProposal,
+  proposalTransactionData,
+} from "../../squads/procedures/helpers";
 import BN from "bn.js";
 
 /**
@@ -76,7 +79,7 @@ async function buildTransferInstructions({
         authority,
         destAta,
         destination,
-        mintKey
+        mintKey,
       ),
       createTransferCheckedInstruction(
         senderAta,
@@ -84,7 +87,7 @@ async function buildTransferInstructions({
         destAta,
         authority,
         rawAmount,
-        mintInfo.decimals
+        mintInfo.decimals,
       ),
     ],
     needsAta,
@@ -117,7 +120,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
     const isSol = tokenAmount.mint === TOKEN_MINTS.WSOL;
     const transferTokenAmount = await toTokenAmountOutput(
       new BN(tokenAmount.amount),
-      tokenAmount.mint
+      tokenAmount.mint,
     );
     const tokenName = TOKEN_NAMES[tokenAmount.mint];
 
@@ -163,33 +166,27 @@ export const transfer = publicProcedure.tokens.transfer.handler(
       });
 
       return {
-        transactionData: {
-          transactions: [
-            {
-              serializedTransaction,
-              metadata: {
-                type: "token_transfer_proposal",
-                description: `Propose transfer of ${tokenName ?? "Token"}`,
-                tokenAmount: transferTokenAmount,
-                tokenName,
-                recipient: destination,
-              },
-            },
-          ],
-          parallel: false,
+        transactionData: proposalTransactionData({
+          serializedTransaction,
+          type: TRANSACTION_TYPES.TOKEN_TRANSFER_PROPOSAL,
+          description: `Propose transfer of ${tokenName ?? "Token"}`,
           tag,
-          actionMetadata: {
-            type: "token_transfer_proposal",
-            multisig: input.multisig,
-            transactionIndex,
+          multisig: input.multisig,
+          transactionIndex,
+          metadata: {
             tokenAmount: transferTokenAmount,
             tokenName,
             recipient: destination,
           },
-        },
+          actionMetadata: {
+            tokenAmount: transferTokenAmount,
+            tokenName,
+            recipient: destination,
+          },
+        }),
         estimatedSolFee: await toTokenAmountOutput(
           new BN(calculateRequiredBalance(feeLamports, 0)),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
     }
@@ -260,8 +257,8 @@ export const transfer = publicProcedure.tokens.transfer.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

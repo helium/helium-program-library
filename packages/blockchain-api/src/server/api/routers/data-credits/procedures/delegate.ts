@@ -12,11 +12,14 @@ import {
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import { getTransactionFee } from "@/lib/utils/balance-validation";
-import { buildActionProposal } from "../../squads/procedures/helpers";
+import {
+  buildActionProposal,
+  proposalTransactionData,
+} from "../../squads/procedures/helpers";
 import BN from "bn.js";
 
 const MEMO_PROGRAM_ID = new PublicKey(
-  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
 );
 
 export const delegate = publicProcedure.dataCredits.delegate.handler(
@@ -42,7 +45,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
           memo,
           buildInstructions: async (vault) => {
             const { provider: vaultProvider } = createSolanaConnection(
-              vault.toBase58()
+              vault.toBase58(),
             );
             const vaultProgram = await initDc(vaultProvider);
             return [
@@ -64,20 +67,13 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
             }),
         });
 
-      return {
-        transactions: [
-          {
-            serializedTransaction,
-            metadata: {
-              type: "delegate_data_credits_proposal",
-              description: `Propose delegation of ${amount} DC to router ${routerKey.substring(
-                0,
-                8
-              )}...`,
-            },
-          },
-        ],
-        parallel: false,
+      return proposalTransactionData({
+        serializedTransaction,
+        type: TRANSACTION_TYPES.DELEGATE_DATA_CREDITS_PROPOSAL,
+        description: `Propose delegation of ${amount} DC to router ${routerKey.substring(
+          0,
+          8,
+        )}...`,
         tag: generateTransactionTag({
           type: TRANSACTION_TYPES.DELEGATE_DATA_CREDITS,
           userAddress: owner,
@@ -86,15 +82,10 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
           mint,
           multisig: input.multisig,
         }),
-        actionMetadata: {
-          type: "delegate_data_credits_proposal",
-          multisig: input.multisig,
-          transactionIndex,
-          routerKey,
-          amount,
-          mint,
-        },
-      };
+        multisig: input.multisig,
+        transactionIndex,
+        actionMetadata: { routerKey, amount, mint },
+      });
     }
 
     const instructions: TransactionInstruction[] = [];
@@ -105,7 +96,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
           keys: [{ pubkey: feePayer, isSigner: true, isWritable: false }],
           programId: MEMO_PROGRAM_ID,
           data: Buffer.from(memo, "utf-8"),
-        })
+        }),
       );
     }
 
@@ -118,7 +109,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
         .accountsPartial({
           subDao,
         })
-        .instruction()
+        .instruction(),
     );
 
     const tx = await buildVersionedTransaction({
@@ -154,7 +145,7 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
             type: "delegate_data_credits",
             description: `Delegate ${amount} DC to router ${routerKey.substring(
               0,
-              8
+              8,
             )}...`,
           },
         },
@@ -168,5 +159,5 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
         mint,
       },
     };
-  }
+  },
 );

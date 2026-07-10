@@ -29,7 +29,11 @@ import {
   getBubblegumAuthorityPDA,
   validateHeliumHotspot,
 } from "@/lib/utils/hotspot-helpers";
-import { buildActionProposal, vaultPda } from "../../squads/procedures/helpers";
+import {
+  buildActionProposal,
+  proposalTransactionData,
+  vaultPda,
+} from "../../squads/procedures/helpers";
 
 /**
  * Create a transaction to transfer a hotspot to a new owner.
@@ -130,7 +134,7 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
       {
         ...args,
         nonce: args.index,
-      }
+      },
     );
 
     const hotspotName = asset.content?.metadata?.name || "Hotspot";
@@ -163,20 +167,10 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
         });
 
       return {
-        transactionData: {
-          transactions: [
-            {
-              serializedTransaction,
-              metadata: {
-                type: "hotspot_transfer_proposal",
-                description: `Propose transfer of ${hotspotName} to ${shortRecipient}`,
-                hotspotKey: assetId,
-                hotspotName,
-                recipient,
-              },
-            },
-          ],
-          parallel: false,
+        transactionData: proposalTransactionData({
+          serializedTransaction,
+          type: TRANSACTION_TYPES.HOTSPOT_TRANSFER_PROPOSAL,
+          description: `Propose transfer of ${hotspotName} to ${shortRecipient}`,
           tag: generateTransactionTag({
             type: TRANSACTION_TYPES.HOTSPOT_TRANSFER,
             walletAddress,
@@ -184,18 +178,14 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
             recipient,
             multisig: input.multisig,
           }),
-          actionMetadata: {
-            type: "hotspot_transfer_proposal",
-            multisig: input.multisig,
-            transactionIndex,
-            hotspotKey: assetId,
-            hotspotName,
-            recipient,
-          },
-        },
+          multisig: multisigPda.toBase58(),
+          transactionIndex,
+          metadata: { hotspotKey: assetId, hotspotName, recipient },
+          actionMetadata: { hotspotKey: assetId, hotspotName, recipient },
+        }),
         estimatedSolFee: await toTokenAmountOutput(
           new BN(feeLamports),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
     }
@@ -254,8 +244,8 @@ export const transferHotspot = publicProcedure.hotspots.transferHotspot.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

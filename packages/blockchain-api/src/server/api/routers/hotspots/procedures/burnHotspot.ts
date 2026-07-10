@@ -29,7 +29,11 @@ import {
   getBubblegumAuthorityPDA,
   validateHeliumHotspot,
 } from "@/lib/utils/hotspot-helpers";
-import { buildActionProposal, vaultPda } from "../../squads/procedures/helpers";
+import {
+  buildActionProposal,
+  proposalTransactionData,
+  vaultPda,
+} from "../../squads/procedures/helpers";
 
 /**
  * Create a transaction to permanently burn (destroy) a hotspot cNFT, using the
@@ -121,7 +125,7 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
       {
         ...args,
         nonce: args.index,
-      }
+      },
     );
 
     const hotspotName = asset.content?.metadata?.name || "Hotspot";
@@ -152,36 +156,24 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
         });
 
       return {
-        transactionData: {
-          transactions: [
-            {
-              serializedTransaction,
-              metadata: {
-                type: "hotspot_burn_proposal",
-                description: `Propose burn of ${hotspotName}`,
-                hotspotKey: assetId,
-                hotspotName,
-              },
-            },
-          ],
-          parallel: false,
+        transactionData: proposalTransactionData({
+          serializedTransaction,
+          type: TRANSACTION_TYPES.HOTSPOT_BURN_PROPOSAL,
+          description: `Propose burn of ${hotspotName}`,
           tag: generateTransactionTag({
             type: TRANSACTION_TYPES.HOTSPOT_BURN,
             walletAddress,
             assetId,
             multisig: input.multisig,
           }),
-          actionMetadata: {
-            type: "hotspot_burn_proposal",
-            multisig: input.multisig,
-            transactionIndex,
-            hotspotKey: assetId,
-            hotspotName,
-          },
-        },
+          multisig: multisigPda.toBase58(),
+          transactionIndex,
+          metadata: { hotspotKey: assetId, hotspotName },
+          actionMetadata: { hotspotKey: assetId, hotspotName },
+        }),
         estimatedSolFee: await toTokenAmountOutput(
           new BN(feeLamports),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
     }
@@ -233,8 +225,8 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

@@ -20,7 +20,11 @@ import {
   calculateRequiredBalance,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
-import { buildActionProposal } from "../../squads/procedures/helpers";
+import {
+  buildActionProposal,
+  proposalTransactionData,
+} from "../../squads/procedures/helpers";
+import { createSolanaConnection } from "@/lib/solana";
 import BN from "bn.js";
 
 /** Burn `rawAmount` of `mint` from `authority`'s associated token account. */
@@ -28,7 +32,7 @@ async function buildBurnInstruction(
   connection: Connection,
   authority: PublicKey,
   mint: string,
-  rawAmount: bigint
+  rawAmount: bigint,
 ): Promise<TransactionInstruction> {
   const mintKey = new PublicKey(mint);
   const senderAta = getAssociatedTokenAddressSync(mintKey, authority, true);
@@ -38,7 +42,7 @@ async function buildBurnInstruction(
     mintKey,
     authority,
     rawAmount,
-    mintInfo.decimals
+    mintInfo.decimals,
   );
 }
 
@@ -47,7 +51,7 @@ export const burn = publicProcedure.tokens.burn.handler(
     const { walletAddress, tokenAmount } = input;
 
     const feePayer = new PublicKey(walletAddress);
-    const connection = new Connection(process.env.SOLANA_RPC_URL!);
+    const { connection } = createSolanaConnection(walletAddress);
 
     let rawAmount: bigint;
     try {
@@ -70,7 +74,7 @@ export const burn = publicProcedure.tokens.burn.handler(
 
     const burnTokenAmount = await toTokenAmountOutput(
       new BN(tokenAmount.amount),
-      tokenAmount.mint
+      tokenAmount.mint,
     );
     const tokenName = TOKEN_NAMES[tokenAmount.mint];
 
@@ -88,7 +92,7 @@ export const burn = publicProcedure.tokens.burn.handler(
               connection,
               vault,
               tokenAmount.mint,
-              rawAmount
+              rawAmount,
             ),
           ],
           insufficientFunds: ({ required, available }) =>
@@ -111,31 +115,19 @@ export const burn = publicProcedure.tokens.burn.handler(
       });
 
       return {
-        transactionData: {
-          transactions: [
-            {
-              serializedTransaction,
-              metadata: {
-                type: "token_burn_proposal",
-                description: `Propose burn of ${tokenName ?? "Token"}`,
-                tokenAmount: burnTokenAmount,
-                tokenName,
-              },
-            },
-          ],
-          parallel: false,
+        transactionData: proposalTransactionData({
+          serializedTransaction,
+          type: TRANSACTION_TYPES.TOKEN_BURN_PROPOSAL,
+          description: `Propose burn of ${tokenName ?? "Token"}`,
           tag,
-          actionMetadata: {
-            type: "token_burn_proposal",
-            multisig: input.multisig,
-            transactionIndex,
-            tokenAmount: burnTokenAmount,
-            tokenName,
-          },
-        },
+          multisig: input.multisig,
+          transactionIndex,
+          metadata: { tokenAmount: burnTokenAmount, tokenName },
+          actionMetadata: { tokenAmount: burnTokenAmount, tokenName },
+        }),
         estimatedSolFee: await toTokenAmountOutput(
           new BN(calculateRequiredBalance(feeLamports, 0)),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
     }
@@ -146,7 +138,7 @@ export const burn = publicProcedure.tokens.burn.handler(
         connection,
         feePayer,
         tokenAmount.mint,
-        rawAmount
+        rawAmount,
       ),
     ];
 
@@ -164,7 +156,7 @@ export const burn = publicProcedure.tokens.burn.handler(
 
     const estimatedSolFeeLamports = calculateRequiredBalance(
       getTransactionFee(tx),
-      0
+      0,
     );
     const walletBalance = await connection.getBalance(feePayer);
     if (walletBalance < estimatedSolFeeLamports) {
@@ -197,8 +189,8 @@ export const burn = publicProcedure.tokens.burn.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

@@ -91,7 +91,7 @@ export const executeProposal = publicProcedure.squads.executeProposal.handler(
         {
           serializedTransaction,
           metadata: {
-            type: "squads_proposal_execute",
+            type: TRANSACTION_TYPES.SQUADS_PROPOSAL_EXECUTE,
             description: `Execute proposal #${transactionIndex}`,
           },
         },
@@ -99,11 +99,11 @@ export const executeProposal = publicProcedure.squads.executeProposal.handler(
       parallel: false,
       tag,
       actionMetadata: {
-        type: "squads_proposal_execute",
+        type: TRANSACTION_TYPES.SQUADS_PROPOSAL_EXECUTE,
         multisig: multisigAddress,
         transactionIndex,
         kind: isVault ? "vault" : "config",
       },
     };
-  }
+  },
 );

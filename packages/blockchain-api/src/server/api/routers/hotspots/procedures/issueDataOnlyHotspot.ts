@@ -93,14 +93,37 @@ export const issueDataOnlyHotspot =
       // instructions before the issue instruction (it reads the issue at a fixed
       // index), so include both a unit-limit and a unit-price instruction.
       const { blockhash } = await connection.getLatestBlockhash();
-      const tx = new Transaction();
-      tx.add(
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
-        issueIx,
-      );
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = owner;
+      const buildIssueTx = (units: number) => {
+        const built = new Transaction();
+        built.add(
+          ComputeBudgetProgram.setComputeUnitLimit({ units }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
+          issueIx,
+        );
+        built.recentBlockhash = blockhash;
+        built.feePayer = owner;
+        return built;
+      };
+
+      // Requested CU is what the user pays for under SIMD-0553, so measure via
+      // simulation (simulated × 1.1) and only fall back to a conservative limit
+      // when simulation is unavailable.
+      const FALLBACK_UNITS = 500000;
+      let units = FALLBACK_UNITS;
+      try {
+        const sim = await connection.simulateTransaction(
+          new VersionedTransaction(
+            buildIssueTx(FALLBACK_UNITS).compileMessage(),
+          ),
+          { sigVerify: false, replaceRecentBlockhash: true },
+        );
+        if (!sim.value.err && sim.value.unitsConsumed) {
+          units = Math.ceil(sim.value.unitsConsumed * 1.1);
+        }
+      } catch {
+        // Simulation is best-effort; keep the conservative fallback.
+      }
+      const tx = buildIssueTx(units);
 
       // The message the gateway signed is the add-gateway proto with its
       // signatures cleared (matching AddGatewayV1.toProto(forSigning=true), which

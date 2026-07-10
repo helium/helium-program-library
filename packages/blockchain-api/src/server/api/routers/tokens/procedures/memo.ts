@@ -1,5 +1,6 @@
 import { publicProcedure } from "../../../procedures";
-import { PublicKey, Connection } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
+import { createSolanaConnection } from "@/lib/solana";
 import { createMemoInstruction } from "@solana/spl-memo";
 import { NATIVE_MINT } from "@solana/spl-token";
 import {
@@ -22,7 +23,7 @@ export const memo = publicProcedure.tokens.memo.handler(
     const { walletAddress, memo: memoText } = input;
 
     const feePayer = new PublicKey(walletAddress);
-    const connection = new Connection(process.env.SOLANA_RPC_URL!);
+    const { connection } = createSolanaConnection(walletAddress);
 
     const instructions = [createMemoInstruction(memoText, [feePayer])];
 
@@ -39,7 +40,7 @@ export const memo = publicProcedure.tokens.memo.handler(
 
     const estimatedSolFeeLamports = calculateRequiredBalance(
       getTransactionFee(tx),
-      0
+      0,
     );
     const walletBalance = await connection.getBalance(feePayer);
     if (walletBalance < estimatedSolFeeLamports) {
@@ -68,8 +69,8 @@ export const memo = publicProcedure.tokens.memo.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

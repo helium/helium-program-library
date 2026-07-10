@@ -14,6 +14,7 @@ import { getTransactionFee } from "@/lib/utils/balance-validation";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
+  TransactionType,
 } from "@/lib/utils/transaction-tags";
 
 /** Fee-shortfall reporter, wired to a procedure's typed INSUFFICIENT_FUNDS error. */
@@ -80,7 +81,7 @@ export type ProposalRef = {
  * both the tag and the metadata; `verb` is its human-readable label.
  */
 export type ProposalVoteAction = {
-  type: string;
+  type: TransactionType;
   verb: string;
 };
 
@@ -148,6 +149,44 @@ export async function buildProposalVote({
       multisig: input.multisig,
       transactionIndex: input.transactionIndex,
     },
+  };
+}
+
+/**
+ * The shared response envelope for an action endpoint's propose mode: one
+ * serialized proposal transaction, display metadata, and actionMetadata keyed
+ * by the proposal's transaction type. `metadata` / `actionMetadata` carry the
+ * endpoint-specific extra fields for each record.
+ */
+export function proposalTransactionData({
+  serializedTransaction,
+  type,
+  description,
+  tag,
+  multisig,
+  transactionIndex,
+  metadata = {},
+  actionMetadata = {},
+}: {
+  serializedTransaction: string;
+  type: TransactionType;
+  description: string;
+  tag: string;
+  multisig: string;
+  transactionIndex: string;
+  metadata?: Record<string, unknown>;
+  actionMetadata?: Record<string, unknown>;
+}) {
+  return {
+    transactions: [
+      {
+        serializedTransaction,
+        metadata: { type, description, ...metadata },
+      },
+    ],
+    parallel: false,
+    tag,
+    actionMetadata: { type, multisig, transactionIndex, ...actionMetadata },
   };
 }
 

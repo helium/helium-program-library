@@ -57,6 +57,14 @@ export const TRANSACTION_TYPES = {
   SQUADS_PROPOSAL_EXECUTE: "squads_proposal_execute",
   SQUADS_CONFIG_CHANGE: "squads_config_change",
 
+  // Squads propose mode of the action endpoints
+  TOKEN_TRANSFER_PROPOSAL: "token_transfer_proposal",
+  TOKEN_BURN_PROPOSAL: "token_burn_proposal",
+  BURN_DATA_CREDITS_PROPOSAL: "burn_data_credits_proposal",
+  DELEGATE_DATA_CREDITS_PROPOSAL: "delegate_data_credits_proposal",
+  HOTSPOT_BURN_PROPOSAL: "hotspot_burn_proposal",
+  HOTSPOT_TRANSFER_PROPOSAL: "hotspot_transfer_proposal",
+
   // Governance - Position Management
   POSITION_CREATE: "position_create",
   POSITION_CLOSE: "position_close",
