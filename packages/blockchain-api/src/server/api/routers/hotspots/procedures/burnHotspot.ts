@@ -18,49 +18,22 @@ import {
   buildVersionedTransaction,
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
-import { proofArgsAndAccounts, type Asset, HNT_MINT } from "@helium/spl-utils";
-import {
-  PROGRAM_ID as BUBBLEGUM_PROGRAM_ID,
-  createBurnInstruction,
-} from "@metaplex-foundation/mpl-bubblegum";
+import { proofArgsAndAccounts } from "@helium/spl-utils";
+import { createBurnInstruction } from "@metaplex-foundation/mpl-bubblegum";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   SPL_NOOP_PROGRAM_ID,
 } from "@solana/spl-account-compression";
-import { entityCreatorKey } from "@helium/helium-entity-manager-sdk";
-import { daoKey } from "@helium/helium-sub-daos-sdk";
-import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
+import {
+  getAssetIdFromPubkey,
+  getBubblegumAuthorityPDA,
+  validateHeliumHotspot,
+} from "@/lib/utils/hotspot-helpers";
 import { buildActionProposal, vaultPda } from "../../squads/procedures/helpers";
 
-const DAO_KEY = daoKey(HNT_MINT)[0];
-
-async function getBubblegumAuthorityPDA(
-  merkleRollPubKey: PublicKey
-): Promise<PublicKey> {
-  const [bubblegumAuthorityPDAKey] = await PublicKey.findProgramAddress(
-    [merkleRollPubKey.toBuffer()],
-    BUBBLEGUM_PROGRAM_ID
-  );
-  return bubblegumAuthorityPDAKey;
-}
-
-function validateHeliumHotspot(asset: Asset): boolean {
-  const heliumEntityCreator = entityCreatorKey(DAO_KEY)[0].toBase58();
-  return (
-    asset.creators?.some((creator) => {
-      const address =
-        typeof creator.address === "string"
-          ? creator.address
-          : creator.address.toBase58();
-      return address === heliumEntityCreator && creator.verified;
-    }) || false
-  );
-}
-
 /**
- * Create a transaction to permanently burn (destroy) a hotspot cNFT. Mirrors
- * transferHotspot's bubblegum + Merkle-proof wiring, using the burn
- * instruction instead of transfer.
+ * Create a transaction to permanently burn (destroy) a hotspot cNFT, using the
+ * bubblegum + Merkle-proof wiring with the burn instruction.
  */
 export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
   async ({ input, errors }) => {
