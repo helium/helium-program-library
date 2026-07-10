@@ -80,10 +80,8 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   // so the prior mainnet reading (n=114, med=105577, max=110200) is stale and
   // under-requests. Re-measure via `pnpm run sample-cu` once it has mainnet volume.
   "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:cc744535507a208c": 222223,
-  // fanout.distribute_v0 (mainnet n=433, med=33555, max=43145; localnet p95=72441
-  //   past bump-grind slack from runtime PDA grinding, raised to the localnet
-  //   worst case so the sim-failure fallback never under-requests)
-  "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6:6de6e02f28465a94": 72441,
+  // fanout.distribute_v0 (n=433, med=33555, max=43145)
+  "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6:6de6e02f28465a94": 41055,
   // helium_entity_manager.approve_maker_v0 — localnet p95 35576 (CI run 28893311292);
   // earlier localnet sample (n=20, med=22076, max=27089) undershot the init path
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:0ce6855c96e58d8e": 35576,
@@ -221,10 +219,8 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h:d95dae6182b77e2c": 156774,
   // mini_fanout.close_mini_fanout_v0 (n=4, med=47983, max=79084)
   "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:6d929483c50acb64": 79084,
-  // mini_fanout.distribute_v0 (mainnet n=134, med=129752, max=151290; localnet
-  //   p95=247164 past bump-grind slack from runtime PDA grinding, raised to the
-  //   localnet worst case so the sim-failure fallback never under-requests)
-  "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:6de6e02f28465a94": 247164,
+  // mini_fanout.distribute_v0 (n=134, med=129752, max=151290)
+  "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:6de6e02f28465a94": 144276,
   // mini_fanout.initialize_mini_fanout_v0 (n=29, med=58576, max=68877)
   "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:0cd0601ffbf3b6f7": 65877,
   // mini_fanout.schedule_task_v0 (n=29, med=160736, max=175973)
