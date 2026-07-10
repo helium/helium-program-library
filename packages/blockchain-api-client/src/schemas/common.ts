@@ -75,6 +75,22 @@ export const PublicKeySchema = z
 export const HeliumPublicKeySchema = z.string().min(32).max(400);
 
 /**
+ * Optional Squads v4 propose-mode fields shared by the action schemas. When
+ * `multisig` is set the action is built from that multisig's vault and wrapped
+ * as a proposal; the action's signer is the proposing member and outer fee
+ * payer.
+ */
+export const squadsProposeFields = {
+  multisig: PublicKeySchema.optional().describe(
+    "If set, build the action as a Squads v4 proposal from this multisig's vault instead of a direct transaction. The action's signer is the proposing member and outer fee payer."
+  ),
+  memo: z
+    .string()
+    .optional()
+    .describe("Optional memo recorded on the Squads proposal (multisig mode)"),
+};
+
+/**
  * Standard pagination input schema.
  */
 export const PaginationInputSchema = z.object({
@@ -115,7 +131,7 @@ export const TokenAmountInputSchema = z.object({
     .string()
     .regex(/^\d+$/, "Amount must be a whole number in smallest unit")
     .describe(
-      'Raw token amount in smallest unit (bones). e.g. for a mint with 8 decimals, 1 full token = "100000000"',
+      'Raw token amount in smallest unit (bones). e.g. for a mint with 8 decimals, 1 full token = "100000000"'
     ),
   mint: PublicKeySchema.describe("Mint address of the token"),
 });
@@ -124,7 +140,7 @@ export const TokenAmountOutputSchema = z.object({
   amount: z
     .string()
     .describe(
-      'Raw token amount in smallest unit (bones). e.g. for a mint with 8 decimals, 1 full token = "100000000"',
+      'Raw token amount in smallest unit (bones). e.g. for a mint with 8 decimals, 1 full token = "100000000"'
     ),
   decimals: z.number().describe("Number of decimals for the mint"),
   uiAmount: z
@@ -158,14 +174,14 @@ export type RewardSplitInput = z.infer<typeof RewardSplitInputSchema>;
 // ---------------------------------------------------------------------------
 
 export function typedTransactionData<T extends z.ZodTypeAny>(
-  metadataSchema: T,
+  metadataSchema: T
 ) {
   return z.object({
     transactions: z.array(
       z.object({
         serializedTransaction: z.string(),
         metadata: metadataSchema.optional(),
-      }),
+      })
     ),
     parallel: z.boolean(),
     tag: z.string().optional(),
@@ -177,18 +193,18 @@ export function createTransactionResponse() {
   return z.object({
     transactionData: TransactionDataSchema,
     estimatedSolFee: TokenAmountOutputSchema.describe(
-      "Estimated total SOL fee including rent, priority fees, and automation costs",
+      "Estimated total SOL fee including rent, priority fees, and automation costs"
     ),
   });
 }
 
 export function createTypedTransactionResponse<T extends z.ZodTypeAny>(
-  metadataSchema: T,
+  metadataSchema: T
 ) {
   return z.object({
     transactionData: typedTransactionData(metadataSchema),
     estimatedSolFee: TokenAmountOutputSchema.describe(
-      "Estimated total SOL fee including rent, priority fees, and automation costs",
+      "Estimated total SOL fee including rent, priority fees, and automation costs"
     ),
   });
 }
@@ -198,19 +214,19 @@ export function createPaginatedTransactionResponse() {
     hasMore: z
       .boolean()
       .describe(
-        "True if more work remains — call again with the same arguments to continue.",
+        "True if more work remains — call again with the same arguments to continue."
       ),
   });
 }
 
 export function createTypedPaginatedTransactionResponse<T extends z.ZodTypeAny>(
-  metadataSchema: T,
+  metadataSchema: T
 ) {
   return createTypedTransactionResponse(metadataSchema).extend({
     hasMore: z
       .boolean()
       .describe(
-        "True if more work remains — call again with the same arguments to continue.",
+        "True if more work remains — call again with the same arguments to continue."
       ),
   });
 }

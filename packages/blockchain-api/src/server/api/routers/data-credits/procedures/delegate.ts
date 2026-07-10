@@ -12,6 +12,10 @@ import {
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import { getTransactionFee } from "@/lib/utils/balance-validation";
+import {
+  buildActionProposal,
+  proposalTransactionData,
+} from "../../squads/procedures/helpers";
 import BN from "bn.js";
 
 const MEMO_PROGRAM_ID = new PublicKey(
@@ -26,6 +30,49 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
     const feePayer = new PublicKey(owner);
     const program = await initDc(provider);
     const subDao = subDaoKey(new PublicKey(mint))[0];
+
+    // ---- Squads propose mode: delegate the vault's DC, wrapped as a proposal.
+    // The vault is both the DC owner (authority) and the payer for the escrow
+    // init, passed explicitly so anchor resolves `fromAccount` to the vault's DC
+    // ATA. `memo` is recorded on the proposal rather than as an in-tx memo here.
+    if (input.multisig) {
+      const multisigPda = new PublicKey(input.multisig);
+      const { serializedTransaction, transactionIndex } =
+        await buildActionProposal({
+          connection,
+          multisigPda,
+          member: feePayer,
+          memo,
+          buildInstructions: async (vault) => [
+            await program.methods
+              .delegateDataCreditsV0({ amount: new BN(amount), routerKey })
+              .accountsPartial({ subDao, owner: vault, payer: vault })
+              .instruction(),
+          ],
+          errors,
+          action: "delegate",
+        });
+
+      return proposalTransactionData({
+        serializedTransaction,
+        type: TRANSACTION_TYPES.DELEGATE_DATA_CREDITS_PROPOSAL,
+        description: `Propose delegation of ${amount} DC to router ${routerKey.substring(
+          0,
+          8
+        )}...`,
+        tag: generateTransactionTag({
+          type: TRANSACTION_TYPES.DELEGATE_DATA_CREDITS,
+          userAddress: owner,
+          routerKey,
+          amount,
+          mint,
+          multisig: input.multisig,
+        }),
+        multisig: input.multisig,
+        transactionIndex,
+        actionMetadata: { routerKey, amount, mint },
+      });
+    }
 
     const instructions: TransactionInstruction[] = [];
 
@@ -82,13 +129,21 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
           serializedTransaction: serializeTransaction(tx),
           metadata: {
             type: "delegate_data_credits",
-            description: `Delegate ${amount} DC to router ${routerKey.substring(0, 8)}...`,
+            description: `Delegate ${amount} DC to router ${routerKey.substring(
+              0,
+              8
+            )}...`,
           },
         },
       ],
       parallel: false,
       tag,
-      actionMetadata: { type: "delegate_data_credits", routerKey, amount, mint },
+      actionMetadata: {
+        type: "delegate_data_credits",
+        routerKey,
+        amount,
+        mint,
+      },
     };
   }
 );

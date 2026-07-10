@@ -33,7 +33,10 @@ export const TRANSACTION_TYPES = {
   REMOVE_SPLIT: "remove_split",
   ADD_SPLIT: "add_split",
   TOKEN_TRANSFER: "token_transfer",
+  TOKEN_BURN: "token_burn",
+  MEMO: "memo",
   HOTSPOT_TRANSFER: "hotspot_transfer",
+  HOTSPOT_BURN: "hotspot_burn",
   HOTSPOT_REASSERT: "hotspot_reassert",
   HOTSPOT_UPDATE: "hotspot_update",
   BANK_SEND: "bank_send",
@@ -45,6 +48,22 @@ export const TRANSACTION_TYPES = {
   MIGRATION: "migration",
   MINT_DATA_CREDITS: "mint_data_credits",
   DELEGATE_DATA_CREDITS: "delegate_data_credits",
+  BURN_DATA_CREDITS: "burn_data_credits",
+
+  // Squads v4 multisig
+  SQUADS_PROPOSAL_APPROVE: "squads_proposal_approve",
+  SQUADS_PROPOSAL_REJECT: "squads_proposal_reject",
+  SQUADS_PROPOSAL_CANCEL: "squads_proposal_cancel",
+  SQUADS_PROPOSAL_EXECUTE: "squads_proposal_execute",
+  SQUADS_CONFIG_CHANGE: "squads_config_change",
+
+  // Squads propose mode of the action endpoints
+  TOKEN_TRANSFER_PROPOSAL: "token_transfer_proposal",
+  TOKEN_BURN_PROPOSAL: "token_burn_proposal",
+  BURN_DATA_CREDITS_PROPOSAL: "burn_data_credits_proposal",
+  DELEGATE_DATA_CREDITS_PROPOSAL: "delegate_data_credits_proposal",
+  HOTSPOT_BURN_PROPOSAL: "hotspot_burn_proposal",
+  HOTSPOT_TRANSFER_PROPOSAL: "hotspot_transfer_proposal",
 
   // Governance - Position Management
   POSITION_CREATE: "position_create",

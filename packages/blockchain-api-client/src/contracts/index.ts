@@ -10,6 +10,7 @@ import { fiatContract } from "./fiat";
 import { webhooksContract } from "./webhooks";
 import { migrationContract } from "./migration";
 import { dataCreditsContract } from "./data-credits";
+import { squadsContract } from "./squads";
 import { oc } from "@orpc/contract";
 
 export * from "./governance";
@@ -24,6 +25,7 @@ export * from "./fiat";
 export * from "./webhooks";
 export * from "./migration";
 export * from "./data-credits";
+export * from "./squads";
 
 /**
  * Public API contract definition (for external consumers).
@@ -40,6 +42,7 @@ export const apiContract = oc.router({
   welcomePacks: welcomePacksContract,
   migration: migrationContract,
   dataCredits: dataCreditsContract,
+  squads: squadsContract,
 });
 
 /**

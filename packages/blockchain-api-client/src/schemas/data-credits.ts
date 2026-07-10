@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PublicKeySchema } from "./common";
+import { PublicKeySchema, squadsProposeFields } from "./common";
 
 export const MintDataCreditsInputSchema = z.object({
   owner: PublicKeySchema.describe(
@@ -9,7 +9,9 @@ export const MintDataCreditsInputSchema = z.object({
     .string()
     .regex(/^\d+$/, "Amount must be a whole number")
     .optional()
-    .describe("Amount of DC to mint (in smallest unit). Provide either dcAmount or hntAmount."),
+    .describe(
+      "Amount of DC to mint (in smallest unit). Provide either dcAmount or hntAmount."
+    ),
   hntAmount: z
     .string()
     .regex(/^\d+$/, "Amount must be a whole number in bones")
@@ -20,6 +22,9 @@ export const MintDataCreditsInputSchema = z.object({
   recipient: PublicKeySchema.optional().describe(
     "Recipient wallet for the minted DC. Defaults to the owner."
   ),
+  // No Squads propose mode: minting requires a fresh Pyth price in the same
+  // transaction, which a deferred proposal can't satisfy (see the mint
+  // procedure). Delegation and burns are proposable.
 });
 
 export type MintDataCreditsInput = z.infer<typeof MintDataCreditsInputSchema>;
@@ -39,7 +44,22 @@ export const DelegateDataCreditsInputSchema = z.object({
   mint: PublicKeySchema.describe(
     "SubDAO token mint (e.g. MOBILE or IOT mint) to determine which subDAO to delegate to"
   ),
-  memo: z.string().optional().describe("Optional memo to include in the transaction"),
+  ...squadsProposeFields,
 });
 
-export type DelegateDataCreditsInput = z.infer<typeof DelegateDataCreditsInputSchema>;
+export type DelegateDataCreditsInput = z.infer<
+  typeof DelegateDataCreditsInputSchema
+>;
+
+export const BurnDataCreditsInputSchema = z.object({
+  owner: PublicKeySchema.describe(
+    "Wallet address burning the data credits (signer and fee payer)"
+  ),
+  amount: z
+    .string()
+    .regex(/^\d+$/, "Amount must be a whole number")
+    .describe("Amount of DC to burn (smallest unit, DC has 0 decimals)"),
+  ...squadsProposeFields,
+});
+
+export type BurnDataCreditsInput = z.infer<typeof BurnDataCreditsInputSchema>;

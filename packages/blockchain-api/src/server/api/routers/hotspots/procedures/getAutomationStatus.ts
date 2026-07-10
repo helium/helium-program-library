@@ -72,6 +72,7 @@ export const getAutomationStatus =
         | undefined;
       let currentSchedule:
         | {
+            cron: string;
             schedule: "daily" | "weekly" | "monthly";
             time: string;
             nextRun: string;
@@ -81,6 +82,7 @@ export const getAutomationStatus =
       if (cronJobAccount?.schedule) {
         const scheduleInfo = interpretCronString(cronJobAccount.schedule);
         currentSchedule = {
+          cron: cronJobAccount.schedule,
           schedule: scheduleInfo.schedule,
           time: scheduleInfo.time,
           nextRun: scheduleInfo.nextRun.toISOString(),
@@ -127,5 +129,5 @@ export const getAutomationStatus =
         cronJobBalance: cronJobBalanceLamports.toString(),
         pdaWalletBalance: pdaWalletBalanceLamports.toString(),
       };
-    },
+    }
   );

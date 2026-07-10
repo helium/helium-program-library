@@ -1,11 +1,6 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import * as anchor from "@coral-xyz/anchor";
-import {
-  cronJobKey,
-  cronJobNameMappingKey,
-  cronJobTransactionKey,
-  init as initCron,
-} from "@helium/cron-sdk";
+import { cronJobKey, init as initCron } from "@helium/cron-sdk";
 import {
   entityCronAuthorityKey,
   init as initHplCrons,
@@ -16,7 +11,8 @@ import {
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
 } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
+import { buildTeardownInstructions } from "./automation-data-helpers";
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
@@ -52,8 +48,9 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
     const cronJob = cronJobKey(authority, 0)[0];
 
     // Fetch cron job account using fetchNullable
-    const cronJobAccount =
-      await cronProgram.account.cronJobV0.fetchNullable(cronJob);
+    const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
+      cronJob
+    );
 
     if (!cronJobAccount) {
       throw errors.NOT_FOUND({
@@ -70,7 +67,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
         : 0;
     const required = calculateRequiredBalance(
       BASE_TX_FEE_LAMPORTS + estimatedJitoTipCost,
-      0,
+      0
     );
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
@@ -79,37 +76,15 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       });
     }
 
-    // Build instructions to remove all entities and close cron job
-    const maxTxId = cronJobAccount.nextTransactionId || 0;
-    const txIds = Array.from({ length: maxTxId }, (_, i) => i);
-
-    const instructions: TransactionInstruction[] = [
-      ...(await Promise.all(
-        txIds.map((txId) =>
-          hplCronsProgram.methods
-            .removeEntityFromCronV0({
-              index: txId,
-            })
-            .accounts({
-              cronJob,
-              rentRefund: wallet,
-              cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
-            })
-            .instruction(),
-        ),
-      )),
-      await hplCronsProgram.methods
-        .closeEntityClaimCronV0()
-        .accounts({
-          cronJob,
-          rentRefund: wallet,
-          cronJobNameMapping: cronJobNameMappingKey(
-            authority,
-            "entity_claim",
-          )[0],
-        })
-        .instruction(),
-    ];
+    // Remove all entities and close the cron job.
+    const instructions = await buildTeardownInstructions(
+      provider.connection,
+      hplCronsProgram,
+      cronJob,
+      authority,
+      wallet,
+      cronJobAccount.nextTransactionId || 0
+    );
 
     // Build and serialize transactions
     const vtxs = (
@@ -130,7 +105,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
     }
 
     const txs: Array<string> = vtxs.map((tx) =>
-      Buffer.from(tx.serialize()).toString("base64"),
+      Buffer.from(tx.serialize()).toString("base64")
     );
 
     const txFees = getTotalTransactionFees(vtxs);
@@ -150,8 +125,8 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFees),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );
