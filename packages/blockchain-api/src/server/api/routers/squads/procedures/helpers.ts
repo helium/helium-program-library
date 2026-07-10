@@ -11,7 +11,10 @@ import {
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
 import { getTransactionFee } from "@/lib/utils/balance-validation";
-import { generateTransactionTag } from "@/lib/utils/transaction-tags";
+import {
+  generateTransactionTag,
+  TRANSACTION_TYPES,
+} from "@/lib/utils/transaction-tags";
 
 /** Fee-shortfall reporter, wired to a procedure's typed INSUFFICIENT_FUNDS error. */
 export type InsufficientFundsReporter = (info: {
@@ -65,6 +68,28 @@ type VoteIxBuilder = (args: {
   memo?: string;
 }) => TransactionInstruction;
 
+/** The three fields that identify a specific proposal across squads inputs. */
+export type ProposalRef = {
+  member: string;
+  multisig: string;
+  transactionIndex: string;
+};
+
+/**
+ * Per-vote-action descriptor. `type` is the single transaction type that keys
+ * both the tag and the metadata; `verb` is its human-readable label.
+ */
+export type ProposalVoteAction = {
+  type: string;
+  verb: string;
+};
+
+export const SQUADS_VOTE_ACTIONS = {
+  approve: { type: TRANSACTION_TYPES.SQUADS_PROPOSAL_APPROVE, verb: "Approve" },
+  reject: { type: TRANSACTION_TYPES.SQUADS_PROPOSAL_REJECT, verb: "Reject" },
+  cancel: { type: TRANSACTION_TYPES.SQUADS_PROPOSAL_CANCEL, verb: "Cancel" },
+} as const satisfies Record<string, ProposalVoteAction>;
+
 /**
  * Shared body for the approve / reject / cancel proposal endpoints, which
  * differ only in the Squads instruction they build and their labels.
@@ -73,22 +98,13 @@ export async function buildProposalVote({
   input,
   connection,
   buildIx,
-  tagType,
-  metaType,
-  verb,
+  action,
   insufficientFunds,
 }: {
-  input: {
-    member: string;
-    multisig: string;
-    transactionIndex: string;
-    memo?: string;
-  };
+  input: ProposalRef & { memo?: string };
   connection: Connection;
   buildIx: VoteIxBuilder;
-  tagType: string;
-  metaType: string;
-  verb: string;
+  action: ProposalVoteAction;
   insufficientFunds: InsufficientFundsReporter;
 }) {
   const member = new PublicKey(input.member);
@@ -109,7 +125,7 @@ export async function buildProposalVote({
   });
 
   const tag = generateTransactionTag({
-    type: tagType,
+    type: action.type,
     member: input.member,
     multisig: input.multisig,
     transactionIndex: input.transactionIndex,
@@ -120,15 +136,15 @@ export async function buildProposalVote({
       {
         serializedTransaction,
         metadata: {
-          type: metaType,
-          description: `${verb} proposal #${input.transactionIndex}`,
+          type: action.type,
+          description: `${action.verb} proposal #${input.transactionIndex}`,
         },
       },
     ],
     parallel: false,
     tag,
     actionMetadata: {
-      type: metaType,
+      type: action.type,
       multisig: input.multisig,
       transactionIndex: input.transactionIndex,
     },
@@ -138,11 +154,11 @@ export async function buildProposalVote({
 /** Fetch the multisig's next (unused) transaction index. */
 export async function nextTransactionIndex(
   connection: Connection,
-  multisigPda: PublicKey
+  multisigPda: PublicKey,
 ): Promise<bigint> {
   const info = await multisig.accounts.Multisig.fromAccountAddress(
     connection,
-    multisigPda
+    multisigPda,
   );
   return BigInt(info.transactionIndex.toString()) + BigInt(1);
 }
@@ -227,7 +243,7 @@ export async function buildActionProposal({
   multisigPda: PublicKey;
   member: PublicKey;
   buildInstructions: (
-    vault: PublicKey
+    vault: PublicKey,
   ) => Promise<TransactionInstruction[]> | TransactionInstruction[];
   memo?: string;
   insufficientFunds: InsufficientFundsReporter;
@@ -239,7 +255,7 @@ export async function buildActionProposal({
 }> {
   const transactionIndex = await nextTransactionIndex(
     connection,
-    multisigPda
+    multisigPda,
   ).catch(() => {
     throw notFound();
   });

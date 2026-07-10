@@ -1,8 +1,7 @@
 import { publicProcedure } from "../../../procedures";
 import * as multisig from "@sqds/multisig";
 import { createSolanaConnection } from "@/lib/solana";
-import { TRANSACTION_TYPES } from "@/lib/utils/transaction-tags";
-import { buildProposalVote } from "./helpers";
+import { buildProposalVote, SQUADS_VOTE_ACTIONS } from "./helpers";
 
 export const rejectProposal = publicProcedure.squads.rejectProposal.handler(
   async ({ input, errors }) => {
@@ -11,14 +10,12 @@ export const rejectProposal = publicProcedure.squads.rejectProposal.handler(
       input,
       connection,
       buildIx: multisig.instructions.proposalReject,
-      tagType: TRANSACTION_TYPES.SQUADS_PROPOSAL_REJECT,
-      metaType: "squads_proposal_reject",
-      verb: "Reject",
+      action: SQUADS_VOTE_ACTIONS.reject,
       insufficientFunds: ({ required, available }) =>
         errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance to reject the proposal",
           data: { required, available },
         }),
     });
-  }
+  },
 );

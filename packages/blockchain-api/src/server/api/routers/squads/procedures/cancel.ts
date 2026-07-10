@@ -1,8 +1,7 @@
 import { publicProcedure } from "../../../procedures";
 import * as multisig from "@sqds/multisig";
 import { createSolanaConnection } from "@/lib/solana";
-import { TRANSACTION_TYPES } from "@/lib/utils/transaction-tags";
-import { buildProposalVote } from "./helpers";
+import { buildProposalVote, SQUADS_VOTE_ACTIONS } from "./helpers";
 
 export const cancelProposal = publicProcedure.squads.cancelProposal.handler(
   async ({ input, errors }) => {
@@ -11,14 +10,12 @@ export const cancelProposal = publicProcedure.squads.cancelProposal.handler(
       input,
       connection,
       buildIx: multisig.instructions.proposalCancel,
-      tagType: TRANSACTION_TYPES.SQUADS_PROPOSAL_CANCEL,
-      metaType: "squads_proposal_cancel",
-      verb: "Cancel",
+      action: SQUADS_VOTE_ACTIONS.cancel,
       insufficientFunds: ({ required, available }) =>
         errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance to cancel the proposal",
           data: { required, available },
         }),
     });
-  }
+  },
 );
