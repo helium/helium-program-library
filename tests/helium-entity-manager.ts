@@ -1042,6 +1042,64 @@ describe("helium-entity-manager", () => {
         expect(storageAcc.deploymentInfo?.wifiInfoV0).to.deep.equal(wifiInfo);
       });
 
+      it("preserves the existing serial when a re-assert omits it", async () => {
+        // First set a serial, as happens at onboard time.
+        const withSerial = {
+          antenna: 1,
+          elevation: 2,
+          azimuth: 3,
+          mechanicalDownTilt: 4,
+          electricalDownTilt: 5,
+          serial: "SERIAL-PRESERVE-123",
+        };
+        const setMethod = (
+          await updateMobileMetadata({
+            program: hemProgram,
+            assetId: hotspot,
+            rewardableEntityConfig,
+            location: new BN(1000),
+            getAssetFn,
+            getAssetProofFn,
+            deploymentInfo: { wifiInfoV0: withSerial },
+          })
+        ).signers([hotspotOwner]);
+        const info = (await setMethod.pubkeys()).mobileInfo!;
+        await setMethod.rpc({ skipPreflight: true });
+
+        // A location re-assert ships a fresh WifiInfoV0 with no serial.
+        const withoutSerial = {
+          antenna: 10,
+          elevation: 20,
+          azimuth: 30,
+          mechanicalDownTilt: 40,
+          electricalDownTilt: 50,
+          serial: null,
+        };
+        const reassert = (
+          await updateMobileMetadata({
+            program: hemProgram,
+            assetId: hotspot,
+            rewardableEntityConfig,
+            location: new BN(2000),
+            getAssetFn,
+            getAssetProofFn,
+            deploymentInfo: { wifiInfoV0: withoutSerial },
+          })
+        ).signers([hotspotOwner]);
+        await reassert.rpc({ skipPreflight: true });
+
+        const storageAcc = await hemProgram.account.mobileHotspotInfoV0.fetch(
+          info!
+        );
+        // The re-assert's other fields are applied...
+        expect(storageAcc.deploymentInfo?.wifiInfoV0?.antenna).to.eq(10);
+        expect(storageAcc.deploymentInfo?.wifiInfoV0?.elevation).to.eq(20);
+        // ...but the previously-set serial is preserved, not wiped to null.
+        expect(storageAcc.deploymentInfo?.wifiInfoV0?.serial).to.eq(
+          "SERIAL-PRESERVE-123"
+        );
+      });
+
       it("oracle can update active status", async () => {
         await hemProgram.methods
           .setEntityActiveV0({
