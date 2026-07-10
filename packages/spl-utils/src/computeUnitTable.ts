@@ -67,7 +67,7 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   // data_credits.initialize_data_credits_v0 (n=4, med=43866, max=63366) [localnet]
   "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:17c173cadc9d4498": 63366,
   // data_credits.issue_data_credits_v0 (n=5, med=55963, max=69839);
-  // p95 × 1.2 undershoots observed max, so use max
+  // p95 × margin undershoots observed max, so use max
   "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT:08ad2a3d9d5835b6": 69839,
   // data_credits.mint_data_credits_v0 — localnet p95 92991 (incl. account init);
   // mainnet (n=56, med=36033, max=59101) never hit the init path, so keep the higher value
@@ -106,7 +106,7 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   // helium_entity_manager.onboard_data_only_iot_hotspot_v0 (n=2, med=89343, max=89343)
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:62b37f333abfaebc": 89343,
   // helium_entity_manager.onboard_data_only_mobile_hotspot_v0 (n=43, med=96693, max=130123);
-  // p95 × 1.2 undershoots observed max, so use max
+  // p95 × margin undershoots observed max, so use max
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:1ebde5db7b773e98": 130123,
   // helium_entity_manager.onboard_iot_hotspot_v0 (n=4, med=109809, max=136021)
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:2d1881260e41070f": 136021,
@@ -125,10 +125,10 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   // helium_entity_manager.update_data_only_tree_v0 (n=1, med=47954, max=47954) [localnet]
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:d6341e41d7267a66": 47954,
   // helium_entity_manager.update_iot_info_v0 (n=89, med=76104, max=128554);
-  // p95 × 1.2 undershoots observed max, so use max
+  // p95 × margin undershoots observed max, so use max
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:d3ebcd1d6d569927": 128554,
   // helium_entity_manager.update_mobile_info_v0 (n=18, med=76554, max=101035);
-  // p95 × 1.2 undershoots observed max, so use max — value is the prior
+  // p95 × margin undershoots observed max, so use max — value is the prior
   // run's observed max (129637), kept because it's higher than this run's
   "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:cf68529dc1e54999": 129637,
   // helium_entity_manager.update_rewardable_entity_config_v0 (n=2, med=10461, max=10461) [localnet]
@@ -144,7 +144,7 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   // helium_sub_daos.claim_rewards_v0 (n=72, med=43206, max=50706)
   "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR:6c062a0600debead": 49206,
   // helium_sub_daos.claim_rewards_v1 (n=1318, med=43233, max=54075);
-  // p95 × 1.2 undershoots observed max, so use max — value is the prior
+  // p95 × margin undershoots observed max, so use max — value is the prior
   // run's observed max (69267), kept because it's higher than this run's
   "hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR:60b6c45174ce9a69": 69267,
   // helium_sub_daos.close_delegation_v0 (n=7, med=47485, max=47973)
@@ -185,7 +185,7 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   // hexboosting.update_boost_config_v0 (n=1, med=3993, max=3993) [localnet]
   "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ:56f63a60270e715a": 3993,
   // lazy_distributor.distribute_compression_rewards_v0 (n=337, med=74780, max=114725);
-  // p95 × 1.2 undershoots observed max, so use max — value is the prior
+  // p95 × margin undershoots observed max, so use max — value is the prior
   // run's observed max (120730), kept because it's higher than this run's
   "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w:a030b8390569e947": 120730,
   // lazy_distributor.distribute_custom_destination_v0 — localnet max 80567 (incl. ATA init);
@@ -195,7 +195,7 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   // mainnet (n=2, med=29457) too thin and never hit the init path, so keep the higher value
   "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w:eb132a0c7162d675": 59163,
   // lazy_distributor.initialize_compression_recipient_v0 (n=21, med=63152, max=81018);
-  // p95 × 1.2 undershoots observed max, so use max — value is the prior
+  // p95 × margin undershoots observed max, so use max — value is the prior
   // run's observed max (95720), kept because it's higher than this run's
   "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w:509097151a90daae": 95720,
   // lazy_distributor.initialize_lazy_distributor_v0 (n=12, med=79481, max=103481) [localnet]
@@ -337,8 +337,14 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
 };
 
 export const MAX_COMPUTE_UNITS = 1400000;
-// Applied on top of p95 to absorb drift between measurements.
-export const FALLBACK_CU_MARGIN = 1.2;
+// Applied on top of the raw p95 entry so the fallback request is worst-case:
+// a sim-failure fallback should never under-request CU and fail the tx on-chain.
+// Sized above the largest overshoot we measured (localnet ran up to ~1.8x the
+// raw p95 for PDA-grinding instructions like distribute_v0 / schedule_task_v0),
+// so 2.0 leaves headroom. The fallback is only hit when live simulation is
+// unavailable, so over-requesting here costs a little and never fails a tx.
+// The primary path (simulation x computeScaleUp) is unaffected.
+export const FALLBACK_CU_MARGIN = 2.0;
 
 export const COMPUTE_BUDGET_PROGRAM_ID =
   ComputeBudgetProgram.programId.toBase58();

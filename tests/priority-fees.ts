@@ -10,6 +10,7 @@ import {
 } from "@solana/web3.js";
 import { expect } from "chai";
 import {
+  FALLBACK_CU_MARGIN,
   INSTRUCTION_CU_TABLE,
   MAX_COMPUTE_UNITS,
   tableComputeUnits,
@@ -105,7 +106,9 @@ describe("tableComputeUnitsForInstructions", () => {
       keys: [],
       data: Buffer.from(discriminatorHex, "hex"),
     });
-    expect(tableComputeUnitsForInstructions([ix])).to.eq(Math.ceil(cu * 1.2));
+    expect(tableComputeUnitsForInstructions([ix])).to.eq(
+      Math.ceil(cu * FALLBACK_CU_MARGIN)
+    );
   });
 
   it("returns MAX_COMPUTE_UNITS when any instruction is unknown", () => {

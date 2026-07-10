@@ -160,7 +160,7 @@ export async function estimatePrioritizationFee(
 
 // Returns a CU limit with headroom already applied: simulated consumption
 // × computeScaleUp, or the static table fallback (which carries its own
-// p95 × 1.2 margin — no extra scaling). When simulation succeeds it
+// p95 × FALLBACK_CU_MARGIN worst-case headroom — no extra scaling). When simulation succeeds it
 // also returns the measured loadedAccountsDataSize (undefined on the table
 // fallback path or when the RPC predates the field). `simulated`
 // distinguishes those two: false means nothing was measured, so callers
