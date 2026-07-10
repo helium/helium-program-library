@@ -1,8 +1,8 @@
 #!/usr/bin/env ts-node
 // CI gate for INSTRUCTION_CU_TABLE: sample the localnet traffic that the
 // anchor test suite just generated and verify every exercised instruction
-// has a table entry (hard fail). Drift beyond FALLBACK_CU_MARGIN +
-// bump-grind slack is reported as a warning only.
+// has a table entry, and that none consume beyond their fallback ceiling
+// (entry * FALLBACK_CU_MARGIN + bump-grind slack). Both are hard failures.
 // Runs after the test-contracts mocha step while the localnet is still up.
 //
 //   RPC_URL=http://127.0.0.1:8899 pnpm run check-cu-table
@@ -91,21 +91,22 @@ const main = async () => {
     console.error(missing.join("\n"));
   }
   if (drifted.length) {
-    // Warning only because localnet p95 is noisy (random keys → bump grinding)
-    // and runs low vs mainnet, so a lone localnet reading isn't authoritative.
-    // But the drift itself is the dangerous direction: the runtime fallback
-    // requests exactly entry × FALLBACK_CU_MARGIN, so real consumption above
-    // that ceiling means the fallback UNDER-requests and the tx fails on-chain
-    // — and with skip-preflight the fee is still burned. Re-measure with
-    // `pnpm run sample-cu` and raise the entry. Missing entries stay a hard error.
+    // Hard fail: drift is the dangerous direction. The runtime fallback requests
+    // exactly entry * FALLBACK_CU_MARGIN, so consumption above that ceiling means
+    // the fallback UNDER-requests and the tx fails on-chain (fee still burned
+    // under skip-preflight). The bump-grind slack already absorbs localnet's
+    // run-to-run noise, so exceeding ceiling+slack is a structural jump. Raise the
+    // flagged entry to the localnet value above (once an entry reflects its
+    // localnet worst case, later noise stays within slack), or re-measure with
+    // `pnpm run sample-cu` for an authoritative mainnet value.
     console.error(
-      `\nWARNING: ${drifted.length} entr(y/ies) exceed FALLBACK_CU_MARGIN +` +
-        ` bump-grind slack — the account structures likely grew. Update via` +
+      `\n${drifted.length} entr(y/ies) exceed FALLBACK_CU_MARGIN +` +
+        ` bump-grind slack. Account structures likely grew; update via` +
         ` \`pnpm run sample-cu\` (mainnet) or the localnet values above:`
     );
     console.error(drifted.join("\n"));
   }
-  if (missing.length) process.exit(1);
+  if (missing.length || drifted.length) process.exit(1);
   console.error(
     `CU table OK: ${
       Object.keys(localTable).length
