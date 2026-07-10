@@ -8,10 +8,13 @@ export function generateTransactionTag(params: {
 
   const sortedParams = Object.keys(otherParams)
     .sort()
-    .reduce((acc, key) => {
-      acc[key] = otherParams[key];
-      return acc;
-    }, {} as Record<string, any>);
+    .reduce(
+      (acc, key) => {
+        acc[key] = otherParams[key];
+        return acc;
+      },
+      {} as Record<string, any>,
+    );
 
   const paramString = JSON.stringify({ type, ...sortedParams });
 
