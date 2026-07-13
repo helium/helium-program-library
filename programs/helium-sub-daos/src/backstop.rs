@@ -30,6 +30,19 @@ use anchor_lang::prelude::*;
 /// The backstop keys off the Mobile sub-DAO's `dc_burned` and percent share.
 pub const MOBILE_SUB_DAO: Pubkey = pubkey!("Gm9xDCJawDEKDrrQW6haw94gABaYzQwCq4ZQU8h8bd22");
 
+/// The canonical mainnet HNT/USD Pyth push account (shard 0 for `HNT_PRICE_FEED_ID`),
+/// kept continuously fresh on-chain and mirrored in `spl-utils`' `HNT_PYTH_PRICE_FEED`.
+/// `calculate_utility_score_v0` pins the supplied price account to this key so a caller
+/// cannot substitute a different (stale-but-valid) HNT price update to steer the backstop.
+///
+/// Operational constraint: this constant and the account the end-epoch cron forwards must
+/// move together. A closed or stale canonical account fails safe (the content checks in
+/// `read_hnt_price` make the epoch dormant, issuance continues). But repointing the cron
+/// at a *different* account without also upgrading this constant hard-fails the pin
+/// (`InvalidPriceOracle`) and halts issuance. To rotate the Pyth feed account, upgrade this
+/// constant and update the cron in the same rollout.
+pub const HNT_PYTH_PRICE_FEED: Pubkey = pubkey!("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33");
+
 /// Mobile data bucket fraction (HIP 149 Decision 3), as a percentage. Hardcoded.
 pub const MOBILE_DATA_BUCKET_PERCENT: u128 = 70;
 
@@ -49,9 +62,17 @@ pub struct BackstopInput {
   /// `10^(hnt_decimals - pyth_exponent - 5)`, the DC->HNT scale factor (mirrors
   /// `mint_data_credits_v0`). With 8 HNT decimals and a -8 exponent this is `10^11`.
   pub decimals_factor: u128,
-  /// Confidence-adjusted Pyth HNT price (`ema_price - 2 * ema_conf`), guaranteed `> 0`
-  /// by the caller. Same convention as `mint_data_credits_v0`.
-  pub hnt_price_with_conf: u64,
+  /// Lower-bound Pyth HNT price (`ema_price - 2 * ema_conf`), guaranteed `> 0` by the
+  /// caller. Used for the floor/top-up: a lower price converts the USD target into more
+  /// HNT, which is the conservative direction for a minimum. Same convention as
+  /// `mint_data_credits_v0`.
+  pub hnt_price_floor: u64,
+  /// EMA (point-estimate) Pyth HNT price, no confidence adjustment. Used for the earnings
+  /// cap so it binds at exactly `3.0 x carrier_paid_USD` at the point price. The floor uses
+  /// the lower bound (never underpay a minimum); the cap uses the point price (land on the
+  /// HIP's 3.0x rather than biasing the ceiling in either direction with the confidence
+  /// width) (I-01).
+  pub hnt_price_cap: u64,
 }
 
 /// Result of the backstop computation for one epoch.
@@ -90,11 +111,12 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
 
   // carrier_paid_USD = dc_burned x 1e-5. The cap is 3.0x of it (dc_burned*3 in DC units);
   // the floor target (0.5x) is computed below, after the share guard, since it's only
-  // used on the top-up path.
+  // used on the top-up path. The cap uses the EMA point price so it binds at exactly 3.0x;
+  // the floor uses the lower (confidence-adjusted) price so a minimum is never underpaid.
   let deployer_cap_hnt = scale_dc_to_hnt(
     (input.mobile_dc_burned as u128).saturating_mul(3),
     input.decimals_factor,
-    input.hnt_price_with_conf,
+    input.hnt_price_cap,
   );
 
   // Total emission unaffected by the backstop: schedule + the existing re-emit.
@@ -115,7 +137,7 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
   let target_hnt = scale_dc_to_hnt(
     (input.mobile_dc_burned / 2) as u128,
     input.decimals_factor,
-    input.hnt_price_with_conf,
+    input.hnt_price_floor,
   );
 
   // deployer_baseline = (emission + existing_re_emit) x mobile_share x 0.70.
@@ -130,13 +152,17 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
   // Reverses the same scale used in deployer_baseline. The alpha division sizes a
   // DAO-level mint so the slice reaching Mobile data deployers equals the shortfall.
   let shortfall = (target_hnt as u128).saturating_sub(deployer_baseline as u128);
+  // If the demand doesn't fit in u64 the inputs are already outside any real range (an
+  // absurdly low price). Fail safe to no top-up for the epoch (I-02) rather than treating
+  // the overflow as "use the whole burn budget"; this matches read_hnt_price, which makes
+  // the backstop dormant on any price that can't be trusted.
   let top_up_demand: u64 = shortfall
     .saturating_mul(u32::MAX as u128)
     .saturating_mul(100)
     .checked_div(share.saturating_mul(MOBILE_DATA_BUCKET_PERCENT))
     .unwrap_or(0)
     .try_into()
-    .unwrap_or(u64::MAX);
+    .unwrap_or(0);
 
   // Burn-bounded: the top-up may use only the burn beyond what the existing re-emit
   // already consumes (HIP 149 shared-budget bound). With existing_re_emit =
@@ -201,6 +227,8 @@ mod tests {
   }
 
   fn base_input(price_dollars: f64, smoothed: u64) -> BackstopInput {
+    // Zero-confidence case: floor and cap prices coincide, so the existing worked
+    // examples are unchanged by the floor/cap price split (I-01).
     BackstopInput {
       emission: EMISSION,
       smoothed_hnt_burned: smoothed,
@@ -208,7 +236,8 @@ mod tests {
       mobile_dc_burned: DC_BURNED,
       mobile_share: SHARE_8927,
       decimals_factor: DECIMALS_FACTOR,
-      hnt_price_with_conf: hnt_price(price_dollars),
+      hnt_price_floor: hnt_price(price_dollars),
+      hnt_price_cap: hnt_price(price_dollars),
     }
   }
 
@@ -290,6 +319,23 @@ mod tests {
     assert!(
       (hnt(out.deployer_cap_hnt) - 10_920.0).abs() < 5.0,
       "cap_hnt {} should be ~10,920 HNT",
+      hnt(out.deployer_cap_hnt)
+    );
+  }
+
+  #[test]
+  fn cap_uses_its_own_price_not_the_floor_price() {
+    // I-01: the cap converts its 3.0x USD ceiling at the EMA point price, independent of
+    // the floor's lower (confidence-adjusted) price. EMA $1.00, floor price $0.90. The cap
+    // in HNT is 3 x $9,100 / $1.00 = 27,300 HNT (exactly 3.0x at the point price), not
+    // 3 x $9,100 / $0.90 = 30,333 HNT (what sharing the floor's lower price would give).
+    let mut input = base_input(1.00, NET_CAP);
+    input.hnt_price_floor = hnt_price(0.90);
+    input.hnt_price_cap = hnt_price(1.00);
+    let out = compute_backstop(&input);
+    assert!(
+      (hnt(out.deployer_cap_hnt) - 27_300.0).abs() < 5.0,
+      "cap_hnt {} should use the EMA point price (~27,300 HNT), not the floor's lower price (~30,333)",
       hnt(out.deployer_cap_hnt)
     );
   }

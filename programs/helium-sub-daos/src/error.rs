@@ -68,7 +68,7 @@ pub enum ErrorCode {
   #[msg("Supplement window is active but no supplement vault was provided")]
   SupplementVaultMissing,
 
-  #[msg("Supplement vault is not owned by the configured supplement vault owner")]
+  #[msg("Supplement vault does not match the configured supplement vault token account")]
   InvalidSupplementVault,
 
   #[msg("Supplement window is active but no Council compensation vault was provided")]
@@ -76,4 +76,13 @@ pub enum ErrorCode {
 
   #[msg("Council compensation vault does not match the configured Council fanout token account")]
   InvalidCouncilVault,
+
+  #[msg("HNT price oracle account is required for the backstop but was not supplied")]
+  PriceOracleMissing,
+
+  #[msg("HNT price oracle account does not match the canonical HNT Pyth price feed")]
+  InvalidPriceOracle,
+
+  #[msg("The Mobile sub-DAO epoch-info accounts required by the backstop were not supplied")]
+  MobileEpochInfoMissing,
 }
