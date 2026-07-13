@@ -4,7 +4,11 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
 } from "@solana/web3.js";
-import { getAccount, getAssociatedTokenAddressSync, NATIVE_MINT } from "@solana/spl-token";
+import {
+  getAccount,
+  getAssociatedTokenAddressSync,
+  NATIVE_MINT,
+} from "@solana/spl-token";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { init as initWelcomePack } from "@helium/welcome-pack-sdk";
 import { expect } from "chai";
@@ -27,11 +31,45 @@ import { RPCLink } from "@orpc/client/fetch";
 import type { appRouter } from "@/server/api";
 import type { RouterClient } from "@orpc/server";
 import { ORPCError } from "@orpc/server";
-import { TEST_HOTSPOT_ENTITY_KEY, TEST_HOTSPOT_2_ENTITY_KEY, TEST_HOTSPOT_2_ASSET_ID, HNT_LAZY_DISTRIBUTOR_ADDRESS } from "./helpers/constants";
+import {
+  TEST_HOTSPOT_ENTITY_KEY,
+  TEST_HOTSPOT_2_ENTITY_KEY,
+  TEST_HOTSPOT_2_ASSET_ID,
+  HNT_LAZY_DISTRIBUTOR_ADDRESS,
+} from "./helpers/constants";
 import { ensureNoContract } from "./helpers/reward-contract";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import type { TestCtx } from "./helpers/context";
 import fs from "fs";
+
+// Set a raw token account into a frozen state, mimicking DC tokens (which the
+// data credits program keeps frozen). surfpool's setTokenAccount accepts a
+// `state` field alongside the balance.
+async function setFrozenTokenAccount(
+  owner: PublicKey,
+  mint: PublicKey,
+  amount: number
+): Promise<void> {
+  const res = await fetch(getSurfpoolRpcUrl(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "surfnet_setTokenAccount",
+      params: [
+        owner.toBase58(),
+        mint.toBase58(),
+        { amount, state: "frozen" },
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      ],
+    }),
+  });
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(`setTokenAccount failed: ${JSON.stringify(json.error)}`);
+  }
+}
 
 describe("migration", () => {
   let payer: Keypair;
@@ -48,10 +86,10 @@ describe("migration", () => {
     payer = loadKeypairFromEnv();
     destination = Keypair.generate();
 
-    // Add payer to migration allowlist via JSON file (shared with Next.js server process)
-    const allowlistPath = "/tmp/test-migration-allowlist.json";
-    fs.writeFileSync(allowlistPath, JSON.stringify([payer.publicKey.toBase58()]));
-    process.env.MIGRATION_ALLOWLIST_PATH = allowlistPath;
+    // Disable rate limiting for the default tests; the rate-limit test opts in
+    // per-call. Read lazily from process.env by the migrate handler.
+    process.env.MIGRATION_RATE_LIMIT_PER_PAIR = "0";
+    process.env.MIGRATION_RATE_LIMIT_PER_IP = "0";
 
     // Set Jito tip account fallback (Jito API not available in test env)
     process.env.JITO_TIP_ACCOUNT = destination.publicKey.toBase58();
@@ -87,27 +125,24 @@ describe("migration", () => {
   });
 
   after(async () => {
-    delete process.env.MIGRATION_ALLOWLIST_PATH;
     await stopNextServer();
     await stopSurfpool();
   });
 
-  it("rejects wallet not in allowlist", async () => {
+  it("allows a wallet not on any allowlist to migrate", async () => {
     const randomWallet = Keypair.generate();
 
-    try {
-      await client.migration.migrate({
-        sourceWallet: randomWallet.publicKey.toBase58(),
-        destinationWallet: destination.publicKey.toBase58(),
-        hotspots: [],
-        tokens: [],
-      });
-      expect.fail("Should have thrown an error");
-    } catch (error: any) {
-      expect(error).to.be.instanceOf(ORPCError);
-      expect(error.code).to.equal("UNAUTHORIZED");
-      expect(error.message).to.include("not in the migration allowlist");
-    }
+    // No allowlist, no password — migration is open. An empty request yields no
+    // transactions but must not be rejected.
+    const result = await client.migration.migrate({
+      sourceWallet: randomWallet.publicKey.toBase58(),
+      destinationWallet: destination.publicKey.toBase58(),
+      hotspots: [],
+      tokens: [],
+    });
+
+    expect(result.transactionData).to.not.be.undefined;
+    expect(result.transactionData.transactions.length).to.equal(0);
   });
 
   it("migrates SOL to destination", async () => {
@@ -130,20 +165,43 @@ describe("migration", () => {
     expect(txData.metadata?.signers).to.deep.include("source");
 
     // Sign and submit — fee payer already signed server-side
-    await signAndSubmitTransactionData(connection, result.transactionData, payer);
+    await signAndSubmitTransactionData(
+      connection,
+      result.transactionData,
+      payer
+    );
 
     const afterBalance = await connection.getBalance(destination.publicKey);
     expect(afterBalance - beforeBalance).to.equal(lamports);
   });
 
   it("migrates SPL token (USDC) to destination", async () => {
-    const rawAmount = 1_500_000; // 1.5 USDC (6 decimals)
+    const mintKey = new PublicKey(TOKEN_MINTS.USDC);
+    const sourceAta = getAssociatedTokenAddressSync(
+      mintKey,
+      payer.publicKey,
+      true
+    );
+    const sourceBalance = (await getAccount(connection, sourceAta)).amount;
+    expect(Number(sourceBalance)).to.be.greaterThan(0);
+
+    const destAta = getAssociatedTokenAddressSync(
+      mintKey,
+      destination.publicKey,
+      true
+    );
+    let beforeDest = BigInt(0);
+    try {
+      beforeDest = (await getAccount(connection, destAta)).amount;
+    } catch {
+      // dest ATA may not exist yet
+    }
 
     const result = await client.migration.migrate({
       sourceWallet: payer.publicKey.toBase58(),
       destinationWallet: destination.publicKey.toBase58(),
       hotspots: [],
-      tokens: [{ mint: TOKEN_MINTS.USDC, amount: String(rawAmount) }],
+      tokens: [{ mint: TOKEN_MINTS.USDC, amount: String(sourceBalance) }],
     });
 
     expect(result.transactionData.transactions.length).to.be.greaterThan(0);
@@ -152,16 +210,120 @@ describe("migration", () => {
     expect(txData.metadata?.type).to.equal("migration");
 
     // Sign and submit
-    await signAndSubmitTransactionData(connection, result.transactionData, payer);
-
-    const mintKey = new PublicKey(TOKEN_MINTS.USDC);
-    const destAta = getAssociatedTokenAddressSync(
-      mintKey,
-      destination.publicKey,
-      true,
+    await signAndSubmitTransactionData(
+      connection,
+      result.transactionData,
+      payer
     );
-    const tokenAccount = await getAccount(connection, destAta);
-    expect(Number(tokenAccount.amount)).to.equal(rawAmount);
+
+    const afterDest = (await getAccount(connection, destAta)).amount;
+    expect(Number(afterDest - beforeDest)).to.equal(Number(sourceBalance));
+  });
+
+  it("ignores a client-supplied partial amount and migrates the full SPL balance", async () => {
+    const fullRaw = 4_000_000; // 4 USDC (6 decimals)
+    const usdcMint = new PublicKey(TOKEN_MINTS.USDC);
+    await ensureTokenBalance(payer.publicKey, usdcMint, 4);
+
+    const destAta = getAssociatedTokenAddressSync(
+      usdcMint,
+      destination.publicKey,
+      true
+    );
+    let beforeDest = BigInt(0);
+    try {
+      beforeDest = (await getAccount(connection, destAta)).amount;
+    } catch {
+      // dest ATA may not exist yet
+    }
+
+    // Request only half — the server must ignore this and move the full balance.
+    const result = await client.migration.migrate({
+      sourceWallet: payer.publicKey.toBase58(),
+      destinationWallet: destination.publicKey.toBase58(),
+      hotspots: [],
+      tokens: [{ mint: TOKEN_MINTS.USDC, amount: String(fullRaw / 2) }],
+    });
+
+    await signAndSubmitTransactionData(
+      connection,
+      result.transactionData,
+      payer
+    );
+
+    const afterDest = (await getAccount(connection, destAta)).amount;
+    expect(Number(afterDest - beforeDest)).to.equal(fullRaw);
+
+    // Source ATA is unconditionally closed (rent refunded to fee payer).
+    const sourceAta = getAssociatedTokenAddressSync(
+      usdcMint,
+      payer.publicKey,
+      true
+    );
+    let sourceClosed = false;
+    try {
+      await getAccount(connection, sourceAta);
+    } catch {
+      sourceClosed = true;
+    }
+    expect(sourceClosed).to.equal(true);
+  });
+
+  it("skips a frozen source token account without creating a dest ATA (DC leak fix)", async () => {
+    const frozenSource = Keypair.generate();
+    const usdcMint = new PublicKey(TOKEN_MINTS.USDC);
+
+    // Freeze a funded token account to mimic DC tokens, which the data credits
+    // program keeps frozen.
+    await setFrozenTokenAccount(frozenSource.publicKey, usdcMint, 3_000_000);
+
+    const result = await client.migration.migrate({
+      sourceWallet: frozenSource.publicKey.toBase58(),
+      destinationWallet: destination.publicKey.toBase58(),
+      hotspots: [],
+      tokens: [{ mint: TOKEN_MINTS.USDC, amount: "1000000" }],
+    });
+
+    // Frozen token is skipped entirely — no dest-ATA create means no unrefunded
+    // rent charged to the fee payer, so there are no transactions at all.
+    expect(result.transactionData.transactions.length).to.equal(0);
+    expect(result.warnings).to.be.an("array");
+    expect(result.warnings!.some((w) => w.includes("frozen"))).to.equal(true);
+  });
+
+  it("rate limits repeated migrations for the same wallet pair", async () => {
+    const prev = process.env.MIGRATION_RATE_LIMIT_PER_PAIR;
+    process.env.MIGRATION_RATE_LIMIT_PER_PAIR = "2";
+    try {
+      const src = Keypair.generate().publicKey.toBase58();
+      const dst = Keypair.generate().publicKey.toBase58();
+      const call = (source: string, dest: string) =>
+        client.migration.migrate({
+          sourceWallet: source,
+          destinationWallet: dest,
+          hotspots: [],
+          tokens: [],
+        });
+
+      await call(src, dst);
+      await call(src, dst);
+      try {
+        await call(src, dst);
+        expect.fail("Should have been rate limited");
+      } catch (error: any) {
+        expect(error).to.be.instanceOf(ORPCError);
+        expect(error.code).to.equal("RATE_LIMITED");
+      }
+
+      // A different pair is unaffected.
+      const otherResult = await call(
+        Keypair.generate().publicKey.toBase58(),
+        dst
+      );
+      expect(otherResult.transactionData).to.not.be.undefined;
+    } finally {
+      process.env.MIGRATION_RATE_LIMIT_PER_PAIR = prev ?? "0";
+    }
   });
 
   it("migrates hotspot in welcome pack (closes pack and transfers)", async () => {
@@ -196,7 +358,7 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       createResult.transactionData,
-      payer,
+      payer
     );
 
     // Verify welcome pack exists on-chain
@@ -211,11 +373,11 @@ describe("migration", () => {
           throw new Error("not supported in test");
         },
       } as any,
-      AnchorProvider.defaultOptions(),
+      AnchorProvider.defaultOptions()
     );
     const wpProgram = await initWelcomePack(anchorProvider);
     const fetched = await wpProgram.account.welcomePackV0.fetchNullable(
-      new PublicKey(createResult.welcomePack.address),
+      new PublicKey(createResult.welcomePack.address)
     );
     expect(fetched).to.not.be.null;
     expect(fetched!.owner.toBase58()).to.equal(walletAddress);
@@ -233,7 +395,7 @@ describe("migration", () => {
     expect(result.transactionData.parallel).to.equal(false);
 
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip",
+      (t: any) => t.metadata?.description !== "Jito tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     for (const t of migrationTxs) {
@@ -257,7 +419,6 @@ describe("migration", () => {
       destinationWallet: destination.publicKey.toBase58(),
       hotspots: [TEST_HOTSPOT_ENTITY_KEY],
       tokens: [],
-
     });
 
     expect(result.transactionData.transactions.length).to.be.greaterThan(0);
@@ -300,13 +461,13 @@ describe("migration", () => {
       });
     if (createError) {
       expect.fail(
-        `Failed to create reward contract: ${JSON.stringify(createError)}`,
+        `Failed to create reward contract: ${JSON.stringify(createError)}`
       );
     }
     await signAndSubmitTransactionData(
       connection,
       createResult.unsignedTransactionData,
-      payer,
+      payer
     );
 
     // Now migrate the hotspot — procedure should detect the mini fanout on chain
@@ -315,7 +476,6 @@ describe("migration", () => {
       destinationWallet: destination.publicKey.toBase58(),
       hotspots: [TEST_HOTSPOT_ENTITY_KEY],
       tokens: [],
-
     });
 
     expect(result.transactionData.transactions.length).to.be.greaterThan(0);
@@ -323,7 +483,7 @@ describe("migration", () => {
     // Hotspot with split: fee payer acts as namespace signer (signed server-side),
     // source wallet signs as cNFT owner and old fanout owner. No destination signing needed.
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip",
+      (t: any) => t.metadata?.description !== "Jito tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     for (const t of migrationTxs) {
@@ -332,6 +492,10 @@ describe("migration", () => {
     }
 
     // Sign and submit — fee payer already signed server-side
-    await signAndSubmitTransactionData(connection, result.transactionData, payer);
+    await signAndSubmitTransactionData(
+      connection,
+      result.transactionData,
+      payer
+    );
   });
 });

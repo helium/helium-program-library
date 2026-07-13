@@ -1,5 +1,15 @@
-import { MigrateInputSchema, MigrateOutputSchema, MigratableHotspotsInputSchema, MigratableHotspotsOutputSchema } from "../schemas/migration";
-import { UNAUTHORIZED, BAD_REQUEST, NOT_FOUND } from "../errors/common";
+import {
+  MigrateInputSchema,
+  MigrateOutputSchema,
+  MigratableHotspotsInputSchema,
+  MigratableHotspotsOutputSchema,
+} from "../schemas/migration";
+import {
+  UNAUTHORIZED,
+  BAD_REQUEST,
+  NOT_FOUND,
+  RATE_LIMITED,
+} from "../errors/common";
 import { INSUFFICIENT_FUNDS } from "../errors/solana";
 import { oc } from "@orpc/contract";
 
@@ -8,7 +18,8 @@ export const migrationContract = oc.tag("Migration").router({
     .route({
       method: "GET",
       path: "/migration/hotspots",
-      summary: "Get hotspots that can be migrated (owned directly or in welcome packs)",
+      summary:
+        "Get hotspots that can be migrated (owned directly or in welcome packs)",
     })
     .input(MigratableHotspotsInputSchema)
     .output(MigratableHotspotsOutputSchema)
@@ -30,5 +41,6 @@ export const migrationContract = oc.tag("Migration").router({
       BAD_REQUEST,
       NOT_FOUND,
       INSUFFICIENT_FUNDS,
+      RATE_LIMITED,
     }),
 });
