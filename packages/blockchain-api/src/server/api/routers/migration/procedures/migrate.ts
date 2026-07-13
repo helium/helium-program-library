@@ -260,6 +260,15 @@ export const migrate = publicProcedure.migration.migrate.handler(
     });
     for (const { mint, position } of ownedPositions) {
       const sourceAta = getAssociatedTokenAddressSync(mint, sourcePubkey, true);
+      // Enumeration can lag on-chain state (stale RPC index); confirm the
+      // source ATA still holds the position NFT before building instructions,
+      // otherwise TransferPositionV0 fails the whole batch with 3012.
+      const sourceAtaInfo = await getAccount(connection, sourceAta).catch(
+        () => null
+      );
+      if (!sourceAtaInfo || sourceAtaInfo.amount !== BigInt(1)) {
+        continue;
+      }
       positionTransferInstructions.push(
         await vsrProgram.methods
           .transferPositionV0()
