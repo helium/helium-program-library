@@ -2,7 +2,6 @@ name: Manual Devnet Program Deploy
 
 env:
   SOLANA_CLI_VERSION: 2.1.6
-  NODE_VERSION: 24.13.1
 
 on:
   workflow_dispatch:
