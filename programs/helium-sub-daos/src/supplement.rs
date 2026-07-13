@@ -41,10 +41,13 @@ pub const INFLATION_FLAT_PER_EPOCH_PER_SUBDAO: u64 = 98_000 * 100_000_000;
 /// then decaying linearly to zero across the taper window.
 pub const INFLATION_TAPER_INITIAL_PER_EPOCH_PER_SUBDAO: u64 = INFLATION_FLAT_PER_EPOCH_PER_SUBDAO;
 
-// PATCH-TIME: the Receiving Entity's Squads vault that receives the supplement. Placeholder
-// (the system program id); set to the real vault before deploy. issue_rewards_v0 checks the
-// supplied supplement token account is owned by this key (relaxed under TESTING).
-pub const SUPPLEMENT_VAULT_OWNER: Pubkey = pubkey!("11111111111111111111111111111111");
+// PATCH-TIME: the Receiving Entity's Squads vault HNT token account that receives the
+// supplement. Placeholder (the system program id); set to the real token account before
+// deploy. issue_rewards_v0 requires the supplied supplement token account to equal this key
+// (relaxed under TESTING), pinned to the exact account — like COUNCIL_FANOUT_TOKEN_ACCOUNT —
+// rather than only checking the token-account authority, so a caller cannot route the
+// supplement to a different account under the same authority (I-03).
+pub const SUPPLEMENT_VAULT_TOKEN_ACCOUNT: Pubkey = pubkey!("11111111111111111111111111111111");
 
 // ── HIP 149 Decision 4: Advisory Council compensation carve-out ─────────────────────────
 /// The community-nominated Council seats share 1.25% of the supplement (HIP 149 Decision 4).

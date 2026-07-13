@@ -77,8 +77,9 @@ pub struct IssueRewardsV0<'info> {
   pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
   // HIP 149 Decision 2 supplement vault (the Receiving Entity's Squads vault HNT account).
   // Optional so pre-supplement callers/tests need not pass it; required only when the
-  // supplement window is active (enforced in the handler). Validated there: HNT mint, and
-  // owned by SUPPLEMENT_VAULT_OWNER (relaxed under TESTING).
+  // supplement window is active (enforced in the handler). Validated there: key equals
+  // SUPPLEMENT_VAULT_TOKEN_ACCOUNT (relaxed under TESTING). The HNT mint is enforced by the
+  // mint CPI.
   #[account(mut)]
   pub supplement_vault: Option<Box<Account<'info, TokenAccount>>>,
   // HIP 149 Decision 4 Council-compensation fanout (a mini_fanout PDA-owned HNT account that
@@ -287,7 +288,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
       .as_ref()
       .ok_or_else(|| error!(ErrorCode::SupplementVaultMissing))?;
     require!(
-      TESTING || vault.owner == crate::supplement::SUPPLEMENT_VAULT_OWNER,
+      TESTING || vault.key() == crate::supplement::SUPPLEMENT_VAULT_TOKEN_ACCOUNT,
       ErrorCode::InvalidSupplementVault
     );
     // Council fanout (the 1.25% carve-out). Always required while active, even if the

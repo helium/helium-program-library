@@ -1,5 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import {
@@ -1073,9 +1074,23 @@ describe("helium-sub-daos", () => {
               // Delivered Mobile data deployer HNT = total_rewards x mobile_share x 0.70.
               const alpha = (mobileShare / 0xffffffff) * 0.7;
               const delivered = di.totalRewards.toNumber() * alpha;
-              // Price-derived target: deployer_cap_hnt is 3x carrier-paid USD in HNT, the
-              // floor target is 0.5x => target == cap / 6. The floor should deliver it.
-              const target = di.deployerCapHnt.toNumber() / 6;
+              // deployer_cap_hnt is 3x carrier-paid USD converted at the EMA point price;
+              // the floor target is 0.5x converted at the lower-bound price (ema - 2*conf).
+              // So target == (cap / 6) x (ema / price_lower), not simply cap / 6 (the two
+              // coincide only at zero confidence). Read the cloned mainnet price to
+              // reconstruct the ratio.
+              const pythReceiver = new PythSolanaReceiver({
+                connection: provider.connection,
+                wallet: provider.wallet as any,
+              });
+              const priceAcc = await pythReceiver.fetchPriceUpdateAccount(
+                HNT_PYTH_PRICE_FEED
+              );
+              const emaPrice = priceAcc!.priceMessage.emaPrice.toNumber();
+              const emaConf = priceAcc!.priceMessage.emaConf.toNumber();
+              const priceLower = emaPrice - 2 * emaConf;
+              const target =
+                (di.deployerCapHnt.toNumber() / 6) * (emaPrice / priceLower);
 
               expect(mobileShare).to.be.greaterThan(0);
               expect(delivered).to.be.closeTo(target, target * 0.02);
