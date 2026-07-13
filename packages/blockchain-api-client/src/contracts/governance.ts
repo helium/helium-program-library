@@ -18,6 +18,8 @@ import {
   ExtendPositionResponseSchema,
   FlipLockupKindInputSchema,
   FlipLockupKindResponseSchema,
+  GetPositionsInputSchema,
+  GetPositionsResponseSchema,
   RelinquishPositionVotesInputSchema,
   RelinquishPositionVotesResponseSchema,
   RelinquishVoteInputSchema,
@@ -42,6 +44,18 @@ export const governanceContract = oc
   .tag("Governance")
   .prefix("/governance")
   .router({
+    getPositions: oc
+      .route({
+        method: "GET",
+        path: "/positions/wallet/{wallet}",
+        summary: "List wallet governance positions",
+        description:
+          "List all voter-stake-registry positions owned by a wallet, including deposited amount, governing mint, and lockup info.",
+      })
+      .input(GetPositionsInputSchema)
+      .errors({ BAD_REQUEST })
+      .output(GetPositionsResponseSchema),
+
     createPosition: oc
       .route({
         method: "POST",

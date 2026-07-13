@@ -29,6 +29,8 @@ import {
   nextAvailableTaskIds,
   taskKey,
 } from "@helium/tuktuk-sdk";
+import { init as initVsr } from "@helium/voter-stake-registry-sdk";
+import { getPositionsForOwner } from "@/server/api/routers/governance/procedures/helpers";
 import {
   batchInstructionsToTxsWithPriorityFee,
   getAsset,
@@ -160,6 +162,8 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     // Token transfer instructions (always included in the first batch)
     const tokenTransferInstructions: TransactionInstruction[] = [];
+    // VSR governance position transfers (always included in the first batch)
+    const positionTransferInstructions: TransactionInstruction[] = [];
     // Simple hotspot transfers tracked per-hotspot for incremental batching
     interface SimpleHotspotWork {
       hotspotPubkey: string;
@@ -242,6 +246,35 @@ export const migrate = publicProcedure.migration.migrate.handler(
           createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey)
         );
       }
+    }
+
+    // 3c-2. Governance (VSR) position transfers. Enumerate every position the
+    // source wallet owns (registrar-agnostic) and transfer each to the
+    // destination. Enumeration re-reads on-chain state on every paginated call,
+    // so already-migrated positions naturally drop out on subsequent calls.
+    const vsrProgram = await initVsr(provider);
+    const ownedPositions = await getPositionsForOwner({
+      connection,
+      vsrProgram,
+      owner: sourcePubkey,
+    });
+    for (const { mint, position } of ownedPositions) {
+      const sourceAta = getAssociatedTokenAddressSync(mint, sourcePubkey, true);
+      positionTransferInstructions.push(
+        await vsrProgram.methods
+          .transferPositionV0()
+          .accountsPartial({
+            payer: feePayer,
+            position,
+            mint,
+            from: sourcePubkey,
+            to: destPubkey,
+          })
+          .instruction(),
+        // The transfer leaves the source ATA empty and thawed; closing it
+        // refunds rent to the fee payer, keeping the migration rent-neutral.
+        createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey)
+      );
     }
 
     // 3d. Hotspot Transfers
@@ -620,6 +653,23 @@ export const migrate = publicProcedure.migration.migrate.handler(
         batchOpts
       );
       for (const draft of tokenDrafts) {
+        allDrafts.push(draft);
+        txMetadata.push({
+          type: TRANSACTION_TYPES.MIGRATION,
+          description: "Migration: transfers",
+        });
+      }
+    }
+
+    // Step 1b: Batch governance position transfers (always included, before
+    // hotspots). Each transfer needs only source signing besides the fee payer.
+    if (positionTransferInstructions.length > 0) {
+      const positionDrafts = await batchInstructionsToTxsWithPriorityFee(
+        provider,
+        positionTransferInstructions,
+        batchOpts
+      );
+      for (const draft of positionDrafts) {
         allDrafts.push(draft);
         txMetadata.push({
           type: TRANSACTION_TYPES.MIGRATION,

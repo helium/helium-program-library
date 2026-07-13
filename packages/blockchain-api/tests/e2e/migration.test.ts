@@ -11,6 +11,7 @@ import {
 } from "@solana/spl-token";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { init as initWelcomePack } from "@helium/welcome-pack-sdk";
+import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
@@ -38,6 +39,7 @@ import {
   HNT_LAZY_DISTRIBUTOR_ADDRESS,
 } from "./helpers/constants";
 import { ensureNoContract } from "./helpers/reward-contract";
+import { createAndFundPosition } from "./helpers/governance";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import type { TestCtx } from "./helpers/context";
 import fs from "fs";
@@ -324,6 +326,108 @@ describe("migration", () => {
     } finally {
       process.env.MIGRATION_RATE_LIMIT_PER_PAIR = prev ?? "0";
     }
+  });
+
+  it("migrates a VSR governance position to destination", async () => {
+    const positionDestination = Keypair.generate();
+
+    // Create a position owned by the source wallet (payer)
+    const { positionMint } = await createAndFundPosition(ctx, {
+      amount: "100000000",
+      lockupKind: "cliff",
+      lockupPeriodsInDays: 30,
+    });
+
+    const positionMintPubkey = new PublicKey(positionMint);
+    const [positionPubkey] = positionKey(positionMintPubkey);
+    const sourceAta = getAssociatedTokenAddressSync(
+      positionMintPubkey,
+      payer.publicKey,
+      true
+    );
+    const destAta = getAssociatedTokenAddressSync(
+      positionMintPubkey,
+      positionDestination.publicKey,
+      true
+    );
+
+    // Source owns the position NFT in a frozen ATA before migration
+    const sourceAtaBefore = await getAccount(connection, sourceAta);
+    expect(Number(sourceAtaBefore.amount)).to.equal(1);
+    expect(sourceAtaBefore.isFrozen).to.equal(true);
+
+    // Snapshot PositionV0 state — the transfer must not alter it
+    const anchorProvider = new AnchorProvider(
+      connection,
+      {
+        publicKey: payer.publicKey,
+        signAllTransactions: async () => {
+          throw new Error("not supported in test");
+        },
+        signTransaction: async () => {
+          throw new Error("not supported in test");
+        },
+      } as any,
+      AnchorProvider.defaultOptions()
+    );
+    const vsrProgram = await initVsr(anchorProvider);
+    const positionBefore = await vsrProgram.account.positionV0.fetch(
+      positionPubkey
+    );
+
+    // No hotspots/tokens requested — positions are discovered server-side
+    const result = await client.migration.migrate({
+      sourceWallet: payer.publicKey.toBase58(),
+      destinationWallet: positionDestination.publicKey.toBase58(),
+      hotspots: [],
+      tokens: [],
+    });
+
+    const migrationTxs = result.transactionData.transactions.filter(
+      (t: any) => t.metadata?.description !== "Jito tip"
+    );
+    expect(migrationTxs.length).to.be.greaterThan(0);
+    for (const t of migrationTxs) {
+      expect(t.metadata?.type).to.equal("migration");
+      expect(t.metadata?.signers).to.deep.equal(["source"]);
+    }
+
+    await signAndSubmitTransactionData(
+      connection,
+      result.transactionData,
+      payer
+    );
+
+    // Destination holds the position NFT in a frozen ATA
+    const destAtaAfter = await getAccount(connection, destAta);
+    expect(Number(destAtaAfter.amount)).to.equal(1);
+    expect(destAtaAfter.isFrozen).to.equal(true);
+
+    // Source ATA is closed (rent refunded to fee payer)
+    let sourceClosed = false;
+    try {
+      await getAccount(connection, sourceAta);
+    } catch {
+      sourceClosed = true;
+    }
+    expect(sourceClosed).to.equal(true);
+
+    // PositionV0 account state is unchanged
+    const positionAfter = await vsrProgram.account.positionV0.fetch(
+      positionPubkey
+    );
+    expect(positionAfter.registrar.toBase58()).to.equal(
+      positionBefore.registrar.toBase58()
+    );
+    expect(positionAfter.mint.toBase58()).to.equal(
+      positionBefore.mint.toBase58()
+    );
+    expect(positionAfter.amountDepositedNative.toString()).to.equal(
+      positionBefore.amountDepositedNative.toString()
+    );
+    expect(positionAfter.lockup.endTs.toString()).to.equal(
+      positionBefore.lockup.endTs.toString()
+    );
   });
 
   it("migrates hotspot in welcome pack (closes pack and transfers)", async () => {
