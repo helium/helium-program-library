@@ -160,10 +160,14 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     const warnings: string[] = [];
 
-    // Token transfer instructions (always included in the first batch)
-    const tokenTransferInstructions: TransactionInstruction[] = [];
-    // VSR governance position transfers (always included in the first batch)
-    const positionTransferInstructions: TransactionInstruction[] = [];
+    // Token transfers (always included in the first batch). Each token's
+    // create/transfer/close instructions form one group so the batcher keeps
+    // them in a single tx — a fee-payer-funded dest ATA can never land in a
+    // client-submittable tx without its offsetting source-ATA close.
+    const tokenTransferGroups: TransactionInstruction[][] = [];
+    // VSR governance position transfers (always included in the first batch).
+    // Each position's transfer/close pair is grouped for the same reason.
+    const positionTransferGroups: TransactionInstruction[][] = [];
     // Simple hotspot transfers tracked per-hotspot for incremental batching
     interface SimpleHotspotWork {
       hotspotPubkey: string;
@@ -185,13 +189,13 @@ export const migrate = publicProcedure.migration.migrate.handler(
       const isSol = token.mint === TOKEN_MINTS.WSOL;
 
       if (isSol) {
-        tokenTransferInstructions.push(
+        tokenTransferGroups.push([
           SystemProgram.transfer({
             fromPubkey: sourcePubkey,
             toPubkey: destPubkey,
             lamports: rawAmount,
-          })
-        );
+          }),
+        ]);
       } else {
         const mintKey = new PublicKey(token.mint);
         const sourceAta = getAssociatedTokenAddressSync(
@@ -228,7 +232,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
           continue;
         }
 
-        tokenTransferInstructions.push(
+        tokenTransferGroups.push([
           createAssociatedTokenAccountIdempotentInstruction(
             feePayer,
             destAta,
@@ -243,8 +247,8 @@ export const migrate = publicProcedure.migration.migrate.handler(
             sourceAtaInfo.amount,
             mintInfo.decimals
           ),
-          createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey)
-        );
+          createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey),
+        ]);
       }
     }
 
@@ -269,7 +273,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       if (!sourceAtaInfo || sourceAtaInfo.amount !== BigInt(1)) {
         continue;
       }
-      positionTransferInstructions.push(
+      positionTransferGroups.push([
         await vsrProgram.methods
           .transferPositionV0()
           .accountsPartial({
@@ -282,8 +286,8 @@ export const migrate = publicProcedure.migration.migrate.handler(
           .instruction(),
         // The transfer leaves the source ATA empty and thawed; closing it
         // refunds rent to the fee payer, keeping the migration rent-neutral.
-        createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey)
-      );
+        createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey),
+      ]);
     }
 
     // 3d. Hotspot Transfers
@@ -655,10 +659,10 @@ export const migrate = publicProcedure.migration.migrate.handler(
     };
 
     // Step 1: Batch token transfers (always included — typically small)
-    if (tokenTransferInstructions.length > 0) {
+    if (tokenTransferGroups.length > 0) {
       const tokenDrafts = await batchInstructionsToTxsWithPriorityFee(
         provider,
-        tokenTransferInstructions,
+        tokenTransferGroups,
         batchOpts
       );
       for (const draft of tokenDrafts) {
@@ -672,10 +676,10 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     // Step 1b: Batch governance position transfers (always included, before
     // hotspots). Each transfer needs only source signing besides the fee payer.
-    if (positionTransferInstructions.length > 0) {
+    if (positionTransferGroups.length > 0) {
       const positionDrafts = await batchInstructionsToTxsWithPriorityFee(
         provider,
-        positionTransferInstructions,
+        positionTransferGroups,
         batchOpts
       );
       for (const draft of positionDrafts) {
