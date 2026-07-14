@@ -85,5 +85,8 @@
       "@solana/web3.js": "1.98.2"
     }
   },
-  "packageManager": "pnpm@9.15.4"
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=24.13.0 <25"
+  }
 }
