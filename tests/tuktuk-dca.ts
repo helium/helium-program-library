@@ -16,11 +16,10 @@ import { ensureTuktukDcaIdl } from "./utils/fixtures"
 
 export const ANCHOR_PATH = "anchor"
 
-// Pyth Solana Receiver sponsored price feed addresses on devnet
-// These are PriceUpdateV2 accounts, not Hermes feed IDs
-// Get the latest addresses from: https://www.pyth.network/developers/price-feed-ids
-export const USDC_PRICE_FEED = new PublicKey("Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX") // USDC/USD
-export const HNT_PRICE_FEED = new PublicKey("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33") // HNT/USD
+// Pyth pro-receiver (rec2...) sponsored PriceUpdateV2 accounts, cloned from
+// mainnet in Anchor.toml. These are PriceUpdateV2 accounts, not Hermes feed IDs.
+export const USDC_PRICE_FEED = new PublicKey("6HAuqASbHEh4w4REJEUUUCginTLfj1kwCh215ZLtMkrT") // USDC/USD
+export const HNT_PRICE_FEED = new PublicKey("He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5") // HNT/USD
 
 describe("tuktuk-dca", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"))
