@@ -9,7 +9,10 @@ use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
+use pyth_solana_receiver_sdk::{
+  price_update::{PriceUpdateV2, VerificationLevel},
+  LEGACY_PYTH_SOLANA_RECEIVER_ID,
+};
 
 use crate::{errors::*, DataCreditsV0};
 
@@ -39,12 +42,10 @@ pub struct MintDataCreditsV0<'info> {
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
-  /// CHECK: Checked by loading with pyth. Also double checked by the has_one on data credits instance.
-  #[account(
-    constraint = hnt_price_oracle.verification_level == VerificationLevel::Full @ DataCreditsErrors::PythPriceFeedStale,
-    constraint = hnt_price_oracle.price_message.feed_id == HNT_PRICE_FEED_ID,
-  )]
-  pub hnt_price_oracle: Account<'info, PriceUpdateV2>,
+  /// CHECK: Manually verified in the handler via `load_hnt_price_oracle` — the account
+  /// must be owned by the legacy or pro Pyth receiver, deserialize as a PriceUpdateV2
+  /// for the HNT feed with Full verification, and be within the freshness window.
+  pub hnt_price_oracle: UncheckedAccount<'info>,
 
   // hnt tokens from this account are burned
   #[account(
@@ -125,6 +126,29 @@ impl<'info> MintDataCreditsV0<'info> {
   }
 }
 
+/// Loads the HNT price oracle from a caller-supplied account, accepting either the
+/// legacy or the pro Pyth receiver as owner so old-SDK and new-SDK callers can both
+/// mint. Checks owner, discriminator, feed id, and Full verification; staleness is
+/// checked separately in the handler.
+pub fn load_hnt_price_oracle(account_info: &AccountInfo) -> Result<PriceUpdateV2> {
+  require!(
+    account_info.owner == &pyth_solana_receiver_sdk::ID
+      || account_info.owner == &LEGACY_PYTH_SOLANA_RECEIVER_ID,
+    DataCreditsErrors::InvalidPriceOracleOwner
+  );
+  let data = account_info.try_borrow_data()?;
+  let price_update = PriceUpdateV2::try_deserialize(&mut data.as_ref())?;
+  require!(
+    price_update.verification_level == VerificationLevel::Full,
+    DataCreditsErrors::PythPriceFeedStale
+  );
+  require!(
+    price_update.price_message.feed_id == HNT_PRICE_FEED_ID,
+    DataCreditsErrors::PythError
+  );
+  Ok(price_update)
+}
+
 pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[&[
     b"dc",
@@ -137,7 +161,7 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
     token::thaw_account(ctx.accounts.thaw_ctx().with_signer(signer_seeds))?;
   }
 
-  let hnt_price_oracle = &ctx.accounts.hnt_price_oracle;
+  let hnt_price_oracle = load_hnt_price_oracle(&ctx.accounts.hnt_price_oracle)?;
   let message = hnt_price_oracle.price_message;
 
   let current_time = Clock::get()?.unix_timestamp;
@@ -219,4 +243,88 @@ pub fn handler(ctx: Context<MintDataCreditsV0>, args: MintDataCreditsArgsV0) -> 
   token::freeze_account(ctx.accounts.freeze_ctx().with_signer(signer_seeds))?;
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use anchor_lang::AccountSerialize;
+  use pythnet_sdk::messages::PriceFeedMessage;
+
+  use super::*;
+
+  fn price_update_data(feed_id: [u8; 32], verification_level: VerificationLevel) -> Vec<u8> {
+    let price_update = PriceUpdateV2 {
+      write_authority: Pubkey::new_unique(),
+      verification_level,
+      price_message: PriceFeedMessage {
+        feed_id,
+        price: 1,
+        conf: 2,
+        exponent: -8,
+        publish_time: 900,
+        prev_publish_time: 899,
+        ema_price: 1,
+        ema_conf: 2,
+      },
+      posted_slot: 0,
+    };
+    let mut data = Vec::new();
+    price_update.try_serialize(&mut data).unwrap();
+    data
+  }
+
+  fn load(owner: &Pubkey, data: &mut [u8]) -> Result<PriceUpdateV2> {
+    let key = Pubkey::new_unique();
+    let mut lamports = 0;
+    let account_info = AccountInfo::new(&key, false, false, &mut lamports, data, owner, false, 0);
+    load_hnt_price_oracle(&account_info)
+  }
+
+  #[test]
+  fn accepts_pro_receiver_owner() {
+    let mut data = price_update_data(HNT_PRICE_FEED_ID, VerificationLevel::Full);
+    assert!(load(&pyth_solana_receiver_sdk::ID, &mut data).is_ok());
+  }
+
+  #[test]
+  fn accepts_legacy_receiver_owner() {
+    let mut data = price_update_data(HNT_PRICE_FEED_ID, VerificationLevel::Full);
+    assert!(load(&LEGACY_PYTH_SOLANA_RECEIVER_ID, &mut data).is_ok());
+  }
+
+  #[test]
+  fn rejects_other_owner() {
+    let mut data = price_update_data(HNT_PRICE_FEED_ID, VerificationLevel::Full);
+    assert_eq!(
+      load(&Pubkey::new_unique(), &mut data).map(|_| ()),
+      Err(error!(DataCreditsErrors::InvalidPriceOracleOwner))
+    );
+  }
+
+  #[test]
+  fn rejects_mismatched_feed_id() {
+    let mut data = price_update_data([1; 32], VerificationLevel::Full);
+    assert_eq!(
+      load(&pyth_solana_receiver_sdk::ID, &mut data).map(|_| ()),
+      Err(error!(DataCreditsErrors::PythError))
+    );
+  }
+
+  #[test]
+  fn rejects_partial_verification() {
+    let mut data = price_update_data(
+      HNT_PRICE_FEED_ID,
+      VerificationLevel::Partial { num_signatures: 5 },
+    );
+    assert_eq!(
+      load(&pyth_solana_receiver_sdk::ID, &mut data).map(|_| ()),
+      Err(error!(DataCreditsErrors::PythPriceFeedStale))
+    );
+  }
+
+  #[test]
+  fn rejects_non_price_update_data() {
+    let mut data = vec![0u8; 134];
+    assert!(load(&pyth_solana_receiver_sdk::ID, &mut data).is_err());
+  }
 }

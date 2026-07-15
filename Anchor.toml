@@ -87,6 +87,9 @@ address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV" # noop
 address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33" # hnt feed needed for dc auto top
 
 [[test.validator.clone]]
+address = "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5" # pro-receiver-owned HNT feed for data-credits dual-accept
+
+[[test.validator.clone]]
 address = "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX" # USDC/USD price feed for tuktuk-dca
 
 [[test.validator.clone]]

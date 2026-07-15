@@ -23,7 +23,10 @@ import {
 } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
-import { daoKey, delegatorRewardsPercent } from "../packages/helium-sub-daos-sdk/src";
+import {
+  daoKey,
+  delegatorRewardsPercent,
+} from "../packages/helium-sub-daos-sdk/src";
 import { toBN, toNumber } from "../packages/spl-utils/src";
 import * as vsr from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
@@ -45,7 +48,7 @@ export async function burnDataCredits({
   amount: number;
   subDao: PublicKey;
 }): Promise<{ subDaoEpochInfo: PublicKey }> {
-  console.log("start delegate")
+  console.log("start delegate");
   const useData = await program.methods
     .delegateDataCreditsV0({
       amount: toBN(amount, 0),
@@ -110,7 +113,7 @@ describe("data-credits", () => {
     nftProxyProgram = await initNftProxy(provider);
     await ensureVSRIdl();
     await ensureHSDIdl();
-  })
+  });
 
   beforeEach(async () => {
     hntMint = await createMint(provider, hntDecimals, me, me);
@@ -153,6 +156,73 @@ describe("data-credits", () => {
     assert(dataCreditsAcc?.dcMint.equals(dcMint));
     assert(dataCreditsAcc?.hntMint.equals(hntMint));
     assert(dataCreditsAcc?.authority.equals(me));
+  });
+
+  // Cloned from mainnet in Anchor.toml; owned by the pro pyth receiver (rec2...)
+  const PRO_HNT_PRICE_FEED = new PublicKey(
+    "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5"
+  );
+
+  it("mints some data credits with a pro-receiver-owned price account", async () => {
+    await program.methods
+      .mintDataCreditsV0({
+        hntAmount: new BN(1 * 10 ** 8),
+        dcAmount: null,
+      })
+      .accountsPartial({
+        dcMint,
+        hntPriceOracle: PRO_HNT_PRICE_FEED,
+      })
+      .rpc({ skipPreflight: true });
+
+    // Decode the PriceUpdateV2 borsh layout directly: 8 discriminator +
+    // 32 write_authority + 1 verification_level (Full) puts the
+    // PriceFeedMessage at offset 41.
+    const oracleData = (await provider.connection.getAccountInfo(
+      PRO_HNT_PRICE_FEED
+    ))!.data;
+    const exponent = oracleData.readInt32LE(41 + 32 + 8 + 8);
+    const emaPrice = oracleData.readBigInt64LE(41 + 32 + 8 + 8 + 4 + 8 + 8);
+    const emaConf = oracleData.readBigUInt64LE(41 + 32 + 8 + 8 + 4 + 8 + 8 + 8);
+
+    const dcAta = await getAssociatedTokenAddress(dcMint, me);
+    const dcAtaAcc = await getAccount(provider.connection, dcAta);
+    assert(dcAtaAcc.isFrozen);
+    const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
+    const hntBal = await provider.connection.getTokenAccountBalance(
+      await getAssociatedTokenAddress(hntMint, me)
+    );
+
+    const approxEndBal =
+      startDcBal +
+      Math.floor(
+        Number(emaPrice - emaConf * BigInt(2)) * 10 ** exponent * 10 ** 5
+      );
+    expect(dcBal.value.uiAmount).to.be.within(
+      approxEndBal - 1,
+      approxEndBal + 1
+    );
+    expect(hntBal.value.uiAmount).to.eq(startHntBal - 1);
+  });
+
+  it("fails to mint when the price account is not owned by a pyth receiver", async () => {
+    let error: any = null;
+    try {
+      await program.methods
+        .mintDataCreditsV0({
+          hntAmount: new BN(1 * 10 ** 8),
+          dcAmount: null,
+        })
+        .accountsPartial({
+          dcMint,
+          hntPriceOracle: dcMint,
+        })
+        .rpc();
+    } catch (e: any) {
+      error = e;
+    }
+    expect(error, "expected mint to fail").to.not.be.null;
+    expect(error.error?.errorCode?.code).to.eq("InvalidPriceOracleOwner");
   });
 
   describe("with data credits", async () => {
@@ -230,9 +300,9 @@ describe("data-credits", () => {
         program,
         hntAmount: new BN(1 * 10 ** 8),
       });
-      console.log('txs', JSON.stringify(txs, null, 2));
+      console.log("txs", JSON.stringify(txs, null, 2));
 
-      await provider.sendAll(txs, { skipPreflight: true })
+      await provider.sendAll(txs, { skipPreflight: true });
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
@@ -248,8 +318,8 @@ describe("data-credits", () => {
           new BN(price.ema_price.price)
             .sub(new BN(price.ema_price.conf).mul(new BN(2)))
             .toNumber() *
-          10 ** price.ema_price.expo *
-          10 ** 5
+            10 ** price.ema_price.expo *
+            10 ** 5
         );
       expect(dcBal.value.uiAmount).to.be.within(
         approxEndBal - 1,
@@ -266,7 +336,7 @@ describe("data-credits", () => {
         dcAmount: new BN(dcAmount),
       });
 
-      await provider.sendAll(txs)
+      await provider.sendAll(txs);
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
