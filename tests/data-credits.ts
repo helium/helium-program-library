@@ -175,15 +175,19 @@ describe("data-credits", () => {
       })
       .rpc({ skipPreflight: true });
 
-    // Decode the PriceUpdateV2 borsh layout directly: 8 discriminator +
-    // 32 write_authority + 1 verification_level (Full) puts the
-    // PriceFeedMessage at offset 41.
-    const oracleData = (await provider.connection.getAccountInfo(
+    const { PythSolanaReceiver } = await import(
+      "@pythnetwork/pyth-solana-receiver"
+    );
+    const pythReceiver = new PythSolanaReceiver({
+      connection: provider.connection,
+      wallet: provider.wallet as any,
+    });
+    const priceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(
       PRO_HNT_PRICE_FEED
-    ))!.data;
-    const exponent = oracleData.readInt32LE(41 + 32 + 8 + 8);
-    const emaPrice = oracleData.readBigInt64LE(41 + 32 + 8 + 8 + 4 + 8 + 8);
-    const emaConf = oracleData.readBigUInt64LE(41 + 32 + 8 + 8 + 4 + 8 + 8 + 8);
+    );
+    const exponent = priceUpdate.priceMessage.exponent;
+    const emaPrice = BigInt(priceUpdate.priceMessage.emaPrice.toString());
+    const emaConf = BigInt(priceUpdate.priceMessage.emaConf.toString());
 
     const dcAta = await getAssociatedTokenAddress(dcMint, me);
     const dcAtaAcc = await getAccount(provider.connection, dcAta);
