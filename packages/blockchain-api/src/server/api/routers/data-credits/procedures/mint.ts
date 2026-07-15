@@ -41,11 +41,10 @@ export const mint = publicProcedure.dataCredits.mint.handler(
 
     const program = await initDc(provider);
 
-    // Note: minting has no Squads propose mode. mintDataCreditsV0 checks Pyth
-    // price freshness on-chain and requires a fresh price posted in the same
-    // transaction; a Squads proposal executes later, by which point any posted
-    // or referenced price is stale (verified: the program throws
-    // PythPriceNotFound). Delegation and burns are proposable; minting is not.
+    // Note: minting has no Squads propose mode. This is a product decision, not
+    // a technical limitation — DC minting is a self-service user action, not a
+    // treasury operation that a multisig should gate. Delegation and burns are
+    // proposable; minting is not.
     const { txs } = await mintDataCredits({
       program,
       dcAmount: dcAmount ? new BN(dcAmount) : undefined,

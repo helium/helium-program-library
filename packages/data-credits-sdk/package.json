@@ -38,8 +38,6 @@
     "@helium/helium-sub-daos-sdk": "workspace:^",
     "@helium/idls": "workspace:^",
     "@helium/spl-utils": "workspace:^",
-    "@pythnetwork/hermes-client": "^2.0.0",
-    "@pythnetwork/pyth-solana-receiver": "^0.10.2",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
