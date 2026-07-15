@@ -8,13 +8,13 @@ This allows us to schedule pyth updates to the chain instead of depending on Pyt
 
 One codebase runs as either the legacy or the pro Pyth instance, selected purely by env:
 
-| Env var                       | Default                                        | Pro deployment                                      |
-| ----------------------------- | ---------------------------------------------- | --------------------------------------------------- |
-| `PYTH_HERMES_URL`             | `https://hermes.pyth.network/`                 | `https://pyth.dourolabs.app/hermes/`                |
-| `PYTH_API_KEY`                | unset (no auth header)                         | Pyth data-plan key, sent as `Authorization: Bearer` |
-| `PYTH_RECEIVER_PROGRAM_ID`    | `rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ`  | `rec2HHDDnjLfj4kE7VyEtFA1HPGQLK33259532cRyHp`       |
-| `PYTH_PUSH_ORACLE_PROGRAM_ID` | `pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT`  | `pyt2F414BA6dPttK6RddPZUdHfapoBN24GL5wbrPCou`       |
-| `WORMHOLE_PROGRAM_ID`         | `HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ` | `HDw2E7P8X1SkCyjvoGsfBGAVUutKcj874bXjHrpVYrVL`      |
+| Env var                       | Default (see `src/env.ts` for exact values) | Pro deployment                                      |
+| ----------------------------- | ------------------------------------------- | --------------------------------------------------- |
+| `PYTH_HERMES_URL`             | public Hermes endpoint                      | `https://pyth.dourolabs.app/hermes/`                |
+| `PYTH_API_KEY`                | unset (no auth header)                      | Pyth data-plan key, sent as `Authorization: Bearer` |
+| `PYTH_RECEIVER_PROGRAM_ID`    | legacy receiver (`rec5…`)                   | `rec2HHDDnjLfj4kE7VyEtFA1HPGQLK33259532cRyHp`       |
+| `PYTH_PUSH_ORACLE_PROGRAM_ID` | legacy push oracle (`pythW…`)               | `pyt2F414BA6dPttK6RddPZUdHfapoBN24GL5wbrPCou`       |
+| `WORMHOLE_PROGRAM_ID`         | legacy wormhole receiver (`HDwc…`)          | `HDw2E7P8X1SkCyjvoGsfBGAVUutKcj874bXjHrpVYrVL`      |
 
 With none of these set, behavior is identical to the pre-parameterization service (legacy deployment unaffected).
 

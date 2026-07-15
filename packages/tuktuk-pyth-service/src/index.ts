@@ -40,10 +40,22 @@ import { IDL } from "./wormhole";
 
 // @ts-ignore
 const camelCaseIDL = convertIdlToCamelCase(IDL);
-const convertedIDL = {
+// Vendored wormhole IDL with its address swapped for the configured program.
+const wormholeIdl = {
   ...camelCaseIDL,
   address: WORMHOLE_PROGRAM_ID.toBase58(),
 };
+
+const makePythReceiver = (payer: PublicKey) =>
+  new PythSolanaReceiver({
+    connection: new Connection(SOLANA_URL),
+    wallet: {
+      publicKey: payer,
+    } as Wallet,
+    receiverProgramId: PYTH_RECEIVER_PROGRAM_ID,
+    pushOracleProgramId: PYTH_PUSH_ORACLE_PROGRAM_ID,
+    wormholeProgramId: WORMHOLE_PROGRAM_ID,
+  });
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -105,7 +117,7 @@ async function generateAllVaaInstructions(
     Buffer.from("vaa"),
     Buffer.from(feedId),
   ]);
-  const wormholeProgram = new Program(convertedIDL, pythProgram.provider);
+  const wormholeProgram = new Program(wormholeIdl, pythProgram.provider);
 
   const vaaExists = await provider.connection.getAccountInfo(tuktukEncodedVaa);
   const initInstructions: {
@@ -289,15 +301,7 @@ async function processVaaInstructions(
   ]);
   const hplCronsProgram = await initHplCrons(provider);
 
-  const pythProgram: PythSolanaReceiver = new PythSolanaReceiver({
-    connection: new Connection(SOLANA_URL),
-    wallet: {
-      publicKey: payer,
-    } as Wallet,
-    receiverProgramId: PYTH_RECEIVER_PROGRAM_ID,
-    pushOracleProgramId: PYTH_PUSH_ORACLE_PROGRAM_ID,
-    wormholeProgramId: WORMHOLE_PROGRAM_ID,
-  });
+  const pythProgram: PythSolanaReceiver = makePythReceiver(payer);
 
   const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(
     new PublicKey(priceUpdateId)
@@ -562,15 +566,7 @@ server.post<{
   const [payer, payerBump] = customSignerKey(taskQueue, [
     Buffer.from("pyth-payer"),
   ]);
-  const pythProgram: PythSolanaReceiver = new PythSolanaReceiver({
-    connection: new Connection(SOLANA_URL),
-    wallet: {
-      publicKey: payer,
-    } as Wallet,
-    receiverProgramId: PYTH_RECEIVER_PROGRAM_ID,
-    pushOracleProgramId: PYTH_PUSH_ORACLE_PROGRAM_ID,
-    wormholeProgramId: WORMHOLE_PROGRAM_ID,
-  });
+  const pythProgram: PythSolanaReceiver = makePythReceiver(payer);
   const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(
     new PublicKey(priceUpdateId)
   );
