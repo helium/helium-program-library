@@ -331,7 +331,7 @@ pub mod tests {
     #[test]
     fn check_size() {
         assert!(
-            PriceUpdateV2::discriminator().len() + borsh0_10::get_packed_len::<PriceUpdateV2>()
+            PriceUpdateV2::DISCRIMINATOR.len() + borsh0_10::get_packed_len::<PriceUpdateV2>()
                 == PriceUpdateV2::LEN
         );
     }
