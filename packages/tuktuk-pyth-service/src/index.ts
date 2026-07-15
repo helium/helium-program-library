@@ -4,20 +4,46 @@ import cors from "@fastify/cors";
 import { init as initHplCrons } from "@helium/hpl-crons-sdk";
 import { truthy } from "@helium/spl-utils";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
-import { compileTransaction, customSignerKey, init, RemoteTaskTransactionV0 } from "@helium/tuktuk-sdk";
+import {
+  compileTransaction,
+  customSignerKey,
+  init,
+  RemoteTaskTransactionV0,
+} from "@helium/tuktuk-sdk";
 import { HermesClient } from "@pythnetwork/hermes-client";
 import { parseAccumulatorUpdateData } from "@pythnetwork/price-service-sdk";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
-import { getConfigPda, getGuardianSetPda, getTreasuryPda } from "@pythnetwork/pyth-solana-receiver/address";
-import { Connection, Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  getConfigPda,
+  getGuardianSetPda,
+  getTreasuryPda,
+} from "@pythnetwork/pyth-solana-receiver/address";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
-import { KEYPAIR, PYTH_HERMES_URL, SOLANA_URL } from "./env";
+import {
+  KEYPAIR,
+  PYTH_API_KEY,
+  PYTH_HERMES_URL,
+  PYTH_PUSH_ORACLE_PROGRAM_ID,
+  PYTH_RECEIVER_PROGRAM_ID,
+  SOLANA_URL,
+  WORMHOLE_PROGRAM_ID,
+} from "./env";
 import { PythPriceUpdate } from "./model";
 import { IDL } from "./wormhole";
 
 // @ts-ignore
-const convertedIDL = convertIdlToCamelCase(IDL)
+const camelCaseIDL = convertIdlToCamelCase(IDL);
+const convertedIDL = {
+  ...camelCaseIDL,
+  address: WORMHOLE_PROGRAM_ID.toBase58(),
+};
 
 const server: FastifyInstance = Fastify({
   logger: true,
@@ -31,17 +57,15 @@ server.get("/health", async () => {
   return { ok: true };
 });
 
-const wallet = new Wallet(KEYPAIR)
+const wallet = new Wallet(KEYPAIR);
 
-const provider = new AnchorProvider(
-  new Connection(SOLANA_URL),
-  wallet,
-  { commitment: "confirmed" }
-);
+const provider = new AnchorProvider(new Connection(SOLANA_URL), wallet, {
+  commitment: "confirmed",
+});
 let tuktukProgram: Promise<Program<Tuktuk>> | null = null;
 function getTuktukProgram() {
   if (!tuktukProgram) {
-    tuktukProgram = init(provider)
+    tuktukProgram = init(provider);
   }
   return tuktukProgram;
 }
@@ -53,43 +77,70 @@ interface ProcessVaaConfig {
 
 const VAA_START = 46;
 
-async function buildEncodedVaaCreateInstruction(wormholeProgram: Program<any>, vaa: Buffer, encodedVaaKeypair: Keypair) {
+async function buildEncodedVaaCreateInstruction(
+  wormholeProgram: Program<any>,
+  vaa: Buffer,
+  encodedVaaKeypair: Keypair
+) {
   const encodedVaaSize = vaa.length + VAA_START;
   // @ts-ignore
-  return await wormholeProgram.account.encodedVaa.createInstruction(encodedVaaKeypair, encodedVaaSize)
+  return await wormholeProgram.account.encodedVaa.createInstruction(
+    encodedVaaKeypair,
+    encodedVaaSize
+  );
 }
 
-async function generateAllVaaInstructions(vaa: Buffer, priceUpdateId: string, taskQueue: PublicKey, pythProgram: PythSolanaReceiver) {
+async function generateAllVaaInstructions(
+  vaa: Buffer,
+  priceUpdateId: string,
+  taskQueue: PublicKey,
+  pythProgram: PythSolanaReceiver
+) {
   const encodedVaaKeypair = new Keypair();
-  const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(new PublicKey(priceUpdateId));
+  const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(
+    new PublicKey(priceUpdateId)
+  );
   const feedId = priceUpdate.priceMessage.feedId;
-  const [tuktukEncodedVaa, bump] = customSignerKey(taskQueue, [Buffer.from("vaa"), Buffer.from(feedId)]);
+  const [tuktukEncodedVaa, bump] = customSignerKey(taskQueue, [
+    Buffer.from("vaa"),
+    Buffer.from(feedId),
+  ]);
   const wormholeProgram = new Program(convertedIDL, pythProgram.provider);
 
   const vaaExists = await provider.connection.getAccountInfo(tuktukEncodedVaa);
-  const initInstructions: { instruction: TransactionInstruction, accountsSize: number }[] = [];
+  const initInstructions: {
+    instruction: TransactionInstruction;
+    accountsSize: number;
+  }[] = [];
   if (vaaExists) {
-    const { instruction: closeInstruction } = await pythProgram.buildCloseEncodedVaaInstruction(tuktukEncodedVaa);
+    const { instruction: closeInstruction } =
+      await pythProgram.buildCloseEncodedVaaInstruction(tuktukEncodedVaa);
     initInstructions.push({ instruction: closeInstruction, accountsSize: 32 });
   }
 
   // Create and init instructions
-  const createInstruction = await buildEncodedVaaCreateInstruction(wormholeProgram, vaa, encodedVaaKeypair);
+  const createInstruction = await buildEncodedVaaCreateInstruction(
+    wormholeProgram,
+    vaa,
+    encodedVaaKeypair
+  );
   const initInstruction = await wormholeProgram.methods
     .initEncodedVaa()
     .accounts({
       encodedVaa: encodedVaaKeypair.publicKey,
     })
-    .instruction()
+    .instruction();
   initInstructions.push(
     { instruction: createInstruction, accountsSize: 32 },
-    { instruction: initInstruction, accountsSize: 32 },
+    { instruction: initInstruction, accountsSize: 32 }
   );
-
 
   // VAA write instructions with proper chunking
   const chunkSize = 370;
-  const writeInstructions: { instruction: TransactionInstruction, accountsSize: number }[] = [];
+  const writeInstructions: {
+    instruction: TransactionInstruction;
+    accountsSize: number;
+  }[] = [];
   let writeIndex = 0;
   for (let i = 0; i < vaa.length; i += chunkSize) {
     const chunk = vaa.subarray(i, Math.min(i + chunkSize, vaa.length));
@@ -102,7 +153,7 @@ async function generateAllVaaInstructions(vaa: Buffer, priceUpdateId: string, ta
       .accounts({
         draftVaa: encodedVaaKeypair.publicKey,
       })
-      .instruction()
+      .instruction();
 
     writeInstructions.push({ instruction: writeInstruction, accountsSize: 32 });
     writeIndex++;
@@ -112,7 +163,10 @@ async function generateAllVaaInstructions(vaa: Buffer, priceUpdateId: string, ta
   const verifyInstruction = await wormholeProgram.methods
     .verifyEncodedVaaV1()
     .accounts({
-      guardianSet: getGuardianSetPda(vaa.readUInt32BE(1), wormholeProgram.programId),
+      guardianSet: getGuardianSetPda(
+        vaa.readUInt32BE(1),
+        wormholeProgram.programId
+      ),
       draftVaa: encodedVaaKeypair.publicKey,
     })
     .instruction();
@@ -120,18 +174,27 @@ async function generateAllVaaInstructions(vaa: Buffer, priceUpdateId: string, ta
   // Get price update data for final instruction
   const priceUpdateModel = await PythPriceUpdate.findByPk(priceUpdateId);
   if (!priceUpdateModel) {
-    throw new Error(`Price update not found for price update id: ${priceUpdateId}`);
+    throw new Error(
+      `Price update not found for price update id: ${priceUpdateId}`
+    );
   }
-  const accumulatorUpdateData = parseAccumulatorUpdateData(Buffer.from(priceUpdateModel.priceUpdate, "base64"));
+  const accumulatorUpdateData = parseAccumulatorUpdateData(
+    Buffer.from(priceUpdateModel.priceUpdate, "base64")
+  );
 
   // Final price update instruction
-  const priceUpdateInstruction = await pythProgram.pushOracle.methods.updatePriceFeed({
-    merklePriceUpdate: {
-      message: accumulatorUpdateData.updates[0].message,
-      proof: accumulatorUpdateData.updates[0].proof,
-    },
-    treasuryId: 0,
-  }, 0, Array.from(feedId))
+  const priceUpdateInstruction = await pythProgram.pushOracle.methods
+    .updatePriceFeed(
+      {
+        merklePriceUpdate: {
+          message: accumulatorUpdateData.updates[0].message,
+          proof: accumulatorUpdateData.updates[0].proof,
+        },
+        treasuryId: 0,
+      },
+      0,
+      Array.from(feedId)
+    )
     .accounts({
       encodedVaa: tuktukEncodedVaa,
       priceFeedAccount: new PublicKey(priceUpdateId),
@@ -142,16 +205,23 @@ async function generateAllVaaInstructions(vaa: Buffer, priceUpdateId: string, ta
     .instruction();
 
   return {
-    allInstructions: [...initInstructions, ...writeInstructions, { instruction: verifyInstruction, accountsSize: 32 }, { instruction: priceUpdateInstruction, accountsSize: 5 * 32 }],
+    allInstructions: [
+      ...initInstructions,
+      ...writeInstructions,
+      { instruction: verifyInstruction, accountsSize: 32 },
+      { instruction: priceUpdateInstruction, accountsSize: 5 * 32 },
+    ],
     encodedVaaAddress: encodedVaaKeypair.publicKey,
     tuktukEncodedVaa,
-    bump
+    bump,
   };
 }
 
 const MAX_SERIALIZED_LENGTH = 702;
 
-const MEMO_PROGRAM_ID = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+const MEMO_PROGRAM_ID = new PublicKey(
+  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+);
 
 // Offsets within an EncodedVaa account: 8-byte anchor discriminator, then
 // Header { status: u8, write_authority: Pubkey, version: u8 }.
@@ -164,7 +234,7 @@ async function sendMemoResponse(
   task: PublicKey,
   taskQueuedAt: BN,
   tuktukProgram: Program<Tuktuk>,
-  message: string,
+  message: string
 ) {
   const memoInstruction = new TransactionInstruction({
     keys: [],
@@ -172,7 +242,10 @@ async function sendMemoResponse(
     data: Buffer.from(message, "utf8"),
   });
 
-  const { transaction, remainingAccounts } = await compileTransaction([memoInstruction], []);
+  const { transaction, remainingAccounts } = await compileTransaction(
+    [memoInstruction],
+    []
+  );
 
   const remoteTx = new RemoteTaskTransactionV0({
     task,
@@ -185,13 +258,13 @@ async function sendMemoResponse(
 
   const serialized = await RemoteTaskTransactionV0.serialize(
     tuktukProgram.coder.accounts,
-    remoteTx,
+    remoteTx
   );
 
   reply.status(200).send({
     transaction: serialized.toString("base64"),
     signature: Buffer.from(
-      sign.detached(Uint8Array.from(serialized), KEYPAIR.secretKey),
+      sign.detached(Uint8Array.from(serialized), KEYPAIR.secretKey)
     ).toString("base64"),
     remaining_accounts: remainingAccounts.map((acc) => ({
       pubkey: acc.pubkey.toBase58(),
@@ -211,49 +284,83 @@ async function processVaaInstructions(
   const task = new PublicKey(request.body.task);
   const taskQueue = new PublicKey(request.body.task_queue);
   const taskQueuedAt = new BN(request.body.task_queued_at);
-  const [payer, payerBump] = customSignerKey(taskQueue, [Buffer.from("pyth-payer")]);
-  const hplCronsProgram = await initHplCrons(provider)
+  const [payer, payerBump] = customSignerKey(taskQueue, [
+    Buffer.from("pyth-payer"),
+  ]);
+  const hplCronsProgram = await initHplCrons(provider);
 
   const pythProgram: PythSolanaReceiver = new PythSolanaReceiver({
     connection: new Connection(SOLANA_URL),
     wallet: {
-      publicKey: payer
+      publicKey: payer,
     } as Wallet,
-  })
+    receiverProgramId: PYTH_RECEIVER_PROGRAM_ID,
+    pushOracleProgramId: PYTH_PUSH_ORACLE_PROGRAM_ID,
+    wormholeProgramId: WORMHOLE_PROGRAM_ID,
+  });
 
-  const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(new PublicKey(priceUpdateId));
+  const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(
+    new PublicKey(priceUpdateId)
+  );
   const feedId = priceUpdate.priceMessage.feedId;
-  const [tuktukEncodedVaa, bump] = customSignerKey(taskQueue, [Buffer.from("vaa"), Buffer.from(feedId)]);
+  const [tuktukEncodedVaa, bump] = customSignerKey(taskQueue, [
+    Buffer.from("vaa"),
+    Buffer.from(feedId),
+  ]);
 
   // Get price update data
   const priceUpdateModel = await PythPriceUpdate.findByPk(priceUpdateId);
   if (!priceUpdateModel) {
-    throw new Error(`Price update not found for price update id: ${priceUpdateId}`);
+    throw new Error(
+      `Price update not found for price update id: ${priceUpdateId}`
+    );
   }
-  const accumulatorUpdateData = parseAccumulatorUpdateData(Buffer.from(priceUpdateModel.priceUpdate, "base64"));
+  const accumulatorUpdateData = parseAccumulatorUpdateData(
+    Buffer.from(priceUpdateModel.priceUpdate, "base64")
+  );
 
   // Generate all instructions
   const { allInstructions, encodedVaaAddress } =
-    await generateAllVaaInstructions(accumulatorUpdateData.vaa, priceUpdateId, taskQueue, pythProgram);
+    await generateAllVaaInstructions(
+      accumulatorUpdateData.vaa,
+      priceUpdateId,
+      taskQueue,
+      pythProgram
+    );
 
   // Continuation pre-flight: if another task chain for this feed already advanced
   // the on-chain VAA past Writing, our remaining writes/verify will fail with
   // NotInWritingStatus. Bail out with a no-op memo tx so the task succeeds and
   // tuktuk doesn't burn retries on a foregone failure.
   if (index > 0) {
-    const accountInfo = await provider.connection.getAccountInfo(tuktukEncodedVaa);
+    const accountInfo = await provider.connection.getAccountInfo(
+      tuktukEncodedVaa
+    );
     const onlyPriceUpdateLeft = index === allInstructions.length - 1;
 
     if (!accountInfo) {
-      return sendMemoResponse(reply, task, taskQueuedAt, tuktukProgram,
-        `pyth: encoded VAA ${tuktukEncodedVaa.toBase58()} no longer exists; another chain consumed it`);
+      return sendMemoResponse(
+        reply,
+        task,
+        taskQueuedAt,
+        tuktukProgram,
+        `pyth: encoded VAA ${tuktukEncodedVaa.toBase58()} no longer exists; another chain consumed it`
+      );
     }
 
     const status = accountInfo.data[ENCODED_VAA_STATUS_OFFSET];
     if (!onlyPriceUpdateLeft && status !== ENCODED_VAA_STATUS_WRITING) {
-      const statusName = status === ENCODED_VAA_STATUS_VERIFIED ? "Verified" : `status=${status}`;
-      return sendMemoResponse(reply, task, taskQueuedAt, tuktukProgram,
-        `pyth: encoded VAA ${tuktukEncodedVaa.toBase58()} is ${statusName}, not Writing; another chain finished verify`);
+      const statusName =
+        status === ENCODED_VAA_STATUS_VERIFIED
+          ? "Verified"
+          : `status=${status}`;
+      return sendMemoResponse(
+        reply,
+        task,
+        taskQueuedAt,
+        tuktukProgram,
+        `pyth: encoded VAA ${tuktukEncodedVaa.toBase58()} is ${statusName}, not Writing; another chain finished verify`
+      );
     }
   }
 
@@ -261,24 +368,35 @@ async function processVaaInstructions(
   let currentIndex = index;
   let hasMoreInstructions = true;
 
-  const instructions: { instruction: TransactionInstruction, accountsSize: number }[] = [];
+  const instructions: {
+    instruction: TransactionInstruction;
+    accountsSize: number;
+  }[] = [];
   while (currentIndex < allInstructions.length && hasMoreInstructions) {
     const currentInstruction = allInstructions[currentIndex];
 
     // Map the encoded VAA address for VAA-related instructions
     const mappedInstruction = {
       programId: currentInstruction.instruction.programId,
-      keys: currentInstruction.instruction.keys.map(key =>
-        key.pubkey.equals(encodedVaaAddress) ? {
-          isSigner: true,
-          isWritable: true,
-          pubkey: tuktukEncodedVaa,
-        } : key
+      keys: currentInstruction.instruction.keys.map((key) =>
+        key.pubkey.equals(encodedVaaAddress)
+          ? {
+              isSigner: true,
+              isWritable: true,
+              pubkey: tuktukEncodedVaa,
+            }
+          : key
       ),
       data: currentInstruction.instruction.data,
     };
 
-    const testInstructions = [...instructions, { instruction: mappedInstruction, accountsSize: currentInstruction.accountsSize }];
+    const testInstructions = [
+      ...instructions,
+      {
+        instruction: mappedInstruction,
+        accountsSize: currentInstruction.accountsSize,
+      },
+    ];
 
     // Determine if we need to requeue
     const nextIndex = currentIndex + 1;
@@ -286,33 +404,47 @@ async function processVaaInstructions(
 
     let requeueInstruction: TransactionInstruction | null = null;
     if (!isLastInstruction) {
-      requeueInstruction = await hplCronsProgram.methods.returnPythTaskV0({
-        index: nextIndex,
-        // If next time we're at the last instruction, we don't need to requeue
-        freeTasks: (nextIndex + 1) >= allInstructions.length ? 0 : 1,
-      }).accountsPartial({
-        task: task,
-        taskQueue: taskQueue,
-        payer: payer,
-      }).instruction();
+      requeueInstruction = await hplCronsProgram.methods
+        .returnPythTaskV0({
+          index: nextIndex,
+          // If next time we're at the last instruction, we don't need to requeue
+          freeTasks: nextIndex + 1 >= allInstructions.length ? 0 : 1,
+        })
+        .accountsPartial({
+          task: task,
+          taskQueue: taskQueue,
+          payer: payer,
+        })
+        .instruction();
     }
 
     // Test serialization with potential requeue instruction
     const finalTestInstructions = requeueInstruction
-      ? [...testInstructions, { instruction: requeueInstruction, accountsSize: 0 }]
+      ? [
+          ...testInstructions,
+          { instruction: requeueInstruction, accountsSize: 0 },
+        ]
       : testInstructions;
 
-    const allAccounts = finalTestInstructions.map(i => i.instruction.keys).flat();
+    const allAccounts = finalTestInstructions
+      .map((i) => i.instruction.keys)
+      .flat();
     const bumpBuffer = Buffer.alloc(1);
     bumpBuffer.writeUint8(bump);
     const payerBumpBuffer = Buffer.alloc(1);
     payerBumpBuffer.writeUint8(payerBump);
 
     const { transaction, remainingAccounts } = await compileTransaction(
-      finalTestInstructions.map(i => i.instruction),
+      finalTestInstructions.map((i) => i.instruction),
       [
-        allAccounts.some(acc => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner) ? [Buffer.from("vaa"), Buffer.from(feedId), bumpBuffer] : undefined,
-        allAccounts.some(acc => acc.pubkey.equals(payer) && acc.isSigner) ? [Buffer.from("pyth-payer"), payerBumpBuffer] : undefined,
+        allAccounts.some(
+          (acc) => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner
+        )
+          ? [Buffer.from("vaa"), Buffer.from(feedId), bumpBuffer]
+          : undefined,
+        allAccounts.some((acc) => acc.pubkey.equals(payer) && acc.isSigner)
+          ? [Buffer.from("pyth-payer"), payerBumpBuffer]
+          : undefined,
       ].filter(truthy)
     );
 
@@ -336,25 +468,34 @@ async function processVaaInstructions(
       // Overflow, most likely
     }
 
-    const len = testSerialized.length + testInstructions.reduce((acc, i) => acc + i.accountsSize, 0)
+    const len =
+      testSerialized.length +
+      testInstructions.reduce((acc, i) => acc + i.accountsSize, 0);
 
     // Check if it fits within the limit
     if (len <= MAX_SERIALIZED_LENGTH) {
-      instructions.push({ instruction: mappedInstruction, accountsSize: currentInstruction.accountsSize })
+      instructions.push({
+        instruction: mappedInstruction,
+        accountsSize: currentInstruction.accountsSize,
+      });
       currentIndex++;
     } else {
       const isLastInstruction = currentIndex >= allInstructions.length;
       if (!isLastInstruction) {
         instructions.push({
-          instruction: await hplCronsProgram.methods.returnPythTaskV0({
-            index: currentIndex,
-            freeTasks: (currentIndex + 1) >= allInstructions.length ? 0 : 1,
-          }).accountsPartial({
-            task: task,
-            taskQueue: taskQueue,
-            payer: payer,
-          }).instruction(), accountsSize: 0
-        })
+          instruction: await hplCronsProgram.methods
+            .returnPythTaskV0({
+              index: currentIndex,
+              freeTasks: currentIndex + 1 >= allInstructions.length ? 0 : 1,
+            })
+            .accountsPartial({
+              task: task,
+              taskQueue: taskQueue,
+              payer: payer,
+            })
+            .instruction(),
+          accountsSize: 0,
+        });
       }
       // If we can't fit this instruction, stop here and requeue
       hasMoreInstructions = false;
@@ -367,12 +508,18 @@ async function processVaaInstructions(
   const payerBumpBuffer = Buffer.alloc(1);
   payerBumpBuffer.writeUint8(payerBump);
 
-  const allAccounts = instructions.map(i => i.instruction.keys).flat();
+  const allAccounts = instructions.map((i) => i.instruction.keys).flat();
   const { transaction, remainingAccounts } = await compileTransaction(
-    instructions.map(i => i.instruction),
+    instructions.map((i) => i.instruction),
     [
-      allAccounts.some(acc => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner) ? [Buffer.from("vaa"), Buffer.from(feedId), bumpBuffer] : undefined,
-      allAccounts.some(acc => acc.pubkey.equals(payer) && acc.isSigner) ? [Buffer.from("pyth-payer"), payerBumpBuffer] : undefined,
+      allAccounts.some(
+        (acc) => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner
+      )
+        ? [Buffer.from("vaa"), Buffer.from(feedId), bumpBuffer]
+        : undefined,
+      allAccounts.some((acc) => acc.pubkey.equals(payer) && acc.isSigner)
+        ? [Buffer.from("pyth-payer"), payerBumpBuffer]
+        : undefined,
     ].filter(truthy)
   );
 
@@ -412,51 +559,62 @@ server.post<{
   const index = parseInt(request.query.i || "0", 10);
   const priceUpdateId = request.params.priceUpdateId;
   const taskQueue = new PublicKey(request.body.task_queue);
-  const [payer, payerBump] = customSignerKey(taskQueue, [Buffer.from("pyth-payer")]);
+  const [payer, payerBump] = customSignerKey(taskQueue, [
+    Buffer.from("pyth-payer"),
+  ]);
   const pythProgram: PythSolanaReceiver = new PythSolanaReceiver({
     connection: new Connection(SOLANA_URL),
     wallet: {
-      publicKey: payer
+      publicKey: payer,
     } as Wallet,
-  })
-  const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(new PublicKey(priceUpdateId));
-  const feedId = priceUpdate.priceMessage.feedId
+    receiverProgramId: PYTH_RECEIVER_PROGRAM_ID,
+    pushOracleProgramId: PYTH_PUSH_ORACLE_PROGRAM_ID,
+    wormholeProgramId: WORMHOLE_PROGRAM_ID,
+  });
+  const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(
+    new PublicKey(priceUpdateId)
+  );
+  const feedId = priceUpdate.priceMessage.feedId;
   const priceServiceConnection = new HermesClient(
     PYTH_HERMES_URL,
-    {}
+    PYTH_API_KEY ? { headers: { Authorization: `Bearer ${PYTH_API_KEY}` } } : {}
   );
 
   async function getData() {
-    const priceUpdates = (
-      await priceServiceConnection.getLatestPriceUpdates(
-        [Buffer.from(feedId).toString("hex")],
-        { encoding: "base64" }
-      )
+    const priceUpdates = await priceServiceConnection.getLatestPriceUpdates(
+      [Buffer.from(feedId).toString("hex")],
+      { encoding: "base64" }
     );
-    const priceUpdateData = priceUpdates.binary.data[0]
-    return priceUpdateData
+    const priceUpdateData = priceUpdates.binary.data[0];
+    return priceUpdateData;
   }
 
-  const existingUpdate = await PythPriceUpdate.findByPk(priceUpdateId)
+  const existingUpdate = await PythPriceUpdate.findByPk(priceUpdateId);
   if (existingUpdate) {
     // Refetch on the first attempt when the cached VAA is older than 30s. Stale
     // VAAs can reference a rotated guardian set, which fails on-chain with
     // GuardianSetExpired. Continuation indices reuse whatever VAA we started with.
-    if (index === 0 && existingUpdate.updatedAt < new Date(Date.now() - 1000 * 30)) {
-      await PythPriceUpdate.update({
-        priceUpdate: await getData(),
-      }, { where: { priceUpdateId } })
+    if (
+      index === 0 &&
+      existingUpdate.updatedAt < new Date(Date.now() - 1000 * 30)
+    ) {
+      await PythPriceUpdate.update(
+        {
+          priceUpdate: await getData(),
+        },
+        { where: { priceUpdateId } }
+      );
     }
   } else {
     await PythPriceUpdate.create({
       priceUpdateId,
       priceUpdate: await getData(),
-    })
+    });
   }
 
   // Use the new unified processing function
   await processVaaInstructions(request, reply, priceUpdateId, index);
-})
+});
 
 const start = async () => {
   try {
