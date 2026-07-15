@@ -20,7 +20,7 @@ use tuktuk_program::{
 
 use crate::{queue_authority_seeds, state::*, ASSOCIATED_TOKEN_PROGRAM_ID, TESTING};
 
-const HNT_PRICE_ORACLE: Pubkey = pubkey!("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33");
+const HNT_PRICE_ORACLE: Pubkey = pubkey!("He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ScheduleTaskArgsV0 {

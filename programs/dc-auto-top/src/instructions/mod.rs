@@ -22,9 +22,9 @@ pub const ASSOCIATED_TOKEN_PROGRAM_ID: Pubkey =
 #[cfg(feature = "devnet")]
 pub const TUKTUK_PYTH_SIGNER: Pubkey = pubkey!("tpyi2GNQyuWRBFy9uwNkEqEoxfc7zMbd6QieBZqhKir");
 #[cfg(feature = "devnet")]
-pub const TUKTUK_PYTH_URL: &str = "https://tuktuk-pyth.web.test-helium.com/v1/write";
+pub const TUKTUK_PYTH_URL: &str = "https://tuktuk-pyth-v2.web.test-helium.com/v1/write";
 
 #[cfg(not(feature = "devnet"))]
 pub const TUKTUK_PYTH_SIGNER: Pubkey = pubkey!("tpyi2GNQyuWRBFy9uwNkEqEoxfc7zMbd6QieBZqhKir");
 #[cfg(not(feature = "devnet"))]
-pub const TUKTUK_PYTH_URL: &str = "https://tuktuk-pyth.web.helium.io/v1/write";
+pub const TUKTUK_PYTH_URL: &str = "https://tuktuk-pyth-v2.web.helium.io/v1/write";
