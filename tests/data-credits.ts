@@ -163,6 +163,22 @@ describe("data-credits", () => {
     "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5"
   );
 
+  // Read the crank-fed feed account the SDK now references, decoded via the
+  // pyth receiver SDK.
+  const fetchFeedPriceMessage = async () => {
+    const { PythSolanaReceiver } = await import(
+      "@pythnetwork/pyth-solana-receiver"
+    );
+    const pythReceiver = new PythSolanaReceiver({
+      connection: provider.connection,
+      wallet: provider.wallet as any,
+    });
+    const priceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(
+      PRO_HNT_PRICE_FEED
+    );
+    return priceUpdate.priceMessage;
+  };
+
   it("mints some data credits with a pro-receiver-owned price account", async () => {
     await program.methods
       .mintDataCreditsV0({
@@ -299,7 +315,7 @@ describe("data-credits", () => {
     });
 
     it("mints some data credits with hnt amount", async () => {
-      const { txs, priceUpdates } = await mintDataCredits({
+      const { txs } = await mintDataCredits({
         dcMint,
         program,
         hntAmount: new BN(1 * 10 ** 8),
@@ -314,15 +330,15 @@ describe("data-credits", () => {
       assert(dcAtaAcc.isFrozen);
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
       const hntBal = await provider.connection.getTokenAccountBalance(hntAta);
-      const price = priceUpdates.parsed![0];
+      const priceMessage = await fetchFeedPriceMessage();
 
       const approxEndBal =
         startDcBal +
         Math.floor(
-          new BN(price.ema_price.price)
-            .sub(new BN(price.ema_price.conf).mul(new BN(2)))
+          new BN(priceMessage.emaPrice.toString())
+            .sub(new BN(priceMessage.emaConf.toString()).mul(new BN(2)))
             .toNumber() *
-            10 ** price.ema_price.expo *
+            10 ** priceMessage.exponent *
             10 ** 5
         );
       expect(dcBal.value.uiAmount).to.be.within(
@@ -334,7 +350,7 @@ describe("data-credits", () => {
 
     it("mints some data credits with dc amount", async () => {
       let dcAmount = 1428 * 10 ** 5;
-      const { txs, priceUpdates } = await mintDataCredits({
+      const { txs } = await mintDataCredits({
         dcMint,
         program,
         dcAmount: new BN(dcAmount),
@@ -351,12 +367,12 @@ describe("data-credits", () => {
         await getAssociatedTokenAddress(hntMint, me)
       );
 
-      const price = priceUpdates.parsed![0];
+      const priceMessage = await fetchFeedPriceMessage();
       const hntEmaPrice =
-        new BN(price.ema_price.price)
-          .sub(new BN(price.ema_price.conf).mul(new BN(2)))
+        new BN(priceMessage.emaPrice.toString())
+          .sub(new BN(priceMessage.emaConf.toString()).mul(new BN(2)))
           .toNumber() *
-        10 ** price.ema_price.expo;
+        10 ** priceMessage.exponent;
       const hntAmount =
         (Math.floor(dcAmount * 10 ** (hntDecimals - 5)) / hntEmaPrice) *
         10 ** -hntDecimals;
