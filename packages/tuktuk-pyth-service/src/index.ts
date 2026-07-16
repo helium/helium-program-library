@@ -19,7 +19,6 @@ import {
   getTreasuryPda,
 } from "@pythnetwork/pyth-solana-receiver/address";
 import {
-  AccountInfo,
   Connection,
   Keypair,
   PublicKey,
@@ -342,31 +341,27 @@ async function processVaaInstructions(
       pythProgram
     );
 
-  // Continuation pre-flight: if another task chain for this feed already advanced
-  // the on-chain VAA past Writing, our remaining writes/verify will fail with
-  // NotInWritingStatus. Bail out with a no-op memo tx so the task succeeds and
-  // tuktuk doesn't burn retries on a foregone failure.
+  // Continuation pre-flight: if the encoded VAA account is gone, another chain
+  // consumed it and our remaining instructions are a foregone failure — bail
+  // with a no-op memo tx so tuktuk doesn't burn retries. A wrong *status* is
+  // NOT trusted here: our RPC has been observed lagging >10s on account reads,
+  // so status mismatches are logged and left to the turner's simulation.
   if (index > 0) {
     const onlyPriceUpdateLeft = index === allInstructions.length - 1;
-    const isWrongState = (info: AccountInfo<Buffer> | null) =>
-      !info ||
-      (!onlyPriceUpdateLeft &&
-        info.data[ENCODED_VAA_STATUS_OFFSET] !== ENCODED_VAA_STATUS_WRITING);
 
     let accountInfo = await provider.connection.getAccountInfo(
       tuktukEncodedVaa
     );
 
-    // If the task was queued moments ago, this very read may predate the
-    // transaction that queued it (and re-inited the VAA in the same slot).
-    // Re-poll until the RPC catches up before concluding another chain
-    // interfered.
-    if (isWrongState(accountInfo)) {
+    // A missing account can also be a stale read that predates the chain's own
+    // create (the continuation task is queued by the same transaction). If the
+    // task was queued moments ago, re-poll before concluding it's gone.
+    if (!accountInfo) {
       const queuedAgoSecs =
         Math.floor(Date.now() / 1000) - taskQueuedAt.toNumber();
       if (queuedAgoSecs < STALE_READ_WINDOW_SECS) {
         const deadline = Date.now() + PREFLIGHT_POLL_TIMEOUT_MS;
-        while (isWrongState(accountInfo) && Date.now() < deadline) {
+        while (!accountInfo && Date.now() < deadline) {
           await new Promise((resolve) =>
             setTimeout(resolve, PREFLIGHT_POLL_INTERVAL_MS)
           );
@@ -389,16 +384,16 @@ async function processVaaInstructions(
 
     const status = accountInfo.data[ENCODED_VAA_STATUS_OFFSET];
     if (!onlyPriceUpdateLeft && status !== ENCODED_VAA_STATUS_WRITING) {
+      // Serve the writes anyway: our RPC has been observed lagging >10s on
+      // account reads, while the crank turner simulates against its own RPC
+      // with a fresh view. If the state is genuinely wrong the sim fails and
+      // the turner retries; bailing here on a stale read costs the whole tick.
       const statusName =
         status === ENCODED_VAA_STATUS_VERIFIED
           ? "Verified"
           : `status=${status}`;
-      return sendMemoResponse(
-        reply,
-        task,
-        taskQueuedAt,
-        tuktukProgram,
-        `pyth: encoded VAA ${tuktukEncodedVaa.toBase58()} is ${statusName}, not Writing; another chain finished verify`
+      request.log.warn(
+        `pyth: encoded VAA ${tuktukEncodedVaa.toBase58()} reads ${statusName}, not Writing; serving writes and deferring to turner simulation`
       );
     }
   }
