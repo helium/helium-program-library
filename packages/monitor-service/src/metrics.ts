@@ -37,10 +37,10 @@ export const circuitBreakerLevel = new client.Gauge({
 register.registerMetric(circuitBreakerLevel);
 
 export const totalRewardsGauge = new client.Gauge({
-  name: 'helium_recipient_total_rewards',
-  help: 'The total rewards claimed in all recipients',
-  labelNames:  ['dnt_mint']
-})
+  name: "helium_recipient_total_rewards",
+  help: "The total rewards claimed in all recipients",
+  labelNames: ["dnt_mint"],
+});
 register.registerMetric(totalRewardsGauge);
 
 export const realVeTokensGauge = new client.Gauge({
@@ -92,3 +92,9 @@ export const oracleTimeSinceSubmitted = new client.Gauge({
 });
 register.registerMetric(oracleTimeSinceSubmitted);
 
+export const pythPublishTime = new client.Gauge({
+  name: "solana_pyth_publish_time",
+  help: "Unix publish time of this pyth feed; feed is stale when time() - this exceeds 600s",
+  labelNames: ["name", "address"],
+});
+register.registerMetric(pythPublishTime);
