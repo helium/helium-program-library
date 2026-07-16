@@ -246,7 +246,9 @@ const ENCODED_VAA_STATUS_VERIFIED = 2;
 // VAA account (ReturnPythTaskV0 runs alongside InitEncodedVaa), so an RPC read
 // taken moments after the task was queued can lag behind that write.
 const STALE_READ_WINDOW_SECS = 60;
-const PREFLIGHT_POLL_TIMEOUT_MS = 10_000;
+// Account reads through this RPC have been observed >10s stale; poll well past
+// that so a lagging read can't fake a missing account within the tick budget.
+const PREFLIGHT_POLL_TIMEOUT_MS = 30_000;
 const PREFLIGHT_POLL_INTERVAL_MS = 1_000;
 
 async function sendMemoResponse(
