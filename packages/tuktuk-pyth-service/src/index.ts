@@ -115,6 +115,7 @@ async function generateAllVaaInstructions(
   const feedId = priceUpdate.priceMessage.feedId;
   const [tuktukEncodedVaa, bump] = customSignerKey(taskQueue, [
     Buffer.from("vaa"),
+    Buffer.from("v2"),
     Buffer.from(feedId),
   ]);
   const wormholeProgram = new Program(wormholeIdl, pythProgram.provider);
@@ -309,6 +310,7 @@ async function processVaaInstructions(
   const feedId = priceUpdate.priceMessage.feedId;
   const [tuktukEncodedVaa, bump] = customSignerKey(taskQueue, [
     Buffer.from("vaa"),
+    Buffer.from("v2"),
     Buffer.from(feedId),
   ]);
 
@@ -444,7 +446,7 @@ async function processVaaInstructions(
         allAccounts.some(
           (acc) => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner
         )
-          ? [Buffer.from("vaa"), Buffer.from(feedId), bumpBuffer]
+          ? [Buffer.from("vaa"), Buffer.from("v2"), Buffer.from(feedId), bumpBuffer]
           : undefined,
         allAccounts.some((acc) => acc.pubkey.equals(payer) && acc.isSigner)
           ? [Buffer.from("pyth-payer"), payerBumpBuffer]
@@ -519,7 +521,7 @@ async function processVaaInstructions(
       allAccounts.some(
         (acc) => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner
       )
-        ? [Buffer.from("vaa"), Buffer.from(feedId), bumpBuffer]
+        ? [Buffer.from("vaa"), Buffer.from("v2"), Buffer.from(feedId), bumpBuffer]
         : undefined,
       allAccounts.some((acc) => acc.pubkey.equals(payer) && acc.isSigner)
         ? [Buffer.from("pyth-payer"), payerBumpBuffer]
