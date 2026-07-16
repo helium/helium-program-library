@@ -19,6 +19,7 @@ import {
   getTreasuryPda,
 } from "@pythnetwork/pyth-solana-receiver/address";
 import {
+  AccountInfo,
   Connection,
   Keypair,
   PublicKey,
@@ -242,6 +243,13 @@ const ENCODED_VAA_STATUS_OFFSET = 8;
 const ENCODED_VAA_STATUS_WRITING = 1;
 const ENCODED_VAA_STATUS_VERIFIED = 2;
 
+// A continuation task is queued by the same transaction that just advanced the
+// VAA account (ReturnPythTaskV0 runs alongside InitEncodedVaa), so an RPC read
+// taken moments after the task was queued can lag behind that write.
+const STALE_READ_WINDOW_SECS = 60;
+const PREFLIGHT_POLL_TIMEOUT_MS = 10_000;
+const PREFLIGHT_POLL_INTERVAL_MS = 1_000;
+
 async function sendMemoResponse(
   reply: any,
   task: PublicKey,
@@ -339,10 +347,35 @@ async function processVaaInstructions(
   // NotInWritingStatus. Bail out with a no-op memo tx so the task succeeds and
   // tuktuk doesn't burn retries on a foregone failure.
   if (index > 0) {
-    const accountInfo = await provider.connection.getAccountInfo(
+    const onlyPriceUpdateLeft = index === allInstructions.length - 1;
+    const isWrongState = (info: AccountInfo<Buffer> | null) =>
+      !info ||
+      (!onlyPriceUpdateLeft &&
+        info.data[ENCODED_VAA_STATUS_OFFSET] !== ENCODED_VAA_STATUS_WRITING);
+
+    let accountInfo = await provider.connection.getAccountInfo(
       tuktukEncodedVaa
     );
-    const onlyPriceUpdateLeft = index === allInstructions.length - 1;
+
+    // If the task was queued moments ago, this very read may predate the
+    // transaction that queued it (and re-inited the VAA in the same slot).
+    // Re-poll until the RPC catches up before concluding another chain
+    // interfered.
+    if (isWrongState(accountInfo)) {
+      const queuedAgoSecs =
+        Math.floor(Date.now() / 1000) - taskQueuedAt.toNumber();
+      if (queuedAgoSecs < STALE_READ_WINDOW_SECS) {
+        const deadline = Date.now() + PREFLIGHT_POLL_TIMEOUT_MS;
+        while (isWrongState(accountInfo) && Date.now() < deadline) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, PREFLIGHT_POLL_INTERVAL_MS)
+          );
+          accountInfo = await provider.connection.getAccountInfo(
+            tuktukEncodedVaa
+          );
+        }
+      }
+    }
 
     if (!accountInfo) {
       return sendMemoResponse(
@@ -446,7 +479,12 @@ async function processVaaInstructions(
         allAccounts.some(
           (acc) => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner
         )
-          ? [Buffer.from("vaa"), Buffer.from("v2"), Buffer.from(feedId), bumpBuffer]
+          ? [
+              Buffer.from("vaa"),
+              Buffer.from("v2"),
+              Buffer.from(feedId),
+              bumpBuffer,
+            ]
           : undefined,
         allAccounts.some((acc) => acc.pubkey.equals(payer) && acc.isSigner)
           ? [Buffer.from("pyth-payer"), payerBumpBuffer]
@@ -521,7 +559,12 @@ async function processVaaInstructions(
       allAccounts.some(
         (acc) => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner
       )
-        ? [Buffer.from("vaa"), Buffer.from("v2"), Buffer.from(feedId), bumpBuffer]
+        ? [
+            Buffer.from("vaa"),
+            Buffer.from("v2"),
+            Buffer.from(feedId),
+            bumpBuffer,
+          ]
         : undefined,
       allAccounts.some((acc) => acc.pubkey.equals(payer) && acc.isSigner)
         ? [Buffer.from("pyth-payer"), payerBumpBuffer]
