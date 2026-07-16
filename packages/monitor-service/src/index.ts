@@ -284,6 +284,14 @@ async function run() {
     ),
     "pyth_hnt_v2_cron"
   );
+  // Legacy crank cron; remove with the issue 10 legacy teardown.
+  await monitorSolBalance(
+    new PublicKey(
+      process.env.LEGACY_PYTH_CRON_KEY ||
+        "HoHXwG7W1vLA5PVs3iEUNfpYJarWcegqRUaktykB1jMc"
+    ),
+    "pyth_hnt_legacy_cron"
+  );
   await monitorSolBalance(
     new PublicKey(
       process.env.PYTH_PAYER_KEY ||
