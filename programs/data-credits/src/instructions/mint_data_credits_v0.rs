@@ -9,10 +9,7 @@ use circuit_breaker::{
   cpi::{accounts::MintV0, mint_v0},
   CircuitBreaker, MintArgsV0, MintWindowedCircuitBreakerV0,
 };
-use pyth_solana_receiver_sdk::{
-  price_update::{PriceUpdateV2, VerificationLevel},
-  LEGACY_PYTH_SOLANA_RECEIVER_ID,
-};
+use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 
 use crate::{errors::*, DataCreditsV0};
 
@@ -39,12 +36,15 @@ pub struct MintDataCreditsV0<'info> {
     ],
     bump = data_credits.data_credits_bump,
     has_one = hnt_mint,
+    has_one = hnt_price_oracle,
   )]
   pub data_credits: Box<Account<'info, DataCreditsV0>>,
 
-  /// CHECK: Manually verified in the handler via `load_hnt_price_oracle` — the account
-  /// must be owned by the legacy or pro Pyth receiver, deserialize as a PriceUpdateV2
-  /// for the HNT feed with Full verification, and be within the freshness window.
+  /// CHECK: Pinned to the address stored on `data_credits` by the has_one above
+  /// (updatable via `UpdateDataCreditsV0`), then verified in the handler via
+  /// `load_hnt_price_oracle` — must be owned by the pro Pyth receiver, deserialize
+  /// as a PriceUpdateV2 for the HNT feed with Full verification, and be within the
+  /// freshness window.
   pub hnt_price_oracle: UncheckedAccount<'info>,
 
   // hnt tokens from this account are burned
@@ -126,14 +126,12 @@ impl<'info> MintDataCreditsV0<'info> {
   }
 }
 
-/// Loads the HNT price oracle from a caller-supplied account, accepting either the
-/// legacy or the pro Pyth receiver as owner so old-SDK and new-SDK callers can both
-/// mint. Checks owner, discriminator, feed id, and Full verification; staleness is
-/// checked separately in the handler.
+/// Loads the HNT price oracle from the account pinned by `has_one = hnt_price_oracle`.
+/// Checks owner (pro Pyth receiver only), discriminator, feed id, and Full
+/// verification; staleness is checked separately in the handler.
 pub fn load_hnt_price_oracle(account_info: &AccountInfo) -> Result<PriceUpdateV2> {
   require!(
-    account_info.owner == &pyth_solana_receiver_sdk::ID
-      || account_info.owner == &LEGACY_PYTH_SOLANA_RECEIVER_ID,
+    account_info.owner == &pyth_solana_receiver_sdk::ID,
     DataCreditsErrors::InvalidPriceOracleOwner
   );
   let data = account_info.try_borrow_data()?;
@@ -287,9 +285,13 @@ mod tests {
   }
 
   #[test]
-  fn accepts_legacy_receiver_owner() {
+  fn rejects_legacy_receiver_owner() {
+    use pyth_solana_receiver_sdk::LEGACY_PYTH_SOLANA_RECEIVER_ID;
     let mut data = price_update_data(HNT_PRICE_FEED_ID, VerificationLevel::Full);
-    assert!(load(&LEGACY_PYTH_SOLANA_RECEIVER_ID, &mut data).is_ok());
+    assert_eq!(
+      load(&LEGACY_PYTH_SOLANA_RECEIVER_ID, &mut data).map(|_| ()),
+      Err(error!(DataCreditsErrors::InvalidPriceOracleOwner))
+    );
   }
 
   #[test]

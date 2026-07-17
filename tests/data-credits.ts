@@ -149,6 +149,19 @@ describe("data-credits", () => {
     await method.rpc({
       skipPreflight: true,
     });
+
+    // Mints are pinned to the oracle stored on DataCreditsV0 (has_one), which
+    // initialize leaves unset — point it at the crank-fed pro feed.
+    await program.methods
+      .updateDataCreditsV0({
+        newAuthority: null,
+        hntPriceOracle: PRO_HNT_PRICE_FEED,
+      })
+      .accountsPartial({
+        dcMint,
+        authority: me,
+      })
+      .rpc({ skipPreflight: true });
   });
 
   it("initializes data credits", async () => {
@@ -161,6 +174,11 @@ describe("data-credits", () => {
   // Cloned from mainnet in Anchor.toml; owned by the pro pyth receiver (rec2...)
   const PRO_HNT_PRICE_FEED = new PublicKey(
     "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5"
+  );
+
+  // Cloned from mainnet in Anchor.toml; owned by the legacy pyth receiver (rec5...)
+  const LEGACY_HNT_PRICE_FEED = new PublicKey(
+    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
   );
 
   // Read the crank-fed feed account the SDK now references, decoded via the
@@ -225,7 +243,7 @@ describe("data-credits", () => {
     expect(hntBal.value.uiAmount).to.eq(startHntBal - 1);
   });
 
-  it("fails to mint when the price account is not owned by a pyth receiver", async () => {
+  it("fails to mint when the price account is not the one stored on data credits", async () => {
     let error: any = null;
     try {
       await program.methods
@@ -235,7 +253,38 @@ describe("data-credits", () => {
         })
         .accountsPartial({
           dcMint,
-          hntPriceOracle: dcMint,
+          hntPriceOracle: LEGACY_HNT_PRICE_FEED,
+        })
+        .rpc();
+    } catch (e: any) {
+      error = e;
+    }
+    expect(error, "expected mint to fail").to.not.be.null;
+    expect(error.error?.errorCode?.code).to.eq("ConstraintHasOne");
+  });
+
+  it("fails to mint when the stored price account is owned by the legacy receiver", async () => {
+    await program.methods
+      .updateDataCreditsV0({
+        newAuthority: null,
+        hntPriceOracle: LEGACY_HNT_PRICE_FEED,
+      })
+      .accountsPartial({
+        dcMint,
+        authority: me,
+      })
+      .rpc({ skipPreflight: true });
+
+    let error: any = null;
+    try {
+      await program.methods
+        .mintDataCreditsV0({
+          hntAmount: new BN(1 * 10 ** 8),
+          dcAmount: null,
+        })
+        .accountsPartial({
+          dcMint,
+          hntPriceOracle: LEGACY_HNT_PRICE_FEED,
         })
         .rpc();
     } catch (e: any) {
@@ -416,6 +465,7 @@ describe("data-credits", () => {
       await program.methods
         .updateDataCreditsV0({
           newAuthority: PublicKey.default,
+          hntPriceOracle: null,
         })
         .accountsPartial({
           dcMint,
