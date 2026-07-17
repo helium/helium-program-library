@@ -61,6 +61,7 @@ startup_wait = 20000
 
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
+bind_address = "127.0.0.1"
 
 [[test.validator.clone]]
 address = "tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA" # tuktuk
