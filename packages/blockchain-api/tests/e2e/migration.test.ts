@@ -5,13 +5,25 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 import {
+  createAssociatedTokenAccountIdempotent,
+  createMint,
   getAccount,
   getAssociatedTokenAddressSync,
+  mintTo,
   NATIVE_MINT,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { init as initWelcomePack } from "@helium/welcome-pack-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
+import {
+  delegatedPositionKey,
+  init as initHsd,
+} from "@helium/helium-sub-daos-sdk";
+import { init as initProxy } from "@helium/nft-proxy-sdk";
+import { MOBILE_MINT } from "@helium/spl-utils";
+import BN from "bn.js";
+import { getCurrentSeasonEnd } from "../../src/server/api/routers/governance/procedures/helpers/get-current-season";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
@@ -37,9 +49,13 @@ import {
   TEST_HOTSPOT_2_ENTITY_KEY,
   TEST_HOTSPOT_2_ASSET_ID,
   HNT_LAZY_DISTRIBUTOR_ADDRESS,
+  TEST_PROXY_ADDRESS,
 } from "./helpers/constants";
 import { ensureNoContract } from "./helpers/reward-contract";
-import { createAndFundPosition } from "./helpers/governance";
+import {
+  createAndFundPosition,
+  ensureSubDaoEpochsCurrent,
+} from "./helpers/governance";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import type { TestCtx } from "./helpers/context";
 import fs from "fs";
@@ -73,6 +89,43 @@ async function setFrozenTokenAccount(
   }
 }
 
+async function getGovPrograms(connection: Connection, payer: Keypair) {
+  const provider = new AnchorProvider(
+    connection,
+    new Wallet(payer),
+    AnchorProvider.defaultOptions()
+  );
+  return {
+    vsrProgram: await initVsr(provider),
+    hsdProgram: await initHsd(provider),
+    proxyProgram: await initProxy(provider),
+  };
+}
+
+// Proxy assignments must expire within the current proxy season (mirrors
+// governance.test.ts's season-bounded expiration).
+async function getProxyExpirationTime(
+  connection: Connection,
+  payer: Keypair,
+  positionMint: string
+): Promise<number> {
+  const { vsrProgram, proxyProgram } = await getGovPrograms(connection, payer);
+  const now = Math.floor(Date.now() / 1000);
+  const [positionPubkey] = positionKey(new PublicKey(positionMint));
+  const positionAcc = await vsrProgram.account.positionV0.fetch(positionPubkey);
+  const registrar = await vsrProgram.account.registrar.fetch(
+    positionAcc.registrar
+  );
+  const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
+    registrar.proxyConfig
+  );
+  const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, new BN(now));
+  if (!seasonEnd) {
+    throw new Error("No current proxy season found");
+  }
+  return Math.min(now + 86400 * 90, seasonEnd.toNumber() - 60);
+}
+
 describe("migration", () => {
   let payer: Keypair;
   let destination: Keypair;
@@ -82,6 +135,9 @@ describe("migration", () => {
     typeof createSafeClient<RouterClient<typeof appRouter>>
   >;
   let ctx: TestCtx;
+  // Captured by the delegated/proxied-position test for the dust-attack test:
+  // an existing account owned by the VSR program (the HNT registrar).
+  let vsrRegistrar: PublicKey | undefined;
 
   before(async () => {
     applyMinimalServerEnv();
@@ -329,6 +385,104 @@ describe("migration", () => {
     }
   });
 
+  it("rejects source == destination", async () => {
+    const wallet = Keypair.generate().publicKey.toBase58();
+    try {
+      await client.migration.migrate({
+        sourceWallet: wallet,
+        destinationWallet: wallet,
+        hotspots: [],
+        tokens: [],
+      });
+      expect.fail("Should have rejected identical source and destination");
+    } catch (error: any) {
+      expect(error).to.be.instanceOf(ORPCError);
+      expect(error.code).to.equal("BAD_REQUEST");
+    }
+  });
+
+  it("rejects an off-curve destination wallet", async () => {
+    // Any PDA is off-curve — assets sent there would be unrecoverable.
+    const [offCurve] = PublicKey.findProgramAddressSync(
+      [Buffer.from("migration-test")],
+      TOKEN_PROGRAM_ID
+    );
+    expect(PublicKey.isOnCurve(offCurve.toBytes())).to.equal(false);
+
+    try {
+      await client.migration.migrate({
+        sourceWallet: Keypair.generate().publicKey.toBase58(),
+        destinationWallet: offCurve.toBase58(),
+        hotspots: [],
+        tokens: [],
+      });
+      expect.fail("Should have rejected an off-curve destination");
+    } catch (error: any) {
+      expect(error).to.be.instanceOf(ORPCError);
+      expect(error.code).to.equal("BAD_REQUEST");
+      expect(error.message).to.include("on-curve");
+    }
+  });
+
+  it("skips an unsupported mint with a warning instead of failing", async () => {
+    // A pubkey with no account behind it makes getMint throw — the endpoint
+    // must skip it (same path as token-2022 mints), not 500.
+    const bogusMint = Keypair.generate().publicKey.toBase58();
+
+    const result = await client.migration.migrate({
+      sourceWallet: Keypair.generate().publicKey.toBase58(),
+      destinationWallet: destination.publicKey.toBase58(),
+      hotspots: [],
+      tokens: [{ mint: bogusMint, amount: "1" }],
+    });
+
+    expect(result.transactionData.transactions.length).to.equal(0);
+    expect(result.warnings).to.be.an("array");
+    expect(
+      result.warnings!.some((w) => w.includes("not a supported SPL token mint"))
+    ).to.equal(true);
+  });
+
+  it("dedupes duplicate mints in tokens[]", async () => {
+    const usdcMint = new PublicKey(TOKEN_MINTS.USDC);
+    await ensureTokenBalance(payer.publicKey, usdcMint, 2);
+    const dupDestination = Keypair.generate();
+
+    const sourceAta = getAssociatedTokenAddressSync(
+      usdcMint,
+      payer.publicKey,
+      true
+    );
+    const sourceBalance = (await getAccount(connection, sourceAta)).amount;
+    expect(Number(sourceBalance)).to.be.greaterThan(0);
+
+    // Without dedupe the second group transfers from the source ATA the first
+    // group just closed, failing the whole tx on submit.
+    const result = await client.migration.migrate({
+      sourceWallet: payer.publicKey.toBase58(),
+      destinationWallet: dupDestination.publicKey.toBase58(),
+      hotspots: [],
+      tokens: [
+        { mint: TOKEN_MINTS.USDC, amount: "0" },
+        { mint: TOKEN_MINTS.USDC, amount: "0" },
+      ],
+    });
+
+    await signAndSubmitTransactionData(
+      connection,
+      result.transactionData,
+      payer
+    );
+
+    const destAta = getAssociatedTokenAddressSync(
+      usdcMint,
+      dupDestination.publicKey,
+      true
+    );
+    const destBalance = (await getAccount(connection, destAta)).amount;
+    expect(Number(destBalance)).to.equal(Number(sourceBalance));
+  });
+
   it("migrates a VSR governance position to destination", async () => {
     const positionDestination = Keypair.generate();
 
@@ -429,6 +583,156 @@ describe("migration", () => {
     expect(positionAfter.lockup.endTs.toString()).to.equal(
       positionBefore.lockup.endTs.toString()
     );
+  });
+
+  it("warns when a migrated position is delegated and proxied", async () => {
+    const warnDestination = Keypair.generate();
+    await ensureSubDaoEpochsCurrent(ctx);
+
+    // subDaoMint makes createAndFundPosition delegate the position at creation
+    const { positionMint } = await createAndFundPosition(ctx, {
+      amount: "100000000",
+      lockupKind: "cliff",
+      lockupPeriodsInDays: 365,
+      subDaoMint: MOBILE_MINT,
+    });
+    const positionMintPubkey = new PublicKey(positionMint);
+    const [positionPubkey] = positionKey(positionMintPubkey);
+
+    const { vsrProgram, hsdProgram } = await getGovPrograms(connection, payer);
+    const delegated =
+      await hsdProgram.account.delegatedPositionV0.fetchNullable(
+        delegatedPositionKey(positionPubkey)[0]
+      );
+    expect(delegated, "position should be delegated").to.not.equal(null);
+
+    const expirationTime = await getProxyExpirationTime(
+      connection,
+      payer,
+      positionMint
+    );
+    const { data: proxyData, error: proxyError } =
+      await safeClient.governance.assignProxies({
+        walletAddress: payer.publicKey.toBase58(),
+        positionMints: [positionMint],
+        proxyKey: TEST_PROXY_ADDRESS,
+        expirationTime,
+      });
+    if (proxyError) {
+      expect.fail(`Failed to assign proxy: ${JSON.stringify(proxyError)}`);
+    }
+    await signAndSubmitTransactionData(
+      connection,
+      proxyData!.transactionData,
+      payer
+    );
+
+    // Capture a real VSR-owned account for the dust-attack test below
+    const positionAcc = await vsrProgram.account.positionV0.fetch(
+      positionPubkey
+    );
+    vsrRegistrar = positionAcc.registrar;
+
+    const result = await client.migration.migrate({
+      sourceWallet: payer.publicKey.toBase58(),
+      destinationWallet: warnDestination.publicKey.toBase58(),
+      hotspots: [],
+      tokens: [],
+    });
+
+    expect(result.warnings).to.be.an("array");
+    expect(
+      result.warnings!.some((w) => w.includes("delegated")),
+      `expected a delegation warning, got: ${JSON.stringify(result.warnings)}`
+    ).to.equal(true);
+    expect(
+      result.warnings!.some((w) => w.includes("proxy")),
+      `expected a proxy warning, got: ${JSON.stringify(result.warnings)}`
+    ).to.equal(true);
+
+    // Submit so the payer holds no positions for later payer-sourced tests
+    await signAndSubmitTransactionData(
+      connection,
+      result.transactionData,
+      payer
+    );
+    const destAta = getAssociatedTokenAddressSync(
+      positionMintPubkey,
+      warnDestination.publicKey,
+      true
+    );
+    const destAtaAfter = await getAccount(connection, destAta);
+    expect(Number(destAtaAfter.amount)).to.equal(1);
+  });
+
+  it("does not let dusted fake position NFTs brick migration", async () => {
+    // Regression for the dust attack: before the positionKey PDA check, any
+    // amount-1 mint whose freeze authority was a VSR-owned account was
+    // enumerated as a position, and the resulting transferPositionV0 against a
+    // nonexistent PositionV0 failed the whole atomic bundle — permanently,
+    // since enumeration re-included the dust on every retry.
+    expect(vsrRegistrar, "vsrRegistrar captured by previous test").to.not.equal(
+      undefined
+    );
+    const victim = Keypair.generate();
+    const dustDestination = Keypair.generate();
+    const usdcMint = new PublicKey(TOKEN_MINTS.USDC);
+
+    // Dust mint A: freeze authority is an existing VSR-owned account (the
+    // registrar) — exactly what the old heuristic accepted.
+    const dustMintA = await createMint(
+      connection,
+      payer,
+      payer.publicKey,
+      vsrRegistrar!,
+      0
+    );
+    // Dust mint B: freeze authority is the correct position PDA for the mint,
+    // but no PositionV0 exists there.
+    const dustMintBKeypair = Keypair.generate();
+    const dustMintB = await createMint(
+      connection,
+      payer,
+      payer.publicKey,
+      positionKey(dustMintBKeypair.publicKey)[0],
+      0,
+      dustMintBKeypair
+    );
+
+    for (const dustMint of [dustMintA, dustMintB]) {
+      const ata = await createAssociatedTokenAccountIdempotent(
+        connection,
+        payer,
+        dustMint,
+        victim.publicKey
+      );
+      await mintTo(connection, payer, dustMint, ata, payer, 1);
+    }
+
+    await ensureTokenBalance(victim.publicKey, usdcMint, 1);
+
+    const result = await client.migration.migrate({
+      sourceWallet: victim.publicKey.toBase58(),
+      destinationWallet: dustDestination.publicKey.toBase58(),
+      hotspots: [],
+      tokens: [{ mint: TOKEN_MINTS.USDC, amount: "0" }],
+    });
+
+    // Submitting succeeds because no transferPositionV0 was built for the
+    // fake positions; the old code's bundle would have failed atomically.
+    await signAndSubmitTransactionData(
+      connection,
+      result.transactionData,
+      victim
+    );
+
+    const destAta = getAssociatedTokenAddressSync(
+      usdcMint,
+      dustDestination.publicKey,
+      true
+    );
+    const destBalance = (await getAccount(connection, destAta)).amount;
+    expect(Number(destBalance)).to.equal(1_000_000);
   });
 
   it("migrates hotspot in welcome pack (closes pack and transfers)", async () => {
