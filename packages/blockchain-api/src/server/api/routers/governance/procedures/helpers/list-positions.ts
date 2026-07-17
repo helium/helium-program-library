@@ -1,6 +1,6 @@
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
-import { getMint, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, unpackMint } from "@solana/spl-token";
+import { AccountInfo, Connection, PublicKey } from "@solana/web3.js";
 
 type VsrProgram = Awaited<ReturnType<typeof initVsr>>;
 
@@ -9,10 +9,28 @@ export interface OwnedPosition {
   position: PublicKey;
 }
 
+// getMultipleAccounts is capped at 100 keys per RPC call.
+const MULTIPLE_ACCOUNTS_CHUNK = 100;
+
+const getMultipleAccountsChunked = async (
+  connection: Connection,
+  keys: PublicKey[]
+): Promise<(AccountInfo<Buffer> | null)[]> => {
+  const infos: (AccountInfo<Buffer> | null)[] = [];
+  for (let i = 0; i < keys.length; i += MULTIPLE_ACCOUNTS_CHUNK) {
+    infos.push(
+      ...(await connection.getMultipleAccountsInfo(
+        keys.slice(i, i + MULTIPLE_ACCOUNTS_CHUNK)
+      ))
+    );
+  }
+  return infos;
+};
+
 /**
  * Enumerate every VSR governance position owned by a wallet, registrar-agnostic.
- * Positions are supply-1, decimals-0 frozen NFTs whose mint freeze authority is
- * owned by the VSR program.
+ * Positions are identified as amount-1 token accounts whose mint's freeze
+ * authority is an account owned by the VSR program (the position PDA).
  */
 export const getPositionsForOwner = async ({
   connection,
@@ -27,26 +45,40 @@ export const getPositionsForOwner = async ({
     programId: TOKEN_PROGRAM_ID,
   });
 
-  const positions: OwnedPosition[] = [];
-  for (const { account } of tokenAccounts.value) {
-    if (account.data.parsed.info.tokenAmount.amount !== "1") continue;
+  const candidateMints = tokenAccounts.value
+    .filter(
+      ({ account }) => account.data.parsed.info.tokenAmount.amount === "1"
+    )
+    .map(({ account }) => new PublicKey(account.data.parsed.info.mint));
+  if (candidateMints.length === 0) return [];
 
-    const mint = new PublicKey(account.data.parsed.info.mint);
-    const freezeAuthority = (await getMint(connection, mint)).freezeAuthority;
-    if (!freezeAuthority) continue;
-
-    const freezeAuthorityOwner = (
-      await connection.getAccountInfo(freezeAuthority)
-    )?.owner;
-    if (
-      !freezeAuthorityOwner ||
-      !freezeAuthorityOwner.equals(vsrProgram.programId)
-    ) {
-      continue;
+  const mintInfos = await getMultipleAccountsChunked(
+    connection,
+    candidateMints
+  );
+  const withFreezeAuthority: { mint: PublicKey; freezeAuthority: PublicKey }[] =
+    [];
+  mintInfos.forEach((info, i) => {
+    if (!info) return;
+    const { freezeAuthority } = unpackMint(candidateMints[i], info);
+    if (freezeAuthority) {
+      withFreezeAuthority.push({ mint: candidateMints[i], freezeAuthority });
     }
+  });
+  if (withFreezeAuthority.length === 0) return [];
 
-    positions.push({ mint, position: positionKey(mint)[0] });
-  }
+  const freezeAuthorityInfos = await getMultipleAccountsChunked(
+    connection,
+    withFreezeAuthority.map((w) => w.freezeAuthority)
+  );
+
+  const positions: OwnedPosition[] = [];
+  freezeAuthorityInfos.forEach((info, i) => {
+    if (info?.owner.equals(vsrProgram.programId)) {
+      const { mint } = withFreezeAuthority[i];
+      positions.push({ mint, position: positionKey(mint)[0] });
+    }
+  });
 
   return positions;
 };

@@ -3,12 +3,29 @@ import { createSolanaConnection } from "@/lib/solana";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
+import { headers } from "next/headers";
+import {
+  createRateLimiter,
+  getClientIp,
+  parseRateLimit,
+} from "@/lib/utils/rate-limit";
 import { getLockupKind } from "../helpers/constants";
 import { getPositionsForOwner } from "../helpers";
 
+// Courtesy throttle (per-process, XFF-keyed) on a public endpoint whose cost
+// is server-side RPC fan-out.
+const getPositionsIpRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: () => parseRateLimit(process.env.GET_POSITIONS_RATE_LIMIT_PER_IP, 60),
+});
+
 export const getPositions = publicProcedure.governance.getPositions.handler(
-  async ({ input }) => {
+  async ({ input, errors }) => {
     const { wallet } = input;
+
+    if (!getPositionsIpRateLimiter(getClientIp(await headers()))) {
+      throw errors.RATE_LIMITED();
+    }
     const walletPubkey = new PublicKey(wallet);
 
     const { connection, provider } = createSolanaConnection(wallet);

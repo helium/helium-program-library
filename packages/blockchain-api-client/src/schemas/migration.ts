@@ -16,10 +16,9 @@ export const MigrateInputSchema = z.object({
       z.object({
         mint: z.string(),
         amount: z.string(),
-      }),
+      })
     )
     .default([]),
-  password: z.string().optional(),
 });
 
 export const MigrateTransactionItemSchema = z.object({
@@ -43,10 +42,10 @@ export const MigrateOutputSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      "True if more work remains — submit these transactions, then call again with nextParams.",
+      "True if more work remains — submit these transactions, then call again with nextParams."
     ),
   nextParams: MigrateInputSchema.optional().describe(
-    "Input for the next call. Present when hasMore is true — pass directly to the next migrate call.",
+    "Input for the next call. Present when hasMore is true — pass directly to the next migrate call."
   ),
 });
 
@@ -65,5 +64,9 @@ export const MigratableHotspotsOutputSchema = z.object({
 
 export type MigrateInput = z.infer<typeof MigrateInputSchema>;
 export type MigrateOutput = z.infer<typeof MigrateOutputSchema>;
-export type MigratableHotspotsInput = z.infer<typeof MigratableHotspotsInputSchema>;
-export type MigratableHotspotsOutput = z.infer<typeof MigratableHotspotsOutputSchema>;
+export type MigratableHotspotsInput = z.infer<
+  typeof MigratableHotspotsInputSchema
+>;
+export type MigratableHotspotsOutput = z.infer<
+  typeof MigratableHotspotsOutputSchema
+>;

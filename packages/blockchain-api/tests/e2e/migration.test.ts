@@ -222,7 +222,7 @@ describe("migration", () => {
     expect(Number(afterDest - beforeDest)).to.equal(Number(sourceBalance));
   });
 
-  it("ignores a client-supplied partial amount and migrates the full SPL balance", async () => {
+  it("ignores a client-supplied amount (even 0) and migrates the full SPL balance", async () => {
     const fullRaw = 4_000_000; // 4 USDC (6 decimals)
     const usdcMint = new PublicKey(TOKEN_MINTS.USDC);
     await ensureTokenBalance(payer.publicKey, usdcMint, 4);
@@ -239,12 +239,13 @@ describe("migration", () => {
       // dest ATA may not exist yet
     }
 
-    // Request only half — the server must ignore this and move the full balance.
+    // Request 0 — the SPL amount is advisory, so the server must ignore it and
+    // move the full on-chain balance rather than skipping the token.
     const result = await client.migration.migrate({
       sourceWallet: payer.publicKey.toBase58(),
       destinationWallet: destination.publicKey.toBase58(),
       hotspots: [],
-      tokens: [{ mint: TOKEN_MINTS.USDC, amount: String(fullRaw / 2) }],
+      tokens: [{ mint: TOKEN_MINTS.USDC, amount: "0" }],
     });
 
     await signAndSubmitTransactionData(

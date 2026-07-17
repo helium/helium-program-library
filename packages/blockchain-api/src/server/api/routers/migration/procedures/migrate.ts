@@ -67,7 +67,11 @@ import {
 } from "@solana/spl-token";
 import BN from "bn.js";
 import { headers } from "next/headers";
-import { createRateLimiter } from "@/lib/utils/rate-limit";
+import {
+  createRateLimiter,
+  getClientIp,
+  parseRateLimit,
+} from "@/lib/utils/rate-limit";
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 import { AssetOwner, HotspotOwnership } from "@/lib/models/hotspot";
 import { Recipient } from "@/lib/models/recipient";
@@ -94,17 +98,6 @@ const ATA_RENT_LAMPORTS = 2_039_280;
 const MAX_JITO_BUNDLE_TXS = 5;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
-// Read limits from process.env at check time (not module load) so ops and tests
-// can adjust them without reimporting; a value of 0 disables that check.
-const parseRateLimit = (
-  value: string | undefined,
-  fallback: number
-): number => {
-  if (value === undefined || value === "") return fallback;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? fallback : parsed;
-};
-
 const migrationPairRateLimiter = createRateLimiter({
   windowMs: RATE_LIMIT_WINDOW_MS,
   max: () => parseRateLimit(process.env.MIGRATION_RATE_LIMIT_PER_PAIR, 30),
@@ -130,9 +123,11 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     // Rate limit per wallet pair and per client IP. Pair is checked first; on a
     // trip we skip the IP check so a rejected request doesn't consume IP budget.
+    // Both keys are ultimately caller-influenced (wallets are free to generate;
+    // the IP key depends on the ingress's XFF handling) and the limiter is
+    // per-process, so this is a courtesy throttle, not an abuse boundary.
     const headerStore = await headers();
-    const clientIp =
-      headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const clientIp = getClientIp(headerStore);
     if (
       !migrationPairRateLimiter(`${sourceWallet}:${destinationWallet}`) ||
       !migrationIpRateLimiter(clientIp)
@@ -160,13 +155,19 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     const warnings: string[] = [];
 
-    // Token transfers (always included in the first batch). Each token's
-    // create/transfer/close instructions form one group so the batcher keeps
-    // them in a single tx — a fee-payer-funded dest ATA can never land in a
-    // client-submittable tx without its offsetting source-ATA close.
-    const tokenTransferGroups: TransactionInstruction[][] = [];
-    // VSR governance position transfers (always included in the first batch).
-    // Each position's transfer/close pair is grouped for the same reason.
+    // Token transfers (first in the batch). Each token's create/transfer/close
+    // instructions form one group so the batcher keeps them in a single tx — a
+    // fee-payer-funded dest ATA can never land in a client-submittable tx
+    // without its offsetting source-ATA close. The originating input token is
+    // kept alongside so tokens that don't fit the bundle can be echoed back
+    // via nextParams.
+    interface TokenWork {
+      token: { mint: string; amount: string };
+      group: TransactionInstruction[];
+    }
+    const tokenWorkList: TokenWork[] = [];
+    // VSR governance position transfers (after tokens). Each position's
+    // transfer/close pair is grouped for the same reason.
     const positionTransferGroups: TransactionInstruction[][] = [];
     // Simple hotspot transfers tracked per-hotspot for incremental batching
     interface SimpleHotspotWork {
@@ -183,19 +184,24 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     // 3c. Token Transfers
     for (const token of tokens) {
-      const rawAmount = BigInt(token.amount);
-      if (rawAmount <= BigInt(0)) continue;
-
       const isSol = token.mint === TOKEN_MINTS.WSOL;
 
       if (isSol) {
-        tokenTransferGroups.push([
-          SystemProgram.transfer({
-            fromPubkey: sourcePubkey,
-            toPubkey: destPubkey,
-            lamports: rawAmount,
-          }),
-        ]);
+        // The client amount is authoritative only for native SOL — for SPL
+        // tokens it's advisory (we always move the full on-chain balance), so
+        // only the SOL path gates on it.
+        const rawAmount = BigInt(token.amount);
+        if (rawAmount <= BigInt(0)) continue;
+        tokenWorkList.push({
+          token,
+          group: [
+            SystemProgram.transfer({
+              fromPubkey: sourcePubkey,
+              toPubkey: destPubkey,
+              lamports: rawAmount,
+            }),
+          ],
+        });
       } else {
         const mintKey = new PublicKey(token.mint);
         const sourceAta = getAssociatedTokenAddressSync(
@@ -232,23 +238,26 @@ export const migrate = publicProcedure.migration.migrate.handler(
           continue;
         }
 
-        tokenTransferGroups.push([
-          createAssociatedTokenAccountIdempotentInstruction(
-            feePayer,
-            destAta,
-            destPubkey,
-            mintKey
-          ),
-          createTransferCheckedInstruction(
-            sourceAta,
-            mintKey,
-            destAta,
-            sourcePubkey,
-            sourceAtaInfo.amount,
-            mintInfo.decimals
-          ),
-          createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey),
-        ]);
+        tokenWorkList.push({
+          token,
+          group: [
+            createAssociatedTokenAccountIdempotentInstruction(
+              feePayer,
+              destAta,
+              destPubkey,
+              mintKey
+            ),
+            createTransferCheckedInstruction(
+              sourceAta,
+              mintKey,
+              destAta,
+              sourcePubkey,
+              sourceAtaInfo.amount,
+              mintInfo.decimals
+            ),
+            createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey),
+          ],
+        });
       }
     }
 
@@ -658,38 +667,71 @@ export const migrate = publicProcedure.migration.migrate.handler(
       commitment: "finalized" as const,
     };
 
-    // Step 1: Batch token transfers (always included — typically small)
-    if (tokenTransferGroups.length > 0) {
-      const tokenDrafts = await batchInstructionsToTxsWithPriorityFee(
+    // Incrementally include instruction groups until batching one more would
+    // push the bundle past maxTxs. Groups are indivisible (fee-payer-funded
+    // create/close pairs), so exclusion is all-or-nothing per group.
+    const fitGroupsWithinLimit = async (
+      groups: TransactionInstruction[][],
+      maxTxs: number
+    ): Promise<{ drafts: TransactionDraft[]; includedCount: number }> => {
+      if (groups.length === 0 || maxTxs <= 0)
+        return { drafts: [], includedCount: 0 };
+      const batched = await batchInstructionsToTxsWithPriorityFee(
         provider,
-        tokenTransferGroups,
+        groups,
         batchOpts
       );
-      for (const draft of tokenDrafts) {
-        allDrafts.push(draft);
-        txMetadata.push({
-          type: TRANSACTION_TYPES.MIGRATION,
-          description: "Migration: transfers",
-        });
+      if (batched.length <= maxTxs) {
+        return { drafts: batched, includedCount: groups.length };
       }
+      let drafts: TransactionDraft[] = [];
+      let includedCount = 0;
+      for (let i = 1; i <= groups.length; i++) {
+        const candidate = await batchInstructionsToTxsWithPriorityFee(
+          provider,
+          groups.slice(0, i),
+          batchOpts
+        );
+        if (candidate.length > maxTxs) break;
+        drafts = candidate;
+        includedCount = i;
+      }
+      return { drafts, includedCount };
+    };
+
+    // Step 1: Batch token transfers, respecting the bundle limit. Tokens that
+    // don't fit are echoed back via nextParams.tokens for the next call.
+    const { drafts: tokenDrafts, includedCount: includedTokenCount } =
+      await fitGroupsWithinLimit(
+        tokenWorkList.map((w) => w.group),
+        MAX_JITO_BUNDLE_TXS
+      );
+    for (const draft of tokenDrafts) {
+      allDrafts.push(draft);
+      txMetadata.push({
+        type: TRANSACTION_TYPES.MIGRATION,
+        description: "Migration: transfers",
+      });
     }
 
-    // Step 1b: Batch governance position transfers (always included, before
-    // hotspots). Each transfer needs only source signing besides the fee payer.
-    if (positionTransferGroups.length > 0) {
-      const positionDrafts = await batchInstructionsToTxsWithPriorityFee(
-        provider,
+    // Step 1b: Batch governance position transfers (before hotspots),
+    // respecting the bundle limit. Positions that don't fit only need hasMore
+    // set — they're auto-enumerated, so the next call re-discovers them while
+    // already-migrated ones drop out.
+    const { drafts: positionDrafts, includedCount: includedPositionCount } =
+      await fitGroupsWithinLimit(
         positionTransferGroups,
-        batchOpts
+        MAX_JITO_BUNDLE_TXS - allDrafts.length
       );
-      for (const draft of positionDrafts) {
-        allDrafts.push(draft);
-        txMetadata.push({
-          type: TRANSACTION_TYPES.MIGRATION,
-          description: "Migration: transfers",
-        });
-      }
+    for (const draft of positionDrafts) {
+      allDrafts.push(draft);
+      txMetadata.push({
+        type: TRANSACTION_TYPES.MIGRATION,
+        description: "Migration: transfers",
+      });
     }
+    const hasMorePositions =
+      includedPositionCount < positionTransferGroups.length;
 
     // Step 2: Batch simple hotspot transfers, respecting the bundle limit.
     // Try batching all simple hotspot instructions together for optimal packing.
@@ -785,7 +827,12 @@ export const migrate = publicProcedure.migration.migrate.handler(
       }
     }
 
-    // Compute nextParams from remaining simple + split hotspots
+    // Compute nextParams from remaining tokens + simple + split hotspots.
+    // Remaining positions don't appear in nextParams (they're auto-enumerated)
+    // but still require a follow-up call.
+    const remainingTokens = tokenWorkList
+      .slice(includedTokenCount)
+      .map((w) => w.token);
     const remainingSimpleHotspots = simpleHotspotWorkList
       .slice(includedSimpleCount)
       .map((w) => w.hotspotPubkey);
@@ -797,12 +844,14 @@ export const migrate = publicProcedure.migration.migrate.handler(
       ...remainingSplitHotspots,
     ];
     const nextParams =
-      remainingHotspots.length > 0
+      remainingHotspots.length > 0 ||
+      remainingTokens.length > 0 ||
+      hasMorePositions
         ? {
             sourceWallet,
             destinationWallet,
             hotspots: remainingHotspots,
-            tokens: [] as { mint: string; amount: string }[],
+            tokens: remainingTokens,
           }
         : undefined;
     const hasMore = nextParams !== undefined;

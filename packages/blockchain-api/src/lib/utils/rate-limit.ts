@@ -49,3 +49,30 @@ export function createRateLimiter({
     return true;
   };
 }
+
+/** Parses a rate limit from an env value at check time (not module load) so
+ * ops and tests can adjust it without reimporting; falls back on missing or
+ * unparseable values. A value of 0 disables the check. */
+export function parseRateLimit(
+  value: string | undefined,
+  fallback: number
+): number {
+  if (value === undefined || value === "") return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+/**
+ * Best-effort client IP for rate-limit keying: the right-most x-forwarded-for
+ * hop, i.e. the one appended by our own ingress. Left-most hops are
+ * client-supplied and trivially spoofable. Even so, the resulting key is only
+ * as trustworthy as the ingress's XFF handling — treat limiters keyed on it as
+ * a courtesy throttle, not a security boundary.
+ */
+export function getClientIp(headerStore: {
+  get(name: string): string | null;
+}): string {
+  return (
+    headerStore.get("x-forwarded-for")?.split(",").at(-1)?.trim() || "unknown"
+  );
+}
