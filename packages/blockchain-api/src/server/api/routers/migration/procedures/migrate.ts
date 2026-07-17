@@ -30,7 +30,15 @@ import {
   taskKey,
 } from "@helium/tuktuk-sdk";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import { getPositionsForOwner } from "@/server/api/routers/governance/procedures/helpers";
+import {
+  delegatedPositionKey,
+  init as initHsd,
+} from "@helium/helium-sub-daos-sdk";
+import { init as initProxy, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
+import {
+  getPositionsForOwner,
+  type OwnedPosition,
+} from "@/server/api/routers/governance/procedures/helpers";
 import {
   batchInstructionsToTxsWithPriorityFee,
   getAsset,
@@ -138,6 +146,21 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const sourcePubkey = new PublicKey(sourceWallet);
     const destPubkey = new PublicKey(destinationWallet);
 
+    if (sourcePubkey.equals(destPubkey)) {
+      throw errors.BAD_REQUEST({
+        message: "Source and destination wallets must be different",
+      });
+    }
+    // Off-curve destinations (PDAs, exchange sub-accounts) can never sign, so
+    // assets sent there — including years-locked governance positions — are
+    // unrecoverable. Almost always a pasted-wrong address; reject outright.
+    if (!PublicKey.isOnCurve(destPubkey.toBytes())) {
+      throw errors.BAD_REQUEST({
+        message:
+          "Destination must be a standard wallet address (on-curve public key)",
+      });
+    }
+
     if (!env.FEE_PAYER_WALLET_PATH) {
       throw errors.BAD_REQUEST({
         message: "Fee payer wallet not configured",
@@ -183,7 +206,13 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const splitHotspotWorkList: SplitHotspotWork[] = [];
 
     // 3c. Token Transfers
+    const seenTokenMints = new Set<string>();
     for (const token of tokens) {
+      // A duplicate mint would build a second transfer against the source ATA
+      // the first group just closed, failing the whole tx.
+      if (seenTokenMints.has(token.mint)) continue;
+      seenTokenMints.add(token.mint);
+
       const isSol = token.mint === TOKEN_MINTS.WSOL;
 
       if (isSol) {
@@ -221,9 +250,18 @@ export const migrate = publicProcedure.migration.migrate.handler(
         // Fetch state BEFORE pushing any instruction — a frozen or empty account
         // must not leave the fee payer paying unrefunded dest-ATA rent.
         const [mintInfo, sourceAtaInfo] = await Promise.all([
-          getMint(connection, mintKey),
+          // getMint throws on non-SPL-token owners (e.g. token-2022 mints,
+          // which this endpoint doesn't support) — skip instead of 500ing.
+          getMint(connection, mintKey).catch(() => null),
           getAccount(connection, sourceAta).catch(() => null),
         ]);
+
+        if (!mintInfo) {
+          warnings.push(
+            `Skipping ${token.mint}: not a supported SPL token mint`
+          );
+          continue;
+        }
 
         if (!sourceAtaInfo || sourceAtaInfo.amount <= BigInt(0)) {
           warnings.push(`Skipping ${token.mint}: no balance to migrate`);
@@ -271,6 +309,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       vsrProgram,
       owner: sourcePubkey,
     });
+    const migratingPositions: OwnedPosition[] = [];
     for (const { mint, position } of ownedPositions) {
       const sourceAta = getAssociatedTokenAddressSync(mint, sourcePubkey, true);
       // Enumeration can lag on-chain state (stale RPC index); confirm the
@@ -282,6 +321,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       if (!sourceAtaInfo || sourceAtaInfo.amount !== BigInt(1)) {
         continue;
       }
+      migratingPositions.push({ mint, position });
       positionTransferGroups.push([
         await vsrProgram.methods
           .transferPositionV0()
@@ -297,6 +337,70 @@ export const migrate = publicProcedure.migration.migrate.handler(
         // refunds rent to the fee payer, keeping the migration rent-neutral.
         createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey),
       ]);
+    }
+
+    // Live governance attachments survive the NFT transfer silently: an
+    // assigned proxy keeps voting the position's weight until revoked, and
+    // delegation reward automation set up from the old wallet stops working.
+    // Neither blocks the transfer, so surface warnings instead.
+    if (migratingPositions.length > 0) {
+      const positionAccs = await vsrProgram.account.positionV0.fetchMultiple(
+        migratingPositions.map((p) => p.position)
+      );
+
+      const hsdProgram = await initHsd(provider);
+      const delegatedAccs =
+        await hsdProgram.account.delegatedPositionV0.fetchMultiple(
+          migratingPositions.map((p) => delegatedPositionKey(p.position)[0])
+        );
+      const delegatedCount = delegatedAccs.filter((acc) => acc !== null).length;
+      if (delegatedCount > 0) {
+        warnings.push(
+          `${delegatedCount} governance position(s) are delegated. Delegation follows the position to the new wallet, but any automated reward claiming set up from the old wallet will stop — claim or re-delegate from the new wallet.`
+        );
+      }
+
+      // Registrars are shared across positions — fetch each unique one once to
+      // resolve its proxy config.
+      const registrarKeys = Array.from(
+        new Set(
+          positionAccs
+            .filter((acc) => acc !== null)
+            .map((acc) => acc!.registrar.toBase58())
+        )
+      );
+      const registrars = await vsrProgram.account.registrar.fetchMultiple(
+        registrarKeys.map((k) => new PublicKey(k))
+      );
+      const proxyConfigByRegistrar = new Map(
+        registrarKeys.map((k, i) => [k, registrars[i]?.proxyConfig])
+      );
+
+      const assignmentKeys = migratingPositions
+        .map(({ mint }, i) => {
+          const acc = positionAccs[i];
+          const proxyConfig =
+            acc && proxyConfigByRegistrar.get(acc.registrar.toBase58());
+          return proxyConfig
+            ? proxyAssignmentKey(proxyConfig, mint, PublicKey.default)[0]
+            : null;
+        })
+        .filter((key): key is PublicKey => key !== null);
+      if (assignmentKeys.length > 0) {
+        const proxyProgram = await initProxy(provider);
+        const assignments =
+          await proxyProgram.account.proxyAssignmentV0.fetchMultiple(
+            assignmentKeys
+          );
+        const proxiedCount = assignments.filter(
+          (acc) => acc && !acc.nextVoter.equals(PublicKey.default)
+        ).length;
+        if (proxiedCount > 0) {
+          warnings.push(
+            `${proxiedCount} governance position(s) have an active voting proxy that survives migration and keeps voting their weight until revoked. Revoke or reassign the proxy from the new wallet if this is not intended.`
+          );
+        }
+      }
     }
 
     // 3d. Hotspot Transfers
