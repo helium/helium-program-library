@@ -146,7 +146,11 @@ export async function initTestSubdao(
       activeDeviceAuthority: activeDeviceAuthority || authority,
     })
     .preInstructions([
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+      // Generous headroom: this tx creates the sub-DAO's rewardable-entity
+      // collection via a Metaplex master edition, and Metaplex is cloned live from
+      // mainnet in tests, so its CU cost drifts. 350k sat right at the ceiling and
+      // tripped intermittently; unused CU isn't charged, so set the max.
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
     ])
     .accountsPartial({
       dao,
