@@ -2,10 +2,17 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use circuit_breaker::CircuitBreaker;
 use no_emit::{NoEmit, NotEmittedCounterV0};
+use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
 use shared_utils::{precise_number::PreciseNumber, try_from};
 use voter_stake_registry::state::Registrar;
 
-use crate::{current_epoch, error::ErrorCode, state::*, update_subdao_vehnt, EPOCH_LENGTH};
+use crate::{
+  backstop::{compute_backstop, BackstopInput, MOBILE_SUB_DAO},
+  current_epoch,
+  error::ErrorCode,
+  state::*,
+  update_subdao_vehnt, EPOCH_LENGTH,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct CalculateUtilityScoreArgsV0 {
@@ -13,6 +20,13 @@ pub struct CalculateUtilityScoreArgsV0 {
 }
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
+
+// Mirror of `data_credits::mint_data_credits_v0::HNT_PRICE_FEED_ID`. Duplicated here
+// (rather than imported) because data-credits depends on this crate, not the reverse.
+pub const HNT_PRICE_FEED_ID: [u8; 32] = [
+  0x64, 0x9f, 0xdd, 0x7e, 0xc0, 0x8e, 0x8e, 0x2a, 0x20, 0xf4, 0x25, 0x72, 0x98, 0x54, 0xe9, 0x02,
+  0x93, 0xdc, 0xbe, 0x23, 0x76, 0xab, 0xc4, 0x71, 0x97, 0xa1, 0x4d, 0xa6, 0xff, 0x33, 0x97, 0x56,
+];
 
 #[derive(Accounts)]
 #[instruction(args: CalculateUtilityScoreArgsV0)]
@@ -76,12 +90,23 @@ pub struct CalculateUtilityScoreV0<'info> {
   /// CHECK: May not have ever been initialized
   pub not_emitted_counter: UncheckedAccount<'info>,
   pub no_emit_program: Program<'info, NoEmit>,
+  /// CHECK: HIP 149 backstop HNT/USD Pyth price. Optional in the account struct (so the
+  /// TESTING dormant-path calls may omit it), but in production the handler requires it to
+  /// be present and pinned to the canonical HNT_PYTH_PRICE_FEED account. Requiring and
+  /// pinning it — rather than treating omission as "go dormant" — is what stops a
+  /// permissionless caller from front-running the cron and suppressing the backstop by
+  /// omitting or substituting the price (M-02/I-04). The price *contents* still fail safe:
+  /// a malformed, unverified, stale, or non-positive price makes the backstop dormant for
+  /// the epoch (handled in read_hnt_price) rather than halting reward issuance. The pinned
+  /// account is maintained continuously on-chain, so its presence is always satisfiable on
+  /// the honest path.
+  pub hnt_price_oracle: Option<UncheckedAccount<'info>>,
 }
 
 const SMOOTHING_FACTOR: u64 = 7;
 
-pub fn handler(
-  ctx: Context<CalculateUtilityScoreV0>,
+pub fn handler<'info>(
+  ctx: Context<'_, '_, 'info, 'info, CalculateUtilityScoreV0<'info>>,
   args: CalculateUtilityScoreArgsV0,
 ) -> Result<()> {
   let end_of_epoch_ts = i64::try_from(args.epoch + 1).unwrap() * EPOCH_LENGTH;
@@ -154,22 +179,98 @@ pub fn handler(
     ctx.accounts.dao_epoch_info.cumulative_not_emitted = cumulative_not_emitted;
   }
 
-  ctx.accounts.dao_epoch_info.total_rewards = ctx
+  let emission_ts = ctx
     .accounts
     .dao
     .emission_schedule
     .get_emissions_at(end_of_epoch_ts)
-    .unwrap()
-    .checked_add(std::cmp::min(
-      ctx.accounts.dao_epoch_info.smoothed_hnt_burned,
-      ctx.accounts.dao.net_emissions_cap,
-    ))
     .unwrap();
+  let net_emissions_cap = ctx.accounts.dao.net_emissions_cap;
+  let smoothed = ctx.accounts.dao_epoch_info.smoothed_hnt_burned;
+
+  // HIP 149 Decision 1 backstop. When a valid, fresh Pyth HNT price and the Mobile
+  // signals are both available, size the deployer target-minimum top-up (added on top of
+  // the existing carrier-burn re-emit) and the earnings-cap ceiling (stored for
+  // issue_rewards_v0 to apply on the Mobile pass). Both passes (IoT and Mobile) read the
+  // same Mobile signals and compute the same total_rewards, so the result is independent
+  // of sub-DAO ordering.
+  //
+  // The price account and the Mobile epoch-info accounts are mandatory inputs (the price
+  // is pinned above; the Mobile accounts error via mobile_signals if omitted), so a
+  // permissionless caller cannot front-run the cron and suppress the backstop by leaving
+  // them out (M-02). What stays fail-safe is the price *content*: a malformed, unverified,
+  // stale, or non-positive price makes the backstop dormant for the epoch (baseline
+  // emission + existing re-emit, no top-up, no cap) rather than halting reward issuance.
+  // The HIP already treats the target as a best-effort per-epoch aim, not a hard guarantee.
+  //
+  // In production the price account must be present and pinned to the canonical HNT feed;
+  // omission or substitution is rejected here rather than silently going dormant, which is
+  // what closes the permissionless-suppression path (M-02/I-04). Relaxed under TESTING,
+  // where the dormant-path tests intentionally omit the oracle. Rotating the pinned feed
+  // account requires upgrading HNT_PYTH_PRICE_FEED and the cron together — see that
+  // constant's docs for the halt-vs-dormant cases.
+  if !TESTING {
+    let oracle = ctx
+      .accounts
+      .hnt_price_oracle
+      .as_ref()
+      .ok_or_else(|| error!(ErrorCode::PriceOracleMissing))?;
+    require!(
+      oracle.key() == crate::backstop::HNT_PYTH_PRICE_FEED,
+      ErrorCode::InvalidPriceOracle
+    );
+  }
+  let backstop = match (read_hnt_price(&ctx), mobile_signals(&ctx, args.epoch)?) {
+    (
+      Some((decimals_factor, hnt_price_floor, hnt_price_cap)),
+      Some((mobile_dc_burned, mobile_share)),
+    ) => compute_backstop(&BackstopInput {
+      emission: emission_ts,
+      smoothed_hnt_burned: smoothed,
+      net_emissions_cap,
+      mobile_dc_burned,
+      mobile_share,
+      decimals_factor,
+      hnt_price_floor,
+      hnt_price_cap,
+    }),
+    _ => {
+      let existing_re_emit = std::cmp::min(smoothed, net_emissions_cap);
+      crate::backstop::BackstopOutput {
+        existing_re_emit,
+        top_up: 0,
+        total_rewards: emission_ts.checked_add(existing_re_emit).unwrap(),
+        deployer_cap_hnt: 0,
+      }
+    }
+  };
+
+  ctx.accounts.dao_epoch_info.total_rewards = backstop.total_rewards;
+  ctx.accounts.dao_epoch_info.deployer_cap_hnt = backstop.deployer_cap_hnt;
 
   ctx.accounts.dao_epoch_info.epoch = args.epoch;
 
   ctx.accounts.dao_epoch_info.current_hnt_supply = curr_supply
     .checked_add(ctx.accounts.dao_epoch_info.total_rewards)
+    .unwrap();
+
+  // HIP 149 Decision 2 supply-tracking correction. issue_rewards_v0 mints the supplement
+  // this epoch (supplement_per_subdao per sub-DAO pass, split between the Receiving Entity
+  // vault and the Council fanout, so num_sub_daos passes sum to the full daily amount, the
+  // split notwithstanding). Record that total in
+  // current_hnt_supply so next epoch's prev_supply is accurate; otherwise the mint reads
+  // as "negative burn", drives smoothed_hnt_burned to zero across its window, and disables
+  // both the floor top-up and the HIP 20 net-emissions re-emit. Tracking it here (and only
+  // here) keeps total_hnt_burned self-correcting -- adding it to total_hnt_burned as well
+  // would double-count. Mirrors the audited 2024-2025 treasury-mint block below.
+  let supplement_this_epoch =
+    crate::supplement::supplement_per_subdao(Clock::get()?.unix_timestamp)
+      .saturating_mul(ctx.accounts.dao.num_sub_daos as u64);
+  ctx.accounts.dao_epoch_info.current_hnt_supply = ctx
+    .accounts
+    .dao_epoch_info
+    .current_hnt_supply
+    .checked_add(supplement_this_epoch)
     .unwrap();
 
   // Until August 1st, 2025, emit the 2.9M HNT to the treasury.
@@ -289,4 +390,130 @@ pub fn handler(
   }
 
   Ok(())
+}
+
+/// Maximum age of the HNT price for it to feed the backstop. A daily mechanism tolerates
+/// staleness (intra-day drift is small), and a too-old price simply makes the backstop
+/// dormant rather than wrong. Generous under TESTING so posted test prices never expire.
+const PRICE_MAX_AGE_SECS: i64 = 60 * 60;
+
+/// Read the DC->HNT scale factor and the lower/upper confidence-adjusted HNT prices from
+/// the (pinned, required) Pyth account, mirroring `mint_data_credits_v0`'s price math.
+/// Returns `(decimals_factor, price_floor, price_cap)`, or `None` (backstop dormant this
+/// epoch) for any reason the price *content* can't be trusted: wrong type, wrong feed, not
+/// Full-verified, stale, or non-positive. Never errors, so a bad price can't halt reward
+/// issuance. Account presence and identity are enforced by the caller (required account +
+/// pin), so the only remaining reason to bail here is untrustworthy content.
+fn read_hnt_price<'info>(
+  ctx: &Context<'_, '_, '_, 'info, CalculateUtilityScoreV0<'info>>,
+) -> Option<(u128, u64, u64)> {
+  let oracle = ctx.accounts.hnt_price_oracle.as_ref()?;
+  let price_update = try_from!(Account<PriceUpdateV2>, oracle).ok()?;
+
+  if price_update.verification_level != VerificationLevel::Full {
+    return None;
+  }
+  let message = price_update.price_message;
+  if message.feed_id != HNT_PRICE_FEED_ID {
+    return None;
+  }
+
+  let now = Clock::get().ok()?.unix_timestamp;
+  let max_age = if TESTING {
+    6_000_000
+  } else {
+    PRICE_MAX_AGE_SECS
+  };
+  if message.publish_time.saturating_add(max_age) < now {
+    return None;
+  }
+
+  // Two prices for the two mechanisms. The floor/top-up uses the lower confidence bound
+  // (`ema_price - 2 * ema_conf`), exactly as mint_data_credits_v0 does: a lower price
+  // yields a larger top-up, the conservative direction for a minimum, and the burn bound
+  // still caps total re-emission at recent destruction. The cap uses the EMA point price
+  // (no confidence adjustment) so it binds at exactly 3.0x the payer rate rather than
+  // biasing the ceiling in either direction by the confidence width (I-01).
+  let conf_2 = i64::try_from(message.ema_conf.checked_mul(2)?).ok()?;
+  let price_floor = message.ema_price.checked_sub(conf_2)?;
+  let price_cap = message.ema_price;
+  if price_floor <= 0 || price_cap <= 0 {
+    return None;
+  }
+
+  // decimals_factor = 10^(hnt_decimals - expo - 5); converts a DC count to HNT lamports.
+  let exponent = i32::from(ctx.accounts.hnt_mint.decimals) - message.exponent - 5;
+  let decimals_factor = 10_u128.checked_pow(u32::try_from(exponent).ok()?)?;
+
+  Some((
+    decimals_factor,
+    u64::try_from(price_floor).ok()?,
+    u64::try_from(price_cap).ok()?,
+  ))
+}
+
+/// Read the Mobile sub-DAO's per-epoch `dc_burned` and 30-epoch EMA percent share.
+///
+/// Returns `Err(MobileEpochInfoMissing)` if the caller omitted the Mobile epoch-info
+/// accounts, so a permissionless caller cannot front-run the cron and suppress the
+/// backstop by leaving them out (M-02). The cron and admin end-epoch always forward them,
+/// and they are public PDAs, so requiring their presence never blocks the honest path.
+/// Returns `Ok(None)` (backstop dormant, no halt) when the accounts are present but not
+/// yet initialized (e.g. a zero-burn epoch), and `Ok(Some(..))` when they are readable.
+///
+/// In production these come from the Mobile sub-DAO's current- and previous-epoch
+/// `SubDaoEpochInfoV0` accounts, located in `remaining_accounts` by their PDAs (pinned to
+/// the hardcoded mainnet `MOBILE_SUB_DAO`). Under TESTING the sub-DAO being processed
+/// plays the role of Mobile, so the named current/previous epoch-info accounts are used
+/// directly.
+fn mobile_signals<'info>(
+  ctx: &Context<'_, '_, 'info, 'info, CalculateUtilityScoreV0<'info>>,
+  epoch: u64,
+) -> Result<Option<(u64, u32)>> {
+  if TESTING {
+    return Ok(Some((
+      ctx.accounts.sub_dao_epoch_info.dc_burned,
+      ctx.accounts.prev_sub_dao_epoch_info.previous_percentage,
+    )));
+  }
+
+  let curr_pda = Pubkey::find_program_address(
+    &[
+      b"sub_dao_epoch_info",
+      MOBILE_SUB_DAO.as_ref(),
+      &epoch.to_le_bytes(),
+    ],
+    &crate::ID,
+  )
+  .0;
+  let prev_pda = Pubkey::find_program_address(
+    &[
+      b"sub_dao_epoch_info",
+      MOBILE_SUB_DAO.as_ref(),
+      &(epoch - 1).to_le_bytes(),
+    ],
+    &crate::ID,
+  )
+  .0;
+
+  let curr_acc = ctx
+    .remaining_accounts
+    .iter()
+    .find(|acc| acc.key() == curr_pda)
+    .ok_or_else(|| error!(ErrorCode::MobileEpochInfoMissing))?;
+  let prev_acc = ctx
+    .remaining_accounts
+    .iter()
+    .find(|acc| acc.key() == prev_pda)
+    .ok_or_else(|| error!(ErrorCode::MobileEpochInfoMissing))?;
+
+  // Present but not yet initialized (e.g. no carrier burn this epoch) -> dormant, not an
+  // error, so a low-activity epoch can never halt reward issuance.
+  match (
+    Account::<SubDaoEpochInfoV0>::try_from(curr_acc).ok(),
+    Account::<SubDaoEpochInfoV0>::try_from(prev_acc).ok(),
+  ) {
+    (Some(curr), Some(prev)) => Ok(Some((curr.dc_burned, prev.previous_percentage))),
+    _ => Ok(None),
+  }
 }

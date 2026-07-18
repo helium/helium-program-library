@@ -75,6 +75,19 @@ pub struct IssueRewardsV0<'info> {
     bump = prev_sub_dao_epoch_info.bump_seed,
   )]
   pub prev_sub_dao_epoch_info: Box<Account<'info, SubDaoEpochInfoV0>>,
+  // HIP 149 Decision 2 supplement vault (the Receiving Entity's Squads vault HNT account).
+  // Optional so pre-supplement callers/tests need not pass it; required only when the
+  // supplement window is active (enforced in the handler). Validated there: key equals
+  // SUPPLEMENT_VAULT_TOKEN_ACCOUNT (relaxed under TESTING). The HNT mint is enforced by the
+  // mint CPI.
+  #[account(mut)]
+  pub supplement_vault: Option<Box<Account<'info, TokenAccount>>>,
+  // HIP 149 Decision 4 Council-compensation fanout (a mini_fanout PDA-owned HNT account that
+  // splits the 1.25% carve-out among the seated community members). Optional/required on the
+  // same terms as supplement_vault. Validated in the handler: key equals
+  // COUNCIL_FANOUT_TOKEN_ACCOUNT (relaxed under TESTING).
+  #[account(mut)]
+  pub council_vault: Option<Box<Account<'info, TokenAccount>>>,
 }
 
 fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
@@ -84,40 +97,33 @@ fn to_prec(n: Option<u128>) -> Option<PreciseNumber> {
 }
 
 impl<'info> IssueRewardsV0<'info> {
-  pub fn mint_delegation_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+  /// CpiContext to mint HNT (through the HNT circuit breaker, signed by the DAO) to
+  /// `to`. All HNT mints in this instruction differ only in the destination.
+  fn mint_hnt_to_ctx(
+    &self,
+    to: AccountInfo<'info>,
+  ) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
     let cpi_accounts = MintV0 {
       mint: self.hnt_mint.to_account_info(),
-      to: self.delegator_pool.to_account_info(),
+      to,
       mint_authority: self.dao.to_account_info(),
       circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
       token_program: self.token_program.to_account_info(),
     };
 
     CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+  }
+
+  pub fn mint_delegation_rewards_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
+    self.mint_hnt_to_ctx(self.delegator_pool.to_account_info())
   }
 
   pub fn mint_treasury_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
-    let cpi_accounts = MintV0 {
-      mint: self.hnt_mint.to_account_info(),
-      to: self.treasury.to_account_info(),
-      mint_authority: self.dao.to_account_info(),
-      circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
-      token_program: self.token_program.to_account_info(),
-    };
-
-    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+    self.mint_hnt_to_ctx(self.treasury.to_account_info())
   }
 
   pub fn mint_rewards_emissions_ctx(&self) -> CpiContext<'_, '_, '_, 'info, MintV0<'info>> {
-    let cpi_accounts = MintV0 {
-      mint: self.hnt_mint.to_account_info(),
-      to: self.rewards_escrow.to_account_info(),
-      mint_authority: self.dao.to_account_info(),
-      circuit_breaker: self.hnt_circuit_breaker.to_account_info(),
-      token_program: self.token_program.to_account_info(),
-    };
-
-    CpiContext::new(self.circuit_breaker_program.to_account_info(), cpi_accounts)
+    self.mint_hnt_to_ctx(self.rewards_escrow.to_account_info())
   }
 }
 
@@ -194,7 +200,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .unwrap();
   let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
 
-  let delegation_rewards_amount = (rewards_amount as u128)
+  let delegation_rewards_amount: u64 = (rewards_amount as u128)
     .checked_mul(u128::from(ctx.accounts.dao.delegator_rewards_percent))
     .unwrap()
     .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
@@ -202,20 +208,46 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .try_into()
     .unwrap();
 
-  if delegation_rewards_amount > 0 {
-    msg!("Minting {} delegation rewards", delegation_rewards_amount);
+  // HIP 149 Decision 1 earnings cap. On the Mobile sub-DAO pass, hold Mobile data
+  // deployers at no more than three times the carrier-paid USD: any HNT in the data
+  // bucket above the ceiling stored by calculate_utility_score_v0 (deployer_cap_hnt)
+  // is redirected from the rewards escrow to the shared delegator pool. This is a
+  // bucket-to-bucket move inside the already-split sub-DAO emission: total_rewards is
+  // unchanged, the HNT is paid to veHNT delegators instead of deployers, and staker
+  // claims already key off the DAO-level delegation_rewards_issued. A zero ceiling
+  // (no carrier burn this epoch, or no price oracle) disables the redirect.
+  let is_mobile = TESTING || ctx.accounts.sub_dao.key() == crate::backstop::MOBILE_SUB_DAO;
+  let escrow_before_overflow = rewards_amount
+    .checked_sub(delegation_rewards_amount)
+    .unwrap();
+  let staker_overflow: u64 = if is_mobile {
+    crate::backstop::staker_overflow(
+      rewards_amount,
+      ctx.accounts.dao_epoch_info.deployer_cap_hnt,
+      escrow_before_overflow,
+    )
+  } else {
+    0
+  };
+
+  let delegation_pool_amount = delegation_rewards_amount
+    .checked_add(staker_overflow)
+    .unwrap();
+
+  if delegation_pool_amount > 0 {
+    msg!("Minting {} delegation rewards", delegation_pool_amount);
     mint_v0(
       ctx
         .accounts
         .mint_delegation_rewards_ctx()
         .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
       MintArgsV0 {
-        amount: delegation_rewards_amount, // send some dnt emissions to delegation pool
+        amount: delegation_pool_amount, // delegator slice + any HIP 149 earnings-cap overflow
       },
     )?;
   }
 
-  let escrow_amount = rewards_amount - delegation_rewards_amount;
+  let escrow_amount = escrow_before_overflow.checked_sub(staker_overflow).unwrap();
   msg!("Minting {} to rewards escrow", escrow_amount);
   mint_v0(
     ctx
@@ -230,10 +262,69 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   ctx.accounts.sub_dao_epoch_info.hnt_rewards_issued = escrow_amount;
   ctx.accounts.dao_epoch_info.num_rewards_issued += 1;
   ctx.accounts.sub_dao_epoch_info.rewards_issued_at = Some(Clock::get()?.unix_timestamp);
-  ctx.accounts.dao_epoch_info.delegation_rewards_issued += delegation_rewards_amount;
-  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = delegation_rewards_amount;
+  ctx.accounts.dao_epoch_info.delegation_rewards_issued += delegation_pool_amount;
+  ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued = delegation_pool_amount;
   ctx.accounts.dao_epoch_info.done_issuing_rewards =
     ctx.accounts.dao.num_sub_daos == ctx.accounts.dao_epoch_info.num_rewards_issued;
+
+  // HIP 149 Decision 2 + 4: mint this sub-DAO's slice of the operations-and-growth supplement
+  // while the supplement window is active. Each sub-DAO pass mints supplement_per_subdao, so
+  // num_sub_daos passes sum to the full daily rate (which calculate_utility_score_v0 records
+  // in current_hnt_supply). The slice is split, per HIP 149 Decision 4, into a 1.25% Council
+  // compensation carve-out (to the Council fanout) and the remainder (to the Receiving Entity
+  // vault); the two sum to supplement_per_subdao, so the supply-tracking correction is
+  // unchanged and total minted is unaffected. Both mints go through the HNT circuit breaker
+  // like the reward mints, so the breaker must be sized for the full supplement. Dormant (no
+  // mint, vaults not required) whenever the hardcoded window is inactive.
+  let supplement = crate::supplement::supplement_per_subdao(curr_ts);
+  if supplement > 0 {
+    let council_amount = crate::supplement::council_cut(supplement);
+    let vault_amount = supplement.saturating_sub(council_amount);
+
+    // Receiving Entity vault (the 98.75% remainder).
+    let vault = ctx
+      .accounts
+      .supplement_vault
+      .as_ref()
+      .ok_or_else(|| error!(ErrorCode::SupplementVaultMissing))?;
+    require!(
+      TESTING || vault.key() == crate::supplement::SUPPLEMENT_VAULT_TOKEN_ACCOUNT,
+      ErrorCode::InvalidSupplementVault
+    );
+    // Council fanout (the 1.25% carve-out). Always required while active, even if the
+    // tapered amount rounds the carve-out to zero, so the destination is unambiguous.
+    let council = ctx
+      .accounts
+      .council_vault
+      .as_ref()
+      .ok_or_else(|| error!(ErrorCode::CouncilVaultMissing))?;
+    require!(
+      TESTING || council.key() == crate::supplement::COUNCIL_FANOUT_TOKEN_ACCOUNT,
+      ErrorCode::InvalidCouncilVault
+    );
+
+    msg!("Minting {vault_amount} supplement, {council_amount} Council compensation");
+    mint_v0(
+      ctx
+        .accounts
+        .mint_hnt_to_ctx(vault.to_account_info())
+        .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
+      MintArgsV0 {
+        amount: vault_amount,
+      },
+    )?;
+    if council_amount > 0 {
+      mint_v0(
+        ctx
+          .accounts
+          .mint_hnt_to_ctx(council.to_account_info())
+          .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
+        MintArgsV0 {
+          amount: council_amount,
+        },
+      )?;
+    }
+  }
 
   Ok(())
 }

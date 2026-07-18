@@ -16,7 +16,8 @@ export const IOT_MINT = new PublicKey(
   "iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns"
 );
 
-// Crank-fed HNT/USD feed account owned by the pro Pyth receiver (rec2...).
+// Mainnet HNT/USD Pyth pull-oracle push account (shard 0 for HNT_PRICE_FEED_ID),
+// kept continuously fresh on-chain.
 export const HNT_PYTH_PRICE_FEED = new PublicKey(
   "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5"
 );
