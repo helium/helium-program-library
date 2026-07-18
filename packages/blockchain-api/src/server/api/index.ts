@@ -12,6 +12,7 @@ import { webhooksRouter } from "./routers/webhooks/router";
 import { migrationRouter } from "./routers/migration/router";
 import { dataCreditsRouter } from "./routers/data-credits/router";
 import { squadsRouter } from "./routers/squads/router";
+import { squadsV3Router } from "./routers/squadsV3/router";
 import { implement } from "@orpc/server";
 import { fullApiContract, apiContract } from "@helium/blockchain-api";
 
@@ -27,6 +28,7 @@ const sharedRouters = {
   migration: migrationRouter,
   dataCredits: dataCreditsRouter,
   squads: squadsRouter,
+  squadsV3: squadsV3Router,
 };
 
 export const publicRouter = implement(apiContract).router(sharedRouters);

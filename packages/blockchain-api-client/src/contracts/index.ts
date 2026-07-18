@@ -11,6 +11,7 @@ import { webhooksContract } from "./webhooks";
 import { migrationContract } from "./migration";
 import { dataCreditsContract } from "./data-credits";
 import { squadsContract } from "./squads";
+import { squadsV3Contract } from "./squadsV3";
 import { oc } from "@orpc/contract";
 
 export * from "./governance";
@@ -26,6 +27,7 @@ export * from "./webhooks";
 export * from "./migration";
 export * from "./data-credits";
 export * from "./squads";
+export * from "./squadsV3";
 
 /**
  * Public API contract definition (for external consumers).
@@ -43,6 +45,7 @@ export const apiContract = oc.router({
   migration: migrationContract,
   dataCredits: dataCreditsContract,
   squads: squadsContract,
+  squadsV3: squadsV3Contract,
 });
 
 /**
