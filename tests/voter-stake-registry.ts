@@ -686,7 +686,8 @@ describe("voter-stake-registry", () => {
         const positionBalance2 = await provider.connection.getBalance(position);
         const spentLamports =
           ((await provider.connection.getAccountInfo(marker! as PublicKey))
-            ?.lamports || 0) + (positionBalance2 - positionBalance);
+            ?.lamports || 0) +
+          (positionBalance2 - positionBalance);
         expect(registrarBalance2).to.eq(registrarBalance - spentLamports);
       });
 
@@ -834,6 +835,7 @@ describe("voter-stake-registry", () => {
       });
 
       it("should not allow me to vote twice", async () => {
+        let error: any;
         try {
           await program.methods
             .voteV0({
@@ -849,8 +851,13 @@ describe("voter-stake-registry", () => {
             })
             .rpc({ skipPreflight: true });
         } catch (e: any) {
-          expect(e.code).to.eq(6044);
+          error = e;
         }
+        expect(error, "Expected vote to fail").to.exist;
+        // The error surfaces as an AnchorError or a raw InstructionError
+        // depending on whether it arrives via simulation or websocket
+        const code = error.code ?? error.InstructionError?.[1]?.Custom;
+        expect(code).to.eq(6044);
       });
 
       it("doesn't allow transferring", async () => {
