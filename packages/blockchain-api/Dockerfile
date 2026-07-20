@@ -1,6 +1,6 @@
 # syntax=docker.io/docker/dockerfile:1
 
-FROM node:22-alpine AS pruner
+FROM node:24-alpine AS pruner
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
@@ -10,7 +10,7 @@ RUN pnpm add -g turbo@2.9.3
 COPY . .
 RUN turbo prune @helium/blockchain-api-service --docker
 
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
@@ -62,7 +62,7 @@ RUN --mount=type=cache,id=turbo,target=/app/.turbo \
     rm -f packages/blockchain-api/.env packages/blockchain-api/.next/standalone/packages/blockchain-api/.env
 
 # Production image
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 

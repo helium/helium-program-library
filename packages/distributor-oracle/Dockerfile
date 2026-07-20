@@ -1,6 +1,6 @@
 # syntax=docker.io/docker/dockerfile:1
 
-FROM node:22-alpine AS pruner
+FROM node:24-alpine AS pruner
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
@@ -10,7 +10,7 @@ RUN pnpm add -g turbo@2.9.3
 COPY . .
 RUN turbo prune @helium/distributor-oracle --docker
 
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 COPY --from=pruner /app/out/json/ .
@@ -25,7 +25,7 @@ COPY packages/idls/lib/ packages/idls/lib/
 RUN mkdir -p target/types && echo 'export {}' > target/types/_placeholder.ts
 RUN --mount=type=cache,id=turbo,target=/app/.turbo pnpm turbo run build --filter=@helium/distributor-oracle
 
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /app
 
 # Preserve pnpm workspace layout so symlinks under node_modules/@helium/* resolve

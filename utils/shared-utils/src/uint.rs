@@ -5,8 +5,11 @@
 #![allow(clippy::ptr_offset_with_cast)]
 #![allow(clippy::manual_range_contains)]
 #![allow(clippy::manual_div_ceil)]
-// uint's construct_uint! expands macros with trailing semicolons in expression
-// position; newer rustc denies this by default (rust-lang/rust#79813).
+// The `uint` crate's construct_uint! expansion (uint_full_mul_reg!) trips
+// semicolon_in_expressions_from_macros on the host x86_64 `anchor idl build`.
+// The lint fires inside third-party macro code we can't edit, and uint 0.9.5
+// (latest 0.9) still emits it; the generated code is correct. Revisit if uint
+// publishes a fix.
 #![allow(semicolon_in_expressions_from_macros)]
 
 use uint::construct_uint;

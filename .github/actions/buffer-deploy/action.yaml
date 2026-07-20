@@ -38,8 +38,6 @@ runs:
   steps:
     - uses: ./.github/actions/setup/
     - uses: ./.github/actions/setup-anchor/
-      with:
-        node-version: ${{ env.NODE_VERSION }}
     - run: echo "$DEPLOY_KEYPAIR" > ./deploy-keypair.json && chmod 600 ./deploy-keypair.json
       shell: bash
       env:
