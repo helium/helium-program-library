@@ -1,11 +1,14 @@
 {
   "$schema": "https://github.com/changesets/changesets/blob/main/packages/config/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "helium/helium-program-library" }],
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "helium/helium-program-library" }
+  ],
   "commit": false,
   "fixed": [],
   "linked": [],
   "access": "public",
-  "baseBranch": "master",
+  "baseBranch": "develop",
   "updateInternalDependencies": "patch",
   "ignore": []
 }

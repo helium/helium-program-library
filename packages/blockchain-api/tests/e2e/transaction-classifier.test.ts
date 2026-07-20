@@ -375,7 +375,7 @@ describe("transaction-classifier", () => {
     it("classifies HSD claimRewardsV1 as delegation_rewards_distribution", async () => {
       const { Connection } = await import("@solana/web3.js");
       const connection = new Connection(
-        process.env.SOLANA_RPC_URL || "https://solana-rpc.web.helium.io",
+        process.env.SOLANA_RPC_URL!,
       );
 
       const result = await classifyTransaction(hsdClaimTx, connection);
@@ -390,7 +390,7 @@ describe("transaction-classifier", () => {
     it("returns null for delegation claim when wallet is not in token balances", async () => {
       const { Connection } = await import("@solana/web3.js");
       const connection = new Connection(
-        process.env.SOLANA_RPC_URL || "https://solana-rpc.web.helium.io",
+        process.env.SOLANA_RPC_URL!,
       );
 
       const result = await classifyTransaction(hsdClaimTx, connection, "someRandomWallet123");

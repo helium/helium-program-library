@@ -2,6 +2,8 @@ import { publicProcedure } from "../../../procedures";
 import { PublicKey } from "@solana/web3.js";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { init as initDc, mintDataCredits } from "@helium/data-credits-sdk";
+import { DC_MINT } from "@helium/spl-utils";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { serializeTransaction } from "@/lib/utils/build-transaction";
 import {
   generateTransactionTag,
@@ -15,6 +17,7 @@ import {
 import {
   calculateRequiredBalance,
   getTotalTransactionFees,
+  RENT_COSTS,
 } from "@/lib/utils/balance-validation";
 import BN from "bn.js";
 
@@ -38,6 +41,11 @@ export const mint = publicProcedure.dataCredits.mint.handler(
 
     const program = await initDc(provider);
 
+    // Note: minting has no Squads propose mode. mintDataCreditsV0 checks Pyth
+    // price freshness on-chain and requires a fresh price posted in the same
+    // transaction; a Squads proposal executes later, by which point any posted
+    // or referenced price is stale (verified: the program throws
+    // PythPriceNotFound). Delegation and burns are proposable; minting is not.
     const { txs } = await mintDataCredits({
       program,
       dcAmount: dcAmount ? new BN(dcAmount) : undefined,
@@ -48,7 +56,21 @@ export const mint = publicProcedure.dataCredits.mint.handler(
     const useJito = shouldUseJitoBundle(txs.length, getCluster());
     const txFees = getTotalTransactionFees(txs.map((t) => t.tx));
     const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
-    const requiredBalance = calculateRequiredBalance(txFees + jitoTipCost, 0);
+
+    // Check if recipient's DC ATA needs creation (init_if_needed on-chain)
+    const recipientPubkey = recipient
+      ? new PublicKey(recipient)
+      : new PublicKey(owner);
+    const recipientDcAta = getAssociatedTokenAddressSync(
+      DC_MINT,
+      recipientPubkey
+    );
+    const recipientDcAtaInfo = await connection.getAccountInfo(recipientDcAta);
+    const ataRent = recipientDcAtaInfo ? 0 : RENT_COSTS.ATA;
+    const requiredBalance = calculateRequiredBalance(
+      txFees + jitoTipCost,
+      ataRent
+    );
 
     const ownerPubkey = new PublicKey(owner);
     const walletBalance = await connection.getBalance(ownerPubkey);
@@ -96,7 +118,12 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       transactions,
       parallel: false,
       tag,
-      actionMetadata: { type: "mint_data_credits", dcAmount: dcAmount || undefined, hntAmount: hntAmount || undefined, recipient: recipient || undefined },
+      actionMetadata: {
+        type: "mint_data_credits",
+        dcAmount: dcAmount || undefined,
+        hntAmount: hntAmount || undefined,
+        recipient: recipient || undefined,
+      },
     };
   }
 );

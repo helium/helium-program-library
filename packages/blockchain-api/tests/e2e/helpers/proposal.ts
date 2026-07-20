@@ -19,6 +19,7 @@ import { init as initHsd, daoKey } from "@helium/helium-sub-daos-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
 import { TestCtx } from "./context";
 import { sendAndConfirmInstructions } from "./tx";
+import { getSurfpoolRpcUrl } from "./surfpool";
 import BN from "bn.js";
 
 interface CreateProposalOptions {
@@ -43,11 +44,11 @@ export interface ProposalSetup {
  */
 function proposalConfigKey(
   name: string,
-  programId: PublicKey = PROPOSAL_PROGRAM_ID
+  programId: PublicKey = PROPOSAL_PROGRAM_ID,
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("proposal_config"), Buffer.from(name, "utf-8")],
-    programId
+    programId,
   );
 }
 
@@ -63,14 +64,14 @@ function proposalConfigKey(
  */
 export async function createTestProposal(
   ctx: TestCtx,
-  options: CreateProposalOptions
+  options: CreateProposalOptions,
 ): Promise<ProposalSetup> {
   // Create a signing provider using the test context's connection and payer
   const wallet = new Wallet(ctx.payer);
   const provider = new AnchorProvider(
     ctx.connection,
     wallet,
-    AnchorProvider.defaultOptions()
+    AnchorProvider.defaultOptions(),
   );
 
   const hsdProgram = await initHsd(provider);
@@ -91,7 +92,9 @@ export async function createTestProposal(
   const votingDuration = new BN(options.votingDurationSecs ?? 3600);
 
   const [resolutionSettingsPda] = resolutionSettingsKey(resolutionName);
-  const resolutionSettingsNodes = settings().offsetFromStartTs(votingDuration).build();
+  const resolutionSettingsNodes = settings()
+    .offsetFromStartTs(votingDuration)
+    .build();
   const [proposalConfig] = proposalConfigKey(configName);
   const seed = Buffer.from(options.name, "utf-8");
   const [proposalPubkey] = proposalKey(ctx.payer.publicKey, seed);
@@ -192,13 +195,13 @@ export async function createTestProposal(
  */
 export async function createTestOrganizationProposal(
   ctx: TestCtx,
-  options: CreateProposalOptions
+  options: CreateProposalOptions,
 ): Promise<ProposalSetup> {
   const wallet = new Wallet(ctx.payer);
   const provider = new AnchorProvider(
     ctx.connection,
     wallet,
-    AnchorProvider.defaultOptions()
+    AnchorProvider.defaultOptions(),
   );
 
   const hsdProgram = await initHsd(provider);
@@ -321,5 +324,187 @@ export async function createTestOrganizationProposal(
     registrar,
     resolutionSettings: resolutionSettingsPda,
     organization: organizationPubkey,
+  };
+}
+
+/**
+ * OrganizationV0 layout (after 8-byte anchor discriminator):
+ *   num_proposals: u32          (offset 8)
+ *   authority: pubkey           (offset 12)
+ *   default_proposal_config: pubkey (offset 44)
+ */
+const ORG_AUTHORITY_OFFSET = 12;
+const ORG_DEFAULT_PROPOSAL_CONFIG_OFFSET = 44;
+
+async function surfnetSetAccount(
+  pubkey: PublicKey,
+  data: Buffer,
+  owner: PublicKey,
+  lamports: number
+): Promise<void> {
+  await fetch(getSurfpoolRpcUrl(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "surfnet_setAccount",
+      params: [
+        pubkey.toBase58(),
+        {
+          data: data.toString("hex"),
+          owner: owner.toBase58(),
+          lamports,
+        },
+      ],
+    }),
+  });
+}
+
+/**
+ * Creates a voting proposal under the real "Helium" organization so it is
+ * discoverable by the assignProxies procedure (which scans
+ * organizationKey("Helium")'s last 10 proposals).
+ *
+ * Seizes the forked Helium org by overwriting its `authority` and
+ * `default_proposal_config` fields via surfnet_setAccount, then creates the
+ * proposal through the organization program using a freshly created config.
+ * `startedSecsAgo` lets the caller backdate `startTs` so the voting window
+ * (startTs + offsetFromStartTs) can already be in the past while the proposal
+ * stays in the Voting state (surfpool does not auto-resolve).
+ */
+export async function createHeliumOrgVotingProposal(
+  ctx: TestCtx,
+  options: CreateProposalOptions & { startedSecsAgo?: number }
+): Promise<ProposalSetup & { index: number }> {
+  const wallet = new Wallet(ctx.payer);
+  const provider = new AnchorProvider(
+    ctx.connection,
+    wallet,
+    AnchorProvider.defaultOptions()
+  );
+
+  const hsdProgram = await initHsd(provider);
+  const proposalProgram = await initProposal(provider);
+  const stateControllerProgram = await initStateController(provider);
+  const orgProgram = await initOrg(provider);
+
+  const [hntOrg] = organizationKey("Helium");
+  const orgAcc = await orgProgram.account.organizationV0.fetch(hntOrg);
+  const index = orgAcc.numProposals;
+
+  const [daoK] = daoKey(HNT_MINT);
+  const dao = await hsdProgram.account.daoV0.fetch(daoK);
+  const registrar = dao.registrar;
+
+  const shortId = Math.random().toString(36).substring(2, 8);
+  const configName = `tc-${shortId}`;
+  const resolutionName = `rs-${shortId}`;
+  const votingDuration = new BN(options.votingDurationSecs ?? 3600);
+
+  const [resolutionSettingsPda] = resolutionSettingsKey(resolutionName);
+  const resolutionSettingsNodes = settings()
+    .offsetFromStartTs(votingDuration)
+    .build();
+  const [proposalConfig] = PublicKey.findProgramAddressSync(
+    [Buffer.from("proposal_config"), Buffer.from(configName, "utf-8")],
+    PROPOSAL_PROGRAM_ID
+  );
+  const [proposalPubkey] = orgProposalKey(hntOrg, index);
+
+  const initResolutionIx = await stateControllerProgram.methods
+    .initializeResolutionSettingsV0({
+      name: resolutionName,
+      settings: { nodes: resolutionSettingsNodes },
+    })
+    .accounts({
+      payer: ctx.payer.publicKey,
+      resolutionSettings: resolutionSettingsPda,
+    })
+    .instruction();
+
+  const initConfigIx = await proposalProgram.methods
+    .initializeProposalConfigV0({
+      name: configName,
+      voteController: registrar,
+      stateController: resolutionSettingsPda,
+      onVoteHook: PublicKey.default,
+      authority: ctx.payer.publicKey,
+    })
+    .accounts({
+      payer: ctx.payer.publicKey,
+      owner: ctx.payer.publicKey,
+      proposalConfig,
+    })
+    .instruction();
+
+  await sendAndConfirmInstructions(ctx.connection, ctx.payer, [
+    initResolutionIx,
+    initConfigIx,
+  ]);
+
+  // Seize the Helium org: authority -> payer so we can create proposals, and
+  // default_proposal_config -> our config so the org accepts it.
+  const accountInfo = await ctx.connection.getAccountInfo(hntOrg);
+  if (!accountInfo) {
+    throw new Error("Helium organization account not found on fork");
+  }
+  const newData = Buffer.from(accountInfo.data);
+  ctx.payer.publicKey.toBuffer().copy(newData, ORG_AUTHORITY_OFFSET);
+  proposalConfig.toBuffer().copy(newData, ORG_DEFAULT_PROPOSAL_CONFIG_OFFSET);
+  await surfnetSetAccount(
+    hntOrg,
+    newData,
+    accountInfo.owner,
+    accountInfo.lamports
+  );
+
+  const initProposalIx = await orgProgram.methods
+    .initializeProposalV0({
+      name: options.name,
+      uri: "https://test.example.com",
+      maxChoicesPerVoter: options.maxChoicesPerVoter ?? 1,
+      choices: options.choices ?? [
+        { name: "Yes", uri: null },
+        { name: "No", uri: null },
+      ],
+      tags: ["test"],
+    })
+    .accounts({
+      payer: ctx.payer.publicKey,
+      authority: ctx.payer.publicKey,
+      owner: ctx.payer.publicKey,
+      proposal: proposalPubkey,
+      proposalConfig,
+      organization: hntOrg,
+      proposalProgram: PROPOSAL_PROGRAM_ID,
+    })
+    .instruction();
+
+  await sendAndConfirmInstructions(ctx.connection, ctx.payer, [initProposalIx]);
+
+  const startTs = Math.floor(Date.now() / 1000) - (options.startedSecsAgo ?? 0);
+  const updateStateIx = await stateControllerProgram.methods
+    .updateStateV0({
+      newState: {
+        voting: { startTs: new BN(startTs) },
+      },
+    })
+    .accounts({
+      proposal: proposalPubkey,
+      proposalConfig,
+      resolutionSettings: resolutionSettingsPda,
+    })
+    .instruction();
+
+  await sendAndConfirmInstructions(ctx.connection, ctx.payer, [updateStateIx]);
+
+  return {
+    proposalConfig,
+    proposal: proposalPubkey,
+    registrar,
+    resolutionSettings: resolutionSettingsPda,
+    organization: hntOrg,
+    index,
   };
 }

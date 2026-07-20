@@ -9,11 +9,11 @@ import type { TokenAmountOutput } from "@helium/blockchain-api/schemas/common";
 
 const SOL_MINT = NATIVE_MINT.toBase58();
 
-function solOutput(lamports: BN): TokenAmountOutput {
+async function solOutput(lamports: BN): Promise<TokenAmountOutput> {
   return toTokenAmountOutput(lamports, SOL_MINT);
 }
 
-function zeroSol(): TokenAmountOutput {
+async function zeroSol(): Promise<TokenAmountOutput> {
   return solOutput(new BN(0));
 }
 
@@ -62,8 +62,8 @@ export const estimate = publicProcedure.transactions.estimate.handler(
             success: false,
             error: `Failed to deserialize transaction: ${err instanceof Error ? err.message : "Unknown error"}`,
             costs: {
-              transactionFees: zeroSol(),
-              rent: zeroSol(),
+              transactionFees: await zeroSol(),
+              rent: await zeroSol(),
               tokenTransfers: [],
             },
           };
@@ -96,8 +96,8 @@ export const estimate = publicProcedure.transactions.estimate.handler(
             error: `Simulation failed: ${errorMessage}`,
             logs: simulation.value.logs ?? undefined,
             costs: {
-              transactionFees: zeroSol(),
-              rent: zeroSol(),
+              transactionFees: await zeroSol(),
+              rent: await zeroSol(),
               tokenTransfers: [],
             },
           };
@@ -145,8 +145,8 @@ export const estimate = publicProcedure.transactions.estimate.handler(
           computeUnits: simulation.value.unitsConsumed ?? 0,
           success: true,
           costs: {
-            transactionFees: solOutput(txFee),
-            rent: solOutput(rentCost),
+            transactionFees: await solOutput(txFee),
+            rent: await solOutput(rentCost),
             tokenTransfers,
           },
         };
@@ -157,7 +157,7 @@ export const estimate = publicProcedure.transactions.estimate.handler(
     const aggregateTokenTransfers: TokenAmountOutput[] = [];
     for (const [mint, amount] of tokenTransfersByMint) {
       if (!amount.isZero()) {
-        aggregateTokenTransfers.push(toTokenAmountOutput(amount, mint));
+        aggregateTokenTransfers.push(await toTokenAmountOutput(amount, mint));
       }
     }
 
@@ -165,10 +165,10 @@ export const estimate = publicProcedure.transactions.estimate.handler(
     const solTotal = totalTransactionFees.add(totalRent);
 
     return {
-      totalSol: solOutput(solTotal),
+      totalSol: await solOutput(solTotal),
       breakdown: {
-        transactionFees: solOutput(totalTransactionFees),
-        rent: solOutput(totalRent),
+        transactionFees: await solOutput(totalTransactionFees),
+        rent: await solOutput(totalRent),
         tokenTransfers: aggregateTokenTransfers,
       },
       transactions: transactionEstimates,

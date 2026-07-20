@@ -2,7 +2,7 @@
   "address": "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8",
   "metadata": {
     "name": "voter_stake_registry",
-    "version": "0.4.1",
+    "version": "0.4.6",
     "spec": "0.1.0",
     "description": "Heliums voter weight plugin for spl-governance"
   },
@@ -145,6 +145,7 @@
         },
         {
           "name": "registrar",
+          "writable": true,
           "relations": [
             "position"
           ]
@@ -1914,48 +1915,18 @@
       "accounts": [
         {
           "name": "rent_refund",
-          "writable": true,
-          "relations": [
-            "marker"
-          ]
+          "writable": true
         },
         {
           "name": "marker",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  97,
-                  114,
-                  107,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "marker.mint",
-                "account": "VoteMarkerV0"
-              },
-              {
-                "kind": "account",
-                "path": "proposal"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "position",
           "writable": true
         },
         {
-          "name": "proposal",
-          "relations": [
-            "marker"
-          ]
+          "name": "proposal"
         },
         {
           "name": "system_program",
@@ -2270,129 +2241,6 @@
       ]
     },
     {
-      "name": "temp_backfill_proxy_marker",
-      "discriminator": [
-        18,
-        0,
-        202,
-        42,
-        187,
-        32,
-        97,
-        76
-      ],
-      "accounts": [
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "marker",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  120,
-                  121,
-                  95,
-                  109,
-                  97,
-                  114,
-                  107,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "voter"
-              },
-              {
-                "kind": "account",
-                "path": "proposal"
-              }
-            ]
-          }
-        },
-        {
-          "name": "voter"
-        },
-        {
-          "name": "authority",
-          "signer": true,
-          "address": "hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW"
-        },
-        {
-          "name": "proposal"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": {
-              "name": "VoteArgsV0"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "temp_backfill_recent_proposals",
-      "discriminator": [
-        248,
-        23,
-        82,
-        43,
-        69,
-        233,
-        74,
-        26
-      ],
-      "accounts": [
-        {
-          "name": "authority",
-          "signer": true,
-          "address": "hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW"
-        },
-        {
-          "name": "registrar",
-          "writable": true,
-          "relations": [
-            "position"
-          ]
-        },
-        {
-          "name": "position",
-          "writable": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "args",
-          "type": {
-            "defined": {
-              "name": "TempBackfillRecentProposalsArgs"
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "temp_release_position_v0",
       "discriminator": [
         18,
@@ -2413,6 +2261,258 @@
         {
           "name": "position",
           "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_position_v0",
+      "discriminator": [
+        13,
+        19,
+        112,
+        27,
+        248,
+        208,
+        38,
+        145
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "position",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "writable": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "from_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "from"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "to_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "to"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "from",
+          "signer": true
+        },
+        {
+          "name": "to",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         }
       ],
       "args": []
@@ -4326,24 +4426,6 @@
           {
             "name": "end",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TempBackfillRecentProposalsArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "recent_proposals",
-            "type": {
-              "vec": {
-                "defined": {
-                  "name": "RecentProposal"
-                }
-              }
-            }
           }
         ]
       }

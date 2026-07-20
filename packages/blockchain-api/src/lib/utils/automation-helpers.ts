@@ -2,6 +2,14 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 export type Schedule = "daily" | "weekly" | "monthly";
 
+/**
+ * Cron-job name-mapping alias. hpl_crons hardcodes this in
+ * init_entity_claim_cron_v0, and the name-mapping PDA is keyed by
+ * (authority, name) — so a wallet has exactly one entity-claim cron. close and
+ * requeue must pass this same name mapping.
+ */
+export const ENTITY_CLAIM_CRON_NAME = "entity_claim";
+
 // Constants from useAutomateHotspotClaims hook
 export const BASE_AUTOMATION_RENT = 0.02098095;
 export const TASK_RETURN_ACCOUNT_SIZE = 0.01;
@@ -42,6 +50,20 @@ export function getScheduleCronString(schedule: Schedule): string {
     default:
       return `${utcSeconds} ${utcMinutes} ${utcHours} * * *`;
   }
+}
+
+const SCHEDULE_PRESETS: readonly Schedule[] = ["daily", "weekly", "monthly"];
+
+/**
+ * Resolve a setup input into a raw crontab string. The preset cadences
+ * (daily/weekly/monthly) map through getScheduleCronString; any other value is
+ * treated as an already-raw clockwork crontab and returned unchanged. Lets
+ * callers pass either a convenient preset or a full crontab.
+ */
+export function resolveScheduleToCron(scheduleOrCron: string): string {
+  return (SCHEDULE_PRESETS as readonly string[]).includes(scheduleOrCron)
+    ? getScheduleCronString(scheduleOrCron as Schedule)
+    : scheduleOrCron;
 }
 
 export interface CronScheduleInfo {

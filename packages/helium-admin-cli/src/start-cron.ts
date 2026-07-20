@@ -1,5 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
-import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
+import {
+  HNT_PYTH_PRICE_FEED,
+  sendInstructionsWithPriorityFee,
+} from "@helium/spl-utils";
 import {
   compileTransaction,
   customSignerKey,
@@ -108,6 +111,11 @@ export async function run(args: any = process.argv) {
           dao,
           iotSubDao,
           mobileSubDao,
+          // HIP 149 backstop: the maintained on-chain HNT/USD Pyth push account (the
+          // same feed the price oracle pulls from Hermes). The cron forwards it into
+          // each calculate_utility_score_v0; a stale/missing price degrades to a
+          // dormant backstop epoch on-chain, never a halt.
+          hntPriceOracle: HNT_PYTH_PRICE_FEED,
           systemProgram: SystemProgram.programId,
         })
         .instruction(),

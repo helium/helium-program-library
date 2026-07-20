@@ -28,6 +28,8 @@ import {
   SplitPositionResponseSchema,
   TransferPositionInputSchema,
   TransferPositionResponseSchema,
+  TransferPositionOwnershipInputSchema,
+  TransferPositionOwnershipResponseSchema,
   UnassignProxiesInputSchema,
   UnassignProxiesResponseSchema,
   UndelegateInputSchema,
@@ -123,6 +125,18 @@ export const governanceContract = oc
       .input(TransferPositionInputSchema)
       .errors({ BAD_REQUEST, NOT_FOUND, INSUFFICIENT_FUNDS })
       .output(TransferPositionResponseSchema),
+
+    transferPositionOwnership: oc
+      .route({
+        method: "POST",
+        path: "/positions/{positionMint}/transfer-ownership",
+        summary: "Transfer position ownership",
+        description:
+          "Transfer ownership of a position NFT to another wallet. Both the current owner and new owner must sign the transaction.",
+      })
+      .input(TransferPositionOwnershipInputSchema)
+      .errors({ BAD_REQUEST, NOT_FOUND, INSUFFICIENT_FUNDS })
+      .output(TransferPositionOwnershipResponseSchema),
 
     delegatePositions: oc
       .route({

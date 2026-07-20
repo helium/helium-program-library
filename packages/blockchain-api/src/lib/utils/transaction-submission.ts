@@ -2,7 +2,6 @@ import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { env } from "../env";
 import { v4 as uuidv4 } from "uuid";
 import bs58 from "bs58";
-import * as Sentry from "@sentry/nextjs";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { getCluster } from "../solana";
 import {
@@ -12,6 +11,46 @@ import {
   JitoBundleContext,
   jitoBlockEngineRequest,
 } from "./jito";
+import { isBundleLanded } from "./submission-helpers";
+
+export class SingleTransactionSubmissionError extends Error {
+  public readonly explorerLink: string | null;
+  public readonly chewingGlassExplorerLink: string | null;
+
+  constructor(
+    message: string,
+    fields: {
+      explorerLink: string | null;
+      chewingGlassExplorerLink: string | null;
+    },
+    cause?: unknown,
+  ) {
+    super(message);
+    this.name = "SingleTransactionSubmissionError";
+    this.explorerLink = fields.explorerLink;
+    this.chewingGlassExplorerLink = fields.chewingGlassExplorerLink;
+    if (cause !== undefined) {
+      (this as { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
+export class JitoMissingTipError extends Error {
+  public readonly bundleSize: number;
+  // When true, the top-level handler should not capture this to Sentry —
+  // this is used for expected, user-facing errors (e.g. stale wallet versions).
+  public readonly skipSentry: boolean;
+
+  constructor(
+    message: string,
+    fields: { bundleSize: number; skipSentry: boolean },
+  ) {
+    super(message);
+    this.name = "JitoMissingTipError";
+    this.bundleSize = fields.bundleSize;
+    this.skipSentry = fields.skipSentry;
+  }
+}
 
 let cachedTipAccountSet: Set<string> | null = null;
 let tipAccountSetCachedAt = 0;
@@ -50,10 +89,16 @@ async function requireBundleHasTipAccount(
       Buffer.from(serialized, "base64"),
     );
     const keys = tx.message.staticAccountKeys;
-    const { numRequiredSignatures, numReadonlySignedAccounts, numReadonlyUnsignedAccounts } = tx.message.header;
-    const writableSignedCount = numRequiredSignatures - numReadonlySignedAccounts;
+    const {
+      numRequiredSignatures,
+      numReadonlySignedAccounts,
+      numReadonlyUnsignedAccounts,
+    } = tx.message.header;
+    const writableSignedCount =
+      numRequiredSignatures - numReadonlySignedAccounts;
     const unsignedStart = numRequiredSignatures;
-    const writableUnsignedCount = keys.length - numRequiredSignatures - numReadonlyUnsignedAccounts;
+    const writableUnsignedCount =
+      keys.length - numRequiredSignatures - numReadonlyUnsignedAccounts;
 
     for (let i = 0; i < writableSignedCount; i++) {
       if (cachedTipAccountSet.has(keys[i].toBase58())) return;
@@ -63,28 +108,48 @@ async function requireBundleHasTipAccount(
     }
   }
 
-  let err = new Error(
-    "Jito bundle is missing a tip transaction — no transaction write-locks a recognized tip account",
+  const isFriendlyUpgradeError =
+    tag?.includes("implicit-burn") || tag?.includes("claim-rewards");
+
+  throw new JitoMissingTipError(
+    isFriendlyUpgradeError
+      ? "Bundle missing Jito tip. Please upgrade your Helium Wallet app and try again."
+      : "Jito bundle is missing a tip transaction — no transaction write-locks a recognized tip account",
+    {
+      bundleSize: serializedTransactions.length,
+      skipSentry: Boolean(isFriendlyUpgradeError),
+    },
   );
-  if (tag?.includes("implicit-burn") || tag?.includes("claim-rewards")) {
-    err = new Error("Bundle missing Jito tip. Please upgrade your Helium Wallet app and try again.")
-  } else {
-    Sentry.captureException(err, {
-      level: "error",
-      tags: { error_type: "jito_bundle_missing_tip" },
-      extra: { bundle_size: serializedTransactions.length },
-    });
-  }
-  throw err;
 }
 
 function isBlockhashNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes("Blockhash not found") || message.includes("blockhash not found");
+  return (
+    message.includes("Blockhash not found") ||
+    message.includes("blockhash not found")
+  );
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Check whether the real (non-tip) transactions of a Jito bundle are already
+ * confirmed on-chain. Lets us treat a bundle rejection (e.g. -32602 "already
+ * processed transaction") as success when the transactions actually landed,
+ * without coupling to Jito's error text.
+ */
+async function bundleTransactionsLanded(
+  connection: Connection,
+  signatures: string[],
+  transactionMetadata?: Array<Record<string, unknown> | undefined>,
+): Promise<boolean> {
+  const { value } = await connection.getSignatureStatuses(signatures, {
+    searchTransactionHistory: true,
+  });
+
+  return isBundleLanded(value, transactionMetadata);
 }
 
 export interface TransactionBatchPayload {
@@ -100,7 +165,6 @@ export interface BatchSubmissionResult {
   submissionType: "single" | "parallel" | "sequential" | "jito_bundle";
   signatures?: string[];
   jitoBundleId?: string;
-  error?: string;
 }
 
 // Submit single transaction
@@ -108,58 +172,28 @@ export async function submitSingleTransaction(
   connection: Connection,
   serializedTransaction: string,
 ): Promise<string> {
-  let transaction: VersionedTransaction;
-  try {
-    transaction = VersionedTransaction.deserialize(
-      Buffer.from(serializedTransaction, "base64"),
-    );
-  } catch (error) {
-    // Capture deserialization error
-    Sentry.captureException(error, {
-      level: "error",
-      tags: {
-        error_type: "transaction_deserialization_failed",
-      },
-      extra: {
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      },
-    });
-    throw error;
-  }
+  const transaction = VersionedTransaction.deserialize(
+    Buffer.from(serializedTransaction, "base64"),
+  );
 
   try {
-    const signature = await connection.sendRawTransaction(
-      transaction.serialize(),
-      {
-        skipPreflight: true,
-      },
-    );
-
-    return signature;
-  } catch (error) {
-    // Capture submission error with explorer link
-    const explorerUrl = getExplorerUrl(transaction);
-    const chewingGlassExplorerUrl = getChewingGlassExplorerUrl(transaction);
-    Sentry.captureException(error, {
-      level: "error",
-      tags: {
-        error_type: "transaction_submission_failed",
-        submission_type: "single",
-      },
-      extra: {
-        error_message: error instanceof Error ? error.message : "Unknown error",
-        explorer_link: explorerUrl,
-        chewing_glass_explorer_link: chewingGlassExplorerUrl,
-      },
-      contexts: {
-        transaction: {
-          explorer_link: explorerUrl,
-          chewing_glass_explorer_link: chewingGlassExplorerUrl,
-          submission_type: "single",
-        },
-      },
+    return await connection.sendRawTransaction(transaction.serialize(), {
+      skipPreflight: true,
     });
-    throw error;
+  } catch (error) {
+    let explorerLink: string | null = null;
+    let chewingGlassExplorerLink: string | null = null;
+    try {
+      explorerLink = getExplorerUrl(transaction);
+      chewingGlassExplorerLink = getChewingGlassExplorerUrl(transaction);
+    } catch {
+      // ignore — links are best-effort
+    }
+    throw new SingleTransactionSubmissionError(
+      error instanceof Error ? error.message : "Unknown error",
+      { explorerLink, chewingGlassExplorerLink },
+      error,
+    );
   }
 }
 
@@ -223,18 +257,40 @@ export async function submitTransactionBatch(
       await requireBundleHasTipAccount(payload.transactions, payload.tag);
       await simulateJitoBundle(payload.transactions, bundleContext);
 
-      const jitoBundleId = await submitJitoBundle(payload.transactions, bundleContext);
-      return {
-        batchId,
-        submissionType: "jito_bundle",
-        jitoBundleId,
-        signatures: payload.transactions.map((tx) =>
-          bs58.encode(
-            VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
-              .signatures[0],
-          ),
+      const signatures = payload.transactions.map((tx) =>
+        bs58.encode(
+          VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
+            .signatures[0],
         ),
-      };
+      );
+
+      try {
+        const jitoBundleId = await submitJitoBundle(
+          payload.transactions,
+          bundleContext,
+        );
+        return {
+          batchId,
+          submissionType: "jito_bundle",
+          jitoBundleId,
+          signatures,
+        };
+      } catch (error) {
+        // Jito rejects a bundle (e.g. -32602 "already processed transaction")
+        // when a transaction in it has already landed. Trust the ledger, not the
+        // error text: if the real (non-tip) transactions are confirmed on-chain,
+        // the work succeeded and the rejection is moot.
+        if (
+          await bundleTransactionsLanded(
+            connection,
+            signatures,
+            payload.transactionMetadata,
+          )
+        ) {
+          return { batchId, submissionType: "jito_bundle", signatures };
+        }
+        throw error;
+      }
     } else {
       // Devnet/Localnet: use parallel or sequential based on payload.parallel
       if (payload.parallel) {
@@ -261,81 +317,26 @@ export async function submitTransactionBatch(
     }
   };
 
-  try {
-    const MAX_BLOCKHASH_RETRIES = 5;
-    let lastError: unknown;
-    for (let i = 0; i <= MAX_BLOCKHASH_RETRIES; i++) {
-      try {
-        return await attempt();
-      } catch (error) {
-        if (isBlockhashNotFoundError(error) && i < MAX_BLOCKHASH_RETRIES) {
-          console.warn(
-            `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
-          );
-          await sleep(2000);
-          lastError = error;
-          continue;
-        }
-        throw error;
-      }
-    }
-    throw lastError;
-  } catch (error) {
-    // Capture batch submission error
-    // Try to get explorer links for transactions if possible
-    const explorerLinks: string[] = [];
-    const chewingGlassExplorerLinks: string[] = [];
+  const MAX_BLOCKHASH_RETRIES = 3;
+  let lastError: unknown;
+  for (let i = 0; i <= MAX_BLOCKHASH_RETRIES; i++) {
     try {
-      for (const serializedTx of payload.transactions.slice(0, 3)) {
-        // Limit to first 3 to avoid too much data
-        const tx = VersionedTransaction.deserialize(
-          Buffer.from(serializedTx, "base64"),
+      return await attempt();
+    } catch (error) {
+      if (
+        isBlockhashNotFoundError(error) &&
+        i < MAX_BLOCKHASH_RETRIES &&
+        payload.transactions.length > 1
+      ) {
+        console.warn(
+          `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
         );
-        explorerLinks.push(getExplorerUrl(tx));
-        chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(tx));
+        await sleep(2000);
+        lastError = error;
+        continue;
       }
-    } catch {
-      // Ignore errors when generating explorer links
+      throw error;
     }
-
-    Sentry.captureException(error, {
-      level: "error",
-      tags: {
-        error_type: "transaction_batch_submission_failed",
-        submission_type: "batch",
-        cluster,
-        tag: payload.tag,
-      },
-      extra: {
-        error_message: error instanceof Error ? error.message : "Unknown error",
-        batch_id: batchId,
-        batch_size: payload.transactions.length,
-        parallel: payload.parallel,
-        cluster,
-        tag: payload.tag,
-        payer: payload.payer,
-        transaction_metadata: payload.transactionMetadata,
-        explorer_links: explorerLinks.length > 0 ? explorerLinks : undefined,
-        chewing_glass_explorer_links: chewingGlassExplorerLinks.length > 0 ? chewingGlassExplorerLinks : undefined,
-      },
-      contexts: {
-        transaction: {
-          batch_id: batchId,
-          batch_size: payload.transactions.length,
-          parallel: payload.parallel,
-          cluster,
-          tag: payload.tag,
-          payer: payload.payer,
-          explorer_links: explorerLinks,
-          chewing_glass_explorer_links: chewingGlassExplorerLinks,
-        },
-      },
-    });
-
-    return {
-      batchId,
-      submissionType: "single", // fallback
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
   }
+  throw lastError;
 }

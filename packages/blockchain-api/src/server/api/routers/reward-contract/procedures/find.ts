@@ -60,12 +60,12 @@ export const find = publicProcedure.rewardContract.find.handler(
           status: "PENDING",
           contract: {
             delegateWalletAddress: wpRecord.owner,
-            recipients: wpRecord.rewardsSplit.map((split) => {
+            recipients: await Promise.all(wpRecord.rewardsSplit.map(async (split) => {
               const receives =
                 split.type === "fixed"
                   ? {
                       type: "FIXED" as const,
-                      tokenAmount: toTokenAmountOutput(
+                      tokenAmount: await toTokenAmountOutput(
                         new BN(split.tokenAmount.amount),
                         hntMint,
                       ),
@@ -77,7 +77,7 @@ export const find = publicProcedure.rewardContract.find.handler(
               if (split.address === PublicKey.default.toBase58()) {
                 return {
                   type: "CLAIMABLE" as const,
-                  giftedCurrency: toTokenAmountOutput(
+                  giftedCurrency: await toTokenAmountOutput(
                     new BN(wpRecord.solAmount),
                     solMint,
                   ),
@@ -89,7 +89,7 @@ export const find = publicProcedure.rewardContract.find.handler(
                 walletAddress: split.address,
                 receives,
               };
-            }),
+            })),
             rewardSchedule: toFiveColumnCron(wpRecord.rewardsSchedule),
           },
         };
@@ -110,7 +110,7 @@ export const find = publicProcedure.rewardContract.find.handler(
         const directWelcomePack =
           await wpProgram.account.welcomePackV0.fetchNullable(assetOwner);
         if (directWelcomePack && directWelcomePack.asset.equals(assetPubkey)) {
-          return buildPendingContractResponse(directWelcomePack);
+          return await buildPendingContractResponse(directWelcomePack);
         }
 
         // Iteration fallback - assetOwner is a wallet with UserWelcomePacks
@@ -127,7 +127,7 @@ export const find = publicProcedure.rewardContract.find.handler(
               await wpProgram.account.welcomePackV0.fetchNullable(welcomePackK);
 
             if (welcomePack && welcomePack.asset.equals(assetPubkey)) {
-              return buildPendingContractResponse(welcomePack);
+              return await buildPendingContractResponse(welcomePack);
             }
           }
         }
@@ -150,13 +150,13 @@ export const find = publicProcedure.rewardContract.find.handler(
           contract: {
             delegateWalletAddress: mfRecord.owner,
             entityOwnerAddress: mfRecord.namespace,
-            recipients: mfRecord.shares.map((share) => ({
+            recipients: await Promise.all(mfRecord.shares.map(async (share) => ({
               walletAddress: share.wallet,
               receives:
                 share.share.fixed && share.share.fixed.amount !== "0"
                   ? {
                       type: "FIXED" as const,
-                      tokenAmount: toTokenAmountOutput(
+                      tokenAmount: await toTokenAmountOutput(
                         new BN(share.share.fixed.amount),
                         hntMint,
                       ),
@@ -165,7 +165,7 @@ export const find = publicProcedure.rewardContract.find.handler(
                       type: "SHARES" as const,
                       shares: share.share.share?.amount || 0,
                     },
-            })),
+            }))),
             rewardSchedule: toFiveColumnCron(mfRecord.schedule),
           },
         };
@@ -202,8 +202,8 @@ export const find = publicProcedure.rewardContract.find.handler(
           contract: {
             delegateWalletAddress: miniFanoutAccount.owner.toBase58(),
             entityOwnerAddress: miniFanoutAccount.namespace.toBase58(),
-            recipients: miniFanoutAccount.shares.map(
-              (share: {
+            recipients: await Promise.all(miniFanoutAccount.shares.map(
+              async (share: {
                 wallet: PublicKey;
                 share: { fixed?: { amount: BN }; share?: { amount: number } };
               }) => ({
@@ -212,7 +212,7 @@ export const find = publicProcedure.rewardContract.find.handler(
                   share.share.fixed && !share.share.fixed.amount.isZero()
                     ? {
                         type: "FIXED" as const,
-                        tokenAmount: toTokenAmountOutput(
+                        tokenAmount: await toTokenAmountOutput(
                           share.share.fixed.amount,
                           hntMint,
                         ),
@@ -222,7 +222,7 @@ export const find = publicProcedure.rewardContract.find.handler(
                         shares: share.share.share?.amount || 0,
                       },
               }),
-            ),
+            )),
             rewardSchedule: toFiveColumnCron(miniFanoutAccount.schedule),
           },
         };
@@ -238,21 +238,21 @@ export const find = publicProcedure.rewardContract.find.handler(
   },
 );
 
-function buildPendingContractResponse(
+async function buildPendingContractResponse(
   welcomePack: any,
-): FindRewardContractResponse {
+): Promise<FindRewardContractResponse> {
   const hntMint = HNT_MINT.toBase58();
   const solMint = NATIVE_MINT.toBase58();
   return {
     status: "PENDING",
     contract: {
       delegateWalletAddress: welcomePack.owner.toBase58(),
-      recipients: welcomePack.rewardsSplit.map((split: any) => {
+      recipients: await Promise.all(welcomePack.rewardsSplit.map(async (split: any) => {
         const receives =
           split.share.fixed && !split.share.fixed.amount.isZero()
             ? {
                 type: "FIXED" as const,
-                tokenAmount: toTokenAmountOutput(
+                tokenAmount: await toTokenAmountOutput(
                   split.share.fixed.amount,
                   hntMint,
                 ),
@@ -264,7 +264,7 @@ function buildPendingContractResponse(
         if (split.wallet.equals(PublicKey.default)) {
           return {
             type: "CLAIMABLE" as const,
-            giftedCurrency: toTokenAmountOutput(welcomePack.solAmount, solMint),
+            giftedCurrency: await toTokenAmountOutput(welcomePack.solAmount, solMint),
             receives,
           };
         }
@@ -273,7 +273,7 @@ function buildPendingContractResponse(
           walletAddress: split.wallet.toBase58(),
           receives,
         };
-      }),
+      })),
       rewardSchedule: toFiveColumnCron(welcomePack.rewardsSchedule),
     },
   };

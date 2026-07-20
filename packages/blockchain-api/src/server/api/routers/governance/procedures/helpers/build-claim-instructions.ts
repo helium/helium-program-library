@@ -56,6 +56,7 @@ export interface ClaimInstructionsResult {
   instructionBatches: TransactionInstruction[][];
   hasMore: boolean;
   hasRewards: boolean;
+  rewardMints: PublicKey[];
 }
 
 export interface BuildClaimInstructionsParams {
@@ -177,10 +178,12 @@ export async function buildClaimInstructions(
       instructionBatches: [],
       hasMore: false,
       hasRewards: false,
+      rewardMints: [],
     };
   }
 
   const allInstructionBatches: TransactionInstruction[][] = [];
+  const rewardMintSet = new Set<string>();
 
   for (const chunk of chunks(allEpochsToClaim, EPOCHS_PER_BATCH)) {
     const subDaoEpochInfoKeys = chunk.map(
@@ -224,6 +227,7 @@ export async function buildClaimInstructions(
         };
 
         if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
+          rewardMintSet.add(daoAcc.hntMint.toBase58());
           return hsdProgram.methods
             .claimRewardsV1({ epoch })
             .accountsStrict({
@@ -245,6 +249,7 @@ export async function buildClaimInstructions(
             })
             .instruction();
         } else {
+          rewardMintSet.add(subDaoAcc.dntMint.toBase58());
           return hsdProgram.methods
             .claimRewardsV0({ epoch })
             .accountsStrict({
@@ -278,5 +283,6 @@ export async function buildClaimInstructions(
     instructionBatches: allInstructionBatches,
     hasMore: hitCap,
     hasRewards: allInstructionBatches.length > 0,
+    rewardMints: [...rewardMintSet].map((m) => new PublicKey(m)),
   };
 }

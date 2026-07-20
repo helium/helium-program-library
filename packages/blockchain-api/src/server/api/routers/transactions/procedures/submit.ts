@@ -2,14 +2,176 @@ import { sequelize } from "@/lib/db";
 import { env } from "@/lib/env";
 import PendingTransaction from "@/lib/models/pending-transaction";
 import TransactionBatch from "@/lib/models/transaction-batch";
-import { getChewingGlassExplorerUrl, getExplorerUrl } from "@/lib/utils/explorer";
+import {
+  getChewingGlassExplorerUrl,
+  getExplorerUrl,
+} from "@/lib/utils/explorer";
 import { getCluster } from "@/lib/solana";
-import { BundleSimulationError } from "@/lib/utils/jito";
-import { submitTransactionBatch } from "@/lib/utils/transaction-submission";
+import {
+  BundleSimulationError,
+  JitoBundleSubmissionError,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
+import { predictSubmissionType } from "@/lib/utils/submission-helpers";
+import { v4 as uuidv4 } from "uuid";
+import {
+  JitoMissingTipError,
+  SingleTransactionSubmissionError,
+  submitTransactionBatch,
+} from "@/lib/utils/transaction-submission";
 import * as Sentry from "@sentry/nextjs";
-import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { classifySimulationLogs } from "@/lib/utils/simulation-classifier";
 import { publicProcedure } from "../../../procedures";
+
+type SubmitInputTx = {
+  serializedTransaction: string;
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * Single Sentry capture point for all submission/simulation failures. Builds
+ * a rich payload (logs, explorer links, bundle metadata) from whichever error
+ * class was thrown so the Sentry issue always has the info needed to debug.
+ */
+function captureSubmissionError(
+  error: unknown,
+  context: {
+    batchSize: number;
+    parallel: boolean;
+    tag?: string;
+    payer: string;
+    transactions: SubmitInputTx[];
+  },
+): void {
+  const baseTags: Record<string, unknown> = {
+    batch_size: context.batchSize,
+    parallel: context.parallel,
+    tag: context.tag,
+  };
+
+  const baseExtra: Record<string, unknown> = {
+    error_message: error instanceof Error ? error.message : "Unknown error",
+    batch_size: context.batchSize,
+    parallel: context.parallel,
+    tag: context.tag,
+    payer: context.payer,
+    transaction_metadata: context.transactions.map((tx) => tx.metadata),
+  };
+
+  if (error instanceof JitoMissingTipError) {
+    if (error.skipSentry) {
+      return;
+    }
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        ...baseTags,
+        error_type: "jito_bundle_missing_tip",
+        submission_type: "jito_bundle",
+      },
+      extra: {
+        ...baseExtra,
+        bundle_size: error.bundleSize,
+      },
+    });
+    return;
+  }
+
+  if (error instanceof BundleSimulationError) {
+    Sentry.captureException(error, {
+      level: "error",
+      fingerprint: [
+        "jito_bundle_simulation_failed",
+        error.category,
+        error.actionType,
+      ],
+      tags: {
+        ...baseTags,
+        error_type: "jito_bundle_simulation_failed",
+        submission_type: "jito_bundle",
+        simulation_failure_category: error.category,
+        action_type: error.actionType,
+      },
+      extra: {
+        ...baseExtra,
+        failure_detail: error.detail,
+        summary: error.summary,
+        simulation_logs: error.logs,
+        transaction_results: error.transactionResults,
+        explorer_links: error.explorerLinks,
+        chewing_glass_explorer_links: error.chewingGlassExplorerLinks,
+        bundle_size: error.bundleSize,
+      },
+    });
+    return;
+  }
+
+  if (error instanceof JitoBundleSubmissionError) {
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        ...baseTags,
+        error_type: "jito_bundle_submission_failed",
+        submission_type: "jito_bundle",
+      },
+      extra: {
+        ...baseExtra,
+        explorer_links: error.explorerLinks,
+        chewing_glass_explorer_links: error.chewingGlassExplorerLinks,
+        bundle_size: error.bundleSize,
+      },
+    });
+    return;
+  }
+
+  if (error instanceof SingleTransactionSubmissionError) {
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        ...baseTags,
+        error_type: "transaction_submission_failed",
+        submission_type: "single",
+      },
+      extra: {
+        ...baseExtra,
+        explorer_link: error.explorerLink,
+        chewing_glass_explorer_link: error.chewingGlassExplorerLink,
+      },
+    });
+    return;
+  }
+
+  // Fallback: unknown error type — attach best-effort explorer links for the
+  // first few transactions so Sentry has *something* to work with.
+  const explorerLinks: (string | null)[] = [];
+  const chewingGlassExplorerLinks: (string | null)[] = [];
+  for (const tx of context.transactions.slice(0, 3)) {
+    try {
+      const deserialized = VersionedTransaction.deserialize(
+        Buffer.from(tx.serializedTransaction, "base64"),
+      );
+      explorerLinks.push(getExplorerUrl(deserialized));
+      chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(deserialized));
+    } catch {
+      explorerLinks.push(null);
+      chewingGlassExplorerLinks.push(null);
+    }
+  }
+
+  Sentry.captureException(error, {
+    level: "error",
+    tags: {
+      ...baseTags,
+      error_type: "transaction_submission_failed",
+    },
+    extra: {
+      ...baseExtra,
+      explorer_links: explorerLinks,
+      chewing_glass_explorer_links: chewingGlassExplorerLinks,
+    },
+  });
+}
 
 /**
  * Submit a batch of transactions for processing.
@@ -146,6 +308,19 @@ export const submit = publicProcedure.transactions.submit.handler(
           },
         );
 
+        if (category === "account_not_found") {
+          const balance = await connection.getBalance(new PublicKey(payer));
+          if (balance === 0) {
+            throw errors.SIMULATION_FAILED({
+              message: `Transaction payer ${payer} has 0 SOL`,
+              data: {
+                logs: ff?.logs ?? undefined,
+                link: ff?.link ?? undefined,
+              },
+            });
+          }
+        }
+
         throw errors.SIMULATION_FAILED({
           message: ff.error ?? "Transaction simulation failed",
           data: {
@@ -156,27 +331,61 @@ export const submit = publicProcedure.transactions.submit.handler(
       }
     }
 
-    // Check for existing pending transaction with same tag+payer
-    if (tag) {
-      const existingBatch = await TransactionBatch.findOne({
-        where: {
-          tag,
-          payer,
-          status: "pending",
-        },
-      });
-
-      if (existingBatch) {
-        return {
-          batchId: existingBatch.id,
-          message: `Transaction with tag "${tag}" already exists and is pending`,
-        };
-      }
-    }
-
+    const cluster = getCluster();
     const serializedTransactions = transactions.map(
       (tx) => tx.serializedTransaction,
     );
+    // Derive actionType from first transaction metadata or actionMetadata
+    const actionType =
+      (actionMetadata?.type as string) ||
+      transactions[0]?.metadata?.type ||
+      undefined;
+
+    const batchId = uuidv4();
+
+    // Reserve the (tag, payer) slot BEFORE submitting so we never have more
+    // than one bundle in flight per tag. The partial unique index on
+    // (tag, payer) where status='pending' makes this atomic across concurrent
+    // or duplicate requests — the loser short-circuits to the in-flight batch
+    // instead of submitting a second, identical bundle (which Jito rejects with
+    // -32602 "already processed transaction").
+    if (tag) {
+      const predictedSubmissionType = predictSubmissionType({
+        transactionCount: transactions.length,
+        useJitoBundle: shouldUseJitoBundle(transactions.length, cluster),
+        parallel,
+      });
+
+      try {
+        await TransactionBatch.create({
+          id: batchId,
+          parallel,
+          status: "pending",
+          submissionType: predictedSubmissionType,
+          cluster,
+          tag,
+          payer,
+          actionType,
+          actionMetadata,
+        });
+      } catch (error) {
+        if (
+          (error as { name?: string })?.name ===
+          "SequelizeUniqueConstraintError"
+        ) {
+          const existingBatch = await TransactionBatch.findOne({
+            where: { tag, payer, status: "pending" },
+          });
+          if (existingBatch) {
+            return {
+              batchId: existingBatch.id,
+              message: `Transaction with tag "${tag}" already exists and is pending`,
+            };
+          }
+        }
+        throw error;
+      }
+    }
 
     let result;
     try {
@@ -188,7 +397,35 @@ export const submit = publicProcedure.transactions.submit.handler(
         transactionMetadata: transactions.map((tx) => tx.metadata),
       });
     } catch (error) {
+      // Release the reservation so a failed submission doesn't leave the tag
+      // locked as pending forever.
+      if (tag) {
+        await TransactionBatch.destroy({ where: { id: batchId } }).catch(
+          () => {},
+        );
+      }
+
+      captureSubmissionError(error, {
+        batchSize: serializedTransactions.length,
+        parallel,
+        tag,
+        payer,
+        transactions,
+      });
+
       if (error instanceof BundleSimulationError) {
+        if (error.category === "account_not_found") {
+          const connection = new Connection(env.SOLANA_RPC_URL);
+          const balance = await connection.getBalance(new PublicKey(payer));
+          if (balance === 0) {
+            throw errors.SIMULATION_FAILED({
+              message: `Transaction payer ${payer} has 0 SOL`,
+              data: {
+                logs: error.logs,
+              },
+            });
+          }
+        }
         throw errors.SIMULATION_FAILED({
           message: error.message,
           data: {
@@ -196,34 +433,12 @@ export const submit = publicProcedure.transactions.submit.handler(
           },
         });
       }
-      throw error;
-    }
 
-    if (result.error) {
-      // Capture submission failure in Sentry
-      Sentry.captureException(new Error(result.error), {
-        level: "error",
-        tags: {
-          error_type: "transaction_submission_failed",
-          submission_type: result.submissionType,
-          batch_size: serializedTransactions.length,
-          parallel,
-        },
-        extra: {
-          error_message: result.error,
-          batch_id: result.batchId,
-          submission_type: result.submissionType,
-          batch_size: serializedTransactions.length,
-          parallel,
-          tag,
-          payer,
-        },
+      throw errors.BAD_REQUEST({
+        message: error instanceof Error ? error.message : "Unknown error",
       });
-
-      throw errors.BAD_REQUEST({ message: result.error });
     }
 
-    const cluster = getCluster();
     const connection = new Connection(env.SOLANA_RPC_URL);
     const { lastValidBlockHeight } = await connection.getLatestBlockhash({
       commitment: "finalized",
@@ -233,28 +448,33 @@ export const submit = publicProcedure.transactions.submit.handler(
     const dbTransaction = await sequelize.transaction();
 
     try {
-      // Create the batch record
-      // Derive actionType from first transaction metadata or actionMetadata
-      const actionType =
-        (actionMetadata?.type as string) ||
-        transactions[0]?.metadata?.type ||
-        undefined;
-
-      await TransactionBatch.create(
-        {
-          id: result.batchId,
-          parallel,
-          status: "pending",
-          submissionType: result.submissionType,
-          jitoBundleId: result.jitoBundleId,
-          cluster,
-          tag,
-          payer,
-          actionType,
-          actionMetadata,
-        },
-        { transaction: dbTransaction },
-      );
+      if (tag) {
+        // Finalize the reservation created above with the real submission
+        // details now that the bundle/transactions have been submitted.
+        await TransactionBatch.update(
+          {
+            submissionType: result.submissionType,
+            jitoBundleId: result.jitoBundleId,
+          },
+          { where: { id: batchId }, transaction: dbTransaction },
+        );
+      } else {
+        await TransactionBatch.create(
+          {
+            id: batchId,
+            parallel,
+            status: "pending",
+            submissionType: result.submissionType,
+            jitoBundleId: result.jitoBundleId,
+            cluster,
+            tag,
+            payer,
+            actionType,
+            actionMetadata,
+          },
+          { transaction: dbTransaction },
+        );
+      }
 
       // Create individual transaction records
       const pendingTransactionPromises = transactions.map(async (txData, i) => {
@@ -267,12 +487,12 @@ export const submit = publicProcedure.transactions.submit.handler(
 
         return PendingTransaction.create(
           {
-            signature: signature || `${result.batchId}-${i}`,
+            signature: signature || `${batchId}-${i}`,
             blockhash: transaction.message.recentBlockhash,
             lastValidBlockHeight,
             status: "pending",
             type: txData.metadata?.type || "batch",
-            batchId: result.batchId,
+            batchId,
             payer,
             metadata: txData.metadata,
             serializedTransaction: txData.serializedTransaction,
@@ -288,20 +508,9 @@ export const submit = publicProcedure.transactions.submit.handler(
     } catch (error: unknown) {
       // Rollback the transaction on any error
       await dbTransaction.rollback();
-
-      // Handle unique constraint violation for tag+payer when status is pending
-      if (
-        (error as { name?: string })?.name ===
-          "SequelizeUniqueConstraintError" &&
-        tag
-      ) {
-        throw errors.CONFLICT({
-          message: `A pending transaction with tag "${tag}" already exists for this payer`,
-        });
-      }
       throw error;
     }
 
-    return { batchId: result.batchId };
+    return { batchId };
   },
 );

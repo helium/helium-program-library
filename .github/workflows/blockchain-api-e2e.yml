@@ -14,6 +14,9 @@ on:
 jobs:
   e2e-tests:
     runs-on: ubuntu-latest
+    # Backstop so a hung test (e.g. a stalled RPC) fails fast instead of running
+    # until GitHub's default 6h job timeout and holding a runner.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -22,6 +25,18 @@ jobs:
             file: hotspot-transfer.test.ts
           - name: token-transfer
             file: token-transfer.test.ts
+          - name: data-credits-burn
+            file: data-credits-burn.test.ts
+          - name: token-burn-memo
+            file: token-burn-memo.test.ts
+          - name: claim-hotspot-rewards
+            file: claim-hotspot-rewards.test.ts
+          - name: hotspot-burn
+            file: hotspot-burn.test.ts
+          - name: squads-lifecycle
+            file: squads-lifecycle.test.ts
+          - name: squads-propose
+            file: squads-propose.test.ts
           - name: update-rewards
             file: update-rewards-destination.test.ts
           - name: welcome-pack
@@ -46,6 +61,7 @@ jobs:
     env:
       NODE_ENV: test
       NEXT_PORT: 3000
+      SOLANA_CLI_VERSION: 2.1.6
       SURFPOOL_RPC_URL: http://127.0.0.1:8899
       ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
       NEXT_PUBLIC_SOLANA_CLUSTER: mainnet
@@ -65,7 +81,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
+          node-version-file: .node-version
           cache: "pnpm"
 
       - name: Setup Rust toolchain
@@ -95,6 +111,11 @@ jobs:
 
       - name: Install Surfpool CLI
         if: steps.cache-surfpool.outputs.cache-hit != 'true'
+        env:
+          # crates.io downloads intermittently fail with "HTTP2 framing layer";
+          # fetch via git CLI and disable HTTP/2 multiplexing to avoid it.
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_HTTP_MULTIPLEXING: "false"
         run: |
           cargo install --git https://github.com/txtx/surfpool --tag v0.11.2 --locked --force
 

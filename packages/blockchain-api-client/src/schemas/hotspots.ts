@@ -5,11 +5,14 @@ import {
   HeliumPublicKeySchema,
   RewardSplitInputSchema,
   ScheduleInputSchema,
+  squadsProposeFields,
   TokenAmountOutputSchema,
   WalletAddressSchema,
 } from "./common";
 
-export const RewardNetworkSchema = z.enum(["hnt", "iot", "mobile"]).default("hnt");
+export const RewardNetworkSchema = z
+  .enum(["hnt", "iot", "mobile"])
+  .default("hnt");
 
 export const HotspotTypeSchema = z.enum(["iot", "mobile", "all"]);
 
@@ -24,6 +27,15 @@ export const ClaimRewardsInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   network: RewardNetworkSchema,
   tuktuk: z.boolean().optional(),
+  estimatedPendingRewards: TokenAmountOutputSchema.optional(),
+});
+
+export const ClaimHotspotRewardsInputSchema = z.object({
+  entityPubKey: HeliumPublicKeySchema.describe(
+    "The hotspot to claim rewards for."
+  ),
+  walletAddress: WalletAddressSchema,
+  network: RewardNetworkSchema,
 });
 
 export const GetPendingRewardsInputSchema = z.object({
@@ -32,22 +44,33 @@ export const GetPendingRewardsInputSchema = z.object({
 });
 
 const PendingRewards = z.object({
-  total: TokenAmountOutputSchema.describe("Total rewards pending for the requested wallet, including rewards which may be directly claimable or paid indirectly through automation to this wallet."),
-  claimable: TokenAmountOutputSchema.describe("Total rewards that can be manually claimed now. Should be a subset of total."),
-  automated: TokenAmountOutputSchema.describe("Total rewards that are pending but will be automatically claimed in the future based on existing automation setups. Should be a subset of total."),
-})
+  total: TokenAmountOutputSchema.describe(
+    "Total rewards pending for the requested wallet, including rewards which may be directly claimable or paid indirectly through automation to this wallet."
+  ),
+  claimable: TokenAmountOutputSchema.describe(
+    "Total rewards that can be manually claimed now. Should be a subset of total."
+  ),
+  automated: TokenAmountOutputSchema.describe(
+    "Total rewards that are pending but will be automatically claimed in the future based on existing automation setups. Should be a subset of total."
+  ),
+});
 export const GetPendingRewardsOutputSchema = z.object({
-  pending: PendingRewards.describe("Total rewards pending for the requested wallet - across all relevant hotspots."),
-  byHotspot: z.array(z.object({
-    hotspotPubKey: HeliumPublicKeySchema,
-    pending: PendingRewards,
-  }))
-})
+  pending: PendingRewards.describe(
+    "Total rewards pending for the requested wallet - across all relevant hotspots."
+  ),
+  byHotspot: z.array(
+    z.object({
+      hotspotPubKey: HeliumPublicKeySchema,
+      pending: PendingRewards,
+    })
+  ),
+});
 
 export const TransferHotspotInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   hotspotPubkey: HeliumPublicKeySchema,
   recipient: WalletAddressSchema,
+  ...squadsProposeFields,
 });
 
 export const UpdateRewardsDestinationInputSchema = z.object({
@@ -79,13 +102,20 @@ export const GetAutomationStatusInputSchema = z.object({
   walletAddress: WalletAddressSchema,
 });
 
+// Best-effort classification of a raw cron string, surfaced on the status
+// output for display only. Funding math is per-firing and never depends on it.
 export const AutomationScheduleSchema = z.enum(["daily", "weekly", "monthly"]);
 
 export const SetupAutomationInputSchema = z.object({
   walletAddress: WalletAddressSchema,
-  schedule: AutomationScheduleSchema,
-  duration: z.number().int().min(1), // Number of claims
-  totalHotspots: z.number().int().min(1),
+  // How often the cron fires: a preset cadence (daily/weekly/monthly) or a raw
+  // clockwork crontab string. Presets are resolved to a crontab server-side.
+  schedule: z
+    .union([AutomationScheduleSchema, z.string().min(1)])
+    .describe(
+      "A preset cadence (daily/weekly/monthly) or a raw clockwork crontab string."
+    ),
+  duration: z.number().int().min(1), // Number of claims to pre-fund
 });
 
 export const FundAutomationInputSchema = z.object({
@@ -100,6 +130,57 @@ export const GetFundingEstimateInputSchema = z.object({
 
 export const CloseAutomationInputSchema = z.object({
   walletAddress: WalletAddressSchema,
+});
+
+export const RequeueAutomationInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+});
+
+// Add a whole-wallet claim (claims every hotspot the wallet owns) to the cron.
+export const AddWalletToAutomationInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+});
+
+// Add a single hotspot/entity claim to the cron.
+export const AddEntityToAutomationInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  entityKey: HeliumPublicKeySchema,
+});
+
+// Remove a single claim entry (by its cron transaction index) from the cron.
+export const RemoveEntityFromAutomationInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  index: z.number().int().min(0),
+});
+
+// ---- Data-only hotspot onboarding ----
+// The onboarding server builds the issue (via the ECC verifier) and onboard
+// transactions; these endpoints relay them for local signing.
+
+export const IssueDataOnlyHotspotInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  // Base64 add-gateway token (BlockchainTxnAddGatewayV1 envelope) from the hotspot.
+  addGatewayTxn: z.string().min(1),
+});
+
+export const OnboardDataOnlyHotspotInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  network: z.enum(["iot", "mobile"]),
+  hotspotAddress: HeliumPublicKeySchema,
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+  elevation: z.number().optional(), // IoT only
+  gain: z.number().optional(), // IoT only
+});
+
+// Operator-run floor top-up: for each target wallet whose pool balance is at or
+// below `floorLamports`, the operator funds it with `fundLamports`. The operator
+// is the fee payer and funding source (mirrors the off-chain funder pattern).
+export const TopUpAutomationInputSchema = z.object({
+  operatorAddress: WalletAddressSchema,
+  floorLamports: z.coerce.number().int().min(0),
+  fundLamports: z.coerce.number().int().min(1),
+  targets: z.array(WalletAddressSchema).min(1).max(50),
 });
 
 // ============================================================================
@@ -144,7 +225,41 @@ export const HotspotsDataSchema = z.object({
   totalPages: z.number(),
 });
 
-export const ClaimRewardsOutputSchema = createPaginatedTransactionResponse();
+const ClaimRewardsActionMetadataSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("claim_rewards"),
+    hotspotCount: z.number(),
+    network: z.string(),
+    hotspotKeys: z.array(z.string()).optional(),
+    hotspotNames: z.array(z.string()).optional(),
+    estimatedPendingRewards: TokenAmountOutputSchema.optional(),
+  }),
+  z.object({
+    type: z.literal("queue_wallet_claim"),
+    hotspotCount: z.number(),
+    network: z.literal("all"),
+    estimatedPendingRewards: TokenAmountOutputSchema.optional(),
+  }),
+]);
+
+export const ClaimRewardsOutputSchema =
+  createPaginatedTransactionResponse().extend({
+    transactionData:
+      createPaginatedTransactionResponse().shape.transactionData.extend({
+        actionMetadata: ClaimRewardsActionMetadataSchema.optional(),
+      }),
+  });
+
+// A single-hotspot claim is one action with no pagination, so it uses the
+// standard (non-paginated) transaction response.
+export const ClaimHotspotRewardsOutputSchema = createTransactionResponse();
+
+export const HotspotBurnInputSchema = z.object({
+  walletAddress: WalletAddressSchema,
+  hotspotPubkey: HeliumPublicKeySchema,
+  ...squadsProposeFields,
+});
+export const HotspotBurnOutputSchema = createTransactionResponse();
 export const TransferHotspotOutputSchema = createTransactionResponse();
 export const UpdateRewardsDestinationOutputSchema = createTransactionResponse();
 export const CreateSplitOutputSchema = createTransactionResponse();
@@ -152,6 +267,14 @@ export const DeleteSplitOutputSchema = createTransactionResponse();
 export const SetupAutomationOutputSchema = createTransactionResponse();
 export const FundAutomationOutputSchema = createTransactionResponse();
 export const CloseAutomationOutputSchema = createTransactionResponse();
+export const RequeueAutomationOutputSchema = createTransactionResponse();
+export const IssueDataOnlyHotspotOutputSchema = createTransactionResponse();
+export const OnboardDataOnlyHotspotOutputSchema = createTransactionResponse();
+export const AddWalletToAutomationOutputSchema = createTransactionResponse();
+export const AddEntityToAutomationOutputSchema = createTransactionResponse();
+export const RemoveEntityFromAutomationOutputSchema =
+  createTransactionResponse();
+export const TopUpAutomationOutputSchema = createTransactionResponse();
 
 export const SplitShareSchema = z.object({
   wallet: z.string(),
@@ -172,7 +295,8 @@ export const AutomationStatusOutputSchema = z.object({
   isOutOfSol: z.boolean(),
   currentSchedule: z
     .object({
-      schedule: AutomationScheduleSchema,
+      cron: z.string(), // raw crontab string the cron fires on
+      schedule: AutomationScheduleSchema, // best-effort classification (display only)
       time: z.string(),
       nextRun: z.string(), // ISO date string
     })
@@ -260,12 +384,14 @@ export const UpdateHotspotInfoInputSchema = z.discriminatedUnion("deviceType", [
   MobileUpdateSchema,
 ]);
 
-export const UpdateHotspotInfoOutputSchema = createTransactionResponse().extend({
-  appliedTo: z.object({
-    iot: z.boolean(),
-    mobile: z.boolean(),
-  }),
-});
+export const UpdateHotspotInfoOutputSchema = createTransactionResponse().extend(
+  {
+    appliedTo: z.object({
+      iot: z.boolean(),
+      mobile: z.boolean(),
+    }),
+  }
+);
 
 export type HotspotType = z.infer<typeof HotspotTypeSchema>;
 export type DeviceType = z.infer<typeof DeviceTypeSchema>;
@@ -274,10 +400,16 @@ export type Hotspot = z.infer<typeof HotspotSchema>;
 export type HotspotsData = z.infer<typeof HotspotsDataSchema>;
 export type GetHotspotsInput = z.infer<typeof GetHotspotsInputSchema>;
 export type ClaimRewardsInput = z.infer<typeof ClaimRewardsInputSchema>;
-export type GetPendingRewardsInput = z.infer<typeof GetPendingRewardsInputSchema>;
+export type GetPendingRewardsInput = z.infer<
+  typeof GetPendingRewardsInputSchema
+>;
 export type TransferHotspotInput = z.infer<typeof TransferHotspotInputSchema>;
-export type GetPendingRewardsOutput = z.infer<typeof GetPendingRewardsOutputSchema>;
-export type UpdateRewardsDestinationInput = z.infer<typeof UpdateRewardsDestinationInputSchema>;
+export type GetPendingRewardsOutput = z.infer<
+  typeof GetPendingRewardsOutputSchema
+>;
+export type UpdateRewardsDestinationInput = z.infer<
+  typeof UpdateRewardsDestinationInputSchema
+>;
 export type GetSplitInput = z.infer<typeof GetSplitInputSchema>;
 export type CreateSplitInput = z.infer<typeof CreateSplitInputSchema>;
 export type DeleteSplitInput = z.infer<typeof DeleteSplitInputSchema>;
@@ -294,3 +426,22 @@ export type GetFundingEstimateInput = z.infer<
   typeof GetFundingEstimateInputSchema
 >;
 export type FundingEstimate = z.infer<typeof FundingEstimateOutputSchema>;
+export type RequeueAutomationInput = z.infer<
+  typeof RequeueAutomationInputSchema
+>;
+export type AddWalletToAutomationInput = z.infer<
+  typeof AddWalletToAutomationInputSchema
+>;
+export type AddEntityToAutomationInput = z.infer<
+  typeof AddEntityToAutomationInputSchema
+>;
+export type RemoveEntityFromAutomationInput = z.infer<
+  typeof RemoveEntityFromAutomationInputSchema
+>;
+export type TopUpAutomationInput = z.infer<typeof TopUpAutomationInputSchema>;
+export type IssueDataOnlyHotspotInput = z.infer<
+  typeof IssueDataOnlyHotspotInputSchema
+>;
+export type OnboardDataOnlyHotspotInput = z.infer<
+  typeof OnboardDataOnlyHotspotInputSchema
+>;

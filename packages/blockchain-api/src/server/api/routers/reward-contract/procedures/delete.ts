@@ -259,6 +259,6 @@ async function buildDeleteTransaction(
       parallel: false,
       tag,
     },
-    estimatedSolFee: toTokenAmountOutput(new BN(txFee), NATIVE_MINT.toBase58()),
+    estimatedSolFee: await toTokenAmountOutput(new BN(txFee), NATIVE_MINT.toBase58()),
   };
 }

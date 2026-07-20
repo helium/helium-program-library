@@ -8,18 +8,29 @@ import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import {
   init as initVsr,
   positionKey,
+  proxyVoteMarkerKey,
   voteMarkerKey,
 } from "@helium/voter-stake-registry-sdk";
-import { Keypair, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { NATIVE_MINT } from "@solana/spl-token";
+import { init as initHplCrons } from "@helium/hpl-crons-sdk";
+import {
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SYSVAR_CLOCK_PUBKEY,
+  Transaction,
+  VersionedTransaction,
+} from "@solana/web3.js";
+import { getAssociatedTokenAddressSync, NATIVE_MINT } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
+import BN from "bn.js";
+import { getCurrentSeasonEnd } from "../../src/server/api/routers/governance/procedures/helpers/get-current-season";
 import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
 import { signAndSubmitTransactionData } from "./helpers/tx";
-import { ensureTokenBalance } from "./helpers/wallet";
+import { ensureFunds, ensureTokenBalance } from "./helpers/wallet";
 import {
   DEFAULT_HPL_CRONS_TASK_QUEUE,
   TEST_PROXY_ADDRESS,
@@ -33,6 +44,7 @@ import {
 import {
   createTestProposal,
   createTestOrganizationProposal,
+  createHeliumOrgVotingProposal,
   ProposalSetup,
 } from "./helpers/proposal";
 
@@ -52,6 +64,37 @@ async function getPrograms(ctx: TestCtx) {
   const proxyProgram = await initProxy(provider);
 
   return { vsrProgram, hsdProgram, proxyProgram, provider };
+}
+
+const PROXY_ASSIGNMENT_DURATION_SECONDS = 86400 * 90;
+const PROXY_EXPIRATION_BUFFER_SECONDS = 60;
+
+async function getSeasonBoundedProxyExpirationTime(
+  ctx: TestCtx,
+  positionMint: string
+): Promise<number> {
+  const { vsrProgram, proxyProgram } = await getPrograms(ctx);
+  const now = Math.floor(Date.now() / 1000);
+  const [positionPubkey] = positionKey(new PublicKey(positionMint));
+  const positionAcc = await vsrProgram.account.positionV0.fetch(positionPubkey);
+  const registrar = await vsrProgram.account.registrar.fetch(
+    positionAcc.registrar
+  );
+  const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
+    registrar.proxyConfig
+  );
+  const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, new BN(now));
+
+  if (!seasonEnd) {
+    throw new Error("No current proxy season found");
+  }
+
+  const maxExpiration = seasonEnd.toNumber() - PROXY_EXPIRATION_BUFFER_SECONDS;
+  if (maxExpiration <= now) {
+    throw new Error("Current proxy season has already ended");
+  }
+
+  return Math.min(now + PROXY_ASSIGNMENT_DURATION_SECONDS, maxExpiration);
 }
 
 describe("governance", () => {
@@ -92,13 +135,12 @@ describe("governance", () => {
     it("creates a position with cliff lockup", async () => {
       // #given funded wallet with HNT
       // #when creating a position
-      const { data, error } =
-        await ctx.safeClient.governance.createPosition({
-          walletAddress,
-          tokenAmount: { amount: "100000000", mint: HNT_MINT.toBase58() }, // 1 HNT in bones
-          lockupKind: "cliff",
-          lockupPeriodsInDays: 30,
-        });
+      const { data, error } = await ctx.safeClient.governance.createPosition({
+        walletAddress,
+        tokenAmount: { amount: "100000000", mint: HNT_MINT.toBase58() }, // 1 HNT in bones
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 30,
+      });
 
       // #then transaction builds successfully
       if (error) {
@@ -125,7 +167,8 @@ describe("governance", () => {
       expect(sigs).to.have.length(1);
 
       // Verify position exists on-chain
-      const positionMint = data.transactionData.transactions[0].metadata?.positionMint as string;
+      const positionMint = data.transactionData.transactions[0].metadata
+        ?.positionMint as string;
       expect(positionMint).to.not.be.undefined;
 
       const [positionPubkey] = positionKey(new PublicKey(positionMint));
@@ -145,16 +188,17 @@ describe("governance", () => {
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
 
       // Read clock before operation for exact endTs computation
-      const clockInfo = await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
       const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
 
       // #when extending the lockup to 60 days
-      const { data, error } =
-        await ctx.safeClient.governance.extendPosition({
-          walletAddress,
-          positionMint: result.positionMint,
-          lockupPeriodsInDays: 60,
-        });
+      const { data, error } = await ctx.safeClient.governance.extendPosition({
+        walletAddress,
+        positionMint: result.positionMint,
+        lockupPeriodsInDays: 60,
+      });
 
       // #then transaction builds and submits successfully
       if (error) {
@@ -173,8 +217,9 @@ describe("governance", () => {
       expect(sigs).to.have.length(1);
 
       // Verify lockup endTs matches expected: clockTimestamp + 60 days
-      const positionAfter =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAfter = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       const expectedEndTs = clockTimestamp + 60 * 86400;
       const actualEndTs = positionAfter.lockup.endTs.toNumber();
       expect(actualEndTs).to.be.within(expectedEndTs, expectedEndTs + 3);
@@ -189,11 +234,10 @@ describe("governance", () => {
       });
 
       // #when flipping lockup kind
-      const { data, error } =
-        await ctx.safeClient.governance.flipLockupKind({
-          walletAddress,
-          positionMint: result.positionMint,
-        });
+      const { data, error } = await ctx.safeClient.governance.flipLockupKind({
+        walletAddress,
+        positionMint: result.positionMint,
+      });
 
       // #then transaction builds and submits successfully
       if (error) {
@@ -214,8 +258,9 @@ describe("governance", () => {
       // Verify lockup kind changed to constant on-chain
       const { vsrProgram } = await getPrograms(ctx);
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
-      const positionAfter =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAfter = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       expect(Object.keys(positionAfter.lockup.kind)[0]).to.equal("constant");
     });
 
@@ -228,17 +273,18 @@ describe("governance", () => {
       });
 
       // Read clock before operation for exact endTs computation
-      const clockInfo = await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
       const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
 
       // #when resetting lockup to cliff with new period
-      const { data, error } =
-        await ctx.safeClient.governance.resetLockup({
-          walletAddress,
-          positionMint: result.positionMint,
-          lockupKind: "cliff",
-          lockupPeriodsInDays: 90,
-        });
+      const { data, error } = await ctx.safeClient.governance.resetLockup({
+        walletAddress,
+        positionMint: result.positionMint,
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 90,
+      });
 
       // #then transaction builds and submits successfully
       if (error) {
@@ -259,8 +305,9 @@ describe("governance", () => {
       // Verify lockup kind is cliff and endTs matches expected
       const { vsrProgram } = await getPrograms(ctx);
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
-      const positionAfter =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAfter = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       expect(Object.keys(positionAfter.lockup.kind)[0]).to.equal("cliff");
       const expectedEndTs = clockTimestamp + 90 * 86400;
       expect(positionAfter.lockup.endTs.toNumber()).to.be.oneOf([
@@ -268,7 +315,6 @@ describe("governance", () => {
         expectedEndTs + 1,
       ]);
     });
-
   });
 
   describe("position close", () => {
@@ -346,8 +392,8 @@ describe("governance", () => {
       expect(sigs).to.have.length(1);
 
       // Verify new position exists on-chain
-      const targetPositionMint =
-        data.transactionData.transactions[0].metadata?.newPositionMint as string;
+      const targetPositionMint = data.transactionData.transactions[0].metadata
+        ?.newPositionMint as string;
       expect(targetPositionMint).to.not.be.undefined;
       const [targetPubkey] = positionKey(new PublicKey(targetPositionMint));
       const targetInfo = await ctx.connection.getAccountInfo(targetPubkey);
@@ -384,22 +430,23 @@ describe("governance", () => {
       const { vsrProgram } = await getPrograms(ctx);
       const [sourcePubkey] = positionKey(new PublicKey(source.positionMint));
       const [targetPubkey] = positionKey(new PublicKey(targetPositionMint));
-      const sourceBefore =
-        await vsrProgram.account.positionV0.fetch(sourcePubkey);
-      const targetBefore =
-        await vsrProgram.account.positionV0.fetch(targetPubkey);
+      const sourceBefore = await vsrProgram.account.positionV0.fetch(
+        sourcePubkey
+      );
+      const targetBefore = await vsrProgram.account.positionV0.fetch(
+        targetPubkey
+      );
       const sourceAmountBefore = sourceBefore.amountDepositedNative.toNumber();
       const targetAmountBefore = targetBefore.amountDepositedNative.toNumber();
 
       // #when transferring 0.5 HNT from source to target
       const transferAmount = 50000000; // 0.5 HNT
-      const { data, error } =
-        await ctx.safeClient.governance.transferPosition({
-          walletAddress,
-          positionMint: source.positionMint,
-          targetPositionMint,
-          amount: transferAmount.toString(),
-        });
+      const { data, error } = await ctx.safeClient.governance.transferPosition({
+        walletAddress,
+        positionMint: source.positionMint,
+        targetPositionMint,
+        amount: transferAmount.toString(),
+      });
 
       // #then transaction builds and submits successfully
       if (error) {
@@ -418,16 +465,104 @@ describe("governance", () => {
       expect(sigs).to.have.length(1);
 
       // Verify amounts changed on-chain
-      const sourceAfter =
-        await vsrProgram.account.positionV0.fetch(sourcePubkey);
-      const targetAfter =
-        await vsrProgram.account.positionV0.fetch(targetPubkey);
+      const sourceAfter = await vsrProgram.account.positionV0.fetch(
+        sourcePubkey
+      );
+      const targetAfter = await vsrProgram.account.positionV0.fetch(
+        targetPubkey
+      );
       expect(sourceAfter.amountDepositedNative.toNumber()).to.equal(
         sourceAmountBefore - transferAmount
       );
       expect(targetAfter.amountDepositedNative.toNumber()).to.equal(
         targetAmountBefore + transferAmount
       );
+    });
+  });
+
+  describe("position ownership transfer", () => {
+    let walletAddress: string;
+
+    before(async () => {
+      walletAddress = ctx.payer.publicKey.toBase58();
+    });
+
+    it("transfers position ownership to another wallet", async () => {
+      // #given a position owned by ctx.payer and a recipient keypair
+      const result = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 30,
+      });
+      const recipient = Keypair.generate();
+      await ensureFunds(recipient.publicKey, 0.01 * LAMPORTS_PER_SOL);
+
+      // #when transferring position ownership
+      const { data, error } =
+        await ctx.safeClient.governance.transferPositionOwnership({
+          from: walletAddress,
+          to: recipient.publicKey.toBase58(),
+          positionMint: result.positionMint,
+        });
+
+      // #then transaction builds with correct metadata
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data?.transactionData?.transactions).to.have.length(1);
+      expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
+        "position_transfer_ownership"
+      );
+      expect(data?.transactionData?.actionMetadata).to.deep.include({
+        type: "position_transfer_ownership",
+        positionMint: result.positionMint,
+        from: walletAddress,
+        to: recipient.publicKey.toBase58(),
+      });
+
+      // Sign with both from and to, then submit
+      const { blockhash, lastValidBlockHeight } =
+        await ctx.connection.getLatestBlockhash("confirmed");
+      const tx = VersionedTransaction.deserialize(
+        Buffer.from(
+          data.transactionData.transactions[0].serializedTransaction,
+          "base64"
+        )
+      );
+      tx.message.recentBlockhash = blockhash;
+      tx.sign([ctx.payer]);
+      const sig = await ctx.connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+      });
+      await ctx.connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
+
+      // Verify ownership transferred on-chain: recipient now holds the position NFT
+      const recipientAta = getAssociatedTokenAddressSync(
+        new PublicKey(result.positionMint),
+        recipient.publicKey,
+        true
+      );
+      const recipientTokenAccount = await ctx.connection.getAccountInfo(
+        recipientAta
+      );
+      expect(recipientTokenAccount).to.not.be.null;
+
+      // Original owner no longer holds it
+      const originalAta = getAssociatedTokenAddressSync(
+        new PublicKey(result.positionMint),
+        ctx.payer.publicKey,
+        true
+      );
+      const originalTokenAccount = await ctx.connection
+        .getTokenAccountBalance(originalAta)
+        .catch(() => null);
+      const recipientBalance = await ctx.connection.getTokenAccountBalance(
+        recipientAta
+      );
+      expect(recipientBalance.value.uiAmount).to.equal(1);
     });
   });
 
@@ -447,13 +582,14 @@ describe("governance", () => {
       });
 
       // #when delegating to MOBILE sub-DAO
-      const { data, error } =
-        await ctx.safeClient.governance.delegatePositions({
+      const { data, error } = await ctx.safeClient.governance.delegatePositions(
+        {
           walletAddress,
           positionMints: [result.positionMint],
           subDaoMint: MOBILE_MINT.toBase58(),
           automationEnabled: false,
-        });
+        }
+      );
 
       // #then transaction builds and delegation is created
       if (error) {
@@ -474,8 +610,9 @@ describe("governance", () => {
       // Verify delegated position exists on-chain
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
       const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
-      const delegatedInfo =
-        await ctx.connection.getAccountInfo(delegatedPosPubkey);
+      const delegatedInfo = await ctx.connection.getAccountInfo(
+        delegatedPosPubkey
+      );
       expect(delegatedInfo).to.not.be.null;
     });
 
@@ -492,21 +629,26 @@ describe("governance", () => {
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
       const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
 
-      const clockInfo = await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
       const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
       const shortExpiration = clockTimestamp + 3600;
-      await setDelegatedPositionExpiration(ctx, delegatedPosPubkey, shortExpiration);
+      await setDelegatedPositionExpiration(
+        ctx,
+        delegatedPosPubkey,
+        shortExpiration
+      );
 
       const delegatedBefore =
         await hsdProgram.account.delegatedPositionV0.fetch(delegatedPosPubkey);
       expect(delegatedBefore.expirationTs.toNumber()).to.equal(shortExpiration);
 
       // #when extending delegation expiration
-      const { data, error } =
-        await ctx.safeClient.governance.extendDelegation({
-          walletAddress,
-          positionMint: result.positionMint,
-        });
+      const { data, error } = await ctx.safeClient.governance.extendDelegation({
+        walletAddress,
+        positionMint: result.positionMint,
+      });
 
       // #then transaction builds and submits successfully
       if (error) {
@@ -525,8 +667,9 @@ describe("governance", () => {
       expect(sigs).to.have.length(1);
 
       // Verify delegated position expiration increased
-      const delegatedAfter =
-        await hsdProgram.account.delegatedPositionV0.fetch(delegatedPosPubkey);
+      const delegatedAfter = await hsdProgram.account.delegatedPositionV0.fetch(
+        delegatedPosPubkey
+      );
       expect(delegatedAfter.expirationTs.toNumber()).to.be.greaterThan(
         delegatedBefore.expirationTs.toNumber()
       );
@@ -567,11 +710,11 @@ describe("governance", () => {
       // Verify delegated position account is closed on-chain
       const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
       const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
-      const delegatedInfo =
-        await ctx.connection.getAccountInfo(delegatedPosPubkey);
+      const delegatedInfo = await ctx.connection.getAccountInfo(
+        delegatedPosPubkey
+      );
       expect(delegatedInfo).to.be.null;
     });
-
   });
 
   describe("delegation with sub-DAO change", () => {
@@ -594,13 +737,14 @@ describe("governance", () => {
     it("changes delegation from IOT to MOBILE sub-DAO", async () => {
       // #given position delegated to IOT
       // #when changing delegation to MOBILE
-      const { data, error } =
-        await ctx.safeClient.governance.delegatePositions({
+      const { data, error } = await ctx.safeClient.governance.delegatePositions(
+        {
           walletAddress,
           positionMints: [positionMint],
           subDaoMint: MOBILE_MINT.toBase58(),
           automationEnabled: false,
-        });
+        }
+      );
 
       // #then transaction builds and delegation changes
       if (error) {
@@ -618,8 +762,9 @@ describe("governance", () => {
       // Verify delegation changed to MOBILE sub-DAO
       const [positionPubkey] = positionKey(new PublicKey(positionMint));
       const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
-      const delegatedInfo =
-        await ctx.connection.getAccountInfo(delegatedPosPubkey);
+      const delegatedInfo = await ctx.connection.getAccountInfo(
+        delegatedPosPubkey
+      );
       expect(delegatedInfo).to.not.be.null;
     });
   });
@@ -640,13 +785,14 @@ describe("governance", () => {
       });
 
       // #when delegating for first time
-      const { data, error } =
-        await ctx.safeClient.governance.delegatePositions({
+      const { data, error } = await ctx.safeClient.governance.delegatePositions(
+        {
           walletAddress,
           positionMints: [result.positionMint],
           subDaoMint: MOBILE_MINT.toBase58(),
           automationEnabled: false,
-        });
+        }
+      );
 
       // #then only delegation transaction is returned (no claims needed)
       if (error) {
@@ -699,7 +845,6 @@ describe("governance", () => {
       expect(data?.transactionData?.transactions).to.have.length(0);
       expect(data?.hasMore).to.equal(false);
     });
-
   });
 
   describe("multi-position delegation batching", () => {
@@ -729,13 +874,14 @@ describe("governance", () => {
     it("delegates multiple positions in a single call", async () => {
       // #given 2 undelegated positions
       // #when delegating both to MOBILE
-      const { data, error } =
-        await ctx.safeClient.governance.delegatePositions({
+      const { data, error } = await ctx.safeClient.governance.delegatePositions(
+        {
           walletAddress,
           positionMints: [mint1, mint2],
           subDaoMint: MOBILE_MINT.toBase58(),
           automationEnabled: false,
-        });
+        }
+      );
 
       // #then response contains transactions for both positions
       if (error) {
@@ -782,7 +928,10 @@ describe("governance", () => {
     it("assigns proxy to position", async () => {
       // #given position with no proxy
       // #when assigning proxy
-      const expirationTime = Math.floor(Date.now() / 1000) + 86400 * 90; // 90 days
+      const expirationTime = await getSeasonBoundedProxyExpirationTime(
+        ctx,
+        positionMint
+      );
 
       const { data, error } = await ctx.safeClient.governance.assignProxies({
         walletAddress,
@@ -811,8 +960,9 @@ describe("governance", () => {
       const { vsrProgram, proxyProgram } = await getPrograms(ctx);
       const positionMintPubkey = new PublicKey(positionMint);
       const [positionPubkey] = positionKey(positionMintPubkey);
-      const positionAcc =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAcc = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       const registrar = await vsrProgram.account.registrar.fetch(
         positionAcc.registrar
       );
@@ -837,7 +987,10 @@ describe("governance", () => {
       });
       const unassignMint = unassignResult.positionMint;
 
-      const expirationTime = Math.floor(Date.now() / 1000) + 86400 * 90;
+      const expirationTime = await getSeasonBoundedProxyExpirationTime(
+        ctx,
+        unassignMint
+      );
       const { data: assignData, error: assignError } =
         await ctx.safeClient.governance.assignProxies({
           walletAddress,
@@ -846,7 +999,9 @@ describe("governance", () => {
           expirationTime,
         });
       if (assignError) {
-        throw new Error(`Failed to assign proxy: ${JSON.stringify(assignError)}`);
+        throw new Error(
+          `Failed to assign proxy: ${JSON.stringify(assignError)}`
+        );
       }
       await signAndSubmitTransactionData(
         ctx.connection,
@@ -881,8 +1036,9 @@ describe("governance", () => {
       const { vsrProgram, proxyProgram } = await getPrograms(ctx);
       const positionMintPubkey = new PublicKey(unassignMint);
       const [positionPubkey] = positionKey(positionMintPubkey);
-      const positionAcc =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAcc = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       const registrar = await vsrProgram.account.registrar.fetch(
         positionAcc.registrar
       );
@@ -917,7 +1073,10 @@ describe("governance", () => {
 
     it("re-assigns proxy from one recipient to another", async () => {
       // #given position with proxy assigned to TEST_PROXY_ADDRESS
-      const expirationTime = Math.floor(Date.now() / 1000) + 86400 * 90;
+      const expirationTime = await getSeasonBoundedProxyExpirationTime(
+        ctx,
+        positionMint
+      );
 
       const { data: assignData, error: assignError } =
         await ctx.safeClient.governance.assignProxies({
@@ -927,7 +1086,9 @@ describe("governance", () => {
           expirationTime,
         });
       if (assignError) {
-        throw new Error(`Failed to assign proxy: ${JSON.stringify(assignError)}`);
+        throw new Error(
+          `Failed to assign proxy: ${JSON.stringify(assignError)}`
+        );
       }
       await signAndSubmitTransactionData(
         ctx.connection,
@@ -964,8 +1125,9 @@ describe("governance", () => {
       const { vsrProgram, proxyProgram } = await getPrograms(ctx);
       const positionMintPubkey = new PublicKey(positionMint);
       const [positionPubkey] = positionKey(positionMintPubkey);
-      const positionAcc =
-        await vsrProgram.account.positionV0.fetch(positionPubkey);
+      const positionAcc = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
       const registrar = await vsrProgram.account.registrar.fetch(
         positionAcc.registrar
       );
@@ -988,6 +1150,164 @@ describe("governance", () => {
       const newProxyAcc =
         await proxyProgram.account.proxyAssignmentV0.fetchNullable(newProxy);
       expect(newProxyAcc).to.not.be.null;
+    });
+  });
+
+  describe("proxy assignment when proxy already voted", () => {
+    let walletAddress: string;
+
+    before(async () => {
+      walletAddress = ctx.payer.publicKey.toBase58();
+    });
+
+    // Decode the instruction name of every instruction in the returned
+    // transactions that belongs to the vsr or hpl-crons program.
+    async function instructionNames(txData: {
+      transactions: Array<{ serializedTransaction: string }>;
+    }): Promise<string[]> {
+      const { vsrProgram, provider } = await getPrograms(ctx);
+      const hplCronsProgram = await initHplCrons(provider);
+      const names: string[] = [];
+      for (const t of txData.transactions) {
+        const tx = VersionedTransaction.deserialize(
+          Buffer.from(t.serializedTransaction, "base64")
+        );
+        const keys = tx.message.staticAccountKeys;
+        for (const ix of tx.message.compiledInstructions) {
+          const programId = keys[ix.programIdIndex];
+          const data = Buffer.from(ix.data);
+          if (programId.equals(vsrProgram.programId)) {
+            const decoded = vsrProgram.coder.instruction.decode(data);
+            if (decoded) names.push(decoded.name);
+          } else if (programId.equals(hplCronsProgram.programId)) {
+            const decoded = hplCronsProgram.coder.instruction.decode(data);
+            if (decoded) names.push(decoded.name);
+          }
+        }
+      }
+      return names;
+    }
+
+    it("queues a proxy-vote task instead of counting the vote inline", async () => {
+      // #given an active Helium-org proposal that the proxy has already voted on
+      const proxyKp = Keypair.generate();
+      const proposalSetup = await createHeliumOrgVotingProposal(ctx, {
+        name: `pv-${Math.random().toString(36).substring(2, 8)}`,
+        votingDurationSecs: 3600,
+        // Backdate so endTs is already in the past while still in Voting state.
+        startedSecsAgo: 7200,
+      });
+
+      const { vsrProgram } = await getPrograms(ctx);
+      const [proxyVoteMarker] = proxyVoteMarkerKey(
+        proxyKp.publicKey,
+        proposalSetup.proposal
+      );
+      const proxiedVoteIx = await vsrProgram.methods
+        .proxiedVoteV1({ choice: 0 })
+        .accountsPartial({
+          proposal: proposalSetup.proposal,
+          voter: proxyKp.publicKey,
+          marker: proxyVoteMarker,
+        })
+        .instruction();
+      const { blockhash, lastValidBlockHeight } =
+        await ctx.connection.getLatestBlockhash("confirmed");
+      const proxiedVoteTx = new Transaction();
+      proxiedVoteTx.recentBlockhash = blockhash;
+      proxiedVoteTx.feePayer = ctx.payer.publicKey;
+      proxiedVoteTx.add(proxiedVoteIx);
+      proxiedVoteTx.sign(ctx.payer, proxyKp);
+      const proxiedVoteSig = await ctx.connection.sendRawTransaction(
+        proxiedVoteTx.serialize()
+      );
+      await ctx.connection.confirmTransaction(
+        { signature: proxiedVoteSig, blockhash, lastValidBlockHeight },
+        "confirmed"
+      );
+
+      // Sanity: the proxy marker now records the cast choice.
+      const proxyMarkerAcc = await vsrProgram.account.proxyMarkerV0.fetch(
+        proxyVoteMarker
+      );
+      expect(proxyMarkerAcc.choices).to.deep.equal([0]);
+
+      // #given a delegated position owned by the wallet, not yet proxied
+      const { positionMint } = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+      const { data: delegateData, error: delegateError } =
+        await ctx.safeClient.governance.delegatePositions({
+          walletAddress,
+          positionMints: [positionMint],
+          subDaoMint: MOBILE_MINT.toBase58(),
+          automationEnabled: false,
+        });
+      if (delegateError) {
+        throw new Error(
+          `Failed to delegate position: ${JSON.stringify(delegateError)}`
+        );
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        delegateData!.transactionData,
+        ctx.payer
+      );
+
+      // #when assigning the delegated position to the proxy that already voted
+      const expirationTime = await getSeasonBoundedProxyExpirationTime(
+        ctx,
+        positionMint
+      );
+      const { data, error } = await ctx.safeClient.governance.assignProxies({
+        walletAddress,
+        positionMints: [positionMint],
+        proxyKey: proxyKp.publicKey.toBase58(),
+        expirationTime,
+      });
+
+      // #then the call succeeds
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+
+      // #then it queues a proxy-vote cron task and does NOT count the vote or
+      // queue the wallet-unsignable relinquish inline
+      const names = await instructionNames(data!.transactionData);
+      expect(names).to.include("queueProxyVoteV0");
+      expect(names).to.not.include("countProxyVoteV0");
+      expect(names).to.not.include("queueRelinquishExpiredVoteMarkerV0");
+
+      // #then the assign transactions submit successfully
+      const sigs = await signAndSubmitTransactionData(
+        ctx.connection,
+        data!.transactionData,
+        ctx.payer
+      );
+      expect(sigs.length).to.be.greaterThan(0);
+
+      // #then the proxy assignment exists on-chain
+      const { proxyProgram } = await getPrograms(ctx);
+      const positionMintPubkey = new PublicKey(positionMint);
+      const [positionPubkey] = positionKey(positionMintPubkey);
+      const positionAcc = await vsrProgram.account.positionV0.fetch(
+        positionPubkey
+      );
+      const registrar = await vsrProgram.account.registrar.fetch(
+        positionAcc.registrar
+      );
+      const [proxyAssignment] = proxyAssignmentKey(
+        registrar.proxyConfig,
+        positionMintPubkey,
+        proxyKp.publicKey
+      );
+      const proxyAssignmentAcc =
+        await proxyProgram.account.proxyAssignmentV0.fetchNullable(
+          proxyAssignment
+        );
+      expect(proxyAssignmentAcc).to.not.be.null;
     });
   });
 
@@ -1064,13 +1384,12 @@ describe("governance", () => {
       );
 
       // #when relinquishing vote
-      const { data, error } =
-        await ctx.safeClient.governance.relinquishVote({
-          walletAddress,
-          proposalKey: proposalSetup.proposal.toBase58(),
-          positionMints: [result.positionMint],
-          choice: 0,
-        });
+      const { data, error } = await ctx.safeClient.governance.relinquishVote({
+        walletAddress,
+        proposalKey: proposalSetup.proposal.toBase58(),
+        positionMints: [result.positionMint],
+        choice: 0,
+      });
 
       // #then transaction builds and submits
       if (error) {
@@ -1094,8 +1413,9 @@ describe("governance", () => {
         new PublicKey(result.positionMint),
         proposalSetup.proposal
       );
-      const markerAfter =
-        await vsrProgram.account.voteMarkerV0.fetchNullable(voteMarker);
+      const markerAfter = await vsrProgram.account.voteMarkerV0.fetchNullable(
+        voteMarker
+      );
       if (markerAfter) {
         expect(markerAfter.choices).to.not.include(0);
       }
@@ -1210,8 +1530,9 @@ describe("governance", () => {
         orgProposalSetup.proposal
       );
       const { vsrProgram } = await getPrograms(ctx);
-      const markerAfter =
-        await vsrProgram.account.voteMarkerV0.fetchNullable(voteMarker);
+      const markerAfter = await vsrProgram.account.voteMarkerV0.fetchNullable(
+        voteMarker
+      );
       if (markerAfter) {
         expect(markerAfter.choices).to.have.length(0);
       }
@@ -1361,13 +1682,12 @@ describe("governance", () => {
         );
 
         // #when trying to transfer from position with active votes
-        const { error } =
-          await ctx.safeClient.governance.transferPosition({
-            walletAddress,
-            positionMint: source.positionMint,
-            targetPositionMint: targetMint,
-            amount: "50000000",
-          });
+        const { error } = await ctx.safeClient.governance.transferPosition({
+          walletAddress,
+          positionMint: source.positionMint,
+          targetPositionMint: targetMint,
+          amount: "50000000",
+        });
 
         // #then returns BAD_REQUEST
         if (!isDefinedError(error)) {
@@ -1391,11 +1711,10 @@ describe("governance", () => {
         });
 
         // #when requesting undelegate
-        const { error } =
-          await ctx.safeClient.governance.undelegatePosition({
-            walletAddress,
-            positionMint: result.positionMint,
-          });
+        const { error } = await ctx.safeClient.governance.undelegatePosition({
+          walletAddress,
+          positionMint: result.positionMint,
+        });
 
         // #then returns BAD_REQUEST
         if (!isDefinedError(error)) {
@@ -1445,8 +1764,9 @@ describe("governance", () => {
           new PublicKey(result.positionMint)
         );
 
-        const clockInfo =
-          await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+        const clockInfo = await ctx.connection.getAccountInfo(
+          SYSVAR_CLOCK_PUBKEY
+        );
         const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
         await setPositionLockupEndTs(
           ctx,
@@ -1455,13 +1775,12 @@ describe("governance", () => {
         );
 
         // #when attempting to delegate
-        const { error } =
-          await ctx.safeClient.governance.delegatePositions({
-            walletAddress,
-            positionMints: [result.positionMint],
-            subDaoMint: MOBILE_MINT.toBase58(),
-            automationEnabled: false,
-          });
+        const { error } = await ctx.safeClient.governance.delegatePositions({
+          walletAddress,
+          positionMints: [result.positionMint],
+          subDaoMint: MOBILE_MINT.toBase58(),
+          automationEnabled: false,
+        });
 
         // #then returns BAD_REQUEST with decay message
         if (!isDefinedError(error)) {
@@ -1489,8 +1808,9 @@ describe("governance", () => {
           new PublicKey(result.positionMint)
         );
 
-        const clockInfo =
-          await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+        const clockInfo = await ctx.connection.getAccountInfo(
+          SYSVAR_CLOCK_PUBKEY
+        );
         const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
         await setPositionLockupEndTs(
           ctx,
@@ -1499,11 +1819,10 @@ describe("governance", () => {
         );
 
         // #when attempting to extend delegation
-        const { error } =
-          await ctx.safeClient.governance.extendDelegation({
-            walletAddress,
-            positionMint: result.positionMint,
-          });
+        const { error } = await ctx.safeClient.governance.extendDelegation({
+          walletAddress,
+          positionMint: result.positionMint,
+        });
 
         // #then returns BAD_REQUEST with decay message
         if (!isDefinedError(error)) {
@@ -1545,6 +1864,5 @@ describe("governance", () => {
         expect(error.message).to.include("No proxy assignments");
       });
     });
-
   });
 });

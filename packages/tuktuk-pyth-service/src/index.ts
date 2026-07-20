@@ -8,7 +8,7 @@ import { compileTransaction, customSignerKey, init, RemoteTaskTransactionV0 } fr
 import { HermesClient } from "@pythnetwork/hermes-client";
 import { parseAccumulatorUpdateData } from "@pythnetwork/price-service-sdk";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
-import { getConfigPda, getGuardianSetPda, getTreasuryPda } from "@pythnetwork/pyth-solana-receiver/lib/address";
+import { getConfigPda, getGuardianSetPda, getTreasuryPda } from "@pythnetwork/pyth-solana-receiver/address";
 import { Connection, Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
@@ -151,6 +151,56 @@ async function generateAllVaaInstructions(vaa: Buffer, priceUpdateId: string, ta
 
 const MAX_SERIALIZED_LENGTH = 702;
 
+const MEMO_PROGRAM_ID = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+
+// Offsets within an EncodedVaa account: 8-byte anchor discriminator, then
+// Header { status: u8, write_authority: Pubkey, version: u8 }.
+const ENCODED_VAA_STATUS_OFFSET = 8;
+const ENCODED_VAA_STATUS_WRITING = 1;
+const ENCODED_VAA_STATUS_VERIFIED = 2;
+
+async function sendMemoResponse(
+  reply: any,
+  task: PublicKey,
+  taskQueuedAt: BN,
+  tuktukProgram: Program<Tuktuk>,
+  message: string,
+) {
+  const memoInstruction = new TransactionInstruction({
+    keys: [],
+    programId: MEMO_PROGRAM_ID,
+    data: Buffer.from(message, "utf8"),
+  });
+
+  const { transaction, remainingAccounts } = await compileTransaction([memoInstruction], []);
+
+  const remoteTx = new RemoteTaskTransactionV0({
+    task,
+    taskQueuedAt,
+    transaction: {
+      ...transaction,
+      accounts: remainingAccounts.map((acc) => acc.pubkey),
+    },
+  });
+
+  const serialized = await RemoteTaskTransactionV0.serialize(
+    tuktukProgram.coder.accounts,
+    remoteTx,
+  );
+
+  reply.status(200).send({
+    transaction: serialized.toString("base64"),
+    signature: Buffer.from(
+      sign.detached(Uint8Array.from(serialized), KEYPAIR.secretKey),
+    ).toString("base64"),
+    remaining_accounts: remainingAccounts.map((acc) => ({
+      pubkey: acc.pubkey.toBase58(),
+      is_signer: acc.isSigner,
+      is_writable: acc.isWritable,
+    })),
+  });
+}
+
 async function processVaaInstructions(
   request: any,
   reply: any,
@@ -185,6 +235,27 @@ async function processVaaInstructions(
   // Generate all instructions
   const { allInstructions, encodedVaaAddress } =
     await generateAllVaaInstructions(accumulatorUpdateData.vaa, priceUpdateId, taskQueue, pythProgram);
+
+  // Continuation pre-flight: if another task chain for this feed already advanced
+  // the on-chain VAA past Writing, our remaining writes/verify will fail with
+  // NotInWritingStatus. Bail out with a no-op memo tx so the task succeeds and
+  // tuktuk doesn't burn retries on a foregone failure.
+  if (index > 0) {
+    const accountInfo = await provider.connection.getAccountInfo(tuktukEncodedVaa);
+    const onlyPriceUpdateLeft = index === allInstructions.length - 1;
+
+    if (!accountInfo) {
+      return sendMemoResponse(reply, task, taskQueuedAt, tuktukProgram,
+        `pyth: encoded VAA ${tuktukEncodedVaa.toBase58()} no longer exists; another chain consumed it`);
+    }
+
+    const status = accountInfo.data[ENCODED_VAA_STATUS_OFFSET];
+    if (!onlyPriceUpdateLeft && status !== ENCODED_VAA_STATUS_WRITING) {
+      const statusName = status === ENCODED_VAA_STATUS_VERIFIED ? "Verified" : `status=${status}`;
+      return sendMemoResponse(reply, task, taskQueuedAt, tuktukProgram,
+        `pyth: encoded VAA ${tuktukEncodedVaa.toBase58()} is ${statusName}, not Writing; another chain finished verify`);
+    }
+  }
 
   // Try to fit as many instructions as possible in this batch
   let currentIndex = index;
@@ -368,8 +439,10 @@ server.post<{
 
   const existingUpdate = await PythPriceUpdate.findByPk(priceUpdateId)
   if (existingUpdate) {
-    // Fresh price within 30 seconds
-    if (index === 0 && existingUpdate.updatedAt > new Date(Date.now() - 1000 * 30)) {
+    // Refetch on the first attempt when the cached VAA is older than 30s. Stale
+    // VAAs can reference a rotated guardian set, which fails on-chain with
+    // GuardianSetExpired. Continuation indices reuse whatever VAA we started with.
+    if (index === 0 && existingUpdate.updatedAt < new Date(Date.now() - 1000 * 30)) {
       await PythPriceUpdate.update({
         priceUpdate: await getData(),
       }, { where: { priceUpdateId } })

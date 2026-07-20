@@ -7,6 +7,8 @@ import { onError } from "@orpc/server";
 import { ORPCError } from "@orpc/server";
 import * as Sentry from "@sentry/nextjs";
 
+export const dynamic = "force-dynamic";
+
 /**
  * ORPC OpenAPI handler for the public v1 API.
  *

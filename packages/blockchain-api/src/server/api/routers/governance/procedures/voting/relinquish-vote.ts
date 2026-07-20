@@ -28,7 +28,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import BN from "bn.js";
 import {
   TASK_QUEUE,
-  validatePositionOwnership,
+  validatePositionOwnershipBatch,
   buildBatchedTransactions,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
@@ -69,10 +69,65 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
       vsrProgram.account.voteMarkerV0.fetchMultiple(markerKeys),
     ]);
 
-    const registrarCache = new Map<
-      string,
-      Awaited<ReturnType<typeof vsrProgram.account.registrar.fetch>>
+    // Batched ownership + proxy-assignment resolution (see vote.ts): one
+    // getMultipleAccounts per 100 instead of ~2 sequential RPCs per position, so
+    // a large proxied relinquish doesn't exceed the gateway timeout.
+    const isOwnerByIndex = await validatePositionOwnershipBatch(
+      connection,
+      positionMintPubkeys,
+      walletPubkey,
+    );
+
+    const registrarKeySet = new Set<string>();
+    positionAccounts.forEach(
+      (acc: (typeof positionAccounts)[number], i: number) => {
+        if (acc && !isOwnerByIndex[i]) {
+          registrarKeySet.add(acc.registrar.toBase58());
+        }
+      },
+    );
+    const registrarKeysToFetch: string[] = Array.from(registrarKeySet);
+    const registrarAccounts = registrarKeysToFetch.length
+      ? await vsrProgram.account.registrar.fetchMultiple(
+          registrarKeysToFetch.map((k: string) => new PublicKey(k)),
+        )
+      : [];
+    const registrarByKey = new Map<string, (typeof registrarAccounts)[number]>(
+      registrarKeysToFetch.map(
+        (k: string, i: number) => [k, registrarAccounts[i]] as const,
+      ),
+    );
+
+    const proxyAssignmentIndexes: number[] = [];
+    const proxyAssignmentKeys: PublicKey[] = [];
+    for (let i = 0; i < positionMints.length; i++) {
+      const acc = positionAccounts[i];
+      if (acc && !isOwnerByIndex[i]) {
+        const registrar = registrarByKey.get(acc.registrar.toBase58());
+        if (registrar) {
+          proxyAssignmentIndexes.push(i);
+          proxyAssignmentKeys.push(
+            proxyAssignmentKey(
+              registrar.proxyConfig,
+              positionMintPubkeys[i],
+              walletPubkey,
+            )[0],
+          );
+        }
+      }
+    }
+    const proxyAssignmentAccounts = proxyAssignmentKeys.length
+      ? await proxyProgram.account.proxyAssignmentV0.fetchMultiple(
+          proxyAssignmentKeys,
+        )
+      : [];
+    const proxyAssignmentByIndex = new Map<
+      number,
+      (typeof proxyAssignmentAccounts)[number]
     >();
+    proxyAssignmentIndexes.forEach((idx, j) => {
+      proxyAssignmentByIndex.set(idx, proxyAssignmentAccounts[j]);
+    });
 
     const groups: InstructionGroup[] = [];
     let hasProxies = false;
@@ -86,31 +141,8 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
         });
       }
 
-      const { isOwner } = await validatePositionOwnership(
-        connection,
-        positionMintPubkeys[i],
-        walletPubkey,
-      );
-
-      if (!isOwner) {
-        const registrarKey = positionAcc.registrar.toBase58();
-        let registrar = registrarCache.get(registrarKey);
-        if (!registrar) {
-          registrar = await vsrProgram.account.registrar.fetch(
-            positionAcc.registrar,
-          );
-          registrarCache.set(registrarKey, registrar);
-        }
-        const proxyAssignmentAddr = proxyAssignmentKey(
-          registrar.proxyConfig,
-          positionMintPubkeys[i],
-          walletPubkey,
-        )[0];
-        const proxyAssignment =
-          await proxyProgram.account.proxyAssignmentV0.fetchNullable(
-            proxyAssignmentAddr,
-          );
-
+      if (!isOwnerByIndex[i]) {
+        const proxyAssignment = proxyAssignmentByIndex.get(i);
         if (!proxyAssignment) {
           throw errors.BAD_REQUEST({
             message: `Wallet does not own or have proxy for position ${positionMints[i]}`,
@@ -251,7 +283,7 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
         actionMetadata: { type: "voting_relinquish", proposalKey, choice, positionCount: positionMints.length },
       },
       hasMore,
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
         NATIVE_MINT.toBase58(),
       ),

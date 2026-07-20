@@ -5,8 +5,9 @@ import {
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import {
-  requirePositionOwnershipWithMessage,
+  validatePositionOwnershipBatch,
   buildBatchedTransactions,
+  TASK_QUEUE,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
 import { delegatedPositionKey } from "@helium/helium-sub-daos-sdk";
@@ -16,13 +17,19 @@ import {
   organizationKey,
   proposalKey,
 } from "@helium/organization-sdk";
+import { init as initHplCrons } from "@helium/hpl-crons-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
-import { truthy } from "@helium/spl-utils";
+import {
+  customSignerKey,
+  nextAvailableTaskIds,
+  taskKey,
+  taskQueueAuthorityKey,
+  init as initTuktuk,
+} from "@helium/tuktuk-sdk";
 import {
   init as initVsr,
   positionKey,
   proxyVoteMarkerKey,
-  voteMarkerKey,
 } from "@helium/voter-stake-registry-sdk";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
@@ -48,6 +55,8 @@ export const assign = publicProcedure.governance.assignProxies.handler(
     const proxyProgram = await initProxy(provider);
     const orgProgram = await initOrg(provider);
     const proposalProgram = await initProposal(provider);
+    const hplCronsProgram = await initHplCrons(provider);
+    const tuktukProgram = await initTuktuk(provider);
 
     const hntOrg = organizationKey("Helium")[0];
     const organization =
@@ -56,14 +65,6 @@ export const assign = publicProcedure.governance.assignProxies.handler(
     type ProposalVoteData = {
       proposalPubkey: PublicKey;
       proxyMarkerPubkey: PublicKey;
-      proxyMarkerAcc: NonNullable<
-        Awaited<
-          ReturnType<typeof vsrProgram.account.proxyMarkerV0.fetchNullable>
-        >
-      >;
-      proposalConfig: PublicKey;
-      stateController: PublicKey;
-      onVoteHook: PublicKey;
     };
 
     let activeProxyVotes: ProposalVoteData[] = [];
@@ -92,102 +93,115 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         const proxyVoteAccounts =
           await vsrProgram.account.proxyMarkerV0.fetchMultiple(proxyVoteKeys);
 
-        const proposalConfigKeys = [
-          ...new Set(
-            proposals
-              .map((p) => p.account.proposalConfig.toBase58())
-              .filter(truthy),
-          ),
-        ];
-        const proposalConfigs = (
-          await proposalProgram.account.proposalConfigV0.fetchMultiple(
-            proposalConfigKeys,
-          )
-        ).reduce(
-          (acc, pc, index) => {
-            if (pc) acc[proposalConfigKeys[index]] = pc;
-            return acc;
-          },
-          {} as Record<
-            string,
-            NonNullable<
-              Awaited<
-                ReturnType<
-                  typeof proposalProgram.account.proposalConfigV0.fetchNullable
-                >
-              >
-            >
-          >,
-        );
-
         for (let i = 0; i < proposals.length; i++) {
           const proxyMarkerAcc = proxyVoteAccounts[i];
           if (!proxyMarkerAcc || proxyMarkerAcc.choices.length === 0) continue;
 
-          const proposal = proposals[i];
-          const config =
-            proposalConfigs[proposal.account.proposalConfig.toBase58()];
-          if (!config) continue;
-
           activeProxyVotes.push({
-            proposalPubkey: proposal.pubkey,
+            proposalPubkey: proposals[i].pubkey,
             proxyMarkerPubkey: proxyVoteKeys[i],
-            proxyMarkerAcc,
-            proposalConfig: proposal.account.proposalConfig,
-            stateController: config.stateController,
-            onVoteHook: config.onVoteHook,
           });
         }
       }
     }
 
-    const allInstructions: TransactionInstruction[][] = [];
-    const registrarCache = new Map<
-      string,
-      Awaited<ReturnType<typeof vsrProgram.account.registrar.fetch>>
-    >();
+    const positionMintPubkeys = positionMints.map((m) => new PublicKey(m));
+    const positionPubkeys = positionMintPubkeys.map((m) => positionKey(m)[0]);
 
-    for (const positionMint of positionMints) {
-      const positionMintPubkey = new PublicKey(positionMint);
-      const [positionPubkey] = positionKey(positionMintPubkey);
+    // Batch the per-position lookups up front so a large assignment doesn't fire
+    // ~4 sequential RPCs per position (which blows past the gateway timeout for a
+    // whale-sized proxied set — the same failure #1195 fixed for voting). The
+    // loop below is then pure in-memory work plus the inherently-sequential
+    // proxy-chain walk that only runs when a position is being reassigned.
+    const positionAccounts =
+      await vsrProgram.account.positionV0.fetchMultiple(positionPubkeys);
+    positionAccounts.forEach(
+      (acc: (typeof positionAccounts)[number], i: number) => {
+        if (!acc) {
+          throw errors.NOT_FOUND({
+            message: `Position ${positionMints[i]} not found`,
+          });
+        }
+      },
+    );
 
-      const positionAcc =
-        await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
-
-      if (!positionAcc) {
-        throw errors.NOT_FOUND({
-          message: `Position ${positionMint} not found`,
+    // Ownership for every position in one batched call instead of one
+    // getAccountInfo per position. Assigning a proxy requires owning each one.
+    const isOwnerByIndex = await validatePositionOwnershipBatch(
+      connection,
+      positionMintPubkeys,
+      walletPubkey,
+    );
+    isOwnerByIndex.forEach((isOwner, i) => {
+      if (!isOwner) {
+        throw errors.BAD_REQUEST({
+          message: `Wallet does not own position ${positionMints[i]}`,
         });
       }
+    });
 
-      await requirePositionOwnershipWithMessage(
-        connection,
-        positionMintPubkey,
-        walletPubkey,
-        positionMint,
-        errors,
+    // Resolve each position's registrar (→ proxyConfig) in one batched fetch.
+    const registrarKeys: string[] = Array.from(
+      new Set(
+        positionAccounts.map(
+          (acc: (typeof positionAccounts)[number]) =>
+            acc!.registrar.toBase58() as string,
+        ),
+      ),
+    );
+    const registrarAccounts = await vsrProgram.account.registrar.fetchMultiple(
+      registrarKeys.map((k: string) => new PublicKey(k)),
+    );
+    const registrarByKey = new Map(
+      registrarKeys.map(
+        (k: string, i: number) => [k, registrarAccounts[i]!] as const,
+      ),
+    );
+    const proxyConfigByIndex = positionAccounts.map(
+      (acc: (typeof positionAccounts)[number]) =>
+        registrarByKey.get(acc!.registrar.toBase58())!.proxyConfig,
+    );
+
+    // Each position's own proxy assignment (voter = default), batched.
+    const ownedAssetProxyAssignmentAddresses = positionMintPubkeys.map(
+      (mint, i) =>
+        proxyAssignmentKey(proxyConfigByIndex[i], mint, PublicKey.default)[0],
+    );
+    const existingProxyAssignments =
+      await proxyProgram.account.proxyAssignmentV0.fetchMultiple(
+        ownedAssetProxyAssignmentAddresses,
       );
 
-      const registrarKey = positionAcc.registrar.toBase58();
-      let registrar = registrarCache.get(registrarKey);
-      if (!registrar) {
-        registrar = await vsrProgram.account.registrar.fetch(
-          positionAcc.registrar,
+    // Delegation status for every position, batched (getMultipleAccounts caps at
+    // 100/request), but only when the proxy has active votes to propagate —
+    // otherwise this is never read.
+    const delegatedExistsByIndex: boolean[] = [];
+    if (activeProxyVotes.length > 0) {
+      const delegatedKeys = positionPubkeys.map(
+        (p) => delegatedPositionKey(p)[0],
+      );
+      const CHUNK_SIZE = 100;
+      for (let i = 0; i < delegatedKeys.length; i += CHUNK_SIZE) {
+        const infos = await connection.getMultipleAccountsInfo(
+          delegatedKeys.slice(i, i + CHUNK_SIZE),
         );
-        registrarCache.set(registrarKey, registrar);
+        delegatedExistsByIndex.push(...infos.map((info) => info !== null));
       }
+    }
 
-      const proxyConfig = registrar.proxyConfig;
-      const ownedAssetProxyAssignmentAddress = proxyAssignmentKey(
-        proxyConfig,
-        positionMintPubkey,
-        PublicKey.default,
-      )[0];
+    const allInstructions: TransactionInstruction[][] = [];
 
-      const existingProxyAssignment =
-        await proxyProgram.account.proxyAssignmentV0.fetchNullable(
-          ownedAssetProxyAssignmentAddress,
-        );
+    // Whether any position being assigned is delegated. The proxy's votes can
+    // only be propagated to delegated positions, so we only kick the proxy-vote
+    // cron when at least one delegated position is in this assignment.
+    let hasDelegatedAssignment = false;
+
+    for (let i = 0; i < positionMints.length; i++) {
+      const positionMintPubkey = positionMintPubkeys[i];
+      const proxyConfig = proxyConfigByIndex[i];
+      const ownedAssetProxyAssignmentAddress =
+        ownedAssetProxyAssignmentAddresses[i];
+      const existingProxyAssignment = existingProxyAssignments[i];
 
       const instructions: TransactionInstruction[] = [];
 
@@ -211,9 +225,9 @@ export const assign = publicProcedure.governance.assignProxies.handler(
           currentVoter = acc.nextVoter;
         }
 
-        for (let i = chain.length - 1; i >= 0; i--) {
+        for (let j = chain.length - 1; j >= 0; j--) {
           const prevAddress =
-            i === 0 ? ownedAssetProxyAssignmentAddress : chain[i - 1].address;
+            j === 0 ? ownedAssetProxyAssignmentAddress : chain[j - 1].address;
 
           instructions.push(
             await proxyProgram.methods
@@ -222,7 +236,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
                 asset: positionMintPubkey,
                 prevProxyAssignment: prevAddress,
                 currentProxyAssignment: ownedAssetProxyAssignmentAddress,
-                proxyAssignment: chain[i].address,
+                proxyAssignment: chain[j].address,
                 voter: PublicKey.default,
                 approver: walletPubkey,
                 tokenAccount: getAssociatedTokenAddressSync(
@@ -235,10 +249,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         }
       }
 
-      const {
-        instruction: assignInstruction,
-        pubkeys: { nextProxyAssignment },
-      } = await proxyProgram.methods
+      const { instruction: assignInstruction } = await proxyProgram.methods
         .assignProxyV0({ expirationTime: expirationTimeBN })
         .accountsPartial({
           asset: positionMintPubkey,
@@ -255,47 +266,63 @@ export const assign = publicProcedure.governance.assignProxies.handler(
 
       instructions.push(assignInstruction);
 
-      if (activeProxyVotes.length > 0 && nextProxyAssignment) {
-        const [delegatedPosKey] = delegatedPositionKey(positionPubkey);
-        const isDelegated =
-          !!(await connection.getAccountInfo(delegatedPosKey));
-
-        if (isDelegated) {
-          const voteMarkerKeys = activeProxyVotes.map(
-            (v) => voteMarkerKey(positionMintPubkey, v.proposalPubkey)[0],
-          );
-          const existingMarkers =
-            await vsrProgram.account.voteMarkerV0.fetchMultiple(voteMarkerKeys);
-
-          for (let i = 0; i < activeProxyVotes.length; i++) {
-            if (existingMarkers[i]) continue;
-            const vote = activeProxyVotes[i];
-
-            instructions.push(
-              await vsrProgram.methods
-                .countProxyVoteV0()
-                .accountsPartial({
-                  payer: walletPubkey,
-                  proxyMarker: vote.proxyMarkerPubkey,
-                  marker: voteMarkerKeys[i],
-                  voter: vote.proxyMarkerAcc.voter,
-                  proxyAssignment: nextProxyAssignment,
-                  registrar: positionAcc.registrar,
-                  position: positionPubkey,
-                  proposal: vote.proposalPubkey,
-                  proposalConfig: vote.proposalConfig,
-                  stateController: vote.stateController,
-                  onVoteHook: vote.onVoteHook,
-                  proposalProgram: proposalProgram.programId,
-                  systemProgram: SystemProgram.programId,
-                })
-                .instruction(),
-            );
-          }
-        }
+      if (activeProxyVotes.length > 0 && delegatedExistsByIndex[i]) {
+        hasDelegatedAssignment = true;
       }
 
       allInstructions.push(instructions);
+    }
+
+    // If the proxy has already voted on an active proposal, that vote was cast
+    // before these positions were delegated to it, so the newly delegated
+    // positions aren't covered. Queueing a proxy-vote task lets the
+    // vote-service cron count the votes for them and schedule each marker's
+    // relinquish via the task-queue PDA (the only signer authorized to do so).
+    if (hasDelegatedAssignment && activeProxyVotes.length > 0) {
+      const taskQueueAcc =
+        await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE);
+      const nextAvailable = nextAvailableTaskIds(
+        taskQueueAcc.taskBitmap,
+        activeProxyVotes.length,
+      );
+      const queueAuthority = PublicKey.findProgramAddressSync(
+        [Buffer.from("queue_authority")],
+        hplCronsProgram.programId,
+      )[0];
+
+      const proxyVoteTaskInstructions: TransactionInstruction[] = [];
+      for (const vote of activeProxyVotes) {
+        if (nextAvailable.length === 0) {
+          throw errors.BAD_REQUEST({ message: "No available task IDs" });
+        }
+        const freeTaskId = nextAvailable.pop()!;
+        proxyVoteTaskInstructions.push(
+          await hplCronsProgram.methods
+            // @ts-ignore queueProxyVoteV0 is missing from the published IDL types
+            .queueProxyVoteV0({ freeTaskId })
+            .accountsPartial({
+              marker: vote.proxyMarkerPubkey,
+              task: taskKey(TASK_QUEUE, freeTaskId)[0],
+              taskQueue: TASK_QUEUE,
+              payer: walletPubkey,
+              systemProgram: SystemProgram.programId,
+              queueAuthority,
+              tuktukProgram: tuktukProgram.programId,
+              voter: proxyKeyPubkey,
+              pdaWallet: customSignerKey(TASK_QUEUE, [
+                Buffer.from("vote_payer"),
+                proxyKeyPubkey.toBuffer(),
+              ])[0],
+              taskQueueAuthority: taskQueueAuthorityKey(
+                TASK_QUEUE,
+                queueAuthority,
+              )[0],
+            })
+            .instruction(),
+        );
+      }
+
+      allInstructions.push(proxyVoteTaskInstructions);
     }
 
     const groups: InstructionGroup[] = allInstructions
@@ -350,10 +377,14 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         transactions,
         parallel: true,
         tag,
-        actionMetadata: { type: "proxy_assign", proxyKey, positionCount: positionMints.length },
+        actionMetadata: {
+          type: "proxy_assign",
+          proxyKey,
+          positionCount: positionMints.length,
+        },
       },
       hasMore,
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
         NATIVE_MINT.toBase58(),
       ),

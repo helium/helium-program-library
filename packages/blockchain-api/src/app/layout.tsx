@@ -4,7 +4,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import React, { Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
-import "../lib/background-jobs/transaction-resubmission";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,14 +30,14 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-background text-foreground min-h-screen antialiased`}
       >
         <Suspense>
           <main
-            className="relative layout-container flex size-full min-h-screen grow flex-col"
+            className="layout-container size-full relative flex min-h-screen grow flex-col"
             style={{ fontFamily: 'Inter, "Noto Sans", sans-serif' }}
           >
-            <div className="flex flex-col flex-1 min-h-screen w-full">
+            <div className="flex min-h-screen w-full flex-1 flex-col">
               <Providers>{children}</Providers>
               <Toaster position="top-center" className="md:hidden" />
               <Toaster position="bottom-right" className="hidden md:block" />

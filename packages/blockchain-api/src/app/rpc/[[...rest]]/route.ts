@@ -6,6 +6,8 @@ import { ORPCError } from "@orpc/server";
 import { ValidationError } from "@orpc/server";
 import * as Sentry from "@sentry/nextjs";
 
+export const dynamic = "force-dynamic";
+
 const rpcHandler = new RPCHandler(appRouter, {
   interceptors: [
     onError((error) => {
@@ -26,7 +28,7 @@ const rpcHandler = new RPCHandler(appRouter, {
               Object.entries(value).map(([key, val]) => [
                 key,
                 serializeValue(val),
-              ]),
+              ])
             );
           } catch {
             // If serialization fails, convert to string
@@ -54,8 +56,8 @@ const rpcHandler = new RPCHandler(appRouter, {
                   data: serializeValue(error.cause.data),
                 }
               : error.cause
-                ? serializeValue(error.cause)
-                : undefined,
+              ? serializeValue(error.cause)
+              : undefined,
         };
         console.error("RPC Error:", JSON.stringify(errorDetails, null, 2));
 
@@ -147,7 +149,7 @@ async function handleRequest(request: Request) {
   if (!response && isBatchPath) {
     console.error(
       "[RPC] BatchHandlerPlugin failed to handle batch request. " +
-        "This might indicate a bug in ORPC or incorrect configuration.",
+        "This might indicate a bug in ORPC or incorrect configuration."
     );
   }
 

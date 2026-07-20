@@ -1,6 +1,13 @@
-import { QuoteResponseSchema } from "@helium/blockchain-api";
+import { QuoteResponse, QuoteResponseSchema } from "@helium/blockchain-api";
 import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
+import { createTtlCache } from "@/lib/utils/ttl-cache";
+
+// Quotes are polled repeatedly and often re-requested with identical params.
+// A short TTL plus in-flight coalescing collapses those bursts into a single
+// Jupiter call, which is what was tripping Jupiter's 429 rate limiting.
+const QUOTE_CACHE_TTL_MS = 2000;
+const quoteCache = createTtlCache<QuoteResponse>({ ttlMs: QUOTE_CACHE_TTL_MS });
 
 /**
  * Get a quote for swapping tokens from Jupiter.
@@ -9,38 +16,66 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
   async ({ input, errors }) => {
     const { inputMint, outputMint, amount, swapMode, slippageBps } = input;
 
-    // Get quote from Jupiter
-    const quoteUrl = new URL(`${env.JUPITER_API_URL}/swap/v1/quote`);
-    quoteUrl.searchParams.set("inputMint", inputMint);
-    quoteUrl.searchParams.set("outputMint", outputMint);
-    quoteUrl.searchParams.set("amount", amount);
-    quoteUrl.searchParams.set("swapMode", swapMode);
-    quoteUrl.searchParams.set("slippageBps", slippageBps.toString());
+    const cacheKey = `${inputMint}:${outputMint}:${amount}:${swapMode}:${slippageBps}`;
 
-    const quoteResponse = await fetch(quoteUrl.toString(), {
-      headers: {
-        "x-api-key": env.JUPITER_API_KEY,
-      },
+    return quoteCache(cacheKey, async () => {
+      // Get quote from Jupiter
+      const quoteUrl = new URL(`${env.JUPITER_API_URL}/swap/v1/quote`);
+      quoteUrl.searchParams.set("inputMint", inputMint);
+      quoteUrl.searchParams.set("outputMint", outputMint);
+      quoteUrl.searchParams.set("amount", amount);
+      quoteUrl.searchParams.set("swapMode", swapMode);
+      quoteUrl.searchParams.set("slippageBps", slippageBps.toString());
+      // Exclude RFQ (JupiterZ) routes: those return maker-co-signed transactions
+      // the requesting wallet cannot sign on its own, so a self-signed swap can't
+      // be completed. The paid api-key host respects `excludeRouters=jupiterz` but
+      // ignores `excludeRfq` (only the keyless lite-api host respects the latter).
+      quoteUrl.searchParams.set("excludeRouters", "jupiterz");
+
+      const quoteResponse = await fetch(quoteUrl.toString(), {
+        headers: {
+          "x-api-key": env.JUPITER_API_KEY,
+        },
+      });
+
+      if (!quoteResponse.ok) {
+        const errorText = await quoteResponse.text();
+        console.error("Jupiter API error:", errorText);
+
+        // TOKEN_NOT_TRADABLE is a client issue (e.g. wallet requesting a non-tradable token),
+        // not a server error — return 400 so it doesn't get sent to Sentry.
+        if (errorText.includes("TOKEN_NOT_TRADABLE")) {
+          throw errors.BAD_REQUEST({
+            message: `Token is not tradable`,
+          });
+        }
+
+        // Surface Jupiter rate limiting as a 429 so clients can back off instead
+        // of us spamming Sentry with JUPITER_ERROR 500s.
+        if (quoteResponse.status === 429) {
+          throw errors.RATE_LIMITED();
+        }
+
+        throw errors.JUPITER_ERROR({
+          message: `Failed to get quote from Jupiter: HTTP ${quoteResponse.status}: ${errorText.slice(0, 500)}`,
+        });
+      }
+
+      const raw = await quoteResponse.json();
+
+      // Validate the response from Jupiter
+      const {
+        data: quote,
+        success,
+        error,
+      } = QuoteResponseSchema.safeParse(raw);
+      if (!success) {
+        console.error("Invalid Jupiter response:", error);
+        throw errors.JUPITER_ERROR({
+          message: "Invalid response from Jupiter API",
+        });
+      }
+      return quote;
     });
-
-    if (!quoteResponse.ok) {
-      const errorText = await quoteResponse.text();
-      console.error("Jupiter API error:", errorText);
-      throw errors.JUPITER_ERROR({
-        message: `Failed to get quote from Jupiter: HTTP ${quoteResponse.status}`,
-      });
-    }
-
-    const raw = await quoteResponse.json();
-
-    // Validate the response from Jupiter
-    const { data: quote, success, error } = QuoteResponseSchema.safeParse(raw);
-    if (!success) {
-      console.error("Invalid Jupiter response:", error);
-      throw errors.JUPITER_ERROR({
-        message: "Invalid response from Jupiter API",
-      });
-    }
-    return quote;
   },
 );

@@ -187,7 +187,7 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
         actionMetadata: { type: "proxy_unassign", proxyKey, positionCount: positionMints.length },
       },
       hasMore,
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
         NATIVE_MINT.toBase58(),
       ),

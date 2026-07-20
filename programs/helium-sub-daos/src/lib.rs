@@ -4,14 +4,18 @@ use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
+pub mod backstop;
 pub mod create_account;
 pub mod error;
 pub mod instructions;
 pub mod state;
+pub mod supplement;
 pub mod utils;
 
+pub use backstop::*;
 pub use instructions::*;
 pub use state::*;
+pub use supplement::*;
 pub use utils::*;
 
 #[cfg(not(feature = "no-entrypoint"))]
@@ -71,8 +75,8 @@ pub mod helium_sub_daos {
     track_dc_burn_v0::handler(ctx, args)
   }
 
-  pub fn calculate_utility_score_v0(
-    ctx: Context<CalculateUtilityScoreV0>,
+  pub fn calculate_utility_score_v0<'info>(
+    ctx: Context<'_, '_, 'info, 'info, CalculateUtilityScoreV0<'info>>,
     args: CalculateUtilityScoreArgsV0,
   ) -> Result<()> {
     calculate_utility_score_v0::handler(ctx, args)

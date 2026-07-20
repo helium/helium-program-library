@@ -37,12 +37,7 @@ export const history = publicProcedure.transactions.history.handler(
           {
             model: PendingTransaction,
             as: "transactions",
-            attributes: [
-              "signature",
-              "status",
-              "type",
-              "metadata",
-            ],
+            attributes: ["signature", "status", "type", "metadata"],
           },
         ],
         order: [["confirmedAt", "DESC NULLS LAST"]],
@@ -82,9 +77,7 @@ export const history = publicProcedure.transactions.history.handler(
           type: tx.type,
           metadata: tx.metadata as Record<string, unknown> | undefined,
         })),
-        timestamp: (
-          batch.confirmedAt || batch.createdAt
-        ).toISOString(),
+        timestamp: (batch.confirmedAt || batch.createdAt).toISOString(),
       })),
       ...historyRows.map((row) => ({
         id: String(row.id),
@@ -109,6 +102,58 @@ export const history = publicProcedure.transactions.history.handler(
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
     const paged = actions.slice(0, limit);
+
+    // Read-time enrichment: backfill token transfers from on-chain data
+    try {
+      const signaturesNeedingEnrichment = paged
+        .filter((a) => {
+          if (a.source !== "blockchain_api") return false;
+          const meta = a.actionMetadata;
+          if (!meta) return false;
+          if (Array.isArray(meta.transfers) && meta.transfers.length > 0)
+            return false;
+          if (meta.tokenAmount) return false;
+          return true;
+        })
+        .flatMap((a) => a.transactions.map((tx) => tx.signature))
+        .filter(Boolean);
+
+      if (signaturesNeedingEnrichment.length > 0) {
+        const onChainMatches = await WalletHistory.findAll({
+          where: { signature: { [Op.in]: signaturesNeedingEnrichment } },
+          attributes: ["signature", "actionMetadata"],
+        });
+
+        const onChainBySig = new Map(
+          onChainMatches.map((row) => [row.signature, row.actionMetadata]),
+        );
+
+        for (const action of paged) {
+          if (action.source !== "blockchain_api" || !action.actionMetadata)
+            continue;
+          if (
+            (Array.isArray(action.actionMetadata.transfers) &&
+              action.actionMetadata.transfers.length > 0) ||
+            action.actionMetadata.tokenAmount
+          )
+            continue;
+          for (const tx of action.transactions) {
+            const onChainMeta = onChainBySig.get(tx.signature);
+            if (!onChainMeta) continue;
+            const transfers = onChainMeta.transfers as unknown[] | undefined;
+            if (transfers && transfers.length > 0) {
+              action.actionMetadata = {
+                ...action.actionMetadata,
+                transfers,
+              };
+              break;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to enrich history with on-chain data:", error);
+    }
 
     const total = batchCount + historyCount;
     const totalPages = Math.ceil(total / limit);

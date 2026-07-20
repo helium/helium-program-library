@@ -1,0 +1,72 @@
+name: "Build IDLs"
+description: "Generate IDL JSON + TS via `anchor idl build` (no BPF compilation), then build @helium/idls. Final artifact (packages/idls/lib) is cached and short-circuits the whole pipeline on hit."
+
+runs:
+  using: "composite"
+  steps:
+    - uses: ./.github/actions/setup/
+
+    # Cache the FINAL consumed artifact. On hit we skip anchor + tsc entirely.
+    - uses: actions/cache@v4
+      name: Cache IDLs final artifact
+      id: cache-idls-lib
+      with:
+        path: |
+          ./packages/idls/lib
+          ./target/idl
+          ./target/types
+        key: idls-lib-${{ runner.os }}-v0001-${{ env.ANCHOR_VERSION }}-${{ hashFiles('programs/**/*.rs', 'programs/**/Cargo.toml', 'Cargo.lock', 'Anchor.toml') }}
+        restore-keys: |
+          idls-lib-${{ runner.os }}-v0001-${{ env.ANCHOR_VERSION }}-
+
+    - uses: ./.github/actions/setup-anchor/
+      if: steps.cache-idls-lib.outputs.cache-hit != 'true'
+
+    - uses: actions/cache@v4
+      if: steps.cache-idls-lib.outputs.cache-hit != 'true'
+      name: Cache Cargo registry + index
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: cargo-${{ runner.os }}-idl-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-${{ runner.os }}-idl-
+          cargo-${{ runner.os }}-cargo-build-
+
+    # `anchor idl build` runs `cargo test --features idl-build` on the program lib
+    # (NOT a BPF build), so target/debug is what gets populated.
+    - uses: actions/cache@v4
+      if: steps.cache-idls-lib.outputs.cache-hit != 'true'
+      name: Cache cargo target (idl build)
+      with:
+        path: ./target/debug
+        key: cargo-target-idl-${{ runner.os }}-${{ env.ANCHOR_VERSION }}-${{ hashFiles('programs/**/*.rs', 'Cargo.lock') }}
+        restore-keys: |
+          cargo-target-idl-${{ runner.os }}-${{ env.ANCHOR_VERSION }}-
+
+    - name: Build IDLs (anchor idl build per program)
+      if: steps.cache-idls-lib.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p target/idl target/types
+        # Extract program names (snake_case) from [programs.localnet] in Anchor.toml
+        programs=$(awk '/^\[programs\.localnet\]/{flag=1;next} /^\[/{flag=0} flag && /=/{print $1}' Anchor.toml)
+        for program in $programs; do
+          echo "::group::IDL build $program"
+          anchor idl build -p "$program" \
+            -o "target/idl/${program}.json" \
+            -t "target/types/${program}.ts" \
+            --skip-lint
+          echo "::endgroup::"
+        done
+
+    - uses: ./.github/actions/setup-ts/
+      if: steps.cache-idls-lib.outputs.cache-hit != 'true'
+
+    - name: Build @helium/idls
+      if: steps.cache-idls-lib.outputs.cache-hit != 'true'
+      shell: bash
+      run: pnpm turbo run build --filter=@helium/idls

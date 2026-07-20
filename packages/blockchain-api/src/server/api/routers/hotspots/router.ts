@@ -1,5 +1,7 @@
 import { getHotspots } from "./procedures/getHotspots";
 import { claimRewards } from "./procedures/claimRewards";
+import { claimHotspotRewards } from "./procedures/claimHotspotRewards";
+import { burnHotspot } from "./procedures/burnHotspot";
 import { getPendingRewards } from "./procedures/getPendingRewards";
 import { transferHotspot } from "./procedures/transferHotspot";
 import { updateRewardsDestination } from "./procedures/updateRewardsDestination";
@@ -11,6 +13,13 @@ import { createAutomation } from "./procedures/createAutomation";
 import { fundAutomation } from "./procedures/fundAutomation";
 import { closeAutomation } from "./procedures/closeAutomation";
 import { getFundingEstimate } from "./procedures/getFundingEstimate";
+import { requeueAutomation } from "./procedures/requeueAutomation";
+import { addWalletToAutomation } from "./procedures/addWalletToAutomation";
+import { addEntityToAutomation } from "./procedures/addEntityToAutomation";
+import { removeEntityFromAutomation } from "./procedures/removeEntityFromAutomation";
+import { topUpAutomation } from "./procedures/topUpAutomation";
+import { issueDataOnlyHotspot } from "./procedures/issueDataOnlyHotspot";
+import { onboardDataOnlyHotspot } from "./procedures/onboardDataOnlyHotspot";
 import { updateHotspotInfo } from "./procedures/updateHotspotInfo";
 import { hotspotsContract } from "@helium/blockchain-api/contracts";
 import { implement } from "@orpc/server";
@@ -23,6 +32,10 @@ export const hotspotsRouter = implement(hotspotsContract).router({
   getHotspots,
   /** Create transactions to claim rewards for hotspots */
   claimRewards,
+  /** Create transactions to claim rewards for a single hotspot */
+  claimHotspotRewards,
+  /** Create a transaction to burn (destroy) a hotspot */
+  burnHotspot,
   /** Get pending rewards for all hotspots in a wallet */
   getPendingRewards,
   /** Create a transaction to transfer a hotspot to a new owner */
@@ -45,6 +58,20 @@ export const hotspotsRouter = implement(hotspotsContract).router({
   getFundingEstimate,
   /** Create transactions to close and remove automation */
   closeAutomation,
+  /** Requeue an automation that ran out of SOL */
+  requeueAutomation,
+  /** Add a whole-wallet claim to an automation */
+  addWalletToAutomation,
+  /** Add a single hotspot claim to an automation */
+  addEntityToAutomation,
+  /** Remove a claim entry from an automation */
+  removeEntityFromAutomation,
+  /** Operator floor top-up for a batch of automations */
+  topUpAutomation,
+  /** Issue a data-only hotspot (relays the onboarding server) */
+  issueDataOnlyHotspot,
+  /** Onboard a data-only hotspot (relays the onboarding server) */
+  onboardDataOnlyHotspot,
   /** Update hotspot info (location, gain, elevation, deployment info) */
   updateHotspotInfo,
 });

@@ -11,6 +11,7 @@ import {
   daoKey,
   init as initDao,
   subDaoEpochInfoKey,
+  subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
@@ -21,6 +22,7 @@ import { init as initBurn } from "@helium/no-emit-sdk";
 import { init as initRewards } from "@helium/rewards-oracle-sdk";
 import {
   HNT_MINT,
+  HNT_PYTH_PRICE_FEED,
   IOT_MINT,
   MOBILE_MINT,
   createMintInstructions,
@@ -97,6 +99,9 @@ export async function run(args: any = process.argv) {
       },
     ]);
 
+    // HIP 149 backstop: the Mobile sub-DAO whose epoch info every calculate pass reads.
+    const [mobileSubDao] = subDaoKey(MOBILE_MINT);
+
     let targetTs = argv.from
       ? new BN(argv.from)
       : subDaos.reduce(
@@ -137,7 +142,29 @@ export async function run(args: any = process.argv) {
                 [
                   await heliumSubDaosProgram.methods
                     .calculateUtilityScoreV0({ epoch })
-                    .accountsPartial({ subDao: subDao.publicKey })
+                    .accountsPartial({
+                      subDao: subDao.publicKey,
+                      // HIP 149 backstop: maintained on-chain HNT/USD Pyth push account.
+                      hntPriceOracle: HNT_PYTH_PRICE_FEED,
+                    })
+                    // The backstop reads the Mobile sub-DAO's current/previous epoch info
+                    // (dc_burned + smoothed percent share) regardless of which sub-DAO is
+                    // being scored, so total_rewards is identical on every pass.
+                    .remainingAccounts([
+                      {
+                        pubkey: subDaoEpochInfoKey(mobileSubDao, targetTs)[0],
+                        isSigner: false,
+                        isWritable: false,
+                      },
+                      {
+                        pubkey: subDaoEpochInfoKey(
+                          mobileSubDao,
+                          targetTs.sub(new BN(EPOCH_LENGTH))
+                        )[0],
+                        isSigner: false,
+                        isWritable: false,
+                      },
+                    ])
                     .instruction(),
                 ],
                 {
@@ -183,7 +210,11 @@ export async function run(args: any = process.argv) {
                 [
                   await heliumSubDaosProgram.methods
                     .issueRewardsV0({ epoch })
-                    .accountsPartial({ subDao: subDao.publicKey })
+                    .accountsPartial({
+                      subDao: subDao.publicKey,
+                      supplementVault: null,
+                      councilVault: null,
+                    })
                     .instruction(),
                 ],
                 {

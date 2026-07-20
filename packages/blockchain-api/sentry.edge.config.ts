@@ -10,5 +10,7 @@ Sentry.init({
   enabled: !!process.env.SENTRY_DSN,
   release: process.env.SENTRY_RELEASE,
   tracesSampleRate: 1,
+  normalizeDepth: 10,
+  normalizeMaxBreadth: 2000,
   sendDefaultPii: true,
 });

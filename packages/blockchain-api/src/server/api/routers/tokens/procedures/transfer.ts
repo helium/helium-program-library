@@ -1,10 +1,14 @@
 import { publicProcedure } from "../../../procedures";
-import { PublicKey, SystemProgram, Connection } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  Connection,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
-  getMint,
 } from "@solana/spl-token";
 import {
   buildVersionedTransaction,
@@ -14,11 +18,87 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
-import { TOKEN_MINTS } from "@/lib/constants/tokens";
-import { getTransactionFee, RENT_COSTS } from "@/lib/utils/balance-validation";
+import {
+  TOKEN_MINTS,
+  TOKEN_NAMES,
+  getTokenDecimals,
+} from "@/lib/constants/tokens";
+import {
+  getTransactionFee,
+  calculateRequiredBalance,
+  RENT_COSTS,
+} from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
+import {
+  buildActionProposal,
+  proposalTransactionData,
+} from "../../squads/procedures/helpers";
 import BN from "bn.js";
+
+/**
+ * Build the raw transfer instructions with `authority` as the source owner and
+ * fee payer for any created associated token account. Shared by the direct
+ * transfer path (authority = wallet) and the Squads propose path (authority =
+ * vault).
+ */
+async function buildTransferInstructions({
+  connection,
+  authority,
+  destination,
+  mint,
+  rawAmount,
+  isSol,
+}: {
+  connection: Connection;
+  authority: PublicKey;
+  destination: PublicKey;
+  mint: string;
+  rawAmount: bigint;
+  isSol: boolean;
+}): Promise<{ instructions: TransactionInstruction[]; needsAta: boolean }> {
+  if (isSol) {
+    return {
+      instructions: [
+        SystemProgram.transfer({
+          fromPubkey: authority,
+          toPubkey: destination,
+          lamports: rawAmount,
+        }),
+      ],
+      needsAta: false,
+    };
+  }
+
+  const mintKey = new PublicKey(mint);
+  const senderAta = getAssociatedTokenAddressSync(mintKey, authority, true);
+  const destAta = getAssociatedTokenAddressSync(mintKey, destination, true);
+  const [destAtaInfo, decimals] = await Promise.all([
+    connection.getAccountInfo(destAta),
+    getTokenDecimals(mint),
+  ]);
+  const needsAta = !destAtaInfo;
+
+  return {
+    instructions: [
+      createAssociatedTokenAccountIdempotentInstruction(
+        authority,
+        destAta,
+        destination,
+        mintKey
+      ),
+      createTransferCheckedInstruction(
+        senderAta,
+        mintKey,
+        destAta,
+        authority,
+        rawAmount,
+        decimals
+      ),
+    ],
+    needsAta,
+  };
+}
 
 export const transfer = publicProcedure.tokens.transfer.handler(
   async ({ input, errors }) => {
@@ -29,12 +109,13 @@ export const transfer = publicProcedure.tokens.transfer.handler(
     const connection = new Connection(process.env.SOLANA_RPC_URL!);
 
     let rawAmount: bigint;
-
     try {
       rawAmount = BigInt(tokenAmount.amount);
     } catch (e) {
       throw errors.BAD_REQUEST({
-        message: `Invalid amount: ${e instanceof Error ? e.message : "could not parse amount"}`,
+        message: `Invalid amount: ${
+          e instanceof Error ? e.message : "could not parse amount"
+        }`,
       });
     }
 
@@ -43,55 +124,75 @@ export const transfer = publicProcedure.tokens.transfer.handler(
     }
 
     const isSol = tokenAmount.mint === TOKEN_MINTS.WSOL;
+    const transferTokenAmount = await toTokenAmountOutput(
+      new BN(tokenAmount.amount),
+      tokenAmount.mint
+    );
+    const tokenName = TOKEN_NAMES[tokenAmount.mint];
 
-    const instructions: (
-      | ReturnType<typeof SystemProgram.transfer>
-      | ReturnType<typeof createAssociatedTokenAccountIdempotentInstruction>
-      | ReturnType<typeof createTransferCheckedInstruction>
-    )[] = [];
+    // ---- Squads propose mode: build the transfer from the vault, wrap it ----
+    if (input.multisig) {
+      const multisigPda = new PublicKey(input.multisig);
+      const { serializedTransaction, transactionIndex, feeLamports } =
+        await buildActionProposal({
+          connection,
+          multisigPda,
+          member: feePayer,
+          memo: input.memo,
+          buildInstructions: async (vault) =>
+            (
+              await buildTransferInstructions({
+                connection,
+                authority: vault,
+                destination: destKey,
+                mint: tokenAmount.mint,
+                rawAmount,
+                isSol,
+              })
+            ).instructions,
+          errors,
+          action: "transfer",
+        });
 
-    let needsAta = false;
+      const tag = generateTransactionTag({
+        type: TRANSACTION_TYPES.TOKEN_TRANSFER,
+        walletAddress,
+        destination,
+        mint: tokenAmount.mint,
+        amount: tokenAmount.amount,
+        multisig: input.multisig,
+      });
 
-    if (isSol) {
-      const lamports = rawAmount;
-
-      instructions.push(
-        SystemProgram.transfer({
-          fromPubkey: feePayer,
-          toPubkey: destKey,
-          lamports,
+      return {
+        transactionData: proposalTransactionData({
+          serializedTransaction,
+          type: TRANSACTION_TYPES.TOKEN_TRANSFER_PROPOSAL,
+          description: `Propose transfer of ${tokenName ?? "Token"}`,
+          tag,
+          multisig: input.multisig,
+          transactionIndex,
+          metadata: {
+            tokenAmount: transferTokenAmount,
+            tokenName,
+            recipient: destination,
+          },
         }),
-      );
-    } else {
-      const mintKey = new PublicKey(tokenAmount.mint);
-      const senderAta = getAssociatedTokenAddressSync(mintKey, feePayer, true);
-      const destAta = getAssociatedTokenAddressSync(mintKey, destKey, true);
-
-      const destAtaInfo = await connection.getAccountInfo(destAta);
-      needsAta = !destAtaInfo;
-
-      const mintInfo = await getMint(connection, mintKey);
-
-      instructions.push(
-        createAssociatedTokenAccountIdempotentInstruction(
-          feePayer,
-          destAta,
-          destKey,
-          mintKey,
+        estimatedSolFee: await toTokenAmountOutput(
+          new BN(calculateRequiredBalance(feeLamports, 0)),
+          NATIVE_MINT.toBase58()
         ),
-      );
-
-      instructions.push(
-        createTransferCheckedInstruction(
-          senderAta,
-          mintKey,
-          destAta,
-          feePayer,
-          rawAmount,
-          mintInfo.decimals,
-        ),
-      );
+      };
     }
+
+    // ---- Direct transfer from the wallet ----
+    const { instructions, needsAta } = await buildTransferInstructions({
+      connection,
+      authority: feePayer,
+      destination: destKey,
+      mint: tokenAmount.mint,
+      rawAmount,
+      isSol,
+    });
 
     const tx = await buildVersionedTransaction({
       connection,
@@ -109,7 +210,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
     // For SOL transfers, no rent. For SPL, ATA rent if needed
     const rentCost = needsAta ? RENT_COSTS.ATA : 0;
     const txFee = getTransactionFee(tx);
-    const estimatedSolFeeLamports = txFee + rentCost;
+    const estimatedSolFeeLamports = calculateRequiredBalance(txFee, rentCost);
 
     const walletBalance = await connection.getBalance(feePayer);
     const totalCost = isSol
@@ -131,21 +232,26 @@ export const transfer = publicProcedure.tokens.transfer.handler(
             serializedTransaction: serializeTransaction(tx),
             metadata: {
               type: "token_transfer",
-              description: `Transfer ${isSol ? "SOL" : "Token"}`,
-              mint: tokenAmount.mint,
-              amount: tokenAmount.amount,
+              description: `Transfer ${tokenName ?? "Token"}`,
+              tokenAmount: transferTokenAmount,
+              tokenName,
               recipient: destination,
             },
           },
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "token_transfer", mint: tokenAmount.mint, amount: tokenAmount.amount, recipient: destination },
+        actionMetadata: {
+          type: "token_transfer",
+          tokenAmount: transferTokenAmount,
+          tokenName,
+          recipient: destination,
+        },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

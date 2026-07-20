@@ -2,7 +2,6 @@ name: Deploy to ECR
 
 env:
   SOLANA_CLI_VERSION: 2.1.6
-  NODE_VERSION: 24.13.1
 
 on:
   push:
@@ -16,6 +15,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune -af
+          df -h /
+
       - name: Check out code
         uses: actions/checkout@v2
 
@@ -74,16 +79,12 @@ jobs:
         with:
           registry-type: public
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build IDLs for JS service Docker builds
         if: startsWith(env.CONTAINER_PATH, './packages/')
-        uses: ./.github/actions/build-anchor/
-        with:
-          testing: false
-      - uses: ./.github/actions/setup-ts/
-        if: startsWith(env.CONTAINER_PATH, './packages/')
-      - name: Build idls package
-        if: startsWith(env.CONTAINER_PATH, './packages/')
-        run: pnpm turbo run build --filter=@helium/idls
+        uses: ./.github/actions/build-idls/
 
       - name: Build, tag, and push image to Amazon ECR
         env:
@@ -98,20 +99,27 @@ jobs:
           REGISTRY_ALIAS=$(aws ecr-public describe-registries | jq --raw-output '.registries[0].aliases[0].name')
           # JS services with turbo prune build from repo root
           # Other services (utils/*, geocoder) build from their own directory
+          # GHA layer cache: scope per repository so unrelated services don't evict each other
+          CACHE_SCOPE="docker-${ECR_REPOSITORY}"
           if grep -q "turbo prune" "$CONTAINER_PATH/Dockerfile" 2>/dev/null; then
-            docker build \
+            docker buildx build \
               --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
               --build-arg SENTRY_ORG=$SENTRY_ORG \
               --build-arg SENTRY_PROJECT=$SENTRY_PROJECT \
               --build-arg SENTRY_RELEASE=$ECR_REPOSITORY@$IMAGE_TAG \
+              --cache-from "type=gha,scope=${CACHE_SCOPE}" \
+              --cache-to "type=gha,mode=max,scope=${CACHE_SCOPE}" \
+              --push \
               -f $CONTAINER_PATH/Dockerfile \
               -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG .
           else
-            docker build \
+            docker buildx build \
               --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
               --build-arg SENTRY_ORG=$SENTRY_ORG \
               --build-arg SENTRY_PROJECT=$SENTRY_PROJECT \
               --build-arg SENTRY_RELEASE=$ECR_REPOSITORY@$IMAGE_TAG \
+              --cache-from "type=gha,scope=${CACHE_SCOPE}" \
+              --cache-to "type=gha,mode=max,scope=${CACHE_SCOPE}" \
+              --push \
               -t $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG $CONTAINER_PATH
           fi
-          docker push $ECR_REGISTRY/$REGISTRY_ALIAS/$ECR_REPOSITORY:$IMAGE_TAG

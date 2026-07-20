@@ -57,9 +57,11 @@ export function classifySimulationLogs(
   // Extract Custom error codes (e.g. {"InstructionError":[4,{"Custom":6044}]})
   const customMatch = errorMessage.match(/Custom[":]+(\d+)/);
   if (customMatch) {
+    const programMatch = logsStr.match(/Program (\S+) failed/);
+    const program = programMatch?.[1] ?? "unknown";
     return {
       category: "custom_program_error",
-      detail: `Custom(${customMatch[1]})`,
+      detail: `Custom(${customMatch[1]})(program=${program})`,
     };
   }
 

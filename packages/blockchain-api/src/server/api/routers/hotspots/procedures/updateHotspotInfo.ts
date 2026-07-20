@@ -10,6 +10,7 @@ import {
   initHemLocal,
 } from "@/lib/utils/hotspot-helpers";
 import { detectHotspotNetworks, getHotspotInfo } from "@/lib/queries/hotspots";
+import animalName from "angry-purple-tiger";
 import { latLngToH3 } from "@/lib/location/h3";
 import OnboardingClient from "@helium/onboarding";
 import { getAsset } from "@helium/spl-utils";
@@ -159,18 +160,6 @@ export const updateHotspotInfo =
         });
       }
 
-      // Check wallet has sufficient balance for transaction fees
-      const walletBalance = await connection.getBalance(
-        new PublicKey(walletAddress),
-      );
-      const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
-      if (walletBalance < required) {
-        throw errors.INSUFFICIENT_FUNDS({
-          message: "Insufficient SOL balance for transaction fees",
-          data: { required, available: walletBalance },
-        });
-      }
-
       const hemProgram = await initHemLocal(provider);
       const [keyToAssetK] = keyToAssetKey(HNT_DAO, entityPubKey);
       const keyToAsset = await (hemProgram.account as any).keyToAssetV0.fetch(
@@ -279,14 +268,51 @@ export const updateHotspotInfo =
         return sum + getTransactionFee(vtx);
       }, 0);
 
+      // Check wallet has sufficient balance using actual transaction fees
+      const walletBalance = await connection.getBalance(
+        new PublicKey(walletAddress)
+      );
+      const required = calculateRequiredBalance(totalFee, 0);
+      if (walletBalance < required) {
+        throw errors.INSUFFICIENT_FUNDS({
+          message: "Insufficient SOL balance for transaction fees",
+          data: { required, available: walletBalance },
+        });
+      }
+
       return {
         transactionData: {
           transactions,
           parallel: false,
           tag,
-          actionMetadata: { type: "hotspot_update", hotspotKey: entityPubKey, deviceType: input.deviceType },
+          actionMetadata: {
+            type: "hotspot_update",
+            hotspotKey: entityPubKey,
+            hotspotName: entityKey ? animalName(entityKey) : undefined,
+            deviceType: input.deviceType,
+            ...(location && { location }),
+            ...(h3 && { h3Index: h3.mobile ?? h3.iot }),
+            ...(input.deviceType === "iot" &&
+              input.gain !== undefined && { gain: input.gain }),
+            ...(input.deviceType === "iot" &&
+              input.elevation !== undefined && { elevation: input.elevation }),
+            ...(input.deviceType === "mobile" &&
+              input.deploymentInfo && {
+                deploymentType: input.deploymentInfo.type,
+                ...(input.deploymentInfo.type === "WIFI" && {
+                  antenna: input.deploymentInfo.antenna,
+                  elevation: input.deploymentInfo.elevation,
+                  azimuth: input.deploymentInfo.azimuth,
+                  mechanicalDownTilt: input.deploymentInfo.mechanicalDownTilt,
+                  electricalDownTilt: input.deploymentInfo.electricalDownTilt,
+                }),
+                ...(input.deploymentInfo.type === "CBRS" && {
+                  radioInfos: input.deploymentInfo.radioInfos,
+                }),
+              }),
+          },
         },
-        estimatedSolFee: toTokenAmountOutput(
+        estimatedSolFee: await toTokenAmountOutput(
           new BN(totalFee),
           NATIVE_MINT.toBase58(),
         ),

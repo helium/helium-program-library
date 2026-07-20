@@ -147,7 +147,7 @@ export const close = publicProcedure.governance.closePosition.handler(
         tag,
         actionMetadata: { type: "position_close", positionMint },
       },
-      estimatedSolFee: toTokenAmountOutput(
+      estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
         NATIVE_MINT.toBase58(),
       ),

@@ -11,7 +11,7 @@ import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
 import { lowerFirstChar } from "@helium/spl-utils";
-import { decompress } from "@mongodb-js/zstd";
+import { decompress as fzstdDecompress } from "fzstd";
 import axios from "axios";
 import { parser } from "stream-json";
 import { pick } from "stream-json/filters/Pick";
@@ -348,8 +348,10 @@ export const upsertProgramAccounts = async ({
                       const data =
                         Array.isArray(account.data) &&
                         account.data[1] === "base64+zstd"
-                          ? await decompress(
-                              Buffer.from(account.data[0], "base64")
+                          ? Buffer.from(
+                              fzstdDecompress(
+                                new Uint8Array(Buffer.from(account.data[0], "base64"))
+                              )
                             )
                           : Array.isArray(account.data) &&
                             account.data[1] === "base64"
