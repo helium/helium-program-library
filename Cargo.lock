@@ -905,7 +905,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "hpl-crons"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
