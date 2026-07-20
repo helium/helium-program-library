@@ -41,7 +41,7 @@ pub const MOBILE_SUB_DAO: Pubkey = pubkey!("Gm9xDCJawDEKDrrQW6haw94gABaYzQwCq4ZQ
 /// at a *different* account without also upgrading this constant hard-fails the pin
 /// (`InvalidPriceOracle`) and halts issuance. To rotate the Pyth feed account, upgrade this
 /// constant and update the cron in the same rollout.
-pub const HNT_PYTH_PRICE_FEED: Pubkey = pubkey!("4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33");
+pub const HNT_PYTH_PRICE_FEED: Pubkey = pubkey!("He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5");
 
 /// Mobile data bucket fraction (HIP 149 Decision 3), as a percentage. Hardcoded.
 pub const MOBILE_DATA_BUCKET_PERCENT: u128 = 70;

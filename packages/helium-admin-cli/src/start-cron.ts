@@ -16,7 +16,11 @@ import {
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { init as initHplCrons, epochTrackerKey, taskReturnAccountKey } from "@helium/hpl-crons-sdk";
+import {
+  init as initHplCrons,
+  epochTrackerKey,
+  taskReturnAccountKey,
+} from "@helium/hpl-crons-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -98,7 +102,9 @@ export async function run(args: any = process.argv) {
         .instruction()
     );
   }
-  const epochTrackerAcc = await program.account.epochTrackerV0.fetch(epochTracker);
+  const epochTrackerAcc = await program.account.epochTrackerV0.fetch(
+    epochTracker
+  );
   const { transaction, remainingAccounts } = compileTransaction(
     [
       await program.methods
@@ -111,10 +117,12 @@ export async function run(args: any = process.argv) {
           dao,
           iotSubDao,
           mobileSubDao,
-          // HIP 149 backstop: the maintained on-chain HNT/USD Pyth push account (the
-          // same feed the price oracle pulls from Hermes). The cron forwards it into
-          // each calculate_utility_score_v0; a stale/missing price degrades to a
-          // dormant backstop epoch on-chain, never a halt.
+          // HIP 149 backstop: the maintained on-chain HNT/USD Pyth push account.
+          // The cron forwards it into each calculate_utility_score_v0, which pins
+          // it to the program's HNT_PYTH_PRICE_FEED constant — a mismatched key
+          // hard-fails (InvalidPriceOracle) and halts epoch issuance, so this
+          // constant and the program's must move together. Only stale/missing
+          // price *content* degrades to a dormant backstop epoch.
           hntPriceOracle: HNT_PYTH_PRICE_FEED,
           systemProgram: SystemProgram.programId,
         })
