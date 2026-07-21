@@ -56,7 +56,6 @@ export async function run(args: any = process.argv) {
         newAuthority: argv.newAuthority
           ? new PublicKey(argv.newAuthority)
           : null,
-        hntPriceOracle: null,
       })
       .accountsPartial({
         dataCredits,
