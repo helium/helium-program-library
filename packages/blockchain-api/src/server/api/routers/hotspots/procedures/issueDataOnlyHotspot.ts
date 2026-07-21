@@ -160,7 +160,7 @@ export const issueDataOnlyHotspot =
         });
       }
 
-      const totalFee = getTransactionFee(eccSignedTx);
+      const totalFee = await getTransactionFee(connection, eccSignedTx);
       const walletBalance = await connection.getBalance(owner);
       const required = calculateRequiredBalance(totalFee, 0);
       if (walletBalance < required) {

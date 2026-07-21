@@ -62,7 +62,7 @@ export async function buildSquadsTransaction({
     draft: { instructions, feePayer: member, addressLookupTableAddresses },
   });
 
-  const required = getTransactionFee(tx);
+  const required = await getTransactionFee(connection, tx);
   const available = await connection.getBalance(member);
   if (available < required) {
     throw insufficientFunds({ required, available });

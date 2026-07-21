@@ -143,7 +143,7 @@ export const onboardDataOnlyHotspot =
         },
       });
 
-      const totalFee = getTransactionFee(tx);
+      const totalFee = await getTransactionFee(connection, tx);
       const walletBalance = await connection.getBalance(owner);
       const required = calculateRequiredBalance(totalFee, 0);
       if (walletBalance < required) {

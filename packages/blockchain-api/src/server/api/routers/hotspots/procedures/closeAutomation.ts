@@ -1,11 +1,6 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import * as anchor from "@coral-xyz/anchor";
-import {
-  cronJobKey,
-  cronJobNameMappingKey,
-  cronJobTransactionKey,
-  init as initCron,
-} from "@helium/cron-sdk";
+import { cronJobKey, init as initCron } from "@helium/cron-sdk";
 import {
   entityCronAuthorityKey,
   init as initHplCrons,
@@ -16,7 +11,8 @@ import {
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
 } from "@helium/spl-utils";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
+import { buildTeardownInstructions } from "./automation-data-helpers";
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
@@ -80,37 +76,15 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       });
     }
 
-    // Build instructions to remove all entities and close cron job
-    const maxTxId = cronJobAccount.nextTransactionId || 0;
-    const txIds = Array.from({ length: maxTxId }, (_, i) => i);
-
-    const instructions: TransactionInstruction[] = [
-      ...(await Promise.all(
-        txIds.map((txId) =>
-          hplCronsProgram.methods
-            .removeEntityFromCronV0({
-              index: txId,
-            })
-            .accounts({
-              cronJob,
-              rentRefund: wallet,
-              cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
-            })
-            .instruction()
-        )
-      )),
-      await hplCronsProgram.methods
-        .closeEntityClaimCronV0()
-        .accounts({
-          cronJob,
-          rentRefund: wallet,
-          cronJobNameMapping: cronJobNameMappingKey(
-            authority,
-            "entity_claim"
-          )[0],
-        })
-        .instruction(),
-    ];
+    // Remove all entities and close the cron job.
+    const instructions = await buildTeardownInstructions(
+      provider.connection,
+      hplCronsProgram,
+      cronJob,
+      authority,
+      wallet,
+      cronJobAccount.nextTransactionId || 0
+    );
 
     // Build and serialize transactions
     const vtxs = (

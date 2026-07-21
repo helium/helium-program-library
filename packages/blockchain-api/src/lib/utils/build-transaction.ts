@@ -177,7 +177,7 @@ export async function buildSingleTransactionResponse({
   });
 
   const required = calculateRequiredBalance(
-    getTransactionFee(tx),
+    await getTransactionFee(connection, tx),
     rentLamports
   );
   const available = await connection.getBalance(feePayer);
