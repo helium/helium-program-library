@@ -56,6 +56,13 @@ jobs:
             echo "Found @helium/idls changeset."
             exit 0
           fi
+          # Release PRs (develop -> master) carry the consumed changeset: the
+          # .changeset/*.md was deleted by Version Packages, but the version
+          # bump it produced is in the diff, which proves the flow ran.
+          if git diff "$BASE"...HEAD -- packages/idls/package.json | grep -q '^+.*"version"'; then
+            echo "@helium/idls version already bumped in this PR (changeset consumed)."
+            exit 0
+          fi
           echo "This PR changes program sources but adds no changeset for @helium/idls."
           echo "Program changes alter the generated IDL types that @helium/idls publishes,"
           echo "but changesets can't detect that because target/types is gitignored."
