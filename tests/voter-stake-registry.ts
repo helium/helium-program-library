@@ -854,9 +854,11 @@ describe("voter-stake-registry", () => {
           error = e;
         }
         expect(error, "Expected vote to fail").to.exist;
-        // The error surfaces as an AnchorError or a raw InstructionError
-        // depending on whether it arrives via simulation or websocket
-        const code = error.code ?? error.InstructionError?.[1]?.Custom;
+        // The error surfaces as an AnchorError, a raw InstructionError, or a
+        // confirmation result ({ err, slot, confirmations }) depending on
+        // whether it arrives via simulation or websocket
+        const code =
+          error.code ?? (error.err ?? error).InstructionError?.[1]?.Custom;
         expect(code).to.eq(6044);
       });
 
