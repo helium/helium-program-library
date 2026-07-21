@@ -40,17 +40,73 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Require an @helium/idls changeset when program sources change
-        # @helium/idls has no src/ of its own -- it compiles the generated
-        # target/types, which is gitignored. Changesets tooling only diffs
-        # packages/, so program interface changes never trigger an idls bump
-        # on their own and the published package silently goes stale.
+      - name: Detect changed programs
+        id: changed
         run: |
           BASE=${{ github.event.pull_request.base.sha }}
-          if ! git diff --name-only "$BASE"...HEAD | grep -qE '^programs/[^/]+/src/'; then
+          DIRS=$(git diff --name-only "$BASE"...HEAD | grep -E '^programs/[^/]+/src/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+          echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
+          if [ -z "$DIRS" ]; then
             echo "No program source changes; skipping."
+          else
+            echo "Changed programs: $DIRS"
+          fi
+      - uses: ./.github/actions/setup-anchor/
+        if: steps.changed.outputs.dirs != ''
+      - uses: actions/cache@v4
+        if: steps.changed.outputs.dirs != ''
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      - name: Require an @helium/idls changeset when the generated IDL changes
+        if: steps.changed.outputs.dirs != ''
+        # @helium/idls has no src/ of its own -- it compiles the generated
+        # target/types, which is gitignored. Changesets tooling only diffs
+        # packages/, so IDL changes never trigger an idls bump on their own
+        # and the published package silently goes stale. Internal-only logic
+        # changes don't alter the IDL, so build the IDL at base and head
+        # (anchor idl build parses the source; no BPF build) and require a
+        # changeset only when the generated IDL actually differs.
+        run: |
+          set -e
+          BASE=${{ github.event.pull_request.base.sha }}
+          DIRS="${{ steps.changed.outputs.dirs }}"
+          mkdir -p /tmp/idl-head /tmp/idl-base
+          for dir in $DIRS; do
+            name=$(echo "$dir" | tr '-' '_')
+            ~/.cargo/bin/anchor idl build -p "$name" > "/tmp/idl-head/$name.json"
+          done
+          git checkout --detach "$BASE"
+          DIFFERING=""
+          for dir in $DIRS; do
+            name=$(echo "$dir" | tr '-' '_')
+            if [ ! -d "programs/$dir" ]; then
+              DIFFERING="$DIFFERING $name(new-program)"
+              continue
+            fi
+            if ! ~/.cargo/bin/anchor idl build -p "$name" > "/tmp/idl-base/$name.json"; then
+              DIFFERING="$DIFFERING $name(base-idl-build-failed)"
+              continue
+            fi
+            # metadata.version tracks the crate version, not the interface --
+            # a version bump alone shouldn't demand an idls republish.
+            if ! diff <(jq -S 'del(.metadata.version)' "/tmp/idl-base/$name.json") \
+                      <(jq -S 'del(.metadata.version)' "/tmp/idl-head/$name.json") > "/tmp/$name.idl.diff"; then
+              DIFFERING="$DIFFERING $name"
+              echo "=== IDL diff for $name ==="
+              cat "/tmp/$name.idl.diff"
+            fi
+          done
+          git checkout -
+          if [ -z "$DIFFERING" ]; then
+            echo "Program sources changed but generated IDLs are identical; no @helium/idls bump needed."
             exit 0
           fi
+          echo "IDL changed for:$DIFFERING"
           ADDED=$(git diff --name-only --diff-filter=A "$BASE"...HEAD -- '.changeset/*.md')
           if [ -n "$ADDED" ] && grep -l '@helium/idls' $ADDED > /dev/null 2>&1; then
             echo "Found @helium/idls changeset."
@@ -63,9 +119,8 @@ jobs:
             echo "@helium/idls version already bumped in this PR (changeset consumed)."
             exit 0
           fi
-          echo "This PR changes program sources but adds no changeset for @helium/idls."
-          echo "Program changes alter the generated IDL types that @helium/idls publishes,"
-          echo "but changesets can't detect that because target/types is gitignored."
+          echo "This PR changes the generated IDL for:$DIFFERING -- but adds no"
+          echo "changeset for @helium/idls, which publishes those generated types."
           echo "Run: npx changeset -- and include \"@helium/idls\" (patch is usually right)."
           exit 1
 
