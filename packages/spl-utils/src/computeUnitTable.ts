@@ -30,6 +30,10 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:d973e6aa442fafc7": 52423,
   // dc_auto_top.initialize_auto_top_off_v0 (n=4, med=149418, max=152410) [localnet]
   "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:1b878c374c515333": 152410,
+  // hpl_crons.queue_end_epoch (n=1, med=380865, max=380865) [localnet]
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:3f865a9ff98338b5": 380865,
+  // hpl_crons.init_epoch_tracker (n=1, med=8607, max=8607) [localnet]
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:2c2149f2ca9ca298": 8607,
   // tuktuk_dca.close_dca_v0 (n=1, med=69738, max=69738) [localnet]
   "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:34871f9c70464b03": 69738,
   // tuktuk_dca.lend_v0 (n=4, med=17431, max=17431) [localnet]

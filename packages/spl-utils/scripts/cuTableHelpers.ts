@@ -28,6 +28,7 @@ export const PROGRAMS: Record<string, string> = {
   porcSnvH9pvcYPmQ65Y8qcZSRxQBiBBQX7UV5nmBegy: "price_oracle",
   we1cGnTxTkDP9Sk49dw1d3T7ik7V2NfnY4qDGCDHXfC: "welcome_pack",
   topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU: "dc_auto_top",
+  hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu: "hpl_crons",
   tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN: "tuktuk_dca",
 };
 
