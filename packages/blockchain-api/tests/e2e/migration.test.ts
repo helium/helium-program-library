@@ -286,9 +286,13 @@ describe("migration", () => {
   it("ignores a client-supplied amount (even 0) and migrates the full SPL balance", async () => {
     const fullRaw = 4_000_000; // 4 USDC (6 decimals)
     const usdcMint = new PublicKey(TOKEN_MINTS.USDC);
-    // Fresh destination — see "migrates SPL token (USDC)" above.
+    // Fresh source AND destination: the payer's USDC ATA exists on mainnet, so
+    // after the close instruction lands the surfpool fork resurrects it from
+    // mainnet state on the next read, which breaks the closed-ATA assertion
+    // below. A generated keypair has no mainnet ATA, so closed stays closed.
+    const fullBalanceSource = Keypair.generate();
     const fullBalanceDestination = Keypair.generate();
-    await ensureTokenBalance(payer.publicKey, usdcMint, 4);
+    await ensureTokenBalance(fullBalanceSource.publicKey, usdcMint, 4);
 
     const destAta = getAssociatedTokenAddressSync(
       usdcMint,
@@ -305,7 +309,7 @@ describe("migration", () => {
     // Request 0 — the SPL amount is advisory, so the server must ignore it and
     // move the full on-chain balance rather than skipping the token.
     const result = await client.migration.migrate({
-      sourceWallet: payer.publicKey.toBase58(),
+      sourceWallet: fullBalanceSource.publicKey.toBase58(),
       destinationWallet: fullBalanceDestination.publicKey.toBase58(),
       hotspots: [],
       tokens: [{ mint: TOKEN_MINTS.USDC, amount: "0" }],
@@ -314,7 +318,7 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer
+      fullBalanceSource
     );
 
     const afterDest = (await getAccount(connection, destAta)).amount;
@@ -323,7 +327,7 @@ describe("migration", () => {
     // Source ATA is unconditionally closed (rent refunded to fee payer).
     const sourceAta = getAssociatedTokenAddressSync(
       usdcMint,
-      payer.publicKey,
+      fullBalanceSource.publicKey,
       true
     );
     let sourceClosed = false;
