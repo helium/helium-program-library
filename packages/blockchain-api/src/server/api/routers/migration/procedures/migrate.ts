@@ -36,6 +36,8 @@ import {
 } from "@helium/helium-sub-daos-sdk";
 import { init as initProxy, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
+  fetchRegistrarsByKey,
+  getMultipleAccountsChunked,
   getPositionsForOwner,
   type OwnedPosition,
 } from "@/server/api/routers/governance/procedures/helpers";
@@ -71,6 +73,7 @@ import {
   getAssociatedTokenAddressSync,
   getMint,
   getAccount,
+  unpackAccount,
   NATIVE_MINT,
 } from "@solana/spl-token";
 import BN from "bn.js";
@@ -309,19 +312,34 @@ export const migrate = publicProcedure.migration.migrate.handler(
       vsrProgram,
       owner: sourcePubkey,
     });
+    const sourceAtas = ownedPositions.map(({ mint }) =>
+      getAssociatedTokenAddressSync(mint, sourcePubkey, true)
+    );
+    // Enumeration can lag on-chain state (stale RPC index); confirm each source
+    // ATA still holds the position NFT before building instructions, otherwise
+    // TransferPositionV0 fails the whole batch with 3012. Batched into one
+    // fetch rather than a serial round trip per position.
+    const sourceAtaInfos = await getMultipleAccountsChunked(
+      connection,
+      sourceAtas
+    );
     const migratingPositions: OwnedPosition[] = [];
-    for (const { mint, position } of ownedPositions) {
-      const sourceAta = getAssociatedTokenAddressSync(mint, sourcePubkey, true);
-      // Enumeration can lag on-chain state (stale RPC index); confirm the
-      // source ATA still holds the position NFT before building instructions,
-      // otherwise TransferPositionV0 fails the whole batch with 3012.
-      const sourceAtaInfo = await getAccount(connection, sourceAta).catch(
-        () => null
-      );
+    for (let i = 0; i < ownedPositions.length; i++) {
+      const owned = ownedPositions[i];
+      const { mint, position } = owned;
+      const sourceAta = sourceAtas[i];
+      const info = sourceAtaInfos[i];
+      let sourceAtaInfo = null;
+      try {
+        sourceAtaInfo = info ? unpackAccount(sourceAta, info) : null;
+      } catch {
+        // Malformed/foreign account at the ATA address — skip, matching the
+        // previous getAccount(...).catch(() => null) behavior.
+      }
       if (!sourceAtaInfo || sourceAtaInfo.amount !== BigInt(1)) {
         continue;
       }
-      migratingPositions.push({ mint, position });
+      migratingPositions.push(owned);
       positionTransferGroups.push([
         await vsrProgram.methods
           .transferPositionV0()
@@ -344,10 +362,6 @@ export const migrate = publicProcedure.migration.migrate.handler(
     // delegation reward automation set up from the old wallet stops working.
     // Neither blocks the transfer, so surface warnings instead.
     if (migratingPositions.length > 0) {
-      const positionAccs = await vsrProgram.account.positionV0.fetchMultiple(
-        migratingPositions.map((p) => p.position)
-      );
-
       const hsdProgram = await initHsd(provider);
       const delegatedAccs =
         await hsdProgram.account.delegatedPositionV0.fetchMultiple(
@@ -362,25 +376,16 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
       // Registrars are shared across positions — fetch each unique one once to
       // resolve its proxy config.
-      const registrarKeys = Array.from(
-        new Set(
-          positionAccs
-            .filter((acc) => acc !== null)
-            .map((acc) => acc!.registrar.toBase58())
-        )
-      );
-      const registrars = await vsrProgram.account.registrar.fetchMultiple(
-        registrarKeys.map((k) => new PublicKey(k))
-      );
-      const proxyConfigByRegistrar = new Map(
-        registrarKeys.map((k, i) => [k, registrars[i]?.proxyConfig])
+      const registrarByKey = await fetchRegistrarsByKey(
+        vsrProgram,
+        migratingPositions
       );
 
       const assignmentKeys = migratingPositions
-        .map(({ mint }, i) => {
-          const acc = positionAccs[i];
-          const proxyConfig =
-            acc && proxyConfigByRegistrar.get(acc.registrar.toBase58());
+        .map(({ mint, account: acc }) => {
+          const proxyConfig = registrarByKey.get(
+            acc.registrar.toBase58()
+          )?.proxyConfig;
           return proxyConfig
             ? proxyAssignmentKey(proxyConfig, mint, PublicKey.default)[0]
             : null;

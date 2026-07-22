@@ -10,7 +10,7 @@ import {
   parseRateLimit,
 } from "@/lib/utils/rate-limit";
 import { getLockupKind } from "../helpers/constants";
-import { getPositionsForOwner } from "../helpers";
+import { fetchRegistrarsByKey, getPositionsForOwner } from "../helpers";
 
 // Courtesy throttle (per-process, XFF-keyed) on a public endpoint whose cost
 // is server-side RPC fan-out.
@@ -38,30 +38,11 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
     });
     if (owned.length === 0) return [];
 
-    const positionAccs = await vsrProgram.account.positionV0.fetchMultiple(
-      owned.map((p) => p.position)
-    );
-
     // Registrars are shared across positions — fetch each unique one once.
-    const registrarKeys = Array.from(
-      new Set(
-        positionAccs
-          .filter((acc) => acc !== null)
-          .map((acc) => acc!.registrar.toBase58())
-      )
-    );
-    const registrars = await vsrProgram.account.registrar.fetchMultiple(
-      registrarKeys.map((k) => new PublicKey(k))
-    );
-    const registrarByKey = new Map(
-      registrarKeys.map((k, i) => [k, registrars[i]])
-    );
+    const registrarByKey = await fetchRegistrarsByKey(vsrProgram, owned);
 
     const positions = await Promise.all(
-      owned.map(async ({ mint, position }, i) => {
-        const acc = positionAccs[i];
-        if (!acc) return null;
-
+      owned.map(async ({ mint, position, account: acc }) => {
         const registrar = registrarByKey.get(acc.registrar.toBase58());
         if (!registrar) return null;
 

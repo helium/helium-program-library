@@ -1,9 +1,9 @@
 export interface RateLimiterOptions {
   windowMs: number;
   /** Max hits allowed per key within the window. A value <= 0 disables the
-   * check (all requests pass). May be a function so the limit can be read from
-   * env per call rather than frozen at construction. */
-  max: number | (() => number);
+   * check (all requests pass). A thunk so the limit can be read from env per
+   * call rather than frozen at construction. */
+  max: () => number;
   maxKeys?: number;
   now?: () => number;
 }
@@ -26,7 +26,7 @@ export function createRateLimiter({
   const hits = new Map<string, number[]>();
 
   return function check(key: string): boolean {
-    const limit = typeof max === "function" ? max() : max;
+    const limit = max();
     if (limit <= 0) return true;
 
     const current = now();
