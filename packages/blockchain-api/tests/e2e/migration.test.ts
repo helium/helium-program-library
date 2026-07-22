@@ -234,6 +234,11 @@ describe("migration", () => {
   });
 
   it("migrates SPL token (USDC) to destination", async () => {
+    // Fresh destination: reusing the shared `destination` after an earlier test
+    // migrated the payer's positions there leaves frozen position ATAs that a
+    // rebuilt transferPositionV0 would trip over (the surfpool fork resurrects
+    // the closed source ATAs from mainnet state on subsequent reads).
+    const usdcDestination = Keypair.generate();
     const mintKey = new PublicKey(TOKEN_MINTS.USDC);
     const sourceAta = getAssociatedTokenAddressSync(
       mintKey,
@@ -245,7 +250,7 @@ describe("migration", () => {
 
     const destAta = getAssociatedTokenAddressSync(
       mintKey,
-      destination.publicKey,
+      usdcDestination.publicKey,
       true
     );
     let beforeDest = BigInt(0);
@@ -257,7 +262,7 @@ describe("migration", () => {
 
     const result = await client.migration.migrate({
       sourceWallet: payer.publicKey.toBase58(),
-      destinationWallet: destination.publicKey.toBase58(),
+      destinationWallet: usdcDestination.publicKey.toBase58(),
       hotspots: [],
       tokens: [{ mint: TOKEN_MINTS.USDC, amount: String(sourceBalance) }],
     });
@@ -281,11 +286,13 @@ describe("migration", () => {
   it("ignores a client-supplied amount (even 0) and migrates the full SPL balance", async () => {
     const fullRaw = 4_000_000; // 4 USDC (6 decimals)
     const usdcMint = new PublicKey(TOKEN_MINTS.USDC);
+    // Fresh destination — see "migrates SPL token (USDC)" above.
+    const fullBalanceDestination = Keypair.generate();
     await ensureTokenBalance(payer.publicKey, usdcMint, 4);
 
     const destAta = getAssociatedTokenAddressSync(
       usdcMint,
-      destination.publicKey,
+      fullBalanceDestination.publicKey,
       true
     );
     let beforeDest = BigInt(0);
@@ -299,7 +306,7 @@ describe("migration", () => {
     // move the full on-chain balance rather than skipping the token.
     const result = await client.migration.migrate({
       sourceWallet: payer.publicKey.toBase58(),
-      destinationWallet: destination.publicKey.toBase58(),
+      destinationWallet: fullBalanceDestination.publicKey.toBase58(),
       hotspots: [],
       tokens: [{ mint: TOKEN_MINTS.USDC, amount: "0" }],
     });
@@ -843,6 +850,8 @@ describe("migration", () => {
 
   // IMPORTANT: This test must run LAST as it modifies Merkle tree state
   it("migrates hotspot with split to destination", async () => {
+    // Fresh destination — see "migrates SPL token (USDC)" above.
+    const splitDestination = Keypair.generate();
     // Ensure clean state
     await ensureNoContract(ctx, TEST_HOTSPOT_ENTITY_KEY);
 
@@ -882,7 +891,7 @@ describe("migration", () => {
     // Now migrate the hotspot — procedure should detect the mini fanout on chain
     const result = await client.migration.migrate({
       sourceWallet: payer.publicKey.toBase58(),
-      destinationWallet: destination.publicKey.toBase58(),
+      destinationWallet: splitDestination.publicKey.toBase58(),
       hotspots: [TEST_HOTSPOT_ENTITY_KEY],
       tokens: [],
     });

@@ -315,14 +315,22 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const sourceAtas = ownedPositions.map(({ mint }) =>
       getAssociatedTokenAddressSync(mint, sourcePubkey, true)
     );
+    const destTokenAtas = ownedPositions.map(({ mint }) =>
+      getAssociatedTokenAddressSync(mint, destPubkey, true)
+    );
     // Enumeration can lag on-chain state (stale RPC index); confirm each source
     // ATA still holds the position NFT before building instructions, otherwise
-    // TransferPositionV0 fails the whole batch with 3012. Batched into one
-    // fetch rather than a serial round trip per position.
-    const sourceAtaInfos = await getMultipleAccountsChunked(
-      connection,
-      sourceAtas
-    );
+    // TransferPositionV0 fails the whole batch with 3012. The destination ATA
+    // is fetched too: a stale read can still show the NFT at the source after
+    // a prior migration, and rebuilding the transfer would fail on the frozen
+    // destination ATA. Batched into one fetch rather than a serial round trip
+    // per position.
+    const ataInfos = await getMultipleAccountsChunked(connection, [
+      ...sourceAtas,
+      ...destTokenAtas,
+    ]);
+    const sourceAtaInfos = ataInfos.slice(0, sourceAtas.length);
+    const destAtaInfos = ataInfos.slice(sourceAtas.length);
     const migratingPositions: OwnedPosition[] = [];
     for (let i = 0; i < ownedPositions.length; i++) {
       const owned = ownedPositions[i];
@@ -337,6 +345,21 @@ export const migrate = publicProcedure.migration.migrate.handler(
         // previous getAccount(...).catch(() => null) behavior.
       }
       if (!sourceAtaInfo || sourceAtaInfo.amount !== BigInt(1)) {
+        continue;
+      }
+      // A frozen destination ATA holding the NFT proves the position already
+      // arrived (only transferPositionV0 freezes it); the source read above
+      // was stale. Skip instead of building a transfer that would fail.
+      let destAtaInfo = null;
+      try {
+        const destInfo = destAtaInfos[i];
+        destAtaInfo = destInfo
+          ? unpackAccount(destTokenAtas[i], destInfo)
+          : null;
+      } catch {
+        // Malformed/foreign account at the ATA address — treat as absent.
+      }
+      if (destAtaInfo?.isFrozen && destAtaInfo.amount === BigInt(1)) {
         continue;
       }
       migratingPositions.push(owned);
