@@ -1,7 +1,7 @@
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import { chunks } from "@helium/spl-utils";
 import { TOKEN_PROGRAM_ID, unpackMint } from "@solana/spl-token";
-import { AccountInfo, Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 
 type VsrProgram = Awaited<ReturnType<typeof initVsr>>;
 type PositionV0 = Awaited<
@@ -16,20 +16,6 @@ export interface OwnedPosition {
   position: PublicKey;
   account: PositionV0;
 }
-
-// getMultipleAccounts is capped at 100 keys per RPC call.
-const MULTIPLE_ACCOUNTS_CHUNK = 100;
-
-export const getMultipleAccountsChunked = async (
-  connection: Connection,
-  keys: PublicKey[]
-): Promise<(AccountInfo<Buffer> | null)[]> => {
-  const infos: (AccountInfo<Buffer> | null)[] = [];
-  for (const c of chunks(keys, MULTIPLE_ACCOUNTS_CHUNK)) {
-    infos.push(...(await connection.getMultipleAccountsInfo(c)));
-  }
-  return infos;
-};
 
 /**
  * Dedupe the registrars referenced by a set of positions and fetch each once,
@@ -74,10 +60,14 @@ export const getPositionsForOwner = async ({
     .map(({ account }) => new PublicKey(account.data.parsed.info.mint));
   if (candidateMints.length === 0) return [];
 
-  const mintInfos = await getMultipleAccountsChunked(
-    connection,
-    candidateMints
-  );
+  // getMultipleAccounts is capped at 100 keys per RPC call.
+  const mintInfos = (
+    await Promise.all(
+      chunks(candidateMints, 100).map((c) =>
+        connection.getMultipleAccountsInfo(c)
+      )
+    )
+  ).flat();
   // The on-chain invariant (transfer_position_v0's mint constraint) is
   // mint::freeze_authority = position PDA. Requiring the exact PDA — not just
   // any VSR-owned freeze authority — keeps permissionlessly dusted fake
@@ -95,10 +85,14 @@ export const getPositionsForOwner = async ({
   });
   if (candidates.length === 0) return [];
 
-  const positionInfos = await getMultipleAccountsChunked(
-    connection,
-    candidates.map((c) => c.position)
-  );
+  const positionInfos = (
+    await Promise.all(
+      chunks(
+        candidates.map((c) => c.position),
+        100
+      ).map((c) => connection.getMultipleAccountsInfo(c))
+    )
+  ).flat();
 
   // Existence of a VSR-owned account at the position PDA proves PositionV0 is
   // initialized, so downstream transferPositionV0 builds can't hit 3012. Decode

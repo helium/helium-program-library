@@ -43,7 +43,7 @@ export function loadKeypair2FromEnv(): Keypair {
 export async function ensureFunds(
   pubkey: PublicKey,
   minLamports: number,
-  rpcUrl = getSurfpoolRpcUrl()
+  rpcUrl = getSurfpoolRpcUrl(),
 ): Promise<void> {
   const connection = new Connection(rpcUrl, "confirmed");
   const current = await connection.getBalance(pubkey);
@@ -55,7 +55,7 @@ export async function ensureFunds(
     const sig = await connection.requestAirdrop(pubkey, Math.ceil(needed));
     await connection.confirmTransaction(
       { signature: sig, blockhash, lastValidBlockHeight },
-      "confirmed"
+      "confirmed",
     );
     return;
   } catch {}
@@ -73,11 +73,40 @@ export async function ensureFunds(
   } catch {}
 }
 
+/** Raw surfpool token-account write. `state: "frozen"` mimics DC tokens
+ * (kept frozen by the data credits program). Throws on RPC error. */
+export async function setTokenAccount(
+  owner: PublicKey,
+  mint: PublicKey,
+  fields: { amount: number; state?: "frozen" },
+  rpcUrl = getSurfpoolRpcUrl(),
+): Promise<void> {
+  const res = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "surfnet_setTokenAccount",
+      params: [
+        owner.toBase58(),
+        mint.toBase58(),
+        fields,
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      ],
+    }),
+  });
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(`setTokenAccount failed: ${JSON.stringify(json.error)}`);
+  }
+}
+
 export async function ensureTokenBalance(
   owner: PublicKey,
   mint: PublicKey,
   amount: number,
-  rpcUrl = getSurfpoolRpcUrl()
+  rpcUrl = getSurfpoolRpcUrl(),
 ): Promise<PublicKey> {
   const connection = new Connection(rpcUrl, "confirmed");
   const ata = getAssociatedTokenAddressSync(mint, owner, true);
@@ -88,33 +117,13 @@ export async function ensureTokenBalance(
     const rawAmount = Math.ceil(amount * Math.pow(10, decimals));
 
     console.log(
-      `Setting ${amount} tokens (${rawAmount} raw with ${decimals} decimals)`
+      `Setting ${amount} tokens (${rawAmount} raw with ${decimals} decimals)`,
     );
 
-    const response = await fetch(rpcUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "surfnet_setTokenAccount",
-        params: [
-          owner.toBase58(),
-          mint.toBase58(),
-          { amount: rawAmount },
-          "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-        ],
-      }),
-    });
-
-    const result = await response.json();
-    if (result.error) {
-      console.error("surfnet_setTokenAccount error:", result.error);
-    } else {
-      console.log(
-        `Set token balance for ${owner.toBase58()} (${ata.toBase58()}) to ${amount} tokens`
-      );
-    }
+    await setTokenAccount(owner, mint, { amount: rawAmount }, rpcUrl);
+    console.log(
+      `Set token balance for ${owner.toBase58()} (${ata.toBase58()}) to ${amount} tokens`,
+    );
   } catch (e) {
     console.warn("Failed to set token balance:", e);
   }

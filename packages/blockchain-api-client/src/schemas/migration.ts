@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
   TransactionDataSchema,
+  TokenAmountInputSchema,
   TokenAmountOutputSchema,
+  HeliumPublicKeySchema,
   WalletAddressSchema,
   TransactionMetadataSchema,
 } from "./common";
@@ -10,15 +12,12 @@ import { HotspotSchema } from "./hotspots";
 export const MigrateInputSchema = z.object({
   sourceWallet: WalletAddressSchema,
   destinationWallet: WalletAddressSchema,
-  hotspots: z.array(z.string()).default([]),
-  tokens: z
-    .array(
-      z.object({
-        mint: z.string(),
-        amount: z.string(),
-      })
-    )
-    .default([]),
+  // Hotspots are Helium entity keys (ECC-compact base58, can exceed 44 chars),
+  // not Solana pubkeys — the handler resolves them via getAssetIdFromPubkey.
+  hotspots: z.array(HeliumPublicKeySchema).default([]),
+  // Malformed mints/amounts must fail validation as BAD_REQUEST — the handler
+  // feeds them straight into new PublicKey()/BigInt(), which would 500.
+  tokens: z.array(TokenAmountInputSchema).default([]),
 });
 
 export const MigrateTransactionItemSchema = z.object({
@@ -45,7 +44,7 @@ export const MigrateOutputSchema = z.object({
       "True if more work remains — submit these transactions, then call again with nextParams."
     ),
   nextParams: MigrateInputSchema.optional().describe(
-    "Input for the next call. Present when hasMore is true — pass directly to the next migrate call."
+    "Input for the next call. Present when hasMore is true — submit this batch and wait for confirmation first, then pass directly to the next migrate call (positions are re-enumerated on-chain, so calling early re-issues transfers for in-flight positions)."
   ),
 });
 

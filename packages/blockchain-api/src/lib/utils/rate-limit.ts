@@ -13,17 +13,26 @@ export interface RateLimiterOptions {
  * records the hit and returns false once a key exceeds `max` hits within
  * `windowMs`, true otherwise.
  *
- * State lives in a Map pruned on access; it is capped at `maxKeys` (oldest
- * inserted evicted first) so a flood of distinct keys can't grow it without
- * bound. This is best-effort per-process protection, not a distributed limiter.
+ * State lives in a Map pruned on access; it is capped at `maxKeys` (least
+ * recently used evicted first) so a flood of distinct keys can't grow it
+ * without bound. LRU rather than FIFO eviction matters: with FIFO, a throttled
+ * client could flood unique keys to evict its own hot key and reset its count.
+ * This is best-effort per-process protection, not a distributed limiter.
  */
-export function createRateLimiter({
+export const createRateLimiter = ({
   windowMs,
   max,
   maxKeys = 10_000,
   now = Date.now,
-}: RateLimiterOptions) {
+}: RateLimiterOptions) => {
   const hits = new Map<string, number[]>();
+
+  // Delete-then-set moves the key to the back of the Map's insertion order,
+  // so eviction below removes the least recently used key.
+  const touch = (key: string, timestamps: number[]) => {
+    hits.delete(key);
+    hits.set(key, timestamps);
+  };
 
   return function check(key: string): boolean {
     const limit = max();
@@ -34,12 +43,12 @@ export function createRateLimiter({
     const timestamps = (hits.get(key) || []).filter((t) => t > cutoff);
 
     if (timestamps.length >= limit) {
-      hits.set(key, timestamps);
+      touch(key, timestamps);
       return false;
     }
 
     timestamps.push(current);
-    hits.set(key, timestamps);
+    touch(key, timestamps);
 
     if (hits.size > maxKeys) {
       const oldest = hits.keys().next().value;
@@ -48,19 +57,19 @@ export function createRateLimiter({
 
     return true;
   };
-}
+};
 
 /** Parses a rate limit from an env value at check time (not module load) so
  * ops and tests can adjust it without reimporting; falls back on missing or
  * unparseable values. A value of 0 disables the check. */
-export function parseRateLimit(
+export const parseRateLimit = (
   value: string | undefined,
-  fallback: number
-): number {
+  fallback: number,
+): number => {
   if (value === undefined || value === "") return fallback;
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
-}
+};
 
 /**
  * Best-effort client IP for rate-limit keying: the right-most x-forwarded-for
@@ -69,10 +78,10 @@ export function parseRateLimit(
  * as trustworthy as the ingress's XFF handling — treat limiters keyed on it as
  * a courtesy throttle, not a security boundary.
  */
-export function getClientIp(headerStore: {
+export const getClientIp = (headerStore: {
   get(name: string): string | null;
-}): string {
+}): string => {
   return (
     headerStore.get("x-forwarded-for")?.split(",").at(-1)?.trim() || "unknown"
   );
-}
+};

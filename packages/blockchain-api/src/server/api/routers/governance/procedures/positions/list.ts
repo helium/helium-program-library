@@ -44,10 +44,13 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
     const positions = await Promise.all(
       owned.map(async ({ mint, position, account: acc }) => {
         const registrar = registrarByKey.get(acc.registrar.toBase58());
-        if (!registrar) return null;
+        // An out-of-range votingMintConfigIdx (corrupt/nonstandard registrar
+        // data) must drop the position, not 500 the whole response.
+        const votingMintConfig =
+          registrar?.votingMints[acc.votingMintConfigIdx];
+        if (!votingMintConfig) return null;
 
-        const votingMint =
-          registrar.votingMints[acc.votingMintConfigIdx].mint.toBase58();
+        const votingMint = votingMintConfig.mint.toBase58();
 
         return {
           positionMint: mint.toBase58(),
@@ -55,7 +58,7 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
           registrar: acc.registrar.toBase58(),
           amountDeposited: await toTokenAmountOutput(
             acc.amountDepositedNative,
-            votingMint
+            votingMint,
           ),
           numActiveVotes: acc.numActiveVotes,
           lockup: {
@@ -64,9 +67,9 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
             endTs: acc.lockup.endTs.toString(),
           },
         };
-      })
+      }),
     );
 
     return positions.filter((p) => p !== null);
-  }
+  },
 );

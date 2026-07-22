@@ -59,9 +59,6 @@ export const env = createEnv({
       .refine((u) => u.startsWith("https://"), "ECC_VERIFIER_URL must be https")
       .default("https://ecc-verifier.web.helium.io"),
     FEE_PAYER_WALLET_PATH: z.string().optional(),
-    MIGRATION_RATE_LIMIT_PER_PAIR: z.string().optional(),
-    MIGRATION_RATE_LIMIT_PER_IP: z.string().optional(),
-    GET_POSITIONS_RATE_LIMIT_PER_IP: z.string().optional(),
   },
   /**
    * Specify your client-side environment variables schema here. This way you can ensure the app
@@ -111,10 +108,6 @@ export const env = createEnv({
     ONBOARDING_ENDPOINT: process.env.ONBOARDING_ENDPOINT,
     ECC_VERIFIER_URL: process.env.ECC_VERIFIER_URL,
     FEE_PAYER_WALLET_PATH: process.env.FEE_PAYER_WALLET_PATH,
-    MIGRATION_RATE_LIMIT_PER_PAIR: process.env.MIGRATION_RATE_LIMIT_PER_PAIR,
-    MIGRATION_RATE_LIMIT_PER_IP: process.env.MIGRATION_RATE_LIMIT_PER_IP,
-    GET_POSITIONS_RATE_LIMIT_PER_IP:
-      process.env.GET_POSITIONS_RATE_LIMIT_PER_IP,
     NEXT_PUBLIC_WORLD_HELIUM_URL: process.env.NEXT_PUBLIC_WORLD_HELIUM_URL,
   },
   /**

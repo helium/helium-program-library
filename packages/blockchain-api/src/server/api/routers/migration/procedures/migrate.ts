@@ -37,12 +37,12 @@ import {
 import { init as initProxy, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
   fetchRegistrarsByKey,
-  getMultipleAccountsChunked,
   getPositionsForOwner,
   type OwnedPosition,
 } from "@/server/api/routers/governance/procedures/helpers";
 import {
   batchInstructionsToTxsWithPriorityFee,
+  chunks,
   getAsset,
   getAssetProof,
   HELIUM_COMMON_LUT,
@@ -324,11 +324,14 @@ export const migrate = publicProcedure.migration.migrate.handler(
     // is fetched too: a stale read can still show the NFT at the source after
     // a prior migration, and rebuilding the transfer would fail on the frozen
     // destination ATA. Batched into one fetch rather than a serial round trip
-    // per position.
-    const ataInfos = await getMultipleAccountsChunked(connection, [
-      ...sourceAtas,
-      ...destTokenAtas,
-    ]);
+    // per position. getMultipleAccounts is capped at 100 keys per RPC call.
+    const ataInfos = (
+      await Promise.all(
+        chunks([...sourceAtas, ...destTokenAtas], 100).map((c) =>
+          connection.getMultipleAccountsInfo(c)
+        )
+      )
+    ).flat();
     const sourceAtaInfos = ataInfos.slice(0, sourceAtas.length);
     const destAtaInfos = ataInfos.slice(sourceAtas.length);
     const migratingPositions: OwnedPosition[] = [];
@@ -336,29 +339,23 @@ export const migrate = publicProcedure.migration.migrate.handler(
       const owned = ownedPositions[i];
       const { mint, position } = owned;
       const sourceAta = sourceAtas[i];
-      const info = sourceAtaInfos[i];
-      let sourceAtaInfo = null;
-      try {
-        sourceAtaInfo = info ? unpackAccount(sourceAta, info) : null;
-      } catch {
-        // Malformed/foreign account at the ATA address — skip, matching the
-        // previous getAccount(...).catch(() => null) behavior.
-      }
+      // A malformed/foreign account at an ATA address is treated as absent,
+      // matching the previous getAccount(...).catch(() => null) behavior.
+      const tryUnpack = (ata: PublicKey, info: (typeof ataInfos)[number]) => {
+        try {
+          return info ? unpackAccount(ata, info) : null;
+        } catch {
+          return null;
+        }
+      };
+      const sourceAtaInfo = tryUnpack(sourceAta, sourceAtaInfos[i]);
       if (!sourceAtaInfo || sourceAtaInfo.amount !== BigInt(1)) {
         continue;
       }
       // A frozen destination ATA holding the NFT proves the position already
       // arrived (only transferPositionV0 freezes it); the source read above
       // was stale. Skip instead of building a transfer that would fail.
-      let destAtaInfo = null;
-      try {
-        const destInfo = destAtaInfos[i];
-        destAtaInfo = destInfo
-          ? unpackAccount(destTokenAtas[i], destInfo)
-          : null;
-      } catch {
-        // Malformed/foreign account at the ATA address — treat as absent.
-      }
+      const destAtaInfo = tryUnpack(destTokenAtas[i], destAtaInfos[i]);
       if (destAtaInfo?.isFrozen && destAtaInfo.amount === BigInt(1)) {
         continue;
       }
@@ -799,6 +796,13 @@ export const migrate = publicProcedure.migration.migrate.handler(
       commitment: "finalized" as const,
     };
 
+    const addDrafts = (drafts: TransactionDraft[], description: string) => {
+      for (const draft of drafts) {
+        allDrafts.push(draft);
+        txMetadata.push({ type: TRANSACTION_TYPES.MIGRATION, description });
+      }
+    };
+
     // Incrementally include instruction groups until batching one more would
     // push the bundle past maxTxs. Groups are indivisible (fee-payer-funded
     // create/close pairs), so exclusion is all-or-nothing per group.
@@ -816,19 +820,27 @@ export const migrate = publicProcedure.migration.migrate.handler(
       if (batched.length <= maxTxs) {
         return { drafts: batched, includedCount: groups.length };
       }
+      // Tx count is monotonic in prefix length, so binary-search the largest
+      // fitting prefix instead of re-batching (RPC-backed fee estimation) for
+      // every prefix. lo is always a known-fitting count, hi a known overflow.
+      let lo = 0;
+      let hi = groups.length;
       let drafts: TransactionDraft[] = [];
-      let includedCount = 0;
-      for (let i = 1; i <= groups.length; i++) {
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
         const candidate = await batchInstructionsToTxsWithPriorityFee(
           provider,
-          groups.slice(0, i),
+          groups.slice(0, mid),
           batchOpts
         );
-        if (candidate.length > maxTxs) break;
-        drafts = candidate;
-        includedCount = i;
+        if (candidate.length <= maxTxs) {
+          lo = mid;
+          drafts = candidate;
+        } else {
+          hi = mid;
+        }
       }
-      return { drafts, includedCount };
+      return { drafts, includedCount: lo };
     };
 
     // Step 1: Batch token transfers, respecting the bundle limit. Tokens that
@@ -838,13 +850,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
         tokenWorkList.map((w) => w.group),
         MAX_JITO_BUNDLE_TXS
       );
-    for (const draft of tokenDrafts) {
-      allDrafts.push(draft);
-      txMetadata.push({
-        type: TRANSACTION_TYPES.MIGRATION,
-        description: "Migration: transfers",
-      });
-    }
+    addDrafts(tokenDrafts, "Migration: transfers");
 
     // Step 1b: Batch governance position transfers (before hotspots),
     // respecting the bundle limit. Positions that don't fit only need hasMore
@@ -855,85 +861,19 @@ export const migrate = publicProcedure.migration.migrate.handler(
         positionTransferGroups,
         MAX_JITO_BUNDLE_TXS - allDrafts.length
       );
-    for (const draft of positionDrafts) {
-      allDrafts.push(draft);
-      txMetadata.push({
-        type: TRANSACTION_TYPES.MIGRATION,
-        description: "Migration: transfers",
-      });
-    }
+    addDrafts(positionDrafts, "Migration: transfers");
     const hasMorePositions =
       includedPositionCount < positionTransferGroups.length;
 
     // Step 2: Batch simple hotspot transfers, respecting the bundle limit.
-    // Try batching all simple hotspot instructions together for optimal packing.
-    // If the result exceeds the limit, incrementally add hotspots until full.
-    let includedSimpleCount = simpleHotspotWorkList.length;
-    if (simpleHotspotWorkList.length > 0) {
-      const allSimpleIxs = simpleHotspotWorkList.flatMap((w) => w.instructions);
-      const simpleHotspotDrafts = await batchInstructionsToTxsWithPriorityFee(
-        provider,
-        allSimpleIxs,
-        batchOpts
+    // Grouping per hotspot keeps each welcome-pack close with its transfer in
+    // one tx while still letting the batcher pack multiple hotspots together.
+    const { drafts: simpleHotspotDrafts, includedCount: includedSimpleCount } =
+      await fitGroupsWithinLimit(
+        simpleHotspotWorkList.map((w) => w.instructions),
+        MAX_JITO_BUNDLE_TXS - allDrafts.length
       );
-
-      if (
-        allDrafts.length + simpleHotspotDrafts.length <=
-        MAX_JITO_BUNDLE_TXS
-      ) {
-        // All fit — add them all
-        for (const draft of simpleHotspotDrafts) {
-          allDrafts.push(draft);
-          txMetadata.push({
-            type: TRANSACTION_TYPES.MIGRATION,
-            description: "Migration: transfers",
-          });
-        }
-      } else {
-        // Too many txs — incrementally add hotspots until we hit the limit
-        includedSimpleCount = 0;
-        const remainingSlots = MAX_JITO_BUNDLE_TXS - allDrafts.length;
-        if (remainingSlots > 0) {
-          const accumulatedIxs: TransactionInstruction[] = [];
-          for (let i = 0; i < simpleHotspotWorkList.length; i++) {
-            const nextIxs = [
-              ...accumulatedIxs,
-              ...simpleHotspotWorkList[i].instructions,
-            ];
-            const candidateDrafts = await batchInstructionsToTxsWithPriorityFee(
-              provider,
-              nextIxs,
-              batchOpts
-            );
-
-            if (
-              allDrafts.length + candidateDrafts.length >
-              MAX_JITO_BUNDLE_TXS
-            ) {
-              break;
-            }
-            accumulatedIxs.push(...simpleHotspotWorkList[i].instructions);
-            includedSimpleCount = i + 1;
-          }
-
-          // Batch the final set of included instructions
-          if (accumulatedIxs.length > 0) {
-            const finalDrafts = await batchInstructionsToTxsWithPriorityFee(
-              provider,
-              accumulatedIxs,
-              batchOpts
-            );
-            for (const draft of finalDrafts) {
-              allDrafts.push(draft);
-              txMetadata.push({
-                type: TRANSACTION_TYPES.MIGRATION,
-                description: "Migration: transfers",
-              });
-            }
-          }
-        }
-      }
-    }
+    addDrafts(simpleHotspotDrafts, "Migration: transfers");
 
     // Step 3: Incrementally add split hotspot txs, respecting the bundle limit.
     // Each split hotspot's groups must stay in the same bundle (atomicity).
@@ -950,13 +890,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       }
 
       includedSplitCount++;
-      for (const draft of hotspotDrafts) {
-        allDrafts.push(draft);
-        txMetadata.push({
-          type: TRANSACTION_TYPES.MIGRATION,
-          description: "Migration: hotspot splits",
-        });
-      }
+      addDrafts(hotspotDrafts, "Migration: hotspot splits");
     }
 
     // Compute nextParams from remaining tokens + simple + split hotspots.
@@ -1012,7 +946,19 @@ export const migrate = publicProcedure.migration.migrate.handler(
       if (!tipPlaced) {
         if (allDrafts.length < MAX_JITO_BUNDLE_TXS) {
           allDrafts.push({
-            instructions: [tipIx],
+            instructions: [
+              // A tip-only tx would be fully signed by the fee payer alone,
+              // letting anyone who calls this open endpoint submit it
+              // standalone and drain tip + fees from the fee payer. Require
+              // the source wallet's signature via a no-op self-transfer so
+              // the tx is only valid as part of the client-signed bundle.
+              SystemProgram.transfer({
+                fromPubkey: sourcePubkey,
+                toPubkey: sourcePubkey,
+                lamports: 0,
+              }),
+              tipIx,
+            ],
             feePayer,
             addressLookupTableAddresses: [lut],
           } as TransactionDraft);

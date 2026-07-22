@@ -1,12 +1,7 @@
-import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
-import {
-  delegatedPositionKey,
-  init as initHsd,
-} from "@helium/helium-sub-daos-sdk";
-import { init as initProxy, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
+import { delegatedPositionKey } from "@helium/helium-sub-daos-sdk";
+import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import {
-  init as initVsr,
   positionKey,
   proxyVoteMarkerKey,
   voteMarkerKey,
@@ -24,8 +19,6 @@ import { getAssociatedTokenAddressSync, NATIVE_MINT } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
-import BN from "bn.js";
-import { getCurrentSeasonEnd } from "../../src/server/api/routers/governance/procedures/helpers/get-current-season";
 import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
@@ -38,6 +31,8 @@ import {
 import {
   createAndFundPosition,
   ensureSubDaoEpochsCurrent,
+  getPrograms,
+  getSeasonBoundedProxyExpirationTime,
   setDelegatedPositionExpiration,
   setPositionLockupEndTs,
 } from "./helpers/governance";
@@ -47,55 +42,6 @@ import {
   createHeliumOrgVotingProposal,
   ProposalSetup,
 } from "./helpers/proposal";
-
-/**
- * Initialize Anchor programs for on-chain state verification
- */
-async function getPrograms(ctx: TestCtx) {
-  const wallet = new Wallet(ctx.payer);
-  const provider = new AnchorProvider(
-    ctx.connection,
-    wallet,
-    AnchorProvider.defaultOptions(),
-  );
-
-  const vsrProgram = await initVsr(provider);
-  const hsdProgram = await initHsd(provider);
-  const proxyProgram = await initProxy(provider);
-
-  return { vsrProgram, hsdProgram, proxyProgram, provider };
-}
-
-const PROXY_ASSIGNMENT_DURATION_SECONDS = 86400 * 90;
-const PROXY_EXPIRATION_BUFFER_SECONDS = 60;
-
-async function getSeasonBoundedProxyExpirationTime(
-  ctx: TestCtx,
-  positionMint: string,
-): Promise<number> {
-  const { vsrProgram, proxyProgram } = await getPrograms(ctx);
-  const now = Math.floor(Date.now() / 1000);
-  const [positionPubkey] = positionKey(new PublicKey(positionMint));
-  const positionAcc = await vsrProgram.account.positionV0.fetch(positionPubkey);
-  const registrar = await vsrProgram.account.registrar.fetch(
-    positionAcc.registrar,
-  );
-  const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
-    registrar.proxyConfig,
-  );
-  const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, new BN(now));
-
-  if (!seasonEnd) {
-    throw new Error("No current proxy season found");
-  }
-
-  const maxExpiration = seasonEnd.toNumber() - PROXY_EXPIRATION_BUFFER_SECONDS;
-  if (maxExpiration <= now) {
-    throw new Error("Current proxy season has already ended");
-  }
-
-  return Math.min(now + PROXY_ASSIGNMENT_DURATION_SECONDS, maxExpiration);
-}
 
 describe("governance", () => {
   let ctx: TestCtx;
