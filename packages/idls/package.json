@@ -1,6 +1,6 @@
 {
   "name": "@helium/idls",
-  "version": "0.11.16",
+  "version": "0.11.17",
   "description": "Exported idls",
   "publishConfig": {
     "access": "public",
@@ -24,7 +24,7 @@
     "clean": "npx shx rm -rf **/tsconfig*.tsbuildinfo && npx shx rm -rf lib && npx shx mkdir -p lib/cjs lib/esm",
     "package": "npx shx mkdir -p lib/cjs lib/esm",
     "prebuild": "test -f lib/cjs/circuit_breaker.js || (npm run clean && npm run package)",
-    "build": "test -f lib/cjs/circuit_breaker.js && echo 'idls already built, skipping' || tsc -b tsconfig.json"
+    "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",

@@ -32,6 +32,43 @@ jobs:
       - run: cargo fmt -- --check
       - run: cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A clippy::manual_is_multiple_of -A ambiguous_glob_reexports -A unexpected-cfgs
 
+  check-idls-changeset:
+    name: Check @helium/idls Changeset
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Require an @helium/idls changeset when program sources change
+        # @helium/idls has no src/ of its own -- it compiles the generated
+        # target/types, which is gitignored. Changesets tooling only diffs
+        # packages/, so program interface changes never trigger an idls bump
+        # on their own and the published package silently goes stale.
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          if ! git diff --name-only "$BASE"...HEAD | grep -qE '^programs/[^/]+/src/'; then
+            echo "No program source changes; skipping."
+            exit 0
+          fi
+          ADDED=$(git diff --name-only --diff-filter=A "$BASE"...HEAD -- '.changeset/*.md')
+          if [ -n "$ADDED" ] && grep -l '@helium/idls' $ADDED > /dev/null 2>&1; then
+            echo "Found @helium/idls changeset."
+            exit 0
+          fi
+          # Release PRs (develop -> master) carry the consumed changeset: the
+          # .changeset/*.md was deleted by Version Packages, but the version
+          # bump it produced is in the diff, which proves the flow ran.
+          if git diff "$BASE"...HEAD -- packages/idls/package.json | grep -q '^+.*"version"'; then
+            echo "@helium/idls version already bumped in this PR (changeset consumed)."
+            exit 0
+          fi
+          echo "This PR changes program sources but adds no changeset for @helium/idls."
+          echo "Program changes alter the generated IDL types that @helium/idls publishes,"
+          echo "but changesets can't detect that because target/types is gitignored."
+          echo "Run: npx changeset -- and include \"@helium/idls\" (patch is usually right)."
+          exit 1
+
   test-unit:
     name: Rust Unit Tests
     runs-on: ubuntu-latest
@@ -209,6 +246,7 @@ jobs:
           - tests/mobile-entity-manager.ts
           - tests/helium-sub-daos.ts
           - tests/hexboosting.ts
+          - tests/hpl-crons.ts
           - tests/lazy-distributor.ts
           - tests/lazy-transactions.ts
           - tests/treasury-management.ts
