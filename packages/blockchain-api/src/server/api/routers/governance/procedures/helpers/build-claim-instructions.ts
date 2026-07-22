@@ -34,6 +34,15 @@ type HsdProgram = Awaited<ReturnType<typeof initHsd>>;
 const DAO = daoKey(HNT_MINT)[0];
 const EPOCHS_PER_BATCH = 128;
 
+// Epochs at or after the delegation's expiration pay zero rewards and
+// close_delegation_v0 no longer requires claiming them. The epoch containing
+// expiration_ts still pays, so the exclusive end-epoch bound is
+// epoch(expiration - 1) + 1. An expirationTs of 0 means no expiration.
+export const expirationCapEpoch = (expirationTs: BN): number =>
+  expirationTs.isZero()
+    ? Number.MAX_SAFE_INTEGER
+    : expirationTs.sub(new BN(1)).div(new BN(EPOCH_LENGTH)).toNumber() + 1;
+
 interface PositionInfo {
   mint: PublicKey;
   pubkey: PublicKey;
@@ -142,17 +151,11 @@ export async function buildClaimInstructions(
       position.delegatedPosition;
     const startEpoch = lastClaimedEpoch.add(new BN(1));
     const bitmapWindowEnd = lastClaimedEpoch.add(new BN(129)).toNumber();
-    // Epochs at or after the delegation's expiration pay zero rewards and
-    // close_delegation_v0 no longer requires claiming them. The epoch
-    // containing expiration_ts still pays, so cap after epoch(expiration - 1).
-    const expirationCapEpoch = expirationTs.isZero()
-      ? Number.MAX_SAFE_INTEGER
-      : expirationTs.sub(new BN(1)).div(new BN(EPOCH_LENGTH)).toNumber() + 1;
     const rawEndEpoch = Math.min(
       isDecayed
         ? decayedEpoch.add(new BN(1)).toNumber()
         : currentEpoch.toNumber(),
-      expirationCapEpoch
+      expirationCapEpoch(expirationTs)
     );
     const endEpoch = Math.min(rawEndEpoch, bitmapWindowEnd);
 
