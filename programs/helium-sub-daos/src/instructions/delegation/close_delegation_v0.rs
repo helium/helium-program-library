@@ -162,12 +162,19 @@ pub fn raw_handler(accounts: &mut CloseDelegationAccounts, sde_bump: u8) -> Resu
   // make sure to account for when the position ends
   // unless we're testing, in which case we don't care
   let curr_epoch = current_epoch(curr_ts);
-  let to_claim_to_epoch =
+  let mut to_claim_to_epoch =
     if position.lockup.end_ts < curr_ts && position.lockup.kind == LockupKind::Cliff {
       current_epoch(position.lockup.end_ts) - 1
     } else {
       curr_epoch - 1
     };
+  // Epochs at or after the delegation's expiration pay zero rewards
+  // (claim_rewards_v1 pays 0 once expiration_ts <= epoch start), so an expired
+  // delegation only needs claims through the last epoch that could pay out.
+  // expiration_ts == 0 means no expiration; keep the strict requirement.
+  if expiration_ts != 0 {
+    to_claim_to_epoch = min(to_claim_to_epoch, current_epoch(expiration_ts - 1));
+  }
   assert!((accounts.delegated_position.last_claimed_epoch >= to_claim_to_epoch) || TESTING);
 
   let delegated_position = &mut accounts.delegated_position;
