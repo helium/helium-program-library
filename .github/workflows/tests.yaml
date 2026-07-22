@@ -301,6 +301,7 @@ jobs:
           - tests/mobile-entity-manager.ts
           - tests/helium-sub-daos.ts
           - tests/hexboosting.ts
+          - tests/hpl-crons.ts
           - tests/lazy-distributor.ts
           - tests/lazy-transactions.ts
           - tests/treasury-management.ts
