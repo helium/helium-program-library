@@ -34,6 +34,15 @@ type HsdProgram = Awaited<ReturnType<typeof initHsd>>;
 const DAO = daoKey(HNT_MINT)[0];
 const EPOCHS_PER_BATCH = 128;
 
+// Epochs at or after the delegation's expiration pay zero rewards and
+// close_delegation_v0 no longer requires claiming them. The epoch containing
+// expiration_ts still pays, so the exclusive end-epoch bound is
+// epoch(expiration - 1) + 1. An expirationTs of 0 means no expiration.
+export const expirationCapEpoch = (expirationTs: BN): number =>
+  expirationTs.isZero()
+    ? Number.MAX_SAFE_INTEGER
+    : expirationTs.sub(new BN(1)).div(new BN(EPOCH_LENGTH)).toNumber() + 1;
+
 interface PositionInfo {
   mint: PublicKey;
   pubkey: PublicKey;
@@ -49,6 +58,7 @@ interface PositionInfo {
     subDao: PublicKey;
     lastClaimedEpoch: BN;
     claimedEpochsBitmap: BN;
+    expirationTs: BN;
   };
 }
 
@@ -68,7 +78,7 @@ export interface BuildClaimInstructionsParams {
 
 async function getMultipleAccounts(
   connection: Connection,
-  keys: PublicKey[],
+  keys: PublicKey[]
 ): Promise<(Awaited<ReturnType<Connection["getAccountInfo"]>> | null)[]> {
   const batchSize = 100;
   const batches = Math.ceil(keys.length / batchSize);
@@ -85,7 +95,7 @@ async function getMultipleAccounts(
 }
 
 export async function buildClaimInstructions(
-  params: BuildClaimInstructionsParams,
+  params: BuildClaimInstructionsParams
 ): Promise<ClaimInstructionsResult> {
   const { positions, walletPubkey, connection, hsdProgram } = params;
 
@@ -94,7 +104,7 @@ export async function buildClaimInstructions(
   const currentEpoch = new BN(unixNow).div(new BN(EPOCH_LENGTH));
 
   const subDaoKeys = new Set(
-    positions.map((p) => p.delegatedPosition.subDao.toBase58()),
+    positions.map((p) => p.delegatedPosition.subDao.toBase58())
   );
 
   type SubDaoAccount = Awaited<
@@ -105,8 +115,8 @@ export async function buildClaimInstructions(
       async (key): Promise<[string, SubDaoAccount]> => [
         key,
         await hsdProgram.account.subDaoV0.fetch(new PublicKey(key)),
-      ],
-    ),
+      ]
+    )
   );
   const subDaos: Record<string, SubDaoAccount> =
     Object.fromEntries(subDaoEntries);
@@ -137,13 +147,16 @@ export async function buildClaimInstructions(
     const subDao = position.delegatedPosition.subDao;
     const subDaoAcc = subDaos[subDao.toBase58()];
 
-    const { lastClaimedEpoch, claimedEpochsBitmap } =
+    const { lastClaimedEpoch, claimedEpochsBitmap, expirationTs } =
       position.delegatedPosition;
     const startEpoch = lastClaimedEpoch.add(new BN(1));
     const bitmapWindowEnd = lastClaimedEpoch.add(new BN(129)).toNumber();
-    const rawEndEpoch = isDecayed
-      ? decayedEpoch.add(new BN(1)).toNumber()
-      : currentEpoch.toNumber();
+    const rawEndEpoch = Math.min(
+      isDecayed
+        ? decayedEpoch.add(new BN(1)).toNumber()
+        : currentEpoch.toNumber(),
+      expirationCapEpoch(expirationTs)
+    );
     const endEpoch = Math.min(rawEndEpoch, bitmapWindowEnd);
 
     if (rawEndEpoch > bitmapWindowEnd) {
@@ -188,11 +201,11 @@ export async function buildClaimInstructions(
   for (const chunk of chunks(allEpochsToClaim, EPOCHS_PER_BATCH)) {
     const subDaoEpochInfoKeys = chunk.map(
       ({ epoch, subDao }) =>
-        subDaoEpochInfoKey(subDao, epoch.mul(new BN(EPOCH_LENGTH)))[0],
+        subDaoEpochInfoKey(subDao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
     );
     const subDaoEpochInfoAccounts = await getMultipleAccounts(
       connection,
-      subDaoEpochInfoKeys,
+      subDaoEpochInfoKeys
     );
 
     const batchInstructions = await Promise.all(
@@ -202,7 +215,7 @@ export async function buildClaimInstructions(
 
         const subDaoEpochInfoData = hsdProgram.coder.accounts.decode(
           "subDaoEpochInfoV0",
-          subDaoEpochInfoAccount.data,
+          subDaoEpochInfoAccount.data
         );
 
         if (!subDaoEpochInfoData.rewardsIssuedAt) return null;
@@ -212,7 +225,7 @@ export async function buildClaimInstructions(
           mint: position.mint,
           positionTokenAccount: getAssociatedTokenAddressSync(
             position.mint,
-            walletPubkey,
+            walletPubkey
           ),
           positionAuthority: walletPubkey,
           registrar: position.account.registrar,
@@ -236,15 +249,15 @@ export async function buildClaimInstructions(
               hntMint: daoAcc.hntMint,
               daoEpochInfo: daoEpochInfoKey(
                 subDaoAcc.dao,
-                epoch.mul(new BN(EPOCH_LENGTH)),
+                epoch.mul(new BN(EPOCH_LENGTH))
               )[0],
               delegatorPool: daoAcc.delegatorPool,
               delegatorAta: getAssociatedTokenAddressSync(
                 daoAcc.hntMint,
-                walletPubkey,
+                walletPubkey
               ),
               delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
-                daoAcc.delegatorPool,
+                daoAcc.delegatorPool
               )[0],
             })
             .instruction();
@@ -257,20 +270,20 @@ export async function buildClaimInstructions(
               dntMint: subDaoAcc.dntMint,
               subDaoEpochInfo: subDaoEpochInfoKey(
                 subDao,
-                epoch.mul(new BN(EPOCH_LENGTH)),
+                epoch.mul(new BN(EPOCH_LENGTH))
               )[0],
               delegatorPool: subDaoAcc.delegatorPool,
               delegatorAta: getAssociatedTokenAddressSync(
                 subDaoAcc.dntMint,
-                walletPubkey,
+                walletPubkey
               ),
               delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
-                subDaoAcc.delegatorPool,
+                subDaoAcc.delegatorPool
               )[0],
             })
             .instruction();
         }
-      }),
+      })
     );
 
     const validInstructions = batchInstructions.filter(truthy);

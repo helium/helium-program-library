@@ -12,7 +12,34 @@ on:
       - "packages/blockchain-api-client/**"
 
 jobs:
+  # Build anchor once and share the generated types/IDLs as an artifact. The
+  # matrix jobs only need target/types (to build @helium/idls); having each of
+  # them run build-anchor meant 17 full rebuilds whenever the cache was evicted
+  # (the repo sits at the 10GB Actions cache cap), and a cold anchor build
+  # can't finish inside the matrix jobs' 20-minute timeout.
+  build-idls:
+    runs-on: ubuntu-latest
+    # A cold-cache anchor build of the whole workspace takes well over 20
+    # minutes; this is the only job that compiles, so give it room.
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+      - name: Upload anchor types and IDLs
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-types
+          path: |
+            target/types
+            target/idl
+          retention-days: 1
+          if-no-files-found: error
+
   e2e-tests:
+    needs: build-idls
     runs-on: ubuntu-latest
     # Backstop so a hung test (e.g. a stalled RPC) fails fast instead of running
     # until GitHub's default 6h job timeout and holding a runner.
@@ -119,9 +146,11 @@ jobs:
         run: |
           cargo install --git https://github.com/txtx/surfpool --tag v0.11.2 --locked --force
 
-      - uses: ./.github/actions/build-anchor/
+      - name: Download anchor types and IDLs
+        uses: actions/download-artifact@v4
         with:
-          testing: true
+          name: anchor-types
+          path: target
       - uses: ./.github/actions/setup-ts/
 
       - name: Write TESTING_KEY to file

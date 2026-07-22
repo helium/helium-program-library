@@ -5,7 +5,7 @@ import { Program } from "@coral-xyz/anchor";
 import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
-  getMint
+  getMint,
 } from "@solana/spl-token";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
@@ -163,10 +163,12 @@ describe("circuit-breaker", () => {
     });
 
     it("allows removing the mint authority", async () => {
-      const method = await program.methods.removeMintAuthorityV0().accountsPartial({
-        rentRefund: me,
-        circuitBreaker: mintWindowedBreakerKey(mint)[0],
-      });
+      const method = await program.methods
+        .removeMintAuthorityV0()
+        .accountsPartial({
+          rentRefund: me,
+          circuitBreaker: mintWindowedBreakerKey(mint)[0],
+        });
       const circuitBreaker = (await method.pubkeys()).circuitBreaker!;
       await method.rpc({ skipPreflight: true });
       const cb =
@@ -192,6 +194,10 @@ describe("circuit-breaker", () => {
 
       try {
         // Curr supply: 250, agg value: 50... Break threshold at 125
+        // Keep preflight on: a preflight failure surfaces as an AnchorError
+        // with code and logs, while a post-send confirmation failure races
+        // anchor's getTransaction log fetch and can come back as an opaque
+        // SendTransactionError with neither.
         await program.methods
           .mintV0({
             amount: new BN(80),
@@ -200,7 +206,7 @@ describe("circuit-breaker", () => {
             mint,
             to: dest,
           })
-          .rpc({ skipPreflight: true });
+          .rpc();
         throw new Error("should not get here");
       } catch (e: any) {
         expectCircuitBreakerTriggered(e);
@@ -324,6 +330,7 @@ describe("circuit-breaker", () => {
         .rpc({ skipPreflight: true });
 
       try {
+        // Preflight on, for the same reason as the mint windowed test above.
         await program.methods
           .transferV0({
             amount: new BN(50),
@@ -334,7 +341,7 @@ describe("circuit-breaker", () => {
             to: dest,
             owner: accountHolder.publicKey,
           })
-          .rpc({ skipPreflight: true });
+          .rpc();
         throw new Error("should not get here");
       } catch (e: any) {
         expectCircuitBreakerTriggered(e);
