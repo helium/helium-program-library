@@ -14,12 +14,35 @@ import {
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import { NATIVE_MINT } from "@solana/spl-token";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  PublicKey,
+  SYSVAR_CLOCK_PUBKEY,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import BN from "bn.js";
 import {
   validatePositionOwnership,
   createTransferInstruction,
 } from "../helpers";
+
+interface LockupLike {
+  startTs: BN;
+  endTs: BN;
+  kind: object;
+}
+
+function rawLockupKind(lockup: LockupLike): string {
+  return Object.keys(lockup.kind)[0];
+}
+
+function lockupStrictness(lockup: LockupLike): number {
+  return rawLockupKind(lockup) === "none" ? 0 : 1;
+}
+
+function lockupSecondsLeft(lockup: LockupLike, unixNow: BN): BN {
+  const currTs = rawLockupKind(lockup) === "constant" ? lockup.startTs : unixNow;
+  return currTs.gte(lockup.endTs) ? new BN(0) : lockup.endTs.sub(currTs);
+}
 
 export const transfer = publicProcedure.governance.transferPosition.handler(
   async ({ input, errors }) => {
@@ -82,6 +105,29 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
     ) {
       throw errors.BAD_REQUEST({
         message: "Target position uses a different voting mint configuration",
+      });
+    }
+
+    const clockInfo = await connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+    const unixNow = new BN(Number(clockInfo!.data.readBigInt64LE(8 * 4)));
+
+    if (
+      lockupSecondsLeft(targetPositionAcc.lockup, unixNow).lt(
+        lockupSecondsLeft(sourcePositionAcc.lockup, unixNow),
+      )
+    ) {
+      throw errors.BAD_REQUEST({
+        message:
+          "Target position lockup must be equal-or-longer than the source's",
+      });
+    }
+    if (
+      lockupStrictness(targetPositionAcc.lockup) <
+      lockupStrictness(sourcePositionAcc.lockup)
+    ) {
+      throw errors.BAD_REQUEST({
+        message:
+          "Target position lockup kind must be equal-or-stricter than the source's",
       });
     }
 
