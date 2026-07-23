@@ -1421,8 +1421,112 @@ describe("governance", () => {
       }
     });
 
-    it("returns BAD_REQUEST when voting twice on same choice", async () => {
-      // #given fresh position, vote for choice 1
+    it("reports a position already at max choices as skipped, still voting the rest", async () => {
+      // #given a maxChoicesPerVoter=1 proposal and a position that has used its
+      // one choice (voted choice 0), plus a fresh position that has not voted
+      const maxOneProposal = await createTestProposal(ctx, {
+        name: `max-one-${Date.now()}`,
+        maxChoicesPerVoter: 1,
+      });
+      const usedUp = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+      const fresh = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+
+      const { data: firstVote, error: firstErr } =
+        await ctx.safeClient.governance.vote({
+          walletAddress,
+          proposalKey: maxOneProposal.proposal.toBase58(),
+          positionMints: [usedUp.positionMint],
+          choice: 0,
+        });
+      if (firstErr) {
+        expect.fail(`Setup vote failed: ${JSON.stringify(firstErr)}`);
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        firstVote!.transactionData,
+        ctx.payer
+      );
+
+      // #when voting a different choice with the used-up and the fresh position
+      const { data, error } = await ctx.safeClient.governance.vote({
+        walletAddress,
+        proposalKey: maxOneProposal.proposal.toBase58(),
+        positionMints: [usedUp.positionMint, fresh.positionMint],
+        choice: 1,
+      });
+
+      // #then the used-up position is reported as skipped, the fresh one votes
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data?.skipped).to.deep.include({
+        positionMint: usedUp.positionMint,
+        reason: "maxChoicesReached",
+      });
+      expect(data?.transactionData?.transactions).to.have.length(1);
+    });
+
+    it("reports a position that already voted this choice as skipped, still voting the rest", async () => {
+      // #given a position that already voted choice 0 and a fresh position
+      const alreadyVoted = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+      const fresh = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+
+      const { data: firstVote, error: firstErr } =
+        await ctx.safeClient.governance.vote({
+          walletAddress,
+          proposalKey: proposalSetup.proposal.toBase58(),
+          positionMints: [alreadyVoted.positionMint],
+          choice: 0,
+        });
+      if (firstErr) {
+        expect.fail(`Setup vote failed: ${JSON.stringify(firstErr)}`);
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        firstVote!.transactionData,
+        ctx.payer
+      );
+
+      // #when re-voting choice 0 with the already-voted and the fresh position
+      const { data, error } = await ctx.safeClient.governance.vote({
+        walletAddress,
+        proposalKey: proposalSetup.proposal.toBase58(),
+        positionMints: [alreadyVoted.positionMint, fresh.positionMint],
+        choice: 0,
+      });
+
+      // #then the already-voted position is skipped without noise, fresh votes
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data?.skipped).to.deep.include({
+        positionMint: alreadyVoted.positionMint,
+        reason: "alreadyVotedThisChoice",
+      });
+      expect(data?.transactionData?.transactions).to.have.length(1);
+      // The single vote-building procedure serves both fee-estimation/prepare
+      // and submission, so estimatedSolFee ships alongside the skip report.
+      expect(data?.estimatedSolFee).to.not.be.undefined;
+    });
+
+    it("returns the skip report when every position is skipped", async () => {
+      // #given a position that already voted choice 1
       const result = await createAndFundPosition(ctx, {
         amount: "100000000",
         lockupKind: "cliff",
@@ -1445,7 +1549,7 @@ describe("governance", () => {
         ctx.payer
       );
 
-      // #when second vote on same choice
+      // #when re-voting the same choice with that lone position
       const { error } = await ctx.safeClient.governance.vote({
         walletAddress,
         proposalKey: proposalSetup.proposal.toBase58(),
@@ -1453,14 +1557,68 @@ describe("governance", () => {
         choice: 1,
       });
 
-      // #then should fail - already voted for this choice
-      if (!isDefinedError(error)) {
+      // #then it errors, but the error carries the full skip report
+      if (!isDefinedError(error) || error.code !== "ALL_POSITIONS_SKIPPED") {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
+          `Expected ALL_POSITIONS_SKIPPED - but got: ${JSON.stringify(error)}`
         );
       }
-      expect(error.code).to.equal("BAD_REQUEST");
-      expect(error.message).to.include("already voted");
+      expect(error.data.skipped).to.deep.include({
+        positionMint: result.positionMint,
+        reason: "alreadyVotedThisChoice",
+      });
+    });
+
+    it("returns the same skip report on repeated prepare calls", async () => {
+      // #given a position that already voted choice 0 and a fresh position
+      const alreadyVoted = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+      const fresh = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+
+      const { data: firstVote, error: firstErr } =
+        await ctx.safeClient.governance.vote({
+          walletAddress,
+          proposalKey: proposalSetup.proposal.toBase58(),
+          positionMints: [alreadyVoted.positionMint],
+          choice: 0,
+        });
+      if (firstErr) {
+        expect.fail(`Setup vote failed: ${JSON.stringify(firstErr)}`);
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        firstVote!.transactionData,
+        ctx.payer
+      );
+
+      // #when preparing the same vote twice without submitting in between
+      const prepareArgs = {
+        walletAddress,
+        proposalKey: proposalSetup.proposal.toBase58(),
+        positionMints: [alreadyVoted.positionMint, fresh.positionMint],
+        choice: 0,
+      };
+      const first = await ctx.safeClient.governance.vote(prepareArgs);
+      const second = await ctx.safeClient.governance.vote(prepareArgs);
+
+      // #then both prepare calls return the same skip report
+      if (first.error || second.error) {
+        expect.fail(
+          `Unexpected error: ${JSON.stringify(first.error ?? second.error)}`
+        );
+      }
+      expect(second.data?.skipped).to.deep.equal(first.data?.skipped);
+      expect(first.data?.skipped).to.deep.include({
+        positionMint: alreadyVoted.positionMint,
+        reason: "alreadyVotedThisChoice",
+      });
     });
   });
 
