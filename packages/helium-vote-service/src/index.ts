@@ -491,11 +491,40 @@ server.get<{
 
   return (
     await sequelize.query(`
-      WITH exploded_choice_vote_markers AS (
-        SELECT voter, registrar, proposal, sum(weight) as weight, unnest(choices) as choice
-        FROM vote_markers
-        WHERE proposal = ${proposal}
-        GROUP BY voter, registrar, proposal, choice
+      -- ADR 0003: attribute weight to the position owner (index-0 proxy
+      -- assignment for the marker's mint), falling back to the casting voter
+      -- when that row is gone. Expiration is deliberately ignored — expiry
+      -- ends the proxy's power, not the ownership fact.
+      WITH markers_with_owner AS (
+        SELECT
+          COALESCE(owner_pa.voter, vm.voter) as voter,
+          vm.voter as casting_voter,
+          vm.registrar,
+          vm.proposal,
+          vm.weight,
+          unnest(vm.choices) as choice
+        FROM vote_markers vm
+        -- One index-0 row may exist per proxy config; the owner is the same
+        -- wallet in each, so dedupe by asset to keep the join 1:1.
+        LEFT OUTER JOIN (
+          SELECT DISTINCT ON (asset) asset, voter
+          FROM proxy_assignments
+          WHERE index = 0
+        ) owner_pa ON owner_pa.asset = vm.mint
+        WHERE vm.proposal = ${proposal}
+      ),
+      exploded_choice_vote_markers AS (
+        SELECT
+          m.voter,
+          m.registrar,
+          m.proposal,
+          sum(m.weight) as weight,
+          m.choice,
+          jsonb_agg(DISTINCT jsonb_build_object('wallet', m.casting_voter, 'name', casting.name))
+            FILTER (WHERE m.casting_voter <> m.voter) as casting_proxies
+        FROM markers_with_owner m
+        LEFT OUTER JOIN proxies casting ON casting.wallet = m.casting_voter
+        GROUP BY m.voter, m.registrar, m.proposal, m.choice
       )
       SELECT
         vm.voter,
@@ -504,7 +533,8 @@ server.get<{
         vm.weight,
         vm.choice,
         p.choices[vm.choice + 1]->>'name' as "choiceName",
-        proxies.name as "proxyName"
+        proxies.name as "proxyName",
+        COALESCE(vm.casting_proxies, '[]'::jsonb) as "castingProxies"
       FROM exploded_choice_vote_markers vm
       JOIN proposals p ON p.address = vm.proposal
       LEFT OUTER JOIN proxies ON proxies.wallet = vm.voter

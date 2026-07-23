@@ -5,6 +5,8 @@ import {
   applySchema,
   ensureProxiesDir,
   seedProposal,
+  seedProxy,
+  seedProxyAssignment,
   seedVoteMarker,
   startTestDb,
   truncateAll,
@@ -12,6 +14,9 @@ import {
 
 const PROPOSAL = "prop1111111111111111111111111111111111111111";
 const OWNER = "owner1111111111111111111111111111111111111111";
+const PROXY = "proxy1111111111111111111111111111111111111111";
+const MINT_A = "mintA1111111111111111111111111111111111111111";
+const MINT_B = "mintB1111111111111111111111111111111111111111";
 
 describe("GET /v1/proposals/:proposal/votes", () => {
   let stopDb: () => Promise<void>;
@@ -74,5 +79,292 @@ describe("GET /v1/proposals/:proposal/votes", () => {
     expect(String(row.weight)).to.equal("100");
     // Owner is not a registered proxy, so no proxy name is attached.
     expect(row.proxyName).to.equal(null);
+  });
+
+  describe("owner attribution (ADR 0003)", () => {
+    beforeEach(async () => {
+      await seedProposal(sequelize, {
+        address: PROPOSAL,
+        choices: ["Yes", "No"],
+      });
+    });
+
+    it("keeps direct-vote attribution unchanged and lists no casting proxy", async () => {
+      // Owner voted with their own wallet; index-0 assignment names them.
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintA1111111111111111111111111111111111111",
+        voter: OWNER,
+        index: 0,
+        asset: MINT_A,
+      });
+      await seedVoteMarker(sequelize, {
+        address: "markerA1111111111111111111111111111111111111",
+        voter: OWNER,
+        proposal: PROPOSAL,
+        mint: MINT_A,
+        choices: [0],
+        weight: "100",
+        proxyIndex: 0,
+      });
+
+      const body = (
+        await server.inject({
+          method: "GET",
+          url: `/v1/proposals/${PROPOSAL}/votes`,
+        })
+      ).json();
+
+      expect(body).to.have.length(1);
+      expect(body[0].voter).to.equal(OWNER);
+      expect(body[0].castingProxies).to.deep.equal([]);
+    });
+
+    it("attributes a proxied vote to the position owner and lists the casting proxy", async () => {
+      await seedProxy(sequelize, { wallet: PROXY, name: "Proxy One" });
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintA1111111111111111111111111111111111111",
+        voter: OWNER,
+        index: 0,
+        asset: MINT_A,
+        nextVoter: PROXY,
+      });
+      await seedProxyAssignment(sequelize, {
+        address: "pa1mintA1111111111111111111111111111111111111",
+        voter: PROXY,
+        index: 1,
+        asset: MINT_A,
+      });
+      await seedVoteMarker(sequelize, {
+        address: "markerA1111111111111111111111111111111111111",
+        voter: PROXY,
+        proposal: PROPOSAL,
+        mint: MINT_A,
+        choices: [0],
+        weight: "100",
+        proxyIndex: 1,
+      });
+
+      const body = (
+        await server.inject({
+          method: "GET",
+          url: `/v1/proposals/${PROPOSAL}/votes`,
+        })
+      ).json();
+
+      // Exactly one row: the weight appears once, under the owner — the
+      // proxy's row no longer accumulates proxied weight.
+      expect(body).to.have.length(1);
+      const [row] = body;
+      expect(row.voter).to.equal(OWNER);
+      expect(String(row.weight)).to.equal("100");
+      expect(row.castingProxies).to.deep.equal([
+        { wallet: PROXY, name: "Proxy One" },
+      ]);
+      // The owner is not themselves a registered proxy.
+      expect(row.proxyName).to.equal(null);
+    });
+
+    it("merges a wallet's direct and proxied votes into one owner row listing the casting proxies", async () => {
+      await seedProxy(sequelize, { wallet: PROXY, name: "Proxy One" });
+      // Position A voted directly by the owner.
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintA1111111111111111111111111111111111111",
+        voter: OWNER,
+        index: 0,
+        asset: MINT_A,
+      });
+      await seedVoteMarker(sequelize, {
+        address: "markerA1111111111111111111111111111111111111",
+        voter: OWNER,
+        proposal: PROPOSAL,
+        mint: MINT_A,
+        choices: [0],
+        weight: "100",
+        proxyIndex: 0,
+      });
+      // Position B voted by the proxy.
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintB1111111111111111111111111111111111111",
+        voter: OWNER,
+        index: 0,
+        asset: MINT_B,
+        nextVoter: PROXY,
+      });
+      await seedVoteMarker(sequelize, {
+        address: "markerB1111111111111111111111111111111111111",
+        voter: PROXY,
+        proposal: PROPOSAL,
+        mint: MINT_B,
+        choices: [0],
+        weight: "200",
+        proxyIndex: 1,
+      });
+
+      const body = (
+        await server.inject({
+          method: "GET",
+          url: `/v1/proposals/${PROPOSAL}/votes`,
+        })
+      ).json();
+
+      expect(body).to.have.length(1);
+      const [row] = body;
+      expect(row.voter).to.equal(OWNER);
+      expect(String(row.weight)).to.equal("300");
+      expect(row.castingProxies).to.deep.equal([
+        { wallet: PROXY, name: "Proxy One" },
+      ]);
+    });
+
+    it("still attributes to the owner when the index-0 assignment has expired", async () => {
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintA1111111111111111111111111111111111111",
+        voter: OWNER,
+        index: 0,
+        asset: MINT_A,
+        expirationTime: Math.floor(Date.now() / 1000) - 24 * 60 * 60,
+      });
+      await seedVoteMarker(sequelize, {
+        address: "markerA1111111111111111111111111111111111111",
+        voter: PROXY,
+        proposal: PROPOSAL,
+        mint: MINT_A,
+        choices: [0],
+        weight: "100",
+        proxyIndex: 1,
+      });
+
+      const body = (
+        await server.inject({
+          method: "GET",
+          url: `/v1/proposals/${PROPOSAL}/votes`,
+        })
+      ).json();
+
+      expect(body).to.have.length(1);
+      expect(body[0].voter).to.equal(OWNER);
+    });
+
+    it("falls back to the casting voter when the index-0 assignment is missing", async () => {
+      await seedVoteMarker(sequelize, {
+        address: "markerA1111111111111111111111111111111111111",
+        voter: PROXY,
+        proposal: PROPOSAL,
+        mint: MINT_A,
+        choices: [0],
+        weight: "100",
+        proxyIndex: 1,
+      });
+
+      const body = (
+        await server.inject({
+          method: "GET",
+          url: `/v1/proposals/${PROPOSAL}/votes`,
+        })
+      ).json();
+
+      expect(body).to.have.length(1);
+      expect(body[0].voter).to.equal(PROXY);
+      // Attribution degraded to the casting voter, so there is no separate
+      // casting proxy to report.
+      expect(body[0].castingProxies).to.deep.equal([]);
+    });
+
+    it("populates proxyName against the owner wallet when the owner is a registered proxy", async () => {
+      await seedProxy(sequelize, { wallet: OWNER, name: "Owner The Proxy" });
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintA1111111111111111111111111111111111111",
+        voter: OWNER,
+        index: 0,
+        asset: MINT_A,
+      });
+      await seedVoteMarker(sequelize, {
+        address: "markerA1111111111111111111111111111111111111",
+        voter: PROXY,
+        proposal: PROPOSAL,
+        mint: MINT_A,
+        choices: [0],
+        weight: "100",
+        proxyIndex: 1,
+      });
+
+      const body = (
+        await server.inject({
+          method: "GET",
+          url: `/v1/proposals/${PROPOSAL}/votes`,
+        })
+      ).json();
+
+      expect(body).to.have.length(1);
+      expect(body[0].voter).to.equal(OWNER);
+      expect(body[0].proxyName).to.equal("Owner The Proxy");
+    });
+
+    it("counts weight exactly once when the asset has index-0 assignments under multiple proxy configs", async () => {
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintAcfg111111111111111111111111111111111",
+        voter: OWNER,
+        index: 0,
+        asset: MINT_A,
+        proxyConfig: "proxyConfig1",
+      });
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintAcfg211111111111111111111111111111111",
+        voter: OWNER,
+        index: 0,
+        asset: MINT_A,
+        proxyConfig: "proxyConfig2",
+      });
+      await seedVoteMarker(sequelize, {
+        address: "markerA1111111111111111111111111111111111111",
+        voter: PROXY,
+        proposal: PROPOSAL,
+        mint: MINT_A,
+        choices: [0],
+        weight: "100",
+        proxyIndex: 1,
+      });
+
+      const body = (
+        await server.inject({
+          method: "GET",
+          url: `/v1/proposals/${PROPOSAL}/votes`,
+        })
+      ).json();
+
+      expect(body).to.have.length(1);
+      expect(body[0].voter).to.equal(OWNER);
+      expect(String(body[0].weight)).to.equal("100");
+    });
+
+    it("keeps the response structurally backward-compatible (additive fields only)", async () => {
+      await seedVoteMarker(sequelize, {
+        address: "markerA1111111111111111111111111111111111111",
+        voter: OWNER,
+        proposal: PROPOSAL,
+        mint: MINT_A,
+        choices: [0],
+        weight: "100",
+        proxyIndex: 0,
+      });
+
+      const body = (
+        await server.inject({
+          method: "GET",
+          url: `/v1/proposals/${PROPOSAL}/votes`,
+        })
+      ).json();
+
+      expect(body[0]).to.have.all.keys(
+        "voter",
+        "registrar",
+        "proposal",
+        "weight",
+        "choice",
+        "choiceName",
+        "proxyName",
+        "castingProxies"
+      );
+    });
   });
 });

@@ -192,6 +192,56 @@ export const seedVoteMarker = async (
   );
 };
 
+export interface SeedProxy {
+  wallet: string;
+  name: string;
+}
+
+export const seedProxy = async (
+  sequelize: Sequelize,
+  p: SeedProxy
+): Promise<void> => {
+  await sequelize.query(
+    `INSERT INTO proxies (wallet, name) VALUES (:wallet, :name)`,
+    { replacements: { wallet: p.wallet, name: p.name } }
+  );
+};
+
+export interface SeedProxyAssignment {
+  address: string;
+  voter: string;
+  index: number;
+  asset: string;
+  nextVoter?: string;
+  proxyConfig?: string;
+  /** Unix seconds; defaults to one day from now. */
+  expirationTime?: number;
+}
+
+export const seedProxyAssignment = async (
+  sequelize: Sequelize,
+  a: SeedProxyAssignment
+): Promise<void> => {
+  await sequelize.query(
+    `INSERT INTO proxy_assignments
+       (address, voter, next_voter, index, asset, proxy_config, expiration_time)
+     VALUES
+       (:address, :voter, :nextVoter, :index, :asset, :proxyConfig, :expirationTime)`,
+    {
+      replacements: {
+        address: a.address,
+        voter: a.voter,
+        nextVoter: a.nextVoter ?? "11111111111111111111111111111111",
+        index: a.index,
+        asset: a.asset,
+        proxyConfig: a.proxyConfig ?? "proxyConfig",
+        expirationTime:
+          a.expirationTime ?? Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+      },
+    }
+  );
+};
+
 /**
  * Some routes register @fastify/static against a proxies dir that only exists
  * at runtime after a repo clone. Create it so server.ready() doesn't throw.
