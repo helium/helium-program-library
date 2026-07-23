@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1223](https://github.com/helium/helium-program-library/pull/1223) [`9431155`](https://github.com/helium/helium-program-library/commit/943115570fc36650cdc83471fdf1ca66c491e6bb) Thanks [@madninja](https://github.com/madninja)! - Allow veHNT position transfer to a target position owned by another wallet. `positions/transfer` no longer requires the caller to own the target position, matching the on-chain `transferV0` constraint, and adds registrar/voting-mint-config compatibility checks between source and target.
+
 ## 0.11.18
 
 ### Patch Changes
