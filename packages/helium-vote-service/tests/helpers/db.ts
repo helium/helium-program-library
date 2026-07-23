@@ -20,10 +20,6 @@ import { Keypair } from "@solana/web3.js";
  * a jsonb[]), because the endpoints run raw SQL against those shapes.
  */
 
-export interface TestDb {
-  stop: () => Promise<void>;
-}
-
 /** Reserve an OS-assigned free port so parallel suites can't collide. */
 const getFreePort = (): Promise<number> =>
   new Promise((resolve, reject) => {
@@ -38,9 +34,9 @@ const getFreePort = (): Promise<number> =>
 /**
  * Boot an ephemeral Postgres and wire the process env to it. Must run before
  * the service module is imported, since ./src/model builds its Sequelize
- * instance from these env vars at import time.
+ * instance from these env vars at import time. Returns a teardown function.
  */
-export const startTestDb = async (): Promise<TestDb> => {
+export const startTestDb = async (): Promise<() => Promise<void>> => {
   const port = await getFreePort();
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "hvs-pg-"));
 
@@ -75,11 +71,9 @@ export const startTestDb = async (): Promise<TestDb> => {
   // Don't let the app try to alter/sync tables or run the vetokens view SQL.
   process.env.MODIFY_DB = "false";
 
-  return {
-    stop: async () => {
-      await pg.stop();
-      fs.rmSync(dataDir, { recursive: true, force: true });
-    },
+  return async () => {
+    await pg.stop();
+    fs.rmSync(dataDir, { recursive: true, force: true });
   };
 };
 

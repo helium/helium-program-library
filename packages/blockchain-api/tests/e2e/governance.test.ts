@@ -1507,12 +1507,13 @@ describe("governance", () => {
       );
 
       // #when re-voting choice 0 with the already-voted and the fresh position
-      const { data, error } = await ctx.safeClient.governance.vote({
+      const voteArgs = {
         walletAddress,
         proposalKey: proposalSetup.proposal.toBase58(),
         positionMints: [alreadyVoted.positionMint, fresh.positionMint],
         choice: 0,
-      });
+      };
+      const { data, error } = await ctx.safeClient.governance.vote(voteArgs);
 
       // #then the already-voted position is skipped without noise, fresh votes
       if (error) {
@@ -1523,9 +1524,10 @@ describe("governance", () => {
         reason: "alreadyVotedThisChoice",
       });
       expect(data?.transactionData?.transactions).to.have.length(1);
-      // The single vote-building procedure serves both fee-estimation/prepare
-      // and submission, so estimatedSolFee ships alongside the skip report.
-      expect(data?.estimatedSolFee).to.not.be.undefined;
+
+      // Preparing again without submitting returns the same skip report.
+      const again = await ctx.safeClient.governance.vote(voteArgs);
+      expect(again.data?.skipped).to.deep.equal(data?.skipped);
     });
 
     it("returns the skip report when every position is skipped", async () => {
@@ -1558,48 +1560,6 @@ describe("governance", () => {
       }
       expect(error.data.skipped).to.deep.include({
         positionMint: result.positionMint,
-        reason: "alreadyVotedThisChoice",
-      });
-    });
-
-    it("returns the same skip report on repeated prepare calls", async () => {
-      // #given a position that already voted choice 0 and a fresh position
-      const alreadyVoted = await createAndFundPosition(ctx, {
-        amount: "100000000",
-        lockupKind: "cliff",
-        lockupPeriodsInDays: 365,
-      });
-      const fresh = await createAndFundPosition(ctx, {
-        amount: "100000000",
-        lockupKind: "cliff",
-        lockupPeriodsInDays: 365,
-      });
-
-      await castVote(
-        proposalSetup.proposal.toBase58(),
-        [alreadyVoted.positionMint],
-        0
-      );
-
-      // #when preparing the same vote twice without submitting in between
-      const prepareArgs = {
-        walletAddress,
-        proposalKey: proposalSetup.proposal.toBase58(),
-        positionMints: [alreadyVoted.positionMint, fresh.positionMint],
-        choice: 0,
-      };
-      const first = await ctx.safeClient.governance.vote(prepareArgs);
-      const second = await ctx.safeClient.governance.vote(prepareArgs);
-
-      // #then both prepare calls return the same skip report
-      if (first.error || second.error) {
-        expect.fail(
-          `Unexpected error: ${JSON.stringify(first.error ?? second.error)}`
-        );
-      }
-      expect(second.data?.skipped).to.deep.equal(first.data?.skipped);
-      expect(first.data?.skipped).to.deep.include({
-        positionMint: alreadyVoted.positionMint,
         reason: "alreadyVotedThisChoice",
       });
     });

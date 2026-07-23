@@ -298,8 +298,8 @@ export const UndelegatePositionResponseSchema =
 export const VoteResponseSchema = createPaginatedTransactionResponse().extend({
   skipped: z
     .array(SkippedPositionSchema)
-    // Default so strict clients tolerate pre-skip-reporting server responses
-    // during the deploy window.
+    // Tolerate server responses that omit the field (servers predating skip
+    // reporting).
     .default([])
     .describe(
       "Positions not included in the vote transactions, each with the reason it was skipped. Empty when every position is eligible."

@@ -8,14 +8,13 @@ import {
   seedVoteMarker,
   startTestDb,
   truncateAll,
-  TestDb,
 } from "./helpers/db";
 
 const PROPOSAL = "prop1111111111111111111111111111111111111111";
 const OWNER = "owner1111111111111111111111111111111111111111";
 
 describe("GET /v1/proposals/:proposal/votes", () => {
-  let db: TestDb;
+  let stopDb: () => Promise<void>;
   let server: FastifyInstance;
   let sequelize: Sequelize;
 
@@ -23,7 +22,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
     this.timeout(60000);
     // Boot Postgres and wire env before importing the service, whose model
     // module builds its Sequelize connection from the PG* env vars at import.
-    db = await startTestDb();
+    stopDb = await startTestDb();
     ensureProxiesDir();
 
     ({ sequelize } = await import("../src/model"));
@@ -36,7 +35,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
   after(async () => {
     if (server) await server.close();
     if (sequelize) await sequelize.close();
-    if (db) await db.stop();
+    if (stopDb) await stopDb();
   });
 
   beforeEach(async () => {
