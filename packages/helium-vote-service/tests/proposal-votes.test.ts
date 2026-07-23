@@ -47,6 +47,15 @@ describe("GET /v1/proposals/:proposal/votes", () => {
     await truncateAll(sequelize);
   });
 
+  const getVotes = async () => {
+    const res = await server.inject({
+      method: "GET",
+      url: `/v1/proposals/${PROPOSAL}/votes`,
+    });
+    expect(res.statusCode).to.equal(200);
+    return res.json();
+  };
+
   it("attributes a direct vote's weight to the casting voter", async () => {
     await seedProposal(sequelize, {
       address: PROPOSAL,
@@ -62,13 +71,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
       proxyIndex: 0,
     });
 
-    const res = await server.inject({
-      method: "GET",
-      url: `/v1/proposals/${PROPOSAL}/votes`,
-    });
-
-    expect(res.statusCode).to.equal(200);
-    const body = res.json();
+    const body = await getVotes();
     expect(body).to.be.an("array").with.length(1);
 
     const [row] = body;
@@ -107,12 +110,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
         proxyIndex: 0,
       });
 
-      const body = (
-        await server.inject({
-          method: "GET",
-          url: `/v1/proposals/${PROPOSAL}/votes`,
-        })
-      ).json();
+      const body = await getVotes();
 
       expect(body).to.have.length(1);
       expect(body[0].voter).to.equal(OWNER);
@@ -144,12 +142,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
         proxyIndex: 1,
       });
 
-      const body = (
-        await server.inject({
-          method: "GET",
-          url: `/v1/proposals/${PROPOSAL}/votes`,
-        })
-      ).json();
+      const body = await getVotes();
 
       // Exactly one row: the weight appears once, under the owner — the
       // proxy's row no longer accumulates proxied weight.
@@ -200,12 +193,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
         proxyIndex: 1,
       });
 
-      const body = (
-        await server.inject({
-          method: "GET",
-          url: `/v1/proposals/${PROPOSAL}/votes`,
-        })
-      ).json();
+      const body = await getVotes();
 
       expect(body).to.have.length(1);
       const [row] = body;
@@ -234,12 +222,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
         proxyIndex: 1,
       });
 
-      const body = (
-        await server.inject({
-          method: "GET",
-          url: `/v1/proposals/${PROPOSAL}/votes`,
-        })
-      ).json();
+      const body = await getVotes();
 
       expect(body).to.have.length(1);
       expect(body[0].voter).to.equal(OWNER);
@@ -256,12 +239,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
         proxyIndex: 1,
       });
 
-      const body = (
-        await server.inject({
-          method: "GET",
-          url: `/v1/proposals/${PROPOSAL}/votes`,
-        })
-      ).json();
+      const body = await getVotes();
 
       expect(body).to.have.length(1);
       expect(body[0].voter).to.equal(PROXY);
@@ -288,12 +266,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
         proxyIndex: 1,
       });
 
-      const body = (
-        await server.inject({
-          method: "GET",
-          url: `/v1/proposals/${PROPOSAL}/votes`,
-        })
-      ).json();
+      const body = await getVotes();
 
       expect(body).to.have.length(1);
       expect(body[0].voter).to.equal(OWNER);
@@ -325,12 +298,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
         proxyIndex: 1,
       });
 
-      const body = (
-        await server.inject({
-          method: "GET",
-          url: `/v1/proposals/${PROPOSAL}/votes`,
-        })
-      ).json();
+      const body = await getVotes();
 
       expect(body).to.have.length(1);
       expect(body[0].voter).to.equal(OWNER);
@@ -348,12 +316,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
         proxyIndex: 0,
       });
 
-      const body = (
-        await server.inject({
-          method: "GET",
-          url: `/v1/proposals/${PROPOSAL}/votes`,
-        })
-      ).json();
+      const body = await getVotes();
 
       expect(body[0]).to.have.all.keys(
         "voter",
