@@ -90,29 +90,37 @@ server.get("/v1/sync", async () => {
 });
 
 // Save for one day
-const CACHE_TIME = 1000 * 60 * 60 * 24
-let cachedDataBurn: any | null = null
-let lastCacheUpdate: Date | null = null
+const CACHE_TIME = 1000 * 60 * 60 * 24;
+let cachedDataBurn: any | null = null;
+let lastCacheUpdate: Date | null = null;
 server.get("/v1/data-burn", async (request, reply) => {
-  if (cachedDataBurn && lastCacheUpdate && lastCacheUpdate.getTime() > Date.now() - CACHE_TIME) {
-    return cachedDataBurn
+  if (
+    cachedDataBurn &&
+    lastCacheUpdate &&
+    lastCacheUpdate.getTime() > Date.now() - CACHE_TIME
+  ) {
+    return cachedDataBurn;
   }
 
-  const client = new DuneClient(process.env.DUNE_API_KEY || "")
-  const result = await client.getLatestResult({ queryId: 5069123 })
+  const client = new DuneClient(process.env.DUNE_API_KEY || "");
+  const result = await client.getLatestResult({ queryId: 5069123 });
   cachedDataBurn = result.result?.rows.reduce((acc, row: any) => {
-    acc[row.subdao] = row.dc_burned
-    return acc
-  }, {} as Record<string, number>)
-  lastCacheUpdate = new Date()
-  return cachedDataBurn
+    acc[row.subdao] = row.dc_burned;
+    return acc;
+  }, {} as Record<string, number>);
+  lastCacheUpdate = new Date();
+  return cachedDataBurn;
 });
 
-let cachedDataSubDaoDelegations: any | null = null
-let lastCacheUpdateSubDaoDelegations: Date | null = null
+let cachedDataSubDaoDelegations: any | null = null;
+let lastCacheUpdateSubDaoDelegations: Date | null = null;
 server.get("/v1/subdao-delegations", async (request, reply) => {
-  if (cachedDataSubDaoDelegations && lastCacheUpdateSubDaoDelegations && lastCacheUpdateSubDaoDelegations.getTime() > Date.now() - CACHE_TIME) {
-    return cachedDataSubDaoDelegations
+  if (
+    cachedDataSubDaoDelegations &&
+    lastCacheUpdateSubDaoDelegations &&
+    lastCacheUpdateSubDaoDelegations.getTime() > Date.now() - CACHE_TIME
+  ) {
+    return cachedDataSubDaoDelegations;
   }
 
   const vetokens = await sequelize.query(`
@@ -132,16 +140,21 @@ GROUP BY sub_dao
   const result = vetokens[0];
 
   const data = result.reduce((acc: Record<string, number>, row: any) => {
-    const subDaoStr = row.subDao == subDaoKey(MOBILE_MINT)[0].toBase58() ? "mobile" : row.subDao == subDaoKey(IOT_MINT)[0].toBase58() ? "iot" : null;
+    const subDaoStr =
+      row.subDao == subDaoKey(MOBILE_MINT)[0].toBase58()
+        ? "mobile"
+        : row.subDao == subDaoKey(IOT_MINT)[0].toBase58()
+        ? "iot"
+        : null;
     if (subDaoStr) {
       acc[subDaoStr] = row.totalVeTokens.split(".")[0];
     }
     return acc;
   }, {} as Record<string, number>);
-  cachedDataSubDaoDelegations = data
-  lastCacheUpdateSubDaoDelegations = new Date()
-  return data
-})
+  cachedDataSubDaoDelegations = data;
+  lastCacheUpdateSubDaoDelegations = new Date();
+  return data;
+});
 
 server.get<{
   Params: { registrar: string };
@@ -205,25 +218,25 @@ server.get<{
     limit,
     include: position
       ? [
-        {
-          model: Position,
-          where: {
-            address: position,
+          {
+            model: Position,
+            where: {
+              address: position,
+            },
+            attributes: [],
+            required: true,
           },
-          attributes: [],
-          required: true,
-        },
-      ]
+        ]
       : [
-        {
-          model: Position,
-          where: {
-            registrar: registrar,
+          {
+            model: Position,
+            where: {
+              registrar: registrar,
+            },
+            attributes: [],
+            required: true,
           },
-          attributes: [],
-          required: true,
-        },
-      ],
+        ],
     order: [["index", "DESC"]],
   });
 });
@@ -294,14 +307,15 @@ WITH
     JOIN proxy_registrars pr ON pr.wallet = proxies.wallet
     LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
     WHERE pr.registrar = ${escapedRegistrar}
-          ${request.query.query
-      ? `AND (proxies.name ILIKE ${sequelize.escape(
-        `%${request.query.query}%`
-      )} OR proxies.wallet ILIKE ${sequelize.escape(
-        `%${request.query.query}%`
-      )})`
-      : ""
-    }
+          ${
+            request.query.query
+              ? `AND (proxies.name ILIKE ${sequelize.escape(
+                  `%${request.query.query}%`
+                )} OR proxies.wallet ILIKE ${sequelize.escape(
+                  `%${request.query.query}%`
+                )})`
+              : ""
+          }
     GROUP BY
       name,
       image,
@@ -529,17 +543,17 @@ server.post<{
   const proposalConfig = await proposalProgram.account.proposalConfigV0.fetch(
     proposalAccount.proposalConfig
   );
-  const resolutionSettingsAccount = await stateControllerProgram.account.resolutionSettingsV0.fetch(proposalConfig.stateController);
-  const endTs =
-    (proposalAccount.state.resolved
-      ?
-      new BN(proposalAccount.state.resolved.endTs)
-      :
-      new BN(proposalAccount.state.voting!.startTs).add(
+  const resolutionSettingsAccount =
+    await stateControllerProgram.account.resolutionSettingsV0.fetch(
+      proposalConfig.stateController
+    );
+  const endTs = proposalAccount.state.resolved
+    ? new BN(proposalAccount.state.resolved.endTs)
+    : new BN(proposalAccount.state.voting!.startTs).add(
         resolutionSettingsAccount.settings.nodes.find(
           (node) => typeof node.offsetFromStartTs !== "undefined"
         )?.offsetFromStartTs?.offset ?? new BN(0)
-      ))
+      );
   try {
     const needsVoteRaw = (
       await sequelize.query(`
@@ -613,14 +627,18 @@ server.post<{
         SystemProgram.transfer({
           fromPubkey: pdaWallet,
           toPubkey: task,
-          lamports: 2 * taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
+          lamports:
+            2 * taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
         }),
         // Count as many votes as possible
         ...(
           await Promise.all(
             needsVote.map(async (vote) => {
               const instructions: TransactionInstruction[] = [];
-              const { instruction: countIx, pubkeys: { marker, position } } = await voterStakeRegistryProgram.methods
+              const {
+                instruction: countIx,
+                pubkeys: { marker, position },
+              } = await voterStakeRegistryProgram.methods
                 .countProxyVoteV0()
                 .accountsPartial({
                   payer: pdaWallet,
@@ -636,15 +654,16 @@ server.post<{
                 })
                 .prepare();
               instructions.push(countIx);
-              const closeIx = await hplCronsProgram.methods.requeueRelinquishExpiredVoteMarkerV0({
-                triggerTs: endTs
-              })
+              const closeIx = await hplCronsProgram.methods
+                .requeueRelinquishExpiredVoteMarkerV0({
+                  triggerTs: endTs,
+                })
                 .accounts({
                   marker: marker!,
-                  position: position!
+                  position: position!,
                 })
                 .instruction();
-              instructions.push(closeIx)
+              instructions.push(closeIx);
               return instructions;
             })
           )
