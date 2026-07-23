@@ -13,6 +13,7 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
+import * as multisig from "@sqds/multisig";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair } from "./utils";
@@ -26,9 +27,11 @@ import { loadKeypair } from "./utils";
 // patch-time edit that sets INFLATION_START), then set the cron's council_vault to it.
 //
 // Operational rules (see HIP 149 Decision 4):
-//   - `owner` MUST be the governance multisig, never the Receiving Entity. It is the only
-//     authority that can edit the seated-member set; the community seats/removes members by
-//     vote and the multisig executes the corresponding update.
+//   - `owner` MUST be the governance multisig's vault, never the Receiving Entity. It is the
+//     only authority that can edit the seated-member set; the community seats/removes members
+//     by vote and the multisig executes the corresponding update. Prefer --multisig over
+//     --owner: it derives the vault the same way update-council-fanout.ts and
+//     close-council-fanout.ts do, instead of relying on a manually-typed vault address.
 //   - On a seat change, CRANK before updating the member vec, so accrual maps to the set that
 //     was seated when it accrued (a vacant seat's share then redistributes to the seated
 //     members from that point forward, per the HIP).
@@ -48,9 +51,13 @@ export async function run(args: any = process.argv) {
     },
     owner: {
       type: "string",
-      required: true,
       describe:
-        "Fanout owner = governance multisig (Squads vault). Edits the seated-member set. NEVER the Receiving Entity.",
+        "Fanout owner = governance multisig (Squads vault) address directly. Edits the seated-member set. NEVER the Receiving Entity. Prefer --multisig, which derives this the same way update-council-fanout.ts and close-council-fanout.ts do; use --owner only to bypass that derivation.",
+    },
+    multisig: {
+      type: "string",
+      describe:
+        "Address of the squads multisig whose vault (index 0) should own the fanout. Derives --owner for you, the same way update-council-fanout.ts and close-council-fanout.ts derive it from --multisig. Exactly one of --owner / --multisig is required.",
     },
     members: {
       type: "string",
@@ -86,7 +93,18 @@ export async function run(args: any = process.argv) {
   const program = await initMfan(provider);
   const tuktukProgram = await initTuktuk(provider);
 
-  const owner = new PublicKey(argv.owner);
+  if (Boolean(argv.owner) === Boolean(argv.multisig)) {
+    throw new Error("exactly one of --owner / --multisig is required");
+  }
+  const owner = argv.multisig
+    ? (
+        await multisig.getVaultPda({
+          multisigPda: new PublicKey(argv.multisig),
+          index: 0,
+          programId: multisig.PROGRAM_ID,
+        })
+      )[0]
+    : new PublicKey(argv.owner);
   const members = argv.members
     .split(",")
     .map((m) => m.trim())
@@ -162,7 +180,10 @@ export async function run(args: any = process.argv) {
   );
 
   console.log("Council fanout created.");
-  console.log(`  owner (governance multisig): ${owner.toBase58()}`);
+  if (argv.multisig) {
+    console.log(`  multisig:                    ${argv.multisig}`);
+  }
+  console.log(`  owner (governance multisig vault): ${owner.toBase58()}`);
   console.log(`  mini fanout:                 ${miniFanout!.toBase58()}`);
   console.log(`  schedule:                    ${argv.schedule}`);
   console.log(`  members (${members.length}):`);
