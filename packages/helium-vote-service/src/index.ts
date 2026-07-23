@@ -62,7 +62,7 @@ const ORG_IDS = {
   [IOT_MINT.toBase58()]: organizationKey("Helium IOT")[0].toBase58(),
 };
 
-const server: FastifyInstance = Fastify({
+export const server: FastifyInstance = Fastify({
   logger: true,
 });
 
@@ -750,7 +750,12 @@ const start = async () => {
   }
 };
 
-start();
+// Guard the listen/bootstrap side effects so the app can be imported under
+// test (NODE_ENV=test) and driven via fastify injection without binding a
+// port, cloning the proxies repo, or reaching Solana.
+if (process.env.NODE_ENV !== "test") {
+  start();
+}
 
 function arrayEquals(choices: number[], choices1: number[]) {
   if (choices.length !== choices1.length) return false;
