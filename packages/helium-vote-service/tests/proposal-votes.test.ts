@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import type { FastifyInstance } from "fastify";
+import type { Sequelize } from "sequelize";
 import {
   applySchema,
   ensureProxiesDir,
@@ -16,7 +17,7 @@ const OWNER = "owner1111111111111111111111111111111111111111";
 describe("GET /v1/proposals/:proposal/votes", () => {
   let db: TestDb;
   let server: FastifyInstance;
-  let sequelize: any;
+  let sequelize: Sequelize;
 
   before(async function () {
     this.timeout(60000);

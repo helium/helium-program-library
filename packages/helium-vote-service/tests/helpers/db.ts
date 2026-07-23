@@ -1,5 +1,7 @@
 import EmbeddedPostgres from "embedded-postgres";
+import type { Sequelize } from "sequelize";
 import fs from "fs";
+import net from "net";
 import os from "os";
 import path from "path";
 import { Keypair } from "@solana/web3.js";
@@ -22,7 +24,16 @@ export interface TestDb {
   stop: () => Promise<void>;
 }
 
-let dataDir: string;
+/** Reserve an OS-assigned free port so parallel suites can't collide. */
+const getFreePort = (): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.once("error", reject);
+    srv.listen(0, () => {
+      const { port } = srv.address() as net.AddressInfo;
+      srv.close(() => resolve(port));
+    });
+  });
 
 /**
  * Boot an ephemeral Postgres and wire the process env to it. Must run before
@@ -30,8 +41,8 @@ let dataDir: string;
  * instance from these env vars at import time.
  */
 export const startTestDb = async (): Promise<TestDb> => {
-  const port = 50000 + Math.floor(Math.random() * 10000);
-  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "hvs-pg-"));
+  const port = await getFreePort();
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "hvs-pg-"));
 
   const pg = new EmbeddedPostgres({
     databaseDir: dataDir,
@@ -77,7 +88,7 @@ export const startTestDb = async (): Promise<TestDb> => {
  * raw SQL (unnest on integer[], jsonb[] indexing, ->> extraction) behaves as
  * it does against the real sink-written schema.
  */
-export const applySchema = async (sequelize: any): Promise<void> => {
+export const applySchema = async (sequelize: Sequelize): Promise<void> => {
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS proposals (
       address TEXT PRIMARY KEY,
@@ -119,7 +130,7 @@ export const applySchema = async (sequelize: any): Promise<void> => {
   `);
 };
 
-export const truncateAll = async (sequelize: any): Promise<void> => {
+export const truncateAll = async (sequelize: Sequelize): Promise<void> => {
   await sequelize.query(
     "TRUNCATE proposals, vote_markers, proxies, proxy_assignments"
   );
@@ -134,7 +145,7 @@ export interface SeedProposal {
 }
 
 export const seedProposal = async (
-  sequelize: any,
+  sequelize: Sequelize,
   p: SeedProposal
 ): Promise<void> => {
   const choicesJson = p.choices.map((name) => JSON.stringify({ name }));
@@ -164,7 +175,7 @@ export interface SeedVoteMarker {
 }
 
 export const seedVoteMarker = async (
-  sequelize: any,
+  sequelize: Sequelize,
   m: SeedVoteMarker
 ): Promise<void> => {
   await sequelize.query(
@@ -182,54 +193,6 @@ export const seedVoteMarker = async (
         choices: m.choices,
         weight: String(m.weight),
         proxyIndex: m.proxyIndex ?? 0,
-      },
-    }
-  );
-};
-
-export interface SeedProxy {
-  wallet: string;
-  name: string;
-}
-
-export const seedProxy = async (
-  sequelize: any,
-  p: SeedProxy
-): Promise<void> => {
-  await sequelize.query(
-    `INSERT INTO proxies (wallet, name) VALUES (:wallet, :name)`,
-    { replacements: { wallet: p.wallet, name: p.name } }
-  );
-};
-
-export interface SeedProxyAssignment {
-  address: string;
-  voter: string;
-  nextVoter?: string;
-  index: number;
-  asset: string;
-  proxyConfig?: string;
-  expirationTime?: number;
-}
-
-export const seedProxyAssignment = async (
-  sequelize: any,
-  a: SeedProxyAssignment
-): Promise<void> => {
-  await sequelize.query(
-    `INSERT INTO proxy_assignments
-       (address, voter, next_voter, index, asset, proxy_config, expiration_time)
-     VALUES
-       (:address, :voter, :nextVoter, :index, :asset, :proxyConfig, :expirationTime)`,
-    {
-      replacements: {
-        address: a.address,
-        voter: a.voter,
-        nextVoter: a.nextVoter ?? "11111111111111111111111111111111",
-        index: a.index,
-        asset: a.asset,
-        proxyConfig: a.proxyConfig ?? "proxyConfig",
-        expirationTime: a.expirationTime ?? 9999999999,
       },
     }
   );

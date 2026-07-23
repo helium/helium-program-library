@@ -1318,6 +1318,29 @@ describe("governance", () => {
       walletAddress = ctx.payer.publicKey.toBase58();
     });
 
+    // Cast and submit a vote, failing the test on any error. Used to set up
+    // "already voted" state before exercising skip reporting.
+    const castVote = async (
+      proposalKey: string,
+      positionMints: string[],
+      choice: number
+    ) => {
+      const { data, error } = await ctx.safeClient.governance.vote({
+        walletAddress,
+        proposalKey,
+        positionMints,
+        choice,
+      });
+      if (error) {
+        expect.fail(`Setup vote failed: ${JSON.stringify(error)}`);
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        data!.transactionData,
+        ctx.payer
+      );
+    };
+
     it("votes on proposal with position", async () => {
       // #given fresh position for voting
       const result = await createAndFundPosition(ctx, {
@@ -1439,20 +1462,10 @@ describe("governance", () => {
         lockupPeriodsInDays: 365,
       });
 
-      const { data: firstVote, error: firstErr } =
-        await ctx.safeClient.governance.vote({
-          walletAddress,
-          proposalKey: maxOneProposal.proposal.toBase58(),
-          positionMints: [usedUp.positionMint],
-          choice: 0,
-        });
-      if (firstErr) {
-        expect.fail(`Setup vote failed: ${JSON.stringify(firstErr)}`);
-      }
-      await signAndSubmitTransactionData(
-        ctx.connection,
-        firstVote!.transactionData,
-        ctx.payer
+      await castVote(
+        maxOneProposal.proposal.toBase58(),
+        [usedUp.positionMint],
+        0
       );
 
       // #when voting a different choice with the used-up and the fresh position
@@ -1487,20 +1500,10 @@ describe("governance", () => {
         lockupPeriodsInDays: 365,
       });
 
-      const { data: firstVote, error: firstErr } =
-        await ctx.safeClient.governance.vote({
-          walletAddress,
-          proposalKey: proposalSetup.proposal.toBase58(),
-          positionMints: [alreadyVoted.positionMint],
-          choice: 0,
-        });
-      if (firstErr) {
-        expect.fail(`Setup vote failed: ${JSON.stringify(firstErr)}`);
-      }
-      await signAndSubmitTransactionData(
-        ctx.connection,
-        firstVote!.transactionData,
-        ctx.payer
+      await castVote(
+        proposalSetup.proposal.toBase58(),
+        [alreadyVoted.positionMint],
+        0
       );
 
       // #when re-voting choice 0 with the already-voted and the fresh position
@@ -1533,20 +1536,10 @@ describe("governance", () => {
         lockupPeriodsInDays: 365,
       });
 
-      const { data: voteData, error: voteError } =
-        await ctx.safeClient.governance.vote({
-          walletAddress,
-          proposalKey: proposalSetup.proposal.toBase58(),
-          positionMints: [result.positionMint],
-          choice: 1,
-        });
-      if (voteError) {
-        expect.fail(`First vote failed: ${JSON.stringify(voteError)}`);
-      }
-      await signAndSubmitTransactionData(
-        ctx.connection,
-        voteData!.transactionData,
-        ctx.payer
+      await castVote(
+        proposalSetup.proposal.toBase58(),
+        [result.positionMint],
+        1
       );
 
       // #when re-voting the same choice with that lone position
@@ -1582,20 +1575,10 @@ describe("governance", () => {
         lockupPeriodsInDays: 365,
       });
 
-      const { data: firstVote, error: firstErr } =
-        await ctx.safeClient.governance.vote({
-          walletAddress,
-          proposalKey: proposalSetup.proposal.toBase58(),
-          positionMints: [alreadyVoted.positionMint],
-          choice: 0,
-        });
-      if (firstErr) {
-        expect.fail(`Setup vote failed: ${JSON.stringify(firstErr)}`);
-      }
-      await signAndSubmitTransactionData(
-        ctx.connection,
-        firstVote!.transactionData,
-        ctx.payer
+      await castVote(
+        proposalSetup.proposal.toBase58(),
+        [alreadyVoted.positionMint],
+        0
       );
 
       // #when preparing the same vote twice without submitting in between

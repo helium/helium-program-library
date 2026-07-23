@@ -1,4 +1,5 @@
 import { publicProcedure } from "@/server/api/procedures";
+import type { SkippedPosition } from "@helium/blockchain-api/schemas/governance";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
@@ -116,10 +117,7 @@ export const vote = publicProcedure.governance.vote.handler(
 
     const ownedPositionsToVote: PositionVoteData[] = [];
     const proxiedPositionsToVote: PositionVoteData[] = [];
-    const skipped: {
-      positionMint: string;
-      reason: "maxChoicesReached" | "alreadyVotedThisChoice";
-    }[] = [];
+    const skipped: SkippedPosition[] = [];
     let ownedTaskIdsNeeded = 0;
     let hasProxies = false;
 
