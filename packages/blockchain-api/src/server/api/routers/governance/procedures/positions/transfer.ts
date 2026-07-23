@@ -48,27 +48,15 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
       throw errors.NOT_FOUND({ message: "Target position not found" });
     }
 
-    const [sourceOwnership, targetOwnership] = await Promise.all([
-      validatePositionOwnership(
-        connection,
-        sourcePositionMintPubkey,
-        walletPubkey,
-      ),
-      validatePositionOwnership(
-        connection,
-        targetPositionMintPubkey,
-        walletPubkey,
-      ),
-    ]);
+    const sourceOwnership = await validatePositionOwnership(
+      connection,
+      sourcePositionMintPubkey,
+      walletPubkey,
+    );
 
     if (!sourceOwnership.isOwner) {
       throw errors.BAD_REQUEST({
         message: "Wallet does not own the source position",
-      });
-    }
-    if (!targetOwnership.isOwner) {
-      throw errors.BAD_REQUEST({
-        message: "Wallet does not own the target position",
       });
     }
 
@@ -80,6 +68,20 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
     if (targetPositionAcc.numActiveVotes > 0) {
       throw errors.BAD_REQUEST({
         message: "Target position has active votes and cannot receive transfer",
+      });
+    }
+
+    if (!targetPositionAcc.registrar.equals(sourcePositionAcc.registrar)) {
+      throw errors.BAD_REQUEST({
+        message: "Target position belongs to a different registrar",
+      });
+    }
+    if (
+      targetPositionAcc.votingMintConfigIdx !==
+      sourcePositionAcc.votingMintConfigIdx
+    ) {
+      throw errors.BAD_REQUEST({
+        message: "Target position uses a different voting mint configuration",
       });
     }
 
