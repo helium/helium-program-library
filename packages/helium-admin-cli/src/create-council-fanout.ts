@@ -104,7 +104,7 @@ export async function run(args: any = process.argv) {
           programId: multisig.PROGRAM_ID,
         })
       )[0]
-    : new PublicKey(argv.owner);
+    : new PublicKey(argv.owner!); // validated above: exactly one of owner/multisig is set
   const members = argv.members
     .split(",")
     .map((m) => m.trim())
