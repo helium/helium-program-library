@@ -59,6 +59,30 @@ pub fn get_closing_epoch_bytes(
   .to_le_bytes()
 }
 
+// Last epoch that must be claimed before a delegation can close. An ended
+// cliff position stops earning at lockup end. Epochs at or after the
+// delegation's expiration pay zero rewards (claim_rewards_v1 pays 0 once
+// expiration_ts <= epoch start), so an expired delegation only needs claims
+// through the last epoch that could pay out. expiration_ts == 0 means no
+// expiration; keep the strict requirement.
+pub fn to_claim_to_epoch(
+  curr_ts: i64,
+  lockup_end_ts: i64,
+  is_cliff: bool,
+  expiration_ts: i64,
+) -> u64 {
+  let curr_epoch = current_epoch(curr_ts);
+  let mut to_claim_to_epoch = if lockup_end_ts < curr_ts && is_cliff {
+    current_epoch(lockup_end_ts) - 1
+  } else {
+    curr_epoch - 1
+  };
+  if expiration_ts != 0 {
+    to_claim_to_epoch = min(to_claim_to_epoch, current_epoch(expiration_ts - 1));
+  }
+  to_claim_to_epoch
+}
+
 #[derive(Accounts)]
 pub struct CloseDelegationV0<'info> {
   #[account(mut)]
@@ -162,12 +186,12 @@ pub fn raw_handler(accounts: &mut CloseDelegationAccounts, sde_bump: u8) -> Resu
   // make sure to account for when the position ends
   // unless we're testing, in which case we don't care
   let curr_epoch = current_epoch(curr_ts);
-  let to_claim_to_epoch =
-    if position.lockup.end_ts < curr_ts && position.lockup.kind == LockupKind::Cliff {
-      current_epoch(position.lockup.end_ts) - 1
-    } else {
-      curr_epoch - 1
-    };
+  let to_claim_to_epoch = to_claim_to_epoch(
+    curr_ts,
+    position.lockup.end_ts,
+    position.lockup.kind == LockupKind::Cliff,
+    expiration_ts,
+  );
   assert!((accounts.delegated_position.last_claimed_epoch >= to_claim_to_epoch) || TESTING);
 
   let delegated_position = &mut accounts.delegated_position;
@@ -317,4 +341,79 @@ pub fn handler(ctx: Context<CloseDelegationV0>) -> Result<()> {
   };
   raw_handler(&mut accounts, ctx.bumps.sub_dao_epoch_info)?;
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::EPOCH_LENGTH;
+
+  const NO_EXPIRATION: i64 = 0;
+
+  fn epoch_start(epoch: i64) -> i64 {
+    epoch * EPOCH_LENGTH
+  }
+
+  #[test]
+  fn no_expiration_requires_claims_through_previous_epoch() {
+    let curr_ts = epoch_start(100) + 5;
+    assert_eq!(
+      to_claim_to_epoch(curr_ts, epoch_start(200), false, NO_EXPIRATION),
+      99
+    );
+  }
+
+  #[test]
+  fn future_expiration_does_not_relax_the_requirement() {
+    let curr_ts = epoch_start(100) + 5;
+    assert_eq!(
+      to_claim_to_epoch(curr_ts, epoch_start(300), false, epoch_start(200)),
+      99
+    );
+  }
+
+  #[test]
+  fn expired_delegation_only_requires_claims_through_last_paying_epoch() {
+    // Expiration mid-epoch 50: epoch 50 still pays, epochs 51+ pay zero, so an
+    // expired delegation must be closable with last_claimed_epoch = 50 even
+    // though the current epoch is 100.
+    let curr_ts = epoch_start(100) + 5;
+    let expiration_ts = epoch_start(50) + 10;
+    assert_eq!(
+      to_claim_to_epoch(curr_ts, epoch_start(300), false, expiration_ts),
+      50
+    );
+  }
+
+  #[test]
+  fn expiration_on_epoch_boundary_excludes_that_epoch() {
+    // Expiration exactly at the start of epoch 50 means epoch 50 pays zero;
+    // epoch 49 is the last paying epoch.
+    let curr_ts = epoch_start(100) + 5;
+    assert_eq!(
+      to_claim_to_epoch(curr_ts, epoch_start(300), false, epoch_start(50)),
+      49
+    );
+  }
+
+  #[test]
+  fn ended_cliff_requires_claims_through_epoch_before_lockup_end() {
+    let curr_ts = epoch_start(100) + 5;
+    let lockup_end_ts = epoch_start(60) + 10;
+    assert_eq!(
+      to_claim_to_epoch(curr_ts, lockup_end_ts, true, NO_EXPIRATION),
+      59
+    );
+  }
+
+  #[test]
+  fn ended_cliff_with_earlier_expiration_takes_the_expiration_cap() {
+    let curr_ts = epoch_start(100) + 5;
+    let lockup_end_ts = epoch_start(60) + 10;
+    let expiration_ts = epoch_start(50) + 10;
+    assert_eq!(
+      to_claim_to_epoch(curr_ts, lockup_end_ts, true, expiration_ts),
+      50
+    );
+  }
 }
