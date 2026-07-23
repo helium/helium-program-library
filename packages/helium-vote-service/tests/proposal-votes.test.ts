@@ -42,7 +42,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
     await truncateAll(sequelize);
   });
 
-  it("attributes a direct vote's weight to the casting wallet", async () => {
+  it("attributes a direct vote's weight to the casting voter", async () => {
     await seedProposal(sequelize, {
       address: PROPOSAL,
       choices: ["Yes", "No"],
