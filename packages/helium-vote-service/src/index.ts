@@ -505,12 +505,15 @@ server.get<{
           unnest(vm.choices) as choice
         FROM vote_markers vm
         -- One index-0 row may exist per proxy config; the owner is the same
-        -- wallet in each, so dedupe by asset to keep the join 1:1.
-        LEFT OUTER JOIN (
-          SELECT DISTINCT ON (asset) asset, voter
+        -- wallet in each, so any single row keeps the join 1:1. LATERAL makes
+        -- this an index probe per marker rather than materializing the
+        -- index-0 rows of the whole table on every request.
+        LEFT OUTER JOIN LATERAL (
+          SELECT voter
           FROM proxy_assignments
-          WHERE index = 0
-        ) owner_pa ON owner_pa.asset = vm.mint
+          WHERE index = 0 AND asset = vm.mint
+          LIMIT 1
+        ) owner_pa ON true
         WHERE vm.proposal = ${proposal}
       ),
       exploded_choice_vote_markers AS (
