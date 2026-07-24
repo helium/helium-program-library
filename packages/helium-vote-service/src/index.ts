@@ -21,7 +21,7 @@ import fs from "fs";
 import { camelCase, isPlainObject, mapKeys } from "lodash";
 import path from "path";
 import { Op } from "sequelize";
-import { SOLANA_URL } from "./env";
+import { PACKAGE_ROOT, PROXIES_DIR, SOLANA_URL } from "./env";
 import {
   Position,
   Proxy,
@@ -71,12 +71,7 @@ server.register(cors, {
 });
 
 server.register(fastifyStatic, {
-  root: path.join(
-    __dirname,
-    process.env.NODE_ENV === "production"
-      ? "../../helium-vote-proxies"
-      : "../helium-vote-proxies"
-  ),
+  root: PROXIES_DIR,
   prefix: "/helium-vote-proxies/",
 });
 
@@ -786,11 +781,7 @@ const start = async () => {
     setRelations();
 
     // Read SQL file
-    const sqlFilePath = path.join(
-      __dirname,
-      process.env.NODE_ENV === "production" ? "../.." : "..",
-      "positions_with_vetokens.sql"
-    );
+    const sqlFilePath = path.join(PACKAGE_ROOT, "positions_with_vetokens.sql");
     const sqlQuery = fs.readFileSync(sqlFilePath, "utf8");
 
     // Execute SQL query
