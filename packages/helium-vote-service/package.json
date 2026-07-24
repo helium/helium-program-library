@@ -30,7 +30,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node lib/esm/index.js",
     "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts",
-    "test": "NODE_ENV=test mocha \"tests/**/*.test.ts\""
+    "test": "mocha \"tests/**/*.test.ts\""
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",

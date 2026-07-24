@@ -526,7 +526,8 @@ server.get<{
           jsonb_agg(DISTINCT jsonb_build_object('wallet', m.casting_voter, 'name', casting.name))
             FILTER (WHERE m.casting_voter <> m.voter) as casting_proxies
         FROM markers_with_owner m
-        LEFT OUTER JOIN proxies casting ON casting.wallet = m.casting_voter
+        LEFT OUTER JOIN proxies casting
+          ON casting.wallet = m.casting_voter AND m.casting_voter <> m.voter
         GROUP BY m.voter, m.registrar, m.proposal, m.choice
       )
       SELECT

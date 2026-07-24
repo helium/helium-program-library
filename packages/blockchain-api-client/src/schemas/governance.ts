@@ -240,7 +240,7 @@ export const SkippedPositionSchema = z.object({
     "Mint of the position that was not included in the vote transactions"
   ),
   reason: SkipReasonSchema.describe(
-    "Why the position was skipped: 'maxChoicesReached' (already used all its choices on this proposal) or 'alreadyVotedThisChoice' (idempotent re-submit)"
+    "Why the position was excluded from the vote transactions"
   ),
 });
 
