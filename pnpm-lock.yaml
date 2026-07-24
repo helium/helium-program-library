@@ -660,19 +660,19 @@ importers:
         version: 1.13.6(@opentelemetry/api@1.9.0)
       '@orpc/json-schema':
         specifier: 1.13.6
-        version: 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))
+        version: 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))
       '@orpc/openapi':
         specifier: 1.13.6
-        version: 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))
+        version: 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))
       '@orpc/server':
         specifier: 1.13.6
-        version: 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))
+        version: 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))
       '@orpc/tanstack-query':
         specifier: 1.13.6
         version: 1.13.6(@opentelemetry/api@1.9.0)(@orpc/client@1.13.6(@opentelemetry/api@1.9.0))(@tanstack/query-core@5.90.20)
       '@orpc/zod':
         specifier: 1.13.6
-        version: 1.13.6(@opentelemetry/api@1.9.0)(@orpc/contract@1.13.6(@opentelemetry/api@1.9.0))(@orpc/server@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10)))(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))(zod@4.3.6)
+        version: 1.13.6(@opentelemetry/api@1.9.0)(@orpc/contract@1.13.6(@opentelemetry/api@1.9.0))(@orpc/server@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10)))(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))(zod@4.3.6)
       '@privy-io/react-auth':
         specifier: ^2.20.0
         version: 2.25.0(@react-native-async-storage/async-storage@1.19.3(react-native@0.72.17(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(bufferutil@4.0.7)(encoding@0.1.13)(react@19.2.6)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.0.7)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/spl-token@0.4.14(@solana/web3.js@1.98.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/web3.js@1.98.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(@types/react@19.2.14)(bs58@6.0.0)(bufferutil@4.0.7)(fastestsmallesttextencoderdecoder@1.0.22)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(use-sync-external-store@1.6.0(react@19.2.6))(utf-8-validate@5.0.10)(zod@4.3.6)
@@ -1050,9 +1050,9 @@ importers:
       '@helium/spl-utils':
         specifier: workspace:^
         version: link:../spl-utils
-      '@pythnetwork/hermes-client':
-        specifier: ^2.0.0
-        version: 2.0.0(axios@1.13.6)
+      '@pythnetwork/pyth-solana-receiver':
+        specifier: ^0.10.2
+        version: 0.10.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/spl-token':
         specifier: ^0.3.8
         version: 0.3.11(@solana/web3.js@1.98.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
@@ -1080,12 +1080,6 @@ importers:
       '@helium/spl-utils':
         specifier: workspace:^
         version: link:../spl-utils
-      '@pythnetwork/hermes-client':
-        specifier: ^2.0.0
-        version: 2.0.0(axios@1.13.6)
-      '@pythnetwork/pyth-solana-receiver':
-        specifier: ^0.10.2
-        version: 0.10.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       bn.js:
         specifier: ^5.2.0
         version: 5.2.3
@@ -2548,6 +2542,9 @@ importers:
       '@metaplex-foundation/mpl-token-metadata':
         specifier: ^2.10.0
         version: 2.13.0(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      '@pythnetwork/pyth-solana-receiver':
+        specifier: ^0.10.2
+        version: 0.10.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/spl-account-compression':
         specifier: ^0.1.7
         version: 0.1.10(@solana/web3.js@1.98.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
@@ -18531,12 +18528,12 @@ snapshots:
 
   '@orpc/interop@1.13.6': {}
 
-  '@orpc/json-schema@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))':
+  '@orpc/json-schema@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))':
     dependencies:
       '@orpc/contract': 1.13.6(@opentelemetry/api@1.9.0)
       '@orpc/interop': 1.13.6
-      '@orpc/openapi': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))
-      '@orpc/server': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))
+      '@orpc/openapi': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))
+      '@orpc/server': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))
       '@orpc/shared': 1.13.6(@opentelemetry/api@1.9.0)
       json-schema-typed: 8.0.2
     transitivePeerDependencies:
@@ -18554,13 +18551,13 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/openapi@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))':
+  '@orpc/openapi@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))':
     dependencies:
       '@orpc/client': 1.13.6(@opentelemetry/api@1.9.0)
       '@orpc/contract': 1.13.6(@opentelemetry/api@1.9.0)
       '@orpc/interop': 1.13.6
       '@orpc/openapi-client': 1.13.6(@opentelemetry/api@1.9.0)
-      '@orpc/server': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))
+      '@orpc/server': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))
       '@orpc/shared': 1.13.6(@opentelemetry/api@1.9.0)
       '@orpc/standard-server': 1.13.6(@opentelemetry/api@1.9.0)
       json-schema-typed: 8.0.2
@@ -18571,7 +18568,7 @@ snapshots:
       - fastify
       - ws
 
-  '@orpc/server@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))':
+  '@orpc/server@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))':
     dependencies:
       '@orpc/client': 1.13.6(@opentelemetry/api@1.9.0)
       '@orpc/contract': 1.13.6(@opentelemetry/api@1.9.0)
@@ -18586,7 +18583,7 @@ snapshots:
       cookie: 1.1.1
     optionalDependencies:
       crossws: 0.3.5
-      ws: 8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10)
+      ws: 8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - '@opentelemetry/api'
       - fastify
@@ -18651,12 +18648,12 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/zod@1.13.6(@opentelemetry/api@1.9.0)(@orpc/contract@1.13.6(@opentelemetry/api@1.9.0))(@orpc/server@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10)))(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))(zod@4.3.6)':
+  '@orpc/zod@1.13.6(@opentelemetry/api@1.9.0)(@orpc/contract@1.13.6(@opentelemetry/api@1.9.0))(@orpc/server@1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10)))(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))(zod@4.3.6)':
     dependencies:
       '@orpc/contract': 1.13.6(@opentelemetry/api@1.9.0)
-      '@orpc/json-schema': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))
-      '@orpc/openapi': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))
-      '@orpc/server': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.2(bufferutil@4.0.7)(utf-8-validate@5.0.10))
+      '@orpc/json-schema': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))
+      '@orpc/openapi': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))
+      '@orpc/server': 1.13.6(@opentelemetry/api@1.9.0)(crossws@0.3.5)(ws@8.18.0(bufferutil@4.0.7)(utf-8-validate@5.0.10))
       '@orpc/shared': 1.13.6(@opentelemetry/api@1.9.0)
       escape-string-regexp: 5.0.0
       wildcard-match: 5.1.4

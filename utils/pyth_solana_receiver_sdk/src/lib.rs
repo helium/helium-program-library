@@ -15,9 +15,17 @@ pub mod pda;
 pub mod price_update;
 pub mod program;
 
-declare_id!("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ");
+// Pro-compatible deployments (matching upstream's `pro-compatible` feature).
+declare_id!("rec2HHDDnjLfj4kE7VyEtFA1HPGQLK33259532cRyHp");
 
-pub const PYTH_PUSH_ORACLE_ID: Pubkey = pubkey!("pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT");
+pub const PYTH_PUSH_ORACLE_ID: Pubkey = pubkey!("pyt2F414BA6dPttK6RddPZUdHfapoBN24GL5wbrPCou");
+
+// Legacy deployments, kept for transition-window dual-accept owner checks.
+pub const LEGACY_PYTH_SOLANA_RECEIVER_ID: Pubkey =
+    pubkey!("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ");
+
+pub const LEGACY_PYTH_PUSH_ORACLE_ID: Pubkey =
+    pubkey!("pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT");
 
 #[derive(Debug, BorshSerialize, BorshDeserialize, Clone)]
 pub struct PostUpdateParams {

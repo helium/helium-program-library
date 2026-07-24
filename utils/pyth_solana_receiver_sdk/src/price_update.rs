@@ -160,7 +160,10 @@ impl TwapUpdate {
 /// This type is used to persist the calculated TWAP in TwapUpdate accounts on Solana.
 #[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone, PartialEq, BorshSchema, Debug)]
 pub struct TwapPrice {
-    pub feed_id: FeedId,
+    // Written as `[u8; 32]` rather than the `FeedId` alias so anchor's idl-build
+    // codegen recognizes it as an array (the alias generates unresolvable
+    // `FeedId::create_type()` calls).
+    pub feed_id: [u8; 32],
     pub start_time: i64,
     pub end_time: i64,
     pub price: i64,
@@ -331,7 +334,7 @@ pub mod tests {
     #[test]
     fn check_size() {
         assert!(
-            PriceUpdateV2::discriminator().len() + borsh0_10::get_packed_len::<PriceUpdateV2>()
+            PriceUpdateV2::DISCRIMINATOR.len() + borsh0_10::get_packed_len::<PriceUpdateV2>()
                 == PriceUpdateV2::LEN
         );
     }

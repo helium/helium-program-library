@@ -29,6 +29,10 @@ export async function run(args: any = process.argv) {
     newAuthority: {
       type: "string",
     },
+    hntPriceOracle: {
+      type: "string",
+      describe: "New HNT price oracle account mints are pinned to",
+    },
     multisig: {
       type: "string",
       describe:
@@ -55,6 +59,9 @@ export async function run(args: any = process.argv) {
       .updateDataCreditsV0({
         newAuthority: argv.newAuthority
           ? new PublicKey(argv.newAuthority)
+          : null,
+        hntPriceOracle: argv.hntPriceOracle
+          ? new PublicKey(argv.hntPriceOracle)
           : null,
       })
       .accountsPartial({

@@ -96,11 +96,19 @@ describe("data-credits", () => {
       expect(data.transactions[0].metadata?.type).to.equal("mint_data_credits");
     });
 
-    // Note: On-chain submission of mintDataCredits transactions fails in surfpool
-    // because PythSolanaReceiver creates transactions with ephemeral signers whose
-    // signatures don't pass surfpool's signature verification. We verify the
-    // transaction is at least deserializable with the correct fee payer.
-    it("returns deserializable transactions with correct fee payer", async () => {
+    // The mint transaction now references the crank-fed feed account directly and
+    // carries no ephemeral signers, so it can submit on-chain in surfpool (the pro
+    // feed account is cloned from mainnet on first reference).
+    //
+    // Skipped until ticket 09 (post-flip release train) deploys the dual-accept
+    // data-credits program (commit "dual-accept legacy and pro pyth receivers in
+    // data-credits mint") to mainnet. surfpool clones the currently-deployed
+    // mainnet program, which only accepts the legacy pyth receiver
+    // (rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ) as the price-oracle owner. The
+    // pro feed account is owned by the pro receiver, so the un-upgraded program
+    // rejects it with AccountOwnedByWrongProgram (0xbbf). Unskip once ticket 09
+    // ships the program upgrade.
+    it.skip("builds and submits a mint transaction on-chain", async () => {
       const owner = ctx.payer.publicKey.toBase58();
 
       const { data, error } = await ctx.safeClient.dataCredits.mint({
@@ -118,6 +126,13 @@ describe("data-credits", () => {
         );
         expect(tx.message.staticAccountKeys[0].toBase58()).to.equal(owner);
       }
+
+      const sigs = await signAndSubmitTransactionData(
+        ctx.connection,
+        data,
+        ctx.payer
+      );
+      expect(sigs).to.have.lengthOf(data.transactions.length);
     });
   });
 

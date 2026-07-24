@@ -1,7 +1,7 @@
 import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Cluster, Connection, PublicKey } from "@solana/web3.js";
-import { HermesClient } from "@pythnetwork/hermes-client";
-import { HNT_PRICE_FEED_ID } from "@helium/spl-utils";
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
+import { HNT_PRICE_FEED_ID, HNT_PYTH_PRICE_FEED } from "@helium/spl-utils";
 import BN from "bn.js";
 
 export const getBalance = async ({
@@ -23,53 +23,40 @@ export const getBalance = async ({
   }
 };
 
-export const PYTH_HERMES_URL = "https://hermes.pyth.network/"
-
-type PythReturn = {
-  priceMessage: {
-    emaPrice: {
-      feedId: number[]
-      price: BN
-      conf: BN
-      exponent: number
-      publishTime: BN
-      prevPublishTime: BN
-      emaPrice: BN
-      emaConf: BN
-    }
-  }
-}
-
-export const getOraclePrice = async ({ tokenType }: {
+export const getOraclePrice = async ({
+  tokenType,
+  connection,
+}: {
   tokenType?: "HNT";
   cluster?: Cluster;
-  connection?: Connection;
+  connection: Connection;
 }) => {
   if (tokenType !== "HNT") {
     throw new Error("Only HNT is supported");
   }
-  const priceServiceConnection = new HermesClient(
-    PYTH_HERMES_URL,
-    {}
-  );
 
-  const priceUpdates = (
-    await priceServiceConnection.getLatestPriceUpdates(
-      [HNT_PRICE_FEED_ID],
-      { encoding: "base64" }
-    )
-  );
-  const price = priceUpdates.parsed![0];
+  // Read the crank-fed feed account directly; the placeholder wallet is only
+  // required by the receiver constructor and is never used to sign.
+  const pythSolanaReceiver = new PythSolanaReceiver({
+    connection,
+    wallet: { publicKey: PublicKey.default } as any,
+  });
+  const priceUpdate =
+    await pythSolanaReceiver.receiver.account.priceUpdateV2.fetch(
+      HNT_PYTH_PRICE_FEED
+    );
+  const { priceMessage } = priceUpdate;
+
   return {
     priceMessage: {
       feedId: HNT_PRICE_FEED_ID,
-      price: new BN(price.price.price as string),
-      emaPrice: new BN(price.ema_price.price as string),
-      conf: new BN(price.price.conf as string),
-      emaConf: new BN(price.ema_price.conf as string),
-      exponent: price.ema_price.expo,
-      publishTime: price.ema_price.publish_time,
-      prevPublishTime: price.ema_price.prev_publish_time,
-    }
-  }
+      price: new BN(priceMessage.price.toString()),
+      emaPrice: new BN(priceMessage.emaPrice.toString()),
+      conf: new BN(priceMessage.conf.toString()),
+      emaConf: new BN(priceMessage.emaConf.toString()),
+      exponent: priceMessage.exponent,
+      publishTime: priceMessage.publishTime.toNumber(),
+      prevPublishTime: priceMessage.prevPublishTime.toNumber(),
+    },
+  };
 };

@@ -1,5 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
-import { chunks, sendInstructions, truthy, withPriorityFees } from "@helium/spl-utils";
+import {
+  chunks,
+  sendInstructions,
+  truthy,
+  withPriorityFees,
+} from "@helium/spl-utils";
 import {
   AddressLookupTableProgram,
   PublicKey,
@@ -7,7 +12,7 @@ import {
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import * as multisig from '@sqds/multisig';
+import * as multisig from "@sqds/multisig";
 import { sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
@@ -72,7 +77,7 @@ export async function run(args: any = process.argv) {
     // Lazy dist mobile
     "GZtTp3AUo2AHdQe9BCJ6gXR9KqfruRvHnZ4QiJUALMcz",
     // Hnt pyth
-    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33",
+    "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5",
     // Mobile pyth
     "DQ4C1tzvu28cwo1roN1Wm6TW35sfJEjLh517k3ZeWevx",
     // Usdc pyth

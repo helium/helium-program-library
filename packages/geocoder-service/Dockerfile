@@ -1,7 +1,7 @@
 FROM amazoncorretto:11
 
 RUN yum install -y \
-        pbzip2 \
+        bzip2 \
         wget \
     && yum clean all
 
