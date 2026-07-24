@@ -505,13 +505,16 @@ server.get<{
           unnest(vm.choices) as choice
         FROM vote_markers vm
         -- One index-0 row may exist per proxy config; the owner is the same
-        -- wallet in each, so any single row keeps the join 1:1. LATERAL makes
-        -- this an index probe per marker rather than materializing the
+        -- wallet in each, so any single row keeps the join 1:1. If that
+        -- invariant ever breaks (e.g. a stale row after a transfer), prefer
+        -- the freshest assignment so attribution stays deterministic. LATERAL
+        -- makes this an index probe per marker rather than materializing the
         -- index-0 rows of the whole table on every request.
         LEFT OUTER JOIN LATERAL (
           SELECT voter
           FROM proxy_assignments
           WHERE index = 0 AND asset = vm.mint
+          ORDER BY expiration_time DESC, address
           LIMIT 1
         ) owner_pa ON true
         WHERE vm.proposal = ${proposal}

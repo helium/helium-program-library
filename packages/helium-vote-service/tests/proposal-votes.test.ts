@@ -45,6 +45,10 @@ describe("GET /v1/proposals/:proposal/votes", () => {
 
   beforeEach(async () => {
     await truncateAll(sequelize);
+    await seedProposal(sequelize, {
+      address: PROPOSAL,
+      choices: ["Yes", "No"],
+    });
   });
 
   const getVotes = async () => {
@@ -57,10 +61,6 @@ describe("GET /v1/proposals/:proposal/votes", () => {
   };
 
   it("attributes a direct vote's weight to the casting voter", async () => {
-    await seedProposal(sequelize, {
-      address: PROPOSAL,
-      choices: ["Yes", "No"],
-    });
     // Direct vote: the owner voted with their own wallet (proxy index 0).
     await seedVoteMarker(sequelize, {
       address: "marker11111111111111111111111111111111111111",
@@ -85,13 +85,6 @@ describe("GET /v1/proposals/:proposal/votes", () => {
   });
 
   describe("owner attribution (ADR 0003)", () => {
-    beforeEach(async () => {
-      await seedProposal(sequelize, {
-        address: PROPOSAL,
-        choices: ["Yes", "No"],
-      });
-    });
-
     it("keeps direct-vote attribution unchanged and lists no casting proxy", async () => {
       // Owner voted with their own wallet; index-0 assignment names them.
       await seedProxyAssignment(sequelize, {
@@ -303,6 +296,40 @@ describe("GET /v1/proposals/:proposal/votes", () => {
       expect(body).to.have.length(1);
       expect(body[0].voter).to.equal(OWNER);
       expect(String(body[0].weight)).to.equal("100");
+    });
+
+    it("attributes to the freshest index-0 voter when stale rows disagree", async () => {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintAstale111111111111111111111111111111",
+        voter: PROXY,
+        index: 0,
+        asset: MINT_A,
+        proxyConfig: "proxyConfig1",
+        expirationTime: nowSeconds + 60 * 60,
+      });
+      await seedProxyAssignment(sequelize, {
+        address: "pa0mintAfresh111111111111111111111111111111",
+        voter: OWNER,
+        index: 0,
+        asset: MINT_A,
+        proxyConfig: "proxyConfig2",
+        expirationTime: nowSeconds + 24 * 60 * 60,
+      });
+      await seedVoteMarker(sequelize, {
+        address: "markerA1111111111111111111111111111111111111",
+        voter: PROXY,
+        proposal: PROPOSAL,
+        mint: MINT_A,
+        choices: [0],
+        weight: "100",
+        proxyIndex: 1,
+      });
+
+      const body = await getVotes();
+
+      expect(body).to.have.length(1);
+      expect(body[0].voter).to.equal(OWNER);
     });
 
     it("keeps the response structurally backward-compatible (additive fields only)", async () => {
