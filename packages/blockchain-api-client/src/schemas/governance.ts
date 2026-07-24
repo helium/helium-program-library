@@ -234,6 +234,24 @@ export const UnassignProxiesInputSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Skip reporting (vote procedure)
+// ---------------------------------------------------------------------------
+
+export const SkipReasonSchema = z.enum([
+  "maxChoicesReached",
+  "alreadyVotedThisChoice",
+]);
+
+export const SkippedPositionSchema = z.object({
+  positionMint: PublicKeySchema.describe(
+    "Mint of the position that was not included in the vote transactions"
+  ),
+  reason: SkipReasonSchema.describe(
+    "Why the position was excluded from the vote transactions"
+  ),
+});
+
+// ---------------------------------------------------------------------------
 // Typed metadata schemas for endpoints with extra fields
 // ---------------------------------------------------------------------------
 
@@ -303,7 +321,16 @@ export const ClaimDelegationRewardsResponseSchema =
   createPaginatedTransactionResponse();
 export const UndelegatePositionResponseSchema =
   createPaginatedTransactionResponse();
-export const VoteResponseSchema = createPaginatedTransactionResponse();
+export const VoteResponseSchema = createPaginatedTransactionResponse().extend({
+  skipped: z
+    .array(SkippedPositionSchema)
+    // Tolerate server responses that omit the field (servers predating skip
+    // reporting).
+    .default([])
+    .describe(
+      "Positions not included in the vote transactions, each with the reason it was skipped. Empty when every position is eligible."
+    ),
+});
 export const RelinquishVoteResponseSchema =
   createPaginatedTransactionResponse();
 export const RelinquishPositionVotesResponseSchema =
@@ -374,6 +401,8 @@ export type UndelegatePositionResponse = z.infer<
 export type ClaimDelegationRewardsResponse = z.infer<
   typeof ClaimDelegationRewardsResponseSchema
 >;
+export type SkipReason = z.infer<typeof SkipReasonSchema>;
+export type SkippedPosition = z.infer<typeof SkippedPositionSchema>;
 export type VoteResponse = z.infer<typeof VoteResponseSchema>;
 export type RelinquishVoteResponse = z.infer<
   typeof RelinquishVoteResponseSchema

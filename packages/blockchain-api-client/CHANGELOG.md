@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.13.0
+
+### Minor Changes
+
+- [#1224](https://github.com/helium/helium-program-library/pull/1224) [`a5d7e07`](https://github.com/helium/helium-program-library/commit/a5d7e073f3da1ab87816c982ec723c7e2158a5ac) Thanks [@bryzettler](https://github.com/bryzettler)! - Governance vote-building now reports skipped positions instead of silently dropping them. The vote response gains a `skipped: [{ positionMint, reason }]` array (reasons `maxChoicesReached` and `alreadyVotedThisChoice`), and the all-positions-skipped case throws a new `ALL_POSITIONS_SKIPPED` error carrying the same skip report. Additive change — existing consumers keep working.
+
 ## 0.12.0
 
 ### Minor Changes

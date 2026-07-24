@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- Updated dependencies [[`a5d7e07`](https://github.com/helium/helium-program-library/commit/a5d7e073f3da1ab87816c982ec723c7e2158a5ac)]:
+  - @helium/voter-stake-registry-sdk@0.12.0
+  - @helium/helium-sub-daos-sdk@0.11.17
+  - @helium/hpl-crons-sdk@0.11.17
+
 ## 0.11.17
 
 ### Patch Changes
