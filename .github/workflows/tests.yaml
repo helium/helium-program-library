@@ -44,7 +44,7 @@ jobs:
         id: changed
         run: |
           BASE=${{ github.event.pull_request.base.sha }}
-          DIRS=$(git diff --name-only "$BASE"...HEAD | grep -E '^programs/[^/]+/src/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+          DIRS=$(git diff --name-only "$BASE"...HEAD | grep -E '^programs/[^/]+/(src/|Cargo\.toml)' | cut -d/ -f2 | sort -u | tr '\n' ' ')
           echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
           if [ -z "$DIRS" ]; then
             echo "No program source changes; skipping."

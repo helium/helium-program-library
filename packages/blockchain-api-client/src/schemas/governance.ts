@@ -6,6 +6,7 @@ import {
   createTypedTransactionResponse,
   PublicKeySchema,
   TokenAmountInputSchema,
+  TokenAmountOutputSchema,
   WalletAddressSchema,
 } from "./common";
 
@@ -109,6 +110,12 @@ export const TransferPositionInputSchema = z.object({
     .string()
     .regex(/^\d+$/, "Amount must be a whole number in smallest unit (bones)")
     .describe("Raw token amount to transfer (in smallest unit)"),
+});
+
+export const GetPositionsInputSchema = z.object({
+  wallet: WalletAddressSchema.describe(
+    "Wallet address to list governance positions for"
+  ),
 });
 
 export const TransferPositionOwnershipInputSchema = z.object({
@@ -266,6 +273,25 @@ const RelinquishAllVotesMetadataSchema = z.object({
   votesRelinquished: z.number().optional(),
 });
 
+export const PositionSchema = z.object({
+  positionMint: z.string().describe("Mint address of the position NFT"),
+  position: z.string().describe("Position PDA address"),
+  registrar: z.string().describe("Registrar the position belongs to"),
+  amountDeposited: TokenAmountOutputSchema.describe(
+    "Amount deposited in the position; mint is the governing token mint"
+  ),
+  numActiveVotes: z
+    .number()
+    .describe("Number of active votes currently cast by the position"),
+  lockup: z.object({
+    kind: LockupKindSchema,
+    startTs: z.string().describe("Lockup start unix timestamp"),
+    endTs: z.string().describe("Lockup end unix timestamp"),
+  }),
+});
+
+export const GetPositionsResponseSchema = z.array(PositionSchema);
+
 // ---------------------------------------------------------------------------
 // Per-endpoint response schemas — simple (no hasMore)
 // ---------------------------------------------------------------------------
@@ -328,6 +354,9 @@ export type TransferPositionInput = z.infer<typeof TransferPositionInputSchema>;
 export type TransferPositionOwnershipInput = z.infer<
   typeof TransferPositionOwnershipInputSchema
 >;
+export type GetPositionsInput = z.infer<typeof GetPositionsInputSchema>;
+export type Position = z.infer<typeof PositionSchema>;
+export type GetPositionsResponse = z.infer<typeof GetPositionsResponseSchema>;
 export type DelegatePositionInput = z.infer<typeof DelegatePositionInputSchema>;
 export type ExtendDelegationInput = z.infer<typeof ExtendDelegationInputSchema>;
 export type UndelegateInput = z.infer<typeof UndelegateInputSchema>;

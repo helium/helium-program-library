@@ -1,5 +1,10 @@
 import { oc } from "@orpc/contract";
-import { BAD_REQUEST, NOT_FOUND, UNAUTHORIZED } from "../errors/common";
+import {
+  BAD_REQUEST,
+  NOT_FOUND,
+  RATE_LIMITED,
+  UNAUTHORIZED,
+} from "../errors/common";
 import { ALL_POSITIONS_SKIPPED } from "../errors/governance";
 import { INSUFFICIENT_FUNDS } from "../errors/solana";
 import {
@@ -19,6 +24,8 @@ import {
   ExtendPositionResponseSchema,
   FlipLockupKindInputSchema,
   FlipLockupKindResponseSchema,
+  GetPositionsInputSchema,
+  GetPositionsResponseSchema,
   RelinquishPositionVotesInputSchema,
   RelinquishPositionVotesResponseSchema,
   RelinquishVoteInputSchema,
@@ -43,6 +50,18 @@ export const governanceContract = oc
   .tag("Governance")
   .prefix("/governance")
   .router({
+    getPositions: oc
+      .route({
+        method: "GET",
+        path: "/positions/wallet/{wallet}",
+        summary: "List wallet governance positions",
+        description:
+          "List all voter-stake-registry positions owned by a wallet, including deposited amount, governing mint, and lockup info.",
+      })
+      .input(GetPositionsInputSchema)
+      .errors({ BAD_REQUEST, RATE_LIMITED })
+      .output(GetPositionsResponseSchema),
+
     createPosition: oc
       .route({
         method: "POST",

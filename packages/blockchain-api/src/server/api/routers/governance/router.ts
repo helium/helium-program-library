@@ -1,5 +1,6 @@
 import { governanceContract } from "@helium/blockchain-api/contracts";
 import { implement } from "@orpc/server";
+import { getPositions } from "./procedures/positions/list";
 import { create as createPosition } from "./procedures/positions/create";
 import { close as closePosition } from "./procedures/positions/close";
 import { extend as extendPosition } from "./procedures/positions/extend";
@@ -19,6 +20,7 @@ import { assign as assignProxy } from "./procedures/proxy/assign";
 import { unassign as unassignProxy } from "./procedures/proxy/unassign";
 
 export const governanceRouter = implement(governanceContract).router({
+  getPositions,
   createPosition,
   closePosition,
   extendPosition,
