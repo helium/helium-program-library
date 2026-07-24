@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- [`fa33546`](https://github.com/helium/helium-program-library/commit/fa3354666d48ddac4825b5a0d6fc1a23d3b27e42) Thanks [@bryzettler](https://github.com/bryzettler)! - Resolve positions_with_vetokens.sql and the helium-vote-proxies dir relative to the package root instead of keying off NODE_ENV and cwd, fixing ENOENT crash when running the compiled build without NODE_ENV=production
+
 ## 0.11.17
 
 ### Patch Changes
