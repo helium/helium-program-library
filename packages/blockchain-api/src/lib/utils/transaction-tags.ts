@@ -57,6 +57,13 @@ export const TRANSACTION_TYPES = {
   SQUADS_PROPOSAL_EXECUTE: "squads_proposal_execute",
   SQUADS_CONFIG_CHANGE: "squads_config_change",
 
+  // Squads v3 multisig
+  SQUADS_V3_PROPOSAL_APPROVE: "squads_v3_proposal_approve",
+  SQUADS_V3_PROPOSAL_REJECT: "squads_v3_proposal_reject",
+  SQUADS_V3_PROPOSAL_CANCEL: "squads_v3_proposal_cancel",
+  SQUADS_V3_PROPOSAL_EXECUTE: "squads_v3_proposal_execute",
+  SQUADS_V3_CONFIG_CHANGE: "squads_v3_config_change",
+
   // Squads propose mode of the action endpoints
   TOKEN_TRANSFER_PROPOSAL: "token_transfer_proposal",
   TOKEN_BURN_PROPOSAL: "token_burn_proposal",
