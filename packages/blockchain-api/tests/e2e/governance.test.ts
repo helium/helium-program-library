@@ -448,6 +448,82 @@ describe("governance", () => {
         targetAmountBefore + transferAmount,
       );
     });
+
+    it("transfers tokens between positions owned by different wallets", async () => {
+      // #given a source position owned by ctx.payer and a target position owned by another wallet
+      const source = await createAndFundPosition(ctx, {
+        amount: "200000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 60,
+      });
+
+      const recipient = Keypair.generate();
+      await ensureFunds(recipient.publicKey, 0.1 * LAMPORTS_PER_SOL);
+      await ensureTokenBalance(recipient.publicKey, HNT_MINT, 10);
+
+      const { data: targetData, error: targetError } =
+        await ctx.safeClient.governance.createPosition({
+          walletAddress: recipient.publicKey.toBase58(),
+          tokenAmount: { amount: "100000000", mint: HNT_MINT.toBase58() },
+          lockupKind: "cliff",
+          lockupPeriodsInDays: 90,
+        });
+      if (targetError) {
+        throw new Error(
+          `Failed to create recipient position: ${JSON.stringify(targetError)}`
+        );
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        targetData!.transactionData,
+        recipient
+      );
+      const targetPositionMint = targetData!.transactionData.transactions[0]
+        .metadata?.positionMint as string;
+
+      const { vsrProgram } = await getPrograms(ctx);
+      const [sourcePubkey] = positionKey(new PublicKey(source.positionMint));
+      const [targetPubkey] = positionKey(new PublicKey(targetPositionMint));
+      const sourceAmountBefore = (
+        await vsrProgram.account.positionV0.fetch(sourcePubkey)
+      ).amountDepositedNative.toNumber();
+      const targetAmountBefore = (
+        await vsrProgram.account.positionV0.fetch(targetPubkey)
+      ).amountDepositedNative.toNumber();
+
+      // #when the source owner transfers part of their position to the recipient's position
+      const transferAmount = 50000000; // 0.5 HNT
+      const { data, error } = await ctx.safeClient.governance.transferPosition({
+        walletAddress,
+        positionMint: source.positionMint,
+        targetPositionMint,
+        amount: transferAmount.toString(),
+      });
+
+      // #then only the source owner's signature is required and the transfer succeeds
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      const sigs = await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        ctx.payer
+      );
+      expect(sigs).to.have.length(1);
+
+      const sourceAfter = await vsrProgram.account.positionV0.fetch(
+        sourcePubkey
+      );
+      const targetAfter = await vsrProgram.account.positionV0.fetch(
+        targetPubkey
+      );
+      expect(sourceAfter.amountDepositedNative.toNumber()).to.equal(
+        sourceAmountBefore - transferAmount
+      );
+      expect(targetAfter.amountDepositedNative.toNumber()).to.equal(
+        targetAmountBefore + transferAmount
+      );
+    });
   });
 
   describe("position ownership transfer", () => {

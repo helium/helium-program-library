@@ -134,7 +134,7 @@ export const governanceContract = oc
         path: "/positions/{positionMint}/transfer",
         summary: "Transfer between positions",
         description:
-          "Transfer tokens from one position to another. Both positions must have no active votes.",
+          "Transfer tokens from one position to another. Both positions must have no active votes. The target position may be owned by a different wallet, enabling veHNT transfer between wallets.",
       })
       .input(TransferPositionInputSchema)
       .errors({ BAD_REQUEST, NOT_FOUND, INSUFFICIENT_FUNDS })
@@ -146,7 +146,7 @@ export const governanceContract = oc
         path: "/positions/{positionMint}/transfer-ownership",
         summary: "Transfer position ownership",
         description:
-          "Transfer ownership of a position NFT to another wallet. Both the current owner and new owner must sign the transaction.",
+          "Transfer ownership of a position NFT to another wallet. Only the current owner must sign the transaction; the recipient does not.",
       })
       .input(TransferPositionOwnershipInputSchema)
       .errors({ BAD_REQUEST, NOT_FOUND, INSUFFICIENT_FUNDS })

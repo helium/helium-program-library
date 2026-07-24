@@ -14,10 +14,10 @@ export const LockupKindSchema = z.enum(["cliff", "constant"]);
 
 export const CreatePositionInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that will own the position",
+    "Wallet address that will own the position"
   ),
   tokenAmount: TokenAmountInputSchema.describe(
-    "Token amount and mint to deposit",
+    "Token amount and mint to deposit"
   ),
   lockupKind: LockupKindSchema.describe("Type of lockup: cliff or constant"),
   lockupPeriodsInDays: z
@@ -27,7 +27,7 @@ export const CreatePositionInputSchema = z.object({
     .max(2920)
     .describe("Number of days to lock the position (max ~8 years)"),
   subDaoMint: PublicKeySchema.optional().describe(
-    "Sub-DAO mint to delegate to immediately after creation (optional)",
+    "Sub-DAO mint to delegate to immediately after creation (optional)"
   ),
   automationEnabled: z
     .boolean()
@@ -37,14 +37,14 @@ export const CreatePositionInputSchema = z.object({
 
 export const ClosePositionInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the position",
+    "Wallet address that owns the position"
   ),
   positionMint: PublicKeySchema.describe("Mint address of the position NFT"),
 });
 
 export const ExtendPositionInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the position",
+    "Wallet address that owns the position"
   ),
   positionMint: PublicKeySchema.describe("Mint address of the position NFT"),
   lockupPeriodsInDays: z
@@ -56,14 +56,14 @@ export const ExtendPositionInputSchema = z.object({
 
 export const FlipLockupKindInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the position",
+    "Wallet address that owns the position"
   ),
   positionMint: PublicKeySchema.describe("Mint address of the position NFT"),
 });
 
 export const ResetLockupInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the position",
+    "Wallet address that owns the position"
   ),
   positionMint: PublicKeySchema.describe("Mint address of the position NFT"),
   lockupKind: LockupKindSchema.describe("New lockup type: cliff or constant"),
@@ -77,16 +77,16 @@ export const ResetLockupInputSchema = z.object({
 
 export const SplitPositionInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the position",
+    "Wallet address that owns the position"
   ),
   positionMint: PublicKeySchema.describe(
-    "Mint address of the source position NFT",
+    "Mint address of the source position NFT"
   ),
   amount: z
     .string()
     .regex(/^\d+$/, "Amount must be a whole number in smallest unit (bones)")
     .describe(
-      "Raw token amount to transfer to new position (in smallest unit)",
+      "Raw token amount to transfer to new position (in smallest unit)"
     ),
   lockupKind: LockupKindSchema.describe("Lockup type for new position"),
   lockupPeriodsInDays: z
@@ -98,13 +98,13 @@ export const SplitPositionInputSchema = z.object({
 
 export const TransferPositionInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns both positions",
+    "Wallet address that owns the source position and pays transaction fees"
   ),
   positionMint: PublicKeySchema.describe(
-    "Mint address of the source position NFT",
+    "Mint address of the source position NFT"
   ),
   targetPositionMint: PublicKeySchema.describe(
-    "Mint address of the target position NFT",
+    "Mint address of the target position NFT. May be owned by a different wallet; its lockup must be equal-or-longer and equal-or-stricter than the source's."
   ),
   amount: z
     .string()
@@ -114,23 +114,23 @@ export const TransferPositionInputSchema = z.object({
 
 export const GetPositionsInputSchema = z.object({
   wallet: WalletAddressSchema.describe(
-    "Wallet address to list governance positions for",
+    "Wallet address to list governance positions for"
   ),
 });
 
 export const TransferPositionOwnershipInputSchema = z.object({
   from: WalletAddressSchema.describe(
-    "Wallet address that currently owns the position",
+    "Wallet address that currently owns the position"
   ),
   to: WalletAddressSchema.describe(
-    "Wallet address that will receive the position",
+    "Wallet address that will receive the position"
   ),
   positionMint: PublicKeySchema.describe("Mint address of the position NFT"),
 });
 
 export const DelegatePositionInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the positions",
+    "Wallet address that owns the positions"
   ),
   positionMints: z
     .array(PublicKeySchema)
@@ -145,21 +145,21 @@ export const DelegatePositionInputSchema = z.object({
 
 export const ExtendDelegationInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the position",
+    "Wallet address that owns the position"
   ),
   positionMint: PublicKeySchema.describe("Mint address of the position NFT"),
 });
 
 export const UndelegateInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the position",
+    "Wallet address that owns the position"
   ),
   positionMint: PublicKeySchema.describe("Mint address of the position NFT"),
 });
 
 export const ClaimDelegationRewardsInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the positions",
+    "Wallet address that owns the positions"
   ),
   positionMints: z
     .array(PublicKeySchema)
@@ -169,10 +169,10 @@ export const ClaimDelegationRewardsInputSchema = z.object({
 
 export const VoteInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the positions",
+    "Wallet address that owns the positions"
   ),
   proposalKey: PublicKeySchema.describe(
-    "Public key of the proposal to vote on",
+    "Public key of the proposal to vote on"
   ),
   positionMints: z
     .array(PublicKeySchema)
@@ -183,10 +183,10 @@ export const VoteInputSchema = z.object({
 
 export const RelinquishVoteInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the positions",
+    "Wallet address that owns the positions"
   ),
   proposalKey: PublicKeySchema.describe(
-    "Public key of the proposal to relinquish vote from",
+    "Public key of the proposal to relinquish vote from"
   ),
   positionMints: z
     .array(PublicKeySchema)
@@ -197,24 +197,24 @@ export const RelinquishVoteInputSchema = z.object({
 
 export const RelinquishPositionVotesInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the position",
+    "Wallet address that owns the position"
   ),
   positionMint: PublicKeySchema.describe("Mint address of the position NFT"),
   organization: PublicKeySchema.describe(
-    "Public key of the DAO organization to relinquish votes from",
+    "Public key of the DAO organization to relinquish votes from"
   ),
 });
 
 export const AssignProxiesInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the positions",
+    "Wallet address that owns the positions"
   ),
   positionMints: z
     .array(PublicKeySchema)
     .min(1)
     .describe("Array of position NFT mint addresses to assign proxy for"),
   proxyKey: PublicKeySchema.describe(
-    "Public key of the proxy recipient who will vote on your behalf",
+    "Public key of the proxy recipient who will vote on your behalf"
   ),
   expirationTime: z
     .number()
@@ -224,7 +224,7 @@ export const AssignProxiesInputSchema = z.object({
 
 export const UnassignProxiesInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns the positions",
+    "Wallet address that owns the positions"
   ),
   proxyKey: PublicKeySchema.describe("Public key of the proxy to unassign"),
   positionMints: z
@@ -260,7 +260,7 @@ export const PositionSchema = z.object({
   position: z.string().describe("Position PDA address"),
   registrar: z.string().describe("Registrar the position belongs to"),
   amountDeposited: TokenAmountOutputSchema.describe(
-    "Amount deposited in the position; mint is the governing token mint",
+    "Amount deposited in the position; mint is the governing token mint"
   ),
   numActiveVotes: z
     .number()
@@ -279,14 +279,14 @@ export const GetPositionsResponseSchema = z.array(PositionSchema);
 // ---------------------------------------------------------------------------
 
 export const CreatePositionResponseSchema = createTypedTransactionResponse(
-  CreatePositionMetadataSchema,
+  CreatePositionMetadataSchema
 );
 export const ClosePositionResponseSchema = createTransactionResponse();
 export const ExtendPositionResponseSchema = createTransactionResponse();
 export const FlipLockupKindResponseSchema = createTransactionResponse();
 export const ResetLockupResponseSchema = createTransactionResponse();
 export const SplitPositionResponseSchema = createTypedTransactionResponse(
-  SplitPositionMetadataSchema,
+  SplitPositionMetadataSchema
 );
 export const TransferPositionResponseSchema = createTransactionResponse();
 export const TransferPositionOwnershipResponseSchema =
