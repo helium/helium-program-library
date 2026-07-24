@@ -97,13 +97,13 @@ export const SplitPositionInputSchema = z.object({
 
 export const TransferPositionInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns both positions"
+    "Wallet address that owns the source position and pays transaction fees"
   ),
   positionMint: PublicKeySchema.describe(
     "Mint address of the source position NFT"
   ),
   targetPositionMint: PublicKeySchema.describe(
-    "Mint address of the target position NFT"
+    "Mint address of the target position NFT. May be owned by a different wallet; its lockup must be equal-or-longer and equal-or-stricter than the source's."
   ),
   amount: z
     .string()

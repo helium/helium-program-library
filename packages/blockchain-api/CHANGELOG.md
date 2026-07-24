@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- Updated dependencies [[`9431155`](https://github.com/helium/helium-program-library/commit/943115570fc36650cdc83471fdf1ca66c491e6bb)]:
+  - @helium/blockchain-api@0.12.0
+
 ## 0.11.17
 
 ### Patch Changes
