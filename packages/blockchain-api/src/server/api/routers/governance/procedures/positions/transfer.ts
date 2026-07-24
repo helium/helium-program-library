@@ -40,7 +40,8 @@ function lockupStrictness(lockup: LockupLike): number {
 }
 
 function lockupSecondsLeft(lockup: LockupLike, unixNow: BN): BN {
-  const currTs = rawLockupKind(lockup) === "constant" ? lockup.startTs : unixNow;
+  const currTs =
+    rawLockupKind(lockup) === "constant" ? lockup.startTs : unixNow;
   return currTs.gte(lockup.endTs) ? new BN(0) : lockup.endTs.sub(currTs);
 }
 
@@ -74,7 +75,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
     const sourceOwnership = await validatePositionOwnership(
       connection,
       sourcePositionMintPubkey,
-      walletPubkey,
+      walletPubkey
     );
 
     if (!sourceOwnership.isOwner) {
@@ -113,7 +114,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
 
     if (
       lockupSecondsLeft(targetPositionAcc.lockup, unixNow).lt(
-        lockupSecondsLeft(sourcePositionAcc.lockup, unixNow),
+        lockupSecondsLeft(sourcePositionAcc.lockup, unixNow)
       )
     ) {
       throw errors.BAD_REQUEST({
@@ -132,7 +133,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
     }
 
     const registrar = await vsrProgram.account.registrar.fetch(
-      sourcePositionAcc.registrar,
+      sourcePositionAcc.registrar
     );
     const depositMint =
       registrar.votingMints[sourcePositionAcc.votingMintConfigIdx].mint;
@@ -156,8 +157,8 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
         sourcePositionPubkey,
         targetPositionPubkey,
         depositMint,
-        { amount: amountBN },
-      ),
+        { amount: amountBN }
+      )
     );
 
     if (amountBN.eq(sourcePositionAcc.amountDepositedNative)) {
@@ -167,7 +168,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
           .accountsPartial({
             position: sourcePositionPubkey,
           })
-          .instruction(),
+          .instruction()
       );
     }
 
@@ -176,7 +177,7 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
       draft: { instructions, feePayer: walletPubkey },
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < txFee) {
@@ -217,8 +218,8 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

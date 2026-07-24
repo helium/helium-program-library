@@ -59,8 +59,9 @@ export const assign = publicProcedure.governance.assignProxies.handler(
     const tuktukProgram = await initTuktuk(provider);
 
     const hntOrg = organizationKey("Helium")[0];
-    const organization =
-      await orgProgram.account.organizationV0.fetchNullable(hntOrg);
+    const organization = await orgProgram.account.organizationV0.fetchNullable(
+      hntOrg
+    );
 
     type ProposalVoteData = {
       proposalPubkey: PublicKey;
@@ -74,7 +75,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         .fill(0)
         .map(
           (_, index) =>
-            proposalKey(hntOrg, organization.numProposals - index - 1)[0],
+            proposalKey(hntOrg, organization.numProposals - index - 1)[0]
         );
 
       const proposals = (
@@ -83,12 +84,12 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         .map((account, index) => ({ account, pubkey: proposalKeys[index] }))
         .filter(
           (p): p is typeof p & { account: NonNullable<typeof p.account> } =>
-            !!p.account?.state.voting,
+            !!p.account?.state.voting
         );
 
       if (proposals.length > 0) {
         const proxyVoteKeys = proposals.map(
-          (p) => proxyVoteMarkerKey(proxyKeyPubkey, p.pubkey)[0],
+          (p) => proxyVoteMarkerKey(proxyKeyPubkey, p.pubkey)[0]
         );
         const proxyVoteAccounts =
           await vsrProgram.account.proxyMarkerV0.fetchMultiple(proxyVoteKeys);
@@ -113,8 +114,9 @@ export const assign = publicProcedure.governance.assignProxies.handler(
     // whale-sized proxied set — the same failure #1195 fixed for voting). The
     // loop below is then pure in-memory work plus the inherently-sequential
     // proxy-chain walk that only runs when a position is being reassigned.
-    const positionAccounts =
-      await vsrProgram.account.positionV0.fetchMultiple(positionPubkeys);
+    const positionAccounts = await vsrProgram.account.positionV0.fetchMultiple(
+      positionPubkeys
+    );
     positionAccounts.forEach(
       (acc: (typeof positionAccounts)[number], i: number) => {
         if (!acc) {
@@ -122,7 +124,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
             message: `Position ${positionMints[i]} not found`,
           });
         }
-      },
+      }
     );
 
     // Ownership for every position in one batched call instead of one
@@ -130,7 +132,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
     const isOwnerByIndex = await validatePositionOwnershipBatch(
       connection,
       positionMintPubkeys,
-      walletPubkey,
+      walletPubkey
     );
     isOwnerByIndex.forEach((isOwner, i) => {
       if (!isOwner) {
@@ -145,31 +147,31 @@ export const assign = publicProcedure.governance.assignProxies.handler(
       new Set(
         positionAccounts.map(
           (acc: (typeof positionAccounts)[number]) =>
-            acc!.registrar.toBase58() as string,
-        ),
-      ),
+            acc!.registrar.toBase58() as string
+        )
+      )
     );
     const registrarAccounts = await vsrProgram.account.registrar.fetchMultiple(
-      registrarKeys.map((k: string) => new PublicKey(k)),
+      registrarKeys.map((k: string) => new PublicKey(k))
     );
     const registrarByKey = new Map(
       registrarKeys.map(
-        (k: string, i: number) => [k, registrarAccounts[i]!] as const,
-      ),
+        (k: string, i: number) => [k, registrarAccounts[i]!] as const
+      )
     );
     const proxyConfigByIndex = positionAccounts.map(
       (acc: (typeof positionAccounts)[number]) =>
-        registrarByKey.get(acc!.registrar.toBase58())!.proxyConfig,
+        registrarByKey.get(acc!.registrar.toBase58())!.proxyConfig
     );
 
     // Each position's own proxy assignment (voter = default), batched.
     const ownedAssetProxyAssignmentAddresses = positionMintPubkeys.map(
       (mint, i) =>
-        proxyAssignmentKey(proxyConfigByIndex[i], mint, PublicKey.default)[0],
+        proxyAssignmentKey(proxyConfigByIndex[i], mint, PublicKey.default)[0]
     );
     const existingProxyAssignments =
       await proxyProgram.account.proxyAssignmentV0.fetchMultiple(
-        ownedAssetProxyAssignmentAddresses,
+        ownedAssetProxyAssignmentAddresses
       );
 
     // Delegation status for every position, batched (getMultipleAccounts caps at
@@ -178,12 +180,12 @@ export const assign = publicProcedure.governance.assignProxies.handler(
     const delegatedExistsByIndex: boolean[] = [];
     if (activeProxyVotes.length > 0) {
       const delegatedKeys = positionPubkeys.map(
-        (p) => delegatedPositionKey(p)[0],
+        (p) => delegatedPositionKey(p)[0]
       );
       const CHUNK_SIZE = 100;
       for (let i = 0; i < delegatedKeys.length; i += CHUNK_SIZE) {
         const infos = await connection.getMultipleAccountsInfo(
-          delegatedKeys.slice(i, i + CHUNK_SIZE),
+          delegatedKeys.slice(i, i + CHUNK_SIZE)
         );
         delegatedExistsByIndex.push(...infos.map((info) => info !== null));
       }
@@ -216,7 +218,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
           const addr = proxyAssignmentKey(
             proxyConfig,
             positionMintPubkey,
-            currentVoter,
+            currentVoter
           )[0];
           chain.push({ address: addr, voter: currentVoter });
           const acc =
@@ -241,10 +243,10 @@ export const assign = publicProcedure.governance.assignProxies.handler(
                 approver: walletPubkey,
                 tokenAccount: getAssociatedTokenAddressSync(
                   positionMintPubkey,
-                  walletPubkey,
+                  walletPubkey
                 ),
               })
-              .instruction(),
+              .instruction()
           );
         }
       }
@@ -259,7 +261,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
           approver: walletPubkey,
           tokenAccount: getAssociatedTokenAddressSync(
             positionMintPubkey,
-            walletPubkey,
+            walletPubkey
           ),
         })
         .prepare();
@@ -279,15 +281,16 @@ export const assign = publicProcedure.governance.assignProxies.handler(
     // vote-service cron count the votes for them and schedule each marker's
     // relinquish via the task-queue PDA (the only signer authorized to do so).
     if (hasDelegatedAssignment && activeProxyVotes.length > 0) {
-      const taskQueueAcc =
-        await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE);
+      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
+        TASK_QUEUE
+      );
       const nextAvailable = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
-        activeProxyVotes.length,
+        activeProxyVotes.length
       );
       const queueAuthority = PublicKey.findProgramAddressSync(
         [Buffer.from("queue_authority")],
-        hplCronsProgram.programId,
+        hplCronsProgram.programId
       )[0];
 
       const proxyVoteTaskInstructions: TransactionInstruction[] = [];
@@ -315,10 +318,10 @@ export const assign = publicProcedure.governance.assignProxies.handler(
               ])[0],
               taskQueueAuthority: taskQueueAuthorityKey(
                 TASK_QUEUE,
-                queueAuthority,
+                queueAuthority
               )[0],
             })
-            .instruction(),
+            .instruction()
         );
       }
 
@@ -355,7 +358,8 @@ export const assign = publicProcedure.governance.assignProxies.handler(
         ? getJitoTipAmountLamports()
         : 0;
     const totalFee =
-      getTotalTransactionFees(versionedTransactions) + jitoTipCost;
+      (await getTotalTransactionFees(connection, versionedTransactions)) +
+      jitoTipCost;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < totalFee) {
@@ -386,8 +390,8 @@ export const assign = publicProcedure.governance.assignProxies.handler(
       hasMore,
       estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

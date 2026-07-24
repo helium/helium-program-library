@@ -103,10 +103,11 @@ export const create = publicProcedure.rewardContract.create.handler(
 
     const recipientK = recipientKey(
       new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS),
-      assetPubkey,
+      assetPubkey
     )[0];
-    const recipientAcc =
-      await ldProgram.account.recipientV0.fetchNullable(recipientK);
+    const recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
+      recipientK
+    );
 
     if (!recipientAcc) {
       instructions.push(
@@ -118,7 +119,7 @@ export const create = publicProcedure.rewardContract.create.handler(
             assetEndpoint,
             lazyDistributor: new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS),
           })
-        ).instruction(),
+        ).instruction()
       );
     }
 
@@ -126,7 +127,7 @@ export const create = publicProcedure.rewardContract.create.handler(
 
     // Check wallet has sufficient balance
     const walletBalance = await connection.getBalance(
-      new PublicKey(signerWalletAddress),
+      new PublicKey(signerWalletAddress)
     );
     let rentCost = 0;
     if (!recipientAcc) {
@@ -138,10 +139,12 @@ export const create = publicProcedure.rewardContract.create.handler(
       rentCost += RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS;
       const claimableRecipient = recipients.find((r) => r.type === "CLAIMABLE");
       if (claimableRecipient?.type === "CLAIMABLE") {
-        rentCost += (await resolveTokenAmountInput(
-          claimableRecipient.giftedCurrency,
-          NATIVE_MINT.toBase58(),
-        )).toNumber();
+        rentCost += (
+          await resolveTokenAmountInput(
+            claimableRecipient.giftedCurrency,
+            NATIVE_MINT.toBase58()
+          )
+        ).toNumber();
       }
     } else {
       // Mini-fanout path - add funding amount
@@ -160,17 +163,19 @@ export const create = publicProcedure.rewardContract.create.handler(
       const program = await init(provider);
 
       const [uwpKey] = userWelcomePacksKey(
-        new PublicKey(delegateWalletAddress),
+        new PublicKey(delegateWalletAddress)
       );
-      const uwpAcc =
-        await program.account.userWelcomePacksV0.fetchNullable(uwpKey);
+      const uwpAcc = await program.account.userWelcomePacksV0.fetchNullable(
+        uwpKey
+      );
       if (uwpAcc && uwpAcc.nextId > 0) {
         const packKeys = Array.from(
           { length: uwpAcc.nextId },
-          (_, i) => welcomePackKey(new PublicKey(delegateWalletAddress), i)[0],
+          (_, i) => welcomePackKey(new PublicKey(delegateWalletAddress), i)[0]
         );
-        const packs =
-          await program.account.welcomePackV0.fetchMultiple(packKeys);
+        const packs = await program.account.welcomePackV0.fetchMultiple(
+          packKeys
+        );
         if (packs.some((p) => p && p.asset.equals(assetPubkey))) {
           throw errors.CONFLICT({
             message: "A welcome pack already exists for this hotspot",
@@ -183,34 +188,36 @@ export const create = publicProcedure.rewardContract.create.handler(
         claimableRecipient?.type === "CLAIMABLE"
           ? await resolveTokenAmountInput(
               claimableRecipient.giftedCurrency,
-              NATIVE_MINT.toBase58(),
+              NATIVE_MINT.toBase58()
             )
           : new BN(0);
 
-      const rewardsSplit = await Promise.all(recipients.map(async (r) => {
-        const wallet =
-          r.type === "PRESET"
-            ? new PublicKey(r.walletAddress)
-            : PublicKey.default;
+      const rewardsSplit = await Promise.all(
+        recipients.map(async (r) => {
+          const wallet =
+            r.type === "PRESET"
+              ? new PublicKey(r.walletAddress)
+              : PublicKey.default;
 
-        if (r.receives.type === "FIXED") {
-          return {
-            share: {
-              fixed: {
-                amount: await resolveTokenAmountInput(
-                  r.receives.tokenAmount,
-                  HNT_MINT.toBase58(),
-                ),
+          if (r.receives.type === "FIXED") {
+            return {
+              share: {
+                fixed: {
+                  amount: await resolveTokenAmountInput(
+                    r.receives.tokenAmount,
+                    HNT_MINT.toBase58()
+                  ),
+                },
               },
-            },
+              wallet,
+            };
+          }
+          return {
+            share: { share: { amount: r.receives.shares } },
             wallet,
           };
-        }
-        return {
-          share: { share: { amount: r.receives.shares } },
-          wallet,
-        };
-      }));
+        })
+      );
 
       const { instruction: ix } = await (
         await initializeWelcomePack({
@@ -234,7 +241,7 @@ export const create = publicProcedure.rewardContract.create.handler(
       const tuktukProgram = await initTuktuk(provider);
       const [miniFanoutK] = miniFanoutKey(
         new PublicKey(signerWalletAddress),
-        assetPubkey.toBuffer(),
+        assetPubkey.toBuffer()
       );
 
       const existingMiniFanout =
@@ -250,30 +257,32 @@ export const create = publicProcedure.rewardContract.create.handler(
       const oracleSigner = new PublicKey(env.ORACLE_SIGNER);
       const oracleUrl = env.ORACLE_URL;
 
-      const shares = await Promise.all(recipients.map(async (r) => {
-        const wallet =
-          r.type === "PRESET"
-            ? new PublicKey(r.walletAddress)
-            : PublicKey.default;
+      const shares = await Promise.all(
+        recipients.map(async (r) => {
+          const wallet =
+            r.type === "PRESET"
+              ? new PublicKey(r.walletAddress)
+              : PublicKey.default;
 
-        if (r.receives.type === "FIXED") {
+          if (r.receives.type === "FIXED") {
+            return {
+              wallet,
+              share: {
+                fixed: {
+                  amount: await resolveTokenAmountInput(
+                    r.receives.tokenAmount,
+                    HNT_MINT.toBase58()
+                  ),
+                },
+              },
+            };
+          }
           return {
             wallet,
-            share: {
-              fixed: {
-                amount: await resolveTokenAmountInput(
-                  r.receives.tokenAmount,
-                  HNT_MINT.toBase58(),
-                ),
-              },
-            },
+            share: { share: { amount: r.receives.shares } },
           };
-        }
-        return {
-          wallet,
-          share: { share: { amount: r.receives.shares } },
-        };
-      }));
+        })
+      );
 
       const { instruction: initIx, pubkeys } = await miniFanoutProgram.methods
         .initializeMiniFanoutV0({
@@ -302,7 +311,7 @@ export const create = publicProcedure.rewardContract.create.handler(
           fromPubkey: new PublicKey(signerWalletAddress),
           toPubkey: pubkeys.miniFanout!,
           lamports: FANOUT_FUNDING_AMOUNT,
-        }),
+        })
       );
 
       const taskQueueAcc =
@@ -310,7 +319,7 @@ export const create = publicProcedure.rewardContract.create.handler(
 
       const [taskId, preTaskId] = nextAvailableTaskIds(
         taskQueueAcc!.taskBitmap,
-        2,
+        2
       );
 
       const scheduleIx = await miniFanoutProgram.methods
@@ -360,7 +369,7 @@ export const create = publicProcedure.rewardContract.create.handler(
       entityPubKey,
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
     const estimatedSolFeeLamports = txFee + rentCost;
 
     return {
@@ -379,8 +388,8 @@ export const create = publicProcedure.rewardContract.create.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

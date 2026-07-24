@@ -1,4 +1,12 @@
-import { VersionedTransaction, ComputeBudgetProgram } from "@solana/web3.js";
+import {
+  Connection,
+  VersionedTransaction,
+  ComputeBudgetProgram,
+} from "@solana/web3.js";
+import {
+  COMPUTE_BUDGET_IX_LIMIT,
+  COMPUTE_BUDGET_IX_PRICE,
+} from "@helium/spl-utils";
 
 // Base signature fee (5000 lamports per signature)
 export const BASE_SIGNATURE_FEE_LAMPORTS = 5000;
@@ -31,7 +39,7 @@ export const RENT_COSTS = {
  */
 export function calculateRequiredBalance(
   estimatedTxFeeLamports: number = BASE_TX_FEE_LAMPORTS,
-  estimatedRentCostLamports: number = 0,
+  estimatedRentCostLamports: number = 0
 ): number {
   return (
     estimatedTxFeeLamports +
@@ -41,10 +49,29 @@ export function calculateRequiredBalance(
 }
 
 /**
- * Extract the actual transaction fee from a VersionedTransaction.
- * Calculates: (base_signature_fee * num_signatures) + (compute_unit_price * compute_unit_limit)
+ * Fee the cluster would charge for this transaction, via getFeeForMessage —
+ * the validator's own fee calculation, so it tracks base, priority, and any
+ * future fee components without local modeling. Falls back to a local
+ * base + priority estimate when the RPC can't answer (null value or error).
  */
-export function getTransactionFee(tx: VersionedTransaction): number {
+export async function getTransactionFee(
+  connection: Connection,
+  tx: VersionedTransaction
+): Promise<number> {
+  try {
+    const { value } = await connection.getFeeForMessage(tx.message);
+    if (value != null) return value;
+  } catch {
+    // RPC unavailable — use the local estimate below.
+  }
+  return estimateTransactionFeeLocally(tx);
+}
+
+/**
+ * Local fallback: (base_signature_fee * num_signatures) + priority fee parsed
+ * from the transaction's compute-budget instructions.
+ */
+function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
   const numSignatures = tx.message.header.numRequiredSignatures;
   const baseFee = BASE_SIGNATURE_FEE_LAMPORTS * numSignatures;
 
@@ -64,25 +91,22 @@ export function getTransactionFee(tx: VersionedTransaction): number {
 
     const discriminator = data[0];
 
-    // SetComputeUnitLimit = 2, data format: [2, u32 limit]
-    if (discriminator === 2 && data.length >= 5) {
-      computeUnitLimit =
-        data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24);
+    // SetComputeUnitLimit, data format: [discriminator, u32 limit]
+    if (discriminator === COMPUTE_BUDGET_IX_LIMIT && data.length >= 5) {
+      computeUnitLimit = Buffer.from(data).readUInt32LE(1);
     }
 
-    // SetComputeUnitPrice = 3, data format: [3, u64 price (microlamports)]
-    if (discriminator === 3 && data.length >= 9) {
-      // Read u64 as two u32s (little endian)
-      const low = data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24);
-      const high = data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24);
-      // Price is in microlamports per CU
-      computeUnitPrice = low + high * 0x100000000;
+    // SetComputeUnitPrice, data format: [discriminator, u64 price (microlamports)]
+    if (discriminator === COMPUTE_BUDGET_IX_PRICE && data.length >= 9) {
+      // readBigUInt64LE parses the full u64 without the signed-shift overflow a
+      // manual `<< 24` hits once a byte's high bit is set (price >= 2^31).
+      computeUnitPrice = Number(Buffer.from(data).readBigUInt64LE(1));
     }
   }
 
   // Priority fee = (price in microlamports * CU limit) / 1_000_000
   const priorityFee = Math.ceil(
-    (computeUnitPrice * computeUnitLimit) / 1_000_000,
+    (computeUnitPrice * computeUnitLimit) / 1_000_000
   );
 
   return baseFee + priorityFee;
@@ -91,6 +115,12 @@ export function getTransactionFee(tx: VersionedTransaction): number {
 /**
  * Get total transaction fees for multiple transactions.
  */
-export function getTotalTransactionFees(txs: VersionedTransaction[]): number {
-  return txs.reduce((total, tx) => total + getTransactionFee(tx), 0);
+export async function getTotalTransactionFees(
+  connection: Connection,
+  txs: VersionedTransaction[]
+): Promise<number> {
+  const fees = await Promise.all(
+    txs.map((tx) => getTransactionFee(connection, tx))
+  );
+  return fees.reduce((total, fee) => total + fee, 0);
 }

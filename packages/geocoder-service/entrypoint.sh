@@ -9,7 +9,7 @@ DOWNLOAD_URL="http://download1.graphhopper.com/public/photon-db-latest.tar.bz2"
 # Download elasticsearch index
 if [ ! -d "${ES_INDEX_DIR}" ]; then
     echo "Downloading search index..."
-    if ! wget -q --show-progress --user-agent="${USER_AGENT}" -O - "${DOWNLOAD_URL}" | pbzip2 -cd | tar x -C "${DATA_DIR}"; then
+    if ! wget -q --show-progress --user-agent="${USER_AGENT}" -O - "${DOWNLOAD_URL}" | bzip2 -cd | tar x -C "${DATA_DIR}"; then
         echo "Error: Failed to download or extract the search index."
         exit 1
     fi

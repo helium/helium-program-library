@@ -39,6 +39,10 @@ pub fn resize_to_fit<'info, T: AccountSerialize + AccountDeserialize + Owner + C
   if new_size > old_size && (new_size - old_size) > MAX_PERMITTED_DATA_INCREASE {
     return Err(error!(ErrorCode::InvalidDataIncrease));
   }
+  // Steady state: already sized and funded, skip the transfer CPI and realloc
+  if new_size == old_size && lamports_diff == 0 {
+    return Ok(());
+  }
   msg!("Resizing to {} with lamports {}", new_size, lamports_diff);
   invoke(
     &system_instruction::transfer(payer.key, &account.key(), lamports_diff),

@@ -93,7 +93,7 @@ export const burn = publicProcedure.dataCredits.burn.handler(
       draft: { instructions: [ix], feePayer },
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
     const walletBalance = await connection.getBalance(feePayer);
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({

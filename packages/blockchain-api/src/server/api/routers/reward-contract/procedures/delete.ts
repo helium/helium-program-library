@@ -57,7 +57,7 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
       const assetOwner = new PublicKey(
         typeof asset.ownership.owner === "string"
           ? asset.ownership.owner
-          : asset.ownership.owner.toBase58(),
+          : asset.ownership.owner.toBase58()
       );
 
       // When asset is transferred to WelcomePack, assetOwner IS the pack address
@@ -86,7 +86,7 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
           entityPubKey,
           "Delete pending reward contract",
           connection,
-          errors,
+          errors
         );
       }
 
@@ -94,7 +94,7 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
       const [userWelcomePacksK] = userWelcomePacksKey(assetOwner);
       const userWelcomePacks =
         await wpProgram.account.userWelcomePacksV0.fetchNullable(
-          userWelcomePacksK,
+          userWelcomePacksK
         );
 
       if (userWelcomePacks) {
@@ -126,7 +126,7 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
               entityPubKey,
               "Delete pending reward contract",
               connection,
-              errors,
+              errors
             );
           }
         }
@@ -141,8 +141,9 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
 
     const lazyDistributor = new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS);
     const [recipientK] = recipientKey(lazyDistributor, assetPubkey);
-    const recipientAcc =
-      await ldProgram.account.recipientV0.fetchNullable(recipientK);
+    const recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
+      recipientK
+    );
 
     if (recipientAcc && !recipientAcc.destination.equals(PublicKey.default)) {
       const miniFanout = recipientAcc.destination;
@@ -150,8 +151,9 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
       // which would cause a deserialization error rather than returning null
       let miniFanoutAccount = null;
       try {
-        miniFanoutAccount =
-          await mfProgram.account.miniFanoutV0.fetchNullable(miniFanout);
+        miniFanoutAccount = await mfProgram.account.miniFanoutV0.fetchNullable(
+          miniFanout
+        );
       } catch {
         // Destination exists but is not a MiniFanout account - treat as no contract
       }
@@ -167,7 +169,7 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
         const task = miniFanoutAccount.nextTask.equals(miniFanout)
           ? null
           : await tuktukProgram.account.taskV0.fetchNullable(
-              miniFanoutAccount.nextTask,
+              miniFanoutAccount.nextTask
             );
 
         const closeIx = await mfProgram.methods
@@ -196,7 +198,7 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
           entityPubKey,
           "Delete active reward contract",
           connection,
-          errors,
+          errors
         );
       }
     }
@@ -205,7 +207,7 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
     throw errors.NOT_FOUND({
       message: "Hotspot does not have a reward contract.",
     });
-  },
+  }
 );
 
 async function buildDeleteTransaction(
@@ -216,10 +218,10 @@ async function buildDeleteTransaction(
   connection: Connection,
   errors: Parameters<
     Parameters<typeof publicProcedure.rewardContract.delete.handler>[0]
-  >[0]["errors"],
+  >[0]["errors"]
 ) {
   const walletBalance = await connection.getBalance(
-    new PublicKey(signerWalletAddress),
+    new PublicKey(signerWalletAddress)
   );
   const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
   if (walletBalance < required) {
@@ -243,7 +245,7 @@ async function buildDeleteTransaction(
     entityPubKey,
   });
 
-  const txFee = getTransactionFee(tx);
+  const txFee = await getTransactionFee(connection, tx);
 
   return {
     unsignedTransactionData: {
@@ -259,6 +261,9 @@ async function buildDeleteTransaction(
       parallel: false,
       tag,
     },
-    estimatedSolFee: await toTokenAmountOutput(new BN(txFee), NATIVE_MINT.toBase58()),
+    estimatedSolFee: await toTokenAmountOutput(
+      new BN(txFee),
+      NATIVE_MINT.toBase58()
+    ),
   };
 }

@@ -127,20 +127,22 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     const { instruction: initIx, pubkeys } = await miniFanoutProgram.methods
       .initializeMiniFanoutV0({
         seed: new PublicKey(assetId).toBuffer(),
-        shares: await Promise.all(rewardsSplit.map(async (split) => ({
-          wallet: new PublicKey(split.address),
-          share:
-            split.type === "fixed"
-              ? {
-                  fixed: {
-                    amount: await resolveTokenAmountInput(
-                      split.tokenAmount,
-                      HNT_MINT.toBase58()
-                    ),
-                  },
-                }
-              : { share: { amount: split.amount } },
-        }))),
+        shares: await Promise.all(
+          rewardsSplit.map(async (split) => ({
+            wallet: new PublicKey(split.address),
+            share:
+              split.type === "fixed"
+                ? {
+                    fixed: {
+                      amount: await resolveTokenAmountInput(
+                        split.tokenAmount,
+                        HNT_MINT.toBase58()
+                      ),
+                    },
+                  }
+                : { share: { amount: split.amount } },
+          }))
+        ),
         schedule: rewardsSchedule,
         preTask: {
           remoteV0: {
@@ -233,7 +235,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     const recipientRent = recipientAcc ? 0 : RENT_COSTS.RECIPIENT;
     const rentCost =
       RENT_COSTS.MINI_FANOUT + RENT_COSTS.TUKTUK_TASK * 2 + recipientRent;
-    const txFees = getTotalTransactionFees(txs);
+    const txFees = await getTotalTransactionFees(provider.connection, txs);
     const cluster = getCluster();
     const jitoTipCost =
       (cluster === "mainnet" || cluster === "mainnet-beta") && txs.length > 1

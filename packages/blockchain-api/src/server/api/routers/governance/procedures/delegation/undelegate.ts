@@ -41,8 +41,9 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
 
     const [positionPubkey] = positionKey(positionMintPubkey);
 
-    const positionAcc =
-      await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
+    const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
+      positionPubkey
+    );
 
     if (!positionAcc) {
       throw errors.NOT_FOUND({ message: "Position not found" });
@@ -52,13 +53,13 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
       connection,
       positionMintPubkey,
       walletPubkey,
-      errors,
+      errors
     );
 
     const delegatedPosKey = delegatedPositionKey(positionPubkey)[0];
     const delegatedPositionAcc =
       await hsdProgram.account.delegatedPositionV0.fetchNullable(
-        delegatedPosKey,
+        delegatedPosKey
       );
 
     if (!delegatedPositionAcc) {
@@ -111,7 +112,9 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
         claimVersionedTxs.length > 1
           ? getJitoTipAmountLamports()
           : 0;
-      const txFee = getTotalTransactionFees(claimVersionedTxs) + claimJitoTipCost;
+      const txFee =
+        (await getTotalTransactionFees(connection, claimVersionedTxs)) +
+        claimJitoTipCost;
 
       const walletBalance = await connection.getBalance(walletPubkey);
       if (walletBalance < txFee) {
@@ -130,7 +133,7 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
         hasMore: true,
         estimatedSolFee: await toTokenAmountOutput(
           new BN(txFee),
-          NATIVE_MINT.toBase58(),
+          NATIVE_MINT.toBase58()
         ),
       };
     }
@@ -149,11 +152,11 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
 
     const delegationClaimBotK = delegationClaimBotKey(
       TASK_QUEUE,
-      delegatedPosKey,
+      delegatedPosKey
     )[0];
     const delegationClaimBot =
       await hplCronsProgram.account.delegationClaimBotV0.fetchNullable(
-        delegationClaimBotK,
+        delegationClaimBotK
       );
 
     if (delegationClaimBot) {
@@ -169,7 +172,7 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
               positionTokenAccount: getAssociatedTokenAddressSync(
                 positionMintPubkey,
                 walletPubkey,
-                true,
+                true
               ),
             })
             .instruction(),
@@ -209,11 +212,14 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
 
     const undelegateCluster = getCluster();
     const undelegateJitoTipCost =
-      (undelegateCluster === "mainnet" || undelegateCluster === "mainnet-beta") &&
+      (undelegateCluster === "mainnet" ||
+        undelegateCluster === "mainnet-beta") &&
       allVersionedTxs.length > 1
         ? getJitoTipAmountLamports()
         : 0;
-    const txFee = getTotalTransactionFees(allVersionedTxs) + undelegateJitoTipCost;
+    const txFee =
+      (await getTotalTransactionFees(connection, allVersionedTxs)) +
+      undelegateJitoTipCost;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < txFee) {
@@ -233,8 +239,8 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
       hasMore: batchHasMore,
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

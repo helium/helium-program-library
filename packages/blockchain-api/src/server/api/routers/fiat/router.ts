@@ -174,7 +174,7 @@ const initKyc = publicProcedure.fiat.initKyc
             "Content-Type": "application/json",
             "Api-Key": env.BRIDGE_API_KEY,
           },
-        },
+        }
       );
 
       if (!response.ok) {
@@ -192,7 +192,7 @@ const initKyc = publicProcedure.fiat.initKyc
       bridgeUser.kycLink = data.kyc_link;
       await bridgeUser.save();
       rejectionReasons = (data.rejection_reasons || []).map(
-        (r: { reason: string }) => r.reason,
+        (r: { reason: string }) => r.reason
       );
     }
 
@@ -296,7 +296,7 @@ const createBankAccount = publicProcedure.fiat.createBankAccount
             postal_code: address.postal_code,
           },
         }),
-      },
+      }
     );
 
     if (!bankAccountResponse.ok) {
@@ -348,7 +348,7 @@ const deleteBankAccount = publicProcedure.fiat.deleteBankAccount
           "Content-Type": "application/json",
           "Api-Key": env.BRIDGE_API_KEY,
         },
-      },
+      }
     );
 
     if (!response.ok) {
@@ -376,7 +376,7 @@ const getSendQuote = publicProcedure.fiat.getSendQuote.handler(
     const quoteResponse = await fetch(
       `https://lite-api.jup.ag/swap/v1/quote?inputMint=${HNT_MINT.toBase58()}&outputMint=${
         TOKEN_MINTS.USDC
-      }&swapMode=ExactOut&amount=${usdcAmount}&slippageBps=50`,
+      }&swapMode=ExactOut&amount=${usdcAmount}&slippageBps=50`
     );
 
     if (!quoteResponse.ok) {
@@ -389,7 +389,7 @@ const getSendQuote = publicProcedure.fiat.getSendQuote.handler(
     }
 
     return await quoteResponse.json();
-  },
+  }
 );
 
 const sendFunds = publicProcedure.fiat.sendFunds.handler(
@@ -430,7 +430,7 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
               "Content-Type": "application/json",
             },
             body: JSON.stringify({}),
-          },
+          }
         );
         await transfer.destroy();
       } catch (e) {
@@ -444,7 +444,7 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
       usdCeil(
         (parseFloat(process.env.BRIDGE_DEVELOPER_FEE_PERCENTAGE || "0.5") /
           100) *
-          usdcToUsd(quoteResponse.outAmount),
+          usdcToUsd(quoteResponse.outAmount)
       )
     ).toString();
 
@@ -472,7 +472,7 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
             external_account_id: bankAccount.bridgeExternalAccountId,
           },
         }),
-      },
+      }
     );
 
     if (!bridgeTransferResponse.ok) {
@@ -488,7 +488,7 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
     const ata = getAssociatedTokenAddressSync(
       new PublicKey(TOKEN_MINTS.USDC),
       new PublicKey(destination),
-      true,
+      true
     );
 
     await BridgeTransfer.create({
@@ -504,7 +504,7 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
     const myUsdcAta = getAssociatedTokenAddressSync(
       new PublicKey(TOKEN_MINTS.USDC),
       new PublicKey(userAddress),
-      true,
+      true
     );
 
     // Check wallet has sufficient balance for potential ATA creations (user + dest USDC)
@@ -520,7 +520,7 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
 
     if (rentCost > 0) {
       const walletBalance = await connection.getBalance(
-        new PublicKey(userAddress),
+        new PublicKey(userAddress)
       );
       const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
       if (walletBalance < required) {
@@ -548,7 +548,7 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
             },
           },
         }),
-      },
+      }
     );
 
     if (!instructionsResponse.ok && instructionsResponse.status === 429) {
@@ -582,14 +582,14 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
         new PublicKey(userAddress),
         myUsdcAta,
         new PublicKey(userAddress),
-        new PublicKey(TOKEN_MINTS.USDC),
+        new PublicKey(TOKEN_MINTS.USDC)
       ),
       deserializeInstruction(instructions.swapInstruction),
       createAssociatedTokenAccountIdempotentInstruction(
         new PublicKey(userAddress),
         ata,
         new PublicKey(destination),
-        new PublicKey(TOKEN_MINTS.USDC),
+        new PublicKey(TOKEN_MINTS.USDC)
       ),
       createTransferCheckedInstruction(
         myUsdcAta,
@@ -597,7 +597,7 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
         ata,
         new PublicKey(userAddress),
         BigInt(quoteResponse.outAmount),
-        6,
+        6
       ),
     ];
 
@@ -608,7 +608,7 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
         feePayer: new PublicKey(userAddress),
         addressLookupTableAddresses:
           instructions.addressLookupTableAddresses.map(
-            (address: string) => new PublicKey(address),
+            (address: string) => new PublicKey(address)
           ),
       },
     });
@@ -636,14 +636,18 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "bank_send", usdAmount: (parseFloat(quoteResponse.outAmount) / 1e6).toFixed(2), bankAccountId: id },
+        actionMetadata: {
+          type: "bank_send",
+          usdAmount: (parseFloat(quoteResponse.outAmount) / 1e6).toFixed(2),
+          bankAccountId: id,
+        },
       },
       estimatedSolFee: await toTokenAmountOutput(
-        new BN(getTransactionFee(tx) + rentCost),
-        NATIVE_MINT.toBase58(),
+        new BN((await getTransactionFee(connection, tx)) + rentCost),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );
 
 const updateTransfer = publicProcedure.fiat.updateTransfer.handler(
@@ -661,7 +665,7 @@ const updateTransfer = publicProcedure.fiat.updateTransfer.handler(
     await transfer.update({ solanaSignature });
 
     return { success: true };
-  },
+  }
 );
 
 // ============================================================================

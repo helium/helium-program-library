@@ -368,7 +368,7 @@ export const create = publicProcedure.governance.createPosition.handler(
       (subDaoMint && automationEnabled ? RENT_COSTS.TUKTUK_TASK : 0); // delegation claim task
 
     const estimatedSolFeeLamports =
-      getTotalTransactionFees(versionedTransactions) +
+      (await getTotalTransactionFees(connection, versionedTransactions)) +
       jitoTipCost +
       mintRent +
       createdAccountRent +

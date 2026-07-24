@@ -103,7 +103,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     const positionMintPubkeys = positionMints.map((m) => new PublicKey(m));
     const positionPubkeys = positionMintPubkeys.map((m) => positionKey(m)[0]);
     const delegatedPosKeys = positionPubkeys.map(
-      (p) => delegatedPositionKey(p)[0],
+      (p) => delegatedPositionKey(p)[0]
     );
 
     const [positionAccounts, delegatedPositionAccounts] = await Promise.all([
@@ -133,7 +133,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         positionMintPubkeys[i],
         walletPubkey,
         positionMints[i],
-        errors,
+        errors
       );
 
       const lockupKind = getLockupKind(positionAcc.lockup);
@@ -150,7 +150,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       let registrar = registrarCache.get(registrarKey);
       if (!registrar) {
         registrar = await vsrProgram.account.registrar.fetch(
-          positionAcc.registrar,
+          positionAcc.registrar
         );
         registrarCache.set(registrarKey, registrar);
       }
@@ -159,7 +159,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       let proxyConfig = proxyConfigCache.get(proxyConfigKey);
       if (!proxyConfig) {
         proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
-          registrar.proxyConfig,
+          registrar.proxyConfig
         );
         proxyConfigCache.set(proxyConfigKey, proxyConfig);
       }
@@ -203,7 +203,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       (info) =>
         !info.needsChange &&
         info.delegatedPositionAcc &&
-        info.delegatedPositionAcc.expirationTs.lt(now),
+        info.delegatedPositionAcc.expirationTs.lt(now)
     );
 
     for (const info of expiredPositionInfos) {
@@ -225,7 +225,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
             position: info.positionPubkey,
             subDao: info.delegatedPositionAcc!.subDao,
           })
-          .instruction(),
+          .instruction()
       );
       info.delegatedPositionAcc = null;
     }
@@ -264,7 +264,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           feePayer: walletPubkey,
         });
 
-        const claimTxFee = getTotalTransactionFees(claimVersionedTxs);
+        const claimTxFee = await getTotalTransactionFees(
+          connection,
+          claimVersionedTxs
+        );
         const claimCluster = getCluster();
         const claimJitoTipCost =
           (claimCluster === "mainnet" || claimCluster === "mainnet-beta") &&
@@ -290,7 +293,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           hasMore: true,
           estimatedSolFee: await toTokenAmountOutput(
             new BN(claimTxFee),
-            NATIVE_MINT.toBase58(),
+            NATIVE_MINT.toBase58()
           ),
         };
       }
@@ -344,11 +347,11 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         const subDaoEpochInfo = subDaoEpochInfoKey(subDaoK, now)[0];
         const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
           subDaoK,
-          closingTs,
+          closingTs
         )[0];
         const genesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
           subDaoK,
-          positionAcc.genesisEnd.lt(now) ? closingTs : positionAcc.genesisEnd,
+          positionAcc.genesisEnd.lt(now) ? closingTs : positionAcc.genesisEnd
         )[0];
 
         delegationInstructions.push(
@@ -362,7 +365,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
               closingTimeSubDaoEpochInfo,
               genesisEndSubDaoEpochInfo,
             })
-            .instruction(),
+            .instruction()
         );
       } else if (!delegatedPositionAcc.subDao.equals(subDaoK)) {
         const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, now);
@@ -374,30 +377,30 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
 
         const newExpirationTs = Math.min(
           seasonEnd.toNumber(),
-          getLockupEffectiveEndTs(positionAcc.lockup).toNumber(),
+          getLockupEffectiveEndTs(positionAcc.lockup).toNumber()
         );
 
         const oldExpirationTs = delegatedPositionAcc.expirationTs;
         const oldSubDaoEpochInfo = subDaoEpochInfoKey(
           delegatedPositionAcc.subDao,
-          now,
+          now
         )[0];
         const newSubDaoEpochInfo = subDaoEpochInfoKey(subDaoK, now)[0];
         const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
           subDaoK,
-          newExpirationTs,
+          newExpirationTs
         )[0];
         const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
           delegatedPositionAcc.subDao,
           positionAcc.genesisEnd.lt(now)
             ? oldExpirationTs
-            : positionAcc.genesisEnd,
+            : positionAcc.genesisEnd
         )[0];
         const genesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
           subDaoK,
           positionAcc.genesisEnd.lt(now)
             ? newExpirationTs
-            : positionAcc.genesisEnd,
+            : positionAcc.genesisEnd
         )[0];
 
         delegationInstructions.push(
@@ -413,7 +416,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
               closingTimeSubDaoEpochInfo,
               genesisEndSubDaoEpochInfo,
             })
-            .instruction(),
+            .instruction()
         );
       } else {
         const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, now);
@@ -421,23 +424,23 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           const lockupEnd = getLockupEffectiveEndTs(positionAcc.lockup);
           const newExpirationTs = Math.min(
             seasonEnd.toNumber(),
-            lockupEnd.toNumber(),
+            lockupEnd.toNumber()
           );
           if (delegatedPositionAcc.expirationTs.lt(new BN(newExpirationTs))) {
             const oldExpirationTs = delegatedPositionAcc.expirationTs;
             const oldClosingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
               delegatedPositionAcc.subDao,
-              oldExpirationTs,
+              oldExpirationTs
             )[0];
             const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
               delegatedPositionAcc.subDao,
-              newExpirationTs,
+              newExpirationTs
             )[0];
             const genesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
               delegatedPositionAcc.subDao,
               positionAcc.genesisEnd.lt(now)
                 ? newExpirationTs
-                : positionAcc.genesisEnd,
+                : positionAcc.genesisEnd
             )[0];
 
             delegationInstructions.push(
@@ -450,7 +453,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
                   closingTimeSubDaoEpochInfo,
                   genesisEndSubDaoEpochInfo,
                 })
-                .instruction(),
+                .instruction()
             );
           }
         }
@@ -470,11 +473,11 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
 
       const delegationClaimBotK = delegationClaimBotKey(
         TASK_QUEUE,
-        delegatedPosKey,
+        delegatedPosKey
       )[0];
       const delegationClaimBot =
         await hplCronsProgram.account.delegationClaimBotV0.fetchNullable(
-          delegationClaimBotK,
+          delegationClaimBotK
         );
 
       if (automationEnabled) {
@@ -501,10 +504,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
                 positionTokenAccount: getAssociatedTokenAddressSync(
                   positionMintPubkey,
                   walletPubkey,
-                  true,
+                  true
                 ),
               })
-              .instruction(),
+              .instruction()
           );
 
           automationInstructions.push(
@@ -512,12 +515,12 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
               fromPubkey: walletPubkey,
               toPubkey: delegationClaimBotK,
               lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
-            }),
+            })
           );
         }
 
         const tuktukProgram = await import("@helium/tuktuk-sdk").then((m) =>
-          m.init(provider),
+          m.init(provider)
         );
         const taskQueueAcc =
           await tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE);
@@ -525,7 +528,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         if (taskQueueAcc) {
           const nextAvailable = nextAvailableTaskIds(
             taskQueueAcc.taskBitmap,
-            1,
+            1
           )[0];
           const task = taskKey(TASK_QUEUE, nextAvailable)[0];
 
@@ -543,14 +546,14 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
                 positionTokenAccount: getAssociatedTokenAddressSync(
                   positionMintPubkey,
                   walletPubkey,
-                  true,
+                  true
                 ),
                 taskQueue: TASK_QUEUE,
                 delegatedPosition: delegatedPosKey,
                 systemProgram: SystemProgram.programId,
                 delegatorAta: getAssociatedTokenAddressSync(
                   HNT_MINT,
-                  walletPubkey,
+                  walletPubkey
                 ),
                 task,
                 nextTask:
@@ -560,7 +563,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
                     : delegationClaimBot.nextTask,
                 rentRefund: delegationClaimBot?.rentRefund || walletPubkey,
               })
-              .instruction(),
+              .instruction()
           );
         }
       } else if (delegationClaimBot) {
@@ -575,10 +578,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
               positionTokenAccount: getAssociatedTokenAddressSync(
                 positionMintPubkey,
                 walletPubkey,
-                true,
+                true
               ),
             })
-            .instruction(),
+            .instruction()
         );
       }
 
@@ -599,7 +602,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       return {
         transactionData: { transactions: [], parallel: false, tag },
         hasMore: false,
-        estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+        estimatedSolFee: await toTokenAmountOutput(
+          new BN(0),
+          NATIVE_MINT.toBase58()
+        ),
       };
     }
 
@@ -613,7 +619,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       feePayer: walletPubkey,
     });
 
-    const txFees = getTotalTransactionFees(versionedTransactions);
+    const txFees = await getTotalTransactionFees(
+      connection,
+      versionedTransactions
+    );
     const cluster = getCluster();
     const jitoTipCost =
       (cluster === "mainnet" || cluster === "mainnet-beta") &&
@@ -642,13 +651,17 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         transactions: allTransactions,
         parallel: !hasClaimTransactions,
         tag,
-        actionMetadata: { type: "delegation_delegate", subDaoMint, positionCount: positionMints.length },
+        actionMetadata: {
+          type: "delegation_delegate",
+          subDaoMint,
+          positionCount: positionMints.length,
+        },
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
       hasMore,
     };
-  },
+  }
 );

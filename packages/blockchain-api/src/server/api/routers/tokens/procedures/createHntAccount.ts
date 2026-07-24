@@ -36,7 +36,7 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
     const hntTokenAccount = getAssociatedTokenAddressSync(
       HNT_MINT,
       wallet,
-      true, // allowOwnerOffCurve
+      true // allowOwnerOffCurve
     );
 
     // Check wallet has sufficient balance
@@ -59,7 +59,7 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
         wallet, // payer
         hntTokenAccount, // associated token account
         wallet, // owner
-        HNT_MINT, // mint
+        HNT_MINT // mint
       );
 
     const tx = await buildVersionedTransaction({
@@ -71,7 +71,7 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
       },
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
     const estimatedSolFeeLamports = txFee + rentCost;
 
     return {
@@ -89,8 +89,8 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

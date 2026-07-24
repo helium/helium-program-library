@@ -1,4 +1,5 @@
 import {
+  AddressLookupTableAccount,
   Connection,
   Keypair,
   PublicKey,
@@ -7,9 +8,12 @@ import {
 } from "@solana/web3.js";
 import { NATIVE_MINT } from "@solana/spl-token";
 import {
+  getAddressLookupTableAccounts,
   HELIUM_COMMON_LUT,
   HELIUM_COMMON_LUT_DEVNET,
   populateMissingDraftInfo,
+  prependComputeBudgetIxs,
+  tableComputeUnitsForInstructions,
   toVersionedTx,
   withPriorityFees,
 } from "@helium/spl-utils";
@@ -51,18 +55,42 @@ export async function buildVersionedTransaction({
     ],
   };
 
+  // withPriorityFees doesn't need a blockhash (simulation replaces it), so
+  // fetch it concurrently with fee/CU estimation. Observe now so an early
+  // throw below doesn't leave an unhandled rejection.
+  const blockhashPromise = connection.getLatestBlockhash("finalized");
+  blockhashPromise.catch(() => {});
+
   let instructionsWithFees: TransactionInstruction[];
+  let addressLookupTables: AddressLookupTableAccount[] | undefined;
   try {
+    // Resolve LUTs once; withPriorityFees and the compile below both skip
+    // their own fetch when addressLookupTables is already populated.
+    addressLookupTables = await getAddressLookupTableAccounts(
+      connection,
+      draftWithLuts.addressLookupTableAddresses
+    );
     instructionsWithFees = await withPriorityFees({
       ...draftWithLuts,
+      addressLookupTables,
       connection,
     });
   } catch (error) {
     console.warn(
-      "[buildVersionedTransaction] Priority fee estimation failed, using default instructions:",
+      "[buildVersionedTransaction] Priority fee estimation failed, using CU table fallback:",
       error
     );
-    instructionsWithFees = draftWithLuts.instructions;
+    instructionsWithFees = prependComputeBudgetIxs(draftWithLuts.instructions, {
+      computeUnits: tableComputeUnitsForInstructions(
+        draftWithLuts.instructions
+      ),
+      // Floor price, matching withPriorityFees' basePriorityFee default —
+      // no network path left to estimate a real one.
+      microLamports: 1,
+      // No simulation validated a data-size ceiling here, so set no limit
+      // and let the runtime's 64 MiB default apply — degrade to overpaying,
+      // never to an on-chain size failure.
+    });
   }
 
   let tx: VersionedTransaction;
@@ -70,7 +98,12 @@ export async function buildVersionedTransaction({
     tx = toVersionedTx(
       await populateMissingDraftInfo(
         connection,
-        { ...draftWithLuts, instructions: instructionsWithFees },
+        {
+          ...draftWithLuts,
+          addressLookupTables,
+          instructions: instructionsWithFees,
+          recentBlockhash: (await blockhashPromise).blockhash,
+        },
         "finalized"
       )
     );
@@ -144,7 +177,7 @@ export async function buildSingleTransactionResponse({
   });
 
   const required = calculateRequiredBalance(
-    getTransactionFee(tx),
+    await getTransactionFee(connection, tx),
     rentLamports
   );
   const available = await connection.getBalance(feePayer);

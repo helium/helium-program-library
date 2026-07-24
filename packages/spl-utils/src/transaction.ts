@@ -24,8 +24,10 @@ import { TransactionCompletionQueue } from "@helium/account-fetch-cache";
 import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
 import {
-  estimatePrioritizationFee,
+  COMPUTE_BUDGET_IX_DATA_SIZE,
+  DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
   MAX_PRIO_FEE,
+  setLoadedAccountsDataSizeLimit,
   withPriorityFees,
 } from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
@@ -106,10 +108,13 @@ export async function sendInstructionsWithPriorityFee(
     payer = provider.wallet.publicKey,
     commitment = "confirmed",
     idlErrors = new Map(),
-    computeUnitLimit = 200000,
+    // When unset, compute units are estimated by simulation (see
+    // withPriorityFees); pass a value to skip the simulation round-trip.
+    computeUnitLimit,
     basePriorityFee = 1,
     maxPriorityFee = MAX_PRIO_FEE,
     priorityFeeOptions,
+    loadedAccountsDataSizeLimit,
   }: {
     signers?: Signer[];
     payer?: PublicKey;
@@ -119,23 +124,21 @@ export async function sendInstructionsWithPriorityFee(
     basePriorityFee?: number;
     maxPriorityFee?: number;
     priorityFeeOptions?: any;
+    loadedAccountsDataSizeLimit?: number;
   } = {}
 ): Promise<string> {
   return await sendInstructions(
     provider,
-    [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnitLimit }),
-      ComputeBudgetProgram.setComputeUnitPrice({
-        microLamports: await estimatePrioritizationFee(
-          provider.connection,
-          instructions,
-          basePriorityFee,
-          maxPriorityFee,
-          priorityFeeOptions
-        ),
-      }),
-      ...instructions,
-    ],
+    await withPriorityFees({
+      connection: provider.connection,
+      instructions,
+      computeUnits: computeUnitLimit,
+      basePriorityFee,
+      maxPriorityFee,
+      priorityFeeOptions,
+      loadedAccountsDataSizeLimit,
+      feePayer: payer,
+    }),
     signers,
     payer,
     commitment,
@@ -483,7 +486,7 @@ export async function bulkSendTransactions(
   onProgress?: (status: Status) => void,
   triesRemaining: number = 10, // Number of blockhashes to try resending txs with before giving up
   extraSigners: Keypair[] = [],
-  maxSignatureBatch: number = TX_BATCH_SIZE,
+  maxSignatureBatch: number = TX_BATCH_SIZE
 ): Promise<string[]> {
   let ret: string[] = [];
 
@@ -559,7 +562,8 @@ export async function bulkSendTransactions(
       triesRemaining--;
       if (triesRemaining <= 0) {
         throw new Error(
-          `Failed to submit all txs after blockhashes expired, ${signedTxs.length - confirmedTxs.length
+          `Failed to submit all txs after blockhashes expired, ${
+            signedTxs.length - confirmedTxs.length
           } remain`
         );
       }
@@ -636,8 +640,17 @@ export async function bulkSendRawTransactions(
         .filter(truthy);
 
       if (failures.length > 0) {
-        const failureIndexes = statuses.map((status, index) => status?.meta?.err ? index : null).filter(i => typeof i !== 'undefined' && i !== null);
-        const failedTxs = await Promise.all(failureIndexes.map(index => connection.getTransaction(txids[index!], { commitment: "confirmed", maxSupportedTransactionVersion: 0 })));
+        const failureIndexes = statuses
+          .map((status, index) => (status?.meta?.err ? index : null))
+          .filter((i) => typeof i !== "undefined" && i !== null);
+        const failedTxs = await Promise.all(
+          failureIndexes.map((index) =>
+            connection.getTransaction(txids[index!], {
+              commitment: "confirmed",
+              maxSupportedTransactionVersion: 0,
+            })
+          )
+        );
         for (const tx of failedTxs) {
           console.error(tx?.meta?.logMessages?.join("\n"));
         }
@@ -805,6 +818,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
     useFirstEstimateForAll = false,
     maxInstructionsPerTx,
     commitment = "confirmed",
+    // Leave unset to let withPriorityFees derive it from simulation.
+    loadedAccountsDataSizeLimit,
   }: {
     commitment?: Commitment;
     // Manually specify limit instead of simulating
@@ -821,17 +836,19 @@ export async function batchInstructionsToTxsWithPriorityFee(
     useFirstEstimateForAll?: boolean;
     // Optional parameter to limit number of instructions per transaction
     maxInstructionsPerTx?: number;
+    loadedAccountsDataSizeLimit?: number;
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
-  const blockhash = (await provider.connection.getLatestBlockhash(commitment)).blockhash;
+  const blockhash = (await provider.connection.getLatestBlockhash(commitment))
+    .blockhash;
   const transactions: TransactionDraft[] = [];
   const addressLookupTables = await getAddressLookupTableAccounts(
     provider.connection,
     addressLookupTableAddresses || []
   );
 
-  let firstTxComputeAndPrio: TransactionInstruction[] | null = null;
+  let firstTxComputeBudgetIxs: TransactionInstruction[] | null = null;
   for (const instruction of instructions) {
     if (!instruction) continue;
     const instrArr = Array.isArray(instruction) ? instruction : [instruction];
@@ -846,6 +863,12 @@ export async function batchInstructionsToTxsWithPriorityFee(
           // Placeholder, will be replaced with actual value
           microLamports: 1,
         }),
+        // Probe must match the real tx's ix count or the size check
+        // under-measures and a full batch overflows maxTxSize. The ix is a
+        // fixed 5 bytes, so the placeholder value doesn't affect sizing.
+        setLoadedAccountsDataSizeLimit(
+          loadedAccountsDataSizeLimit ?? DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
+        ),
         ...currentTxInstructions,
       ],
       addressLookupTableAddresses: addressLookupTableAddresses || [],
@@ -870,8 +893,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
           // Only do this optimization if `useFirstEstimateForAll` is set. This is necessary for
           // large sets of txs to avoid spamming the rpc.
           let ixs: TransactionInstruction[] = [];
-          if (firstTxComputeAndPrio) {
-            ixs = [...firstTxComputeAndPrio, ...currentTxInstructions];
+          if (firstTxComputeBudgetIxs) {
+            ixs = [...firstTxComputeBudgetIxs, ...currentTxInstructions];
           } else {
             ixs = await withPriorityFees({
               connection: provider.connection,
@@ -881,9 +904,31 @@ export async function batchInstructionsToTxsWithPriorityFee(
               basePriorityFee,
               addressLookupTables,
               feePayer: provider.wallet.publicKey,
+              loadedAccountsDataSizeLimit,
             });
             if (useFirstEstimateForAll) {
-              firstTxComputeAndPrio = ixs.slice(0, 2);
+              // withPriorityFees may prepend up to three ixs (limit, price,
+              // loaded-accounts-data-size) but omits any the caller set or
+              // that couldn't be derived — count instead of assuming 3.
+              let cbCount = 0;
+              while (
+                cbCount < ixs.length &&
+                ixs[cbCount].programId.equals(ComputeBudgetProgram.programId)
+              ) {
+                cbCount++;
+              }
+              // A sim-derived data-size limit was measured against THIS tx's
+              // accounts only; reusing it on a later tx that loads more data
+              // would fail on-chain. Drop it from the reused set (later txs
+              // fall back to the runtime 64 MiB default) unless the caller
+              // pinned an explicit batch-wide limit.
+              firstTxComputeBudgetIxs = ixs
+                .slice(0, cbCount)
+                .filter(
+                  (ix) =>
+                    loadedAccountsDataSizeLimit != null ||
+                    ix.data[0] !== COMPUTE_BUDGET_IX_DATA_SIZE
+                );
             }
           }
 
@@ -909,16 +954,24 @@ export async function batchInstructionsToTxsWithPriorityFee(
   }
 
   if (currentTxInstructions.length > 0) {
+    // Reuse the first estimate for the final flush too when useFirstEstimateForAll
+    // is set — re-estimating here would contradict the option (extra sim + fee
+    // RPC calls, inconsistent fees). firstTxComputeBudgetIxs is only populated
+    // in that mode; otherwise estimate this chunk on its own.
+    const ixs = firstTxComputeBudgetIxs
+      ? [...firstTxComputeBudgetIxs, ...currentTxInstructions]
+      : await withPriorityFees({
+          connection: provider.connection,
+          instructions: currentTxInstructions,
+          computeUnits: computeUnitLimit,
+          computeScaleUp,
+          basePriorityFee,
+          addressLookupTables,
+          feePayer: provider.wallet.publicKey,
+          loadedAccountsDataSizeLimit,
+        });
     transactions.push({
-      instructions: await withPriorityFees({
-        connection: provider.connection,
-        instructions: currentTxInstructions,
-        computeUnits: computeUnitLimit,
-        computeScaleUp,
-        basePriorityFee,
-        addressLookupTables,
-        feePayer: provider.wallet.publicKey,
-      }),
+      instructions: ixs,
       addressLookupTableAddresses: addressLookupTableAddresses || [],
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,

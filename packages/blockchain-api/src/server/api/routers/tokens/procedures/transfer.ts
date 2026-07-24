@@ -209,7 +209,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
 
     // For SOL transfers, no rent. For SPL, ATA rent if needed
     const rentCost = needsAta ? RENT_COSTS.ATA : 0;
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
     const estimatedSolFeeLamports = calculateRequiredBalance(txFee, rentCost);
 
     const walletBalance = await connection.getBalance(feePayer);

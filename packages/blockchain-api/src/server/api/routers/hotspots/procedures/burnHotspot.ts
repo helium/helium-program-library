@@ -133,7 +133,7 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
       timestamp: Date.now(),
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
 
     return {
       transactionData: {

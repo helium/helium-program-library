@@ -1,6 +1,7 @@
 import axios from "axios";
 import * as anchor from "@coral-xyz/anchor";
 import { init } from "@helium/price-oracle-sdk";
+import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 
 export async function findCoingeckoPrice(token: string): Promise<number> {
@@ -50,9 +51,11 @@ export async function findCoingeckoPrice(token: string): Promise<number> {
       );
     }
 
-    const decimalShiftedPrice = new anchor.BN(price! * 10 ** priceOracleAcc.decimals);
+    const decimalShiftedPrice = new anchor.BN(
+      price! * 10 ** priceOracleAcc.decimals
+    );
 
-    await program.methods
+    const instruction = await program.methods
       .submitPriceV0({
         oracleIndex,
         price: decimalShiftedPrice,
@@ -61,7 +64,8 @@ export async function findCoingeckoPrice(token: string): Promise<number> {
         priceOracle,
         oracle: provider.wallet.publicKey,
       })
-      .rpc({ skipPreflight: true });
+      .instruction();
+    await sendInstructionsWithPriorityFee(provider, [instruction]);
 
     console.log(`Submitted price: ${price} for ${id}`);
   }
