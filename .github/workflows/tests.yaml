@@ -210,6 +210,18 @@ jobs:
       - name: Run bootstrap script
         run: ./scripts/bootstrap.sh
 
+  test-helium-vote-service:
+    needs: build
+    name: Test Helium Vote Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+      - uses: ./.github/actions/setup-ts/
+      - run: pnpm --filter @helium/helium-vote-service test
+
   test-docker-builds:
     needs: build
     name: Test Docker Builds
