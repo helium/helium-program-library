@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.14.0
+
+### Minor Changes
+
+- [#1206](https://github.com/helium/helium-program-library/pull/1206) [`77df26b`](https://github.com/helium/helium-program-library/commit/77df26b20ce9922b11f6b6e36b9f45b1a723e8bc) Thanks [@bryzettler](https://github.com/bryzettler)! - Add `governance.getPositions` (GET /positions/wallet/{wallet}) listing a wallet's voter-stake-registry positions with deposited amount, governing mint, and lockup info. Governance and migration contracts now also declare `RATE_LIMITED` errors.
+
 ## 0.13.0
 
 ### Minor Changes
