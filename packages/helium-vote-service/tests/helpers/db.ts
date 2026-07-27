@@ -63,7 +63,7 @@ export const startTestDb = async (): Promise<() => Promise<void>> => {
   const keypairPath = path.join(dataDir, "test-keypair.json");
   fs.writeFileSync(
     keypairPath,
-    JSON.stringify(Array.from(Keypair.generate().secretKey))
+    JSON.stringify(Array.from(Keypair.generate().secretKey)),
   );
   process.env.ANCHOR_WALLET = keypairPath;
   process.env.SOLANA_URL = "http://localhost:8899";
@@ -119,6 +119,7 @@ export const applySchema = async (sequelize: Sequelize): Promise<void> => {
       index INTEGER,
       asset TEXT,
       proxy_config TEXT,
+      rent_refund TEXT,
       expiration_time NUMERIC
     );
   `);
@@ -126,7 +127,7 @@ export const applySchema = async (sequelize: Sequelize): Promise<void> => {
 
 export const truncateAll = async (sequelize: Sequelize): Promise<void> => {
   await sequelize.query(
-    "TRUNCATE proposals, vote_markers, proxies, proxy_assignments"
+    "TRUNCATE proposals, vote_markers, proxies, proxy_assignments",
   );
 };
 
@@ -140,7 +141,7 @@ export interface SeedProposal {
 
 export const seedProposal = async (
   sequelize: Sequelize,
-  p: SeedProposal
+  p: SeedProposal,
 ): Promise<void> => {
   const choicesJson = p.choices.map((name) => JSON.stringify({ name }));
   await sequelize.query(
@@ -153,7 +154,7 @@ export const seedProposal = async (
         choices: choicesJson,
         name: p.name ?? "Test Proposal",
       },
-    }
+    },
   );
 };
 
@@ -170,7 +171,7 @@ export interface SeedVoteMarker {
 
 export const seedVoteMarker = async (
   sequelize: Sequelize,
-  m: SeedVoteMarker
+  m: SeedVoteMarker,
 ): Promise<void> => {
   await sequelize.query(
     `INSERT INTO vote_markers
@@ -188,7 +189,7 @@ export const seedVoteMarker = async (
         weight: String(m.weight),
         proxyIndex: m.proxyIndex ?? 0,
       },
-    }
+    },
   );
 };
 
@@ -199,11 +200,11 @@ export interface SeedProxy {
 
 export const seedProxy = async (
   sequelize: Sequelize,
-  p: SeedProxy
+  p: SeedProxy,
 ): Promise<void> => {
   await sequelize.query(
     `INSERT INTO proxies (wallet, name) VALUES (:wallet, :name)`,
-    { replacements: { wallet: p.wallet, name: p.name } }
+    { replacements: { wallet: p.wallet, name: p.name } },
   );
 };
 
@@ -214,19 +215,22 @@ export interface SeedProxyAssignment {
   asset: string;
   nextVoter?: string;
   proxyConfig?: string;
+  /** Wallet that paid for the first assignment; on-chain this is the owner
+   * unless the position NFT was transferred afterwards. */
+  rentRefund?: string;
   /** Unix seconds; defaults to one day from now. */
   expirationTime?: number;
 }
 
 export const seedProxyAssignment = async (
   sequelize: Sequelize,
-  a: SeedProxyAssignment
+  a: SeedProxyAssignment,
 ): Promise<void> => {
   await sequelize.query(
     `INSERT INTO proxy_assignments
-       (address, voter, next_voter, index, asset, proxy_config, expiration_time)
+       (address, voter, next_voter, index, asset, proxy_config, rent_refund, expiration_time)
      VALUES
-       (:address, :voter, :nextVoter, :index, :asset, :proxyConfig, :expirationTime)`,
+       (:address, :voter, :nextVoter, :index, :asset, :proxyConfig, :rentRefund, :expirationTime)`,
     {
       replacements: {
         address: a.address,
@@ -235,10 +239,11 @@ export const seedProxyAssignment = async (
         index: a.index,
         asset: a.asset,
         proxyConfig: a.proxyConfig ?? "proxyConfig",
+        rentRefund: a.rentRefund ?? null,
         expirationTime:
           a.expirationTime ?? Math.floor(Date.now() / 1000) + 24 * 60 * 60,
       },
-    }
+    },
   );
 };
 
