@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.14.1
+
+### Patch Changes
+
+- [#1229](https://github.com/helium/helium-program-library/pull/1229) [`f64a0ea`](https://github.com/helium/helium-program-library/commit/f64a0ea9df61e2e52710e1cdcee7d4bd3c02e7f9) Thanks [@allenan](https://github.com/allenan)! - Stop tracing middleware in Sentry. The edge runtime's `tracesSampleRate: 1` emitted 155,763 bare `middleware GET` / `middleware POST` transactions in the 2026-07-12 billing period, duplicating timing the route transaction already records. That was 40% of this service's transaction volume and the largest single contributor to exhausting the org's shared 500k quota nine days into a thirty-day period, which rate-limits performance data for every other project in the org. Error reporting from middleware is unaffected.
+
 ## 0.14.0
 
 ### Minor Changes
