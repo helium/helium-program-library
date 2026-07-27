@@ -486,32 +486,38 @@ server.get<{
 
   return (
     await sequelize.query(`
-      -- ADR 0003: attribute weight to the position owner (index-0 proxy
-      -- assignment for the marker's mint), falling back to the casting voter
-      -- when that row is gone. Expiration is deliberately ignored — expiry
-      -- ends the proxy's power, not the ownership fact.
+      -- Attribute proxy-cast weight (proxy_index > 0) to the
+      -- position owner, falling back to the casting voter when no owner can
+      -- be resolved. The index-0 assignment's voter is Pubkey::default() by
+      -- design (it seeds the PDA), so the owner is taken from rent_refund:
+      -- the wallet that paid for the first assignment, which is the owner
+      -- unless the position NFT changed hands afterwards. Expiration is
+      -- deliberately ignored — expiry ends the proxy's power, not the
+      -- ownership fact.
       WITH markers_with_owner AS (
         SELECT
-          COALESCE(owner_pa.voter, vm.voter) as voter,
+          COALESCE(
+            NULLIF(owner_pa.rent_refund, '11111111111111111111111111111111'),
+            vm.voter
+          ) as voter,
           vm.voter as casting_voter,
           vm.registrar,
           vm.proposal,
           vm.weight,
           unnest(vm.choices) as choice
         FROM vote_markers vm
-        -- One index-0 row may exist per proxy config; the owner is the same
-        -- wallet in each, so any single row keeps the join 1:1. If that
-        -- invariant ever breaks (e.g. a stale row after a transfer), prefer
-        -- the freshest assignment so attribution stays deterministic. LATERAL
-        -- makes this an index probe per marker rather than materializing the
-        -- index-0 rows of the whole table on every request.
+        -- One index-0 row may exist per proxy config; prefer the freshest so
+        -- attribution stays deterministic. LATERAL makes this an index probe
+        -- per marker rather than materializing the index-0 rows of the whole
+        -- table on every request. Direct votes (proxy_index = 0) already
+        -- carry the owner in vm.voter and are never re-attributed.
         LEFT OUTER JOIN LATERAL (
-          SELECT voter
+          SELECT rent_refund
           FROM proxy_assignments
           WHERE index = 0 AND asset = vm.mint
           ORDER BY expiration_time DESC, address
           LIMIT 1
-        ) owner_pa ON true
+        ) owner_pa ON vm.proxy_index > 0
         WHERE vm.proposal = ${proposal}
       ),
       exploded_choice_vote_markers AS (
