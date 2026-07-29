@@ -27,6 +27,7 @@ import { decompress, decompressSigners, shouldThrottle } from "./utils";
 import {
   estimateComputeBudget,
   estimatePrioritizationFee,
+  getAddressLookupTableAccounts,
   MAX_COMPUTE_UNITS,
   truthy,
 } from "@helium/spl-utils";
@@ -135,19 +136,20 @@ async function getTransactions(
     lazyTransactions
   );
 
-  const lookupTableAccs = await Promise.all(
-    luts.map(
-      async (lut) =>
-        (
-          await provider.connection.getAddressLookupTable(new PublicKey(lut))
-        ).value
-    )
+  const lookupTableAccs = await getAddressLookupTableAccounts(
+    provider.connection,
+    luts.map((lut) => new PublicKey(lut))
   );
 
-  // Cap concurrency: each pending tx issues 2 RPC calls (simulate + fee).
-  // An unbounded Promise.all over hundreds of pending migrations would 429 the
-  // RPC, degrading every throttled sim to the ~1.8x precomputed fallback.
+  // Cap concurrency: an unbounded Promise.all of simulations over hundreds of
+  // pending migrations would 429 the RPC, degrading every throttled sim to
+  // the ~1.8x precomputed fallback.
   const SIMULATE_CONCURRENCY = 10;
+  // One fee estimate per request, seeded from the first tx's accounts — the
+  // executeTransactionV0 txs differ only by block PDA, so the writable-account
+  // fee median is effectively identical across them; per-tx estimates would
+  // just be N extra RPC calls.
+  let feeEstimate: Promise<number> | null = null;
   const buildExecuteTx = async ({
     proof,
     compiled,
@@ -216,7 +218,7 @@ async function getTransactions(
             }).compileToV0Message(lookupTableAccs.filter(truthy))
           )
         ),
-        estimatePrioritizationFee(provider.connection, [ix]),
+        (feeEstimate ??= estimatePrioritizationFee(provider.connection, [ix])),
       ]);
 
       return {
@@ -241,12 +243,8 @@ async function getTransactions(
     | { id: number; transaction: TransactionMessage }
     | undefined
   )[] = [];
-  for (let i = 0; i < results.length; i += SIMULATE_CONCURRENCY) {
-    mapped.push(
-      ...(await Promise.all(
-        results.slice(i, i + SIMULATE_CONCURRENCY).map(buildExecuteTx)
-      ))
-    );
+  for (const batch of chunks(results, SIMULATE_CONCURRENCY)) {
+    mapped.push(...(await Promise.all(batch.map(buildExecuteTx))));
   }
   // @ts-ignore
   const asExecuteTxs: { id: number; transaction: TransactionMessage }[] =
