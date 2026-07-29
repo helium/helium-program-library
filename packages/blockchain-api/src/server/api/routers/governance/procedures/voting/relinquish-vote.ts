@@ -45,9 +45,8 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
     const proposalProgram = await initProposal(provider);
     const proxyProgram = await initProxy(provider);
 
-    const proposalAcc = await proposalProgram.account.proposalV0.fetchNullable(
-      proposalPubkey
-    );
+    const proposalAcc =
+      await proposalProgram.account.proposalV0.fetchNullable(proposalPubkey);
 
     if (!proposalAcc) {
       throw errors.NOT_FOUND({ message: "Proposal not found" });
@@ -62,7 +61,7 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
     const positionMintPubkeys = positionMints.map((m) => new PublicKey(m));
     const positionPubkeys = positionMintPubkeys.map((m) => positionKey(m)[0]);
     const markerKeys = positionMintPubkeys.map(
-      (m) => voteMarkerKey(m, proposalPubkey)[0]
+      (m) => voteMarkerKey(m, proposalPubkey)[0],
     );
 
     const [positionAccounts, markerAccounts] = await Promise.all([
@@ -76,7 +75,7 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
     const isOwnerByIndex = await validatePositionOwnershipBatch(
       connection,
       positionMintPubkeys,
-      walletPubkey
+      walletPubkey,
     );
 
     const registrarKeySet = new Set<string>();
@@ -85,18 +84,18 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
         if (acc && !isOwnerByIndex[i]) {
           registrarKeySet.add(acc.registrar.toBase58());
         }
-      }
+      },
     );
     const registrarKeysToFetch: string[] = Array.from(registrarKeySet);
     const registrarAccounts = registrarKeysToFetch.length
       ? await vsrProgram.account.registrar.fetchMultiple(
-          registrarKeysToFetch.map((k: string) => new PublicKey(k))
+          registrarKeysToFetch.map((k: string) => new PublicKey(k)),
         )
       : [];
     const registrarByKey = new Map<string, (typeof registrarAccounts)[number]>(
       registrarKeysToFetch.map(
-        (k: string, i: number) => [k, registrarAccounts[i]] as const
-      )
+        (k: string, i: number) => [k, registrarAccounts[i]] as const,
+      ),
     );
 
     const proxyAssignmentIndexes: number[] = [];
@@ -111,15 +110,15 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
             proxyAssignmentKey(
               registrar.proxyConfig,
               positionMintPubkeys[i],
-              walletPubkey
-            )[0]
+              walletPubkey,
+            )[0],
           );
         }
       }
     }
     const proxyAssignmentAccounts = proxyAssignmentKeys.length
       ? await proxyProgram.account.proxyAssignmentV0.fetchMultiple(
-          proxyAssignmentKeys
+          proxyAssignmentKeys,
         )
       : [];
     const proxyAssignmentByIndex = new Map<
@@ -181,7 +180,7 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
     if (hasProxies) {
       const proxyVoteMarkerK = proxyVoteMarkerKey(
         walletPubkey,
-        proposalPubkey
+        proposalPubkey,
       )[0];
       const proxyMarkerAcc =
         await vsrProgram.account.proxyMarkerV0.fetchNullable(proxyVoteMarkerK);
@@ -189,14 +188,13 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
       if (proxyMarkerAcc?.choices.includes(choice)) {
         const hplCronsProgram = await initHplCrons(provider);
         const tuktukProgram = await initTuktuk(provider);
-        const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-          TASK_QUEUE
-        );
+        const taskQueueAcc =
+          await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE);
 
         const task1 = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)[0];
         const queueAuthority = PublicKey.findProgramAddressSync(
           [Buffer.from("queue_authority")],
-          hplCronsProgram.programId
+          hplCronsProgram.programId,
         )[0];
 
         groups.unshift({
@@ -226,7 +224,7 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
                 ])[0],
                 taskQueueAuthority: taskQueueAuthorityKey(
                   TASK_QUEUE,
-                  queueAuthority
+                  queueAuthority,
                 )[0],
               })
               .instruction(),
@@ -294,8 +292,8 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
       hasMore,
       estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

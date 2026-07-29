@@ -29,9 +29,8 @@ export const transferOwnership =
       const vsrProgram = await initVsr(provider);
 
       const [positionPubkey] = positionKey(positionMintPubkey);
-      const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
-        positionPubkey
-      );
+      const positionAcc =
+        await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
 
       if (!positionAcc) {
         throw errors.NOT_FOUND({ message: "Position not found" });
@@ -40,7 +39,7 @@ export const transferOwnership =
       const ownership = await validatePositionOwnership(
         connection,
         positionMintPubkey,
-        fromPubkey
+        fromPubkey,
       );
 
       if (!ownership.isOwner) {
@@ -104,8 +103,8 @@ export const transferOwnership =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(txFee),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
-    }
+    },
   );

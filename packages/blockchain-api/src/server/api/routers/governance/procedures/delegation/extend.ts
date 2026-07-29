@@ -46,9 +46,8 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
 
     const [positionPubkey] = positionKey(positionMintPubkey);
 
-    const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
-      positionPubkey
-    );
+    const positionAcc =
+      await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
 
     if (!positionAcc) {
       throw errors.NOT_FOUND({ message: "Position not found" });
@@ -58,13 +57,13 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
       connection,
       positionMintPubkey,
       walletPubkey,
-      errors
+      errors,
     );
 
     const delegatedPosKey = delegatedPositionKey(positionPubkey)[0];
     const delegatedPositionAcc =
       await hsdProgram.account.delegatedPositionV0.fetchNullable(
-        delegatedPosKey
+        delegatedPosKey,
       );
 
     if (!delegatedPositionAcc) {
@@ -72,10 +71,10 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
     }
 
     const registrar = await vsrProgram.account.registrar.fetch(
-      positionAcc.registrar
+      positionAcc.registrar,
     );
     const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
-      registrar.proxyConfig
+      registrar.proxyConfig,
     );
 
     const clock = await connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
@@ -121,7 +120,7 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
         transactionData: { transactions: [], parallel: false, tag },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(0),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
     }
@@ -130,15 +129,15 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
 
     const oldSubDaoEpochInfo = subDaoEpochInfoKey(
       delegatedPositionAcc.subDao,
-      oldExpirationTs
+      oldExpirationTs,
     )[0];
     const newSubDaoEpochInfo = subDaoEpochInfoKey(
       delegatedPositionAcc.subDao,
-      newExpirationTs
+      newExpirationTs,
     )[0];
     const genesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
       delegatedPositionAcc.subDao,
-      positionAcc.genesisEnd.lt(now) ? newExpirationTs : positionAcc.genesisEnd
+      positionAcc.genesisEnd.lt(now) ? newExpirationTs : positionAcc.genesisEnd,
     )[0];
 
     const instructions: TransactionInstruction[] = [];
@@ -153,7 +152,7 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
           closingTimeSubDaoEpochInfo: newSubDaoEpochInfo,
           genesisEndSubDaoEpochInfo,
         })
-        .instruction()
+        .instruction(),
     );
 
     const tx = await buildVersionedTransaction({
@@ -188,8 +187,8 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

@@ -45,12 +45,12 @@ export const deletePack = publicProcedure.welcomePacks.delete.handler(
 
     const welcomePackK = welcomePackKey(
       new PublicKey(walletAddress),
-      Number(packId)
+      Number(packId),
     )[0];
 
     // Check wallet has sufficient balance for transaction fees
     const walletBalance = await provider.connection.getBalance(
-      new PublicKey(walletAddress)
+      new PublicKey(walletAddress),
     );
     const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
     if (walletBalance < required) {
@@ -67,12 +67,12 @@ export const deletePack = publicProcedure.welcomePacks.delete.handler(
         getAssetFn: (_, assetId) =>
           getAsset(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId
+            assetId,
           ),
         getAssetProofFn: (_, assetId) =>
           getAssetProof(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId
+            assetId,
           ),
       })
     ).prepare();
@@ -110,8 +110,8 @@ export const deletePack = publicProcedure.welcomePacks.delete.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );
