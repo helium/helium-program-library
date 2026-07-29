@@ -34,7 +34,7 @@ const OUT = process.env.OUT || path.join(__dirname, "results.json");
 const printTable = (results: CuSampleResults, names: Map<string, string>) => {
   const table = cuTableFromSamples(results.samples);
   for (const key of Object.keys(table).sort((a, b) =>
-    (names.get(a) || a).localeCompare(names.get(b) || b)
+    (names.get(a) || a).localeCompare(names.get(b) || b),
   )) {
     const vals = results.samples[key];
     const name = names.get(key);
@@ -49,7 +49,7 @@ const printTable = (results: CuSampleResults, names: Map<string, string>) => {
 // count of problems so the caller can exit non-zero.
 const verifyTable = (
   results: CuSampleResults,
-  names: Map<string, string>
+  names: Map<string, string>,
 ): number => {
   const missing: string[] = [];
   const under: string[] = [];
@@ -70,22 +70,22 @@ const verifyTable = (
       // Store the observed max so entry × margin regains full headroom.
       under.push(
         `  // ${name}: mainnet max=${max} exceeded ceiling ${Math.ceil(
-          entry * FALLBACK_CU_MARGIN
-        )} (was ${entry})\n  "${key}": ${max},`
+          entry * FALLBACK_CU_MARGIN,
+        )} (was ${entry})\n  "${key}": ${max},`,
       );
     }
   }
   if (missing.length) {
     console.error(
       `\n${missing.length} sampled instruction(s) MISSING from` +
-        ` INSTRUCTION_CU_TABLE — paste into src/computeUnitTable.ts:`
+        ` INSTRUCTION_CU_TABLE — paste into src/computeUnitTable.ts:`,
     );
     console.error(missing.join("\n"));
   }
   if (under.length) {
     console.error(
       `\n${under.length} entr(y/ies) UNDER worst-case (entry ×` +
-        ` ${FALLBACK_CU_MARGIN} < mainnet max) — raise in src/computeUnitTable.ts:`
+        ` ${FALLBACK_CU_MARGIN} < mainnet max) — raise in src/computeUnitTable.ts:`,
     );
     console.error(under.join("\n"));
   }
@@ -94,7 +94,7 @@ const verifyTable = (
 
 const main = async () => {
   const connection = new Connection(
-    process.env.RPC_URL || "https://api.mainnet-beta.solana.com"
+    process.env.RPC_URL || "https://solana-rpc.web.helium.io",
   );
   const names = loadIxNames();
   const results = await sampleComputeUnits(connection, {
@@ -116,8 +116,8 @@ const main = async () => {
       console.error(
         `${label}: tx n=${ratios.length} med over-request=${percentile(
           ratios,
-          0.5
-        ).toFixed(1)}x`
+          0.5,
+        ).toFixed(1)}x`,
       );
     }
   }
@@ -126,7 +126,7 @@ const main = async () => {
   console.error(
     problems === 0
       ? "\nCU table OK: every sampled instruction covered within worst-case margin."
-      : `\n${problems} CU-table problem(s) — see above.`
+      : `\n${problems} CU-table problem(s) — see above.`,
   );
   if (problems > 0) process.exitCode = 1;
 };

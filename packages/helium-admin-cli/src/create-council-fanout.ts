@@ -169,9 +169,7 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  await sendInstructionsWithPriorityFee(provider, instructions, {
-    computeUnitLimit: 500000,
-  });
+  await sendInstructionsWithPriorityFee(provider, instructions);
 
   const tokenAccount = getAssociatedTokenAddressSync(
     HNT_MINT,
