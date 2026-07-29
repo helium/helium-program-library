@@ -11,7 +11,11 @@ import {
 // Base signature fee (5000 lamports per signature)
 export const BASE_SIGNATURE_FEE_LAMPORTS = 5000;
 
-// Transaction fee estimates (legacy, kept for backwards compatibility)
+// Transaction fee estimates (legacy, kept for backwards compatibility).
+// Used only for pre-build balance gates where no tx exists yet to price via
+// getFeeForMessage. Once a SIMD-0553 burn gate activates, large-CU txs (e.g.
+// Jupiter swaps) can cost more than this in resource fees alone — revisit
+// these call sites then.
 export const BASE_TX_FEE_LAMPORTS = 50000; // 0.00005 SOL
 
 // Minimum rent-exempt balance (wallet must stay above this)
@@ -70,21 +74,31 @@ export async function getTransactionFee(
 /**
  * Local fallback: (base_signature_fee * num_signatures) + priority fee parsed
  * from the transaction's compute-budget instructions.
+ *
+ * Models only today's fee components — it does NOT model the SIMD-0553
+ * resource fee (burned, priced on requested CU + loaded-data size), whose
+ * rates are feature-gated and unknowable client-side. The primary
+ * getFeeForMessage path picks that up automatically at activation; this
+ * fallback will under-estimate once a burn gate is live.
  */
 function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
   const numSignatures = tx.message.header.numRequiredSignatures;
   const baseFee = BASE_SIGNATURE_FEE_LAMPORTS * numSignatures;
 
-  let computeUnitLimit = 200000; // Default CU limit
+  let computeUnitLimit: number | undefined;
   let computeUnitPrice = 0; // Default no priority fee
 
   const computeBudgetProgramId = ComputeBudgetProgram.programId.toBase58();
 
   // Parse instructions to find ComputeBudget instructions
   const accountKeys = tx.message.staticAccountKeys;
+  let numOtherInstructions = 0;
   for (const ix of tx.message.compiledInstructions) {
     const programId = accountKeys[ix.programIdIndex]?.toBase58();
-    if (programId !== computeBudgetProgramId) continue;
+    if (programId !== computeBudgetProgramId) {
+      numOtherInstructions++;
+      continue;
+    }
 
     const data = ix.data;
     if (data.length === 0) continue;
@@ -102,6 +116,12 @@ function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
       // manual `<< 24` hits once a byte's high bit is set (price >= 2^31).
       computeUnitPrice = Number(Buffer.from(data).readBigUInt64LE(1));
     }
+  }
+
+  // No explicit limit ix: the runtime grants 200k CU per non-ComputeBudget
+  // top-level instruction, capped at 1.4M — not a flat 200k per tx.
+  if (computeUnitLimit == null) {
+    computeUnitLimit = Math.min(1_400_000, 200_000 * numOtherInstructions);
   }
 
   // Priority fee = (price in microlamports * CU limit) / 1_000_000

@@ -61,9 +61,21 @@ describe("getTransactionFee", () => {
   });
 
   it("falls back to base + priority when the RPC throws", async () => {
-    // No compute budget ixs: default 200k CU at price 0 => base fee only
+    // No compute budget ixs: price 0 => base fee only
     const tx = compile([transfer]);
     expect(await getTransactionFee(rpcError(), tx)).to.eq(5_000);
+  });
+
+  it("defaults the CU limit to 200k per instruction when no limit ix is set", async () => {
+    // Price ix but no limit ix: runtime default is 200k per non-ComputeBudget
+    // top-level instruction, so 2 transfers => 400k CU at 10k microlamports/CU
+    // => priority 4000; base 5000 (1 sig)
+    const tx = compile([
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+      transfer,
+      SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports: 2 }),
+    ]);
+    expect(await getTransactionFee(rpcFee(null), tx)).to.eq(9_000);
   });
 
   it("parses a compute-unit price above the 2^31 signed-int boundary", async () => {
@@ -71,7 +83,9 @@ describe("getTransactionFee", () => {
     // read it as negative and produce a bogus (negative) fee.
     const tx = compile([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 1 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 3_000_000_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: 3_000_000_000,
+      }),
       transfer,
     ]);
     // priority = ceil(3e9 * 1 / 1e6) = 3000; base 5000 (1 sig)
