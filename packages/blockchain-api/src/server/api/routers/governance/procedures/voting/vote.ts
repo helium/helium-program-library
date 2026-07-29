@@ -1,4 +1,5 @@
 import { publicProcedure } from "@/server/api/procedures";
+import type { SkippedPosition } from "@helium/blockchain-api/schemas/governance";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
@@ -116,6 +117,7 @@ export const vote = publicProcedure.governance.vote.handler(
 
     const ownedPositionsToVote: PositionVoteData[] = [];
     const proxiedPositionsToVote: PositionVoteData[] = [];
+    const skipped: SkippedPosition[] = [];
     let ownedTaskIdsNeeded = 0;
     let hasProxies = false;
 
@@ -223,6 +225,7 @@ export const vote = publicProcedure.governance.vote.handler(
       const existingMarker = markerAccounts[i];
 
       if (existingMarker?.choices.includes(choice)) {
+        skipped.push({ positionMint, reason: "alreadyVotedThisChoice" });
         continue;
       }
 
@@ -230,6 +233,7 @@ export const vote = publicProcedure.governance.vote.handler(
         existingMarker &&
         existingMarker.choices.length >= proposalAcc.maxChoicesPerVoter
       ) {
+        skipped.push({ positionMint, reason: "maxChoicesReached" });
         continue;
       }
 
@@ -384,10 +388,7 @@ export const vote = publicProcedure.governance.vote.handler(
     }
 
     if (allInstructions.length === 0) {
-      throw errors.BAD_REQUEST({
-        message:
-          "No votes to cast - all positions already voted for this choice",
-      });
+      throw errors.ALL_POSITIONS_SKIPPED({ data: { skipped } });
     }
 
     const groups: InstructionGroup[] = allInstructions.map((instructions) => ({
@@ -448,6 +449,7 @@ export const vote = publicProcedure.governance.vote.handler(
         new BN(totalFee),
         NATIVE_MINT.toBase58()
       ),
+      skipped,
     };
   }
 );

@@ -1,5 +1,23 @@
 # Change Log
 
+## 0.14.1
+
+### Patch Changes
+
+- [#1229](https://github.com/helium/helium-program-library/pull/1229) [`f64a0ea`](https://github.com/helium/helium-program-library/commit/f64a0ea9df61e2e52710e1cdcee7d4bd3c02e7f9) Thanks [@allenan](https://github.com/allenan)! - Stop tracing middleware in Sentry. The edge runtime's `tracesSampleRate: 1` emitted 155,763 bare `middleware GET` / `middleware POST` transactions in the 2026-07-12 billing period, duplicating timing the route transaction already records. That was 40% of this service's transaction volume and the largest single contributor to exhausting the org's shared 500k quota nine days into a thirty-day period, which rate-limits performance data for every other project in the org. Error reporting from middleware is unaffected.
+
+## 0.14.0
+
+### Minor Changes
+
+- [#1206](https://github.com/helium/helium-program-library/pull/1206) [`77df26b`](https://github.com/helium/helium-program-library/commit/77df26b20ce9922b11f6b6e36b9f45b1a723e8bc) Thanks [@bryzettler](https://github.com/bryzettler)! - Add `governance.getPositions` (GET /positions/wallet/{wallet}) listing a wallet's voter-stake-registry positions with deposited amount, governing mint, and lockup info. Governance and migration contracts now also declare `RATE_LIMITED` errors.
+
+## 0.13.0
+
+### Minor Changes
+
+- [#1224](https://github.com/helium/helium-program-library/pull/1224) [`a5d7e07`](https://github.com/helium/helium-program-library/commit/a5d7e073f3da1ab87816c982ec723c7e2158a5ac) Thanks [@bryzettler](https://github.com/bryzettler)! - Governance vote-building now reports skipped positions instead of silently dropping them. The vote response gains a `skipped: [{ positionMint, reason }]` array (reasons `maxChoicesReached` and `alreadyVotedThisChoice`), and the all-positions-skipped case throws a new `ALL_POSITIONS_SKIPPED` error carrying the same skip report. Additive change — existing consumers keep working.
+
 ## 0.12.0
 
 ### Minor Changes

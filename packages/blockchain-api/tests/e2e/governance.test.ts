@@ -1,12 +1,7 @@
-import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
-import {
-  delegatedPositionKey,
-  init as initHsd,
-} from "@helium/helium-sub-daos-sdk";
-import { init as initProxy, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
+import { delegatedPositionKey } from "@helium/helium-sub-daos-sdk";
+import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import {
-  init as initVsr,
   positionKey,
   proxyVoteMarkerKey,
   voteMarkerKey,
@@ -24,8 +19,6 @@ import { getAssociatedTokenAddressSync, NATIVE_MINT } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
-import BN from "bn.js";
-import { getCurrentSeasonEnd } from "../../src/server/api/routers/governance/procedures/helpers/get-current-season";
 import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
@@ -38,6 +31,8 @@ import {
 import {
   createAndFundPosition,
   ensureSubDaoEpochsCurrent,
+  getPrograms,
+  getSeasonBoundedProxyExpirationTime,
   setDelegatedPositionExpiration,
   setPositionLockupEndTs,
 } from "./helpers/governance";
@@ -47,55 +42,6 @@ import {
   createHeliumOrgVotingProposal,
   ProposalSetup,
 } from "./helpers/proposal";
-
-/**
- * Initialize Anchor programs for on-chain state verification
- */
-async function getPrograms(ctx: TestCtx) {
-  const wallet = new Wallet(ctx.payer);
-  const provider = new AnchorProvider(
-    ctx.connection,
-    wallet,
-    AnchorProvider.defaultOptions()
-  );
-
-  const vsrProgram = await initVsr(provider);
-  const hsdProgram = await initHsd(provider);
-  const proxyProgram = await initProxy(provider);
-
-  return { vsrProgram, hsdProgram, proxyProgram, provider };
-}
-
-const PROXY_ASSIGNMENT_DURATION_SECONDS = 86400 * 90;
-const PROXY_EXPIRATION_BUFFER_SECONDS = 60;
-
-async function getSeasonBoundedProxyExpirationTime(
-  ctx: TestCtx,
-  positionMint: string
-): Promise<number> {
-  const { vsrProgram, proxyProgram } = await getPrograms(ctx);
-  const now = Math.floor(Date.now() / 1000);
-  const [positionPubkey] = positionKey(new PublicKey(positionMint));
-  const positionAcc = await vsrProgram.account.positionV0.fetch(positionPubkey);
-  const registrar = await vsrProgram.account.registrar.fetch(
-    positionAcc.registrar
-  );
-  const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
-    registrar.proxyConfig
-  );
-  const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, new BN(now));
-
-  if (!seasonEnd) {
-    throw new Error("No current proxy season found");
-  }
-
-  const maxExpiration = seasonEnd.toNumber() - PROXY_EXPIRATION_BUFFER_SECONDS;
-  if (maxExpiration <= now) {
-    throw new Error("Current proxy season has already ended");
-  }
-
-  return Math.min(now + PROXY_ASSIGNMENT_DURATION_SECONDS, maxExpiration);
-}
 
 describe("governance", () => {
   let ctx: TestCtx;
@@ -174,6 +120,39 @@ describe("governance", () => {
       const [positionPubkey] = positionKey(new PublicKey(positionMint));
       const positionInfo = await ctx.connection.getAccountInfo(positionPubkey);
       expect(positionInfo).to.not.be.null;
+    });
+
+    it("lists positions owned by a wallet", async () => {
+      // #given a fresh position owned by the wallet
+      const created = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 30,
+      });
+      const [positionPubkey] = positionKey(new PublicKey(created.positionMint));
+
+      // #when listing positions for that wallet
+      const { data, error } = await ctx.safeClient.governance.getPositions({
+        wallet: walletAddress,
+      });
+
+      // #then the created position is present with its details
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data).to.be.an("array");
+      const position = data!.find(
+        (p) => p.positionMint === created.positionMint
+      );
+      expect(position, "created position should be listed").to.not.be.undefined;
+      expect(position!.position).to.equal(positionPubkey.toBase58());
+      expect(position!.amountDeposited.mint).to.equal(HNT_MINT.toBase58());
+      expect(position!.amountDeposited.amount).to.equal("100000000");
+      expect(position!.amountDeposited.decimals).to.equal(8);
+      expect(position!.amountDeposited.uiAmountString).to.equal("1");
+      expect(position!.lockup.kind).to.equal("cliff");
+      expect(Number(position!.lockup.endTs)).to.be.greaterThan(0);
+      expect(position!.numActiveVotes).to.equal(0);
     });
 
     it("extends position lockup", async () => {
@@ -1394,6 +1373,29 @@ describe("governance", () => {
       walletAddress = ctx.payer.publicKey.toBase58();
     });
 
+    // Cast and submit a vote, failing the test on any error. Used to set up
+    // "already voted" state before exercising skip reporting.
+    const castVote = async (
+      proposalKey: string,
+      positionMints: string[],
+      choice: number
+    ) => {
+      const { data, error } = await ctx.safeClient.governance.vote({
+        walletAddress,
+        proposalKey,
+        positionMints,
+        choice,
+      });
+      if (error) {
+        expect.fail(`Setup vote failed: ${JSON.stringify(error)}`);
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        data!.transactionData,
+        ctx.payer
+      );
+    };
+
     it("votes on proposal with position", async () => {
       // #given fresh position for voting
       const result = await createAndFundPosition(ctx, {
@@ -1497,31 +1499,107 @@ describe("governance", () => {
       }
     });
 
-    it("returns BAD_REQUEST when voting twice on same choice", async () => {
-      // #given fresh position, vote for choice 1
+    it("reports a position already at max choices as skipped, still voting the rest", async () => {
+      // #given a maxChoicesPerVoter=1 proposal and a position that has used its
+      // one choice (voted choice 0), plus a fresh position that has not voted
+      const maxOneProposal = await createTestProposal(ctx, {
+        name: `max-one-${Date.now()}`,
+        maxChoicesPerVoter: 1,
+      });
+      const usedUp = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+      const fresh = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+
+      await castVote(
+        maxOneProposal.proposal.toBase58(),
+        [usedUp.positionMint],
+        0
+      );
+
+      // #when voting a different choice with the used-up and the fresh position
+      const { data, error } = await ctx.safeClient.governance.vote({
+        walletAddress,
+        proposalKey: maxOneProposal.proposal.toBase58(),
+        positionMints: [usedUp.positionMint, fresh.positionMint],
+        choice: 1,
+      });
+
+      // #then the used-up position is reported as skipped, the fresh one votes
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data?.skipped).to.deep.include({
+        positionMint: usedUp.positionMint,
+        reason: "maxChoicesReached",
+      });
+      expect(data?.transactionData?.transactions).to.have.length(1);
+    });
+
+    it("reports a position that already voted this choice as skipped, still voting the rest", async () => {
+      // #given a position that already voted choice 0 and a fresh position
+      const alreadyVoted = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+      const fresh = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+
+      await castVote(
+        proposalSetup.proposal.toBase58(),
+        [alreadyVoted.positionMint],
+        0
+      );
+
+      // #when re-voting choice 0 with the already-voted and the fresh position
+      const voteArgs = {
+        walletAddress,
+        proposalKey: proposalSetup.proposal.toBase58(),
+        positionMints: [alreadyVoted.positionMint, fresh.positionMint],
+        choice: 0,
+      };
+      const { data, error } = await ctx.safeClient.governance.vote(voteArgs);
+
+      // #then the already-voted position is skipped without noise, fresh votes
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data?.skipped).to.deep.include({
+        positionMint: alreadyVoted.positionMint,
+        reason: "alreadyVotedThisChoice",
+      });
+      expect(data?.transactionData?.transactions).to.have.length(1);
+
+      // Preparing again without submitting returns the same skip report.
+      const again = await ctx.safeClient.governance.vote(voteArgs);
+      expect(again.data?.skipped).to.deep.equal(data?.skipped);
+    });
+
+    it("returns the skip report when every position is skipped", async () => {
+      // #given a position that already voted choice 1
       const result = await createAndFundPosition(ctx, {
         amount: "100000000",
         lockupKind: "cliff",
         lockupPeriodsInDays: 365,
       });
 
-      const { data: voteData, error: voteError } =
-        await ctx.safeClient.governance.vote({
-          walletAddress,
-          proposalKey: proposalSetup.proposal.toBase58(),
-          positionMints: [result.positionMint],
-          choice: 1,
-        });
-      if (voteError) {
-        expect.fail(`First vote failed: ${JSON.stringify(voteError)}`);
-      }
-      await signAndSubmitTransactionData(
-        ctx.connection,
-        voteData!.transactionData,
-        ctx.payer
+      await castVote(
+        proposalSetup.proposal.toBase58(),
+        [result.positionMint],
+        1
       );
 
-      // #when second vote on same choice
+      // #when re-voting the same choice with that lone position
       const { error } = await ctx.safeClient.governance.vote({
         walletAddress,
         proposalKey: proposalSetup.proposal.toBase58(),
@@ -1529,14 +1607,16 @@ describe("governance", () => {
         choice: 1,
       });
 
-      // #then should fail - already voted for this choice
-      if (!isDefinedError(error)) {
+      // #then it errors, but the error carries the full skip report
+      if (!isDefinedError(error) || error.code !== "ALL_POSITIONS_SKIPPED") {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
+          `Expected ALL_POSITIONS_SKIPPED - but got: ${JSON.stringify(error)}`
         );
       }
-      expect(error.code).to.equal("BAD_REQUEST");
-      expect(error.message).to.include("already voted");
+      expect(error.data.skipped).to.deep.include({
+        positionMint: result.positionMint,
+        reason: "alreadyVotedThisChoice",
+      });
     });
   });
 
