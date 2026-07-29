@@ -314,33 +314,22 @@ export async function withPriorityFees({
       ...rest,
       recentBlockhash: rest.recentBlockhash ?? PublicKey.default.toBase58(),
     });
-    // Inject only the ComputeBudget ix types the caller left unset — a
-    // duplicate type fails sanitization (DuplicateInstruction), and a
-    // caller who set e.g. only a price ix should still get the sim-derived
-    // limit and data-size ceiling. Mirrors prependComputeBudgetIxs.
-    const callerCbTypes = callerComputeBudgetTypes(tx.instructions);
-    // Only true when our data-size ix actually enters the sim tx below.
-    // When the caller brought their own data-size ix the sim runs under
-    // their ceiling instead, and nothing has validated ours.
-    let simValidatesDataSizeCeiling = false;
-    const simCbIxs: TransactionInstruction[] = [];
-    if (!callerCbTypes.has(COMPUTE_BUDGET_IX_LIMIT)) {
-      simCbIxs.push(
-        ComputeBudgetProgram.setComputeUnitLimit({ units: MAX_COMPUTE_UNITS })
-      );
-    }
-    if (!callerCbTypes.has(COMPUTE_BUDGET_IX_PRICE)) {
-      simCbIxs.push(
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })
-      );
-    }
-    if (!callerCbTypes.has(COMPUTE_BUDGET_IX_DATA_SIZE)) {
-      // Include the data-size limit in the sim tx so simulation validates
-      // the ceiling — a tx that would exceed it fails here, not on-chain.
-      simValidatesDataSizeCeiling = true;
-      simCbIxs.push(setLoadedAccountsDataSizeLimit(simCeiling));
-    }
-    const ixWithComputeUnits = [...simCbIxs, ...tx.instructions];
+    // Inject only the ComputeBudget ix types the caller left unset (a
+    // duplicate type fails sanitization) — prependComputeBudgetIxs owns that
+    // skip rule. MAX limit lets the sim measure real consumption; including
+    // the data-size ceiling makes the sim validate it — a tx that would
+    // exceed it fails here, not on-chain.
+    // Only true when our data-size ix actually enters the sim tx. When the
+    // caller brought their own data-size ix the sim runs under their ceiling
+    // instead, and nothing has validated ours.
+    const simValidatesDataSizeCeiling = !callerComputeBudgetTypes(
+      tx.instructions
+    ).has(COMPUTE_BUDGET_IX_DATA_SIZE);
+    const ixWithComputeUnits = prependComputeBudgetIxs(tx.instructions, {
+      computeUnits: MAX_COMPUTE_UNITS,
+      microLamports: 1,
+      loadedAccountsDataSizeLimit: simCeiling,
+    });
     const budget = await estimateComputeBudget(
       connection,
       toVersionedTx({ ...tx, instructions: ixWithComputeUnits }),

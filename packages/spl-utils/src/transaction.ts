@@ -907,16 +907,15 @@ export async function batchInstructionsToTxsWithPriorityFee(
               loadedAccountsDataSizeLimit,
             });
             if (useFirstEstimateForAll) {
-              // withPriorityFees may prepend up to three ixs (limit, price,
-              // loaded-accounts-data-size) but omits any the caller set or
-              // that couldn't be derived — count instead of assuming 3.
-              let cbCount = 0;
-              while (
-                cbCount < ixs.length &&
-                ixs[cbCount].programId.equals(ComputeBudgetProgram.programId)
-              ) {
-                cbCount++;
-              }
+              // withPriorityFees returns its prepended ComputeBudget ixs
+              // (up to three: limit, price, loaded-accounts-data-size,
+              // omitting any the caller set or that couldn't be derived)
+              // followed by the original instructions — so the prepended
+              // prefix is exactly the length difference. Scanning for
+              // ComputeBudget-program ixs instead would wrongly capture a
+              // caller-supplied CB ix at the front of the first chunk and
+              // replay it on every later tx.
+              const cbCount = ixs.length - currentTxInstructions.length;
               // A sim-derived data-size limit was measured against THIS tx's
               // accounts only; reusing it on a later tx that loads more data
               // would fail on-chain. Drop it from the reused set (later txs
