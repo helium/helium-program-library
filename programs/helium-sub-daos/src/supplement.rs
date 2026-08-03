@@ -10,22 +10,34 @@
 //! `calculate_utility_score_v0` adds the same total back into `current_hnt_supply` so the
 //! supplement isn't misread as burned HNT (see the supply-tracking note there).
 //!
-//! All parameters are hardcoded; changing them requires a community-voted program
-//! upgrade. Several are **patch-time** values set just before the mainnet deploy — by
-//! default they leave the supplement INACTIVE (a far-future start), so the program is safe
-//! to ship before they're finalized.
+//! All parameters are hardcoded; changing them requires a community-voted program upgrade.
+//! The two destination token accounts are **patch-time** values, still placeholders here, and
+//! a supplement window that opens against a placeholder fails every epoch: the accounts are
+//! mandatory once a window is open, and `hpl-crons` withholds a placeholder rather than
+//! forward it. So the mint destinations and `INFLATION_START` have to be real in the same
+//! deploy, and no build carrying a placeholder may reach a live window.
 
 use anchor_lang::prelude::*;
+
+use crate::TESTING;
 
 const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 
 // ── Patch-time constants ─────────────────────────────────────────────────────────────
-// PATCH-TIME: set INFLATION_START to the real mint-start unix timestamp (the upgrade slot
-// + ~2 weeks, the Council pre-mint review window) before the mainnet deploy. The default
-// is a far-future sentinel (2100-01-01) so the supplement stays dormant until deliberately
-// configured — shipping without setting it mints nothing, and the test suite (which runs
-// at present-day wall-clock) sees a zero supplement and is unaffected.
-pub const INFLATION_START: i64 = 4_102_444_800;
+/// Mint start, 2026-08-05T12:00:00Z. Epochs settle on the 00:00 UTC boundary, so the first
+/// supplement mint lands at the 2026-08-06T00:00:00Z crank, closing the Council's pre-mint
+/// review window. The value sits between two crank boundaries rather than on one, so neither
+/// Solana clock drift nor a late crank can change which epoch mints first; the flat window
+/// then spans exactly 360 cranks (through 2027-08-01) and the taper exactly 720.
+///
+/// Under TESTING the start stays a far-future sentinel (2100-01-01), keeping the supplement
+/// dormant for the localnet suite: an open window makes both destination accounts mandatory
+/// in `issue_rewards_v0`, and every test there closes epochs without them.
+pub const INFLATION_START: i64 = if TESTING {
+  4_102_444_800
+} else {
+  1_785_931_200
+};
 
 /// End of the flat window (~12 months / ~360 epochs after the start).
 pub const INFLATION_FLAT_END: i64 = INFLATION_START + 360 * EPOCH_LENGTH;
@@ -119,6 +131,34 @@ mod tests {
 
   fn amt(now: i64) -> u64 {
     supplement_amount(now, START, FLAT_END, TAPER_END, FLAT, FLAT)
+  }
+
+  /// Pins the three deployed boundary timestamps, and which epoch crank mints first, against
+  /// the dates published in the HIP. `cargo test --lib` builds without TESTING and so checks
+  /// the mainnet values; a TESTING build must hold the dormant sentinel instead, and asserting
+  /// both directions means swapping the two branches fails here either way.
+  #[test]
+  fn deployed_window_boundaries_match_the_published_dates() {
+    const AUG_05_0000Z: i64 = 1_785_888_000;
+    const AUG_06_0000Z: i64 = 1_785_974_400;
+
+    if TESTING {
+      assert_eq!(INFLATION_START, 4_102_444_800);
+      assert_eq!(supplement_per_subdao(AUG_06_0000Z), 0);
+      return;
+    }
+
+    assert_eq!(INFLATION_START, 1_785_931_200); // 2026-08-05T12:00:00Z
+    assert_eq!(INFLATION_FLAT_END, 1_817_035_200); // 2027-07-31T12:00:00Z
+    assert_eq!(INFLATION_TAPER_END, 1_879_243_200); // 2029-07-20T12:00:00Z
+
+    // The 00:00 UTC crank on 2026-08-06 is the first one to mint; the one a day earlier
+    // must not, so the Council's pre-mint review window runs its full length.
+    assert_eq!(supplement_per_subdao(AUG_05_0000Z), 0);
+    assert_eq!(
+      supplement_per_subdao(AUG_06_0000Z),
+      INFLATION_FLAT_PER_EPOCH_PER_SUBDAO
+    );
   }
 
   #[test]

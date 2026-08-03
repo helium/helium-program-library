@@ -2,8 +2,10 @@ use std::cmp::max;
 
 use anchor_lang::{prelude::*, system_program, InstructionData};
 use helium_sub_daos::{
-  accounts::CalculateUtilityScoreV0, instruction::IssueRewardsV0, CalculateUtilityScoreArgsV0,
-  DaoV0, IssueRewardsArgsV0, SubDaoV0,
+  accounts::CalculateUtilityScoreV0,
+  instruction::IssueRewardsV0,
+  supplement::{COUNCIL_FANOUT_TOKEN_ACCOUNT, SUPPLEMENT_VAULT_TOKEN_ACCOUNT},
+  CalculateUtilityScoreArgsV0, DaoV0, IssueRewardsArgsV0, SubDaoV0,
 };
 use spl_token::solana_program::instruction::{AccountMeta, Instruction};
 use tuktuk_program::{
@@ -13,6 +15,13 @@ use tuktuk_program::{
 };
 
 use crate::{hpl_crons::CIRCUIT_BREAKER_PROGRAM, EpochTrackerV0, EPOCH_LENGTH};
+
+/// A HIP 149 supplement destination to forward into `issue_rewards_v0`, or `None` while the
+/// constant still holds its pre-activation placeholder (the system program id, which is also
+/// `Pubkey::default()`).
+fn supplement_account(configured: Pubkey) -> Option<Pubkey> {
+  (configured != Pubkey::default()).then_some(configured)
+}
 
 #[derive(Accounts)]
 pub struct QueueEndEpoch<'info> {
@@ -184,12 +193,19 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
         treasury: sub_dao.treasury,
         rewards_escrow: ctx.accounts.dao.rewards_escrow,
         delegator_pool: ctx.accounts.dao.delegator_pool,
-        // HIP 149 Decision 2 supplement vault + Decision 4 Council fanout. None while the
-        // supplement window is inactive (the default). At patch-time activation, set these to
-        // the Receiving Entity vault's HNT ATA and the Council fanout's HNT token account
-        // before rescheduling the cron.
-        supplement_vault: None,
-        council_vault: None,
+        // HIP 149 Decision 2 supplement vault + Decision 4 Council fanout, read from the
+        // helium-sub-daos constants so the two programs cannot disagree about the destinations.
+        // `issue_rewards_v0` requires them only while a supplement window is open, but a task
+        // is queued one epoch before it runs, so window state at queue time says nothing about
+        // window state at execution: both are forwarded whenever the constants are real, or the
+        // first epoch of a window would settle against a task built without them and fail
+        // closed, stopping the self-rescheduling chain.
+        //
+        // A placeholder constant is withheld instead, because Anchor deserializes a forwarded
+        // account as a `TokenAccount` regardless of window state and the placeholder is the
+        // system program id.
+        supplement_vault: supplement_account(SUPPLEMENT_VAULT_TOKEN_ACCOUNT),
+        council_vault: supplement_account(COUNCIL_FANOUT_TOKEN_ACCOUNT),
       }
       .to_account_metas(None),
       data: reward_args.data(),
@@ -283,4 +299,23 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
     tasks: vec![],
     accounts: return_accounts,
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn placeholder_supplement_destination_is_not_forwarded() {
+    // Anchor deserializes a forwarded account as a TokenAccount regardless of whether a
+    // supplement window is open, so forwarding the pre-activation placeholder would fail
+    // every epoch. Pubkey::default() is the system program id the constants ship with.
+    assert_eq!(supplement_account(Pubkey::default()), None);
+  }
+
+  #[test]
+  fn configured_supplement_destination_is_forwarded() {
+    let configured = Pubkey::new_unique();
+    assert_eq!(supplement_account(configured), Some(configured));
+  }
 }
