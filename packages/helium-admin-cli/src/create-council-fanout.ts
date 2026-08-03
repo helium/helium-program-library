@@ -153,6 +153,26 @@ export async function run(args: any = process.argv) {
   );
 
   // Schedule the first distribution task; the fanout self-reschedules thereafter.
+  //
+  // `schedule_task_v0` declares `has_one = task_queue / next_task / next_pre_task` on the
+  // fanout, and Anchor's client resolver satisfies those by fetching it. The instruction
+  // above creates the fanout in this same transaction, so there is nothing on chain to fetch
+  // and resolution fails before anything is sent. Each of those accounts is known ahead of
+  // time instead: `initialize_mini_fanout_v0` stores the task queue it was handed, and sets
+  // `next_task` and `next_pre_task` to the fanout's own key, the "no next task" sentinel that
+  // the scheduling constraint accepts.
+  const [queueAuthority] = PublicKey.findProgramAddressSync(
+    [Buffer.from("queue_authority", "utf-8")],
+    program.programId
+  );
+  const [taskQueueAuthority] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("task_queue_authority", "utf-8"),
+      TASK_QUEUE_ID.toBuffer(),
+      queueAuthority.toBuffer(),
+    ],
+    tuktukProgram.programId
+  );
   const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
     TASK_QUEUE_ID
   );
@@ -160,9 +180,14 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .scheduleTaskV0({ taskId, preTaskId })
-      .accounts({
+      .accountsPartial({
         payer: wallet.publicKey,
         miniFanout: miniFanout!,
+        taskQueue: TASK_QUEUE_ID,
+        queueAuthority,
+        taskQueueAuthority,
+        nextTask: miniFanout!,
+        nextPreTask: miniFanout!,
         task: taskKey(TASK_QUEUE_ID, taskId)[0],
         preTask: taskKey(TASK_QUEUE_ID, preTaskId)[0],
       })
