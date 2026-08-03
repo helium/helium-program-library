@@ -57,6 +57,7 @@ import {
   buildBatchedTransactions,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
+import { canSign } from "@/lib/utils/can-sign";
 
 export const create = publicProcedure.governance.createPosition.handler(
   async ({ input, errors }) => {
@@ -71,6 +72,18 @@ export const create = publicProcedure.governance.createPosition.handler(
 
     const { connection, provider } = createSolanaConnection(walletAddress);
     const walletPubkey = new PublicKey(walletAddress);
+
+    // The new position's mint is an ephemeral keypair that signs the transaction
+    // as it is built. A wallet that cannot sign is served by re-wrapping the
+    // message into a multisig proposal, which discards that signature, so the
+    // proposal could only fail on execution after quorum and rent are spent.
+    if (!canSign(walletPubkey)) {
+      throw errors.BAD_REQUEST({
+        message:
+          "Creating a position requires a wallet that can sign; a multisig-held wallet cannot supply the new position mint's signature",
+      });
+    }
+
     const mintPubkey = new PublicKey(tokenAmount.mint);
     const amount = await resolveTokenAmountInput(tokenAmount);
 
