@@ -53,13 +53,16 @@ pub const INFLATION_FLAT_PER_EPOCH_PER_SUBDAO: u64 = 98_000 * 100_000_000;
 /// then decaying linearly to zero across the taper window.
 pub const INFLATION_TAPER_INITIAL_PER_EPOCH_PER_SUBDAO: u64 = INFLATION_FLAT_PER_EPOCH_PER_SUBDAO;
 
-// PATCH-TIME: the Receiving Entity's Squads vault HNT token account that receives the
-// supplement. Placeholder (the system program id); set to the real token account before
-// deploy. issue_rewards_v0 requires the supplied supplement token account to equal this key
-// (relaxed under TESTING), pinned to the exact account — like COUNCIL_FANOUT_TOKEN_ACCOUNT —
-// rather than only checking the token-account authority, so a caller cannot route the
-// supplement to a different account under the same authority (I-03).
-pub const SUPPLEMENT_VAULT_TOKEN_ACCOUNT: Pubkey = pubkey!("11111111111111111111111111111111");
+/// The Receiving Entity's HNT token account: the associated token account of vault index 0 of
+/// Squads multisig `2g7qF5d3p2XeJALK6RzAF1sFY8Emt8LuMLXATF6hjWyy`, whose vault is
+/// `Cuy6WiVdHE6Wznqos86AUwLpA4zPfPABYq3qszMa6E6A`.
+///
+/// issue_rewards_v0 requires the supplied supplement token account to equal this key (relaxed
+/// under TESTING). Pinning the exact account, rather than only checking the token account's
+/// authority, is what stops a caller routing the supplement to a different account under the
+/// same authority.
+pub const SUPPLEMENT_VAULT_TOKEN_ACCOUNT: Pubkey =
+  pubkey!("AGPDcgpXan5RB2Y9usHvdJmmJHpyyYqcQm8KouRkK6f4");
 
 // ── HIP 149 Decision 4: Advisory Council compensation carve-out ─────────────────────────
 /// The community-nominated Council seats share 1.25% of the supplement (HIP 149 Decision 4).
@@ -131,6 +134,24 @@ mod tests {
 
   fn amt(now: i64) -> u64 {
     supplement_amount(now, START, FLAT_END, TAPER_END, FLAT, FLAT)
+  }
+
+  /// Derives the supplement destination from the Receiving Entity's Squads vault rather than
+  /// restating the constant, so a mistyped address, a wrong mint, or an on-curve derivation
+  /// fails here. The vault itself is off-curve, which `get_associated_token_address` handles;
+  /// changing the destination means changing the vault named here, deliberately.
+  #[test]
+  fn supplement_destination_is_the_receiving_entity_vault_hnt_ata() {
+    const RECEIVING_ENTITY_VAULT: Pubkey = pubkey!("Cuy6WiVdHE6Wznqos86AUwLpA4zPfPABYq3qszMa6E6A");
+    const HNT_MINT: Pubkey = pubkey!("hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux");
+
+    assert_eq!(
+      SUPPLEMENT_VAULT_TOKEN_ACCOUNT,
+      anchor_spl::associated_token::get_associated_token_address(
+        &RECEIVING_ENTITY_VAULT,
+        &HNT_MINT
+      )
+    );
   }
 
   /// Pins the three deployed boundary timestamps, and which epoch crank mints first, against
