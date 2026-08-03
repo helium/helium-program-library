@@ -282,7 +282,8 @@ export const create = publicProcedure.governance.createPosition.handler(
                 systemProgram: SystemProgram.programId,
                 delegatorAta: getAssociatedTokenAddressSync(
                   HNT_MINT,
-                  walletPubkey
+                  walletPubkey,
+                  true
                 ),
                 task,
                 nextTask: task,
@@ -387,7 +388,11 @@ export const create = publicProcedure.governance.createPosition.handler(
     // verify the user actually holds enough of the deposit mint, otherwise
     // the on-chain tx fails with an opaque SPL token Custom(1) instead of
     // a clean INSUFFICIENT_FUNDS response.
-    const depositAta = getAssociatedTokenAddressSync(mintPubkey, walletPubkey);
+    const depositAta = getAssociatedTokenAddressSync(
+      mintPubkey,
+      walletPubkey,
+      true
+    );
     const depositAtaInfo = await connection
       .getTokenAccountBalance(depositAta)
       .catch(() => null);
