@@ -439,8 +439,10 @@ mod tests {
   /// rather than a literal 32KB assertion. The localnet test remains the ground truth.
   #[test]
   fn end_epoch_instruction_set_stays_within_its_allocation_budget() {
-    // Measured at 23,444 bytes today. The budget leaves ~1KB of room: enough that an incidental
-    // change does not trip it, tight enough that anything structural does.
+    // Measured at 24,104 bytes carrying both supplement destinations, against 24,464 on the
+    // pre-HIP-149 baseline: pre-sizing the metas Vec more than pays for the 136 bytes the two
+    // destinations add. The budget leaves a few hundred bytes: enough that an incidental change
+    // does not trip it, tight enough that anything structural does.
     const BUDGET: usize = 24_500;
 
     let inputs = test_inputs();
@@ -458,6 +460,36 @@ mod tests {
        within ~136 bytes of that limit. Reclaim allocations or reduce what the task carries; \
        shaving incidental clones will not create durable headroom."
     );
+  }
+
+  /// Pins what the task actually carries, so a lost account shows up here rather than as a
+  /// failed epoch. Five instructions: a calculate and an issue per sub-DAO, plus no-emit.
+  #[test]
+  fn end_epoch_forwards_both_supplement_destinations() {
+    let ixs = end_epoch_ixs(&test_inputs());
+    assert_eq!(ixs.len(), 5);
+
+    let issue_ixs: Vec<_> = ixs
+      .iter()
+      .filter(|ix| {
+        ix.data
+          == IssueRewardsV0 {
+            args: IssueRewardsArgsV0 { epoch: 20_668 },
+          }
+          .data()
+      })
+      .collect();
+    assert_eq!(issue_ixs.len(), 2);
+
+    for ix in issue_ixs {
+      for destination in [SUPPLEMENT_VAULT_TOKEN_ACCOUNT, COUNCIL_FANOUT_TOKEN_ACCOUNT] {
+        assert!(
+          ix.accounts.iter().any(|a| a.pubkey == destination),
+          "issue_rewards_v0 must carry {destination}, or the first epoch of a supplement \
+           window settles without it and the cron chain stops"
+        );
+      }
+    }
   }
 
   #[test]

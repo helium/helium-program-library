@@ -10,22 +10,34 @@
 //! `calculate_utility_score_v0` adds the same total back into `current_hnt_supply` so the
 //! supplement isn't misread as burned HNT (see the supply-tracking note there).
 //!
-//! All parameters are hardcoded; changing them requires a community-voted program
-//! upgrade. Several are **patch-time** values set just before the mainnet deploy — by
-//! default they leave the supplement INACTIVE (a far-future start), so the program is safe
-//! to ship before they're finalized.
+//! All parameters are hardcoded; changing them requires a community-voted program upgrade.
+//! That includes the two destination token accounts, so the supplement cannot be redirected
+//! without a community-voted upgrade either. Both destinations are mandatory while a window is
+//! open, and `hpl-crons` withholds a destination that still holds its pre-activation
+//! placeholder rather than forwarding it, so a build whose destinations are not real fails
+//! every epoch of a live window instead of minting somewhere unintended.
 
 use anchor_lang::prelude::*;
+
+use crate::TESTING;
 
 const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 
 // ── Patch-time constants ─────────────────────────────────────────────────────────────
-// PATCH-TIME: set INFLATION_START to the real mint-start unix timestamp (the upgrade slot
-// + ~2 weeks, the Council pre-mint review window) before the mainnet deploy. The default
-// is a far-future sentinel (2100-01-01) so the supplement stays dormant until deliberately
-// configured — shipping without setting it mints nothing, and the test suite (which runs
-// at present-day wall-clock) sees a zero supplement and is unaffected.
-pub const INFLATION_START: i64 = 4_102_444_800;
+/// Mint start, 2026-08-05T12:00:00Z. Epochs settle on the 00:00 UTC boundary, so the first
+/// supplement mint lands at the 2026-08-06T00:00:00Z crank, closing the Council's pre-mint
+/// review window. The value sits between two crank boundaries rather than on one, so neither
+/// Solana clock drift nor a late crank can change which epoch mints first; the flat window
+/// then spans exactly 360 cranks (through 2027-08-01) and the taper exactly 720.
+///
+/// Under TESTING the start stays a far-future sentinel (2100-01-01), keeping the supplement
+/// dormant for the localnet suite: an open window makes both destination accounts mandatory
+/// in `issue_rewards_v0`, and every test there closes epochs without them.
+pub const INFLATION_START: i64 = if TESTING {
+  4_102_444_800
+} else {
+  1_785_931_200
+};
 
 /// End of the flat window (~12 months / ~360 epochs after the start).
 pub const INFLATION_FLAT_END: i64 = INFLATION_START + 360 * EPOCH_LENGTH;
@@ -41,13 +53,16 @@ pub const INFLATION_FLAT_PER_EPOCH_PER_SUBDAO: u64 = 98_000 * 100_000_000;
 /// then decaying linearly to zero across the taper window.
 pub const INFLATION_TAPER_INITIAL_PER_EPOCH_PER_SUBDAO: u64 = INFLATION_FLAT_PER_EPOCH_PER_SUBDAO;
 
-// PATCH-TIME: the Receiving Entity's Squads vault HNT token account that receives the
-// supplement. Placeholder (the system program id); set to the real token account before
-// deploy. issue_rewards_v0 requires the supplied supplement token account to equal this key
-// (relaxed under TESTING), pinned to the exact account — like COUNCIL_FANOUT_TOKEN_ACCOUNT —
-// rather than only checking the token-account authority, so a caller cannot route the
-// supplement to a different account under the same authority (I-03).
-pub const SUPPLEMENT_VAULT_TOKEN_ACCOUNT: Pubkey = pubkey!("11111111111111111111111111111111");
+/// The Receiving Entity's HNT token account: the associated token account of vault index 0 of
+/// Squads multisig `2g7qF5d3p2XeJALK6RzAF1sFY8Emt8LuMLXATF6hjWyy`, whose vault is
+/// `Cuy6WiVdHE6Wznqos86AUwLpA4zPfPABYq3qszMa6E6A`.
+///
+/// issue_rewards_v0 requires the supplied supplement token account to equal this key (relaxed
+/// under TESTING). Pinning the exact account, rather than only checking the token account's
+/// authority, is what stops a caller routing the supplement to a different account under the
+/// same authority.
+pub const SUPPLEMENT_VAULT_TOKEN_ACCOUNT: Pubkey =
+  pubkey!("AGPDcgpXan5RB2Y9usHvdJmmJHpyyYqcQm8KouRkK6f4");
 
 // ── HIP 149 Decision 4: Advisory Council compensation carve-out ─────────────────────────
 /// The community-nominated Council seats share 1.25% of the supplement (HIP 149 Decision 4).
@@ -57,12 +72,15 @@ pub const SUPPLEMENT_VAULT_TOKEN_ACCOUNT: Pubkey = pubkey!("11111111111111111111
 /// Expressed in basis points; the HIP caps the total at 1.25%, so this is a ceiling.
 pub const COUNCIL_COMPENSATION_BPS: u64 = 125;
 
-// PATCH-TIME: the Council compensation fanout's HNT token account (a mini_fanout PDA-owned
-// ATA). Placeholder (the system program id); set to the real fanout token account before
-// deploy. issue_rewards_v0 requires the supplied Council token account to equal this key
-// (relaxed under TESTING). The fanout's `owner` (who edits the seated-member set) is the
-// governance multisig, never the Receiving Entity; see the create-council-fanout tooling.
-pub const COUNCIL_FANOUT_TOKEN_ACCOUNT: Pubkey = pubkey!("11111111111111111111111111111111");
+/// The Council compensation fanout's HNT token account: the associated token account of
+/// `mini_fanout` `2pCpQYrUmQor9igsF4cY7tkmd3jBQzHFEB75gtpjdWA2`.
+///
+/// issue_rewards_v0 requires the supplied Council token account to equal this key (relaxed
+/// under TESTING). The fanout's `owner`, the only authority that can edit the seated-member
+/// set, is the governance multisig vault and never the Receiving Entity, so seating and
+/// removal reach the chain only through a multisig action.
+pub const COUNCIL_FANOUT_TOKEN_ACCOUNT: Pubkey =
+  pubkey!("EYbAXgLq1aRr9a9y55DbjfMdXNrZuMa69WXN9c1UR6eK");
 
 /// The Council compensation carve-out (1.25%) of a per-sub-DAO supplement amount. The
 /// remainder (`supplement - council_cut`) goes to the Receiving Entity vault.
@@ -119,6 +137,76 @@ mod tests {
 
   fn amt(now: i64) -> u64 {
     supplement_amount(now, START, FLAT_END, TAPER_END, FLAT, FLAT)
+  }
+
+  /// Derives the supplement destination from the Receiving Entity's Squads vault rather than
+  /// restating the constant, so a mistyped address, a wrong mint, or an on-curve derivation
+  /// fails here. The vault itself is off-curve, which `get_associated_token_address` handles;
+  /// changing the destination means changing the vault named here, deliberately.
+  #[test]
+  fn supplement_destination_is_the_receiving_entity_vault_hnt_ata() {
+    const RECEIVING_ENTITY_VAULT: Pubkey = pubkey!("Cuy6WiVdHE6Wznqos86AUwLpA4zPfPABYq3qszMa6E6A");
+    const HNT_MINT: Pubkey = pubkey!("hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux");
+
+    assert_eq!(
+      SUPPLEMENT_VAULT_TOKEN_ACCOUNT,
+      anchor_spl::associated_token::get_associated_token_address(
+        &RECEIVING_ENTITY_VAULT,
+        &HNT_MINT
+      )
+    );
+  }
+
+  /// Derives the Council destination through the whole chain that produced it: the fanout PDA
+  /// from the mini_fanout program, the creating wallet as namespace and the seed, then that
+  /// fanout's HNT associated token account. Repointing Council compensation means changing one
+  /// of those inputs, deliberately, rather than editing an opaque address.
+  #[test]
+  fn council_destination_is_the_seated_fanout_hnt_ata() {
+    const MINI_FANOUT_PROGRAM: Pubkey = pubkey!("mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn");
+    const NAMESPACE: Pubkey = pubkey!("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW");
+    const HNT_MINT: Pubkey = pubkey!("hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux");
+
+    let (fanout, _bump) = Pubkey::find_program_address(
+      &[b"mini_fanout", NAMESPACE.as_ref(), b"hip149-council"],
+      &MINI_FANOUT_PROGRAM,
+    );
+    assert_eq!(
+      fanout,
+      pubkey!("2pCpQYrUmQor9igsF4cY7tkmd3jBQzHFEB75gtpjdWA2")
+    );
+    assert_eq!(
+      COUNCIL_FANOUT_TOKEN_ACCOUNT,
+      anchor_spl::associated_token::get_associated_token_address(&fanout, &HNT_MINT)
+    );
+  }
+
+  /// Pins the three deployed boundary timestamps, and which epoch crank mints first, against
+  /// the dates published in the HIP. `cargo test --lib` builds without TESTING and so checks
+  /// the mainnet values; a TESTING build must hold the dormant sentinel instead, and asserting
+  /// both directions means swapping the two branches fails here either way.
+  #[test]
+  fn deployed_window_boundaries_match_the_published_dates() {
+    const AUG_05_0000Z: i64 = 1_785_888_000;
+    const AUG_06_0000Z: i64 = 1_785_974_400;
+
+    if TESTING {
+      assert_eq!(INFLATION_START, 4_102_444_800);
+      assert_eq!(supplement_per_subdao(AUG_06_0000Z), 0);
+      return;
+    }
+
+    assert_eq!(INFLATION_START, 1_785_931_200); // 2026-08-05T12:00:00Z
+    assert_eq!(INFLATION_FLAT_END, 1_817_035_200); // 2027-07-31T12:00:00Z
+    assert_eq!(INFLATION_TAPER_END, 1_879_243_200); // 2029-07-20T12:00:00Z
+
+    // The 00:00 UTC crank on 2026-08-06 is the first one to mint; the one a day earlier
+    // must not, so the Council's pre-mint review window runs its full length.
+    assert_eq!(supplement_per_subdao(AUG_05_0000Z), 0);
+    assert_eq!(
+      supplement_per_subdao(AUG_06_0000Z),
+      INFLATION_FLAT_PER_EPOCH_PER_SUBDAO
+    );
   }
 
   #[test]
