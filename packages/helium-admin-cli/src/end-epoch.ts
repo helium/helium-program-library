@@ -76,6 +76,16 @@ export async function run(args: any = process.argv) {
         type: "number",
         describe: "The timestamp to start ending epochs from",
       },
+      supplementVault: {
+        type: "string",
+        describe:
+          "HIP 149 Decision 2 Receiving Entity vault HNT token account. Required to close an epoch inside a supplement window; issue_rewards_v0 pins it to SUPPLEMENT_VAULT_TOKEN_ACCOUNT, so a wrong value fails the instruction rather than misrouting the mint. Omit while the supplement is dormant.",
+      },
+      councilVault: {
+        type: "string",
+        describe:
+          "HIP 149 Decision 4 Council fanout HNT token account. Same requirement and same on-chain pinning as --supplementVault.",
+      },
     });
     const argv = await yarg.argv;
     process.env.ANCHOR_WALLET = argv.wallet;
@@ -89,6 +99,12 @@ export async function run(args: any = process.argv) {
     const unixNow = new Date().valueOf() / 1000;
     const [dao] = daoKey(hntMint);
     const basePriorityFee = Number(argv.basePriorityFee || 1);
+    const supplementVault = argv.supplementVault
+      ? new PublicKey(argv.supplementVault)
+      : null;
+    const councilVault = argv.councilVault
+      ? new PublicKey(argv.councilVault)
+      : null;
 
     const subDaos = await heliumSubDaosProgram.account.subDaoV0.all([
       {
@@ -212,8 +228,8 @@ export async function run(args: any = process.argv) {
                     .issueRewardsV0({ epoch })
                     .accountsPartial({
                       subDao: subDao.publicKey,
-                      supplementVault: null,
-                      councilVault: null,
+                      supplementVault,
+                      councilVault,
                     })
                     .instruction(),
                 ],
