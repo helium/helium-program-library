@@ -236,9 +236,16 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
     data: no_emit::instruction::NoEmitV0.data(),
   });
 
+  // This handler runs inside tuktuk's `run_task`, under a 32KB heap that the two compiled
+  // transactions below dominate, and it has already overflowed once in production. Every
+  // allocation here is therefore load-bearing: `sub_dao_infos` is dead by this point and is
+  // dropped rather than left to the end of scope, the seeds are rebuilt instead of cloned, and
+  // the account metas are moved rather than copied.
+  drop(sub_dao_infos);
+
   let bump = ctx.bumps.payer;
-  let seeds = vec![vec![b"helium".to_vec(), bump.to_le_bytes().to_vec()]];
-  let (compiled_tx, _) = compile_transaction(ixs, seeds.clone())?;
+  let seeds = || vec![vec![b"helium".to_vec(), bump.to_le_bytes().to_vec()]];
+  let (compiled_tx, _) = compile_transaction(ixs, seeds())?;
 
   let reschedule_ix = Instruction {
     program_id: crate::ID,
@@ -253,11 +260,10 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
       task_queue: ctx.accounts.task_queue.to_account_info(),
       epoch_tracker: ctx.accounts.epoch_tracker.to_account_info(),
     }
-    .to_account_metas(None)
-    .to_vec(),
+    .to_account_metas(None),
     data: crate::instruction::QueueEndEpoch.data(),
   };
-  let (compiled_reschedule_tx, _) = compile_transaction(vec![reschedule_ix], seeds).unwrap();
+  let (compiled_reschedule_tx, _) = compile_transaction(vec![reschedule_ix], seeds()).unwrap();
 
   let end_of_epoch_trigger = TriggerV0::Timestamp(max(
     Clock::get()?.unix_timestamp,
