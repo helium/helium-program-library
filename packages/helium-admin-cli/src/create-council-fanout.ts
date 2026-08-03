@@ -37,9 +37,9 @@ import { loadKeypair } from "./utils";
 //     members from that point forward, per the HIP).
 //   - Keep the fanout funded with lamports; it pays its own crank reward and silently
 //     unschedules itself if it runs dry.
-//   - The fanout's stored `rent_refund` is the PAYER, not the `rentRefund` account passed
-//     below: initialize_mini_fanout_v0 writes `ctx.accounts.payer.key()` and ignores that
-//     account. Closing the fanout therefore refunds its rent to whoever paid to create it.
+//   - Closing the fanout refunds its rent to whoever paid to create it, not to the owner:
+//     initialize_mini_fanout_v0 stores `ctx.accounts.payer.key()` as `rent_refund` and never
+//     reads the account passed under that name. Pick the payer accordingly.
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
@@ -140,7 +140,12 @@ export async function run(args: any = process.argv) {
       payer: wallet.publicKey,
       owner,
       taskQueue: TASK_QUEUE_ID,
-      rentRefund: owner,
+      // The account required here does not decide where rent goes:
+      // initialize_mini_fanout_v0 stores `ctx.accounts.payer.key()` and never reads this one.
+      // Passing the payer keeps the argument honest about the refund destination, and keeps a
+      // vault that has no other role in this instruction out of the writable set. Change the
+      // payer to change where closing the fanout refunds its rent.
+      rentRefund: wallet.publicKey,
       mint: HNT_MINT,
     })
     .prepare();
