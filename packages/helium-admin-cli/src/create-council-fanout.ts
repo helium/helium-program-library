@@ -37,6 +37,9 @@ import { loadKeypair } from "./utils";
 //     members from that point forward, per the HIP).
 //   - Keep the fanout funded with lamports; it pays its own crank reward and silently
 //     unschedules itself if it runs dry.
+//   - The fanout's stored `rent_refund` is the PAYER, not the `rentRefund` account passed
+//     below: initialize_mini_fanout_v0 writes `ctx.accounts.payer.key()` and ignores that
+//     account. Closing the fanout therefore refunds its rent to whoever paid to create it.
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {

@@ -11,11 +11,11 @@
 //! supplement isn't misread as burned HNT (see the supply-tracking note there).
 //!
 //! All parameters are hardcoded; changing them requires a community-voted program upgrade.
-//! The two destination token accounts are **patch-time** values, still placeholders here, and
-//! a supplement window that opens against a placeholder fails every epoch: the accounts are
-//! mandatory once a window is open, and `hpl-crons` withholds a placeholder rather than
-//! forward it. So the mint destinations and `INFLATION_START` have to be real in the same
-//! deploy, and no build carrying a placeholder may reach a live window.
+//! That includes the two destination token accounts, so the supplement cannot be redirected
+//! without a community-voted upgrade either. Both destinations are mandatory while a window is
+//! open, and `hpl-crons` withholds a destination that still holds its pre-activation
+//! placeholder rather than forwarding it, so a build whose destinations are not real fails
+//! every epoch of a live window instead of minting somewhere unintended.
 
 use anchor_lang::prelude::*;
 
@@ -72,12 +72,15 @@ pub const SUPPLEMENT_VAULT_TOKEN_ACCOUNT: Pubkey =
 /// Expressed in basis points; the HIP caps the total at 1.25%, so this is a ceiling.
 pub const COUNCIL_COMPENSATION_BPS: u64 = 125;
 
-// PATCH-TIME: the Council compensation fanout's HNT token account (a mini_fanout PDA-owned
-// ATA). Placeholder (the system program id); set to the real fanout token account before
-// deploy. issue_rewards_v0 requires the supplied Council token account to equal this key
-// (relaxed under TESTING). The fanout's `owner` (who edits the seated-member set) is the
-// governance multisig, never the Receiving Entity; see the create-council-fanout tooling.
-pub const COUNCIL_FANOUT_TOKEN_ACCOUNT: Pubkey = pubkey!("11111111111111111111111111111111");
+/// The Council compensation fanout's HNT token account: the associated token account of
+/// `mini_fanout` `2pCpQYrUmQor9igsF4cY7tkmd3jBQzHFEB75gtpjdWA2`.
+///
+/// issue_rewards_v0 requires the supplied Council token account to equal this key (relaxed
+/// under TESTING). The fanout's `owner`, the only authority that can edit the seated-member
+/// set, is the governance multisig vault and never the Receiving Entity, so seating and
+/// removal reach the chain only through a multisig action.
+pub const COUNCIL_FANOUT_TOKEN_ACCOUNT: Pubkey =
+  pubkey!("EYbAXgLq1aRr9a9y55DbjfMdXNrZuMa69WXN9c1UR6eK");
 
 /// The Council compensation carve-out (1.25%) of a per-sub-DAO supplement amount. The
 /// remainder (`supplement - council_cut`) goes to the Receiving Entity vault.
@@ -151,6 +154,30 @@ mod tests {
         &RECEIVING_ENTITY_VAULT,
         &HNT_MINT
       )
+    );
+  }
+
+  /// Derives the Council destination through the whole chain that produced it: the fanout PDA
+  /// from the mini_fanout program, the creating wallet as namespace and the seed, then that
+  /// fanout's HNT associated token account. Repointing Council compensation means changing one
+  /// of those inputs, deliberately, rather than editing an opaque address.
+  #[test]
+  fn council_destination_is_the_seated_fanout_hnt_ata() {
+    const MINI_FANOUT_PROGRAM: Pubkey = pubkey!("mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn");
+    const NAMESPACE: Pubkey = pubkey!("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW");
+    const HNT_MINT: Pubkey = pubkey!("hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux");
+
+    let (fanout, _bump) = Pubkey::find_program_address(
+      &[b"mini_fanout", NAMESPACE.as_ref(), b"hip149-council"],
+      &MINI_FANOUT_PROGRAM,
+    );
+    assert_eq!(
+      fanout,
+      pubkey!("2pCpQYrUmQor9igsF4cY7tkmd3jBQzHFEB75gtpjdWA2")
+    );
+    assert_eq!(
+      COUNCIL_FANOUT_TOKEN_ACCOUNT,
+      anchor_spl::associated_token::get_associated_token_address(&fanout, &HNT_MINT)
     );
   }
 
