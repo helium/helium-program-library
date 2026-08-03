@@ -131,7 +131,7 @@ export const claimRewards =
 
       // Check which reward ATAs need creation
       const rewardAtaKeys = claimResult.rewardMints.map((mint) =>
-        getAssociatedTokenAddressSync(mint, walletPubkey),
+        getAssociatedTokenAddressSync(mint, walletPubkey, true),
       );
       const rewardAtaAccounts = await connection.getMultipleAccountsInfo(rewardAtaKeys);
       const missingAtaCount = rewardAtaAccounts.filter((a) => !a).length;
