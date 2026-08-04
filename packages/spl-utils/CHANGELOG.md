@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- [#1237](https://github.com/helium/helium-program-library/pull/1237) [`bc60ae4`](https://github.com/helium/helium-program-library/commit/bc60ae4c5564a560de1bda46df76c269d90a1d98) Thanks [@bryzettler](https://github.com/bryzettler)! - Fix batchInstructionsToTxsWithPriorityFee mutating the caller's instruction group arrays when starting a new transaction after overflow, which corrupted groups across repeated batch calls and produced oversized transactions. Also catch simulateTransaction rejections in estimateComputeUnits and fall back to max compute units instead of propagating the error.
+
 ## 0.11.17
 
 ### Patch Changes
