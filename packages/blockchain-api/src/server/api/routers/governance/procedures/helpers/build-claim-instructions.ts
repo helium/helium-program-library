@@ -225,7 +225,8 @@ export async function buildClaimInstructions(
           mint: position.mint,
           positionTokenAccount: getAssociatedTokenAddressSync(
             position.mint,
-            walletPubkey
+            walletPubkey,
+            true
           ),
           positionAuthority: walletPubkey,
           registrar: position.account.registrar,
@@ -254,7 +255,8 @@ export async function buildClaimInstructions(
               delegatorPool: daoAcc.delegatorPool,
               delegatorAta: getAssociatedTokenAddressSync(
                 daoAcc.hntMint,
-                walletPubkey
+                walletPubkey,
+                true
               ),
               delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
                 daoAcc.delegatorPool
@@ -275,7 +277,8 @@ export async function buildClaimInstructions(
               delegatorPool: subDaoAcc.delegatorPool,
               delegatorAta: getAssociatedTokenAddressSync(
                 subDaoAcc.dntMint,
-                walletPubkey
+                walletPubkey,
+                true
               ),
               delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
                 subDaoAcc.delegatorPool

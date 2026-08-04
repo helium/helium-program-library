@@ -551,6 +551,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
                 delegatorAta: getAssociatedTokenAddressSync(
                   HNT_MINT,
                   walletPubkey,
+                  true,
                 ),
                 task,
                 nextTask:

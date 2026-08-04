@@ -64,6 +64,11 @@ export type ProposalWithVotes = Proposal & {
   votes: Vote[];
 };
 
+export type CastingProxy = {
+  wallet: string;
+  name: string | null;
+};
+
 export type Vote = {
   voter: string;
   registrar: string;
@@ -71,6 +76,7 @@ export type Vote = {
   choice: number;
   choiceName: string;
   proxyName: string;
+  castingProxies: CastingProxy[];
 };
 
 export type SubDaoDelegationSplit = {

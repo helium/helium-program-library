@@ -11,7 +11,11 @@
     {
       "programId": "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p",
       "accounts": [
-        { "type": "ProxyAssignmentV0", "table": "proxy_assignments", "schema": "public" }
+        {
+          "type": "ProxyAssignmentV0",
+          "table": "proxy_assignments",
+          "schema": "public"
+        }
       ]
     },
     {
@@ -43,5 +47,7 @@
       ]
     }
   ],
-  "indexConfigs": []
+  "indexConfigs": [
+    "CREATE INDEX IF NOT EXISTS idx_proxy_assignments_asset_index ON proxy_assignments (asset, index);"
+  ]
 }

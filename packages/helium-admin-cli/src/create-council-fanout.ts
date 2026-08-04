@@ -13,8 +13,10 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
+import * as multisig from "@sqds/multisig";
 import os from "os";
 import yargs from "yargs/yargs";
+import { COUNCIL_FANOUT_TOKEN_ACCOUNT } from "./hip149";
 import { loadKeypair } from "./utils";
 
 // HIP 149 Decision 4: create the Advisory Council compensation fanout. The supplement mint in
@@ -26,14 +28,19 @@ import { loadKeypair } from "./utils";
 // patch-time edit that sets INFLATION_START), then set the cron's council_vault to it.
 //
 // Operational rules (see HIP 149 Decision 4):
-//   - `owner` MUST be the governance multisig, never the Receiving Entity. It is the only
-//     authority that can edit the seated-member set; the community seats/removes members by
-//     vote and the multisig executes the corresponding update.
+//   - `owner` MUST be the governance multisig's vault, never the Receiving Entity. It is the
+//     only authority that can edit the seated-member set; the community seats/removes members
+//     by vote and the multisig executes the corresponding update. Prefer --multisig over
+//     --owner: it derives the vault the same way update-council-fanout.ts and
+//     close-council-fanout.ts do, instead of relying on a manually-typed vault address.
 //   - On a seat change, CRANK before updating the member vec, so accrual maps to the set that
 //     was seated when it accrued (a vacant seat's share then redistributes to the seated
 //     members from that point forward, per the HIP).
 //   - Keep the fanout funded with lamports; it pays its own crank reward and silently
 //     unschedules itself if it runs dry.
+//   - Closing the fanout refunds its rent to whoever paid to create it, not to the owner:
+//     initialize_mini_fanout_v0 stores `ctx.accounts.payer.key()` as `rent_refund` and never
+//     reads the account passed under that name. Pick the payer accordingly.
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
@@ -48,9 +55,13 @@ export async function run(args: any = process.argv) {
     },
     owner: {
       type: "string",
-      required: true,
       describe:
-        "Fanout owner = governance multisig (Squads vault). Edits the seated-member set. NEVER the Receiving Entity.",
+        "Fanout owner = governance multisig (Squads vault) address directly. Edits the seated-member set. NEVER the Receiving Entity. Prefer --multisig, which derives this the same way update-council-fanout.ts and close-council-fanout.ts do; use --owner only to bypass that derivation.",
+    },
+    multisig: {
+      type: "string",
+      describe:
+        "Address of the squads multisig whose vault (index 0) should own the fanout. Derives --owner for you, the same way update-council-fanout.ts and close-council-fanout.ts derive it from --multisig. Exactly one of --owner / --multisig is required.",
     },
     members: {
       type: "string",
@@ -86,7 +97,18 @@ export async function run(args: any = process.argv) {
   const program = await initMfan(provider);
   const tuktukProgram = await initTuktuk(provider);
 
-  const owner = new PublicKey(argv.owner);
+  if (Boolean(argv.owner) === Boolean(argv.multisig)) {
+    throw new Error("exactly one of --owner / --multisig is required");
+  }
+  const owner = argv.multisig
+    ? (
+        await multisig.getVaultPda({
+          multisigPda: new PublicKey(argv.multisig),
+          index: 0,
+          programId: multisig.PROGRAM_ID,
+        })
+      )[0]
+    : new PublicKey(argv.owner!); // validated above: exactly one of owner/multisig is set
   const members = argv.members
     .split(",")
     .map((m) => m.trim())
@@ -119,11 +141,31 @@ export async function run(args: any = process.argv) {
       payer: wallet.publicKey,
       owner,
       taskQueue: TASK_QUEUE_ID,
-      rentRefund: owner,
+      // The account required here does not decide where rent goes:
+      // initialize_mini_fanout_v0 stores `ctx.accounts.payer.key()` and never reads this one.
+      // Passing the payer keeps the argument honest about the refund destination, and keeps a
+      // vault that has no other role in this instruction out of the writable set. Change the
+      // payer to change where closing the fanout refunds its rent.
+      rentRefund: wallet.publicKey,
       mint: HNT_MINT,
     })
     .prepare();
   instructions.push(initIx);
+
+  // The fanout PDA is seeded by the `namespace` signer and `--seed`. Anchor resolves that
+  // signer to the provider wallet, so a different wallet, or a different seed, silently
+  // produces a different PDA, a different HNT associated token account, and a fanout that
+  // `issue_rewards_v0` rejects on its account pin. That would fail every epoch close inside a
+  // supplement window. Members, owner and schedule do not enter the derivation, so this only
+  // constrains the two inputs that have to stay fixed. Checked before anything is sent.
+  const tokenAccount = getAssociatedTokenAddressSync(HNT_MINT, miniFanout!, true);
+  if (!tokenAccount.equals(COUNCIL_FANOUT_TOKEN_ACCOUNT)) {
+    throw new Error(
+      `Derived fanout token account ${tokenAccount.toBase58()} does not match the ` +
+        `COUNCIL_FANOUT_TOKEN_ACCOUNT pinned in issue_rewards_v0 ` +
+        `(${COUNCIL_FANOUT_TOKEN_ACCOUNT.toBase58()}). Wrong signing wallet or wrong --seed.`
+    );
+  }
 
   // Fund the fanout so it can pay its own crank reward and stay scheduled.
   instructions.push(
@@ -135,6 +177,26 @@ export async function run(args: any = process.argv) {
   );
 
   // Schedule the first distribution task; the fanout self-reschedules thereafter.
+  //
+  // `schedule_task_v0` declares `has_one = task_queue / next_task / next_pre_task` on the
+  // fanout, and Anchor's client resolver satisfies those by fetching it. The instruction
+  // above creates the fanout in this same transaction, so there is nothing on chain to fetch
+  // and resolution fails before anything is sent. Each of those accounts is known ahead of
+  // time instead: `initialize_mini_fanout_v0` stores the task queue it was handed, and sets
+  // `next_task` and `next_pre_task` to the fanout's own key, the "no next task" sentinel that
+  // the scheduling constraint accepts.
+  const [queueAuthority] = PublicKey.findProgramAddressSync(
+    [Buffer.from("queue_authority", "utf-8")],
+    program.programId
+  );
+  const [taskQueueAuthority] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("task_queue_authority", "utf-8"),
+      TASK_QUEUE_ID.toBuffer(),
+      queueAuthority.toBuffer(),
+    ],
+    tuktukProgram.programId
+  );
   const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
     TASK_QUEUE_ID
   );
@@ -142,9 +204,14 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .scheduleTaskV0({ taskId, preTaskId })
-      .accounts({
+      .accountsPartial({
         payer: wallet.publicKey,
         miniFanout: miniFanout!,
+        taskQueue: TASK_QUEUE_ID,
+        queueAuthority,
+        taskQueueAuthority,
+        nextTask: miniFanout!,
+        nextPreTask: miniFanout!,
         task: taskKey(TASK_QUEUE_ID, taskId)[0],
         preTask: taskKey(TASK_QUEUE_ID, preTaskId)[0],
       })
@@ -155,21 +222,18 @@ export async function run(args: any = process.argv) {
     computeUnitLimit: 500000,
   });
 
-  const tokenAccount = getAssociatedTokenAddressSync(
-    HNT_MINT,
-    miniFanout!,
-    true
-  );
-
   console.log("Council fanout created.");
-  console.log(`  owner (governance multisig): ${owner.toBase58()}`);
+  if (argv.multisig) {
+    console.log(`  multisig:                    ${argv.multisig}`);
+  }
+  console.log(`  owner (governance multisig vault): ${owner.toBase58()}`);
   console.log(`  mini fanout:                 ${miniFanout!.toBase58()}`);
   console.log(`  schedule:                    ${argv.schedule}`);
   console.log(`  members (${members.length}):`);
   members.forEach((m) => console.log(`    - ${m.toBase58()}`));
   console.log("");
   console.log(
-    "  >>> Council fanout token account (set COUNCIL_FANOUT_TOKEN_ACCOUNT):"
+    "  >>> Council fanout token account (matches COUNCIL_FANOUT_TOKEN_ACCOUNT):"
   );
   console.log(`      ${tokenAccount.toBase58()}`);
 }
