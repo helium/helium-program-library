@@ -928,7 +928,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.42"
+version = "0.2.43"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "hpl-crons"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
