@@ -27,7 +27,7 @@ export async function estimatePrioritizationFee(
   ixs: TransactionInstruction[],
   basePriorityFee?: number,
   maxPriorityFee: number = MAX_PRIO_FEE,
-  priorityFeeOptions: any = {}
+  priorityFeeOptions: any = {},
 ): Promise<number> {
   const accounts = ixs
     .map((x) => x.keys.filter((k) => k.isWritable).map((k) => k.pubkey))
@@ -51,16 +51,16 @@ export async function estimatePrioritizationFee(
             ...priorityFeeOptions,
           },
         },
-      ])
+      ]),
     );
     return Math.min(
       maxPriorityFee,
-      Math.max(basePriorityFee || 1, Math.ceil(priorityFeeEstimate))
+      Math.max(basePriorityFee || 1, Math.ceil(priorityFeeEstimate)),
     );
   } catch (e: any) {
     console.error(
       "Failed to use getPriorityFeeEstimate, falling back to getRecentPrioritizationFees",
-      e
+      e,
     );
     const priorityFees = await connection.getRecentPrioritizationFees({
       lockedWritableAccounts: uniqueAccounts,
@@ -71,24 +71,30 @@ export async function estimatePrioritizationFee(
     }
 
     // get max priority fee per slot (and sort by slot from old to new)
-    const groupedBySlot = priorityFees.reduce((acc, fee) => {
-      const key = fee.slot;
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(fee);
-      return acc;
-    }, {} as Record<string, RecentPrioritizationFees[]>);
+    const groupedBySlot = priorityFees.reduce(
+      (acc, fee) => {
+        const key = fee.slot;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(fee);
+        return acc;
+      },
+      {} as Record<string, RecentPrioritizationFees[]>,
+    );
 
-    const maxFeeBySlot = Object.keys(groupedBySlot).reduce((acc, slot) => {
-      acc[slot] = groupedBySlot[slot].reduce((max, fee) => {
-        return fee.prioritizationFee > max.prioritizationFee ? fee : max;
-      });
-      return acc;
-    }, {} as Record<string, RecentPrioritizationFees>);
+    const maxFeeBySlot = Object.keys(groupedBySlot).reduce(
+      (acc, slot) => {
+        acc[slot] = groupedBySlot[slot].reduce((max, fee) => {
+          return fee.prioritizationFee > max.prioritizationFee ? fee : max;
+        });
+        return acc;
+      },
+      {} as Record<string, RecentPrioritizationFees>,
+    );
     const maximumFees = Object.values(maxFeeBySlot).sort(
       (a: RecentPrioritizationFees, b: RecentPrioritizationFees) =>
-        a.slot - b.slot
+        a.slot - b.slot,
     ) as RecentPrioritizationFees[];
 
     // get median of last 20 fees
@@ -108,9 +114,17 @@ export async function estimatePrioritizationFee(
 export const estimateComputeUnits = async (
   connection: Connection,
   tx: VersionedTransaction,
-  retries: number = 5
+  retries: number = 5,
 ): Promise<number | undefined> => {
-  const sim = (await connection.simulateTransaction(tx)).value;
+  let sim: Awaited<ReturnType<Connection["simulateTransaction"]>>["value"];
+  try {
+    sim = (await connection.simulateTransaction(tx)).value;
+  } catch (e: any) {
+    // An RPC-level rejection (e.g. oversized tx) shouldn't take down the
+    // caller — fall back to max compute like any other failed simulation.
+    console.error("simulateTransaction failed, defaulting compute units", e);
+    return 1400000;
+  }
   if (
     sim.err &&
     sim.err.toString().includes("BlockhashNotFound") &&
@@ -158,7 +172,7 @@ export async function withPriorityFees({
     instructions,
     basePriorityFee,
     maxPriorityFee,
-    priorityFeeOptions
+    priorityFeeOptions,
   );
   if (!computeUnits) {
     const temp = {
@@ -170,7 +184,7 @@ export async function withPriorityFees({
     let ixWithComputeUnits = tx.instructions;
     if (
       !tx.instructions.some((ix) =>
-        ix.programId.equals(ComputeBudgetProgram.programId)
+        ix.programId.equals(ComputeBudgetProgram.programId),
       )
     ) {
       ixWithComputeUnits = [
@@ -185,12 +199,12 @@ export async function withPriorityFees({
     }
     const estimatedFee = await estimateComputeUnits(
       connection,
-      toVersionedTx({ ...tx, instructions: ixWithComputeUnits })
+      toVersionedTx({ ...tx, instructions: ixWithComputeUnits }),
     );
     if (estimatedFee) {
       computeUnits = Math.min(
         1400000,
-        Math.ceil(estimatedFee * (computeScaleUp || 1.1))
+        Math.ceil(estimatedFee * (computeScaleUp || 1.1)),
       );
     } else {
       computeUnits = 200000;
