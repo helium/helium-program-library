@@ -180,7 +180,7 @@ describe("hpl-crons", () => {
     // This is the step that OOMed on mainnet: RunTaskV0 CPIs into
     // queue_end_epoch, which compiles the 5-instruction end-epoch transaction
     // plus its own reschedule and writes both into the task return account.
-    await sendInstructions(provider, [
+    const sig = await sendInstructions(provider, [
       ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
       ...(await runTask({
         program: tuktukProgram,
@@ -188,6 +188,25 @@ describe("hpl-crons", () => {
         crankTurner: me,
       })),
     ]);
+
+    // queue_end_epoch trades allocation for computation: it dedupes and indexes accounts by
+    // linear scan rather than by hashing, because the 32KB heap is the scarcer budget and a
+    // bump allocator never reclaims what a HashMap's growth chain leaves behind. That trade is
+    // only safe while the compute side stays clear of its own ceiling, so measure it here
+    // rather than reasoning about it: the crank turner sets the limit, and a regression that
+    // pushes past it fails the epoch exactly as an overflow would.
+    const executed = await provider.connection.getTransaction(sig, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
+    const consumed = executed?.meta?.computeUnitsConsumed;
+    console.log(`    queue_end_epoch consumed ${consumed} compute units`);
+    expect(consumed, "compute units should be reported").to.be.a("number");
+    expect(
+      consumed!,
+      "queue_end_epoch compute has regressed; the linear scans that keep the heap down are the " +
+        "likely cause, and the crank turner's limit is what this has to stay under"
+    ).to.be.lessThan(900000);
 
     const epochAfter = (
       await program.account.epochTrackerV0.fetch(epochTracker)
