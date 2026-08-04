@@ -87,8 +87,13 @@ fn sub_dao_epoch_info_pda(sub_dao: &Pubkey, epoch: u64) -> Pubkey {
 /// writable, then read-only, with `num_rw_signers` / `num_ro_signers` / `num_rw` describing the
 /// boundaries so the crank turner can reconstruct each account's privileges. Indices are resolved
 /// against the list built here, so self-consistency is what correctness requires, not matching the
-/// order upstream would have produced. Within a priority group this is insertion order, which is
-/// deterministic; upstream's is HashMap iteration order, which is not.
+/// order upstream would have produced.
+///
+/// Getting the boundaries wrong makes a task unexecutable rather than over-privileged.
+/// `run_task_v0` takes signer privilege from `signer_seeds` under a forced
+/// `[b"custom", task_queue]` prefix and never from these counts, and writability is capped by the
+/// crank turner's outer transaction, which it builds from these same counts. The failure mode is
+/// a stuck epoch.
 fn compile_task_transaction(
   instructions: Vec<Instruction>,
   signer_seeds: Vec<Vec<Vec<u8>>>,
@@ -118,6 +123,12 @@ fn compile_task_transaction(
     }
   }
 
+  // Account indices and the three privilege counts are all u8. Past 255 accounts the indices
+  // would truncate silently and point instructions at the wrong accounts, and the counts would
+  // overflow, so refuse before either can happen. The end-epoch set uses 32; this is a bound,
+  // not a limit anything approaches.
+  require_gte!(u8::MAX as usize, keys.len(), ErrorCode::TooManyAccounts);
+
   fn rank(privileges: (bool, bool)) -> u8 {
     match privileges {
       (true, true) => 0,
@@ -143,10 +154,6 @@ fn compile_task_transaction(
   }
 
   let accounts: Vec<Pubkey> = order.iter().map(|i| keys[*i]).collect();
-  // Indices and the three counts are u8. Past 255 accounts they would truncate silently and
-  // point instructions at the wrong accounts, rather than failing, so refuse instead. The
-  // end-epoch set uses 32; this is a bound, not a limit anything approaches.
-  require_gte!(u8::MAX as usize, accounts.len(), ErrorCode::TooManyAccounts);
   let index_of = |key: &Pubkey| {
     accounts
       .iter()
@@ -174,34 +181,34 @@ fn compile_task_transaction(
 }
 
 /// One sub-DAO's contribution to the end-epoch instruction set.
-pub struct SubDaoInputs {
-  pub key: Pubkey,
-  pub dnt_mint: Pubkey,
-  pub treasury: Pubkey,
+struct SubDaoInputs {
+  key: Pubkey,
+  dnt_mint: Pubkey,
+  treasury: Pubkey,
 }
 
 /// The plain values the end-epoch instruction set is built from, lifted out of the Anchor
 /// context so it can be built, and its allocation cost measured, without one.
-pub struct EndEpochInputs {
-  pub payer: Pubkey,
-  pub registrar: Pubkey,
-  pub dao: Pubkey,
-  pub hnt_mint: Pubkey,
-  pub rewards_escrow: Pubkey,
-  pub delegator_pool: Pubkey,
-  pub hnt_price_oracle: Pubkey,
-  pub mobile_sub_dao: Pubkey,
+struct EndEpochInputs {
+  payer: Pubkey,
+  registrar: Pubkey,
+  dao: Pubkey,
+  hnt_mint: Pubkey,
+  rewards_escrow: Pubkey,
+  delegator_pool: Pubkey,
+  hnt_price_oracle: Pubkey,
+  mobile_sub_dao: Pubkey,
   /// IoT first, then Mobile, matching the order the handler passes them.
-  pub sub_daos: [SubDaoInputs; 2],
-  pub prev_epoch: u64,
-  pub curr_epoch: u64,
+  sub_daos: [SubDaoInputs; 2],
+  prev_epoch: u64,
+  curr_epoch: u64,
 }
 
 /// Builds the calculate/issue/no-emit instruction set the end-epoch task executes.
 ///
 /// Separate from the handler because its allocation cost is what has to stay inside the 32KB
 /// heap, and measuring that needs to be cheaper than standing up a localnet.
-pub fn end_epoch_ixs(inputs: &EndEpochInputs) -> Vec<Instruction> {
+fn end_epoch_ixs(inputs: &EndEpochInputs) -> Vec<Instruction> {
   let EndEpochInputs {
     payer,
     registrar,
@@ -308,9 +315,10 @@ pub fn end_epoch_ixs(inputs: &EndEpochInputs) -> Vec<Instruction> {
         // helium-sub-daos constants so the two programs cannot disagree about the destinations.
         // `issue_rewards_v0` requires them only while a supplement window is open, but a task
         // is queued one epoch before it runs, so window state at queue time says nothing about
-        // window state at execution: both are forwarded whenever the constants are real, or the
-        // first epoch of a window would settle against a task built without them and fail
-        // closed, stopping the self-rescheduling chain.
+        // window state at execution: both are forwarded whenever the constants are real. Were
+        // they withheld until a window was observed open, the first epoch of that window would
+        // settle against a task built without them and fail closed, leaving that epoch to be
+        // settled by hand through the `end-epoch` CLI.
         //
         // A placeholder constant is withheld instead, because Anchor deserializes a forwarded
         // account as a `TokenAccount` regardless of window state and the placeholder is the
@@ -606,8 +614,13 @@ mod tests {
   /// handler actually compiles: the five-instruction end-epoch set and the single-instruction
   /// reschedule. Ordering within a priority group differs by construction, so this asserts the
   /// properties `run_task_v0` and the crank turner rely on: the same accounts, the same privilege
-  /// boundaries, and every index resolving to the same account. Those decide which accounts a
-  /// task may write, so they are what is worth guarding rather than byte equality.
+  /// boundaries, and every index resolving to the same account.
+  ///
+  /// The third shape carries no handler traffic. It covers the signer half of the
+  /// cross-instruction privilege accumulation, which neither real shape reaches: in both, every
+  /// account either holds the same privileges everywhere it appears or gains only writability.
+  /// An account has to appear read-only *before* it appears as a signer for that accumulation to
+  /// be load-bearing, which is the order `escalating` is passed in.
   #[test]
   fn presized_compile_matches_upstream() {
     let inputs = test_inputs();
@@ -633,9 +646,58 @@ mod tests {
       }]
     };
 
+    // An account whose privileges rise between instructions: read-only non-signer on first
+    // sight, writable signer on second. The compiled result must call it a writable signer.
+    let escalating = fixed_key(200);
+    let privilege_escalation = vec![
+      Instruction {
+        program_id: crate::ID,
+        accounts: vec![
+          AccountMeta::new_readonly(escalating, false),
+          AccountMeta::new(fixed_key(201), false),
+        ],
+        data: vec![1u8; 8],
+      },
+      Instruction {
+        program_id: crate::ID,
+        accounts: vec![
+          AccountMeta::new(escalating, true),
+          AccountMeta::new_readonly(fixed_key(202), true),
+        ],
+        data: vec![2u8; 8],
+      },
+    ];
+
     let end_epoch = end_epoch_ixs(&inputs);
 
-    for (label, ixs) in [("end-epoch", &end_epoch), ("reschedule", &reschedule)] {
+    {
+      let ours =
+        compile_task_transaction(privilege_escalation.clone(), seeds()).expect("presized compile");
+      let index = ours
+        .accounts
+        .iter()
+        .position(|k| *k == escalating)
+        .expect("escalating account is in the compiled set");
+      assert_eq!(
+        index, 0,
+        "an account that is a writable signer in any instruction belongs in the writable-signer \
+         group, which sorts first"
+      );
+      assert_eq!(
+        ours.num_rw_signers, 1,
+        "the escalating account is the only writable signer"
+      );
+      assert_eq!(
+        ours.num_ro_signers, 1,
+        "fixed_key(202) is a read-only signer"
+      );
+    }
+
+    for (label, ixs) in [
+      ("end-epoch", &end_epoch),
+      ("reschedule", &reschedule),
+      ("privilege-escalation", &privilege_escalation),
+    ] {
       let (upstream, _) =
         tuktuk_program::compile_transaction(ixs.clone(), seeds()).expect("upstream compile");
       let ours = compile_task_transaction(ixs.clone(), seeds()).expect("presized compile");
@@ -719,5 +781,50 @@ mod tests {
   fn configured_supplement_destination_is_forwarded() {
     let configured = Pubkey::new_unique();
     assert_eq!(supplement_account(configured), Some(configured));
+  }
+
+  /// Both sides of the u8 bound. Above it an account index would truncate and point an
+  /// instruction at the wrong account, so the compile has to refuse; at it the compile has to
+  /// still work, or the refusal is a lower ceiling than it claims to be.
+  #[test]
+  fn compile_refuses_more_accounts_than_a_u8_index_can_address() {
+    // 16 bits of entropy, because these fixtures need more than the 256 keys `fixed_key` spans.
+    fn wide_key(n: u16) -> Pubkey {
+      let mut bytes = [0u8; 32];
+      bytes[0..2].copy_from_slice(&n.to_le_bytes());
+      Pubkey::new_from_array(bytes)
+    }
+
+    // One instruction contributes its own program id, so n accounts means n + 1 distinct keys.
+    let ix_with = |n: u16| {
+      vec![Instruction {
+        program_id: crate::ID,
+        accounts: (0..n)
+          .map(|i| AccountMeta::new_readonly(wide_key(i + 1), false))
+          .collect(),
+        data: vec![0u8; 8],
+      }]
+    };
+    let seeds = || vec![vec![b"helium".to_vec(), vec![255u8]]];
+
+    let at_limit = compile_task_transaction(ix_with(254), seeds())
+      .expect("255 accounts is addressable and must compile");
+    assert_eq!(at_limit.accounts.len(), 255);
+    // Every index still resolves to the account it was built from, which is the property the
+    // bound exists to protect.
+    let resolved: Vec<Pubkey> = at_limit.instructions[0]
+      .accounts
+      .iter()
+      .map(|i| at_limit.accounts[*i as usize])
+      .collect();
+    assert_eq!(
+      resolved,
+      (0..254).map(|i| wide_key(i + 1)).collect::<Vec<_>>()
+    );
+
+    assert!(
+      compile_task_transaction(ix_with(255), seeds()).is_err(),
+      "256 accounts must be refused, not silently truncated into a u8 index"
+    );
   }
 }

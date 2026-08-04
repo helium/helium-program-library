@@ -11,8 +11,9 @@
 //! supplement isn't misread as burned HNT (see the supply-tracking note there).
 //!
 //! All parameters are hardcoded; changing them requires a community-voted program upgrade.
-//! That includes the two destination token accounts, so the supplement cannot be redirected
-//! without a community-voted upgrade either. Both destinations are mandatory while a window is
+//! That includes both destination token accounts, so which accounts the supplement mints *into*
+//! cannot change without one; see COUNCIL_FANOUT_TOKEN_ACCOUNT for what that does not fix about
+//! where the Council carve-out ends up. Both destinations are mandatory while a window is
 //! open, and `hpl-crons` withholds a destination that still holds its pre-activation
 //! placeholder rather than forwarding it, so a build whose destinations are not real fails
 //! every epoch of a live window instead of minting somewhere unintended.
@@ -27,8 +28,8 @@ const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 /// Mint start, 2026-08-05T12:00:00Z. Epochs settle on the 00:00 UTC boundary, so the first
 /// supplement mint lands at the 2026-08-06T00:00:00Z crank, closing the Council's pre-mint
 /// review window. The value sits between two crank boundaries rather than on one, so neither
-/// Solana clock drift nor a late crank can change which epoch mints first; the flat window
-/// then spans exactly 360 cranks (through 2027-08-01) and the taper exactly 720.
+/// Solana clock drift nor a late crank can change which epoch mints first, and the windows
+/// come to whole crank counts: 360 flat, then 720 tapering.
 ///
 /// Under TESTING the start stays a far-future sentinel (2100-01-01), keeping the supplement
 /// dormant for the localnet suite: an open window makes both destination accounts mandatory
@@ -76,9 +77,13 @@ pub const COUNCIL_COMPENSATION_BPS: u64 = 125;
 /// `mini_fanout` `2pCpQYrUmQor9igsF4cY7tkmd3jBQzHFEB75gtpjdWA2`.
 ///
 /// issue_rewards_v0 requires the supplied Council token account to equal this key (relaxed
-/// under TESTING). The fanout's `owner`, the only authority that can edit the seated-member
-/// set, is the governance multisig vault and never the Receiving Entity, so seating and
-/// removal reach the chain only through a multisig action.
+/// under TESTING). The fanout's `owner` is the governance multisig vault, never the Receiving
+/// Entity, so the seated-member set changes only through a multisig action.
+///
+/// The pinned address fixes where the carve-out is *minted*, not where it ends up. A seated
+/// member can point their own share at a delegate under their own signature, and closing the
+/// fanout sweeps its balance to the owner and frees the PDA for re-initialisation by the
+/// namespace keypair. Monitor the fanout's shares, not just this address.
 pub const COUNCIL_FANOUT_TOKEN_ACCOUNT: Pubkey =
   pubkey!("EYbAXgLq1aRr9a9y55DbjfMdXNrZuMa69WXN9c1UR6eK");
 
@@ -181,14 +186,42 @@ mod tests {
     );
   }
 
-  /// Pins the three deployed boundary timestamps, and which epoch crank mints first, against
-  /// the dates published in the HIP. `cargo test --lib` builds without TESTING and so checks
-  /// the mainnet values; a TESTING build must hold the dormant sentinel instead, and asserting
-  /// both directions means swapping the two branches fails here either way.
+  /// Pins the deployed mint rate against the amount published in HIP 149 Decision 2: 98,000 HNT
+  /// per sub-DAO per epoch, which across the two sub-DAO passes is the 196,000 HNT/day headline
+  /// figure, and the taper opening at the same rate so the handoff neither steps up nor drops.
+  ///
+  /// The amounts are literals on both sides. An assertion that reads the constant it is meant to
+  /// pin holds for every value that constant could take, and so states only that the window is
+  /// open. The rate is not gated on TESTING, only the window is, so this holds in both builds.
   #[test]
-  fn deployed_window_boundaries_match_the_published_dates() {
+  fn deployed_supplement_rate_matches_the_published_amount() {
+    const HNT: u64 = 100_000_000;
+    const SUB_DAO_PASSES_PER_EPOCH: u64 = 2;
+
+    assert_eq!(INFLATION_FLAT_PER_EPOCH_PER_SUBDAO, 98_000 * HNT);
+    assert_eq!(INFLATION_TAPER_INITIAL_PER_EPOCH_PER_SUBDAO, 98_000 * HNT);
+    assert_eq!(
+      INFLATION_FLAT_PER_EPOCH_PER_SUBDAO * SUB_DAO_PASSES_PER_EPOCH,
+      196_000 * HNT
+    );
+  }
+
+  /// Pins the deployed start timestamp and which epoch crank mints first. `cargo test --lib`
+  /// builds without TESTING and so checks the mainnet value; a TESTING build must hold the
+  /// dormant sentinel instead, and asserting both directions means swapping the two branches
+  /// fails here either way.
+  ///
+  /// Both end boundaries are `INFLATION_START + N * EPOCH_LENGTH`, so what is worth pinning is
+  /// `N` and the rate each crank sees, not a restatement of arithmetic the compiler performed.
+  #[test]
+  fn deployed_window_boundaries_match_the_published_schedule() {
     const AUG_05_0000Z: i64 = 1_785_888_000;
     const AUG_06_0000Z: i64 = 1_785_974_400;
+
+    // Whole crank counts, in both builds: the HIP defines the windows in epochs, and a start
+    // that did not sit between two crank boundaries would leave a fractional remainder.
+    assert_eq!(INFLATION_FLAT_END - INFLATION_START, 360 * EPOCH_LENGTH);
+    assert_eq!(INFLATION_TAPER_END - INFLATION_FLAT_END, 720 * EPOCH_LENGTH);
 
     if TESTING {
       assert_eq!(INFLATION_START, 4_102_444_800);
@@ -197,8 +230,6 @@ mod tests {
     }
 
     assert_eq!(INFLATION_START, 1_785_931_200); // 2026-08-05T12:00:00Z
-    assert_eq!(INFLATION_FLAT_END, 1_817_035_200); // 2027-07-31T12:00:00Z
-    assert_eq!(INFLATION_TAPER_END, 1_879_243_200); // 2029-07-20T12:00:00Z
 
     // The 00:00 UTC crank on 2026-08-06 is the first one to mint; the one a day earlier
     // must not, so the Council's pre-mint review window runs its full length.
@@ -207,6 +238,18 @@ mod tests {
       supplement_per_subdao(AUG_06_0000Z),
       INFLATION_FLAT_PER_EPOCH_PER_SUBDAO
     );
+
+    // Counted in cranks from that first minting one, so the flat window's last full-rate mint,
+    // the taper's first reduced one, and the final paying crank are each pinned without
+    // restating a derived timestamp. 360 flat + 720 tapering = 1,080 cranks that mint.
+    let crank = |n: i64| AUG_06_0000Z + n * EPOCH_LENGTH;
+    assert_eq!(
+      supplement_per_subdao(crank(359)),
+      INFLATION_FLAT_PER_EPOCH_PER_SUBDAO
+    );
+    assert!(supplement_per_subdao(crank(360)) < INFLATION_FLAT_PER_EPOCH_PER_SUBDAO);
+    assert!(supplement_per_subdao(crank(1079)) > 0);
+    assert_eq!(supplement_per_subdao(crank(1080)), 0);
   }
 
   #[test]
