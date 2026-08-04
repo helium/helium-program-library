@@ -35,8 +35,13 @@ import {
   Keypair,
   PublicKey,
   SYSVAR_CLOCK_PUBKEY,
+  SystemProgram,
 } from "@solana/web3.js";
 import { BN } from "bn.js";
+import {
+  COUNCIL_FANOUT_TOKEN_ACCOUNT,
+  SUPPLEMENT_VAULT_TOKEN_ACCOUNT,
+} from "./hip149";
 import b58 from "bs58";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -76,6 +81,18 @@ export async function run(args: any = process.argv) {
         type: "number",
         describe: "The timestamp to start ending epochs from",
       },
+      supplementVault: {
+        type: "string",
+        default: SUPPLEMENT_VAULT_TOKEN_ACCOUNT.toBase58(),
+        describe:
+          "HIP 149 Decision 2 Receiving Entity vault HNT token account. Required to close an epoch inside a supplement window. Defaults to the address issue_rewards_v0 pins, which is the only value that can succeed while a window is open; a wrong value fails the instruction rather than misrouting the mint. Passing the system program id withholds it, which is what a dormant-supplement build expects.",
+      },
+      councilVault: {
+        type: "string",
+        default: COUNCIL_FANOUT_TOKEN_ACCOUNT.toBase58(),
+        describe:
+          "HIP 149 Decision 4 Council fanout HNT token account. Same defaulting and same on-chain pinning as --supplementVault.",
+      },
     });
     const argv = await yarg.argv;
     process.env.ANCHOR_WALLET = argv.wallet;
@@ -89,6 +106,26 @@ export async function run(args: any = process.argv) {
     const unixNow = new Date().valueOf() / 1000;
     const [dao] = daoKey(hntMint);
     const basePriorityFee = Number(argv.basePriorityFee || 1);
+    // The supplement follows crank time, not epoch time: issue_rewards_v0 sizes it from
+    // Clock::get() at execution, not from the epoch it is settling. So backfilling this loop
+    // through several stale epochs while a window is open mints a full per-epoch supplement for
+    // each one, on the day the backfill runs, and cranks that cross a window boundary late are
+    // paid at the later rate. The HNT mint circuit breaker is the backstop that bounds this: at
+    // a 350,000 HNT/day absolute threshold it admits roughly one supplement per day on top of
+    // normal emissions, so a multi-epoch backfill fails on the breaker rather than overminting
+    // without limit. Settle stale epochs one crank interval at a time while a window is open.
+    //
+    // Both destinations default to the pinned constants, so the permissionless fallback cannot
+    // silently omit them: a null vault during an open window makes issue_rewards_v0 fail, and
+    // this loop collects that into `errors` and advances rather than stopping. Pass the system
+    // program id to withhold one deliberately.
+    const asVault = (raw: string | undefined) => {
+      if (!raw) return null;
+      const key = new PublicKey(raw);
+      return key.equals(SystemProgram.programId) ? null : key;
+    };
+    const supplementVault = asVault(argv.supplementVault);
+    const councilVault = asVault(argv.councilVault);
 
     const subDaos = await heliumSubDaosProgram.account.subDaoV0.all([
       {
@@ -212,8 +249,8 @@ export async function run(args: any = process.argv) {
                     .issueRewardsV0({ epoch })
                     .accountsPartial({
                       subDao: subDao.publicKey,
-                      supplementVault: null,
-                      councilVault: null,
+                      supplementVault,
+                      councilVault,
                     })
                     .instruction(),
                 ],
