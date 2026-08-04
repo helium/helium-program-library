@@ -12,4 +12,6 @@ pub enum ErrorCode {
   UnclaimedIotMobileRewards,
   #[msg("Invalid task for pyth")]
   InvalidTaskForPyth,
+  #[msg("Too many accounts to index a compiled transaction")]
+  TooManyAccounts,
 }

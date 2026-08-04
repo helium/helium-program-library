@@ -14,7 +14,7 @@ use tuktuk_program::{
   RunTaskReturnV0, TaskReturnV0, TransactionSourceV0, TriggerV0,
 };
 
-use crate::{hpl_crons::CIRCUIT_BREAKER_PROGRAM, EpochTrackerV0, EPOCH_LENGTH};
+use crate::{error::ErrorCode, hpl_crons::CIRCUIT_BREAKER_PROGRAM, EpochTrackerV0, EPOCH_LENGTH};
 
 /// A HIP 149 supplement destination to forward into `issue_rewards_v0`, or `None` while the
 /// constant still holds its pre-activation placeholder (the system program id, which is also
@@ -92,7 +92,7 @@ fn sub_dao_epoch_info_pda(sub_dao: &Pubkey, epoch: u64) -> Pubkey {
 fn compile_task_transaction(
   instructions: Vec<Instruction>,
   signer_seeds: Vec<Vec<Vec<u8>>>,
-) -> CompiledTransactionV0 {
+) -> Result<CompiledTransactionV0> {
   // Upper bound: every account of every instruction, plus each instruction's program id.
   let slots: usize = instructions.iter().map(|ix| ix.accounts.len() + 1).sum();
   let mut keys: Vec<Pubkey> = Vec::with_capacity(slots);
@@ -143,6 +143,10 @@ fn compile_task_transaction(
   }
 
   let accounts: Vec<Pubkey> = order.iter().map(|i| keys[*i]).collect();
+  // Indices and the three counts are u8. Past 255 accounts they would truncate silently and
+  // point instructions at the wrong accounts, rather than failing, so refuse instead. The
+  // end-epoch set uses 32; this is a bound, not a limit anything approaches.
+  require_gte!(u8::MAX as usize, accounts.len(), ErrorCode::TooManyAccounts);
   let index_of = |key: &Pubkey| {
     accounts
       .iter()
@@ -159,14 +163,14 @@ fn compile_task_transaction(
     })
     .collect();
 
-  CompiledTransactionV0 {
+  Ok(CompiledTransactionV0 {
     num_ro_signers,
     num_rw_signers,
     num_rw,
     instructions: compiled,
     signer_seeds,
     accounts,
-  }
+  })
 }
 
 /// One sub-DAO's contribution to the end-epoch instruction set.
@@ -381,7 +385,7 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
   // moving the account metas rather than copying them.
   let bump = ctx.bumps.payer;
   let seeds = || vec![vec![b"helium".to_vec(), bump.to_le_bytes().to_vec()]];
-  let compiled_tx = compile_task_transaction(ixs, seeds());
+  let compiled_tx = compile_task_transaction(ixs, seeds())?;
 
   let reschedule_ix = Instruction {
     program_id: crate::ID,
@@ -399,7 +403,7 @@ pub fn handler(ctx: Context<QueueEndEpoch>) -> Result<RunTaskReturnV0> {
     .to_account_metas(None),
     data: crate::instruction::QueueEndEpoch.data(),
   };
-  let compiled_reschedule_tx = compile_task_transaction(vec![reschedule_ix], seeds());
+  let compiled_reschedule_tx = compile_task_transaction(vec![reschedule_ix], seeds())?;
 
   let end_of_epoch_trigger = TriggerV0::Timestamp(max(
     Clock::get()?.unix_timestamp,
@@ -492,26 +496,33 @@ static TALLYING_ALLOCATOR: alloc_tally::Tallying = alloc_tally::Tallying;
 mod tests {
   use super::*;
 
+  /// Fixed keys, not `Pubkey::new_unique()`. That helper is a process-global counter, so a
+  /// fixture built from it depends on what ran before, which made the allocation figure move by
+  /// ~1.7KB with test ordering. A measurement fixture has to be a constant.
+  fn fixed_key(seed: u8) -> Pubkey {
+    Pubkey::new_from_array([seed; 32])
+  }
+
   fn test_inputs() -> EndEpochInputs {
     EndEpochInputs {
-      payer: Pubkey::new_unique(),
-      registrar: Pubkey::new_unique(),
-      dao: Pubkey::new_unique(),
-      hnt_mint: Pubkey::new_unique(),
-      rewards_escrow: Pubkey::new_unique(),
-      delegator_pool: Pubkey::new_unique(),
-      hnt_price_oracle: Pubkey::new_unique(),
-      mobile_sub_dao: Pubkey::new_unique(),
+      payer: fixed_key(1),
+      registrar: fixed_key(2),
+      dao: fixed_key(3),
+      hnt_mint: fixed_key(4),
+      rewards_escrow: fixed_key(5),
+      delegator_pool: fixed_key(6),
+      hnt_price_oracle: fixed_key(7),
+      mobile_sub_dao: fixed_key(8),
       sub_daos: [
         SubDaoInputs {
-          key: Pubkey::new_unique(),
-          dnt_mint: Pubkey::new_unique(),
-          treasury: Pubkey::new_unique(),
+          key: fixed_key(9),
+          dnt_mint: fixed_key(10),
+          treasury: fixed_key(11),
         },
         SubDaoInputs {
-          key: Pubkey::new_unique(),
-          dnt_mint: Pubkey::new_unique(),
-          treasury: Pubkey::new_unique(),
+          key: fixed_key(8),
+          dnt_mint: fixed_key(12),
+          treasury: fixed_key(13),
         },
       ],
       prev_epoch: 20_667,
@@ -522,7 +533,7 @@ mod tests {
   fn build_and_compile(inputs: &EndEpochInputs) {
     let ixs = end_epoch_ixs(inputs);
     let seeds = vec![vec![b"helium".to_vec(), 255u8.to_le_bytes().to_vec()]];
-    compile_task_transaction(ixs, seeds);
+    compile_task_transaction(ixs, seeds).expect("compile end-epoch transaction");
   }
 
   /// The end-epoch task has already exhausted the 32KB SBF heap in production, and the localnet
@@ -537,7 +548,7 @@ mod tests {
   /// rather than a literal 32KB assertion. The localnet test remains the ground truth.
   #[test]
   fn end_epoch_instruction_set_stays_within_its_allocation_budget() {
-    // Measured at 15,000 bytes carrying both supplement destinations, against 24,464 for the
+    // Measured at 14,968 bytes carrying both supplement destinations, against 24,464 for the
     // same work before the pre-sized compile and metas Vec. The two destinations cost 136 of
     // that, so the margin is now measured in kilobytes rather than bytes. The budget leaves
     // ~1KB: enough that an incidental change does not trip it, tight enough that anything
@@ -591,77 +602,108 @@ mod tests {
     }
   }
 
-  /// Pins the pre-sized compile against the upstream one it replaces. Ordering within a
-  /// priority group differs by construction, so this asserts the properties the crank turner
-  /// and `run_task_v0` actually rely on: the same accounts, the same privilege boundaries, and
-  /// every instruction index resolving to the same account. Anything that changes those changes
-  /// which accounts a task can write, so this is the guard that matters.
+  /// Pins the pre-sized compile against the upstream one it replaces, for every shape this
+  /// handler actually compiles: the five-instruction end-epoch set and the single-instruction
+  /// reschedule. Ordering within a priority group differs by construction, so this asserts the
+  /// properties `run_task_v0` and the crank turner rely on: the same accounts, the same privilege
+  /// boundaries, and every index resolving to the same account. Those decide which accounts a
+  /// task may write, so they are what is worth guarding rather than byte equality.
   #[test]
   fn presized_compile_matches_upstream() {
     let inputs = test_inputs();
     let seeds = || vec![vec![b"helium".to_vec(), vec![255u8]]];
 
-    let (upstream, _) = tuktuk_program::compile_transaction(end_epoch_ixs(&inputs), seeds())
-      .expect("upstream compile");
-    let ours = compile_task_transaction(end_epoch_ixs(&inputs), seeds());
+    // Built once: regenerating these per call would hand the two compilers different keys.
+    let reschedule = {
+      vec![Instruction {
+        program_id: crate::ID,
+        accounts: (0..9)
+          .map(|i| {
+            let key = fixed_key(100 + i as u8);
+            if i == 0 {
+              AccountMeta::new(key, true)
+            } else if i % 2 == 0 {
+              AccountMeta::new(key, false)
+            } else {
+              AccountMeta::new_readonly(key, false)
+            }
+          })
+          .collect(),
+        data: vec![0u8; 8],
+      }]
+    };
 
-    let mut a = upstream.accounts.clone();
-    let mut b = ours.accounts.clone();
-    a.sort();
-    b.sort();
-    assert_eq!(a, b, "same account set");
-    assert_eq!(
-      (
-        upstream.num_rw_signers,
-        upstream.num_ro_signers,
-        upstream.num_rw
-      ),
-      (ours.num_rw_signers, ours.num_ro_signers, ours.num_rw),
-      "same privilege boundaries"
-    );
-    assert_eq!(upstream.instructions.len(), ours.instructions.len());
-    assert_eq!(upstream.signer_seeds, ours.signer_seeds);
+    let end_epoch = end_epoch_ixs(&inputs);
 
-    for (u, o) in upstream.instructions.iter().zip(ours.instructions.iter()) {
-      assert_eq!(u.data, o.data, "instruction data preserved");
+    for (label, ixs) in [("end-epoch", &end_epoch), ("reschedule", &reschedule)] {
+      let (upstream, _) =
+        tuktuk_program::compile_transaction(ixs.clone(), seeds()).expect("upstream compile");
+      let ours = compile_task_transaction(ixs.clone(), seeds()).expect("presized compile");
+
+      let mut a = upstream.accounts.clone();
+      let mut b = ours.accounts.clone();
+      a.sort();
+      b.sort();
+      assert_eq!(a, b, "{label}: same account set");
       assert_eq!(
-        upstream.accounts[u.program_id_index as usize], ours.accounts[o.program_id_index as usize],
-        "program id resolves the same"
+        (
+          upstream.num_rw_signers,
+          upstream.num_ro_signers,
+          upstream.num_rw
+        ),
+        (ours.num_rw_signers, ours.num_ro_signers, ours.num_rw),
+        "{label}: same privilege boundaries"
       );
-      let resolved_u: Vec<Pubkey> = u
-        .accounts
-        .iter()
-        .map(|i| upstream.accounts[*i as usize])
-        .collect();
-      let resolved_o: Vec<Pubkey> = o
-        .accounts
-        .iter()
-        .map(|i| ours.accounts[*i as usize])
-        .collect();
-      assert_eq!(
-        resolved_u, resolved_o,
-        "indices resolve to the same accounts"
-      );
-    }
+      assert_eq!(upstream.instructions.len(), ours.instructions.len());
+      assert_eq!(upstream.signer_seeds, ours.signer_seeds);
 
-    // The boundaries must describe the ordering, or the crank turner grants the wrong
-    // privileges: every account before num_rw_signers is a writable signer, and so on.
-    let rw_signers = ours.num_rw_signers as usize;
-    let signers = rw_signers + ours.num_ro_signers as usize;
-    let writable = signers + ours.num_rw as usize;
-    assert!(writable <= ours.accounts.len());
-    for (i, key) in ours.accounts.iter().enumerate() {
-      let expected_signer = i < signers;
-      let expected_writable = i < rw_signers || (i >= signers && i < writable);
-      let (signer, wr) = end_epoch_ixs(&inputs)
-        .iter()
-        .flat_map(|ix| ix.accounts.iter())
-        .filter(|a| a.pubkey == *key)
-        .fold((false, false), |acc, a| {
-          (acc.0 || a.is_signer, acc.1 || a.is_writable)
-        });
-      assert_eq!(signer, expected_signer, "signer boundary for account {i}");
-      assert_eq!(wr, expected_writable, "writable boundary for account {i}");
+      for (u, o) in upstream.instructions.iter().zip(ours.instructions.iter()) {
+        assert_eq!(u.data, o.data, "{label}: instruction data preserved");
+        assert_eq!(
+          upstream.accounts[u.program_id_index as usize],
+          ours.accounts[o.program_id_index as usize],
+          "{label}: program id resolves the same"
+        );
+        let resolved_u: Vec<Pubkey> = u
+          .accounts
+          .iter()
+          .map(|i| upstream.accounts[*i as usize])
+          .collect();
+        let resolved_o: Vec<Pubkey> = o
+          .accounts
+          .iter()
+          .map(|i| ours.accounts[*i as usize])
+          .collect();
+        assert_eq!(
+          resolved_u, resolved_o,
+          "{label}: indices resolve to the same accounts"
+        );
+      }
+
+      // The boundaries must describe the ordering, or the crank turner grants the wrong
+      // privileges: everything before num_rw_signers is a writable signer, and so on.
+      let rw_signers = ours.num_rw_signers as usize;
+      let signers = rw_signers + ours.num_ro_signers as usize;
+      let writable = signers + ours.num_rw as usize;
+      assert!(
+        writable <= ours.accounts.len(),
+        "{label}: boundaries in range"
+      );
+      for (i, key) in ours.accounts.iter().enumerate() {
+        let (signer, wr) = ixs
+          .iter()
+          .flat_map(|ix| ix.accounts.iter())
+          .filter(|a| a.pubkey == *key)
+          .fold((false, false), |acc, a| {
+            (acc.0 || a.is_signer, acc.1 || a.is_writable)
+          });
+        assert_eq!(signer, i < signers, "{label}: signer boundary at {i}");
+        assert_eq!(
+          wr,
+          i < rw_signers || (i >= signers && i < writable),
+          "{label}: writable boundary at {i}"
+        );
+      }
     }
   }
 
