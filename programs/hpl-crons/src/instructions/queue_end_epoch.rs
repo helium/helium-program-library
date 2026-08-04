@@ -76,8 +76,9 @@ fn sub_dao_epoch_info_pda(sub_dao: &Pubkey, epoch: u64) -> Pubkey {
 /// `tuktuk_program::compile_transaction` is semantically what we want, but it builds two HashMaps
 /// that grow from empty by doubling and a `remaining_accounts` Vec that this caller discards. On
 /// the SBF heap, which is bump-allocated and never reuses freed memory, every intermediate table
-/// is retained for the life of the instruction: measured at 8,672 bytes of a 32KB budget that
-/// `queue_end_epoch` has already exhausted once in production.
+/// is retained for the life of the instruction. Compiling the end-epoch set through it costs
+/// ~8,600 bytes more than this function does, out of a 32KB budget `queue_end_epoch` has already
+/// exhausted once in production.
 ///
 /// Sizing both vectors from the known slot count removes the growth chain, and a linear scan
 /// replaces the hashing. At this instruction's scale, ~73 slots over ~31 distinct accounts, the
