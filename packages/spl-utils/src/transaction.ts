@@ -32,7 +32,7 @@ import { TransactionDraft, populateMissingDraftInfo } from "./draft";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
-    array.slice(index * size, (index + 1) * size)
+    array.slice(index * size, (index + 1) * size),
   );
 
 async function sleep(ms: number): Promise<void> {
@@ -40,7 +40,7 @@ async function sleep(ms: number): Promise<void> {
 }
 
 async function promiseAllInOrder<T>(
-  it: (() => Promise<T>)[]
+  it: (() => Promise<T>)[],
 ): Promise<Iterable<T>> {
   let ret: T[] = [];
   for (const i of it) {
@@ -52,7 +52,7 @@ async function promiseAllInOrder<T>(
 
 export const getAddressLookupTableAccounts = async (
   connection: Connection,
-  keys: PublicKey[]
+  keys: PublicKey[],
 ): Promise<AddressLookupTableAccount[]> => {
   if (keys.length == 0) {
     return [];
@@ -60,7 +60,7 @@ export const getAddressLookupTableAccounts = async (
 
   const addressLookupTableAccountInfos =
     await connection.getMultipleAccountsInfo(
-      keys.map((key) => new PublicKey(key))
+      keys.map((key) => new PublicKey(key)),
     );
 
   return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
@@ -119,7 +119,7 @@ export async function sendInstructionsWithPriorityFee(
     basePriorityFee?: number;
     maxPriorityFee?: number;
     priorityFeeOptions?: any;
-  } = {}
+  } = {},
 ): Promise<string> {
   return await sendInstructions(
     provider,
@@ -131,7 +131,7 @@ export async function sendInstructionsWithPriorityFee(
           instructions,
           basePriorityFee,
           maxPriorityFee,
-          priorityFeeOptions
+          priorityFeeOptions,
         ),
       }),
       ...instructions,
@@ -139,7 +139,7 @@ export async function sendInstructionsWithPriorityFee(
     signers,
     payer,
     commitment,
-    idlErrors
+    idlErrors,
   );
 }
 
@@ -149,7 +149,7 @@ export async function sendInstructions(
   signers: Signer[] = [],
   payer: PublicKey = provider.wallet.publicKey,
   commitment: Commitment = "confirmed",
-  idlErrors: Map<number, string> = new Map()
+  idlErrors: Map<number, string> = new Map(),
 ): Promise<string> {
   if (instructions.length == 0) {
     return "";
@@ -168,8 +168,8 @@ export async function sendInstructions(
     tx.feePayer.equals(provider.wallet.publicKey) ||
     tx.instructions.some((ix) =>
       ix.keys.some(
-        (key) => key.isSigner && key.pubkey.equals(provider.wallet.publicKey)
-      )
+        (key) => key.isSigner && key.pubkey.equals(provider.wallet.publicKey),
+      ),
     )
   ) {
     tx = await provider.wallet.signTransaction(tx);
@@ -183,7 +183,7 @@ export async function sendInstructions(
         skipPreflight: true,
         maxRetries: 0,
       },
-      commitment
+      commitment,
     );
     return txid;
   } catch (e) {
@@ -205,7 +205,7 @@ export async function sendMultipleInstructions(
   signerGroups: Signer[][],
   payer?: PublicKey,
   finality: Finality = "confirmed",
-  idlErrors: Map<number, string> = new Map()
+  idlErrors: Map<number, string> = new Map(),
 ): Promise<Iterable<string>> {
   const recentBlockhash = (
     await provider.connection.getLatestBlockhash(finality)
@@ -255,10 +255,10 @@ export async function sendMultipleInstructions(
           {
             skipPreflight: true,
           },
-          finality
+          finality,
         );
         return txid;
-      })
+      }),
     );
   } catch (e) {
     console.error(e);
@@ -272,7 +272,7 @@ export async function execute<Output>(
   provider: AnchorProvider,
   command: InstructionResult<Output>,
   payer: PublicKey = provider.wallet.publicKey,
-  commitment?: Commitment
+  commitment?: Commitment,
 ): Promise<Output & { txid?: string }> {
   const { instructions, signers, output } = command;
   const errors = program.idl.errors?.reduce((acc: any, err: any) => {
@@ -286,7 +286,7 @@ export async function execute<Output>(
       signers,
       payer,
       commitment,
-      errors
+      errors,
     );
     return { txid, ...output };
   }
@@ -300,7 +300,7 @@ export async function executeBig<Output>(
   provider: AnchorProvider,
   command: BigInstructionResult<Output>,
   payer: PublicKey = provider.wallet.publicKey,
-  finality?: Finality
+  finality?: Finality,
 ): Promise<Output & { txids?: string[] }> {
   const { instructions, signers, output } = command;
   const errors = program.idl.errors?.reduce((acc, err) => {
@@ -314,7 +314,7 @@ export async function executeBig<Output>(
       signers,
       payer || provider.wallet.publicKey,
       finality,
-      errors
+      errors,
     );
     return {
       ...output,
@@ -335,7 +335,7 @@ export const awaitTransactionSignatureConfirmation = async (
   timeout: number,
   connection: Connection,
   commitment: Commitment = "recent",
-  queryStatus = false
+  queryStatus = false,
 ): Promise<SignatureStatus | null | void> => {
   return new TransactionCompletionQueue({
     connection,
@@ -346,12 +346,12 @@ export const awaitTransactionSignatureConfirmation = async (
 async function simulateTransaction(
   connection: Connection,
   transaction: Transaction,
-  commitment: Commitment
+  commitment: Commitment,
 ): Promise<RpcResponseAndContext<SimulatedTransactionResponse>> {
   // @ts-ignore
   transaction.recentBlockhash = await connection._recentBlockhash(
     // @ts-ignore
-    connection._disableBlockhashCaching
+    connection._disableBlockhashCaching,
   );
 
   const signData = transaction.serializeMessage();
@@ -384,7 +384,7 @@ export async function sendAndConfirmWithRetry(
   txn: Buffer,
   sendOptions: SendOptions,
   commitment: Commitment,
-  timeout = DEFAULT_TIMEOUT
+  timeout = DEFAULT_TIMEOUT,
 ): Promise<{ txid: string }> {
   let done = false;
   let slot = 0;
@@ -403,7 +403,7 @@ export async function sendAndConfirmWithRetry(
       timeout,
       connection,
       commitment,
-      true
+      true,
     );
 
     if (!confirmation)
@@ -458,7 +458,7 @@ export function bufferToTransaction(solanaTransaction: Buffer) {
 
 async function withRetries<A>(
   tries: number,
-  input: () => Promise<A>
+  input: () => Promise<A>,
 ): Promise<A> {
   for (let i = 0; i < tries; i++) {
     try {
@@ -493,7 +493,7 @@ export async function bulkSendTransactions(
     // Continually send in bulk while resetting blockhash until we send them all
     while (true) {
       const recentBlockhash = await withRetries(5, () =>
-        provider.connection.getLatestBlockhash("confirmed")
+        provider.connection.getLatestBlockhash("confirmed"),
       );
       const blockhashedTxs = await Promise.all(
         chunk.map(async (tx) => {
@@ -505,17 +505,17 @@ export async function bulkSendTransactions(
             addressLookupTables: tx.addressLookupTables!,
             feePayer: tx.feePayer,
           });
-        })
+        }),
       );
       const signedTxs = (
         await (provider as AnchorProvider).wallet.signAllTransactions(
-          blockhashedTxs
+          blockhashedTxs,
         )
       ).map((tx, i) => {
         extraSigners.forEach((signer: Keypair) => {
           if (
             chunk[i].signers?.some((sig) =>
-              sig.publicKey.equals(signer.publicKey)
+              sig.publicKey.equals(signer.publicKey),
             )
           ) {
             tx.sign([signer]);
@@ -543,7 +543,7 @@ export async function bulkSendTransactions(
         recentBlockhash.lastValidBlockHeight,
         // Hail mary, try with preflight enabled. Sometimes this causes
         // errors that wouldn't otherwise happen
-        triesRemaining != 1
+        triesRemaining != 1,
       );
       thisRet.push(...confirmedTxs);
       if (confirmedTxs.length == signedTxs.length) {
@@ -559,8 +559,9 @@ export async function bulkSendTransactions(
       triesRemaining--;
       if (triesRemaining <= 0) {
         throw new Error(
-          `Failed to submit all txs after blockhashes expired, ${signedTxs.length - confirmedTxs.length
-          } remain`
+          `Failed to submit all txs after blockhashes expired, ${
+            signedTxs.length - confirmedTxs.length
+          } remain`,
         );
       }
     }
@@ -580,14 +581,14 @@ export async function bulkSendRawTransactions(
   onProgress?: (status: Status) => void,
   lastValidBlockHeight?: number,
   skipPreflight: boolean = true,
-  maxRetries: number = 0
+  maxRetries: number = 0,
 ): Promise<string[]> {
   const txBatchSize = TX_BATCH_SIZE;
   let totalProgress = 0;
   const ret: string[] = [];
   if (!lastValidBlockHeight) {
     const blockhash = await withRetries(5, () =>
-      connection.getLatestBlockhash("confirmed")
+      connection.getLatestBlockhash("confirmed"),
     );
     lastValidBlockHeight = blockhash.lastValidBlockHeight;
   }
@@ -636,8 +637,17 @@ export async function bulkSendRawTransactions(
         .filter(truthy);
 
       if (failures.length > 0) {
-        const failureIndexes = statuses.map((status, index) => status?.meta?.err ? index : null).filter(i => typeof i !== 'undefined' && i !== null);
-        const failedTxs = await Promise.all(failureIndexes.map(index => connection.getTransaction(txids[index!], { commitment: "confirmed", maxSupportedTransactionVersion: 0 })));
+        const failureIndexes = statuses
+          .map((status, index) => (status?.meta?.err ? index : null))
+          .filter((i) => typeof i !== "undefined" && i !== null);
+        const failedTxs = await Promise.all(
+          failureIndexes.map((index) =>
+            connection.getTransaction(txids[index!], {
+              commitment: "confirmed",
+              maxSupportedTransactionVersion: 0,
+            }),
+          ),
+        );
         for (const tx of failedTxs) {
           console.error(tx?.meta?.logMessages?.join("\n"));
         }
@@ -646,7 +656,7 @@ export async function bulkSendRawTransactions(
       ret.push(
         ...txids
           .map((txid, idx) => (statuses[idx] == null ? null : txid))
-          .filter(truthy)
+          .filter(truthy),
       );
       chunk = chunk.filter((_, index) => statuses[index] === null);
       txids = txids.filter((_, index) => statuses[index] === null);
@@ -661,7 +671,7 @@ export async function bulkSendRawTransactions(
 const MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS = 200;
 async function getAllTxns(
   connection: Connection,
-  txids: string[]
+  txids: string[],
 ): Promise<(VersionedTransactionResponse | null)[]> {
   return (
     await Promise.all(
@@ -669,8 +679,8 @@ async function getAllTxns(
         connection.getTransactions(txids, {
           maxSupportedTransactionVersion: 0,
           commitment: "confirmed",
-        })
-      )
+        }),
+      ),
     )
   ).flat();
 }
@@ -700,7 +710,7 @@ export async function batchParallelInstructions({
   const transactions: TransactionDraft[] = [];
   const addressLookupTables = await getAddressLookupTableAccounts(
     provider.connection,
-    addressLookupTableAddresses
+    addressLookupTableAddresses,
   );
 
   for (const instruction of instructions) {
@@ -760,7 +770,7 @@ export async function batchParallelInstructions({
     onProgress,
     triesRemaining,
     extraSigners,
-    maxSignatureBatch
+    maxSignatureBatch,
   );
 }
 
@@ -821,14 +831,15 @@ export async function batchInstructionsToTxsWithPriorityFee(
     useFirstEstimateForAll?: boolean;
     // Optional parameter to limit number of instructions per transaction
     maxInstructionsPerTx?: number;
-  } = {}
+  } = {},
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
-  const blockhash = (await provider.connection.getLatestBlockhash(commitment)).blockhash;
+  const blockhash = (await provider.connection.getLatestBlockhash(commitment))
+    .blockhash;
   const transactions: TransactionDraft[] = [];
   const addressLookupTables = await getAddressLookupTableAccounts(
     provider.connection,
-    addressLookupTableAddresses || []
+    addressLookupTableAddresses || [],
   );
 
   let firstTxComputeAndPrio: TransactionInstruction[] | null = null;
@@ -895,13 +906,15 @@ export async function batchInstructionsToTxsWithPriorityFee(
             addressLookupTables,
             signers: extraSigners.filter((s) =>
               currentTxInstructions.some((ix) =>
-                ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
-              )
+                ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner),
+              ),
             ),
           });
         }
 
-        currentTxInstructions = instrArr;
+        // Copy — aliasing instrArr would mutate the caller's group array on
+        // the next push, corrupting inputs across repeated batch calls.
+        currentTxInstructions = [...instrArr];
       } else {
         throw e;
       }
@@ -925,8 +938,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
       addressLookupTables,
       signers: extraSigners.filter((s) =>
         currentTxInstructions.some((ix) =>
-          ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
-        )
+          ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner),
+        ),
       ),
     });
   }
@@ -957,7 +970,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     basePriorityFee?: number;
     extraSigners?: Keypair[];
     maxSignatureBatch?: number;
-  } = {}
+  } = {},
 ): Promise<void> {
   const transactions = await batchInstructionsToTxsWithPriorityFee(
     provider,
@@ -966,7 +979,7 @@ export async function batchParallelInstructionsWithPriorityFee(
       computeUnitLimit,
       basePriorityFee,
       computeScaleUp,
-    }
+    },
   );
 
   await bulkSendTransactions(
@@ -975,6 +988,6 @@ export async function batchParallelInstructionsWithPriorityFee(
     onProgress,
     triesRemaining,
     extraSigners,
-    maxSignatureBatch
+    maxSignatureBatch,
   );
 }
