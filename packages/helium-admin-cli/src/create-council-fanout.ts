@@ -16,6 +16,7 @@ import {
 import * as multisig from "@sqds/multisig";
 import os from "os";
 import yargs from "yargs/yargs";
+import { COUNCIL_FANOUT_TOKEN_ACCOUNT } from "./hip149";
 import { loadKeypair } from "./utils";
 
 // HIP 149 Decision 4: create the Advisory Council compensation fanout. The supplement mint in
@@ -151,6 +152,21 @@ export async function run(args: any = process.argv) {
     .prepare();
   instructions.push(initIx);
 
+  // The fanout PDA is seeded by the `namespace` signer and `--seed`. Anchor resolves that
+  // signer to the provider wallet, so a different wallet, or a different seed, silently
+  // produces a different PDA, a different HNT associated token account, and a fanout that
+  // `issue_rewards_v0` rejects on its account pin. That would fail every epoch close inside a
+  // supplement window. Members, owner and schedule do not enter the derivation, so this only
+  // constrains the two inputs that have to stay fixed. Checked before anything is sent.
+  const tokenAccount = getAssociatedTokenAddressSync(HNT_MINT, miniFanout!, true);
+  if (!tokenAccount.equals(COUNCIL_FANOUT_TOKEN_ACCOUNT)) {
+    throw new Error(
+      `Derived fanout token account ${tokenAccount.toBase58()} does not match the ` +
+        `COUNCIL_FANOUT_TOKEN_ACCOUNT pinned in issue_rewards_v0 ` +
+        `(${COUNCIL_FANOUT_TOKEN_ACCOUNT.toBase58()}). Wrong signing wallet or wrong --seed.`
+    );
+  }
+
   // Fund the fanout so it can pay its own crank reward and stay scheduled.
   instructions.push(
     SystemProgram.transfer({
@@ -206,12 +222,6 @@ export async function run(args: any = process.argv) {
     computeUnitLimit: 500000,
   });
 
-  const tokenAccount = getAssociatedTokenAddressSync(
-    HNT_MINT,
-    miniFanout!,
-    true
-  );
-
   console.log("Council fanout created.");
   if (argv.multisig) {
     console.log(`  multisig:                    ${argv.multisig}`);
@@ -223,7 +233,7 @@ export async function run(args: any = process.argv) {
   members.forEach((m) => console.log(`    - ${m.toBase58()}`));
   console.log("");
   console.log(
-    "  >>> Council fanout token account (set COUNCIL_FANOUT_TOKEN_ACCOUNT):"
+    "  >>> Council fanout token account (matches COUNCIL_FANOUT_TOKEN_ACCOUNT):"
   );
   console.log(`      ${tokenAccount.toBase58()}`);
 }

@@ -25,17 +25,31 @@ use crate::TESTING;
 const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 
 // ── Patch-time constants ─────────────────────────────────────────────────────────────
+/// A start far enough out that both windows are closed, leaving the supplement dormant.
+/// 2100-01-01.
+const DORMANT_START: i64 = 4_102_444_800;
+
 /// Mint start, 2026-08-05T12:00:00Z. Epochs settle on the 00:00 UTC boundary, so the first
 /// supplement mint lands at the 2026-08-06T00:00:00Z crank, closing the Council's pre-mint
-/// review window. The value sits between two crank boundaries rather than on one, so neither
-/// Solana clock drift nor a late crank can change which epoch mints first, and the windows
-/// come to whole crank counts: 360 flat, then 720 tapering.
+/// review window.
 ///
-/// Under TESTING the start stays a far-future sentinel (2100-01-01), keeping the supplement
-/// dormant for the localnet suite: an open window makes both destination accounts mandatory
-/// in `issue_rewards_v0`, and every test there closes epochs without them.
+/// `issue_rewards_v0` sizes the supplement from the wall clock at execution rather than from the
+/// epoch it is settling, so placing the start midway between two crank boundaries buys 12 hours
+/// of tolerance either side: clock drift, or a crank running late, cannot change which epoch
+/// mints first unless a crank is more than 12 hours late. Cranks normally land within seconds.
+/// The windows also come to whole crank counts this way: 360 flat, then 720 tapering.
+///
+/// Dormant on devnet as well as under TESTING. Both destination constants are associated token
+/// accounts of the mainnet HNT mint, so they cannot exist on another cluster, and an open window
+/// makes both mandatory in `issue_rewards_v0`; a live start anywhere else would stop epochs
+/// closing at the first crank inside the window. Gating the start is what keeps the destinations
+/// from being required, so they need no gating of their own. Devnet builds set the `devnet`
+/// feature and leave `TESTING` unset, so they need their own arm rather than the TESTING one.
+#[cfg(feature = "devnet")]
+pub const INFLATION_START: i64 = DORMANT_START;
+#[cfg(not(feature = "devnet"))]
 pub const INFLATION_START: i64 = if TESTING {
-  4_102_444_800
+  DORMANT_START
 } else {
   1_785_931_200
 };
@@ -207,9 +221,9 @@ mod tests {
   }
 
   /// Pins the deployed start timestamp and which epoch crank mints first. `cargo test --lib`
-  /// builds without TESTING and so checks the mainnet value; a TESTING build must hold the
-  /// dormant sentinel instead, and asserting both directions means swapping the two branches
-  /// fails here either way.
+  /// builds with neither TESTING nor `devnet` and so checks the mainnet value; a build with
+  /// either must hold the dormant sentinel instead. Asserting both directions means a live start
+  /// reaching the wrong cluster fails here, whichever way the arms are swapped.
   ///
   /// Both end boundaries are `INFLATION_START + N * EPOCH_LENGTH`, so what is worth pinning is
   /// `N` and the rate each crank sees, not a restatement of arithmetic the compiler performed.
@@ -218,13 +232,13 @@ mod tests {
     const AUG_05_0000Z: i64 = 1_785_888_000;
     const AUG_06_0000Z: i64 = 1_785_974_400;
 
-    // Whole crank counts, in both builds: the HIP defines the windows in epochs, and a start
+    // Whole crank counts, in every build: the HIP defines the windows in epochs, and a start
     // that did not sit between two crank boundaries would leave a fractional remainder.
     assert_eq!(INFLATION_FLAT_END - INFLATION_START, 360 * EPOCH_LENGTH);
     assert_eq!(INFLATION_TAPER_END - INFLATION_FLAT_END, 720 * EPOCH_LENGTH);
 
-    if TESTING {
-      assert_eq!(INFLATION_START, 4_102_444_800);
+    if TESTING || cfg!(feature = "devnet") {
+      assert_eq!(INFLATION_START, DORMANT_START);
       assert_eq!(supplement_per_subdao(AUG_06_0000Z), 0);
       return;
     }

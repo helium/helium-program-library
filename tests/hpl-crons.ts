@@ -195,10 +195,19 @@ describe("hpl-crons", () => {
     // only safe while the compute side stays clear of its own ceiling, so measure it here
     // rather than reasoning about it: the crank turner sets the limit, and a regression that
     // pushes past it fails the epoch exactly as an overflow would.
-    const executed = await provider.connection.getTransaction(sig, {
-      commitment: "confirmed",
-      maxSupportedTransactionVersion: 0,
-    });
+    // A confirmed signature is not immediately queryable on a busy RPC, so getTransaction can
+    // return null for a transaction that landed. Retry, or this measures RPC timing rather than
+    // compute and fails as a flake instead of as a regression.
+    let executed: Awaited<
+      ReturnType<typeof provider.connection.getTransaction>
+    > = null;
+    for (let i = 0; i < 10 && !executed; i++) {
+      executed = await provider.connection.getTransaction(sig, {
+        commitment: "confirmed",
+        maxSupportedTransactionVersion: 0,
+      });
+      if (!executed) await new Promise((r) => setTimeout(r, 500));
+    }
     const consumed = executed?.meta?.computeUnitsConsumed;
     console.log(`    queue_end_epoch consumed ${consumed} compute units`);
     expect(consumed, "compute units should be reported").to.be.a("number");
