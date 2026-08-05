@@ -177,9 +177,10 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
       draft: { instructions, feePayer: walletPubkey },
     });
 
-    const txFee = await getTransactionFee(connection, tx);
-
-    const walletBalance = await connection.getBalance(walletPubkey);
+    const [txFee, walletBalance] = await Promise.all([
+      getTransactionFee(connection, tx),
+      connection.getBalance(walletPubkey),
+    ]);
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",

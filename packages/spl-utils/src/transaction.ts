@@ -27,6 +27,8 @@ import {
   COMPUTE_BUDGET_IX_DATA_SIZE,
   DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
   MAX_PRIO_FEE,
+  callerComputeBudgetTypes,
+  prependedComputeBudgetIxs,
   setLoadedAccountsDataSizeLimit,
   withPriorityFees,
 } from "./priorityFees";
@@ -849,19 +851,58 @@ export async function batchInstructionsToTxsWithPriorityFee(
   );
 
   let firstTxComputeBudgetIxs: TransactionInstruction[] | null = null;
-  // Reuse the first chunk's ComputeBudget ixs on a later chunk, skipping any
-  // CB type the chunk already carries — the runtime rejects duplicate
-  // ComputeBudget instruction types (DuplicateInstruction).
-  const withFirstEstimate = (chunk: TransactionInstruction[]) => {
-    const chunkCbTypes = new Set(
-      chunk
-        .filter((ix) => ix.programId.equals(ComputeBudgetProgram.programId))
-        .map((ix) => ix.data[0])
-    );
-    return [
-      ...firstTxComputeBudgetIxs!.filter((ix) => !chunkCbTypes.has(ix.data[0])),
-      ...chunk,
-    ];
+  // Price a full chunk and push it as a draft. When the first chunk's
+  // ComputeBudget ixs are captured (useFirstEstimateForAll), reuse them on
+  // later chunks — skipping any CB type the chunk already carries, since the
+  // runtime rejects duplicate ComputeBudget instruction types
+  // (DuplicateInstruction) — instead of re-estimating per chunk.
+  const flushChunk = async (chunk: TransactionInstruction[]) => {
+    let ixs: TransactionInstruction[];
+    if (firstTxComputeBudgetIxs) {
+      const chunkCbTypes = callerComputeBudgetTypes(chunk);
+      ixs = [
+        ...firstTxComputeBudgetIxs.filter(
+          (ix) => !chunkCbTypes.has(ix.data[0])
+        ),
+        ...chunk,
+      ];
+    } else {
+      ixs = await withPriorityFees({
+        connection: provider.connection,
+        instructions: chunk,
+        computeUnits: computeUnitLimit,
+        computeScaleUp,
+        basePriorityFee,
+        addressLookupTables,
+        feePayer: provider.wallet.publicKey,
+        loadedAccountsDataSizeLimit,
+      });
+      if (useFirstEstimateForAll) {
+        // A sim-derived data-size limit was measured against THIS tx's
+        // accounts only; reusing it on a later tx that loads more data
+        // would fail on-chain. Drop it from the reused set (later txs
+        // fall back to the runtime 64 MiB default) unless the caller
+        // pinned an explicit batch-wide limit.
+        firstTxComputeBudgetIxs = prependedComputeBudgetIxs(ixs, chunk).filter(
+          (ix) =>
+            loadedAccountsDataSizeLimit != null ||
+            ix.data[0] !== COMPUTE_BUDGET_IX_DATA_SIZE
+        );
+      }
+    }
+
+    transactions.push({
+      instructions: ixs,
+      addressLookupTableAddresses: addressLookupTableAddresses || [],
+      feePayer: provider.wallet.publicKey,
+      recentBlockhash: blockhash,
+      addressLookupTables,
+      signers: extraSigners.filter((s) =>
+        chunk.some((ix) =>
+          ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
+        )
+      ),
+    });
   };
   for (const instruction of instructions) {
     if (!instruction) continue;
@@ -902,61 +943,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
       if (e.toString().includes("encoding overruns Uint8Array")) {
         currentTxInstructions = currentTxInstructions.slice(0, prevLen);
         if (currentTxInstructions.length > 0) {
-          // If we've already estimated the compute and priority fee for the first tx, we can use that for
-          // all txs. Otherwise, we estimate it for each tx individually.
-          // Only do this optimization if `useFirstEstimateForAll` is set. This is necessary for
-          // large sets of txs to avoid spamming the rpc.
-          let ixs: TransactionInstruction[] = [];
-          if (firstTxComputeBudgetIxs) {
-            ixs = withFirstEstimate(currentTxInstructions);
-          } else {
-            ixs = await withPriorityFees({
-              connection: provider.connection,
-              instructions: currentTxInstructions,
-              computeUnits: computeUnitLimit,
-              computeScaleUp,
-              basePriorityFee,
-              addressLookupTables,
-              feePayer: provider.wallet.publicKey,
-              loadedAccountsDataSizeLimit,
-            });
-            if (useFirstEstimateForAll) {
-              // withPriorityFees returns its prepended ComputeBudget ixs
-              // (up to three: limit, price, loaded-accounts-data-size,
-              // omitting any the caller set or that couldn't be derived)
-              // followed by the original instructions — so the prepended
-              // prefix is exactly the length difference. Scanning for
-              // ComputeBudget-program ixs instead would wrongly capture a
-              // caller-supplied CB ix at the front of the first chunk and
-              // replay it on every later tx.
-              const cbCount = ixs.length - currentTxInstructions.length;
-              // A sim-derived data-size limit was measured against THIS tx's
-              // accounts only; reusing it on a later tx that loads more data
-              // would fail on-chain. Drop it from the reused set (later txs
-              // fall back to the runtime 64 MiB default) unless the caller
-              // pinned an explicit batch-wide limit.
-              firstTxComputeBudgetIxs = ixs
-                .slice(0, cbCount)
-                .filter(
-                  (ix) =>
-                    loadedAccountsDataSizeLimit != null ||
-                    ix.data[0] !== COMPUTE_BUDGET_IX_DATA_SIZE
-                );
-            }
-          }
-
-          transactions.push({
-            instructions: ixs,
-            addressLookupTableAddresses: addressLookupTableAddresses || [],
-            feePayer: provider.wallet.publicKey,
-            recentBlockhash: blockhash,
-            addressLookupTables,
-            signers: extraSigners.filter((s) =>
-              currentTxInstructions.some((ix) =>
-                ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
-              )
-            ),
-          });
+          await flushChunk(currentTxInstructions);
         }
 
         // Copy — aliasing instrArr would mutate the caller's group array on
@@ -969,34 +956,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
   }
 
   if (currentTxInstructions.length > 0) {
-    // Reuse the first estimate for the final flush too when useFirstEstimateForAll
-    // is set — re-estimating here would contradict the option (extra sim + fee
-    // RPC calls, inconsistent fees). firstTxComputeBudgetIxs is only populated
-    // in that mode; otherwise estimate this chunk on its own.
-    const ixs = firstTxComputeBudgetIxs
-      ? withFirstEstimate(currentTxInstructions)
-      : await withPriorityFees({
-          connection: provider.connection,
-          instructions: currentTxInstructions,
-          computeUnits: computeUnitLimit,
-          computeScaleUp,
-          basePriorityFee,
-          addressLookupTables,
-          feePayer: provider.wallet.publicKey,
-          loadedAccountsDataSizeLimit,
-        });
-    transactions.push({
-      instructions: ixs,
-      addressLookupTableAddresses: addressLookupTableAddresses || [],
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash: blockhash,
-      addressLookupTables,
-      signers: extraSigners.filter((s) =>
-        currentTxInstructions.some((ix) =>
-          ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
-        )
-      ),
-    });
+    await flushChunk(currentTxInstructions);
   }
 
   return transactions;

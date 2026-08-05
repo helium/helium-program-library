@@ -412,11 +412,11 @@ export const vote = publicProcedure.governance.vote.handler(
       versionedTransactions.length > 1
         ? getJitoTipAmountLamports()
         : 0;
-    const totalFee =
-      (await getTotalTransactionFees(connection, versionedTransactions)) +
-      jitoTipCost;
-
-    const walletBalance = await connection.getBalance(walletPubkey);
+    const [txFees, walletBalance] = await Promise.all([
+      getTotalTransactionFees(connection, versionedTransactions),
+      connection.getBalance(walletPubkey),
+    ]);
+    const totalFee = txFees + jitoTipCost;
     if (walletBalance < totalFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",

@@ -6,6 +6,7 @@ import {
 import {
   COMPUTE_BUDGET_IX_LIMIT,
   COMPUTE_BUDGET_IX_PRICE,
+  MAX_COMPUTE_UNITS,
 } from "@helium/spl-utils";
 
 // Base signature fee (5000 lamports per signature)
@@ -121,7 +122,10 @@ function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
   // No explicit limit ix: the runtime grants 200k CU per non-ComputeBudget
   // top-level instruction, capped at 1.4M — not a flat 200k per tx.
   if (computeUnitLimit == null) {
-    computeUnitLimit = Math.min(1_400_000, 200_000 * numOtherInstructions);
+    computeUnitLimit = Math.min(
+      MAX_COMPUTE_UNITS,
+      200_000 * numOtherInstructions
+    );
   }
 
   // Priority fee = (price in microlamports * CU limit) / 1_000_000

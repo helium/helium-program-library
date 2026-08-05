@@ -160,8 +160,10 @@ export const issueDataOnlyHotspot =
         });
       }
 
-      const totalFee = await getTransactionFee(connection, eccSignedTx);
-      const walletBalance = await connection.getBalance(owner);
+      const [totalFee, walletBalance] = await Promise.all([
+        getTransactionFee(connection, eccSignedTx),
+        connection.getBalance(owner),
+      ]);
       const required = calculateRequiredBalance(totalFee, 0);
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({

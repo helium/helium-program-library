@@ -39,7 +39,7 @@ export const COMPUTE_BUDGET_IX_PRICE = 3;
 export const COMPUTE_BUDGET_IX_DATA_SIZE = 4;
 
 // ComputeBudget ix types (first data byte) the caller already set.
-const callerComputeBudgetTypes = (
+export const callerComputeBudgetTypes = (
   instructions: TransactionInstruction[]
 ): Set<number> =>
   new Set(
@@ -347,48 +347,43 @@ export async function withPriorityFees({
     // Whether the sim that produced `budget` ran under our injected ceiling —
     // starts as simValidatesDataSizeCeiling, cleared by the retry below.
     let simRanUnderOurCeiling = simValidatesDataSizeCeiling;
-    // A tx can legitimately load more than the DEFAULT ceiling (the caller
-    // never asked for it). Falling back to the table here would forfeit the
-    // measured CU estimate, so re-simulate once under the runtime 64 MiB
-    // default. Caller-explicit ceilings are handled below instead: exceeding
-    // one is fatal on-chain, not a reason to re-measure.
+    // The sim failed specifically by exceeding the ceiling we injected.
     if (
-      loadedAccountsDataSizeLimit == null &&
       simValidatesDataSizeCeiling &&
       !budget.simulated &&
       isDataSizeExceededErr(budget.simErr)
     ) {
-      budget = await estimateComputeBudget(
-        connection,
-        toVersionedTx({
-          ...tx,
-          instructions: prependComputeBudgetIxs(tx.instructions, {
-            computeUnits: MAX_COMPUTE_UNITS,
-            microLamports: 1,
+      if (loadedAccountsDataSizeLimit == null) {
+        // A tx can legitimately load more than the DEFAULT ceiling (the
+        // caller never asked for it). Falling back to the table here would
+        // forfeit the measured CU estimate, so re-simulate once under the
+        // runtime 64 MiB default.
+        budget = await estimateComputeBudget(
+          connection,
+          toVersionedTx({
+            ...tx,
+            instructions: prependComputeBudgetIxs(tx.instructions, {
+              computeUnits: MAX_COMPUTE_UNITS,
+              microLamports: 1,
+            }),
           }),
-        }),
-        { computeScaleUp }
-      );
-      simRanUnderOurCeiling = false;
+          { computeScaleUp }
+        );
+        simRanUnderOurCeiling = false;
+      } else {
+        // Exceeding a CALLER-explicit limit proves it is fatal on-chain — and
+        // downstream sends skip preflight, so nothing else would catch it.
+        // Drop the ceiling and let the runtime 64 MiB default carry the tx:
+        // degrade to overpaying, never to a burned fee. (Unrelated sim
+        // failures keep the explicit value — trusted, same as the
+        // explicit-computeUnits path.)
+        console.warn(
+          `Dropping explicit loadedAccountsDataSizeLimit ${resolvedDataSizeLimit}: simulation exceeded it`
+        );
+        resolvedDataSizeLimit = undefined;
+      }
     }
     computeUnits = budget.computeUnits;
-    // A sim that failed specifically by exceeding the ceiling we injected
-    // proves the caller's explicit limit is fatal on-chain — and downstream
-    // sends skip preflight, so nothing else would catch it. Drop the ceiling
-    // and let the runtime 64 MiB default carry the tx: degrade to
-    // overpaying, never to a burned fee. Unrelated sim failures keep the
-    // explicit value (trusted, same as the explicit-computeUnits path).
-    if (
-      resolvedDataSizeLimit != null &&
-      simValidatesDataSizeCeiling &&
-      !budget.simulated &&
-      isDataSizeExceededErr(budget.simErr)
-    ) {
-      console.warn(
-        `Dropping explicit loadedAccountsDataSizeLimit ${resolvedDataSizeLimit}: simulation exceeded it`
-      );
-      resolvedDataSizeLimit = undefined;
-    }
     if (loadedAccountsDataSizeLimit == null) {
       if (budget.simulated && budget.loadedAccountsDataSize) {
         // Request measured size × headroom, rounded up to the 32 KiB fee
@@ -457,4 +452,15 @@ export function prependComputeBudgetIxs(
       : [setLoadedAccountsDataSizeLimit(loadedAccountsDataSizeLimit)]),
     ...instructions,
   ];
+}
+
+// The ComputeBudget prefix withPriorityFees/prependComputeBudgetIxs prepended
+// to `original` — exactly the leading length difference. Scanning for
+// ComputeBudget-program ixs instead would wrongly capture a caller-supplied
+// CB ix at the front of `original`.
+export function prependedComputeBudgetIxs(
+  withFees: TransactionInstruction[],
+  original: TransactionInstruction[]
+): TransactionInstruction[] {
+  return withFees.slice(0, withFees.length - original.length);
 }

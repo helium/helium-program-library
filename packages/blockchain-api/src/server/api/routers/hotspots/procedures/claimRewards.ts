@@ -415,10 +415,10 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     }
 
     // Check balance with actual transaction fees
-    const senderBalance = await provider.connection.getBalance(
-      new PublicKey(walletAddress)
-    );
-    const txFees = await getTotalTransactionFees(provider.connection, vtxs);
+    const [senderBalance, txFees] = await Promise.all([
+      provider.connection.getBalance(new PublicKey(walletAddress)),
+      getTotalTransactionFees(provider.connection, vtxs),
+    ]);
     const totalRequired = calculateRequiredBalance(
       txFees,
       pdaWalletLamportsShortfall

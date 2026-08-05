@@ -38,6 +38,7 @@ const stubConnection = ({
   fee = 100,
   simTxs,
 }: {
+  // A single result returned on every call, or an array consumed one per call.
   sim?: any;
   fee?: number;
   simTxs?: any[];
@@ -47,8 +48,9 @@ const stubConnection = ({
     _buildArgs: (args: any[]) => args,
     simulateTransaction: async (tx: any) => {
       simTxs?.push(tx);
-      if (!sim) throw new Error("unexpected simulateTransaction call");
-      return { value: sim };
+      const next = Array.isArray(sim) ? sim.shift() : sim;
+      if (!next) throw new Error("unexpected simulateTransaction call");
+      return { value: next };
     },
   } as unknown as Connection);
 
@@ -236,26 +238,20 @@ describe("withPriorityFees", () => {
 
   it("re-simulates without the injected default ceiling when the tx legitimately exceeds it", async () => {
     const simTxs: any[] = [];
-    const sims = [
-      // First sim runs under the injected 16 MiB default and fails on it.
-      { err: "MaxLoadedAccountsDataSizeExceeded" },
-      // Retry without the ceiling measures real consumption.
-      {
-        err: null,
-        unitsConsumed: 50000,
-        loadedAccountsDataSize: 20 * 1024 * 1024,
-      },
-    ];
-    const connection = {
-      _rpcRequest: async () => ({ result: { priorityFeeEstimate: 100 } }),
-      _buildArgs: (args: any[]) => args,
-      simulateTransaction: async (tx: any) => {
-        simTxs.push(tx);
-        return { value: sims.shift() };
-      },
-    } as unknown as Connection;
     const ixs = await withPriorityFees({
-      connection,
+      connection: stubConnection({
+        sim: [
+          // First sim runs under the injected 16 MiB default and fails on it.
+          { err: "MaxLoadedAccountsDataSizeExceeded" },
+          // Retry without the ceiling measures real consumption.
+          {
+            err: null,
+            unitsConsumed: 50000,
+            loadedAccountsDataSize: 20 * 1024 * 1024,
+          },
+        ],
+        simTxs,
+      }),
       instructions: [transferIx],
       feePayer,
     });

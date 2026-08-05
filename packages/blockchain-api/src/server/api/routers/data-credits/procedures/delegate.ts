@@ -106,8 +106,10 @@ export const delegate = publicProcedure.dataCredits.delegate.handler(
       },
     });
 
-    const txFee = await getTransactionFee(connection, tx);
-    const walletBalance = await connection.getBalance(feePayer);
+    const [txFee, walletBalance] = await Promise.all([
+      getTransactionFee(connection, tx),
+      connection.getBalance(feePayer),
+    ]);
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to delegate data credits",

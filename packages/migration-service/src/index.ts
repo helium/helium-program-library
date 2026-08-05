@@ -246,9 +246,7 @@ async function getTransactions(
   for (const batch of chunks(results, SIMULATE_CONCURRENCY)) {
     mapped.push(...(await Promise.all(batch.map(buildExecuteTx))));
   }
-  // @ts-ignore
-  const asExecuteTxs: { id: number; transaction: TransactionMessage }[] =
-    mapped.filter((v) => Boolean(v && v.transaction));
+  const asExecuteTxs = mapped.filter(truthy);
 
   if (asExecuteTxs.length > 0) {
     return await Promise.all(
