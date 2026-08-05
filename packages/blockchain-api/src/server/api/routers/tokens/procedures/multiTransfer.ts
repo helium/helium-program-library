@@ -52,10 +52,7 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
       return raw;
     });
 
-    const totalAmount = parsedAmounts.reduce(
-      (sum, a) => sum + a,
-      BigInt(0),
-    );
+    const totalAmount = parsedAmounts.reduce((sum, a) => sum + a, BigInt(0));
 
     const tokenName = TOKEN_NAMES[mint];
     const isSol = mint === TOKEN_MINTS.WSOL;
@@ -146,7 +143,10 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
     const isMainnet = cluster === "mainnet" || cluster === "mainnet-beta";
     const jitoTipIncluded = isMainnet && versionedTransactions.length > 1;
 
-    const txFee = getTotalTransactionFees(versionedTransactions);
+    const txFee = await getTotalTransactionFees(
+      connection,
+      versionedTransactions,
+    );
     const jitoTipCost = jitoTipIncluded ? getJitoTipAmountLamports() : 0;
     const ataRent = needsAtaCount * RENT_COSTS.ATA;
     const tokenCost = isSol ? Number(totalAmount) : 0;

@@ -144,7 +144,6 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
             ? HELIUM_COMMON_LUT_DEVNET
             : HELIUM_COMMON_LUT,
         ],
-        computeUnitLimit: 500000,
         commitment: "finalized",
       })
     ).map((tx) => toVersionedTx(tx));
@@ -159,7 +158,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
     );
 
     // Estimated fee includes tx fees + funding amounts
-    const txFees = getTotalTransactionFees(vtxs);
+    const txFees = await getTotalTransactionFees(provider.connection, vtxs);
     const estimatedSolFeeLamports = txFees + totalFundingNeeded;
 
     return {

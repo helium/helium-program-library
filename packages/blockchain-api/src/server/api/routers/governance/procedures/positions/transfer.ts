@@ -40,7 +40,8 @@ function lockupStrictness(lockup: LockupLike): number {
 }
 
 function lockupSecondsLeft(lockup: LockupLike, unixNow: BN): BN {
-  const currTs = rawLockupKind(lockup) === "constant" ? lockup.startTs : unixNow;
+  const currTs =
+    rawLockupKind(lockup) === "constant" ? lockup.startTs : unixNow;
   return currTs.gte(lockup.endTs) ? new BN(0) : lockup.endTs.sub(currTs);
 }
 
@@ -176,9 +177,10 @@ export const transfer = publicProcedure.governance.transferPosition.handler(
       draft: { instructions, feePayer: walletPubkey },
     });
 
-    const txFee = getTransactionFee(tx);
-
-    const walletBalance = await connection.getBalance(walletPubkey);
+    const [txFee, walletBalance] = await Promise.all([
+      getTransactionFee(connection, tx),
+      connection.getBalance(walletPubkey),
+    ]);
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",

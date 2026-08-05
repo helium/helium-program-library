@@ -234,7 +234,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         Buffer.from(tx.serialize()).toString("base64")
       );
 
-      const txFees = getTotalTransactionFees(allVtxs);
+      const txFees = await getTotalTransactionFees(connection, allVtxs);
       const assets = allClaimable.map((h) => h.asset);
 
       const recipientKeys = assets.map(
@@ -415,11 +415,12 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     }
 
     // Check balance with actual transaction fees
-    const senderBalance = await provider.connection.getBalance(
-      new PublicKey(walletAddress)
-    );
+    const [senderBalance, txFees] = await Promise.all([
+      provider.connection.getBalance(new PublicKey(walletAddress)),
+      getTotalTransactionFees(provider.connection, vtxs),
+    ]);
     const totalRequired = calculateRequiredBalance(
-      getTotalTransactionFees(vtxs),
+      txFees,
       pdaWalletLamportsShortfall
     );
     if (senderBalance < totalRequired) {
@@ -437,7 +438,6 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     );
 
     // For Tuktuk claims: tx fees + PDA wallet funding (already includes recipient rent)
-    const txFees = getTotalTransactionFees(vtxs);
     const rentCost = pdaWalletLamportsShortfall;
 
     return {

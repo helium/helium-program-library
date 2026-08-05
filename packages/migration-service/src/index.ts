@@ -24,7 +24,13 @@ import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
 import { decompress, decompressSigners, shouldThrottle } from "./utils";
-import { estimatePrioritizationFee, truthy } from "@helium/spl-utils";
+import {
+  estimateComputeBudget,
+  estimatePrioritizationFee,
+  getAddressLookupTableAccounts,
+  MAX_COMPUTE_UNITS,
+  truthy,
+} from "@helium/spl-utils";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -130,91 +136,119 @@ async function getTransactions(
     lazyTransactions
   );
 
-  // @ts-ignore
-  const asExecuteTxs: { id: number; transaction: TransactionMessage }[] = (
-    await Promise.all(
-      results.map(
-        async (
-          {
-            proof,
-            compiled,
-            id,
-            signers: signersRaw,
-            compute,
-          }: {
-            id: number;
-            compiled: Buffer;
-            proof: string[];
-            signers: Buffer;
-            compute: number;
-          },
-          idx
-        ) => {
-          const hasRun = isExecuted(executed, id);
-          const compiledTx = decompress(compiled);
-          const block = blockKey(lazyTransactions, id)[0];
-          const signers = decompressSigners(signersRaw);
+  const lookupTableAccs = await getAddressLookupTableAccounts(
+    provider.connection,
+    luts.map((lut) => new PublicKey(lut))
+  );
 
-          if (!hasRun && compiledTx.instructions.length > 0) {
-            const ix = await program.methods
-              .executeTransactionV0({
-                instructions: compiledTx.instructions,
-                index: compiledTx.index,
-                signerSeeds: signers,
-              })
-              .accountsStrict({
-                payer: provider.wallet.publicKey,
-                lazyTransactions,
-                canopy: lazyTxns.canopy,
-                lazySigner,
-                block,
-                systemProgram: SystemProgram.programId,
-                executedTransactions: lt.executedTransactions,
-              })
-              .remainingAccounts([
-                ...compiledTx.accounts,
-                ...proof.map((p) => ({
-                  pubkey: new PublicKey(Buffer.from(p, "hex")),
-                  isWritable: false,
-                  isSigner: false,
-                })),
-              ])
-              .instruction();
+  // Cap concurrency: an unbounded Promise.all of simulations over hundreds of
+  // pending migrations would 429 the RPC, degrading every throttled sim to
+  // the ~1.8x precomputed fallback.
+  const SIMULATE_CONCURRENCY = 10;
+  // One fee estimate per request, seeded from the first tx's accounts — the
+  // executeTransactionV0 txs differ only by block PDA, so the writable-account
+  // fee median is effectively identical across them; per-tx estimates would
+  // just be N extra RPC calls.
+  let feeEstimate: Promise<number> | null = null;
+  const buildExecuteTx = async ({
+    proof,
+    compiled,
+    id,
+    signers: signersRaw,
+    compute,
+  }: {
+    id: number;
+    compiled: Buffer;
+    proof: string[];
+    signers: Buffer;
+    compute: number;
+  }) => {
+    const hasRun = isExecuted(executed, id);
+    const compiledTx = decompress(compiled);
+    const block = blockKey(lazyTransactions, id)[0];
+    const signers = decompressSigners(signersRaw);
 
-            return {
-              id,
-              transaction: new TransactionMessage({
-                payerKey: provider.wallet.publicKey,
-                recentBlockhash,
-                instructions: [
-                  ComputeBudgetProgram.setComputeUnitLimit({
-                    units: compute,
-                  }),
-                  ComputeBudgetProgram.setComputeUnitPrice({
-                    microLamports: await estimatePrioritizationFee(
-                      provider.connection,
-                      [ix]
-                    ),
-                  }),
-                  ix,
-                ],
-              }),
-            };
-          }
-        }
-      )
-    )
-  ).filter((v) => Boolean(v && v.transaction));
+    if (!hasRun && compiledTx.instructions.length > 0) {
+      const ix = await program.methods
+        .executeTransactionV0({
+          instructions: compiledTx.instructions,
+          index: compiledTx.index,
+          signerSeeds: signers,
+        })
+        .accountsStrict({
+          payer: provider.wallet.publicKey,
+          lazyTransactions,
+          canopy: lazyTxns.canopy,
+          lazySigner,
+          block,
+          systemProgram: SystemProgram.programId,
+          executedTransactions: lt.executedTransactions,
+        })
+        .remainingAccounts([
+          ...compiledTx.accounts,
+          ...proof.map((p) => ({
+            pubkey: new PublicKey(Buffer.from(p, "hex")),
+            isWritable: false,
+            isSigner: false,
+          })),
+        ])
+        .instruction();
+
+      // Precomputed `compute` over-requests (~1.8x median on sampled
+      // mainnet executions) and never under-requests — simulate for an
+      // accurate limit, falling back to the precomputed value: the
+      // static CU table has no lazy_transactions entry, so its 1.4M cap
+      // would be worse.
+      const [budget, microLamports] = await Promise.all([
+        estimateComputeBudget(
+          provider.connection,
+          new VersionedTransaction(
+            new TransactionMessage({
+              payerKey: provider.wallet.publicKey,
+              recentBlockhash,
+              instructions: [
+                // Sim under the max limit, not the 200k runtime
+                // default, so heavy txs still measure instead of
+                // failing straight to the fallback.
+                ComputeBudgetProgram.setComputeUnitLimit({
+                  units: MAX_COMPUTE_UNITS,
+                }),
+                ix,
+              ],
+            }).compileToV0Message(lookupTableAccs.filter(truthy))
+          )
+        ),
+        (feeEstimate ??= estimatePrioritizationFee(provider.connection, [ix])),
+      ]);
+
+      return {
+        id,
+        transaction: new TransactionMessage({
+          payerKey: provider.wallet.publicKey,
+          recentBlockhash,
+          instructions: [
+            ComputeBudgetProgram.setComputeUnitLimit({
+              units: budget.simulated ? budget.computeUnits : compute,
+            }),
+            ComputeBudgetProgram.setComputeUnitPrice({
+              microLamports,
+            }),
+            ix,
+          ],
+        }),
+      };
+    }
+  };
+  const mapped: (
+    | { id: number; transaction: TransactionMessage }
+    | undefined
+  )[] = [];
+  for (const batch of chunks(results, SIMULATE_CONCURRENCY)) {
+    mapped.push(...(await Promise.all(batch.map(buildExecuteTx))));
+  }
+  const asExecuteTxs = mapped.filter(truthy);
 
   if (asExecuteTxs.length > 0) {
-    const lookupTableAccs = await Promise.all(
-      luts.map(
-        async (lut) =>
-          (
-            await provider.connection.getAddressLookupTable(new PublicKey(lut))
-          ).value
-      )
-    );
     return await Promise.all(
       asExecuteTxs.map((val) => {
         const { transaction: tx, id } = val;
@@ -251,8 +285,7 @@ server.post<{
   }
 
   return (await getMigrateTransactions(from, to)).map(
-    (tx) =>
-      Buffer.from(tx.serialize()).toJSON().data
+    (tx) => Buffer.from(tx.serialize()).toJSON().data
   );
 });
 

@@ -8,6 +8,12 @@ pub use instructions::*;
 
 declare_id!("rorcfdX4h9m9swCKgcypaHJ8NGYVANBpmV9EHn3cYrF");
 
+// Canonical bump for the static ["oracle_signer"] PDA under this program id,
+// hardcoded to skip find_program_address grinding on every wrapper call.
+pub const ORACLE_SIGNER_BUMP: u8 = 251;
+pub const ORACLE_SIGNER_SEED: &[u8] = b"oracle_signer";
+pub const ORACLE_SIGNER_SEEDS: &[&[u8]] = &[ORACLE_SIGNER_SEED, &[ORACLE_SIGNER_BUMP]];
+
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
   name: "Rewards Oracle",
@@ -46,5 +52,18 @@ pub mod rewards_oracle {
     args: SetCurrentRewardsWrapperArgsV1,
   ) -> Result<()> {
     set_current_rewards_wrapper_v2::handler(ctx, args)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn oracle_signer_bump_is_canonical() {
+    assert_eq!(
+      Pubkey::find_program_address(&[ORACLE_SIGNER_SEED], &crate::ID).1,
+      ORACLE_SIGNER_BUMP
+    );
   }
 }

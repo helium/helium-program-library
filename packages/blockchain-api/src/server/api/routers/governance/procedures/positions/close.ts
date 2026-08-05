@@ -39,8 +39,9 @@ export const close = publicProcedure.governance.closePosition.handler(
     const vsrProgram = await initVsr(provider);
     const [positionPubkey] = positionKey(positionMintPubkey);
 
-    const positionAcc =
-      await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
+    const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
+      positionPubkey
+    );
 
     if (!positionAcc) {
       throw errors.NOT_FOUND({ message: "Position not found" });
@@ -50,7 +51,7 @@ export const close = publicProcedure.governance.closePosition.handler(
       connection,
       positionMintPubkey,
       walletPubkey,
-      errors,
+      errors
     );
 
     if (positionAcc.numActiveVotes > 0) {
@@ -73,7 +74,7 @@ export const close = publicProcedure.governance.closePosition.handler(
     }
 
     const registrar = await vsrProgram.account.registrar.fetch(
-      positionAcc.registrar,
+      positionAcc.registrar
     );
     const depositMint =
       registrar.votingMints[positionAcc.votingMintConfigIdx].mint;
@@ -89,7 +90,7 @@ export const close = publicProcedure.governance.closePosition.handler(
           position: positionPubkey,
           depositMint,
         })
-        .instruction(),
+        .instruction()
     );
 
     instructions.push(
@@ -97,8 +98,8 @@ export const close = publicProcedure.governance.closePosition.handler(
         walletPubkey,
         getAssociatedTokenAddressSync(depositMint, walletPubkey, true),
         walletPubkey,
-        depositMint,
-      ),
+        depositMint
+      )
     );
 
     instructions.push(
@@ -107,7 +108,7 @@ export const close = publicProcedure.governance.closePosition.handler(
         .accountsPartial({
           position: positionPubkey,
         })
-        .instruction(),
+        .instruction()
     );
 
     const tx = await buildVersionedTransaction({
@@ -115,9 +116,10 @@ export const close = publicProcedure.governance.closePosition.handler(
       draft: { instructions, feePayer: walletPubkey },
     });
 
-    const txFee = getTransactionFee(tx);
-
-    const walletBalance = await connection.getBalance(walletPubkey);
+    const [txFee, walletBalance] = await Promise.all([
+      getTransactionFee(connection, tx),
+      connection.getBalance(walletPubkey),
+    ]);
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",
@@ -149,8 +151,8 @@ export const close = publicProcedure.governance.closePosition.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

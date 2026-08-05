@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1201](https://github.com/helium/helium-program-library/pull/1201) [`c6e759e`](https://github.com/helium/helium-program-library/commit/c6e759e421db942e69d6ad357c65d735e0ca2bae) Thanks [@bryzettler](https://github.com/bryzettler)! - Add a measured compute-unit table (`computeUnitTable`) and CU sampler, and use them in `sendInstructionsWithPriorityFee`/transaction building to set tight per-instruction compute budgets instead of fixed limits, reducing CU price paid under SIMD-0553.
+
+  New exports for consumers building their own transactions: `estimateComputeBudget`, `prependComputeBudgetIxs`, `setLoadedAccountsDataSizeLimit`, `tableComputeUnitsForInstructions`, `MAX_COMPUTE_UNITS`, `DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT`, and the `COMPUTE_BUDGET_IX_*` instruction discriminants. Also adds `sample-cu` and `check-cu-table` scripts for regenerating and validating the table against real traffic.
+
 ## 0.11.18
 
 ### Patch Changes

@@ -143,8 +143,10 @@ export const onboardDataOnlyHotspot =
         },
       });
 
-      const totalFee = getTransactionFee(tx);
-      const walletBalance = await connection.getBalance(owner);
+      const [totalFee, walletBalance] = await Promise.all([
+        getTransactionFee(connection, tx),
+        connection.getBalance(owner),
+      ]);
       const required = calculateRequiredBalance(totalFee, 0);
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({

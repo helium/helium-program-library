@@ -181,10 +181,12 @@ export const split = publicProcedure.governance.splitPosition.handler(
       amount,
     });
 
-    const txFee = getTransactionFee(tx);
+    const [txFee, walletBalance] = await Promise.all([
+      getTransactionFee(connection, tx),
+      connection.getBalance(walletPubkey),
+    ]);
     const estimatedSolFeeLamports = txFee + mintRent;
 
-    const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to split position",

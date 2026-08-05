@@ -218,9 +218,7 @@ export async function run(args: any = process.argv) {
       .instruction()
   );
 
-  await sendInstructionsWithPriorityFee(provider, instructions, {
-    computeUnitLimit: 500000,
-  });
+  await sendInstructionsWithPriorityFee(provider, instructions);
 
   console.log("Council fanout created.");
   if (argv.multisig) {

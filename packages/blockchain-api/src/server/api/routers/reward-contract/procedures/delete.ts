@@ -243,7 +243,7 @@ async function buildDeleteTransaction(
     entityPubKey,
   });
 
-  const txFee = getTransactionFee(tx);
+  const txFee = await getTransactionFee(connection, tx);
 
   return {
     unsignedTransactionData: {
@@ -259,6 +259,9 @@ async function buildDeleteTransaction(
       parallel: false,
       tag,
     },
-    estimatedSolFee: await toTokenAmountOutput(new BN(txFee), NATIVE_MINT.toBase58()),
+    estimatedSolFee: await toTokenAmountOutput(
+      new BN(txFee),
+      NATIVE_MINT.toBase58(),
+    ),
   };
 }

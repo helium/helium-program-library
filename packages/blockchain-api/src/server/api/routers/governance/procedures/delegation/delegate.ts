@@ -264,7 +264,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           feePayer: walletPubkey,
         });
 
-        const claimTxFee = getTotalTransactionFees(claimVersionedTxs);
+        const claimTxFee = await getTotalTransactionFees(
+          connection,
+          claimVersionedTxs,
+        );
         const claimCluster = getCluster();
         const claimJitoTipCost =
           (claimCluster === "mainnet" || claimCluster === "mainnet-beta") &&
@@ -600,7 +603,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       return {
         transactionData: { transactions: [], parallel: false, tag },
         hasMore: false,
-        estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+        estimatedSolFee: await toTokenAmountOutput(
+          new BN(0),
+          NATIVE_MINT.toBase58(),
+        ),
       };
     }
 
@@ -614,7 +620,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       feePayer: walletPubkey,
     });
 
-    const txFees = getTotalTransactionFees(versionedTransactions);
+    const txFees = await getTotalTransactionFees(
+      connection,
+      versionedTransactions,
+    );
     const cluster = getCluster();
     const jitoTipCost =
       (cluster === "mainnet" || cluster === "mainnet-beta") &&
@@ -643,7 +652,11 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         transactions: allTransactions,
         parallel: !hasClaimTransactions,
         tag,
-        actionMetadata: { type: "delegation_delegate", subDaoMint, positionCount: positionMints.length },
+        actionMetadata: {
+          type: "delegation_delegate",
+          subDaoMint,
+          positionCount: positionMints.length,
+        },
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),

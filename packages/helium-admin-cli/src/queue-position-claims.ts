@@ -155,7 +155,5 @@ export async function run(args: any = process.argv) {
   console.log("Queue authority is", pubkeys.queueAuthority!.toBase58());
   instructions.push(instruction);
 
-  await sendInstructionsWithPriorityFee(provider, instructions, {
-    computeUnitLimit: 500000,
-  });
+  await sendInstructionsWithPriorityFee(provider, instructions);
 }
