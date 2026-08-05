@@ -128,6 +128,7 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
             tokenAccount: getAssociatedTokenAddressSync(
               positionMintPubkey,
               walletPubkey,
+              true,
             ),
           })
           .instruction(),

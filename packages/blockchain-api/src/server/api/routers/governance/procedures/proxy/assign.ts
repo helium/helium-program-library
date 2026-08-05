@@ -242,6 +242,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
                 tokenAccount: getAssociatedTokenAddressSync(
                   positionMintPubkey,
                   walletPubkey,
+                  true,
                 ),
               })
               .instruction(),
@@ -260,6 +261,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
           tokenAccount: getAssociatedTokenAddressSync(
             positionMintPubkey,
             walletPubkey,
+            true,
           ),
         })
         .prepare();

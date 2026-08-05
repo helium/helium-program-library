@@ -66,7 +66,8 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       : new PublicKey(owner);
     const recipientDcAta = getAssociatedTokenAddressSync(
       DC_MINT,
-      recipientPubkey
+      recipientPubkey,
+      true
     );
     const recipientDcAtaInfo = await connection.getAccountInfo(recipientDcAta);
     const ataRent = recipientDcAtaInfo ? 0 : RENT_COSTS.ATA;

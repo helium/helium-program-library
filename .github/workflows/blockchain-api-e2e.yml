@@ -38,6 +38,30 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # Unit tests need no chain, no secrets and no surfpool, so they run as their
+  # own job and report in about a minute rather than waiting on the matrix.
+  unit-tests:
+    needs: build-idls
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/blockchain-api
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download anchor types and IDLs
+        uses: actions/download-artifact@v4
+        with:
+          name: anchor-types
+          path: target
+
+      - uses: ./.github/actions/setup-ts/
+
+      - name: Run unit tests
+        run: pnpm test:unit
+
   e2e-tests:
     needs: build-idls
     runs-on: ubuntu-latest
