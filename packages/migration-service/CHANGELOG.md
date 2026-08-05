@@ -1,5 +1,23 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- [#1201](https://github.com/helium/helium-program-library/pull/1201) [`2022672`](https://github.com/helium/helium-program-library/commit/2022672309d34fb95d20b6b45f6ac88b72755ef2) Thanks [@bryzettler](https://github.com/bryzettler)! - Set compute-unit limits on `executeTransactionV0` transactions from simulation instead of the precomputed per-transaction value, which over-requests roughly 1.8x the median on sampled mainnet executions. Lookup tables are fetched once per request, the prioritization-fee estimate is hoisted to one call (the transactions differ only by block PDA, so the writable-account median is effectively identical), and simulations run at bounded concurrency so a large batch doesn't get throttled into the fallback path. Transactions that fail to simulate keep the precomputed limit.
+
+- Updated dependencies [[`c6e759e`](https://github.com/helium/helium-program-library/commit/c6e759e421db942e69d6ad357c65d735e0ca2bae)]:
+  - @helium/spl-utils@0.12.0
+  - @helium/circuit-breaker-sdk@0.11.17
+  - @helium/data-credits-sdk@0.11.17
+  - @helium/distributor-oracle@0.11.17
+  - @helium/helium-entity-manager-sdk@0.11.17
+  - @helium/helium-sub-daos-sdk@0.11.18
+  - @helium/lazy-distributor-sdk@0.11.17
+  - @helium/lazy-transactions-sdk@0.11.17
+  - @helium/treasury-management-sdk@0.11.17
+  - @helium/voter-stake-registry-sdk@0.12.1
+
 ## 0.11.17
 
 ### Patch Changes

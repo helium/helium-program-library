@@ -1,5 +1,18 @@
 # Change Log
 
+## 0.11.19
+
+### Patch Changes
+
+- Updated dependencies [[`c6e759e`](https://github.com/helium/helium-program-library/commit/c6e759e421db942e69d6ad357c65d735e0ca2bae), [`c6e759e`](https://github.com/helium/helium-program-library/commit/c6e759e421db942e69d6ad357c65d735e0ca2bae)]:
+  - @helium/automation-hooks@0.11.17
+  - @helium/spl-utils@0.12.0
+  - @helium/circuit-breaker-sdk@0.11.17
+  - @helium/helium-react-hooks@0.11.17
+  - @helium/helium-sub-daos-sdk@0.11.18
+  - @helium/hpl-crons-sdk@0.11.18
+  - @helium/voter-stake-registry-sdk@0.12.1
+
 ## 0.11.18
 
 ### Patch Changes
