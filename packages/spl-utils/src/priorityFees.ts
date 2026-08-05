@@ -58,7 +58,16 @@ export function setLoadedAccountsDataSizeLimit(
 ): TransactionInstruction {
   const data = Buffer.alloc(5);
   data.writeUInt8(COMPUTE_BUDGET_IX_DATA_SIZE, 0);
-  data.writeUInt32LE(bytes, 1);
+  // Clamp to a valid u32 in [1, runtime max] — writeUInt32LE throws a
+  // RangeError on negative/fractional/>= 2^32 input, and 0 is rejected
+  // on-chain as InvalidLoadedAccountsDataSizeLimit.
+  data.writeUInt32LE(
+    Math.min(
+      MAX_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
+      Math.max(1, Math.floor(bytes))
+    ),
+    1
+  );
   return new TransactionInstruction({
     programId: ComputeBudgetProgram.programId,
     keys: [],
@@ -330,11 +339,38 @@ export async function withPriorityFees({
       microLamports: 1,
       loadedAccountsDataSizeLimit: simCeiling,
     });
-    const budget = await estimateComputeBudget(
+    let budget = await estimateComputeBudget(
       connection,
       toVersionedTx({ ...tx, instructions: ixWithComputeUnits }),
       { computeScaleUp }
     );
+    // Whether the sim that produced `budget` ran under our injected ceiling —
+    // starts as simValidatesDataSizeCeiling, cleared by the retry below.
+    let simRanUnderOurCeiling = simValidatesDataSizeCeiling;
+    // A tx can legitimately load more than the DEFAULT ceiling (the caller
+    // never asked for it). Falling back to the table here would forfeit the
+    // measured CU estimate, so re-simulate once under the runtime 64 MiB
+    // default. Caller-explicit ceilings are handled below instead: exceeding
+    // one is fatal on-chain, not a reason to re-measure.
+    if (
+      loadedAccountsDataSizeLimit == null &&
+      simValidatesDataSizeCeiling &&
+      !budget.simulated &&
+      isDataSizeExceededErr(budget.simErr)
+    ) {
+      budget = await estimateComputeBudget(
+        connection,
+        toVersionedTx({
+          ...tx,
+          instructions: prependComputeBudgetIxs(tx.instructions, {
+            computeUnits: MAX_COMPUTE_UNITS,
+            microLamports: 1,
+          }),
+        }),
+        { computeScaleUp }
+      );
+      simRanUnderOurCeiling = false;
+    }
     computeUnits = budget.computeUnits;
     // A sim that failed specifically by exceeding the ceiling we injected
     // proves the caller's explicit limit is fatal on-chain — and downstream
@@ -367,10 +403,10 @@ export async function withPriorityFees({
               LOADED_ACCOUNTS_DATA_SIZE_QUANTUM
           ) * LOADED_ACCOUNTS_DATA_SIZE_QUANTUM
         );
-        resolvedDataSizeLimit = simValidatesDataSizeCeiling
+        resolvedDataSizeLimit = simRanUnderOurCeiling
           ? Math.min(simCeiling, derived)
           : derived;
-      } else if (budget.simulated && simValidatesDataSizeCeiling) {
+      } else if (budget.simulated && simRanUnderOurCeiling) {
         // Sim succeeded under our default ceiling but the RPC predates the
         // loadedAccountsDataSize field — the sim itself validated the
         // ceiling, so requesting it is safe.

@@ -234,6 +234,44 @@ describe("withPriorityFees", () => {
     );
   });
 
+  it("re-simulates without the injected default ceiling when the tx legitimately exceeds it", async () => {
+    const simTxs: any[] = [];
+    const sims = [
+      // First sim runs under the injected 16 MiB default and fails on it.
+      { err: "MaxLoadedAccountsDataSizeExceeded" },
+      // Retry without the ceiling measures real consumption.
+      {
+        err: null,
+        unitsConsumed: 50000,
+        loadedAccountsDataSize: 20 * 1024 * 1024,
+      },
+    ];
+    const connection = {
+      _rpcRequest: async () => ({ result: { priorityFeeEstimate: 100 } }),
+      _buildArgs: (args: any[]) => args,
+      simulateTransaction: async (tx: any) => {
+        simTxs.push(tx);
+        return { value: sims.shift() };
+      },
+    } as unknown as Connection;
+    const ixs = await withPriorityFees({
+      connection,
+      instructions: [transferIx],
+      feePayer,
+    });
+    expect(simTxs).to.have.length(2);
+    expect(simCbIxs(simTxs[0], COMPUTE_BUDGET_IX_DATA_SIZE)).to.have.length(1);
+    expect(simCbIxs(simTxs[1], COMPUTE_BUDGET_IX_DATA_SIZE)).to.be.empty;
+    // CU comes from the retry's measurement, not the table fallback.
+    const [limit] = cbIxs(ixs, COMPUTE_BUDGET_IX_LIMIT);
+    expect(limit.data.readUInt32LE(1)).to.eq(Math.ceil(50000 * 1.1));
+    // Derived size is NOT clamped to the default ceiling the retry ran without.
+    const [dataSize] = cbIxs(ixs, COMPUTE_BUDGET_IX_DATA_SIZE);
+    expect(dataSize.data.readUInt32LE(1)).to.eq(
+      Math.ceil((20 * 1024 * 1024 * 1.1) / 32768) * 32768
+    );
+  });
+
   it("keeps the default data-size limit when simulation succeeds but the RPC omits the field", async () => {
     const ixs = await withPriorityFees({
       connection: stubConnection({ sim: { err: null, unitsConsumed: 50000 } }),

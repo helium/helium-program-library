@@ -176,11 +176,11 @@ export async function buildSingleTransactionResponse({
     draft: { instructions, feePayer, addressLookupTableAddresses },
   });
 
-  const required = calculateRequiredBalance(
-    await getTransactionFee(connection, tx),
-    rentLamports
-  );
-  const available = await connection.getBalance(feePayer);
+  const [txFee, available] = await Promise.all([
+    getTransactionFee(connection, tx),
+    connection.getBalance(feePayer),
+  ]);
+  const required = calculateRequiredBalance(txFee, rentLamports);
   if (available < required) {
     throw errors.INSUFFICIENT_FUNDS({
       message: insufficientFundsMessage,

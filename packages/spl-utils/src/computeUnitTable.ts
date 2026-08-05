@@ -338,6 +338,28 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6:f49b9aa5eb7f2cbb": 204750,
   // fanout.unstake_v0 (n=1, med=65264, max=65264) [localnet]
   "fanqeMu3fw8R4LwKNbahPtYXJsyLL6NXyfe2BqzhfB6:c72b785167076870": 65264,
+  // hpl_crons.return_pyth_task_v0 (n=2570, med=8979, max=9083)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:e84f95190fa03200": 9083,
+  // hpl_crons.requeue_entity_claim_v1 (n=3749, med=26828, max=27552)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:76852f41b6df15f5": 27474,
+  // hpl_crons.requeue_wallet_claim_v0 (n=870, med=25507, max=26591)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:30728631ae0f54d1": 26461,
+  // hpl_crons.close_entity_claim_cron_v0 (n=11, med=33442, max=55887)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:e00545309cad3477": 55887,
+  // hpl_crons.init_delegation_claim_bot_v0 (n=32, med=13292, max=19505)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:59d043dd74967d7c": 19434,
+  // hpl_crons.start_delegation_claim_bot_v1 (n=33, med=167535, max=182621)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:881bfbc9a9530fce": 181986,
+  // hpl_crons.init_entity_claim_cron_v0 (n=20, med=238335, max=263828)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:25bbf0e2c259d539": 263828,
+  // hpl_crons.remove_entity_from_cron_v0 (n=8, med=17357, max=18875)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:bf5d02ac7f030110": 18875,
+  // hpl_crons.queue_wallet_claim_v0 (n=80, med=59826, max=68012)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:6d694121031f838f": 65598,
+  // hpl_crons.close_delegation_claim_bot_v0 (n=29, med=28997, max=29281)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:b3fd74f09eb38f77": 29279,
+  // hpl_crons.queue_delegation_claim_v0 (n=1264, med=311318, max=346130)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:7a169de76dc89b02": 327897,
 };
 
 export const MAX_COMPUTE_UNITS = 1400000;
