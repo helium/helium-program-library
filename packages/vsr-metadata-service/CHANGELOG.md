@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- Updated dependencies [[`c6e759e`](https://github.com/helium/helium-program-library/commit/c6e759e421db942e69d6ad357c65d735e0ca2bae)]:
+  - @helium/spl-utils@0.12.0
+  - @helium/voter-stake-registry-sdk@0.12.1
+
 ## 0.11.17
 
 ### Patch Changes

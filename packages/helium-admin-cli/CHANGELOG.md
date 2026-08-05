@@ -1,5 +1,33 @@
 # Change Log
 
+## 0.11.19
+
+### Patch Changes
+
+- [#1201](https://github.com/helium/helium-program-library/pull/1201) [`2022672`](https://github.com/helium/helium-program-library/commit/2022672309d34fb95d20b6b45f6ac88b72755ef2) Thanks [@bryzettler](https://github.com/bryzettler)! - Drop the hardcoded 500k compute-unit limits from `create-council-fanout`, `queue-hotspot-claims`, `queue-position-claims`, and `requeue-hotspot-claims`; limits now come from spl-utils' measured compute-unit table, so these commands stop paying for CU they never use.
+
+- Updated dependencies [[`c6e759e`](https://github.com/helium/helium-program-library/commit/c6e759e421db942e69d6ad357c65d735e0ca2bae)]:
+  - @helium/spl-utils@0.12.0
+  - @helium/circuit-breaker-sdk@0.11.17
+  - @helium/data-credits-sdk@0.11.17
+  - @helium/dc-auto-top-sdk@0.11.17
+  - @helium/distributor-oracle@0.11.17
+  - @helium/fanout-sdk@0.11.17
+  - @helium/helium-entity-manager-sdk@0.11.17
+  - @helium/helium-sub-daos-sdk@0.11.18
+  - @helium/hexboosting-sdk@0.11.17
+  - @helium/hpl-crons-sdk@0.11.18
+  - @helium/lazy-distributor-sdk@0.11.17
+  - @helium/lazy-transactions-sdk@0.11.17
+  - @helium/mini-fanout-sdk@0.11.17
+  - @helium/mobile-entity-manager-sdk@0.11.17
+  - @helium/no-emit-sdk@0.11.17
+  - @helium/price-oracle-sdk@0.11.17
+  - @helium/rewards-oracle-sdk@0.11.17
+  - @helium/treasury-management-sdk@0.11.17
+  - @helium/tuktuk-dca-sdk@0.11.17
+  - @helium/voter-stake-registry-sdk@0.12.1
+
 ## 0.11.18
 
 ### Patch Changes

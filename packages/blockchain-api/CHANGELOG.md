@@ -1,5 +1,27 @@
 # Change Log
 
+## 0.11.21
+
+### Patch Changes
+
+- [#1201](https://github.com/helium/helium-program-library/pull/1201) [`2022672`](https://github.com/helium/helium-program-library/commit/2022672309d34fb95d20b6b45f6ac88b72755ef2) Thanks [@bryzettler](https://github.com/bryzettler)! - Price transactions with the cluster's own fee calculation instead of local compute-budget math. `getTransactionFee`/`getTotalTransactionFees` now take a `Connection` and resolve via `getFeeForMessage`, so quoted fees track base, priority, and any future fee components (SIMD-0553 resource fees) without client-side modeling. The local fallback used when the RPC can't answer parses the u64 CU price without the signed-shift overflow past 2^31 and models the runtime's 200k-per-instruction default (capped at 1.4M) rather than a flat 200k.
+
+  `buildVersionedTransaction` resolves address lookup tables once and shares them with `withPriorityFees` and the message compile, fetches the blockhash concurrently with fee estimation, and on estimation failure falls back to spl-utils' measured compute-unit table instead of shipping instructions with no compute budget. Hardcoded 500k compute-unit limits are dropped from the remaining procedures.
+
+- Updated dependencies [[`c6e759e`](https://github.com/helium/helium-program-library/commit/c6e759e421db942e69d6ad357c65d735e0ca2bae)]:
+  - @helium/spl-utils@0.12.0
+  - @helium/circuit-breaker-sdk@0.11.17
+  - @helium/data-credits-sdk@0.11.17
+  - @helium/distributor-oracle@0.11.17
+  - @helium/helium-entity-manager-sdk@0.11.17
+  - @helium/helium-sub-daos-sdk@0.11.18
+  - @helium/hpl-crons-sdk@0.11.18
+  - @helium/lazy-distributor-sdk@0.11.17
+  - @helium/mini-fanout-sdk@0.11.17
+  - @helium/sus@0.11.17
+  - @helium/voter-stake-registry-sdk@0.12.1
+  - @helium/welcome-pack-sdk@0.11.17
+
 ## 0.11.20
 
 ### Patch Changes
