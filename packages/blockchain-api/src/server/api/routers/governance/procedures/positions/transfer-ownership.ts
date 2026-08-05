@@ -64,9 +64,10 @@ export const transferOwnership =
         draft: { instructions: [ix], feePayer: fromPubkey },
       });
 
-      const txFee = getTransactionFee(tx);
-
-      const walletBalance = await connection.getBalance(fromPubkey);
+      const [txFee, walletBalance] = await Promise.all([
+        getTransactionFee(connection, tx),
+        connection.getBalance(fromPubkey),
+      ]);
       if (walletBalance < txFee) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance for transaction fees",
@@ -94,7 +95,12 @@ export const transferOwnership =
           ],
           parallel: false,
           tag,
-          actionMetadata: { type: "position_transfer_ownership", positionMint, from, to },
+          actionMetadata: {
+            type: "position_transfer_ownership",
+            positionMint,
+            from,
+            to,
+          },
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(txFee),

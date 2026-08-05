@@ -1003,7 +1003,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       timestamp: Date.now(),
     });
 
-    const txFees = getTotalTransactionFees(allTxs);
+    const txFees = await getTotalTransactionFees(connection, allTxs);
 
     return {
       transactionData: {

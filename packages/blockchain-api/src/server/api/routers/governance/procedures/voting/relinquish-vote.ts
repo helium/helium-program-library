@@ -257,9 +257,11 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
       versionedTransactions.length > 1
         ? getJitoTipAmountLamports()
         : 0;
-    const totalFee = getTotalTransactionFees(versionedTransactions) + jitoTipCost;
-
-    const walletBalance = await connection.getBalance(walletPubkey);
+    const [txFees, walletBalance] = await Promise.all([
+      getTotalTransactionFees(connection, versionedTransactions),
+      connection.getBalance(walletPubkey),
+    ]);
+    const totalFee = txFees + jitoTipCost;
     if (walletBalance < totalFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",
@@ -280,7 +282,12 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
         transactions,
         parallel: true,
         tag,
-        actionMetadata: { type: "voting_relinquish", proposalKey, choice, positionCount: positionMints.length },
+        actionMetadata: {
+          type: "voting_relinquish",
+          proposalKey,
+          choice,
+          positionCount: positionMints.length,
+        },
       },
       hasMore,
       estimatedSolFee: await toTokenAmountOutput(

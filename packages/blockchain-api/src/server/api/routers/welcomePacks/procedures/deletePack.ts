@@ -91,7 +91,7 @@ export const deletePack = publicProcedure.welcomePacks.delete.handler(
       packId,
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(provider.connection, tx);
 
     return {
       transactionData: {

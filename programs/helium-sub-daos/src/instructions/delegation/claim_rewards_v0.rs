@@ -51,7 +51,7 @@ pub struct ClaimRewardsV0<'info> {
     mut,
     has_one = sub_dao,
     seeds = ["delegated_position".as_bytes(), position.key().as_ref()],
-    bump,
+    bump = delegated_position.bump_seed,
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
 
@@ -59,7 +59,7 @@ pub struct ClaimRewardsV0<'info> {
 
   #[account(
     seeds = ["sub_dao_epoch_info".as_bytes(), sub_dao.key().as_ref(), &args.epoch.to_le_bytes()],
-    bump,
+    bump = sub_dao_epoch_info.bump_seed,
     constraint = sub_dao_epoch_info.rewards_issued_at.is_some() @ ErrorCode::EpochNotClosed,
     constraint = sub_dao_epoch_info.hnt_rewards_issued == 0,
   )]
@@ -127,7 +127,7 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     ctx.accounts.sub_dao_epoch_info.start_ts(),
   )?;
 
-  msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao", 
+  msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao",
     delegated_vehnt_at_epoch,
     ctx.accounts.sub_dao_epoch_info.vehnt_at_epoch_start,
     ctx.accounts.sub_dao_epoch_info.delegation_rewards_issued

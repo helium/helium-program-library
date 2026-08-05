@@ -1,9 +1,22 @@
-import { VersionedTransaction, ComputeBudgetProgram } from "@solana/web3.js";
+import {
+  Connection,
+  VersionedTransaction,
+  ComputeBudgetProgram,
+} from "@solana/web3.js";
+import {
+  COMPUTE_BUDGET_IX_LIMIT,
+  COMPUTE_BUDGET_IX_PRICE,
+  MAX_COMPUTE_UNITS,
+} from "@helium/spl-utils";
 
 // Base signature fee (5000 lamports per signature)
 export const BASE_SIGNATURE_FEE_LAMPORTS = 5000;
 
-// Transaction fee estimates (legacy, kept for backwards compatibility)
+// Transaction fee estimates (legacy, kept for backwards compatibility).
+// Used only for pre-build balance gates where no tx exists yet to price via
+// getFeeForMessage. Once a SIMD-0553 burn gate activates, large-CU txs (e.g.
+// Jupiter swaps) can cost more than this in resource fees alone — revisit
+// these call sites then.
 export const BASE_TX_FEE_LAMPORTS = 50000; // 0.00005 SOL
 
 // Minimum rent-exempt balance (wallet must stay above this)
@@ -31,7 +44,7 @@ export const RENT_COSTS = {
  */
 export function calculateRequiredBalance(
   estimatedTxFeeLamports: number = BASE_TX_FEE_LAMPORTS,
-  estimatedRentCostLamports: number = 0,
+  estimatedRentCostLamports: number = 0
 ): number {
   return (
     estimatedTxFeeLamports +
@@ -41,48 +54,83 @@ export function calculateRequiredBalance(
 }
 
 /**
- * Extract the actual transaction fee from a VersionedTransaction.
- * Calculates: (base_signature_fee * num_signatures) + (compute_unit_price * compute_unit_limit)
+ * Fee the cluster would charge for this transaction, via getFeeForMessage —
+ * the validator's own fee calculation, so it tracks base, priority, and any
+ * future fee components without local modeling. Falls back to a local
+ * base + priority estimate when the RPC can't answer (null value or error).
  */
-export function getTransactionFee(tx: VersionedTransaction): number {
+export async function getTransactionFee(
+  connection: Connection,
+  tx: VersionedTransaction
+): Promise<number> {
+  try {
+    const { value } = await connection.getFeeForMessage(tx.message);
+    if (value != null) return value;
+  } catch {
+    // RPC unavailable — use the local estimate below.
+  }
+  return estimateTransactionFeeLocally(tx);
+}
+
+/**
+ * Local fallback: (base_signature_fee * num_signatures) + priority fee parsed
+ * from the transaction's compute-budget instructions.
+ *
+ * Models only today's fee components — it does NOT model the SIMD-0553
+ * resource fee (burned, priced on requested CU + loaded-data size), whose
+ * rates are feature-gated and unknowable client-side. The primary
+ * getFeeForMessage path picks that up automatically at activation; this
+ * fallback will under-estimate once a burn gate is live.
+ */
+function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
   const numSignatures = tx.message.header.numRequiredSignatures;
   const baseFee = BASE_SIGNATURE_FEE_LAMPORTS * numSignatures;
 
-  let computeUnitLimit = 200000; // Default CU limit
+  let computeUnitLimit: number | undefined;
   let computeUnitPrice = 0; // Default no priority fee
 
   const computeBudgetProgramId = ComputeBudgetProgram.programId.toBase58();
 
   // Parse instructions to find ComputeBudget instructions
   const accountKeys = tx.message.staticAccountKeys;
+  let numOtherInstructions = 0;
   for (const ix of tx.message.compiledInstructions) {
     const programId = accountKeys[ix.programIdIndex]?.toBase58();
-    if (programId !== computeBudgetProgramId) continue;
+    if (programId !== computeBudgetProgramId) {
+      numOtherInstructions++;
+      continue;
+    }
 
     const data = ix.data;
     if (data.length === 0) continue;
 
     const discriminator = data[0];
 
-    // SetComputeUnitLimit = 2, data format: [2, u32 limit]
-    if (discriminator === 2 && data.length >= 5) {
-      computeUnitLimit =
-        data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24);
+    // SetComputeUnitLimit, data format: [discriminator, u32 limit]
+    if (discriminator === COMPUTE_BUDGET_IX_LIMIT && data.length >= 5) {
+      computeUnitLimit = Buffer.from(data).readUInt32LE(1);
     }
 
-    // SetComputeUnitPrice = 3, data format: [3, u64 price (microlamports)]
-    if (discriminator === 3 && data.length >= 9) {
-      // Read u64 as two u32s (little endian)
-      const low = data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24);
-      const high = data[5] | (data[6] << 8) | (data[7] << 16) | (data[8] << 24);
-      // Price is in microlamports per CU
-      computeUnitPrice = low + high * 0x100000000;
+    // SetComputeUnitPrice, data format: [discriminator, u64 price (microlamports)]
+    if (discriminator === COMPUTE_BUDGET_IX_PRICE && data.length >= 9) {
+      // readBigUInt64LE parses the full u64 without the signed-shift overflow a
+      // manual `<< 24` hits once a byte's high bit is set (price >= 2^31).
+      computeUnitPrice = Number(Buffer.from(data).readBigUInt64LE(1));
     }
+  }
+
+  // No explicit limit ix: the runtime grants 200k CU per non-ComputeBudget
+  // top-level instruction, capped at 1.4M — not a flat 200k per tx.
+  if (computeUnitLimit == null) {
+    computeUnitLimit = Math.min(
+      MAX_COMPUTE_UNITS,
+      200_000 * numOtherInstructions
+    );
   }
 
   // Priority fee = (price in microlamports * CU limit) / 1_000_000
   const priorityFee = Math.ceil(
-    (computeUnitPrice * computeUnitLimit) / 1_000_000,
+    (computeUnitPrice * computeUnitLimit) / 1_000_000
   );
 
   return baseFee + priorityFee;
@@ -91,6 +139,12 @@ export function getTransactionFee(tx: VersionedTransaction): number {
 /**
  * Get total transaction fees for multiple transactions.
  */
-export function getTotalTransactionFees(txs: VersionedTransaction[]): number {
-  return txs.reduce((total, tx) => total + getTransactionFee(tx), 0);
+export async function getTotalTransactionFees(
+  connection: Connection,
+  txs: VersionedTransaction[]
+): Promise<number> {
+  const fees = await Promise.all(
+    txs.map((tx) => getTransactionFee(connection, tx))
+  );
+  return fees.reduce((total, fee) => total + fee, 0);
 }

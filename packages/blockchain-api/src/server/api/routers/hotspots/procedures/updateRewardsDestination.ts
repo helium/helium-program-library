@@ -180,7 +180,7 @@ export const updateRewardsDestination =
       });
 
       const rentCost = RENT_COSTS.RECIPIENT * recipientsNeeded;
-      const txFee = getTransactionFee(tx);
+      const txFee = await getTransactionFee(connection, tx);
       const estimatedSolFeeLamports = txFee + rentCost;
 
       return {

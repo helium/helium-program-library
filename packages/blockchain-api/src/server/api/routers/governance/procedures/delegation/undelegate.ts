@@ -111,9 +111,11 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
         claimVersionedTxs.length > 1
           ? getJitoTipAmountLamports()
           : 0;
-      const txFee = getTotalTransactionFees(claimVersionedTxs) + claimJitoTipCost;
-
-      const walletBalance = await connection.getBalance(walletPubkey);
+      const [claimTxFees, walletBalance] = await Promise.all([
+        getTotalTransactionFees(connection, claimVersionedTxs),
+        connection.getBalance(walletPubkey),
+      ]);
+      const txFee = claimTxFees + claimJitoTipCost;
       if (walletBalance < txFee) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance for transaction fees",
@@ -209,13 +211,16 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
 
     const undelegateCluster = getCluster();
     const undelegateJitoTipCost =
-      (undelegateCluster === "mainnet" || undelegateCluster === "mainnet-beta") &&
+      (undelegateCluster === "mainnet" ||
+        undelegateCluster === "mainnet-beta") &&
       allVersionedTxs.length > 1
         ? getJitoTipAmountLamports()
         : 0;
-    const txFee = getTotalTransactionFees(allVersionedTxs) + undelegateJitoTipCost;
-
-    const walletBalance = await connection.getBalance(walletPubkey);
+    const [undelegateTxFees, walletBalance] = await Promise.all([
+      getTotalTransactionFees(connection, allVersionedTxs),
+      connection.getBalance(walletPubkey),
+    ]);
+    const txFee = undelegateTxFees + undelegateJitoTipCost;
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",

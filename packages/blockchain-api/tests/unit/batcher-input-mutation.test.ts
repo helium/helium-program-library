@@ -9,7 +9,8 @@ import {
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import { batchInstructionsToTxsWithPriorityFee } from "../../../spl-utils/src/transaction";
-import { estimateComputeUnits } from "../../../spl-utils/src/priorityFees";
+import { estimateComputeBudget } from "../../../spl-utils/src/priorityFees";
+import { MAX_COMPUTE_UNITS } from "../../../spl-utils/src/computeUnitTable";
 
 const FEE_PAYER = Keypair.generate().publicKey;
 const NOOP_PROGRAM = Keypair.generate().publicKey;
@@ -87,8 +88,8 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
   });
 });
 
-describe("estimateComputeUnits", () => {
-  it("falls back to max compute units when simulateTransaction rejects", async () => {
+describe("estimateComputeBudget", () => {
+  it("falls back to the CU table when simulateTransaction rejects", async () => {
     const connection = {
       simulateTransaction: async () => {
         throw new Error(
@@ -97,12 +98,16 @@ describe("estimateComputeUnits", () => {
       },
     } as unknown as Connection;
 
-    const units = await estimateComputeUnits(
+    const result = await estimateComputeBudget(
       connection,
-      // Never serialized/sent — the fake rejects before touching it.
-      {} as unknown as VersionedTransaction,
+      // Never serialized/sent — the fake rejects before the table reads it.
+      // Empty instructions miss the CU table, yielding the MAX fallback.
+      {
+        message: { compiledInstructions: [], staticAccountKeys: [] },
+      } as unknown as VersionedTransaction,
     );
 
-    expect(units).to.equal(1400000);
+    expect(result.simulated).to.equal(false);
+    expect(result.computeUnits).to.equal(MAX_COMPUTE_UNITS);
   });
 });

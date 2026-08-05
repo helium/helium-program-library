@@ -63,7 +63,9 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
         throw errors.RATE_LIMITED();
       }
       throw errors.JUPITER_ERROR({
-        message: `Failed to get swap instructions from Jupiter: HTTP ${instructionsResponse.status}: ${errorText.slice(0, 500)}`,
+        message: `Failed to get swap instructions from Jupiter: HTTP ${
+          instructionsResponse.status
+        }: ${errorText.slice(0, 500)}`,
       });
     }
 
@@ -129,15 +131,15 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     });
 
     // Check wallet has sufficient balance using actual transaction fees
-    const walletBalance = await connection.getBalance(
-      new PublicKey(userPublicKey),
-    );
+    const [walletBalance, txFee] = await Promise.all([
+      connection.getBalance(new PublicKey(userPublicKey)),
+      getTransactionFee(connection, tx),
+    ]);
     const rentCost = destinationTokenAccount ? 0 : RENT_COSTS.ATA;
     const solInputAmount =
       quoteResponse.inputMint === NATIVE_MINT.toBase58()
         ? Number(quoteResponse.inAmount)
         : 0;
-    const txFee = getTransactionFee(tx);
     const required = calculateRequiredBalance(txFee, rentCost + solInputAmount);
 
     if (walletBalance < required) {

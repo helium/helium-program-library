@@ -117,7 +117,7 @@ export const claimHotspotRewards =
         vtxs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
       }
 
-      const txFees = getTotalTransactionFees(vtxs);
+      const txFees = await getTotalTransactionFees(connection, vtxs);
       const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
       const rentCost = recipientAcc ? 0 : RENT_COSTS.RECIPIENT;
       const requiredLamports = calculateRequiredBalance(

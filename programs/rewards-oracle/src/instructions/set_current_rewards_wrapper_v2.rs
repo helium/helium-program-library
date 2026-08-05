@@ -31,7 +31,7 @@ pub struct SetCurrentRewardsWrapperV2<'info> {
   /// CHECK: checked in cpi
   #[account(
     seeds = ["oracle_signer".as_bytes()],
-    bump
+    bump = crate::ORACLE_SIGNER_BUMP
   )]
   pub oracle_signer: AccountInfo<'info>,
   pub lazy_distributor_program: Program<'info, LazyDistributor>,
@@ -58,7 +58,7 @@ pub fn handler(
     sysvar_instructions: ctx.accounts.sysvar_instructions.to_account_info(),
   };
 
-  let signer_seeds: &[&[&[u8]]] = &[&["oracle_signer".as_bytes(), &[ctx.bumps.oracle_signer]]];
+  let signer_seeds: &[&[&[u8]]] = &[crate::ORACLE_SIGNER_SEEDS];
   set_current_rewards_v1(
     CpiContext::new_with_signer(
       ctx.accounts.lazy_distributor_program.to_account_info(),

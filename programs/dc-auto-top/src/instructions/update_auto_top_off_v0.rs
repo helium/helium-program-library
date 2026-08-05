@@ -39,7 +39,7 @@ pub struct UpdateAutoTopOffV0<'info> {
   /// CHECK: queue authority
   #[account(
     seeds = [b"queue_authority"],
-    bump
+    bump = auto_top_off.load()?.queue_authority_bump,
   )]
   pub queue_authority: UncheckedAccount<'info>,
   /// CHECK: task queue authority
