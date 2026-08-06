@@ -118,7 +118,10 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
     if (delegatedPositionAcc.expirationTs.gte(newExpirationTs)) {
       return {
         transactionData: { transactions: [], parallel: false, tag },
-        estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+        estimatedSolFee: await toTokenAmountOutput(
+          new BN(0),
+          NATIVE_MINT.toBase58(),
+        ),
       };
     }
 
@@ -157,9 +160,10 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
       draft: { instructions, feePayer: walletPubkey },
     });
 
-    const txFee = getTransactionFee(tx);
-
-    const walletBalance = await connection.getBalance(walletPubkey);
+    const [txFee, walletBalance] = await Promise.all([
+      getTransactionFee(connection, tx),
+      connection.getBalance(walletPubkey),
+    ]);
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",

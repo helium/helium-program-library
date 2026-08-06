@@ -28,6 +28,9 @@ RUN --mount=type=cache,id=turbo,target=/app/.turbo pnpm turbo run build --filter
 FROM node:24-alpine
 WORKDIR /app
 
+# The service shells out to git at runtime to clone helium-vote-proxies
+RUN apk add --no-cache git
+
 # Preserve pnpm workspace layout so symlinks under node_modules/@helium/* resolve
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages ./packages

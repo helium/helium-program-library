@@ -353,9 +353,7 @@ export const useAutomateHotspotClaims = ({
       if (params.onInstructions) {
         await params.onInstructions(instructions)
       } else {
-        await sendInstructionsWithPriorityFee(provider, instructions, {
-          computeUnitLimit: 500000,
-        })
+        await sendInstructionsWithPriorityFee(provider, instructions)
       }
     },
   )
@@ -406,9 +404,7 @@ export const useAutomateHotspotClaims = ({
       if (params.onInstructions) {
         await params.onInstructions(instructions)
       } else {
-        await sendInstructionsWithPriorityFee(provider, instructions, {
-          computeUnitLimit: 500000,
-        })
+        await sendInstructionsWithPriorityFee(provider, instructions)
       }
     },
   )

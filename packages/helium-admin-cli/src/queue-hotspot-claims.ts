@@ -81,9 +81,7 @@ export async function run(args: any = process.argv) {
         toPubkey: cronJob,
         lamports: BigInt(argv.fundingAmount),
       }),
-    ], {
-      computeUnitLimit: 500000
-    });
+    ]);
   }
   console.log("Cron job account", cronJob.toBase58());
   const cronJobAcc = await cronProgram.account.cronJobV0.fetch(cronJob);
@@ -101,7 +99,5 @@ export async function run(args: any = process.argv) {
 
   instructions.push(instruction);
 
-  await sendInstructionsWithPriorityFee(provider, instructions, {
-    computeUnitLimit: 500000,
-  });
+  await sendInstructionsWithPriorityFee(provider, instructions);
 }

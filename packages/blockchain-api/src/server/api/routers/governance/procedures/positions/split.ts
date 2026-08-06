@@ -32,6 +32,7 @@ import {
   toLockupKindArg,
   LockupKindType,
 } from "../helpers";
+import { canSign } from "@/lib/utils/can-sign";
 
 export const split = publicProcedure.governance.splitPosition.handler(
   async ({ input, errors }) => {
@@ -45,6 +46,19 @@ export const split = publicProcedure.governance.splitPosition.handler(
 
     const { connection, provider } = createSolanaConnection(walletAddress);
     const walletPubkey = new PublicKey(walletAddress);
+
+    // The split's new position mint is an ephemeral keypair that signs the
+    // transaction as it is built. A wallet that cannot sign is served by
+    // re-wrapping the message into a multisig proposal, which discards that
+    // signature, so the proposal could only fail on execution after quorum and
+    // rent are spent.
+    if (!canSign(walletPubkey)) {
+      throw errors.BAD_REQUEST({
+        message:
+          "Splitting a position requires a wallet that can sign; a multisig-held wallet cannot supply the new position mint's signature",
+      });
+    }
+
     const sourcePositionMintPubkey = new PublicKey(positionMint);
 
     const vsrProgram = await initVsr(provider);
@@ -167,10 +181,12 @@ export const split = publicProcedure.governance.splitPosition.handler(
       amount,
     });
 
-    const txFee = getTransactionFee(tx);
+    const [txFee, walletBalance] = await Promise.all([
+      getTransactionFee(connection, tx),
+      connection.getBalance(walletPubkey),
+    ]);
     const estimatedSolFeeLamports = txFee + mintRent;
 
-    const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to split position",

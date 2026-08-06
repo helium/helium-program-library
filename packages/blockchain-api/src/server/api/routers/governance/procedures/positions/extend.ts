@@ -75,9 +75,10 @@ export const extend = publicProcedure.governance.extendPosition.handler(
       draft: { instructions, feePayer: walletPubkey },
     });
 
-    const txFee = getTransactionFee(tx);
-
-    const walletBalance = await connection.getBalance(walletPubkey);
+    const [txFee, walletBalance] = await Promise.all([
+      getTransactionFee(connection, tx),
+      connection.getBalance(walletPubkey),
+    ]);
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",
@@ -105,7 +106,11 @@ export const extend = publicProcedure.governance.extendPosition.handler(
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "position_extend", positionMint, lockupPeriodDays: lockupPeriodsInDays },
+        actionMetadata: {
+          type: "position_extend",
+          positionMint,
+          lockupPeriodDays: lockupPeriodsInDays,
+        },
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),

@@ -61,9 +61,9 @@ pub fn distribute_impl(ctx: &mut DistributeRewardsCommonV0) -> Result<()> {
   let recipient = &mut ctx.recipient;
   let mut filtered: Vec<u64> = recipient
     .current_rewards
-    .clone()
-    .into_iter()
+    .iter()
     .flatten()
+    .copied()
     .collect();
   filtered.sort_unstable();
   let median_idx = filtered.len() / 2;
@@ -77,23 +77,24 @@ pub fn distribute_impl(ctx: &mut DistributeRewardsCommonV0) -> Result<()> {
 
   if ctx.recipient.current_config_version != ctx.lazy_distributor.version {
     ctx.recipient.current_config_version = ctx.lazy_distributor.version;
-    ctx.recipient.current_rewards = vec![None; ctx.lazy_distributor.oracles.len()];
   }
 
-  transfer_v0(
-    CpiContext::new_with_signer(
-      ctx.circuit_breaker_program.to_account_info().clone(),
-      TransferV0 {
-        from: ctx.rewards_escrow.to_account_info().clone(),
-        to: ctx.destination_account.to_account_info().clone(),
-        owner: ctx.lazy_distributor.to_account_info().clone(),
-        circuit_breaker: ctx.circuit_breaker.to_account_info().clone(),
-        token_program: ctx.token_program.to_account_info().clone(),
-      },
-      seeds,
-    ),
-    TransferArgsV0 { amount: to_dist },
-  )?;
+  if to_dist > 0 {
+    transfer_v0(
+      CpiContext::new_with_signer(
+        ctx.circuit_breaker_program.to_account_info().clone(),
+        TransferV0 {
+          from: ctx.rewards_escrow.to_account_info().clone(),
+          to: ctx.destination_account.to_account_info().clone(),
+          owner: ctx.lazy_distributor.to_account_info().clone(),
+          circuit_breaker: ctx.circuit_breaker.to_account_info().clone(),
+          token_program: ctx.token_program.to_account_info().clone(),
+        },
+        seeds,
+      ),
+      TransferArgsV0 { amount: to_dist },
+    )?;
+  }
 
   Ok(())
 }

@@ -53,7 +53,10 @@ export const mint = publicProcedure.dataCredits.mint.handler(
     });
 
     const useJito = shouldUseJitoBundle(txs.length, getCluster());
-    const txFees = getTotalTransactionFees(txs.map((t) => t.tx));
+    const txFees = await getTotalTransactionFees(
+      connection,
+      txs.map((t) => t.tx)
+    );
     const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
 
     // Check if recipient's DC ATA needs creation (init_if_needed on-chain)
@@ -62,7 +65,8 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       : new PublicKey(owner);
     const recipientDcAta = getAssociatedTokenAddressSync(
       DC_MINT,
-      recipientPubkey
+      recipientPubkey,
+      true
     );
     const recipientDcAtaInfo = await connection.getAccountInfo(recipientDcAta);
     const ataRent = recipientDcAtaInfo ? 0 : RENT_COSTS.ATA;

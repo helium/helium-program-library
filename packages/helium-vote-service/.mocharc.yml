@@ -1,0 +1,4 @@
+require:
+  - "@swc-node/register"
+timeout: 60000
+exit: true

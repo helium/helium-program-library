@@ -93,8 +93,10 @@ export const burn = publicProcedure.dataCredits.burn.handler(
       draft: { instructions: [ix], feePayer },
     });
 
-    const txFee = getTransactionFee(tx);
-    const walletBalance = await connection.getBalance(feePayer);
+    const [txFee, walletBalance] = await Promise.all([
+      getTransactionFee(connection, tx),
+      connection.getBalance(feePayer),
+    ]);
     if (walletBalance < txFee) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to burn data credits",

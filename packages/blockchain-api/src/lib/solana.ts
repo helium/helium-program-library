@@ -27,7 +27,10 @@ let cachedConnection: Connection | undefined;
 
 function getConnection(): Connection {
   if (!cachedConnection) {
-    cachedConnection = new Connection(env.SOLANA_RPC_URL);
+    // "confirmed" so state reads see recently-landed transactions; the default
+    // ("finalized") lags ~15-30s, causing repeat rounds of claim flows to
+    // rebuild epochs that were already claimed.
+    cachedConnection = new Connection(env.SOLANA_RPC_URL, "confirmed");
   }
   return cachedConnection;
 }

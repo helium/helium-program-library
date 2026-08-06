@@ -6,6 +6,7 @@ import {
   createTypedTransactionResponse,
   PublicKeySchema,
   TokenAmountInputSchema,
+  TokenAmountOutputSchema,
   WalletAddressSchema,
 } from "./common";
 
@@ -97,18 +98,24 @@ export const SplitPositionInputSchema = z.object({
 
 export const TransferPositionInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
-    "Wallet address that owns both positions"
+    "Wallet address that owns the source position and pays transaction fees"
   ),
   positionMint: PublicKeySchema.describe(
     "Mint address of the source position NFT"
   ),
   targetPositionMint: PublicKeySchema.describe(
-    "Mint address of the target position NFT"
+    "Mint address of the target position NFT. May be owned by a different wallet; its lockup must be equal-or-longer and equal-or-stricter than the source's."
   ),
   amount: z
     .string()
     .regex(/^\d+$/, "Amount must be a whole number in smallest unit (bones)")
     .describe("Raw token amount to transfer (in smallest unit)"),
+});
+
+export const GetPositionsInputSchema = z.object({
+  wallet: WalletAddressSchema.describe(
+    "Wallet address to list governance positions for"
+  ),
 });
 
 export const TransferPositionOwnershipInputSchema = z.object({
@@ -164,7 +171,9 @@ export const VoteInputSchema = z.object({
   walletAddress: WalletAddressSchema.describe(
     "Wallet address that owns the positions"
   ),
-  proposalKey: PublicKeySchema.describe("Public key of the proposal to vote on"),
+  proposalKey: PublicKeySchema.describe(
+    "Public key of the proposal to vote on"
+  ),
   positionMints: z
     .array(PublicKeySchema)
     .min(1)
@@ -225,6 +234,24 @@ export const UnassignProxiesInputSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Skip reporting (vote procedure)
+// ---------------------------------------------------------------------------
+
+export const SkipReasonSchema = z.enum([
+  "maxChoicesReached",
+  "alreadyVotedThisChoice",
+]);
+
+export const SkippedPositionSchema = z.object({
+  positionMint: PublicKeySchema.describe(
+    "Mint of the position that was not included in the vote transactions"
+  ),
+  reason: SkipReasonSchema.describe(
+    "Why the position was excluded from the vote transactions"
+  ),
+});
+
+// ---------------------------------------------------------------------------
 // Typed metadata schemas for endpoints with extra fields
 // ---------------------------------------------------------------------------
 
@@ -246,22 +273,42 @@ const RelinquishAllVotesMetadataSchema = z.object({
   votesRelinquished: z.number().optional(),
 });
 
+export const PositionSchema = z.object({
+  positionMint: z.string().describe("Mint address of the position NFT"),
+  position: z.string().describe("Position PDA address"),
+  registrar: z.string().describe("Registrar the position belongs to"),
+  amountDeposited: TokenAmountOutputSchema.describe(
+    "Amount deposited in the position; mint is the governing token mint"
+  ),
+  numActiveVotes: z
+    .number()
+    .describe("Number of active votes currently cast by the position"),
+  lockup: z.object({
+    kind: LockupKindSchema,
+    startTs: z.string().describe("Lockup start unix timestamp"),
+    endTs: z.string().describe("Lockup end unix timestamp"),
+  }),
+});
+
+export const GetPositionsResponseSchema = z.array(PositionSchema);
+
 // ---------------------------------------------------------------------------
 // Per-endpoint response schemas — simple (no hasMore)
 // ---------------------------------------------------------------------------
 
 export const CreatePositionResponseSchema = createTypedTransactionResponse(
-  CreatePositionMetadataSchema,
+  CreatePositionMetadataSchema
 );
 export const ClosePositionResponseSchema = createTransactionResponse();
 export const ExtendPositionResponseSchema = createTransactionResponse();
 export const FlipLockupKindResponseSchema = createTransactionResponse();
 export const ResetLockupResponseSchema = createTransactionResponse();
 export const SplitPositionResponseSchema = createTypedTransactionResponse(
-  SplitPositionMetadataSchema,
+  SplitPositionMetadataSchema
 );
 export const TransferPositionResponseSchema = createTransactionResponse();
-export const TransferPositionOwnershipResponseSchema = createTransactionResponse();
+export const TransferPositionOwnershipResponseSchema =
+  createTransactionResponse();
 export const ExtendDelegationResponseSchema = createTransactionResponse();
 
 // ---------------------------------------------------------------------------
@@ -274,13 +321,21 @@ export const ClaimDelegationRewardsResponseSchema =
   createPaginatedTransactionResponse();
 export const UndelegatePositionResponseSchema =
   createPaginatedTransactionResponse();
-export const VoteResponseSchema = createPaginatedTransactionResponse();
+export const VoteResponseSchema = createPaginatedTransactionResponse().extend({
+  skipped: z
+    .array(SkippedPositionSchema)
+    // Tolerate server responses that omit the field (servers predating skip
+    // reporting).
+    .default([])
+    .describe(
+      "Positions not included in the vote transactions, each with the reason it was skipped. Empty when every position is eligible."
+    ),
+});
 export const RelinquishVoteResponseSchema =
   createPaginatedTransactionResponse();
 export const RelinquishPositionVotesResponseSchema =
   createTypedPaginatedTransactionResponse(RelinquishAllVotesMetadataSchema);
-export const AssignProxiesResponseSchema =
-  createPaginatedTransactionResponse();
+export const AssignProxiesResponseSchema = createPaginatedTransactionResponse();
 export const UnassignProxiesResponseSchema =
   createPaginatedTransactionResponse();
 
@@ -296,7 +351,12 @@ export type FlipLockupKindInput = z.infer<typeof FlipLockupKindInputSchema>;
 export type ResetLockupInput = z.infer<typeof ResetLockupInputSchema>;
 export type SplitPositionInput = z.infer<typeof SplitPositionInputSchema>;
 export type TransferPositionInput = z.infer<typeof TransferPositionInputSchema>;
-export type TransferPositionOwnershipInput = z.infer<typeof TransferPositionOwnershipInputSchema>;
+export type TransferPositionOwnershipInput = z.infer<
+  typeof TransferPositionOwnershipInputSchema
+>;
+export type GetPositionsInput = z.infer<typeof GetPositionsInputSchema>;
+export type Position = z.infer<typeof PositionSchema>;
+export type GetPositionsResponse = z.infer<typeof GetPositionsResponseSchema>;
 export type DelegatePositionInput = z.infer<typeof DelegatePositionInputSchema>;
 export type ExtendDelegationInput = z.infer<typeof ExtendDelegationInputSchema>;
 export type UndelegateInput = z.infer<typeof UndelegateInputSchema>;
@@ -341,6 +401,8 @@ export type UndelegatePositionResponse = z.infer<
 export type ClaimDelegationRewardsResponse = z.infer<
   typeof ClaimDelegationRewardsResponseSchema
 >;
+export type SkipReason = z.infer<typeof SkipReasonSchema>;
+export type SkippedPosition = z.infer<typeof SkippedPositionSchema>;
 export type VoteResponse = z.infer<typeof VoteResponseSchema>;
 export type RelinquishVoteResponse = z.infer<
   typeof RelinquishVoteResponseSchema

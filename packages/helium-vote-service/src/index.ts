@@ -21,7 +21,7 @@ import fs from "fs";
 import { camelCase, isPlainObject, mapKeys } from "lodash";
 import path from "path";
 import { Op } from "sequelize";
-import { SOLANA_URL } from "./env";
+import { PACKAGE_ROOT, PROXIES_DIR, SOLANA_URL } from "./env";
 import {
   Position,
   Proxy,
@@ -62,7 +62,7 @@ const ORG_IDS = {
   [IOT_MINT.toBase58()]: organizationKey("Helium IOT")[0].toBase58(),
 };
 
-const server: FastifyInstance = Fastify({
+export const server: FastifyInstance = Fastify({
   logger: true,
 });
 
@@ -71,12 +71,7 @@ server.register(cors, {
 });
 
 server.register(fastifyStatic, {
-  root: path.join(
-    __dirname,
-    process.env.NODE_ENV === "production"
-      ? "../../helium-vote-proxies"
-      : "../helium-vote-proxies"
-  ),
+  root: PROXIES_DIR,
   prefix: "/helium-vote-proxies/",
 });
 
@@ -90,29 +85,37 @@ server.get("/v1/sync", async () => {
 });
 
 // Save for one day
-const CACHE_TIME = 1000 * 60 * 60 * 24
-let cachedDataBurn: any | null = null
-let lastCacheUpdate: Date | null = null
+const CACHE_TIME = 1000 * 60 * 60 * 24;
+let cachedDataBurn: any | null = null;
+let lastCacheUpdate: Date | null = null;
 server.get("/v1/data-burn", async (request, reply) => {
-  if (cachedDataBurn && lastCacheUpdate && lastCacheUpdate.getTime() > Date.now() - CACHE_TIME) {
-    return cachedDataBurn
+  if (
+    cachedDataBurn &&
+    lastCacheUpdate &&
+    lastCacheUpdate.getTime() > Date.now() - CACHE_TIME
+  ) {
+    return cachedDataBurn;
   }
 
-  const client = new DuneClient(process.env.DUNE_API_KEY || "")
-  const result = await client.getLatestResult({ queryId: 5069123 })
+  const client = new DuneClient(process.env.DUNE_API_KEY || "");
+  const result = await client.getLatestResult({ queryId: 5069123 });
   cachedDataBurn = result.result?.rows.reduce((acc, row: any) => {
-    acc[row.subdao] = row.dc_burned
-    return acc
-  }, {} as Record<string, number>)
-  lastCacheUpdate = new Date()
-  return cachedDataBurn
+    acc[row.subdao] = row.dc_burned;
+    return acc;
+  }, {} as Record<string, number>);
+  lastCacheUpdate = new Date();
+  return cachedDataBurn;
 });
 
-let cachedDataSubDaoDelegations: any | null = null
-let lastCacheUpdateSubDaoDelegations: Date | null = null
+let cachedDataSubDaoDelegations: any | null = null;
+let lastCacheUpdateSubDaoDelegations: Date | null = null;
 server.get("/v1/subdao-delegations", async (request, reply) => {
-  if (cachedDataSubDaoDelegations && lastCacheUpdateSubDaoDelegations && lastCacheUpdateSubDaoDelegations.getTime() > Date.now() - CACHE_TIME) {
-    return cachedDataSubDaoDelegations
+  if (
+    cachedDataSubDaoDelegations &&
+    lastCacheUpdateSubDaoDelegations &&
+    lastCacheUpdateSubDaoDelegations.getTime() > Date.now() - CACHE_TIME
+  ) {
+    return cachedDataSubDaoDelegations;
   }
 
   const vetokens = await sequelize.query(`
@@ -132,16 +135,21 @@ GROUP BY sub_dao
   const result = vetokens[0];
 
   const data = result.reduce((acc: Record<string, number>, row: any) => {
-    const subDaoStr = row.subDao == subDaoKey(MOBILE_MINT)[0].toBase58() ? "mobile" : row.subDao == subDaoKey(IOT_MINT)[0].toBase58() ? "iot" : null;
+    const subDaoStr =
+      row.subDao == subDaoKey(MOBILE_MINT)[0].toBase58()
+        ? "mobile"
+        : row.subDao == subDaoKey(IOT_MINT)[0].toBase58()
+        ? "iot"
+        : null;
     if (subDaoStr) {
       acc[subDaoStr] = row.totalVeTokens.split(".")[0];
     }
     return acc;
   }, {} as Record<string, number>);
-  cachedDataSubDaoDelegations = data
-  lastCacheUpdateSubDaoDelegations = new Date()
-  return data
-})
+  cachedDataSubDaoDelegations = data;
+  lastCacheUpdateSubDaoDelegations = new Date();
+  return data;
+});
 
 server.get<{
   Params: { registrar: string };
@@ -205,25 +213,25 @@ server.get<{
     limit,
     include: position
       ? [
-        {
-          model: Position,
-          where: {
-            address: position,
+          {
+            model: Position,
+            where: {
+              address: position,
+            },
+            attributes: [],
+            required: true,
           },
-          attributes: [],
-          required: true,
-        },
-      ]
+        ]
       : [
-        {
-          model: Position,
-          where: {
-            registrar: registrar,
+          {
+            model: Position,
+            where: {
+              registrar: registrar,
+            },
+            attributes: [],
+            required: true,
           },
-          attributes: [],
-          required: true,
-        },
-      ],
+        ],
     order: [["index", "DESC"]],
   });
 });
@@ -294,14 +302,15 @@ WITH
     JOIN proxy_registrars pr ON pr.wallet = proxies.wallet
     LEFT OUTER JOIN positions_with_proxy_assignments p ON p.voter = proxies.wallet
     WHERE pr.registrar = ${escapedRegistrar}
-          ${request.query.query
-      ? `AND (proxies.name ILIKE ${sequelize.escape(
-        `%${request.query.query}%`
-      )} OR proxies.wallet ILIKE ${sequelize.escape(
-        `%${request.query.query}%`
-      )})`
-      : ""
-    }
+          ${
+            request.query.query
+              ? `AND (proxies.name ILIKE ${sequelize.escape(
+                  `%${request.query.query}%`
+                )} OR proxies.wallet ILIKE ${sequelize.escape(
+                  `%${request.query.query}%`
+                )})`
+              : ""
+          }
     GROUP BY
       name,
       image,
@@ -477,11 +486,53 @@ server.get<{
 
   return (
     await sequelize.query(`
-      WITH exploded_choice_vote_markers AS (
-        SELECT voter, registrar, proposal, sum(weight) as weight, unnest(choices) as choice
-        FROM vote_markers
-        WHERE proposal = ${proposal}
-        GROUP BY voter, registrar, proposal, choice
+      -- Attribute proxy-cast weight (proxy_index > 0) to the
+      -- position owner, falling back to the casting voter when no owner can
+      -- be resolved. The index-0 assignment's voter is Pubkey::default() by
+      -- design (it seeds the PDA), so the owner is taken from rent_refund:
+      -- the wallet that paid for the first assignment, which is the owner
+      -- unless the position NFT changed hands afterwards. Expiration is
+      -- deliberately ignored — expiry ends the proxy's power, not the
+      -- ownership fact.
+      WITH markers_with_owner AS (
+        SELECT
+          COALESCE(
+            NULLIF(owner_pa.rent_refund, '11111111111111111111111111111111'),
+            vm.voter
+          ) as voter,
+          vm.voter as casting_voter,
+          vm.registrar,
+          vm.proposal,
+          vm.weight,
+          unnest(vm.choices) as choice
+        FROM vote_markers vm
+        -- One index-0 row may exist per proxy config; prefer the freshest so
+        -- attribution stays deterministic. LATERAL makes this an index probe
+        -- per marker rather than materializing the index-0 rows of the whole
+        -- table on every request. Direct votes (proxy_index = 0) already
+        -- carry the owner in vm.voter and are never re-attributed.
+        LEFT OUTER JOIN LATERAL (
+          SELECT rent_refund
+          FROM proxy_assignments
+          WHERE index = 0 AND asset = vm.mint
+          ORDER BY expiration_time DESC, address
+          LIMIT 1
+        ) owner_pa ON vm.proxy_index > 0
+        WHERE vm.proposal = ${proposal}
+      ),
+      exploded_choice_vote_markers AS (
+        SELECT
+          m.voter,
+          m.registrar,
+          m.proposal,
+          sum(m.weight) as weight,
+          m.choice,
+          jsonb_agg(DISTINCT jsonb_build_object('wallet', m.casting_voter, 'name', casting.name))
+            FILTER (WHERE m.casting_voter <> m.voter) as casting_proxies
+        FROM markers_with_owner m
+        LEFT OUTER JOIN proxies casting
+          ON casting.wallet = m.casting_voter AND m.casting_voter <> m.voter
+        GROUP BY m.voter, m.registrar, m.proposal, m.choice
       )
       SELECT
         vm.voter,
@@ -490,7 +541,8 @@ server.get<{
         vm.weight,
         vm.choice,
         p.choices[vm.choice + 1]->>'name' as "choiceName",
-        proxies.name as "proxyName"
+        proxies.name as "proxyName",
+        COALESCE(vm.casting_proxies, '[]'::jsonb) as "castingProxies"
       FROM exploded_choice_vote_markers vm
       JOIN proposals p ON p.address = vm.proposal
       LEFT OUTER JOIN proxies ON proxies.wallet = vm.voter
@@ -529,17 +581,17 @@ server.post<{
   const proposalConfig = await proposalProgram.account.proposalConfigV0.fetch(
     proposalAccount.proposalConfig
   );
-  const resolutionSettingsAccount = await stateControllerProgram.account.resolutionSettingsV0.fetch(proposalConfig.stateController);
-  const endTs =
-    (proposalAccount.state.resolved
-      ?
-      new BN(proposalAccount.state.resolved.endTs)
-      :
-      new BN(proposalAccount.state.voting!.startTs).add(
+  const resolutionSettingsAccount =
+    await stateControllerProgram.account.resolutionSettingsV0.fetch(
+      proposalConfig.stateController
+    );
+  const endTs = proposalAccount.state.resolved
+    ? new BN(proposalAccount.state.resolved.endTs)
+    : new BN(proposalAccount.state.voting!.startTs).add(
         resolutionSettingsAccount.settings.nodes.find(
           (node) => typeof node.offsetFromStartTs !== "undefined"
         )?.offsetFromStartTs?.offset ?? new BN(0)
-      ))
+      );
   try {
     const needsVoteRaw = (
       await sequelize.query(`
@@ -613,14 +665,18 @@ server.post<{
         SystemProgram.transfer({
           fromPubkey: pdaWallet,
           toPubkey: task,
-          lamports: 2 * taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
+          lamports:
+            2 * taskQueueAcc.minCrankReward.toNumber() * needsVote.length,
         }),
         // Count as many votes as possible
         ...(
           await Promise.all(
             needsVote.map(async (vote) => {
               const instructions: TransactionInstruction[] = [];
-              const { instruction: countIx, pubkeys: { marker, position } } = await voterStakeRegistryProgram.methods
+              const {
+                instruction: countIx,
+                pubkeys: { marker, position },
+              } = await voterStakeRegistryProgram.methods
                 .countProxyVoteV0()
                 .accountsPartial({
                   payer: pdaWallet,
@@ -636,15 +692,16 @@ server.post<{
                 })
                 .prepare();
               instructions.push(countIx);
-              const closeIx = await hplCronsProgram.methods.requeueRelinquishExpiredVoteMarkerV0({
-                triggerTs: endTs
-              })
+              const closeIx = await hplCronsProgram.methods
+                .requeueRelinquishExpiredVoteMarkerV0({
+                  triggerTs: endTs,
+                })
                 .accounts({
                   marker: marker!,
-                  position: position!
+                  position: position!,
                 })
                 .instruction();
-              instructions.push(closeIx)
+              instructions.push(closeIx);
               return instructions;
             })
           )
@@ -730,11 +787,7 @@ const start = async () => {
     setRelations();
 
     // Read SQL file
-    const sqlFilePath = path.join(
-      __dirname,
-      process.env.NODE_ENV === "production" ? "../.." : "..",
-      "positions_with_vetokens.sql"
-    );
+    const sqlFilePath = path.join(PACKAGE_ROOT, "positions_with_vetokens.sql");
     const sqlQuery = fs.readFileSync(sqlFilePath, "utf8");
 
     // Execute SQL query
@@ -750,7 +803,12 @@ const start = async () => {
   }
 };
 
-start();
+// Guard the listen/bootstrap side effects so the app can be imported under
+// test (NODE_ENV=test) and driven via fastify injection without binding a
+// port, cloning the proxies repo, or reaching Solana.
+if (process.env.NODE_ENV !== "test") {
+  start();
+}
 
 function arrayEquals(choices: number[], choices1: number[]) {
   if (choices.length !== choices1.length) return false;

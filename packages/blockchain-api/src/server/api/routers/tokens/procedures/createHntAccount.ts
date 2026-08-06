@@ -71,7 +71,7 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
       },
     });
 
-    const txFee = getTransactionFee(tx);
+    const txFee = await getTransactionFee(connection, tx);
     const estimatedSolFeeLamports = txFee + rentCost;
 
     return {

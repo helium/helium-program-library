@@ -27,7 +27,7 @@ import type { IdlTypes, Program } from "@coral-xyz/anchor";
 import type { z } from "zod";
 import { UpdateHotspotInfoInputSchema } from "@helium/blockchain-api/schemas/hotspots";
 import {
-  getTransactionFee,
+  getTotalTransactionFees,
   calculateRequiredBalance,
   BASE_TX_FEE_LAMPORTS,
 } from "@/lib/utils/balance-validation";
@@ -263,14 +263,14 @@ export const updateHotspotInfo =
       });
 
       // Calculate fees from external transactions (format: v0 ensures VersionedTransaction)
-      const totalFee = rawTxBytes.reduce((sum, bytes) => {
-        const vtx = VersionedTransaction.deserialize(bytes);
-        return sum + getTransactionFee(vtx);
-      }, 0);
+      const vtxs = rawTxBytes.map((bytes) =>
+        VersionedTransaction.deserialize(bytes),
+      );
+      const totalFee = await getTotalTransactionFees(connection, vtxs);
 
       // Check wallet has sufficient balance using actual transaction fees
       const walletBalance = await connection.getBalance(
-        new PublicKey(walletAddress)
+        new PublicKey(walletAddress),
       );
       const required = calculateRequiredBalance(totalFee, 0);
       if (walletBalance < required) {

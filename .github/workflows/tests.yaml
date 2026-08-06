@@ -44,7 +44,7 @@ jobs:
         id: changed
         run: |
           BASE=${{ github.event.pull_request.base.sha }}
-          DIRS=$(git diff --name-only "$BASE"...HEAD | grep -E '^programs/[^/]+/src/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+          DIRS=$(git diff --name-only "$BASE"...HEAD | grep -E '^programs/[^/]+/(src/|Cargo\.toml)' | cut -d/ -f2 | sort -u | tr '\n' ' ')
           echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
           if [ -z "$DIRS" ]; then
             echo "No program source changes; skipping."
@@ -210,6 +210,18 @@ jobs:
       - name: Run bootstrap script
         run: ./scripts/bootstrap.sh
 
+  test-helium-vote-service:
+    needs: build
+    name: Test Helium Vote Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+      - uses: ./.github/actions/setup-ts/
+      - run: pnpm --filter @helium/helium-vote-service test
+
   test-docker-builds:
     needs: build
     name: Test Docker Builds
@@ -313,6 +325,7 @@ jobs:
           - tests/welcome-pack.ts
           - tests/dc-auto-topoff.ts
           - tests/tuktuk-dca.ts
+          - tests/priority-fees.ts
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
@@ -332,3 +345,11 @@ jobs:
           TESTING: true
           TEST: ${{ matrix.test }}
           ANCHOR_PROVIDER_URL: http://localhost:8899
+      - name: Check CU table covers test traffic
+        # priority-fees.ts (mocked) and sus.ts (remote RPC) never commit
+        # localnet traffic, so the CU sampler legitimately sees 0 — don't gate them.
+        if: matrix.test != 'tests/priority-fees.ts' && matrix.test != 'tests/sus.ts'
+        run: pnpm run check-cu-table
+        working-directory: packages/spl-utils
+        env:
+          RPC_URL: http://localhost:8899

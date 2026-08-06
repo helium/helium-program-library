@@ -79,10 +79,7 @@ export async function run(args: any = process.argv) {
           toPubkey: cronJob,
           lamports: BigInt(argv.fundingAmount),
         }),
-      ],
-      {
-        computeUnitLimit: 500000,
-      }
+      ]
     );
   }
 }

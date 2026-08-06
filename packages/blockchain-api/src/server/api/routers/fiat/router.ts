@@ -636,10 +636,14 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
         ],
         parallel: false,
         tag,
-        actionMetadata: { type: "bank_send", usdAmount: (parseFloat(quoteResponse.outAmount) / 1e6).toFixed(2), bankAccountId: id },
+        actionMetadata: {
+          type: "bank_send",
+          usdAmount: (parseFloat(quoteResponse.outAmount) / 1e6).toFixed(2),
+          bankAccountId: id,
+        },
       },
       estimatedSolFee: await toTokenAmountOutput(
-        new BN(getTransactionFee(tx) + rentCost),
+        new BN((await getTransactionFee(connection, tx)) + rentCost),
         NATIVE_MINT.toBase58(),
       ),
     };

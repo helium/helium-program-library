@@ -1,5 +1,11 @@
 import { oc } from "@orpc/contract";
-import { BAD_REQUEST, NOT_FOUND, UNAUTHORIZED } from "../errors/common";
+import {
+  BAD_REQUEST,
+  NOT_FOUND,
+  RATE_LIMITED,
+  UNAUTHORIZED,
+} from "../errors/common";
+import { ALL_POSITIONS_SKIPPED } from "../errors/governance";
 import { INSUFFICIENT_FUNDS } from "../errors/solana";
 import {
   AssignProxiesInputSchema,
@@ -18,6 +24,8 @@ import {
   ExtendPositionResponseSchema,
   FlipLockupKindInputSchema,
   FlipLockupKindResponseSchema,
+  GetPositionsInputSchema,
+  GetPositionsResponseSchema,
   RelinquishPositionVotesInputSchema,
   RelinquishPositionVotesResponseSchema,
   RelinquishVoteInputSchema,
@@ -42,6 +50,18 @@ export const governanceContract = oc
   .tag("Governance")
   .prefix("/governance")
   .router({
+    getPositions: oc
+      .route({
+        method: "GET",
+        path: "/positions/wallet/{wallet}",
+        summary: "List wallet governance positions",
+        description:
+          "List all voter-stake-registry positions owned by a wallet, including deposited amount, governing mint, and lockup info.",
+      })
+      .input(GetPositionsInputSchema)
+      .errors({ BAD_REQUEST, RATE_LIMITED })
+      .output(GetPositionsResponseSchema),
+
     createPosition: oc
       .route({
         method: "POST",
@@ -120,7 +140,7 @@ export const governanceContract = oc
         path: "/positions/{positionMint}/transfer",
         summary: "Transfer between positions",
         description:
-          "Transfer tokens from one position to another. Both positions must have no active votes.",
+          "Transfer tokens from one position to another. Both positions must have no active votes. The target position may be owned by a different wallet, enabling veHNT transfer between wallets.",
       })
       .input(TransferPositionInputSchema)
       .errors({ BAD_REQUEST, NOT_FOUND, INSUFFICIENT_FUNDS })
@@ -132,7 +152,7 @@ export const governanceContract = oc
         path: "/positions/{positionMint}/transfer-ownership",
         summary: "Transfer position ownership",
         description:
-          "Transfer ownership of a position NFT to another wallet. Both the current owner and new owner must sign the transaction.",
+          "Transfer ownership of a position NFT to another wallet. Only the current owner must sign the transaction; the recipient does not.",
       })
       .input(TransferPositionOwnershipInputSchema)
       .errors({ BAD_REQUEST, NOT_FOUND, INSUFFICIENT_FUNDS })
@@ -195,7 +215,12 @@ export const governanceContract = oc
           "Cast votes on a proposal using one or more positions. Auto-detects owned vs proxied positions — proxied positions use proxy vote path. Automatically queues cleanup tasks to relinquish vote markers after the proposal ends. If many positions are provided, may require multiple API calls - check hasMore in the response.",
       })
       .input(VoteInputSchema)
-      .errors({ BAD_REQUEST, NOT_FOUND, INSUFFICIENT_FUNDS })
+      .errors({
+        BAD_REQUEST,
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+        ALL_POSITIONS_SKIPPED,
+      })
       .output(VoteResponseSchema),
 
     relinquishVote: oc
