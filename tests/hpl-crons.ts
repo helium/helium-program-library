@@ -224,4 +224,60 @@ describe("hpl-crons", () => {
       epochBefore.add(new anchor.BN(1)).toString()
     );
   });
+
+  // A pyth verification chain advances one step at a time, so the task it hands back carries a
+  // fixed spawn budget rather than a caller-chosen one.
+  describe("return_pyth_task_v0", () => {
+    const taskId = 20;
+    let task: PublicKey;
+
+    before(async () => {
+      const [customWallet, bump] = customSignerKey(taskQueue, [
+        Buffer.from("pyth", "utf-8"),
+      ]);
+      const bumpBuffer = Buffer.alloc(1);
+      bumpBuffer.writeUint8(bump);
+      const { transaction, remainingAccounts } = compileTransaction(
+        [
+          SystemProgram.transfer({
+            fromPubkey: customWallet,
+            toPubkey: me,
+            lamports: 1,
+          }),
+        ],
+        [[Buffer.from("pyth", "utf-8"), bumpBuffer]]
+      );
+
+      task = taskKey(taskQueue, taskId)[0];
+      await tuktukProgram.methods
+        .queueTaskV0({
+          id: taskId,
+          trigger: { now: {} },
+          crankReward: null,
+          freeTasks: 1,
+          transaction: { compiledV0: [transaction] },
+          description: "pyth bounds",
+        })
+        .accountsPartial({ task, taskQueue })
+        .remainingAccounts(remainingAccounts)
+        .rpc({ skipPreflight: true });
+    });
+
+    async function returnPythTask(freeTasks: number) {
+      let code: string | undefined;
+      try {
+        await program.methods
+          .returnPythTaskV0({ index: 0, freeTasks })
+          .accountsPartial({ task, taskQueue, payer: me })
+          .rpc();
+      } catch (e: any) {
+        code = e?.error?.errorCode?.code ?? JSON.stringify(e);
+      }
+      return code;
+    }
+
+    it("rejects a free task count above the bound", async () => {
+      expect(await returnPythTask(2)).to.eq("TooManyFreeTasks");
+    });
+  });
 });

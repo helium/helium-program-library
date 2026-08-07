@@ -179,7 +179,7 @@ pub fn handler(ctx: Context<CheckRepayV0>, _args: CheckRepayArgsV0) -> Result<Ru
           signer: dca.dca_signer,
           url: format!("{}/{}", dca_url, dca_key),
         },
-        crank_reward: Some(dca.crank_reward),
+        crank_reward: None,
         free_tasks: 1,
         description: format!("dca {}", &dca_key.to_string()[..(32 - 4)]),
       }],
