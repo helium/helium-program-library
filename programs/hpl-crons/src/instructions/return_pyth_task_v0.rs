@@ -13,7 +13,9 @@ use crate::error::ErrorCode;
 #[derive(Accounts)]
 pub struct ReturnPythTaskV0<'info> {
   pub task_queue: Account<'info, TaskQueueV0>,
-  #[account(has_one = task_queue)]
+  // The handler funds the returned task by transferring into this account, so it must be
+  // writable even for direct (non-run_task) invocations built from the IDL.
+  #[account(mut, has_one = task_queue)]
   pub task: Account<'info, TaskV0>,
   #[account(mut)]
   pub payer: Signer<'info>,

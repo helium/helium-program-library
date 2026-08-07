@@ -232,21 +232,9 @@ describe("hpl-crons", () => {
     let task: PublicKey;
 
     before(async () => {
-      const [customWallet, bump] = customSignerKey(taskQueue, [
+      const [customWallet] = customSignerKey(taskQueue, [
         Buffer.from("pyth", "utf-8"),
       ]);
-      const bumpBuffer = Buffer.alloc(1);
-      bumpBuffer.writeUint8(bump);
-      const { transaction, remainingAccounts } = compileTransaction(
-        [
-          SystemProgram.transfer({
-            fromPubkey: customWallet,
-            toPubkey: me,
-            lamports: 1,
-          }),
-        ],
-        [[Buffer.from("pyth", "utf-8"), bumpBuffer]]
-      );
 
       task = taskKey(taskQueue, taskId)[0];
       await tuktukProgram.methods
@@ -255,11 +243,12 @@ describe("hpl-crons", () => {
           trigger: { now: {} },
           crankReward: null,
           freeTasks: 1,
-          transaction: { compiledV0: [transaction] },
+          transaction: {
+            remoteV0: { url: "https://example.com/pyth", signer: customWallet },
+          },
           description: "pyth bounds",
         })
         .accountsPartial({ task, taskQueue })
-        .remainingAccounts(remainingAccounts)
         .rpc({ skipPreflight: true });
     });
 
@@ -271,13 +260,21 @@ describe("hpl-crons", () => {
           .accountsPartial({ task, taskQueue, payer: me })
           .rpc();
       } catch (e: any) {
-        code = e?.error?.errorCode?.code ?? JSON.stringify(e);
+        code = e?.error?.errorCode?.code;
+        // Anything without an anchor error code is an infra failure, not a program verdict.
+        if (!code) throw e;
       }
       return code;
     }
 
     it("rejects a free task count above the bound", async () => {
       expect(await returnPythTask(2)).to.eq("TooManyFreeTasks");
+    });
+
+    // The pyth service always requeues with a single free task; guard the accept side of the
+    // bound so an off-by-one in MAX_FREE_TASKS can't slip past CI.
+    it("accepts a free task count at the bound", async () => {
+      expect(await returnPythTask(1)).to.be.undefined;
     });
   });
 });
