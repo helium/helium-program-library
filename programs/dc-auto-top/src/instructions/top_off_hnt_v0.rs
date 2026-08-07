@@ -331,7 +331,6 @@ pub fn handler<'info>(
           // This isn't actually used, since we're running in tuktuk it doesn't need to queue.
           dca_signer,
           dca_url,
-          crank_reward: 20000,
         },
       )?;
 

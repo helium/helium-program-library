@@ -14,4 +14,6 @@ pub enum ErrorCode {
   InvalidTaskForPyth,
   #[msg("Too many accounts to index a compiled transaction")]
   TooManyAccounts,
+  #[msg("Free tasks exceeds the maximum for this instruction")]
+  TooManyFreeTasks,
 }
