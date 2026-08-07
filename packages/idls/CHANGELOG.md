@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.11.19
+
+### Patch Changes
+
+- [#1244](https://github.com/helium/helium-program-library/pull/1244) [`a5ed28a`](https://github.com/helium/helium-program-library/commit/a5ed28a1bc040b31f1173aad00235acc329df3bf) Thanks [@madninja](https://github.com/madninja)! - Queue-returned tasks carry the task queue's minimum crank reward. `hpl-crons`
+  gains a `TooManyFreeTasks` error, and `tuktuk-dca` drops `crank_reward` from
+  `InitializeDcaArgsV0` and from the `DcaV0` account.
+
 ## 0.11.18
 
 ### Patch Changes

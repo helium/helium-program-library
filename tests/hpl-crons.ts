@@ -224,4 +224,57 @@ describe("hpl-crons", () => {
       epochBefore.add(new anchor.BN(1)).toString()
     );
   });
+
+  // A pyth verification chain advances one step at a time, so the task it hands back carries a
+  // fixed spawn budget rather than a caller-chosen one.
+  describe("return_pyth_task_v0", () => {
+    const taskId = 20;
+    let task: PublicKey;
+
+    before(async () => {
+      const [customWallet] = customSignerKey(taskQueue, [
+        Buffer.from("pyth", "utf-8"),
+      ]);
+
+      task = taskKey(taskQueue, taskId)[0];
+      await tuktukProgram.methods
+        .queueTaskV0({
+          id: taskId,
+          trigger: { now: {} },
+          crankReward: null,
+          freeTasks: 1,
+          transaction: {
+            remoteV0: { url: "https://example.com/pyth", signer: customWallet },
+          },
+          description: "pyth bounds",
+        })
+        .accountsPartial({ task, taskQueue })
+        .rpc({ skipPreflight: true });
+    });
+
+    async function returnPythTask(freeTasks: number) {
+      let code: string | undefined;
+      try {
+        await program.methods
+          .returnPythTaskV0({ index: 0, freeTasks })
+          .accountsPartial({ task, taskQueue, payer: me })
+          .rpc();
+      } catch (e: any) {
+        code = e?.error?.errorCode?.code;
+        // Anything without an anchor error code is an infra failure, not a program verdict.
+        if (!code) throw e;
+      }
+      return code;
+    }
+
+    it("rejects a free task count above the bound", async () => {
+      expect(await returnPythTask(2)).to.eq("TooManyFreeTasks");
+    });
+
+    // The pyth service always requeues with a single free task; guard the accept side of the
+    // bound so an off-by-one in MAX_FREE_TASKS can't slip past CI.
+    it("accepts a free task count at the bound", async () => {
+      expect(await returnPythTask(1)).to.be.undefined;
+    });
+  });
 });

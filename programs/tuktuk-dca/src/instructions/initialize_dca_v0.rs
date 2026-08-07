@@ -25,7 +25,6 @@ pub struct InitializeDcaArgsV0 {
   pub task_id: u16,
   pub dca_signer: Pubkey,
   pub dca_url: String,
-  pub crank_reward: u64,
 }
 
 // Shared accounts for both nested and non-nested versions
@@ -154,7 +153,6 @@ pub fn initialize_dca_impl(
     initial_num_orders: args.num_orders,
     num_orders: args.num_orders,
     swap_amount_per_order: args.swap_amount_per_order,
-    crank_reward: args.crank_reward,
     interval_seconds: args.interval_seconds,
     next_task: task_key,
     slippage_bps_from_oracle: args.slippage_bps_from_oracle,
@@ -173,7 +171,7 @@ pub fn initialize_dca_impl(
       signer: args.dca_signer,
       url: format!("{}/{}", args.dca_url, core.dca.key()),
     },
-    crank_reward: Some(args.crank_reward),
+    crank_reward: None,
     free_tasks: 1,
     description: format!("dca {}", &dca_key.to_string()[..(32 - 4)]),
   })

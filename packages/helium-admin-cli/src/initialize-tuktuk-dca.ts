@@ -76,11 +76,6 @@ export async function run(args: any = process.argv) {
       describe: "URL of the DCA service",
       required: true,
     },
-    crankReward: {
-      type: "number",
-      describe: "Crank reward in lamports",
-      default: 20000,
-    },
     multisig: {
       type: 'string',
       describe:
@@ -162,7 +157,6 @@ export async function run(args: any = process.argv) {
       taskId: nextTask,
       dcaSigner,
       dcaUrl: argv.dcaUrl,
-      crankReward: new anchor.BN(argv.crankReward),
     })
     .accountsPartial({
       core: {

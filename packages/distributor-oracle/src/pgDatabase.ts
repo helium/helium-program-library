@@ -219,11 +219,15 @@ export class PgDatabase implements Database {
             where: {
               dao: DAO.toBase58(),
             },
+            // No columns from the join may be selected, or the aggregate
+            // needs a GROUP BY
+            attributes: [],
           },
         ],
         attributes: [
           [sequelize.fn("SUM", sequelize.col("rewards")), "rewards"],
         ],
+        raw: true,
       })
     )[0].rewards;
     return totalRewards;

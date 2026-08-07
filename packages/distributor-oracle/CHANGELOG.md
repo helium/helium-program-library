@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- [`a2a5d22`](https://github.com/helium/helium-program-library/commit/a2a5d221b4bf736a7c532745f3622191c50794e1) Thanks [@bryzettler](https://github.com/bryzettler)! - Fix `/metrics` 500ing with "column reward_index.address must appear in the GROUP BY clause": the dao filter join added to `getTotalRewards` made Sequelize select the primary key and joined columns alongside the `SUM` aggregate. Exclude the join's attributes and query raw so only the aggregate is selected.
+
 ## 0.11.17
 
 ### Patch Changes

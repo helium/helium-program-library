@@ -713,7 +713,7 @@ dependencies = [
 
 [[package]]
 name = "dc-auto-top"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "hpl-crons"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3276,7 +3276,7 @@ dependencies = [
 
 [[package]]
 name = "tuktuk-dca"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
