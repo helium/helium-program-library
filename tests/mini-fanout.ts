@@ -431,13 +431,17 @@ describe("mini-fanout", () => {
               })]
           );
         }
-      } catch (e) {
-        if (tries < 2) {
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          await runAllTasks(tries + 1)
-        } else {
+      } catch (e: any) {
+        // Retry only what a retry can fix: a task whose trigger had not passed when it was
+        // tried. Retrying every error made a real failure read as intermittent and reported
+        // it three attempts late, against the wrong one of the three.
+        const notReady = String(e.message ?? e).includes("TaskNotReady")
+        if (!notReady || tries >= 2) {
           throw e
         }
+        console.log(`task not ready, retrying (${tries + 1}/2)`)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        await runAllTasks(tries + 1)
       }
     }
 
@@ -484,6 +488,16 @@ describe("mini-fanout", () => {
       expect(
         await tuktukProgram.account.taskV0.fetch(nextTask)
       ).to.not.be.null
+
+      // distribute_v0 re-queues the pre task every cycle, so this is the read-through at that
+      // call site: the stored pre task reaches the queue, and it carries no free tasks, which
+      // is what keeps a pre task from spawning children of its own.
+      const nextPreTaskAcc = await tuktukProgram.account.taskV0.fetch(
+        miniFanoutAcc.nextPreTask
+      )
+      expect(nextPreTaskAcc.freeTasks).to.equal(0)
+      expect(nextPreTaskAcc.transaction.compiledV0![0].instructions.length).to.equal(1)
+      expect(nextPreTaskAcc.transaction.compiledV0![0].signerSeeds).to.deep.equal([])
     })
 
     it("should distribute tokens to 6 wallets in one tx", async () => {
@@ -524,7 +538,7 @@ describe("mini-fanout", () => {
           rentRefund: me,
           mint,
         })
-        .rpcAndKeys({ skipPreflight: true })
+        .rpcAndKeys()
 
       console.log("transferring")
       await sendInstructions(provider, [SystemProgram.transfer({
@@ -578,7 +592,7 @@ describe("mini-fanout", () => {
           miniFanout: fanout,
           taskRentRefund: me,
         })
-        .rpc({ skipPreflight: true })
+        .rpc()
     })
   })
 });
