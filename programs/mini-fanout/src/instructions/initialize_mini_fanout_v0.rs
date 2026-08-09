@@ -132,6 +132,9 @@ pub fn handler(
     msg!("Invalid schedule {}", e);
     crate::errors::ErrorCode::InvalidSchedule
   })?;
+  if let Some(pre_task) = &args.pre_task {
+    validate_pre_task(pre_task)?;
+  }
 
   let mini_fanout = &mut ctx.accounts.mini_fanout;
   mini_fanout.set_inner(MiniFanoutV0 {

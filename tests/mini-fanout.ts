@@ -6,12 +6,22 @@ import { compileTransaction, init as initTuktuk, nextAvailableTaskIds, runTask, 
 import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { createMemoInstruction } from "@solana/spl-memo";
 import { ComputeBudgetProgram, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { expect } from "chai";
+import chai, { expect } from "chai";
+import chaiAsPromised from "chai-as-promised";
 import { execSync } from "child_process";
 import { init, PROGRAM_ID, queueAuthorityKey } from "../packages/mini-fanout-sdk/src";
 import { MiniFanout } from "../target/types/mini_fanout";
 
+chai.use(chaiAsPromised);
+
 export const ANCHOR_PATH = "anchor";
+
+// shared_utils::ORACLE_SIGNER, which the tests build against because `anchor build` here runs
+// without the `devnet` feature. Changing the constant makes these tests fail rather than pass
+// against a stale value.
+const ORACLE_SIGNER = new PublicKey(
+  "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
+);
 
 export async function ensureIdls() {
   let programs = [
@@ -56,13 +66,16 @@ describe("mini-fanout", () => {
   const queueAuthority = queueAuthorityKey()[0]
   const FANOUT_AMOUNT = 1000000000
 
-  const memoPreTask = compileTransaction([
-    createMemoInstruction(
-      "HELLO!",
+  // compileTransaction hands the account list back separately so it can ride as remaining
+  // accounts on queue_task_v0, which merges them in. A pre task is stored on the fanout
+  // instead, so it has to carry its own accounts for program_id_index to resolve against.
+  const memoPreTask = (() => {
+    const { transaction, remainingAccounts } = compileTransaction(
+      [createMemoInstruction("HELLO!", [])],
       []
-    ),
-  ],
-    [])
+    )
+    return { ...transaction, accounts: remainingAccounts.map((a) => a.pubkey) }
+  })()
 
   let taskQueue: PublicKey;
   before(async () => {
@@ -147,7 +160,7 @@ describe("mini-fanout", () => {
       seed: Buffer.from(fanoutName, "utf-8"),
       shares,
       schedule: "0 0 * * * *",
-      preTask: { compiledV0: memoPreTask.transaction as any }
+      preTask: { compiledV0: [memoPreTask as any] }
     })
       .accounts({
         payer: me,
@@ -175,6 +188,77 @@ describe("mini-fanout", () => {
     }
   });
 
+  describe("pre task shapes", () => {
+    // Distinct per case so each lands on its own fanout PDA rather than colliding with a
+    // previous one and failing for the wrong reason.
+    let caseId = 0;
+    const initWith = (preTask: any) =>
+      program.methods.initializeMiniFanoutV0({
+        seed: Buffer.from(`${fanoutName}-shape-${caseId++}`, "utf-8"),
+        shares,
+        schedule: "0 0 * * * *",
+        preTask,
+      })
+        .accounts({
+          payer: me,
+          owner: me,
+          taskQueue,
+          rentRefund: me,
+          mint,
+        })
+        .rpcAndKeys()
+
+    const refused = /Error Code: InvalidPreTask\. Error Number: 6011\./
+
+    it("stores a remote pre task the oracle signs", async () => {
+      const { pubkeys: { miniFanout } } = await initWith({
+        remoteV0: {
+          url: "https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/1",
+          signer: ORACLE_SIGNER,
+        },
+      })
+
+      const acc = await program.account.miniFanoutV0.fetch(miniFanout)
+      expect(acc.preTask!.remoteV0!.signer.toBase58()).to.equal(ORACLE_SIGNER.toBase58())
+    })
+
+    it("refuses a remote pre task signed by anyone else", async () => {
+      await expect(initWith({
+        remoteV0: {
+          url: "https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/1",
+          signer: Keypair.generate().publicKey,
+        },
+      })).to.eventually.be.rejectedWith(refused)
+    })
+
+    it("stores a compiled pre task carrying no seeds", async () => {
+      const { pubkeys: { miniFanout } } = await initWith({
+        compiledV0: [memoPreTask as any],
+      })
+
+      // The instruction has to survive the round trip, or a refusal below could be passing
+      // because the transaction arrived empty rather than because it was refused.
+      const acc = await program.account.miniFanoutV0.fetch(miniFanout)
+      expect(acc.preTask!.compiledV0![0].instructions.length).to.equal(1)
+      expect(acc.preTask!.compiledV0![0].signerSeeds).to.deep.equal([])
+    })
+
+    it("refuses a compiled pre task carrying signer seeds", async () => {
+      await expect(initWith({
+        compiledV0: [{
+          ...(memoPreTask as any),
+          signerSeeds: [[Buffer.from("helium", "utf-8"), Buffer.from([253])]],
+        }],
+      })).to.eventually.be.rejectedWith(refused)
+    })
+
+    it("refuses a compiled pre task carrying an empty seed group", async () => {
+      await expect(initWith({
+        compiledV0: [{ ...(memoPreTask as any), signerSeeds: [[]] }],
+      })).to.eventually.be.rejectedWith(refused)
+    })
+  })
+
   describe("with a fanout", () => {
     let fanout: PublicKey;
     let cronJob: PublicKey;
@@ -194,7 +278,7 @@ describe("mini-fanout", () => {
         // Run in 2 seconds
         schedule: `${nextSeconds} ${nextMinutes} * * * *`,
         shares,
-        preTask: { compiledV0: memoPreTask.transaction as any }
+        preTask: { compiledV0: [memoPreTask as any] }
       })
         .accounts({
           payer: me,
@@ -417,7 +501,7 @@ describe("mini-fanout", () => {
         seed: Buffer.from(fanoutName + 'big', "utf-8"),
         schedule: `${nextSeconds} ${nextMinutes} * * * *`,
         shares,
-        preTask: { compiledV0: memoPreTask.transaction as any }
+        preTask: { compiledV0: [memoPreTask as any] }
       })
         .accounts({
           payer: me,

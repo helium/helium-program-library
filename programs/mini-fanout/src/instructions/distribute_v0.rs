@@ -261,7 +261,7 @@ pub fn handler<'info>(
     free_tasks: 2,
     description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
   }];
-  if let Some(pre_task) = mini_fanout.pre_task.clone() {
+  if let Some(pre_task) = mini_fanout.pre_task_to_queue()? {
     tasks.push(TaskReturnV0 {
       trigger: TriggerV0::Timestamp(next_time - 1),
       transaction: pre_task,
