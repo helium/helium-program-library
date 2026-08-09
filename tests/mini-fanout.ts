@@ -22,6 +22,12 @@ const ORACLE_SIGNER = new PublicKey(
   "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
 );
 
+// A schedule whose next occurrence is always a second away, however long the setup before it
+// took. A cron string built from `now + 2 seconds` is only correct if the transactions that
+// follow it land inside those two seconds; when they don't, the next occurrence is an hour
+// out and the run fails on balances rather than on the thing under test.
+const EVERY_SECOND = "* * * * * *";
+
 export async function ensureIdls() {
   let programs = [
     {
@@ -275,22 +281,13 @@ describe("mini-fanout", () => {
 
   describe("with a fanout", () => {
     let fanout: PublicKey;
-    let cronJob: PublicKey;
     beforeEach(async () => {
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
       const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
 
-      const now = new Date()
-      let nextSeconds = now.getSeconds() + 2
-      let nextMinutes = now.getMinutes()
-      if (nextSeconds > 59) {
-        nextSeconds = 0 + (nextSeconds - 59)
-        nextMinutes = now.getMinutes() + 1
-      }
       const { pubkeys: { miniFanout: fanoutK } } = await program.methods.initializeMiniFanoutV0({
         seed: Buffer.from(fanoutName, "utf-8"),
-        // Run in 2 seconds
-        schedule: `${nextSeconds} ${nextMinutes} * * * *`,
+        schedule: EVERY_SECOND,
         shares,
         preTask: { compiledV0: [memoPreTask as any] }
       })
@@ -445,61 +442,10 @@ describe("mini-fanout", () => {
       }
     }
 
-    it("should distribute tokens to wallets", async () => {
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      const wallet1TokenAccountBefore = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, wallet1.publicKey)
-      );
-      const wallet3TokenAccountBefore = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, wallet3.publicKey)
-      );
-      await runAllTasks()
-
-      // Verify the claims were processed
-      const fanoutTokenAccount = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, fanout, true)
-      );
-      const wallet1TokenAccount = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, wallet1.publicKey)
-      );
-      const wallet3TokenAccount = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, wallet3.publicKey)
-      );
-
-      const miniFanoutAcc = await program.account.miniFanoutV0.fetch(fanout);
-      expect(Number(fanoutTokenAccount.amount)).to.equal(450000000);
-      expect(Number(wallet1TokenAccount.amount) - Number(wallet1TokenAccountBefore.amount)).to.equal(450000000);
-      // There was no ATA for this wallet, so the total owed is the amount we couldn't transfer
-      expect(Number(miniFanoutAcc.shares[1].totalOwed.toString())).to.equal(450000000);
-      expect(Number(wallet3TokenAccount.amount) - Number(wallet3TokenAccountBefore.amount)).to.equal(100000000);
-
-      // Verify vouchers were updated
-      const nextTask = miniFanoutAcc.nextTask
-      expect(
-        await tuktukProgram.account.taskV0.fetch(nextTask)
-      ).to.not.be.null
-
-      // distribute_v0 re-queues the pre task every cycle, so this is the read-through at that
-      // call site: the stored pre task reaches the queue, and it carries no free tasks, which
-      // is what keeps a pre task from spawning children of its own.
-      const nextPreTaskAcc = await tuktukProgram.account.taskV0.fetch(
-        miniFanoutAcc.nextPreTask
-      )
-      expect(nextPreTaskAcc.freeTasks).to.equal(0)
-      expect(nextPreTaskAcc.transaction.compiledV0![0].instructions.length).to.equal(1)
-      expect(nextPreTaskAcc.transaction.compiledV0![0].signerSeeds).to.deep.equal([])
-    })
-
+    // The widest distribution the program allows, and so the one whose compute cost the CU
+    // table is sized against. It runs against a validator rather than under bankrun because
+    // the sampler that keeps that table honest reads localnet traffic. The narrower cases,
+    // and the ones that need state a program will not write, are in mini-fanout-bankrun.ts.
     it("should distribute tokens to 6 wallets in one tx", async () => {
       const wallets = Array.from({ length: 6 }, () => Keypair.generate())
       const shares = wallets.map(w => ({
@@ -516,18 +462,10 @@ describe("mini-fanout", () => {
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
       const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
 
-      // Set up a fanout with 10 shares
-      const now = new Date()
-      let nextSeconds = now.getSeconds() + 2
-      let nextMinutes = now.getMinutes()
-      if (nextSeconds > 59) {
-        nextSeconds = 0 + (nextSeconds - 59)
-        nextMinutes = now.getMinutes() + 1
-      }
       console.log("creating fanout")
       const { pubkeys: { miniFanout: fanoutK } } = await program.methods.initializeMiniFanoutV0({
         seed: Buffer.from(fanoutName + 'big', "utf-8"),
-        schedule: `${nextSeconds} ${nextMinutes} * * * *`,
+        schedule: EVERY_SECOND,
         shares,
         preTask: { compiledV0: [memoPreTask as any] }
       })

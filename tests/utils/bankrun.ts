@@ -1,5 +1,3 @@
-import { Program, Idl } from "@coral-xyz/anchor";
-import { BankrunProvider } from "anchor-bankrun";
 import { Clock, ProgramTestContext, start } from "solana-bankrun";
 import { PublicKey } from "@solana/web3.js";
 import { execFileSync } from "child_process";
@@ -14,7 +12,7 @@ import { join } from "path";
  * there is no preflight to skip.
  */
 
-export const TARGET_DEPLOY = join(__dirname, "..", "..", "target", "deploy");
+const TARGET_DEPLOY = join(__dirname, "..", "..", "target", "deploy");
 
 // An SBF program is an ELF, and a truncated download is the failure this guards: a
 // present-but-unusable file would otherwise be taken for a cached one.
@@ -111,17 +109,6 @@ export async function startBankrun(
   return start(programs, accounts);
 }
 
-export function providerFor(ctx: ProgramTestContext): BankrunProvider {
-  return new BankrunProvider(ctx);
-}
-
-export function programFor<T extends Idl>(
-  idl: T,
-  provider: BankrunProvider
-): Program<T> {
-  return new Program<T>(idl, provider);
-}
-
 /**
  * Move the clock to `unixTimestamp`. `Clock` exposes getters only, so assigning to the value
  * returned by `getClock()` changes nothing and `setClock` then writes the original back --
@@ -142,11 +129,6 @@ export async function warpTo(ctx: ProgramTestContext, unixTimestamp: bigint) {
   if (now !== unixTimestamp) {
     throw new Error(`clock did not move: asked for ${unixTimestamp}, got ${now}`);
   }
-}
-
-export async function warpBy(ctx: ProgramTestContext, seconds: bigint) {
-  const { unixTimestamp } = await ctx.banksClient.getClock();
-  await warpTo(ctx, unixTimestamp + seconds);
 }
 
 /** The account's raw bytes, or null. Fails loudly rather than returning empty on a miss. */
