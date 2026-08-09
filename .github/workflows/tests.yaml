@@ -322,6 +322,7 @@ jobs:
           - tests/fanout.ts
           - tests/sus.ts
           - tests/mini-fanout.ts
+          - tests/mini-fanout-bankrun.ts
           - tests/welcome-pack.ts
           - tests/dc-auto-topoff.ts
           - tests/tuktuk-dca.ts
