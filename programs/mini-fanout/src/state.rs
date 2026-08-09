@@ -32,7 +32,7 @@ pub struct MiniFanoutV0 {
 
 /// The two shapes a pre task may take: a remote transaction the Helium oracle signs, or a
 /// compiled transaction carrying no signer seeds.
-pub fn validate_pre_task(pre_task: &TransactionSourceV0) -> Result<()> {
+fn validate_pre_task(pre_task: &TransactionSourceV0) -> Result<()> {
   match pre_task {
     TransactionSourceV0::RemoteV0 { signer, .. } => {
       require_keys_eq!(*signer, ORACLE_SIGNER, ErrorCode::InvalidPreTask)
@@ -46,9 +46,8 @@ pub fn validate_pre_task(pre_task: &TransactionSourceV0) -> Result<()> {
 }
 
 impl MiniFanoutV0 {
-  /// The pre task to queue this cycle, checked against the rule every pre task must satisfy.
-  /// Queuing reads it through here rather than off the field, so a stored pre task is held to
-  /// the same rule as one being stored.
+  /// The pre task to queue this cycle. Every path that queues one reads it through here rather
+  /// than off the field, so the rule holds whenever the pre task was stored.
   pub fn pre_task_to_queue(&self) -> Result<Option<TransactionSourceV0>> {
     let Some(pre_task) = &self.pre_task else {
       return Ok(None);

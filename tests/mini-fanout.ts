@@ -17,8 +17,7 @@ chai.use(chaiAsPromised);
 export const ANCHOR_PATH = "anchor";
 
 // shared_utils::ORACLE_SIGNER, which the tests build against because `anchor build` here runs
-// without the `devnet` feature. Changing the constant makes these tests fail rather than pass
-// against a stale value.
+// without the `devnet` feature.
 const ORACLE_SIGNER = new PublicKey(
   "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
 );
@@ -189,12 +188,11 @@ describe("mini-fanout", () => {
   });
 
   describe("pre task shapes", () => {
-    // Distinct per case so each lands on its own fanout PDA rather than colliding with a
-    // previous one and failing for the wrong reason.
-    let caseId = 0;
+    const ORACLE_URL = "https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/1"
+
     const initWith = (preTask: any) =>
       program.methods.initializeMiniFanoutV0({
-        seed: Buffer.from(`${fanoutName}-shape-${caseId++}`, "utf-8"),
+        seed: Buffer.from(fanoutName, "utf-8"),
         shares,
         schedule: "0 0 * * * *",
         preTask,
@@ -208,54 +206,70 @@ describe("mini-fanout", () => {
         })
         .rpcAndKeys()
 
+    const scheduleFor = async (miniFanout: PublicKey) => {
+      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
+      const [preTaskId, taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
+      return program.methods.scheduleTaskV0({ taskId, preTaskId })
+        .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 })])
+        .accounts({
+          payer: me,
+          miniFanout,
+          task: taskKey(taskQueue, taskId)[0],
+          preTask: taskKey(taskQueue, preTaskId)[0],
+        })
+        .rpc()
+    }
+
     const refused = /Error Code: InvalidPreTask\. Error Number: 6011\./
 
-    it("stores a remote pre task the oracle signs", async () => {
+    it("queues a remote pre task the oracle signs", async () => {
       const { pubkeys: { miniFanout } } = await initWith({
-        remoteV0: {
-          url: "https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/1",
-          signer: ORACLE_SIGNER,
-        },
+        remoteV0: { url: ORACLE_URL, signer: ORACLE_SIGNER },
       })
 
       const acc = await program.account.miniFanoutV0.fetch(miniFanout)
       expect(acc.preTask!.remoteV0!.signer.toBase58()).to.equal(ORACLE_SIGNER.toBase58())
+      await scheduleFor(miniFanout)
     })
 
-    it("refuses a remote pre task signed by anyone else", async () => {
-      await expect(initWith({
-        remoteV0: {
-          url: "https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/1",
-          signer: Keypair.generate().publicKey,
-        },
-      })).to.eventually.be.rejectedWith(refused)
-    })
-
-    it("stores a compiled pre task carrying no seeds", async () => {
+    it("queues a compiled pre task carrying no seeds", async () => {
       const { pubkeys: { miniFanout } } = await initWith({
         compiledV0: [memoPreTask as any],
       })
 
-      // The instruction has to survive the round trip, or a refusal below could be passing
+      // The instruction has to survive the round trip, or the refusals below could be passing
       // because the transaction arrived empty rather than because it was refused.
       const acc = await program.account.miniFanoutV0.fetch(miniFanout)
       expect(acc.preTask!.compiledV0![0].instructions.length).to.equal(1)
       expect(acc.preTask!.compiledV0![0].signerSeeds).to.deep.equal([])
+      await scheduleFor(miniFanout)
     })
 
-    it("refuses a compiled pre task carrying signer seeds", async () => {
-      await expect(initWith({
+    it("refuses to queue a remote pre task signed by anyone else", async () => {
+      const { pubkeys: { miniFanout } } = await initWith({
+        remoteV0: { url: ORACLE_URL, signer: Keypair.generate().publicKey },
+      })
+
+      await expect(scheduleFor(miniFanout)).to.eventually.be.rejectedWith(refused)
+    })
+
+    it("refuses to queue a compiled pre task carrying signer seeds", async () => {
+      const { pubkeys: { miniFanout } } = await initWith({
         compiledV0: [{
           ...(memoPreTask as any),
           signerSeeds: [[Buffer.from("helium", "utf-8"), Buffer.from([253])]],
         }],
-      })).to.eventually.be.rejectedWith(refused)
+      })
+
+      await expect(scheduleFor(miniFanout)).to.eventually.be.rejectedWith(refused)
     })
 
-    it("refuses a compiled pre task carrying an empty seed group", async () => {
-      await expect(initWith({
+    it("refuses to queue a compiled pre task carrying an empty seed group", async () => {
+      const { pubkeys: { miniFanout } } = await initWith({
         compiledV0: [{ ...(memoPreTask as any), signerSeeds: [[]] }],
-      })).to.eventually.be.rejectedWith(refused)
+      })
+
+      await expect(scheduleFor(miniFanout)).to.eventually.be.rejectedWith(refused)
     })
   })
 
