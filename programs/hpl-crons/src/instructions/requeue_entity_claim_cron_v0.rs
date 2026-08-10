@@ -79,21 +79,26 @@ pub struct RequeueEntityClaimCronV0<'info> {
   pub cron_program: Program<'info, Cron>,
 }
 
+/// The address of one of a cron job's transaction records. The records belong to the cron
+/// program, so they are derived under it -- the same address `add_entity_to_cron_v0` reaches
+/// with `seeds::program = cron_program`.
+fn cron_job_transaction_key(cron_job: &Pubkey, index: u32) -> Pubkey {
+  Pubkey::find_program_address(
+    &[
+      b"cron_job_transaction",
+      cron_job.as_ref(),
+      &index.to_le_bytes(),
+    ],
+    &tuktuk_program::cron::ID,
+  )
+  .0
+}
+
 pub fn handler(ctx: Context<RequeueEntityClaimCronV0>) -> Result<()> {
   let remaining_accounts = (ctx.accounts.cron_job.current_transaction_id
     ..ctx.accounts.cron_job.current_transaction_id
       + ctx.accounts.cron_job.num_tasks_per_queue_call as u32)
-    .map(|i| {
-      Pubkey::find_program_address(
-        &[
-          b"cron_job_transaction",
-          ctx.accounts.cron_job.key().as_ref(),
-          &i.to_le_bytes(),
-        ],
-        &crate::ID,
-      )
-      .0
-    })
+    .map(|i| cron_job_transaction_key(&ctx.accounts.cron_job.key(), i))
     .collect::<Vec<Pubkey>>();
   let (queue_tx, _) = compile_transaction(
     vec![Instruction {
@@ -152,4 +157,35 @@ pub fn handler(ctx: Context<RequeueEntityClaimCronV0>) -> Result<()> {
   )?;
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn a_transaction_record_is_derived_under_the_cron_program() {
+    let cron_job = Pubkey::new_unique();
+
+    for index in [0u32, 1, 7, 999] {
+      let seeds = [
+        b"cron_job_transaction".as_ref(),
+        cron_job.as_ref(),
+        &index.to_le_bytes(),
+      ];
+      let key = cron_job_transaction_key(&cron_job, index);
+
+      assert_eq!(
+        key,
+        Pubkey::find_program_address(&seeds, &tuktuk_program::cron::ID).0,
+        "index {index}"
+      );
+      // Pinned against this program's id, the other one these seeds could be derived under.
+      assert_ne!(
+        key,
+        Pubkey::find_program_address(&seeds, &crate::ID).0,
+        "index {index}"
+      );
+    }
+  }
 }
