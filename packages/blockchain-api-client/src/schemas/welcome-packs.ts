@@ -41,7 +41,9 @@ export const WelcomePackClaimInputSchema = z.object({
 export const WelcomePackInviteInputSchema = z.object({
   packAddress: z.string().min(32),
   walletAddress: WalletAddressSchema,
-  expirationDays: z.number().int().positive().max(365).default(7),
+  // An invite is approved by a signature over the pack and this expiry, and that signature is
+  // good for whatever window it names. An invite is acted on in hours, so the window is days.
+  expirationDays: z.number().int().positive().max(14).default(3),
 });
 
 export const WelcomePackSchema = z.object({
