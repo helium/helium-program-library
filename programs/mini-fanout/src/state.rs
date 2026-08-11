@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
+use shared_utils::ORACLE_SIGNER;
 use tuktuk_program::TransactionSourceV0;
+
+use crate::errors::ErrorCode;
 
 // ["fanout", hash(name)]
 #[account]
@@ -25,6 +28,36 @@ pub struct MiniFanoutV0 {
   pub seed: Vec<u8>,
   pub next_pre_task: Pubkey,
   pub pre_task: Option<TransactionSourceV0>,
+}
+
+/// The two shapes a pre task may take: a remote transaction the Helium oracle signs, or a
+/// compiled transaction carrying no signer seeds. Storing one holds it to this rule so the
+/// mistake is refused where it is made; queuing holds it again, which is what covers a pre
+/// task already on an account.
+pub(crate) fn validate_pre_task(pre_task: &TransactionSourceV0) -> Result<()> {
+  match pre_task {
+    TransactionSourceV0::RemoteV0 { signer, .. } => {
+      require_keys_eq!(*signer, ORACLE_SIGNER, ErrorCode::InvalidPreTask)
+    }
+    TransactionSourceV0::CompiledV0(compiled) => {
+      require!(compiled.signer_seeds.is_empty(), ErrorCode::InvalidPreTask)
+    }
+  }
+
+  Ok(())
+}
+
+impl MiniFanoutV0 {
+  /// The pre task to queue this cycle. Every path that queues one reads it through here rather
+  /// than off the field, so the rule holds whenever the pre task was stored.
+  pub fn pre_task_to_queue(&self) -> Result<Option<TransactionSourceV0>> {
+    let Some(pre_task) = &self.pre_task else {
+      return Ok(None);
+    };
+    validate_pre_task(pre_task)?;
+
+    Ok(Some(pre_task.clone()))
+  }
 }
 
 #[account]
@@ -78,4 +111,66 @@ macro_rules! queue_authority_seeds {
   ($fanout:expr) => {
     &[b"queue_authority", &[$fanout.queue_authority_bump]]
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use tuktuk_program::CompiledTransactionV0;
+
+  use super::*;
+
+  fn remote(signer: Pubkey) -> TransactionSourceV0 {
+    TransactionSourceV0::RemoteV0 {
+      url: "https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/1".to_string(),
+      signer,
+    }
+  }
+
+  fn compiled(signer_seeds: Vec<Vec<Vec<u8>>>) -> TransactionSourceV0 {
+    TransactionSourceV0::CompiledV0(CompiledTransactionV0 {
+      signer_seeds,
+      ..Default::default()
+    })
+  }
+
+  #[test]
+  fn a_pre_task_is_oracle_signed_or_carries_no_seeds() {
+    validate_pre_task(&remote(ORACLE_SIGNER)).expect("the oracle's remote transaction");
+    validate_pre_task(&compiled(vec![])).expect("a compiled transaction with no seeds");
+
+    assert!(validate_pre_task(&remote(Pubkey::new_unique())).is_err());
+    assert!(validate_pre_task(&compiled(vec![vec![b"helium".to_vec(), vec![253]]])).is_err());
+    // An empty group is still a group.
+    assert!(validate_pre_task(&compiled(vec![vec![]])).is_err());
+  }
+
+  #[test]
+  fn queuing_holds_a_stored_pre_task_to_the_same_rule() {
+    let stored = |pre_task| MiniFanoutV0 {
+      pre_task,
+      ..Default::default()
+    };
+
+    assert!(stored(None)
+      .pre_task_to_queue()
+      .expect("no pre task")
+      .is_none());
+    assert!(stored(Some(remote(ORACLE_SIGNER)))
+      .pre_task_to_queue()
+      .expect("the oracle's remote transaction")
+      .is_some());
+    assert!(stored(Some(compiled(vec![])))
+      .pre_task_to_queue()
+      .expect("a compiled transaction with no seeds")
+      .is_some());
+
+    assert!(stored(Some(remote(Pubkey::new_unique())))
+      .pre_task_to_queue()
+      .is_err());
+    assert!(
+      stored(Some(compiled(vec![vec![b"helium".to_vec(), vec![253]]])))
+        .pre_task_to_queue()
+        .is_err()
+    );
+  }
 }

@@ -135,7 +135,7 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
   mini_fanout.next_task = ctx.task.key();
 
   // CPI to tuktuk to queue the tasks
-  if let Some(pre_task) = mini_fanout.pre_task.clone() {
+  if let Some(pre_task) = mini_fanout.pre_task_to_queue()? {
     mini_fanout.next_pre_task = ctx.pre_task.key();
     queue_task_v0(
       CpiContext::new_with_signer(

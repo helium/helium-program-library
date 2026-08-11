@@ -27,7 +27,7 @@ export default function InviteModal({
   onClose,
   pack,
 }: InviteModalProps) {
-  const [expirationDays, setExpirationDays] = useState("7");
+  const [expirationDays, setExpirationDays] = useState("3");
   const [inviteUrl, setInviteUrl] = useState<string>();
   const { user, connectWallet } = usePrivy();
   const walletAddress = useWalletAddress();

@@ -835,9 +835,13 @@ describe("voter-stake-registry", () => {
       });
 
       it("should not allow me to vote twice", async () => {
-        let error: any;
-        try {
-          await program.methods
+        // The refusal is what this test reads, so it runs preflight rather than taking the
+        // file's skipPreflight. Simulation returns the program's logs with the response, so
+        // Anchor raises an AnchorError naming the code; a sent transaction reports through
+        // confirmation instead, whose shape varies and which carries no code when it times
+        // out. Matching the message pins the name and the number together.
+        await expect(
+          program.methods
             .voteV0({
               choice: 0,
             })
@@ -849,17 +853,10 @@ describe("voter-stake-registry", () => {
               stateController: me,
               onVoteHook: PublicKey.default,
             })
-            .rpc({ skipPreflight: true });
-        } catch (e: any) {
-          error = e;
-        }
-        expect(error, "Expected vote to fail").to.exist;
-        // The error surfaces as an AnchorError, a raw InstructionError, or a
-        // confirmation result ({ err, slot, confirmations }) depending on
-        // whether it arrives via simulation or websocket
-        const code =
-          error.code ?? (error.err ?? error).InstructionError?.[1]?.Custom;
-        expect(code).to.eq(6044);
+            .rpc()
+        ).to.eventually.be.rejectedWith(
+          /Error Code: NftAlreadyVoted\. Error Number: 6044\./
+        );
       });
 
       it("doesn't allow transferring", async () => {

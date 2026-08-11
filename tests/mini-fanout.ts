@@ -6,12 +6,27 @@ import { compileTransaction, init as initTuktuk, nextAvailableTaskIds, runTask, 
 import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { createMemoInstruction } from "@solana/spl-memo";
 import { ComputeBudgetProgram, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { expect } from "chai";
+import chai, { expect } from "chai";
+import chaiAsPromised from "chai-as-promised";
 import { execSync } from "child_process";
 import { init, PROGRAM_ID, queueAuthorityKey } from "../packages/mini-fanout-sdk/src";
 import { MiniFanout } from "../target/types/mini_fanout";
 
+chai.use(chaiAsPromised);
+
 export const ANCHOR_PATH = "anchor";
+
+// shared_utils::ORACLE_SIGNER, which the tests build against because `anchor build` here runs
+// without the `devnet` feature.
+const ORACLE_SIGNER = new PublicKey(
+  "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
+);
+
+// A schedule whose next occurrence is always a second away, however long the setup before it
+// took. A cron string built from `now + 2 seconds` is only correct if the transactions that
+// follow it land inside those two seconds; when they don't, the next occurrence is an hour
+// out and the run fails on balances rather than on the thing under test.
+const EVERY_SECOND = "* * * * * *";
 
 export async function ensureIdls() {
   let programs = [
@@ -56,13 +71,16 @@ describe("mini-fanout", () => {
   const queueAuthority = queueAuthorityKey()[0]
   const FANOUT_AMOUNT = 1000000000
 
-  const memoPreTask = compileTransaction([
-    createMemoInstruction(
-      "HELLO!",
+  // compileTransaction hands the account list back separately so it can ride as remaining
+  // accounts on queue_task_v0, which merges them in. A pre task is stored on the fanout
+  // instead, so it has to carry its own accounts for program_id_index to resolve against.
+  const memoPreTask = (() => {
+    const { transaction, remainingAccounts } = compileTransaction(
+      [createMemoInstruction("HELLO!", [])],
       []
-    ),
-  ],
-    [])
+    )
+    return { ...transaction, accounts: remainingAccounts.map((a) => a.pubkey) }
+  })()
 
   let taskQueue: PublicKey;
   before(async () => {
@@ -147,7 +165,7 @@ describe("mini-fanout", () => {
       seed: Buffer.from(fanoutName, "utf-8"),
       shares,
       schedule: "0 0 * * * *",
-      preTask: { compiledV0: memoPreTask.transaction as any }
+      preTask: { compiledV0: [memoPreTask as any] }
     })
       .accounts({
         payer: me,
@@ -175,26 +193,100 @@ describe("mini-fanout", () => {
     }
   });
 
+  describe("pre task shapes", () => {
+    const ORACLE_URL = "https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/1"
+
+    const initWith = (preTask: any) =>
+      program.methods.initializeMiniFanoutV0({
+        seed: Buffer.from(fanoutName, "utf-8"),
+        shares,
+        schedule: "0 0 * * * *",
+        preTask,
+      })
+        .accounts({
+          payer: me,
+          owner: me,
+          taskQueue,
+          rentRefund: me,
+          mint,
+        })
+        .rpcAndKeys()
+
+    const scheduleFor = async (miniFanout: PublicKey) => {
+      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
+      const [preTaskId, taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
+      return program.methods.scheduleTaskV0({ taskId, preTaskId })
+        .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 })])
+        .accounts({
+          payer: me,
+          miniFanout,
+          task: taskKey(taskQueue, taskId)[0],
+          preTask: taskKey(taskQueue, preTaskId)[0],
+        })
+        .rpc()
+    }
+
+    const refused = /Error Code: InvalidPreTask\. Error Number: 6011\./
+
+    it("queues a remote pre task the oracle signs", async () => {
+      const { pubkeys: { miniFanout } } = await initWith({
+        remoteV0: { url: ORACLE_URL, signer: ORACLE_SIGNER },
+      })
+
+      const acc = await program.account.miniFanoutV0.fetch(miniFanout)
+      expect(acc.preTask!.remoteV0!.signer.toBase58()).to.equal(ORACLE_SIGNER.toBase58())
+      await scheduleFor(miniFanout)
+    })
+
+    it("queues a compiled pre task carrying no seeds", async () => {
+      const { pubkeys: { miniFanout } } = await initWith({
+        compiledV0: [memoPreTask as any],
+      })
+
+      // The instruction has to survive the round trip, or the refusals below could be passing
+      // because the transaction arrived empty rather than because it was refused.
+      const acc = await program.account.miniFanoutV0.fetch(miniFanout)
+      expect(acc.preTask!.compiledV0![0].instructions.length).to.equal(1)
+      expect(acc.preTask!.compiledV0![0].signerSeeds).to.deep.equal([])
+      await scheduleFor(miniFanout)
+    })
+
+    // Storing is refused, so these never reach a schedule. A pre task already on an account is
+    // held to the same rule when it is queued, which mini-fanout-bankrun.ts drives by writing
+    // one the program will not store.
+    it("refuses to store a remote pre task signed by anyone else", async () => {
+      await expect(initWith({
+        remoteV0: { url: ORACLE_URL, signer: Keypair.generate().publicKey },
+      })).to.eventually.be.rejectedWith(refused)
+    })
+
+    it("refuses to store a compiled pre task carrying signer seeds", async () => {
+      await expect(initWith({
+        compiledV0: [{
+          ...(memoPreTask as any),
+          signerSeeds: [[Buffer.from("helium", "utf-8"), Buffer.from([253])]],
+        }],
+      })).to.eventually.be.rejectedWith(refused)
+    })
+
+    it("refuses to store a compiled pre task carrying an empty seed group", async () => {
+      await expect(initWith({
+        compiledV0: [{ ...(memoPreTask as any), signerSeeds: [[]] }],
+      })).to.eventually.be.rejectedWith(refused)
+    })
+  })
+
   describe("with a fanout", () => {
     let fanout: PublicKey;
-    let cronJob: PublicKey;
     beforeEach(async () => {
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
       const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
 
-      const now = new Date()
-      let nextSeconds = now.getSeconds() + 2
-      let nextMinutes = now.getMinutes()
-      if (nextSeconds > 59) {
-        nextSeconds = 0 + (nextSeconds - 59)
-        nextMinutes = now.getMinutes() + 1
-      }
       const { pubkeys: { miniFanout: fanoutK } } = await program.methods.initializeMiniFanoutV0({
         seed: Buffer.from(fanoutName, "utf-8"),
-        // Run in 2 seconds
-        schedule: `${nextSeconds} ${nextMinutes} * * * *`,
+        schedule: EVERY_SECOND,
         shares,
-        preTask: { compiledV0: memoPreTask.transaction as any }
+        preTask: { compiledV0: [memoPreTask as any] }
       })
         .accounts({
           payer: me,
@@ -333,61 +425,24 @@ describe("mini-fanout", () => {
               })]
           );
         }
-      } catch (e) {
-        if (tries < 2) {
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          await runAllTasks(tries + 1)
-        } else {
+      } catch (e: any) {
+        // Retry only what a retry can fix: a task whose trigger had not passed when it was
+        // tried. Retrying every error made a real failure read as intermittent and reported
+        // it three attempts late, against the wrong one of the three.
+        const notReady = String(e.message ?? e).includes("TaskNotReady")
+        if (!notReady || tries >= 2) {
           throw e
         }
+        console.log(`task not ready, retrying (${tries + 1}/2)`)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        await runAllTasks(tries + 1)
       }
     }
 
-    it("should distribute tokens to wallets", async () => {
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      const wallet1TokenAccountBefore = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, wallet1.publicKey)
-      );
-      const wallet3TokenAccountBefore = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, wallet3.publicKey)
-      );
-      await runAllTasks()
-
-      // Verify the claims were processed
-      const fanoutTokenAccount = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, fanout, true)
-      );
-      const wallet1TokenAccount = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, wallet1.publicKey)
-      );
-      const wallet3TokenAccount = await getAccount(
-        // @ts-ignore
-        provider.connection,
-        getAssociatedTokenAddressSync(mint, wallet3.publicKey)
-      );
-
-      const miniFanoutAcc = await program.account.miniFanoutV0.fetch(fanout);
-      expect(Number(fanoutTokenAccount.amount)).to.equal(450000000);
-      expect(Number(wallet1TokenAccount.amount) - Number(wallet1TokenAccountBefore.amount)).to.equal(450000000);
-      // There was no ATA for this wallet, so the total owed is the amount we couldn't transfer
-      expect(Number(miniFanoutAcc.shares[1].totalOwed.toString())).to.equal(450000000);
-      expect(Number(wallet3TokenAccount.amount) - Number(wallet3TokenAccountBefore.amount)).to.equal(100000000);
-
-      // Verify vouchers were updated
-      const nextTask = miniFanoutAcc.nextTask
-      expect(
-        await tuktukProgram.account.taskV0.fetch(nextTask)
-      ).to.not.be.null
-    })
-
+    // The widest distribution the program allows, and so the one whose compute cost the CU
+    // table is sized against. It runs against a validator rather than under bankrun because
+    // the sampler that keeps that table honest reads localnet traffic. The narrower cases,
+    // and the ones that need state a program will not write, are in mini-fanout-bankrun.ts.
     it("should distribute tokens to 6 wallets in one tx", async () => {
       const wallets = Array.from({ length: 6 }, () => Keypair.generate())
       const shares = wallets.map(w => ({
@@ -404,20 +459,12 @@ describe("mini-fanout", () => {
       const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue)
       const [nextPreTask, nextTask] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2, true)
 
-      // Set up a fanout with 10 shares
-      const now = new Date()
-      let nextSeconds = now.getSeconds() + 2
-      let nextMinutes = now.getMinutes()
-      if (nextSeconds > 59) {
-        nextSeconds = 0 + (nextSeconds - 59)
-        nextMinutes = now.getMinutes() + 1
-      }
       console.log("creating fanout")
       const { pubkeys: { miniFanout: fanoutK } } = await program.methods.initializeMiniFanoutV0({
         seed: Buffer.from(fanoutName + 'big', "utf-8"),
-        schedule: `${nextSeconds} ${nextMinutes} * * * *`,
+        schedule: EVERY_SECOND,
         shares,
-        preTask: { compiledV0: memoPreTask.transaction as any }
+        preTask: { compiledV0: [memoPreTask as any] }
       })
         .accounts({
           payer: me,
@@ -426,7 +473,7 @@ describe("mini-fanout", () => {
           rentRefund: me,
           mint,
         })
-        .rpcAndKeys({ skipPreflight: true })
+        .rpcAndKeys()
 
       console.log("transferring")
       await sendInstructions(provider, [SystemProgram.transfer({
@@ -480,7 +527,7 @@ describe("mini-fanout", () => {
           miniFanout: fanout,
           taskRentRefund: me,
         })
-        .rpc({ skipPreflight: true })
+        .rpc()
     })
   })
 });
