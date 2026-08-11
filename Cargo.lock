@@ -3454,7 +3454,7 @@ dependencies = [
 
 [[package]]
 name = "welcome-pack"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",

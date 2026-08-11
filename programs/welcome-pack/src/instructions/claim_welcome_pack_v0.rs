@@ -28,6 +28,10 @@ use tuktuk_program::{tuktuk::program::Tuktuk, TransactionSourceV0};
 
 use crate::{error::ErrorCode, welcome_pack_seeds, WelcomePackV0, ATA_SIZE, FANOUT_FUNDING_AMOUNT};
 
+/// The longest an invite approval may be good for. The client offers a shorter window than this;
+/// this is the outer bound every approval is held to, whatever offered it.
+pub const MAX_CLAIM_APPROVAL_SECONDS: i64 = 30 * 24 * 60 * 60;
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct ClaimWelcomePackArgsV0 {
   pub data_hash: [u8; 32],
@@ -120,10 +124,19 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, ClaimWelcomePackV0<'info>>,
   args: ClaimWelcomePackArgsV0,
 ) -> Result<()> {
+  let now = Clock::get()?.unix_timestamp;
   require_gt!(
     args.approval_expiration_timestamp,
-    Clock::get()?.unix_timestamp,
+    now,
     ErrorCode::ClaimApprovalExpired
+  );
+  // An approval names its own expiry, so how long one lasts is settled here rather than by the
+  // client that offered it. An invite is acted on in days; the owner signs a fresh one whenever
+  // they need to.
+  require_gte!(
+    now + MAX_CLAIM_APPROVAL_SECONDS,
+    args.approval_expiration_timestamp,
+    ErrorCode::ClaimApprovalTooLong
   );
   let msg = format!(
     "Approve invite {} expiring {}",
