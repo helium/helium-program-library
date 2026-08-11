@@ -342,9 +342,9 @@ describe("mini-fanout under bankrun", () => {
       shares: [shareOf(wallet.publicKey, 100)],
     });
 
-    // A fanout whose stored pre task the program would not write today: scheduled while it
-    // still conformed, then rewritten underneath. Only bankrun can produce it, and it is the
-    // only way distribute_v0's read of the pre task is reached with anything to refuse.
+    // A fanout carrying a pre task neither instruction would store: scheduled while it
+    // conformed, then rewritten underneath. Only bankrun can produce it, and it is what
+    // reaches distribute_v0's read of the pre task with something to refuse.
     const acc = await program.account.miniFanoutV0.fetch(miniFanout);
     const encoded = await program.coder.accounts.encode("miniFanoutV0", {
       ...acc,

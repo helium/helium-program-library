@@ -12,6 +12,9 @@ use crate::{errors::ErrorCode, state::*};
 
 pub const MAX_SHARES: usize = 6;
 
+/// Reserved beyond what the account's contents need, so a later field fits without a resize.
+const RESERVE: usize = 60;
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitializeMiniFanoutArgsV0 {
   pub schedule: String,
@@ -114,7 +117,7 @@ impl MiniFanoutV0 {
         }
       }
     }
-    size + 60 // extra space for future fields
+    size + RESERVE
   }
 }
 
@@ -169,6 +172,10 @@ pub fn handler(
     pre_task: args.pre_task,
   });
 
+  if let Some(pre_task) = &mini_fanout.pre_task {
+    validate_pre_task(pre_task)?;
+  }
+
   Ok(())
 }
 
@@ -177,8 +184,6 @@ mod tests {
   use tuktuk_program::{CompiledInstructionV0, CompiledTransactionV0};
 
   use super::*;
-
-  const RESERVE: usize = 60;
 
   /// The account `handler` writes for these args, so what `size` reserves can be measured
   /// against what storing it actually costs.

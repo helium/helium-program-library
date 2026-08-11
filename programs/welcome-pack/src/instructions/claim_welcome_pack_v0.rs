@@ -32,14 +32,13 @@ use crate::{error::ErrorCode, welcome_pack_seeds, WelcomePackV0, ATA_SIZE, FANOU
 /// is ever live for longer than this. Measured from the claim rather than from the signature,
 /// which carries no issuance time. The client offers a shorter window; this is the bound every
 /// approval is held to whatever offered it.
-pub const MAX_CLAIM_APPROVAL_SECONDS: i64 = 30 * 24 * 60 * 60;
+const MAX_CLAIM_APPROVAL_SECONDS: i64 = 30 * 24 * 60 * 60;
 
 /// An approval is claimable while its expiry is ahead of now and no further ahead than the
 /// window allows.
 fn check_approval_window(expiration_timestamp: i64, now: i64) -> Result<()> {
   require_gt!(expiration_timestamp, now, ErrorCode::ClaimApprovalExpired);
-  // Saturating here would put the bound at the end of time and admit everything, so a clock that
-  // leaves no room for the window refuses instead.
+  // The end of the window has to be representable, so a clock leaving no room for one refuses.
   let latest = now
     .checked_add(MAX_CLAIM_APPROVAL_SECONDS)
     .ok_or(error!(ErrorCode::ClaimApprovalTooLong))?;

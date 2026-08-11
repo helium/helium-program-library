@@ -251,31 +251,28 @@ describe("mini-fanout", () => {
       await scheduleFor(miniFanout)
     })
 
-    it("refuses to queue a remote pre task signed by anyone else", async () => {
-      const { pubkeys: { miniFanout } } = await initWith({
+    // Storing is refused, so these never reach a schedule. A pre task already on an account is
+    // held to the same rule when it is queued, which mini-fanout-bankrun.ts drives by writing
+    // one the program will not store.
+    it("refuses to store a remote pre task signed by anyone else", async () => {
+      await expect(initWith({
         remoteV0: { url: ORACLE_URL, signer: Keypair.generate().publicKey },
-      })
-
-      await expect(scheduleFor(miniFanout)).to.eventually.be.rejectedWith(refused)
+      })).to.eventually.be.rejectedWith(refused)
     })
 
-    it("refuses to queue a compiled pre task carrying signer seeds", async () => {
-      const { pubkeys: { miniFanout } } = await initWith({
+    it("refuses to store a compiled pre task carrying signer seeds", async () => {
+      await expect(initWith({
         compiledV0: [{
           ...(memoPreTask as any),
           signerSeeds: [[Buffer.from("helium", "utf-8"), Buffer.from([253])]],
         }],
-      })
-
-      await expect(scheduleFor(miniFanout)).to.eventually.be.rejectedWith(refused)
+      })).to.eventually.be.rejectedWith(refused)
     })
 
-    it("refuses to queue a compiled pre task carrying an empty seed group", async () => {
-      const { pubkeys: { miniFanout } } = await initWith({
+    it("refuses to store a compiled pre task carrying an empty seed group", async () => {
+      await expect(initWith({
         compiledV0: [{ ...(memoPreTask as any), signerSeeds: [[]] }],
-      })
-
-      await expect(scheduleFor(miniFanout)).to.eventually.be.rejectedWith(refused)
+      })).to.eventually.be.rejectedWith(refused)
     })
   })
 

@@ -31,8 +31,10 @@ pub struct MiniFanoutV0 {
 }
 
 /// The two shapes a pre task may take: a remote transaction the Helium oracle signs, or a
-/// compiled transaction carrying no signer seeds.
-fn validate_pre_task(pre_task: &TransactionSourceV0) -> Result<()> {
+/// compiled transaction carrying no signer seeds. Storing one holds it to this rule so the
+/// mistake is refused where it is made; queuing holds it again, which is what covers a pre
+/// task already on an account.
+pub(crate) fn validate_pre_task(pre_task: &TransactionSourceV0) -> Result<()> {
   match pre_task {
     TransactionSourceV0::RemoteV0 { signer, .. } => {
       require_keys_eq!(*signer, ORACLE_SIGNER, ErrorCode::InvalidPreTask)
