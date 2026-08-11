@@ -212,14 +212,16 @@ mod tests {
   }
 
   fn args(pre_task: Option<TransactionSourceV0>) -> InitializeMiniFanoutArgsV0 {
+    args_with(pre_task, Share::Fixed { amount: 1 })
+  }
+
+  fn args_with(pre_task: Option<TransactionSourceV0>, share: Share) -> InitializeMiniFanoutArgsV0 {
     InitializeMiniFanoutArgsV0 {
       schedule: "0 0 * * * *".to_string(),
-      // Fixed rather than Share, which is the narrower of the two variants MiniFanoutShareV0
-      // reserves for, so a share costs exactly what it reserves.
       shares: vec![
         MiniFanoutShareArgV0 {
           wallet: Pubkey::new_unique(),
-          share: Share::Fixed { amount: 1 },
+          share,
         };
         MAX_SHARES
       ],
@@ -243,6 +245,23 @@ mod tests {
         .collect(),
       signer_seeds,
     })
+  }
+
+  #[test]
+  fn a_narrower_share_is_reserved_for_the_wider_one() {
+    // MiniFanoutShareV0 reserves for the wider of the two Share variants, so a fanout of the
+    // narrower one costs less than is set aside for it and never more.
+    let args = args_with(None, Share::Share { amount: 1 });
+    let reserved = MiniFanoutV0::size(&args);
+    let needed = 8
+      + stored(&args)
+        .try_to_vec()
+        .expect("serialize the account")
+        .len();
+
+    assert!(reserved >= needed, "reserved {reserved} < needed {needed}");
+    // Four bytes per share wider than Fixed, on top of the space held back for future fields.
+    assert_eq!(reserved - needed, RESERVE + 4 * MAX_SHARES);
   }
 
   #[test]
