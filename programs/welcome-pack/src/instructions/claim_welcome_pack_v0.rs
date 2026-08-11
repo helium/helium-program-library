@@ -28,9 +28,29 @@ use tuktuk_program::{tuktuk::program::Tuktuk, TransactionSourceV0};
 
 use crate::{error::ErrorCode, welcome_pack_seeds, WelcomePackV0, ATA_SIZE, FANOUT_FUNDING_AMOUNT};
 
-/// The longest an invite approval may be good for. The client offers a shorter window than this;
-/// this is the outer bound every approval is held to, whatever offered it.
+/// How much of an approval's window may still be ahead of it when it is claimed, so no approval
+/// is ever live for longer than this. Measured from the claim rather than from the signature,
+/// which carries no issuance time. The client offers a shorter window; this is the bound every
+/// approval is held to whatever offered it.
 pub const MAX_CLAIM_APPROVAL_SECONDS: i64 = 30 * 24 * 60 * 60;
+
+/// An approval is claimable while its expiry is ahead of now and no further ahead than the
+/// window allows.
+fn check_approval_window(expiration_timestamp: i64, now: i64) -> Result<()> {
+  require_gt!(expiration_timestamp, now, ErrorCode::ClaimApprovalExpired);
+  // Saturating here would put the bound at the end of time and admit everything, so a clock that
+  // leaves no room for the window refuses instead.
+  let latest = now
+    .checked_add(MAX_CLAIM_APPROVAL_SECONDS)
+    .ok_or(error!(ErrorCode::ClaimApprovalTooLong))?;
+  require_gte!(
+    latest,
+    expiration_timestamp,
+    ErrorCode::ClaimApprovalTooLong
+  );
+
+  Ok(())
+}
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct ClaimWelcomePackArgsV0 {
@@ -124,20 +144,10 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, ClaimWelcomePackV0<'info>>,
   args: ClaimWelcomePackArgsV0,
 ) -> Result<()> {
-  let now = Clock::get()?.unix_timestamp;
-  require_gt!(
+  check_approval_window(
     args.approval_expiration_timestamp,
-    now,
-    ErrorCode::ClaimApprovalExpired
-  );
-  // An approval names its own expiry, so how long one lasts is settled here rather than by the
-  // client that offered it. An invite is acted on in days; the owner signs a fresh one whenever
-  // they need to.
-  require_gte!(
-    now + MAX_CLAIM_APPROVAL_SECONDS,
-    args.approval_expiration_timestamp,
-    ErrorCode::ClaimApprovalTooLong
-  );
+    Clock::get()?.unix_timestamp,
+  )?;
   let msg = format!(
     "Approve invite {} expiring {}",
     ctx.accounts.welcome_pack.unique_id, args.approval_expiration_timestamp
@@ -327,4 +337,25 @@ pub fn handler<'info>(
   }
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn an_approval_is_claimable_inside_its_window_only() {
+    let now = 1_800_000_000;
+
+    check_approval_window(now + 1, now).expect("a second of window left");
+    check_approval_window(now + MAX_CLAIM_APPROVAL_SECONDS, now).expect("the whole window");
+
+    // Expired, and expiring exactly now, which is no window at all.
+    assert!(check_approval_window(now, now).is_err());
+    assert!(check_approval_window(now - 1, now).is_err());
+    // Further ahead than the window reaches.
+    assert!(check_approval_window(now + MAX_CLAIM_APPROVAL_SECONDS + 1, now).is_err());
+    // A clock near the end of time still refuses rather than wrapping into acceptance.
+    assert!(check_approval_window(i64::MAX, i64::MAX - 1).is_err());
+  }
 }

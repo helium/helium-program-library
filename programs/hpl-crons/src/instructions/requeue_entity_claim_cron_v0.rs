@@ -94,12 +94,20 @@ fn cron_job_transaction_key(cron_job: &Pubkey, index: u32) -> Pubkey {
   .0
 }
 
+/// The records a schedule run reads: one per transaction the run will queue, starting where the
+/// job's execution left off.
+fn records_to_queue(cron_job: &Pubkey, from: u32, count: u8) -> Vec<Pubkey> {
+  (from..from + count as u32)
+    .map(|i| cron_job_transaction_key(cron_job, i))
+    .collect()
+}
+
 pub fn handler(ctx: Context<RequeueEntityClaimCronV0>) -> Result<()> {
-  let remaining_accounts = (ctx.accounts.cron_job.current_transaction_id
-    ..ctx.accounts.cron_job.current_transaction_id
-      + ctx.accounts.cron_job.num_tasks_per_queue_call as u32)
-    .map(|i| cron_job_transaction_key(&ctx.accounts.cron_job.key(), i))
-    .collect::<Vec<Pubkey>>();
+  let remaining_accounts = records_to_queue(
+    &ctx.accounts.cron_job.key(),
+    ctx.accounts.cron_job.current_transaction_id,
+    ctx.accounts.cron_job.num_tasks_per_queue_call,
+  );
   let (queue_tx, _) = compile_transaction(
     vec![Instruction {
       program_id: tuktuk_program::cron::ID,
@@ -162,6 +170,36 @@ pub fn handler(ctx: Context<RequeueEntityClaimCronV0>) -> Result<()> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn a_schedule_run_reads_the_records_its_execution_left_off_at() {
+    let cron_job = Pubkey::new_unique();
+
+    let records = records_to_queue(&cron_job, 3, 4);
+
+    assert_eq!(records.len(), 4, "one record per transaction to queue");
+    assert_eq!(
+      records,
+      (3..7)
+        .map(|i| cron_job_transaction_key(&cron_job, i))
+        .collect::<Vec<_>>(),
+      "the records are ids 3..7, in order"
+    );
+    // Named against the derivation rather than against the helper, so the list is pinned to the
+    // cron program even if the helper stops deriving it there.
+    assert_eq!(
+      records[0],
+      Pubkey::find_program_address(
+        &[
+          b"cron_job_transaction",
+          cron_job.as_ref(),
+          &3u32.to_le_bytes()
+        ],
+        &tuktuk_program::cron::ID,
+      )
+      .0
+    );
+  }
 
   #[test]
   fn a_transaction_record_is_derived_under_the_cron_program() {
