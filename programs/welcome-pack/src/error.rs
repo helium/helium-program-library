@@ -18,4 +18,6 @@ pub enum ErrorCode {
   InvalidRewardsSplit,
   #[msg("Invalid schedule")]
   InvalidSchedule,
+  #[msg("Claim approval expires too far out")]
+  ClaimApprovalTooLong,
 }

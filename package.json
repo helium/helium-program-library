@@ -58,6 +58,7 @@
     "@types/mocha": "^9.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "anchor-bankrun": "^0.5.0",
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
     "chai-http": "^4.3.0",
@@ -66,6 +67,7 @@
     "pre-commit": "^1.2.2",
     "prettier": "^2.6.2",
     "shx": "^0.3.4",
+    "solana-bankrun": "^0.4.0",
     "ts-mocha": "^10.0.0",
     "ts-node": "^10.4.0",
     "turbo": "^2.3.0",
@@ -84,6 +86,11 @@
       "@helium/crypto": "^4.14.2",
       "@types/bn.js": "^5.2.0",
       "@solana/web3.js": "1.98.2"
+    },
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "anchor-bankrun>@coral-xyz/anchor": "0.31.1"
+      }
     }
   },
   "packageManager": "pnpm@9.15.4",

@@ -28,6 +28,29 @@ use tuktuk_program::{tuktuk::program::Tuktuk, TransactionSourceV0};
 
 use crate::{error::ErrorCode, welcome_pack_seeds, WelcomePackV0, ATA_SIZE, FANOUT_FUNDING_AMOUNT};
 
+/// How much of an approval's window may still be ahead of it when it is claimed, so no approval
+/// is ever live for longer than this. Measured from the claim rather than from the signature,
+/// which carries no issuance time. The client offers a shorter window; this is the bound every
+/// approval is held to whatever offered it.
+const MAX_CLAIM_APPROVAL_SECONDS: i64 = 30 * 24 * 60 * 60;
+
+/// An approval is claimable while its expiry is ahead of now and no further ahead than the
+/// window allows.
+fn check_approval_window(expiration_timestamp: i64, now: i64) -> Result<()> {
+  require_gt!(expiration_timestamp, now, ErrorCode::ClaimApprovalExpired);
+  // The end of the window has to be representable, so a clock leaving no room for one refuses.
+  let latest = now
+    .checked_add(MAX_CLAIM_APPROVAL_SECONDS)
+    .ok_or(error!(ErrorCode::ClaimApprovalTooLong))?;
+  require_gte!(
+    latest,
+    expiration_timestamp,
+    ErrorCode::ClaimApprovalTooLong
+  );
+
+  Ok(())
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct ClaimWelcomePackArgsV0 {
   pub data_hash: [u8; 32],
@@ -120,11 +143,10 @@ pub fn handler<'info>(
   ctx: Context<'_, '_, '_, 'info, ClaimWelcomePackV0<'info>>,
   args: ClaimWelcomePackArgsV0,
 ) -> Result<()> {
-  require_gt!(
+  check_approval_window(
     args.approval_expiration_timestamp,
     Clock::get()?.unix_timestamp,
-    ErrorCode::ClaimApprovalExpired
-  );
+  )?;
   let msg = format!(
     "Approve invite {} expiring {}",
     ctx.accounts.welcome_pack.unique_id, args.approval_expiration_timestamp
@@ -314,4 +336,25 @@ pub fn handler<'info>(
   }
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn an_approval_is_claimable_inside_its_window_only() {
+    let now = 1_800_000_000;
+
+    check_approval_window(now + 1, now).expect("a second of window left");
+    check_approval_window(now + MAX_CLAIM_APPROVAL_SECONDS, now).expect("the whole window");
+
+    // Expired, and expiring exactly now, which is no window at all.
+    assert!(check_approval_window(now, now).is_err());
+    assert!(check_approval_window(now - 1, now).is_err());
+    // Further ahead than the window reaches.
+    assert!(check_approval_window(now + MAX_CLAIM_APPROVAL_SECONDS + 1, now).is_err());
+    // A clock near the end of time still refuses rather than wrapping into acceptance.
+    assert!(check_approval_window(i64::MAX, i64::MAX - 1).is_err());
+  }
 }
