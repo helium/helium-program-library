@@ -23,7 +23,11 @@ jobs:
           path: |
             ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}-v0002
-      - run: (cargo install toml-cli || true)
+      # `--locked` builds against the crate's own lockfile, so a dependency that later requires a
+      # newer rustc than this runner has cannot break the install. A failure here is fatal: the
+      # next step reads the program id with this binary, and an empty id reaches `anchor idl
+      # write-buffer` several steps later as a missing argument.
+      - run: cargo install toml-cli --locked
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
 
@@ -35,6 +39,14 @@ jobs:
           VERSION=$(echo $TAG | sed 's/.*-\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)$/\1/')
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+
+          # An id is what every step below addresses the program by, and an empty one is accepted
+          # until `anchor idl write-buffer` rejects it as a missing argument, several steps away
+          # from the tag that named no program Anchor.toml holds.
+          if [ -z "$PROGRAM_ID" ]; then
+            echo "::error::no program id for '${PROGRAM_NAME}' in Anchor.toml programs.localnet (tag ${TAG})"
+            exit 1
+          fi
 
           echo "Program: $PROGRAM"
           echo "Program: $PROGRAM_ID"
