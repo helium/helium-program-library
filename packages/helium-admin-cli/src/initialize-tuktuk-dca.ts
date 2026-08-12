@@ -1,13 +1,28 @@
 import * as anchor from "@coral-xyz/anchor";
-import { dcaKey, init as initTuktukDca, queueAuthorityKey } from "@helium/tuktuk-dca-sdk";
-import { init as initTuktuk, nextAvailableTaskIds, taskKey, taskQueueAuthorityKey } from "@helium/tuktuk-sdk";
+import {
+  dcaKey,
+  init as initTuktukDca,
+  queueAuthorityKey,
+} from "@helium/tuktuk-dca-sdk";
+import {
+  init as initTuktuk,
+  nextAvailableTaskIds,
+  taskKey,
+  taskQueueAuthorityKey,
+} from "@helium/tuktuk-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 
-const TASK_QUEUE_ID = new PublicKey("HMBp68hMkHAr574nmckmS93p2RSZL5N4NMavhmFApwjF");
+const TASK_QUEUE_ID = new PublicKey(
+  "HMBp68hMkHAr574nmckmS93p2RSZL5N4NMavhmFApwjF"
+);
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -77,9 +92,9 @@ export async function run(args: any = process.argv) {
       required: true,
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     initialLamports: {
       type: "number",
@@ -101,7 +116,7 @@ export async function run(args: any = process.argv) {
   let authority = provider.wallet.publicKey;
   let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
   if (multisigPda) {
-    const { getVaultPda } = await import('@sqds/multisig');
+    const { getVaultPda } = await import("@sqds/multisig");
     const [vaultPda] = getVaultPda({
       multisigPda,
       index: 0,
@@ -124,16 +139,21 @@ export async function run(args: any = process.argv) {
   );
 
   // Get task queue and find available task IDs
-  const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID);
+  const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
+    TASK_QUEUE_ID
+  );
   const [nextTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 1);
-
 
   const instructions: TransactionInstruction[] = [];
 
   const dcaPda = dcaKey(authority, inputMint, outputMint, 0)[0];
-  const dcaPdaExists = await tuktukDcaProgram.account.dcaV0.fetchNullable(dcaPda);
+  const dcaPdaExists = await tuktukDcaProgram.account.dcaV0.fetchNullable(
+    dcaPda
+  );
   if (dcaPdaExists) {
-    console.log(`DCA already initialized at: ${dcaPda.toBase58()}, closing it...`);
+    console.log(
+      `DCA already initialized at: ${dcaPda.toBase58()}, closing it...`
+    );
     const { instruction: closeDcaIx } = await tuktukDcaProgram.methods
       .closeDcaV0()
       .accounts({ dca: dcaPda })
@@ -147,7 +167,10 @@ export async function run(args: any = process.argv) {
   }
 
   // Initialize DCA
-  const { instruction: initDcaIx, pubkeys: { core } } = await tuktukDcaProgram.methods
+  const {
+    instruction: initDcaIx,
+    pubkeys: { core },
+  } = await tuktukDcaProgram.methods
     .initializeDcaV0({
       index: 0,
       numOrders: argv.numOrders,
@@ -157,6 +180,7 @@ export async function run(args: any = process.argv) {
       taskId: nextTask,
       dcaSigner,
       dcaUrl: argv.dcaUrl,
+      crankReward: new anchor.BN(0),
     })
     .accountsPartial({
       core: {
@@ -171,11 +195,13 @@ export async function run(args: any = process.argv) {
         taskQueue: TASK_QUEUE_ID,
       },
       queueAuthority: queueAuthorityKey()[0],
-      taskQueueAuthority: taskQueueAuthorityKey(TASK_QUEUE_ID, queueAuthorityKey()[0])[0],
+      taskQueueAuthority: taskQueueAuthorityKey(
+        TASK_QUEUE_ID,
+        queueAuthorityKey()[0]
+      )[0],
       task: taskKey(TASK_QUEUE_ID, nextTask)[0],
     })
     .prepare();
-
 
   const dca = core?.dca!;
   instructions.push(initDcaIx);
