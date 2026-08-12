@@ -44,22 +44,11 @@ ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN} \
     SENTRY_PROJECT=${SENTRY_PROJECT} \
     SENTRY_RELEASE=${SENTRY_RELEASE}
 
-# Server env vars don't reach Next.js 15 worker threads via Docker ENV,
-# so write dummy values to .env for the build to read from disk
+# The build needs no server env vars: env validation is skipped during the
+# build phase (see src/lib/env.ts) and re-runs at server startup.
 RUN --mount=type=cache,id=turbo,target=/app/.turbo \
     --mount=type=cache,id=nextjs,target=/app/packages/blockchain-api/.next/cache \
-    printf '%s\n' \
-    'SKIP_ENV_VALIDATION=1' \
-    'PG_USER=build' \
-    'PG_NAME=build' \
-    'PG_HOST=localhost' \
-    'PG_PORT=5432' \
-    'PRIVY_APP_SECRET=build' \
-    'BRIDGE_API_KEY=build' \
-    'JUPITER_API_KEY=build' \
-    > packages/blockchain-api/.env && \
-    pnpm turbo run build --filter=@helium/blockchain-api-service && \
-    rm -f packages/blockchain-api/.env packages/blockchain-api/.next/standalone/packages/blockchain-api/.env
+    pnpm turbo run build --filter=@helium/blockchain-api-service
 
 # Production image
 FROM node:24-alpine

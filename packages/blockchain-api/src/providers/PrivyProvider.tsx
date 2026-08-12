@@ -5,7 +5,10 @@ import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { env } from "@/lib/env";
 
 export const PrivyProvider = ({ children }: { children: React.ReactNode }) => {
-  if (env.NEXT_PUBLIC_PRIVY_APP_ID.startsWith("__")) {
+  if (
+    !env.NEXT_PUBLIC_PRIVY_APP_ID ||
+    env.NEXT_PUBLIC_PRIVY_APP_ID.startsWith("__")
+  ) {
     return <>{children}</>;
   }
 

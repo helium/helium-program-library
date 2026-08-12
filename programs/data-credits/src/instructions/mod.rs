@@ -1,3 +1,7 @@
+// Each instruction module exports a `handler` fn; the globs below collide on
+// that name, but handlers are only ever called fully qualified.
+#![allow(ambiguous_glob_reexports)]
+
 pub mod burn;
 pub mod change_delegated_sub_dao_v0;
 pub mod delegate_data_credits_v0;
