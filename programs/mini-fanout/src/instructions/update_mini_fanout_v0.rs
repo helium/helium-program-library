@@ -83,9 +83,7 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
         MiniFanoutShareV0 {
           wallet: s.wallet,
           share: s.share,
-          delegate: existing_share
-            .map(|s| s.delegate)
-            .unwrap_or(Pubkey::default()),
+          delegate: existing_share.map(|s| s.delegate).unwrap_or_default(),
           total_dust: existing_share.map(|s| s.total_dust).unwrap_or(0),
           total_owed: existing_share.map(|s| s.total_owed).unwrap_or(0),
         }

@@ -6,7 +6,7 @@
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "clean": "npx shx rm -rf {.,packages/*}/{node_modules,lib,dist}",
     "fmt": "cargo fmt --check",
-    "clippy": "cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments -A ambiguous_glob_reexports -A unexpected-cfgs",
+    "clippy": "cargo clippy --all-targets -- -D warnings -D clippy::or_fun_call -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A clippy::manual_is_multiple_of -A ambiguous_glob_reexports -A unexpected-cfgs",
     "generate-idl-docs": "ts-node -T scripts/generate-idl-docs.ts",
     "changeset": "changeset",
     "version-packages": "changeset version",
