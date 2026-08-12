@@ -12,6 +12,9 @@ use crate::{errors::ErrorCode, state::*};
 
 pub const MAX_SHARES: usize = 6;
 
+/// Reserved beyond what the account's contents need, so a later field fits without a resize.
+const RESERVE: usize = 60;
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitializeMiniFanoutArgsV0 {
   pub schedule: String,
@@ -71,8 +74,8 @@ impl MiniFanoutV0 {
   pub fn size(args: &InitializeMiniFanoutArgsV0) -> usize {
     // Discriminator
     let mut size = 8;
-    // Pubkey fields: authority, mint, token_account, next_task, rent_refund (5 * 32)
-    size += 7 * 32;
+    // owner, namespace, mint, token_account, task_queue, next_task, rent_refund, next_pre_task
+    size += 8 * 32;
     // bump: u8
     size += 1;
     // schedule: String (4 bytes len + string bytes)
@@ -83,30 +86,38 @@ impl MiniFanoutV0 {
     size += 4 + args.shares.len() * MiniFanoutShareV0::size();
     // seed: Vec<u8> (4 bytes len + seed bytes)
     size += 4 + args.seed.len();
-    // Option<TransactionSourceV0> and enum in TransactionSourceV0
-    size += 2;
+    // pre_task: the Option tag, and for Some the TransactionSourceV0 enum discriminant
+    size += 1;
     if let Some(pre_task) = &args.pre_task {
+      size += 1;
       match pre_task {
         TransactionSourceV0::CompiledV0(compiled) => {
+          // num_rw_signers, num_ro_signers, num_rw
+          size += 3;
+          // accounts: Vec<Pubkey>
+          size += 4 + 32 * compiled.accounts.len();
+          // instructions: Vec<CompiledInstructionV0>, each a program_id_index and two Vec<u8>
           size += 4
-            + 3
-            + 4
-            + 32 * compiled.accounts.len()
-            + 1 // option
-            + 4 // Vec<>
             + compiled
               .instructions
               .iter()
-              .map(|i| i.accounts.len() + i.data.len() + 4)
-              .sum::<usize>()
-            + compiled.signer_seeds.iter().map(|s| s.len()).sum::<usize>();
+              .map(|i| 1 + 4 + i.accounts.len() + 4 + i.data.len())
+              .sum::<usize>();
+          // signer_seeds: Vec<Vec<Vec<u8>>>
+          size += 4
+            + compiled
+              .signer_seeds
+              .iter()
+              .map(|group| 4 + group.iter().map(|seed| 4 + seed.len()).sum::<usize>())
+              .sum::<usize>();
         }
-        TransactionSourceV0::RemoteV0 { url, .. } => {
-          size += 4 + 32 + url.len();
+        TransactionSourceV0::RemoteV0 { url, signer: _ } => {
+          // url: String, signer: Pubkey
+          size += 4 + url.len() + 32;
         }
       }
     }
-    size + 60 // extra space for future fields
+    size + RESERVE
   }
 }
 
@@ -161,5 +172,149 @@ pub fn handler(
     pre_task: args.pre_task,
   });
 
+  if let Some(pre_task) = &mini_fanout.pre_task {
+    validate_pre_task(pre_task)?;
+  }
+
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use tuktuk_program::{CompiledInstructionV0, CompiledTransactionV0};
+
+  use super::*;
+
+  /// The account `handler` writes for these args, so what `size` reserves can be measured
+  /// against what storing it actually costs.
+  fn stored(args: &InitializeMiniFanoutArgsV0) -> MiniFanoutV0 {
+    MiniFanoutV0 {
+      owner: Pubkey::new_unique(),
+      namespace: Pubkey::new_unique(),
+      mint: Pubkey::new_unique(),
+      token_account: Pubkey::new_unique(),
+      task_queue: Pubkey::new_unique(),
+      next_task: Pubkey::new_unique(),
+      rent_refund: Pubkey::new_unique(),
+      bump: 255,
+      schedule: args.schedule.clone(),
+      queue_authority_bump: 254,
+      shares: args
+        .shares
+        .iter()
+        .map(|s| MiniFanoutShareV0 {
+          wallet: s.wallet,
+          share: s.share.clone(),
+          delegate: Pubkey::default(),
+          total_dust: 0,
+          total_owed: 0,
+        })
+        .collect(),
+      seed: args.seed.clone(),
+      next_pre_task: Pubkey::new_unique(),
+      pre_task: args.pre_task.clone(),
+    }
+  }
+
+  fn args(pre_task: Option<TransactionSourceV0>) -> InitializeMiniFanoutArgsV0 {
+    args_with(pre_task, Share::Fixed { amount: 1 })
+  }
+
+  fn args_with(pre_task: Option<TransactionSourceV0>, share: Share) -> InitializeMiniFanoutArgsV0 {
+    InitializeMiniFanoutArgsV0 {
+      schedule: "0 0 * * * *".to_string(),
+      shares: vec![
+        MiniFanoutShareArgV0 {
+          wallet: Pubkey::new_unique(),
+          share,
+        };
+        MAX_SHARES
+      ],
+      seed: b"a-fanout-seed".to_vec(),
+      pre_task,
+    }
+  }
+
+  fn compiled(instructions: usize, signer_seeds: Vec<Vec<Vec<u8>>>) -> TransactionSourceV0 {
+    TransactionSourceV0::CompiledV0(CompiledTransactionV0 {
+      num_rw_signers: 1,
+      num_ro_signers: 0,
+      num_rw: 2,
+      accounts: vec![Pubkey::new_unique(); 5],
+      instructions: (0..instructions)
+        .map(|i| CompiledInstructionV0 {
+          program_id_index: 4,
+          accounts: vec![0, 1, 2],
+          data: vec![i as u8; 17],
+        })
+        .collect(),
+      signer_seeds,
+    })
+  }
+
+  #[test]
+  fn a_narrower_share_is_reserved_for_the_wider_one() {
+    // MiniFanoutShareV0 reserves for the wider of the two Share variants, so a fanout of the
+    // narrower one costs less than is set aside for it and never more.
+    let args = args_with(None, Share::Share { amount: 1 });
+    let reserved = MiniFanoutV0::size(&args);
+    let needed = 8
+      + stored(&args)
+        .try_to_vec()
+        .expect("serialize the account")
+        .len();
+
+    assert!(reserved >= needed, "reserved {reserved} < needed {needed}");
+    // Four bytes per share wider than Fixed, on top of the space held back for future fields.
+    assert_eq!(reserved - needed, RESERVE + 4 * MAX_SHARES);
+  }
+
+  #[test]
+  fn the_space_reserved_is_the_space_the_account_needs() {
+    let cases = [
+      ("none", None),
+      (
+        "remote",
+        Some(TransactionSourceV0::RemoteV0 {
+          url: "https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset/1".to_string(),
+          signer: Pubkey::new_unique(),
+        }),
+      ),
+      ("one instruction", Some(compiled(1, vec![]))),
+      ("twenty instructions", Some(compiled(20, vec![]))),
+      // Queuing is what holds a pre task to a shape, so init reserves space for one carrying
+      // seed groups of any width even though such a fanout never reaches distribution.
+      (
+        "seed groups",
+        Some(compiled(
+          2,
+          vec![
+            vec![b"helium".to_vec(), vec![253]],
+            vec![],
+            vec![b"a".to_vec(), b"much-longer-seed".to_vec(), vec![1, 2, 3]],
+          ],
+        )),
+      ),
+    ];
+
+    for (name, pre_task) in cases {
+      let args = args(pre_task);
+      let reserved = MiniFanoutV0::size(&args);
+      let needed = 8
+        + stored(&args)
+          .try_to_vec()
+          .expect("serialize the account")
+          .len();
+
+      assert!(
+        reserved >= needed,
+        "{name}: reserved {reserved} < needed {needed}"
+      );
+      assert_eq!(
+        reserved - needed,
+        RESERVE,
+        "{name}: reserved {reserved}, needed {needed}"
+      );
+    }
+  }
 }

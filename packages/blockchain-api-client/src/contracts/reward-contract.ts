@@ -104,7 +104,7 @@ export const rewardContract = oc
                 z.object({
                     entityPubKey: HeliumPublicKeySchema.describe("The public key of the hotspot entity"),
                     signerWalletAddress: WalletAddressSchema.describe("The wallet address of the caller"),
-                    expirationDays: z.number().int().positive().max(365).default(7).describe("Number of days until the invite expires"),
+                    expirationDays: z.number().int().positive().max(14).default(3).describe("Number of days until the invite expires"),
                 })
             )
             .errors({

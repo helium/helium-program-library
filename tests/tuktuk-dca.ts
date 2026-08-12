@@ -224,7 +224,6 @@ describe("tuktuk-dca", () => {
           taskId,
           dcaSigner: dcaSigner.publicKey,
           dcaUrl: "http://localhost:8123/dca",
-          crankReward: new anchor.BN(15000),
         })
         .accountsPartial({
           core: {

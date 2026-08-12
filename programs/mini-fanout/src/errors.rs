@@ -24,4 +24,6 @@ pub enum ErrorCode {
   PreTaskNotRun,
   #[msg("Invalid CPI context - must be called via tuktuk for next_task")]
   InvalidCpiContext,
+  #[msg("Invalid pre task")]
+  InvalidPreTask,
 }

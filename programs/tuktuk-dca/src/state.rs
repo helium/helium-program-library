@@ -27,7 +27,6 @@ pub struct DcaV0 {
   pub dca_signer: Pubkey,
   pub dca_url: [u8; 128],
   pub rent_refund: Pubkey,
-  pub crank_reward: u64,
 }
 
 #[macro_export]

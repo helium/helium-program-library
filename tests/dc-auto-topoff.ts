@@ -667,6 +667,20 @@ describe("dc-auto-topoff", () => {
       // Run the topoff task which should initialize the DCA
       await runAllTasks();
 
+      // The DCA task the topoff just handed back is funded by the queue, so it carries the
+      // queue's minimum crank reward, as does every other task queued here.
+      const queueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+      const queuedTasks = await tuktukProgram.account.taskV0.all([
+        { memcmp: { offset: 8, bytes: taskQueue.toBase58() } },
+      ]);
+      expect(queuedTasks.length, "topoff should have queued tasks").to.be.greaterThan(0);
+      for (const queued of queuedTasks) {
+        expect(
+          queued.account.crankReward.toString(),
+          `task ${queued.publicKey.toBase58()} (${queued.account.description})`
+        ).to.eq(queueAcc.minCrankReward.toString());
+      }
+
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Run first DCA swap
