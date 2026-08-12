@@ -43,13 +43,8 @@ export async function onboardIotHotspot({
   } = asset;
 
   const keyToAssetKey = keyToAssetForAsset(asset, dao);
-  const keyToAsset = await program.account.keyToAssetV0.fetch(
-    keyToAssetKey
-  );
-  const [info] = await iotInfoKey(
-    rewardableEntityConfig,
-    keyToAsset.entityKey
-  );
+  const keyToAsset = await program.account.keyToAssetV0.fetch(keyToAssetKey);
+  const [info] = await iotInfoKey(rewardableEntityConfig, keyToAsset.entityKey);
   const makerAcc = await program.account.makerV0.fetchNullable(maker);
 
   return program.methods

@@ -7,7 +7,14 @@ import {
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { getAsset, getAssetProof, HNT_MINT, IOT_MINT, MOBILE_MINT, proofArgsAndAccounts } from "@helium/spl-utils";
+import {
+  getAsset,
+  getAssetProof,
+  HNT_MINT,
+  IOT_MINT,
+  MOBILE_MINT,
+  proofArgsAndAccounts,
+} from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -15,7 +22,10 @@ import { exists } from "./utils";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import bs58 from "bs58";
 import { loadKeypair } from "./utils";
-import { getLeafAssetId, TreeAuthorityIncorrectError } from "@metaplex-foundation/mpl-bubblegum";
+import {
+  getLeafAssetId,
+  TreeAuthorityIncorrectError,
+} from "@metaplex-foundation/mpl-bubblegum";
 import axios from "axios";
 
 export async function run(args: any = process.argv) {
@@ -35,8 +45,8 @@ export async function run(args: any = process.argv) {
     },
     testRewardsOracleFaucet: {
       type: "string",
-      default: "https://iot-rewards-faucet.oracle.test-helium.com"
-    }
+      default: "https://iot-rewards-faucet.oracle.test-helium.com",
+    },
   });
 
   const argv = await yarg.argv;
@@ -48,7 +58,7 @@ export async function run(args: any = process.argv) {
   const hemProgram = await initHem(provider);
   const eccVerifier = loadKeypair(argv.testEccVerifierKeypair!);
   const ecc = (await HeliumKeypair.makeRandom()).address.b58;
-  
+
   console.log(ecc);
   // uncomment when data only hotspots are supported
   // const method = await hemProgram.methods.issueDataOnlyEntityV0({
@@ -59,7 +69,7 @@ export async function run(args: any = process.argv) {
   //   eccVerifier: eccVerifier.publicKey,
   // })
   // .signers([eccVerifier]);
-  
+
   // const { keyToAsset } = await method.pubkeys();
   // await method.rpc({skipPreflight: true});
 
@@ -71,7 +81,6 @@ export async function run(args: any = process.argv) {
   //   connection: hemProgram.provider.connection,
   //   assetId: kta.asset,
   // });
-
 
   // const rewardableEntityConfig = rewardableEntityConfigKey(subDaoKey(IOT_MINT)[0], "IOT")[0];
   // await hemProgram.methods.onboardDataOnlyIotHotspotV0({

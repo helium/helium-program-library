@@ -103,123 +103,122 @@ export const Navbar = ({ showNav = true }: { showNav?: boolean }) => {
   return (
     <>
       {viewAsAddress && (
-        <div className="bg-yellow-500 text-black text-center text-sm py-1 px-4 font-medium">
+        <div className="bg-yellow-500 px-4 py-1 text-center text-sm font-medium text-black">
           Viewing as: {truncateAddress(viewAsAddress, 8, 8)}
           {" — "}
-          <a
-            href={pathname}
-            className="underline font-semibold"
-          >
+          <a href={pathname} className="font-semibold underline">
             Exit
           </a>
         </div>
       )}
       <header
-      className={`sticky top-0 z-40 w-full py-[2px] bg-white dark:bg-background ${
-        pathname !== "/" ? "border-b border-gray-200 dark:border-gray-800" : ""
-      }`}
-    >
-      <NavigationMenu className="mx-auto">
-        <NavigationMenuList className="container h-14 px-4 w-screen flex justify-between ">
-          <div className="flex-1 items-center">
-            <NavigationMenuItem className="font-bold flex">
-              <Link
-                rel="noreferrer noopener"
-                href={dashboardHref}
-                className="font-bold text-xl flex items-center gap-2"
-              >
-                <IconHeliumLogo className="w-9 h-9" />
-                my
-              </Link>
-            </NavigationMenuItem>
-          </div>
-
-          <div
-            className="hidden md:flex flex-1 justify-center items-center gap-2 px-4 py-1"
-            hidden={!showNav}
-          >
-            <div className="md:flex justify-center items-center gap-2 bg-slate-100 dark:bg-accent rounded-full px-4">
-              <nav className="flex gap-4 px-2">
-                {routeList.map(({ href, label }, i) => (
-                  <Link href={href} rel="noreferrer noopener" key={i}>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="hover:cursor-pointer p-0"
-                    >
-                      {label}
-                    </Button>
-                  </Link>
-                ))}
-              </nav>
+        className={`dark:bg-background sticky top-0 z-40 w-full bg-white py-[2px] ${
+          pathname !== "/"
+            ? "border-b border-gray-200 dark:border-gray-800"
+            : ""
+        }`}
+      >
+        <NavigationMenu className="mx-auto">
+          <NavigationMenuList className="container flex h-14 w-screen justify-between px-4 ">
+            <div className="flex-1 items-center">
+              <NavigationMenuItem className="flex font-bold">
+                <Link
+                  rel="noreferrer noopener"
+                  href={dashboardHref}
+                  className="flex items-center gap-2 text-xl font-bold"
+                >
+                  <IconHeliumLogo className="h-9 w-9" />
+                  my
+                </Link>
+              </NavigationMenuItem>
             </div>
-          </div>
 
-          <div className="hidden md:flex flex-1 justify-end items-center gap-2">
-            {isDev && displayAddress && (
-              <Button variant="outline" size="sm" onClick={connectWallet}>
-                + Wallet
-              </Button>
-            )}
-            {displayAddress ? (
-              <UserMenu address={displayAddress} onLogout={logout} />
-            ) : (
-              <ConnectWalletButton size="sm" />
-            )}
-          </div>
-
-          {/* mobile */}
-          <span className="flex md:hidden">
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
-              <SheetTrigger className="px-2" asChild>
-                <button type="button" aria-label="Open menu">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Menu Icon</span>
-                </button>
-              </SheetTrigger>
-
-              <SheetContent side={"left"} className="flex flex-col h-full">
-                <SheetHeader>
-                  <SheetTitle className="font-bold text-xl flex items-center gap-2">
-                    <IconHeliumLogo className="w-8 h-8" /> my
-                  </SheetTitle>
-                </SheetHeader>
-                <nav className="flex flex-col w-full gap-2 mt-4 px-4">
+            <div
+              className="hidden flex-1 items-center justify-center gap-2 px-4 py-1 md:flex"
+              hidden={!showNav}
+            >
+              <div className="dark:bg-accent items-center justify-center gap-2 rounded-full bg-slate-100 px-4 md:flex">
+                <nav className="flex gap-4 px-2">
                   {routeList.map(({ href, label }, i) => (
-                    <Link
-                      href={href}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      key={i}
-                    >
+                    <Link href={href} rel="noreferrer noopener" key={i}>
                       <Button
-                        variant="ghost"
+                        variant="link"
                         size="sm"
-                        className="hover:cursor-pointer w-full"
+                        className="p-0 hover:cursor-pointer"
                       >
                         {label}
                       </Button>
                     </Link>
                   ))}
                 </nav>
-                <div className="flex flex-grow" />
-                <div className="w-full flex flex-col gap-2 px-8 pb-8">
-                  {displayAddress ? (
-                    <UserMenu address={displayAddress} onLogout={logout} />
-                  ) : (
-                    <ConnectWalletButton
-                      variant="default"
-                      size="sm"
-                      className="hover:cursor-pointer w-full"
-                    />
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-          </span>
-        </NavigationMenuList>
-      </NavigationMenu>
-    </header>
+              </div>
+            </div>
+
+            <div className="hidden flex-1 items-center justify-end gap-2 md:flex">
+              {isDev && displayAddress && (
+                <Button variant="outline" size="sm" onClick={connectWallet}>
+                  + Wallet
+                </Button>
+              )}
+              {displayAddress ? (
+                <UserMenu address={displayAddress} onLogout={logout} />
+              ) : (
+                <ConnectWalletButton size="sm" />
+              )}
+            </div>
+
+            {/* mobile */}
+            <span className="flex md:hidden">
+              <Sheet open={isOpen} onOpenChange={setIsOpen}>
+                <SheetTrigger className="px-2" asChild>
+                  <button type="button" aria-label="Open menu">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Menu Icon</span>
+                  </button>
+                </SheetTrigger>
+
+                <SheetContent side={"left"} className="flex h-full flex-col">
+                  <SheetHeader>
+                    <SheetTitle className="flex items-center gap-2 text-xl font-bold">
+                      <IconHeliumLogo className="h-8 w-8" /> my
+                    </SheetTitle>
+                  </SheetHeader>
+                  <nav className="mt-4 flex w-full flex-col gap-2 px-4">
+                    {routeList.map(({ href, label }, i) => (
+                      <Link
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        key={i}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full hover:cursor-pointer"
+                        >
+                          {label}
+                        </Button>
+                      </Link>
+                    ))}
+                  </nav>
+                  <div className="flex flex-grow" />
+                  <div className="flex w-full flex-col gap-2 px-8 pb-8">
+                    {displayAddress ? (
+                      <UserMenu address={displayAddress} onLogout={logout} />
+                    ) : (
+                      <ConnectWalletButton
+                        variant="default"
+                        size="sm"
+                        className="w-full hover:cursor-pointer"
+                      />
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </span>
+          </NavigationMenuList>
+        </NavigationMenu>
+      </header>
     </>
   );
 };

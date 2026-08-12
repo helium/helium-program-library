@@ -275,7 +275,7 @@ describe("batchTag", () => {
 
   it("includes the claim_rewards prefix and wallet", () => {
     expect(batchTag(wallet, [a])).to.match(
-      new RegExp(`^claim_rewards:${wallet}:[0-9a-f]{16}$`),
+      new RegExp(`^claim_rewards:${wallet}:[0-9a-f]{16}$`)
     );
   });
 });

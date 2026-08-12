@@ -7,14 +7,14 @@ export interface Season {
 
 export function getCurrentSeason(
   seasons: Season[],
-  now: BN,
+  now: BN
 ): Season | undefined {
   return [...seasons].reverse().find((season) => now.gte(season.start));
 }
 
 export function getCurrentSeasonEnd(
   seasons: Season[],
-  now: BN,
+  now: BN
 ): BN | undefined {
   return getCurrentSeason(seasons, now)?.end;
 }

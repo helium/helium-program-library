@@ -50,7 +50,7 @@ export default function Invite({
         title: "Start Earning",
       },
     ],
-    [step],
+    [step]
   );
 
   const { submitTransactions } = useTransactionSubmission();
@@ -78,7 +78,7 @@ export default function Invite({
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to claim welcome pack",
+            : "Failed to claim welcome pack"
         );
       }
     },
@@ -88,22 +88,22 @@ export default function Invite({
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to claim welcome pack",
+            : "Failed to claim welcome pack"
         );
       },
-    },
+    }
   );
 
   return (
-    <div className="flex items-center justify-center w-full min-h-[100dvh]">
-      <div className="w-full h-[100dvh] md:w-full md:max-w-6xl md:h-auto p-8 flex flex-col justify-between md:justify-center">
-        <div className="flex-1 flex flex-col justify-center md:justify-start">
+    <div className="flex min-h-[100dvh] w-full items-center justify-center">
+      <div className="flex h-[100dvh] w-full flex-col justify-between p-8 md:h-auto md:w-full md:max-w-6xl md:justify-center">
+        <div className="flex flex-1 flex-col justify-center md:justify-start">
           <div className="mb-6">
             <InviteStepper steps={steps} currentStep={step} />
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-end gap-4 md:mt-6 md:max-w-sm h-full md:mx-auto">
+        <div className="flex h-full flex-col items-center justify-end gap-4 md:mx-auto md:mt-6 md:max-w-sm">
           {step === 0 && (
             <ConnectWalletButton className="w-full" onLogin={login} />
           )}
@@ -112,7 +112,7 @@ export default function Invite({
               variant="secondary"
               onClick={handleSignAndSend}
               disabled={loading}
-              className="hover:cursor-pointer w-full"
+              className="w-full hover:cursor-pointer"
             >
               {loading ? "Claiming..." : "Claim Hotspot"}
             </Button>

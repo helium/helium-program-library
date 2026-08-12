@@ -37,10 +37,10 @@ export const circuitBreakerLevel = new client.Gauge({
 register.registerMetric(circuitBreakerLevel);
 
 export const totalRewardsGauge = new client.Gauge({
-  name: 'helium_recipient_total_rewards',
-  help: 'The total rewards claimed in all recipients',
-  labelNames:  ['dnt_mint']
-})
+  name: "helium_recipient_total_rewards",
+  help: "The total rewards claimed in all recipients",
+  labelNames: ["dnt_mint"],
+});
 register.registerMetric(totalRewardsGauge);
 
 export const realVeTokensGauge = new client.Gauge({
@@ -91,4 +91,3 @@ export const oracleTimeSinceSubmitted = new client.Gauge({
   labelNames: ["oracle", "wallet"],
 });
 register.registerMetric(oracleTimeSinceSubmitted);
-

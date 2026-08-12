@@ -37,7 +37,7 @@ export const getByPayerAndTag =
           "partial",
         ];
         statusFilter = requestedStatuses.filter((s) =>
-          validStatuses.includes(s),
+          validStatuses.includes(s)
         );
 
         if (statusFilter.length === 0) {
@@ -108,5 +108,5 @@ export const getByPayerAndTag =
           totalPages,
         },
       };
-    },
+    }
   );

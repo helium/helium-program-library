@@ -12,7 +12,7 @@ import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 
 export function shouldUseJitoBundle(
   transactionsLength: number,
-  cluster: string,
+  cluster: string
 ): boolean {
   return (
     (cluster === "mainnet" || cluster === "mainnet-beta") &&
@@ -22,7 +22,7 @@ export function shouldUseJitoBundle(
 
 export async function jitoBlockEngineRequest(
   method: string,
-  params: unknown[],
+  params: unknown[]
 ): Promise<Response> {
   return fetch(`${env.JITO_BLOCK_ENGINE_URL}/api/v1/bundles`, {
     method: "POST",
@@ -41,7 +41,7 @@ export async function jitoBlockEngineRequest(
 
 async function jitoRpcRequest(
   method: string,
-  params: unknown[],
+  params: unknown[]
 ): Promise<Response> {
   return fetch(env.SOLANA_RPC_URL, {
     method: "POST",
@@ -98,12 +98,14 @@ async function resolveJitoTipAccount(): Promise<string> {
     return await getJitoTipAccount();
   } catch (error) {
     console.warn(
-      `Failed to fetch Jito tip accounts, using fallback: ${error instanceof Error ? error.message : "Unknown error"}`,
+      `Failed to fetch Jito tip accounts, using fallback: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
     );
 
     if (!env.JITO_TIP_ACCOUNT) {
       throw new Error(
-        "Failed to fetch Jito tip accounts and JITO_TIP_ACCOUNT fallback not configured",
+        "Failed to fetch Jito tip accounts and JITO_TIP_ACCOUNT fallback not configured"
       );
     }
     return env.JITO_TIP_ACCOUNT;
@@ -115,7 +117,7 @@ export function getJitoTipAmountLamports(): number {
 }
 
 export async function getJitoTipInstruction(
-  wallet: PublicKey,
+  wallet: PublicKey
 ): Promise<TransactionInstruction> {
   const tipAccount = await resolveJitoTipAccount();
 
@@ -162,7 +164,7 @@ export class BundleSimulationError extends Error {
 
   constructor(fields: BundleSimulationErrorFields) {
     super(
-      `Jito bundle simulation failed [${fields.category}] (${fields.actionType}): ${fields.detail}`,
+      `Jito bundle simulation failed [${fields.category}] (${fields.actionType}): ${fields.detail}`
     );
     this.name = "BundleSimulationError";
     this.category = fields.category;
@@ -200,7 +202,7 @@ export class JitoBundleSubmissionError extends Error {
       payer?: string;
       transactionMetadata?: Array<Record<string, unknown> | undefined>;
     },
-    cause?: unknown,
+    cause?: unknown
   ) {
     super(message);
     this.name = "JitoBundleSubmissionError";
@@ -215,7 +217,6 @@ export class JitoBundleSubmissionError extends Error {
     }
   }
 }
-
 
 export interface JitoBundleContext {
   tag?: string;
@@ -236,7 +237,7 @@ function stringifySummary(summary: unknown): string {
  * Classify bundle simulation failure using the shared classifier.
  */
 function classifyBundleSimulationFailure(
-  txResults: Array<{ logs?: string[]; err?: unknown }>,
+  txResults: Array<{ logs?: string[]; err?: unknown }>
 ): { category: string; detail: string } {
   const allLogs = txResults.flatMap((r) => r.logs ?? []);
   const firstErr = txResults.find((r) => r.err);
@@ -252,26 +253,22 @@ function classifyBundleSimulationFailure(
  * Derive the action type from the bundle's transaction metadata
  * (e.g. "claim_rewards", "position_create", "mint_data_credits").
  */
-function deriveActionType(
-  context?: JitoBundleContext,
-): string {
+function deriveActionType(context?: JitoBundleContext): string {
   const meta = context?.transactionMetadata;
   if (!meta) return "unknown";
-  const firstReal = meta.find(
-    (m) => m && m.type && m.type !== "jito_tip",
-  );
+  const firstReal = meta.find((m) => m && m.type && m.type !== "jito_tip");
   return (firstReal?.type as string) ?? "unknown";
 }
 
 export async function simulateJitoBundle(
   serializedTransactions: string[],
-  context?: JitoBundleContext,
+  context?: JitoBundleContext
 ): Promise<void> {
   const deserializedTxs = serializedTransactions.map((tx) =>
-    VersionedTransaction.deserialize(Buffer.from(tx, "base64")),
+    VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
   );
   const base64Txs = deserializedTxs.map((transaction) =>
-    Buffer.from(transaction.serialize()).toString("base64"),
+    Buffer.from(transaction.serialize()).toString("base64")
   );
 
   const nullConfigs = base64Txs.map(() => null);
@@ -302,13 +299,15 @@ export async function simulateJitoBundle(
 
   if (!response.ok) {
     throw new Error(
-      `simulateBundle HTTP ${response.status}: ${JSON.stringify(rpcResponse)}`,
+      `simulateBundle HTTP ${response.status}: ${JSON.stringify(rpcResponse)}`
     );
   }
 
   if (rpcResponse.error) {
     throw new Error(
-      `simulateBundle RPC error: ${rpcResponse.error.message || JSON.stringify(rpcResponse.error)}`,
+      `simulateBundle RPC error: ${
+        rpcResponse.error.message || JSON.stringify(rpcResponse.error)
+      }`
     );
   }
 
@@ -342,9 +341,9 @@ export async function simulateJitoBundle(
             (r, i) =>
               `  tx[${i}]: error=${JSON.stringify(r.err ?? null)}, ` +
               `unitsConsumed=${r.unitsConsumed ?? "N/A"}\n` +
-              (r.logs ?? []).map((l) => `    ${l}`).join("\n"),
+              (r.logs ?? []).map((l) => `    ${l}`).join("\n")
           )
-          .join("\n"),
+          .join("\n")
     );
 
     throw new BundleSimulationError({
@@ -377,13 +376,13 @@ export async function simulateJitoBundle(
 
 export async function submitJitoBundle(
   serializedTransactions: string[],
-  context?: JitoBundleContext,
+  context?: JitoBundleContext
 ): Promise<string> {
   const deserializedTxs = serializedTransactions.map((tx) =>
-    VersionedTransaction.deserialize(Buffer.from(tx, "base64")),
+    VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
   );
   const transactions = deserializedTxs.map((transaction) =>
-    Buffer.from(transaction.serialize()).toString("base64"),
+    Buffer.from(transaction.serialize()).toString("base64")
   );
 
   try {
@@ -394,7 +393,9 @@ export async function submitJitoBundle(
 
     if (!response.ok) {
       throw new Error(
-        `HTTP error! status: ${response.status}: ${JSON.stringify(await response.json())}`,
+        `HTTP error! status: ${response.status}: ${JSON.stringify(
+          await response.json()
+        )}`
       );
     }
 
@@ -402,7 +403,9 @@ export async function submitJitoBundle(
 
     if (result.error) {
       throw new Error(
-        `Jito API error: ${result.error.message || JSON.stringify(result.error)}`,
+        `Jito API error: ${
+          result.error.message || JSON.stringify(result.error)
+        }`
       );
     }
 
@@ -411,7 +414,9 @@ export async function submitJitoBundle(
     console.error("Jito bundle submission failed:", error);
 
     throw new JitoBundleSubmissionError(
-      `Jito bundle submission failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      `Jito bundle submission failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
       {
         explorerLinks: deserializedTxs.map((tx) => {
           try {
@@ -432,13 +437,13 @@ export async function submitJitoBundle(
         payer: context?.payer,
         transactionMetadata: context?.transactionMetadata,
       },
-      error,
+      error
     );
   }
 }
 
 export async function getJitoTipTransaction(
-  wallet: PublicKey,
+  wallet: PublicKey
 ): Promise<VersionedTransaction> {
   const tipAccount = await resolveJitoTipAccount();
 
@@ -457,7 +462,7 @@ export async function getJitoTipTransaction(
         ],
         feePayer: wallet,
       },
-      "finalized",
-    ),
+      "finalized"
+    )
   );
 }

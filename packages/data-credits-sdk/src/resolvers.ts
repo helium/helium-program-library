@@ -34,7 +34,11 @@ export const dataCreditsResolvers = combineResolvers(
     owner: "recipient",
   }),
   resolveIndividual(async ({ path, accounts, provider, args }) => {
-    if (path[path.length - 1] === "recipient" && !accounts.recipient && (provider as AnchorProvider).wallet) {
+    if (
+      path[path.length - 1] === "recipient" &&
+      !accounts.recipient &&
+      (provider as AnchorProvider).wallet
+    ) {
       return (provider as AnchorProvider).wallet.publicKey;
     } else if (
       path[path.length - 1] === "delegatedDataCredits" &&
@@ -42,7 +46,10 @@ export const dataCreditsResolvers = combineResolvers(
       accounts.subDao &&
       args[0].routerKey
     ) {
-      return delegatedDataCreditsKey(accounts.subDao as PublicKey, args[0].routerKey)[0];
+      return delegatedDataCreditsKey(
+        accounts.subDao as PublicKey,
+        args[0].routerKey
+      )[0];
     }
   })
 );

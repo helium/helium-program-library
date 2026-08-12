@@ -1,7 +1,7 @@
-import { PublicKey } from '@solana/web3.js';
-import { BinaryReader, BinaryWriter } from 'borsh';
+import { PublicKey } from "@solana/web3.js";
+import { BinaryReader, BinaryWriter } from "borsh";
 // @ts-ignore
-import base58 from 'bs58';
+import base58 from "bs58";
 
 export type StringPublicKey = string;
 
@@ -24,7 +24,7 @@ export const extendBorsh = () => {
   };
 
   (BinaryWriter.prototype as any).writePubkeyAsString = function (
-    value: StringPublicKey,
+    value: StringPublicKey
   ) {
     const writer = this as unknown as BinaryWriter;
     writer.writeFixedArray(base58.decode(value));

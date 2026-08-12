@@ -23,7 +23,10 @@ import {
 } from "../packages/data-credits-sdk/src";
 import { PROGRAM_ID } from "../packages/data-credits-sdk/src/constants";
 import * as hsd from "../packages/helium-sub-daos-sdk/src";
-import { daoKey, delegatorRewardsPercent } from "../packages/helium-sub-daos-sdk/src";
+import {
+  daoKey,
+  delegatorRewardsPercent,
+} from "../packages/helium-sub-daos-sdk/src";
 import { toBN, toNumber } from "../packages/spl-utils/src";
 import * as vsr from "../packages/voter-stake-registry-sdk/src";
 import { DataCredits } from "../target/types/data_credits";
@@ -45,7 +48,7 @@ export async function burnDataCredits({
   amount: number;
   subDao: PublicKey;
 }): Promise<{ subDaoEpochInfo: PublicKey }> {
-  console.log("start delegate")
+  console.log("start delegate");
   const useData = await program.methods
     .delegateDataCreditsV0({
       amount: toBN(amount, 0),
@@ -110,7 +113,7 @@ describe("data-credits", () => {
     nftProxyProgram = await initNftProxy(provider);
     await ensureVSRIdl();
     await ensureHSDIdl();
-  })
+  });
 
   beforeEach(async () => {
     hntMint = await createMint(provider, hntDecimals, me, me);
@@ -230,9 +233,9 @@ describe("data-credits", () => {
         program,
         hntAmount: new BN(1 * 10 ** 8),
       });
-      console.log('txs', JSON.stringify(txs, null, 2));
+      console.log("txs", JSON.stringify(txs, null, 2));
 
-      await provider.sendAll(txs, { skipPreflight: true })
+      await provider.sendAll(txs, { skipPreflight: true });
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);
@@ -248,8 +251,8 @@ describe("data-credits", () => {
           new BN(price.ema_price.price)
             .sub(new BN(price.ema_price.conf).mul(new BN(2)))
             .toNumber() *
-          10 ** price.ema_price.expo *
-          10 ** 5
+            10 ** price.ema_price.expo *
+            10 ** 5
         );
       expect(dcBal.value.uiAmount).to.be.within(
         approxEndBal - 1,
@@ -266,7 +269,7 @@ describe("data-credits", () => {
         dcAmount: new BN(dcAmount),
       });
 
-      await provider.sendAll(txs)
+      await provider.sendAll(txs);
 
       const dcAta = await getAssociatedTokenAddress(dcMint, me);
       const dcAtaAcc = await getAccount(provider.connection, dcAta);

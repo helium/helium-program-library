@@ -350,7 +350,9 @@ export const upsertProgramAccounts = async ({
                         account.data[1] === "base64+zstd"
                           ? Buffer.from(
                               fzstdDecompress(
-                                new Uint8Array(Buffer.from(account.data[0], "base64"))
+                                new Uint8Array(
+                                  Buffer.from(account.data[0], "base64")
+                                )
                               )
                             )
                           : Array.isArray(account.data) &&
@@ -472,10 +474,18 @@ export const upsertProgramAccounts = async ({
               if (toUpdate.length > 0) {
                 const UPSERT_CHUNK_SIZE = 5000;
                 for (let i = 0; i < toUpdate.length; i += UPSERT_CHUNK_SIZE) {
-                  await model.bulkCreate(toUpdate.slice(i, i + UPSERT_CHUNK_SIZE), {
-                    updateOnDuplicate: ["address", "refreshedAt", "lastBlock", ...updateOnDuplicateFields],
-                    transaction,
-                  });
+                  await model.bulkCreate(
+                    toUpdate.slice(i, i + UPSERT_CHUNK_SIZE),
+                    {
+                      updateOnDuplicate: [
+                        "address",
+                        "refreshedAt",
+                        "lastBlock",
+                        ...updateOnDuplicateFields,
+                      ],
+                      transaction,
+                    }
+                  );
                 }
               }
 

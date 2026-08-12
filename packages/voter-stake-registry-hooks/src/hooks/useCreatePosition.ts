@@ -8,7 +8,10 @@ import {
   subDaoEpochInfoKey,
   subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
-import { delegationClaimBotKey, init as initHplCrons } from "@helium/hpl-crons-sdk";
+import {
+  delegationClaimBotKey,
+  init as initHplCrons,
+} from "@helium/hpl-crons-sdk";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
 import { HNT_MINT, sendInstructions } from "@helium/spl-utils";
 import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
@@ -54,7 +57,7 @@ export const useCreatePosition = ({
     automationEnabled,
     isDelegated: true,
     hasDelegationClaimBot: false,
-    wallet: provider?.wallet?.publicKey
+    wallet: provider?.wallet?.publicKey,
   });
   const { info: taskQueue } = useTaskQueue(TASK_QUEUE);
 
@@ -201,11 +204,15 @@ export const useCreatePosition = ({
             delegateInstructions.push(
               createAssociatedTokenAccountIdempotentInstruction(
                 provider.wallet.publicKey,
-                getAssociatedTokenAddressSync(HNT_MINT, provider.wallet.publicKey, true),
+                getAssociatedTokenAddressSync(
+                  HNT_MINT,
+                  provider.wallet.publicKey,
+                  true
+                ),
                 provider.wallet.publicKey,
-                HNT_MINT,
+                HNT_MINT
               )
-            )
+            );
             delegateInstructions.push(
               await hplCronsProgram.methods
                 .initDelegationClaimBotV0()
@@ -214,21 +221,29 @@ export const useCreatePosition = ({
                   position: position,
                   taskQueue: TASK_QUEUE,
                   mint: mintKeypair.publicKey,
-                  positionTokenAccount: getAssociatedTokenAddressSync(mintKeypair.publicKey, provider.wallet.publicKey, true),
+                  positionTokenAccount: getAssociatedTokenAddressSync(
+                    mintKeypair.publicKey,
+                    provider.wallet.publicKey,
+                    true
+                  ),
                 })
                 .instruction()
             );
-            const delegationClaimBotK = delegationClaimBotKey(TASK_QUEUE, delegatedPosKey)[0];
+            const delegationClaimBotK = delegationClaimBotKey(
+              TASK_QUEUE,
+              delegatedPosKey
+            )[0];
             delegateInstructions.push(
               SystemProgram.transfer({
                 fromPubkey: provider.wallet.publicKey,
                 toPubkey: delegationClaimBotK,
-                lamports: BigInt(
-                  PREPAID_TX_FEES * LAMPORTS_PER_SOL
-                ),
+                lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
               })
             );
-            const nextAvailable = await nextAvailableTaskIds(taskQueue!.taskBitmap, 1)[0];
+            const nextAvailable = await nextAvailableTaskIds(
+              taskQueue!.taskBitmap,
+              1
+            )[0];
             const task = taskKey(TASK_QUEUE, nextAvailable)[0];
             delegateInstructions.push(
               await hplCronsProgram.methods
@@ -241,7 +256,11 @@ export const useCreatePosition = ({
                   mint: mintKeypair.publicKey,
                   hntMint: HNT_MINT,
                   positionAuthority: provider.wallet!.publicKey!,
-                  positionTokenAccount: getAssociatedTokenAddressSync(mintKeypair.publicKey, provider.wallet.publicKey, true),
+                  positionTokenAccount: getAssociatedTokenAddressSync(
+                    mintKeypair.publicKey,
+                    provider.wallet.publicKey,
+                    true
+                  ),
                   taskQueue: TASK_QUEUE,
                   delegatedPosition: delegatedPosKey,
                   systemProgram: SystemProgram.programId,

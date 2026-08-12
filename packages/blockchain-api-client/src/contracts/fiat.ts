@@ -14,7 +14,13 @@ import {
   UpdateTransferInputSchema,
   UpdateTransferOutputSchema,
 } from "../schemas/fiat";
-import { BAD_REQUEST, NOT_FOUND, RATE_LIMITED, UNAUTHENTICATED, UNAUTHORIZED } from "../errors/common";
+import {
+  BAD_REQUEST,
+  NOT_FOUND,
+  RATE_LIMITED,
+  UNAUTHENTICATED,
+  UNAUTHORIZED,
+} from "../errors/common";
 import { INSUFFICIENT_FUNDS } from "../errors/solana";
 import { oc } from "@orpc/contract";
 
@@ -29,7 +35,7 @@ export const fiatContract = oc
       .route({ method: "GET", path: "/fiat/kyc/status" })
       .output(KycStatusOutputSchema)
       .errors({
-        EMAIL_NOT_LINKED: { status: 401, message: "Email not linked." }
+        EMAIL_NOT_LINKED: { status: 401, message: "Email not linked." },
       }),
     initKyc: oc
       .route({ method: "POST", path: "/fiat/kyc/init" })
@@ -37,7 +43,10 @@ export const fiatContract = oc
       .output(KycStatusOutputSchema)
       .errors({
         EMAIL_NOT_LINKED: { status: 401, message: "Email not linked." },
-        BRIDGE_ERROR: { message: "Failed to create Bridge KYC link", status: 500 },
+        BRIDGE_ERROR: {
+          message: "Failed to create Bridge KYC link",
+          status: 500,
+        },
       }),
     getFees: oc
       .route({ method: "GET", path: "/fiat/fees" })
@@ -55,7 +64,10 @@ export const fiatContract = oc
       .output(BankAccountSchema)
       .errors({
         NO_CUSTOMER: { message: "Bridge customer ID not found", status: 404 },
-        BRIDGE_ERROR: { message: "Failed to create Bridge KYC link", status: 500 },
+        BRIDGE_ERROR: {
+          message: "Failed to create Bridge KYC link",
+          status: 500,
+        },
       }),
     deleteBankAccount: oc
       .route({ method: "DELETE", path: "/fiat/bank-accounts/{id}" })
@@ -71,7 +83,10 @@ export const fiatContract = oc
       .output(QuoteOutputSchema)
       .errors({
         BAD_REQUEST,
-        JUPITER_ERROR: { message: "Failed to get quote from Jupiter", status: 500 },
+        JUPITER_ERROR: {
+          message: "Failed to get quote from Jupiter",
+          status: 500,
+        },
         RATE_LIMITED,
       }),
     sendFunds: oc
@@ -80,8 +95,14 @@ export const fiatContract = oc
       .output(SendFundsOutputSchema)
       .errors({
         NOT_FOUND,
-        BRIDGE_ERROR: { message: "Failed to create Bridge transfer", status: 500 },
-        JUPITER_ERROR: { message: "Failed to get quote from Jupiter", status: 500 },
+        BRIDGE_ERROR: {
+          message: "Failed to create Bridge transfer",
+          status: 500,
+        },
+        JUPITER_ERROR: {
+          message: "Failed to get quote from Jupiter",
+          status: 500,
+        },
         INSUFFICIENT_FUNDS,
         RATE_LIMITED,
       }),

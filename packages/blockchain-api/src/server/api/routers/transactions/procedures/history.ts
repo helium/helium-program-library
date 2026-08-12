@@ -99,7 +99,7 @@ export const history = publicProcedure.transactions.history.handler(
     // Sort merged results by timestamp descending and take page
     actions.sort(
       (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
     const paged = actions.slice(0, limit);
 
@@ -125,7 +125,7 @@ export const history = publicProcedure.transactions.history.handler(
         });
 
         const onChainBySig = new Map(
-          onChainMatches.map((row) => [row.signature, row.actionMetadata]),
+          onChainMatches.map((row) => [row.signature, row.actionMetadata])
         );
 
         for (const action of paged) {
@@ -168,5 +168,5 @@ export const history = publicProcedure.transactions.history.handler(
         totalPages,
       },
     };
-  },
+  }
 );

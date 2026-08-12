@@ -1,7 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  init as initHem,
-} from "@helium/helium-entity-manager-sdk";
+import { init as initHem } from "@helium/helium-entity-manager-sdk";
 import os from "os";
 import yargs from "yargs/yargs";
 import fs from "fs";
@@ -27,6 +25,9 @@ export async function run(args: any = process.argv) {
   const hemProgram = await initHem(provider);
 
   const mobileInfos = await hemProgram.account.mobileHotspotInfoV0.all();
-  fs.writeFileSync("./snapshot.json", JSON.stringify(mobileInfos.map((x) => x.publicKey.toString())));
+  fs.writeFileSync(
+    "./snapshot.json",
+    JSON.stringify(mobileInfos.map((x) => x.publicKey.toString()))
+  );
   console.log(mobileInfos.length);
 }

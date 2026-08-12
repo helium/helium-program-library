@@ -92,7 +92,7 @@ export const upsertOwners = async ({
 
             if (assetsToUpdate.length > 0) {
               await AssetOwner.bulkCreate(assetsToUpdate, {
-                updateOnDuplicate: ['owner', 'lastBlock'],
+                updateOnDuplicate: ["owner", "lastBlock"],
                 transaction,
               });
             }

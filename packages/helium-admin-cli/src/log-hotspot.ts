@@ -6,7 +6,11 @@ import {
   mobileInfoKey,
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
-import { lazyDistributorKey, recipientKey, init as initLazy } from "@helium/lazy-distributor-sdk";
+import {
+  lazyDistributorKey,
+  recipientKey,
+  init as initLazy,
+} from "@helium/lazy-distributor-sdk";
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
   getAsset,
@@ -105,8 +109,20 @@ export async function run(args: any = process.argv) {
     const mobileRecipient = recipientKey(mobileLazy, keyToAsset!.asset);
     const hntRecipient = recipientKey(hntLazy, keyToAsset!.asset);
 
-    console.log("Iot Recipient", iotRecipient, await lazyProgram.account.recipientV0.fetchNullable(iotRecipient[0]));
-    console.log("Mobile Recipient", mobileRecipient, await lazyProgram.account.recipientV0.fetchNullable(mobileRecipient[0]));
-    console.log("Hnt Recipient", hntRecipient, await lazyProgram.account.recipientV0.fetchNullable(hntRecipient[0]));
+    console.log(
+      "Iot Recipient",
+      iotRecipient,
+      await lazyProgram.account.recipientV0.fetchNullable(iotRecipient[0])
+    );
+    console.log(
+      "Mobile Recipient",
+      mobileRecipient,
+      await lazyProgram.account.recipientV0.fetchNullable(mobileRecipient[0])
+    );
+    console.log(
+      "Hnt Recipient",
+      hntRecipient,
+      await lazyProgram.account.recipientV0.fetchNullable(hntRecipient[0])
+    );
   }
 }

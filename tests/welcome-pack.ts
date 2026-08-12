@@ -1,79 +1,127 @@
-import * as anchor from "@coral-xyz/anchor"
-import { Program } from "@coral-xyz/anchor"
-import { Keypair as HeliumKeypair } from "@helium/crypto"
-import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk"
-import { init as initMiniFanout } from "@helium/mini-fanout-sdk"
-import { bulkSendTransactions, createMint, sendInstructions, sleep, toBN } from "@helium/spl-utils"
-import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk"
-import bs58 from "bs58"
-import { init as initTuktuk, taskQueueKey, taskQueueNameMappingKey, tuktukConfigKey } from "@helium/tuktuk-sdk"
-import { AddressLookupTableProgram, ComputeBudgetProgram, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js"
-import { BN } from "bn.js"
-import chai from "chai"
-import chaiAsPromised from "chai-as-promised"
-import { ThresholdType } from "../packages/circuit-breaker-sdk/src"
-import { initializeCompressionRecipient, init as initLazyDistributor, lazyDistributorKey, recipientKey } from "../packages/lazy-distributor-sdk/src"
-import { miniFanoutKey, queueAuthorityKey } from "../packages/mini-fanout-sdk/src"
-import { oracleSignerKey } from "../packages/rewards-oracle-sdk/src"
-import { claimApprovalSignature, claimWelcomePack, closeWelcomePack, initializeWelcomePack, init as initWelcomePack, welcomePackKey } from "../packages/welcome-pack-sdk/src"
-import { HeliumSubDaos } from "../target/types/helium_sub_daos"
-import { LazyDistributor } from "../target/types/lazy_distributor"
-import { MiniFanout } from "../target/types/mini_fanout"
-import { WelcomePack } from "../target/types/welcome_pack"
-import { createMockCompression } from "./utils/compression"
-import { dataOnlyConfigKey, init as initHeliumEntityManager } from "../packages/helium-entity-manager-sdk/src"
-import { HeliumEntityManager } from "../target/types/helium_entity_manager"
-import { initTestDao, initTestSubdao } from "./utils/daos"
-import { ensureHEMIdl, ensureHSDIdl, ensureLDIdl, ensureMFIdl, ensureWPIdl } from "./utils/fixtures"
-import { getConcurrentMerkleTreeAccountSize, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression"
-import { loadKeypair } from "./utils/solana"
-import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token"
-import { BUBBLEGUM_PROGRAM_ID, NOOP_PROGRAM_ID } from "../packages/welcome-pack-sdk/src/functions/initializeWelcomePack"
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { Keypair as HeliumKeypair } from "@helium/crypto";
+import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
+import { init as initMiniFanout } from "@helium/mini-fanout-sdk";
+import {
+  bulkSendTransactions,
+  createMint,
+  sendInstructions,
+  sleep,
+  toBN,
+} from "@helium/spl-utils";
+import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
+import bs58 from "bs58";
+import {
+  init as initTuktuk,
+  taskQueueKey,
+  taskQueueNameMappingKey,
+  tuktukConfigKey,
+} from "@helium/tuktuk-sdk";
+import {
+  AddressLookupTableProgram,
+  ComputeBudgetProgram,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
+import { BN } from "bn.js";
+import chai from "chai";
+import chaiAsPromised from "chai-as-promised";
+import { ThresholdType } from "../packages/circuit-breaker-sdk/src";
+import {
+  initializeCompressionRecipient,
+  init as initLazyDistributor,
+  lazyDistributorKey,
+  recipientKey,
+} from "../packages/lazy-distributor-sdk/src";
+import {
+  miniFanoutKey,
+  queueAuthorityKey,
+} from "../packages/mini-fanout-sdk/src";
+import { oracleSignerKey } from "../packages/rewards-oracle-sdk/src";
+import {
+  claimApprovalSignature,
+  claimWelcomePack,
+  closeWelcomePack,
+  initializeWelcomePack,
+  init as initWelcomePack,
+  welcomePackKey,
+} from "../packages/welcome-pack-sdk/src";
+import { HeliumSubDaos } from "../target/types/helium_sub_daos";
+import { LazyDistributor } from "../target/types/lazy_distributor";
+import { MiniFanout } from "../target/types/mini_fanout";
+import { WelcomePack } from "../target/types/welcome_pack";
+import { createMockCompression } from "./utils/compression";
+import {
+  dataOnlyConfigKey,
+  init as initHeliumEntityManager,
+} from "../packages/helium-entity-manager-sdk/src";
+import { HeliumEntityManager } from "../target/types/helium_entity_manager";
+import { initTestDao, initTestSubdao } from "./utils/daos";
+import {
+  ensureHEMIdl,
+  ensureHSDIdl,
+  ensureLDIdl,
+  ensureMFIdl,
+  ensureWPIdl,
+} from "./utils/fixtures";
+import {
+  getConcurrentMerkleTreeAccountSize,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+} from "@solana/spl-account-compression";
+import { loadKeypair } from "./utils/solana";
+import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
+import {
+  BUBBLEGUM_PROGRAM_ID,
+  NOOP_PROGRAM_ID,
+} from "../packages/welcome-pack-sdk/src/functions/initializeWelcomePack";
 
-chai.use(chaiAsPromised)
-const { expect } = chai
+chai.use(chaiAsPromised);
+const { expect } = chai;
 
 describe("welcome-pack", () => {
-  anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"))
-  const provider = anchor.getProvider() as anchor.AnchorProvider
-  const me = provider.wallet.publicKey
+  anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
+  const provider = anchor.getProvider() as anchor.AnchorProvider;
+  const me = provider.wallet.publicKey;
   const eccVerifier = loadKeypair(__dirname + "/keypairs/verifier-test.json");
 
-  const oracle = Keypair.generate()
-  let welcomePackProgram: Program<WelcomePack>
-  let tuktukProgram: Program<Tuktuk>
-  let hemProgram: Program<HeliumEntityManager>
-  let lazyDistributorProgram: Program<LazyDistributor>
-  let heliumSubDaosProgram: Program<HeliumSubDaos>
-  let miniFanoutProgram: Program<MiniFanout>
-  let dao: PublicKey
-  let hntMint: PublicKey
-  let dcMint: PublicKey
-  let collection: PublicKey
-  let merkle: PublicKey
-  let hotspot: PublicKey
-  let hotspotOwner: Keypair
-  let getAssetFn: any
-  let getAssetProofFn: any
-  let lazyDistributor: PublicKey
-  let rewardsMint: PublicKey
-  let taskQueue: PublicKey
+  const oracle = Keypair.generate();
+  let welcomePackProgram: Program<WelcomePack>;
+  let tuktukProgram: Program<Tuktuk>;
+  let hemProgram: Program<HeliumEntityManager>;
+  let lazyDistributorProgram: Program<LazyDistributor>;
+  let heliumSubDaosProgram: Program<HeliumSubDaos>;
+  let miniFanoutProgram: Program<MiniFanout>;
+  let dao: PublicKey;
+  let hntMint: PublicKey;
+  let dcMint: PublicKey;
+  let collection: PublicKey;
+  let merkle: PublicKey;
+  let hotspot: PublicKey;
+  let hotspotOwner: Keypair;
+  let getAssetFn: any;
+  let getAssetProofFn: any;
+  let lazyDistributor: PublicKey;
+  let rewardsMint: PublicKey;
+  let taskQueue: PublicKey;
   let taskQueueName = `test-${Math.random().toString(36).substring(2, 15)}`;
   let ecc: string;
 
   before(async () => {
-    await ensureLDIdl()
-    await ensureWPIdl()
-    await ensureHSDIdl()
-    await ensureMFIdl()
-    await ensureHEMIdl()
-    heliumSubDaosProgram = await initHeliumSubDaos(provider)
-    welcomePackProgram = await initWelcomePack(provider)
-    miniFanoutProgram = await initMiniFanout(provider)
-    lazyDistributorProgram = await initLazyDistributor(provider)
-    hemProgram = await initHeliumEntityManager(provider)
+    await ensureLDIdl();
+    await ensureWPIdl();
+    await ensureHSDIdl();
+    await ensureMFIdl();
+    await ensureHEMIdl();
+    heliumSubDaosProgram = await initHeliumSubDaos(provider);
+    welcomePackProgram = await initWelcomePack(provider);
+    miniFanoutProgram = await initMiniFanout(provider);
+    lazyDistributorProgram = await initLazyDistributor(provider);
+    hemProgram = await initHeliumEntityManager(provider);
     tuktukProgram = await initTuktuk(provider);
-    const tuktukConfig = tuktukConfigKey()[0]
+    const tuktukConfig = tuktukConfigKey()[0];
     const config = await tuktukProgram.account.tuktukConfigV0.fetch(
       tuktukConfig
     );
@@ -93,7 +141,10 @@ describe("welcome-pack", () => {
         payer: me,
         updateAuthority: me,
         taskQueue,
-        taskQueueNameMapping: taskQueueNameMappingKey(tuktukConfig, taskQueueName)[0],
+        taskQueueNameMapping: taskQueueNameMappingKey(
+          tuktukConfig,
+          taskQueueName
+        )[0],
       })
       .rpc();
 
@@ -105,14 +156,14 @@ describe("welcome-pack", () => {
         taskQueue,
       })
       .rpc();
-  })
+  });
 
   beforeEach(async () => {
     ecc = (await HeliumKeypair.makeRandom()).address.b58;
     // Set up DAO, SubDAO, mints, and a compressed hotspot NFT
-    const mint = await createMint(provider, 8, me, me)
-    hntMint = mint
-    dcMint = await createMint(provider, 0, me, me)
+    const mint = await createMint(provider, 8, me, me);
+    hntMint = mint;
+    dcMint = await createMint(provider, 0, me, me);
     const daoRes = await initTestDao(
       heliumSubDaosProgram,
       provider,
@@ -120,22 +171,25 @@ describe("welcome-pack", () => {
       me,
       dcMint,
       hntMint
-    )
-    dao = daoRes.dao
+    );
+    dao = daoRes.dao;
     await initTestSubdao({
       hsdProgram: heliumSubDaosProgram,
       provider,
       authority: me,
       dao,
       numTokens: new BN(1000000000),
-    })
+    });
 
     // Mint a compressed hotspot NFT
-    hotspotOwner = Keypair.generate()
-    const merkleKeypair = Keypair.generate()
-    merkle = merkleKeypair.publicKey
-    const dataOnlyConfigK = dataOnlyConfigKey(dao)[0]
-    collection = PublicKey.findProgramAddressSync([Buffer.from("collection"), dataOnlyConfigK.toBuffer()], hemProgram.programId)[0]
+    hotspotOwner = Keypair.generate();
+    const merkleKeypair = Keypair.generate();
+    merkle = merkleKeypair.publicKey;
+    const dataOnlyConfigK = dataOnlyConfigKey(dao)[0];
+    collection = PublicKey.findProgramAddressSync(
+      [Buffer.from("collection"), dataOnlyConfigK.toBuffer()],
+      hemProgram.programId
+    )[0];
 
     const [height, buffer, canopy] = [3, 8, 0];
     const space = getConcurrentMerkleTreeAccountSize(height, buffer, canopy);
@@ -166,7 +220,7 @@ describe("welcome-pack", () => {
           lamports: cost,
           space: space,
           programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-        })
+        }),
       ])
       .signers([merkleKeypair])
       .rpc({ skipPreflight: true });
@@ -191,15 +245,15 @@ describe("welcome-pack", () => {
       merkle,
       ecc,
       hotspotOwner: hotspotOwner.publicKey,
-    })
-    hotspot = mock.hotspot
-    getAssetFn = mock.getAssetFn
-    getAssetProofFn = mock.getAssetProofFn
+    });
+    hotspot = mock.hotspot;
+    getAssetFn = mock.getAssetFn;
+    getAssetProofFn = mock.getAssetProofFn;
 
     // Initialize Lazy Distributor and Recipient
-    rewardsMint = hntMint
-    const [ldPda] = lazyDistributorKey(rewardsMint)
-    lazyDistributor = ldPda
+    rewardsMint = hntMint;
+    const [ldPda] = lazyDistributorKey(rewardsMint);
+    lazyDistributor = ldPda;
     await lazyDistributorProgram.methods
       .initializeLazyDistributorV0({
         authority: me,
@@ -219,21 +273,23 @@ describe("welcome-pack", () => {
       .accountsPartial({
         rewardsMint,
       })
-      .rpc({ skipPreflight: true })
-    await (await initializeCompressionRecipient({
-      program: lazyDistributorProgram,
-      assetId: hotspot,
-      lazyDistributor,
-      owner: hotspotOwner.publicKey,
-      payer: me,
-      assetEndpoint: "https://some-url/",
-      getAssetFn,
-      getAssetProofFn,
-    })).rpc({ skipPreflight: true })
-  })
+      .rpc({ skipPreflight: true });
+    await (
+      await initializeCompressionRecipient({
+        program: lazyDistributorProgram,
+        assetId: hotspot,
+        lazyDistributor,
+        owner: hotspotOwner.publicKey,
+        payer: me,
+        assetEndpoint: "https://some-url/",
+        getAssetFn,
+        getAssetProofFn,
+      })
+    ).rpc({ skipPreflight: true });
+  });
 
   describe("with a welcome pack", () => {
-    const rewardsSchedule = "* * * * * *"
+    const rewardsSchedule = "* * * * * *";
     let welcomePack: PublicKey;
     beforeEach(async () => {
       const rewardsSplit = [
@@ -244,42 +300,46 @@ describe("welcome-pack", () => {
         {
           wallet: PublicKey.default,
           share: { share: { amount: 50 } },
-        }
-      ]
-      const solAmount = toBN(0.01, 9)
-      welcomePack = welcomePackKey(hotspotOwner.publicKey, 0)[0]
-      console.log("Inittting welcome pack")
-      const { pubkeys: { welcomePack: welcomePackPda } } = await (await initializeWelcomePack({
-        program: welcomePackProgram,
-        assetId: hotspot,
-        lazyDistributor,
-        solAmount,
-        rewardsSplit,
-        rewardsSchedule,
-        getAssetFn,
-        getAssetProofFn,
-        assetReturnAddress: hotspotOwner.publicKey,
-        rentRefund: PublicKey.default,
-        owner: hotspotOwner.publicKey,
-        payer: me,
-      }))
+        },
+      ];
+      const solAmount = toBN(0.01, 9);
+      welcomePack = welcomePackKey(hotspotOwner.publicKey, 0)[0];
+      console.log("Inittting welcome pack");
+      const {
+        pubkeys: { welcomePack: welcomePackPda },
+      } = await (
+        await initializeWelcomePack({
+          program: welcomePackProgram,
+          assetId: hotspot,
+          lazyDistributor,
+          solAmount,
+          rewardsSplit,
+          rewardsSchedule,
+          getAssetFn,
+          getAssetProofFn,
+          assetReturnAddress: hotspotOwner.publicKey,
+          rentRefund: PublicKey.default,
+          owner: hotspotOwner.publicKey,
+          payer: me,
+        })
+      )
         .signers([hotspotOwner])
-        .rpcAndKeys({ skipPreflight: true })
-      welcomePack = welcomePackPda!
-      console.log("Welcome pack initialized")
-    })
+        .rpcAndKeys({ skipPreflight: true });
+      welcomePack = welcomePackPda!;
+      console.log("Welcome pack initialized");
+    });
 
     it("claims a welcome pack", async () => {
       const claimer = Keypair.generate();
       const claimApproval = {
         uniqueId: 0,
         expirationTimestamp: new BN(Math.floor(Date.now() / 1000) + 60),
-      }
-      const claimSignature = claimApprovalSignature(claimApproval, hotspotOwner)
-      const miniFanout = miniFanoutKey(
-        welcomePack,
-        hotspot.toBuffer()
-      )[0]
+      };
+      const claimSignature = claimApprovalSignature(
+        claimApproval,
+        hotspotOwner
+      );
+      const miniFanout = miniFanoutKey(welcomePack, hotspot.toBuffer())[0];
       // TODO: Asset proof stuff
       const mock = await createMockCompression({
         collection,
@@ -287,82 +347,118 @@ describe("welcome-pack", () => {
         merkle,
         ecc,
         hotspotOwner: welcomePack,
-      })
-      getAssetFn = mock.getAssetFn
-      getAssetProofFn = mock.getAssetProofFn
-      console.log("getting ixns")
+      });
+      getAssetFn = mock.getAssetFn;
+      getAssetProofFn = mock.getAssetProofFn;
+      console.log("getting ixns");
       const ixs = [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1000000 }),
-        await (await claimWelcomePack({
-          program: welcomePackProgram,
-          tuktukProgram,
-          welcomePack,
-          claimApproval,
-          claimApprovalSignature: claimSignature,
-          claimer: claimer.publicKey,
-          taskQueue,
-          getAssetFn,
-          getAssetProofFn,
-        }))
-          .instruction()
-      ]
-      console.log("ixns got")
+        await (
+          await claimWelcomePack({
+            program: welcomePackProgram,
+            tuktukProgram,
+            welcomePack,
+            claimApproval,
+            claimApprovalSignature: claimSignature,
+            claimer: claimer.publicKey,
+            taskQueue,
+            getAssetFn,
+            getAssetProofFn,
+          })
+        ).instruction(),
+      ];
+      console.log("ixns got");
       const slot = await provider.connection.getSlot();
-      console.log("creating lut")
+      console.log("creating lut");
       const [lutIx, lut] = AddressLookupTableProgram.createLookupTable({
         authority: me,
         payer: me,
         recentSlot: slot,
-      })
-      await sendInstructions(provider, [lutIx, AddressLookupTableProgram.extendLookupTable({
-        payer: me,
-        authority: me,
-        lookupTable: lut,
-        addresses: [taskQueue, hntMint, ASSOCIATED_PROGRAM_ID, BUBBLEGUM_PROGRAM_ID, NOOP_PROGRAM_ID],
-      })])
-      console.log("lut created")
+      });
+      await sendInstructions(provider, [
+        lutIx,
+        AddressLookupTableProgram.extendLookupTable({
+          payer: me,
+          authority: me,
+          lookupTable: lut,
+          addresses: [
+            taskQueue,
+            hntMint,
+            ASSOCIATED_PROGRAM_ID,
+            BUBBLEGUM_PROGRAM_ID,
+            NOOP_PROGRAM_ID,
+          ],
+        }),
+      ]);
+      console.log("lut created");
       // Wait for lut to activate
-      await sleep(1000)
-      console.log("sending ixs")
-      await bulkSendTransactions(provider, [{
-        instructions: ixs,
-        addressLookupTableAddresses: [lut],
-        feePayer: me,
-        signers: [claimer],
-      }], undefined, 10, [claimer])
-      console.log("ixns sent")
+      await sleep(1000);
+      console.log("sending ixs");
+      await bulkSendTransactions(
+        provider,
+        [
+          {
+            instructions: ixs,
+            addressLookupTableAddresses: [lut],
+            feePayer: me,
+            signers: [claimer],
+          },
+        ],
+        undefined,
+        10,
+        [claimer]
+      );
+      console.log("ixns sent");
       // Verify mini fanout was created
-      const miniFanoutAccount = await miniFanoutProgram.account.miniFanoutV0.fetch(miniFanout)
-      expect(miniFanoutAccount.schedule).to.equal(rewardsSchedule)
-      expect(miniFanoutAccount.shares.length).to.equal(2)
-      expect(miniFanoutAccount.shares[0].wallet.toBase58()).to.equal(me.toBase58())
-      expect(miniFanoutAccount.shares[0].share.share?.amount).to.equal(50)
-      expect(miniFanoutAccount.shares[1].wallet.toBase58()).to.equal(claimer.publicKey.toBase58())
-      expect(miniFanoutAccount.shares[1].share.share?.amount).to.equal(50)
+      const miniFanoutAccount =
+        await miniFanoutProgram.account.miniFanoutV0.fetch(miniFanout);
+      expect(miniFanoutAccount.schedule).to.equal(rewardsSchedule);
+      expect(miniFanoutAccount.shares.length).to.equal(2);
+      expect(miniFanoutAccount.shares[0].wallet.toBase58()).to.equal(
+        me.toBase58()
+      );
+      expect(miniFanoutAccount.shares[0].share.share?.amount).to.equal(50);
+      expect(miniFanoutAccount.shares[1].wallet.toBase58()).to.equal(
+        claimer.publicKey.toBase58()
+      );
+      expect(miniFanoutAccount.shares[1].share.share?.amount).to.equal(50);
 
       // Verify rewards recipient set to the fanout
-      const rewardsRecipient = await lazyDistributorProgram.account.recipientV0.fetch(recipientKey(lazyDistributor, hotspot)[0])
-      expect(rewardsRecipient.destination.toBase58()).to.equal(miniFanout.toBase58())
-    })
+      const rewardsRecipient =
+        await lazyDistributorProgram.account.recipientV0.fetch(
+          recipientKey(lazyDistributor, hotspot)[0]
+        );
+      expect(rewardsRecipient.destination.toBase58()).to.equal(
+        miniFanout.toBase58()
+      );
+    });
 
     it("closes a welcome pack", async () => {
-      await (await closeWelcomePack({
-        program: welcomePackProgram,
-        welcomePack,
-        assetEndpoint: "https://some-url/",
-        getAssetFn,
-        getAssetProofFn,
-      }))
-        .signers([hotspotOwner])
-        .rpc({ skipPreflight: true })
-
-      const welcomePackAccount = await welcomePackProgram.account.welcomePackV0.fetchNullable(welcomePack)
-      expect(welcomePackAccount).to.be.null
-
-      const recipientAccount = await lazyDistributorProgram.account.recipientV0.fetch(
-        recipientKey(lazyDistributor, hotspot)[0]
+      await (
+        await closeWelcomePack({
+          program: welcomePackProgram,
+          welcomePack,
+          assetEndpoint: "https://some-url/",
+          getAssetFn,
+          getAssetProofFn,
+        })
       )
-      expect(recipientAccount.destination.toBase58()).to.equal(PublicKey.default.toBase58())
-    })
-  })
-})
+        .signers([hotspotOwner])
+        .rpc({ skipPreflight: true });
+
+      const welcomePackAccount =
+        await welcomePackProgram.account.welcomePackV0.fetchNullable(
+          welcomePack
+        );
+      expect(welcomePackAccount).to.be.null;
+
+      const recipientAccount =
+        await lazyDistributorProgram.account.recipientV0.fetch(
+          recipientKey(lazyDistributor, hotspot)[0]
+        );
+      expect(recipientAccount.destination.toBase58()).to.equal(
+        PublicKey.default.toBase58()
+      );
+    });
+  });
+});

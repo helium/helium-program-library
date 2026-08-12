@@ -70,7 +70,7 @@ export function KycStatus() {
     async () => {
       await refreshStatus();
       router.push("/withdraw?step=1");
-    },
+    }
   );
 
   const renderStatus = () => {
@@ -98,7 +98,7 @@ export function KycStatus() {
               <Button
                 variant="link"
                 onClick={handleStartKyc}
-                className="p-0 h-auto font-normal ml-2"
+                className="ml-2 h-auto p-0 font-normal"
               >
                 Continue Verification
               </Button>
@@ -141,7 +141,7 @@ export function KycStatus() {
                 <Button
                   variant="link"
                   onClick={handleStartKyc}
-                  className="p-0 h-auto font-normal ml-2"
+                  className="ml-2 h-auto p-0 font-normal"
                 >
                   Accept Terms
                 </Button>

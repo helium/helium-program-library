@@ -23,7 +23,7 @@ export class SingleTransactionSubmissionError extends Error {
       explorerLink: string | null;
       chewingGlassExplorerLink: string | null;
     },
-    cause?: unknown,
+    cause?: unknown
   ) {
     super(message);
     this.name = "SingleTransactionSubmissionError";
@@ -43,7 +43,7 @@ export class JitoMissingTipError extends Error {
 
   constructor(
     message: string,
-    fields: { bundleSize: number; skipSentry: boolean },
+    fields: { bundleSize: number; skipSentry: boolean }
   ) {
     super(message);
     this.name = "JitoMissingTipError";
@@ -63,7 +63,7 @@ const TIP_ACCOUNTS_TTL_MS = 5 * 60 * 1000;
  */
 async function requireBundleHasTipAccount(
   serializedTransactions: string[],
-  tag?: string,
+  tag?: string
 ): Promise<void> {
   if (
     !cachedTipAccountSet ||
@@ -86,7 +86,7 @@ async function requireBundleHasTipAccount(
 
   for (const serialized of serializedTransactions) {
     const tx = VersionedTransaction.deserialize(
-      Buffer.from(serialized, "base64"),
+      Buffer.from(serialized, "base64")
     );
     const keys = tx.message.staticAccountKeys;
     const {
@@ -118,7 +118,7 @@ async function requireBundleHasTipAccount(
     {
       bundleSize: serializedTransactions.length,
       skipSentry: Boolean(isFriendlyUpgradeError),
-    },
+    }
   );
 }
 
@@ -143,7 +143,7 @@ function sleep(ms: number): Promise<void> {
 async function bundleTransactionsLanded(
   connection: Connection,
   signatures: string[],
-  transactionMetadata?: Array<Record<string, unknown> | undefined>,
+  transactionMetadata?: Array<Record<string, unknown> | undefined>
 ): Promise<boolean> {
   const { value } = await connection.getSignatureStatuses(signatures, {
     searchTransactionHistory: true,
@@ -170,10 +170,10 @@ export interface BatchSubmissionResult {
 // Submit single transaction
 export async function submitSingleTransaction(
   connection: Connection,
-  serializedTransaction: string,
+  serializedTransaction: string
 ): Promise<string> {
   const transaction = VersionedTransaction.deserialize(
-    Buffer.from(serializedTransaction, "base64"),
+    Buffer.from(serializedTransaction, "base64")
   );
 
   try {
@@ -192,7 +192,7 @@ export async function submitSingleTransaction(
     throw new SingleTransactionSubmissionError(
       error instanceof Error ? error.message : "Unknown error",
       { explorerLink, chewingGlassExplorerLink },
-      error,
+      error
     );
   }
 }
@@ -200,7 +200,7 @@ export async function submitSingleTransaction(
 // Submit transactions in parallel
 export async function submitTransactionsParallel(
   connection: Connection,
-  serializedTransactions: string[],
+  serializedTransactions: string[]
 ): Promise<string[]> {
   const submissions = serializedTransactions.map(async (serializedTx) => {
     return await submitSingleTransaction(connection, serializedTx);
@@ -212,7 +212,7 @@ export async function submitTransactionsParallel(
 // Submit transactions sequentially
 export async function submitTransactionsSequential(
   connection: Connection,
-  serializedTransactions: string[],
+  serializedTransactions: string[]
 ): Promise<string[]> {
   const signatures: string[] = [];
 
@@ -226,7 +226,7 @@ export async function submitTransactionsSequential(
 
 // Main submission function that handles all types
 export async function submitTransactionBatch(
-  payload: TransactionBatchPayload,
+  payload: TransactionBatchPayload
 ): Promise<BatchSubmissionResult> {
   const batchId = uuidv4();
   const connection = new Connection(env.SOLANA_RPC_URL);
@@ -242,7 +242,7 @@ export async function submitTransactionBatch(
     if (payload.transactions.length === 1) {
       const signature = await submitSingleTransaction(
         connection,
-        payload.transactions[0],
+        payload.transactions[0]
       );
       return {
         batchId,
@@ -260,14 +260,14 @@ export async function submitTransactionBatch(
       const signatures = payload.transactions.map((tx) =>
         bs58.encode(
           VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
-            .signatures[0],
-        ),
+            .signatures[0]
+        )
       );
 
       try {
         const jitoBundleId = await submitJitoBundle(
           payload.transactions,
-          bundleContext,
+          bundleContext
         );
         return {
           batchId,
@@ -284,7 +284,7 @@ export async function submitTransactionBatch(
           await bundleTransactionsLanded(
             connection,
             signatures,
-            payload.transactionMetadata,
+            payload.transactionMetadata
           )
         ) {
           return { batchId, submissionType: "jito_bundle", signatures };
@@ -296,7 +296,7 @@ export async function submitTransactionBatch(
       if (payload.parallel) {
         const signatures = await submitTransactionsParallel(
           connection,
-          payload.transactions,
+          payload.transactions
         );
         return {
           batchId,
@@ -306,7 +306,7 @@ export async function submitTransactionBatch(
       } else {
         const signatures = await submitTransactionsSequential(
           connection,
-          payload.transactions,
+          payload.transactions
         );
         return {
           batchId,
@@ -329,7 +329,9 @@ export async function submitTransactionBatch(
         payload.transactions.length > 1
       ) {
         console.warn(
-          `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
+          `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${
+            i + 1
+          }/${MAX_BLOCKHASH_RETRIES})...`
         );
         await sleep(2000);
         lastError = error;

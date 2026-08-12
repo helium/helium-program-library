@@ -104,5 +104,5 @@ MiniFanout.init(
     tableName: "mini_fanouts",
     timestamps: false,
     underscored: true,
-  },
+  }
 );

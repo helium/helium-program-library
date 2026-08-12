@@ -1,24 +1,17 @@
 import {
   accountWindowedBreakerKey,
-  mintWindowedBreakerKey
+  mintWindowedBreakerKey,
 } from "@helium/circuit-breaker-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { toNumber } from "@helium/spl-utils";
 import { Program } from "@coral-xyz/anchor";
-import {
-  getAccount,
-  getMint,
-  Mint
-} from "@solana/spl-token";
-import {
-  PublicKey
-} from "@solana/web3.js";
+import { getAccount, getMint, Mint } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import { circuitBreakerLevel, circuitBreakerLimitGauge } from "../metrics";
 import { provider } from "../solana";
 import { getUnixTimestamp, toPercent } from "./utils";
 import { watch } from "./watch";
-
 
 function setLimit(account: any, mint: Mint, balance: number, label: string) {
   let threshold: number;
@@ -47,7 +40,11 @@ async function setLevel(account: any, mint: Mint, label: string) {
   circuitBreakerLevel.set({ name: label }, discount * lastValue);
 }
 
-export async function monitorAccountCircuitBreaker(cbProgram: Program<CircuitBreaker>, account: PublicKey, label: string) {
+export async function monitorAccountCircuitBreaker(
+  cbProgram: Program<CircuitBreaker>,
+  account: PublicKey,
+  label: string
+) {
   const tokenAccount = await getAccount(provider.connection, account);
   const mint = await getMint(provider.connection, tokenAccount.mint);
   const [cb] = await accountWindowedBreakerKey(account);

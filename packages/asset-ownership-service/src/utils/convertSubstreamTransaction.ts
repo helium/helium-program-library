@@ -1,7 +1,4 @@
-import {
-  AddressLookupTableAccount,
-  PublicKey,
-} from "@solana/web3.js";
+import { AddressLookupTableAccount, PublicKey } from "@solana/web3.js";
 import { provider } from "./solana";
 import { ProcessableInstruction } from "./processTransaction";
 
@@ -42,7 +39,9 @@ const getAddressLookupTableAccounts = async (
       if (accountInfo) {
         const account = new AddressLookupTableAccount({
           key: new PublicKey(address),
-          state: AddressLookupTableAccount.deserialize(Uint8Array.from(accountInfo.data)),
+          state: AddressLookupTableAccount.deserialize(
+            Uint8Array.from(accountInfo.data)
+          ),
         });
         result.set(address, account);
 
@@ -91,7 +90,9 @@ export async function convertSubstreamTransaction(txInfo: any): Promise<
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (lookup: any) => decodeBase64ToPublicKey(lookup.accountKey).toBase58()
     );
-    const lookupTableMap = await getAddressLookupTableAccounts(lookupTableAddresses);
+    const lookupTableMap = await getAddressLookupTableAccounts(
+      lookupTableAddresses
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     message.addressTableLookups.forEach((lookup: any) => {

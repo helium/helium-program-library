@@ -81,7 +81,7 @@ export function SwapInterface() {
         console.error("Error loading tokens:", error);
         setError("Failed to load tokens");
       },
-    },
+    }
   );
 
   // Get quote
@@ -126,7 +126,7 @@ export function SwapInterface() {
         setQuote(null);
         setToAmount("");
       },
-    },
+    }
   );
 
   // Swap transaction submission
@@ -134,7 +134,7 @@ export function SwapInterface() {
     async () => {
       if (!authenticated || !user || !quote || !fromToken || !toToken) {
         throw new Error(
-          "Please connect your wallet and ensure you have a valid quote",
+          "Please connect your wallet and ensure you have a valid quote"
         );
       }
 
@@ -188,7 +188,7 @@ export function SwapInterface() {
           description: error.message || "Failed to execute swap",
         });
       },
-    },
+    }
   );
 
   // Get user's balance for the selected from token
@@ -202,7 +202,7 @@ export function SwapInterface() {
 
     // Check SPL tokens
     const tokenBalance = tokenBalances.tokens?.find(
-      (t) => t.mint === fromToken.address,
+      (t) => t.mint === fromToken.address
     );
     return tokenBalance
       ? parseFloat(tokenBalance.balance) / Math.pow(10, fromToken.decimals)
@@ -220,14 +220,14 @@ export function SwapInterface() {
     (token) =>
       token.symbol.toLowerCase().includes(fromTokenSearch.toLowerCase()) ||
       token.name.toLowerCase().includes(fromTokenSearch.toLowerCase()) ||
-      token.address.toLowerCase().includes(fromTokenSearch.toLowerCase()),
+      token.address.toLowerCase().includes(fromTokenSearch.toLowerCase())
   );
 
   const filteredToTokens = tokens.filter(
     (token) =>
       token.symbol.toLowerCase().includes(toTokenSearch.toLowerCase()) ||
       token.name.toLowerCase().includes(toTokenSearch.toLowerCase()) ||
-      token.address.toLowerCase().includes(toTokenSearch.toLowerCase()),
+      token.address.toLowerCase().includes(toTokenSearch.toLowerCase())
   );
 
   // Load tokens on component mount
@@ -256,11 +256,11 @@ export function SwapInterface() {
 
   if (!ready) {
     return (
-      <div className="w-full max-w-lg mx-auto">
+      <div className="mx-auto w-full max-w-lg">
         <Card>
           <CardContent className="p-8">
-            <div className="text-center space-y-4">
-              <div className="w-8 h-8 border-2 border-muted border-t-foreground rounded-full animate-spin mx-auto"></div>
+            <div className="space-y-4 text-center">
+              <div className="border-muted border-t-foreground mx-auto h-8 w-8 animate-spin rounded-full border-2"></div>
               <div className="text-muted-foreground">
                 Loading swap interface...
               </div>
@@ -273,9 +273,9 @@ export function SwapInterface() {
 
   if (!authenticated) {
     return (
-      <div className="w-full max-w-lg mx-auto">
+      <div className="mx-auto w-full max-w-lg">
         <Card>
-          <CardHeader className="text-center pb-6">
+          <CardHeader className="pb-6 text-center">
             <CardTitle className="text-2xl font-bold">Connect Wallet</CardTitle>
             <CardDescription className="text-base">
               Connect your wallet to start swapping tokens
@@ -290,9 +290,9 @@ export function SwapInterface() {
   }
 
   return (
-    <div className="w-full max-w-lg mx-auto">
+    <div className="mx-auto w-full max-w-lg">
       <Card>
-        <CardHeader className="text-center pb-6">
+        <CardHeader className="pb-6 text-center">
           <CardTitle className="text-2xl font-bold">Token Swap</CardTitle>
           <CardDescription className="text-base">
             Trade tokens on Solana using Jupiter&apos;s best routes
@@ -307,15 +307,15 @@ export function SwapInterface() {
 
           {/* From Token */}
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <Label
                 htmlFor="from-token"
-                className="text-sm font-medium text-muted-foreground"
+                className="text-muted-foreground text-sm font-medium"
               >
                 From
               </Label>
               {fromToken && tokenBalances && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-muted-foreground text-xs">
                   Balance: {getFromTokenBalance().toFixed(6)} {fromToken.symbol}
                 </span>
               )}
@@ -329,7 +329,7 @@ export function SwapInterface() {
                   setFromTokenSearch(""); // Clear search when token is selected
                 }}
               >
-                <SelectTrigger className="flex-1 h-12">
+                <SelectTrigger className="h-12 flex-1">
                   <SelectValue placeholder="Select token">
                     {fromToken && (
                       <div className="flex items-center gap-3">
@@ -338,7 +338,7 @@ export function SwapInterface() {
                           <img
                             src={fromToken.logoURI}
                             alt={fromToken.symbol}
-                            className="w-6 h-6 rounded-full"
+                            className="h-6 w-6 rounded-full"
                           />
                         )}
                         <span className="font-medium">{fromToken.symbol}</span>
@@ -363,12 +363,12 @@ export function SwapInterface() {
                           <img
                             src={token.logoURI}
                             alt={token.symbol}
-                            className="w-4 h-4"
+                            className="h-4 w-4"
                           />
                         )}
                         <div>
                           <div className="font-medium">{token.symbol}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-muted-foreground text-xs">
                             {token.name}
                           </div>
                         </div>
@@ -376,7 +376,7 @@ export function SwapInterface() {
                     </SelectItem>
                   ))}
                   {filteredFromTokens.length === 0 && (
-                    <div className="p-2 text-sm text-muted-foreground text-center">
+                    <div className="text-muted-foreground p-2 text-center text-sm">
                       No tokens found
                     </div>
                   )}
@@ -389,7 +389,7 @@ export function SwapInterface() {
                   placeholder="0.0"
                   value={fromAmount}
                   onChange={(e) => setFromAmount(e.target.value)}
-                  className="w-32 h-12 text-right font-medium"
+                  className="h-12 w-32 text-right font-medium"
                 />
                 <Button
                   type="button"
@@ -411,10 +411,10 @@ export function SwapInterface() {
               variant="outline"
               size="sm"
               onClick={handleSwapTokens}
-              className="rounded-full w-12 h-12 p-0"
+              className="h-12 w-12 rounded-full p-0"
             >
               <svg
-                className="w-5 h-5"
+                className="h-5 w-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -433,7 +433,7 @@ export function SwapInterface() {
           <div className="space-y-3">
             <Label
               htmlFor="to-token"
-              className="text-sm font-medium text-muted-foreground"
+              className="text-muted-foreground text-sm font-medium"
             >
               To
             </Label>
@@ -446,7 +446,7 @@ export function SwapInterface() {
                   setToTokenSearch(""); // Clear search when token is selected
                 }}
               >
-                <SelectTrigger className="flex-1 h-12">
+                <SelectTrigger className="h-12 flex-1">
                   <SelectValue placeholder="Select token">
                     {toToken && (
                       <div className="flex items-center gap-3">
@@ -455,7 +455,7 @@ export function SwapInterface() {
                           <img
                             src={toToken.logoURI}
                             alt={toToken.symbol}
-                            className="w-6 h-6 rounded-full"
+                            className="h-6 w-6 rounded-full"
                           />
                         )}
                         <span className="font-medium">{toToken.symbol}</span>
@@ -480,12 +480,12 @@ export function SwapInterface() {
                           <img
                             src={token.logoURI}
                             alt={token.symbol}
-                            className="w-4 h-4"
+                            className="h-4 w-4"
                           />
                         )}
                         <div>
                           <div className="font-medium">{token.symbol}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-muted-foreground text-xs">
                             {token.name}
                           </div>
                         </div>
@@ -493,7 +493,7 @@ export function SwapInterface() {
                     </SelectItem>
                   ))}
                   {filteredToTokens.length === 0 && (
-                    <div className="p-2 text-sm text-muted-foreground text-center">
+                    <div className="text-muted-foreground p-2 text-center text-sm">
                       No tokens found
                     </div>
                   )}
@@ -505,26 +505,26 @@ export function SwapInterface() {
                 placeholder="0.0"
                 value={toAmount}
                 readOnly
-                className="w-32 h-12 text-right font-medium text-muted-foreground"
+                className="text-muted-foreground h-12 w-32 text-right font-medium"
               />
             </div>
           </div>
 
           {/* Quote Info */}
           {quote && (
-            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-              <div className="flex justify-between items-center text-sm">
+            <div className="bg-muted/50 space-y-2 rounded-lg p-4">
+              <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Price Impact</span>
                 <span className="font-medium">
                   {parseFloat(quote.priceImpactPct).toFixed(2)}%
                 </span>
               </div>
-              <div className="flex justify-between items-center text-sm">
+              <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Slippage</span>
                 <span className="font-medium">{quote.slippageBps / 100}%</span>
               </div>
               {isLoadingQuote && (
-                <div className="text-center text-sm text-muted-foreground font-medium">
+                <div className="text-muted-foreground text-center text-sm font-medium">
                   Updating quote...
                 </div>
               )}
@@ -541,12 +541,12 @@ export function SwapInterface() {
           >
             {isSwapping ? (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-muted border-t-foreground rounded-full animate-spin"></div>
+                <div className="border-muted border-t-foreground h-4 w-4 animate-spin rounded-full border-2"></div>
                 Swapping...
               </div>
             ) : isLoadingQuote ? (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-muted border-t-foreground rounded-full animate-spin"></div>
+                <div className="border-muted border-t-foreground h-4 w-4 animate-spin rounded-full border-2"></div>
                 Getting Quote...
               </div>
             ) : (
@@ -555,10 +555,10 @@ export function SwapInterface() {
           </Button>
 
           {/* User Info */}
-          <div className="text-center pt-4 border-t border-muted/50">
-            <div className="text-xs text-muted-foreground">
+          <div className="border-muted/50 border-t pt-4 text-center">
+            <div className="text-muted-foreground text-xs">
               Connected:{" "}
-              <span className="font-mono text-primary">
+              <span className="text-primary font-mono">
                 {walletAddress?.slice(0, 8)}...
                 {walletAddress?.slice(-8)}
               </span>

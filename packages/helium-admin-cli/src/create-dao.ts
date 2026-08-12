@@ -12,7 +12,11 @@ import {
   dataOnlyConfigKey,
   init as initHem,
 } from "@helium/helium-entity-manager-sdk";
-import { daoKey, delegatorRewardsPercent, init as initDao } from "@helium/helium-sub-daos-sdk";
+import {
+  daoKey,
+  delegatorRewardsPercent,
+  init as initDao,
+} from "@helium/helium-sub-daos-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import {
   init as initVsr,
@@ -117,8 +121,7 @@ export async function run(args: any = process.argv) {
     bucket: {
       type: "string",
       describe: "Bucket URL prefix holding all of the metadata jsons",
-      default:
-        "https://entities.nft.helium.io/v2/tokens",
+      default: "https://entities.nft.helium.io/v2/tokens",
     },
     emissionSchedulePath: {
       required: true,
@@ -223,16 +226,11 @@ export async function run(args: any = process.argv) {
 
   console.log("DAO", dao.toString());
 
-  const proxySeasonsFile = fs.readFileSync(
-    argv.proxySeasonsFile,
-    "utf8"
-  );
-  const seasons = JSON.parse(proxySeasonsFile).map(
-    (s) => ({
-      start: new anchor.BN(Math.floor(Date.parse(s.start) / 1000)),
-      end: new anchor.BN(Math.floor(Date.parse(s.end) / 1000)),
-    })
-  );
+  const proxySeasonsFile = fs.readFileSync(argv.proxySeasonsFile, "utf8");
+  const seasons = JSON.parse(proxySeasonsFile).map((s) => ({
+    start: new anchor.BN(Math.floor(Date.parse(s.start) / 1000)),
+    end: new anchor.BN(Math.floor(Date.parse(s.end) / 1000)),
+  }));
 
   const conn = provider.connection;
 
@@ -409,31 +407,34 @@ export async function run(args: any = process.argv) {
       fanout,
       true
     );
-  const oracleKey = new PublicKey(argv.oracleKey!);
-  const { instruction: initLazyDist, pubkeys: { rewardsEscrow, lazyDistributor } } = await lazyDistProgram.methods
-    .initializeLazyDistributorV0({
-      authority,
-      oracles: [
-        {
-          oracle: oracleKey,
-          url: argv.rewardsOracleUrl,
+    const oracleKey = new PublicKey(argv.oracleKey!);
+    const {
+      instruction: initLazyDist,
+      pubkeys: { rewardsEscrow, lazyDistributor },
+    } = await lazyDistProgram.methods
+      .initializeLazyDistributorV0({
+        authority,
+        oracles: [
+          {
+            oracle: oracleKey,
+            url: argv.rewardsOracleUrl,
+          },
+        ],
+        // 5 x epoch rewards in a 24 hour period
+        windowConfig: {
+          windowSizeSeconds: new anchor.BN(24 * 60 * 60),
+          thresholdType: ThresholdType.Absolute as never,
+          threshold: new anchor.BN(currentHntEmission.emissionsPerEpoch).mul(
+            new anchor.BN(5)
+          ),
         },
-      ],
-      // 5 x epoch rewards in a 24 hour period
-      windowConfig: {
-        windowSizeSeconds: new anchor.BN(24 * 60 * 60),
-        thresholdType: ThresholdType.Absolute as never,
-        threshold: new anchor.BN(currentHntEmission.emissionsPerEpoch).mul(
-          new anchor.BN(5)
-        ),
-      },
-      approver: oracleSignerKey()[0],
-    })
-    .accountsPartial({
-      payer: authority,
-      rewardsMint: hntKeypair.publicKey,
-    })
-    .prepare();
+        approver: oracleSignerKey()[0],
+      })
+      .accountsPartial({
+        payer: authority,
+        rewardsMint: hntKeypair.publicKey,
+      })
+      .prepare();
     const ldExists = await exists(conn, lazyDistributor!);
 
     await heliumSubDaosProgram.methods
@@ -445,7 +446,9 @@ export async function run(args: any = process.argv) {
         hstEmissionSchedule: [currentHstEmission],
         emissionSchedule: [currentHntEmission],
         proposalNamespace: organizationKey("Helium")[0],
-        delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
+        delegatorRewardsPercent: delegatorRewardsPercent(
+          argv.delegatorRewardsPercent
+        ),
       })
       .preInstructions([
         ...(ldExists ? [] : [initLazyDist]),
@@ -475,7 +478,9 @@ export async function run(args: any = process.argv) {
             hstPool: null,
             netEmissionsCap: null,
             proposalNamespace: organizationKey("Helium")[0],
-            delegatorRewardsPercent: delegatorRewardsPercent(argv.delegatorRewardsPercent),
+            delegatorRewardsPercent: delegatorRewardsPercent(
+              argv.delegatorRewardsPercent
+            ),
             rewardsEscrow: rewardsEscrow ? rewardsEscrow : null,
           })
           .accountsPartial({

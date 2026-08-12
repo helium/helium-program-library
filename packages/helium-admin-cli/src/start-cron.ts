@@ -16,7 +16,11 @@ import {
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import { init as initHplCrons, epochTrackerKey, taskReturnAccountKey } from "@helium/hpl-crons-sdk";
+import {
+  init as initHplCrons,
+  epochTrackerKey,
+  taskReturnAccountKey,
+} from "@helium/hpl-crons-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -98,7 +102,9 @@ export async function run(args: any = process.argv) {
         .instruction()
     );
   }
-  const epochTrackerAcc = await program.account.epochTrackerV0.fetch(epochTracker);
+  const epochTrackerAcc = await program.account.epochTrackerV0.fetch(
+    epochTracker
+  );
   const { transaction, remainingAccounts } = compileTransaction(
     [
       await program.methods

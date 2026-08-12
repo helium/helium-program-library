@@ -37,5 +37,5 @@ export const get = publicProcedure.transactions.get.handler(
       jitoBundleId: batch.jitoBundleId,
       jitoBundleStatus: result.jitoBundleStatus,
     };
-  },
+  }
 );

@@ -11,12 +11,18 @@ import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { PositionWithMeta, SubDaoWithMeta } from "../sdk/types";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
-import { PROGRAM_ID as PROXY_PROGRAM_ID, init as initProxy } from "@helium/nft-proxy-sdk";
-import { PROGRAM_ID as VSR_PROGRAM_ID, init as initVsr } from "@helium/voter-stake-registry-sdk";
+import {
+  PROGRAM_ID as PROXY_PROGRAM_ID,
+  init as initProxy,
+} from "@helium/nft-proxy-sdk";
+import {
+  PROGRAM_ID as VSR_PROGRAM_ID,
+  init as initVsr,
+} from "@helium/voter-stake-registry-sdk";
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 export const useExtendDelegation = () => {
   const { provider } = useHeliumVsrState();
-  const now = useSolanaUnixNow(60 * 5 * 1000)
+  const now = useSolanaUnixNow(60 * 5 * 1000);
   const { error, loading, execute } = useAsyncCallback(
     async ({
       position,
@@ -34,7 +40,11 @@ export const useExtendDelegation = () => {
         !now || !provider || !provider.wallet || !position.isDelegated;
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
-      const proxyProgram = await initProxy(provider as any, PROXY_PROGRAM_ID, idl);
+      const proxyProgram = await initProxy(
+        provider as any,
+        PROXY_PROGRAM_ID,
+        idl
+      );
       const vsrProgram = await initVsr(provider as any, VSR_PROGRAM_ID, idl);
 
       if (loading) return;
@@ -53,9 +63,9 @@ export const useExtendDelegation = () => {
         const proxyConfigAcc = await proxyProgram.account.proxyConfigV0.fetch(
           registrarAcc.proxyConfig
         );
-        const newExpirationTs = [...(proxyConfigAcc.seasons || [])].reverse().find(
-          (season) => new BN(now!).gte(season.start)
-        )?.end;
+        const newExpirationTs = [...(proxyConfigAcc.seasons || [])]
+          .reverse()
+          .find((season) => new BN(now!).gte(season.start))?.end;
         if (!newExpirationTs) {
           throw new Error("No new valid expiration ts found");
         }

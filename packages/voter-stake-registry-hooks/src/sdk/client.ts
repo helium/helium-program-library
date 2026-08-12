@@ -1,6 +1,6 @@
-import { Program, Provider, web3 } from '@coral-xyz/anchor'
-import { VoterStakeRegistry } from '@helium/idls/lib/types/voter_stake_registry'
-import { PROGRAM_ID, init } from '@helium/voter-stake-registry-sdk'
+import { Program, Provider, web3 } from "@coral-xyz/anchor";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { PROGRAM_ID, init } from "@helium/voter-stake-registry-sdk";
 
 export class HeliumVsrClient {
   constructor(
@@ -16,6 +16,6 @@ export class HeliumVsrClient {
     return new HeliumVsrClient(
       (await init(provider as any, programId)) as any,
       devnet
-    )
+    );
   }
 }

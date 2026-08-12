@@ -22,7 +22,7 @@ export const TOKEN_MINTS = {
 
 export const TOKEN_NAMES: Record<string, string> = {
   ...Object.fromEntries(
-    Object.entries(TOKEN_MINTS).map(([name, mint]) => [mint, name]),
+    Object.entries(TOKEN_MINTS).map(([name, mint]) => [mint, name])
   ),
   [TOKEN_MINTS.WSOL]: "SOL",
 };

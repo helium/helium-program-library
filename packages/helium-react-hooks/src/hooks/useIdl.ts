@@ -34,7 +34,7 @@ export function useIdl<IDL extends Idl>(
   const cache = useAccountFetchCache();
   const idlParser: TypedAccountParser<IDL> = useMemo(() => {
     if (programId) {
-      const cacheK = cacheKey(programId, cache.connection)
+      const cacheK = cacheKey(programId, cache.connection);
       // Default to using the cached parser if it exists, this makes
       // for fewer rerenders in useAccounts.
       if (!parserCache[cacheK]) {
@@ -69,5 +69,5 @@ export function useIdl<IDL extends Idl>(
 }
 
 function cacheKey(programId: PublicKey, connection: Connection) {
-  return `${programId.toBase58()}-${connection.rpcEndpoint}`
+  return `${programId.toBase58()}-${connection.rpcEndpoint}`;
 }

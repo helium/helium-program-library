@@ -44,7 +44,7 @@ export const TokenList = ({ walletAddress }: TokenListProps) => {
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className="flex w-full flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Holdings</h2>
         {!!tokenBalances && (
@@ -72,7 +72,7 @@ export const TokenList = ({ walletAddress }: TokenListProps) => {
       {isLoading ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-1 p-2">
-            <div className="w-8 h-8 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin mb-4" />
+            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-zinc-600 border-t-transparent" />
             <p className="text-muted-foreground">Loading tokens...</p>
           </CardContent>
         </Card>
@@ -80,38 +80,38 @@ export const TokenList = ({ walletAddress }: TokenListProps) => {
         (!tokenBalances?.tokens?.length && tokenBalances.solBalance === 0) ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-1 p-2">
-            <Coins className="w-10 h-10 text-muted-foreground mb-4" />
+            <Coins className="text-muted-foreground mb-4 h-10 w-10" />
             <p className="text-muted-foreground">
               No tokens found for this wallet
             </p>
-            <p className="text-sm text-muted-foreground/50">
+            <p className="text-muted-foreground/50 text-sm">
               Tokens associated with your wallet will appear here.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* SOL Balance */}
           <Card>
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+                  <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-purple-500 to-blue-500">
                     <Image
                       src={`https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${TOKEN_MINTS.WSOL}/logo.png`}
                       alt="Solana"
                       width={32}
                       height={32}
-                      className="w-full h-full"
+                      className="h-full w-full"
                     />
                   </div>
                   <div>
                     <p className="font-medium">Solana</p>
-                    <p className="text-sm text-muted-foreground">SOL</p>
+                    <p className="text-muted-foreground text-sm">SOL</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     {formatTokenAmount(tokenBalances.solBalance)} SOL
                   </p>
                 </div>
@@ -125,19 +125,19 @@ export const TokenList = ({ walletAddress }: TokenListProps) => {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full">
                       {token.logoURI ? (
                         <Image
                           src={token.logoURI}
                           alt={token.name || token.symbol || "Token"}
                           width={32}
                           height={32}
-                          className="w-full h-full"
+                          className="h-full w-full"
                         />
                       ) : null}
                       {!token.logoURI && (
-                        <div className="w-10 h-10 rounded-full text-white font-bold text-xs flex items-center justify-center">
-                          <span className="w-full h-full rounded-full text-white font-bold text-xs flex items-center justify-center">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-white">
+                          <span className="flex h-full w-full items-center justify-center rounded-full text-xs font-bold text-white">
                             {token.symbol?.slice(0, 3).toUpperCase() || "?"}
                           </span>
                         </div>
@@ -147,7 +147,7 @@ export const TokenList = ({ walletAddress }: TokenListProps) => {
                       <p className="font-medium">
                         {token.name || token.symbol}
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-muted-foreground text-sm">
                         {token.symbol}
                       </p>
                     </div>
@@ -161,7 +161,7 @@ export const TokenList = ({ walletAddress }: TokenListProps) => {
                     ) : (
                       <p className="font-medium">Price unavailable</p>
                     )}
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       {formatTokenAmount(token.uiAmount)} {token.symbol}
                     </p>
                   </div>
@@ -187,9 +187,9 @@ export const TokenList = ({ walletAddress }: TokenListProps) => {
         ]}
       />
       {swapOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg shadow-2xl">
+            <div className="flex items-center justify-between border-b p-6">
               <h2 className="text-xl font-semibold">Token Swap</h2>
               <Button
                 variant="ghost"

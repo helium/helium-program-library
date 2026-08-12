@@ -41,7 +41,17 @@ export async function run(args: any = process.argv) {
   console.log(`Found ${positions.length} total positions`);
 
   // Get unique mints from positions
-  const mints = [...new Set(positions.filter(p => p.account.lockup.kind.constant || p.account.lockup.endTs.gte(new anchor.BN(Date.now() / 1000))).map(p => p.account.mint.toString()))];
+  const mints = [
+    ...new Set(
+      positions
+        .filter(
+          (p) =>
+            p.account.lockup.kind.constant ||
+            p.account.lockup.endTs.gte(new anchor.BN(Date.now() / 1000))
+        )
+        .map((p) => p.account.mint.toString())
+    ),
+  ];
   console.log(`Found ${mints.length} unique mints to process`);
 
   // Get token accounts for each mint and extract owner addresses
@@ -51,23 +61,25 @@ export async function run(args: any = process.argv) {
   // Process mints in batches of batchSize
   for (let i = 0; i < mints.length; i += batchSize) {
     const mintBatch = mints.slice(i, i + batchSize);
-    const tokenAccountsPromises = mintBatch.map(mint => 
+    const tokenAccountsPromises = mintBatch.map((mint) =>
       connection.getTokenLargestAccounts(new PublicKey(mint))
     );
-    
+
     const tokenAccountsResults = await Promise.all(tokenAccountsPromises);
-    
+
     // Collect all token account addresses
     const tokenAccountAddresses: PublicKey[] = [];
-    tokenAccountsResults.forEach(result => {
-      result.value.forEach(account => {
+    tokenAccountsResults.forEach((result) => {
+      result.value.forEach((account) => {
         tokenAccountAddresses.push(account.address);
       });
     });
 
     // Fetch all token accounts in one batch
-    const tokenAccountsInfo = await connection.getMultipleAccountsInfo(tokenAccountAddresses);
-    
+    const tokenAccountsInfo = await connection.getMultipleAccountsInfo(
+      tokenAccountAddresses
+    );
+
     // Parse token accounts and extract owners
     tokenAccountsInfo.forEach((accountInfo, index) => {
       if (accountInfo) {
@@ -80,12 +92,16 @@ export async function run(args: any = process.argv) {
       }
     });
 
-    console.log(`Processed ${i / batchSize} of ${mints.length / batchSize} batches`);
+    console.log(
+      `Processed ${i / batchSize} of ${mints.length / batchSize} batches`
+    );
   }
 
   // Convert Set to Array and write to file
   const stakedWalletsArray = Array.from(stakedWallets);
-  console.log(`\nWriting ${stakedWalletsArray.length} unique staked wallets to ${argv.output}`);
+  console.log(
+    `\nWriting ${stakedWalletsArray.length} unique staked wallets to ${argv.output}`
+  );
   fs.writeFileSync(argv.output, JSON.stringify(stakedWalletsArray, null, 2));
 
   console.log("Done!");

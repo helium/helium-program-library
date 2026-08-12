@@ -17,7 +17,10 @@ import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { truthy } from "@helium/spl-utils";
 import type { TokenAmountOutput } from "@helium/blockchain-api/schemas/common";
 import { unpackAccount } from "@solana/spl-token";
-import { getMintForNetwork, getLazyDistributorForNetwork } from "@/lib/utils/network-mint";
+import {
+  getMintForNetwork,
+  getLazyDistributorForNetwork,
+} from "@/lib/utils/network-mint";
 
 interface MiniFanoutShare {
   wallet: PublicKey;
@@ -76,13 +79,13 @@ export const getPendingRewards =
     const [oracleRewards, recipients, cronJobAccount] = await Promise.all([
       getBulkRewards(ldProgram, lazyDistributor, entityKeys),
       ldProgram.account.recipientV0.fetchMultiple(
-        assets.map((asset) => recipientKey(lazyDistributor, asset)[0]),
+        assets.map((asset) => recipientKey(lazyDistributor, asset)[0])
       ),
       cronProgram.account.cronJobV0.fetchNullable(
         cronJobKey(
           entityCronAuthorityKey(new PublicKey(walletAddress))[0],
-          0,
-        )[0],
+          0
+        )[0]
       ),
     ]);
 
@@ -109,7 +112,7 @@ export const getPendingRewards =
       try {
         const decoded = mfProgram.coder.accounts.decode(
           "miniFanoutV0",
-          mf.data,
+          mf.data
         );
         destinationToMiniFanout.set(uniqueDestinations[idx]!, decoded);
       } catch (e) {
@@ -128,13 +131,13 @@ export const getPendingRewards =
       ...new Set(
         [...destinationToMiniFanout.values()]
           .map((mf) => mf.tokenAccount?.toBase58())
-          .filter(truthy),
+          .filter(truthy)
       ),
     ];
     const tokenAccountInfos =
       uniqueTokenAccounts.length > 0
         ? await connection.getMultipleAccountsInfo(
-            uniqueTokenAccounts.map((ta) => new PublicKey(ta)),
+            uniqueTokenAccounts.map((ta) => new PublicKey(ta))
           )
         : [];
     const tokenAccountBalances = new Map<string, BN>();
@@ -142,11 +145,11 @@ export const getPendingRewards =
       if (info) {
         const tokenAccount = unpackAccount(
           new PublicKey(uniqueTokenAccounts[idx]!),
-          info,
+          info
         );
         tokenAccountBalances.set(
           uniqueTokenAccounts[idx]!,
-          new BN(tokenAccount.amount.toString()),
+          new BN(tokenAccount.amount.toString())
         );
       }
     });
@@ -174,7 +177,7 @@ export const getPendingRewards =
       const userShare = shares.find(
         (s) =>
           s.wallet.toBase58() === walletAddress ||
-          s.delegate.toBase58() === walletAddress,
+          s.delegate.toBase58() === walletAddress
       );
       if (!userShare) return new BN(0);
 
@@ -214,7 +217,7 @@ export const getPendingRewards =
 
     const pendingInMiniFanoutATAs = ataBalancePerHotspot.reduce(
       (acc, bn) => acc.add(bn),
-      new BN(0),
+      new BN(0)
     );
 
     const totalPendingBn = netPendingPerHotspot
@@ -225,34 +228,36 @@ export const getPendingRewards =
     let claimableBn = new BN(0);
     let automatedBn = pendingInMiniFanoutATAs; // ATA balance is always automated
 
-    const byHotspot = (await Promise.all(uniqueHotspots
-      .map(async (hotspot, idx) => {
-        const oraclePendingBn = netPendingPerHotspot[idx]!;
-        const ataPendingBn = ataBalancePerHotspot[idx]!;
-        const totalPendingBn = oraclePendingBn.add(ataPendingBn);
-        const miniFanout = miniFanouts[idx];
-        const zeroOut = await tokenOutput(new BN(0));
+    const byHotspot = (
+      await Promise.all(
+        uniqueHotspots.map(async (hotspot, idx) => {
+          const oraclePendingBn = netPendingPerHotspot[idx]!;
+          const ataPendingBn = ataBalancePerHotspot[idx]!;
+          const totalPendingBn = oraclePendingBn.add(ataPendingBn);
+          const miniFanout = miniFanouts[idx];
+          const zeroOut = await tokenOutput(new BN(0));
 
-        const isAutomated = hasAutomation || !!miniFanout;
-        if (isAutomated) {
-          automatedBn = automatedBn.add(oraclePendingBn);
-        } else {
-          claimableBn = claimableBn.add(oraclePendingBn);
-        }
+          const isAutomated = hasAutomation || !!miniFanout;
+          if (isAutomated) {
+            automatedBn = automatedBn.add(oraclePendingBn);
+          } else {
+            claimableBn = claimableBn.add(oraclePendingBn);
+          }
 
-        if (totalPendingBn.isZero()) return null;
+          if (totalPendingBn.isZero()) return null;
 
-        const totalOut = await tokenOutput(totalPendingBn);
-        return {
-          hotspotPubKey: hotspot.entityKey,
-          pending: {
-            total: totalOut,
-            claimable: isAutomated ? zeroOut : totalOut,
-            automated: isAutomated ? totalOut : zeroOut,
-          },
-        };
-      }),
-    )).filter(truthy);
+          const totalOut = await tokenOutput(totalPendingBn);
+          return {
+            hotspotPubKey: hotspot.entityKey,
+            pending: {
+              total: totalOut,
+              claimable: isAutomated ? zeroOut : totalOut,
+              automated: isAutomated ? totalOut : zeroOut,
+            },
+          };
+        })
+      )
+    ).filter(truthy);
 
     closeSingleton(connection);
 

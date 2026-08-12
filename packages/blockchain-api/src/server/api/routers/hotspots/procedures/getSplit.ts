@@ -60,24 +60,26 @@ export const getSplit = publicProcedure.hotspots.getSplit.handler(
     const totalShares = shares.reduce(
       (acc: number, share: MiniFanoutShare) =>
         acc + (share.share?.share?.amount || 0),
-      0,
+      0
     );
 
     return {
       walletAddress,
       hotspotPubkey,
       splitAddress: assetOwner.recipient.split.address,
-      shares: await Promise.all(shares.map(async (share: MiniFanoutShare) => ({
-        wallet: share.wallet,
-        delegate: share.delegate,
-        fixed: await toTokenAmountOutput(
-          new BN(String(share.share?.fixed?.amount ?? 0)),
-          HNT_MINT.toBase58(),
-        ),
-        shares: share.share?.share?.amount
-          ? share.share.share.amount / totalShares
-          : 0,
-      }))),
+      shares: await Promise.all(
+        shares.map(async (share: MiniFanoutShare) => ({
+          wallet: share.wallet,
+          delegate: share.delegate,
+          fixed: await toTokenAmountOutput(
+            new BN(String(share.share?.fixed?.amount ?? 0)),
+            HNT_MINT.toBase58()
+          ),
+          shares: share.share?.share?.amount
+            ? share.share.share.amount / totalShares
+            : 0,
+        }))
+      ),
     };
-  },
+  }
 );

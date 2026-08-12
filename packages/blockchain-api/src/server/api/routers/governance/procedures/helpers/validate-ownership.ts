@@ -13,7 +13,7 @@ type OwnershipErrorHandler = {
 
 function throwOwnershipError(
   errors: OwnershipErrorHandler,
-  message: string,
+  message: string
 ): never {
   if (errors.UNAUTHORIZED) {
     throw errors.UNAUTHORIZED({ message });
@@ -27,12 +27,12 @@ function throwOwnershipError(
 export async function validatePositionOwnership(
   connection: Connection,
   positionMint: PublicKey,
-  wallet: PublicKey,
+  wallet: PublicKey
 ): Promise<OwnershipValidationResult> {
   const tokenAccount = getAssociatedTokenAddressSync(
     positionMint,
     wallet,
-    true,
+    true
   );
   const tokenAccountInfo = await connection.getAccountInfo(tokenAccount);
   return {
@@ -53,10 +53,10 @@ export async function validatePositionOwnership(
 export async function validatePositionOwnershipBatch(
   connection: Connection,
   positionMints: PublicKey[],
-  wallet: PublicKey,
+  wallet: PublicKey
 ): Promise<boolean[]> {
   const tokenAccounts = positionMints.map((mint) =>
-    getAssociatedTokenAddressSync(mint, wallet, true),
+    getAssociatedTokenAddressSync(mint, wallet, true)
   );
 
   const CHUNK_SIZE = 100;
@@ -73,12 +73,12 @@ export async function requirePositionOwnership<T extends OwnershipErrorHandler>(
   connection: Connection,
   positionMint: PublicKey,
   wallet: PublicKey,
-  errors: T,
+  errors: T
 ): Promise<PublicKey> {
   const { isOwner, tokenAccount } = await validatePositionOwnership(
     connection,
     positionMint,
-    wallet,
+    wallet
   );
   if (!isOwner) {
     throwOwnershipError(errors, "Wallet does not own the specified position");
@@ -87,23 +87,23 @@ export async function requirePositionOwnership<T extends OwnershipErrorHandler>(
 }
 
 export async function requirePositionOwnershipWithMessage<
-  T extends OwnershipErrorHandler,
+  T extends OwnershipErrorHandler
 >(
   connection: Connection,
   positionMint: PublicKey,
   wallet: PublicKey,
   positionIdentifier: string,
-  errors: T,
+  errors: T
 ): Promise<PublicKey> {
   const { isOwner, tokenAccount } = await validatePositionOwnership(
     connection,
     positionMint,
-    wallet,
+    wallet
   );
   if (!isOwner) {
     throwOwnershipError(
       errors,
-      `Wallet does not own position ${positionIdentifier}`,
+      `Wallet does not own position ${positionIdentifier}`
     );
   }
   return tokenAccount;

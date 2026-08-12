@@ -29,7 +29,7 @@ const claimMeta = { type: "claim_rewards" };
 describe("isBundleLanded", () => {
   it("returns true when all real transactions are confirmed", () => {
     expect(
-      isBundleLanded([confirmed, confirmed], [claimMeta, claimMeta]),
+      isBundleLanded([confirmed, confirmed], [claimMeta, claimMeta])
     ).to.equal(true);
   });
 
@@ -42,20 +42,20 @@ describe("isBundleLanded", () => {
     expect(
       isBundleLanded(
         [confirmed, confirmed, null],
-        [claimMeta, claimMeta, tipMeta],
-      ),
+        [claimMeta, claimMeta, tipMeta]
+      )
     ).to.equal(true);
   });
 
   it("returns false when a real transaction is not found (null)", () => {
     expect(isBundleLanded([confirmed, null], [claimMeta, claimMeta])).to.equal(
-      false,
+      false
     );
   });
 
   it("returns false when a real transaction has an error", () => {
     expect(
-      isBundleLanded([confirmed, failed], [claimMeta, claimMeta]),
+      isBundleLanded([confirmed, failed], [claimMeta, claimMeta])
     ).to.equal(false);
   });
 
@@ -66,7 +66,7 @@ describe("isBundleLanded", () => {
   it("does not let a landed tip mask an unlanded real transaction", () => {
     // Tip finalized, real tx missing — must be false.
     expect(isBundleLanded([null, finalized], [claimMeta, tipMeta])).to.equal(
-      false,
+      false
     );
   });
 
@@ -87,7 +87,7 @@ describe("predictSubmissionType", () => {
         transactionCount: 1,
         useJitoBundle: true,
         parallel: true,
-      }),
+      })
     ).to.equal("single");
   });
 
@@ -97,7 +97,7 @@ describe("predictSubmissionType", () => {
         transactionCount: 3,
         useJitoBundle: true,
         parallel: false,
-      }),
+      })
     ).to.equal("jito_bundle");
   });
 
@@ -107,7 +107,7 @@ describe("predictSubmissionType", () => {
         transactionCount: 2,
         useJitoBundle: false,
         parallel: true,
-      }),
+      })
     ).to.equal("parallel");
   });
 
@@ -117,7 +117,7 @@ describe("predictSubmissionType", () => {
         transactionCount: 2,
         useJitoBundle: false,
         parallel: false,
-      }),
+      })
     ).to.equal("sequential");
   });
 });

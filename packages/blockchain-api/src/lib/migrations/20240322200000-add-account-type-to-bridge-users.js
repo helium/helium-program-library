@@ -13,7 +13,7 @@ module.exports = {
   async down(queryInterface, Sequelize) {
     await queryInterface.removeColumn("bridge_users", "account_type");
     await queryInterface.sequelize.query(
-      "DROP TYPE IF EXISTS enum_bridge_users_account_type",
+      "DROP TYPE IF EXISTS enum_bridge_users_account_type"
     );
   },
 };

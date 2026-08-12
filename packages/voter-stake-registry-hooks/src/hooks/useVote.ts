@@ -1,23 +1,30 @@
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { init as hsdInit } from "@helium/helium-sub-daos-sdk";
 import { useProposal } from "@helium/modular-governance-hooks";
-import {
-  init as hplCronsInit,
-  TASK_QUEUE_ID,
-} from "@helium/hpl-crons-sdk";
+import { init as hplCronsInit, TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
 import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
 import {
   init,
   proxyVoteMarkerKey,
   voteMarkerKey,
 } from "@helium/voter-stake-registry-sdk";
-import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import BN from "bn.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { calcPositionVotingPower } from "../utils/calcPositionVotingPower";
-import { customSignerKey, taskKey, taskQueueAuthorityKey,nextAvailableTaskIds,  init as tuktukInit } from "@helium/tuktuk-sdk";
+import {
+  customSignerKey,
+  taskKey,
+  taskQueueAuthorityKey,
+  nextAvailableTaskIds,
+  init as tuktukInit,
+} from "@helium/tuktuk-sdk";
 import { useVoteMarkers } from "./useVoteMarkers";
 import { useProposalEndTs } from "./useProposalEndTs";
 import { useProxyVoteMarker } from "./useProxyVoteMarker";
@@ -32,7 +39,7 @@ export const useVote = (proposalKey: PublicKey) => {
     return proxyVoteMarkerKey(provider.wallet.publicKey, proposalKey)[0];
   }, [provider?.wallet?.publicKey, proposalKey]);
   const { info: proxyVoteMarker } = useProxyVoteMarker(proxyVoteMarkerK);
-  const sortedPositions = useSortedPositions()
+  const sortedPositions = useSortedPositions();
   const voteMarkerKeys = useMemo(() => {
     return sortedPositions
       ? sortedPositions.map((p) => voteMarkerKey(p.mint, proposalKey)[0])
@@ -66,7 +73,8 @@ export const useVote = (proposalKey: PublicKey) => {
           if (
             (marker?.info?.proxyIndex || 0) >= (position?.proxy?.index || 0)
           ) {
-            acc[choice] = (acc[choice] || marker.info && !marker.info.weight.isZero())
+            acc[choice] =
+              acc[choice] || (marker.info && !marker.info.weight.isZero());
           }
         });
         return acc;
@@ -147,11 +155,18 @@ export const useVote = (proposalKey: PublicKey) => {
     (choice: number) => {
       if (!markers || !proposal) return false;
       const myPositions = sortedPositions.filter((p) => !p.isProxiedToMe);
-      const myPositionsCanVote = myPositions.some((p) => canPositionVote(p.index, choice));
+      const myPositionsCanVote = myPositions.some((p) =>
+        canPositionVote(p.index, choice)
+      );
       const hasProxies = sortedPositions.some((p) => p.isProxiedToMe);
       const hasNeverProxyVoted = hasProxies && !proxyVoteMarker;
-      const hasProxyVotedButCanVote = proxyVoteMarker && proxyVoteMarker.choices.length < proposal.maxChoicesPerVoter && !proxyVoteMarker.choices.includes(choice);
-      return myPositionsCanVote || hasNeverProxyVoted || hasProxyVotedButCanVote;
+      const hasProxyVotedButCanVote =
+        proxyVoteMarker &&
+        proxyVoteMarker.choices.length < proposal.maxChoicesPerVoter &&
+        !proxyVoteMarker.choices.includes(choice);
+      return (
+        myPositionsCanVote || hasNeverProxyVoted || hasProxyVotedButCanVote
+      );
     },
     [markers, canPositionVote, proxyVoteMarker]
   );
@@ -225,7 +240,7 @@ export const useVote = (proposalKey: PublicKey) => {
             )[0];
             proxyVoteInstructions.push(
               await hplCronsProgram.methods
-              // @ts-ignore
+                // @ts-ignore
                 .queueProxyVoteV0({
                   freeTaskId: task1,
                 })
@@ -322,8 +337,7 @@ export const useVote = (proposalKey: PublicKey) => {
               return instructions;
             })
           )
-        )
-          .filter(truthy)
+        ).filter(truthy);
 
         if (onInstructions) {
           await onInstructions([
@@ -333,7 +347,10 @@ export const useVote = (proposalKey: PublicKey) => {
         } else {
           await batchParallelInstructions({
             provider,
-            instructions: [...proxyVoteInstructions, ...normalVoteInstructions.flat()],
+            instructions: [
+              ...proxyVoteInstructions,
+              ...normalVoteInstructions.flat(),
+            ],
             onProgress,
             triesRemaining: 10,
             extraSigners: [],

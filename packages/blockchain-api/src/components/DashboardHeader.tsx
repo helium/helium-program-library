@@ -28,7 +28,7 @@ export const DashboardHeader = ({ walletAddress }: DashboardHeaderProps) => {
 
   // Check if user has HNT token account
   const hasHntAccount = tokenBalances?.tokens.some(
-    (token) => token.mint === HNT_MINT.toBase58(),
+    (token) => token.mint === HNT_MINT.toBase58()
   );
 
   const { loading: isCreatingHntAccount, execute: createHntAccount } =
@@ -72,15 +72,15 @@ export const DashboardHeader = ({ walletAddress }: DashboardHeaderProps) => {
       <Alert
         className={`w-full ${
           isOwner
-            ? "bg-green-50 border-green-500 dark:bg-green-950/50 dark:border-green-600"
-            : "bg-orange-50 border-orange-500 dark:bg-orange-950/50 dark:border-orange-600"
+            ? "border-green-500 bg-green-50 dark:border-green-600 dark:bg-green-950/50"
+            : "border-orange-500 bg-orange-50 dark:border-orange-600 dark:bg-orange-950/50"
         } border`}
       >
-        <AlertTitle className="flex flex-col md:flex-row justify-between gap-1">
-          <div className="flex flex-none gap-2 items-center">
+        <AlertTitle className="flex flex-col justify-between gap-1 md:flex-row">
+          <div className="flex flex-none items-center gap-2">
             {isOwner ? (
               <>
-                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <p className="text-sm text-green-600 dark:text-green-400">
                   You are the owner of this wallet
                   <span className="hidden md:inline">
@@ -90,7 +90,7 @@ export const DashboardHeader = ({ walletAddress }: DashboardHeaderProps) => {
               </>
             ) : (
               <>
-                <XCircle className="w-4 h-4 text-orange-600 dark:text-orange-600" />
+                <XCircle className="h-4 w-4 text-orange-600 dark:text-orange-600" />
                 <p className="text-sm text-orange-600 dark:text-orange-400">
                   You are not the owner of this wallet
                   <span className="hidden md:inline">
@@ -105,15 +105,15 @@ export const DashboardHeader = ({ walletAddress }: DashboardHeaderProps) => {
 
       {/* HNT Token Account Alert */}
       {isOwner && !isLoadingBalances && !hasHntAccount && (
-        <Alert className="w-full bg-blue-50 border-blue-500 dark:bg-blue-950/50 dark:border-blue-600 border">
-          <AlertTitle className="flex flex-col md:flex-row justify-between gap-4">
-            <div className="flex flex-none gap-2 items-center">
-              <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+        <Alert className="w-full border border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-950/50">
+          <AlertTitle className="flex flex-col justify-between gap-4 md:flex-row">
+            <div className="flex flex-none items-center gap-2">
+              <Plus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <div>
-                <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
                   Create HNT Token Account
                 </p>
-                <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
+                <p className="mt-1 text-xs text-blue-600/80 dark:text-blue-400/80">
                   You need an HNT token account to receive HNT tokens from your
                   hotspots.
                 </p>
@@ -135,24 +135,24 @@ export const DashboardHeader = ({ walletAddress }: DashboardHeaderProps) => {
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Balance</p>
+              <p className="text-muted-foreground text-sm">Total Balance</p>
               {isLoadingBalances ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xl font-bold text-foreground">
+                  <div className="border-muted-foreground h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" />
+                  <p className="text-foreground text-xl font-bold">
                     Loading...
                   </p>
                 </div>
               ) : (
-                <p className="text-3xl font-bold text-foreground">
+                <p className="text-foreground text-3xl font-bold">
                   {formatUsdAmount(tokenBalances?.totalBalanceUsd || 0)}{" "}
-                  <span className="text-base font-normal text-muted-foreground">
+                  <span className="text-muted-foreground text-base font-normal">
                     USD
                   </span>
                 </p>
               )}
             </div>
-            <div className="text-6xl font-light text-muted-foreground/40">
+            <div className="text-muted-foreground/40 text-6xl font-light">
               $
             </div>
           </div>

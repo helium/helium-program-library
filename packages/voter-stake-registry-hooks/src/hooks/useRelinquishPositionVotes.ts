@@ -110,7 +110,7 @@ export const useRelinquishPositionVotes = () => {
             onProgress,
             triesRemaining: 10,
             extraSigners: [],
-            maxSignatureBatch
+            maxSignatureBatch,
           });
         }
       }

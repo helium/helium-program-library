@@ -23,24 +23,26 @@ export const getBalance = async ({
   }
 };
 
-export const PYTH_HERMES_URL = "https://hermes.pyth.network/"
+export const PYTH_HERMES_URL = "https://hermes.pyth.network/";
 
 type PythReturn = {
   priceMessage: {
     emaPrice: {
-      feedId: number[]
-      price: BN
-      conf: BN
-      exponent: number
-      publishTime: BN
-      prevPublishTime: BN
-      emaPrice: BN
-      emaConf: BN
-    }
-  }
-}
+      feedId: number[];
+      price: BN;
+      conf: BN;
+      exponent: number;
+      publishTime: BN;
+      prevPublishTime: BN;
+      emaPrice: BN;
+      emaConf: BN;
+    };
+  };
+};
 
-export const getOraclePrice = async ({ tokenType }: {
+export const getOraclePrice = async ({
+  tokenType,
+}: {
   tokenType?: "HNT";
   cluster?: Cluster;
   connection?: Connection;
@@ -48,16 +50,11 @@ export const getOraclePrice = async ({ tokenType }: {
   if (tokenType !== "HNT") {
     throw new Error("Only HNT is supported");
   }
-  const priceServiceConnection = new HermesClient(
-    PYTH_HERMES_URL,
-    {}
-  );
+  const priceServiceConnection = new HermesClient(PYTH_HERMES_URL, {});
 
-  const priceUpdates = (
-    await priceServiceConnection.getLatestPriceUpdates(
-      [HNT_PRICE_FEED_ID],
-      { encoding: "base64" }
-    )
+  const priceUpdates = await priceServiceConnection.getLatestPriceUpdates(
+    [HNT_PRICE_FEED_ID],
+    { encoding: "base64" }
   );
   const price = priceUpdates.parsed![0];
   return {
@@ -70,6 +67,6 @@ export const getOraclePrice = async ({ tokenType }: {
       exponent: price.ema_price.expo,
       publishTime: price.ema_price.publish_time,
       prevPublishTime: price.ema_price.prev_publish_time,
-    }
-  }
+    },
+  };
 };

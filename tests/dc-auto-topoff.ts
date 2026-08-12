@@ -669,7 +669,10 @@ describe("dc-auto-topoff", () => {
       const queuedTasks = await tuktukProgram.account.taskV0.all([
         { memcmp: { offset: 8, bytes: taskQueue.toBase58() } },
       ]);
-      expect(queuedTasks.length, "topoff should have queued tasks").to.be.greaterThan(0);
+      expect(
+        queuedTasks.length,
+        "topoff should have queued tasks"
+      ).to.be.greaterThan(0);
       for (const queued of queuedTasks) {
         expect(
           queued.account.crankReward.toString(),

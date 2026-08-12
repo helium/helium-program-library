@@ -1,6 +1,9 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { init as initDataCredits, mintDataCredits } from "@helium/data-credits-sdk";
+import {
+  init as initDataCredits,
+  mintDataCredits,
+} from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
 import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
@@ -100,13 +103,15 @@ describe("hexboosting", () => {
     const hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, new BN("100000000000000"), me);
     await provider.sendAll(
-      (await mintDataCredits({
-        program: dcProgram,
-        dcAmount: new BN("10000000000"),
-        dcMint: dataCredits.dcMint,
-      })).txs
+      (
+        await mintDataCredits({
+          program: dcProgram,
+          dcAmount: new BN("10000000000"),
+          dcMint: dataCredits.dcMint,
+        })
+      ).txs
     );
-    
+
     const { dao } = await initTestDao(
       hsdProgram,
       provider,
@@ -304,9 +309,7 @@ describe("hexboosting", () => {
         )
       ).amount;
 
-      const expected = Number(
-        BigInt(toBN((6 * 0.005), 6).toNumber())
-      );
+      const expected = Number(BigInt(toBN(6 * 0.005, 6).toNumber()));
       expect(Number(preBalance - postBalance)).to.be.within(
         expected - 1,
         expected
@@ -401,7 +404,7 @@ describe("hexboosting", () => {
           )
         ).amount;
 
-        const expected = BigInt(toBN((3 * 0.005), 6).toNumber());
+        const expected = BigInt(toBN(3 * 0.005, 6).toNumber());
         const actual = preBalance - postBalance;
         expect(Number(actual)).to.be.within(
           Number(expected) - 1,

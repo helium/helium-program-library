@@ -58,7 +58,7 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
           registrar: acc.registrar.toBase58(),
           amountDeposited: await toTokenAmountOutput(
             acc.amountDepositedNative,
-            votingMint,
+            votingMint
           ),
           numActiveVotes: acc.numActiveVotes,
           lockup: {
@@ -67,9 +67,9 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
             endTs: acc.lockup.endTs.toString(),
           },
         };
-      }),
+      })
     );
 
     return positions.filter((p) => p !== null);
-  },
+  }
 );

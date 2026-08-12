@@ -1,8 +1,15 @@
 import * as anchor from "@coral-xyz/anchor";
 import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
 import { init as initMfan } from "@helium/mini-fanout-sdk";
-import { batchInstructionsToTxsWithPriorityFee, bulkSendTransactions } from "@helium/spl-utils";
-import { init as initTuktuk, nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
+import {
+  batchInstructionsToTxsWithPriorityFee,
+  bulkSendTransactions,
+} from "@helium/spl-utils";
+import {
+  init as initTuktuk,
+  nextAvailableTaskIds,
+  taskKey,
+} from "@helium/tuktuk-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -56,8 +63,10 @@ export async function run(args: any = process.argv) {
   // dequeue a live task from a bare client instruction, so don't try; skip
   // and say so instead of submitting a transaction guaranteed to fail on a
   // missing signature.
-  const isIdleSentinel = (miniFanout: (typeof allMiniFanouts)[number], task: PublicKey) =>
-    task.equals(program.programId) || task.equals(miniFanout.publicKey);
+  const isIdleSentinel = (
+    miniFanout: (typeof allMiniFanouts)[number],
+    task: PublicKey
+  ) => task.equals(program.programId) || task.equals(miniFanout.publicKey);
   const idle = miniFanouts.filter((mf) => {
     const ok =
       isIdleSentinel(mf, mf.account.nextTask) &&
@@ -72,8 +81,10 @@ export async function run(args: any = process.argv) {
   });
 
   const batchSize = 10;
-  const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID)
-  const freeTasks = nextAvailableTaskIds(taskQueue.taskBitmap, idle.length * 2)
+  const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
+    TASK_QUEUE_ID
+  );
+  const freeTasks = nextAvailableTaskIds(taskQueue.taskBitmap, idle.length * 2);
   for (let i = 0; i < idle.length; i += batchSize) {
     // Log progress every 100 positions
     if (i > 0 && i % 100 === 0) {
@@ -82,24 +93,27 @@ export async function run(args: any = process.argv) {
 
     const batch = idle.slice(i, i + batchSize);
 
-    await Promise.all(batch.map(async (miniFanout) => {
-      const nextTask = freeTasks.pop()!;
-      const nextPreTask = freeTasks.pop()!;
+    await Promise.all(
+      batch.map(async (miniFanout) => {
+        const nextTask = freeTasks.pop()!;
+        const nextPreTask = freeTasks.pop()!;
 
-      instructions.push([
-        await program.methods.scheduleTaskV0({
-          taskId: nextTask,
-          preTaskId: nextPreTask,
-        })
-          .accounts({
-            payer: wallet.publicKey,
-            miniFanout: miniFanout.publicKey,
-            task: taskKey(TASK_QUEUE_ID, nextTask)[0],
-            preTask: taskKey(TASK_QUEUE_ID, nextPreTask)[0],
-          })
-          .instruction()
-      ]);
-    }));
+        instructions.push([
+          await program.methods
+            .scheduleTaskV0({
+              taskId: nextTask,
+              preTaskId: nextPreTask,
+            })
+            .accounts({
+              payer: wallet.publicKey,
+              miniFanout: miniFanout.publicKey,
+              task: taskKey(TASK_QUEUE_ID, nextTask)[0],
+              preTask: taskKey(TASK_QUEUE_ID, nextPreTask)[0],
+            })
+            .instruction(),
+        ]);
+      })
+    );
   }
   console.log(
     `Finished processing ${idle.length} mini fanouts (${

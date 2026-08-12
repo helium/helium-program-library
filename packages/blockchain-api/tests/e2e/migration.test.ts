@@ -157,7 +157,7 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer,
+      payer
     );
 
     const afterBalance = await connection.getBalance(destination.publicKey);
@@ -174,7 +174,7 @@ describe("migration", () => {
     const sourceAta = getAssociatedTokenAddressSync(
       mintKey,
       payer.publicKey,
-      true,
+      true
     );
     const sourceBalance = (await getAccount(connection, sourceAta)).amount;
     expect(Number(sourceBalance)).to.be.greaterThan(0);
@@ -182,7 +182,7 @@ describe("migration", () => {
     const destAta = getAssociatedTokenAddressSync(
       mintKey,
       usdcDestination.publicKey,
-      true,
+      true
     );
     let beforeDest = BigInt(0);
     try {
@@ -207,7 +207,7 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer,
+      payer
     );
 
     const afterDest = (await getAccount(connection, destAta)).amount;
@@ -228,7 +228,7 @@ describe("migration", () => {
     const destAta = getAssociatedTokenAddressSync(
       usdcMint,
       fullBalanceDestination.publicKey,
-      true,
+      true
     );
     let beforeDest = BigInt(0);
     try {
@@ -249,7 +249,7 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      fullBalanceSource,
+      fullBalanceSource
     );
 
     const afterDest = (await getAccount(connection, destAta)).amount;
@@ -259,7 +259,7 @@ describe("migration", () => {
     const sourceAta = getAssociatedTokenAddressSync(
       usdcMint,
       fullBalanceSource.publicKey,
-      true,
+      true
     );
     let sourceClosed = false;
     try {
@@ -322,7 +322,7 @@ describe("migration", () => {
       // A different pair is unaffected.
       const otherResult = await call(
         Keypair.generate().publicKey.toBase58(),
-        dst,
+        dst
       );
       expect(otherResult.transactionData).to.not.be.undefined;
     } finally {
@@ -350,7 +350,7 @@ describe("migration", () => {
     // Any PDA is off-curve — assets sent there would be unrecoverable.
     const [offCurve] = PublicKey.findProgramAddressSync(
       [Buffer.from("migration-test")],
-      TOKEN_PROGRAM_ID,
+      TOKEN_PROGRAM_ID
     );
     expect(PublicKey.isOnCurve(offCurve.toBytes())).to.equal(false);
 
@@ -384,9 +384,7 @@ describe("migration", () => {
     expect(result.transactionData.transactions.length).to.equal(0);
     expect(result.warnings).to.be.an("array");
     expect(
-      result.warnings!.some((w) =>
-        w.includes("not a supported SPL token mint"),
-      ),
+      result.warnings!.some((w) => w.includes("not a supported SPL token mint"))
     ).to.equal(true);
   });
 
@@ -398,7 +396,7 @@ describe("migration", () => {
     const sourceAta = getAssociatedTokenAddressSync(
       usdcMint,
       payer.publicKey,
-      true,
+      true
     );
     const sourceBalance = (await getAccount(connection, sourceAta)).amount;
     expect(Number(sourceBalance)).to.be.greaterThan(0);
@@ -418,13 +416,13 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer,
+      payer
     );
 
     const destAta = getAssociatedTokenAddressSync(
       usdcMint,
       dupDestination.publicKey,
-      true,
+      true
     );
     const destBalance = (await getAccount(connection, destAta)).amount;
     expect(Number(destBalance)).to.equal(Number(sourceBalance));
@@ -445,12 +443,12 @@ describe("migration", () => {
     const sourceAta = getAssociatedTokenAddressSync(
       positionMintPubkey,
       payer.publicKey,
-      true,
+      true
     );
     const destAta = getAssociatedTokenAddressSync(
       positionMintPubkey,
       positionDestination.publicKey,
-      true,
+      true
     );
 
     // Source owns the position NFT in a frozen ATA before migration
@@ -460,8 +458,9 @@ describe("migration", () => {
 
     // Snapshot PositionV0 state — the transfer must not alter it
     const { vsrProgram } = await getPrograms(ctx);
-    const positionBefore =
-      await vsrProgram.account.positionV0.fetch(positionPubkey);
+    const positionBefore = await vsrProgram.account.positionV0.fetch(
+      positionPubkey
+    );
 
     // No hotspots/tokens requested — positions are discovered server-side
     const result = await client.migration.migrate({
@@ -472,7 +471,7 @@ describe("migration", () => {
     });
 
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip",
+      (t: any) => t.metadata?.description !== "Jito tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     for (const t of migrationTxs) {
@@ -483,7 +482,7 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer,
+      payer
     );
 
     // Destination holds the position NFT in a frozen ATA
@@ -501,19 +500,20 @@ describe("migration", () => {
     expect(sourceClosed).to.equal(true);
 
     // PositionV0 account state is unchanged
-    const positionAfter =
-      await vsrProgram.account.positionV0.fetch(positionPubkey);
+    const positionAfter = await vsrProgram.account.positionV0.fetch(
+      positionPubkey
+    );
     expect(positionAfter.registrar.toBase58()).to.equal(
-      positionBefore.registrar.toBase58(),
+      positionBefore.registrar.toBase58()
     );
     expect(positionAfter.mint.toBase58()).to.equal(
-      positionBefore.mint.toBase58(),
+      positionBefore.mint.toBase58()
     );
     expect(positionAfter.amountDepositedNative.toString()).to.equal(
-      positionBefore.amountDepositedNative.toString(),
+      positionBefore.amountDepositedNative.toString()
     );
     expect(positionAfter.lockup.endTs.toString()).to.equal(
-      positionBefore.lockup.endTs.toString(),
+      positionBefore.lockup.endTs.toString()
     );
   });
 
@@ -534,13 +534,13 @@ describe("migration", () => {
     const { vsrProgram, hsdProgram } = await getPrograms(ctx);
     const delegated =
       await hsdProgram.account.delegatedPositionV0.fetchNullable(
-        delegatedPositionKey(positionPubkey)[0],
+        delegatedPositionKey(positionPubkey)[0]
       );
     expect(delegated, "position should be delegated").to.not.equal(null);
 
     const expirationTime = await getSeasonBoundedProxyExpirationTime(
       ctx,
-      positionMint,
+      positionMint
     );
     const { data: proxyData, error: proxyError } =
       await safeClient.governance.assignProxies({
@@ -555,12 +555,13 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       proxyData!.transactionData,
-      payer,
+      payer
     );
 
     // Capture a real VSR-owned account for the dust-attack test below
-    const positionAcc =
-      await vsrProgram.account.positionV0.fetch(positionPubkey);
+    const positionAcc = await vsrProgram.account.positionV0.fetch(
+      positionPubkey
+    );
     vsrRegistrar = positionAcc.registrar;
 
     const result = await client.migration.migrate({
@@ -573,23 +574,23 @@ describe("migration", () => {
     expect(result.warnings).to.be.an("array");
     expect(
       result.warnings!.some((w) => w.includes("delegated")),
-      `expected a delegation warning, got: ${JSON.stringify(result.warnings)}`,
+      `expected a delegation warning, got: ${JSON.stringify(result.warnings)}`
     ).to.equal(true);
     expect(
       result.warnings!.some((w) => w.includes("proxy")),
-      `expected a proxy warning, got: ${JSON.stringify(result.warnings)}`,
+      `expected a proxy warning, got: ${JSON.stringify(result.warnings)}`
     ).to.equal(true);
 
     // Submit so the payer holds no positions for later payer-sourced tests
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer,
+      payer
     );
     const destAta = getAssociatedTokenAddressSync(
       positionMintPubkey,
       warnDestination.publicKey,
-      true,
+      true
     );
     const destAtaAfter = await getAccount(connection, destAta);
     expect(Number(destAtaAfter.amount)).to.equal(1);
@@ -602,7 +603,7 @@ describe("migration", () => {
     // nonexistent PositionV0 failed the whole atomic bundle — permanently,
     // since enumeration re-included the dust on every retry.
     expect(vsrRegistrar, "vsrRegistrar captured by previous test").to.not.equal(
-      undefined,
+      undefined
     );
     const victim = Keypair.generate();
     const dustDestination = Keypair.generate();
@@ -615,7 +616,7 @@ describe("migration", () => {
       payer,
       payer.publicKey,
       vsrRegistrar!,
-      0,
+      0
     );
     // Dust mint B: freeze authority is the correct position PDA for the mint,
     // but no PositionV0 exists there.
@@ -626,7 +627,7 @@ describe("migration", () => {
       payer.publicKey,
       positionKey(dustMintBKeypair.publicKey)[0],
       0,
-      dustMintBKeypair,
+      dustMintBKeypair
     );
 
     for (const dustMint of [dustMintA, dustMintB]) {
@@ -634,7 +635,7 @@ describe("migration", () => {
         connection,
         payer,
         dustMint,
-        victim.publicKey,
+        victim.publicKey
       );
       await mintTo(connection, payer, dustMint, ata, payer, 1);
     }
@@ -653,13 +654,13 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      victim,
+      victim
     );
 
     const destAta = getAssociatedTokenAddressSync(
       usdcMint,
       dustDestination.publicKey,
-      true,
+      true
     );
     const destBalance = (await getAccount(connection, destAta)).amount;
     expect(Number(destBalance)).to.equal(1_000_000);
@@ -697,7 +698,7 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       createResult.transactionData,
-      payer,
+      payer
     );
 
     // Verify welcome pack exists on-chain
@@ -712,11 +713,11 @@ describe("migration", () => {
           throw new Error("not supported in test");
         },
       } as any,
-      AnchorProvider.defaultOptions(),
+      AnchorProvider.defaultOptions()
     );
     const wpProgram = await initWelcomePack(anchorProvider);
     const fetched = await wpProgram.account.welcomePackV0.fetchNullable(
-      new PublicKey(createResult.welcomePack.address),
+      new PublicKey(createResult.welcomePack.address)
     );
     expect(fetched).to.not.be.null;
     expect(fetched!.owner.toBase58()).to.equal(walletAddress);
@@ -734,7 +735,7 @@ describe("migration", () => {
     expect(result.transactionData.parallel).to.equal(false);
 
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip",
+      (t: any) => t.metadata?.description !== "Jito tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     for (const t of migrationTxs) {
@@ -802,13 +803,13 @@ describe("migration", () => {
       });
     if (createError) {
       expect.fail(
-        `Failed to create reward contract: ${JSON.stringify(createError)}`,
+        `Failed to create reward contract: ${JSON.stringify(createError)}`
       );
     }
     await signAndSubmitTransactionData(
       connection,
       createResult.unsignedTransactionData,
-      payer,
+      payer
     );
 
     // Now migrate the hotspot — procedure should detect the mini fanout on chain
@@ -824,7 +825,7 @@ describe("migration", () => {
     // Hotspot with split: fee payer acts as namespace signer (signed server-side),
     // source wallet signs as cNFT owner and old fanout owner. No destination signing needed.
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip",
+      (t: any) => t.metadata?.description !== "Jito tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     for (const t of migrationTxs) {
@@ -836,7 +837,7 @@ describe("migration", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer,
+      payer
     );
   });
 });

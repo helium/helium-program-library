@@ -56,7 +56,7 @@ export function TransferTokenModal({
   const { submitTransactions, isSubmitting } = useTransactionSubmission();
   const queryClient = useQueryClient();
   const [selectedMint, setSelectedMint] = useState<string>(
-    token?.mint ?? tokens[0]?.mint ?? "SOL",
+    token?.mint ?? tokens[0]?.mint ?? "SOL"
   );
 
   const effectiveToken = useMemo(() => {
@@ -68,16 +68,16 @@ export function TransferTokenModal({
   const isSolSelected = useMemo(() => !effectiveToken?.mint, [effectiveToken]);
   const decimals = useMemo(
     () => effectiveToken?.decimals ?? (isSolSelected ? 9 : 0),
-    [effectiveToken, isSolSelected],
+    [effectiveToken, isSolSelected]
   );
   const available = useMemo(
     () => effectiveToken?.uiAmount || 0,
-    [effectiveToken],
+    [effectiveToken]
   );
   const feeBufferSol = 0.01;
   const maxSendable = useMemo(
     () => (isSolSelected ? Math.max(available - feeBufferSol, 0) : available),
-    [isSolSelected, available],
+    [isSolSelected, available]
   );
 
   useEffect(() => {
@@ -125,7 +125,7 @@ export function TransferTokenModal({
 
       const mint = effectiveToken?.mint ?? TOKEN_MINTS.WSOL;
       const rawAmount = Math.round(
-        parseFloat(amount) * Math.pow(10, decimals),
+        parseFloat(amount) * Math.pow(10, decimals)
       ).toString();
 
       const { transactionData } = await client.tokens.transfer({
@@ -144,7 +144,7 @@ export function TransferTokenModal({
           });
         },
       });
-    },
+    }
   );
 
   const formatAvailable = (value: number) => {
@@ -189,12 +189,12 @@ export function TransferTokenModal({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="amount">Amount</Label>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 Available: {formatAvailable(maxSendable)}{" "}
                 {effectiveToken?.symbol || "SOL"}
               </span>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex items-center gap-2">
               <Input
                 id="amount"
                 type="number"
@@ -216,7 +216,7 @@ export function TransferTokenModal({
                 Max
               </Button>
             </div>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && <p className="text-destructive text-xs">{error}</p>}
           </div>
 
           <div className="flex justify-end gap-2">
@@ -238,7 +238,7 @@ export function TransferTokenModal({
               }
             >
               {isSubmittingTransfer ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-foreground" />
+                <div className="border-foreground h-4 w-4 animate-spin rounded-full border-b-2" />
               ) : (
                 "Send"
               )}

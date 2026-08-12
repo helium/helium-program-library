@@ -64,7 +64,7 @@ export const createRateLimiter = ({
  * unparseable values. A value of 0 disables the check. */
 export const parseRateLimit = (
   value: string | undefined,
-  fallback: number,
+  fallback: number
 ): number => {
   if (value === undefined || value === "") return fallback;
   const parsed = Number.parseInt(value, 10);

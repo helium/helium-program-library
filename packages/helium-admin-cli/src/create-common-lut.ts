@@ -1,5 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
-import { chunks, sendInstructions, truthy, withPriorityFees } from "@helium/spl-utils";
+import {
+  chunks,
+  sendInstructions,
+  truthy,
+  withPriorityFees,
+} from "@helium/spl-utils";
 import {
   AddressLookupTableProgram,
   PublicKey,
@@ -7,7 +12,7 @@ import {
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
-import * as multisig from '@sqds/multisig';
+import * as multisig from "@sqds/multisig";
 import { sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {

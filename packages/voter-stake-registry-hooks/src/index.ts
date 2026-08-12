@@ -11,7 +11,10 @@ export { useClosePosition } from "./hooks/useClosePosition";
 export { useCreatePosition } from "./hooks/useCreatePosition";
 export { useDao } from "./hooks/useDao";
 export { useExtendDelegation } from "./hooks/useExtendDelegation";
-export { useDelegatePosition, useDelegatePositions } from "./hooks/useDelegatePosition";
+export {
+  useDelegatePosition,
+  useDelegatePositions,
+} from "./hooks/useDelegatePosition";
 export { useProposalEndTs } from "./hooks/useProposalEndTs";
 export { useExtendPosition } from "./hooks/useExtendPosition";
 export { useFlipPositionLockupKind } from "./hooks/useFlipPositionLockupKind";
@@ -43,5 +46,8 @@ export { proxyAssignmentsForWalletQuery } from "./queries/proxyAssignmentsForWal
 export { proxyQuery } from "./queries/proxyQuery";
 export { votesForProposalQuery } from "./queries/votesForProposalQuery";
 export { votesForWalletQuery } from "./queries/votesForWalletQuery";
-export { subDaoDelegationSplitQuery, useSubDaoDelegationSplit } from "./hooks/useSubDaoDelegationSplit";
+export {
+  subDaoDelegationSplitQuery,
+  useSubDaoDelegationSplit,
+} from "./hooks/useSubDaoDelegationSplit";
 export { dataBurnSplitQuery, useDataBurnSplit } from "./hooks/useDataBurnSplit";

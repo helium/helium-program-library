@@ -43,7 +43,7 @@ describe("hotspot-updates", () => {
         expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
       }
       expect(
-        data?.transactionData?.transactions?.[0]?.serializedTransaction,
+        data?.transactionData?.transactions?.[0]?.serializedTransaction
       ).to.be.a("string");
       expect(data?.appliedTo?.mobile).to.equal(true);
       expect(data?.appliedTo?.iot).to.equal(false);
@@ -58,7 +58,7 @@ describe("hotspot-updates", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
     });
 
@@ -83,14 +83,14 @@ describe("hotspot-updates", () => {
           (error.code === "NOT_FOUND" || error.code === "UNAUTHORIZED")
         ) {
           console.log(
-            `Skipping IoT-specific test: ${error.message} (hotspot may not be owned by test wallet)`,
+            `Skipping IoT-specific test: ${error.message} (hotspot may not be owned by test wallet)`
           );
           return;
         }
         expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
       }
       expect(
-        data?.transactionData?.transactions?.[0]?.serializedTransaction,
+        data?.transactionData?.transactions?.[0]?.serializedTransaction
       ).to.be.a("string");
       expect(data?.appliedTo?.iot).to.equal(true);
 
@@ -98,7 +98,7 @@ describe("hotspot-updates", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
     });
 
@@ -129,14 +129,14 @@ describe("hotspot-updates", () => {
           error.message?.includes("not a mobile device")
         ) {
           console.log(
-            "Skipping WiFi deployment test: hotspot is not Mobile-capable",
+            "Skipping WiFi deployment test: hotspot is not Mobile-capable"
           );
           return;
         }
         expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
       }
       expect(
-        data?.transactionData?.transactions?.[0]?.serializedTransaction,
+        data?.transactionData?.transactions?.[0]?.serializedTransaction
       ).to.be.a("string");
       expect(data?.appliedTo?.mobile).to.equal(true);
 
@@ -144,7 +144,7 @@ describe("hotspot-updates", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
-        ctx.payer,
+        ctx.payer
       );
     });
 
@@ -165,12 +165,12 @@ describe("hotspot-updates", () => {
       if (!isDefinedError(error)) {
         if (!error) {
           console.log(
-            "Skipping device type mismatch test: hotspot may support both networks",
+            "Skipping device type mismatch test: hotspot may support both networks"
           );
           return;
         }
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("BAD_REQUEST");
@@ -193,7 +193,7 @@ describe("hotspot-updates", () => {
       // #then returns UNAUTHORIZED
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("UNAUTHORIZED");
@@ -216,7 +216,7 @@ describe("hotspot-updates", () => {
       // #then returns NOT_FOUND
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("NOT_FOUND");

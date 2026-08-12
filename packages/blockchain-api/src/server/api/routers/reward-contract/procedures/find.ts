@@ -40,7 +40,7 @@ export const find = publicProcedure.rewardContract.find.handler(
     }
 
     const { provider, connection } = createSolanaConnection(
-      PublicKey.default.toBase58(),
+      PublicKey.default.toBase58()
     );
     const assetEndpoint = env.ASSET_ENDPOINT || connection.rpcEndpoint;
     const assetPubkey = new PublicKey(assetId);
@@ -60,36 +60,38 @@ export const find = publicProcedure.rewardContract.find.handler(
           status: "PENDING",
           contract: {
             delegateWalletAddress: wpRecord.owner,
-            recipients: await Promise.all(wpRecord.rewardsSplit.map(async (split) => {
-              const receives =
-                split.type === "fixed"
-                  ? {
-                      type: "FIXED" as const,
-                      tokenAmount: await toTokenAmountOutput(
-                        new BN(split.tokenAmount.amount),
-                        hntMint,
-                      ),
-                    }
-                  : {
-                      type: "SHARES" as const,
-                      shares: split.amount,
-                    };
-              if (split.address === PublicKey.default.toBase58()) {
+            recipients: await Promise.all(
+              wpRecord.rewardsSplit.map(async (split) => {
+                const receives =
+                  split.type === "fixed"
+                    ? {
+                        type: "FIXED" as const,
+                        tokenAmount: await toTokenAmountOutput(
+                          new BN(split.tokenAmount.amount),
+                          hntMint
+                        ),
+                      }
+                    : {
+                        type: "SHARES" as const,
+                        shares: split.amount,
+                      };
+                if (split.address === PublicKey.default.toBase58()) {
+                  return {
+                    type: "CLAIMABLE" as const,
+                    giftedCurrency: await toTokenAmountOutput(
+                      new BN(wpRecord.solAmount),
+                      solMint
+                    ),
+                    receives,
+                  };
+                }
                 return {
-                  type: "CLAIMABLE" as const,
-                  giftedCurrency: await toTokenAmountOutput(
-                    new BN(wpRecord.solAmount),
-                    solMint,
-                  ),
+                  type: "PRESET" as const,
+                  walletAddress: split.address,
                   receives,
                 };
-              }
-              return {
-                type: "PRESET" as const,
-                walletAddress: split.address,
-                receives,
-              };
-            })),
+              })
+            ),
             rewardSchedule: toFiveColumnCron(wpRecord.rewardsSchedule),
           },
         };
@@ -103,7 +105,7 @@ export const find = publicProcedure.rewardContract.find.handler(
         const assetOwner = new PublicKey(
           typeof asset.ownership.owner === "string"
             ? asset.ownership.owner
-            : asset.ownership.owner.toBase58(),
+            : asset.ownership.owner.toBase58()
         );
 
         // When asset is transferred to WelcomePack, assetOwner IS the pack address
@@ -117,7 +119,7 @@ export const find = publicProcedure.rewardContract.find.handler(
         const [userWelcomePacksK] = userWelcomePacksKey(assetOwner);
         const userWelcomePacks =
           await wpProgram.account.userWelcomePacksV0.fetchNullable(
-            userWelcomePacksK,
+            userWelcomePacksK
           );
 
         if (userWelcomePacks) {
@@ -150,22 +152,24 @@ export const find = publicProcedure.rewardContract.find.handler(
           contract: {
             delegateWalletAddress: mfRecord.owner,
             entityOwnerAddress: mfRecord.namespace,
-            recipients: await Promise.all(mfRecord.shares.map(async (share) => ({
-              walletAddress: share.wallet,
-              receives:
-                share.share.fixed && share.share.fixed.amount !== "0"
-                  ? {
-                      type: "FIXED" as const,
-                      tokenAmount: await toTokenAmountOutput(
-                        new BN(share.share.fixed.amount),
-                        hntMint,
-                      ),
-                    }
-                  : {
-                      type: "SHARES" as const,
-                      shares: share.share.share?.amount || 0,
-                    },
-            }))),
+            recipients: await Promise.all(
+              mfRecord.shares.map(async (share) => ({
+                walletAddress: share.wallet,
+                receives:
+                  share.share.fixed && share.share.fixed.amount !== "0"
+                    ? {
+                        type: "FIXED" as const,
+                        tokenAmount: await toTokenAmountOutput(
+                          new BN(share.share.fixed.amount),
+                          hntMint
+                        ),
+                      }
+                    : {
+                        type: "SHARES" as const,
+                        shares: share.share.share?.amount || 0,
+                      },
+              }))
+            ),
             rewardSchedule: toFiveColumnCron(mfRecord.schedule),
           },
         };
@@ -180,8 +184,9 @@ export const find = publicProcedure.rewardContract.find.handler(
 
     const lazyDistributor = new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS);
     const [recipientK] = recipientKey(lazyDistributor, assetPubkey);
-    const recipientAcc =
-      await ldProgram.account.recipientV0.fetchNullable(recipientK);
+    const recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
+      recipientK
+    );
 
     if (recipientAcc && !recipientAcc.destination.equals(PublicKey.default)) {
       const miniFanout = recipientAcc.destination;
@@ -189,8 +194,9 @@ export const find = publicProcedure.rewardContract.find.handler(
       // which would cause a deserialization error rather than returning null
       let miniFanoutAccount = null;
       try {
-        miniFanoutAccount =
-          await mfProgram.account.miniFanoutV0.fetchNullable(miniFanout);
+        miniFanoutAccount = await mfProgram.account.miniFanoutV0.fetchNullable(
+          miniFanout
+        );
       } catch {
         // Destination exists but is not a MiniFanout account - treat as no contract
       }
@@ -202,27 +208,29 @@ export const find = publicProcedure.rewardContract.find.handler(
           contract: {
             delegateWalletAddress: miniFanoutAccount.owner.toBase58(),
             entityOwnerAddress: miniFanoutAccount.namespace.toBase58(),
-            recipients: await Promise.all(miniFanoutAccount.shares.map(
-              async (share: {
-                wallet: PublicKey;
-                share: { fixed?: { amount: BN }; share?: { amount: number } };
-              }) => ({
-                walletAddress: share.wallet.toBase58(),
-                receives:
-                  share.share.fixed && !share.share.fixed.amount.isZero()
-                    ? {
-                        type: "FIXED" as const,
-                        tokenAmount: await toTokenAmountOutput(
-                          share.share.fixed.amount,
-                          hntMint,
-                        ),
-                      }
-                    : {
-                        type: "SHARES" as const,
-                        shares: share.share.share?.amount || 0,
-                      },
-              }),
-            )),
+            recipients: await Promise.all(
+              miniFanoutAccount.shares.map(
+                async (share: {
+                  wallet: PublicKey;
+                  share: { fixed?: { amount: BN }; share?: { amount: number } };
+                }) => ({
+                  walletAddress: share.wallet.toBase58(),
+                  receives:
+                    share.share.fixed && !share.share.fixed.amount.isZero()
+                      ? {
+                          type: "FIXED" as const,
+                          tokenAmount: await toTokenAmountOutput(
+                            share.share.fixed.amount,
+                            hntMint
+                          ),
+                        }
+                      : {
+                          type: "SHARES" as const,
+                          shares: share.share.share?.amount || 0,
+                        },
+                })
+              )
+            ),
             rewardSchedule: toFiveColumnCron(miniFanoutAccount.schedule),
           },
         };
@@ -235,11 +243,11 @@ export const find = publicProcedure.rewardContract.find.handler(
       status: "NONE",
     };
     return noneResponse;
-  },
+  }
 );
 
 async function buildPendingContractResponse(
-  welcomePack: any,
+  welcomePack: any
 ): Promise<FindRewardContractResponse> {
   const hntMint = HNT_MINT.toBase58();
   const solMint = NATIVE_MINT.toBase58();
@@ -247,33 +255,38 @@ async function buildPendingContractResponse(
     status: "PENDING",
     contract: {
       delegateWalletAddress: welcomePack.owner.toBase58(),
-      recipients: await Promise.all(welcomePack.rewardsSplit.map(async (split: any) => {
-        const receives =
-          split.share.fixed && !split.share.fixed.amount.isZero()
-            ? {
-                type: "FIXED" as const,
-                tokenAmount: await toTokenAmountOutput(
-                  split.share.fixed.amount,
-                  hntMint,
-                ),
-              }
-            : {
-                type: "SHARES" as const,
-                shares: split.share.share?.amount || 0,
-              };
-        if (split.wallet.equals(PublicKey.default)) {
+      recipients: await Promise.all(
+        welcomePack.rewardsSplit.map(async (split: any) => {
+          const receives =
+            split.share.fixed && !split.share.fixed.amount.isZero()
+              ? {
+                  type: "FIXED" as const,
+                  tokenAmount: await toTokenAmountOutput(
+                    split.share.fixed.amount,
+                    hntMint
+                  ),
+                }
+              : {
+                  type: "SHARES" as const,
+                  shares: split.share.share?.amount || 0,
+                };
+          if (split.wallet.equals(PublicKey.default)) {
+            return {
+              type: "CLAIMABLE" as const,
+              giftedCurrency: await toTokenAmountOutput(
+                welcomePack.solAmount,
+                solMint
+              ),
+              receives,
+            };
+          }
           return {
-            type: "CLAIMABLE" as const,
-            giftedCurrency: await toTokenAmountOutput(welcomePack.solAmount, solMint),
+            type: "PRESET" as const,
+            walletAddress: split.wallet.toBase58(),
             receives,
           };
-        }
-        return {
-          type: "PRESET" as const,
-          walletAddress: split.wallet.toBase58(),
-          receives,
-        };
-      })),
+        })
+      ),
       rewardSchedule: toFiveColumnCron(welcomePack.rewardsSchedule),
     },
   };

@@ -4,11 +4,11 @@ export default function SwapPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="container mx-auto px-4 py-12">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 mb-6">
+        <div className="mx-auto max-w-4xl">
+          <div className="mb-12 text-center">
+            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-600">
               <svg
-                className="w-8 h-8 text-white"
+                className="h-8 w-8 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -21,10 +21,10 @@ export default function SwapPage() {
                 />
               </svg>
             </div>
-            <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <h1 className="mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-4xl font-bold text-transparent">
               Token Swap
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground mx-auto max-w-2xl text-lg">
               Trade tokens on Solana using Jupiter&apos;s best routes. Get the
               best prices with minimal slippage.
             </p>
@@ -35,16 +35,16 @@ export default function SwapPage() {
           </div>
 
           <div className="mt-12 text-center">
-            <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-full border border-muted/50">
+            <div className="text-muted-foreground border-muted/50 inline-flex items-center gap-2 rounded-full border bg-white/50 px-4 py-2 text-sm dark:bg-gray-800/50">
               <span>Powered by</span>
               <a
                 href="https://jup.ag"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:underline font-medium flex items-center gap-1"
+                className="text-primary flex items-center gap-1 font-medium hover:underline"
               >
                 <svg
-                  className="w-4 h-4"
+                  className="h-4 w-4"
                   viewBox="0 0 24 24"
                   fill="currentColor"
                 >

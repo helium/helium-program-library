@@ -33,10 +33,10 @@ export function BankAccounts() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [accountToDelete, setAccountToDelete] = useState<BankAccount | null>(
-    null,
+    null
   );
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(
-    null,
+    null
   );
 
   const {
@@ -63,14 +63,14 @@ export function BankAccounts() {
   if (isLoading) {
     return (
       <div className="flex justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+        <div className="border-foreground h-8 w-8 animate-spin rounded-full border-b-2"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center p-8">
+      <div className="p-8 text-center">
         <p className="text-destructive">
           {error instanceof Error
             ? error.message
@@ -85,10 +85,10 @@ export function BankAccounts() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-foreground">Bank Accounts</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-foreground text-xl font-semibold">Bank Accounts</h2>
         <Button size="sm" onClick={() => router.push("/withdraw?step=5")}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Add Account
         </Button>
       </div>
@@ -100,7 +100,7 @@ export function BankAccounts() {
             className="mt-4"
             onClick={() => router.push("/withdraw?step=5")}
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             Add Your First Account
           </Button>
         </Card>
@@ -108,12 +108,12 @@ export function BankAccounts() {
         <div className="grid gap-4">
           {accounts.map((account: BankAccount) => (
             <Card key={account.id} className="p-4">
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-medium">
                     {account.bankName || "Unknown Bank"}
                   </h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     {account.accountName} •••• {account.lastFourDigits}
                   </p>
                 </div>
@@ -123,7 +123,7 @@ export function BankAccounts() {
                     size="sm"
                     onClick={() => setSelectedAccount(account)}
                   >
-                    <Send className="h-4 w-4 mr-2" />
+                    <Send className="mr-2 h-4 w-4" />
                     Send Funds
                   </Button>
                   <Button
@@ -133,7 +133,7 @@ export function BankAccounts() {
                     disabled={isDeleting}
                   >
                     {isDeleting ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-foreground"></div>
+                      <div className="border-foreground h-4 w-4 animate-spin rounded-full border-b-2"></div>
                     ) : (
                       <Trash2 className="h-4 w-4" />
                     )}
@@ -159,7 +159,7 @@ export function BankAccounts() {
           </DialogHeader>
           <div className="py-4">
             {accountToDelete && (
-              <div className="text-sm text-muted-foreground">
+              <div className="text-muted-foreground text-sm">
                 <p>
                   <strong>Bank:</strong> {accountToDelete.bankName || "Unknown"}
                 </p>
@@ -171,7 +171,7 @@ export function BankAccounts() {
             )}
           </div>
           {deleteError && (
-            <div className="text-sm text-destructive mb-4">
+            <div className="text-destructive mb-4 text-sm">
               {deleteError.message || "Failed to delete bank account"}
             </div>
           )}

@@ -4,7 +4,7 @@ import { orpc } from "@/lib/orpc";
 
 export function useOwnedHotspots(
   walletAddress: string,
-  options: UseOwnedHotspotsOptions = {},
+  options: UseOwnedHotspotsOptions = {}
 ) {
   const { type = "all", page = 1, limit = 10 } = options;
 

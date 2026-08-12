@@ -42,7 +42,9 @@ import {
   warpTo,
 } from "./utils/bankrun";
 
-const MINI_FANOUT = new PublicKey("mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn");
+const MINI_FANOUT = new PublicKey(
+  "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn"
+);
 const TUKTUK = new PublicKey("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
 // tuktuk's config, and the IDL account `initTuktuk` reads to build its Program. Both are what
 // `Anchor.toml` clones for the localnet suites, so both suites run against the same tuktuk.
@@ -104,9 +106,8 @@ describe("mini-fanout under bankrun", () => {
 
   async function createMint(): Promise<PublicKey> {
     const mintKeypair = Keypair.generate();
-    const lamports = await provider.connection.getMinimumBalanceForRentExemption(
-      MINT_SIZE
-    );
+    const lamports =
+      await provider.connection.getMinimumBalanceForRentExemption(MINT_SIZE);
     await provider.sendAndConfirm(
       new Transaction().add(
         SystemProgram.createAccount({
@@ -124,7 +125,11 @@ describe("mini-fanout under bankrun", () => {
   }
 
   /** The wallet's ATA, created if absent and credited with `amount`. */
-  async function ataWith(owner: PublicKey, amount: number, allowOwnerOffCurve = false) {
+  async function ataWith(
+    owner: PublicKey,
+    amount: number,
+    allowOwnerOffCurve = false
+  ) {
     const ata = getAssociatedTokenAddressSync(mint, owner, allowOwnerOffCurve);
     const instructions = [
       createAssociatedTokenAccountIdempotentInstruction(me, ata, owner, mint),
@@ -158,9 +163,8 @@ describe("mini-fanout under bankrun", () => {
     mint = await createMint();
 
     const name = "bankrun";
-    const { nextTaskQueueId } = await tuktukProgram.account.tuktukConfigV0.fetch(
-      TUKTUK_CONFIG
-    );
+    const { nextTaskQueueId } =
+      await tuktukProgram.account.tuktukConfigV0.fetch(TUKTUK_CONFIG);
     taskQueue = taskQueueKey(TUKTUK_CONFIG, nextTaskQueueId)[0];
     await tuktukProgram.methods
       .initializeTaskQueueV0({
@@ -221,7 +225,9 @@ describe("mini-fanout under bankrun", () => {
       }),
     ]);
 
-    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(
+      taskQueue
+    );
     const [preTaskId, taskId] = nextAvailableTaskIds(taskBitmap, 2, false);
     await program.methods
       .scheduleTaskV0({ taskId, preTaskId })
@@ -284,7 +290,10 @@ describe("mini-fanout under bankrun", () => {
       shares: [
         shareOf(wallet1.publicKey, 50),
         shareOf(wallet2.publicKey, 50),
-        { wallet: wallet3.publicKey, share: { fixed: { amount: new anchor.BN(100000000) } } },
+        {
+          wallet: wallet3.publicKey,
+          share: { fixed: { amount: new anchor.BN(100000000) } },
+        },
       ],
     });
     const fanoutAta = getAssociatedTokenAddressSync(mint, miniFanout, true);
@@ -303,11 +312,18 @@ describe("mini-fanout under bankrun", () => {
     // distribute_v0 re-queues both tasks every cycle, so this is the read-through at that call
     // site: the stored pre task reaches the queue, and it carries no free tasks, which is what
     // keeps a pre task from spawning children of its own.
-    expect(await tuktukProgram.account.taskV0.fetch(acc.nextTask)).to.not.be.null;
-    const nextPreTask = await tuktukProgram.account.taskV0.fetch(acc.nextPreTask);
+    expect(await tuktukProgram.account.taskV0.fetch(acc.nextTask)).to.not.be
+      .null;
+    const nextPreTask = await tuktukProgram.account.taskV0.fetch(
+      acc.nextPreTask
+    );
     expect(nextPreTask.freeTasks).to.equal(0);
-    expect(nextPreTask.transaction.compiledV0![0].instructions.length).to.equal(1);
-    expect(nextPreTask.transaction.compiledV0![0].signerSeeds).to.deep.equal([]);
+    expect(nextPreTask.transaction.compiledV0![0].instructions.length).to.equal(
+      1
+    );
+    expect(nextPreTask.transaction.compiledV0![0].signerSeeds).to.deep.equal(
+      []
+    );
   });
 
   it("distributes to 6 wallets in one transaction", async () => {
@@ -389,7 +405,9 @@ describe("mini-fanout under bankrun", () => {
 
     // Owner and executable survive the rewrite, or later instructions fail for the wrong reason.
     const account = await ctx.banksClient.getAccount(taskQueue);
-    expect(new PublicKey(account!.owner).toBase58()).to.equal(TUKTUK.toBase58());
+    expect(new PublicKey(account!.owner).toBase58()).to.equal(
+      TUKTUK.toBase58()
+    );
 
     await overwriteAccountData(ctx, taskQueue, original!);
     expect((await readAccount(ctx, taskQueue))!.equals(original!)).to.be.true;

@@ -1,5 +1,9 @@
 import { networksToMint } from "@helium/spl-utils";
-import { PartialEnhancedProxy, VoteService, getRegistrarKey } from "@helium/voter-stake-registry-sdk";
+import {
+  PartialEnhancedProxy,
+  VoteService,
+  getRegistrarKey,
+} from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
 import { queryOptions } from "@tanstack/react-query";
 

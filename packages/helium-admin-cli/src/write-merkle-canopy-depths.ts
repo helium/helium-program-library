@@ -36,8 +36,5 @@ export async function run(args: any = process.argv) {
       )
     ).getCanopyDepth();
   }
-  fs.writeFileSync(
-    "./merkles.json",
-    JSON.stringify(merkleDepths, null, 2)
-  );
+  fs.writeFileSync("./merkles.json", JSON.stringify(merkleDepths, null, 2));
 }

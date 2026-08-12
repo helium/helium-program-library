@@ -45,9 +45,7 @@ export class MapboxService {
     });
   }
 
-  public async fetchParsedLocation(
-    coords: [number, number]
-  ): Promise<{
+  public async fetchParsedLocation(coords: [number, number]): Promise<{
     city?: string;
     state?: string;
     country?: string;

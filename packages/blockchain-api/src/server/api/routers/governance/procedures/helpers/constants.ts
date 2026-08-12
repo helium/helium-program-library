@@ -8,7 +8,7 @@ export const LockupKind = {
 export type LockupKindType = (typeof LockupKind)[keyof typeof LockupKind];
 
 export function toLockupKindArg(
-  kind: LockupKindType,
+  kind: LockupKindType
 ): { constant: Record<string, never> } | { cliff: Record<string, never> } {
   return kind === LockupKind.CONSTANT ? { constant: {} } : { cliff: {} };
 }
@@ -28,7 +28,7 @@ export const MAX_TXS_PER_CALL = 5;
 export const PREPAID_TX_FEES = 0.01;
 export const TASK_QUEUE = new PublicKey(
   process.env.HPL_CRONS_TASK_QUEUE ||
-    "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7",
+    "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7"
 );
 
 export function secsToDays(secs: number): number {

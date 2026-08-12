@@ -46,12 +46,12 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
 
     // Initialize connection and programs
     const { provider } = createSolanaConnection(
-      feePayerWallet.publicKey.toString(),
+      feePayerWallet.publicKey.toString()
     );
     const program = await init(provider);
     const tuktukProgram = await initTuktuk(provider);
     const welcomePack = await program.account.welcomePackV0.fetch(
-      new PublicKey(packAddress),
+      new PublicKey(packAddress)
     );
 
     // Prepare claim transaction
@@ -74,12 +74,12 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
         getAssetFn: (_, assetId) =>
           getAsset(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId,
+            assetId
           ),
         getAssetProofFn: (_, assetId) =>
           getAssetProof(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId,
+            assetId
           ),
       })
     ).prepare();
@@ -94,10 +94,10 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
             getAssociatedTokenAddressSync(
               rewardsMint!,
               new PublicKey(walletAddress),
-              true,
+              true
             ),
             new PublicKey(walletAddress),
-            rewardsMint!,
+            rewardsMint!
           ),
         ],
         feePayer: feePayerWallet.publicKey,
@@ -131,7 +131,10 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
           rewardsMint: rewardsMint?.toBase58(),
         },
       },
-      estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+      estimatedSolFee: await toTokenAmountOutput(
+        new BN(0),
+        NATIVE_MINT.toBase58()
+      ),
     };
-  },
+  }
 );
