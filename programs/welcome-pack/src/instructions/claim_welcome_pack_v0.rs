@@ -41,7 +41,7 @@ fn check_approval_window(expiration_timestamp: i64, now: i64) -> Result<()> {
   // The end of the window has to be representable, so a clock leaving no room for one refuses.
   let latest = now
     .checked_add(MAX_CLAIM_APPROVAL_SECONDS)
-    .ok_or(error!(ErrorCode::ClaimApprovalTooLong))?;
+    .ok_or_else(|| error!(ErrorCode::ClaimApprovalTooLong))?;
   require_gte!(
     latest,
     expiration_timestamp,

@@ -1,6 +1,6 @@
 [package]
 name = "welcome-pack"
-version = "0.0.4"
+version = "0.0.5"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -17,9 +17,7 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
-
-[profile.release]
-overflow-checks = true
+anchor-debug = []
 
 [dependencies]
 anchor-lang = { workspace = true }

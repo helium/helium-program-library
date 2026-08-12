@@ -1,6 +1,6 @@
 [package]
 name = "mini-fanout"
-version = "0.1.4"
+version = "0.1.5"
 # Trigger deployment - timestamp: 03-31-2025 #4
 description = "Created with Anchor"
 edition = "2021"
@@ -18,9 +18,7 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
-
-[profile.release]
-overflow-checks = true
+anchor-debug = []
 
 [dependencies]
 anchor-lang = { workspace = true }

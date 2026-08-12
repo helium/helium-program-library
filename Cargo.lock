@@ -905,7 +905,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -928,7 +928,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.44"
+version = "0.2.45"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "hpl-crons"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1231,7 +1231,7 @@ dependencies = [
 
 [[package]]
 name = "mini-fanout"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3454,7 +3454,7 @@ dependencies = [
 
 [[package]]
 name = "welcome-pack"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",

@@ -130,7 +130,7 @@ pub fn handler<'info>(
     .rewardable_entity_config
     .settings
     .mobile_device_fees(ctx.accounts.mobile_info.device_type)
-    .ok_or(error!(ErrorCode::InvalidDeviceType))?;
+    .ok_or_else(|| error!(ErrorCode::InvalidDeviceType))?;
 
   if let Some(new_location) = args.location {
     if ctx.accounts.mobile_info.location.is_none()

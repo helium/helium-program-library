@@ -166,7 +166,7 @@ pub fn handler<'info>(
     .rewardable_entity_config
     .settings
     .mobile_device_fees(MobileDeviceTypeV0::WifiDataOnly)
-    .ok_or(error!(ErrorCode::InvalidDeviceType))?;
+    .ok_or_else(|| error!(ErrorCode::InvalidDeviceType))?;
   let mut dc_fee = fees.dc_onboarding_fee;
   let location_fee = fees.location_staking_fee;
 

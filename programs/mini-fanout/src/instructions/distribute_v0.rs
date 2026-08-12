@@ -124,8 +124,7 @@ pub fn handler<'info>(
     .iter()
     .map(|s| s.total_dust as u128)
     .sum::<u128>()
-    .checked_div(DUST_PRECISION)
-    .ok_or(error!(ErrorCode::ArithmeticError))?;
+    / DUST_PRECISION;
   let mut remaining = (token_account.amount as u128).saturating_sub(total_dust);
 
   // 3. Assign fixed payouts in order, saturating if not enough left
@@ -160,33 +159,23 @@ pub fn handler<'info>(
     let share_val = share.share.as_u128();
     let amount = remaining
       .checked_mul(share_val)
-      .ok_or(error!(ErrorCode::ArithmeticError))?
+      .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
       .checked_mul(DUST_PRECISION)
-      .ok_or(error!(ErrorCode::ArithmeticError))?
+      .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
       .checked_div(total_shares as u128)
-      .ok_or(error!(ErrorCode::ArithmeticError))?;
-    let payout = u64::try_from(
-      amount
-        .checked_div(DUST_PRECISION)
-        .ok_or(error!(ErrorCode::ArithmeticError))?,
-    )
-    .map_err(|_| error!(ErrorCode::ArithmeticError))?;
-    let dust = u64::try_from(
-      amount
-        .checked_rem(DUST_PRECISION)
-        .ok_or(error!(ErrorCode::ArithmeticError))?,
-    )
-    .map_err(|_| error!(ErrorCode::ArithmeticError))?
-    .checked_add(share.total_dust)
-    .ok_or(error!(ErrorCode::ArithmeticError))?;
+      .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
+    let payout =
+      u64::try_from(amount / DUST_PRECISION).map_err(|_| error!(ErrorCode::ArithmeticError))?;
+    let dust = u64::try_from(amount % DUST_PRECISION)
+      .map_err(|_| error!(ErrorCode::ArithmeticError))?
+      .checked_add(share.total_dust)
+      .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
     if dust >= DUST_PRECISION as u64 {
       payouts[i] = payout
         .checked_add(1)
-        .ok_or(error!(ErrorCode::ArithmeticError))?;
-      new_dusts[i] = dust
-        .checked_sub(DUST_PRECISION as u64)
-        .ok_or(error!(ErrorCode::ArithmeticError))?
-        .into();
+        .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
+      // The branch condition is what makes this subtraction safe.
+      new_dusts[i] = (dust - DUST_PRECISION as u64).into();
     } else {
       payouts[i] = payout;
       new_dusts[i] = dust as u128;
