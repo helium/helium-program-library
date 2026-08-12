@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.11.21
+
+### Patch Changes
+
+- [#1254](https://github.com/helium/helium-program-library/pull/1254) [`c8ef518`](https://github.com/helium/helium-program-library/commit/c8ef518b4df8af9334808dcf092333be10a868c2) Thanks [@madninja](https://github.com/madninja)! - `helium-sub-daos`, `mini-fanout`, `helium-entity-manager` and `welcome-pack` build their errors
+  only where they are raised. An `AnchorError` owns its name and message as `String`s, so passing
+  one to `ok_or` allocates on every call rather than only on the ones that fail, and the heap a
+  program runs on never gives that memory back.
+
 ## 0.11.20
 
 ### Patch Changes
