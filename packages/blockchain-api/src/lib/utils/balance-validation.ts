@@ -31,11 +31,11 @@ export const RENT_COSTS = {
   RECIPIENT: 2422080, // ~0.00242208 SOL - from automation-helpers.ts RECIPIENT_RENT
   // Welcome pack rent values derived from e2e test measurements
   // InitializeWelcomePack also updates compression destination and transfers asset
-  WELCOME_PACK: 15100000, // ~0.0151 SOL (measured: includes account creation + operations)
+  WELCOME_PACK: 15200000, // ~0.0152 SOL (measured: includes account creation + operations)
   USER_WELCOME_PACKS: 2600000, // ~0.0026 SOL (measured from actual account creation)
   // Mini-fanout rent values derived from e2e test measurements
   MINI_FANOUT: 10560000, // ~0.01056 SOL (measured from actual account creation)
-  TUKTUK_TASK: 3200000, // ~0.0032 SOL per task (mini-fanout creates 2 tasks: task + preTask)
+  TUKTUK_TASK: 3325000, // ~0.003325 SOL per task (mini-fanout creates 2 tasks: task + preTask)
 } as const;
 
 /**

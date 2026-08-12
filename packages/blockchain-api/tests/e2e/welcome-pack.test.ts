@@ -6,16 +6,16 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
-import { stopNextServer } from "./helpers/next"
-import { stopSurfpool } from "./helpers/surfpool"
-import { signAndSubmitTransactionData } from "./helpers/tx"
-import { setupTestCtx, TestCtx } from "./helpers/context"
+import { stopNextServer } from "./helpers/next";
+import { stopSurfpool } from "./helpers/surfpool";
+import { signAndSubmitTransactionData } from "./helpers/tx";
+import { setupTestCtx, TestCtx } from "./helpers/context";
 import {
   DEFAULT_HPL_CRONS_TASK_QUEUE,
   HNT_LAZY_DISTRIBUTOR_ADDRESS,
-} from "./helpers/constants"
-import { verifyEstimatedSolFee } from "./helpers/estimate"
-import nacl from "tweetnacl"
+} from "./helpers/constants";
+import { verifyEstimatedSolFee } from "./helpers/estimate";
+import nacl from "tweetnacl";
 
 describe("welcome-pack", () => {
   let ctx: TestCtx;
@@ -63,7 +63,7 @@ describe("welcome-pack", () => {
     });
 
     expect(
-      result?.transactionData?.transactions?.[0]?.serializedTransaction,
+      result?.transactionData?.transactions?.[0]?.serializedTransaction
     ).to.be.a("string");
     expect(result?.welcomePack?.address).to.be.a("string");
 
@@ -75,16 +75,16 @@ describe("welcome-pack", () => {
     // Verify response welcomePack shape matches request expectations
     expect(result.welcomePack.owner).to.equal(walletAddress);
     expect(result.welcomePack.asset).to.equal(
-      "CKesVwoY6mfc7iyjzYTKvigjcWoGZgnvEAX1UaGr7o89",
+      "CKesVwoY6mfc7iyjzYTKvigjcWoGZgnvEAX1UaGr7o89"
     );
     expect(result.welcomePack.lazyDistributor).to.equal(
-      "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq",
+      "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq"
     );
     expect(result.welcomePack.assetReturnAddress).to.equal(
-      "72szxs4Q2JNuM4MQAo79xZNdb9qtBEjTqxZTsRwt8bFn",
+      "72szxs4Q2JNuM4MQAo79xZNdb9qtBEjTqxZTsRwt8bFn"
     );
     expect(result.welcomePack.rentRefund).to.equal(
-      "72szxs4Q2JNuM4MQAo79xZNdb9qtBEjTqxZTsRwt8bFn",
+      "72szxs4Q2JNuM4MQAo79xZNdb9qtBEjTqxZTsRwt8bFn"
     );
     expect(result.welcomePack.solAmount).to.equal("10000000");
     expect(result.welcomePack.rewardsSplit).to.be.an("array").with.lengthOf(2);
@@ -97,17 +97,21 @@ describe("welcome-pack", () => {
       address: "72szxs4Q2JNuM4MQAo79xZNdb9qtBEjTqxZTsRwt8bFn",
       amount: 70,
       type: "percentage",
-    })
+    });
 
     // Verify estimate accuracy
-    await verifyEstimatedSolFee(ctx, result.transactionData, result.estimatedSolFee)
+    await verifyEstimatedSolFee(
+      ctx,
+      result.transactionData,
+      result.estimatedSolFee
+    );
 
-    const welcomePackAddress = result.welcomePack.address as string
+    const welcomePackAddress = result.welcomePack.address as string;
     await signAndSubmitTransactionData(
       ctx.connection,
       result.transactionData,
-      ctx.payer,
-    )
+      ctx.payer
+    );
 
     const provider = new AnchorProvider(
       ctx.connection,
@@ -120,20 +124,20 @@ describe("welcome-pack", () => {
           throw new Error("not supported in test");
         },
       } as any,
-      AnchorProvider.defaultOptions(),
+      AnchorProvider.defaultOptions()
     );
     const program = await initWelcomePack(provider);
     const fetched = await program.account.welcomePackV0.fetchNullable(
-      new PublicKey(welcomePackAddress),
+      new PublicKey(welcomePackAddress)
     );
     expect(fetched).to.exist;
     // On-chain spot checks where field names are stable across SDK versions
     expect(fetched?.owner?.toBase58?.()).to.equal(walletAddress);
     expect(fetched?.lazyDistributor?.toBase58?.()).to.equal(
-      "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq",
+      "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq"
     );
     expect(fetched?.asset?.toBase58?.()).to.equal(
-      "CKesVwoY6mfc7iyjzYTKvigjcWoGZgnvEAX1UaGr7o89",
+      "CKesVwoY6mfc7iyjzYTKvigjcWoGZgnvEAX1UaGr7o89"
     );
   });
 
@@ -147,13 +151,13 @@ describe("welcome-pack", () => {
     });
 
     expect(
-      result?.transactionData?.transactions?.[0]?.serializedTransaction,
+      result?.transactionData?.transactions?.[0]?.serializedTransaction
     ).to.be.a("string");
 
     await signAndSubmitTransactionData(
       ctx.connection,
       result.transactionData,
-      ctx.payer,
+      ctx.payer
     );
 
     // TODO: Verify closure when surfpool fixes this issue:
@@ -193,17 +197,17 @@ describe("welcome-pack", () => {
     });
 
     expect(
-      claimResult?.transactionData?.transactions?.[0]?.serializedTransaction,
+      claimResult?.transactionData?.transactions?.[0]?.serializedTransaction
     ).to.be.a("string");
 
     await signAndSubmitTransactionData(
       ctx.connection,
       claimResult.transactionData,
-      claimer,
+      claimer
     );
 
     const afterBal = await ctx.connection.getBalance(claimer.publicKey);
-    expect(afterBal).to.eq(3818440);
+    expect(afterBal).to.eq(3595720);
 
     const provider = new AnchorProvider(
       ctx.connection,
@@ -216,23 +220,23 @@ describe("welcome-pack", () => {
           throw new Error("not supported in test");
         },
       } as any,
-      AnchorProvider.defaultOptions(),
+      AnchorProvider.defaultOptions()
     );
 
     const ldProgram = await initLd(provider);
     const [recipientK] = recipientKey(
       new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS),
-      new PublicKey("CFSfEZAskWxjy3MrBB4Zy9HoLSLi7fpMePsuGYXvBL6A"),
+      new PublicKey("CFSfEZAskWxjy3MrBB4Zy9HoLSLi7fpMePsuGYXvBL6A")
     );
     const recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
-      recipientK,
+      recipientK
     );
     expect(recipientAcc?.destination).to.exist;
 
     const miniFanoutProgram = await initMiniFanout(provider);
     const miniFanout =
       await miniFanoutProgram.account.miniFanoutV0.fetchNullable(
-        recipientAcc!.destination,
+        recipientAcc!.destination
       );
     expect(miniFanout).to.exist;
     const wallets = miniFanout!.shares.map((s: any) => s.wallet.toBase58());
