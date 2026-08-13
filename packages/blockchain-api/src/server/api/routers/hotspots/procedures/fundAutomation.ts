@@ -107,7 +107,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
           fromPubkey: wallet,
           toPubkey: cronJob,
           lamports: cronJobFundingLamports,
-        })
+        }),
       );
     }
 
@@ -118,7 +118,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
           fromPubkey: wallet,
           toPubkey: pdaWallet,
           lamports: pdaWalletFundingLamports,
-        })
+        }),
       );
     }
 
@@ -132,7 +132,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
           fromPubkey: wallet,
           toPubkey: cronJob,
           lamports: minFunding,
-        })
+        }),
       );
     }
 
@@ -149,12 +149,13 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
     ).map((tx) => toVersionedTx(tx));
 
     // Add Jito tip if needed for mainnet bundles
-    if (shouldUseJitoBundle(vtxs.length, getCluster())) {
+    const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
+    if (useJito) {
       vtxs.push(await getJitoTipTransaction(wallet));
     }
 
     const txs: Array<string> = vtxs.map((tx) =>
-      Buffer.from(tx.serialize()).toString("base64")
+      Buffer.from(tx.serialize()).toString("base64"),
     );
 
     // Estimated fee includes tx fees + funding amounts
@@ -163,13 +164,16 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
 
     return {
       transactionData: {
-        transactions: txs.map((serialized) => ({
+        transactions: txs.map((serialized, i) => ({
           serializedTransaction: serialized,
-          metadata: {
-            type: "fund_automation",
-            description: "Fund hotspot claim automation",
-            additionalDuration,
-          },
+          metadata:
+            useJito && i === txs.length - 1
+              ? { type: "jito_tip", description: "Jito bundle tip" }
+              : {
+                  type: "fund_automation",
+                  description: "Fund hotspot claim automation",
+                  additionalDuration,
+                },
         })),
         parallel: false,
         tag: `fund_automation:${walletAddress}`,
@@ -177,8 +181,8 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

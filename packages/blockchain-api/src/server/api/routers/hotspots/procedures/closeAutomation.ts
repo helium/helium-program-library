@@ -48,9 +48,8 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
     const cronJob = cronJobKey(authority, 0)[0];
 
     // Fetch cron job account using fetchNullable
-    const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
-      cronJob
-    );
+    const cronJobAccount =
+      await cronProgram.account.cronJobV0.fetchNullable(cronJob);
 
     if (!cronJobAccount) {
       throw errors.NOT_FOUND({
@@ -67,7 +66,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
         : 0;
     const required = calculateRequiredBalance(
       BASE_TX_FEE_LAMPORTS + estimatedJitoTipCost,
-      0
+      0,
     );
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
@@ -83,7 +82,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       cronJob,
       authority,
       wallet,
-      cronJobAccount.nextTransactionId || 0
+      cronJobAccount.nextTransactionId || 0,
     );
 
     // Build and serialize transactions
@@ -99,24 +98,28 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
     ).map((tx) => toVersionedTx(tx));
 
     // Add Jito tip if needed for mainnet bundles
-    if (shouldUseJitoBundle(vtxs.length, getCluster())) {
+    const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
+    if (useJito) {
       vtxs.push(await getJitoTipTransaction(wallet));
     }
 
     const txs: Array<string> = vtxs.map((tx) =>
-      Buffer.from(tx.serialize()).toString("base64")
+      Buffer.from(tx.serialize()).toString("base64"),
     );
 
     const txFees = await getTotalTransactionFees(provider.connection, vtxs);
 
     return {
       transactionData: {
-        transactions: txs.map((serialized) => ({
+        transactions: txs.map((serialized, i) => ({
           serializedTransaction: serialized,
-          metadata: {
-            type: "close_automation",
-            description: "Close hotspot claim automation",
-          },
+          metadata:
+            useJito && i === txs.length - 1
+              ? { type: "jito_tip", description: "Jito bundle tip" }
+              : {
+                  type: "close_automation",
+                  description: "Close hotspot claim automation",
+                },
         })),
         parallel: false,
         tag: `close_automation:${walletAddress}`,
@@ -124,8 +127,8 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFees),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

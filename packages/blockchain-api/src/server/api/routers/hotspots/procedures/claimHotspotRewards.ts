@@ -63,7 +63,7 @@ export const claimHotspotRewards =
       const hasPending = pendingOracleRewards(
         rewards,
         entityKey,
-        recipientAcc
+        recipientAcc,
       ).gtn(0);
 
       const emptyResponse = async () => ({
@@ -80,7 +80,7 @@ export const claimHotspotRewards =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(0),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       });
 
@@ -95,7 +95,7 @@ export const claimHotspotRewards =
         mfProgram,
         connection,
         lazyDistributor,
-        [{ asset, entityKey }]
+        [{ asset, entityKey }],
       );
       if (claimable.length === 0) {
         return emptyResponse();
@@ -122,10 +122,10 @@ export const claimHotspotRewards =
       const rentCost = recipientAcc ? 0 : RENT_COSTS.RECIPIENT;
       const requiredLamports = calculateRequiredBalance(
         txFees + jitoTipCost,
-        rentCost
+        rentCost,
       );
       const senderBalance = await connection.getBalance(
-        new PublicKey(walletAddress)
+        new PublicKey(walletAddress),
       );
       if (senderBalance < requiredLamports) {
         throw errors.INSUFFICIENT_FUNDS({
@@ -134,12 +134,12 @@ export const claimHotspotRewards =
         });
       }
 
-      const transactions = vtxs.map((tx) => ({
+      const transactions = vtxs.map((tx, i) => ({
         serializedTransaction: Buffer.from(tx.serialize()).toString("base64"),
-        metadata: {
-          type: "claim_rewards",
-          description: "Claim hotspot rewards",
-        },
+        metadata:
+          useJito && i === vtxs.length - 1
+            ? { type: "jito_tip", description: "Jito bundle tip" }
+            : { type: "claim_rewards", description: "Claim hotspot rewards" },
       }));
 
       return {
@@ -158,8 +158,8 @@ export const claimHotspotRewards =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(txFees + rentCost),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
-    }
+    },
   );

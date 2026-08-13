@@ -44,9 +44,8 @@ export const resolveEntityClaimCronJob = async ({
   const authority = entityCronAuthorityKey(wallet)[0];
   const cronJob = cronJobKey(authority, 0)[0];
 
-  const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
-    cronJob
-  );
+  const cronJobAccount =
+    await cronProgram.account.cronJobV0.fetchNullable(cronJob);
   if (!cronJobAccount) {
     throw errors.NOT_FOUND({ message: notFoundMessage });
   }
@@ -97,7 +96,8 @@ export const buildAutomationTransactionResponse = async ({
     })
   ).map((tx) => toVersionedTx(tx));
 
-  if (shouldUseJitoBundle(vtxs.length, getCluster())) {
+  const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
+  if (useJito) {
     vtxs.push(await getJitoTipTransaction(feePayer));
   }
 
@@ -106,9 +106,12 @@ export const buildAutomationTransactionResponse = async ({
 
   return {
     transactionData: {
-      transactions: txs.map((serialized) => ({
+      transactions: txs.map((serialized, i) => ({
         serializedTransaction: serialized,
-        metadata: transactionMetadata,
+        metadata:
+          useJito && i === txs.length - 1
+            ? { type: "jito_tip", description: "Jito bundle tip" }
+            : transactionMetadata,
       })),
       parallel: false,
       tag,
@@ -116,7 +119,7 @@ export const buildAutomationTransactionResponse = async ({
     },
     estimatedSolFee: await toTokenAmountOutput(
       new BN(txFees + extraFeeLamports),
-      NATIVE_MINT.toBase58()
+      NATIVE_MINT.toBase58(),
     ),
   };
 };

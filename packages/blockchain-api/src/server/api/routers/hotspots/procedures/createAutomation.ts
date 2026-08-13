@@ -73,9 +73,8 @@ export const createAutomation =
       const authority = entityCronAuthorityKey(wallet)[0];
       const cronJob = cronJobKey(authority, 0)[0];
 
-      const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
-        cronJob
-      );
+      const cronJobAccount =
+        await cronProgram.account.cronJobV0.fetchNullable(cronJob);
 
       const instructions: TransactionInstruction[] = [];
 
@@ -94,8 +93,8 @@ export const createAutomation =
               cronJob,
               authority,
               wallet,
-              cronJobAccount.nextTransactionId || 0
-            ))
+              cronJobAccount.nextTransactionId || 0,
+            )),
           );
         }
 
@@ -113,10 +112,10 @@ export const createAutomation =
               task: freshTask,
               cronJobNameMapping: cronJobNameMappingKey(
                 authority,
-                ENTITY_CLAIM_CRON_NAME
+                ENTITY_CLAIM_CRON_NAME,
               )[0],
             })
-            .instruction()
+            .instruction(),
         );
       } else if (cronJobAccount?.removedFromQueue) {
         // If cron exists but was removed from queue due to insufficient SOL,
@@ -132,10 +131,10 @@ export const createAutomation =
               task: freshTask,
               cronJobNameMapping: cronJobNameMappingKey(
                 authority,
-                ENTITY_CLAIM_CRON_NAME
+                ENTITY_CLAIM_CRON_NAME,
               )[0],
             })
-            .instruction()
+            .instruction(),
         );
       }
 
@@ -210,7 +209,7 @@ export const createAutomation =
             fromPubkey: wallet,
             toPubkey: cronJob,
             lamports: minCrankSolFee,
-          })
+          }),
         );
       }
 
@@ -220,7 +219,7 @@ export const createAutomation =
             fromPubkey: wallet,
             toPubkey: pdaWallet,
             lamports: minPdaWalletSolFee,
-          })
+          }),
         );
       }
 
@@ -237,12 +236,13 @@ export const createAutomation =
       ).map((tx) => toVersionedTx(tx));
 
       // Add Jito tip if needed for mainnet bundles
-      if (shouldUseJitoBundle(vtxs.length, getCluster())) {
+      const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
+      if (useJito) {
         vtxs.push(await getJitoTipTransaction(wallet));
       }
 
       const txs: Array<string> = vtxs.map((tx) =>
-        Buffer.from(tx.serialize()).toString("base64")
+        Buffer.from(tx.serialize()).toString("base64"),
       );
 
       // Estimated fee includes tx fees + operational funding (cronJob + pdaWallet)
@@ -251,14 +251,17 @@ export const createAutomation =
 
       return {
         transactionData: {
-          transactions: txs.map((serialized) => ({
+          transactions: txs.map((serialized, i) => ({
             serializedTransaction: serialized,
-            metadata: {
-              type: "setup_automation",
-              description: "Set up hotspot claim automation",
-              cronSchedule,
-              duration,
-            },
+            metadata:
+              useJito && i === txs.length - 1
+                ? { type: "jito_tip", description: "Jito bundle tip" }
+                : {
+                    type: "setup_automation",
+                    description: "Set up hotspot claim automation",
+                    cronSchedule,
+                    duration,
+                  },
           })),
           parallel: false,
           tag: `setup_automation:${walletAddress}`,
@@ -266,8 +269,8 @@ export const createAutomation =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
-    }
+    },
   );
