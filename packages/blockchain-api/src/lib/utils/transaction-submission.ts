@@ -9,13 +9,9 @@ import {
   simulateJitoBundle,
   submitJitoBundle,
   JitoBundleContext,
-  jitoBlockEngineRequest,
+  getJitoTipAccounts,
 } from "./jito";
-import {
-  isBundleLanded,
-  isClientCraftedBundleTag,
-  messageWriteLocksAnyAccount,
-} from "./submission-helpers";
+import { isBundleLanded, isClientCraftedBundleTag } from "./submission-helpers";
 
 export class SingleTransactionSubmissionError extends Error {
   public readonly explorerLink: string | null;
@@ -49,42 +45,30 @@ export class JitoMissingTipError extends Error {
   }
 }
 
-let cachedTipAccountSet: Set<string> | null = null;
-let tipAccountSetCachedAt = 0;
-const TIP_ACCOUNTS_TTL_MS = 5 * 60 * 1000;
-
 /**
  * Whether the bundle contains at least one transaction that write-locks a
- * Jito tip account. Returns true when validation is impossible (tip accounts
- * unavailable) so submission proceeds and Jito rejects if needed.
+ * Jito tip account. Only static account keys are checked (Jito tip transfers
+ * never use lookup tables). Returns true when validation is impossible (tip
+ * accounts unavailable) so submission proceeds and Jito rejects if needed.
  */
 async function bundleHasTipAccount(
-  serializedTransactions: string[],
+  transactions: VersionedTransaction[],
 ): Promise<boolean> {
-  if (
-    !cachedTipAccountSet ||
-    Date.now() - tipAccountSetCachedAt > TIP_ACCOUNTS_TTL_MS
-  ) {
-    const response = await jitoBlockEngineRequest("getTipAccounts", []);
-    if (response.ok) {
-      const result = await response.json();
-      if (Array.isArray(result.result) && result.result.length > 0) {
-        cachedTipAccountSet = new Set(result.result as string[]);
-        tipAccountSetCachedAt = Date.now();
-      }
-    }
-  }
-
-  const tipAccounts = cachedTipAccountSet;
-  if (!tipAccounts || tipAccounts.size === 0) {
+  let tipAccounts: Set<string>;
+  try {
+    tipAccounts = new Set(await getJitoTipAccounts());
+  } catch (error) {
+    console.warn(
+      "[bundleHasTipAccount] Failed to fetch Jito tip accounts:",
+      error,
+    );
     return true;
   }
 
-  return serializedTransactions.some((serialized) =>
-    messageWriteLocksAnyAccount(
-      VersionedTransaction.deserialize(Buffer.from(serialized, "base64"))
-        .message,
-      tipAccounts,
+  return transactions.some(({ message }) =>
+    message.staticAccountKeys.some(
+      (key, i) =>
+        message.isAccountWritable(i) && tipAccounts.has(key.toBase58()),
     ),
   );
 }
@@ -238,8 +222,12 @@ export async function submitTransactionBatch(
 
     // Multiple transactions
     if (shouldUseJitoBundle(payload.transactions.length, cluster)) {
+      const bundleTransactions = payload.transactions.map((tx) =>
+        VersionedTransaction.deserialize(Buffer.from(tx, "base64")),
+      );
+
       // Mainnet: use Jito bundle — verify tip is present before submitting
-      if (!(await bundleHasTipAccount(payload.transactions))) {
+      if (!(await bundleHasTipAccount(bundleTransactions))) {
         if (isClientCraftedBundleTag(payload.tag)) {
           // Stale wallet-app releases and third-party clients craft their own
           // transactions without a Jito tip. The transactions are still valid,
@@ -256,11 +244,8 @@ export async function submitTransactionBatch(
       }
       await simulateJitoBundle(payload.transactions, bundleContext);
 
-      const signatures = payload.transactions.map((tx) =>
-        bs58.encode(
-          VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
-            .signatures[0],
-        ),
+      const signatures = bundleTransactions.map((tx) =>
+        bs58.encode(tx.signatures[0]),
       );
 
       try {
