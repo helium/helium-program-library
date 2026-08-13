@@ -42,10 +42,9 @@ export async function mintDataCredits({
   const wallet = program.provider.wallet;
   const connection = program.provider.connection;
 
-  // @ts-ignore
   const pythSolanaReceiver = new PythSolanaReceiver({
     connection,
-    wallet: wallet!,
+    wallet: wallet as any,
   });
 
   const transactionBuilder = pythSolanaReceiver.newTransactionBuilder({
