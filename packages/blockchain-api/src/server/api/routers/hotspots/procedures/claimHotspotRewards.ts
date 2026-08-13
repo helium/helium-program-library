@@ -13,6 +13,7 @@ import { PublicKey } from "@solana/web3.js";
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
+  serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import {
@@ -63,7 +64,7 @@ export const claimHotspotRewards =
       const hasPending = pendingOracleRewards(
         rewards,
         entityKey,
-        recipientAcc
+        recipientAcc,
       ).gtn(0);
 
       const emptyResponse = async () => ({
@@ -80,7 +81,7 @@ export const claimHotspotRewards =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(0),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       });
 
@@ -95,7 +96,7 @@ export const claimHotspotRewards =
         mfProgram,
         connection,
         lazyDistributor,
-        [{ asset, entityKey }]
+        [{ asset, entityKey }],
       );
       if (claimable.length === 0) {
         return emptyResponse();
@@ -122,10 +123,10 @@ export const claimHotspotRewards =
       const rentCost = recipientAcc ? 0 : RENT_COSTS.RECIPIENT;
       const requiredLamports = calculateRequiredBalance(
         txFees + jitoTipCost,
-        rentCost
+        rentCost,
       );
       const senderBalance = await connection.getBalance(
-        new PublicKey(walletAddress)
+        new PublicKey(walletAddress),
       );
       if (senderBalance < requiredLamports) {
         throw errors.INSUFFICIENT_FUNDS({
@@ -134,13 +135,11 @@ export const claimHotspotRewards =
         });
       }
 
-      const transactions = vtxs.map((tx) => ({
-        serializedTransaction: Buffer.from(tx.serialize()).toString("base64"),
-        metadata: {
-          type: "claim_rewards",
-          description: "Claim hotspot rewards",
-        },
-      }));
+      const transactions = serializeWithTipMetadata(
+        vtxs,
+        { type: "claim_rewards", description: "Claim hotspot rewards" },
+        useJito,
+      );
 
       return {
         transactionData: {
@@ -158,8 +157,8 @@ export const claimHotspotRewards =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(txFees + rentCost),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
-    }
+    },
   );

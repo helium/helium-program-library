@@ -9,6 +9,7 @@ import { populateMissingDraftInfo, toVersionedTx } from "@helium/spl-utils";
 import { env } from "../env";
 import { classifySimulationLogs } from "./simulation-classifier";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
+import { createTtlCache } from "./ttl-cache";
 
 export function shouldUseJitoBundle(
   transactionsLength: number,
@@ -57,8 +58,9 @@ async function jitoRpcRequest(
 
 // Tip account cache with TTL (5 minutes)
 const TIP_ACCOUNTS_TTL_MS = 5 * 60 * 1000;
-let cachedTipAccounts: string[] | null = null;
-let tipAccountsCachedAt = 0;
+const tipAccountsCache = createTtlCache<string[]>({
+  ttlMs: TIP_ACCOUNTS_TTL_MS,
+});
 
 async function fetchJitoTipAccounts(): Promise<string[]> {
   const response = await jitoBlockEngineRequest("getTipAccounts", []);
@@ -79,18 +81,13 @@ async function fetchJitoTipAccounts(): Promise<string[]> {
   return result.result;
 }
 
-async function getJitoTipAccount(): Promise<string> {
-  if (
-    !cachedTipAccounts ||
-    Date.now() - tipAccountsCachedAt > TIP_ACCOUNTS_TTL_MS
-  ) {
-    cachedTipAccounts = await fetchJitoTipAccounts();
-    tipAccountsCachedAt = Date.now();
-  }
+export function getJitoTipAccounts(): Promise<string[]> {
+  return tipAccountsCache("tip-accounts", fetchJitoTipAccounts);
+}
 
-  return cachedTipAccounts[
-    Math.floor(Math.random() * cachedTipAccounts.length)
-  ];
+async function getJitoTipAccount(): Promise<string> {
+  const tipAccounts = await getJitoTipAccounts();
+  return tipAccounts[Math.floor(Math.random() * tipAccounts.length)];
 }
 
 async function resolveJitoTipAccount(): Promise<string> {
@@ -465,4 +462,29 @@ export async function getJitoTipTransaction(
       "finalized"
     )
   );
+}
+
+export const JITO_TIP_METADATA = {
+  type: "jito_tip",
+  description: "Jito bundle tip",
+};
+
+/**
+ * Serialize transactions into {serializedTransaction, metadata} entries,
+ * labeling the appended tip transaction (always last when hasTip) with
+ * jito_tip metadata so isBundleLanded/deriveActionType can exclude it.
+ */
+export function serializeWithTipMetadata<M>(
+  transactions: VersionedTransaction[],
+  metadata: M,
+  hasTip: boolean,
+): Array<{
+  serializedTransaction: string;
+  metadata: M | typeof JITO_TIP_METADATA;
+}> {
+  return transactions.map((tx, i) => ({
+    serializedTransaction: Buffer.from(tx.serialize()).toString("base64"),
+    metadata:
+      hasTip && i === transactions.length - 1 ? JITO_TIP_METADATA : metadata,
+  }));
 }

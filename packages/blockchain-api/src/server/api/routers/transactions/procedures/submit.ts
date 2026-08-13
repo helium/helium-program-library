@@ -60,9 +60,6 @@ function captureSubmissionError(
   };
 
   if (error instanceof JitoMissingTipError) {
-    if (error.skipSentry) {
-      return;
-    }
     Sentry.captureException(error, {
       level: "error",
       tags: {
