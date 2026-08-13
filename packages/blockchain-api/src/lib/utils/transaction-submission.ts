@@ -11,7 +11,11 @@ import {
   JitoBundleContext,
   jitoBlockEngineRequest,
 } from "./jito";
-import { isBundleLanded } from "./submission-helpers";
+import {
+  isBundleLanded,
+  isClientCraftedBundleTag,
+  messageWriteLocksAnyAccount,
+} from "./submission-helpers";
 
 export class SingleTransactionSubmissionError extends Error {
   public readonly explorerLink: string | null;
@@ -37,18 +41,11 @@ export class SingleTransactionSubmissionError extends Error {
 
 export class JitoMissingTipError extends Error {
   public readonly bundleSize: number;
-  // When true, the top-level handler should not capture this to Sentry —
-  // this is used for expected, user-facing errors (e.g. stale wallet versions).
-  public readonly skipSentry: boolean;
 
-  constructor(
-    message: string,
-    fields: { bundleSize: number; skipSentry: boolean },
-  ) {
+  constructor(message: string, fields: { bundleSize: number }) {
     super(message);
     this.name = "JitoMissingTipError";
     this.bundleSize = fields.bundleSize;
-    this.skipSentry = fields.skipSentry;
   }
 }
 
@@ -57,14 +54,13 @@ let tipAccountSetCachedAt = 0;
 const TIP_ACCOUNTS_TTL_MS = 5 * 60 * 1000;
 
 /**
- * Verify that a bundle contains at least one transaction that write-locks
- * a Jito tip account. Throws if no tip is found — this should never happen
- * since all server-crafted bundles include a tip transaction.
+ * Whether the bundle contains at least one transaction that write-locks a
+ * Jito tip account. Returns true when validation is impossible (tip accounts
+ * unavailable) so submission proceeds and Jito rejects if needed.
  */
-async function requireBundleHasTipAccount(
+async function bundleHasTipAccount(
   serializedTransactions: string[],
-  tag?: string,
-): Promise<void> {
+): Promise<boolean> {
   if (
     !cachedTipAccountSet ||
     Date.now() - tipAccountSetCachedAt > TIP_ACCOUNTS_TTL_MS
@@ -79,46 +75,17 @@ async function requireBundleHasTipAccount(
     }
   }
 
-  if (!cachedTipAccountSet || cachedTipAccountSet.size === 0) {
-    // Can't validate — allow submission and let Jito reject if needed
-    return;
+  const tipAccounts = cachedTipAccountSet;
+  if (!tipAccounts || tipAccounts.size === 0) {
+    return true;
   }
 
-  for (const serialized of serializedTransactions) {
-    const tx = VersionedTransaction.deserialize(
-      Buffer.from(serialized, "base64"),
-    );
-    const keys = tx.message.staticAccountKeys;
-    const {
-      numRequiredSignatures,
-      numReadonlySignedAccounts,
-      numReadonlyUnsignedAccounts,
-    } = tx.message.header;
-    const writableSignedCount =
-      numRequiredSignatures - numReadonlySignedAccounts;
-    const unsignedStart = numRequiredSignatures;
-    const writableUnsignedCount =
-      keys.length - numRequiredSignatures - numReadonlyUnsignedAccounts;
-
-    for (let i = 0; i < writableSignedCount; i++) {
-      if (cachedTipAccountSet.has(keys[i].toBase58())) return;
-    }
-    for (let i = 0; i < writableUnsignedCount; i++) {
-      if (cachedTipAccountSet.has(keys[unsignedStart + i].toBase58())) return;
-    }
-  }
-
-  const isFriendlyUpgradeError =
-    tag?.includes("implicit-burn") || tag?.includes("claim-rewards");
-
-  throw new JitoMissingTipError(
-    isFriendlyUpgradeError
-      ? "Bundle missing Jito tip. Please upgrade your Helium Wallet app and try again."
-      : "Jito bundle is missing a tip transaction — no transaction write-locks a recognized tip account",
-    {
-      bundleSize: serializedTransactions.length,
-      skipSentry: Boolean(isFriendlyUpgradeError),
-    },
+  return serializedTransactions.some((serialized) =>
+    messageWriteLocksAnyAccount(
+      VersionedTransaction.deserialize(Buffer.from(serialized, "base64"))
+        .message,
+      tipAccounts,
+    ),
   );
 }
 
@@ -251,10 +218,42 @@ export async function submitTransactionBatch(
       };
     }
 
+    // Submit each transaction directly via RPC, parallel or sequential based
+    // on payload.parallel. Used on devnet/localnet, and as the mainnet
+    // fallback for client-crafted bundles that lack a Jito tip.
+    const submitViaRpc = async (): Promise<BatchSubmissionResult> => {
+      if (payload.parallel) {
+        const signatures = await submitTransactionsParallel(
+          connection,
+          payload.transactions,
+        );
+        return { batchId, submissionType: "parallel", signatures };
+      }
+      const signatures = await submitTransactionsSequential(
+        connection,
+        payload.transactions,
+      );
+      return { batchId, submissionType: "sequential", signatures };
+    };
+
     // Multiple transactions
     if (shouldUseJitoBundle(payload.transactions.length, cluster)) {
       // Mainnet: use Jito bundle — verify tip is present before submitting
-      await requireBundleHasTipAccount(payload.transactions, payload.tag);
+      if (!(await bundleHasTipAccount(payload.transactions))) {
+        if (isClientCraftedBundleTag(payload.tag)) {
+          // Stale wallet-app releases and third-party clients craft their own
+          // transactions without a Jito tip. The transactions are still valid,
+          // so submit them directly via RPC instead of failing the bundle.
+          console.warn(
+            `[submitTransactionBatch] Bundle tagged "${payload.tag}" has no Jito tip; falling back to direct RPC submission`,
+          );
+          return submitViaRpc();
+        }
+        throw new JitoMissingTipError(
+          "Jito bundle is missing a tip transaction — no transaction write-locks a recognized tip account",
+          { bundleSize: payload.transactions.length },
+        );
+      }
       await simulateJitoBundle(payload.transactions, bundleContext);
 
       const signatures = payload.transactions.map((tx) =>
@@ -292,28 +291,7 @@ export async function submitTransactionBatch(
         throw error;
       }
     } else {
-      // Devnet/Localnet: use parallel or sequential based on payload.parallel
-      if (payload.parallel) {
-        const signatures = await submitTransactionsParallel(
-          connection,
-          payload.transactions,
-        );
-        return {
-          batchId,
-          submissionType: "parallel",
-          signatures,
-        };
-      } else {
-        const signatures = await submitTransactionsSequential(
-          connection,
-          payload.transactions,
-        );
-        return {
-          batchId,
-          submissionType: "sequential",
-          signatures,
-        };
-      }
+      return submitViaRpc();
     }
   };
 
@@ -329,7 +307,9 @@ export async function submitTransactionBatch(
         payload.transactions.length > 1
       ) {
         console.warn(
-          `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${i + 1}/${MAX_BLOCKHASH_RETRIES})...`,
+          `[submitTransactionBatch] Blockhash not found, retrying after 2s (attempt ${
+            i + 1
+          }/${MAX_BLOCKHASH_RETRIES})...`,
         );
         await sleep(2000);
         lastError = error;
