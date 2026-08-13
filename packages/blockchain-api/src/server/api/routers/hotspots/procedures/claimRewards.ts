@@ -37,6 +37,7 @@ import {
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
+  serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import {
@@ -230,10 +231,6 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
         allVtxs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
       }
 
-      const txs = allVtxs.map((tx) =>
-        Buffer.from(tx.serialize()).toString("base64"),
-      );
-
       const txFees = await getTotalTransactionFees(connection, allVtxs);
       const assets = allClaimable.map((h) => h.asset);
 
@@ -289,16 +286,11 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
 
       return {
         transactionData: {
-          transactions: txs.map((serialized, i) => ({
-            serializedTransaction: serialized,
-            metadata:
-              useJito && i === txs.length - 1
-                ? { type: "jito_tip", description: "Jito bundle tip" }
-                : {
-                    type: "claim_rewards",
-                    description: "Claim hotspot rewards",
-                  },
-          })),
+          transactions: serializeWithTipMetadata(
+            allVtxs,
+            { type: "claim_rewards", description: "Claim hotspot rewards" },
+            useJito,
+          ),
           // Sequential: init and distribute ixs for the same recipient may land
           // in different packed txs; parallel submission races them.
           parallel: false,
@@ -409,7 +401,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     ).map((tx) => toVersionedTx(tx));
 
     // Add Jito tip if needed for mainnet bundles
-    if (shouldUseJitoBundle(vtxs.length, getCluster())) {
+    const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
+    if (useJito) {
       vtxs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
     }
 
@@ -432,23 +425,20 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       });
     }
 
-    const txs: Array<string> = vtxs.map((tx) =>
-      Buffer.from(tx.serialize()).toString("base64"),
-    );
-
     // For Tuktuk claims: tx fees + PDA wallet funding (already includes recipient rent)
     const rentCost = pdaWalletLamportsShortfall;
 
     return {
       transactionData: {
-        transactions: txs.map((serialized) => ({
-          serializedTransaction: serialized,
-          metadata: {
+        transactions: serializeWithTipMetadata(
+          vtxs,
+          {
             type: "queue_wallet_claim",
             description: "Queue wallet claim task via Tuktuk",
             taskIds: [taskId],
           },
-        })),
+          useJito,
+        ),
         parallel: true,
         tag: `claim_rewards_tuktuk:${walletAddress}`,
         actionMetadata: {

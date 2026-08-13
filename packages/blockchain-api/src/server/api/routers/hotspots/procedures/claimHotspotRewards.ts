@@ -13,6 +13,7 @@ import { PublicKey } from "@solana/web3.js";
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
+  serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import {
@@ -134,13 +135,11 @@ export const claimHotspotRewards =
         });
       }
 
-      const transactions = vtxs.map((tx, i) => ({
-        serializedTransaction: Buffer.from(tx.serialize()).toString("base64"),
-        metadata:
-          useJito && i === vtxs.length - 1
-            ? { type: "jito_tip", description: "Jito bundle tip" }
-            : { type: "claim_rewards", description: "Claim hotspot rewards" },
-      }));
+      const transactions = serializeWithTipMetadata(
+        vtxs,
+        { type: "claim_rewards", description: "Claim hotspot rewards" },
+        useJito,
+      );
 
       return {
         transactionData: {

@@ -38,6 +38,7 @@ import BN from "bn.js";
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
+  serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import { publicProcedure } from "../../../procedures";
@@ -241,28 +242,22 @@ export const createAutomation =
         vtxs.push(await getJitoTipTransaction(wallet));
       }
 
-      const txs: Array<string> = vtxs.map((tx) =>
-        Buffer.from(tx.serialize()).toString("base64"),
-      );
-
       // Estimated fee includes tx fees + operational funding (cronJob + pdaWallet)
       const txFees = await getTotalTransactionFees(provider.connection, vtxs);
       const estimatedSolFeeLamports = txFees + totalFundingNeeded;
 
       return {
         transactionData: {
-          transactions: txs.map((serialized, i) => ({
-            serializedTransaction: serialized,
-            metadata:
-              useJito && i === txs.length - 1
-                ? { type: "jito_tip", description: "Jito bundle tip" }
-                : {
-                    type: "setup_automation",
-                    description: "Set up hotspot claim automation",
-                    cronSchedule,
-                    duration,
-                  },
-          })),
+          transactions: serializeWithTipMetadata(
+            vtxs,
+            {
+              type: "setup_automation",
+              description: "Set up hotspot claim automation",
+              cronSchedule,
+              duration,
+            },
+            useJito,
+          ),
           parallel: false,
           tag: `setup_automation:${walletAddress}`,
           actionMetadata: { type: "setup_automation", cronSchedule, duration },

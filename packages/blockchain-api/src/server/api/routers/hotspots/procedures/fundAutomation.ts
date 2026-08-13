@@ -15,6 +15,7 @@ import {
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
+  serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import { publicProcedure } from "../../../procedures";
@@ -154,27 +155,21 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
       vtxs.push(await getJitoTipTransaction(wallet));
     }
 
-    const txs: Array<string> = vtxs.map((tx) =>
-      Buffer.from(tx.serialize()).toString("base64"),
-    );
-
     // Estimated fee includes tx fees + funding amounts
     const txFees = await getTotalTransactionFees(provider.connection, vtxs);
     const estimatedSolFeeLamports = txFees + totalFundingNeeded;
 
     return {
       transactionData: {
-        transactions: txs.map((serialized, i) => ({
-          serializedTransaction: serialized,
-          metadata:
-            useJito && i === txs.length - 1
-              ? { type: "jito_tip", description: "Jito bundle tip" }
-              : {
-                  type: "fund_automation",
-                  description: "Fund hotspot claim automation",
-                  additionalDuration,
-                },
-        })),
+        transactions: serializeWithTipMetadata(
+          vtxs,
+          {
+            type: "fund_automation",
+            description: "Fund hotspot claim automation",
+            additionalDuration,
+          },
+          useJito,
+        ),
         parallel: false,
         tag: `fund_automation:${walletAddress}`,
         actionMetadata: { type: "fund_automation", additionalDuration },

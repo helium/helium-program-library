@@ -16,6 +16,7 @@ import { buildTeardownInstructions } from "./automation-data-helpers";
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
+  serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import { publicProcedure } from "../../../procedures";
@@ -103,24 +104,18 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       vtxs.push(await getJitoTipTransaction(wallet));
     }
 
-    const txs: Array<string> = vtxs.map((tx) =>
-      Buffer.from(tx.serialize()).toString("base64"),
-    );
-
     const txFees = await getTotalTransactionFees(provider.connection, vtxs);
 
     return {
       transactionData: {
-        transactions: txs.map((serialized, i) => ({
-          serializedTransaction: serialized,
-          metadata:
-            useJito && i === txs.length - 1
-              ? { type: "jito_tip", description: "Jito bundle tip" }
-              : {
-                  type: "close_automation",
-                  description: "Close hotspot claim automation",
-                },
-        })),
+        transactions: serializeWithTipMetadata(
+          vtxs,
+          {
+            type: "close_automation",
+            description: "Close hotspot claim automation",
+          },
+          useJito,
+        ),
         parallel: false,
         tag: `close_automation:${walletAddress}`,
         actionMetadata: { type: "close_automation" },

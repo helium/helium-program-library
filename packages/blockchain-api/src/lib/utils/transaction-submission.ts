@@ -206,18 +206,14 @@ export async function submitTransactionBatch(
     // on payload.parallel. Used on devnet/localnet, and as the mainnet
     // fallback for client-crafted bundles that lack a Jito tip.
     const submitViaRpc = async (): Promise<BatchSubmissionResult> => {
-      if (payload.parallel) {
-        const signatures = await submitTransactionsParallel(
-          connection,
-          payload.transactions,
-        );
-        return { batchId, submissionType: "parallel", signatures };
-      }
-      const signatures = await submitTransactionsSequential(
-        connection,
-        payload.transactions,
-      );
-      return { batchId, submissionType: "sequential", signatures };
+      const submit = payload.parallel
+        ? submitTransactionsParallel
+        : submitTransactionsSequential;
+      return {
+        batchId,
+        submissionType: payload.parallel ? "parallel" : "sequential",
+        signatures: await submit(connection, payload.transactions),
+      };
     };
 
     // Multiple transactions

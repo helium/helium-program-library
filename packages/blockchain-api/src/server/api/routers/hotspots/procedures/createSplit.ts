@@ -40,6 +40,7 @@ import {
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
+  serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import {
@@ -254,18 +255,16 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
 
     return {
       transactionData: {
-        transactions: txs.map((tx, i) => ({
-          serializedTransaction: Buffer.from(tx.serialize()).toString("base64"),
-          metadata:
-            useJito && i === txs.length - 1
-              ? { type: "jito_tip", description: "Jito bundle tip" }
-              : {
-                  type: "add_split",
-                  description: "Create split",
-                  hotspotKey: assetId,
-                  recipients: rewardsSplit.map((s) => s.address),
-                },
-        })),
+        transactions: serializeWithTipMetadata(
+          txs,
+          {
+            type: "add_split",
+            description: "Create split",
+            hotspotKey: assetId,
+            recipients: rewardsSplit.map((s) => s.address),
+          },
+          useJito,
+        ),
         parallel: true,
         tag,
         actionMetadata: {

@@ -13,7 +13,11 @@ import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipTransaction,
+  serializeWithTipMetadata,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 
@@ -101,18 +105,15 @@ export const buildAutomationTransactionResponse = async ({
     vtxs.push(await getJitoTipTransaction(feePayer));
   }
 
-  const txs = vtxs.map((tx) => Buffer.from(tx.serialize()).toString("base64"));
   const txFees = await getTotalTransactionFees(provider.connection, vtxs);
 
   return {
     transactionData: {
-      transactions: txs.map((serialized, i) => ({
-        serializedTransaction: serialized,
-        metadata:
-          useJito && i === txs.length - 1
-            ? { type: "jito_tip", description: "Jito bundle tip" }
-            : transactionMetadata,
-      })),
+      transactions: serializeWithTipMetadata(
+        vtxs,
+        transactionMetadata,
+        useJito,
+      ),
       parallel: false,
       tag,
       actionMetadata,
