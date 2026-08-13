@@ -27,7 +27,7 @@ export interface ResubmissionResult {
  * Resubmit a single transaction that has expired or failed
  */
 export async function resubmitSingleTransaction(
-  pendingTx: PendingTransaction
+  pendingTx: PendingTransaction,
 ): Promise<ResubmissionResult> {
   if (!pendingTx.serializedTransaction) {
     return {
@@ -61,14 +61,14 @@ export async function resubmitSingleTransaction(
 
     // Deserialize and resubmit the transaction
     const transaction = VersionedTransaction.deserialize(
-      Buffer.from(pendingTx.serializedTransaction, "base64")
+      Buffer.from(pendingTx.serializedTransaction, "base64"),
     );
 
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
       {
         skipPreflight: true,
-      }
+      },
     );
 
     // Update the transaction record with new signature
@@ -91,7 +91,7 @@ export async function resubmitSingleTransaction(
     try {
       if (pendingTx.serializedTransaction) {
         const transaction = VersionedTransaction.deserialize(
-          Buffer.from(pendingTx.serializedTransaction, "base64")
+          Buffer.from(pendingTx.serializedTransaction, "base64"),
         );
         explorerUrl = getExplorerUrl(transaction);
         chewingGlassExplorerUrl = getChewingGlassExplorerUrl(transaction);
@@ -140,7 +140,7 @@ export async function resubmitSingleTransaction(
  */
 export async function resubmitTransactionBatch(
   batch: TransactionBatch,
-  pendingTransactions: PendingTransaction[]
+  pendingTransactions: PendingTransaction[],
 ): Promise<ResubmissionResult> {
   if (pendingTransactions.length === 0) {
     return {
@@ -161,7 +161,7 @@ export async function resubmitTransactionBatch(
 
   // Check if all transactions have serialized data
   const missingSerialized = pendingTransactions.filter(
-    (tx) => !tx.serializedTransaction
+    (tx) => !tx.serializedTransaction,
   );
   if (missingSerialized.length > 0) {
     return {
@@ -174,7 +174,7 @@ export async function resubmitTransactionBatch(
   try {
     // Prepare transactions for resubmission using existing submission logic
     const serializedTransactions = pendingTransactions.map(
-      (tx) => tx.serializedTransaction!
+      (tx) => tx.serializedTransaction!,
     );
 
     // Use the existing submission logic with the same parameters as the original batch
@@ -182,6 +182,8 @@ export async function resubmitTransactionBatch(
       transactions: serializedTransactions,
       parallel: batch.parallel,
       tag: batch.tag,
+      payer: batch.payer,
+      transactionMetadata: pendingTransactions.map((tx) => tx.metadata),
     });
 
     // Update the pending transactions with new signatures
@@ -197,7 +199,7 @@ export async function resubmitTransactionBatch(
               signature: newSignature,
               status: "pending",
             },
-            { transaction: dbTransaction }
+            { transaction: dbTransaction },
           );
         }
       }
@@ -227,11 +229,11 @@ export async function resubmitTransactionBatch(
         // Limit to first 3 to avoid too much data
         if (pendingTx.serializedTransaction) {
           const transaction = VersionedTransaction.deserialize(
-            Buffer.from(pendingTx.serializedTransaction, "base64")
+            Buffer.from(pendingTx.serializedTransaction, "base64"),
           );
           explorerLinks.push(getExplorerUrl(transaction));
           chewingGlassExplorerLinks.push(
-            getChewingGlassExplorerUrl(transaction)
+            getChewingGlassExplorerUrl(transaction),
           );
         }
       }
@@ -332,7 +334,7 @@ async function expirePendingBatch(batch: TransactionBatch): Promise<void> {
       {
         where: { batchId: batch.id, status: "pending" },
         transaction: dbTransaction,
-      }
+      },
     );
     batch.status = "expired";
     await batch.save({ transaction: dbTransaction });
