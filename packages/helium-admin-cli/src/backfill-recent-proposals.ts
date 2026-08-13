@@ -3,12 +3,13 @@ import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {
   daoKey,
   EPOCH_LENGTH,
-  init as initHsd
+  init as initHsd,
 } from "@helium/helium-sub-daos-sdk";
-import { batchParallelInstructionsWithPriorityFee, HNT_MINT } from "@helium/spl-utils";
 import {
-  TransactionInstruction
-} from "@solana/web3.js";
+  batchParallelInstructionsWithPriorityFee,
+  HNT_MINT,
+} from "@helium/spl-utils";
+import { TransactionInstruction } from "@solana/web3.js";
 import { BN } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -43,8 +44,8 @@ export async function run(args: any = process.argv) {
   const dao = await hsdProgram.account.daoV0.fetch(daoK);
   const oldestProposal = dao.recentProposals[3].ts;
   const daoEpochInfos = await hsdProgram.account.daoEpochInfoV0.all();
-  const affectedDaoEpochInfos = daoEpochInfos.filter(
-    (e) => e.account.epoch.mul(new BN(EPOCH_LENGTH)).gt(oldestProposal)
+  const affectedDaoEpochInfos = daoEpochInfos.filter((e) =>
+    e.account.epoch.mul(new BN(EPOCH_LENGTH)).gt(oldestProposal)
   );
 
   let instructions: TransactionInstruction[] = [];

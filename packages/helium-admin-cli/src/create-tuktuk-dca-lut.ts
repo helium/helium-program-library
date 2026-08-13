@@ -1,10 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { chunks, truthy, withPriorityFees } from "@helium/spl-utils";
-import {
-  AddressLookupTableProgram,
-  PublicKey
-} from "@solana/web3.js";
-import * as multisig from '@sqds/multisig';
+import { AddressLookupTableProgram, PublicKey } from "@solana/web3.js";
+import * as multisig from "@sqds/multisig";
 import os from "os";
 import yargs from "yargs/yargs";
 import { sendInstructionsOrSquadsV4 } from "./utils";
@@ -60,7 +57,7 @@ export async function run(args: any = process.argv) {
     "11111111111111111111111111111111",
     "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN",
     "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
-    "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+    "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
   ].map((a) => {
     return new PublicKey(a);
   });

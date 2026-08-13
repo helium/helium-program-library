@@ -68,7 +68,7 @@ export default function HotspotCard({
           queryClient.setQueryData(queryKey, {
             ...queryData,
             hotspots: queryData.hotspots.map((h: Hotspot) =>
-              h.asset === hotspot.asset ? updater(h) : h,
+              h.asset === hotspot.asset ? updater(h) : h
             ),
           });
         });
@@ -90,7 +90,7 @@ export default function HotspotCard({
           updateHotspotQueries((h) => ({ ...h, shares: previousShares }));
         },
       });
-    },
+    }
   );
 
   // Mock status - replace with actual status from hotspot data when available
@@ -102,72 +102,72 @@ export default function HotspotCard({
     <>
       <Card
         className={cn(
-          "flex-1 w-full md:max-w-sm",
-          nested && "bg-muted/45 md:max-w-full",
+          "w-full flex-1 md:max-w-sm",
+          nested && "bg-muted/45 md:max-w-full"
         )}
       >
         <CardContent>
           <div className="flex items-center">
-            <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center mr-4 shrink-0">
-              <div className="w-10 h-10 flex items-center justify-center">
+            <div className="bg-accent mr-4 flex h-16 w-16 shrink-0 items-center justify-center rounded-full">
+              <div className="flex h-10 w-10 items-center justify-center">
                 {deviceImageUrl ? (
                   <Image
                     src={deviceImageUrl}
                     width={40}
                     height={40}
-                    className="w-10 h-10"
+                    className="h-10 w-10"
                     alt={formatDeviceType(hotspot.deviceType)}
                   />
                 ) : (
-                  <Router className="w-10 h-10 text-gray-500" />
+                  <Router className="h-10 w-10 text-gray-500" />
                 )}
               </div>
             </div>
             <div className="flex-1 gap-0">
-              <h3 className="text-lg font-semibold text-foreground mb-1">
+              <h3 className="text-foreground mb-1 text-lg font-semibold">
                 {hotspot.name}
               </h3>
-              <p className="text-sm text-muted-foreground leading-tight font-normal">
+              <p className="text-muted-foreground text-sm font-normal leading-tight">
                 Location: {location}
               </p>
               <Button
                 variant="link"
                 onClick={copyAddress}
                 size="sm"
-                className="font-mono text-xs text-muted-foreground/50 hover:text-foreground !p-0 !m-0 h-auto gap-0"
+                className="text-muted-foreground/50 hover:text-foreground !m-0 h-auto gap-0 !p-0 font-mono text-xs"
               >
                 <span>{truncateAddress(hotspot.entityKey, 6, 6)}</span>
-                <Copy className="h-3 w-3 ml-2" />
+                <Copy className="ml-2 h-3 w-3" />
               </Button>
             </div>
           </div>
           <div
             className={cn(
               "flex flex-col space-y-2",
-              showCreateButton && "mt-4",
+              showCreateButton && "mt-4"
             )}
           >
             <div className="flex flex-wrap gap-2">
               {showStatus && (
                 <span
                   className={cn(
-                    "text-xs px-2 py-1 rounded-full",
+                    "rounded-full px-2 py-1 text-xs",
                     !hasStatusData
                       ? "bg-muted text-muted-foreground"
                       : isOnline
-                        ? "bg-green-500 text-green-100"
-                        : "bg-red-500 text-red-100",
+                      ? "bg-green-500 text-green-100"
+                      : "bg-red-500 text-red-100"
                   )}
                 >
                   {!hasStatusData
                     ? "Status Unknown"
                     : isOnline
-                      ? "Online"
-                      : "Offline"}
+                    ? "Online"
+                    : "Offline"}
                 </span>
               )}
               {hotspot.owner && hotspot.owner !== currentWallet && (
-                <span className="text-xs px-2 py-1 rounded-full bg-blue-500 text-blue-100">
+                <span className="rounded-full bg-blue-500 px-2 py-1 text-xs text-blue-100">
                   Owned by {truncateAddress(hotspot.owner, 4, 4)}
                 </span>
               )}
@@ -176,7 +176,7 @@ export default function HotspotCard({
                 (Number(hotspot.shares.percentage) > 0 ||
                   !new BN(hotspot.shares?.fixed || "0").isZero()) && (
                   <button
-                    className="cursor-pointer text-xs px-2 py-1 rounded-full bg-purple-500 text-purple-100 hover:opacity-90"
+                    className="cursor-pointer rounded-full bg-purple-500 px-2 py-1 text-xs text-purple-100 hover:opacity-90"
                     onClick={() => setShowSplitDetails(true)}
                     title="View split recipients"
                   >
@@ -184,7 +184,7 @@ export default function HotspotCard({
                       ? `${(hotspot.shares.percentage || 0) * 100}% Rewards`
                       : `${humanReadable(
                           new BN(hotspot.shares.fixed || "0") as any,
-                          8,
+                          8
                         )} HNT/Period`}
                   </button>
                 )}
@@ -211,10 +211,10 @@ export default function HotspotCard({
                   disabled={isRemoving}
                 >
                   {isRemoving ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-foreground"></div>
+                    <div className="border-foreground h-4 w-4 animate-spin rounded-full border-b-2"></div>
                   ) : (
                     <>
-                      <Split className="h-4 w-4 mr-2" />
+                      <Split className="mr-2 h-4 w-4" />
                       Remove Split
                     </>
                   )}
@@ -229,7 +229,7 @@ export default function HotspotCard({
         open={isCreateWelcomePackOpen}
         onOpenChange={setIsCreateWelcomePackOpen}
       >
-        <DialogContent className="max-w-screen h-screen md:max-w-2xl md:max-h-[90vh] md:h-auto overflow-y-auto">
+        <DialogContent className="max-w-screen h-screen overflow-y-auto md:h-auto md:max-h-[90vh] md:max-w-2xl">
           <CreateWelcomePackForm
             hotspot={hotspot}
             onClose={() => setIsCreateWelcomePackOpen(false)}

@@ -1,5 +1,5 @@
-import { PublicKey } from '@solana/web3.js';
-import fastify from 'fastify';
+import { PublicKey } from "@solana/web3.js";
+import fastify from "fastify";
 import * as anchor from "@coral-xyz/anchor";
 import { createAtaAndTransfer, toBN } from "@helium/spl-utils";
 import { getMint } from "@solana/spl-token";
@@ -16,24 +16,28 @@ let MOBILE_MINT_DECIMALS: number;
 
 const window = 30 * 1000; // 30 seconds
 const rateLimit = {
-  "hnt": {
+  hnt: {
     wallet: new Map<string, number>(),
     ip: new Map<string, number>(),
   },
-  "iot": {
+  iot: {
     wallet: new Map<string, number>(),
     ip: new Map<string, number>(),
   },
-  "mobile": {
+  mobile: {
     wallet: new Map<string, number>(),
     ip: new Map<string, number>(),
-  }
-}
+  },
+};
 type RateLimitTracker = {
   wallet: Map<string, number>;
   ip: Map<string, number>;
-}
-function isRateLimited(request: any, walletStr: string, rateLimitTracker: RateLimitTracker): boolean {
+};
+function isRateLimited(
+  request: any,
+  walletStr: string,
+  rateLimitTracker: RateLimitTracker
+): boolean {
   // Check if the wallet has been accessed within the rate limit window
   const walletLastAccessed = rateLimitTracker.wallet.get(walletStr);
   const now = Date.now();
@@ -43,9 +47,11 @@ function isRateLimited(request: any, walletStr: string, rateLimitTracker: RateLi
   rateLimitTracker.wallet.set(walletStr, now);
 
   // Check if the IP needs to be rate limited
-  const ip = (request.headers['x-real-ip'] // nginx
-    || request.headers['x-client-ip'] // apache
-    || request.ip).toString() // fallback to default
+  const ip = (
+    request.headers["x-real-ip"] || // nginx
+    request.headers["x-client-ip"] || // apache
+    request.ip
+  ).toString(); // fallback to default
   const ipLastAccessed = rateLimitTracker.ip.get(ip);
   if (ipLastAccessed && now - ipLastAccessed < window) {
     return true;
@@ -59,7 +65,7 @@ server.get("/health", async () => {
   return { ok: true };
 });
 
-server.get<{Params: { wallet: string } }>('/hnt/:wallet', {
+server.get<{ Params: { wallet: string } }>("/hnt/:wallet", {
   handler: async (request, reply) => {
     const walletStr = request.params.wallet;
     try {
@@ -68,25 +74,31 @@ server.get<{Params: { wallet: string } }>('/hnt/:wallet', {
       const wallet = new PublicKey(walletStr);
 
       if (amount > 10) {
-        reply.code(403).send('Must be less than 10');
+        reply.code(403).send("Must be less than 10");
         return;
       }
 
       const limit = isRateLimited(request, walletStr, rateLimit.hnt);
       if (limit) {
-        reply.code(429).send('Too Many Requests');
+        reply.code(429).send("Too Many Requests");
         return;
       }
-  
-      await createAtaAndTransfer(provider, HNT_MINT, toBN(amount, HNT_MINT_DECIMALS), provider.wallet.publicKey, wallet);
+
+      await createAtaAndTransfer(
+        provider,
+        HNT_MINT,
+        toBN(amount, HNT_MINT_DECIMALS),
+        provider.wallet.publicKey,
+        wallet
+      );
 
       reply.status(200).send({
         message: "Airdrop sent",
-      })
+      });
     } catch (err) {
       console.error(err);
       reply.status(500).send({
-        message: 'Request failed'
+        message: "Request failed",
       });
     }
   },
@@ -175,7 +187,8 @@ server.get<{ Params: { wallet: string } }>("/mobile/:wallet", {
 const start = async () => {
   HNT_MINT_DECIMALS = (await getMint(provider.connection, HNT_MINT)).decimals;
   IOT_MINT_DECIMALS = (await getMint(provider.connection, IOT_MINT)).decimals;
-  MOBILE_MINT_DECIMALS = (await getMint(provider.connection, MOBILE_MINT)).decimals;
+  MOBILE_MINT_DECIMALS = (await getMint(provider.connection, MOBILE_MINT))
+    .decimals;
 
   try {
     await server.listen({ port: 3000, host: "0.0.0.0" });

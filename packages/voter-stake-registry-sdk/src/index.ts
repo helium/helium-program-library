@@ -10,8 +10,12 @@ export * from "./pdas";
 export * from "./resolvers";
 export { VoteService } from "./voteService";
 export type {
-  EnhancedProxy, EnhancedProxyData, PartialEnhancedProxy, ProposalWithVotes,
-  ProxyAssignment, WithRank
+  EnhancedProxy,
+  EnhancedProxyData,
+  PartialEnhancedProxy,
+  ProposalWithVotes,
+  ProxyAssignment,
+  WithRank,
 } from "./voteService";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 
@@ -52,18 +56,23 @@ export const init = async (
 export function isClaimed({
   epoch,
   lastClaimedEpoch,
-  claimedEpochsBitmap
+  claimedEpochsBitmap,
 }: {
-  epoch: number,
-  lastClaimedEpoch: number,
-  claimedEpochsBitmap: BN,
+  epoch: number;
+  lastClaimedEpoch: number;
+  claimedEpochsBitmap: BN;
 }): boolean {
   if (epoch <= lastClaimedEpoch) {
-    return true
+    return true;
   } else if (epoch > lastClaimedEpoch + 128) {
-    return false
+    return false;
   } else {
     const bitIndex: number = epoch - lastClaimedEpoch - 1;
-    return claimedEpochsBitmap.shrn(127 - bitIndex).and(new BN(1)).toNumber() === 1;
+    return (
+      claimedEpochsBitmap
+        .shrn(127 - bitIndex)
+        .and(new BN(1))
+        .toNumber() === 1
+    );
   }
 }

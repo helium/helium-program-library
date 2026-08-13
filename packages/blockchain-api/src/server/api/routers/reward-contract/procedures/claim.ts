@@ -48,7 +48,7 @@ export const claim = publicProcedure.rewardContract.claim.handler(
     const feePayerWallet = loadKeypair(process.env.FEE_PAYER_WALLET_PATH!);
 
     const { provider, connection } = createSolanaConnection(
-      feePayerWallet.publicKey.toString(),
+      feePayerWallet.publicKey.toString()
     );
     const assetEndpoint = env.ASSET_ENDPOINT || connection.rpcEndpoint;
     const assetPubkey = new PublicKey(assetId);
@@ -63,7 +63,7 @@ export const claim = publicProcedure.rewardContract.claim.handler(
     const assetOwner = new PublicKey(
       typeof asset.ownership.owner === "string"
         ? asset.ownership.owner
-        : asset.ownership.owner.toBase58(),
+        : asset.ownership.owner.toBase58()
     );
 
     // When asset is transferred to WelcomePack, assetOwner IS the pack address
@@ -90,14 +90,15 @@ export const claim = publicProcedure.rewardContract.claim.handler(
     const [userWelcomePacksK] = userWelcomePacksKey(assetOwner);
     const userWelcomePacks =
       await wpProgram.account.userWelcomePacksV0.fetchNullable(
-        userWelcomePacksK,
+        userWelcomePacksK
       );
 
     if (userWelcomePacks) {
       for (let i = 0; i < (userWelcomePacks.nextId || 0); i++) {
         const [welcomePackK] = welcomePackKey(assetOwner, i);
-        const welcomePack =
-          await wpProgram.account.welcomePackV0.fetchNullable(welcomePackK);
+        const welcomePack = await wpProgram.account.welcomePackV0.fetchNullable(
+          welcomePackK
+        );
 
         if (welcomePack && welcomePack.asset.equals(assetPubkey)) {
           return buildClaimTransaction({
@@ -119,7 +120,7 @@ export const claim = publicProcedure.rewardContract.claim.handler(
     }
 
     throw errors.NOT_FOUND({ message: "Reward contract not found." });
-  },
+  }
 );
 
 async function buildClaimTransaction({
@@ -212,10 +213,10 @@ async function buildClaimTransaction({
           getAssociatedTokenAddressSync(
             rewardsMint,
             new PublicKey(signerWalletAddress),
-            true,
+            true
           ),
           new PublicKey(signerWalletAddress),
-          rewardsMint,
+          rewardsMint
         ),
       ],
       feePayer: feePayerWallet.publicKey,
@@ -244,6 +245,9 @@ async function buildClaimTransaction({
       parallel: false,
       tag,
     },
-    estimatedSolFee: await toTokenAmountOutput(new BN(0), NATIVE_MINT.toBase58()),
+    estimatedSolFee: await toTokenAmountOutput(
+      new BN(0),
+      NATIVE_MINT.toBase58()
+    ),
   };
 }

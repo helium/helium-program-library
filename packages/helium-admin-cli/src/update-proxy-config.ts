@@ -1,16 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  init as initProxy,
-  proxyConfigKey,
-} from "@helium/nft-proxy-sdk";
+import { init as initProxy, proxyConfigKey } from "@helium/nft-proxy-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
-import {
-  loadKeypair,
-  sendInstructionsOrSquadsV4
-} from "./utils";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -66,7 +60,9 @@ export async function run(args: any = process.argv) {
   instructions.push(
     await program.methods
       .updateProxyConfigV0({
-        maxProxyTime: argv.maxProxyTime ? new anchor.BN(argv.maxProxyTime) : null,
+        maxProxyTime: argv.maxProxyTime
+          ? new anchor.BN(argv.maxProxyTime)
+          : null,
         seasons,
       })
       .accountsPartial({

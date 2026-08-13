@@ -1,7 +1,7 @@
 module.exports = {
   async up(queryInterface, Sequelize) {
     const tableInfo = await queryInterface.describeTable(
-      "pending_transactions",
+      "pending_transactions"
     );
     if (tableInfo.tag) {
       await queryInterface.removeColumn("pending_transactions", "tag");
@@ -10,7 +10,7 @@ module.exports = {
 
   async down(queryInterface, Sequelize) {
     const tableInfo = await queryInterface.describeTable(
-      "pending_transactions",
+      "pending_transactions"
     );
     if (!tableInfo.tag) {
       await queryInterface.addColumn("pending_transactions", "tag", {

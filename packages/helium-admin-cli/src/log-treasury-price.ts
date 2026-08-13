@@ -1,6 +1,9 @@
 import * as anchor from "@coral-xyz/anchor";
 import { HNT_MINT, amountAsNum, toNumber, toBN } from "@helium/spl-utils";
-import { init as initTreasuryManagement, treasuryManagementKey } from "@helium/treasury-management-sdk";
+import {
+  init as initTreasuryManagement,
+  treasuryManagementKey,
+} from "@helium/treasury-management-sdk";
 import { getAccount, getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
@@ -33,8 +36,8 @@ export async function run(args: any = process.argv) {
       alias: "n",
       type: "string",
       required: true,
-      describe: "Amount to get the price for, in bones"
-    }
+      describe: "Amount to get the price for, in bones",
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -51,7 +54,7 @@ export async function run(args: any = process.argv) {
     await treasuryManagementProgram.account.treasuryManagementV0.fetch(
       treasuryManagementK
     );
-  
+
   const fromMintAcc = await getMint(provider.connection, dntMint);
   const amount = toNumber(new anchor.BN(argv.amount), fromMintAcc.decimals);
   const toMintAcc = await getMint(provider.connection, hntMint);
@@ -69,11 +72,11 @@ export async function run(args: any = process.argv) {
     fromMintAcc.supply / BigInt(Math.pow(10, fromMintAcc.decimals))
   );
   const R = amountAsNum(treasuryAcc.amount, toMintAcc.decimals);
-  
+
   const dR =
     (R / Math.pow(S, k + 1)) *
     (Math.pow(S - amount, k + 1) - Math.pow(S, k + 1));
   const output = Math.abs(dR);
 
-  console.log(toBN(output, toMintAcc.decimals).toString())
+  console.log(toBN(output, toMintAcc.decimals).toString());
 }

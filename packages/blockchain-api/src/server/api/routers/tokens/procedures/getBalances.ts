@@ -15,5 +15,5 @@ export const getBalances = publicProcedure.tokens.getBalances.handler(
 
     const tokenBalances = await getTokenBalances({ walletAddress });
     return tokenBalances;
-  },
+  }
 );

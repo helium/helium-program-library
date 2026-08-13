@@ -100,5 +100,5 @@ export const getByPayer = publicProcedure.transactions.getByPayer.handler(
         totalPages,
       },
     };
-  },
+  }
 );

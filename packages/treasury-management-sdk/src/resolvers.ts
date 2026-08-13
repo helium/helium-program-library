@@ -33,5 +33,5 @@ export const treasuryManagementResolvers = combineResolvers(
     account: "from",
     mint: "supplyMint",
     owner: "owner",
-  }),
+  })
 );

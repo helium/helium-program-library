@@ -4,7 +4,11 @@ import {
   makerKey,
   init as initHem,
 } from "@helium/helium-entity-manager-sdk";
-import { subDaoKey, daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
+import {
+  subDaoKey,
+  daoKey,
+  init as initHsd,
+} from "@helium/helium-sub-daos-sdk";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -72,7 +76,7 @@ export async function run(args: any = process.argv) {
         maker,
         authority,
         rewardableEntityConfig: entityConfigKey,
-        payer: authority
+        payer: authority,
       })
       .instruction()
   );

@@ -56,5 +56,5 @@ export const resubmit = publicProcedure.transactions.resubmit.handler(
         error: result.error,
       };
     }
-  },
+  }
 );

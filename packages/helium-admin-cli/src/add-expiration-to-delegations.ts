@@ -1,9 +1,24 @@
 import * as anchor from "@coral-xyz/anchor";
-import { daoKey, init as initHsd, subDaoEpochInfoKey } from "@helium/helium-sub-daos-sdk";
+import {
+  daoKey,
+  init as initHsd,
+  subDaoEpochInfoKey,
+} from "@helium/helium-sub-daos-sdk";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
-import { batchInstructionsToTxsWithPriorityFee, batchParallelInstructionsWithPriorityFee, bulkSendTransactions, HNT_MINT } from "@helium/spl-utils";
+import {
+  batchInstructionsToTxsWithPriorityFee,
+  batchParallelInstructionsWithPriorityFee,
+  bulkSendTransactions,
+  HNT_MINT,
+} from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import { AccountInfo, PublicKey, SystemProgram, SYSVAR_CLOCK_PUBKEY, TransactionInstruction } from "@solana/web3.js";
+import {
+  AccountInfo,
+  PublicKey,
+  SystemProgram,
+  SYSVAR_CLOCK_PUBKEY,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import { min } from "bn.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -48,7 +63,9 @@ export async function run(args: any = process.argv) {
 
   const instructions: TransactionInstruction[] = [];
   const delegations = await hsdProgram.account.delegatedPositionV0.all();
-  const needsMigration = delegations.filter(d => d.account.expirationTs.isZero());
+  const needsMigration = delegations.filter((d) =>
+    d.account.expirationTs.isZero()
+  );
   const positionKeys = needsMigration.map((d) => d.account.position);
   const coder = vsrProgram.coder.accounts;
   const positionAccs = (
@@ -56,7 +73,7 @@ export async function run(args: any = process.argv) {
       connection: provider.connection,
       keys: positionKeys,
     })
-  ).map((a) => a ? coder.decode("positionV0", a.data) : null);
+  ).map((a) => (a ? coder.decode("positionV0", a.data) : null));
 
   const currTs = await getSolanaUnixTimestamp(provider);
   const currTsBN = new anchor.BN(currTs.toString());
@@ -74,53 +91,58 @@ export async function run(args: any = process.argv) {
 
     const batch = needsMigration.slice(i, i + batchSize);
     const batchPositions = positionAccs.slice(i, i + batchSize);
-    
-    await Promise.all(batch.map(async (delegation, j) => {
-      const position = batchPositions[j];
-      if (!position) {
-        console.log(`Position not found for ${delegation.account.position.toBase58()}`);
-        return;
-      }
 
-      const subDao = delegation.account.subDao;
-      const positionTokenAccount = (
-        await provider.connection.getTokenLargestAccounts(position.mint)
-      ).value[0].address;
-      
-      instructions.push(
-        await hsdProgram.methods
-          .extendExpirationTsV0()
-          .accountsStrict({
-            payer: wallet.publicKey,
-            position: delegation.account.position,
-            delegatedPosition: delegation.publicKey,
-            registrar: registrarK,
-            mint: position.mint,
-            authority: wallet.publicKey,
-            positionTokenAccount,
-            dao,
-            subDao: delegation.account.subDao,
-            oldClosingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
-              subDao,
-              delegation.account.expirationTs.isZero()
-                ? position.lockup.endTs
-                : min(position.lockup.endTs, delegation.account.expirationTs)
-            )[0],
-            closingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
-              subDao,
-              min(position.lockup.endTs, proxyEndTs!)
-            )[0],
-            genesisEndSubDaoEpochInfo: subDaoEpochInfoKey(
-              subDao,
-              position.genesisEnd.lt(currTsBN) ?
-                min(position.lockup.endTs, proxyEndTs!) : position.genesisEnd
-            )[0],
-            proxyConfig: registrar.proxyConfig,
-            systemProgram: SystemProgram.programId,
-          })
-          .instruction()
-      );
-    }));
+    await Promise.all(
+      batch.map(async (delegation, j) => {
+        const position = batchPositions[j];
+        if (!position) {
+          console.log(
+            `Position not found for ${delegation.account.position.toBase58()}`
+          );
+          return;
+        }
+
+        const subDao = delegation.account.subDao;
+        const positionTokenAccount = (
+          await provider.connection.getTokenLargestAccounts(position.mint)
+        ).value[0].address;
+
+        instructions.push(
+          await hsdProgram.methods
+            .extendExpirationTsV0()
+            .accountsStrict({
+              payer: wallet.publicKey,
+              position: delegation.account.position,
+              delegatedPosition: delegation.publicKey,
+              registrar: registrarK,
+              mint: position.mint,
+              authority: wallet.publicKey,
+              positionTokenAccount,
+              dao,
+              subDao: delegation.account.subDao,
+              oldClosingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
+                subDao,
+                delegation.account.expirationTs.isZero()
+                  ? position.lockup.endTs
+                  : min(position.lockup.endTs, delegation.account.expirationTs)
+              )[0],
+              closingTimeSubDaoEpochInfo: subDaoEpochInfoKey(
+                subDao,
+                min(position.lockup.endTs, proxyEndTs!)
+              )[0],
+              genesisEndSubDaoEpochInfo: subDaoEpochInfoKey(
+                subDao,
+                position.genesisEnd.lt(currTsBN)
+                  ? min(position.lockup.endTs, proxyEndTs!)
+                  : position.genesisEnd
+              )[0],
+              proxyConfig: registrar.proxyConfig,
+              systemProgram: SystemProgram.programId,
+            })
+            .instruction()
+        );
+      })
+    );
   }
   console.log(`Finished processing ${needsMigration.length} delegations`);
 

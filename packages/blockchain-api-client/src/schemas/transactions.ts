@@ -1,12 +1,19 @@
 import { z } from "zod";
-import { TransactionMetadataSchema, TransactionItemSchema, TokenAmountOutputSchema } from "./common";
+import {
+  TransactionMetadataSchema,
+  TransactionItemSchema,
+  TokenAmountOutputSchema,
+} from "./common";
 
 export const SubmitInputSchema = z.object({
   transactions: z.array(TransactionItemSchema),
   parallel: z.boolean(),
   tag: z.string().optional(),
   actionMetadata: z.record(z.string(), z.unknown()).optional(),
-  simulationCommitment: z.enum(["confirmed", "finalized"]).optional().default("confirmed"),
+  simulationCommitment: z
+    .enum(["confirmed", "finalized"])
+    .optional()
+    .default("confirmed"),
   simulate: z.boolean().optional().default(true),
 });
 
@@ -44,7 +51,7 @@ const TransactionStateSchema = z.union([
   z.literal("confirmed"),
   z.literal("failed"),
   z.literal("expired"),
-  z.literal("partial")
+  z.literal("partial"),
 ]);
 
 export const TransactionStatusSchema = z.object({
@@ -118,7 +125,10 @@ export const EstimateInputSchema = z.object({
   transactions: z.array(TransactionItemSchema),
   parallel: z.boolean(),
   tag: z.string().optional(),
-  simulationCommitment: z.enum(["confirmed", "finalized"]).optional().default("confirmed"),
+  simulationCommitment: z
+    .enum(["confirmed", "finalized"])
+    .optional()
+    .default("confirmed"),
 });
 
 const CostBreakdownSchema = z.object({

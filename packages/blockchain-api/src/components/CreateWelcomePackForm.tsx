@@ -87,7 +87,7 @@ export default function CreateWelcomePackForm({
   });
   const [recipientHasWallet, setRecipientHasWallet] = useState<boolean>(false);
   const [additionalRecipients, setAdditionalRecipients] = useState<Recipient[]>(
-    [],
+    []
   );
   const [schedule, setSchedule] = useState<Schedule>("monthly");
   // Default to now
@@ -96,15 +96,15 @@ export default function CreateWelcomePackForm({
       hour12: false,
       hour: "2-digit",
       minute: "2-digit",
-    }),
+    })
   );
   // Default to current day of week (0-6, where 0 is Sunday)
   const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState(
-    DAYS_OF_WEEK[new Date().getDay()],
+    DAYS_OF_WEEK[new Date().getDay()]
   );
   // Default to current day of month (1-31)
   const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState(
-    new Date().getDate().toString(),
+    new Date().getDate().toString()
   );
   const [returnAddress, setReturnAddress] = useState<ReturnAddress>("me");
   const [customReturnAddress, setCustomReturnAddress] = useState("");
@@ -126,7 +126,7 @@ export default function CreateWelcomePackForm({
     }
 
     const percentageRecipients = additionalRecipients.filter(
-      (r) => r.type === "percentage",
+      (r) => r.type === "percentage"
     );
 
     const ownerAmount =
@@ -146,7 +146,7 @@ export default function CreateWelcomePackForm({
       validationError:
         total !== 100
           ? `Total percentage must equal 100%. Current total: ${total.toFixed(
-              2,
+              2
             )}%`
           : null,
     };
@@ -209,7 +209,7 @@ export default function CreateWelcomePackForm({
         amount: solToLamportsBN(
           Number.isFinite(parsedSolAmount) && parsedSolAmount > 0
             ? parsedSolAmount
-            : 0.01,
+            : 0.01
         ).toString(),
         mint: NATIVE_MINT.toBase58(),
       },
@@ -231,7 +231,7 @@ export default function CreateWelcomePackForm({
               address: r.address,
               type: "percentage" as const,
               amount: r.amount,
-            },
+            }
       ),
       schedule: {
         frequency: schedule,
@@ -244,8 +244,8 @@ export default function CreateWelcomePackForm({
         returnAddress === "me"
           ? walletAddress!
           : returnAddress === "recipient"
-            ? recipientReward.address || PublicKey.default.toBase58()
-            : customReturnAddress,
+          ? recipientReward.address || PublicKey.default.toBase58()
+          : customReturnAddress,
       rentRefund: walletAddress!,
       lazyDistributor: HNT_LAZY_DISTRIBUTOR_ADDRESS,
     };
@@ -277,7 +277,7 @@ export default function CreateWelcomePackForm({
 
     // Update all hotspot queries that match the wallet address
     const updateHotspotQueries = (
-      updater: (old: HotspotsData | undefined) => HotspotsData | undefined,
+      updater: (old: HotspotsData | undefined) => HotspotsData | undefined
     ) => {
       // Get all existing queries
       const existingQueries = queryClient.getQueriesData<HotspotsData>({
@@ -309,7 +309,7 @@ export default function CreateWelcomePackForm({
               ].filter((r) => r.type === "percentage");
               const totalPercentage = percentageRecipients.reduce(
                 (sum, r) => sum + (typeof r.amount === "string" ? 0 : r.amount),
-                0,
+                0
               );
 
               // Snapshot and update all matching hotspot queries
@@ -339,7 +339,7 @@ export default function CreateWelcomePackForm({
                                 : h.shares?.fixed,
                           },
                         }
-                      : h,
+                      : h
                   ),
                 };
               });
@@ -358,7 +358,7 @@ export default function CreateWelcomePackForm({
               // Update welcome packs cache
               queryClient.setQueryData(
                 welcomePackQueryKey,
-                (old: WelcomePack[] = []) => [...old, welcomePack!],
+                (old: WelcomePack[] = []) => [...old, welcomePack!]
               );
 
               // Optimistically remove hotspot from all matching queries
@@ -367,7 +367,7 @@ export default function CreateWelcomePackForm({
                 return {
                   ...old,
                   hotspots: old.hotspots.filter(
-                    (h) => h.asset !== hotspot.asset,
+                    (h) => h.asset !== hotspot.asset
                   ),
                   total: old.total - 1,
                 };
@@ -382,9 +382,9 @@ export default function CreateWelcomePackForm({
                   return old.map((pack) =>
                     pack.id === welcomePack!.id
                       ? { ...pack, loading: false }
-                      : pack,
+                      : pack
                   );
-                },
+                }
               );
             },
             onError: () => {
@@ -392,7 +392,7 @@ export default function CreateWelcomePackForm({
               queryClient.setQueryData(
                 welcomePackQueryKey,
                 (old: WelcomePack[] = []) =>
-                  old.filter((pack) => pack.id !== welcomePack!.id),
+                  old.filter((pack) => pack.id !== welcomePack!.id)
               );
 
               // Add hotspot back to all matching queries
@@ -405,7 +405,7 @@ export default function CreateWelcomePackForm({
                 };
               });
             },
-          },
+          }
     );
   };
 
@@ -444,13 +444,13 @@ export default function CreateWelcomePackForm({
           </DialogDescription>
         </DialogHeader>
         {error && (
-          <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md border border-destructive/20">
+          <div className="bg-destructive/15 text-destructive border-destructive/20 rounded-md border p-3 text-sm">
             {error.message}
           </div>
         )}
 
         {validationError && (
-          <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md border border-destructive/20">
+          <div className="bg-destructive/15 text-destructive border-destructive/20 rounded-md border p-3 text-sm">
             {validationError}
           </div>
         )}
@@ -469,7 +469,7 @@ export default function CreateWelcomePackForm({
               placeholder="0.01"
               className="text-sm"
             />
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               The amount of SOL that will be deposited into the recipient&apos;s
               wallet to ensure they can execute transactions
             </p>
@@ -553,17 +553,17 @@ export default function CreateWelcomePackForm({
               type="checkbox"
               checked={recipientHasWallet}
               onChange={(e) => setRecipientHasWallet(e.target.checked)}
-              className="w-4 h-4"
+              className="h-4 w-4"
             />
             <Label
               htmlFor="recipient-has-wallet"
-              className="font-normal text-sm"
+              className="text-sm font-normal"
             >
               Recipient already has a wallet
             </Label>
           </div>
           {recipientHasWallet && (
-            <div className="flex gap-2 mt-2">
+            <div className="mt-2 flex gap-2">
               <Input
                 placeholder="Recipient wallet address"
                 value={recipientReward.address}
@@ -578,7 +578,7 @@ export default function CreateWelcomePackForm({
             </div>
           )}
           {!recipientHasWallet && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               After creating a welcome pack, you will be able to generate an
               invite link. Whoever follows that invite link will be able to
               enter their wallet address or create a new wallet as the recipient
@@ -588,7 +588,7 @@ export default function CreateWelcomePackForm({
 
         {/* Additional Recipients */}
         <div className="space-y-3">
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <Label>Additional Recipients</Label>
             <Button
               type="button"
@@ -600,9 +600,9 @@ export default function CreateWelcomePackForm({
             </Button>
           </div>
           {!additionalRecipients.length && (
-            <div className="text-center py-6 px-4 border-2 border-dashed border-muted-foreground/25 rounded-lg bg-muted/10">
-              <UserPlus className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="text-muted-foreground text-sm mb-1">
+            <div className="border-muted-foreground/25 bg-muted/10 rounded-lg border-2 border-dashed px-4 py-6 text-center">
+              <UserPlus className="text-muted-foreground/50 mx-auto mb-2 h-8 w-8" />
+              <p className="text-muted-foreground mb-1 text-sm">
                 No additional recipients yet
               </p>
               <p className="text-muted-foreground/70 text-xs">
@@ -613,7 +613,7 @@ export default function CreateWelcomePackForm({
           {additionalRecipients.map((recipient, index) => (
             <div
               key={index}
-              className="flex flex-col sm:flex-row gap-2 items-start"
+              className="flex flex-col items-start gap-2 sm:flex-row"
             >
               <Input
                 placeholder="Address"
@@ -625,7 +625,7 @@ export default function CreateWelcomePackForm({
                 }}
                 className="flex-1 text-sm"
               />
-              <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex w-full gap-2 sm:w-auto">
                 <Input
                   type="number"
                   value={recipient.amount || ""}
@@ -633,7 +633,7 @@ export default function CreateWelcomePackForm({
                     const newRecipients = [...additionalRecipients];
                     newRecipients[index].amount = handleNumberInput(
                       e.target.value,
-                      0,
+                      0
                     );
                     setAdditionalRecipients(newRecipients);
                   }}
@@ -676,7 +676,7 @@ export default function CreateWelcomePackForm({
         {/* Distribution Schedule */}
         <div className="space-y-2">
           <Label>Distribution Schedule</Label>
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Select
               value={schedule}
               onValueChange={(value: Schedule) => setSchedule(value)}
@@ -781,9 +781,9 @@ export default function CreateWelcomePackForm({
                       onChange={(e) =>
                         setReturnAddress(e.target.value as ReturnAddress)
                       }
-                      className="w-4 h-4"
+                      className="h-4 w-4"
                     />
-                    <Label htmlFor="return-me" className="font-normal text-sm">
+                    <Label htmlFor="return-me" className="text-sm font-normal">
                       Return to me
                     </Label>
                   </div>
@@ -796,11 +796,11 @@ export default function CreateWelcomePackForm({
                       onChange={(e) =>
                         setReturnAddress(e.target.value as ReturnAddress)
                       }
-                      className="w-4 h-4"
+                      className="h-4 w-4"
                     />
                     <Label
                       htmlFor="return-recipient"
-                      className="font-normal text-sm"
+                      className="text-sm font-normal"
                     >
                       Return to recipient
                     </Label>
@@ -814,11 +814,11 @@ export default function CreateWelcomePackForm({
                       onChange={(e) =>
                         setReturnAddress(e.target.value as ReturnAddress)
                       }
-                      className="w-4 h-4"
+                      className="h-4 w-4"
                     />
                     <Label
                       htmlFor="return-custom"
-                      className="font-normal text-sm"
+                      className="text-sm font-normal"
                     >
                       Custom address
                     </Label>
@@ -837,7 +837,7 @@ export default function CreateWelcomePackForm({
           </Collapsible>
         )}
 
-        <div className="flex gap-3 pt-4 flex-grow justify-end items-end md:flex-grow-0 md:justify-end md:items-end">
+        <div className="flex flex-grow items-end justify-end gap-3 pt-4 md:flex-grow-0 md:items-end md:justify-end">
           <Button
             variant="secondary"
             className="flex-1 text-sm"

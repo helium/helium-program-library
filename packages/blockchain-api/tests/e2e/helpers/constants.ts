@@ -7,7 +7,8 @@ export const TEST_HOTSPOT_ENTITY_KEY =
 /**
  * Test hotspot asset ID (cNFT address)
  */
-export const TEST_HOTSPOT_ASSET_ID = "CKesVwoY6mfc7iyjzYTKvigjcWoGZgnvEAX1UaGr7o89";
+export const TEST_HOTSPOT_ASSET_ID =
+  "CKesVwoY6mfc7iyjzYTKvigjcWoGZgnvEAX1UaGr7o89";
 
 /**
  * Second test hotspot encoded entity key - owned by the test wallet in Surfpool
@@ -18,12 +19,14 @@ export const TEST_HOTSPOT_2_ENTITY_KEY =
 /**
  * Second test hotspot asset ID (cNFT address)
  */
-export const TEST_HOTSPOT_2_ASSET_ID = "Ep7Cs7MB6764sPqa7TWBk6t61ubzENYB2Y1nU7N96ofQ";
+export const TEST_HOTSPOT_2_ASSET_ID =
+  "Ep7Cs7MB6764sPqa7TWBk6t61ubzENYB2Y1nU7N96ofQ";
 
 /**
  * IoT-only hotspot for network-specific tests
  */
-export const IOT_ONLY_HOTSPOT = "112SkfH1tmqoP32WAwA3SCKQtDXrz1V9TDd1Kyb6szHupbnKMeFb";
+export const IOT_ONLY_HOTSPOT =
+  "112SkfH1tmqoP32WAwA3SCKQtDXrz1V9TDd1Kyb6szHupbnKMeFb";
 
 /**
  * Mainnet HNT Lazy Distributor address
@@ -40,4 +43,5 @@ export const DEFAULT_HPL_CRONS_TASK_QUEUE =
 /**
  * Test proxy address for proxy assignment tests
  */
-export const TEST_PROXY_ADDRESS = "9DfBwcpMyAAyySPmkNwfmUhshYui4KJEkLS9EN8twv68";
+export const TEST_PROXY_ADDRESS =
+  "9DfBwcpMyAAyySPmkNwfmUhshYui4KJEkLS9EN8twv68";

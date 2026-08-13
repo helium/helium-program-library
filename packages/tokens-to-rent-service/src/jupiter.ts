@@ -1,4 +1,10 @@
-import { HNT_MINT, IOT_MINT, MOBILE_MINT, toBN, truthy } from "@helium/spl-utils";
+import {
+  HNT_MINT,
+  IOT_MINT,
+  MOBILE_MINT,
+  toBN,
+  truthy,
+} from "@helium/spl-utils";
 import {
   Configuration,
   DefaultApi,
@@ -130,7 +136,7 @@ export const fundFees = async ({
     slippageBps: 100, // 1%
     platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
     maxAccounts: 20,
-    onlyDirectRoutes: true
+    onlyDirectRoutes: true,
   });
 
   // Tx contains instructions to create/close WSOL token account
@@ -174,10 +180,10 @@ export const fundFees = async ({
         case "SetComputeUnitLimit":
           units =
             ComputeBudgetInstruction.decodeSetComputeUnitLimit(instr).units;
-            break;
+          break;
         case "RequestUnits":
           units = ComputeBudgetInstruction.decodeRequestUnits(instr).units;
-            break;
+          break;
         case "SetComputeUnitPrice":
           price = Number(
             ComputeBudgetInstruction.decodeSetComputeUnitPrice(instr)

@@ -1,10 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
-import { cronJobKey, cronJobNameMappingKey, cronJobTransactionKey, init as initCron } from "@helium/cron-sdk";
-import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import {
-  init as initTuktuk,
-  taskKey
-} from "@helium/tuktuk-sdk";
+  cronJobKey,
+  cronJobNameMappingKey,
+  cronJobTransactionKey,
+  init as initCron,
+} from "@helium/cron-sdk";
+import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
+import { init as initTuktuk, taskKey } from "@helium/tuktuk-sdk";
 import {
   PublicKey,
   SystemProgram,
@@ -73,7 +75,10 @@ export async function run(args: any = process.argv) {
           taskQueue,
           cronJob,
           task,
-          cronJobNameMapping: cronJobNameMappingKey(authority, "entity_claim")[0],
+          cronJobNameMapping: cronJobNameMappingKey(
+            authority,
+            "entity_claim"
+          )[0],
         })
         .instruction(),
       SystemProgram.transfer({
@@ -93,7 +98,10 @@ export async function run(args: any = process.argv) {
     .accountsPartial({
       keyToAsset,
       cronJob,
-      cronJobTransaction: cronJobTransactionKey(cronJob, cronJobAcc.nextTransactionId)[0],
+      cronJobTransaction: cronJobTransactionKey(
+        cronJob,
+        cronJobAcc.nextTransactionId
+      )[0],
     })
     .prepare();
 

@@ -1,4 +1,11 @@
-import { AddressLookupTableAccount, Commitment, Connection, PublicKey, Signer, TransactionInstruction } from "@solana/web3.js";
+import {
+  AddressLookupTableAccount,
+  Commitment,
+  Connection,
+  PublicKey,
+  Signer,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import { getAddressLookupTableAccounts } from "./transaction";
 
 export type TransactionDraft = {
@@ -24,7 +31,9 @@ export async function populateMissingDraftInfo(
   }
 
   if (!tx.recentBlockhash) {
-    tx.recentBlockhash = (await connection.getLatestBlockhash(commitment)).blockhash;
+    tx.recentBlockhash = (
+      await connection.getLatestBlockhash(commitment)
+    ).blockhash;
   }
 
   return tx;

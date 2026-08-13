@@ -1,7 +1,7 @@
-import { ParsedTransaction, TransactionBuffer } from "./types"
+import { ParsedTransaction, TransactionBuffer } from "./types";
 
 export class TransactionBufferManager {
-  private buffers: Map<string, TransactionBuffer> = new Map()
+  private buffers: Map<string, TransactionBuffer> = new Map();
 
   constructor(private defaultMaxSize: number = 1000) {}
 
@@ -9,46 +9,52 @@ export class TransactionBufferManager {
     if (!this.buffers.has(route)) {
       this.buffers.set(route, {
         transactions: [],
-        maxSize: maxSize || this.defaultMaxSize
-      })
+        maxSize: maxSize || this.defaultMaxSize,
+      });
     }
   }
 
   addTransaction(route: string, transaction: ParsedTransaction) {
-    const buffer = this.buffers.get(route)
+    const buffer = this.buffers.get(route);
     if (!buffer) {
-      throw new Error(`Buffer not initialized for route: ${route}`)
+      throw new Error(`Buffer not initialized for route: ${route}`);
     }
 
-    buffer.transactions.unshift(transaction)
+    buffer.transactions.unshift(transaction);
     if (buffer.transactions.length > buffer.maxSize) {
-      buffer.transactions.pop()
+      buffer.transactions.pop();
     }
   }
 
-  getTransactions(route: string, untilBlock?: number, limit?: number): ParsedTransaction[] {
-    const buffer = this.buffers.get(route)
+  getTransactions(
+    route: string,
+    untilBlock?: number,
+    limit?: number
+  ): ParsedTransaction[] {
+    const buffer = this.buffers.get(route);
     if (!buffer) {
-      throw new Error(`Buffer not initialized for route: ${route}`)
+      throw new Error(`Buffer not initialized for route: ${route}`);
     }
 
     if (!untilBlock) {
-      return buffer.transactions
+      return buffer.transactions;
     }
 
-    return buffer.transactions.filter(tx => tx.block > untilBlock).slice(0, limit)
+    return buffer.transactions
+      .filter((tx) => tx.block > untilBlock)
+      .slice(0, limit);
   }
 
   clear(route: string) {
-    const buffer = this.buffers.get(route)
+    const buffer = this.buffers.get(route);
     if (buffer) {
-      buffer.transactions = []
+      buffer.transactions = [];
     }
   }
 
   clearAll() {
-    this.buffers.forEach(buffer => {
-      buffer.transactions = []
-    })
+    this.buffers.forEach((buffer) => {
+      buffer.transactions = [];
+    });
   }
-} 
+}

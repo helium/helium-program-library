@@ -1,40 +1,40 @@
-import * as anchor from '@coral-xyz/anchor';
-import { init } from '@helium/helium-entity-manager-sdk';
-import { init as initHsd } from '@helium/helium-sub-daos-sdk';
-import { daoKey } from '@helium/helium-sub-daos-sdk';
-import { createMintInstructions, sendInstructions } from '@helium/spl-utils';
-import { PublicKey, Keypair, TransactionInstruction } from '@solana/web3.js';
-import { BN } from 'bn.js';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
+import * as anchor from "@coral-xyz/anchor";
+import { init } from "@helium/helium-entity-manager-sdk";
+import { init as initHsd } from "@helium/helium-sub-daos-sdk";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
+import { createMintInstructions, sendInstructions } from "@helium/spl-utils";
+import { PublicKey, Keypair, TransactionInstruction } from "@solana/web3.js";
+import { BN } from "bn.js";
+import os from "os";
+import yargs from "yargs/yargs";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     hntMint: {
-      type: 'string',
+      type: "string",
       required: true,
-      describe: 'Mint address of hnt',
+      describe: "Mint address of hnt",
     },
     recipient: {
-      type: 'string',
+      type: "string",
       required: true,
-      describe: 'Recipient wallet address for the iot ops fund nft',
+      describe: "Recipient wallet address for the iot ops fund nft",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
   });
 

@@ -210,8 +210,16 @@ async function run() {
   );
   await monitorSolBalance(mobileAutoTopOff, "helium_mobile_auto_topoff");
 
-  const mobileAutoTopoffTokenAccount = getAssociatedTokenAddressSync(dao.hntMint, mobileAutoTopOff, true);
-  const carrierAutoTopOffTokenAccount = getAssociatedTokenAddressSync(dao.hntMint, carrierAutoTopOff, true);
+  const mobileAutoTopoffTokenAccount = getAssociatedTokenAddressSync(
+    dao.hntMint,
+    mobileAutoTopOff,
+    true
+  );
+  const carrierAutoTopOffTokenAccount = getAssociatedTokenAddressSync(
+    dao.hntMint,
+    carrierAutoTopOff,
+    true
+  );
 
   if (await exists(mobileAutoTopoffTokenAccount)) {
     await monitorTokenBalance(
@@ -220,7 +228,10 @@ async function run() {
     );
   }
   if (await exists(carrierAutoTopOffTokenAccount)) {
-    await monitorTokenBalance(carrierAutoTopOffTokenAccount, "carrier_auto_topoff_hnt");
+    await monitorTokenBalance(
+      carrierAutoTopOffTokenAccount,
+      "carrier_auto_topoff_hnt"
+    );
   }
 
   for (const maker of makers) {

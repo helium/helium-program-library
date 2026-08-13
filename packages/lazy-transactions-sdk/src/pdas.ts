@@ -27,7 +27,7 @@ export function blockKey(
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
   const indexBuffer = Buffer.alloc(4);
-  indexBuffer.writeUint32LE(index)
+  indexBuffer.writeUint32LE(index);
   return PublicKey.findProgramAddressSync(
     [Buffer.from("block", "utf-8"), lazyTransactions.toBuffer(), indexBuffer],
     programId

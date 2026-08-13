@@ -23,9 +23,7 @@ import {
   sendAndConfirmWithRetry,
   sendInstructions,
 } from "@helium/spl-utils";
-import {
-  init as initTuktuk
-} from "@helium/tuktuk-sdk";
+import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import {
   ComputeBudgetProgram,
   Ed25519Program,
@@ -115,17 +113,32 @@ export class DatabaseMock implements Database {
       byHotspot: {},
     };
   }
-  getRewardableEntitiesByDestination(destination: PublicKey, limit: number, batchNumber?: number): Promise<{ entities: Pick<RewardableEntity, "keyToAsset">[]; nextBatchNumber: number; }> {
+  getRewardableEntitiesByDestination(
+    destination: PublicKey,
+    limit: number,
+    batchNumber?: number
+  ): Promise<{
+    entities: Pick<RewardableEntity, "keyToAsset">[];
+    nextBatchNumber: number;
+  }> {
     throw new Error("Method not implemented.");
   }
-  async getRewardsByOwner(owner: string): Promise<{ lifetime: string; pending: string; }> {
+  async getRewardsByOwner(
+    owner: string
+  ): Promise<{ lifetime: string; pending: string }> {
     return { lifetime: "0", pending: "0" };
   }
-  async getRewardsByDestination(destination: string): Promise<{ lifetime: string; pending: string; }> {
+  async getRewardsByDestination(
+    destination: string
+  ): Promise<{ lifetime: string; pending: string }> {
     return { lifetime: "0", pending: "0" };
   }
 
-  getRewardableEntities(wallet: anchor.web3.PublicKey, limit: number, batchNumber?: number): Promise<{ entities: RewardableEntity[]; nextBatchNumber: number; }> {
+  getRewardableEntities(
+    wallet: anchor.web3.PublicKey,
+    limit: number,
+    batchNumber?: number
+  ): Promise<{ entities: RewardableEntity[]; nextBatchNumber: number }> {
     throw new Error("Method not implemented.");
   }
 
@@ -180,8 +193,8 @@ export class DatabaseMock implements Database {
       console.error("No asset found", assetId.toBase58());
       return "0";
     }
-    const kta = keyToAssetForAsset(asset, this.dao)
-    const ktaAcc = await this.hemProgram.account.keyToAssetV0.fetch(kta)
+    const kta = keyToAssetForAsset(asset, this.dao);
+    const ktaAcc = await this.hemProgram.account.keyToAssetV0.fetch(kta);
     const eccCompact = decodeEntityKey(
       ktaAcc.entityKey,
       ktaAcc.keySerialization
@@ -513,7 +526,9 @@ describe("distributor-oracle", () => {
 
     console.log(res.body);
     assert.hasAllKeys(res.body, ["transactions", "success"]);
-    const signedTx = VersionedTransaction.deserialize(res.body.transactions[0].data);
+    const signedTx = VersionedTransaction.deserialize(
+      res.body.transactions[0].data
+    );
     await sendAndConfirmWithRetry(
       provider.connection,
       Buffer.from(signedTx.serialize()),
@@ -556,7 +571,9 @@ describe("distributor-oracle", () => {
       .send({ transaction: Buffer.from(serializedTx) });
 
     assert.hasAllKeys(res.body, ["transaction", "success"]);
-    const signedTx = VersionedTransaction.deserialize(res.body.transaction.data);
+    const signedTx = VersionedTransaction.deserialize(
+      res.body.transaction.data
+    );
     await sendAndConfirmWithRetry(
       provider.connection,
       Buffer.from(signedTx.serialize()),

@@ -54,8 +54,8 @@ export default function WelcomePacks({
     const updateHotspotQueries = (
       updater: (
         old: HotspotsData | undefined,
-        queryKey: unknown[],
-      ) => HotspotsData | undefined,
+        queryKey: unknown[]
+      ) => HotspotsData | undefined
     ) => {
       const existingQueries = queryClient.getQueriesData<HotspotsData>({
         queryKey: ["owned-hotspots", walletAddr],
@@ -63,7 +63,7 @@ export default function WelcomePacks({
 
       existingQueries.forEach(([queryKey]) => {
         queryClient.setQueryData(queryKey, (old: HotspotsData | undefined) =>
-          updater(old, queryKey as unknown[]),
+          updater(old, queryKey as unknown[])
         );
       });
     };
@@ -74,7 +74,7 @@ export default function WelcomePacks({
         queryClient.setQueryData(
           welcomePackQueryKey,
           (old: WelcomePackWithHotspot[] = []) =>
-            old.map((p) => (p.id === pack.id ? { ...p, loading: true } : p)),
+            old.map((p) => (p.id === pack.id ? { ...p, loading: true } : p))
         );
 
         // Add hotspot back to all matching queries
@@ -103,7 +103,7 @@ export default function WelcomePacks({
                 ...old,
                 total: old.total + 1,
               };
-            },
+            }
           );
         }
       },
@@ -112,7 +112,7 @@ export default function WelcomePacks({
         queryClient.setQueryData(
           welcomePackQueryKey,
           (old: WelcomePackWithHotspot[] = []) =>
-            old.filter((p) => p.id !== pack.id),
+            old.filter((p) => p.id !== pack.id)
         );
       },
       onError: () => {
@@ -120,7 +120,7 @@ export default function WelcomePacks({
         queryClient.setQueryData(
           welcomePackQueryKey,
           (old: WelcomePackWithHotspot[] = []) =>
-            old.map((p) => (p.id === pack.id ? { ...p, loading: false } : p)),
+            old.map((p) => (p.id === pack.id ? { ...p, loading: false } : p))
         );
 
         // Remove hotspot from queries since delete failed
@@ -131,11 +131,11 @@ export default function WelcomePacks({
               return {
                 ...old,
                 hotspots: old.hotspots.filter(
-                  (h) => h.asset !== pack.hotspot?.asset,
+                  (h) => h.asset !== pack.hotspot?.asset
                 ),
                 total: old.total - 1,
               };
-            },
+            }
           );
         }
       },
@@ -151,7 +151,7 @@ export default function WelcomePacks({
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="text-center p-8 flex flex-col items-center gap-4">
+        <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
           <Spinner />
           <p className="text-muted-foreground">
             Loading welcome packs for deployer...
@@ -164,7 +164,7 @@ export default function WelcomePacks({
   if (isError) {
     return (
       <Card>
-        <CardContent className="text-center p-8">
+        <CardContent className="p-8 text-center">
           <p className="text-destructive">
             An error occurred while fetching data for this deployer
           </p>
@@ -187,17 +187,17 @@ export default function WelcomePacks({
       {!packs || packs.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-1 p-2">
-            <Package2 className="w-10 h-10 text-muted-foreground mb-4" />
+            <Package2 className="text-muted-foreground mb-4 h-10 w-10" />
             <p className="text-muted-foreground">
               No welcome packs found for this wallet
             </p>
-            <p className="text-sm text-muted-foreground/50">
+            <p className="text-muted-foreground/50 text-sm">
               Create a welcome pack to get started
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {packs.map((pack) => {
             const packWithHotspot: WelcomePackWithHotspot = {
               ...pack,
@@ -211,7 +211,7 @@ export default function WelcomePacks({
             return (
               <Card key={pack.id} className="relative">
                 {pack.loading && (
-                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                  <div className="bg-background/80 absolute inset-0 z-10 flex items-center justify-center rounded-lg backdrop-blur-sm">
                     <Spinner />
                   </div>
                 )}
@@ -246,18 +246,18 @@ export default function WelcomePacks({
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <p className="text-sm">
-                      <span className="font-medium text-muted-foreground">
+                      <span className="text-muted-foreground font-medium">
                         Asset:
                       </span>{" "}
-                      <span className="font-mono break-all">{pack.asset}</span>
+                      <span className="break-all font-mono">{pack.asset}</span>
                     </p>
                     <p className="text-sm">
-                      <span className="font-medium text-muted-foreground">
+                      <span className="text-muted-foreground font-medium">
                         SOL Amount:
                       </span>{" "}
                       <span className="font-mono">
                         {(parseInt(pack.solAmount, 10) / 1_000_000_000).toFixed(
-                          4,
+                          4
                         )}{" "}
                         SOL
                       </span>
@@ -266,7 +266,7 @@ export default function WelcomePacks({
 
                   {packWithHotspot.hotspot ? (
                     <div>
-                      <h4 className="font-medium text-sm mb-2 text-muted-foreground">
+                      <h4 className="text-muted-foreground mb-2 text-sm font-medium">
                         Associated Hotspot:
                       </h4>
                       <HotspotCard
@@ -275,7 +275,7 @@ export default function WelcomePacks({
                       />
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground italic">
+                    <p className="text-muted-foreground text-sm italic">
                       No hotspot associated
                     </p>
                   )}

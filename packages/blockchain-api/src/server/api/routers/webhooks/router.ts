@@ -23,7 +23,7 @@ const bridge = publicProcedure.webhooks.bridge.handler(
       if (!bridgeUser) {
         console.error(
           "Bridge user not found for KYC link ID:",
-          data.kyc_link_id,
+          data.kyc_link_id
         );
         throw errors.NOT_FOUND({ message: "Bridge user not found" });
       }
@@ -40,7 +40,7 @@ const bridge = publicProcedure.webhooks.bridge.handler(
 
     // Handle other webhook types here
     return { success: true };
-  },
+  }
 );
 
 // ============================================================================

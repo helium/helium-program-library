@@ -49,7 +49,7 @@ export default function HotspotList({ walletAddress }: HotspotListProps) {
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="text-center p-8">
+        <CardContent className="p-8 text-center">
           <p className="text-muted-foreground">Loading hotspots...</p>
         </CardContent>
       </Card>
@@ -59,7 +59,7 @@ export default function HotspotList({ walletAddress }: HotspotListProps) {
   if (isError) {
     return (
       <Card>
-        <CardContent className="text-center p-8">
+        <CardContent className="p-8 text-center">
           <p className="text-destructive">Error: {(error as Error).message}</p>
         </CardContent>
       </Card>
@@ -67,7 +67,7 @@ export default function HotspotList({ walletAddress }: HotspotListProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className="flex w-full flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Hotspots</h2>
         <Select value={type} onValueChange={handleTypeChange}>
@@ -85,18 +85,18 @@ export default function HotspotList({ walletAddress }: HotspotListProps) {
       {!ownedHotspots || ownedHotspots.hotspots.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-1 p-2">
-            <Router className="w-10 h-10 text-muted-foreground mb-4" />
+            <Router className="text-muted-foreground mb-4 h-10 w-10" />
             <p className="text-muted-foreground">
               No hotspots found for this wallet
             </p>
-            <p className="text-sm text-muted-foreground/50">
+            <p className="text-muted-foreground/50 text-sm">
               Hotspots associated with your wallet will appear here
             </p>
           </CardContent>
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {ownedHotspots.hotspots.map((hotspot) => (
               <HotspotCard
                 key={hotspot.address}
@@ -108,7 +108,7 @@ export default function HotspotList({ walletAddress }: HotspotListProps) {
           </div>
 
           {ownedHotspots.totalPages > 1 && (
-            <div className="flex justify-center items-center mt-6 gap-2">
+            <div className="mt-6 flex items-center justify-center gap-2">
               <Button
                 variant="secondary"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -116,7 +116,7 @@ export default function HotspotList({ walletAddress }: HotspotListProps) {
               >
                 Previous
               </Button>
-              <span className="px-4 py-2 text-sm text-muted-foreground">
+              <span className="text-muted-foreground px-4 py-2 text-sm">
                 Page {page} of {ownedHotspots.totalPages}
               </span>
               <Button

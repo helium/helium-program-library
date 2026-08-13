@@ -51,7 +51,7 @@ const welcomePackIncludes = [
 ];
 
 function transformWelcomePackWithHotspot(
-  pack: WelcomePack,
+  pack: WelcomePack
 ): WelcomePackWithHotspot {
   const packJson = pack.toJSON() as WelcomePackQueryResult;
   const infoStruct = packJson.iotHotspotInfo || packJson.mobileHotspotInfo;
@@ -101,11 +101,11 @@ function transformWelcomePackWithHotspot(
     keySerialization: infoStruct!.keyToAsset!.keySerialization || "",
     shares: transformedRewardsSplit.reduce(
       (acc: number, curr: { amount: number }) => acc + curr.amount,
-      0,
+      0
     ),
     totalShares: transformedRewardsSplit.reduce(
       (acc: number, curr: { amount: number }) => acc + curr.amount,
-      0,
+      0
     ),
     fixedAmount: undefined,
     type: "direct",
@@ -150,7 +150,7 @@ export async function getWelcomePacksByOwner(owner: string) {
  * @returns A promise that resolves to a welcome pack object or null if not found.
  */
 export async function getWelcomePackByAddress(
-  address: string,
+  address: string
 ): Promise<WelcomePackWithHotspot | null> {
   await connectToDb();
 

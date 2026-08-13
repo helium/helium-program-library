@@ -1,7 +1,7 @@
 import AWS from "aws-sdk";
 import dotenv from "dotenv";
 import * as pg from "pg";
-import { BIGINT, Model, STRING, Sequelize } from 'sequelize';
+import { BIGINT, Model, STRING, Sequelize } from "sequelize";
 dotenv.config();
 
 const host = process.env.PGHOST || "localhost";

@@ -59,7 +59,7 @@ export const getHotspots = publicProcedure.migration.getHotspots.handler(
         if (ao.recipient?.split?.shares) {
           splitWalletsByAsset.set(
             ao.asset,
-            ao.recipient.split.shares.map((s) => s.wallet),
+            ao.recipient.split.shares.map((s) => s.wallet)
           );
         }
       }
@@ -71,5 +71,5 @@ export const getHotspots = publicProcedure.migration.getHotspots.handler(
         splitWallets: splitWalletsByAsset.get(h.asset) || undefined,
       })),
     };
-  },
+  }
 );

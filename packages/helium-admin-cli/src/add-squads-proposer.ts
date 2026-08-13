@@ -1,33 +1,30 @@
-import * as anchor from '@coral-xyz/anchor';
-import { PublicKey } from '@solana/web3.js';
+import * as anchor from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
-import os from 'os';
-import yargs from 'yargs/yargs';
-import {
-  loadKeypair,
-  sendInstructionsOrSquadsV4
-} from './utils';
+import os from "os";
+import yargs from "yargs/yargs";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
       required: true,
     },
     proposer: {
-      type: 'string',
+      type: "string",
       required: true,
     },
   });
@@ -55,16 +52,18 @@ export async function run(args: any = process.argv) {
     transactionIndex: newTransactionIndex,
     // Member must have at least "Proposer" permissions
     creator: wallet.publicKey,
-    actions: [{
-      // Type of action
-      __kind: "AddMember",
-      newMember: {
-        key: new PublicKey(argv.proposer),
-        permissions: {
-          mask: multisig.types.Permission.Initiate
-        }
+    actions: [
+      {
+        // Type of action
+        __kind: "AddMember",
+        newMember: {
+          key: new PublicKey(argv.proposer),
+          permissions: {
+            mask: multisig.types.Permission.Initiate,
+          },
+        },
       },
-    }],
+    ],
   });
 
   await sendInstructionsOrSquadsV4({
@@ -72,5 +71,5 @@ export async function run(args: any = process.argv) {
     payer: wallet.publicKey,
     instructions: [ix],
     multisig: multisigPda,
-  })
+  });
 }

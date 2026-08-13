@@ -33,11 +33,11 @@ export function solToLamportsBN(sol: number): BN {
 
 export async function resolveTokenAmountInput(
   input: TokenAmountInput,
-  expectedMint?: string,
+  expectedMint?: string
 ): Promise<BN> {
   if (expectedMint && input.mint !== expectedMint) {
     throw new Error(
-      `Mint mismatch: expected ${expectedMint}, got ${input.mint}`,
+      `Mint mismatch: expected ${expectedMint}, got ${input.mint}`
     );
   }
   await getTokenDecimals(input.mint);
@@ -57,7 +57,7 @@ function formatTokenAmount(raw: string, decimals: number): string {
 
 export async function toTokenAmountOutput(
   rawAmount: BN,
-  mint: string,
+  mint: string
 ): Promise<TokenAmountOutput> {
   const decimals = await getTokenDecimals(mint);
 

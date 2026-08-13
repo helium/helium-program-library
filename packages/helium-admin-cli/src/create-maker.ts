@@ -1,18 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  init as initHem,
-  makerKey
-} from "@helium/helium-entity-manager-sdk";
-import {
-  daoKey,
-  init as initHsd
-} from "@helium/helium-sub-daos-sdk";
+import { init as initHem, makerKey } from "@helium/helium-entity-manager-sdk";
+import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import {
   HNT_MINT,
   humanReadable,
   sendInstructions,
   truthy,
-  withPriorityFees
+  withPriorityFees,
 } from "@helium/spl-utils";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -27,11 +21,7 @@ import {
 import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
-import {
-  exists,
-  loadKeypair,
-  merkleSizes
-} from "./utils";
+import { exists, loadKeypair, merkleSizes } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -63,7 +53,8 @@ export async function run(args: any = process.argv) {
     },
     metadataUrl: {
       type: "string",
-      describe: "URL to metadata for this maker. Should be JSON with at least { name, image, description }",
+      describe:
+        "URL to metadata for this maker. Should be JSON with at least { name, image, description }",
       required: true,
     },
     makerCount: {
@@ -188,7 +179,10 @@ export async function run(args: any = process.argv) {
             issuingAuthority,
             updateAuthority,
           })
-          .accountsPartial({ maker, updateAuthority: provider.wallet.publicKey })
+          .accountsPartial({
+            maker,
+            updateAuthority: provider.wallet.publicKey,
+          })
           .instruction()
       );
     }
@@ -258,7 +252,7 @@ export async function run(args: any = process.argv) {
     await withPriorityFees({
       connection: provider.connection,
       instructions,
-      feePayer: provider.wallet.publicKey
+      feePayer: provider.wallet.publicKey,
     })
   );
 }

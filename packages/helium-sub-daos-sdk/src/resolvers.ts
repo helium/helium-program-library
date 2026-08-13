@@ -207,9 +207,9 @@ export const closingTimeEpochInfoResolver = resolveIndividual(
         const expirationTs =
           !delegatedPositionAcc || delegatedPositionAcc.expirationTs.isZero()
             ? [...(proxyConfigAcc?.seasons || [])]
-              ?.reverse()
-              .find((s) => new BN(now.toString()).gte(s.start))?.end ||
-            getLockupEffectiveEndTs(positionAcc.lockup)
+                ?.reverse()
+                .find((s) => new BN(now.toString()).gte(s.start))?.end ||
+              getLockupEffectiveEndTs(positionAcc.lockup)
             : delegatedPositionAcc.expirationTs;
         const [key] = subDaoEpochInfoKey(
           subDao,

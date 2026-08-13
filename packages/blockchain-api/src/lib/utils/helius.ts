@@ -1,7 +1,5 @@
 import { env } from "../env";
-import type {
-  VersionedTransactionResponse,
-} from "@solana/web3.js";
+import type { VersionedTransactionResponse } from "@solana/web3.js";
 
 export interface HeliusTransaction {
   signature: string;
@@ -22,7 +20,7 @@ export interface FetchResult {
  */
 export async function fetchWalletTransactions(
   wallet: string,
-  options?: { paginationToken?: string; limit?: number },
+  options?: { paginationToken?: string; limit?: number }
 ): Promise<FetchResult> {
   const response = await fetch(env.SOLANA_RPC_URL, {
     method: "POST",
@@ -70,7 +68,7 @@ export async function fetchWalletTransactions(
       blockTime: item.blockTime,
       transaction: item.transaction,
       meta: item.meta,
-    }),
+    })
   );
 
   return {

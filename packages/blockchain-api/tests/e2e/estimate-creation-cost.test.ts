@@ -67,21 +67,23 @@ describe("estimateCreationCost", () => {
       console.log(
         "  Transaction fees:",
         estimate.lineItems.transactionFees.uiAmountString,
-        "SOL",
+        "SOL"
       );
       console.log(
         "  Rent fee:",
         estimate.lineItems.rentFee.uiAmountString,
-        "SOL",
+        "SOL"
       );
       console.log(
         "  Recipient gift:",
         estimate.lineItems.recipientGift.uiAmountString,
-        "SOL",
+        "SOL"
       );
 
       // #when record balance before transaction
-      const balanceBefore = await ctx.connection.getBalance(ctx.payer.publicKey);
+      const balanceBefore = await ctx.connection.getBalance(
+        ctx.payer.publicKey
+      );
 
       // #when create the transaction
       const { data: createData, error: createError } =
@@ -112,7 +114,7 @@ describe("estimateCreationCost", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         createData.unsignedTransactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #then record balance after transaction
@@ -130,14 +132,17 @@ describe("estimateCreationCost", () => {
       // Allow small tolerance for priority fees
       const tolerance = BigInt(10000); // 0.00001 SOL tolerance
 
-      console.log("Difference (lamports):", (actualCostBigInt - estimatedTotal).toString());
+      console.log(
+        "Difference (lamports):",
+        (actualCostBigInt - estimatedTotal).toString()
+      );
 
       // The estimate should be >= actual cost (conservative) or within tolerance
       // A conservative estimate (higher than actual) is acceptable to ensure users have enough funds
       expect(
         estimatedTotal >= actualCostBigInt ||
           actualCostBigInt - estimatedTotal <= tolerance,
-        `Estimate ${estimatedTotal} should be >= actual ${actualCostBigInt} or within ${tolerance} tolerance`,
+        `Estimate ${estimatedTotal} should be >= actual ${actualCostBigInt} or within ${tolerance} tolerance`
       ).to.be.true;
     });
   });
@@ -160,7 +165,10 @@ describe("estimateCreationCost", () => {
           recipients: [
             {
               type: "CLAIMABLE",
-              giftedCurrency: { amount: giftedAmount, mint: NATIVE_MINT.toBase58() },
+              giftedCurrency: {
+                amount: giftedAmount,
+                mint: NATIVE_MINT.toBase58(),
+              },
               receives: { type: "SHARES", shares: 50 },
             },
             {
@@ -181,24 +189,26 @@ describe("estimateCreationCost", () => {
       console.log(
         "  Transaction fees:",
         estimate.lineItems.transactionFees.uiAmountString,
-        "SOL",
+        "SOL"
       );
       console.log(
         "  Rent fee:",
         estimate.lineItems.rentFee.uiAmountString,
-        "SOL",
+        "SOL"
       );
       console.log(
         "  Recipient gift:",
         estimate.lineItems.recipientGift.uiAmountString,
-        "SOL",
+        "SOL"
       );
 
       // Verify recipient gift matches input
       expect(estimate.lineItems.recipientGift.amount).to.equal(giftedAmount);
 
       // #when record balance before transaction
-      const balanceBefore = await ctx.connection.getBalance(ctx.payer.publicKey);
+      const balanceBefore = await ctx.connection.getBalance(
+        ctx.payer.publicKey
+      );
 
       // #when create the transaction
       const { data: createData, error: createError } =
@@ -209,7 +219,10 @@ describe("estimateCreationCost", () => {
           recipients: [
             {
               type: "CLAIMABLE",
-              giftedCurrency: { amount: giftedAmount, mint: NATIVE_MINT.toBase58() },
+              giftedCurrency: {
+                amount: giftedAmount,
+                mint: NATIVE_MINT.toBase58(),
+              },
               receives: { type: "SHARES", shares: 50 },
             },
             {
@@ -229,7 +242,7 @@ describe("estimateCreationCost", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         createData.unsignedTransactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #then record balance after transaction
@@ -247,13 +260,16 @@ describe("estimateCreationCost", () => {
       // Allow small tolerance for priority fees
       const tolerance = BigInt(10000); // 0.00001 SOL tolerance
 
-      console.log("Difference (lamports):", (actualCostBigInt - estimatedTotal).toString());
+      console.log(
+        "Difference (lamports):",
+        (actualCostBigInt - estimatedTotal).toString()
+      );
 
       // The estimate should be >= actual cost (conservative) or within tolerance
       expect(
         estimatedTotal >= actualCostBigInt ||
           actualCostBigInt - estimatedTotal <= tolerance,
-        `Estimate ${estimatedTotal} should be >= actual ${actualCostBigInt} or within ${tolerance} tolerance`,
+        `Estimate ${estimatedTotal} should be >= actual ${actualCostBigInt} or within ${tolerance} tolerance`
       ).to.be.true;
     });
   });
@@ -279,7 +295,7 @@ describe("estimateCreationCost", () => {
 
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("NOT_FOUND");

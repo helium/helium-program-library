@@ -5,12 +5,15 @@ import {
   heliumCommonResolver,
   resolveIndividual,
 } from "@helium/anchor-resolvers";
-import {
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { init } from "./init";
-import { iotInfoKey, keyToAssetKey, mobileInfoKey, programApprovalKey } from "./pdas";
+import {
+  iotInfoKey,
+  keyToAssetKey,
+  mobileInfoKey,
+  programApprovalKey,
+} from "./pdas";
 import { notEmittedKey } from "@helium/no-emit-sdk";
 
 export const heliumEntityManagerResolvers = combineResolvers(

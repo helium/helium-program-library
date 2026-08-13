@@ -4,7 +4,7 @@
  */
 export function classifySimulationLogs(
   errorMessage: string,
-  logs: (string | null)[] | null,
+  logs: (string | null)[] | null
 ): { category: string; detail: string } {
   const logsStr = (logs ?? []).join("\n");
   const combined = `${errorMessage}\n${logsStr}`;
@@ -31,11 +31,11 @@ export function classifySimulationLogs(
     combined.includes("insufficient funds")
   ) {
     const programMatch = combined.match(
-      /Program (\S+) failed.*(?:insufficient|custom program error)/,
+      /Program (\S+) failed.*(?:insufficient|custom program error)/
     );
     const program = programMatch?.[1] ?? "unknown";
     const amountMatch = combined.match(
-      /insufficient lamports (\d+), need (\d+)/,
+      /insufficient lamports (\d+), need (\d+)/
     );
     const detail = amountMatch
       ? `insufficient_lamports(have=${amountMatch[1]},need=${amountMatch[2]},program=${program})`

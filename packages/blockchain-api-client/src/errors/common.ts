@@ -22,15 +22,17 @@ export const NOT_FOUND = {
 export const BAD_REQUEST = {
   status: 400,
   message: "Invalid input data provided.",
-  data: z.object({
-    fields: z.array(z.string()).optional(),
-  }).optional(),
+  data: z
+    .object({
+      fields: z.array(z.string()).optional(),
+    })
+    .optional(),
 } as const;
 
 export const INVALID_WALLET_ADDRESS = {
   status: 400,
   message: "The provided wallet address is invalid.",
-}
+};
 
 /** Rate limit exceeded error */
 export const RATE_LIMITED = {

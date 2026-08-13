@@ -23,7 +23,9 @@ const getAdressLookupTableAccounts = async (
     if (accountInfo) {
       const addressLookupTableAccount = new AddressLookupTableAccount({
         key: new PublicKey(addressLookupTableAddress),
-        state: AddressLookupTableAccount.deserialize(Uint8Array.from(accountInfo.data)),
+        state: AddressLookupTableAccount.deserialize(
+          Uint8Array.from(accountInfo.data)
+        ),
       });
       acc.push(addressLookupTableAccount);
     }
@@ -50,24 +52,26 @@ export const convertYellowstoneTransaction = async (
 
   const staticKeyCount = message.accountKeys.length;
   const loadedWritableCount = (meta?.loadedWritableAddresses || []).length;
-  const { numRequiredSignatures, numReadonlySignedAccounts, numReadonlyUnsignedAccounts } =
-    message.header!;
+  const {
+    numRequiredSignatures,
+    numReadonlySignedAccounts,
+    numReadonlyUnsignedAccounts,
+  } = message.header!;
 
   const instructions = message.instructions.map((instr) => {
-    const keys: AccountMeta[] = Array.from(instr.accounts).map(
-      (accIndex) => {
-        const isSigner = accIndex < numRequiredSignatures;
-        let isWritable: boolean;
-        if (accIndex < numRequiredSignatures) {
-          isWritable = accIndex < numRequiredSignatures - numReadonlySignedAccounts;
-        } else if (accIndex < staticKeyCount) {
-          isWritable = accIndex < staticKeyCount - numReadonlyUnsignedAccounts;
-        } else {
-          isWritable = accIndex < staticKeyCount + loadedWritableCount;
-        }
-        return { pubkey: accountKeys[accIndex], isSigner, isWritable };
+    const keys: AccountMeta[] = Array.from(instr.accounts).map((accIndex) => {
+      const isSigner = accIndex < numRequiredSignatures;
+      let isWritable: boolean;
+      if (accIndex < numRequiredSignatures) {
+        isWritable =
+          accIndex < numRequiredSignatures - numReadonlySignedAccounts;
+      } else if (accIndex < staticKeyCount) {
+        isWritable = accIndex < staticKeyCount - numReadonlyUnsignedAccounts;
+      } else {
+        isWritable = accIndex < staticKeyCount + loadedWritableCount;
       }
-    );
+      return { pubkey: accountKeys[accIndex], isSigner, isWritable };
+    });
 
     return new TransactionInstruction({
       keys,

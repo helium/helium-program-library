@@ -10,14 +10,14 @@ module.exports = {
       {
         type: DataTypes.BIGINT,
         allowNull: true,
-      },
+      }
     );
   },
 
   async down(queryInterface, Sequelize) {
     await queryInterface.removeColumn(
       "pending_transactions",
-      "last_valid_block_height",
+      "last_valid_block_height"
     );
   },
 };

@@ -20,7 +20,7 @@ export function scheduleToUtcCron(schedule: WelcomePackSchedule): string {
   const now = new Date();
   const utcNow = new Date(now.toLocaleString("en-US", { timeZone: "UTC" }));
   const tzNow = new Date(
-    now.toLocaleString("en-US", { timeZone: schedule.timezone }),
+    now.toLocaleString("en-US", { timeZone: schedule.timezone })
   );
 
   // Calculate the offset in hours (positive means ahead of UTC)
@@ -76,7 +76,7 @@ export function scheduleToUtcCron(schedule: WelcomePackSchedule): string {
       const utcTestDate = new Date(
         testDate.toLocaleString("en-US", {
           timeZone: schedule.timezone,
-        }) + " UTC",
+        }) + " UTC"
       );
 
       // Use the UTC day as our cron day
@@ -98,7 +98,7 @@ export const toFiveColumnCron = (sixColCron: string): string =>
 export const truncateAddress = (
   address: string,
   startChars: number = 6,
-  endChars: number = 4,
+  endChars: number = 4
 ) => {
   if (address.length <= startChars + endChars) {
     return address;

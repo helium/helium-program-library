@@ -1,8 +1,10 @@
 import {
-  AddressLookupTableAccount, ComputeBudgetProgram,
+  AddressLookupTableAccount,
+  ComputeBudgetProgram,
   PublicKey,
   TransactionInstruction,
-  TransactionMessage, VersionedTransaction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 

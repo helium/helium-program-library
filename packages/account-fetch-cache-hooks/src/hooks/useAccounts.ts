@@ -181,8 +181,7 @@ export function useAccounts<T>(
   const sanitizedAccounts = useMemo(() => {
     return (accounts || [])
       .filter(
-        (a): a is typeof a & { publicKey: PublicKey } =>
-          a.publicKey != null
+        (a): a is typeof a & { publicKey: PublicKey } => a.publicKey != null
       )
       .map(({ info, account, publicKey }) => ({ info, account, publicKey }));
   }, [accounts]);

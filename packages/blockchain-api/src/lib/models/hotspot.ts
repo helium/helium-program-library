@@ -116,7 +116,7 @@ HotspotOwnership.init(
     tableName: "hotspot_ownership_v0",
     timestamps: false,
     underscored: true,
-  },
+  }
 );
 
 export class AssetOwner extends Model<
@@ -147,7 +147,7 @@ AssetOwner.init(
     tableName: "asset_owners",
     timestamps: true,
     underscored: true,
-  },
+  }
 );
 
 export class IotHotspotInfo extends Model<
@@ -191,7 +191,7 @@ IotHotspotInfo.init(
     tableName: "iot_hotspot_infos",
     timestamps: false,
     underscored: true,
-  },
+  }
 );
 
 export class MobileHotspotInfo extends Model<
@@ -240,5 +240,5 @@ MobileHotspotInfo.init(
     tableName: "mobile_hotspot_infos",
     timestamps: false,
     underscored: true,
-  },
+  }
 );

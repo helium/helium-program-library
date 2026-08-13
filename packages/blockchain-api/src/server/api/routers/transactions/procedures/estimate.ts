@@ -53,14 +53,16 @@ export const estimate = publicProcedure.transactions.estimate.handler(
         let transaction: VersionedTransaction;
         try {
           transaction = VersionedTransaction.deserialize(
-            Buffer.from(tx.serializedTransaction, "base64"),
+            Buffer.from(tx.serializedTransaction, "base64")
           );
         } catch (err) {
           return {
             index,
             computeUnits: 0,
             success: false,
-            error: `Failed to deserialize transaction: ${err instanceof Error ? err.message : "Unknown error"}`,
+            error: `Failed to deserialize transaction: ${
+              err instanceof Error ? err.message : "Unknown error"
+            }`,
             costs: {
               transactionFees: await zeroSol(),
               rent: await zeroSol(),
@@ -71,7 +73,7 @@ export const estimate = publicProcedure.transactions.estimate.handler(
 
         // Get all account keys for simulation
         const accountKeys = transaction.message.staticAccountKeys.map((k) =>
-          k.toBase58(),
+          k.toBase58()
         );
 
         // Simulate the transaction with account info
@@ -113,7 +115,7 @@ export const estimate = publicProcedure.transactions.estimate.handler(
         let rentCost = new BN(0);
         const preBalances = await getAccountBalances(
           connection,
-          accountKeys.map((k) => new PublicKey(k)),
+          accountKeys.map((k) => new PublicKey(k))
         );
         const postAccounts = simulation.value.accounts;
 
@@ -150,7 +152,7 @@ export const estimate = publicProcedure.transactions.estimate.handler(
             tokenTransfers,
           },
         };
-      }),
+      })
     );
 
     // Aggregate breakdown for token transfers
@@ -173,7 +175,7 @@ export const estimate = publicProcedure.transactions.estimate.handler(
       },
       transactions: transactionEstimates,
     };
-  },
+  }
 );
 
 /**
@@ -181,7 +183,7 @@ export const estimate = publicProcedure.transactions.estimate.handler(
  */
 async function getAccountBalances(
   connection: Connection,
-  accounts: PublicKey[],
+  accounts: PublicKey[]
 ): Promise<(number | null)[]> {
   const accountInfos = await connection.getMultipleAccountsInfo(accounts);
   return accountInfos.map((info) => (info ? info.lamports : null));

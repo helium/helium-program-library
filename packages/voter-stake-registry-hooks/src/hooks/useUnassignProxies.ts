@@ -3,11 +3,9 @@ import { PROGRAM_ID, init, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
   Status,
   batchParallelInstructionsWithPriorityFee,
-  truthy
+  truthy,
 } from "@helium/spl-utils";
-import {
-  ProxyAssignment
-} from "@helium/voter-stake-registry-sdk";
+import { ProxyAssignment } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -50,7 +48,7 @@ export const useUnassignProxies = () => {
         let undelegated: ProxyAssignment[] = [];
         for (const position of positions) {
           const currentProxyAssignment = position.proxy?.address;
-          const proxy = position.proxy!
+          const proxy = position.proxy!;
           const toUndelegate = await voteService.getProxyAssignmentsForPosition(
             position.pubkey,
             proxy.index

@@ -10,7 +10,6 @@ export * from "./pdas";
 export * from "./resolvers";
 export * from "./constants";
 
-
 /**
  * Convert a number to a string avoiding scientific notation
  * @param n

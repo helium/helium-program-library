@@ -1,4 +1,8 @@
-import { useProposal, useProposalConfig, useResolutionSettings } from "@helium/modular-governance-hooks";
+import {
+  useProposal,
+  useProposalConfig,
+  useResolutionSettings,
+} from "@helium/modular-governance-hooks";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 
@@ -8,7 +12,8 @@ export function useProposalEndTs(proposalKey?: PublicKey) {
   const { info: resolution } = useResolutionSettings(
     proposalConfig?.stateController
   );
-  return resolution &&
+  return (
+    resolution &&
     // @ts-ignore
     (proposal?.state.resolved
       ? // @ts-ignore
@@ -18,5 +23,6 @@ export function useProposalEndTs(proposalKey?: PublicKey) {
           resolution.settings.nodes.find(
             (node) => typeof node.offsetFromStartTs !== "undefined"
           )?.offsetFromStartTs?.offset ?? new BN(0)
-        ));
+        ))
+  );
 }

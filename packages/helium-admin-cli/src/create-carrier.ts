@@ -83,7 +83,8 @@ export async function run(args: any = process.argv) {
     },
     incentiveEscrowFundBps: {
       type: "number",
-      describe: "The percentage of the SP rewards that are allocated to the incentive fund, in basis points",
+      describe:
+        "The percentage of the SP rewards that are allocated to the incentive fund, in basis points",
       required: true,
     },
   });

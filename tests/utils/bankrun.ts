@@ -34,7 +34,11 @@ function looksLikeAProgram(path: string): boolean {
  * get these by cloning mainnet in `Anchor.toml`; bankrun needs the bytes on disk, so fetch
  * them the same way and from the same place.
  */
-export function ensureDumped(name: string, programId: PublicKey, cluster = "m") {
+export function ensureDumped(
+  name: string,
+  programId: PublicKey,
+  cluster = "m"
+) {
   const path = join(TARGET_DEPLOY, `${name}.so`);
   if (looksLikeAProgram(path)) {
     return path;
@@ -127,7 +131,9 @@ export async function warpTo(ctx: ProgramTestContext, unixTimestamp: bigint) {
   );
   const now = (await ctx.banksClient.getClock()).unixTimestamp;
   if (now !== unixTimestamp) {
-    throw new Error(`clock did not move: asked for ${unixTimestamp}, got ${now}`);
+    throw new Error(
+      `clock did not move: asked for ${unixTimestamp}, got ${now}`
+    );
   }
 }
 
@@ -149,7 +155,9 @@ export async function overwriteAccountData(
 ) {
   const existing = await ctx.banksClient.getAccount(address);
   if (!existing) {
-    throw new Error(`cannot overwrite ${address.toBase58()}: it does not exist`);
+    throw new Error(
+      `cannot overwrite ${address.toBase58()}: it does not exist`
+    );
   }
   ctx.setAccount(address, {
     lamports: existing.lamports,

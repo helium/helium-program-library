@@ -5,7 +5,7 @@ const { DataTypes } = require("sequelize");
 module.exports = {
   async up(queryInterface, Sequelize) {
     const tableInfo = await queryInterface.describeTable(
-      "pending_transactions",
+      "pending_transactions"
     );
 
     // Add metadata column if it doesn't exist
@@ -21,7 +21,7 @@ module.exports = {
 
   async down(queryInterface, Sequelize) {
     const tableInfo = await queryInterface.describeTable(
-      "pending_transactions",
+      "pending_transactions"
     );
 
     // Remove metadata column if it exists

@@ -3,26 +3,33 @@ import {
   computeCompressedNFTHash,
   computeCreatorHash,
   computeDataHash,
-  getLeafAssetId, PROGRAM_ID as BUBBLEGUM_PROGRAM_ID, TokenProgramVersion,
-  TokenStandard
+  getLeafAssetId,
+  PROGRAM_ID as BUBBLEGUM_PROGRAM_ID,
+  TokenProgramVersion,
+  TokenStandard,
 } from "@metaplex-foundation/mpl-bubblegum";
 import { Asset, AssetProof } from "@helium/spl-utils";
-import { Metadata, PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
+import {
+  Metadata,
+  PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID,
+} from "@metaplex-foundation/mpl-token-metadata";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
   ConcurrentMerkleTreeAccount,
   getConcurrentMerkleTreeAccountSize,
   MerkleTree,
-  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
 } from "@solana/spl-account-compression";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { Bubblegum as MplBubblegum, IDL as BubblegumIdl } from "./bubblegum";
-import { entityCreatorKey, keyToAssetKey } from "@helium/helium-entity-manager-sdk";
+import {
+  entityCreatorKey,
+  keyToAssetKey,
+} from "@helium/helium-entity-manager-sdk";
 // @ts-ignore
 import animalHash from "angry-purple-tiger";
 import { BN } from "bn.js";
-
 
 export async function createCompressionNft({
   provider,
@@ -122,7 +129,10 @@ export async function createCompressionNft({
       ],
       TOKEN_METADATA_PROGRAM_ID
     )[0];
-    const collection = await Metadata.fromAccountAddress(provider.connection, collectionMetadata);
+    const collection = await Metadata.fromAccountAddress(
+      provider.connection,
+      collectionMetadata
+    );
 
     await bubblegum.methods
       .mintToCollectionV1({
@@ -191,12 +201,12 @@ export async function createMockCompression({
   merkle,
   ecc,
   hotspotOwner = Keypair.generate().publicKey,
-} : {
-  collection: PublicKey,
-  dao: PublicKey,
-  ecc: string,
-  merkle: PublicKey,
-  hotspotOwner: PublicKey,
+}: {
+  collection: PublicKey;
+  dao: PublicKey;
+  ecc: string;
+  merkle: PublicKey;
+  hotspotOwner: PublicKey;
 }) {
   const kta = keyToAssetKey(dao, ecc, "b58")[0];
   const creators = [
@@ -285,5 +295,5 @@ export async function createMockCompression({
     getAssetProofFn,
     hotspot,
     metadata,
-  }
+  };
 }

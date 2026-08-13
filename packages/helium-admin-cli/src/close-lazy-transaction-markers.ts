@@ -10,7 +10,7 @@ import {
   Keypair,
   PublicKey,
   SystemProgram,
-  TransactionInstruction
+  TransactionInstruction,
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";

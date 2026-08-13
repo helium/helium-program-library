@@ -48,7 +48,7 @@ export async function run(args: any = process.argv) {
       await getAccount(provider.connection, owners.value[0].address)
     ).owner;
 
-    console.log("Distributing for mint", mint.toBase58())
+    console.log("Distributing for mint", mint.toBase58());
 
     await hydraProgram.methods
       .distributeV0()

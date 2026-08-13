@@ -41,7 +41,7 @@ WalletHistoryCursor.init(
     tableName: "wallet_history_cursors",
     underscored: true,
     createdAt: false,
-  },
+  }
 );
 
 export default WalletHistoryCursor;

@@ -66,7 +66,7 @@ export default function MigratePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="flex min-h-screen items-center justify-center">
           <p className="text-muted-foreground">Loading...</p>
         </div>
       }
@@ -91,7 +91,7 @@ function MigratePageContent() {
   const [hotspots, setHotspots] = useState<HotspotItem[]>([]);
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
   const [selectedHotspots, setSelectedHotspots] = useState<Set<string>>(
-    new Set(),
+    new Set()
   );
   const [tokenAmounts, setTokenAmounts] = useState<Record<string, string>>({});
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -121,7 +121,7 @@ function MigratePageContent() {
     (a: any) =>
       a.type === "wallet" &&
       a.walletClientType === "privy" &&
-      a.chainType === "solana",
+      a.chainType === "solana"
   ) as { address: string } | undefined;
 
   // Step "check": detect wallet type and route to next step
@@ -180,7 +180,7 @@ function MigratePageContent() {
           console.error("Create wallet error:", e);
           setError(e.message);
         },
-      },
+      }
     );
 
   // Load assets
@@ -201,7 +201,7 @@ function MigratePageContent() {
           deviceType: h.deviceType,
           splitWallets: h.splitWallets,
           inWelcomePack: h.inWelcomePack,
-        })),
+        }))
       );
 
       const tokens: TokenBalance[] = [];
@@ -230,7 +230,7 @@ function MigratePageContent() {
         console.error("Load assets error:", e);
         setError(e.message);
       },
-    },
+    }
   );
 
   // Load assets when entering select-assets step
@@ -295,8 +295,8 @@ function MigratePageContent() {
         process.env.NEXT_PUBLIC_SOLANA_URL ||
           clusterApiUrl(
             (process.env.NEXT_PUBLIC_SOLANA_CLUSTER as Cluster) ||
-              "mainnet-beta",
-          ),
+              "mainnet-beta"
+          )
       );
 
       let currentBatch = 0;
@@ -335,7 +335,7 @@ function MigratePageContent() {
 
         for (const txItem of result.transactionData.transactions) {
           let tx = VersionedTransaction.deserialize(
-            Buffer.from(txItem.serializedTransaction, "base64"),
+            Buffer.from(txItem.serializedTransaction, "base64")
           );
 
           // Check the actual transaction message for required signers
@@ -368,7 +368,7 @@ function MigratePageContent() {
 
           signedTransactions.push({
             serializedTransaction: Buffer.from(tx.serialize()).toString(
-              "base64",
+              "base64"
             ),
             metadata: txItem.metadata,
           });
@@ -401,12 +401,12 @@ function MigratePageContent() {
               .map((t) => t.signature)
               .join(", ");
             throw new Error(
-              `Migration transactions ${batch.status}: ${failedTxs}`,
+              `Migration transactions ${batch.status}: ${failedTxs}`
             );
           }
           if (batch.status === "partial") {
             setError(
-              "Some migration transactions failed. Review what still needs to be migrated below.",
+              "Some migration transactions failed. Review what still needs to be migrated below."
             );
             setSelectedHotspots(new Set());
             setTokenAmounts({});
@@ -419,7 +419,7 @@ function MigratePageContent() {
 
         if (!confirmed) {
           throw new Error(
-            "Migration transactions timed out waiting for confirmation",
+            "Migration transactions timed out waiting for confirmation"
           );
         }
 
@@ -436,14 +436,14 @@ function MigratePageContent() {
       if (!reverse && externalWallet?.address) {
         const isLinked = user?.linkedAccounts?.some(
           (a: any) =>
-            a.type === "wallet" && a.address === externalWallet.address,
+            a.type === "wallet" && a.address === externalWallet.address
         );
         if (isLinked) {
           await unlinkWallet(externalWallet.address).catch((e) =>
             console.warn(
               "Failed to unlink wallet (migration still succeeded):",
-              e,
-            ),
+              e
+            )
           );
         }
         if (externalWallet.disconnect) {
@@ -461,18 +461,18 @@ function MigratePageContent() {
           msg.includes("Unexpected error")
         ) {
           setError(
-            "Wallet failed to sign the transaction. Make sure your wallet is connected and set to the correct network (e.g., devnet for testing).",
+            "Wallet failed to sign the transaction. Make sure your wallet is connected and set to the correct network (e.g., devnet for testing)."
           );
         } else {
           setError(msg);
         }
       },
-    },
+    }
   );
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     );
@@ -483,7 +483,7 @@ function MigratePageContent() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <Navbar showNav={false} />
         <div className="flex items-center justify-center pt-24">
-          <Card className="max-w-md w-full">
+          <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Sign In Required</CardTitle>
             </CardHeader>
@@ -503,16 +503,16 @@ function MigratePageContent() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <Navbar showNav={false} />
       <div className="container mx-auto px-4 py-12">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">Migrate to Helium World</h1>
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-8 text-center">
+            <h1 className="mb-2 text-3xl font-bold">Migrate to Helium World</h1>
             <p className="text-muted-foreground">
               Move your assets to world.helium.com
             </p>
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+            <div className="bg-destructive/10 border-destructive/20 text-destructive mb-6 rounded-lg border p-4 text-sm">
               {error}
             </div>
           )}
@@ -598,10 +598,10 @@ function MigratePageContent() {
               {destinationWallet && (
                 <Card>
                   <CardContent className="py-4">
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       Destination wallet:
                     </p>
-                    <p className="font-mono text-sm break-all">
+                    <p className="break-all font-mono text-sm">
                       {destinationWallet}
                     </p>
                   </CardContent>
@@ -610,7 +610,7 @@ function MigratePageContent() {
 
               {/* Warnings */}
               {hotspots.some((h) => h.splitWallets?.length) && (
-                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-700 dark:text-yellow-300 text-sm">
+                <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-700 dark:text-yellow-300">
                   Split contracts will be removed and recreated with your new
                   wallet.
                 </div>
@@ -648,7 +648,7 @@ function MigratePageContent() {
                       {hotspots.map((hotspot) => (
                         <label
                           key={hotspot.address}
-                          className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50"
+                          className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 rounded-lg border p-3"
                         >
                           <input
                             type="checkbox"
@@ -656,17 +656,21 @@ function MigratePageContent() {
                             onChange={() => toggleHotspot(hotspot.address)}
                             className="h-4 w-4 rounded border-gray-300"
                           />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
                               {hotspot.name}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-muted-foreground text-xs">
                               {hotspot.type}{" "}
                               {hotspot.deviceType
                                 ? `- ${hotspot.deviceType}`
                                 : ""}
                               {hotspot.splitWallets?.length
-                                ? ` (splits to ${hotspot.splitWallets.map((w) => w.slice(0, 4) + "..." + w.slice(-4)).join(", ")})`
+                                ? ` (splits to ${hotspot.splitWallets
+                                    .map(
+                                      (w) => w.slice(0, 4) + "..." + w.slice(-4)
+                                    )
+                                    .join(", ")})`
                                 : ""}
                               {hotspot.inWelcomePack
                                 ? " (in welcome pack)"
@@ -735,7 +739,7 @@ function MigratePageContent() {
                 disabled={
                   selectedHotspots.size === 0 &&
                   Object.values(tokenAmounts).every(
-                    (v) => !v || parseFloat(v || "0") === 0,
+                    (v) => !v || parseFloat(v || "0") === 0
                   )
                 }
               >
@@ -752,28 +756,28 @@ function MigratePageContent() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <p className="text-sm font-medium mb-1">
+                    <p className="mb-1 text-sm font-medium">
                       Source Wallet ({reverse ? "Embedded" : "External"})
                     </p>
-                    <p className="font-mono text-xs break-all text-muted-foreground">
+                    <p className="text-muted-foreground break-all font-mono text-xs">
                       {sourceWallet}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium mb-1">
+                    <p className="mb-1 text-sm font-medium">
                       Destination Wallet ({reverse ? "External" : "Embedded"})
                     </p>
-                    <p className="font-mono text-xs break-all text-muted-foreground">
+                    <p className="text-muted-foreground break-all font-mono text-xs">
                       {destinationWallet}
                     </p>
                   </div>
 
                   {selectedHotspots.size > 0 && (
                     <div>
-                      <p className="text-sm font-medium mb-1">
+                      <p className="mb-1 text-sm font-medium">
                         Hotspots ({selectedHotspots.size})
                       </p>
-                      <ul className="text-sm text-muted-foreground space-y-1">
+                      <ul className="text-muted-foreground space-y-1 text-sm">
                         {hotspots
                           .filter((h) => selectedHotspots.has(h.address))
                           .map((h) => (
@@ -784,16 +788,16 @@ function MigratePageContent() {
                   )}
 
                   {Object.entries(tokenAmounts).some(
-                    ([, v]) => v && parseFloat(v || "0") > 0,
+                    ([, v]) => v && parseFloat(v || "0") > 0
                   ) && (
                     <div>
-                      <p className="text-sm font-medium mb-1">Tokens</p>
-                      <ul className="text-sm text-muted-foreground space-y-1">
+                      <p className="mb-1 text-sm font-medium">Tokens</p>
+                      <ul className="text-muted-foreground space-y-1 text-sm">
                         {Object.entries(tokenAmounts)
                           .filter(([, v]) => v && parseFloat(v || "0") > 0)
                           .map(([mint, amount]) => {
                             const token = tokenBalances.find(
-                              (t) => t.mint === mint,
+                              (t) => t.mint === mint
                             );
                             return (
                               <li key={mint}>
@@ -810,7 +814,7 @@ function MigratePageContent() {
                       {warnings.map((w, i) => (
                         <div
                           key={i}
-                          className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded text-yellow-700 dark:text-yellow-300 text-sm"
+                          className="rounded border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-300"
                         >
                           {w}
                         </div>
@@ -846,7 +850,7 @@ function MigratePageContent() {
 
           {step === "success" && (
             <Card>
-              <CardContent className="py-12 text-center space-y-4">
+              <CardContent className="space-y-4 py-12 text-center">
                 <h2 className="text-2xl font-bold text-green-600">
                   Migration Complete
                 </h2>

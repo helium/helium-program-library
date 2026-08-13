@@ -11,23 +11,25 @@ import {
   userWelcomePacksKey,
 } from "@helium/welcome-pack-sdk";
 import { NATIVE_MINT } from "@solana/spl-token";
-import {
-  Keypair,
-  LAMPORTS_PER_SOL,
-  PublicKey,
-} from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
-import { stopNextServer } from "./helpers/next"
-import { stopSurfpool } from "./helpers/surfpool"
-import { ensureFunds } from "./helpers/wallet"
-import { signAndSubmitTransactionData } from "./helpers/tx"
-import { setupTestCtx, TestCtx } from "./helpers/context"
-import { DEFAULT_HPL_CRONS_TASK_QUEUE, TEST_HOTSPOT_ENTITY_KEY } from "./helpers/constants"
-import { ensureNoContract, ensurePendingContract } from "./helpers/reward-contract"
-import { verifyEstimatedSolFee } from "./helpers/estimate"
-import nacl from "tweetnacl"
+import { stopNextServer } from "./helpers/next";
+import { stopSurfpool } from "./helpers/surfpool";
+import { ensureFunds } from "./helpers/wallet";
+import { signAndSubmitTransactionData } from "./helpers/tx";
+import { setupTestCtx, TestCtx } from "./helpers/context";
+import {
+  DEFAULT_HPL_CRONS_TASK_QUEUE,
+  TEST_HOTSPOT_ENTITY_KEY,
+} from "./helpers/constants";
+import {
+  ensureNoContract,
+  ensurePendingContract,
+} from "./helpers/reward-contract";
+import { verifyEstimatedSolFee } from "./helpers/estimate";
+import nacl from "tweetnacl";
 
 describe("reward-contract", () => {
   let ctx: TestCtx;
@@ -77,7 +79,7 @@ describe("reward-contract", () => {
       // #then returns NOT_FOUND
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("NOT_FOUND");
@@ -116,22 +118,26 @@ describe("reward-contract", () => {
 
       // #then returns valid unsigned transaction
       if (error) {
-        expect.fail(`Unexpected error: ${JSON.stringify(error)}`)
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
       }
       expect(
-        data?.unsignedTransactionData?.transactions?.[0]?.serializedTransaction,
-      ).to.be.a("string")
-      expect(data?.unsignedTransactionData?.tag).to.be.a("string")
+        data?.unsignedTransactionData?.transactions?.[0]?.serializedTransaction
+      ).to.be.a("string");
+      expect(data?.unsignedTransactionData?.tag).to.be.a("string");
 
       // Verify estimate accuracy
-      await verifyEstimatedSolFee(ctx, data.unsignedTransactionData, data.estimatedSolFee)
+      await verifyEstimatedSolFee(
+        ctx,
+        data.unsignedTransactionData,
+        data.estimatedSolFee
+      );
 
       // #then tx submits successfully
       await signAndSubmitTransactionData(
         ctx.connection,
         data.unsignedTransactionData,
-        ctx.payer,
-      )
+        ctx.payer
+      );
 
       // #then welcome pack exists on-chain
       const provider = new AnchorProvider(
@@ -145,7 +151,7 @@ describe("reward-contract", () => {
             throw new Error("not supported in test");
           },
         } as any,
-        AnchorProvider.defaultOptions(),
+        AnchorProvider.defaultOptions()
       );
 
       const wpProgram = await initWelcomePack(provider);
@@ -154,7 +160,7 @@ describe("reward-contract", () => {
       const [userWelcomePacksK] = userWelcomePacksKey(ownerPubkey);
       const userWelcomePacks =
         await wpProgram.account.userWelcomePacksV0.fetchNullable(
-          userWelcomePacksK,
+          userWelcomePacksK
         );
       expect(userWelcomePacks).to.exist;
     });
@@ -182,7 +188,7 @@ describe("reward-contract", () => {
       // #then returns CONFLICT
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("CONFLICT");
@@ -212,7 +218,7 @@ describe("reward-contract", () => {
       // #then returns UNAUTHORIZED
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("UNAUTHORIZED");
@@ -285,7 +291,7 @@ describe("reward-contract", () => {
       // #then returns UNAUTHORIZED
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("UNAUTHORIZED");
@@ -305,7 +311,7 @@ describe("reward-contract", () => {
       // #then returns NOT_FOUND
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("NOT_FOUND");
@@ -375,7 +381,7 @@ describe("reward-contract", () => {
           await signAndSubmitTransactionData(
             ctx.connection,
             data.unsignedTransactionData,
-            claimer,
+            claimer
           );
           expect.fail("Expected transaction to fail with invalid signature");
         } catch (txError: unknown) {
@@ -417,14 +423,14 @@ describe("reward-contract", () => {
         expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
       }
       expect(
-        data?.unsignedTransactionData?.transactions?.[0]?.serializedTransaction,
+        data?.unsignedTransactionData?.transactions?.[0]?.serializedTransaction
       ).to.be.a("string");
 
       // #then tx submits successfully
       await signAndSubmitTransactionData(
         ctx.connection,
         data.unsignedTransactionData,
-        claimer,
+        claimer
       );
     });
 
@@ -445,7 +451,7 @@ describe("reward-contract", () => {
       // #then returns BAD_REQUEST
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("BAD_REQUEST");
@@ -457,7 +463,7 @@ describe("reward-contract", () => {
       const randomEntityKey = Keypair.generate().publicKey.toBase58();
       const claimer = Keypair.generate();
       const futureDate = new Date(
-        Date.now() + 24 * 60 * 60 * 1000,
+        Date.now() + 24 * 60 * 60 * 1000
       ).toISOString();
 
       // #when claiming non-existent contract
@@ -471,7 +477,7 @@ describe("reward-contract", () => {
       // #then returns NOT_FOUND
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("NOT_FOUND");
@@ -497,7 +503,7 @@ describe("reward-contract", () => {
       // #then returns NOT_FOUND
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("NOT_FOUND");
@@ -529,8 +535,8 @@ describe("reward-contract", () => {
           signAndSubmitTransactionData(
             ctx.connection,
             res.unsignedTransactionData,
-            ctx.payer,
-          ),
+            ctx.payer
+          )
         );
 
       // #when trying to delete with wrong wallet
@@ -543,7 +549,7 @@ describe("reward-contract", () => {
       // #then returns UNAUTHORIZED
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
         );
       }
       expect(error.code).to.equal("UNAUTHORIZED");
@@ -565,14 +571,14 @@ describe("reward-contract", () => {
         expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
       }
       expect(
-        data?.unsignedTransactionData?.transactions?.[0]?.serializedTransaction,
+        data?.unsignedTransactionData?.transactions?.[0]?.serializedTransaction
       ).to.be.a("string");
 
       // #then tx submits successfully
       await signAndSubmitTransactionData(
         ctx.connection,
         data.unsignedTransactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #then contract no longer exists
@@ -613,7 +619,7 @@ describe("reward-contract", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         createResult.unsignedTransactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // Verify contract is ACTIVE and destination is set
@@ -628,26 +634,28 @@ describe("reward-contract", () => {
             throw new Error("not supported");
           },
         } as any,
-        AnchorProvider.defaultOptions(),
+        AnchorProvider.defaultOptions()
       );
 
       // Get asset ID from on-chain keyToAsset account
       const hemProgram = await initHem(provider);
       const [keyToAssetK] = keyToAssetKey(daoKey(HNT_MINT)[0], entityPubKey);
-      const keyToAsset =
-        await hemProgram.account.keyToAssetV0.fetchNullable(keyToAssetK);
+      const keyToAsset = await hemProgram.account.keyToAssetV0.fetchNullable(
+        keyToAssetK
+      );
       expect(keyToAsset).to.exist;
       const assetPubkey = keyToAsset!.asset;
 
       // HNT Lazy Distributor address (mainnet)
       const HNT_LAZY_DISTRIBUTOR = new PublicKey(
-        "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq",
+        "6gcZXjHgKUBMedc2V1aZLFPwh8M1rPVRw7kpo2KqNrFq"
       );
       const ldProgram = await initLd(provider);
       const [recipientK] = recipientKey(HNT_LAZY_DISTRIBUTOR, assetPubkey);
 
-      const recipientBefore =
-        await ldProgram.account.recipientV0.fetchNullable(recipientK);
+      const recipientBefore = await ldProgram.account.recipientV0.fetchNullable(
+        recipientK
+      );
       expect(recipientBefore).to.exist;
       expect(recipientBefore!.destination.equals(PublicKey.default)).to.be
         .false;
@@ -663,12 +671,13 @@ describe("reward-contract", () => {
       await signAndSubmitTransactionData(
         ctx.connection,
         data.unsignedTransactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #then compression destination is reset to PublicKey.default
-      const recipientAfter =
-        await ldProgram.account.recipientV0.fetchNullable(recipientK);
+      const recipientAfter = await ldProgram.account.recipientV0.fetchNullable(
+        recipientK
+      );
       expect(recipientAfter).to.exist;
       expect(recipientAfter!.destination.equals(PublicKey.default)).to.be.true;
     });
@@ -708,14 +717,14 @@ describe("reward-contract", () => {
         expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
       }
       expect(
-        data?.unsignedTransactionData?.transactions?.[0]?.serializedTransaction,
+        data?.unsignedTransactionData?.transactions?.[0]?.serializedTransaction
       ).to.be.a("string");
 
       // #then tx submits successfully
       await signAndSubmitTransactionData(
         ctx.connection,
         data.unsignedTransactionData,
-        ctx.payer,
+        ctx.payer
       );
 
       // #then find returns ACTIVE with correct contract shape

@@ -9,7 +9,7 @@ export function positionKeysForWalletQuery({
 }: {
   wallet?: PublicKey;
   registrar?: PublicKey;
-  connection?: Connection
+  connection?: Connection;
 }) {
   return queryOptions({
     queryKey: [

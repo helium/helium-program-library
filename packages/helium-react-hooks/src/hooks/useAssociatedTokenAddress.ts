@@ -1,6 +1,4 @@
-import {
-  getAssociatedTokenAddress,
-} from "@solana/spl-token";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { useAsync } from "react-async-hook";
 
@@ -19,9 +17,9 @@ const fetch = async (
   const associatedTokenAddress = await getAssociatedTokenAddress(
     mint,
     wallet,
-    true,
-  )
-  return associatedTokenAddress
+    true
+  );
+  return associatedTokenAddress;
 };
 
 export function useAssociatedTokenAddress(
@@ -29,8 +27,8 @@ export function useAssociatedTokenAddress(
   mint: PublicKey | undefined | null
 ): AssocState {
   const { result, loading } = useAsync(async () => {
-    return fetch(wallet, mint)
-  }, [mint?.toBase58(), wallet?.toBase58()])
+    return fetch(wallet, mint);
+  }, [mint?.toBase58(), wallet?.toBase58()]);
 
   return { result, loading };
 }

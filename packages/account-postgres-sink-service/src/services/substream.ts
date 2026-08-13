@@ -120,7 +120,9 @@ export const setupSubstream = async (
       });
 
       if (global.gc) {
-        gcIntervalId = setInterval(() => { global.gc!(); }, 300_000);
+        gcIntervalId = setInterval(() => {
+          global.gc!();
+        }, 300_000);
         gcIntervalId.unref();
       }
 
@@ -210,8 +212,7 @@ export const setupSubstream = async (
 
           if (hasAccountChanges) {
             // eslint-disable-next-line prefer-const
-            let accounts = (output as any)
-              .accounts as IOutputAccount[];
+            let accounts = (output as any).accounts as IOutputAccount[];
             output = null;
 
             const t = await database.transaction({
@@ -223,9 +224,7 @@ export const setupSubstream = async (
               for (const account of accounts) {
                 const ownerStr = new PublicKey(account.owner).toBase58();
                 if (!configsByOwner.has(ownerStr)) {
-                  const config = configs.find(
-                    (x) => x.programId === ownerStr
-                  );
+                  const config = configs.find((x) => x.programId === ownerStr);
                   if (config) configsByOwner.set(ownerStr, config);
                 }
               }
@@ -279,13 +278,19 @@ export const setupSubstream = async (
 
       // Stream ended normally (server closed gracefully), reconnect
       cursorManager.stopStalenessCheck();
-      if (gcIntervalId) { clearInterval(gcIntervalId); gcIntervalId = undefined; }
+      if (gcIntervalId) {
+        clearInterval(gcIntervalId);
+        gcIntervalId = undefined;
+      }
       await cursorManager.flushCursor();
       isConnecting = false;
       handleReconnect(1);
     } catch (err) {
       cursorManager.stopStalenessCheck();
-      if (gcIntervalId) { clearInterval(gcIntervalId); gcIntervalId = undefined; }
+      if (gcIntervalId) {
+        clearInterval(gcIntervalId);
+        gcIntervalId = undefined;
+      }
       await cursorManager.flushCursor();
       console.log("Substream connection error:", err);
       isConnecting = false;
@@ -320,7 +325,9 @@ export const setupSubstream = async (
       if (isResourceExhausted) {
         const exhaustedDelay = 15_000 + Math.random() * 5_000;
         console.log(
-          `Resource exhausted, waiting ${Math.round(exhaustedDelay / 1000)}s before reconnect...`
+          `Resource exhausted, waiting ${Math.round(
+            exhaustedDelay / 1000
+          )}s before reconnect...`
         );
         reconnectTimeoutId = setTimeout(() => {
           reconnectTimeoutId = null;

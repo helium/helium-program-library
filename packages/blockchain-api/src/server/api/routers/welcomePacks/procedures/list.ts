@@ -13,5 +13,5 @@ export const list = publicProcedure.welcomePacks.list.handler(
     }
 
     return await getWelcomePacksByOwner(walletAddress);
-  },
+  }
 );

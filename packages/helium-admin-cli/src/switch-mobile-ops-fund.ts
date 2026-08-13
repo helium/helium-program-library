@@ -37,23 +37,16 @@ export async function run(args: any = process.argv) {
 
   const hsdProgram = await initHsd(provider);
 
-  const dao = daoKey(HNT_MINT)[0]
-  const daoAuth = (await hsdProgram.account.subDaoV0.fetch(dao))
-    .authority;
+  const dao = daoKey(HNT_MINT)[0];
+  const daoAuth = (await hsdProgram.account.subDaoV0.fetch(dao)).authority;
   const instructions = [
     await hsdProgram.methods
       .switchMobileOpsFund()
       .accountsPartial({
         authority: daoAuth,
         payer: daoAuth,
-        opsFundHnt: getAssociatedTokenAddressSync(
-          daoAuth,
-          HNT_MINT
-        ),
-        opsFundMobile: getAssociatedTokenAddressSync(
-          daoAuth,
-          MOBILE_MINT
-        ),
+        opsFundHnt: getAssociatedTokenAddressSync(daoAuth, HNT_MINT),
+        opsFundMobile: getAssociatedTokenAddressSync(daoAuth, MOBILE_MINT),
         dao,
       })
       .instruction(),

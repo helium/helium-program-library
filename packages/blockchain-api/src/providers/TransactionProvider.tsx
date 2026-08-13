@@ -47,7 +47,7 @@ interface TransactionContextType {
   refreshPending: () => void;
   registerSuccessCallback: (
     batchId: string,
-    callback: (batchId: string, signatures: string[]) => void,
+    callback: (batchId: string, signatures: string[]) => void
   ) => void;
 }
 
@@ -104,7 +104,7 @@ export function TransactionProvider({
             batchStatus.status === "expired"
           ) {
             console.error(
-              `Transaction ${tx.batchId} failed: ${batchStatus.status}`,
+              `Transaction ${tx.batchId} failed: ${batchStatus.status}`
             );
             toast.error(`${tx.description} failed`, { duration: 3000 });
             completedBatchIds.push(tx.batchId);
@@ -128,7 +128,7 @@ export function TransactionProvider({
           queryKey: ["pendingTransactions", user?.wallet?.address],
         });
       }
-    },
+    }
   );
 
   // Update the persistent toast
@@ -143,7 +143,7 @@ export function TransactionProvider({
 
     const content = (
       <div className="w-full">
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-medium">
             {transactions.length} transaction
             {transactions.length > 1 ? "s" : ""} in progress
@@ -152,29 +152,29 @@ export function TransactionProvider({
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"
+                className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400"
                 style={{ animationDelay: `${i * 0.2}s` }}
               />
             ))}
           </div>
         </div>
-        <div className="space-y-1 max-h-32 overflow-y-auto">
+        <div className="max-h-32 space-y-1 overflow-y-auto">
           {transactions.map((tx) => (
             <div key={tx.batchId} className="text-xs text-gray-300">
-              <div className="flex justify-between mb-1">
-                <span className="truncate max-w-[200px] font-medium">
+              <div className="mb-1 flex justify-between">
+                <span className="max-w-[200px] truncate font-medium">
                   {tx.transactionCount > 1
                     ? `${tx.transactionCount} transactions`
                     : tx.description}
                 </span>
-                <span className="text-blue-300 ml-2 flex-shrink-0">
+                <span className="ml-2 flex-shrink-0 text-blue-300">
                   {tx.status}
                 </span>
               </div>
               {tx.transactionCount > 1 && (
-                <div className="space-y-0.5 ml-2">
+                <div className="ml-2 space-y-0.5">
                   {tx.transactions.map((subTx, index) => (
-                    <div key={index} className="text-gray-400 truncate">
+                    <div key={index} className="truncate text-gray-400">
                       • {subTx.description}
                     </div>
                   ))}
@@ -208,14 +208,14 @@ export function TransactionProvider({
         ["pendingTransactions", user?.wallet?.address],
         (oldData: PendingTransactionInfo[] = []) => {
           const exists = oldData.find(
-            (tx) => tx.batchId === transaction.batchId,
+            (tx) => tx.batchId === transaction.batchId
           );
           if (exists) return oldData;
           return [...oldData, transaction];
-        },
+        }
       );
     },
-    [queryClient, user?.wallet?.address],
+    [queryClient, user?.wallet?.address]
   );
 
   // Update toast whenever pending transactions change
@@ -312,11 +312,11 @@ export function TransactionProvider({
   const registerSuccessCallback = useCallback(
     (
       batchId: string,
-      callback: (batchId: string, signatures: string[]) => void,
+      callback: (batchId: string, signatures: string[]) => void
     ) => {
       successCallbacks.set(batchId, callback);
     },
-    [],
+    []
   );
 
   const contextValue: TransactionContextType = {
@@ -338,7 +338,7 @@ export function useTransactionContext() {
   const context = useContext(TransactionContext);
   if (!context) {
     throw new Error(
-      "useTransactionContext must be used within a TransactionProvider",
+      "useTransactionContext must be used within a TransactionProvider"
     );
   }
   return context;
