@@ -38,6 +38,19 @@ export function isBundleLanded(
 }
 
 /**
+ * Tags used by batches whose transactions were crafted by the client rather
+ * than this server (older wallet-app releases and third-party clients build
+ * their own claim/burn transactions and submit them without a Jito tip).
+ * Server-crafted bundles always include a tip, so a missing tip on these tags
+ * means a stale client, not a server bug.
+ */
+export function isClientCraftedBundleTag(tag?: string): boolean {
+  return Boolean(
+    tag && (tag.includes("implicit-burn") || tag.includes("claim-rewards")),
+  );
+}
+
+/**
  * Predict the submission type for a batch reservation that is recorded before
  * the batch is actually submitted. Mirrors the branching in
  * submitTransactionBatch so the reservation row matches the eventual result.

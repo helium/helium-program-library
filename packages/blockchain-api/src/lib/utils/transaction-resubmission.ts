@@ -181,6 +181,9 @@ export async function resubmitTransactionBatch(
     const submissionResult = await submitTransactionBatch({
       transactions: serializedTransactions,
       parallel: batch.parallel,
+      tag: batch.tag,
+      payer: batch.payer,
+      transactionMetadata: pendingTransactions.map((tx) => tx.metadata),
     });
 
     // Update the pending transactions with new signatures
