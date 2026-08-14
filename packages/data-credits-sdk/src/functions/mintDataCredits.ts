@@ -1,7 +1,8 @@
 import { Program } from "@coral-xyz/anchor";
 import BN from "bn.js";
 import { DataCredits } from "@helium/idls/lib/types/data_credits";
-import { DC_MINT, HNT_PYTH_PRICE_FEED } from "@helium/spl-utils";
+import { DC_MINT } from "@helium/spl-utils";
+import { dataCreditsKey } from "../pdas";
 import {
   ComputeBudgetProgram,
   PublicKey,
@@ -30,17 +31,23 @@ export async function mintDataCredits({
   const connection = program.provider.connection;
   const wallet = program.provider.wallet!;
 
-  // The crank keeps HNT_PYTH_PRICE_FEED inside the mint freshness window, so the
-  // mint just references it as the price oracle — no ephemeral price update to post.
+  // The program has_one-pins hnt_price_oracle to the address stored on the
+  // DataCreditsV0 account, so read it from chain rather than assuming a feed —
+  // this keeps the SDK correct on both sides of the pro-feed flip. The crank
+  // keeps that feed inside the mint freshness window; no ephemeral price
+  // update to post.
+  const [{ hntPriceOracle }, { blockhash }] = await Promise.all([
+    program.account.dataCreditsV0.fetch(dataCreditsKey(dcMint)[0]),
+    connection.getLatestBlockhash(),
+  ]);
   const instruction = await program.methods
     .mintDataCreditsV0({
       hntAmount: hntAmount ? hntAmount : null,
       dcAmount: dcAmount ? dcAmount : null,
     })
-    .accountsPartial({ dcMint, hntPriceOracle: HNT_PYTH_PRICE_FEED, recipient })
+    .accountsPartial({ dcMint, hntPriceOracle, recipient })
     .instruction();
 
-  const { blockhash } = await connection.getLatestBlockhash();
   const message = new TransactionMessage({
     payerKey: wallet.publicKey,
     recentBlockhash: blockhash,
