@@ -27,6 +27,7 @@ import {
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import {
+  IS_LEGACY_RECEIVER,
   KEYPAIR,
   PYTH_API_KEY,
   PYTH_HERMES_URL,
@@ -46,9 +47,22 @@ const wormholeIdl = {
   address: WORMHOLE_PROGRAM_ID.toBase58(),
 };
 
+// Encoded-VAA PDA seeds. The pro instance namespaces with "v2" so it never
+// collides with the legacy crank's PDA for the same feed on a shared task
+// queue; the legacy instance keeps the original seeds so a redeploy from this
+// image doesn't orphan its in-flight continuation chains.
+const encodedVaaSeeds = (feedId: number[] | Uint8Array): Buffer[] =>
+  IS_LEGACY_RECEIVER
+    ? [Buffer.from("vaa"), Buffer.from(feedId)]
+    : [Buffer.from("vaa"), Buffer.from("v2"), Buffer.from(feedId)];
+
+// One shared RPC connection — makePythReceiver runs on every task tick, and a
+// fresh Connection per call would defeat HTTP keep-alive to the RPC node.
+const connection = new Connection(SOLANA_URL);
+
 const makePythReceiver = (payer: PublicKey) =>
   new PythSolanaReceiver({
-    connection: new Connection(SOLANA_URL),
+    connection,
     wallet: {
       publicKey: payer,
     } as Wallet,
@@ -71,7 +85,7 @@ server.get("/health", async () => {
 
 const wallet = new Wallet(KEYPAIR);
 
-const provider = new AnchorProvider(new Connection(SOLANA_URL), wallet, {
+const provider = new AnchorProvider(connection, wallet, {
   commitment: "confirmed",
 });
 let tuktukProgram: Promise<Program<Tuktuk>> | null = null;
@@ -103,21 +117,18 @@ async function buildEncodedVaaCreateInstruction(
 }
 
 async function generateAllVaaInstructions(
-  vaa: Buffer,
+  accumulatorUpdateData: ReturnType<typeof parseAccumulatorUpdateData>,
+  feedId: number[],
   priceUpdateId: string,
   taskQueue: PublicKey,
   pythProgram: PythSolanaReceiver,
 ) {
+  const vaa = accumulatorUpdateData.vaa;
   const encodedVaaKeypair = new Keypair();
-  const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(
-    new PublicKey(priceUpdateId),
+  const [tuktukEncodedVaa, bump] = customSignerKey(
+    taskQueue,
+    encodedVaaSeeds(feedId),
   );
-  const feedId = priceUpdate.priceMessage.feedId;
-  const [tuktukEncodedVaa, bump] = customSignerKey(taskQueue, [
-    Buffer.from("vaa"),
-    Buffer.from("v2"),
-    Buffer.from(feedId),
-  ]);
   const wormholeProgram = new Program(wormholeIdl, pythProgram.provider);
 
   const vaaExists = await provider.connection.getAccountInfo(tuktukEncodedVaa);
@@ -183,17 +194,6 @@ async function generateAllVaaInstructions(
       draftVaa: encodedVaaKeypair.publicKey,
     })
     .instruction();
-
-  // Get price update data for final instruction
-  const priceUpdateModel = await PythPriceUpdate.findByPk(priceUpdateId);
-  if (!priceUpdateModel) {
-    throw new Error(
-      `Price update not found for price update id: ${priceUpdateId}`,
-    );
-  }
-  const accumulatorUpdateData = parseAccumulatorUpdateData(
-    Buffer.from(priceUpdateModel.priceUpdate, "base64"),
-  );
 
   // Final price update instruction
   const priceUpdateInstruction = await pythProgram.pushOracle.methods
@@ -300,6 +300,7 @@ async function processVaaInstructions(
   request: any,
   reply: any,
   priceUpdateId: string,
+  feedId: number[],
   index: number = 0,
 ) {
   const tuktukProgram = await getTuktukProgram();
@@ -313,15 +314,10 @@ async function processVaaInstructions(
 
   const pythProgram: PythSolanaReceiver = makePythReceiver(payer);
 
-  const priceUpdate = await pythProgram.receiver.account.priceUpdateV2.fetch(
-    new PublicKey(priceUpdateId),
+  const [tuktukEncodedVaa, bump] = customSignerKey(
+    taskQueue,
+    encodedVaaSeeds(feedId),
   );
-  const feedId = priceUpdate.priceMessage.feedId;
-  const [tuktukEncodedVaa, bump] = customSignerKey(taskQueue, [
-    Buffer.from("vaa"),
-    Buffer.from("v2"),
-    Buffer.from(feedId),
-  ]);
 
   // Get price update data
   const priceUpdateModel = await PythPriceUpdate.findByPk(priceUpdateId);
@@ -337,7 +333,8 @@ async function processVaaInstructions(
   // Generate all instructions
   const { allInstructions, encodedVaaAddress } =
     await generateAllVaaInstructions(
-      accumulatorUpdateData.vaa,
+      accumulatorUpdateData,
+      feedId,
       priceUpdateId,
       taskQueue,
       pythProgram,
@@ -366,8 +363,12 @@ async function processVaaInstructions(
           await new Promise((resolve) =>
             setTimeout(resolve, PREFLIGHT_POLL_INTERVAL_MS),
           );
-          accountInfo =
-            await provider.connection.getAccountInfo(tuktukEncodedVaa);
+          // Poll at 'processed' — we only need existence, and it shaves the
+          // confirmation lag off the stale-read wait.
+          accountInfo = await provider.connection.getAccountInfo(
+            tuktukEncodedVaa,
+            "processed",
+          );
         }
       }
     }
@@ -474,12 +475,7 @@ async function processVaaInstructions(
         allAccounts.some(
           (acc) => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner,
         )
-          ? [
-              Buffer.from("vaa"),
-              Buffer.from("v2"),
-              Buffer.from(feedId),
-              bumpBuffer,
-            ]
+          ? [...encodedVaaSeeds(feedId), bumpBuffer]
           : undefined,
         allAccounts.some((acc) => acc.pubkey.equals(payer) && acc.isSigner)
           ? [Buffer.from("pyth-payer"), payerBumpBuffer]
@@ -554,12 +550,7 @@ async function processVaaInstructions(
       allAccounts.some(
         (acc) => acc.pubkey.equals(tuktukEncodedVaa) && acc.isSigner,
       )
-        ? [
-            Buffer.from("vaa"),
-            Buffer.from("v2"),
-            Buffer.from(feedId),
-            bumpBuffer,
-          ]
+        ? [...encodedVaaSeeds(feedId), bumpBuffer]
         : undefined,
       allAccounts.some((acc) => acc.pubkey.equals(payer) && acc.isSigner)
         ? [Buffer.from("pyth-payer"), payerBumpBuffer]
@@ -651,7 +642,7 @@ server.post<{
   }
 
   // Use the new unified processing function
-  await processVaaInstructions(request, reply, priceUpdateId, index);
+  await processVaaInstructions(request, reply, priceUpdateId, feedId, index);
 });
 
 const start = async () => {

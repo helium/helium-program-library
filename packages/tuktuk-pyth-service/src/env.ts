@@ -12,10 +12,17 @@ export const PYTH_HERMES_URL =
 export const PYTH_API_KEY = process.env.PYTH_API_KEY;
 // Program IDs default to the legacy deployments so the existing crank runs
 // unchanged; the pro instance overrides all three via env.
+const LEGACY_RECEIVER_PROGRAM_ID =
+  "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ";
 export const PYTH_RECEIVER_PROGRAM_ID = new PublicKey(
-  process.env.PYTH_RECEIVER_PROGRAM_ID ||
-    "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ",
+  process.env.PYTH_RECEIVER_PROGRAM_ID || LEGACY_RECEIVER_PROGRAM_ID,
 );
+// The legacy instance must keep its original encoded-VAA PDA seeds so in-flight
+// continuation chains survive a redeploy; the pro instance namespaces its PDA
+// with a "v2" seed to avoid colliding with the legacy crank on a shared task
+// queue (see encodedVaaSeeds in index.ts).
+export const IS_LEGACY_RECEIVER =
+  PYTH_RECEIVER_PROGRAM_ID.toBase58() === LEGACY_RECEIVER_PROGRAM_ID;
 export const PYTH_PUSH_ORACLE_PROGRAM_ID = new PublicKey(
   process.env.PYTH_PUSH_ORACLE_PROGRAM_ID ||
     "pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT",

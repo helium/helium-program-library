@@ -16,7 +16,7 @@ One codebase runs as either the legacy or the pro Pyth instance, selected purely
 | `PYTH_PUSH_ORACLE_PROGRAM_ID` | legacy push oracle (`pythW…`)               | `pyt2F414BA6dPttK6RddPZUdHfapoBN24GL5wbrPCou`       |
 | `WORMHOLE_PROGRAM_ID`         | legacy wormhole receiver (`HDwc…`)          | `HDw2E7P8X1SkCyjvoGsfBGAVUutKcj874bXjHrpVYrVL`      |
 
-With none of these set, behavior is identical to the pre-parameterization service (legacy deployment unaffected).
+With none of these set, behavior is identical to the pre-parameterization service (legacy deployment unaffected): the legacy instance keeps its original `["vaa", feedId]` encoded-VAA PDA seeds, while the pro instance namespaces them as `["vaa", "v2", feedId]` so the two cranks never collide on a shared task queue.
 
 The baseline update cadence is not a property of this service — it is the schedule on the tuktuk cron job that fires `/v1/write` tasks, set at cron-job registration time (ops runbook). The pro instance's cron must be registered at ≤4 minutes so consumers never hit the 10-minute on-chain staleness window.
 
