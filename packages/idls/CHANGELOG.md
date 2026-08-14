@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.22
+
+### Patch Changes
+
+- [#1207](https://github.com/helium/helium-program-library/pull/1207) [`79889b1`](https://github.com/helium/helium-program-library/commit/79889b13c1cc3654fa29c02ca5d5a2fc293f0e96) Thanks [@bryzettler](https://github.com/bryzettler)! - Regenerate IDLs for the Pyth pro migration — `data_credits` IDL changes from dropping the Hermes ephemeral price-update path.
+
 ## 0.11.21
 
 ### Patch Changes

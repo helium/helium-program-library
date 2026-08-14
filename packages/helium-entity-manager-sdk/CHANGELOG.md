@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- Updated dependencies [[`79889b1`](https://github.com/helium/helium-program-library/commit/79889b13c1cc3654fa29c02ca5d5a2fc293f0e96), [`580baa2`](https://github.com/helium/helium-program-library/commit/580baa257ffcc4ce593d9caeba9d096ba9a288a1), [`c49ab38`](https://github.com/helium/helium-program-library/commit/c49ab38eb4a710d50bd905465e8b3041a74aeb9a)]:
+  - @helium/idls@0.11.22
+  - @helium/spl-utils@0.13.0
+  - @helium/helium-sub-daos-sdk@0.11.19
+  - @helium/no-emit-sdk@0.11.18
+
 ## 0.11.17
 
 ### Patch Changes

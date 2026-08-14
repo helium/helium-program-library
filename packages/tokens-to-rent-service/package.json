@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.17",
+  "version": "0.11.18",
   "description": "Service that gives flashloans of sol to allow jupiter swap of small amounts of hnt/mobile/iot to sol for fees",
   "repository": {
     "type": "git",
