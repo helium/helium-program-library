@@ -23,4 +23,7 @@ pub enum DataCreditsErrors {
 
   #[msg("Genesis endpoints are currently disabled")]
   NoGenesis,
+
+  #[msg("Price oracle is not owned by a known Pyth receiver")]
+  InvalidPriceOracleOwner,
 }

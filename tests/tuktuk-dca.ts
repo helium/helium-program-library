@@ -42,14 +42,13 @@ import { ensureTuktukDcaIdl } from "./utils/fixtures";
 
 export const ANCHOR_PATH = "anchor";
 
-// Pyth Solana Receiver sponsored price feed addresses on devnet
-// These are PriceUpdateV2 accounts, not Hermes feed IDs
-// Get the latest addresses from: https://www.pyth.network/developers/price-feed-ids
+// Pyth pro-receiver (rec2...) sponsored PriceUpdateV2 accounts, cloned from
+// mainnet in Anchor.toml. These are PriceUpdateV2 accounts, not Hermes feed IDs.
 export const USDC_PRICE_FEED = new PublicKey(
-  "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX"
+  "6HAuqASbHEh4w4REJEUUUCginTLfj1kwCh215ZLtMkrT",
 ); // USDC/USD
 export const HNT_PRICE_FEED = new PublicKey(
-  "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
+  "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5",
 ); // HNT/USD
 
 describe("tuktuk-dca", () => {
@@ -86,9 +85,8 @@ describe("tuktuk-dca", () => {
       }),
     ]);
 
-    const config = await tuktukProgram.account.tuktukConfigV0.fetch(
-      tuktukConfig
-    );
+    const config =
+      await tuktukProgram.account.tuktukConfigV0.fetch(tuktukConfig);
     const nextTaskQueueId = config.nextTaskQueueId;
     taskQueue = taskQueueKey(tuktukConfig, nextTaskQueueId)[0];
 
@@ -107,7 +105,7 @@ describe("tuktuk-dca", () => {
         taskQueue,
         taskQueueNameMapping: taskQueueNameMappingKey(
           tuktukConfig,
-          taskQueueName
+          taskQueueName,
         )[0],
       })
       .rpc({ skipPreflight: true });
@@ -127,7 +125,7 @@ describe("tuktuk-dca", () => {
       (provider.wallet as anchor.Wallet).payer,
       me,
       me,
-      6 // USDC decimals
+      6, // USDC decimals
     );
 
     hntMint = await createMint(
@@ -135,7 +133,7 @@ describe("tuktuk-dca", () => {
       (provider.wallet as anchor.Wallet).payer,
       me,
       me,
-      8 // HNT decimals
+      8, // HNT decimals
     );
 
     // Create PDA for swap source (similar to claim_payer in distributor-oracle)
@@ -157,7 +155,7 @@ describe("tuktuk-dca", () => {
       provider,
       usdcMint,
       new BN(0), // No initial USDC needed
-      swapPayer
+      swapPayer,
     );
 
     // Mint HNT to the swap payer's ATA (to provide output tokens)
@@ -165,7 +163,7 @@ describe("tuktuk-dca", () => {
       provider,
       hntMint,
       new BN(100_00000000 * 100), // Mint 10,000 HNT for testing
-      swapPayer
+      swapPayer,
     );
 
     console.log("Starting DCA server");
@@ -218,13 +216,12 @@ describe("tuktuk-dca", () => {
       destinationTokenAccount = getAssociatedTokenAddressSync(
         hntMint,
         destinationWallet,
-        true
+        true,
       );
       await createAtaAndMint(provider, hntMint, new BN(0), destinationWallet);
 
-      const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-        taskQueue
-      );
+      const taskQueueAcc =
+        await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
       const [taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1);
       task = taskKey(taskQueue, taskId)[0];
 
@@ -275,7 +272,7 @@ describe("tuktuk-dca", () => {
           queueAuthority: queueAuthorityKey()[0],
           taskQueueAuthority: taskQueueAuthorityKey(
             taskQueue,
-            queueAuthorityKey()[0]
+            queueAuthorityKey()[0],
           )[0],
         })
         .signers([dcaAuthority])
@@ -299,7 +296,7 @@ describe("tuktuk-dca", () => {
       const swapAmountPerOrder = dcaAccount.swapAmountPerOrder; // 235 USDC per order
       const initialInputBalance = swapAmountPerOrder.muln(numOrders); // 940 USDC total
       console.log(
-        `Fixed swap amount per order: ${swapAmountPerOrder.toString()} USDC`
+        `Fixed swap amount per order: ${swapAmountPerOrder.toString()} USDC`,
       );
 
       // Get initial payer balance (for rent refund verification)
@@ -316,22 +313,18 @@ describe("tuktuk-dca", () => {
 
       const usdcPriceUpdate =
         await pythReceiver.receiver.account.priceUpdateV2.fetch(
-          dcaAccount.inputPriceOracle
+          dcaAccount.inputPriceOracle,
         );
       const hntPriceUpdate =
         await pythReceiver.receiver.account.priceUpdateV2.fetch(
-          dcaAccount.outputPriceOracle
+          dcaAccount.outputPriceOracle,
         );
 
       console.log(
-        `USDC Price: ${usdcPriceUpdate.priceMessage.price.toString()} (expo: ${
-          usdcPriceUpdate.priceMessage.exponent
-        })`
+        `USDC Price: ${usdcPriceUpdate.priceMessage.price.toString()} (expo: ${usdcPriceUpdate.priceMessage.exponent})`,
       );
       console.log(
-        `HNT Price: ${hntPriceUpdate.priceMessage.price.toString()} (expo: ${
-          hntPriceUpdate.priceMessage.exponent
-        })`
+        `HNT Price: ${hntPriceUpdate.priceMessage.price.toString()} (expo: ${hntPriceUpdate.priceMessage.exponent})`,
       );
 
       // Run through all 4 swaps
@@ -347,14 +340,14 @@ describe("tuktuk-dca", () => {
         const expectedSwapAmount =
           i === numOrders - 1 ? currentInputBalance : swapAmountPerOrder;
         console.log(
-          `Expected swap amount: ${expectedSwapAmount.toString()} USDC`
+          `Expected swap amount: ${expectedSwapAmount.toString()} USDC`,
         );
 
         // Calculate expected HNT output
         const expectedHntOutput = calculateExpectedOutput(
           expectedSwapAmount,
           usdcPriceUpdate,
-          hntPriceUpdate
+          hntPriceUpdate,
         );
         console.log(`Expected HNT output: ${expectedHntOutput.toString()}`);
 
@@ -370,7 +363,7 @@ describe("tuktuk-dca", () => {
           expect(dcaAccountNow.isSwapping).to.eq(0);
           expect(dcaAccountNow.numOrders).to.equal(numOrders - (i + 1));
           expect(dcaAccountNow.preSwapDestinationBalance.toNumber()).to.equal(
-            0
+            0,
           );
         }
 
@@ -387,19 +380,19 @@ describe("tuktuk-dca", () => {
         totalHntReceived = totalHntReceived.add(expectedHntOutput);
 
         console.log(
-          `Input balance after swap ${i + 1}: ${inputBalanceAfter.toString()}`
+          `Input balance after swap ${i + 1}: ${inputBalanceAfter.toString()}`,
         );
         console.log(
-          `HNT balance after swap ${i + 1}: ${hntBalance.toString()}`
+          `HNT balance after swap ${i + 1}: ${hntBalance.toString()}`,
         );
         console.log(
-          `Expected input remaining: ${currentInputBalance.toString()}`
+          `Expected input remaining: ${currentInputBalance.toString()}`,
         );
         console.log(`Expected total HNT: ${totalHntReceived.toString()}`);
 
         // Verify balances match expectations
         expect(inputBalanceAfter.toString()).to.equal(
-          currentInputBalance.toString()
+          currentInputBalance.toString(),
         );
         expect(hntBalance.toString()).to.equal(totalHntReceived.toString());
 
@@ -409,9 +402,8 @@ describe("tuktuk-dca", () => {
 
           // Verify accounts are closed
           const dcaAccountInfo = await provider.connection.getAccountInfo(dca);
-          const inputAccountInfo = await provider.connection.getAccountInfo(
-            inputAccount
-          );
+          const inputAccountInfo =
+            await provider.connection.getAccountInfo(inputAccount);
           expect(dcaAccountInfo).to.be.null;
           expect(inputAccountInfo).to.be.null;
           console.log(`✅ DCA account and input account closed`);
@@ -420,11 +412,11 @@ describe("tuktuk-dca", () => {
           const finalPayerBalance = await provider.connection.getBalance(me);
           expect(finalPayerBalance).to.be.greaterThan(initialPayerBalance);
           console.log(
-            `✅ Rent refunded to payer (initial: ${initialPayerBalance}, final: ${finalPayerBalance})`
+            `✅ Rent refunded to payer (initial: ${initialPayerBalance}, final: ${finalPayerBalance})`,
           );
         } else {
           console.log(
-            `✅ Swap ${i + 1} complete, ${ordersRemaining - 1} orders remaining`
+            `✅ Swap ${i + 1} complete, ${ordersRemaining - 1} orders remaining`,
           );
         }
       }

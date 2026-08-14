@@ -14,7 +14,7 @@ import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
 import { lazyDistributorKey } from "@helium/lazy-distributor-sdk";
 import { lazySignerKey } from "@helium/lazy-transactions-sdk";
 import { init as poInit } from "@helium/price-oracle-sdk";
-import { toNumber } from "@helium/spl-utils";
+import { HNT_PYTH_PRICE_FEED, toNumber } from "@helium/spl-utils";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
@@ -32,6 +32,7 @@ import {
   monitorAccountCircuitBreaker,
   monitorMintCircuitBreaker,
 } from "./monitors/circuitBreaker";
+import { monitorPythFreshness } from "./monitors/pythFreshness";
 import { monitorSupply } from "./monitors/supply";
 import { monitorVehnt } from "./monitors/vehnt";
 import { provider } from "./solana";
@@ -275,6 +276,32 @@ async function run() {
       process.env.ORACLE_KEY || "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
     ),
     "oracle"
+  );
+  await monitorSolBalance(
+    new PublicKey(
+      process.env.PYTH_CRON_KEY ||
+        "5iErodyrhbvc9BeYQxojcVe877PSKAJ3zwjmUJaL57u1"
+    ),
+    "pyth_hnt_v2_cron"
+  );
+  // Legacy crank cron; remove with the issue 10 legacy teardown.
+  await monitorSolBalance(
+    new PublicKey(
+      process.env.LEGACY_PYTH_CRON_KEY ||
+        "HoHXwG7W1vLA5PVs3iEUNfpYJarWcegqRUaktykB1jMc"
+    ),
+    "pyth_hnt_legacy_cron"
+  );
+  await monitorSolBalance(
+    new PublicKey(
+      process.env.PYTH_PAYER_KEY ||
+        "BbqEv5mvCvRFwEHwHJfD87SxbBh74XExzxHCyxAeoNyR"
+    ),
+    "pyth_payer"
+  );
+  await monitorPythFreshness(
+    new PublicKey(process.env.PYTH_HNT_FEED || HNT_PYTH_PRICE_FEED),
+    "hnt"
   );
   await monitorSolBalance(
     new PublicKey(

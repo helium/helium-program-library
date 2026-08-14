@@ -3,6 +3,7 @@ import { heliumSubDaosResolvers } from "@helium/helium-sub-daos-sdk";
 import { resolveIndividual } from "@helium/anchor-resolvers";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
+import { HNT_PYTH_PRICE_FEED } from "@helium/spl-utils";
 import { delegatedDataCreditsKey } from "./pdas";
 import { PublicKey } from "@solana/web3.js";
 
@@ -40,6 +41,14 @@ export const dataCreditsResolvers = combineResolvers(
       (provider as AnchorProvider).wallet
     ) {
       return (provider as AnchorProvider).wallet.publicKey;
+    } else if (
+      path[path.length - 1] === "hntPriceOracle" &&
+      !accounts.hntPriceOracle
+    ) {
+      // The on-chain IDL has no resolution info for this account (the has_one
+      // was dropped when ephemeral price updates were supported), so default to
+      // the crank-fed feed the program blesses.
+      return HNT_PYTH_PRICE_FEED;
     } else if (
       path[path.length - 1] === "delegatedDataCredits" &&
       !accounts.delegatedDataCredits &&

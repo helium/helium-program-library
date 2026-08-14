@@ -4,6 +4,7 @@ import {
   createAtaAndMint,
   createAtaAndTransfer,
   createMint,
+  HNT_PYTH_PRICE_FEED,
   sendMultipleInstructions,
   toBN,
 } from "@helium/spl-utils";
@@ -82,6 +83,19 @@ export const initTestDataCredits = async (
   const dcKey = (await initDataCredits.pubkeys()).dataCredits!;
 
   await initDataCredits.rpc({ skipPreflight: true });
+
+  // Mints are pinned to the oracle stored on DataCreditsV0 (has_one), which
+  // initialize leaves unset — point it at the crank-fed pro feed.
+  await program.methods
+    .updateDataCreditsV0({
+      newAuthority: null,
+      hntPriceOracle: HNT_PYTH_PRICE_FEED,
+    })
+    .accountsPartial({
+      dcMint,
+      authority: me,
+    })
+    .rpc({ skipPreflight: true });
 
   return { dcKey, hntMint, hntBal, dcMint, dcBal };
 };

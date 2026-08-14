@@ -1,15 +1,15 @@
 import { Program } from "@coral-xyz/anchor";
 import BN from "bn.js";
 import { DataCredits } from "@helium/idls/lib/types/data_credits";
-import { DC_MINT, HNT_PRICE_FEED_ID } from "@helium/spl-utils";
+import { DC_MINT } from "@helium/spl-utils";
+import { dataCreditsKey } from "../pdas";
 import {
-  InstructionWithEphemeralSigners,
-  PythSolanaReceiver,
-} from "@pythnetwork/pyth-solana-receiver";
-import { PublicKey, Signer, VersionedTransaction } from "@solana/web3.js";
-import { HermesClient, PriceUpdate } from "@pythnetwork/hermes-client";
-
-export const PYTH_HERMES_URL = "https://hermes.pyth.network/";
+  ComputeBudgetProgram,
+  PublicKey,
+  Signer,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js";
 
 export async function mintDataCredits({
   dcMint = DC_MINT,
@@ -23,64 +23,41 @@ export async function mintDataCredits({
   hntAmount?: BN;
   program: Program<DataCredits>;
   recipient?: PublicKey;
-}): Promise<{
-  txs: { tx: VersionedTransaction; signers: Signer[] }[];
-  priceUpdates: PriceUpdate;
-}> {
+}): Promise<{ txs: { tx: VersionedTransaction; signers: Signer[] }[] }> {
   if (!hntAmount && !dcAmount) {
     throw new Error("Either hntAmount or dcAmount must be provided");
   }
 
-  const priceServiceConnection = new HermesClient(PYTH_HERMES_URL, {});
-
-  const priceUpdates = await priceServiceConnection.getLatestPriceUpdates(
-    [HNT_PRICE_FEED_ID],
-    { encoding: "base64" }
-  );
-  const priceUpdateData = priceUpdates.binary.data;
-
-  const wallet = program.provider.wallet;
   const connection = program.provider.connection;
+  const wallet = program.provider.wallet!;
 
-  const pythSolanaReceiver = new PythSolanaReceiver({
-    connection,
-    wallet: wallet as any,
-  });
+  // The program has_one-pins hnt_price_oracle to the address stored on the
+  // DataCreditsV0 account, so read it from chain rather than assuming a feed —
+  // this keeps the SDK correct on both sides of the pro-feed flip. The crank
+  // keeps that feed inside the mint freshness window; no ephemeral price
+  // update to post.
+  const [{ hntPriceOracle }, { blockhash }] = await Promise.all([
+    program.account.dataCreditsV0.fetch(dataCreditsKey(dcMint)[0]),
+    connection.getLatestBlockhash(),
+  ]);
+  const instruction = await program.methods
+    .mintDataCreditsV0({
+      hntAmount: hntAmount ? hntAmount : null,
+      dcAmount: dcAmount ? dcAmount : null,
+    })
+    .accountsPartial({ dcMint, hntPriceOracle, recipient })
+    .instruction();
 
-  const transactionBuilder = pythSolanaReceiver.newTransactionBuilder({
-    closeUpdateAccounts: true,
-  });
-  await transactionBuilder.addPostPriceUpdates(priceUpdateData);
-
-  await transactionBuilder.addPriceConsumerInstructions(
-    async (
-      getPriceUpdateAccount: (priceFeedId: string) => PublicKey
-    ): Promise<InstructionWithEphemeralSigners[]> => {
-      // Generate instructions here that use the price updates posted above.
-      // getPriceUpdateAccount(<price feed id>) will give you the account for each price update.
-      return [
-        {
-          instruction: await program.methods
-            .mintDataCreditsV0({
-              hntAmount: hntAmount ? hntAmount : null,
-              dcAmount: dcAmount ? dcAmount : null,
-            })
-            .accountsPartial({
-              dcMint,
-              hntPriceOracle: getPriceUpdateAccount(HNT_PRICE_FEED_ID),
-              recipient,
-            })
-            .instruction(),
-          signers: [],
-        },
-      ];
-    }
-  );
+  const message = new TransactionMessage({
+    payerKey: wallet.publicKey,
+    recentBlockhash: blockhash,
+    instructions: [
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10000 }),
+      instruction,
+    ],
+  }).compileToV0Message();
 
   return {
-    txs: await transactionBuilder.buildVersionedTransactions({
-      computeUnitPriceMicroLamports: 10000,
-    }),
-    priceUpdates,
+    txs: [{ tx: new VersionedTransaction(message), signers: [] }],
   };
 }

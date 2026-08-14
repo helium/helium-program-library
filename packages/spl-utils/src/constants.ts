@@ -19,7 +19,7 @@ export const IOT_MINT = new PublicKey(
 // Mainnet HNT/USD Pyth pull-oracle push account (shard 0 for HNT_PRICE_FEED_ID),
 // kept continuously fresh on-chain.
 export const HNT_PYTH_PRICE_FEED = new PublicKey(
-  "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
+  "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5"
 );
 
 export const HELIUM_COMMON_LUT_DEVNET = new PublicKey(

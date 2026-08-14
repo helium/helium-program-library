@@ -91,3 +91,10 @@ export const oracleTimeSinceSubmitted = new client.Gauge({
   labelNames: ["oracle", "wallet"],
 });
 register.registerMetric(oracleTimeSinceSubmitted);
+
+export const pythPublishTime = new client.Gauge({
+  name: "solana_pyth_publish_time",
+  help: "Unix publish time of this pyth feed; feed is stale when time() - this exceeds 600s",
+  labelNames: ["name", "address"],
+});
+register.registerMetric(pythPublishTime);
