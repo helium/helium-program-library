@@ -39,7 +39,7 @@ KeyToAsset.init(
     modelName: "key_to_assets",
     underscored: true,
     timestamps: false,
-  },
+  }
 );
 
 export default KeyToAsset;

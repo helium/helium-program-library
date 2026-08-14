@@ -1,11 +1,11 @@
-import * as anchor from '@coral-xyz/anchor';
+import * as anchor from "@coral-xyz/anchor";
 import {
   init as initHem,
   dataOnlyConfigKey,
-} from '@helium/helium-entity-manager-sdk';
-import { HNT_MINT, sendInstructions } from '@helium/spl-utils';
-import { daoKey } from '@helium/helium-sub-daos-sdk';
-import * as multisig from '@sqds/multisig';
+} from "@helium/helium-entity-manager-sdk";
+import { HNT_MINT, sendInstructions } from "@helium/spl-utils";
+import { daoKey } from "@helium/helium-sub-daos-sdk";
+import * as multisig from "@sqds/multisig";
 import {
   ComputeBudgetProgram,
   Connection,
@@ -13,16 +13,16 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
-} from '@solana/web3.js';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
-import fs from 'fs';
-import { BN } from 'bn.js';
+} from "@solana/web3.js";
+import os from "os";
+import yargs from "yargs/yargs";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
+import fs from "fs";
+import { BN } from "bn.js";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-} from '@solana/spl-account-compression';
+} from "@solana/spl-account-compression";
 
 async function exists(
   connection: Connection,
@@ -34,28 +34,28 @@ async function exists(
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     hntMint: {
-      type: 'string',
-      describe: 'HNT token mint',
+      type: "string",
+      describe: "HNT token mint",
       default: HNT_MINT.toString(),
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to control the dao. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
     },
     merklePath: {
-      type: 'string',
-      describe: 'Path to the merkle keypair',
+      type: "string",
+      describe: "Path to the merkle keypair",
       default: `${__dirname}/../../keypairs/data-only-merkle.json`,
     },
   });
@@ -83,7 +83,7 @@ export async function run(args: any = process.argv) {
     // Fund authority
     const authAcc = await provider.connection.getAccountInfo(authority);
     if (!authAcc || authAcc.lamports < LAMPORTS_PER_SOL) {
-      console.log('Funding multisig...');
+      console.log("Funding multisig...");
       await sendInstructions(provider, [
         SystemProgram.transfer({
           fromPubkey: provider.wallet.publicKey,
@@ -94,7 +94,7 @@ export async function run(args: any = process.argv) {
     }
   }
   if (await exists(provider.connection, dataOnlyConfigKey(dao)[0])) {
-    console.log('DataOnly Config already exists');
+    console.log("DataOnly Config already exists");
     return;
   }
   console.log(`Initializing DataOnly Config`);
@@ -141,9 +141,9 @@ export async function run(args: any = process.argv) {
             getConcurrentMerkleTreeAccountSize(size, buffer, canopy)
           ),
           newTreeFeeLamports: new BN(cost / 2 ** size),
-          name: 'DATAONLY',
+          name: "DATAONLY",
           metadataUrl:
-            'https://shdw-drive.genesysgo.net/H8b1gZmA2aBqDYxicxawGpznCaNbFSEJ3YnJuawGQ2EQ/data-only.json',
+            "https://shdw-drive.genesysgo.net/H8b1gZmA2aBqDYxicxawGpznCaNbFSEJ3YnJuawGQ2EQ/data-only.json",
         })
         .accountsPartial({
           dao,

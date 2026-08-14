@@ -1,6 +1,4 @@
-import {
-  PublicKey
-} from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import dotenv from "dotenv";
 

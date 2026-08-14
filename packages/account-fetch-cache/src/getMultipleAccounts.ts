@@ -1,10 +1,9 @@
 import { AccountInfo, PublicKey } from "@solana/web3.js";
 
-export const chunks = <T,>(array: T[], size: number): T[][] =>
-  Array.apply(
-    0,
-    new Array(Math.ceil(array.length / size))
-  ).map((_, index) => array.slice(index * size, (index + 1) * size));
+export const chunks = <T>(array: T[], size: number): T[][] =>
+  Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
+    array.slice(index * size, (index + 1) * size)
+  );
 
 const getMultipleAccountsCore = async (
   connection: any,
@@ -28,7 +27,6 @@ const getMultipleAccountsCore = async (
   // TODO: fix
   throw new Error();
 };
-
 
 const MAX_CHUNK_SIZE = 99; // Define the maximum chunk size
 

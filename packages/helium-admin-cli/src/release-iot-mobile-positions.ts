@@ -1,8 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
-import { batchInstructionsToTxsWithPriorityFee, batchParallelInstructionsWithPriorityFee, bulkSendTransactions } from "@helium/spl-utils";
 import {
-  init as initVsr,
-} from "@helium/voter-stake-registry-sdk";
+  batchInstructionsToTxsWithPriorityFee,
+  batchParallelInstructionsWithPriorityFee,
+  bulkSendTransactions,
+} from "@helium/spl-utils";
+import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import os from "os";
@@ -37,7 +39,9 @@ export async function run(args: any = process.argv) {
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const vsrProgram = await initVsr(provider);
   const positions = await vsrProgram.account.positionV0.all();
-  const registrars = new Set([MOBILE_REGISTRAR, IOT_REGISTRAR].map((p) => p.toBase58()));
+  const registrars = new Set(
+    [MOBILE_REGISTRAR, IOT_REGISTRAR].map((p) => p.toBase58())
+  );
   const validPositions = positions.filter(
     (p) =>
       registrars.has(p.account.registrar.toBase58()) &&
@@ -45,12 +49,17 @@ export async function run(args: any = process.argv) {
         !!p.account.lockup.kind.constant)
   );
   console.log(`Updating ${validPositions.length} positions`);
-  const instructions = await Promise.all(validPositions.map((p) => {
-    return vsrProgram.methods.tempReleasePositionV0().accountsStrict({
-      position: p.publicKey,
-      authority: wallet.publicKey,
-    }).instruction();
-  }));
+  const instructions = await Promise.all(
+    validPositions.map((p) => {
+      return vsrProgram.methods
+        .tempReleasePositionV0()
+        .accountsStrict({
+          position: p.publicKey,
+          authority: wallet.publicKey,
+        })
+        .instruction();
+    })
+  );
 
   console.log(`Constructing ${instructions.length} instructions`);
   const transactions = await batchInstructionsToTxsWithPriorityFee(
@@ -62,12 +71,5 @@ export async function run(args: any = process.argv) {
   );
   console.log(`Sending ${transactions.length} transactions`);
 
-  await bulkSendTransactions(
-    provider,
-    transactions,
-    console.log,
-    10,
-    [],
-    100
-  );
+  await bulkSendTransactions(provider, transactions, console.log, 10, [], 100);
 }

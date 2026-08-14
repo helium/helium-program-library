@@ -80,7 +80,7 @@ module.exports = {
     await queryInterface.removeColumn("pending_transactions", "batch_id");
     await queryInterface.removeIndex(
       "transaction_batches",
-      "transaction_batches_tag_payer_pending_unique",
+      "transaction_batches_tag_payer_pending_unique"
     );
     await queryInterface.dropTable("transaction_batches");
   },

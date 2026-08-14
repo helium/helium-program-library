@@ -13,7 +13,7 @@ export interface DaoCheckResult {
 
 export async function checkIsDao(
   connection: Connection,
-  depositMint: PublicKey,
+  depositMint: PublicKey
 ): Promise<DaoCheckResult> {
   const [dao] = daoKey(depositMint);
   const accountInfo = await connection.getAccountInfo(dao);
@@ -35,14 +35,14 @@ export async function createResetLockupInstruction(
   vsrProgram: VsrProgram,
   position: PublicKey,
   depositMint: PublicKey,
-  args: ResetLockupArgs,
+  args: ResetLockupArgs
 ): Promise<TransactionInstruction> {
   const { isDao, daoKey: dao } = await checkIsDao(connection, depositMint);
 
   if (isDao) {
     return hsdProgram.methods
       .resetLockupV0(
-        args as Parameters<typeof hsdProgram.methods.resetLockupV0>[0],
+        args as Parameters<typeof hsdProgram.methods.resetLockupV0>[0]
       )
       .accountsPartial({ position, dao })
       .instruction();
@@ -50,7 +50,7 @@ export async function createResetLockupInstruction(
 
   return vsrProgram.methods
     .resetLockupV0(
-      args as Parameters<typeof vsrProgram.methods.resetLockupV0>[0],
+      args as Parameters<typeof vsrProgram.methods.resetLockupV0>[0]
     )
     .accountsPartial({ position })
     .instruction();
@@ -67,7 +67,7 @@ export async function createTransferInstruction(
   sourcePosition: PublicKey,
   targetPosition: PublicKey,
   depositMint: PublicKey,
-  args: TransferArgs,
+  args: TransferArgs
 ): Promise<TransactionInstruction> {
   const { isDao, daoKey: dao } = await checkIsDao(connection, depositMint);
 

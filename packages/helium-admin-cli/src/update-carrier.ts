@@ -66,7 +66,7 @@ export async function run(args: any = process.argv) {
   const dntMint = new PublicKey(argv.dntMint);
   const subDao = subDaoKey(dntMint)[0];
   const carrier = carrierKey(subDao, argv.name)[0];
-  const carrierAcc = await program.account.carrierV0.fetch(carrier)
+  const carrierAcc = await program.account.carrierV0.fetch(carrier);
 
   instructions.push(
     await program.methods
@@ -80,7 +80,10 @@ export async function run(args: any = process.argv) {
         updateAuthority: argv.updateAuthority
           ? new PublicKey(argv.updateAuthority)
           : null,
-        incentiveEscrowFundBps: typeof argv.incentiveEscrowFundBps === "number" ? argv.incentiveEscrowFundBps : null,
+        incentiveEscrowFundBps:
+          typeof argv.incentiveEscrowFundBps === "number"
+            ? argv.incentiveEscrowFundBps
+            : null,
       })
       .accountsPartial({
         carrier,

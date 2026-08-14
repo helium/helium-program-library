@@ -1,40 +1,43 @@
-import * as anchor from '@coral-xyz/anchor';
-import { BN, Program } from '@coral-xyz/anchor';
-import { init as initDataCredits } from '@helium/data-credits-sdk';
-import { init as initHeliumSubDaos } from '@helium/helium-sub-daos-sdk';
+import * as anchor from "@coral-xyz/anchor";
+import { BN, Program } from "@coral-xyz/anchor";
+import { init as initDataCredits } from "@helium/data-credits-sdk";
+import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import {
   SystemProgram,
   Keypair,
   PublicKey,
   ComputeBudgetProgram,
-} from '@solana/web3.js';
-import chai from 'chai';
-import { init as initMobileEntityManager } from '../packages/mobile-entity-manager-sdk/src';
-import { init as initHeliumEntityManager, keyToAssetKey } from '../packages/helium-entity-manager-sdk/src';
-import { DataCredits } from '../target/types/data_credits';
-import { HeliumSubDaos } from '../target/types/helium_sub_daos';
-import { MobileEntityManager } from '../target/types/mobile_entity_manager';
-import { initTestDao, initTestSubdao } from './utils/daos';
+} from "@solana/web3.js";
+import chai from "chai";
+import { init as initMobileEntityManager } from "../packages/mobile-entity-manager-sdk/src";
+import {
+  init as initHeliumEntityManager,
+  keyToAssetKey,
+} from "../packages/helium-entity-manager-sdk/src";
+import { DataCredits } from "../target/types/data_credits";
+import { HeliumSubDaos } from "../target/types/helium_sub_daos";
+import { MobileEntityManager } from "../target/types/mobile_entity_manager";
+import { initTestDao, initTestSubdao } from "./utils/daos";
 import {
   ensureMemIdl,
   ensureDCIdl,
   ensureHSDIdl,
   initTestDataCredits,
-} from './utils/fixtures';
+} from "./utils/fixtures";
 const { expect } = chai;
-import chaiAsPromised from 'chai-as-promised';
-import { getAccount } from '@solana/spl-token';
-import { random } from './utils/string';
+import chaiAsPromised from "chai-as-promised";
+import { getAccount } from "@solana/spl-token";
+import { random } from "./utils/string";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
   getConcurrentMerkleTreeAccountSize,
-} from '@solana/spl-account-compression';
-import { HeliumEntityManager } from '../target/types/helium_entity_manager';
-import { createAtaAndMint, createMint } from '@helium/spl-utils';
+} from "@solana/spl-account-compression";
+import { HeliumEntityManager } from "../target/types/helium_entity_manager";
+import { createAtaAndMint, createMint } from "@helium/spl-utils";
 
 chai.use(chaiAsPromised);
 
-describe('mobile-entity-manager', () => {
+describe("mobile-entity-manager", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
 
   let dcProgram: Program<DataCredits>;
@@ -97,7 +100,7 @@ describe('mobile-entity-manager', () => {
       provider,
       authority: me,
       dao,
-      numTokens: new anchor.BN("500000000000000")
+      numTokens: new anchor.BN("500000000000000"),
     }));
 
     const approve = await hemProgram.methods
@@ -110,7 +113,7 @@ describe('mobile-entity-manager', () => {
     await approve.rpc({ skipPreflight: true });
   });
 
-  it('should initialize a carrier', async () => {
+  it("should initialize a carrier", async () => {
     const name = random();
     const {
       pubkeys: { carrier, escrow },
@@ -143,7 +146,7 @@ describe('mobile-entity-manager', () => {
     expect(escrowAcc.amount.toString()).to.eq("10000000000000");
   });
 
-  describe('with a carrier', async () => {
+  describe("with a carrier", async () => {
     let carrier: PublicKey;
     let merkle: Keypair;
     beforeEach(async () => {
@@ -190,7 +193,7 @@ describe('mobile-entity-manager', () => {
         .rpc({ skipPreflight: true });
     });
 
-    it('allows the subdao to approve and revoke the carrier', async () => {
+    it("allows the subdao to approve and revoke the carrier", async () => {
       await memProgram.methods
         .approveCarrierV0()
         .accountsPartial({ carrier })
@@ -206,7 +209,7 @@ describe('mobile-entity-manager', () => {
       expect(carrierAcc.approved).to.be.false;
     });
 
-    it('allows the carrier to issue itself a rewardable NFT', async () => {
+    it("allows the carrier to issue itself a rewardable NFT", async () => {
       await memProgram.methods
         .issueCarrierNftV0({
           metadataUrl: null,
@@ -219,7 +222,7 @@ describe('mobile-entity-manager', () => {
       // No further assertions since we don't have the digital asset api in testing
     });
 
-    describe('with carrier approval', async () => {
+    describe("with carrier approval", async () => {
       beforeEach(async () => {
         await memProgram.methods
           .approveCarrierV0()
@@ -227,11 +230,11 @@ describe('mobile-entity-manager', () => {
           .rpc({ skipPreflight: true });
       });
 
-      it('allows the carrier to initialize subscribers', async () => {
+      it("allows the carrier to initialize subscribers", async () => {
         const name = random();
         await memProgram.methods
           .initializeSubscriberV0({
-            entityKey: Buffer.from(name, 'utf-8'),
+            entityKey: Buffer.from(name, "utf-8"),
             metadataUrl: null,
             name,
           })
@@ -244,7 +247,9 @@ describe('mobile-entity-manager', () => {
 
       it("allows the carrier to initialize and update incentive programs", async () => {
         const name = random();
-        const { pubkeys: { incentiveEscrowProgram } } = await memProgram.methods
+        const {
+          pubkeys: { incentiveEscrowProgram },
+        } = await memProgram.methods
           .initializeIncentiveProgramV0({
             metadataUrl: null,
             name,
@@ -261,28 +266,33 @@ describe('mobile-entity-manager', () => {
             keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
           })
           .rpcAndKeys({ skipPreflight: true });
-          const incentiveEscrowProgramAcc =
-            await memProgram.account.incentiveEscrowProgramV0.fetch(
-              incentiveEscrowProgram!
-            );
-          expect(incentiveEscrowProgramAcc.carrier.toBase58()).to.eq(carrier.toBase58());
-          expect(incentiveEscrowProgramAcc.startTs.toNumber()).to.eq(5);
-          expect(incentiveEscrowProgramAcc.stopTs.toNumber()).to.eq(10);
-          expect(incentiveEscrowProgramAcc.shares).to.eq(100);
+        const incentiveEscrowProgramAcc =
+          await memProgram.account.incentiveEscrowProgramV0.fetch(
+            incentiveEscrowProgram!
+          );
+        expect(incentiveEscrowProgramAcc.carrier.toBase58()).to.eq(
+          carrier.toBase58()
+        );
+        expect(incentiveEscrowProgramAcc.startTs.toNumber()).to.eq(5);
+        expect(incentiveEscrowProgramAcc.stopTs.toNumber()).to.eq(10);
+        expect(incentiveEscrowProgramAcc.shares).to.eq(100);
 
-          await memProgram.methods.updateIncentiveProgramV0({
+        await memProgram.methods
+          .updateIncentiveProgramV0({
             startTs: new BN(10),
             stopTs: new BN(15),
             shares: 200,
-          }).accountsPartial({ incentiveEscrowProgram }).rpc({ skipPreflight: true });
-          const incentiveEscrowProgramAcc2 =
-            await memProgram.account.incentiveEscrowProgramV0.fetch(
-              incentiveEscrowProgram!
-            );
-          
-          expect(incentiveEscrowProgramAcc2.startTs.toNumber()).to.eq(10);
-          expect(incentiveEscrowProgramAcc2.stopTs.toNumber()).to.eq(15);
-          expect(incentiveEscrowProgramAcc2.shares).to.eq(200);
+          })
+          .accountsPartial({ incentiveEscrowProgram })
+          .rpc({ skipPreflight: true });
+        const incentiveEscrowProgramAcc2 =
+          await memProgram.account.incentiveEscrowProgramV0.fetch(
+            incentiveEscrowProgram!
+          );
+
+        expect(incentiveEscrowProgramAcc2.startTs.toNumber()).to.eq(10);
+        expect(incentiveEscrowProgramAcc2.stopTs.toNumber()).to.eq(15);
+        expect(incentiveEscrowProgramAcc2.shares).to.eq(200);
       });
 
       it("can swap tree when it's full", async () => {
@@ -292,7 +302,7 @@ describe('mobile-entity-manager', () => {
             const name = random();
             await memProgram.methods
               .initializeSubscriberV0({
-                entityKey: Buffer.from(name, 'utf-8'),
+                entityKey: Buffer.from(name, "utf-8"),
                 metadataUrl: null,
                 name,
               })
@@ -327,7 +337,7 @@ describe('mobile-entity-manager', () => {
           .preInstructions([createMerkle])
           .signers([newMerkle])
           .rpc();
-      })
+      });
     });
   });
 });

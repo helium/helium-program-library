@@ -13,7 +13,11 @@ import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipTransaction,
+  serializeWithTipMetadata,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
 import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 
@@ -44,9 +48,8 @@ export const resolveEntityClaimCronJob = async ({
   const authority = entityCronAuthorityKey(wallet)[0];
   const cronJob = cronJobKey(authority, 0)[0];
 
-  const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
-    cronJob
-  );
+  const cronJobAccount =
+    await cronProgram.account.cronJobV0.fetchNullable(cronJob);
   if (!cronJobAccount) {
     throw errors.NOT_FOUND({ message: notFoundMessage });
   }
@@ -97,26 +100,27 @@ export const buildAutomationTransactionResponse = async ({
     })
   ).map((tx) => toVersionedTx(tx));
 
-  if (shouldUseJitoBundle(vtxs.length, getCluster())) {
+  const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
+  if (useJito) {
     vtxs.push(await getJitoTipTransaction(feePayer));
   }
 
-  const txs = vtxs.map((tx) => Buffer.from(tx.serialize()).toString("base64"));
   const txFees = await getTotalTransactionFees(provider.connection, vtxs);
 
   return {
     transactionData: {
-      transactions: txs.map((serialized) => ({
-        serializedTransaction: serialized,
-        metadata: transactionMetadata,
-      })),
+      transactions: serializeWithTipMetadata(
+        vtxs,
+        transactionMetadata,
+        useJito,
+      ),
       parallel: false,
       tag,
       actionMetadata,
     },
     estimatedSolFee: await toTokenAmountOutput(
       new BN(txFees + extraFeeLamports),
-      NATIVE_MINT.toBase58()
+      NATIVE_MINT.toBase58(),
     ),
   };
 };

@@ -17,7 +17,7 @@ export interface SplitResponse {
 
 export function useSplitShares(
   walletAddress: string | undefined,
-  hotspotPubkey: string | undefined,
+  hotspotPubkey: string | undefined
 ) {
   return useQuery({
     ...orpc.hotspots.getSplit.queryOptions({

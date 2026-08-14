@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils/misc";
 export function AccountTypeSelection() {
   const router = useRouter();
   const [accountType, setAccountType] = useState<"individual" | "business">(
-    "individual",
+    "individual"
   );
 
   const handleSubmit = () => {
@@ -21,7 +21,7 @@ export function AccountTypeSelection() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-foreground">
+        <h2 className="text-foreground text-xl font-semibold">
           Select Account Type
         </h2>
         <p className="text-muted-foreground mt-2">
@@ -30,21 +30,21 @@ export function AccountTypeSelection() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card
           className={cn(
-            "p-6 cursor-pointer transition-all hover:border-primary",
-            "flex flex-col items-center justify-center text-center space-y-4",
-            accountType === "individual" && "border-2 border-primary",
+            "hover:border-primary cursor-pointer p-6 transition-all",
+            "flex flex-col items-center justify-center space-y-4 text-center",
+            accountType === "individual" && "border-primary border-2"
           )}
           onClick={() => setAccountType("individual")}
         >
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-            <User2 className="w-8 h-8 text-primary" />
+          <div className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full">
+            <User2 className="text-primary h-8 w-8" />
           </div>
           <div>
-            <h3 className="font-semibold text-lg">Individual</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="text-lg font-semibold">Individual</h3>
+            <p className="text-muted-foreground text-sm">
               Personal account for individual use
             </p>
           </div>
@@ -52,18 +52,18 @@ export function AccountTypeSelection() {
 
         <Card
           className={cn(
-            "p-6 cursor-pointer transition-all hover:border-primary",
-            "flex flex-col items-center justify-center text-center space-y-4",
-            accountType === "business" && "border-2 border-primary",
+            "hover:border-primary cursor-pointer p-6 transition-all",
+            "flex flex-col items-center justify-center space-y-4 text-center",
+            accountType === "business" && "border-primary border-2"
           )}
           onClick={() => setAccountType("business")}
         >
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-primary" />
+          <div className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full">
+            <Building2 className="text-primary h-8 w-8" />
           </div>
           <div>
-            <h3 className="font-semibold text-lg">Business</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="text-lg font-semibold">Business</h3>
+            <p className="text-muted-foreground text-sm">
               Business or organization account
             </p>
           </div>

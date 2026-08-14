@@ -1,6 +1,4 @@
-import {
-  SYSVAR_CLOCK_PUBKEY
-} from "@solana/web3.js";
+import { SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { provider } from "../solana";
 import * as anchor from "@coral-xyz/anchor";
 import BN from "bn.js";

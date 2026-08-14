@@ -1,69 +1,66 @@
-import * as anchor from '@coral-xyz/anchor';
-import Address from '@helium/address';
-import { ED25519_KEY_TYPE } from '@helium/address/build/KeyTypes';
-import { fanoutKey, init, membershipVoucherKey } from '@helium/fanout-sdk';
-import { createMintInstructions } from '@helium/spl-utils';
-import {
-  getAccount,
-  getAssociatedTokenAddressSync,
-} from '@solana/spl-token';
-import * as multisig from '@sqds/multisig';
-import { ComputeBudgetProgram, Keypair, PublicKey } from '@solana/web3.js';
-import fs from 'fs';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import { createAndMint, exists, loadKeypair } from './utils';
+import * as anchor from "@coral-xyz/anchor";
+import Address from "@helium/address";
+import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
+import { fanoutKey, init, membershipVoucherKey } from "@helium/fanout-sdk";
+import { createMintInstructions } from "@helium/spl-utils";
+import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import * as multisig from "@sqds/multisig";
+import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
+import fs from "fs";
+import os from "os";
+import yargs from "yargs/yargs";
+import { createAndMint, exists, loadKeypair } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     hnt: {
-      type: 'string',
-      describe: 'Pubkey of hnt',
+      type: "string",
+      describe: "Pubkey of hnt",
       required: true,
     },
     state: {
-      type: 'string',
-      alias: 's',
+      type: "string",
+      alias: "s",
       default: `${__dirname}/../../migration-service/export.json`,
     },
     name: {
-      type: 'string',
+      type: "string",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to control the dao. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
     },
     authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
     hstKeypair: {
-      type: 'string',
-      describe: 'Keypair of the HST token',
+      type: "string",
+      describe: "Keypair of the HST token",
       default: `${__dirname}/../keypairs/hst.json`,
     },
     hstReceiptBasePath: {
-      type: 'string',
-      describe: 'Keypair of the HST receipt token',
+      type: "string",
+      describe: "Keypair of the HST receipt token",
       default: `${__dirname}/../keypairs`,
     },
     bucket: {
-      type: 'string',
-      describe: 'Bucket URL prefix holding all of the metadata jsons',
+      type: "string",
+      describe: "Bucket URL prefix holding all of the metadata jsons",
       default:
-        'https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP',
+        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP",
     },
   });
 
@@ -112,7 +109,7 @@ export async function run(args: any = process.argv) {
 
   const fanout = fanoutKey(argv.name!)[0];
   const hntAccount = await getAssociatedTokenAddressSync(hnt, fanout, true);
-  console.log('Outputting hnt to', hntAccount.toBase58());
+  console.log("Outputting hnt to", hntAccount.toBase58());
   if (!(await exists(provider.connection, fanout))) {
     await fanoutProgram.methods
       .initializeFanoutV0({
@@ -130,7 +127,7 @@ export async function run(args: any = process.argv) {
   }
 
   for (const [address, account] of Object.entries(accounts)) {
-    if (!account.hst || account.hst === 0 || account.hst === '0') {
+    if (!account.hst || account.hst === 0 || account.hst === "0") {
       continue;
     }
     let solAddress: PublicKey | undefined = toSolana(address);
@@ -154,7 +151,7 @@ export async function run(args: any = process.argv) {
     if (ownerActual && ownerActual.toBase58() !== solAddress.toBase58()) {
       const acc = await getAccount(provider.connection, ownerActual);
       console.log(
-        'Found diff address',
+        "Found diff address",
         solAddress.toBase58(),
         acc.owner.toBase58()
       );

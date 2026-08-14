@@ -13,10 +13,10 @@ const RewardSchedule = z
   .string()
   .regex(
     CRON_REGEX,
-    "Invalid cron format. Expected 5 fields: minute hour day month weekday",
+    "Invalid cron format. Expected 5 fields: minute hour day month weekday"
   )
   .describe(
-    `UTC cron expression with 5 fields (e.g. '30 9 * * *' or '0 0 1,15 * *')`,
+    `UTC cron expression with 5 fields (e.g. '30 9 * * *' or '0 0 1,15 * *')`
   );
 
 const RecipientShareInput = z.discriminatedUnion("type", [
@@ -56,7 +56,7 @@ const RecipientConfigInput = z.discriminatedUnion("type", [
     .object({
       type: z.literal("PRESET"),
       walletAddress: WalletAddressSchema.describe(
-        "The wallet address of a preconfigured recipient",
+        "The wallet address of a preconfigured recipient"
       ),
       receives: RecipientShareInput,
     })
@@ -65,12 +65,12 @@ const RecipientConfigInput = z.discriminatedUnion("type", [
     .object({
       type: z.literal("CLAIMABLE"),
       giftedCurrency: TokenAmountInputSchema.describe(
-        "The amount of currency bundled in the contract, and gifted to the claimer upon creation",
+        "The amount of currency bundled in the contract, and gifted to the claimer upon creation"
       ),
       receives: RecipientShareInput,
     })
     .describe(
-      "A recipient that in yet unknown, but will claim the pending contract",
+      "A recipient that in yet unknown, but will claim the pending contract"
     ),
 ]);
 
@@ -79,7 +79,7 @@ const RecipientConfigOutput = z.discriminatedUnion("type", [
     .object({
       type: z.literal("PRESET"),
       walletAddress: WalletAddressSchema.describe(
-        "The wallet address of a preconfigured recipient",
+        "The wallet address of a preconfigured recipient"
       ),
       receives: RecipientShareOutput,
     })
@@ -88,54 +88,54 @@ const RecipientConfigOutput = z.discriminatedUnion("type", [
     .object({
       type: z.literal("CLAIMABLE"),
       giftedCurrency: TokenAmountOutputSchema.describe(
-        "The amount of currency bundled in the contract, and gifted to the claimer upon creation",
+        "The amount of currency bundled in the contract, and gifted to the claimer upon creation"
       ),
       receives: RecipientShareOutput,
     })
     .describe(
-      "A recipient that in yet unknown, but will claim the pending contract",
+      "A recipient that in yet unknown, but will claim the pending contract"
     ),
 ]);
 
 const PendingRewardContract = z.object({
   delegateWalletAddress: WalletAddressSchema.describe(
-    "The wallet address of the contract delegate. This wallet is capable of taking admin actions (delete) on the pending contract.",
+    "The wallet address of the contract delegate. This wallet is capable of taking admin actions (delete) on the pending contract."
   ),
   recipients: z
     .array(RecipientConfigOutput)
     .min(1)
     .max(6)
     .describe(
-      "An exhaustive list of recipients and their respective shares in the reward contract",
+      "An exhaustive list of recipients and their respective shares in the reward contract"
     ),
   rewardSchedule: RewardSchedule.describe(
-    "The schedule on which rewards would be distributed to recipients",
+    "The schedule on which rewards would be distributed to recipients"
   ),
 });
 
 const ActiveRewardContract = z.object({
   delegateWalletAddress: WalletAddressSchema.describe(
-    "The wallet address of the contract delegate. This wallet is capable of taking admin actions (delete) on the active contract.",
+    "The wallet address of the contract delegate. This wallet is capable of taking admin actions (delete) on the active contract."
   ),
   entityOwnerAddress: WalletAddressSchema.describe(
-    "The wallet address that owns the entity (hotspot)",
+    "The wallet address that owns the entity (hotspot)"
   ),
   recipients: z
     .array(
       z.object({
         walletAddress: WalletAddressSchema.describe(
-          "The wallet address of the reward recipient",
+          "The wallet address of the reward recipient"
         ),
         receives: RecipientShareOutput,
-      }),
+      })
     )
     .min(1)
     .max(6)
     .describe(
-      "An exhaustive list of recipients and their respective shares in the reward contract",
+      "An exhaustive list of recipients and their respective shares in the reward contract"
     ),
   rewardSchedule: RewardSchedule.describe(
-    "The schedule on which rewards are distributed to recipients",
+    "The schedule on which rewards are distributed to recipients"
   ),
 });
 
@@ -155,7 +155,7 @@ export const FindRewardContractResponseSchema = z.discriminatedUnion("status", [
 
 export const CreateRewardContractTransactionInputSchema = z.object({
   delegateWalletAddress: WalletAddressSchema.describe(
-    "The wallet address of the contract delegate. This wallet is capable of taking admin actions (delete) on the contract.",
+    "The wallet address of the contract delegate. This wallet is capable of taking admin actions (delete) on the contract."
   ),
   recipients: z
     .array(RecipientConfigInput)
@@ -175,51 +175,61 @@ export const CreateRewardContractTransactionInputSchema = z.object({
             (acc, curr) =>
               acc +
               (curr.receives.type === "SHARES" ? curr.receives.shares : 0),
-            0,
+            0
           ) === 100
         );
       },
       {
         message: "Total shares must equal 100.",
-      },
+      }
     )
     .describe(
-      "An exhaustive list of recipients and their respective shares in the reward contract",
+      "An exhaustive list of recipients and their respective shares in the reward contract"
     ),
   rewardSchedule: RewardSchedule.describe(
-    "The schedule on which rewards would be distributed to recipients",
+    "The schedule on which rewards would be distributed to recipients"
   ),
 });
 
 export const EstimateCostToCreateRewardContractResponseSchema = z.object({
-  total: TokenAmountOutputSchema.describe("The total cost to create the contract."),
-  lineItems: z.object({
-    transactionFees: TokenAmountOutputSchema.describe("The cost of transaction fees, including funding for future scheduled transactions."),
-    rentFee: TokenAmountOutputSchema.describe("The cost of the rent fee."),
-    recipientGift: TokenAmountOutputSchema.describe("The total cost of gifted currency, bundled with the contract."),
-  }).describe("A breakdown of the costs invovled. Should sum to the total cost.")
+  total: TokenAmountOutputSchema.describe(
+    "The total cost to create the contract."
+  ),
+  lineItems: z
+    .object({
+      transactionFees: TokenAmountOutputSchema.describe(
+        "The cost of transaction fees, including funding for future scheduled transactions."
+      ),
+      rentFee: TokenAmountOutputSchema.describe("The cost of the rent fee."),
+      recipientGift: TokenAmountOutputSchema.describe(
+        "The total cost of gifted currency, bundled with the contract."
+      ),
+    })
+    .describe(
+      "A breakdown of the costs invovled. Should sum to the total cost."
+    ),
 });
 
 export const CreateRewardContractTransactionResponseSchema = z.object({
   unsignedTransactionData: TransactionDataSchema.describe(
-    "The unsigned transaction data which, when signed and submitted will create the pending or finalized reward contract",
+    "The unsigned transaction data which, when signed and submitted will create the pending or finalized reward contract"
   ),
   estimatedSolFee: TokenAmountOutputSchema,
-})
+});
 
 export const DeleteRewardContractTransactionResponseSchema = z.object({
   unsignedTransactionData: TransactionDataSchema.describe(
-    "The unsigned transaction data which, when signed and submitted will delete the contract",
+    "The unsigned transaction data which, when signed and submitted will delete the contract"
   ),
   estimatedSolFee: TokenAmountOutputSchema,
-})
+});
 
 export const CreateInviteResponseSchema = z.object({
   unsignedMessage: z
     .string()
     .min(1)
     .describe(
-      "The unsigned invite message which, when signed by the delegate's wallet, can be used by a recipient to claim the pending contract.",
+      "The unsigned invite message which, when signed by the delegate's wallet, can be used by a recipient to claim the pending contract."
     ),
   expiration: z.iso.datetime(),
 });
@@ -234,7 +244,7 @@ export const ClaimInviteRequestSchema = z.object({
 
 export const ClaimInviteResponseSchema = z.object({
   unsignedTransactionData: TransactionDataSchema.describe(
-    "The unsigned transaction data which, when signed and submitted will claim the pending reward contract",
+    "The unsigned transaction data which, when signed and submitted will claim the pending reward contract"
   ),
   estimatedSolFee: TokenAmountOutputSchema,
-})
+});

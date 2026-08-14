@@ -1,38 +1,38 @@
-import * as anchor from '@coral-xyz/anchor';
-import { PublicKey } from '@solana/web3.js';
-import os from 'os';
-import yargs from 'yargs/yargs';
+import * as anchor from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
+import os from "os";
+import yargs from "yargs/yargs";
 import {
   createProgramSetAuthorityInstruction,
   createSetIdlAuthorityInstruction,
   loadKeypair,
-  sendInstructionsOrSquadsV4
-} from './utils';
-import * as multisig from '@sqds/multisig';
+  sendInstructionsOrSquadsV4,
+} from "./utils";
+import * as multisig from "@sqds/multisig";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     newAuthority: {
-      type: 'string',
+      type: "string",
       required: true,
     },
     programId: {
-      type: 'string',
+      type: "string",
       required: true,
     },
   });
@@ -57,12 +57,12 @@ export async function run(args: any = process.argv) {
       await createProgramSetAuthorityInstruction(
         new PublicKey(argv.programId),
         authority,
-        new PublicKey(argv.newAuthority),
+        new PublicKey(argv.newAuthority)
       ),
       await createSetIdlAuthorityInstruction(
         new PublicKey(argv.programId),
         authority,
-        new PublicKey(argv.newAuthority),
+        new PublicKey(argv.newAuthority)
       ),
     ],
     multisig: multisigPda!,

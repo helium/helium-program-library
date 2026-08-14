@@ -5,7 +5,15 @@ import AWS from "aws-sdk";
 
 // Make sure to set your POSTGRES_URL in a .env.local file
 // Example: POSTGRES_URL="postgres://user:password@localhost:5432/database"
-const POSTGRES_URL = `postgres://${env.PG_USER}:${env.PG_PASSWORD}@${env.PG_HOST}:${env.PG_PORT}/${env.PG_NAME}`;
+// During `next build` env validation is skipped and PG vars may be unset, but
+// this module still loads while collecting page data. Fall back to parseable
+// placeholders — no connection is opened at build time, and the production
+// server phase validates env at startup before any query runs.
+const POSTGRES_URL = `postgres://${env.PG_USER ?? "postgres"}:${
+  env.PG_PASSWORD ?? ""
+}@${env.PG_HOST ?? "localhost"}:${env.PG_PORT ?? "5432"}/${
+  env.PG_NAME ?? "postgres"
+}`;
 
 if (!POSTGRES_URL) {
   if (process.env.NODE_ENV === "production") {

@@ -79,7 +79,7 @@ PendingTransaction.init(
     sequelize,
     modelName: "pending_transactions",
     underscored: true,
-  },
+  }
 );
 
 export default PendingTransaction;

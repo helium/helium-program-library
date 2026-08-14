@@ -12,8 +12,17 @@ import {
   PROGRAM_ID,
   subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
-import { delegationClaimBotKey, init as initHplCrons } from "@helium/hpl-crons-sdk";
-import { batchParallelInstructionsWithPriorityFee, batchSequentialParallelInstructions, fetchBackwardsCompatibleIdl, HNT_MINT, sleep } from "@helium/spl-utils";
+import {
+  delegationClaimBotKey,
+  init as initHplCrons,
+} from "@helium/hpl-crons-sdk";
+import {
+  batchParallelInstructionsWithPriorityFee,
+  batchSequentialParallelInstructions,
+  fetchBackwardsCompatibleIdl,
+  HNT_MINT,
+  sleep,
+} from "@helium/spl-utils";
 import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
@@ -47,13 +56,13 @@ export const useDelegatePosition = ({
     automationEnabled,
     positions: useMemo(() => [position], [position]),
     subDao,
-  })
+  });
 
   return {
     ...rest,
     delegatePosition: delegatePositions,
-  }
-}
+  };
+};
 
 export const useDelegatePositions = ({
   automationEnabled = false,
@@ -70,21 +79,38 @@ export const useDelegatePositions = ({
     [positions]
   );
   const delegationClaimBotKeys = useMemo(
-    () => positions.map((position) => delegationClaimBotKey(TASK_QUEUE, delegatedPositionKey(position.pubkey)[0])[0]),
+    () =>
+      positions.map(
+        (position) =>
+          delegationClaimBotKey(
+            TASK_QUEUE,
+            delegatedPositionKey(position.pubkey)[0]
+          )[0]
+      ),
     [positions]
   );
-  const { accounts: delegationClaimBots } =
-    useDelegationClaimBots(delegationClaimBotKeys);
-  const { accounts: delegatedPositions } = useDelegatedPositions(delegatedPosKeys);
+  const { accounts: delegationClaimBots } = useDelegationClaimBots(
+    delegationClaimBotKeys
+  );
+  const { accounts: delegatedPositions } =
+    useDelegatedPositions(delegatedPosKeys);
   const { info: taskQueue } = useTaskQueue(TASK_QUEUE);
-  const { info: registrar } = useRegistrar(positions[0] && positions[0].registrar);
+  const { info: registrar } = useRegistrar(
+    positions[0] && positions[0].registrar
+  );
   const { info: proxyConfig } = useProxyConfig(registrar?.proxyConfig);
 
   const { rentFee, prepaidTxFees, insufficientBalance } = usePositionsFees({
     automationEnabled,
     numPositions: positions.length,
-    numDelegatedPositions: useMemo(() => positions.filter((position) => position.isDelegated).length, [positions]),
-    numDelegationClaimBots: useMemo(() => delegationClaimBots?.filter(i => i.info)?.length, [delegationClaimBots]),
+    numDelegatedPositions: useMemo(
+      () => positions.filter((position) => position.isDelegated).length,
+      [positions]
+    ),
+    numDelegationClaimBots: useMemo(
+      () => delegationClaimBots?.filter((i) => i.info)?.length,
+      [delegationClaimBots]
+    ),
     wallet: provider?.wallet?.publicKey,
   });
 
@@ -100,7 +126,11 @@ export const useDelegatePositions = ({
       ) => Promise<void>;
     }) => {
       const isInvalid =
-        !provider || !provider.wallet || !subDao || !delegatedPositions || !delegationClaimBots;
+        !provider ||
+        !provider.wallet ||
+        !subDao ||
+        !delegatedPositions ||
+        !delegationClaimBots;
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
       const hplCronsProgram = await initHplCrons(provider as any);
@@ -117,14 +147,18 @@ export const useDelegatePositions = ({
             throw new Error("No proxy config found");
           }
           const now = new BN(Date.now() / 1000);
-          const expiredPositions = positions.map((position, index) => {
-            const delegatedPositionAcc = delegatedPositions[index];
-            return {
-              position,
-              delegatedPosition: delegatedPositionAcc,
-              index,
-            }
-          }).filter(({ delegatedPosition }) => delegatedPosition?.info?.expirationTs?.lt(now));
+          const expiredPositions = positions
+            .map((position, index) => {
+              const delegatedPositionAcc = delegatedPositions[index];
+              return {
+                position,
+                delegatedPosition: delegatedPositionAcc,
+                index,
+              };
+            })
+            .filter(({ delegatedPosition }) =>
+              delegatedPosition?.info?.expirationTs?.lt(now)
+            );
           // Claim and close out expired positions.
           if (expiredPositions.length > 0) {
             if (expiredPositions.some(({ position }) => position.hasRewards)) {
@@ -132,7 +166,7 @@ export const useDelegatePositions = ({
                 provider,
                 positions: expiredPositions.map(({ position }) => position),
                 hsdProgramId: programId,
-              })
+              });
               if (onInstructions) {
                 for (const ixs of claims) {
                   await onInstructions(ixs);
@@ -141,7 +175,7 @@ export const useDelegatePositions = ({
                 await batchSequentialParallelInstructions({
                   provider,
                   instructions,
-                  onProgress: () => { },
+                  onProgress: () => {},
                   triesRemaining: 10,
                   extraSigners: [],
                   maxSignatureBatch: 10,
@@ -149,22 +183,24 @@ export const useDelegatePositions = ({
               }
             }
             // Close out the expired positions.
-            const closeInstructions = await Promise.all(expiredPositions.map(({ position }, index) => {
-              return hsdProgram.methods
-                .closeDelegationV0()
-                .accountsPartial({
-                  position: position.pubkey,
-                  subDao: delegatedPositions[index].info?.subDao,
-                })
-                .instruction()
-            }));
+            const closeInstructions = await Promise.all(
+              expiredPositions.map(({ position }, index) => {
+                return hsdProgram.methods
+                  .closeDelegationV0()
+                  .accountsPartial({
+                    position: position.pubkey,
+                    subDao: delegatedPositions[index].info?.subDao,
+                  })
+                  .instruction();
+              })
+            );
             if (onInstructions) {
-              await onInstructions(closeInstructions.map(i => [i]));
+              await onInstructions(closeInstructions.map((i) => [i]));
             } else {
               await batchParallelInstructionsWithPriorityFee(
                 provider,
-                closeInstructions,
-              )
+                closeInstructions
+              );
             }
 
             // Remove the delegated positions from the list.
@@ -186,9 +222,10 @@ export const useDelegatePositions = ({
               !delegatedPositionAcc.info!.subDao.equals(subDao.pubkey)
             ) {
               const newExpirationTs = Math.min(
-                [...proxyConfig.seasons].reverse().find(
-                  (season) => now.gte(season.start)
-                )?.end.toNumber() ?? 0,
+                [...proxyConfig.seasons]
+                  .reverse()
+                  .find((season) => now.gte(season.start))
+                  ?.end.toNumber() ?? 0,
                 getLockupEffectiveEndTs(position.lockup).toNumber()
               );
               if (!newExpirationTs) {
@@ -205,20 +242,28 @@ export const useDelegatePositions = ({
               )[0];
               const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                position.genesisEnd.lt(now) ?
-                  oldExpirationTs : position.genesisEnd
+                position.genesisEnd.lt(now)
+                  ? oldExpirationTs
+                  : position.genesisEnd
               )[0];
               const newGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 subDao.pubkey,
-                position.genesisEnd.lt(now) ?
-                  newExpirationTs : position.genesisEnd
+                position.genesisEnd.lt(now)
+                  ? newExpirationTs
+                  : position.genesisEnd
               )[0];
               const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
                 subDao.pubkey,
                 newExpirationTs
               )[0];
-              if (delegatedPositionAcc.info && delegatedPositionAcc.info.lastClaimedEpoch.toNumber() < HNT_EPOCH) {
-                throw new Error("Must claim IOT/MOBILE delegation rewards before changing delegation")
+              if (
+                delegatedPositionAcc.info &&
+                delegatedPositionAcc.info.lastClaimedEpoch.toNumber() <
+                  HNT_EPOCH
+              ) {
+                throw new Error(
+                  "Must claim IOT/MOBILE delegation rewards before changing delegation"
+                );
               }
               innerInstructions.push(
                 await hsdProgram.methods
@@ -248,9 +293,10 @@ export const useDelegatePositions = ({
             } else if (position.isDelegated && position.isDelegationRenewable) {
               const now = new BN(Date.now() / 1000);
               const newExpirationTs = Math.min(
-                [...proxyConfig.seasons].reverse().find(
-                  (season) => now.gte(season.start)
-                )?.end.toNumber() ?? 0,
+                [...proxyConfig.seasons]
+                  .reverse()
+                  .find((season) => now.gte(season.start))
+                  ?.end.toNumber() ?? 0,
                 getLockupEffectiveEndTs(position.lockup).toNumber()
               );
               if (!newExpirationTs) {
@@ -268,8 +314,9 @@ export const useDelegatePositions = ({
               )[0];
               const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                position.genesisEnd.lt(now) ?
-                  newExpirationTs : position.genesisEnd
+                position.genesisEnd.lt(now)
+                  ? newExpirationTs
+                  : position.genesisEnd
               )[0];
               innerInstructions.push(
                 await hsdProgram.methods
@@ -287,7 +334,10 @@ export const useDelegatePositions = ({
 
             const delegationClaimBot = delegationClaimBots[index];
             const delegationClaimBotK = delegationClaimBots[index].publicKey;
-            if (automationEnabled && (!delegationClaimBot || !delegationClaimBot.info)) {
+            if (
+              automationEnabled &&
+              (!delegationClaimBot || !delegationClaimBot.info)
+            ) {
               innerInstructions.push(
                 await hplCronsProgram.methods
                   .initDelegationClaimBotV0()
@@ -311,7 +361,11 @@ export const useDelegatePositions = ({
                   lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
                 })
               );
-            } else if (!automationEnabled && delegationClaimBot && delegationClaimBot.info) {
+            } else if (
+              !automationEnabled &&
+              delegationClaimBot &&
+              delegationClaimBot.info
+            ) {
               innerInstructions.push(
                 await hplCronsProgram.methods
                   .closeDelegationClaimBotV0()
@@ -326,21 +380,24 @@ export const useDelegatePositions = ({
                       true
                     ),
                   })
-                  .instruction(),
+                  .instruction()
               );
             }
 
-            if (
-              automationEnabled &&
-              subDao
-            ) {
+            if (automationEnabled && subDao) {
               const nextAvailable = await nextAvailableTaskIds(
                 taskQueue!.taskBitmap,
                 1
               )[0];
-              const task = taskKey(TASK_QUEUE, nextAvailable)[0]
-              if (delegatedPositionAcc.info && delegatedPositionAcc.info.lastClaimedEpoch.toNumber() < HNT_EPOCH) {
-                throw new Error("Must claim IOT/MOBILE delegation rewards before automating rewards claims")
+              const task = taskKey(TASK_QUEUE, nextAvailable)[0];
+              if (
+                delegatedPositionAcc.info &&
+                delegatedPositionAcc.info.lastClaimedEpoch.toNumber() <
+                  HNT_EPOCH
+              ) {
+                throw new Error(
+                  "Must claim IOT/MOBILE delegation rewards before automating rewards claims"
+                );
               }
               innerInstructions.push(
                 await hplCronsProgram.methods
@@ -366,8 +423,14 @@ export const useDelegatePositions = ({
                       provider.wallet.publicKey
                     ),
                     task,
-                    nextTask: !delegationClaimBot.info || delegationClaimBot.info.nextTask.equals(PublicKey.default) ? task : delegationClaimBot.info?.nextTask,
-                    rentRefund: delegationClaimBot.info?.rentRefund || provider.wallet.publicKey,
+                    nextTask:
+                      !delegationClaimBot.info ||
+                      delegationClaimBot.info.nextTask.equals(PublicKey.default)
+                        ? task
+                        : delegationClaimBot.info?.nextTask,
+                    rentRefund:
+                      delegationClaimBot.info?.rentRefund ||
+                      provider.wallet.publicKey,
                   })
                   .instruction()
               );
@@ -383,14 +446,14 @@ export const useDelegatePositions = ({
             provider,
             instructions,
             {
-              onProgress: () => { },
+              onProgress: () => {},
               triesRemaining: 10,
               extraSigners: [],
               maxSignatureBatch: 10,
             }
           );
         }
-        await sleep(2000)
+        await sleep(2000);
         refetch();
       }
     }

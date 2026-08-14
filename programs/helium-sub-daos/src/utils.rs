@@ -212,7 +212,7 @@ impl PrecisePosition for PositionV0 {
       .checked_add(baseline_vote_weight)
       .unwrap()
       .checked_mul(genesis_multiplier as u128)
-      .ok_or(error!(ErrorCode::ArithmeticError))
+      .ok_or_else(|| error!(ErrorCode::ArithmeticError))
   }
 
   /// Vote power contribution from locked funds only.

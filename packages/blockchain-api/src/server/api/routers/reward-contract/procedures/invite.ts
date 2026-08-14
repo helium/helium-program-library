@@ -32,7 +32,7 @@ export const invite = publicProcedure.rewardContract.invite.handler(
     const assetOwner = new PublicKey(
       typeof asset.ownership.owner === "string"
         ? asset.ownership.owner
-        : asset.ownership.owner.toBase58(),
+        : asset.ownership.owner.toBase58()
     );
 
     const wpProgram = await initWelcomePack(provider);
@@ -61,14 +61,15 @@ export const invite = publicProcedure.rewardContract.invite.handler(
     const [userWelcomePacksK] = userWelcomePacksKey(assetOwner);
     const userWelcomePacks =
       await wpProgram.account.userWelcomePacksV0.fetchNullable(
-        userWelcomePacksK,
+        userWelcomePacksK
       );
 
     if (userWelcomePacks) {
       for (let i = 0; i < (userWelcomePacks.nextId || 0); i++) {
         const [welcomePackK] = welcomePackKey(assetOwner, i);
-        const welcomePack =
-          await wpProgram.account.welcomePackV0.fetchNullable(welcomePackK);
+        const welcomePack = await wpProgram.account.welcomePackV0.fetchNullable(
+          welcomePackK
+        );
 
         if (welcomePack && welcomePack.asset.equals(assetPubkey)) {
           if (welcomePack.owner.toBase58() !== signerWalletAddress) {
@@ -90,5 +91,5 @@ export const invite = publicProcedure.rewardContract.invite.handler(
     }
 
     throw errors.NOT_FOUND({ message: "Reward contract not found." });
-  },
+  }
 );

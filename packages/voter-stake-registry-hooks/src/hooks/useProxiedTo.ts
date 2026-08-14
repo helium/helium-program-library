@@ -16,9 +16,7 @@ export function useProxiedTo(wallet?: PublicKey): {
   const result = useMemo(() => {
     if (wallet) {
       return positions?.filter(
-        (position) =>
-          position.proxy &&
-          position.proxy.nextVoter.equals(wallet)
+        (position) => position.proxy && position.proxy.nextVoter.equals(wallet)
       );
     }
   }, [positions]);

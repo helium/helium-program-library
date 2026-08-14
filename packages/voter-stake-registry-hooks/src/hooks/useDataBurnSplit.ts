@@ -8,22 +8,20 @@ export function dataBurnSplitQuery({
   voteService?: VoteService;
 }) {
   return queryOptions({
-    queryKey: [
-      "dataBurnSplit",
-      voteService?.config,
-    ],
+    queryKey: ["dataBurnSplit", voteService?.config],
     queryFn: () => voteService!.getDataBurnSplit(),
     enabled: !!voteService,
   });
 }
-
 
 export const useDataBurnSplit = ({
   voteService,
 }: {
   voteService?: VoteService;
 }) => {
-  return useQuery(dataBurnSplitQuery({
-    voteService: voteService,
-  }));
+  return useQuery(
+    dataBurnSplitQuery({
+      voteService: voteService,
+    })
+  );
 };

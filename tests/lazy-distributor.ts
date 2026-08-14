@@ -139,10 +139,12 @@ describe("lazy-distributor", () => {
     });
 
     it("initializes a recipient", async () => {
-      const method = await program.methods.initializeRecipientV0().accountsPartial({
-        lazyDistributor,
-        mint,
-      });
+      const method = await program.methods
+        .initializeRecipientV0()
+        .accountsPartial({
+          lazyDistributor,
+          mint,
+        });
       await method.rpc({ skipPreflight: true });
       const recipient = (await method.pubkeys()).recipient!;
       const recipientAcc = await program.account.recipientV0.fetch(recipient);
@@ -274,13 +276,13 @@ describe("lazy-distributor", () => {
             currentRewards: new anchor.BN("5000000"),
             oracleIndex: 0,
           })
-          .preInstructions(
-            [Ed25519Program.createInstructionWithPublicKey({
+          .preInstructions([
+            Ed25519Program.createInstructionWithPublicKey({
               publicKey: me.toBytes(),
               message: setCurrentRewardsTransactionBytes,
               signature,
-            })]
-          )
+            }),
+          ])
           .accountsPartial({
             lazyDistributor,
             recipient,
@@ -458,10 +460,12 @@ describe("lazy-distributor", () => {
     describe("with recipient", () => {
       let recipient: PublicKey;
       beforeEach(async () => {
-        const method = await program.methods.initializeRecipientV0().accountsPartial({
-          lazyDistributor,
-          mint,
-        });
+        const method = await program.methods
+          .initializeRecipientV0()
+          .accountsPartial({
+            lazyDistributor,
+            mint,
+          });
         await method.rpc({ skipPreflight: true });
 
         recipient = (await method.pubkeys()).recipient!;
@@ -497,9 +501,11 @@ describe("lazy-distributor", () => {
             recipient,
           })
           .rpc({ skipPreflight: true });
-        const method = await program.methods.distributeRewardsV0().accountsPartial({
-          common: { recipient, lazyDistributor, rewardsMint },
-        });
+        const method = await program.methods
+          .distributeRewardsV0()
+          .accountsPartial({
+            common: { recipient, lazyDistributor, rewardsMint },
+          });
         await method.rpc({ skipPreflight: true });
         // @ts-ignore
         const destination = (await method.pubkeys()).common.destinationAccount!;
@@ -682,10 +688,12 @@ describe("lazy-distributor", () => {
         pubkeys.lazyDistributor
       );
 
-      const method2 = await program.methods.initializeRecipientV0().accountsPartial({
-        lazyDistributor,
-        mint,
-      });
+      const method2 = await program.methods
+        .initializeRecipientV0()
+        .accountsPartial({
+          lazyDistributor,
+          mint,
+        });
       await method2.rpc({ skipPreflight: true });
       recipient = (await method2.pubkeys()).recipient!;
     });

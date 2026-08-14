@@ -8,7 +8,9 @@ import { AccountContext } from "../contexts/accountContext";
 export const useAccountFetchCache = () => {
   const cache = useContext(AccountContext);
   if (!cache) {
-    throw new Error("Account fetch cache not found. Is AccountProvider present?");
+    throw new Error(
+      "Account fetch cache not found. Is AccountProvider present?"
+    );
   }
   return cache;
 };

@@ -1,5 +1,9 @@
 import * as anchor from "@coral-xyz/anchor";
-import { init as initHem, makerKey, rewardableEntityConfigKey } from "@helium/helium-entity-manager-sdk";
+import {
+  init as initHem,
+  makerKey,
+  rewardableEntityConfigKey,
+} from "@helium/helium-entity-manager-sdk";
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";

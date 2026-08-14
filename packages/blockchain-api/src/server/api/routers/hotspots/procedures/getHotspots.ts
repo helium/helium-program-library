@@ -20,5 +20,5 @@ export const getHotspots = publicProcedure.hotspots.getHotspots.handler(
     });
 
     return hotspots;
-  },
+  }
 );

@@ -5,16 +5,16 @@ import { useMemo } from "react";
 import { AsyncStateStatus } from "react-async-hook";
 
 export interface ParsedAccountBase {
-  pubkey: PublicKey
-  account: AccountInfo<Buffer>
+  pubkey: PublicKey;
+  account: AccountInfo<Buffer>;
   info: any; // TODO: change to unkown
 }
 
 export interface UseAccountState<T> {
-  loading: boolean
-  account?: AccountInfo<Buffer>
-  info?: T
-  status: AsyncStateStatus
+  loading: boolean;
+  account?: AccountInfo<Buffer>;
+  info?: T;
+  status: AsyncStateStatus;
 }
 
 /**
@@ -29,15 +29,15 @@ export interface UseAccountState<T> {
 export function useAccount<T>(
   key: null | undefined | PublicKey,
   parser?: TypedAccountParser<T>,
-  isStatic = false, // Set if the accounts data will never change, optimisation to lower websocket usage.
+  isStatic = false // Set if the accounts data will never change, optimisation to lower websocket usage.
 ): UseAccountState<T> {
-  const args = useMemo(() => key ? [key] : undefined, [key?.toBase58()])
-  const ret = useAccounts<T>(args, parser, isStatic)
+  const args = useMemo(() => (key ? [key] : undefined), [key?.toBase58()]);
+  const ret = useAccounts<T>(args, parser, isStatic);
 
   return {
     loading: ret.loading,
     account: ret.accounts?.[0]?.account,
     info: ret.accounts?.[0]?.info,
-    status: ret.status
-  }
+    status: ret.status,
+  };
 }

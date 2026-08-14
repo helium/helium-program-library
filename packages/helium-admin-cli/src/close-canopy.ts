@@ -1,36 +1,36 @@
-import * as anchor from '@coral-xyz/anchor';
-import { daoKey, init as initHsd } from '@helium/helium-sub-daos-sdk';
-import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import os from 'os';
-import yargs from 'yargs/yargs';
+import * as anchor from "@coral-xyz/anchor";
+import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import os from "os";
+import yargs from "yargs/yargs";
 import {
   loadKeypair,
   parseEmissionsSchedule,
   sendInstructionsOrSquadsV4,
-} from './utils';
-import { init, lazyTransactionsKey } from '@helium/lazy-transactions-sdk';
+} from "./utils";
+import { init, lazyTransactionsKey } from "@helium/lazy-transactions-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     name: {
       required: true,
-      type: 'string',
-      describe: 'Lazy dist name',
+      type: "string",
+      describe: "Lazy dist name",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
   });
   const argv = await yarg.argv;

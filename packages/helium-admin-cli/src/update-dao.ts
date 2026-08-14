@@ -3,7 +3,11 @@ import {
   init as initCb,
   mintWindowedBreakerKey,
 } from "@helium/circuit-breaker-sdk";
-import { daoKey, delegatorRewardsPercent, init as initHsd } from "@helium/helium-sub-daos-sdk";
+import {
+  daoKey,
+  delegatorRewardsPercent,
+  init as initHsd,
+} from "@helium/helium-sub-daos-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -122,7 +126,7 @@ export async function run(args: any = process.argv) {
         delegatorRewardsPercent: argv.delegatorRewardsPercent
           ? delegatorRewardsPercent(argv.delegatorRewardsPercent)
           : null,
-        rewardsEscrow: null,  
+        rewardsEscrow: null,
       })
       .accountsPartial({
         dao,

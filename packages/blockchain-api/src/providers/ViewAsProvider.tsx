@@ -16,10 +16,7 @@ export const ViewAsProvider = ({ children }: { children: React.ReactNode }) => {
   const searchParams = useSearchParams();
   const viewAsAddress = searchParams.get("viewAs");
 
-  const value = useMemo(
-    () => ({ viewAsAddress }),
-    [viewAsAddress],
-  );
+  const value = useMemo(() => ({ viewAsAddress }), [viewAsAddress]);
 
   return (
     <ViewAsContext.Provider value={value}>{children}</ViewAsContext.Provider>

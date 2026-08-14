@@ -8,22 +8,20 @@ export function subDaoDelegationSplitQuery({
   voteService?: VoteService;
 }) {
   return queryOptions({
-    queryKey: [
-      "subDaoDelegationSplit",
-      voteService?.config,
-    ],
+    queryKey: ["subDaoDelegationSplit", voteService?.config],
     queryFn: () => voteService!.getSubDaoDelegationSplit(),
     enabled: !!voteService,
   });
 }
-
 
 export const useSubDaoDelegationSplit = ({
   voteService,
 }: {
   voteService?: VoteService;
 }) => {
-  return useQuery(subDaoDelegationSplitQuery({
-    voteService: voteService,
-  }));
+  return useQuery(
+    subDaoDelegationSplitQuery({
+      voteService: voteService,
+    })
+  );
 };

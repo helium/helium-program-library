@@ -22,7 +22,7 @@ interface KycData {
 }
 
 const checkKycStatus = async (
-  type: "individual" | "business" | null,
+  type: "individual" | "business" | null
 ): Promise<KycData | null> => {
   return (await client.fiat.initKyc({
     type: type || undefined,
@@ -54,7 +54,7 @@ export function WithdrawStepContent({ step }: { step: number }) {
       if (!user?.id || !user?.email) return null;
       if (step > 2) {
         return checkKycStatus(
-          searchParams.get("type") as "individual" | "business",
+          searchParams.get("type") as "individual" | "business"
         );
       }
       return null;
@@ -65,7 +65,7 @@ export function WithdrawStepContent({ step }: { step: number }) {
       searchParams.get("type"),
       step,
     ],
-    { executeOnMount: true },
+    { executeOnMount: true }
   );
 
   const type = useMemo((): "individual" | "business" | null => {
@@ -206,7 +206,7 @@ export function WithdrawStepContent({ step }: { step: number }) {
       const redirectUrl = new URL(kycData.tosLink);
       redirectUrl.searchParams.set(
         "redirect_uri",
-        `${window.location.origin}/withdraw?step=4&type=${type}`,
+        `${window.location.origin}/withdraw?step=4&type=${type}`
       );
       window.location.href = redirectUrl.toString();
       return;
@@ -216,7 +216,7 @@ export function WithdrawStepContent({ step }: { step: number }) {
       const redirectUrl = new URL(kycData.kycLink);
       redirectUrl.searchParams.set(
         "redirect_uri",
-        `${window.location.origin}/withdraw?step=5&type=${type}`,
+        `${window.location.origin}/withdraw?step=5&type=${type}`
       );
       window.location.href = redirectUrl.toString();
       return;
@@ -230,7 +230,7 @@ export function WithdrawStepContent({ step }: { step: number }) {
       case 1:
         return (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2 className="text-foreground text-xl font-semibold">
               Verify Your Email
             </h2>
             <p className="text-muted-foreground">
@@ -249,14 +249,14 @@ export function WithdrawStepContent({ step }: { step: number }) {
         if (kycData?.tosStatus === "approved") {
           return (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="text-foreground text-xl font-semibold">
                 Terms of Service
               </h2>
               <p className="text-muted-foreground">
                 Terms of service accepted. Moving to verification...
               </p>
               <div className="flex justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+                <div className="border-foreground h-8 w-8 animate-spin rounded-full border-b-2"></div>
               </div>
             </div>
           );
@@ -267,12 +267,12 @@ export function WithdrawStepContent({ step }: { step: number }) {
           const redirectUrl = new URL(kycData.tosLink);
           redirectUrl.searchParams.set(
             "redirect_uri",
-            `${window.location.origin}/withdraw?step=4&type=${type}`,
+            `${window.location.origin}/withdraw?step=4&type=${type}`
           );
 
           return (
             <div className="space-y-4 transition-opacity duration-200">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="text-foreground text-xl font-semibold">
                 Terms of Service
               </h2>
               <p className="text-muted-foreground">
@@ -290,14 +290,14 @@ export function WithdrawStepContent({ step }: { step: number }) {
         // Loading state while we fetch ToS
         return (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2 className="text-foreground text-xl font-semibold">
               Terms of Service
             </h2>
             <p className="text-muted-foreground">
               Please wait while we prepare your terms of service...
             </p>
             <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+              <div className="border-foreground h-8 w-8 animate-spin rounded-full border-b-2"></div>
             </div>
             {(kycError || processError) && (
               <p className="text-destructive">
@@ -313,12 +313,12 @@ export function WithdrawStepContent({ step }: { step: number }) {
           const redirectUrl = new URL(kycData.kycLink);
           redirectUrl.searchParams.set(
             "redirect_uri",
-            `${window.location.origin}/withdraw?step=5&type=${type}`,
+            `${window.location.origin}/withdraw?step=5&type=${type}`
           );
 
           return (
             <div className="space-y-4 transition-opacity duration-200">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="text-foreground text-xl font-semibold">
                 Identity Verification
               </h2>
               <p className="text-muted-foreground">
@@ -335,14 +335,14 @@ export function WithdrawStepContent({ step }: { step: number }) {
 
         return (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2 className="text-foreground text-xl font-semibold">
               Identity Verification
             </h2>
             <p className="text-muted-foreground">
               Please wait while we prepare your identity verification...
             </p>
             <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+              <div className="border-foreground h-8 w-8 animate-spin rounded-full border-b-2"></div>
             </div>
             {(kycError || processError) && (
               <p className="text-destructive">
@@ -359,7 +359,7 @@ export function WithdrawStepContent({ step }: { step: number }) {
         ) {
           return (
             <div className="space-y-4 transition-opacity duration-200">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="text-foreground text-xl font-semibold">
                 Add Bank Account
               </h2>
               <p className="text-muted-foreground">
@@ -375,7 +375,7 @@ export function WithdrawStepContent({ step }: { step: number }) {
 
         return (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2 className="text-foreground text-xl font-semibold">
               Identity Verification in Progress
             </h2>
             <p className="text-muted-foreground">

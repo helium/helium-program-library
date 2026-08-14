@@ -14,19 +14,19 @@ export const PYTH_API_KEY = process.env.PYTH_API_KEY;
 // unchanged; the pro instance overrides all three via env.
 export const PYTH_RECEIVER_PROGRAM_ID = new PublicKey(
   process.env.PYTH_RECEIVER_PROGRAM_ID ||
-    "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"
+    "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ",
 );
 export const PYTH_PUSH_ORACLE_PROGRAM_ID = new PublicKey(
   process.env.PYTH_PUSH_ORACLE_PROGRAM_ID ||
-    "pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT"
+    "pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT",
 );
 export const WORMHOLE_PROGRAM_ID = new PublicKey(
   process.env.WORMHOLE_PROGRAM_ID ||
-    "HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ"
+    "HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ",
 );
 export const ORIGIN = process.env.ORIGIN || "http://localhost:8081";
 export const KEYPAIR = Keypair.fromSecretKey(
   new Uint8Array(
-    JSON.parse(fs.readFileSync(process.env.KEYPAIR_PATH!).toString())
-  )
+    JSON.parse(fs.readFileSync(process.env.KEYPAIR_PATH!).toString()),
+  ),
 );

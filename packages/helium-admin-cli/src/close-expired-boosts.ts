@@ -56,7 +56,10 @@ export async function run(args: any = process.argv) {
   );
 
   // Verify signer matches rent reclaim authority to avoid signature failures on commit
-  if (argv.commit && !provider.wallet.publicKey.equals(boostConfig.rentReclaimAuthority)) {
+  if (
+    argv.commit &&
+    !provider.wallet.publicKey.equals(boostConfig.rentReclaimAuthority)
+  ) {
     console.log(
       `Wallet ${provider.wallet.publicKey.toBase58()} is not the rent reclaim authority (${boostConfig.rentReclaimAuthority.toBase58()}). Aborting. Use the correct wallet.`
     );
@@ -67,7 +70,7 @@ export async function run(args: any = process.argv) {
   const nowBig = await getUnixTimestamp(provider);
   const now = Number(nowBig);
 
-  const boostedHexes = await program.account.boostedHexV0.all()
+  const boostedHexes = await program.account.boostedHexV0.all();
 
   const periodLength = Number(boostConfig.periodLength);
 
@@ -84,7 +87,11 @@ export async function run(args: any = process.argv) {
 
   const expired = boostedHexes.filter((bh) => isExpired(bh.account));
   console.log(
-    `Found ${boostedHexes.length} boosted hexes for config ${boostConfigPubkey.toBase58()}, ${expired.length} expired`
+    `Found ${
+      boostedHexes.length
+    } boosted hexes for config ${boostConfigPubkey.toBase58()}, ${
+      expired.length
+    } expired`
   );
 
   if (!expired.length) {
@@ -135,4 +142,3 @@ export async function run(args: any = process.argv) {
   });
   console.log("Done");
 }
-

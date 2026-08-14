@@ -106,7 +106,7 @@ TransactionBatch.init(
     sequelize,
     modelName: "transaction_batches",
     underscored: true,
-  },
+  }
 );
 
 export default TransactionBatch;

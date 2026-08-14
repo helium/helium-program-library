@@ -98,17 +98,17 @@ describe("data-credits", () => {
     program = await init(
       provider,
       PROGRAM_ID,
-      anchor.workspace.DataCredits.idl
+      anchor.workspace.DataCredits.idl,
     );
     hsdProgram = await hsd.init(
       provider,
       hsd.PROGRAM_ID,
-      anchor.workspace.HeliumSubDaos.idl
+      anchor.workspace.HeliumSubDaos.idl,
     );
     vsrProgram = await vsr.init(
       provider,
       vsr.PROGRAM_ID,
-      anchor.workspace.VoterStakeRegistry.idl
+      anchor.workspace.VoterStakeRegistry.idl,
     );
     nftProxyProgram = await initNftProxy(provider);
     await ensureVSRIdl();
@@ -122,13 +122,13 @@ describe("data-credits", () => {
       provider,
       hntMint,
       toBN(startHntBal, hntDecimals).toNumber(),
-      me
+      me,
     );
     await createAtaAndMint(
       provider,
       dcMint,
       toBN(startDcBal, dcDecimals).toNumber(),
-      me
+      me,
     );
 
     const method = await program.methods
@@ -173,27 +173,27 @@ describe("data-credits", () => {
 
   // Cloned from mainnet in Anchor.toml; owned by the pro pyth receiver (rec2...)
   const PRO_HNT_PRICE_FEED = new PublicKey(
-    "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5"
+    "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5",
   );
 
   // Cloned from mainnet in Anchor.toml; owned by the legacy pyth receiver (rec5...)
   const LEGACY_HNT_PRICE_FEED = new PublicKey(
-    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
+    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33",
   );
 
   // Read the crank-fed feed account the SDK now references, decoded via the
   // pyth receiver SDK.
   const fetchFeedPriceMessage = async () => {
-    const { PythSolanaReceiver } = await import(
-      "@pythnetwork/pyth-solana-receiver"
-    );
+    const { PythSolanaReceiver } =
+      await import("@pythnetwork/pyth-solana-receiver");
     const pythReceiver = new PythSolanaReceiver({
       connection: provider.connection,
       wallet: provider.wallet as any,
     });
-    const priceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(
-      PRO_HNT_PRICE_FEED
-    );
+    const priceUpdate =
+      await pythReceiver.receiver.account.priceUpdateV2.fetch(
+        PRO_HNT_PRICE_FEED,
+      );
     return priceUpdate.priceMessage;
   };
 
@@ -209,16 +209,16 @@ describe("data-credits", () => {
       })
       .rpc({ skipPreflight: true });
 
-    const { PythSolanaReceiver } = await import(
-      "@pythnetwork/pyth-solana-receiver"
-    );
+    const { PythSolanaReceiver } =
+      await import("@pythnetwork/pyth-solana-receiver");
     const pythReceiver = new PythSolanaReceiver({
       connection: provider.connection,
       wallet: provider.wallet as any,
     });
-    const priceUpdate = await pythReceiver.receiver.account.priceUpdateV2.fetch(
-      PRO_HNT_PRICE_FEED
-    );
+    const priceUpdate =
+      await pythReceiver.receiver.account.priceUpdateV2.fetch(
+        PRO_HNT_PRICE_FEED,
+      );
     const exponent = priceUpdate.priceMessage.exponent;
     const emaPrice = BigInt(priceUpdate.priceMessage.emaPrice.toString());
     const emaConf = BigInt(priceUpdate.priceMessage.emaConf.toString());
@@ -228,17 +228,17 @@ describe("data-credits", () => {
     assert(dcAtaAcc.isFrozen);
     const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
     const hntBal = await provider.connection.getTokenAccountBalance(
-      await getAssociatedTokenAddress(hntMint, me)
+      await getAssociatedTokenAddress(hntMint, me),
     );
 
     const approxEndBal =
       startDcBal +
       Math.floor(
-        Number(emaPrice - emaConf * BigInt(2)) * 10 ** exponent * 10 ** 5
+        Number(emaPrice - emaConf * BigInt(2)) * 10 ** exponent * 10 ** 5,
       );
     expect(dcBal.value.uiAmount).to.be.within(
       approxEndBal - 1,
-      approxEndBal + 1
+      approxEndBal + 1,
     );
     expect(hntBal.value.uiAmount).to.eq(startHntBal - 1);
   });
@@ -306,14 +306,14 @@ describe("data-credits", () => {
           provider,
           provider.wallet.publicKey,
           hntMint,
-          daoKey(hntMint)[0]
+          daoKey(hntMint)[0],
         )
       ).registrar;
       const rewardsEscrow = await createAtaAndMint(
         provider,
         hntMint,
         0,
-        provider.wallet.publicKey
+        provider.wallet.publicKey,
       );
       const method = await hsdProgram.methods
         .initializeDaoV0({
@@ -340,7 +340,7 @@ describe("data-credits", () => {
             me,
             await getAssociatedTokenAddress(hntMint, me),
             me,
-            hntMint
+            hntMint,
           ),
         ])
         .accountsPartial({
@@ -388,11 +388,11 @@ describe("data-credits", () => {
             .sub(new BN(priceMessage.emaConf.toString()).mul(new BN(2)))
             .toNumber() *
             10 ** priceMessage.exponent *
-            10 ** 5
+            10 ** 5,
         );
       expect(dcBal.value.uiAmount).to.be.within(
         approxEndBal - 1,
-        approxEndBal + 1
+        approxEndBal + 1,
       );
       expect(hntBal.value.uiAmount).to.eq(startHntBal - 1);
     });
@@ -413,7 +413,7 @@ describe("data-credits", () => {
       assert(dcAtaAcc.isFrozen);
       const dcBal = await provider.connection.getTokenAccountBalance(dcAta);
       const hntBal = await provider.connection.getTokenAccountBalance(
-        await getAssociatedTokenAddress(hntMint, me)
+        await getAssociatedTokenAddress(hntMint, me),
       );
 
       const priceMessage = await fetchFeedPriceMessage();
@@ -429,7 +429,7 @@ describe("data-credits", () => {
       const approxEndBal = startHntBal - hntAmount;
       expect(hntBal.value.uiAmount).to.be.within(
         approxEndBal * 0.999,
-        approxEndBal * 1.001
+        approxEndBal * 1.001,
       );
       expect(dcBal.value.uiAmount).to.eq(startDcBal + dcAmount);
     });
@@ -437,7 +437,7 @@ describe("data-credits", () => {
     it("burns some data credits", async () => {
       await provider.connection.requestAirdrop(
         accountPayerKey()[0],
-        web3.LAMPORTS_PER_SOL
+        web3.LAMPORTS_PER_SOL,
       );
 
       const { subDaoEpochInfo } = await burnDataCredits({
@@ -454,9 +454,8 @@ describe("data-credits", () => {
       expect(dcBal.value.uiAmount).to.eq(startDcBal - 1);
 
       // check that epoch info was tracked correctly
-      const epochInfo = await hsdProgram.account.subDaoEpochInfoV0.fetch(
-        subDaoEpochInfo
-      );
+      const epochInfo =
+        await hsdProgram.account.subDaoEpochInfoV0.fetch(subDaoEpochInfo);
       const numBurned = toNumber(epochInfo.dcBurned as BN, dcDecimals);
       expect(numBurned).to.eq(1);
     });
@@ -502,7 +501,7 @@ describe("data-credits", () => {
 
       const destinationDelegatedDataCredits = delegatedDataCreditsKey(
         destinationSubDao,
-        routerKey
+        routerKey,
       )[0];
 
       await program.methods
@@ -521,15 +520,13 @@ describe("data-credits", () => {
 
       const sourceEscrow = escrowAccountKey(sourceDelegatedDataCredits)[0];
       const destinationEscrow = escrowAccountKey(
-        destinationDelegatedDataCredits
+        destinationDelegatedDataCredits,
       )[0];
 
-      const sourceBal = await provider.connection.getTokenAccountBalance(
-        sourceEscrow
-      );
-      const destinationBal = await provider.connection.getTokenAccountBalance(
-        destinationEscrow
-      );
+      const sourceBal =
+        await provider.connection.getTokenAccountBalance(sourceEscrow);
+      const destinationBal =
+        await provider.connection.getTokenAccountBalance(destinationEscrow);
 
       expect(sourceBal.value.uiAmount).to.eq(0);
       expect(destinationBal.value.uiAmount).to.eq(amount);

@@ -1,49 +1,49 @@
-import { init } from '@helium/price-oracle-sdk';
-import * as anchor from '@coral-xyz/anchor';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import { exists, loadKeypair } from './utils';
-import * as multisig from '@sqds/multisig';
-import fs from 'fs';
-import { heliumAddressToSolPublicKey } from '@helium/spl-utils';
+import { init } from "@helium/price-oracle-sdk";
+import * as anchor from "@coral-xyz/anchor";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import os from "os";
+import yargs from "yargs/yargs";
+import { exists, loadKeypair } from "./utils";
+import * as multisig from "@sqds/multisig";
+import fs from "fs";
+import { heliumAddressToSolPublicKey } from "@helium/spl-utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     priceOracleKeypair: {
-      type: 'string',
+      type: "string",
       required: false,
-      describe: 'Keypair of the price oracle account',
+      describe: "Keypair of the price oracle account",
       default: null,
     },
     oracles: {
-      type: 'string',
+      type: "string",
       required: true,
       describe: `JSON file of helium keypairs of the oracles`,
     },
     decimals: {
-      type: 'number',
+      type: "number",
       required: true,
-      describe: 'Number of decimals in the price',
+      describe: "Number of decimals in the price",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to control the dao. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to control the dao. If not provided, your wallet will be the authority",
     },
     authorityIndex: {
-      type: 'number',
-      describe: 'Authority index for squads. Defaults to 1',
+      type: "number",
+      describe: "Authority index for squads. Defaults to 1",
       default: 1,
     },
   });
@@ -72,7 +72,7 @@ export async function run(args: any = process.argv) {
     : Keypair.generate();
 
   if (await exists(provider.connection, priceOracleKeypair.publicKey)) {
-    console.log('Price oracle already exists');
+    console.log("Price oracle already exists");
     return;
   }
   const oracleKeys = JSON.parse(fs.readFileSync(argv.oracles).toString()).map(

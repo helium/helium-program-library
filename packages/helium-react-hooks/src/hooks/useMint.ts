@@ -8,6 +8,8 @@ export const MintParser = (pubKey: PublicKey, info: AccountInfo<Buffer>) => {
   return data;
 };
 
-export function useMint(key: PublicKey | undefined | null): UseAccountState<Mint> {
+export function useMint(
+  key: PublicKey | undefined | null
+): UseAccountState<Mint> {
   return useAccount(key, MintParser);
 }

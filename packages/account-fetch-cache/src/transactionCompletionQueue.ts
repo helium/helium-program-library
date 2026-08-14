@@ -57,7 +57,7 @@ export class TransactionCompletionQueue {
           {} as Record<string, SignatureStatus | null>
         );
       } else {
-        this.currentStatuses[commitment] = {}
+        this.currentStatuses[commitment] = {};
       }
       this.lastQuery = new Date();
     }

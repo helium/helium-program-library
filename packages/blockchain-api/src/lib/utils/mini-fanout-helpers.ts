@@ -25,7 +25,7 @@ export async function filterHotspotsWithoutMiniFanout(
   mfProgram: MiniFanoutProgram,
   connection: Connection,
   lazyDistributor: PublicKey,
-  hotspots: Array<{ asset: PublicKey; entityKey: string }>,
+  hotspots: Array<{ asset: PublicKey; entityKey: string }>
 ): Promise<FilterResult> {
   if (hotspots.length === 0) {
     return { claimable: [], skippedCount: 0 };
@@ -33,10 +33,11 @@ export async function filterHotspotsWithoutMiniFanout(
 
   // Batch fetch all recipient accounts
   const recipientKeys = hotspots.map(
-    (h) => recipientKey(lazyDistributor, h.asset)[0],
+    (h) => recipientKey(lazyDistributor, h.asset)[0]
   );
-  const recipients =
-    await ldProgram.account.recipientV0.fetchMultiple(recipientKeys);
+  const recipients = await ldProgram.account.recipientV0.fetchMultiple(
+    recipientKeys
+  );
 
   // Collect unique non-default destinations
   const destinationToIndices = new Map<string, number[]>();

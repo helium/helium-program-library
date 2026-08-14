@@ -58,9 +58,11 @@ export const handleAccountWebhook = async ({
     }
 
     const ownsTransaction = !externalTx;
-    const t = externalTx ?? await sequelize.transaction({
-      isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-    });
+    const t =
+      externalTx ??
+      (await sequelize.transaction({
+        isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+      }));
 
     try {
       if (isDelete) {
@@ -178,10 +180,7 @@ export const handleAccountWebhook = async ({
           }
         }
 
-        await model.upsert(
-          { ...sanitized, lastBlock },
-          { transaction: t }
-        );
+        await model.upsert({ ...sanitized, lastBlock }, { transaction: t });
       }
 
       if (ownsTransaction) await t.commit();

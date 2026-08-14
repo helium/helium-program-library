@@ -30,7 +30,7 @@ import { orpc } from "@/lib/orpc";
 // Add debounce utility function
 const debounce = <F extends (...args: any[]) => any>(
   func: F,
-  waitFor: number,
+  waitFor: number
 ) => {
   let timeout: NodeJS.Timeout;
 
@@ -49,7 +49,7 @@ const formatUsd = (value: number, decimals = 2, withSlippage = false) => {
   const multiplier = Math.pow(10, decimals);
   const slippageAdjustedValue = withSlippage ? value * 0.99 : value; // 1% slippage buffer
   return (Math.floor(slippageAdjustedValue * multiplier) / multiplier).toFixed(
-    decimals,
+    decimals
   );
 };
 
@@ -65,7 +65,7 @@ interface SendResponse {
 
 const getQuote = async (
   usdAmount: string,
-  bankAccountId: string,
+  bankAccountId: string
 ): Promise<QuoteResponse | null> => {
   try {
     return await client.fiat.getSendQuote({
@@ -96,7 +96,7 @@ const sendFunds = async ({
 
 const updateTransferSignature = async (
   bridgeTransferId: string,
-  signature: string,
+  signature: string
 ) => {
   try {
     await client.fiat.updateTransfer({
@@ -149,7 +149,7 @@ export function SendFundsModal({
     result: quoteResult,
     loading: isLoadingQuote,
   } = useAsyncCallback(async (amount: string) =>
-    getQuote(amount, bankAccount.id),
+    getQuote(amount, bankAccount.id)
   );
 
   const { data: fees } = useQuery({
@@ -166,7 +166,7 @@ export function SendFundsModal({
 
     const fixedFee = parseFloat(fees.developer_fee);
     const percentageFee = ceilToCent(
-      amount * (fees.developer_fee_percent / 100),
+      amount * (fees.developer_fee_percent / 100)
     );
 
     return {
@@ -209,13 +209,13 @@ export function SendFundsModal({
           onClose();
         },
       });
-    },
+    }
   );
 
   // Create debounced version of executeQuote
   const debouncedExecuteQuote = useMemo(
     () => debounce((amount: string) => executeQuote(amount), 500),
-    [executeQuote],
+    [executeQuote]
   );
 
   useEffect(() => {
@@ -228,13 +228,13 @@ export function SendFundsModal({
   const hntToken = useMemo(
     () =>
       tokenBalances?.tokens.find((token) => token.mint === HNT_MINT.toBase58()),
-    [tokenBalances],
+    [tokenBalances]
   );
   const totalUsdValue = hntToken?.balanceUsd || 0;
 
   const handleMaxClick = () => {
     const hntToken = tokenBalances?.tokens.find(
-      (token) => token.mint === HNT_MINT.toBase58(),
+      (token) => token.mint === HNT_MINT.toBase58()
     );
     if (hntToken?.balanceUsd) {
       setValue("usdAmount", formatUsd(hntToken.balanceUsd, 2, true));
@@ -246,7 +246,7 @@ export function SendFundsModal({
       await executeSubmit(data);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to send funds",
+        error instanceof Error ? error.message : "Failed to send funds"
       );
     }
   };
@@ -273,10 +273,10 @@ export function SendFundsModal({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <Label htmlFor="usdAmount">Amount (USD)</Label>
               <div className="flex items-center gap-2">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   Available: ${formatUsd(totalUsdValue, 2, true)}
                 </p>
                 <Button
@@ -305,7 +305,7 @@ export function SendFundsModal({
                   if (fees) {
                     const fixedFee = parseFloat(fees.developer_fee);
                     const percentageFee = ceilToCent(
-                      numValue * (fees.developer_fee_percent / 100),
+                      numValue * (fees.developer_fee_percent / 100)
                     );
                     const totalFeeAmount = fixedFee + percentageFee;
                     const amountAfterFees = numValue - totalFeeAmount;
@@ -319,25 +319,25 @@ export function SendFundsModal({
               })}
             />
             {errors.usdAmount && (
-              <p className="text-sm text-destructive">
+              <p className="text-destructive text-sm">
                 {errors.usdAmount.message}
               </p>
             )}
             {quoteResult && (
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   ≈ {toNumber(new BN(quoteResult.inAmount), 8)} HNT
                 </p>
                 {totalFees !== null && (
                   <>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       Fixed Fee: ${formatUsd(totalFees.fixed, 2)}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       Percentage Fee: ${formatUsd(totalFees.percentage, 2)} (
                       {fees?.developer_fee_percent}%)
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       Total Fees: ${formatUsd(totalFees.total, 2)}
                     </p>
                     <p className="text-sm">
@@ -366,8 +366,8 @@ export function SendFundsModal({
               {isSubmitting
                 ? "Sending..."
                 : isLoadingQuote
-                  ? "Loading quote..."
-                  : "Send"}
+                ? "Loading quote..."
+                : "Send"}
             </Button>
           </DialogFooter>
         </form>

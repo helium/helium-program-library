@@ -19,10 +19,10 @@ export interface MinimalSignatureStatus {
  */
 export function isBundleLanded(
   statuses: Array<MinimalSignatureStatus | null>,
-  transactionMetadata?: Array<Record<string, unknown> | undefined>,
+  transactionMetadata?: Array<Record<string, unknown> | undefined>
 ): boolean {
   const realStatuses = statuses.filter(
-    (_, i) => transactionMetadata?.[i]?.type !== "jito_tip",
+    (_, i) => transactionMetadata?.[i]?.type !== "jito_tip"
   );
   const toCheck = realStatuses.length > 0 ? realStatuses : statuses;
 
@@ -33,7 +33,20 @@ export function isBundleLanded(
       status != null &&
       status.err == null &&
       (status.confirmationStatus === "confirmed" ||
-        status.confirmationStatus === "finalized"),
+        status.confirmationStatus === "finalized")
+  );
+}
+
+/**
+ * Tags used by batches whose transactions were crafted by the client rather
+ * than this server (older wallet-app releases and third-party clients build
+ * their own claim/burn transactions and submit them without a Jito tip).
+ * Server-crafted bundles always include a tip, so a missing tip on these tags
+ * means a stale client, not a server bug.
+ */
+export function isClientCraftedBundleTag(tag?: string): boolean {
+  return Boolean(
+    tag && (tag.includes("implicit-burn") || tag.includes("claim-rewards")),
   );
 }
 

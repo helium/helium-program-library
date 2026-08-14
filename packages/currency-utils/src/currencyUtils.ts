@@ -43,7 +43,7 @@ export const getOraclePrice = async ({
   });
   const priceUpdate =
     await pythSolanaReceiver.receiver.account.priceUpdateV2.fetch(
-      HNT_PYTH_PRICE_FEED
+      HNT_PYTH_PRICE_FEED,
     );
   const { priceMessage } = priceUpdate;
 

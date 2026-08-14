@@ -2,9 +2,9 @@ import { Sequelize } from "sequelize";
 
 export const createPgIndexes = async ({
   indexConfigs,
-  sequelize
+  sequelize,
 }: {
-  indexConfigs: string[],
+  indexConfigs: string[];
   sequelize: Sequelize;
 }) => {
   try {

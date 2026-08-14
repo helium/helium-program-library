@@ -1,7 +1,5 @@
 import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
-import {
-  heliumCommonResolver
-} from "@helium/anchor-resolvers";
+import { heliumCommonResolver } from "@helium/anchor-resolvers";
 import { HplCrons } from "@helium/idls/lib/types/hpl_crons";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";

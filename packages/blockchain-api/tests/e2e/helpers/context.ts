@@ -13,7 +13,9 @@ export interface TestCtx {
   payer: Keypair;
   connection: Connection;
   client: RouterClient<typeof appRouter>;
-  safeClient: ReturnType<typeof createSafeClient<RouterClient<typeof appRouter>>>;
+  safeClient: ReturnType<
+    typeof createSafeClient<RouterClient<typeof appRouter>>
+  >;
 }
 
 export interface SetupTestCtxOptions {
@@ -28,11 +30,11 @@ export interface SetupTestCtxOptions {
 }
 
 export async function setupTestCtx(
-  options: SetupTestCtxOptions = {},
+  options: SetupTestCtxOptions = {}
 ): Promise<TestCtx> {
   if (!process.env.ASSET_ENDPOINT) {
     throw new Error(
-      "ASSET_ENDPOINT is not set. You need to set it to a DAS capable mainnet endpoint.",
+      "ASSET_ENDPOINT is not set. You need to set it to a DAS capable mainnet endpoint."
     );
   }
   applyMinimalServerEnv();

@@ -87,7 +87,7 @@ export async function syncWalletHistory(wallet: string): Promise<void> {
         ) {
           console.error(
             `Failed to insert wallet history for ${tx.signature}:`,
-            error,
+            error
           );
         }
       }

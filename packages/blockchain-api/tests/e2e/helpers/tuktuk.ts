@@ -67,12 +67,16 @@ export async function runAllTasks(
       feePayer: crankTurner.publicKey,
     });
     const tx = toVersionedTx(
-      await populateMissingDraftInfo(provider.connection, {
-        instructions: draftIxs,
-        feePayer: crankTurner.publicKey,
-        signers: [crankTurner],
-        addressLookupTableAddresses: taskQueueAcc.lookupTables,
-      }, "finalized")
+      await populateMissingDraftInfo(
+        provider.connection,
+        {
+          instructions: draftIxs,
+          feePayer: crankTurner.publicKey,
+          signers: [crankTurner],
+          addressLookupTableAddresses: taskQueueAcc.lookupTables,
+        },
+        "finalized"
+      )
     );
     await tx.sign([crankTurner]);
     console.log(

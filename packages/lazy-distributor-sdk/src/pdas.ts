@@ -1,7 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 
-
 export function lazyDistributorKey(
   mint: PublicKey,
   programId: PublicKey = PROGRAM_ID
@@ -18,7 +17,11 @@ export function recipientKey(
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("recipient", "utf-8"), lazyDistributor.toBuffer(), asset.toBuffer()],
+    [
+      Buffer.from("recipient", "utf-8"),
+      lazyDistributor.toBuffer(),
+      asset.toBuffer(),
+    ],
     programId
   );
 }

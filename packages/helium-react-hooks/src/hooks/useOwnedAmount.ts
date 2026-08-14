@@ -8,7 +8,11 @@ import { useSolOwnedAmount } from "./useSolOwnedAmount";
 export function useOwnedAmount(
   wallet: PublicKey | undefined | null,
   mint: PublicKey | undefined | null
-): { amount: bigint | undefined , decimals: number | undefined, loading: boolean } {
+): {
+  amount: bigint | undefined;
+  decimals: number | undefined;
+  loading: boolean;
+} {
   const { amount: solOwnedAmount } = useSolOwnedAmount(wallet || undefined);
   const { associatedAccount, loading: loadingAssoc } =
     useAssociatedTokenAccount(wallet, mint);
@@ -16,9 +20,9 @@ export function useOwnedAmount(
 
   const amount = useMemo(() => {
     if (mint?.equals(NATIVE_MINT)) {
-      return solOwnedAmount
+      return solOwnedAmount;
     } else if (associatedAccount) {
-      return associatedAccount.amount
+      return associatedAccount.amount;
     }
   }, [solOwnedAmount, associatedAccount?.amount]);
   return {

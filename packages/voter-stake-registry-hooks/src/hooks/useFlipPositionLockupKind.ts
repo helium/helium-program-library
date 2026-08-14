@@ -29,10 +29,7 @@ export const useFlipPositionLockupKind = () => {
         instructions: TransactionInstruction[]
       ) => Promise<void>;
     }) => {
-      const isInvalid =
-        !provider ||
-        !provider.wallet ||
-        !unixNow;
+      const isInvalid = !provider || !provider.wallet || !unixNow;
       const lockupKind = Object.keys(position.lockup.kind)[0] as string;
       const isConstant = lockupKind === "constant";
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
@@ -54,13 +51,16 @@ export const useFlipPositionLockupKind = () => {
         const kind = isConstant ? { cliff: {} } : { constant: {} };
         const isDao = Boolean(await provider.connection.getAccountInfo(dao));
         // Max 4 years
-        const positionLockupPeriodInDays = Math.min(MAX_LOCKUP_PERIOD_IN_DAYS, Math.ceil(
-          secsToDays(
-            isConstant
-              ? position.lockup.endTs.sub(position.lockup.startTs).toNumber()
-              : position.lockup.endTs.sub(new BN(unixNow)).toNumber()
+        const positionLockupPeriodInDays = Math.min(
+          MAX_LOCKUP_PERIOD_IN_DAYS,
+          Math.ceil(
+            secsToDays(
+              isConstant
+                ? position.lockup.endTs.sub(position.lockup.startTs).toNumber()
+                : position.lockup.endTs.sub(new BN(unixNow)).toNumber()
+            )
           )
-        ));
+        );
 
         if (isDao) {
           instructions.push(

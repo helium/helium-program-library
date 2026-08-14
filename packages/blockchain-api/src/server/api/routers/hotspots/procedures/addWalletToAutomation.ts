@@ -47,5 +47,5 @@ export const addWalletToAutomation =
           index,
         },
       });
-    },
+    }
   );

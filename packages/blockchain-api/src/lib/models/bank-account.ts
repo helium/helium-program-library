@@ -69,5 +69,5 @@ BankAccount.init(
     tableName: "bank_accounts",
     underscored: true,
     timestamps: true,
-  },
+  }
 );

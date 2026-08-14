@@ -1,9 +1,13 @@
-import { heliumEntityManagerResolvers, keyToAssetKey, programApprovalKey } from "@helium/helium-entity-manager-sdk";
+import {
+  heliumEntityManagerResolvers,
+  keyToAssetKey,
+  programApprovalKey,
+} from "@helium/helium-entity-manager-sdk";
 import {
   ataResolver,
   combineResolvers,
   heliumCommonResolver,
-  resolveIndividual
+  resolveIndividual,
 } from "@helium/anchor-resolvers";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
@@ -33,17 +37,26 @@ export const mobileEntityManagerResolvers = combineResolvers(
       accounts.dao &&
       idlIx.name === "issueCarrierNftV0"
     ) {
-      const program = await init(provider as AnchorProvider)
-      const carrier = await program.account.carrierV0.fetchNullable(accounts.carrier as PublicKey);
+      const program = await init(provider as AnchorProvider);
+      const carrier = await program.account.carrierV0.fetchNullable(
+        accounts.carrier as PublicKey
+      );
       if (!carrier) {
-        return
+        return;
       }
       return keyToAssetKey(
         accounts.dao as PublicKey,
         Buffer.from(carrier.name, "utf-8")
       )[0];
-    } else if (path[path.length - 1] === "incentiveEscrowProgram" && accounts.carrier && args[0].name) {
-      return incentiveProgramKey(accounts.carrier as PublicKey, args[0].name)[0];
+    } else if (
+      path[path.length - 1] === "incentiveEscrowProgram" &&
+      accounts.carrier &&
+      args[0].name
+    ) {
+      return incentiveProgramKey(
+        accounts.carrier as PublicKey,
+        args[0].name
+      )[0];
     } else if (
       path[path.length - 1] === "keyToAsset" &&
       accounts.carrier &&

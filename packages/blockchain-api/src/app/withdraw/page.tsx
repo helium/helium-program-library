@@ -25,8 +25,8 @@ export default async function WithdrawPage({
   ];
 
   return (
-    <div className="container max-w-4xl mx-auto py-8 px-4 sm:px-6">
-      <h1 className="text-2xl font-bold mb-12 text-foreground text-center">
+    <div className="container mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <h1 className="text-foreground mb-12 text-center text-2xl font-bold">
         Withdraw to Bank Account
       </h1>
 

@@ -75,7 +75,7 @@ export default function RegisterBankPage() {
       onError: (error) => {
         console.error("Error registering bank account:", error);
       },
-    },
+    }
   );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -100,16 +100,16 @@ export default function RegisterBankPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">Register Bank Account</h1>
+      <h1 className="mb-6 text-2xl font-bold">Register Bank Account</h1>
 
       {error && (
-        <div className="mb-4 p-4 text-red-600 bg-red-50 rounded-md">
+        <div className="mb-4 rounded-md bg-red-50 p-4 text-red-600">
           {error.message ||
             "Failed to register bank account. Please try again."}
         </div>
       )}
 
-      <Card className="max-w-lg mx-auto p-6">
+      <Card className="mx-auto max-w-lg p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>

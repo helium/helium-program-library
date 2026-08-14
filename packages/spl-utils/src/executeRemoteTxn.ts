@@ -67,9 +67,14 @@ export async function executeTxnsInOrder(
     return [
       ...(await promiseAllInOrder(
         txns.map((txn) => async () => {
-          const { txid } = await sendAndConfirmWithRetry(provider.connection, txn, {
-            skipPreflight: true,
-          }, "confirmed");
+          const { txid } = await sendAndConfirmWithRetry(
+            provider.connection,
+            txn,
+            {
+              skipPreflight: true,
+            },
+            "confirmed"
+          );
 
           return txid;
         })

@@ -4,7 +4,7 @@ import {
   fetchBackwardsCompatibleIdl,
   sendAndConfirmWithRetry,
   toBN,
-  toVersionedTx
+  toVersionedTx,
 } from "@helium/spl-utils";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
@@ -151,7 +151,7 @@ export const useSplitPosition = () => {
             provider,
             instructions
           );
-          const transactions = drafts.map(toVersionedTx)
+          const transactions = drafts.map(toVersionedTx);
 
           let i = 0;
           for (const tx of await provider.wallet.signAllTransactions(
@@ -166,7 +166,7 @@ export const useSplitPosition = () => {
               }
             });
 
-            i++
+            i++;
             await sendAndConfirmWithRetry(
               provider.connection,
               Buffer.from(tx.serialize()),

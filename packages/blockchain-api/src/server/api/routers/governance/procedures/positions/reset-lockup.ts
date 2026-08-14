@@ -35,8 +35,9 @@ export const resetLockup = publicProcedure.governance.resetLockup.handler(
     const hsdProgram = await initHsd(provider);
     const [positionPubkey] = positionKey(positionMintPubkey);
 
-    const positionAcc =
-      await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
+    const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
+      positionPubkey
+    );
 
     if (!positionAcc) {
       throw errors.NOT_FOUND({ message: "Position not found" });
@@ -46,11 +47,11 @@ export const resetLockup = publicProcedure.governance.resetLockup.handler(
       connection,
       positionMintPubkey,
       walletPubkey,
-      errors,
+      errors
     );
 
     const registrar = await vsrProgram.account.registrar.fetch(
-      positionAcc.registrar,
+      positionAcc.registrar
     );
     const depositMint =
       registrar.votingMints[positionAcc.votingMintConfigIdx].mint;
@@ -67,8 +68,8 @@ export const resetLockup = publicProcedure.governance.resetLockup.handler(
         {
           kind: toLockupKindArg(lockupKind as LockupKindType),
           periods: lockupPeriodsInDays,
-        },
-      ),
+        }
+      )
     );
 
     const tx = await buildVersionedTransaction({
@@ -117,8 +118,8 @@ export const resetLockup = publicProcedure.governance.resetLockup.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58(),
+        NATIVE_MINT.toBase58()
       ),
     };
-  },
+  }
 );

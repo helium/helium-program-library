@@ -18,7 +18,7 @@ export async function run(args: any = process.argv) {
     },
     token: {
       type: "string",
-      default: "hnt"
+      default: "hnt",
     },
     state: {
       type: "string",
@@ -27,8 +27,8 @@ export async function run(args: any = process.argv) {
     },
     decimals: {
       type: "number",
-      default: 8
-    }
+      default: 8,
+    },
   });
 
   const argv = await yarg.argv;
@@ -45,5 +45,5 @@ export async function run(args: any = process.argv) {
     new anchor.BN(0)
   );
 
-  console.log(toNumber(total, argv.decimals))
+  console.log(toNumber(total, argv.decimals));
 }

@@ -30,7 +30,10 @@ jobs:
           key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo build --locked
       - run: cargo fmt -- --check
-      - run: cargo clippy --all-targets -- -D warnings -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A clippy::manual_is_multiple_of -A ambiguous_glob_reexports -A unexpected-cfgs
+      # or_fun_call is on because `ok_or(error!(..))` builds the error on the success path too,
+      # and an AnchorError owns two Strings. The heap a program gets is a bump allocator that
+      # never frees, so errors that are never returned still consume it.
+      - run: cargo clippy --all-targets -- -D warnings -D clippy::or_fun_call -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A clippy::manual_is_multiple_of -A ambiguous_glob_reexports -A unexpected-cfgs
 
   check-idls-changeset:
     name: Check @helium/idls Changeset

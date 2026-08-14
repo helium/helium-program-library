@@ -5,13 +5,11 @@ import { AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import { expect } from "chai";
-import {
-  ThresholdType
-} from "../packages/circuit-breaker-sdk/src";
+import { ThresholdType } from "../packages/circuit-breaker-sdk/src";
 import {
   init,
   PROGRAM_ID,
-  toU128
+  toU128,
 } from "../packages/treasury-management-sdk/src";
 import { TreasuryManagement } from "../target/types/treasury_management";
 
@@ -54,15 +52,16 @@ describe("treasury-management", () => {
       });
 
     await method.rpc({ skipPreflight: true });
-    
+
     const pubkeys = await method.pubkeys();
     const treasuryManagement = pubkeys.treasuryManagement;
 
-    const treasuryManagementAcc = await program.account.treasuryManagementV0.fetch(treasuryManagement!);
+    const treasuryManagementAcc =
+      await program.account.treasuryManagementV0.fetch(treasuryManagement!);
 
     expect(treasuryManagementAcc.authority.toBase58()).to.eq(me.toBase58());
     expect(treasuryManagementAcc.freezeUnixTime.toNumber()).to.eq(100000000000);
-  })
+  });
 
   describe("with treasury management", () => {
     let treasuryMint: PublicKey;
@@ -95,7 +94,12 @@ describe("treasury-management", () => {
 
       await method.rpc({ skipPreflight: true });
       const pubkeys = await method.pubkeys();
-      await createAtaAndMint(provider, treasuryMint, new BN(10000), pubkeys.treasuryManagement);
+      await createAtaAndMint(
+        provider,
+        treasuryMint,
+        new BN(10000),
+        pubkeys.treasuryManagement
+      );
       treasuryManagement = pubkeys.treasuryManagement!;
     });
 
@@ -119,20 +123,23 @@ describe("treasury-management", () => {
       const treasuryManagementAcc =
         await program.account.treasuryManagementV0.fetch(treasuryManagement!);
 
-      expect(treasuryManagementAcc.authority.toBase58()).to.eq(newAuth.publicKey.toBase58());
+      expect(treasuryManagementAcc.authority.toBase58()).to.eq(
+        newAuth.publicKey.toBase58()
+      );
       expect(treasuryManagementAcc.freezeUnixTime.toNumber()).to.eq(10);
       // @ts-ignore
       expect(treasuryManagementAcc.curve.exponentialCurveV0.k.toNumber()).to.eq(
         5000000000000
       );
-    })
+    });
 
-    it ("allows redemption", async () => {
+    it("allows redemption", async () => {
       // dR = (R / S^(1 + k)) ((S + dS)^(1 + k) - S^(1 + k))
       // 100 / (100 ^ (1 + 2)) ((100 - 50)^(1+2) - 100^(1 + 2))
       // 100 / 100^3 (50^3 - 100^3)
 
-      const outputAmtRaw = Math.pow(100, -2) * (Math.pow(50, 3) - Math.pow(100, 3)) * 100;
+      const outputAmtRaw =
+        Math.pow(100, -2) * (Math.pow(50, 3) - Math.pow(100, 3)) * 100;
       // On-chain u128 fixed-point truncation loses 1 unit vs JS floating-point
       const outputAmt = Math.floor(Math.abs(outputAmtRaw)) - 1;
 
@@ -167,6 +174,6 @@ describe("treasury-management", () => {
       ).amount;
       expect(Number(balance)).to.eq(5000);
       expect(Number(treasBalance)).to.eq(outputAmt);
-    })
-  })
-})
+    });
+  });
+});

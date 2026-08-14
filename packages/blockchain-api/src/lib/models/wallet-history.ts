@@ -65,7 +65,7 @@ WalletHistory.init(
     modelName: "wallet_history",
     tableName: "wallet_history",
     underscored: true,
-  },
+  }
 );
 
 export default WalletHistory;

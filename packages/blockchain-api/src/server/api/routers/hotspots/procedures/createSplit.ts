@@ -40,6 +40,7 @@ import {
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
+  serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import {
@@ -100,11 +101,10 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     // Ensure Lazy Distributor Recipient exists for the asset
     const recipientK = recipientKey(
       new PublicKey(lazyDistributor),
-      new PublicKey(assetId)
+      new PublicKey(assetId),
     )[0];
-    const recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
-      recipientK
-    );
+    const recipientAcc =
+      await ldProgram.account.recipientV0.fetchNullable(recipientK);
     const instructions: TransactionInstruction[] = [];
 
     if (!recipientAcc) {
@@ -117,7 +117,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
             assetEndpoint: env.SOLANA_RPC_URL,
             lazyDistributor: new PublicKey(lazyDistributor),
           })
-        ).instruction()
+        ).instruction(),
       );
     }
 
@@ -136,12 +136,12 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
                     fixed: {
                       amount: await resolveTokenAmountInput(
                         split.tokenAmount,
-                        HNT_MINT.toBase58()
+                        HNT_MINT.toBase58(),
                       ),
                     },
                   }
                 : { share: { amount: split.amount } },
-          }))
+          })),
         ),
         schedule: rewardsSchedule,
         preTask: {
@@ -166,15 +166,14 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
         fromPubkey: wallet.publicKey,
         toPubkey: pubkeys.miniFanout!,
         lamports: FANOUT_FUNDING_AMOUNT,
-      })
+      }),
     );
 
-    const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetchNullable(
-      TASK_QUEUE_ID
-    );
+    const taskQueueAcc =
+      await tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE_ID);
     const [taskId, preTaskId] = nextAvailableTaskIds(
       taskQueueAcc!.taskBitmap,
-      2
+      2,
     );
 
     // Schedule a task for the mini fanout
@@ -227,7 +226,8 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
       lazyDistributor,
     });
 
-    if (shouldUseJitoBundle(txs.length, getCluster())) {
+    const useJito = shouldUseJitoBundle(txs.length, getCluster());
+    if (useJito) {
       txs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
     }
 
@@ -236,16 +236,12 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     const rentCost =
       RENT_COSTS.MINI_FANOUT + RENT_COSTS.TUKTUK_TASK * 2 + recipientRent;
     const txFees = await getTotalTransactionFees(provider.connection, txs);
-    const cluster = getCluster();
-    const jitoTipCost =
-      (cluster === "mainnet" || cluster === "mainnet-beta") && txs.length > 1
-        ? getJitoTipAmountLamports()
-        : 0;
+    const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
     const estimatedSolFeeLamports =
       txFees + jitoTipCost + rentCost + FANOUT_FUNDING_AMOUNT;
 
     const walletBalance = await provider.connection.getBalance(
-      new PublicKey(walletAddress)
+      new PublicKey(walletAddress),
     );
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({
@@ -259,15 +255,16 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
 
     return {
       transactionData: {
-        transactions: txs.map((tx) => ({
-          serializedTransaction: Buffer.from(tx.serialize()).toString("base64"),
-          metadata: {
+        transactions: serializeWithTipMetadata(
+          txs,
+          {
             type: "add_split",
             description: "Create split",
             hotspotKey: assetId,
             recipients: rewardsSplit.map((s) => s.address),
           },
-        })),
+          useJito,
+        ),
         parallel: true,
         tag,
         actionMetadata: {
@@ -285,8 +282,8 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

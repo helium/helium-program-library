@@ -1,8 +1,7 @@
 import {
   ataResolver,
-  combineResolvers, heliumCommonResolver
-} from "@helium/anchor-resolvers"
-
-export const welcomePackResolvers = combineResolvers(
+  combineResolvers,
   heliumCommonResolver,
-)
+} from "@helium/anchor-resolvers";
+
+export const welcomePackResolvers = combineResolvers(heliumCommonResolver);

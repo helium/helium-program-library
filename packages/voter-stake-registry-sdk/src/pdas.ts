@@ -32,7 +32,11 @@ export const proxyVoteMarkerKey = (
   programId: PublicKey = PROGRAM_ID
 ) =>
   PublicKey.findProgramAddressSync(
-    [Buffer.from("proxy_marker", "utf-8"), voter.toBuffer(), proposal.toBuffer()],
+    [
+      Buffer.from("proxy_marker", "utf-8"),
+      voter.toBuffer(),
+      proposal.toBuffer(),
+    ],
     programId
   );
 

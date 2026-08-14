@@ -158,7 +158,11 @@ export async function run(args: any = process.argv) {
   // `issue_rewards_v0` rejects on its account pin. That would fail every epoch close inside a
   // supplement window. Members, owner and schedule do not enter the derivation, so this only
   // constrains the two inputs that have to stay fixed. Checked before anything is sent.
-  const tokenAccount = getAssociatedTokenAddressSync(HNT_MINT, miniFanout!, true);
+  const tokenAccount = getAssociatedTokenAddressSync(
+    HNT_MINT,
+    miniFanout!,
+    true
+  );
   if (!tokenAccount.equals(COUNCIL_FANOUT_TOKEN_ACCOUNT)) {
     throw new Error(
       `Derived fanout token account ${tokenAccount.toBase58()} does not match the ` +

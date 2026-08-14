@@ -1,7 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  IdlInstructionAccountItem,
-} from "@coral-xyz/anchor/dist/cjs/idl";
+import { IdlInstructionAccountItem } from "@coral-xyz/anchor/dist/cjs/idl";
 import { CustomAccountResolver } from "@coral-xyz/anchor/dist/cjs/program/accounts-resolver";
 import { AllInstructions } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
 import { PublicKey } from "@solana/web3.js";
@@ -110,7 +108,7 @@ export function resolveIndividual<T extends anchor.Idl>(
     }
     return {
       accounts,
-      resolved
-    }
+      resolved,
+    };
   };
 }

@@ -1,7 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
-import { init as initDataCredits, mintDataCredits } from "@helium/data-credits-sdk";
+import {
+  init as initDataCredits,
+  mintDataCredits,
+} from "@helium/data-credits-sdk";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { notEmittedKey, init as initBurn } from "@helium/no-emit-sdk";
 import {
@@ -329,11 +332,13 @@ describe("helium-entity-manager", () => {
       }));
 
       await provider.sendAll(
-        (await mintDataCredits({
-          program: dcProgram,
-          hntAmount: toBN(startDcBal, 8),
-          dcMint,
-        })).txs
+        (
+          await mintDataCredits({
+            program: dcProgram,
+            hntAmount: toBN(startDcBal, 8),
+            dcMint,
+          })
+        ).txs
       );
     });
     it("issues and onboards an iot data only hotspot", async () => {
@@ -736,11 +741,13 @@ describe("helium-entity-manager", () => {
       await initTestMaker(hemProgram, provider, rewardableEntityConfig, dao);
 
       await provider.sendAll(
-        (await mintDataCredits({
-          program: dcProgram,
-          hntAmount: toBN(startDcBal, 8),
-          dcMint,
-        })).txs
+        (
+          await mintDataCredits({
+            program: dcProgram,
+            hntAmount: toBN(startDcBal, 8),
+            dcMint,
+          })
+        ).txs
       );
 
       maker = makerConf.maker;
@@ -918,12 +925,14 @@ describe("helium-entity-manager", () => {
 
         await method.rpc({ skipPreflight: true });
         await provider.sendAll(
-          (await mintDataCredits({
-            program: dcProgram,
-            hntAmount: toBN(startDcBal, 8),
-            dcMint,
-            recipient: hotspotOwner.publicKey,
-          })).txs
+          (
+            await mintDataCredits({
+              program: dcProgram,
+              hntAmount: toBN(startDcBal, 8),
+              dcMint,
+              recipient: hotspotOwner.publicKey,
+            })
+          ).txs
         );
       });
 
@@ -1162,11 +1171,13 @@ describe("helium-entity-manager", () => {
       await initTestMaker(hemProgram, provider, rewardableEntityConfig, dao);
 
       await provider.sendAll(
-        (await mintDataCredits({
-          program: dcProgram,
-          hntAmount: toBN(startDcBal, 8),
-          dcMint,
-        })).txs
+        (
+          await mintDataCredits({
+            program: dcProgram,
+            hntAmount: toBN(startDcBal, 8),
+            dcMint,
+          })
+        ).txs
       );
 
       maker = makerConf.maker;
@@ -1284,12 +1295,14 @@ describe("helium-entity-manager", () => {
         await method.rpc({ skipPreflight: true });
 
         await provider.sendAll(
-          (await mintDataCredits({
-            program: dcProgram,
-            hntAmount: toBN(startDcBal, 8),
-            dcMint,
-            recipient: hotspotOwner.publicKey,
-          })).txs
+          (
+            await mintDataCredits({
+              program: dcProgram,
+              hntAmount: toBN(startDcBal, 8),
+              dcMint,
+              recipient: hotspotOwner.publicKey,
+            })
+          ).txs
         );
       });
 

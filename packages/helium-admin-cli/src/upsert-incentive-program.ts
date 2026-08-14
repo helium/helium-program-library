@@ -1,6 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
-import { carrierKey, incentiveProgramKey, init as initMem } from "@helium/mobile-entity-manager-sdk";
+import {
+  carrierKey,
+  incentiveProgramKey,
+  init as initMem,
+} from "@helium/mobile-entity-manager-sdk";
 import { MOBILE_MINT } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import os from "os";
@@ -83,9 +87,12 @@ export async function run(args: any = process.argv) {
   const carrierAcc = await memProgram.account.carrierV0.fetch(carrier);
   const issuingAuthority = carrierAcc.issuingAuthority;
   const incentiveProgramK = incentiveProgramKey(carrier, argv.name)[0];
-  const incentiveProgram = await memProgram.account.incentiveEscrowProgramV0.fetchNullable(incentiveProgramK);
+  const incentiveProgram =
+    await memProgram.account.incentiveEscrowProgramV0.fetchNullable(
+      incentiveProgramK
+    );
 
-  let instructions: TransactionInstruction[] = []
+  let instructions: TransactionInstruction[] = [];
   if (!incentiveProgram) {
     console.log("Creating incentive program");
     instructions.push(
@@ -97,22 +104,27 @@ export async function run(args: any = process.argv) {
           stopTs: new anchor.BN(argv.stopTs),
           name: argv.name,
         })
-        .accountsPartial({ carrier, recipient: new PublicKey(argv.recipient), issuingAuthority })
+        .accountsPartial({
+          carrier,
+          recipient: new PublicKey(argv.recipient),
+          issuingAuthority,
+        })
         .instruction()
     );
   } else {
     instructions.push(
-      await memProgram.methods.updateIncentiveProgramV0({
-        startTs: new anchor.BN(argv.startTs),
-        stopTs: new anchor.BN(argv.stopTs),
-        shares: argv.shares,
-      })
-      .accountsPartial({
-        carrier,
-        incentiveEscrowProgram: incentiveProgramK,
-        issuingAuthority
-      })
-      .instruction()
+      await memProgram.methods
+        .updateIncentiveProgramV0({
+          startTs: new anchor.BN(argv.startTs),
+          stopTs: new anchor.BN(argv.stopTs),
+          shares: argv.shares,
+        })
+        .accountsPartial({
+          carrier,
+          incentiveEscrowProgram: incentiveProgramK,
+          issuingAuthority,
+        })
+        .instruction()
     );
   }
 

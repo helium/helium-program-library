@@ -6,7 +6,10 @@ import { useIdl } from "./useIdl";
 import { useIdlAccount } from "./useIdlAccount";
 import { useEffect } from "react";
 
-export function useAnchorAccount<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
+export function useAnchorAccount<
+  IDL extends Idl,
+  A extends keyof AllAccountsMap<IDL>
+>(
   key: PublicKey | undefined,
   type: A,
   // Perf optimization - set if the account will never change, to lower websocket usage.
@@ -15,7 +18,12 @@ export function useAnchorAccount<IDL extends Idl, A extends keyof AllAccountsMap
   error?: Error;
 } {
   const { account: rawAccount } = useAccount(key);
-  const { account: idlAccount, info: idl, error, loading } = useIdl<IDL>(rawAccount?.owner);
+  const {
+    account: idlAccount,
+    info: idl,
+    error,
+    loading,
+  } = useIdl<IDL>(rawAccount?.owner);
   useEffect(() => {
     if (!loading && rawAccount && !idl && !idlAccount) {
       console.warn(`Idl not found for ${rawAccount.owner.toBase58()}`, error);

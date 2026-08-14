@@ -1,44 +1,44 @@
-import * as anchor from '@coral-xyz/anchor';
-import { PublicKey } from '@solana/web3.js';
+import * as anchor from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
 import {
   createUpdateMetadataAccountV2Instruction,
   Metadata,
-  PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID
-} from '@metaplex-foundation/mpl-token-metadata'
-import * as multisig from '@sqds/multisig';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
+  PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID,
+} from "@metaplex-foundation/mpl-token-metadata";
+import * as multisig from "@sqds/multisig";
+import os from "os";
+import yargs from "yargs/yargs";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     mint: {
       required: true,
-      type: 'string',
-      describe: 'Token address to update metadata for',
+      type: "string",
+      describe: "Token address to update metadata for",
     },
     uri: {
-      type: 'string',
-      describe: 'The new metadata URI',
+      type: "string",
+      describe: "The new metadata URI",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     newAuthority: {
-      type: 'string',
-      describe: 'New authority for the token',
+      type: "string",
+      describe: "New authority for the token",
     },
   });
 
@@ -93,14 +93,16 @@ export async function run(args: any = process.argv) {
               sellerFeeBasisPoints: metadataAccount.data.sellerFeeBasisPoints,
               creators: metadataAccount.data.creators || null,
               collection: null,
-              uses: null
+              uses: null,
             },
-            updateAuthority: argv.newAuthority ? new PublicKey(argv.newAuthority) : metadataAccount.updateAuthority,
+            updateAuthority: argv.newAuthority
+              ? new PublicKey(argv.newAuthority)
+              : metadataAccount.updateAuthority,
             primarySaleHappened: metadataAccount.primarySaleHappened,
-            isMutable: metadataAccount.isMutable
-          }
+            isMutable: metadataAccount.isMutable,
+          },
         }
-      )
+      ),
     ];
 
     await sendInstructionsOrSquadsV4({
@@ -110,9 +112,11 @@ export async function run(args: any = process.argv) {
       signers: [],
     });
 
-    console.log(`Successfully created transaction to update metadata URI for token ${argv.token} to ${argv.uri}`);
+    console.log(
+      `Successfully created transaction to update metadata URI for token ${argv.token} to ${argv.uri}`
+    );
   } catch (err) {
-    console.error('Failed to update token metadata:', err);
+    console.error("Failed to update token metadata:", err);
     process.exit(1);
   }
-} 
+}

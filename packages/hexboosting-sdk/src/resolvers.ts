@@ -14,12 +14,17 @@ export const hexboostingResolvers = combineResolvers(
     if (path[path.length - 1] === "subDao" && accounts.dntMint) {
       return subDaoKey(accounts.dntMint as PublicKey)[0];
     }
-    if (path[path.length - 1] === "boostedHex" && accounts.boostConfig && args[0].deviceType && args[0].location) {
+    if (
+      path[path.length - 1] === "boostedHex" &&
+      accounts.boostConfig &&
+      args[0].deviceType &&
+      args[0].location
+    ) {
       return boostedHexKey(
         accounts.boostConfig as PublicKey,
         args[0].deviceType,
         args[0].location
-      )[0]
+      )[0];
     }
   }),
   ataResolver({

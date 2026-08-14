@@ -5,10 +5,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
-import {
-  init as initHsd,
-  subDaoKey,
-} from "@helium/helium-sub-daos-sdk";
+import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -65,8 +62,8 @@ export async function run(args: any = process.argv) {
   const instructions: TransactionInstruction[] = [];
 
   const dntMint = new PublicKey(argv.dntMint);
-  const subDaoK = subDaoKey(dntMint)[0]
-  const subDao = await hsdProgram.account.subDaoV0.fetch(subDaoK)
+  const subDaoK = subDaoKey(dntMint)[0];
+  const subDao = await hsdProgram.account.subDaoV0.fetch(subDaoK);
   instructions.push(
     await program.methods
       .updateBoostConfigV0({

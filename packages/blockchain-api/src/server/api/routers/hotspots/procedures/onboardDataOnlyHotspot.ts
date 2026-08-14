@@ -84,7 +84,7 @@ export const onboardDataOnlyHotspot =
         const subDao = subDaoKey(IOT_MINT)[0];
         const rewardableEntityConfig = rewardableEntityConfigKey(
           subDao,
-          "IOT",
+          "IOT"
         )[0];
         onboardIx = await program.methods
           .onboardDataOnlyIotHotspotV0({
@@ -110,7 +110,7 @@ export const onboardDataOnlyHotspot =
         const subDao = subDaoKey(MOBILE_MINT)[0];
         const rewardableEntityConfig = rewardableEntityConfigKey(
           subDao,
-          "MOBILE",
+          "MOBILE"
         )[0];
         onboardIx = await program.methods
           .onboardDataOnlyMobileHotspotV0({
@@ -125,7 +125,7 @@ export const onboardDataOnlyHotspot =
             keyToAsset,
             mobileInfo: mobileInfoKey(
               rewardableEntityConfig,
-              hotspotAddress,
+              hotspotAddress
             )[0],
             subDao,
             merkleTree: accounts.merkleTree,
@@ -173,8 +173,8 @@ export const onboardDataOnlyHotspot =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(totalFee),
-          NATIVE_MINT.toBase58(),
+          NATIVE_MINT.toBase58()
         ),
       };
-    },
+    }
   );

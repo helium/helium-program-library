@@ -8,8 +8,16 @@ import {
   taskQueueAuthorityKey,
   init as tuktukInit,
 } from "@helium/tuktuk-sdk";
-import { init, proxyVoteMarkerKey, voteMarkerKey } from "@helium/voter-stake-registry-sdk";
-import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import {
+  init,
+  proxyVoteMarkerKey,
+  voteMarkerKey,
+} from "@helium/voter-stake-registry-sdk";
+import {
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import { useCallback, useMemo } from "react";
 import { useAsyncCallback } from "react-async-hook";
 import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
@@ -49,9 +57,10 @@ export const useRelinquishVote = (proposal: PublicKey) => {
     (choice: number) => {
       if (!markers) return false;
 
-      return markers.some((_, index) =>
-        canPositionRelinquishVote(index, choice)
-      ) || (proxyVoteMarker && proxyVoteMarker.choices.includes(choice));
+      return (
+        markers.some((_, index) => canPositionRelinquishVote(index, choice)) ||
+        (proxyVoteMarker && proxyVoteMarker.choices.includes(choice))
+      );
     },
     [markers, canPositionRelinquishVote, proxyVoteMarker]
   );
@@ -80,7 +89,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
       } else {
         const vsrProgram = await init(provider);
         const hsdProgram = await initHsd(provider);
-        
+
         const proxyVoteInstructions: TransactionInstruction[] = [];
         if (sortedPositions.some((p) => p.isProxiedToMe)) {
           const proxyVoteMarker = proxyVoteMarkerKey(
@@ -97,10 +106,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
             const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
               TASK_QUEUE_ID
             );
-            const task1 = nextAvailableTaskIds(
-              taskQueue.taskBitmap,
-              1
-            )[0];
+            const task1 = nextAvailableTaskIds(taskQueue.taskBitmap, 1)[0];
             const queueAuthority = PublicKey.findProgramAddressSync(
               [Buffer.from("queue_authority")],
               hplCronsProgram.programId
@@ -187,10 +193,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
         } else {
           await batchParallelInstructions({
             provider,
-            instructions: [
-              ...proxyVoteInstructions,
-              ...normalVoteInstructions,
-            ],
+            instructions: [...proxyVoteInstructions, ...normalVoteInstructions],
             onProgress,
             triesRemaining: 10,
             extraSigners: [],

@@ -17,12 +17,11 @@ const INVALIDATION_WAIT = 1000;
 const INVALIDATE_ALL_RECORD_THRESHOLD = 10000;
 // Headers used across all Cloudflare invalidation requests
 const CLOUDFLARE_HEADERS = {
-  'Authorization': `Bearer ${CLOUDFLARE_API_TOKEN}`,
-  'Content-Type': 'application/json',
+  Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+  "Content-Type": "application/json",
 };
 // URL used across all Cloudflare invalidation requests
 const CLOUDFLARE_API_URL = `https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache`;
-
 
 async function run() {
   const date = new Date();
@@ -34,7 +33,7 @@ async function run() {
   // - /:eccCompact
   // Note that the /v2/hotspots route does not need
   // cache invalidation due to usage of origin response
-  // headers preventing caching of non-cacheable assets 
+  // headers preventing caching of non-cacheable assets
   // (e.g., the end of the result list)
   const limit = 10000;
   let lastId = null;
@@ -77,7 +76,7 @@ async function run() {
 
   if (totalCount >= INVALIDATE_ALL_RECORD_THRESHOLD) {
     const arg = {
-      purge_everything: true
+      purge_everything: true,
     };
 
     await invalidate(arg);
@@ -128,20 +127,20 @@ async function run() {
   } while (entities.length === limit);
 
   // Split the paths into batches of 30
-  const batches = chunks(paths, 30)
+  const batches = chunks(paths, 30);
 
   // Process each batch of invalidations
   let i = 0;
   for (const batch of batches) {
     const arg = {
-      files: batch
+      files: batch,
     };
 
     await invalidate(arg);
     await delay(INVALIDATION_WAIT);
-    
+
     console.log(`Invalidated ${i} / ${batches.length} batches`);
-    i++
+    i++;
   }
 }
 
@@ -163,14 +162,18 @@ async function invalidate(arg: any): Promise<void> {
   try {
     const body = JSON.stringify(arg);
 
-    const response = await fetch(CLOUDFLARE_API_URL, { method: 'POST', headers: CLOUDFLARE_HEADERS, body: body });
+    const response = await fetch(CLOUDFLARE_API_URL, {
+      method: "POST",
+      headers: CLOUDFLARE_HEADERS,
+      body: body,
+    });
     const data = await response.json();
 
     console.log(data);
 
     return;
   } catch (error) {
-    console.error('Error:', error);
+    console.error("Error:", error);
     throw error;
   }
 }

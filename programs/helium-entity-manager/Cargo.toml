@@ -1,6 +1,6 @@
 [package]
 name = "helium-entity-manager"
-version = "0.3.8"
+version = "0.3.9"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
@@ -18,9 +18,7 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
-
-[profile.release]
-overflow-checks = true
+anchor-debug = []
 
 [dependencies]
 bs58 = "0.3.1"

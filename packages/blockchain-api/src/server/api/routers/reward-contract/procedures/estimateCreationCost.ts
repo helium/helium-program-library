@@ -29,17 +29,18 @@ export const estimateCreationCost =
       }
 
       const { connection, provider } = createSolanaConnection(
-        delegateWalletAddress,
+        delegateWalletAddress
       );
       const assetPubkey = new PublicKey(assetId);
 
       const ldProgram = await initLd(provider);
       const recipientK = recipientKey(
         new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS),
-        assetPubkey,
+        assetPubkey
       )[0];
-      const recipientAcc =
-        await ldProgram.account.recipientV0.fetchNullable(recipientK);
+      const recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
+        recipientK
+      );
 
       let rentFee = new BN(0);
       if (!recipientAcc) {
@@ -52,21 +53,21 @@ export const estimateCreationCost =
 
       if (hasClaimable) {
         rentFee = rentFee.add(
-          new BN(RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS),
+          new BN(RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS)
         );
         const claimableRecipient = recipients.find(
-          (r) => r.type === "CLAIMABLE",
+          (r) => r.type === "CLAIMABLE"
         );
         if (claimableRecipient?.type === "CLAIMABLE") {
           recipientGift = await resolveTokenAmountInput(
             claimableRecipient.giftedCurrency,
-            NATIVE_MINT.toBase58(),
+            NATIVE_MINT.toBase58()
           );
         }
       } else {
         // Mini-fanout path: rent for miniFanout account + 2 tuktuk tasks (task + preTask)
         rentFee = rentFee.add(
-          new BN(RENT_COSTS.MINI_FANOUT + RENT_COSTS.TUKTUK_TASK * 2),
+          new BN(RENT_COSTS.MINI_FANOUT + RENT_COSTS.TUKTUK_TASK * 2)
         );
         // Funding for future scheduled transaction fees
         transactionFees = transactionFees.add(FANOUT_FUNDING_AMOUNT);
@@ -83,5 +84,5 @@ export const estimateCreationCost =
           recipientGift: await toTokenAmountOutput(recipientGift, solMint),
         },
       };
-    },
+    }
   );

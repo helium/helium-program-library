@@ -8,7 +8,7 @@ import { signAndSubmitTransactionData } from "./tx";
  */
 export async function ensureNoContract(
   ctx: TestCtx,
-  entityPubKey: string,
+  entityPubKey: string
 ): Promise<void> {
   const { data } = await ctx.safeClient.rewardContract.find({ entityPubKey });
   if (data?.status === "NONE") return;
@@ -23,7 +23,7 @@ export async function ensureNoContract(
     await signAndSubmitTransactionData(
       ctx.connection,
       deleteData.unsignedTransactionData,
-      ctx.payer,
+      ctx.payer
     );
   }
 }
@@ -34,7 +34,7 @@ export async function ensureNoContract(
  */
 export async function ensurePendingContract(
   ctx: TestCtx,
-  entityPubKey: string,
+  entityPubKey: string
 ): Promise<void> {
   const { data } = await ctx.safeClient.rewardContract.find({ entityPubKey });
   if (data?.status === "PENDING") return;
@@ -67,7 +67,7 @@ export async function ensurePendingContract(
     await signAndSubmitTransactionData(
       ctx.connection,
       created.unsignedTransactionData,
-      ctx.payer,
+      ctx.payer
     );
   }
 }

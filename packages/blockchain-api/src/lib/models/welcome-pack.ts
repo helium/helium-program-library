@@ -129,7 +129,7 @@ WelcomePack.init(
     tableName: "welcome_packs",
     timestamps: false,
     underscored: true,
-  },
+  }
 );
 
 export default WelcomePack;

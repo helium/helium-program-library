@@ -7,7 +7,7 @@ export async function run(args: any = process.argv) {
       type: "string",
       alias: "t",
       default: "helium",
-    }
+    },
   });
 
   const argv = await yarg.argv;

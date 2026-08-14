@@ -27,7 +27,7 @@ import axios from "axios";
 // gateway's ECC signature. This pubkey matches the one the on-chain program and
 // the SDK resolver expect.
 const ECC_VERIFIER = new PublicKey(
-  "eccSAJM3tq7nQSpQTm8roxv4FPoipCkMsGizW2KBhqZ",
+  "eccSAJM3tq7nQSpQTm8roxv4FPoipCkMsGizW2KBhqZ"
 );
 
 /**
@@ -47,7 +47,7 @@ export const issueDataOnlyHotspot =
       let addGateway;
       try {
         addGateway = helium.blockchain_txn.decode(
-          Buffer.from(addGatewayTxn, "base64"),
+          Buffer.from(addGatewayTxn, "base64")
         ).addGateway;
       } catch {
         throw errors.BAD_REQUEST({
@@ -97,7 +97,7 @@ export const issueDataOnlyHotspot =
       tx.add(
         ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
-        issueIx,
+        issueIx
       );
       tx.recentBlockhash = blockhash;
       tx.feePayer = owner;
@@ -136,7 +136,7 @@ export const issueDataOnlyHotspot =
         // Log the verifier's detail server-side; don't reflect it to the caller.
         console.error(
           "ECC verifier /verify failed",
-          axios.isAxiosError(e) ? (e.response?.data ?? e.message) : e,
+          axios.isAxiosError(e) ? e.response?.data ?? e.message : e
         );
         throw errors.BAD_REQUEST({
           message: "ECC verifier could not co-sign the issue transaction",
@@ -189,8 +189,8 @@ export const issueDataOnlyHotspot =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(totalFee),
-          NATIVE_MINT.toBase58(),
+          NATIVE_MINT.toBase58()
         ),
       };
-    },
+    }
   );

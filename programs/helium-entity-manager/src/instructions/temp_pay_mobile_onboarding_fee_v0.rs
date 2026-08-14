@@ -84,7 +84,7 @@ pub fn handler(ctx: Context<TempPayMobileOnboardingFeeV0>) -> Result<()> {
     .rewardable_entity_config
     .settings
     .mobile_device_fees(ctx.accounts.mobile_info.device_type)
-    .ok_or(error!(ErrorCode::InvalidDeviceType))?
+    .ok_or_else(|| error!(ErrorCode::InvalidDeviceType))?
     .dc_onboarding_fee;
   require_eq!(dc_fee, 4000000, ErrorCode::InvalidDcFee);
   require_eq!(

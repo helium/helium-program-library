@@ -2,7 +2,7 @@ import { PendingTransactionInfo } from "@/hooks/usePersistentTransactions";
 import { client } from "@/lib/orpc";
 
 export const fetchPendingTransactions = async (
-  walletAddress: string,
+  walletAddress: string
 ): Promise<PendingTransactionInfo[]> => {
   const data = await client.transactions.getByPayer({
     payer: walletAddress,

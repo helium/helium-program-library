@@ -29,7 +29,7 @@ export function CopyAddressButton({
       className={["font-mono text-xs", className].filter(Boolean).join(" ")}
     >
       {truncateAddress(address, truncateStart, truncateEnd)}
-      <Copy className="h-3 w-3 ml-2" />
+      <Copy className="ml-2 h-3 w-3" />
     </Button>
   );
 }

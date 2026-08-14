@@ -1,10 +1,6 @@
 import { toNumber } from "@helium/spl-utils";
-import {
-  MintLayout
-} from "@solana/spl-token";
-import {
-  PublicKey
-} from "@solana/web3.js";
+import { MintLayout } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import { supplyGauge } from "../metrics";
 import { watch } from "./watch";

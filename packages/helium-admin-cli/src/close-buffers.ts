@@ -1,35 +1,35 @@
-import * as anchor from '@coral-xyz/anchor';
-import { PublicKey } from '@solana/web3.js';
-import * as multisig from '@sqds/multisig';
-import os from 'os';
-import yargs from 'yargs/yargs';
+import * as anchor from "@coral-xyz/anchor";
+import { PublicKey } from "@solana/web3.js";
+import * as multisig from "@sqds/multisig";
+import os from "os";
+import yargs from "yargs/yargs";
 import {
   createCloseBufferInstruction,
   loadKeypair,
   sendInstructionsOrSquadsV4,
-} from './utils';
-import { BPF_UPGRADE_LOADER_ID } from '@solana/spl-governance';
-import bs58 from 'bs58';
+} from "./utils";
+import { BPF_UPGRADE_LOADER_ID } from "@solana/spl-governance";
+import bs58 from "bs58";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     programId: {
-      type: 'string',
+      type: "string",
       required: true,
     },
   });

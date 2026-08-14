@@ -1,7 +1,12 @@
 import { init as initDc, mintDataCredits } from "@helium/data-credits-sdk";
 import { toBN, DC_MINT, sendInstructions } from "@helium/spl-utils";
 import * as anchor from "@coral-xyz/anchor";
-import { createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import {
+  createAssociatedTokenAccountIdempotent,
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddress,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -43,11 +48,12 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dataCreditsProgram = await initDc(provider);
 
-
   const dcKey = new PublicKey(argv.dcKey);
-  const destination = new PublicKey(argv.destination || provider.wallet.publicKey.toString());
-  const destAta = await getAssociatedTokenAddress(dcKey, destination)
-  let preBalance = 0
+  const destination = new PublicKey(
+    argv.destination || provider.wallet.publicKey.toString()
+  );
+  const destAta = await getAssociatedTokenAddress(dcKey, destination);
+  let preBalance = 0;
   try {
     preBalance = (
       await provider.connection.getTokenAccountBalance(destAta, "confirmed")
@@ -64,20 +70,22 @@ export async function run(args: any = process.argv) {
       getAssociatedTokenAddressSync(dcKey, destination, true),
       destination,
       dcKey
-    )
-  ])
-  const {txs} = await mintDataCredits({
+    ),
+  ]);
+  const { txs } = await mintDataCredits({
     program: dataCreditsProgram,
     hntAmount: toBN(argv.numHnt, 8),
     dcMint: dcKey,
     recipient: destination,
-  })
+  });
 
-  await provider.sendAll(txs)
-  
+  await provider.sendAll(txs);
+
   const postBalance = (
     await provider.connection.getTokenAccountBalance(destAta, "confirmed")
   ).value.uiAmount;
 
-  console.log(`Burned ${argv.numHnt} HNT to mint ${postBalance! - preBalance} DC`);
+  console.log(
+    `Burned ${argv.numHnt} HNT to mint ${postBalance! - preBalance} DC`
+  );
 }
