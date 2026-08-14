@@ -20,7 +20,9 @@ declare_id!("rec2HHDDnjLfj4kE7VyEtFA1HPGQLK33259532cRyHp");
 
 pub const PYTH_PUSH_ORACLE_ID: Pubkey = pubkey!("pyt2F414BA6dPttK6RddPZUdHfapoBN24GL5wbrPCou");
 
-// Legacy deployments, kept for transition-window dual-accept owner checks.
+// Legacy deployments. The programs accept only the pro receiver as an oracle
+// owner (no dual-accept); these ids remain for owner-rejection tests and for
+// identifying legacy-era accounts during the migration.
 pub const LEGACY_PYTH_SOLANA_RECEIVER_ID: Pubkey =
     pubkey!("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ");
 
