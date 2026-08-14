@@ -17,7 +17,7 @@ describe("data-credits", () => {
     await ensureTokenBalance(
       ctx.payer.publicKey,
       new PublicKey(TOKEN_MINTS.HNT),
-      10
+      10,
     );
   });
 
@@ -34,12 +34,12 @@ describe("data-credits", () => {
 
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
         );
       }
       expect(error.code).to.equal("BAD_REQUEST");
       expect(error.message).to.include(
-        "Either dcAmount or hntAmount must be provided"
+        "Either dcAmount or hntAmount must be provided",
       );
     });
 
@@ -52,12 +52,12 @@ describe("data-credits", () => {
 
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
         );
       }
       expect(error.code).to.equal("BAD_REQUEST");
       expect(error.message).to.include(
-        "Provide only one of dcAmount or hntAmount"
+        "Provide only one of dcAmount or hntAmount",
       );
     });
 
@@ -96,11 +96,7 @@ describe("data-credits", () => {
       expect(data.transactions[0].metadata?.type).to.equal("mint_data_credits");
     });
 
-    // Note: On-chain submission of mintDataCredits transactions fails in surfpool
-    // because PythSolanaReceiver creates transactions with ephemeral signers whose
-    // signatures don't pass surfpool's signature verification. We verify the
-    // transaction is at least deserializable with the correct fee payer.
-    it("returns deserializable transactions with correct fee payer", async () => {
+    it("builds deserializable mint transactions with the owner as fee payer", async () => {
       const owner = ctx.payer.publicKey.toBase58();
 
       const { data, error } = await ctx.safeClient.dataCredits.mint({
@@ -114,10 +110,42 @@ describe("data-credits", () => {
 
       for (const t of data.transactions) {
         const tx = VersionedTransaction.deserialize(
-          Buffer.from(t.serializedTransaction, "base64")
+          Buffer.from(t.serializedTransaction, "base64"),
         );
         expect(tx.message.staticAccountKeys[0].toBase58()).to.equal(owner);
       }
+    });
+
+    // The mint transaction references the oracle stored on the DataCreditsV0
+    // account (surfpool clones it, and the feed it names, from mainnet on first
+    // reference) and carries no ephemeral signers, so it can submit on-chain in
+    // surfpool.
+    //
+    // Skipped until ticket 09 (post-flip release train) both upgrades the
+    // data-credits program (pro-only oracle owner check) and runs
+    // updateDataCreditsV0 to point the stored hnt_price_oracle at the pro feed:
+    // until then success depends on the legacy feed still being cranked and on
+    // clone-time freshness beating the 10-minute on-chain staleness window,
+    // which makes the test flaky mid-migration. Unskip once ticket 09 ships
+    // both steps.
+    it.skip("submits a mint transaction on-chain", async () => {
+      const owner = ctx.payer.publicKey.toBase58();
+
+      const { data, error } = await ctx.safeClient.dataCredits.mint({
+        owner,
+        dcAmount: "1000",
+      });
+
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+
+      const sigs = await signAndSubmitTransactionData(
+        ctx.connection,
+        data,
+        ctx.payer,
+      );
+      expect(sigs).to.have.lengthOf(data.transactions.length);
     });
   });
 
@@ -126,7 +154,7 @@ describe("data-credits", () => {
       await ensureTokenBalance(
         ctx.payer.publicKey,
         new PublicKey(TOKEN_MINTS.DC),
-        10000
+        10000,
       );
     });
 
@@ -140,7 +168,7 @@ describe("data-credits", () => {
 
       if (!isDefinedError(error)) {
         expect.fail(
-          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
         );
       }
       expect(error.code).to.equal("BAD_REQUEST");
@@ -164,13 +192,13 @@ describe("data-credits", () => {
       expect(data.parallel).to.equal(false);
       expect(data.tag).to.be.a("string");
       expect(data.transactions[0].metadata?.type).to.equal(
-        "delegate_data_credits"
+        "delegate_data_credits",
       );
 
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data,
-        ctx.payer
+        ctx.payer,
       );
       expect(sigs).to.have.lengthOf(1);
     });
@@ -193,7 +221,7 @@ describe("data-credits", () => {
       const sigs = await signAndSubmitTransactionData(
         ctx.connection,
         data,
-        ctx.payer
+        ctx.payer,
       );
       expect(sigs).to.have.lengthOf(1);
     });

@@ -60,20 +60,20 @@ export async function run(args: any = process.argv) {
         "The staking requirement for the entity, numeric. Decimals will be added automatically",
     },
     cbrsDcOnboardingFee: {
-      type: 'number',
-      describe: 'The cbrs dc onboarding fee',
+      type: "number",
+      describe: "The cbrs dc onboarding fee",
     },
     cbrsDcLocationStakingFee: {
-      type: 'number',
-      describe: 'The cbrs dc location staking fee',
+      type: "number",
+      describe: "The cbrs dc location staking fee",
     },
     wifiDcOnboardingFee: {
-      type: 'number',
-      describe: 'The wifi dc onboarding fee',
+      type: "number",
+      describe: "The wifi dc onboarding fee",
     },
     wifiDcLocationStakingFee: {
-      type: 'number',
-      describe: 'The wifi dc location staking fee',
+      type: "number",
+      describe: "The wifi dc location staking fee",
     },
   });
   const argv = await yarg.argv;
@@ -147,7 +147,9 @@ export async function run(args: any = process.argv) {
     await hemProgram.methods
       .updateRewardableEntityConfigV0({
         settings,
-        newAuthority: argv.newAuthority ? new PublicKey(argv.newAuthority) : null,
+        newAuthority: argv.newAuthority
+          ? new PublicKey(argv.newAuthority)
+          : null,
         stakingRequirement: argv.stakingRequirement
           ? toBN(argv.stakingRequirement, dntMintAcc.decimals)
           : new BN(0),

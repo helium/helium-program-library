@@ -92,7 +92,7 @@ export const useTransferPosition = () => {
         }
 
         if (onInstructions) {
-          await onInstructions(instructions)
+          await onInstructions(instructions);
         } else {
           await sendInstructions(provider, instructions);
         }

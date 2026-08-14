@@ -32,7 +32,7 @@ import {
   PublicKey,
   SystemProgram,
 } from "@solana/web3.js";
-import { USDC_PRICE_FEED, HNT_PRICE_FEED } from "./tuktuk-dca";
+import { USDC_PRICE_FEED } from "./tuktuk-dca";
 import { expect } from "chai";
 import { execSync } from "child_process";
 import {
@@ -64,6 +64,12 @@ import { createAtaAndMint } from "@helium/spl-utils";
 import { FastifyInstance } from "fastify";
 
 export const ANCHOR_PATH = "anchor";
+
+// Cloned from mainnet in Anchor.toml; owned by the pro pyth receiver. Must match
+// the HNT_PRICE_ORACLE constant baked into the dc-auto-top program.
+const PRO_HNT_PRICE_FEED = new PublicKey(
+  "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5"
+);
 
 export async function ensureIdls() {
   let programs = [
@@ -292,7 +298,7 @@ describe("dc-auto-topoff", () => {
         authority: me,
         taskQueue,
         delegatedDataCredits,
-        hntPriceOracle: HNT_PRICE_FEED,
+        hntPriceOracle: PRO_HNT_PRICE_FEED,
         dcaMint,
       })
       .rpcAndKeys();
@@ -344,9 +350,7 @@ describe("dc-auto-topoff", () => {
           authority: me,
           taskQueue,
           delegatedDataCredits,
-          hntPriceOracle: new PublicKey(
-            "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
-          ),
+          hntPriceOracle: PRO_HNT_PRICE_FEED,
           dcaMint,
         })
         .rpcAndKeys({ skipPreflight: true });
@@ -496,7 +500,9 @@ describe("dc-auto-topoff", () => {
           USDC_PRICE_FEED
         );
       const outputPriceUpdate =
-        await pythReceiver.receiver.account.priceUpdateV2.fetch(HNT_PRICE_FEED);
+        await pythReceiver.receiver.account.priceUpdateV2.fetch(
+          PRO_HNT_PRICE_FEED
+        );
 
       console.log(
         `Input (USDC) Price: ${inputPriceUpdate.priceMessage.price.toString()} (expo: ${
@@ -588,9 +594,7 @@ describe("dc-auto-topoff", () => {
         .updateAutoTopOffV0({
           schedule: `${nextSeconds} ${nextMinutes} * * * *`, // Run in 2 seconds
           threshold: new anchor.BN(0), // No dc threshold or it'll mess with our expected HNT
-          hntPriceOracle: new PublicKey(
-            "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
-          ),
+          hntPriceOracle: PRO_HNT_PRICE_FEED,
           hntThreshold,
           dcaSwapAmount,
           dcaIntervalSeconds,
@@ -669,7 +673,10 @@ describe("dc-auto-topoff", () => {
       const queuedTasks = await tuktukProgram.account.taskV0.all([
         { memcmp: { offset: 8, bytes: taskQueue.toBase58() } },
       ]);
-      expect(queuedTasks.length, "topoff should have queued tasks").to.be.greaterThan(0);
+      expect(
+        queuedTasks.length,
+        "topoff should have queued tasks"
+      ).to.be.greaterThan(0);
       for (const queued of queuedTasks) {
         expect(
           queued.account.crankReward.toString(),

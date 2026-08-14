@@ -5,14 +5,8 @@ import {
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { carrierKey, init as initMem } from "@helium/mobile-entity-manager-sdk";
-import {
-  HNT_MINT,
-  MOBILE_MINT
-} from "@helium/spl-utils";
-import {
-  ComputeBudgetProgram,
-  PublicKey
-} from "@solana/web3.js";
+import { HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
 

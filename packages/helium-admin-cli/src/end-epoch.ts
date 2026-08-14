@@ -282,10 +282,12 @@ export async function run(args: any = process.argv) {
 
       const [recipient] = recipientKey(lazyDistributor, assetId);
       if (!(await provider.connection.getAccountInfo(recipient))) {
-        const method = lazyProgram.methods.initializeRecipientV0().accountsPartial({
-          lazyDistributor,
-          mint: assetId,
-        });
+        const method = lazyProgram.methods
+          .initializeRecipientV0()
+          .accountsPartial({
+            lazyDistributor,
+            mint: assetId,
+          });
 
         await sendInstructionsWithPriorityFee(
           provider,

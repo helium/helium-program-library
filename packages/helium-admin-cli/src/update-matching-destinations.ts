@@ -59,7 +59,10 @@ export async function run(args: any = process.argv) {
     // Only doing this to cNFTs
     if (!assetOnChain) {
       const hntRecipient = hntRecipientsByKey[r.account.destination.toString()];
-      if (!hntRecipient || hntRecipient?.account.destination.equals(PublicKey.default)) {
+      if (
+        !hntRecipient ||
+        hntRecipient?.account.destination.equals(PublicKey.default)
+      ) {
         let hntRecipientKey = hntRecipient?.publicKey;
         if (!hntRecipient) {
           const { instruction, pubkeys } = await (

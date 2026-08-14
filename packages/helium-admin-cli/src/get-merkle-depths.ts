@@ -1,13 +1,14 @@
 import * as anchor from "@coral-xyz/anchor";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import { init as initHem } from "@helium/helium-entity-manager-sdk";
+import { init as initMem } from "@helium/mobile-entity-manager-sdk";
 import {
-  init as initHem
-} from "@helium/helium-entity-manager-sdk";
-import {
-  init as initMem
-} from "@helium/mobile-entity-manager-sdk";
-import { concurrentMerkleTreeBeetFactory, concurrentMerkleTreeHeaderBeet, getCanopyDepth, getConcurrentMerkleTreeAccountSize } from "@solana/spl-account-compression";
+  concurrentMerkleTreeBeetFactory,
+  concurrentMerkleTreeHeaderBeet,
+  getCanopyDepth,
+  getConcurrentMerkleTreeAccountSize,
+} from "@solana/spl-account-compression";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import yargs from "yargs";
 import os from "os";
@@ -73,25 +74,34 @@ export async function run(args: any = process.argv) {
 
   // Get depths for all maker merkle trees
   for (const maker of makers) {
-    const merkleAccount = await provider.connection.getAccountInfo(maker.account.merkleTree);
+    const merkleAccount = await provider.connection.getAccountInfo(
+      maker.account.merkleTree
+    );
     if (merkleAccount) {
-      merkleDepths[maker.account.merkleTree.toBase58()] = getMerkleTreeDepth(merkleAccount);
+      merkleDepths[maker.account.merkleTree.toBase58()] =
+        getMerkleTreeDepth(merkleAccount);
     }
   }
 
   // Get depths for all carrier merkle trees
   for (const carrier of carriers) {
-    const merkleAccount = await provider.connection.getAccountInfo(carrier.account.merkleTree);
+    const merkleAccount = await provider.connection.getAccountInfo(
+      carrier.account.merkleTree
+    );
     if (merkleAccount) {
-      merkleDepths[carrier.account.merkleTree.toBase58()] = getMerkleTreeDepth(merkleAccount);
+      merkleDepths[carrier.account.merkleTree.toBase58()] =
+        getMerkleTreeDepth(merkleAccount);
     }
   }
 
   // Get depths for all data only config merkle trees
   for (const config of dataOnlyConfigs) {
-    const merkleAccount = await provider.connection.getAccountInfo(config.account.merkleTree);
+    const merkleAccount = await provider.connection.getAccountInfo(
+      config.account.merkleTree
+    );
     if (merkleAccount) {
-      merkleDepths[config.account.merkleTree.toBase58()] = getMerkleTreeDepth(merkleAccount);
+      merkleDepths[config.account.merkleTree.toBase58()] =
+        getMerkleTreeDepth(merkleAccount);
     }
   }
 

@@ -29,7 +29,7 @@ export async function checkTransactionStatus(
   batch: TransactionBatch,
   connection: Connection,
   commitment: "confirmed" | "finalized" = "confirmed",
-  currentBlockHeight?: number,
+  currentBlockHeight?: number
 ): Promise<TransactionStatusResult> {
   let txStatus: TransactionStatus = pendingTx.status;
   let transaction = null;
@@ -74,7 +74,7 @@ export async function checkTransactionStatus(
  * Check Jito bundle status
  */
 export async function checkJitoBundleStatus(
-  batch: TransactionBatch,
+  batch: TransactionBatch
 ): Promise<{ status: BatchStatus; jitoBundleStatus?: any }> {
   let batchStatus: BatchStatus = "pending";
   let jitoBundleStatus = null;
@@ -83,7 +83,7 @@ export async function checkJitoBundleStatus(
     try {
       const response = await jitoBlockEngineRequest(
         "getInflightBundleStatuses",
-        [[batch.jitoBundleId]],
+        [[batch.jitoBundleId]]
       );
 
       if (response.ok) {
@@ -115,7 +115,7 @@ export async function checkJitoBundleStatus(
  */
 export async function checkAndUpdateBatchStatus(
   batch: TransactionBatch,
-  commitment: "confirmed" | "finalized" = "confirmed",
+  commitment: "confirmed" | "finalized" = "confirmed"
 ): Promise<BatchStatusResult> {
   const connection = new Connection(env.SOLANA_RPC_URL);
   const transactions = batch.transactions || [];
@@ -144,7 +144,7 @@ export async function checkAndUpdateBatchStatus(
             batch,
             connection,
             commitment,
-            currentBlockHeight,
+            currentBlockHeight
           );
 
           // Count statuses
@@ -185,7 +185,7 @@ export async function checkAndUpdateBatchStatus(
           // Log network/other errors and continue with current status
           console.error(
             `Error checking status for transaction ${pendingTx.signature}:`,
-            error,
+            error
           );
           return {
             signature: pendingTx.signature,
@@ -193,7 +193,7 @@ export async function checkAndUpdateBatchStatus(
             transaction: null,
           };
         }
-      },
+      }
     );
 
     const transactionStatuses = await Promise.all(transactionStatusPromises);
@@ -228,7 +228,7 @@ export async function checkAndUpdateBatchStatus(
     // Notify indexers for confirmed transactions AFTER committing the transaction
     // This prevents indexer errors from aborting the database transaction
     const confirmedTransactions = transactionStatuses.filter(
-      (ts) => ts.status === "confirmed" && ts.transaction !== null,
+      (ts) => ts.status === "confirmed" && ts.transaction !== null
     );
     for (const confirmedTx of confirmedTransactions) {
       try {
@@ -237,7 +237,7 @@ export async function checkAndUpdateBatchStatus(
         // Log but don't throw - indexer notification is not critical
         console.error(
           `Error notifying indexers for transaction ${confirmedTx.signature}:`,
-          error,
+          error
         );
       }
     }

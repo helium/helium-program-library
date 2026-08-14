@@ -75,22 +75,13 @@ export async function run(args: any = process.argv) {
       .accountsPartial({
         carrier,
         updateAuthority: carrierAcc.updateAuthority,
-        newStakeSource: getAssociatedTokenAddressSync(
-          HNT_MINT,
-          authority,
-        ),
+        newStakeSource: getAssociatedTokenAddressSync(HNT_MINT, authority),
         originalStakeDestination: getAssociatedTokenAddressSync(
           MOBILE_MINT,
-          authority,
+          authority
         ),
-        originalStake: getAssociatedTokenAddressSync(
-          MOBILE_MINT,
-          carrier,
-        ),
-        newEscrow: getAssociatedTokenAddressSync(
-          HNT_MINT,
-          carrier,
-        ),
+        originalStake: getAssociatedTokenAddressSync(MOBILE_MINT, carrier),
+        newEscrow: getAssociatedTokenAddressSync(HNT_MINT, carrier),
         dntMint: MOBILE_MINT,
         hntMint: HNT_MINT,
       })

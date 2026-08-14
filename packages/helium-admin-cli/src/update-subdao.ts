@@ -1,99 +1,96 @@
-import * as anchor from '@coral-xyz/anchor';
+import * as anchor from "@coral-xyz/anchor";
 import {
   accountWindowedBreakerKey,
   init as initCb,
   mintWindowedBreakerKey,
-} from '@helium/circuit-breaker-sdk';
+} from "@helium/circuit-breaker-sdk";
 import {
   init as initHem,
   rewardableEntityConfigKey,
-} from '@helium/helium-entity-manager-sdk';
-import {
-  init as initHsd,
-  subDaoKey,
-} from '@helium/helium-sub-daos-sdk';
-import { PublicKey, TransactionInstruction } from '@solana/web3.js';
-import { BN } from 'bn.js';
-import os from 'os';
-import yargs from 'yargs/yargs';
+} from "@helium/helium-entity-manager-sdk";
+import { init as initHsd, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { BN } from "bn.js";
+import os from "os";
+import yargs from "yargs/yargs";
 import {
   loadKeypair,
   parseEmissionsSchedule,
   sendInstructionsOrSquadsV4,
-} from './utils';
+} from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     dntMint: {
       required: true,
-      type: 'string',
-      describe: 'DNT mint of the subdao to be updated',
+      type: "string",
+      describe: "DNT mint of the subdao to be updated",
     },
     name: {
-      alias: 'n',
-      type: 'string',
+      alias: "n",
+      type: "string",
       required: false,
-      describe: 'The name of the entity config',
+      describe: "The name of the entity config",
     },
     newAuthority: {
       required: false,
-      describe: 'New subdao authority',
-      type: 'string',
+      describe: "New subdao authority",
+      type: "string",
       default: null,
     },
     newEmissionsSchedulePath: {
       required: false,
-      describe: 'Path to file that contains the new emissions schedule',
-      type: 'string',
+      describe: "Path to file that contains the new emissions schedule",
+      type: "string",
       default: null,
     },
     newDcBurnAuthority: {
       required: false,
       default: null,
-      type: 'string',
+      type: "string",
     },
     multisig: {
-      type: 'string',
+      type: "string",
       describe:
-        'Address of the squads multisig to be authority. If not provided, your wallet will be the authority',
+        "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
     switchboardNetwork: {
-      type: 'string',
-      describe: 'The switchboard network',
-      default: 'devnet',
+      type: "string",
+      describe: "The switchboard network",
+      default: "devnet",
     },
     registrar: {
-      type: 'string',
+      type: "string",
       required: false,
-      describe: 'VSR Registrar of subdao',
+      describe: "VSR Registrar of subdao",
       default: null,
     },
     onboardingDcFee: {
-      type: 'number',
+      type: "number",
       required: false,
-      describe: 'The data credits fee for onboarding hotspots',
+      describe: "The data credits fee for onboarding hotspots",
       default: null,
     },
     onboardingDataOnlyDcFee: {
-      type: 'number',
+      type: "number",
       required: false,
-      describe: 'The data credits fee for onboarding data only hotspots',
+      describe: "The data credits fee for onboarding data only hotspots",
       default: null,
     },
     activeDeviceAuthority: {
-      type: 'string',
+      type: "string",
       required: false,
-      describe: 'The authority that can set hotspot active status',
+      describe: "The authority that can set hotspot active status",
       default: null,
     },
   });
@@ -114,7 +111,7 @@ export async function run(args: any = process.argv) {
   const subDaoAcc = await program.account.subDaoV0.fetch(subDao);
   if (argv.newAuthority) {
     if (!argv.name) {
-      throw new Error('--name is required');
+      throw new Error("--name is required");
     }
     // update entity config auth
     const config = rewardableEntityConfigKey(
@@ -129,7 +126,7 @@ export async function run(args: any = process.argv) {
         .updateRewardableEntityConfigV0({
           newAuthority: new PublicKey(argv.newAuthority),
           settings: null,
-          stakingRequirement: null
+          stakingRequirement: null,
         })
         .accountsPartial({
           rewardableEntityConfig: config,

@@ -27,13 +27,20 @@ export const AuthRouter = ({ children }: { children: React.ReactNode }) => {
       const isPublicRoute =
         PUBLIC_ROUTES.includes(pathname) ||
         PUBLIC_ROUTES.some(
-          (route) => route !== "/" && pathname.startsWith(route),
+          (route) => route !== "/" && pathname.startsWith(route)
         );
       if (!isPublicRoute) {
         router.replace("/");
       }
     }
-  }, [ready, authenticated, user?.wallet?.address, viewAsAddress, router, pathname]);
+  }, [
+    ready,
+    authenticated,
+    user?.wallet?.address,
+    viewAsAddress,
+    router,
+    pathname,
+  ]);
 
   return <>{children}</>;
 };

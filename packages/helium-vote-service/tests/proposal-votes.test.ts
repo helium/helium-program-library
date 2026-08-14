@@ -67,7 +67,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
   const seedRootAssignment = (
     asset: string,
     rentRefund: string,
-    address = `pa0${asset.slice(0, 41)}`,
+    address = `pa0${asset.slice(0, 41)}`
   ) =>
     seedProxyAssignment(sequelize, {
       address,
@@ -127,7 +127,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
       // voter (proxy_index = 0) remains the ground truth for a direct vote.
       await seedRootAssignment(
         MINT_A,
-        "payer1111111111111111111111111111111111111111",
+        "payer1111111111111111111111111111111111111111"
       );
       await seedVoteMarker(sequelize, {
         address: "markerA1111111111111111111111111111111111111",
@@ -276,12 +276,12 @@ describe("GET /v1/proposals/:proposal/votes", () => {
       await seedRootAssignment(
         MINT_A,
         OWNER,
-        "pa0configA111111111111111111111111111111111",
+        "pa0configA111111111111111111111111111111111"
       );
       await seedRootAssignment(
         MINT_A,
         OWNER,
-        "pa0configB111111111111111111111111111111111",
+        "pa0configB111111111111111111111111111111111"
       );
       await seedVoteMarker(sequelize, {
         address: "markerA1111111111111111111111111111111111111",
@@ -341,7 +341,7 @@ describe("GET /v1/proposals/:proposal/votes", () => {
         "choice",
         "choiceName",
         "proxyName",
-        "castingProxies",
+        "castingProxies"
       );
     });
   });

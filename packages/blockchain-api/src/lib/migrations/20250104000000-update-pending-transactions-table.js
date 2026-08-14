@@ -6,14 +6,14 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     // Check if columns exist before trying to remove them
     const tableInfo = await queryInterface.describeTable(
-      "pending_transactions",
+      "pending_transactions"
     );
 
     // Remove unused columns: serializedTransaction and metadata
     if (tableInfo.serialized_transaction) {
       await queryInterface.removeColumn(
         "pending_transactions",
-        "serialized_transaction",
+        "serialized_transaction"
       );
     }
     if (tableInfo.metadata) {
@@ -59,7 +59,7 @@ module.exports = {
       // Index might already exist, ignore error
       console.log(
         "Index already exists or could not be created:",
-        error.message,
+        error.message
       );
     }
   },
@@ -69,7 +69,7 @@ module.exports = {
     try {
       await queryInterface.removeIndex(
         "pending_transactions",
-        "pending_transactions_tag_payer_pending_unique",
+        "pending_transactions_tag_payer_pending_unique"
       );
     } catch (error) {
       // Index might not exist, ignore error
@@ -78,7 +78,7 @@ module.exports = {
 
     // Remove the new columns
     const tableInfo = await queryInterface.describeTable(
-      "pending_transactions",
+      "pending_transactions"
     );
     if (tableInfo.payer) {
       await queryInterface.removeColumn("pending_transactions", "payer");
@@ -94,7 +94,7 @@ module.exports = {
         "serialized_transaction",
         {
           type: DataTypes.TEXT,
-        },
+        }
       );
     }
 

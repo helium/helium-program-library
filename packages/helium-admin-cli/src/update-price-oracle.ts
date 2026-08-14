@@ -1,7 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  init as initPrice,
-} from "@helium/price-oracle-sdk"
+import { init as initPrice } from "@helium/price-oracle-sdk";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -31,9 +29,9 @@ export async function run(args: any = process.argv) {
     },
     oracles: {
       type: "array",
-      describe: 'public keys of the oracles',
-      required: true
-    }
+      describe: "public keys of the oracles",
+      required: true,
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -42,21 +40,21 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
   const program = await initPrice(provider);
-  const oracleKey = new PublicKey(argv.oracle)
-  const oracle = await program.account.priceOracleV0.fetch(oracleKey)
+  const oracleKey = new PublicKey(argv.oracle);
+  const oracle = await program.account.priceOracleV0.fetch(oracleKey);
 
   const ix = await program.methods
     .updatePriceOracleV0({
-      oracles: argv.oracles.map(o => ({
+      oracles: argv.oracles.map((o) => ({
         authority: new PublicKey(o),
         lastSubmittedPrice: null,
         lastSubmittedTimestamp: null,
       })),
-      authority: null
+      authority: null,
     })
     .accountsPartial({
       priceOracle: oracleKey,
-      authority: oracle.authority
+      authority: oracle.authority,
     })
     .instruction();
 

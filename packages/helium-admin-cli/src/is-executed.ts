@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import {
   init as initLazy,
   isExecuted,
-  lazyTransactionsKey
+  lazyTransactionsKey,
 } from "@helium/lazy-transactions-sdk";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -25,8 +25,8 @@ export async function run(args: any = process.argv) {
     },
     index: {
       type: "number",
-      required: true
-    }
+      required: true,
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;

@@ -12,7 +12,7 @@ export * from "./resolvers";
 
 export const ThresholdType = {
   Percent: { percent: {} },
-  Absolute: { absolute: {} }
+  Absolute: { absolute: {} },
 };
 
 const MAX_U64 = new BN("18446744073709551615");

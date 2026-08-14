@@ -1,14 +1,17 @@
-import { Keypair } from "@solana/web3.js"
-import { expect } from "chai"
-import { after, before, describe, it } from "mocha"
-import { isDefinedError } from "@orpc/client"
-import { stopNextServer } from "./helpers/next"
-import { stopSurfpool } from "./helpers/surfpool"
-import { signAndSubmitTransactionData } from "./helpers/tx"
-import { setupTestCtx, TestCtx } from "./helpers/context"
-import { TEST_HOTSPOT_ENTITY_KEY, TEST_HOTSPOT_ASSET_ID } from "./helpers/constants"
-import { ensureNoContract } from "./helpers/reward-contract"
-import { verifyEstimatedSolFee } from "./helpers/estimate"
+import { Keypair } from "@solana/web3.js";
+import { expect } from "chai";
+import { after, before, describe, it } from "mocha";
+import { isDefinedError } from "@orpc/client";
+import { stopNextServer } from "./helpers/next";
+import { stopSurfpool } from "./helpers/surfpool";
+import { signAndSubmitTransactionData } from "./helpers/tx";
+import { setupTestCtx, TestCtx } from "./helpers/context";
+import {
+  TEST_HOTSPOT_ENTITY_KEY,
+  TEST_HOTSPOT_ASSET_ID,
+} from "./helpers/constants";
+import { ensureNoContract } from "./helpers/reward-contract";
+import { verifyEstimatedSolFee } from "./helpers/estimate";
 
 describe("hotspot-transfer", () => {
   let ctx: TestCtx;
@@ -34,7 +37,7 @@ describe("hotspot-transfer", () => {
 
     if (!isDefinedError(error)) {
       expect.fail(
-        `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+        `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
       );
     }
     expect(error.code).to.equal("UNAUTHORIZED");
@@ -51,7 +54,7 @@ describe("hotspot-transfer", () => {
     });
     if (!isDefinedError(error)) {
       expect.fail(
-        `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+        `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
       );
     }
     expect(error.code).to.equal("BAD_REQUEST");
@@ -73,7 +76,7 @@ describe("hotspot-transfer", () => {
     });
     if (!isDefinedError(error)) {
       expect.fail(
-        `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+        `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
       );
     }
     expect(error.code).to.equal("BAD_REQUEST");
@@ -93,7 +96,7 @@ describe("hotspot-transfer", () => {
 
     if (!isDefinedError(error)) {
       expect.fail(
-        `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+        `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
       );
     }
     expect(error.code).to.equal("NOT_FOUND");
@@ -129,12 +132,14 @@ describe("hotspot-transfer", () => {
       rewardSchedule: "0 0 1,15 * *",
     });
     if (createResult.error) {
-      expect.fail(`Failed to create contract: ${JSON.stringify(createResult.error)}`);
+      expect.fail(
+        `Failed to create contract: ${JSON.stringify(createResult.error)}`
+      );
     }
     await signAndSubmitTransactionData(
       ctx.connection,
       createResult.data.unsignedTransactionData,
-      ctx.payer,
+      ctx.payer
     );
 
     // #when attempting to transfer
@@ -146,7 +151,9 @@ describe("hotspot-transfer", () => {
 
     // #then returns CONFLICT error
     if (!isDefinedError(error)) {
-      expect.fail(`Expected CONFLICT error - but got: ${JSON.stringify(error)}`);
+      expect.fail(
+        `Expected CONFLICT error - but got: ${JSON.stringify(error)}`
+      );
     }
     expect(error.code).to.equal("CONFLICT");
     expect(error.message).to.include("reward contract");
@@ -158,53 +165,57 @@ describe("hotspot-transfer", () => {
   // IMPORTANT: This test must run LAST as it actually executes a transfer
   // which modifies the Merkle tree state
   it("transfers a hotspot to another wallet", async () => {
-    const walletAddress = ctx.payer.publicKey.toBase58()
-    const recipient = Keypair.generate()
+    const walletAddress = ctx.payer.publicKey.toBase58();
+    const recipient = Keypair.generate();
 
     // Clean up any existing reward contract first
-    await ensureNoContract(ctx, TEST_HOTSPOT_ENTITY_KEY)
+    await ensureNoContract(ctx, TEST_HOTSPOT_ENTITY_KEY);
 
     const { error, data: result } =
       await ctx.safeClient.hotspots.transferHotspot({
         walletAddress,
         hotspotPubkey: TEST_HOTSPOT_ENTITY_KEY,
         recipient: recipient.publicKey.toBase58(),
-      })
+      });
     if (error) {
-      expect.fail(`Unexpected error: ${error}`)
+      expect.fail(`Unexpected error: ${error}`);
     }
     expect(
-      result.transactionData.transactions[0].serializedTransaction,
-    ).to.be.a("string")
-    expect(result.transactionData.tag).to.be.a("string")
-    expect(result.transactionData.parallel).to.equal(false)
+      result.transactionData.transactions[0].serializedTransaction
+    ).to.be.a("string");
+    expect(result.transactionData.tag).to.be.a("string");
+    expect(result.transactionData.parallel).to.equal(false);
 
     // Verify transaction metadata
-    const txData = result.transactionData.transactions[0]
-    expect(txData.metadata?.type).to.equal("hotspot_transfer")
-    expect(txData.metadata?.description).to.include("Transfer")
+    const txData = result.transactionData.transactions[0];
+    expect(txData.metadata?.type).to.equal("hotspot_transfer");
+    expect(txData.metadata?.description).to.include("Transfer");
 
     // Verify enriched per-transaction metadata
-    expect(txData.metadata?.hotspotKey).to.equal(TEST_HOTSPOT_ASSET_ID)
-    expect(txData.metadata?.hotspotName).to.be.a("string").and.not.be.empty
-    expect(txData.metadata?.recipient).to.equal(recipient.publicKey.toBase58())
+    expect(txData.metadata?.hotspotKey).to.equal(TEST_HOTSPOT_ASSET_ID);
+    expect(txData.metadata?.hotspotName).to.be.a("string").and.not.be.empty;
+    expect(txData.metadata?.recipient).to.equal(recipient.publicKey.toBase58());
 
     // Verify batch-level actionMetadata
     expect(result.transactionData.actionMetadata).to.deep.include({
       type: "hotspot_transfer",
       hotspotKey: TEST_HOTSPOT_ASSET_ID,
       recipient: recipient.publicKey.toBase58(),
-    })
+    });
 
     // Verify estimate accuracy
-    await verifyEstimatedSolFee(ctx, result.transactionData, result.estimatedSolFee)
+    await verifyEstimatedSolFee(
+      ctx,
+      result.transactionData,
+      result.estimatedSolFee
+    );
 
     await signAndSubmitTransactionData(
       ctx.connection,
       result.transactionData,
-      ctx.payer,
-    )
+      ctx.payer
+    );
     // Note: We cannot verify ownership change on surfpool because it doesn't support DAS API.
     // The transaction execution without errors is sufficient validation for this test.
-  })
-})
+  });
+});

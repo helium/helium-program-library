@@ -22,9 +22,7 @@ import {
   init as initVsr,
   registrarKey,
 } from "@helium/voter-stake-registry-sdk";
-import {
-  getGovernanceProgramVersion
-} from "@solana/spl-governance";
+import { getGovernanceProgramVersion } from "@solana/spl-governance";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   LAMPORTS_PER_SOL,
@@ -105,8 +103,7 @@ export async function run(args: any = process.argv) {
     bucket: {
       type: "string",
       describe: "Bucket URL prefix holding all of the metadata jsons",
-      default:
-        "https://entities.nft.helium.io/v2/tokens",
+      default: "https://entities.nft.helium.io/v2/tokens",
     },
     rewardsOracleUrl: {
       alias: "ro",
@@ -420,9 +417,7 @@ export async function run(args: any = process.argv) {
 
     await sendInstructionsOrSquadsV4({
       provider,
-      instructions: [
-        await initSubdaoMethod.instruction(),
-      ],
+      instructions: [await initSubdaoMethod.instruction()],
       multisig: multisigPda!,
       signers: [],
     });

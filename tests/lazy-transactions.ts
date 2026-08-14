@@ -71,8 +71,15 @@ describe("lazy-transactions", () => {
       createTransferInstruction(lazySignerAta, myAta, lazySigner, 10),
     ];
 
-    const mintSeeds = [Buffer.from("user", "utf-8"), Buffer.from(name, "utf-8"), Buffer.from("mint" + name, "utf-8")];
-    const [mintKey, mintBump] = PublicKey.findProgramAddressSync(mintSeeds, program.programId);
+    const mintSeeds = [
+      Buffer.from("user", "utf-8"),
+      Buffer.from(name, "utf-8"),
+      Buffer.from("mint" + name, "utf-8"),
+    ];
+    const [mintKey, mintBump] = PublicKey.findProgramAddressSync(
+      mintSeeds,
+      program.programId
+    );
     const createMintIxns = [
       SystemProgram.createAccount({
         fromPubkey: lazySigner,
@@ -83,17 +90,9 @@ describe("lazy-transactions", () => {
         ),
         programId: TOKEN_PROGRAM_ID,
       }),
-      createInitializeMintInstruction(
-        mintKey,
-        0,
-        me,
-        me
-      )
+      createInitializeMintInstruction(mintKey, 0, me, me),
     ];
-    const mintSignerSeeds = [
-      ...mintSeeds,
-      Buffer.from([mintBump]),
-    ];
+    const mintSignerSeeds = [...mintSeeds, Buffer.from([mintBump])];
     // Execute instructions via lazy transactions
     const { merkleTree, compiledTransactions } = compile(lazySigner, [
       // Include an irrelevant signer seeds just to make sure tx succeeds with it
@@ -104,10 +103,13 @@ describe("lazy-transactions", () => {
     const canopy = Keypair.generate();
     const executedTransactions = Keypair.generate();
     const canopySize = getCanopySize(merkleTree.depth - 1);
-    const canopyRent = await provider.connection.getMinimumBalanceForRentExemption(canopySize)
+    const canopyRent =
+      await provider.connection.getMinimumBalanceForRentExemption(canopySize);
     const executedTransactionsSize = 1 + getBitmapLen(merkleTree.depth - 1);
     const executedTransactionsRent =
-      await provider.connection.getMinimumBalanceForRentExemption(executedTransactionsSize);
+      await provider.connection.getMinimumBalanceForRentExemption(
+        executedTransactionsSize
+      );
     await program.methods
       .initializeLazyTransactionsV0({
         root: merkleTree.getRoot().toJSON().data,
@@ -137,12 +139,12 @@ describe("lazy-transactions", () => {
       ])
       .signers([canopy, executedTransactions])
       .rpc({ skipPreflight: true });
-    
+
     await fillCanopy({
       program,
       lazyTransactions,
       merkleTree,
-      cacheDepth: merkleTree.depth - 1
+      cacheDepth: merkleTree.depth - 1,
     });
     await sleep(2000);
 
@@ -161,10 +163,13 @@ describe("lazy-transactions", () => {
             ),
             createTransferInstruction(lazySignerAta, myAta, lazySigner, 1000),
           ],
-          signerSeeds: []
+          signerSeeds: [],
         },
       ];
-      const { compiledTransactions: badTransactions } = compile(lazySigner, bogus);
+      const { compiledTransactions: badTransactions } = compile(
+        lazySigner,
+        bogus
+      );
       await program.methods
         .executeTransactionV0({
           instructions: badTransactions[0].instructions,
@@ -191,7 +196,6 @@ describe("lazy-transactions", () => {
       .remainingAccounts(accounts)
       .rpc({ skipPreflight: true });
 
-
     // Execute a tx with a pda
     await program.methods
       .executeTransactionV0({
@@ -217,13 +221,14 @@ describe("lazy-transactions", () => {
 
       throw new Error("Should have failed");
     } catch (e: any) {
-      console.log(e.toString())
+      console.log(e.toString());
       expect(e.toString()).to.include("Transaction has already been executed");
     }
 
     /// Attempt to close the canopy
-    console.log("Closing canopy")
-    await program.methods.closeCanopyV0()
+    console.log("Closing canopy");
+    await program.methods
+      .closeCanopyV0()
       .accountsPartial({ lazyTransactions, refund: provider.wallet.publicKey })
       .rpc({ skipPreflight: true });
   });

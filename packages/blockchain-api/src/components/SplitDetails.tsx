@@ -32,7 +32,7 @@ export function SplitDetails({
   const { data, isLoading, isError, error } = useSplitShares(
     // Ensure that this is disabled until open
     open ? walletAddress : undefined,
-    open ? hotspotPubkey : undefined,
+    open ? hotspotPubkey : undefined
   );
 
   return (
@@ -43,24 +43,24 @@ export function SplitDetails({
         </DialogHeader>
         <div className="space-y-4">
           {isLoading && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Loading split recipients…
             </p>
           )}
           {isError && (
-            <p className="text-sm text-destructive">
+            <p className="text-destructive text-sm">
               {(error as Error)?.message || "Failed to load"}
             </p>
           )}
           {!!data && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Split</span>
+                <span className="text-muted-foreground text-sm">Split</span>
                 <CopyAddressButton address={data.splitAddress} />
               </div>
 
               <Card className="py-0">
-                <CardContent className="p-0 divide-y">
+                <CardContent className="divide-y p-0">
                   {data.shares.map((s, idx) => {
                     const percentage = s.shares;
                     const fixed = s.fixed;
@@ -70,19 +70,19 @@ export function SplitDetails({
                         className="flex items-center justify-between p-3"
                       >
                         <div className="flex flex-col">
-                          <span className="font-medium text-sm">
+                          <span className="text-sm font-medium">
                             <CopyAddressButton address={s.wallet} />
                           </span>
 
                           {s.delegate &&
                           s.delegate !== s.wallet &&
                           s.delegate !== PublicKey.default.toBase58() ? (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-muted-foreground text-xs">
                               `Delegate: ${truncateAddress(s.delegate, 4, 4)}`
                             </span>
                           ) : null}
                         </div>
-                        <div className="text-sm text-right">
+                        <div className="text-right text-sm">
                           {percentage !== undefined
                             ? `${(percentage * 100).toFixed(2)}%`
                             : `${fixed.uiAmountString} HNT/period`}

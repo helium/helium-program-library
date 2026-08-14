@@ -71,7 +71,7 @@ const baseSchema = {
       .string()
       .regex(
         /^\d{5}(-\d{4})?$/,
-        "Invalid ZIP code format (e.g. 12345 or 12345-6789)",
+        "Invalid ZIP code format (e.g. 12345 or 12345-6789)"
       ),
     country: z.literal("USA"),
   }),
@@ -104,7 +104,7 @@ export function BankAccountForm({
 
   const form = useForm<FormData>({
     resolver: zodResolver(
-      (isBusinessAccount ? businessSchema : individualSchema) as any,
+      (isBusinessAccount ? businessSchema : individualSchema) as any
     ),
     defaultValues: {
       accountType: "checking",

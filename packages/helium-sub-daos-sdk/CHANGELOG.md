@@ -1,5 +1,19 @@
 # Change Log
 
+## 0.11.19
+
+### Patch Changes
+
+- [#1207](https://github.com/helium/helium-program-library/pull/1207) [`c49ab38`](https://github.com/helium/helium-program-library/commit/c49ab38eb4a710d50bd905465e8b3041a74aeb9a) Thanks [@bryzettler](https://github.com/bryzettler)! - Flip the helium-sub-daos HIP 149 backstop feed pin (`HNT_PYTH_PRICE_FEED`) from the legacy HNT feed account to the pro feed account `He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5`. Program-side change: `calculate_utility_score_v0` now hard-requires the pro feed account (wrong key is `InvalidPriceOracle` and halts epoch issuance), so the program upgrade and the end-epoch cron's forwarded account must move together.
+
+- Updated dependencies [[`79889b1`](https://github.com/helium/helium-program-library/commit/79889b13c1cc3654fa29c02ca5d5a2fc293f0e96), [`580baa2`](https://github.com/helium/helium-program-library/commit/580baa257ffcc4ce593d9caeba9d096ba9a288a1)]:
+  - @helium/idls@0.11.22
+  - @helium/spl-utils@0.13.0
+  - @helium/circuit-breaker-sdk@0.11.18
+  - @helium/no-emit-sdk@0.11.18
+  - @helium/treasury-management-sdk@0.11.18
+  - @helium/voter-stake-registry-sdk@0.12.2
+
 ## 0.11.18
 
 ### Patch Changes

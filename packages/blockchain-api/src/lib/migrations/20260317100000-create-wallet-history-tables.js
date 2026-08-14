@@ -58,7 +58,7 @@ module.exports = {
         ["wallet", "action_type", "slot"],
         {
           name: "idx_wallet_history_wallet_action_type_slot",
-        },
+        }
       );
     }
 

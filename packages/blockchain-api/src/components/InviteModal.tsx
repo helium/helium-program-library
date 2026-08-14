@@ -66,7 +66,7 @@ export default function InviteModal({
       url.searchParams.set("expirationTs", data.expirationTs.toString());
       url.searchParams.set(
         "signature",
-        encodeURIComponent(Buffer.from(signature).toString("base64")),
+        encodeURIComponent(Buffer.from(signature).toString("base64"))
       );
 
       setInviteUrl(url.toString());
@@ -77,7 +77,7 @@ export default function InviteModal({
         console.error("Error generating invite message", e);
         setError(e instanceof Error ? e.message : "Failed to generate invite");
       },
-    },
+    }
   );
 
   return (
@@ -109,11 +109,11 @@ export default function InviteModal({
 
           {inviteUrl && (
             <div className="space-y-4">
-              <div className="flex justify-center p-4 bg-white rounded-lg border">
+              <div className="flex justify-center rounded-lg border bg-white p-4">
                 <QRCodeSVG value={inviteUrl} size={200} />
               </div>
-              <div className="rounded-md bg-muted p-3">
-                <p className="text-sm text-muted-foreground break-all font-mono">
+              <div className="bg-muted rounded-md p-3">
+                <p className="text-muted-foreground break-all font-mono text-sm">
                   {inviteUrl}
                 </p>
               </div>

@@ -9,26 +9,26 @@ import * as Sentry from "@sentry/nextjs";
  */
 export function filterSensitiveData<T extends Sentry.Event>(
   event: T,
-  hint: Sentry.EventHint,
+  hint: Sentry.EventHint
 ): T | null {
   // Filter out sensitive data from request body
   if (event.request) {
     if (event.request.data) {
-      const data = event.request.data as Record<string, unknown>
+      const data = event.request.data as Record<string, unknown>;
       if (typeof data === "object" && data !== null) {
         if (Array.isArray(data.transactions)) {
           data.transactions = data.transactions.map((tx: unknown) => {
             if (typeof tx === "object" && tx !== null) {
-              const txObj = tx as Record<string, unknown>
+              const txObj = tx as Record<string, unknown>;
               if ("serializedTransaction" in txObj) {
-                return { ...txObj, serializedTransaction: "[FILTERED]" }
+                return { ...txObj, serializedTransaction: "[FILTERED]" };
               }
             }
-            return tx
-          })
+            return tx;
+          });
         }
         if ("serializedTransaction" in data) {
-          data.serializedTransaction = "[FILTERED]"
+          data.serializedTransaction = "[FILTERED]";
         }
       }
     }
@@ -44,15 +44,15 @@ export function filterSensitiveData<T extends Sentry.Event>(
         key.toLowerCase().includes("key") ||
         key.toLowerCase().includes("serialized")
       ) {
-        event.extra![key] = "[FILTERED]"
+        event.extra![key] = "[FILTERED]";
       }
-    })
+    });
   }
 
   // Filter out sensitive data from contexts (server only)
   if (event.contexts) {
     Object.keys(event.contexts).forEach((key) => {
-      const context = event.contexts?.[key]
+      const context = event.contexts?.[key];
       if (typeof context === "object" && context !== null) {
         Object.keys(context).forEach((contextKey) => {
           if (
@@ -62,14 +62,14 @@ export function filterSensitiveData<T extends Sentry.Event>(
             contextKey.toLowerCase().includes("key") ||
             contextKey.toLowerCase().includes("serialized")
           ) {
-            context[contextKey] = "[FILTERED]"
+            context[contextKey] = "[FILTERED]";
           }
-        })
+        });
       }
-    })
+    });
   }
 
-  return event
+  return event;
 }
 
 /**
@@ -83,5 +83,4 @@ export const commonSentryOptions = {
   debug: false,
 
   beforeSend: filterSensitiveData,
-}
-
+};

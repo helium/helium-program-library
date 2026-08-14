@@ -115,9 +115,13 @@ export const UpdateTransferOutputSchema = z.object({
 export const QuoteOutputSchema = QuoteResponseSchema;
 
 export type InitKycInput = z.infer<typeof InitKycInputSchema>;
-export type CreateBankAccountInput = z.infer<typeof CreateBankAccountInputSchema>;
+export type CreateBankAccountInput = z.infer<
+  typeof CreateBankAccountInputSchema
+>;
 export type GetBankAccountInput = z.infer<typeof GetBankAccountInputSchema>;
-export type DeleteBankAccountInput = z.infer<typeof DeleteBankAccountInputSchema>;
+export type DeleteBankAccountInput = z.infer<
+  typeof DeleteBankAccountInputSchema
+>;
 export type GetSendQuoteInput = z.infer<typeof GetSendQuoteInputSchema>;
 export type SendFundsInput = z.infer<typeof SendFundsInputSchema>;
 export type GetTransferInput = z.infer<typeof GetTransferInputSchema>;
@@ -126,7 +130,9 @@ export type KycStatusOutput = z.infer<typeof KycStatusOutputSchema>;
 export type FeesOutput = z.infer<typeof FeesOutputSchema>;
 export type BankAccount = z.infer<typeof BankAccountSchema>;
 export type BankAccountListOutput = z.infer<typeof BankAccountListOutputSchema>;
-export type DeleteBankAccountOutput = z.infer<typeof DeleteBankAccountOutputSchema>;
+export type DeleteBankAccountOutput = z.infer<
+  typeof DeleteBankAccountOutputSchema
+>;
 export type BridgeTransfer = z.infer<typeof BridgeTransferSchema>;
 export type SendFundsOutput = z.infer<typeof SendFundsOutputSchema>;
 export type UpdateTransferOutput = z.infer<typeof UpdateTransferOutputSchema>;

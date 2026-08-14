@@ -34,13 +34,13 @@ const makeFakeConnection = () =>
       context: { slot: 1 },
       value: { err: null, unitsConsumed: 100000, logs: [] },
     }),
-  }) as unknown as Connection;
+  } as unknown as Connection);
 
 const makeProvider = (connection: Connection) =>
   ({
     connection,
     wallet: { publicKey: FEE_PAYER },
-  }) as unknown as AnchorProvider;
+  } as unknown as AnchorProvider);
 
 // ~600 bytes of instruction data so two groups overflow one 1232-byte tx,
 // forcing the batcher's overflow/close path (where the aliasing bug lived).
@@ -72,18 +72,18 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
     const first = await batchInstructionsToTxsWithPriorityFee(
       provider,
       groups,
-      { computeUnitLimit: 200000 },
+      { computeUnitLimit: 200000 }
     );
     const second = await batchInstructionsToTxsWithPriorityFee(
       provider,
       groups,
-      { computeUnitLimit: 200000 },
+      { computeUnitLimit: 200000 }
     );
 
     expect(second.length).to.equal(first.length);
     expect(
       second.map((d) => d.instructions.length),
-      "repeat call produced txs with extra (duplicated) instructions",
+      "repeat call produced txs with extra (duplicated) instructions"
     ).to.deep.equal(first.map((d) => d.instructions.length));
   });
 });
@@ -93,7 +93,7 @@ describe("estimateComputeBudget", () => {
     const connection = {
       simulateTransaction: async () => {
         throw new Error(
-          "failed to simulate transaction: base64 encoded solana_transaction::versioned::VersionedTransaction too large: 1804 bytes (max: encoded/raw 1644/1232)",
+          "failed to simulate transaction: base64 encoded solana_transaction::versioned::VersionedTransaction too large: 1804 bytes (max: encoded/raw 1644/1232)"
         );
       },
     } as unknown as Connection;
@@ -104,7 +104,7 @@ describe("estimateComputeBudget", () => {
       // Empty instructions miss the CU table, yielding the MAX fallback.
       {
         message: { compiledInstructions: [], staticAccountKeys: [] },
-      } as unknown as VersionedTransaction,
+      } as unknown as VersionedTransaction
     );
 
     expect(result.simulated).to.equal(false);

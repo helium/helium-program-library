@@ -56,5 +56,5 @@ export const addEntityToAutomation =
           index,
         },
       });
-    },
+    }
   );

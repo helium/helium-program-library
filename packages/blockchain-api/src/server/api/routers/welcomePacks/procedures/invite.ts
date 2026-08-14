@@ -20,7 +20,7 @@ export const invite = publicProcedure.welcomePacks.invite.handler(
     const { provider } = createSolanaConnection(walletAddress);
     const program = await initWelcomePack(provider);
     const welcomePack = await program.account.welcomePackV0.fetch(
-      new PublicKey(packAddress),
+      new PublicKey(packAddress)
     );
     const uniqueId = welcomePack.uniqueId.toString();
     const expirationTs =
@@ -30,5 +30,5 @@ export const invite = publicProcedure.welcomePacks.invite.handler(
     const message = `Approve invite ${uniqueId} expiring ${expirationTs}`;
 
     return { message, expirationTs };
-  },
+  }
 );

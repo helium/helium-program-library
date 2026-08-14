@@ -69,5 +69,5 @@ BridgeTransfer.init(
     tableName: "bridge_transfers",
     underscored: true,
     timestamps: true,
-  },
+  }
 );

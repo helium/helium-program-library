@@ -23,7 +23,7 @@ export async function getPrograms(ctx: TestCtx) {
   const provider = new AnchorProvider(
     ctx.connection,
     wallet,
-    AnchorProvider.defaultOptions(),
+    AnchorProvider.defaultOptions()
   );
 
   const vsrProgram = await initVsr(provider);
@@ -39,17 +39,17 @@ const PROXY_EXPIRATION_BUFFER_SECONDS = 60;
 /** Proxy assignments must expire within the current proxy season. */
 export async function getSeasonBoundedProxyExpirationTime(
   ctx: TestCtx,
-  positionMint: string,
+  positionMint: string
 ): Promise<number> {
   const { vsrProgram, proxyProgram } = await getPrograms(ctx);
   const now = Math.floor(Date.now() / 1000);
   const [positionPubkey] = positionKey(new PublicKey(positionMint));
   const positionAcc = await vsrProgram.account.positionV0.fetch(positionPubkey);
   const registrar = await vsrProgram.account.registrar.fetch(
-    positionAcc.registrar,
+    positionAcc.registrar
   );
   const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
-    registrar.proxyConfig,
+    registrar.proxyConfig
   );
   const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, new BN(now));
 
@@ -80,7 +80,7 @@ export async function ensureSubDaoEpochsCurrent(ctx: TestCtx): Promise<void> {
     if (!accountInfo) continue;
 
     const lastCalcTs = Number(
-      accountInfo.data.readBigInt64LE(VEHNT_LAST_CALCULATED_TS_OFFSET),
+      accountInfo.data.readBigInt64LE(VEHNT_LAST_CALCULATED_TS_OFFSET)
     );
 
     if (currentEpochStart - lastCalcTs <= EPOCH_LENGTH) continue;
@@ -88,7 +88,7 @@ export async function ensureSubDaoEpochsCurrent(ctx: TestCtx): Promise<void> {
     const newData = Buffer.from(accountInfo.data);
     newData.writeBigInt64LE(
       BigInt(currentEpochStart),
-      VEHNT_LAST_CALCULATED_TS_OFFSET,
+      VEHNT_LAST_CALCULATED_TS_OFFSET
     );
 
     await fetch(getSurfpoolRpcUrl(), {
@@ -116,10 +116,10 @@ const DELEGATED_POSITION_EXPIRATION_TS_OFFSET = 146;
 export async function setDelegatedPositionExpiration(
   ctx: TestCtx,
   delegatedPositionPubkey: PublicKey,
-  newExpirationTs: number,
+  newExpirationTs: number
 ): Promise<void> {
   const accountInfo = await ctx.connection.getAccountInfo(
-    delegatedPositionPubkey,
+    delegatedPositionPubkey
   );
   if (!accountInfo) {
     throw new Error("DelegatedPositionV0 account not found");
@@ -128,7 +128,7 @@ export async function setDelegatedPositionExpiration(
   const newData = Buffer.from(accountInfo.data);
   newData.writeBigInt64LE(
     BigInt(newExpirationTs),
-    DELEGATED_POSITION_EXPIRATION_TS_OFFSET,
+    DELEGATED_POSITION_EXPIRATION_TS_OFFSET
   );
 
   await fetch(getSurfpoolRpcUrl(), {
@@ -155,7 +155,7 @@ const POSITION_LOCKUP_END_TS_OFFSET = 80;
 export async function setPositionLockupEndTs(
   ctx: TestCtx,
   positionPubkey: PublicKey,
-  newEndTs: number,
+  newEndTs: number
 ): Promise<void> {
   const accountInfo = await ctx.connection.getAccountInfo(positionPubkey);
   if (!accountInfo) {
@@ -199,7 +199,7 @@ interface CreatePositionResult {
 
 export async function createAndFundPosition(
   ctx: TestCtx,
-  options: CreatePositionOptions,
+  options: CreatePositionOptions
 ): Promise<CreatePositionResult> {
   const walletAddress = ctx.payer.publicKey.toBase58();
 
@@ -234,7 +234,7 @@ export async function createAndFundPosition(
   const signatures = await signAndSubmitTransactionData(
     ctx.connection,
     data.transactionData,
-    ctx.payer,
+    ctx.payer
   );
 
   const positionMint = data.transactionData.transactions[0].metadata

@@ -7,33 +7,39 @@ import Fastify, { FastifyInstance } from "fastify";
 import { provider } from "./solana";
 
 const server: FastifyInstance = Fastify({
-  logger: true
+  logger: true,
 });
 server.register(cors, {
-  origin: "*"
+  origin: "*",
 });
 server.get("/health", async () => {
   return { ok: true };
-})
-
-server.get<{ Params: { mintKey: string } }>("/:mintKey", async (request, reply) => {
-  const { mintKey } = request.params;
-  const mint = new PublicKey(mintKey);
-  const fanoutProgram = await init(provider);
-  const voucher = membershipVoucherKey(mint)[0];
-  const voucherAcc = await fanoutProgram.account.fanoutVoucherV0.fetch(voucher);
-  const fanout = await fanoutProgram.account.fanoutV0.fetch(voucherAcc.fanout);
-  const decimals = (await getMint(provider.connection, fanout.membershipMint)).decimals;
-  const uiAmount = humanReadable(voucherAcc.shares, decimals)
-  return {
-    description: `${uiAmount} tokens staked in a fanout wallet, receiving ${fanout.fanoutMint.toBase58()} tokens`,
-    image:
-      "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/vsr.png",
-    attributes: [
-      { trait_type: "amount_deposited", value: uiAmount },
-    ],
-  };
 });
+
+server.get<{ Params: { mintKey: string } }>(
+  "/:mintKey",
+  async (request, reply) => {
+    const { mintKey } = request.params;
+    const mint = new PublicKey(mintKey);
+    const fanoutProgram = await init(provider);
+    const voucher = membershipVoucherKey(mint)[0];
+    const voucherAcc = await fanoutProgram.account.fanoutVoucherV0.fetch(
+      voucher
+    );
+    const fanout = await fanoutProgram.account.fanoutV0.fetch(
+      voucherAcc.fanout
+    );
+    const decimals = (await getMint(provider.connection, fanout.membershipMint))
+      .decimals;
+    const uiAmount = humanReadable(voucherAcc.shares, decimals);
+    return {
+      description: `${uiAmount} tokens staked in a fanout wallet, receiving ${fanout.fanoutMint.toBase58()} tokens`,
+      image:
+        "https://shdw-drive.genesysgo.net/6tcnBSybPG7piEDShBcrVtYJDPSvGrDbVvXmXKpzBvWP/vsr.png",
+      attributes: [{ trait_type: "amount_deposited", value: uiAmount }],
+    };
+  }
+);
 
 const start = async () => {
   try {

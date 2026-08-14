@@ -9,52 +9,52 @@ interface InviteStepperProps {
 
 export function InviteStepper({ steps, currentStep }: InviteStepperProps) {
   return (
-    <div className="flex flex-col md:flex-row items-center w-full gap-4">
+    <div className="flex w-full flex-col items-center gap-4 md:flex-row">
       {steps.map((step, idx) => (
         <div
           key={step.title}
-          className="flex flex-col items-center relative flex-1 w-full md:w-auto"
+          className="relative flex w-full flex-1 flex-col items-center md:w-auto"
         >
           {idx > 0 && (
             <div
               className={cn(
-                "md:hidden absolute -top-4 left-1/2 w-0.5 h-6 -translate-x-1/2 z-0",
-                idx <= currentStep ? "bg-green-600" : "bg-gray-300",
+                "absolute -top-4 left-1/2 z-0 h-6 w-0.5 -translate-x-1/2 md:hidden",
+                idx <= currentStep ? "bg-green-600" : "bg-gray-300"
               )}
             />
           )}
           {idx > 0 && (
             <div
               className={cn(
-                "hidden md:block absolute top-1/2 -left-4 w-4 h-0.5 -translate-y-1/2 z-0",
-                idx <= currentStep ? "bg-green-600" : "bg-gray-300",
+                "absolute -left-4 top-1/2 z-0 hidden h-0.5 w-4 -translate-y-1/2 md:block",
+                idx <= currentStep ? "bg-green-600" : "bg-gray-300"
               )}
             />
           )}
           <div
             className={cn(
-              "bg-white dark:bg-accent rounded-lg p-4 w-full relative",
+              "dark:bg-accent relative w-full rounded-lg bg-white p-4",
               idx === currentStep
                 ? "outline outline-blue-600 dark:outline-blue-400"
                 : idx < currentStep
-                  ? "opacity-60"
-                  : "",
+                ? "opacity-60"
+                : ""
             )}
           >
-            <div className="flex flex-row md:flex-col gap-4 p-6">
+            <div className="flex flex-row gap-4 p-6 md:flex-col">
               <div
                 className={cn(
-                  "rounded-full h-8 w-8 flex items-center justify-center text-sm font-medium flex-shrink-0 md:order-2",
+                  "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-medium md:order-2",
                   idx < currentStep
-                    ? "bg-green-600 ring-4 ring-green-300 dark:ring-green-800 text-black dark:text-white"
+                    ? "bg-green-600 text-black ring-4 ring-green-300 dark:text-white dark:ring-green-800"
                     : idx === currentStep
-                      ? "bg-blue-600 ring-4 ring-blue-300 dark:ring-blue-800 text-black dark:text-white"
-                      : "bg-gray-300 text-black",
+                    ? "bg-blue-600 text-black ring-4 ring-blue-300 dark:text-white dark:ring-blue-800"
+                    : "bg-gray-300 text-black"
                 )}
               >
                 {idx < currentStep ? (
                   <svg
-                    className="w-4 h-4"
+                    className="h-4 w-4"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -72,7 +72,7 @@ export function InviteStepper({ steps, currentStep }: InviteStepperProps) {
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Step {idx + 1}
                 </p>
-                <p className="text-md md:text-xl font-semibold text-gray-900 dark:text-gray-100 leading-tight">
+                <p className="text-md font-semibold leading-tight text-gray-900 dark:text-gray-100 md:text-xl">
                   {step.title}
                 </p>
               </div>

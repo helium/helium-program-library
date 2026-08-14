@@ -21,7 +21,7 @@ export async function initTestDao(
   authority: PublicKey,
   dcMint?: PublicKey,
   mint?: PublicKey,
-  registrar?: PublicKey,
+  registrar?: PublicKey
 ): Promise<{
   mint: PublicKey;
   dao: PublicKey;
@@ -102,16 +102,24 @@ export async function initTestDao(
   };
 }
 
-export async function initTestSubdao(
-  {hsdProgram, provider, authority, dao, epochRewards, registrar, numTokens, activeDeviceAuthority}: {
-  hsdProgram: anchor.Program<HeliumSubDaos>,
-  provider: anchor.AnchorProvider,
-  authority: PublicKey,
-  dao: PublicKey,
-  epochRewards?: number,
-  registrar?: PublicKey,
-  numTokens?: number | BN,
-  activeDeviceAuthority?: PublicKey,
+export async function initTestSubdao({
+  hsdProgram,
+  provider,
+  authority,
+  dao,
+  epochRewards,
+  registrar,
+  numTokens,
+  activeDeviceAuthority,
+}: {
+  hsdProgram: anchor.Program<HeliumSubDaos>;
+  provider: anchor.AnchorProvider;
+  authority: PublicKey;
+  dao: PublicKey;
+  epochRewards?: number;
+  registrar?: PublicKey;
+  numTokens?: number | BN;
+  activeDeviceAuthority?: PublicKey;
 }): Promise<{
   mint: PublicKey;
   subDao: PublicKey;

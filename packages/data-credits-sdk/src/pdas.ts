@@ -2,7 +2,10 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { sha256 } from "js-sha256";
 
-export function dataCreditsKey(dcMint: PublicKey, programId = PROGRAM_ID): [PublicKey, number] {
+export function dataCreditsKey(
+  dcMint: PublicKey,
+  programId = PROGRAM_ID
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("dc", "utf-8"), dcMint.toBuffer()],
     programId
@@ -15,7 +18,7 @@ export function accountPayerKey(
   return PublicKey.findProgramAddressSync(
     [Buffer.from("account_payer", "utf-8")],
     programId
-  )
+  );
 }
 
 export function delegatedDataCreditsKey(
@@ -33,7 +36,7 @@ export function delegatedDataCreditsKey(
     ],
     programId
   );
-};
+}
 
 export function escrowAccountKey(
   delegatedDataCredits: PublicKey,
@@ -46,4 +49,4 @@ export function escrowAccountKey(
     ],
     programId
   );
-};
+}

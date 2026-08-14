@@ -57,7 +57,9 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
         }
 
         throw errors.JUPITER_ERROR({
-          message: `Failed to get quote from Jupiter: HTTP ${quoteResponse.status}: ${errorText.slice(0, 500)}`,
+          message: `Failed to get quote from Jupiter: HTTP ${
+            quoteResponse.status
+          }: ${errorText.slice(0, 500)}`,
         });
       }
 
@@ -77,5 +79,5 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       }
       return quote;
     });
-  },
+  }
 );

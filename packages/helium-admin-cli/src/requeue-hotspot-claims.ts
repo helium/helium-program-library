@@ -2,14 +2,11 @@ import * as anchor from "@coral-xyz/anchor";
 import {
   cronJobKey,
   cronJobNameMappingKey,
-  init as initCron
+  init as initCron,
 } from "@helium/cron-sdk";
 import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import { init as initTuktuk, taskKey } from "@helium/tuktuk-sdk";
-import {
-  PublicKey,
-  SystemProgram
-} from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -59,27 +56,24 @@ export async function run(args: any = process.argv) {
   const cronJob = cronJobKey(authority, 0)[0];
   const cronJobAcc = await cronProgram.account.cronJobV0.fetch(cronJob);
   if (cronJobAcc.removedFromQueue) {
-    await sendInstructionsWithPriorityFee(
-      provider,
-      [
-        await program.methods
-          .requeueEntityClaimCronV0()
-          .accounts({
-            taskQueue,
-            cronJob,
-            task,
-            cronJobNameMapping: cronJobNameMappingKey(
-              authority,
-              "entity_claim"
-            )[0],
-          })
-          .instruction(),
-        SystemProgram.transfer({
-          fromPubkey: provider.wallet.publicKey,
-          toPubkey: cronJob,
-          lamports: BigInt(argv.fundingAmount),
-        }),
-      ]
-    );
+    await sendInstructionsWithPriorityFee(provider, [
+      await program.methods
+        .requeueEntityClaimCronV0()
+        .accounts({
+          taskQueue,
+          cronJob,
+          task,
+          cronJobNameMapping: cronJobNameMappingKey(
+            authority,
+            "entity_claim"
+          )[0],
+        })
+        .instruction(),
+      SystemProgram.transfer({
+        fromPubkey: provider.wallet.publicKey,
+        toPubkey: cronJob,
+        lamports: BigInt(argv.fundingAmount),
+      }),
+    ]);
   }
 }

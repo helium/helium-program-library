@@ -43,7 +43,7 @@ module.exports = {
                 return reject(err);
               }
               resolve(token);
-            }),
+            })
           );
           config.dialectOptions = {
             ssl: {

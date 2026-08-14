@@ -4,7 +4,10 @@ import {
   BorshInstructionCoder,
   Idl,
 } from "@coral-xyz/anchor";
-import { convertIdlToCamelCase, decodeIdlAccount } from "@coral-xyz/anchor/dist/cjs/idl";
+import {
+  convertIdlToCamelCase,
+  decodeIdlAccount,
+} from "@coral-xyz/anchor/dist/cjs/idl";
 import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import {
@@ -740,7 +743,10 @@ function getIdlKey(programId: PublicKey): PublicKey {
   return new PublicKey(publicKeyBytes);
 }
 
-function decodeIdl(account: AccountInfo<Buffer>, programAddress?: string): Idl | undefined {
+function decodeIdl(
+  account: AccountInfo<Buffer>,
+  programAddress?: string
+): Idl | undefined {
   try {
     const idlData = decodeIdlAccount(Buffer.from(account.data.subarray(8)));
     const inflatedIdl = inflate(idlData.data);
@@ -899,9 +905,9 @@ function decodeIdlStruct(
     const coder = new BorshAccountsCoder(convertIdlToCamelCase(idl));
     const descriminator = account.data.slice(0, 8);
     const type = idl.accounts?.find((account) =>
-      new BorshAccountsCoder(idl).accountDiscriminator(lowerFirstChar(account.name)).equals(
-        descriminator
-      )
+      new BorshAccountsCoder(idl)
+        .accountDiscriminator(lowerFirstChar(account.name))
+        .equals(descriminator)
     )?.name;
     if (type) {
       return {
@@ -1061,4 +1067,3 @@ const HELIUM_ENTITY_CREATOR = PublicKey.findProgramAddressSync(
 function lowercaseFirst(type: string): string {
   return type.charAt(0).toLowerCase() + type.slice(1);
 }
-

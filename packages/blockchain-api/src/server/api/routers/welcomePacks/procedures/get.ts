@@ -13,7 +13,7 @@ export const get = publicProcedure.welcomePacks.get.handler(
     // Derive the welcome pack address from wallet and packId
     const welcomePackAddress = welcomePackKey(
       new PublicKey(walletAddress),
-      Number(packId),
+      Number(packId)
     )[0].toBase58();
 
     const pack = await getWelcomePackByAddress(welcomePackAddress);
@@ -23,5 +23,5 @@ export const get = publicProcedure.welcomePacks.get.handler(
     }
 
     return pack;
-  },
+  }
 );

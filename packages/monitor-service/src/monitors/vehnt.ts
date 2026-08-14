@@ -10,9 +10,9 @@ import { sequelize } from "../model";
 import { toNumber } from "@helium/spl-utils";
 
 export async function monitorVehnt() {
-  await monitorVehntOnce()
+  await monitorVehntOnce();
   // Check once a minute
-  setInterval(monitorVehntOnce, 60 * 1000)
+  setInterval(monitorVehntOnce, 60 * 1000);
 }
 
 async function monitorVehntOnce() {
@@ -151,7 +151,9 @@ FROM subdao_delegations;
       mint,
       delegations,
     } = result as any;
-    realVeTokensGauge.labels(mint).set(toNumber(new BN(real_ve_tokens.split(".")[0]), 8));
+    realVeTokensGauge
+      .labels(mint)
+      .set(toNumber(new BN(real_ve_tokens.split(".")[0]), 8));
     approxVeTokensGauge
       .labels(mint)
       .set(toNumber(new BN(approx_ve_tokens.split(".")[0]), 8));

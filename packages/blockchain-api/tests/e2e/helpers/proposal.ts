@@ -44,11 +44,11 @@ export interface ProposalSetup {
  */
 function proposalConfigKey(
   name: string,
-  programId: PublicKey = PROPOSAL_PROGRAM_ID,
+  programId: PublicKey = PROPOSAL_PROGRAM_ID
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("proposal_config"), Buffer.from(name, "utf-8")],
-    programId,
+    programId
   );
 }
 
@@ -64,14 +64,14 @@ function proposalConfigKey(
  */
 export async function createTestProposal(
   ctx: TestCtx,
-  options: CreateProposalOptions,
+  options: CreateProposalOptions
 ): Promise<ProposalSetup> {
   // Create a signing provider using the test context's connection and payer
   const wallet = new Wallet(ctx.payer);
   const provider = new AnchorProvider(
     ctx.connection,
     wallet,
-    AnchorProvider.defaultOptions(),
+    AnchorProvider.defaultOptions()
   );
 
   const hsdProgram = await initHsd(provider);
@@ -195,13 +195,13 @@ export async function createTestProposal(
  */
 export async function createTestOrganizationProposal(
   ctx: TestCtx,
-  options: CreateProposalOptions,
+  options: CreateProposalOptions
 ): Promise<ProposalSetup> {
   const wallet = new Wallet(ctx.payer);
   const provider = new AnchorProvider(
     ctx.connection,
     wallet,
-    AnchorProvider.defaultOptions(),
+    AnchorProvider.defaultOptions()
   );
 
   const hsdProgram = await initHsd(provider);

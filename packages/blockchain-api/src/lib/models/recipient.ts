@@ -66,5 +66,5 @@ Recipient.init(
     tableName: "recipients",
     timestamps: false,
     underscored: true,
-  },
+  }
 );

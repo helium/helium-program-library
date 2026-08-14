@@ -65,5 +65,5 @@ BridgeUser.init(
     tableName: "bridge_users",
     underscored: true,
     timestamps: true,
-  },
+  }
 );

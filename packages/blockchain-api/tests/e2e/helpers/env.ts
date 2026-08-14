@@ -30,5 +30,6 @@ export function applyMinimalServerEnv(): void {
   process.env.ONBOARDING_ENDPOINT ||= "https://onboarding.dewi.org/api/v3";
   process.env.HPL_CRONS_TASK_QUEUE ||=
     "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7";
-  process.env.JITO_TIP_ACCOUNT ||= "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5";
+  process.env.JITO_TIP_ACCOUNT ||=
+    "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5";
 }

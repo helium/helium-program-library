@@ -1,6 +1,9 @@
 import { IdlTypes, Program } from "@coral-xyz/anchor";
 import { WelcomePack } from "@helium/idls/lib/types/welcome_pack";
-import { recipientKey, PROGRAM_ID as LAZY_DISTRIBUTOR_PROGRAM_ID } from "@helium/lazy-distributor-sdk";
+import {
+  recipientKey,
+  PROGRAM_ID as LAZY_DISTRIBUTOR_PROGRAM_ID,
+} from "@helium/lazy-distributor-sdk";
 import { Asset, AssetProof, proofArgsAndAccounts } from "@helium/spl-utils";
 import { SPL_ACCOUNT_COMPRESSION_PROGRAM_ID } from "@solana/spl-account-compression";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
@@ -27,14 +30,10 @@ export async function closeWelcomePack({
     assetId: PublicKey
   ) => Promise<AssetProof | undefined>;
 }) {
-  const welcomePackAcc = await program.account.welcomePackV0.fetch(welcomePack)
-  const assetId = welcomePackAcc.asset
-  const recipient = recipientKey(welcomePackAcc.lazyDistributor, assetId)[0]
-  const {
-    args,
-    accounts,
-    remainingAccounts,
-  } = await proofArgsAndAccounts({
+  const welcomePackAcc = await program.account.welcomePackV0.fetch(welcomePack);
+  const assetId = welcomePackAcc.asset;
+  const recipient = recipientKey(welcomePackAcc.lazyDistributor, assetId)[0];
+  const { args, accounts, remainingAccounts } = await proofArgsAndAccounts({
     assetEndpoint,
     connection: program.provider.connection,
     assetId,
@@ -48,8 +47,13 @@ export async function closeWelcomePack({
     .accountsStrict({
       welcomePack: welcomePack,
       owner: welcomePackAcc.owner,
-      rentRefund: welcomePackAcc.rentRefund.equals(PublicKey.default) ? welcomePackAcc.owner : welcomePackAcc.rentRefund,
-      treeAuthority: PublicKey.findProgramAddressSync([accounts.merkleTree.toBuffer()], BUBBLEGUM_PROGRAM_ID)[0],
+      rentRefund: welcomePackAcc.rentRefund.equals(PublicKey.default)
+        ? welcomePackAcc.owner
+        : welcomePackAcc.rentRefund,
+      treeAuthority: PublicKey.findProgramAddressSync(
+        [accounts.merkleTree.toBuffer()],
+        BUBBLEGUM_PROGRAM_ID
+      )[0],
       merkleTree: accounts.merkleTree,
       logWrapper: NOOP_PROGRAM_ID,
       compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,

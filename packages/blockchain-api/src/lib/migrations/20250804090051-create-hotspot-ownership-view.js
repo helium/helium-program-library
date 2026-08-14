@@ -8,7 +8,7 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     const sql = fs.readFileSync(
       path.join(__dirname, "sql", "hotspot-ownership-v0.sql"),
-      "utf8",
+      "utf8"
     );
     await queryInterface.sequelize.query(sql);
   },

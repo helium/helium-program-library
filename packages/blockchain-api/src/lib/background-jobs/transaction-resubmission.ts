@@ -26,7 +26,7 @@ class TransactionResubmissionService {
       reaperIntervalMs: 30000, // 30 seconds
       maxRetries: 10,
       enabled: true,
-    },
+    }
   ) {
     this.config = config;
   }
@@ -46,7 +46,7 @@ class TransactionResubmissionService {
     }
 
     console.log(
-      `Starting transaction resubmission service with ${this.config.intervalMs}ms interval`,
+      `Starting transaction resubmission service with ${this.config.intervalMs}ms interval`
     );
 
     this.isRunning = true;
@@ -97,7 +97,7 @@ class TransactionResubmissionService {
     this.config = { ...this.config, ...newConfig };
     console.log(
       "Transaction resubmission service config updated:",
-      this.config,
+      this.config
     );
   }
 
@@ -126,7 +126,7 @@ class TransactionResubmissionService {
             } catch (error) {
               console.error(`Error processing batch ${batch.id}:`, error);
             }
-          }),
+          })
         );
       }
     } catch (error) {
@@ -139,7 +139,7 @@ class TransactionResubmissionService {
    */
   private async processBatch(
     batch: TransactionBatch,
-    transactions: PendingTransaction[],
+    transactions: PendingTransaction[]
   ): Promise<void> {
     try {
       // Use the existing working logic to check and update batch status
@@ -154,12 +154,12 @@ class TransactionResubmissionService {
       const stillPending = transactions.filter(
         (tx) =>
           result.transactionStatuses.find((ts) => ts.signature === tx.signature)
-            ?.status === "pending",
+            ?.status === "pending"
       );
 
       if (stillPending.length > 0) {
         console.log(
-          `Resubmitting ${stillPending.length} transactions in batch ${batch.id}`,
+          `Resubmitting ${stillPending.length} transactions in batch ${batch.id}`
         );
 
         try {
@@ -170,7 +170,7 @@ class TransactionResubmissionService {
           } else {
             console.error(
               `Failed to resubmit batch ${batch.id}:`,
-              result.error,
+              result.error
             );
           }
         } catch (error) {

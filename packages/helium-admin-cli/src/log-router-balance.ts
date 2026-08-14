@@ -1,8 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  delegatedDataCreditsKey,
-  init,
-} from "@helium/data-credits-sdk";
+import { delegatedDataCreditsKey, init } from "@helium/data-credits-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { DC_MINT } from "@helium/spl-utils";
 import { getAccount } from "@solana/spl-token";
@@ -43,12 +40,19 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dcProgram = await init(provider);
   const dntMint = new PublicKey(argv.dntMint);
-  const [subdao] = subDaoKey(dntMint)
+  const [subdao] = subDaoKey(dntMint);
 
-  const [delegatedDataCreditsK] = delegatedDataCreditsKey(subdao, argv.routerKey);
-  console.log("Delegated data credits key: ", delegatedDataCreditsK.toBase58())
-  const delegatedDataCredits = await dcProgram.account.delegatedDataCreditsV0.fetch(delegatedDataCreditsK);
-  console.log(delegatedDataCredits)
-  const account = await getAccount(provider.connection, delegatedDataCredits.escrowAccount);
+  const [delegatedDataCreditsK] = delegatedDataCreditsKey(
+    subdao,
+    argv.routerKey
+  );
+  console.log("Delegated data credits key: ", delegatedDataCreditsK.toBase58());
+  const delegatedDataCredits =
+    await dcProgram.account.delegatedDataCreditsV0.fetch(delegatedDataCreditsK);
+  console.log(delegatedDataCredits);
+  const account = await getAccount(
+    provider.connection,
+    delegatedDataCredits.escrowAccount
+  );
   console.log("Balance: ", account.amount.toString());
 }

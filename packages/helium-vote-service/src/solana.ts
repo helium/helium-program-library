@@ -28,13 +28,7 @@ export const cache = new AccountFetchCache({
 });
 export const keypair = Keypair.fromSecretKey(
   new Uint8Array(
-    JSON.parse(
-      fs
-        .readFileSync(
-          process.env.ANCHOR_WALLET!
-        )
-        .toString()
-    )
+    JSON.parse(fs.readFileSync(process.env.ANCHOR_WALLET!).toString())
   )
 );
 

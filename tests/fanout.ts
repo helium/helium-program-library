@@ -195,13 +195,7 @@ describe("fanout", () => {
           }
         }
 
-        await createAtaAndTransfer(
-          provider,
-          fanoutMint,
-          4,
-          me,
-          fanout
-        );
+        await createAtaAndTransfer(provider, fanoutMint, 4, me, fanout);
 
         await distribute();
 
@@ -211,16 +205,12 @@ describe("fanout", () => {
             getAssociatedTokenAddressSync(fanoutMint, wallet.publicKey)
           );
           // This first dist will ignore dust. Position 1 gets 0, position 2 gets 4.
-          expect(toAccount.amount).to.eq(BigInt(Math.floor((amount / 100) * 4)));
+          expect(toAccount.amount).to.eq(
+            BigInt(Math.floor((amount / 100) * 4))
+          );
         }
 
-        await createAtaAndTransfer(
-          provider,
-          fanoutMint,
-          1,
-          me,
-          fanout
-        );
+        await createAtaAndTransfer(provider, fanoutMint, 1, me, fanout);
 
         await distribute();
 

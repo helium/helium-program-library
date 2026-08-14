@@ -109,8 +109,10 @@ async function run() {
     );
     progress.start(txs.length, 0);
   }
-  await bulkSendTransactions(provider, txs, (prog) =>
-    progress && progress.update(prog.totalProgress)
+  await bulkSendTransactions(
+    provider,
+    txs,
+    (prog) => progress && progress.update(prog.totalProgress)
   );
   if (progress) {
     progress.stop();

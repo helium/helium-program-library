@@ -6,15 +6,21 @@ export function autoTopOffKey(
   authority: PublicKey,
   programId: PublicKey = PROGRAM_ID
 ): [PublicKey, number] {
-    return PublicKey.findProgramAddressSync(
-    [Buffer.from("auto_top_off", "utf-8"), delegatedDataCredits.toBuffer(), authority.toBuffer()],
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("auto_top_off", "utf-8"),
+      delegatedDataCredits.toBuffer(),
+      authority.toBuffer(),
+    ],
     programId
-  )
+  );
 }
 
-export function queueAuthorityKey(programId: PublicKey = PROGRAM_ID): [PublicKey, number] {
+export function queueAuthorityKey(
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("queue_authority", "utf-8")],
     programId
-  )
+  );
 }

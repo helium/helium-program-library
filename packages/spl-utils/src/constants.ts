@@ -4,18 +4,22 @@ export const DC_MINT = new PublicKey(
   "dcuc8Amr83Wz27ZkQ2K9NS6r8zRpf1J6cvArEBDZDmm"
 );
 
-export const HNT_MINT = new PublicKey("hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux");
+export const HNT_MINT = new PublicKey(
+  "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux"
+);
 
 export const MOBILE_MINT = new PublicKey(
   "mb1eu7TzEc71KxDpsmsKoucSSuuoGLv1drys1oP2jh6"
 );
 
-export const IOT_MINT = new PublicKey("iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns");
+export const IOT_MINT = new PublicKey(
+  "iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns"
+);
 
 // Mainnet HNT/USD Pyth pull-oracle push account (shard 0 for HNT_PRICE_FEED_ID),
 // kept continuously fresh on-chain.
 export const HNT_PYTH_PRICE_FEED = new PublicKey(
-  "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"
+  "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5"
 );
 
 export const HELIUM_COMMON_LUT_DEVNET = new PublicKey(
@@ -26,7 +30,8 @@ export const HELIUM_COMMON_LUT = new PublicKey(
   "43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt"
 );
 
-export const HNT_PRICE_FEED_ID = "0x649fdd7ec08e8e2a20f425729854e90293dcbe2376abc47197a14da6ff339756"
+export const HNT_PRICE_FEED_ID =
+  "0x649fdd7ec08e8e2a20f425729854e90293dcbe2376abc47197a14da6ff339756";
 
 export type Network = "hnt" | "mobile" | "iot";
 export const networksToMint: { [Network: string]: PublicKey } = {

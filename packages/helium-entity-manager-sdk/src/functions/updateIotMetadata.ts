@@ -29,26 +29,20 @@ export async function updateIotMetadata({
   gain: number | null;
   assetId: PublicKey;
   rewardableEntityConfig: PublicKey;
-  dao?: PublicKey
+  dao?: PublicKey;
 } & Omit<ProofArgsAndAccountsArgs, "connection">) {
-  const {
-    asset,
-    args,
-    accounts,
-    remainingAccounts,
-  } = await proofArgsAndAccounts({
-    connection: program.provider.connection,
-    assetId,
-    ...rest,
-  });
+  const { asset, args, accounts, remainingAccounts } =
+    await proofArgsAndAccounts({
+      connection: program.provider.connection,
+      assetId,
+      ...rest,
+    });
   const {
     ownership: { owner },
   } = asset;
 
   const keyToAssetKey = keyToAssetForAsset(asset, dao);
-  const keyToAsset = await program.account.keyToAssetV0.fetch(
-    keyToAssetKey
-  );
+  const keyToAsset = await program.account.keyToAssetV0.fetch(keyToAssetKey);
   const [info] = await iotInfoKey(rewardableEntityConfig, keyToAsset.entityKey);
 
   return program.methods

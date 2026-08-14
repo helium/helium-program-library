@@ -10,7 +10,10 @@ import { lowerFirstChar } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
 
-export function useIdlAccounts<IDL extends Idl, A extends keyof AllAccountsMap<IDL>>(
+export function useIdlAccounts<
+  IDL extends Idl,
+  A extends keyof AllAccountsMap<IDL>
+>(
   keys: PublicKey[] | undefined,
   idl: IDL | undefined,
   type: A,

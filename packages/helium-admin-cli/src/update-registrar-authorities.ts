@@ -1,32 +1,32 @@
-import * as anchor from '@coral-xyz/anchor';
-import { init } from '@helium/voter-stake-registry-sdk';
-import { PublicKey } from '@solana/web3.js';
-import os from 'os';
-import yargs from 'yargs/yargs';
-import { loadKeypair, sendInstructionsOrSquadsV4 } from './utils';
+import * as anchor from "@coral-xyz/anchor";
+import { init } from "@helium/voter-stake-registry-sdk";
+import { PublicKey } from "@solana/web3.js";
+import os from "os";
+import yargs from "yargs/yargs";
+import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
-      alias: 'k',
-      describe: 'Anchor wallet keypair',
+      alias: "k",
+      describe: "Anchor wallet keypair",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
-      alias: 'u',
-      default: 'http://127.0.0.1:8899',
-      describe: 'The solana url',
+      alias: "u",
+      default: "http://127.0.0.1:8899",
+      describe: "The solana url",
     },
     registrar: {
-      type: 'string',
+      type: "string",
       required: true,
     },
     authority: {
-      type: 'string',
-      required: true
+      type: "string",
+      required: true,
     },
     multisig: {
-      type: 'string',
+      type: "string",
     },
   });
 
@@ -42,7 +42,7 @@ export async function run(args: any = process.argv) {
   const instructions = [
     await vsrProgram.methods
       .updateRegistrarAuthorityV0({
-        authority: new PublicKey(argv.authority)
+        authority: new PublicKey(argv.authority),
       })
       .accountsPartial({
         registrar,

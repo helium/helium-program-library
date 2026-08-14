@@ -61,32 +61,50 @@ export async function run(args: any = process.argv) {
   // @ts-ignore
   const proxyMarkers = await vsrProgram.account.proxyMarkerV0.all();
 
-  const distinctProposals: Set<string> = new Set(proxyMarkers.map((m) => m.account.proposal.toBase58()));
-  const proposalKeys = Array.from(distinctProposals).map(d => new PublicKey(d));
-  const proposals = await proposalProgram.account.proposalV0.fetchMultiple(proposalKeys);
-  const proposalConfigs = await proposalProgram.account.proposalConfigV0.fetchMultiple(proposals.map(p => p!.proposalConfig));
-  const resolutions = await stateControllerProgram.account.resolutionSettingsV0.fetchMultiple(proposalConfigs.map(pc => pc!.stateController));
+  const distinctProposals: Set<string> = new Set(
+    proxyMarkers.map((m) => m.account.proposal.toBase58())
+  );
+  const proposalKeys = Array.from(distinctProposals).map(
+    (d) => new PublicKey(d)
+  );
+  const proposals = await proposalProgram.account.proposalV0.fetchMultiple(
+    proposalKeys
+  );
+  const proposalConfigs =
+    await proposalProgram.account.proposalConfigV0.fetchMultiple(
+      proposals.map((p) => p!.proposalConfig)
+    );
+  const resolutions =
+    await stateControllerProgram.account.resolutionSettingsV0.fetchMultiple(
+      proposalConfigs.map((pc) => pc!.stateController)
+    );
 
-  const endTsByProposal: Record<string, anchor.BN> = proposals.reduce((acc, proposal, i) => {
-    const resolution = resolutions[i]
-    acc[proposalKeys[i].toBase58()] = (resolution &&
-      (proposal?.state.resolved
-        ? proposal?.state.resolved.endTs
-        : proposal?.state.voting?.startTs.add(
-            resolution.settings.nodes.find(
-              (node) => typeof node.offsetFromStartTs !== "undefined"
-            )?.offsetFromStartTs?.offset ?? new anchor.BN(0)
-          )))!
-    return acc;
-  }, {} as Record<string, anchor.BN>);
+  const endTsByProposal: Record<string, anchor.BN> = proposals.reduce(
+    (acc, proposal, i) => {
+      const resolution = resolutions[i];
+      acc[proposalKeys[i].toBase58()] = (resolution &&
+        (proposal?.state.resolved
+          ? proposal?.state.resolved.endTs
+          : proposal?.state.voting?.startTs.add(
+              resolution.settings.nodes.find(
+                (node) => typeof node.offsetFromStartTs !== "undefined"
+              )?.offsetFromStartTs?.offset ?? new anchor.BN(0)
+            )))!;
+      return acc;
+    },
+    {} as Record<string, anchor.BN>
+  );
   const proposalsByPubkey = proposals.reduce((acc, proposal, i) => {
     acc[proposalKeys[i].toBase58()] = proposal;
     return acc;
   }, {} as Record<string, any>);
 
-  const nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, proxyMarkers.length);
+  const nextAvailable = nextAvailableTaskIds(
+    taskQueueAcc.taskBitmap,
+    proxyMarkers.length
+  );
   const instructions: TransactionInstruction[] = [];
-  const org = organizationKey("Helium")[0]
+  const org = organizationKey("Helium")[0];
   for (const marker of proxyMarkers) {
     const currTs = new Date().valueOf() / 1000;
     const endTs = endTsByProposal[marker.account.proposal.toBase58()];
@@ -120,7 +138,7 @@ export async function run(args: any = process.argv) {
               queueAuthority
             )[0],
           })
-          .instruction(),
+          .instruction()
       );
     }
   }

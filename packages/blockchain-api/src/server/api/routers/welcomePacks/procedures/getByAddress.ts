@@ -15,5 +15,5 @@ export const getByAddress = publicProcedure.welcomePacks.getByAddress.handler(
     }
 
     return pack;
-  },
+  }
 );

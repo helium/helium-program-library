@@ -21,9 +21,7 @@ export async function allocateNextTasks(
   task: PublicKey;
   preTask: PublicKey;
 }> {
-  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-    taskQueue
-  );
+  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
   const [taskId, preTaskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2);
   return {
     taskId,

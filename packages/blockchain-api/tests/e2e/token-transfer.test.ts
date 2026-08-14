@@ -68,7 +68,7 @@ describe("token-transfer", () => {
     });
 
     expect(
-      result?.transactionData?.transactions?.[0]?.serializedTransaction,
+      result?.transactionData?.transactions?.[0]?.serializedTransaction
     ).to.be.a("string");
     expect(result?.transactionData?.tag).to.be.a("string");
     expect(result?.transactionData?.parallel).to.equal(false);
@@ -98,7 +98,7 @@ describe("token-transfer", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer,
+      payer
     );
 
     const afterBalance = await connection.getBalance(recipient.publicKey);
@@ -117,7 +117,7 @@ describe("token-transfer", () => {
     });
 
     expect(
-      result?.transactionData?.transactions?.[0]?.serializedTransaction,
+      result?.transactionData?.transactions?.[0]?.serializedTransaction
     ).to.be.a("string");
     expect(result?.transactionData?.tag).to.be.a("string");
 
@@ -145,14 +145,14 @@ describe("token-transfer", () => {
     await signAndSubmitTransactionData(
       connection,
       result.transactionData,
-      payer,
+      payer
     );
 
     const mintKey = new PublicKey(TOKEN_MINTS.USDC);
     const recipientAta = getAssociatedTokenAddressSync(
       mintKey,
       recipient.publicKey,
-      true,
+      true
     );
     const tokenAccount = await getAccount(connection, recipientAta);
     expect(Number(tokenAccount.amount)).to.equal(rawAmount);
@@ -236,7 +236,7 @@ describe("token-transfer", () => {
       const amounts = [1_000_000, 2_000_000, 3_000_000];
 
       const beforeBalances = await Promise.all(
-        recipients.map((r) => connection.getBalance(r.publicKey)),
+        recipients.map((r) => connection.getBalance(r.publicKey))
       );
 
       const result = await client.tokens.multiTransfer({
@@ -258,17 +258,17 @@ describe("token-transfer", () => {
       expect(actionMeta.tokenName).to.equal("SOL");
       expect(actionMeta.recipientCount).to.equal(3);
       expect(actionMeta.totalAmount.amount).to.equal(
-        String(amounts.reduce((a, b) => a + b, 0)),
+        String(amounts.reduce((a, b) => a + b, 0))
       );
 
       await signAndSubmitTransactionData(
         connection,
         result.transactionData,
-        payer,
+        payer
       );
 
       const afterBalances = await Promise.all(
-        recipients.map((r) => connection.getBalance(r.publicKey)),
+        recipients.map((r) => connection.getBalance(r.publicKey))
       );
       afterBalances.forEach((after, i) => {
         expect(after - beforeBalances[i]).to.equal(amounts[i]);
@@ -299,20 +299,16 @@ describe("token-transfer", () => {
       await signAndSubmitTransactionData(
         connection,
         result.transactionData,
-        payer,
+        payer
       );
 
       const mintKey = new PublicKey(TOKEN_MINTS.USDC);
       const balances = await Promise.all(
         recipients.map(async (r) => {
-          const ata = getAssociatedTokenAddressSync(
-            mintKey,
-            r.publicKey,
-            true,
-          );
+          const ata = getAssociatedTokenAddressSync(mintKey, r.publicKey, true);
           const acc = await getAccount(connection, ata);
           return Number(acc.amount);
-        }),
+        })
       );
       balances.forEach((bal, i) => expect(bal).to.equal(amounts[i]));
     });

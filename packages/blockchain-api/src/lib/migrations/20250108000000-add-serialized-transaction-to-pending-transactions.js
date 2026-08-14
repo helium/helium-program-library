@@ -12,14 +12,14 @@ module.exports = {
         type: DataTypes.TEXT,
         allowNull: true,
         comment: "Base64 encoded serialized transaction for resubmission",
-      },
+      }
     );
   },
 
   async down(queryInterface, Sequelize) {
     await queryInterface.removeColumn(
       "pending_transactions",
-      "serialized_transaction",
+      "serialized_transaction"
     );
   },
 };

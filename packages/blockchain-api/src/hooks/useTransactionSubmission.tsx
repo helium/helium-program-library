@@ -40,11 +40,11 @@ class SimulationError extends Error {
 const renderSimulationError = (error: SimulationError) => {
   const toastContent = (
     <div className="w-full max-w-xl">
-      <div className="flex justify-between items-start gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="text-sm font-medium text-red-200">{error.message}</div>
         <button
           onClick={() => toast.dismiss()}
-          className="text-gray-400 hover:text-white shrink-0"
+          className="shrink-0 text-gray-400 hover:text-white"
           aria-label="Close"
         >
           ✕
@@ -52,14 +52,14 @@ const renderSimulationError = (error: SimulationError) => {
       </div>
       {error.logs && error.logs.length > 0 && (
         <details className="mt-3 text-xs">
-          <summary className="cursor-pointer text-blue-300 hover:text-blue-200 flex items-center select-none">
-            <span className="transform transition-transform duration-200 group-open:rotate-90 mr-1.5">
+          <summary className="flex cursor-pointer select-none items-center text-blue-300 hover:text-blue-200">
+            <span className="mr-1.5 transform transition-transform duration-200 group-open:rotate-90">
               ▶
             </span>
             View Transaction Logs
           </summary>
-          <div className="mt-2 bg-black/50 rounded border border-white/5">
-            <div className="flex items-center justify-between px-2 py-1 border-b border-white/5">
+          <div className="mt-2 rounded border border-white/5 bg-black/50">
+            <div className="flex items-center justify-between border-b border-white/5 px-2 py-1">
               <span className="text-gray-400">Transaction Logs</span>
               <button
                 onClick={() => {
@@ -67,13 +67,13 @@ const renderSimulationError = (error: SimulationError) => {
                   navigator.clipboard.writeText(text);
                   toast.success("Copied to clipboard", { duration: 2000 });
                 }}
-                className="text-blue-300 hover:text-blue-200 px-2 py-0.5"
+                className="px-2 py-0.5 text-blue-300 hover:text-blue-200"
               >
                 Copy
               </button>
             </div>
-            <div className="max-h-[160px] overflow-y-auto custom-scrollbar p-2">
-              <pre className="font-mono text-gray-300 whitespace-pre-wrap break-words">
+            <div className="custom-scrollbar max-h-[160px] overflow-y-auto p-2">
+              <pre className="whitespace-pre-wrap break-words font-mono text-gray-300">
                 {error.logs.join("\n")}
               </pre>
             </div>
@@ -85,7 +85,7 @@ const renderSimulationError = (error: SimulationError) => {
           href={error.link}
           target="_blank"
           rel="noopener noreferrer"
-          className="block mt-2 text-xs text-blue-300 hover:text-blue-200"
+          className="mt-2 block text-xs text-blue-300 hover:text-blue-200"
         >
           View in Explorer →
         </a>
@@ -159,8 +159,8 @@ export function useTransactionSubmission() {
               process.env.NEXT_PUBLIC_SOLANA_URL
                 ? process.env.NEXT_PUBLIC_SOLANA_URL
                 : clusterApiUrl(
-                    process.env.NEXT_PUBLIC_SOLANA_CLUSTER as Cluster,
-                  ),
+                    process.env.NEXT_PUBLIC_SOLANA_CLUSTER as Cluster
+                  )
             ),
           })
       : wallets.find((wallet) => wallet.address == user?.wallet?.address)
@@ -173,7 +173,7 @@ export function useTransactionSubmission() {
         metadata?: TransactionMetadata;
       }>,
       parallel: boolean,
-      tag?: string,
+      tag?: string
     ): Promise<string> => {
       if (!user?.wallet) {
         throw new Error("Wallet not connected");
@@ -192,12 +192,12 @@ export function useTransactionSubmission() {
       const signedTransactions = [];
       for (const txData of transactions) {
         const transaction = VersionedTransaction.deserialize(
-          Buffer.from(txData.serializedTransaction, "base64"),
+          Buffer.from(txData.serializedTransaction, "base64")
         );
         const signedTx = await signTransaction(transaction);
         signedTransactions.push({
           serializedTransaction: Buffer.from(signedTx.serialize()).toString(
-            "base64",
+            "base64"
           ),
           metadata: txData.metadata,
         });
@@ -226,12 +226,12 @@ export function useTransactionSubmission() {
           throw new SimulationError(
             err.message || "Simulation failed",
             err.data.logs,
-            err.data.link,
+            err.data.link
           );
         }
         throw error;
       }
-    },
+    }
   );
 
   const submitTransactions = useAsyncCallback(
@@ -244,7 +244,7 @@ export function useTransactionSubmission() {
         parallel: boolean;
         tag?: string;
       },
-      options: TransactionSubmissionOptions = {},
+      options: TransactionSubmissionOptions = {}
     ) => {
       if (!user?.wallet) {
         toast.error("Please connect your wallet first");
@@ -268,7 +268,7 @@ export function useTransactionSubmission() {
         const batchId = await submitTransactionBatch.execute(
           transactionsWithMetadata,
           parallel,
-          tag,
+          tag
         );
 
         // Dismiss the loading toast
@@ -323,12 +323,12 @@ export function useTransactionSubmission() {
         }
 
         onError?.(
-          error instanceof SimulationError ? error : new Error(String(error)),
+          error instanceof SimulationError ? error : new Error(String(error))
         );
 
         throw error;
       }
-    },
+    }
   );
 
   return {

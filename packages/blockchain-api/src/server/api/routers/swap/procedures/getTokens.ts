@@ -88,7 +88,7 @@ export const getTokens = publicProcedure.swap.getTokens.handler(
     } else {
       // Move HNT to the top if it exists
       const hntIndex = validatedTokens.findIndex(
-        (token) => token.symbol === "HNT",
+        (token) => token.symbol === "HNT"
       );
       if (hntIndex > 0) {
         const hnt = validatedTokens.splice(hntIndex, 1)[0];
@@ -97,5 +97,5 @@ export const getTokens = publicProcedure.swap.getTokens.handler(
     }
 
     return { tokens: validatedTokens };
-  },
+  }
 );

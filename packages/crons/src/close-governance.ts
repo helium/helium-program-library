@@ -159,32 +159,34 @@ async function getSolanaUnixTimestamp(
           a.account.index < b.account.index ? 1 : -1
         );
 
-        return (await Promise.all(
-          sortedProxies.map(async (proxy, index) => {
-            if (proxy.account.index === 0) {
-              return proxyProgram.methods
-                .closeExpiredProxyV0()
-                .accountsPartial({
-                  proxyAssignment: new PublicKey(proxy.publicKey),
-                })
-                .instruction();
-            }
+        return (
+          await Promise.all(
+            sortedProxies.map(async (proxy, index) => {
+              if (proxy.account.index === 0) {
+                return proxyProgram.methods
+                  .closeExpiredProxyV0()
+                  .accountsPartial({
+                    proxyAssignment: new PublicKey(proxy.publicKey),
+                  })
+                  .instruction();
+              }
 
-            if (proxy.account.index !== 0 && sortedProxies[index + 1]) {
-              const prevProxyAssignment = new PublicKey(
-                sortedProxies[index + 1].publicKey
-              );
+              if (proxy.account.index !== 0 && sortedProxies[index + 1]) {
+                const prevProxyAssignment = new PublicKey(
+                  sortedProxies[index + 1].publicKey
+                );
 
-              return proxyProgram.methods
-                .unassignExpiredProxyV0()
-                .accountsPartial({
-                  prevProxyAssignment,
-                  proxyAssignment: new PublicKey(proxy.publicKey),
-                })
-                .instruction();
-            }
-          })
-        )).filter(truthy);
+                return proxyProgram.methods
+                  .unassignExpiredProxyV0()
+                  .accountsPartial({
+                    prevProxyAssignment,
+                    proxyAssignment: new PublicKey(proxy.publicKey),
+                  })
+                  .instruction();
+              }
+            })
+          )
+        ).filter(truthy);
       })
     );
 

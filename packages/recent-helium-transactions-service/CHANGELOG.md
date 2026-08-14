@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.11.18
+
+### Patch Changes
+
+- Updated dependencies [[`580baa2`](https://github.com/helium/helium-program-library/commit/580baa257ffcc4ce593d9caeba9d096ba9a288a1)]:
+  - @helium/spl-utils@0.13.0
+  - @helium/lazy-distributor-sdk@0.11.18
+
 ## 0.11.17
 
 ### Patch Changes

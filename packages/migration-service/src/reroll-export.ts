@@ -14,11 +14,12 @@ const yarg = yargs(hideBin(process.argv)).options({
     alias: "o",
     default: "./rerolled-export.json",
   },
-  mapOutput :{
+  mapOutput: {
     type: "string",
     required: true,
-    describe: "The output location of the map of old addresses to new addresses"
-  }
+    describe:
+      "The output location of the map of old addresses to new addresses",
+  },
 });
 
 // Simple utility to mangle an export so it doesn't conflict with any existing state.
@@ -33,7 +34,7 @@ async function run() {
   state.accounts = {};
   for (let [addr, account] of Object.entries(accounts)) {
     const newKey = await Keypair.makeRandom();
-    addrMap[addr] = newKey.address.b58
+    addrMap[addr] = newKey.address.b58;
     state.accounts[newKey.address.b58] = account;
   }
 

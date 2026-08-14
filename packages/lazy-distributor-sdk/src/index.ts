@@ -16,7 +16,7 @@ export * from "./resolvers";
 export async function init(
   provider: AnchorProvider,
   programId: PublicKey = PROGRAM_ID,
-  idl?: Idl | null,
+  idl?: Idl | null
 ): Promise<Program<LazyDistributor>> {
   if (!idl) {
     idl = await fetchBackwardsCompatibleIdl(programId, provider);

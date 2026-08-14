@@ -8,7 +8,7 @@ import {
   SendOptions,
   TransactionInstruction,
   VersionedMessage,
-  VersionedTransaction
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { EventEmitter } from "./eventEmitter";
 import { getMultipleAccounts } from "./getMultipleAccounts";
@@ -97,42 +97,44 @@ export class MapAccountCache implements AccountCache {
 // Keeps track of a promise representing a batch of accounts to fetch.
 // When the promise resolves, it returns a map of pubkey to account info.
 class Batcher {
-  inFlight = false
+  inFlight = false;
   currentBatch = new Set<string>();
   result: Promise<Record<string, AccountInfo<Buffer>>> | null;
-  currentBatchResultResolve: (res: Record<string, AccountInfo<Buffer>>) => void = () => {};
+  currentBatchResultResolve: (
+    res: Record<string, AccountInfo<Buffer>>
+  ) => void = () => {};
   currentBatchResultReject: (e: any) => void = () => {};
 
   constructor() {
     this.result = new Promise((resolve, reject) => {
-      this.currentBatchResultReject = reject
-      this.currentBatchResultResolve = resolve
-    })
+      this.currentBatchResultReject = reject;
+      this.currentBatchResultResolve = resolve;
+    });
     this.resolve = this.resolve.bind(this);
     this.reject = this.resolve.bind(this);
   }
 
   start() {
-    this.inFlight = true
+    this.inFlight = true;
   }
 
   resolve(res: Record<string, AccountInfo<Buffer>>) {
-    this.currentBatchResultResolve(res)
+    this.currentBatchResultResolve(res);
   }
 
   reject(e: any) {
-    this.currentBatchResultReject(e)
+    this.currentBatchResultReject(e);
   }
 
   get keys() {
-    return Array.from(this.currentBatch)
+    return Array.from(this.currentBatch);
   }
 
   add(...keys: string[]) {
     if (keys.length === 1) {
-      this.currentBatch.add(keys[0])
+      this.currentBatch.add(keys[0]);
     } else {
-      this.currentBatch = new Set([...this.currentBatch, ...keys])
+      this.currentBatch = new Set([...this.currentBatch, ...keys]);
     }
   }
 }
@@ -153,8 +155,8 @@ export class AccountFetchCache {
   // As account requests come in, they get pushed to the list of batches
   // When the batcher is full, it gets flushed to the network. Then a new one is added.
   // There can be multiple in flight batches at the same time.
-  activeBatches = [new Batcher()]
-  
+  activeBatches = [new Batcher()];
+
   id: number; // For debugging, to see which cache is being used
 
   oldGetAccountinfo?: (
@@ -421,7 +423,7 @@ export class AccountFetchCache {
         } catch (e: any) {
           reject && reject(e);
         } finally {
-          this.activeBatches = this.activeBatches.filter(q => q != batcher)
+          this.activeBatches = this.activeBatches.filter((q) => q != batcher);
         }
       }
     }
@@ -434,7 +436,7 @@ export class AccountFetchCache {
     batcher.add(idStr);
 
     this.debounceFetchBatch();
-    return batcher
+    return batcher;
   }
 
   debounceFetchBatch() {
@@ -595,18 +597,18 @@ export class AccountFetchCache {
   }
 
   async awaitAllInFlight() {
-    let results = {}
+    let results = {};
     for (const batch of this.activeBatches) {
       if (batch.inFlight) {
         results = {
           ...(await batch.result),
           ...results,
         };
-        this.activeBatches = this.activeBatches.filter(b => b != batch)
+        this.activeBatches = this.activeBatches.filter((b) => b != batch);
       }
     }
 
-    return results
+    return results;
   }
 
   async searchMultiple<T>(
@@ -621,7 +623,7 @@ export class AccountFetchCache {
     const keysToFetch: PublicKey[] = [];
     const indexMap: Record<string, number> = {};
 
-    const inflightResults = await this.awaitAllInFlight()
+    const inflightResults = await this.awaitAllInFlight();
 
     // First pass: check cache and prepare keys to fetch
     pubKeys.forEach((key, index) => {
@@ -639,7 +641,7 @@ export class AccountFetchCache {
           | ParsedAccountBase<T>
           | undefined;
       } else if (inflightResults[address]) {
-        result[index] = inflightResults[address]
+        result[index] = inflightResults[address];
       } else {
         keysToFetch.push(key);
         indexMap[address] = index;
@@ -648,7 +650,7 @@ export class AccountFetchCache {
 
     // Fetch missing accounts in batches
     if (keysToFetch.length > 0) {
-      const batcher = this.activeBatches[this.activeBatches.length - 1]
+      const batcher = this.activeBatches[this.activeBatches.length - 1];
       batcher.add(...keysToFetch.map((k) => k.toBase58()));
       this.debounceFetchBatch();
       const accounts = await batcher.result;

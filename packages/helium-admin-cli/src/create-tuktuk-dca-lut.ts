@@ -1,10 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { chunks, truthy, withPriorityFees } from "@helium/spl-utils";
-import {
-  AddressLookupTableProgram,
-  PublicKey
-} from "@solana/web3.js";
-import * as multisig from '@sqds/multisig';
+import { AddressLookupTableProgram, PublicKey } from "@solana/web3.js";
+import * as multisig from "@sqds/multisig";
 import os from "os";
 import yargs from "yargs/yargs";
 import { sendInstructionsOrSquadsV4 } from "./utils";
@@ -49,7 +46,7 @@ export async function run(args: any = process.argv) {
     "HMBp68hMkHAr574nmckmS93p2RSZL5N4NMavhmFApwjF",
     "dcauByvWqZMRAhPr7Qoadag4XqVS75JyR5zsvqWPWJS",
     "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX",
-    "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33",
+    "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5",
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
     "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux",
     "Dpw1EAVrSB1ibxiDQyTAW6Zip3J4Btk2x4SgApQCeFbX",
@@ -60,7 +57,7 @@ export async function run(args: any = process.argv) {
     "11111111111111111111111111111111",
     "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN",
     "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
-    "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+    "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
   ].map((a) => {
     return new PublicKey(a);
   });

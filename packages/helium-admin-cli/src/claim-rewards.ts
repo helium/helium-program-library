@@ -2,16 +2,14 @@ import * as anchor from "@coral-xyz/anchor";
 import * as client from "@helium/distributor-oracle";
 import {
   init as initHem,
-  keyToAssetKey
+  keyToAssetKey,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
   init as initLazy,
-  lazyDistributorKey
+  lazyDistributorKey,
 } from "@helium/lazy-distributor-sdk";
-import {
-  init as initRewards,
-} from "@helium/rewards-oracle-sdk";
+import { init as initRewards } from "@helium/rewards-oracle-sdk";
 import { HNT_MINT, sendAndConfirmWithRetry } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";

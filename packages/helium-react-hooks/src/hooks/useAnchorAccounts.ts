@@ -2,7 +2,7 @@ import { Idl, IdlAccounts } from "@coral-xyz/anchor";
 import { AllAccountsMap } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
 import {
   UseAccountsState,
-  useAccounts
+  useAccounts,
 } from "@helium/account-fetch-cache-hooks";
 import { PublicKey } from "@solana/web3.js";
 import { useIdl } from "./useIdl";
