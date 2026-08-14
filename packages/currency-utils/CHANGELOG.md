@@ -1,5 +1,16 @@
 # Change Log
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1207](https://github.com/helium/helium-program-library/pull/1207) [`580baa2`](https://github.com/helium/helium-program-library/commit/580baa257ffcc4ce593d9caeba9d096ba9a288a1) Thanks [@bryzettler](https://github.com/bryzettler)! - Migrate to Pyth pro (sponsored push) HNT price feed. The HNT feed constant now points at the pro feed account `He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5`; Hermes ephemeral price updates are no longer fetched or posted — the `priceUpdates` return field and `PYTH_HERMES_URL` exports are removed. No Pyth configuration is needed by consumers; the returned `{txs}` shape is unchanged.
+
+### Patch Changes
+
+- Updated dependencies [[`580baa2`](https://github.com/helium/helium-program-library/commit/580baa257ffcc4ce593d9caeba9d096ba9a288a1)]:
+  - @helium/spl-utils@0.13.0
+
 ## 0.11.17
 
 ### Patch Changes
