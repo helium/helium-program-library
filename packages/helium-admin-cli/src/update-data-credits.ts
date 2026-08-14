@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
 import {
@@ -38,6 +39,11 @@ export async function run(args: any = process.argv) {
       describe:
         "Address of the squads multisig to be authority. If not provided, your wallet will be the authority",
     },
+    idl: {
+      type: "string",
+      describe:
+        "Path to a local IDL JSON to use instead of the on-chain IDL (use when the on-chain IDL is stale)",
+    },
   });
   const argv = await yarg.argv;
   process.env.ANCHOR_WALLET = argv.wallet;
@@ -45,7 +51,10 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const wallet = new anchor.Wallet(loadKeypair(argv.wallet));
-  const program = await initDc(provider);
+  const localIdl = argv.idl
+    ? JSON.parse(fs.readFileSync(argv.idl, "utf8"))
+    : undefined;
+  const program = await initDc(provider, undefined, localIdl);
 
   const instructions: TransactionInstruction[] = [];
 
@@ -69,7 +78,7 @@ export async function run(args: any = process.argv) {
         dcMint: new PublicKey(argv.dcMint),
         authority: dataCreditsAcc.authority,
       })
-      .instruction()
+      .instruction(),
   );
 
   await sendInstructionsOrSquadsV4({
