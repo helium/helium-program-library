@@ -209,19 +209,7 @@ describe("data-credits", () => {
       })
       .rpc({ skipPreflight: true });
 
-    const { PythSolanaReceiver } =
-      await import("@pythnetwork/pyth-solana-receiver");
-    const pythReceiver = new PythSolanaReceiver({
-      connection: provider.connection,
-      wallet: provider.wallet as any,
-    });
-    const priceUpdate =
-      await pythReceiver.receiver.account.priceUpdateV2.fetch(
-        PRO_HNT_PRICE_FEED,
-      );
-    const exponent = priceUpdate.priceMessage.exponent;
-    const emaPrice = BigInt(priceUpdate.priceMessage.emaPrice.toString());
-    const emaConf = BigInt(priceUpdate.priceMessage.emaConf.toString());
+    const priceMessage = await fetchFeedPriceMessage();
 
     const dcAta = await getAssociatedTokenAddress(dcMint, me);
     const dcAtaAcc = await getAccount(provider.connection, dcAta);
@@ -234,7 +222,11 @@ describe("data-credits", () => {
     const approxEndBal =
       startDcBal +
       Math.floor(
-        Number(emaPrice - emaConf * BigInt(2)) * 10 ** exponent * 10 ** 5,
+        new BN(priceMessage.emaPrice.toString())
+          .sub(new BN(priceMessage.emaConf.toString()).mul(new BN(2)))
+          .toNumber() *
+          10 ** priceMessage.exponent *
+          10 ** 5,
       );
     expect(dcBal.value.uiAmount).to.be.within(
       approxEndBal - 1,
