@@ -23,6 +23,7 @@ import { underscore } from "inflection";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "./env";
 import { register, totalRewardsGauge } from "./metrics";
 import { Recipient, sequelize } from "./model";
+import { monitorAutoTopOff } from "./monitors/autoTopOff";
 import {
   monitiorAssociatedTokenBalance,
   monitorSolBalance,
@@ -235,6 +236,27 @@ async function run() {
     );
   }
 
+  // The DCA leg buys its HNT with the USDC held here, transferring a whole run's worth
+  // up front. A shortfall reverts the run rather than shrinking it, which stops the leg
+  // rescheduling itself, so this balance is watched alongside the HNT it buys.
+  await monitiorAssociatedTokenBalance(
+    carrierAutoTopOff,
+    USDC_MINT,
+    "carrier_auto_topoff",
+    false,
+    "usdc"
+  );
+  await monitiorAssociatedTokenBalance(
+    mobileAutoTopOff,
+    USDC_MINT,
+    "helium_mobile_auto_topoff",
+    false,
+    "usdc"
+  );
+
+  await monitorAutoTopOff(carrierAutoTopOff, "carrier_auto_topoff");
+  await monitorAutoTopOff(mobileAutoTopOff, "helium_mobile_auto_topoff");
+
   for (const maker of makers) {
     await monitorSolBalance(
       maker.account.issuingAuthority,
@@ -302,6 +324,15 @@ async function run() {
   await monitorPythFreshness(
     new PublicKey(process.env.PYTH_HNT_FEED || HNT_PYTH_PRICE_FEED),
     "hnt"
+  );
+  // dc-auto-top's DCA leg prices its USDC input from this feed and refuses to start a
+  // run when it is over 5 minutes old.
+  await monitorPythFreshness(
+    new PublicKey(
+      process.env.PYTH_USDC_FEED ||
+        "6HAuqASbHEh4w4REJEUUUCginTLfj1kwCh215ZLtMkrT"
+    ),
+    "usdc"
   );
   await monitorSolBalance(
     new PublicKey(
