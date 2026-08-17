@@ -98,3 +98,14 @@ export const pythPublishTime = new client.Gauge({
   labelNames: ["name", "address"],
 });
 register.registerMetric(pythPublishTime);
+
+export const autoTopOffTaskTrigger = new client.Gauge({
+  name: "solana_auto_top_off_task_trigger",
+  help:
+    "Unix trigger time of the tuktuk task this auto top off leg currently points at, " +
+    "or 0 when no task is scheduled. A leg is stalled when time() - this exceeds one " +
+    "cron interval: a healthy leg always points at a future trigger, because each run " +
+    "reschedules itself, and 0 makes the same expression catch a swept task.",
+  labelNames: ["name", "leg", "address"],
+});
+register.registerMetric(autoTopOffTaskTrigger);

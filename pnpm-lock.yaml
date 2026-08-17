@@ -2563,6 +2563,9 @@ importers:
       '@helium/data-credits-sdk':
         specifier: workspace:^
         version: link:../data-credits-sdk
+      '@helium/dc-auto-top-sdk':
+        specifier: workspace:^
+        version: link:../dc-auto-top-sdk
       '@helium/helium-entity-manager-sdk':
         specifier: workspace:^
         version: link:../helium-entity-manager-sdk
@@ -2584,6 +2587,9 @@ importers:
       '@helium/spl-utils':
         specifier: workspace:^
         version: link:../spl-utils
+      '@helium/tuktuk-sdk':
+        specifier: ^0.1.1
+        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@metaplex-foundation/mpl-bubblegum':
         specifier: ^0.7.0
         version: 0.7.0(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
@@ -10363,7 +10369,6 @@ packages:
   eslint@9.39.4:
     resolution: {integrity: sha512-XoMjdBOwe/esVgEvLmNsD3IRHkm7fbKIUGvrleloJXUZgDHig2IPWNniv+GwjyJXzuNqVjlr5+4yVUZjycJwfQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
-    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -27419,7 +27424,7 @@ snapshots:
 
   metro-runtime@0.76.9:
     dependencies:
-      '@babel/runtime': 7.29.7
+      '@babel/runtime': 7.26.0
       react-refresh: 0.4.3
 
   metro-source-map@0.76.9:
