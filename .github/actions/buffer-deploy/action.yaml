@@ -46,6 +46,20 @@ runs:
       shell: bash
     - run: ls -l ./target/deploy/
       shell: bash
+    # This action upgrades an existing program: it writes a buffer for the multisig to apply.
+    # Creating a program at a new address needs that address's own keypair, which no workflow
+    # here holds. Check that precondition before spending anything on a buffer.
+    - name: Require the program on the target cluster
+      shell: bash
+      run: |
+        if ! solana program show "$PROGRAM_ID" -u "$NETWORK" > /dev/null 2>&1; then
+          echo "::error title=$PROGRAM is not deployed on the target cluster::$PROGRAM_ID does not exist there, so there is nothing to upgrade. Deploy it once with its program keypair, then re-run."
+          exit 1
+        fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
     - name: Buffer Deploy
       if: steps.cache-buffer.outputs.cache-hit != 'true'
       id: buffer-deploy
