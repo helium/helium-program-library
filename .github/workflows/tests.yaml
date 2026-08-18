@@ -15,6 +15,7 @@ jobs:
   test-rust-lint:
     name: Test Rust Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
@@ -39,6 +40,7 @@ jobs:
     name: Check @helium/idls Changeset
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v3
         with:
@@ -130,6 +132,7 @@ jobs:
   test-unit:
     name: Rust Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
@@ -149,6 +152,7 @@ jobs:
   test-atomic-data-publisher:
     name: Atomic Data Publisher Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16
@@ -186,6 +190,7 @@ jobs:
   build:
     name: Build Anchor
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/build-anchor/
@@ -196,6 +201,7 @@ jobs:
     needs: build
     name: Test Development Workflow
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
@@ -203,13 +209,34 @@ jobs:
           testing: true
       - uses: ./.github/actions/setup-ts/
       - name: Start Anchor Localnet
-        run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 2
-      - name: Wait for localnet to start
+        # Redirect to a file and record the pid: `cmd &` returns 0 whatever happens, so
+        # without these a validator that dies on startup leaves the step green and its
+        # output nowhere, and the health wait below has nothing to report.
         run: |
-          while [[ "$(curl -s http://localhost:8899/health)" != "ok" ]]; do
-            echo "Waiting for local Anchor network to start..."
+          ~/.cargo/bin/anchor localnet --skip-build \
+            --provider.wallet ~/.config/solana/id.json > /tmp/localnet.log 2>&1 &
+          echo $! > /tmp/localnet.pid
+          sleep 2
+      - name: Wait for localnet to start
+        # A healthy validator answers on the first poll, so this only bounds a broken
+        # one. Fail on a dead pid rather than waiting out the cap, and print the log so
+        # the failure says why instead of just timing out.
+        run: |
+          for i in $(seq 1 60); do
+            if [[ "$(curl -s http://localhost:8899/health)" == "ok" ]]; then
+              echo "localnet healthy after $i poll(s)"
+              exit 0
+            fi
+            if ! kill -0 "$(cat /tmp/localnet.pid)" 2>/dev/null; then
+              echo "::error::anchor localnet exited before becoming healthy"
+              cat /tmp/localnet.log
+              exit 1
+            fi
             sleep 5
           done
+          echo "::error::localnet did not become healthy within 5 minutes"
+          cat /tmp/localnet.log
+          exit 1
       - name: Run bootstrap script
         run: ./scripts/bootstrap.sh
 
@@ -217,6 +244,7 @@ jobs:
     needs: build
     name: Test Helium Vote Service
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
@@ -229,6 +257,7 @@ jobs:
     needs: build
     name: Test Docker Builds
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -284,6 +313,7 @@ jobs:
     needs: build
     name: Test Rust Builds
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -305,6 +335,7 @@ jobs:
     needs: build
     name: Test Anchor Contracts
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -337,13 +368,34 @@ jobs:
           testing: true
       - uses: ./.github/actions/setup-ts/
       - name: Start Anchor Localnet
-        run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 2
-      - name: Wait for localnet to start
+        # Redirect to a file and record the pid: `cmd &` returns 0 whatever happens, so
+        # without these a validator that dies on startup leaves the step green and its
+        # output nowhere, and the health wait below has nothing to report.
         run: |
-          while [[ "$(curl -s http://localhost:8899/health)" != "ok" ]]; do
-            echo "Waiting for local Anchor network to start..."
+          ~/.cargo/bin/anchor localnet --skip-build \
+            --provider.wallet ~/.config/solana/id.json > /tmp/localnet.log 2>&1 &
+          echo $! > /tmp/localnet.pid
+          sleep 2
+      - name: Wait for localnet to start
+        # A healthy validator answers on the first poll, so this only bounds a broken
+        # one. Fail on a dead pid rather than waiting out the cap, and print the log so
+        # the failure says why instead of just timing out.
+        run: |
+          for i in $(seq 1 60); do
+            if [[ "$(curl -s http://localhost:8899/health)" == "ok" ]]; then
+              echo "localnet healthy after $i poll(s)"
+              exit 0
+            fi
+            if ! kill -0 "$(cat /tmp/localnet.pid)" 2>/dev/null; then
+              echo "::error::anchor localnet exited before becoming healthy"
+              cat /tmp/localnet.log
+              exit 1
+            fi
             sleep 5
           done
+          echo "::error::localnet did not become healthy within 5 minutes"
+          cat /tmp/localnet.log
+          exit 1
       - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json pnpm exec ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
         env:
           TESTING: true
