@@ -14,8 +14,8 @@ runs:
         echo $! > /tmp/localnet.pid
         sleep 2
     - name: Wait for localnet to start
-      # A healthy validator answers on the first poll, so this bound only ever applies to
-      # a broken one. A vanished pid is reported with the log but is not itself fatal:
+      # A healthy validator answers within a poll or two (~5s), so this bound only ever
+      # applies to a broken one. A vanished pid is reported with the log but is not itself fatal:
       # `anchor localnet` is a wrapper around solana-test-validator, so treating its exit
       # as terminal would fail a build whose validator is merely slow to come up.
       shell: bash
