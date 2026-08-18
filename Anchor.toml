@@ -60,7 +60,11 @@ test = "pnpm exec ts-mocha -p ./tsconfig.test.json -t 1000000 tests/**/*.ts"
 startup_wait = 20000
 
 [test.validator]
-url = "https://api.mainnet-beta.solana.com"
+# Clone from Helium's own RPC. The 29 clone entries below are fetched at validator
+# startup by every job that needs localnet, in parallel across the test matrix, so
+# pointing them at the free public endpoint made CI startup depend on a shared
+# rate-limited service: its timeouts are what leave a validator never becoming healthy.
+url = "https://solana-rpc.web.helium.io"
 bind_address = "127.0.0.1"
 
 [[test.validator.clone]]
