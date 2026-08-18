@@ -57,7 +57,12 @@ wallet = "~/.config/solana/id.json"
 test = "pnpm exec ts-mocha -p ./tsconfig.test.json -t 1000000 tests/**/*.ts"
 
 [test]
-startup_wait = 20000
+# How long `anchor localnet` waits for the validator to answer before giving up. The
+# validator clones 29 accounts from an upstream RPC first, and when that upstream is
+# slow the clone outlasts this wait, so anchor exits with "Unable to get latest
+# blockhash" and the suite fails with no validator. Stays below the health wait in
+# .github/actions/start-localnet (300s) so that bound remains the outer limit.
+startup_wait = 120000
 
 [test.validator]
 url = "https://api.mainnet-beta.solana.com"
