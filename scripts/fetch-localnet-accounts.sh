@@ -14,8 +14,13 @@ PAIRS="$(mktemp)"
 trap 'rm -f "$PAIRS"' EXIT
 python3 - > "$PAIRS" <<'PY'
 import tomllib
-for a in tomllib.load(open("Anchor.toml","rb"))["test"]["validator"].get("account", []):
-    print(a["address"], a["filename"])
+t = tomllib.load(open("Anchor.toml", "rb"))["test"]
+# account entries are raw account dumps; genesis entries are program .so dumps, which
+# the validator preloads properly rather than leaving to the program cache.
+for a in t["validator"].get("account", []):
+    print("account", a["address"], a["filename"])
+for g in t.get("genesis", []):
+    print("program", g["address"], g["program"])
 PY
 
 total=$(wc -l < "$PAIRS" | tr -d ' ')
@@ -25,7 +30,7 @@ if [ "$total" -eq 0 ]; then
 fi
 
 fetched=0; cached=0
-while read -r addr file; do
+while read -r kind addr file; do
   [ -n "$addr" ] || continue
   if [ -s "$file" ]; then cached=$((cached+1)); continue; fi
   mkdir -p "$(dirname "$file")"
@@ -33,8 +38,13 @@ while read -r addr file; do
   attempt=1
   while [ "$attempt" -le "$ATTEMPTS" ]; do
     # stdin is this loop's pair list, so keep the fetch off it
-    if solana account -u "$RPC" "$addr" --output json --output-file "$file" \
-         < /dev/null >/dev/null 2>&1 && [ -s "$file" ]; then
+    if [ "$kind" = "program" ]; then
+      solana program dump -u "$RPC" "$addr" "$file" < /dev/null >/dev/null 2>&1 || true
+    else
+      solana account -u "$RPC" "$addr" --output json --output-file "$file" \
+        < /dev/null >/dev/null 2>&1 || true
+    fi
+    if [ -s "$file" ]; then
       ok=1; break
     fi
     rm -f "$file"
@@ -52,7 +62,7 @@ done < "$PAIRS"
 # A missing file makes the validator fail at boot with a far less obvious message, so
 # confirm every entry resolved before handing over.
 missing=0
-while read -r addr file; do
+while read -r kind addr file; do
   [ -n "$file" ] || continue
   [ -s "$file" ] || { echo "ERROR: $file missing for $addr" >&2; missing=1; }
 done < "$PAIRS"
