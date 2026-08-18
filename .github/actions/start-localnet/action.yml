@@ -1,0 +1,38 @@
+name: "Start localnet"
+description: "Start anchor localnet in the background and wait for it to report healthy"
+runs:
+  using: "composite"
+  steps:
+    - name: Start Anchor Localnet
+      # Redirect to a file and record the pid: `cmd &` returns 0 whatever the validator
+      # does, so without these a validator that dies on startup leaves the step green and
+      # its output attached to a shell that has already exited.
+      shell: bash
+      run: |
+        ~/.cargo/bin/anchor localnet --skip-build \
+          --provider.wallet ~/.config/solana/id.json > /tmp/localnet.log 2>&1 &
+        echo $! > /tmp/localnet.pid
+        sleep 2
+    - name: Wait for localnet to start
+      # A healthy validator answers on the first poll, so this bound only ever applies to
+      # a broken one. A vanished pid is reported with the log but is not itself fatal:
+      # `anchor localnet` is a wrapper around solana-test-validator, so treating its exit
+      # as terminal would fail a build whose validator is merely slow to come up.
+      shell: bash
+      run: |
+        reported=0
+        for i in $(seq 1 60); do
+          if [[ "$(curl -s http://localhost:8899/health)" == "ok" ]]; then
+            echo "localnet healthy after $i poll(s)"
+            exit 0
+          fi
+          if [[ "$reported" == "0" ]] && ! kill -0 "$(cat /tmp/localnet.pid 2>/dev/null)" 2>/dev/null; then
+            echo "::warning::anchor localnet is no longer running; polling until the bound anyway"
+            cat /tmp/localnet.log || true
+            reported=1
+          fi
+          sleep 5
+        done
+        echo "::error::localnet did not become healthy within 5 minutes"
+        cat /tmp/localnet.log || true
+        exit 1
