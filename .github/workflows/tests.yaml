@@ -196,6 +196,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+      - uses: ./.github/actions/localnet-accounts/
 
   test-devflow:
     needs: build
@@ -208,6 +209,7 @@ jobs:
         with:
           testing: true
       - uses: ./.github/actions/setup-ts/
+      - uses: ./.github/actions/localnet-accounts/
       - uses: ./.github/actions/start-localnet/
       - name: Run bootstrap script
         run: ./scripts/bootstrap.sh
@@ -339,6 +341,7 @@ jobs:
         with:
           testing: true
       - uses: ./.github/actions/setup-ts/
+      - uses: ./.github/actions/localnet-accounts/
       - uses: ./.github/actions/start-localnet/
       - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json pnpm exec ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
         env:
