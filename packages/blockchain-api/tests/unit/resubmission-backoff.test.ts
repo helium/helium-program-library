@@ -7,14 +7,14 @@ import {
 } from "../../src/lib/utils/resubmission-backoff";
 
 describe("resubmissionBackoffMs", () => {
-  it("starts at 5s and doubles", () => {
-    expect(resubmissionBackoffMs(0)).to.equal(5000);
-    expect(resubmissionBackoffMs(1)).to.equal(10000);
-    expect(resubmissionBackoffMs(2)).to.equal(20000);
+  it("waits 5s after the first resubmission and doubles", () => {
+    expect(resubmissionBackoffMs(1)).to.equal(5000);
+    expect(resubmissionBackoffMs(2)).to.equal(10000);
+    expect(resubmissionBackoffMs(3)).to.equal(20000);
   });
 
   it("caps at 20s", () => {
-    expect(resubmissionBackoffMs(3)).to.equal(20000);
+    expect(resubmissionBackoffMs(4)).to.equal(20000);
     expect(resubmissionBackoffMs(10)).to.equal(20000);
   });
 });
@@ -32,27 +32,27 @@ describe("resubmissionEligibilityWhere", () => {
     expect(first).to.deep.equal({ lastResubmittedAt: null });
   });
 
-  it("gives each attempt count its own backoff cutoff", () => {
+  it("gives each backoff tier its own cutoff", () => {
     const clauses = resubmissionEligibilityWhere(10, now)[Op.or].slice(1);
 
-    expect(clauses).to.have.length(10);
-    expect(clauses[0]).to.deep.equal({
-      resubmissionCount: 0,
-      lastResubmittedAt: { [Op.lte]: new Date(now.getTime() - 5000) },
-    });
-    expect(clauses[1]).to.deep.equal({
-      resubmissionCount: 1,
-      lastResubmittedAt: { [Op.lte]: new Date(now.getTime() - 10000) },
-    });
-    expect(clauses[9]).to.deep.equal({
-      resubmissionCount: 9,
-      lastResubmittedAt: { [Op.lte]: new Date(now.getTime() - 20000) },
-    });
+    expect(clauses).to.deep.equal([
+      {
+        resubmissionCount: 1,
+        lastResubmittedAt: { [Op.lte]: new Date(now.getTime() - 5000) },
+      },
+      {
+        resubmissionCount: 2,
+        lastResubmittedAt: { [Op.lte]: new Date(now.getTime() - 10000) },
+      },
+      {
+        resubmissionCount: { [Op.gte]: 3 },
+        lastResubmittedAt: { [Op.lte]: new Date(now.getTime() - 20000) },
+      },
+    ]);
   });
 
   it("selects nothing when retries are disabled", () => {
     const where = resubmissionEligibilityWhere(0, now);
     expect(where.resubmissionCount).to.deep.equal({ [Op.lt]: 0 });
-    expect(where[Op.or]).to.have.length(1);
   });
 });
