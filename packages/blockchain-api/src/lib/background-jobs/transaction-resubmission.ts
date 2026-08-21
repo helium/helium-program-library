@@ -159,10 +159,6 @@ class TransactionResubmissionService {
       );
 
       if (stillPending.length > 0) {
-        console.log(
-          `Resubmitting ${stillPending.length} transactions in batch ${batch.id}`,
-        );
-
         try {
           const result = await resubmitTransactionBatch(
             batch,
@@ -170,8 +166,13 @@ class TransactionResubmissionService {
             this.config.maxRetries,
           );
 
+          // Only the replica that wins the claim logs. Announcing the attempt
+          // before the claim would put a line on every replica for every
+          // backed-off batch on every 2s tick.
           if (result.success) {
-            console.log(`Successfully resubmitted batch ${batch.id}`);
+            console.log(
+              `Resubmitted ${stillPending.length} transactions in batch ${batch.id}`,
+            );
           } else if (!result.ineligible) {
             console.error(
               `Failed to resubmit batch ${batch.id}:`,
