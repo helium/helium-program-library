@@ -95,10 +95,10 @@ import { MiniFanout } from "@/lib/models/mini-fanout";
 // required signer, so the client never asks the wallet to sign it.
 function markLeafOwnerAsSigner(
   ix: TransactionInstruction,
-  leafOwner: PublicKey
+  leafOwner: PublicKey,
 ): TransactionInstruction {
   ix.keys = ix.keys.map((key) =>
-    key.pubkey.equals(leafOwner) ? { ...key, isSigner: true } : key
+    key.pubkey.equals(leafOwner) ? { ...key, isSigner: true } : key,
   );
   return ix;
 }
@@ -120,11 +120,11 @@ const migrationIpRateLimiter = createRateLimiter({
 });
 
 async function getBubblegumAuthorityPDA(
-  merkleRollPubKey: PublicKey
+  merkleRollPubKey: PublicKey,
 ): Promise<PublicKey> {
   const [bubblegumAuthorityPDAKey] = await PublicKey.findProgramAddress(
     [merkleRollPubKey.toBuffer()],
-    BUBBLEGUM_PROGRAM_ID
+    BUBBLEGUM_PROGRAM_ID,
   );
   return bubblegumAuthorityPDAKey;
 }
@@ -210,6 +210,13 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const splitHotspotWorkList: SplitHotspotWork[] = [];
 
     // 3c. Token Transfers
+    // One live-balance read serves both the SOL sweep below and the
+    // split-hotspot rent top-up: the top-up gate must see the balance the
+    // sweep leaves behind, or a swept wallet can no longer fund
+    // closeMiniFanoutV0's owner-paid ATA rent and the whole bundle fails.
+    let remainingSourceLamports = BigInt(
+      await connection.getBalance(sourcePubkey),
+    );
     const seenTokenMints = new Set<string>();
     for (const token of tokens) {
       // A duplicate mint would build a second transfer against the source ATA
@@ -225,10 +232,11 @@ export const migrate = publicProcedure.migration.migrate.handler(
         const { lamports, warning } = planSolTransfer(
           token.mint,
           requested,
-          BigInt(await connection.getBalance(sourcePubkey))
+          remainingSourceLamports,
         );
         if (warning) warnings.push(warning);
         if (lamports === null) continue;
+        remainingSourceLamports -= lamports;
         tokenWorkList.push({
           token,
           group: [
@@ -244,12 +252,12 @@ export const migrate = publicProcedure.migration.migrate.handler(
         const sourceAta = getAssociatedTokenAddressSync(
           mintKey,
           sourcePubkey,
-          true
+          true,
         );
         const destAta = getAssociatedTokenAddressSync(
           mintKey,
           destPubkey,
-          true
+          true,
         );
 
         // The client-supplied amount is advisory for SPL tokens: we always move
@@ -266,7 +274,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
         if (!mintInfo) {
           warnings.push(
-            `Skipping ${token.mint}: not a supported SPL token mint`
+            `Skipping ${token.mint}: not a supported SPL token mint`,
           );
           continue;
         }
@@ -279,7 +287,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
         // Skip frozen token accounts (e.g. DC tokens are frozen by the data credits program)
         if (sourceAtaInfo.isFrozen) {
           warnings.push(
-            `Skipping ${token.mint}: token account is frozen and cannot be transferred`
+            `Skipping ${token.mint}: token account is frozen and cannot be transferred`,
           );
           continue;
         }
@@ -291,7 +299,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
               feePayer,
               destAta,
               destPubkey,
-              mintKey
+              mintKey,
             ),
             createTransferCheckedInstruction(
               sourceAta,
@@ -299,7 +307,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
               destAta,
               sourcePubkey,
               sourceAtaInfo.amount,
-              mintInfo.decimals
+              mintInfo.decimals,
             ),
             createCloseAccountInstruction(sourceAta, feePayer, sourcePubkey),
           ],
@@ -318,10 +326,10 @@ export const migrate = publicProcedure.migration.migrate.handler(
       owner: sourcePubkey,
     });
     const sourceAtas = ownedPositions.map(({ mint }) =>
-      getAssociatedTokenAddressSync(mint, sourcePubkey, true)
+      getAssociatedTokenAddressSync(mint, sourcePubkey, true),
     );
     const destTokenAtas = ownedPositions.map(({ mint }) =>
-      getAssociatedTokenAddressSync(mint, destPubkey, true)
+      getAssociatedTokenAddressSync(mint, destPubkey, true),
     );
     // Enumeration can lag on-chain state (stale RPC index); confirm each source
     // ATA still holds the position NFT before building instructions, otherwise
@@ -333,8 +341,8 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const ataInfos = (
       await Promise.all(
         chunks([...sourceAtas, ...destTokenAtas], 100).map((c) =>
-          connection.getMultipleAccountsInfo(c)
-        )
+          connection.getMultipleAccountsInfo(c),
+        ),
       )
     ).flat();
     const sourceAtaInfos = ataInfos.slice(0, sourceAtas.length);
@@ -390,12 +398,12 @@ export const migrate = publicProcedure.migration.migrate.handler(
       const hsdProgram = await initHsd(provider);
       const delegatedAccs =
         await hsdProgram.account.delegatedPositionV0.fetchMultiple(
-          migratingPositions.map((p) => delegatedPositionKey(p.position)[0])
+          migratingPositions.map((p) => delegatedPositionKey(p.position)[0]),
         );
       const delegatedCount = delegatedAccs.filter((acc) => acc !== null).length;
       if (delegatedCount > 0) {
         warnings.push(
-          `${delegatedCount} governance position(s) are delegated. Delegation follows the position to the new wallet, but any automated reward claiming set up from the old wallet will stop — claim or re-delegate from the new wallet.`
+          `${delegatedCount} governance position(s) are delegated. Delegation follows the position to the new wallet, but any automated reward claiming set up from the old wallet will stop — claim or re-delegate from the new wallet.`,
         );
       }
 
@@ -403,13 +411,13 @@ export const migrate = publicProcedure.migration.migrate.handler(
       // resolve its proxy config.
       const registrarByKey = await fetchRegistrarsByKey(
         vsrProgram,
-        migratingPositions
+        migratingPositions,
       );
 
       const assignmentKeys = migratingPositions
         .map(({ mint, account: acc }) => {
           const proxyConfig = registrarByKey.get(
-            acc.registrar.toBase58()
+            acc.registrar.toBase58(),
           )?.proxyConfig;
           return proxyConfig
             ? proxyAssignmentKey(proxyConfig, mint, PublicKey.default)[0]
@@ -420,14 +428,14 @@ export const migrate = publicProcedure.migration.migrate.handler(
         const proxyProgram = await initProxy(provider);
         const assignments =
           await proxyProgram.account.proxyAssignmentV0.fetchMultiple(
-            assignmentKeys
+            assignmentKeys,
           );
         const proxiedCount = assignments.filter(
-          (acc) => acc && !acc.nextVoter.equals(PublicKey.default)
+          (acc) => acc && !acc.nextVoter.equals(PublicKey.default),
         ).length;
         if (proxiedCount > 0) {
           warnings.push(
-            `${proxiedCount} governance position(s) have an active voting proxy that survives migration and keeps voting their weight until revoked. Revoke or reassign the proxy from the new wallet if this is not intended.`
+            `${proxiedCount} governance position(s) have an active voting proxy that survives migration and keeps voting their weight until revoked. Revoke or reassign the proxy from the new wallet if this is not intended.`,
           );
         }
       }
@@ -454,14 +462,13 @@ export const migrate = publicProcedure.migration.migrate.handler(
       let recipientAcc: any = null;
       const [recipientK] = recipientKey(
         new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS),
-        assetPubkey
+        assetPubkey,
       );
 
       if (env.NO_PG === "true") {
         // On-chain lookup
-        recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
-          recipientK
-        );
+        recipientAcc =
+          await ldProgram.account.recipientV0.fetchNullable(recipientK);
         if (
           recipientAcc &&
           !recipientAcc.destination.equals(PublicKey.default)
@@ -497,15 +504,14 @@ export const migrate = publicProcedure.migration.migrate.handler(
           miniFanoutKey = new PublicKey(assetOwner.recipient.split.address);
           miniFanoutAccount =
             await miniFanoutProgram.account.miniFanoutV0.fetchNullable(
-              miniFanoutKey
+              miniFanoutKey,
             );
         }
 
         // Also fetch recipient on-chain if not found via DB
         if (!recipientAcc) {
-          recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
-            recipientK
-          );
+          recipientAcc =
+            await ldProgram.account.recipientV0.fetchNullable(recipientK);
         }
       }
 
@@ -547,16 +553,15 @@ export const migrate = publicProcedure.migration.migrate.handler(
         const [userWelcomePacksK] = userWelcomePacksKey(sourcePubkey);
         const userWelcomePacksAcc =
           await wpProgram.account.userWelcomePacksV0.fetchNullable(
-            userWelcomePacksK
+            userWelcomePacksK,
           );
 
         let foundWelcomePack = false;
         if (userWelcomePacksAcc) {
           for (let i = 0; i < (userWelcomePacksAcc.nextId || 0); i++) {
             const [wpKey] = welcomePackKey(sourcePubkey, i);
-            const wp = await wpProgram.account.welcomePackV0.fetchNullable(
-              wpKey
-            );
+            const wp =
+              await wpProgram.account.welcomePackV0.fetchNullable(wpKey);
             if (wp && wp.asset.equals(assetPubkey)) {
               const { instruction: ix } = await (
                 await closeWelcomePack({
@@ -598,20 +603,20 @@ export const migrate = publicProcedure.migration.migrate.handler(
         if (welcomePackCloseIx) {
           closeGroup.push(welcomePackCloseIx);
         }
-        const sourceBalance = await connection.getBalance(sourcePubkey);
+        const sourceBalance = Number(remainingSourceLamports);
         if (sourceBalance < ATA_RENT_LAMPORTS) {
           closeGroup.push(
             SystemProgram.transfer({
               fromPubkey: feePayer,
               toPubkey: sourcePubkey,
               lamports: ATA_RENT_LAMPORTS - sourceBalance,
-            })
+            }),
           );
         }
         const task = miniFanoutAccount.nextTask.equals(miniFanoutKey)
           ? null
           : await tuktukProgram.account.taskV0.fetchNullable(
-              miniFanoutAccount.nextTask
+              miniFanoutAccount.nextTask,
             );
         closeGroup.push(
           await miniFanoutProgram.methods
@@ -621,7 +626,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
               owner: sourcePubkey,
               taskRentRefund: task?.rentRefund || feePayer,
             })
-            .instruction()
+            .instruction(),
         );
         groups.push(closeGroup);
 
@@ -649,7 +654,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
           await tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE_ID);
         const [taskId, preTaskId] = nextAvailableTaskIds(
           taskQueueAcc!.taskBitmap,
-          2
+          2,
         );
         const scheduleIx = await (
           await miniFanoutProgram.methods
@@ -706,9 +711,9 @@ export const migrate = publicProcedure.migration.migrate.handler(
               {
                 ...args,
                 nonce: args.index,
-              }
+              },
             ),
-            effectiveLeafOwner
+            effectiveLeafOwner,
           ),
         ]);
 
@@ -734,9 +739,9 @@ export const migrate = publicProcedure.migration.migrate.handler(
             {
               ...args,
               nonce: args.index,
-            }
+            },
           ),
-          effectiveLeafOwner
+          effectiveLeafOwner,
         );
 
         // Simple transfers only need source signing
@@ -771,12 +776,12 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
       // Filter to splits where source wallet is a recipient but NOT the asset owner
       const nonOwnerRecipientSplits = nonOwnerSplits.filter(
-        (ho) => ho.assetOwner !== sourceWallet
+        (ho) => ho.assetOwner !== sourceWallet,
       );
 
       if (nonOwnerRecipientSplits.length > 0) {
         warnings.push(
-          `You are a recipient of reward splits on hotspots you don't own. Contact your Deployer to update the split to send to your new wallet ${destinationWallet}. Come back after they've done that.`
+          `You are a recipient of reward splits on hotspots you don't own. Contact your Deployer to update the split to send to your new wallet ${destinationWallet}. Come back after they've done that.`,
         );
       }
     }
@@ -813,14 +818,14 @@ export const migrate = publicProcedure.migration.migrate.handler(
     // create/close pairs), so exclusion is all-or-nothing per group.
     const fitGroupsWithinLimit = async (
       groups: TransactionInstruction[][],
-      maxTxs: number
+      maxTxs: number,
     ): Promise<{ drafts: TransactionDraft[]; includedCount: number }> => {
       if (groups.length === 0 || maxTxs <= 0)
         return { drafts: [], includedCount: 0 };
       const batched = await batchInstructionsToTxsWithPriorityFee(
         provider,
         groups,
-        batchOpts
+        batchOpts,
       );
       if (batched.length <= maxTxs) {
         return { drafts: batched, includedCount: groups.length };
@@ -836,7 +841,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
         const candidate = await batchInstructionsToTxsWithPriorityFee(
           provider,
           groups.slice(0, mid),
-          batchOpts
+          batchOpts,
         );
         if (candidate.length <= maxTxs) {
           lo = mid;
@@ -853,7 +858,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const { drafts: tokenDrafts, includedCount: includedTokenCount } =
       await fitGroupsWithinLimit(
         tokenWorkList.map((w) => w.group),
-        MAX_JITO_BUNDLE_TXS
+        MAX_JITO_BUNDLE_TXS,
       );
     addDrafts(tokenDrafts, "Migration: transfers");
 
@@ -864,7 +869,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const { drafts: positionDrafts, includedCount: includedPositionCount } =
       await fitGroupsWithinLimit(
         positionTransferGroups,
-        MAX_JITO_BUNDLE_TXS - allDrafts.length
+        MAX_JITO_BUNDLE_TXS - allDrafts.length,
       );
     addDrafts(positionDrafts, "Migration: transfers");
     const hasMorePositions =
@@ -876,7 +881,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const { drafts: simpleHotspotDrafts, includedCount: includedSimpleCount } =
       await fitGroupsWithinLimit(
         simpleHotspotWorkList.map((w) => w.instructions),
-        MAX_JITO_BUNDLE_TXS - allDrafts.length
+        MAX_JITO_BUNDLE_TXS - allDrafts.length,
       );
     addDrafts(simpleHotspotDrafts, "Migration: transfers");
 
@@ -887,7 +892,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       const hotspotDrafts = await batchInstructionsToTxsWithPriorityFee(
         provider,
         work.groups,
-        batchOpts
+        batchOpts,
       );
 
       if (allDrafts.length + hotspotDrafts.length > MAX_JITO_BUNDLE_TXS) {
@@ -985,7 +990,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     // Determine which client wallets are required signers on a transaction
     function getRequiredClientSigners(
-      tx: VersionedTransaction
+      tx: VersionedTransaction,
     ): ("source" | "destination")[] {
       const numRequired = tx.message.header.numRequiredSignatures;
       const requiredKeys = tx.message.staticAccountKeys
@@ -1030,11 +1035,11 @@ export const migrate = publicProcedure.migration.migrate.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFees),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
       warnings: warnings.length > 0 ? warnings : undefined,
       hasMore,
       nextParams,
     };
-  }
+  },
 );

@@ -42,7 +42,7 @@ function captureSubmissionError(
     tag?: string;
     payer: string;
     transactions: SubmitInputTx[];
-  }
+  },
 ): void {
   const baseTags: Record<string, unknown> = {
     batch_size: context.batchSize,
@@ -146,7 +146,7 @@ function captureSubmissionError(
   for (const tx of context.transactions.slice(0, 3)) {
     try {
       const deserialized = VersionedTransaction.deserialize(
-        Buffer.from(tx.serializedTransaction, "base64")
+        Buffer.from(tx.serializedTransaction, "base64"),
       );
       explorerLinks.push(getExplorerUrl(deserialized));
       chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(deserialized));
@@ -198,7 +198,7 @@ export const submit = publicProcedure.transactions.submit.handler(
     let payer: string;
     try {
       const firstTransaction = VersionedTransaction.deserialize(
-        Buffer.from(transactions[0].serializedTransaction, "base64")
+        Buffer.from(transactions[0].serializedTransaction, "base64"),
       );
       payer = firstTransaction.message.staticAccountKeys[0].toBase58();
     } catch {
@@ -220,7 +220,7 @@ export const submit = publicProcedure.transactions.submit.handler(
       const simulationPromises = transactions.map(async (tx, index) => {
         try {
           const transaction = VersionedTransaction.deserialize(
-            Buffer.from(tx.serializedTransaction, "base64")
+            Buffer.from(tx.serializedTransaction, "base64"),
           );
           const simulation = await connection.simulateTransaction(transaction, {
             commitment: simulationCommitment,
@@ -260,7 +260,7 @@ export const submit = publicProcedure.transactions.submit.handler(
       if (ff) {
         const failedTxMeta = transactions[ff.index]?.metadata;
         const firstRealMeta = transactions.find(
-          (t) => t.metadata?.type && t.metadata.type !== "jito_tip"
+          (t) => t.metadata?.type && t.metadata.type !== "jito_tip",
         )?.metadata;
         const actionType =
           (failedTxMeta?.type as string | undefined) ??
@@ -268,12 +268,12 @@ export const submit = publicProcedure.transactions.submit.handler(
           "unknown";
         const { category, detail } = classifySimulationLogs(
           ff.error ?? "",
-          ff.logs ?? []
+          ff.logs ?? [],
         );
 
         Sentry.captureException(
           new Error(
-            `Transaction simulation failed [${category}] (${actionType}): ${detail}`
+            `Transaction simulation failed [${category}] (${actionType}): ${detail}`,
           ),
           {
             level: "error",
@@ -302,7 +302,7 @@ export const submit = publicProcedure.transactions.submit.handler(
               chewing_glass_explorer_link: ff?.chewingGlassLink,
               simulation_logs: ff?.logs,
             },
-          }
+          },
         );
 
         if (category === "account_not_found") {
@@ -330,7 +330,7 @@ export const submit = publicProcedure.transactions.submit.handler(
 
     const cluster = getCluster();
     const serializedTransactions = transactions.map(
-      (tx) => tx.serializedTransaction
+      (tx) => tx.serializedTransaction,
     );
     // Derive actionType from first transaction metadata or actionMetadata
     const actionType =
@@ -394,7 +394,9 @@ export const submit = publicProcedure.transactions.submit.handler(
               error_name: (error as { name?: string })?.name,
               error_message:
                 error instanceof Error ? error.message : "Unknown error",
+              tag,
               tag_length: tag.length,
+              parallel,
               payer,
               action_type: actionType,
               batch_size: transactions.length,
@@ -419,7 +421,7 @@ export const submit = publicProcedure.transactions.submit.handler(
       // locked as pending forever.
       if (tag) {
         await TransactionBatch.destroy({ where: { id: batchId } }).catch(
-          () => {}
+          () => {},
         );
       }
 
@@ -474,7 +476,7 @@ export const submit = publicProcedure.transactions.submit.handler(
             submissionType: result.submissionType,
             jitoBundleId: result.jitoBundleId,
           },
-          { where: { id: batchId }, transaction: dbTransaction }
+          { where: { id: batchId }, transaction: dbTransaction },
         );
       } else {
         await TransactionBatch.create(
@@ -490,7 +492,7 @@ export const submit = publicProcedure.transactions.submit.handler(
             actionType,
             actionMetadata,
           },
-          { transaction: dbTransaction }
+          { transaction: dbTransaction },
         );
       }
 
@@ -500,7 +502,7 @@ export const submit = publicProcedure.transactions.submit.handler(
 
         // Decode transaction to get blockhash
         const transaction = VersionedTransaction.deserialize(
-          Buffer.from(txData.serializedTransaction, "base64")
+          Buffer.from(txData.serializedTransaction, "base64"),
         );
 
         return PendingTransaction.create(
@@ -515,7 +517,7 @@ export const submit = publicProcedure.transactions.submit.handler(
             metadata: txData.metadata,
             serializedTransaction: txData.serializedTransaction,
           },
-          { transaction: dbTransaction }
+          { transaction: dbTransaction },
         );
       });
 
@@ -530,5 +532,5 @@ export const submit = publicProcedure.transactions.submit.handler(
     }
 
     return { batchId };
-  }
+  },
 );
