@@ -219,18 +219,32 @@ export const migrate = publicProcedure.migration.migrate.handler(
       const isSol = token.mint === TOKEN_MINTS.WSOL;
 
       if (isSol) {
-        // The client amount is authoritative only for native SOL — for SPL
-        // tokens it's advisory (we always move the full on-chain balance), so
-        // only the SOL path gates on it.
+        // The client amount is advisory here, like it is for SPL tokens: the
+        // app replays full amounts on retry and expects the server to recompute
+        // from chain state, so clamp to the live balance instead of building a
+        // transfer that can only fail. The fee payer signs and funds every tx
+        // in the bundle, so the source keeps nothing back for fees or rent and
+        // its whole balance is transferable.
         const rawAmount = BigInt(token.amount);
         if (rawAmount <= BigInt(0)) continue;
+        const liveBalance = BigInt(await connection.getBalance(sourcePubkey));
+        if (liveBalance <= BigInt(0)) {
+          warnings.push(`Skipping ${token.mint}: no balance to migrate`);
+          continue;
+        }
+        const lamports = rawAmount > liveBalance ? liveBalance : rawAmount;
+        if (lamports < rawAmount) {
+          warnings.push(
+            `Reduced the SOL transfer to the wallet's live balance of ${lamports} lamports (${rawAmount} requested).`
+          );
+        }
         tokenWorkList.push({
           token,
           group: [
             SystemProgram.transfer({
               fromPubkey: sourcePubkey,
               toPubkey: destPubkey,
-              lamports: rawAmount,
+              lamports,
             }),
           ],
         });
