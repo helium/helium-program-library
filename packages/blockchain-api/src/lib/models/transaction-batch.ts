@@ -79,7 +79,8 @@ TransactionBatch.init(
       allowNull: false,
     },
     tag: {
-      type: DataTypes.STRING,
+      // TEXT, not STRING: client-supplied tags can exceed varchar(255).
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     payer: {

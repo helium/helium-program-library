@@ -8,7 +8,7 @@ import {
 export const SubmitInputSchema = z.object({
   transactions: z.array(TransactionItemSchema),
   parallel: z.boolean(),
-  tag: z.string().optional(),
+  tag: z.string().max(1000).optional(),
   actionMetadata: z.record(z.string(), z.unknown()).optional(),
   simulationCommitment: z
     .enum(["confirmed", "finalized"])
@@ -35,7 +35,7 @@ export const GetByPayerInputSchema = z.object({
 
 export const GetByPayerAndTagInputSchema = z.object({
   payer: z.string().min(32),
-  tag: z.string(),
+  tag: z.string().max(1000),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   status: z.string().optional().default("pending"),
@@ -84,7 +84,7 @@ export const ResubmitOutputSchema = z.object({
 
 export const PayerBatchSummarySchema = z.object({
   batchId: z.string(),
-  tag: z.string().optional(),
+  tag: z.string().max(1000).optional(),
   status: z.string(),
   submissionType: z.string(),
   parallel: z.boolean(),
@@ -124,7 +124,7 @@ export type PayerBatchSummary = z.infer<typeof PayerBatchSummarySchema>;
 export const EstimateInputSchema = z.object({
   transactions: z.array(TransactionItemSchema),
   parallel: z.boolean(),
-  tag: z.string().optional(),
+  tag: z.string().max(1000).optional(),
   simulationCommitment: z
     .enum(["confirmed", "finalized"])
     .optional()
