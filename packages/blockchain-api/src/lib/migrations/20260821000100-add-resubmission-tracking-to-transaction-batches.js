@@ -2,8 +2,8 @@
 
 /**
  * Per-batch resubmission bookkeeping. The resubmission job polls every 2s on
- * every replica and used to resubmit each pending batch on every tick; these
- * columns give it a backoff window and a retry cap.
+ * every replica with no cross-replica coordination; these columns give each
+ * batch a backoff window and a retry cap so it is not resubmitted on every tick.
  *
  * @type {import('sequelize-cli').Migration}
  */

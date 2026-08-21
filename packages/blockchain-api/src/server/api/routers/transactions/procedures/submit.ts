@@ -47,7 +47,6 @@ function captureSubmissionError(
   const baseTags: Record<string, unknown> = {
     batch_size: context.batchSize,
     parallel: context.parallel,
-    tag: context.tag,
   };
 
   const baseExtra: Record<string, unknown> = {
@@ -382,10 +381,9 @@ export const submit = publicProcedure.transactions.submit.handler(
         }
         // Everything that is not the dedup short-circuit above is a real
         // failure, and it is rethrown below outside captureSubmissionError —
-        // capture it here or it stays invisible (which is how the
-        // varchar(255) tag overflow went unnoticed for days). A unique
-        // violation whose winning batch has already left "pending" lands here
-        // too, so it no longer escapes as a silent 500.
+        // capture it here or it stays invisible. A unique violation whose
+        // winning batch has already left "pending" lands here too, so it no
+        // longer escapes as a silent 500.
         Sentry.captureException(error, {
           level: "error",
           tags: {
@@ -393,14 +391,10 @@ export const submit = publicProcedure.transactions.submit.handler(
             action_type: actionType,
           },
           extra: {
-            error_name: (error as { name?: string })?.name,
-            error_message:
-              error instanceof Error ? error.message : "Unknown error",
             tag,
             tag_length: tag.length,
             parallel,
             payer,
-            action_type: actionType,
             batch_size: transactions.length,
           },
         });

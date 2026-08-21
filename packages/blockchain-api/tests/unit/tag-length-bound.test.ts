@@ -10,8 +10,8 @@ const submitInput = (tag: string) => ({
 
 describe("SubmitInputSchema tag bound", () => {
   it("accepts a tag longer than the old varchar(255) column", () => {
-    // The wallet app's multi-recipient payment tag reaches ~712 chars, which
-    // used to crash submit with a raw 500 against varchar(255).
+    // The wallet app's multi-recipient payment tag reaches ~712 chars, beyond
+    // the old varchar(255) column.
     const parsed = SubmitInputSchema.parse(submitInput("t".repeat(712)));
     expect(parsed.tag).to.have.length(712);
   });

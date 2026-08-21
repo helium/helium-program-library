@@ -160,11 +160,7 @@ class TransactionResubmissionService {
 
       if (stillPending.length > 0) {
         try {
-          const result = await resubmitTransactionBatch(
-            batch,
-            stillPending,
-            this.config.maxRetries,
-          );
+          const result = await resubmitTransactionBatch(batch, stillPending);
 
           // Only the replica that wins the claim logs. Announcing the attempt
           // before the claim would put a line on every replica for every

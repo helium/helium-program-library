@@ -9,7 +9,7 @@ import TransactionBatch from "../models/transaction-batch";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import {
   DEFAULT_MAX_RESUBMISSIONS,
-  resubmissionEligibilityWhere,
+  resubmissionBackoffMs,
 } from "./resubmission-backoff";
 import { submitTransactionBatch } from "./transaction-submission";
 import { checkAndUpdateBatchStatus } from "./transaction-status-checker";
@@ -25,7 +25,7 @@ export interface ResubmissionResult {
   newSignatures?: string[];
   error?: string;
   batchId: string;
-  /** The batch lost the atomic claim: another replica holds it, or it is inside its backoff window / past its retry cap. Expected, not a failure. */
+  /** The batch lost the atomic claim: another replica holds it, it is inside its backoff window / past its retry cap, or it is no longer pending. Expected, not a failure. */
   ineligible?: boolean;
 }
 
@@ -147,7 +147,6 @@ export async function resubmitSingleTransaction(
 export async function resubmitTransactionBatch(
   batch: TransactionBatch,
   pendingTransactions: PendingTransaction[],
-  maxRetries: number = DEFAULT_MAX_RESUBMISSIONS,
 ): Promise<ResubmissionResult> {
   if (pendingTransactions.length === 0) {
     return {
@@ -179,29 +178,45 @@ export async function resubmitTransactionBatch(
   }
 
   // Count the attempt before making it: an attempt that keeps throwing has to
-  // back off too, and this is what the selection query reads. The WHERE
-  // re-checks eligibility so the increment doubles as an atomic claim — a
-  // concurrent replica (or a client hammering transactions.resubmit) loses the
-  // update and skips instead of double-submitting. Written silently so
-  // updated_at stays the stale-batch reaper's clock.
+  // back off too. The WHERE re-checks the count we read, so the increment
+  // doubles as a compare-and-swap claim — a concurrent replica (or a client
+  // hammering transactions.resubmit) that already bumped the count loses the
+  // update and skips instead of double-submitting; the same predicate drops a
+  // batch that left "pending" between our status check and this claim.
+  // Written silently so updated_at stays the stale-batch reaper's clock.
+  const ineligible: ResubmissionResult = {
+    success: false,
+    error:
+      "Batch is not eligible for resubmission (backoff window or retry limit)",
+    batchId: batch.id,
+    ineligible: true,
+  };
+  if (batch.resubmissionCount >= DEFAULT_MAX_RESUBMISSIONS) {
+    return ineligible;
+  }
+  const cutoff = new Date(
+    Date.now() - resubmissionBackoffMs(batch.resubmissionCount),
+  );
   const [claimed] = await TransactionBatch.update(
     {
       resubmissionCount: sequelize.literal("resubmission_count + 1"),
       lastResubmittedAt: new Date(),
     },
     {
-      where: { id: batch.id, ...resubmissionEligibilityWhere(maxRetries) },
+      where: {
+        id: batch.id,
+        status: "pending",
+        resubmissionCount: batch.resubmissionCount,
+        [Op.or]: [
+          { lastResubmittedAt: null },
+          { lastResubmittedAt: { [Op.lte]: cutoff } },
+        ],
+      },
       silent: true,
     },
   );
   if (claimed === 0) {
-    return {
-      success: false,
-      error:
-        "Batch is not eligible for resubmission (backoff window or retry limit)",
-      batchId: batch.id,
-      ineligible: true,
-    };
+    return ineligible;
   }
 
   try {
