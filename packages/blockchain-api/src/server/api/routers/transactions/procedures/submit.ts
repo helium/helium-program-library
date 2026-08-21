@@ -379,30 +379,31 @@ export const submit = publicProcedure.transactions.submit.handler(
               message: `Transaction with tag "${tag}" already exists and is pending`,
             };
           }
-        } else {
-          // Anything other than the unique-constraint dedup path is a real
-          // failure, and it is rethrown below outside captureSubmissionError —
-          // capture it here or it stays invisible (which is how the
-          // varchar(255) tag overflow went unnoticed for days).
-          Sentry.captureException(error, {
-            level: "error",
-            tags: {
-              error_type: "tag_reservation_failed",
-              action_type: actionType,
-            },
-            extra: {
-              error_name: (error as { name?: string })?.name,
-              error_message:
-                error instanceof Error ? error.message : "Unknown error",
-              tag,
-              tag_length: tag.length,
-              parallel,
-              payer,
-              action_type: actionType,
-              batch_size: transactions.length,
-            },
-          });
         }
+        // Everything that is not the dedup short-circuit above is a real
+        // failure, and it is rethrown below outside captureSubmissionError —
+        // capture it here or it stays invisible (which is how the
+        // varchar(255) tag overflow went unnoticed for days). A unique
+        // violation whose winning batch has already left "pending" lands here
+        // too, so it no longer escapes as a silent 500.
+        Sentry.captureException(error, {
+          level: "error",
+          tags: {
+            error_type: "tag_reservation_failed",
+            action_type: actionType,
+          },
+          extra: {
+            error_name: (error as { name?: string })?.name,
+            error_message:
+              error instanceof Error ? error.message : "Unknown error",
+            tag,
+            tag_length: tag.length,
+            parallel,
+            payer,
+            action_type: actionType,
+            batch_size: transactions.length,
+          },
+        });
         throw error;
       }
     }

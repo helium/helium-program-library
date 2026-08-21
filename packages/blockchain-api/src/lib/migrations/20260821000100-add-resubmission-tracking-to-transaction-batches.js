@@ -19,7 +19,7 @@ module.exports = {
           type: Sequelize.INTEGER,
           allowNull: false,
           defaultValue: 0,
-        }
+        },
       );
     }
 
@@ -30,17 +30,19 @@ module.exports = {
         {
           type: Sequelize.DATE,
           allowNull: true,
-        }
+        },
       );
     }
   },
 
   async down(queryInterface) {
-    await queryInterface
-      .removeColumn("transaction_batches", "resubmission_count")
-      .catch(() => {});
-    await queryInterface
-      .removeColumn("transaction_batches", "last_resubmitted_at")
-      .catch(() => {});
+    await queryInterface.removeColumn(
+      "transaction_batches",
+      "resubmission_count",
+    );
+    await queryInterface.removeColumn(
+      "transaction_batches",
+      "last_resubmitted_at",
+    );
   },
 };

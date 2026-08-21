@@ -107,9 +107,7 @@ class TransactionResubmissionService {
    */
   private async processPendingTransactions(): Promise<void> {
     try {
-      const { batches } = await getPendingTransactionsForResubmission(
-        this.config.maxRetries,
-      );
+      const { batches } = await getPendingTransactionsForResubmission();
 
       if (batches.length === 0) {
         return; // No pending transactions to process
@@ -174,7 +172,7 @@ class TransactionResubmissionService {
 
           if (result.success) {
             console.log(`Successfully resubmitted batch ${batch.id}`);
-          } else {
+          } else if (!result.ineligible) {
             console.error(
               `Failed to resubmit batch ${batch.id}:`,
               result.error,

@@ -25,6 +25,8 @@ export interface ResubmissionResult {
   newSignatures?: string[];
   error?: string;
   batchId: string;
+  /** The batch lost the atomic claim: another replica holds it, or it is inside its backoff window / past its retry cap. Expected, not a failure. */
+  ineligible?: boolean;
 }
 
 /**
@@ -198,6 +200,7 @@ export async function resubmitTransactionBatch(
       error:
         "Batch is not eligible for resubmission (backoff window or retry limit)",
       batchId: batch.id,
+      ineligible: true,
     };
   }
 
@@ -311,12 +314,13 @@ export async function resubmitTransactionBatch(
 
 /**
  * Get all pending transactions that need resubmission
- * Excludes Jito bundles since they cannot be resubmitted, batches that have
- * exhausted maxRetries, and batches still inside their backoff window.
+ * Excludes Jito bundles since they cannot be resubmitted. The retry cap and the
+ * backoff window are enforced by the atomic claim in resubmitTransactionBatch,
+ * not here, so that a batch inside its backoff window (or past its retry cap)
+ * is still selected and status-checked instead of sitting "pending" until the
+ * stale-batch reaper picks it up.
  */
-export async function getPendingTransactionsForResubmission(
-  maxRetries: number,
-): Promise<{
+export async function getPendingTransactionsForResubmission(): Promise<{
   batches: Array<{
     batch: TransactionBatch;
     transactions: PendingTransaction[];
@@ -331,7 +335,6 @@ export async function getPendingTransactionsForResubmission(
       submissionType: {
         [Op.ne]: "jito_bundle", // Exclude Jito bundles
       },
-      ...resubmissionEligibilityWhere(maxRetries),
     },
     include: [
       {
