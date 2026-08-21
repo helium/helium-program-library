@@ -3,12 +3,13 @@ import {
   TransactionMetadataSchema,
   TransactionItemSchema,
   TokenAmountOutputSchema,
+  TagSchema,
 } from "./common";
 
 export const SubmitInputSchema = z.object({
   transactions: z.array(TransactionItemSchema),
   parallel: z.boolean(),
-  tag: z.string().max(1000).optional(),
+  tag: TagSchema.optional(),
   actionMetadata: z.record(z.string(), z.unknown()).optional(),
   simulationCommitment: z
     .enum(["confirmed", "finalized"])
@@ -35,7 +36,7 @@ export const GetByPayerInputSchema = z.object({
 
 export const GetByPayerAndTagInputSchema = z.object({
   payer: z.string().min(32),
-  tag: z.string().max(1000),
+  tag: TagSchema,
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   status: z.string().optional().default("pending"),
@@ -93,7 +94,7 @@ export const PayerBatchSummarySchema = z.object({
   transactions: z.array(
     z.object({
       metadata: TransactionMetadataSchema.optional(),
-    })
+    }),
   ),
 });
 
@@ -124,7 +125,7 @@ export type PayerBatchSummary = z.infer<typeof PayerBatchSummarySchema>;
 export const EstimateInputSchema = z.object({
   transactions: z.array(TransactionItemSchema),
   parallel: z.boolean(),
-  tag: z.string().max(1000).optional(),
+  tag: TagSchema.optional(),
   simulationCommitment: z
     .enum(["confirmed", "finalized"])
     .optional()
