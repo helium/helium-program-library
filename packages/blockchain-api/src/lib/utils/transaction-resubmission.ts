@@ -7,6 +7,7 @@ import { defineAssociations } from "../models/associations";
 import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
+import { resubmissionEligibilityWhere } from "./resubmission-backoff";
 import { submitTransactionBatch } from "./transaction-submission";
 import { checkAndUpdateBatchStatus } from "./transaction-status-checker";
 
@@ -171,6 +172,17 @@ export async function resubmitTransactionBatch(
     };
   }
 
+  // Count the attempt before making it: an attempt that keeps throwing has to
+  // back off too, and this is what the selection query reads. Written silently
+  // so updated_at stays the stale-batch reaper's clock.
+  await TransactionBatch.update(
+    {
+      resubmissionCount: sequelize.literal("resubmission_count + 1"),
+      lastResubmittedAt: new Date(),
+    },
+    { where: { id: batch.id }, silent: true }
+  );
+
   try {
     // Prepare transactions for resubmission using existing submission logic
     const serializedTransactions = pendingTransactions.map(
@@ -203,9 +215,6 @@ export async function resubmitTransactionBatch(
           );
         }
       }
-
-      // Update batch status (no Jito bundle ID since we're not using Jito for resubmission)
-      await batch.update({ status: "pending" }, { transaction: dbTransaction });
 
       await dbTransaction.commit();
 
@@ -284,9 +293,12 @@ export async function resubmitTransactionBatch(
 
 /**
  * Get all pending transactions that need resubmission
- * Excludes Jito bundles since they cannot be resubmitted
+ * Excludes Jito bundles since they cannot be resubmitted, batches that have
+ * exhausted maxRetries, and batches still inside their backoff window.
  */
-export async function getPendingTransactionsForResubmission(): Promise<{
+export async function getPendingTransactionsForResubmission(
+  maxRetries: number
+): Promise<{
   batches: Array<{
     batch: TransactionBatch;
     transactions: PendingTransaction[];
@@ -301,6 +313,7 @@ export async function getPendingTransactionsForResubmission(): Promise<{
       submissionType: {
         [Op.ne]: "jito_bundle", // Exclude Jito bundles
       },
+      ...resubmissionEligibilityWhere(maxRetries),
     },
     include: [
       {

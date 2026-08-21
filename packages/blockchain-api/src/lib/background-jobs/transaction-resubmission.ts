@@ -106,7 +106,9 @@ class TransactionResubmissionService {
    */
   private async processPendingTransactions(): Promise<void> {
     try {
-      const { batches } = await getPendingTransactionsForResubmission();
+      const { batches } = await getPendingTransactionsForResubmission(
+        this.config.maxRetries
+      );
 
       if (batches.length === 0) {
         return; // No pending transactions to process
