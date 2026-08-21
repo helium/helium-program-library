@@ -84,7 +84,7 @@ export const ResubmitOutputSchema = z.object({
 
 export const PayerBatchSummarySchema = z.object({
   batchId: z.string(),
-  tag: z.string().max(1000).optional(),
+  tag: z.string().optional(),
   status: z.string(),
   submissionType: z.string(),
   parallel: z.boolean(),

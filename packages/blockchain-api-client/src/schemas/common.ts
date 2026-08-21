@@ -25,7 +25,7 @@ export const TransactionItemSchema = z.object({
 export const TransactionDataSchema = z.object({
   transactions: z.array(TransactionItemSchema),
   parallel: z.boolean(),
-  tag: z.string().max(1000).optional(),
+  tag: z.string().optional(),
   actionMetadata: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -184,7 +184,7 @@ export function typedTransactionData<T extends z.ZodTypeAny>(
       })
     ),
     parallel: z.boolean(),
-    tag: z.string().max(1000).optional(),
+    tag: z.string().optional(),
     actionMetadata: z.record(z.string(), z.unknown()).optional(),
   });
 }

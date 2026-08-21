@@ -30,7 +30,7 @@ export const MigrateTransactionItemSchema = z.object({
 export const MigrateTransactionDataSchema = z.object({
   transactions: z.array(MigrateTransactionItemSchema),
   parallel: z.boolean(),
-  tag: z.string().max(1000).optional(),
+  tag: z.string().optional(),
 });
 
 export const MigrateOutputSchema = z.object({
