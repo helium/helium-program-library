@@ -1,0 +1,17 @@
+name: "Localnet accounts"
+description: "Restore or fetch the account dumps localnet loads instead of cloning at boot"
+runs:
+  using: "composite"
+  steps:
+    # Keyed on Anchor.toml because that is where the address list lives, so editing an
+    # entry invalidates the cache and nothing else does.
+    - uses: actions/cache@v4
+      with:
+        path: accounts
+        key: localnet-accounts-${{ hashFiles('Anchor.toml') }}
+        restore-keys: |
+          localnet-accounts-
+    # A cache hit makes this a no-op; the script skips any file already present, and
+    # re-fetches only what a partial restore left missing.
+    - run: ./scripts/fetch-localnet-accounts.sh
+      shell: bash
