@@ -8,6 +8,22 @@ import { watch } from "./watch";
 type Leg = "dc" | "hnt";
 
 /**
+ * Whether a task account is this leg's own.
+ *
+ * tuktuk reuses task ids, so once a leg's task is swept another program's task takes the
+ * same address and the stored pointer still resolves. The trigger it carries is then
+ * somebody else's, and a stalled leg reads as a healthy one. dc-auto-top stamps each task
+ * it queues with `topoff <leg> <truncated auto top off key>`, so the description is what
+ * distinguishes its own task from a squatter at the same id.
+ */
+function ownsTask(description: string, leg: Leg, address: string): boolean {
+  // The program truncates the key to fit tuktuk's description limit: 32 - "topoff dc ".len
+  // for the DC leg and one char less for the longer "topoff hnt " prefix.
+  const keep = leg === "dc" ? 32 - 14 : 32 - 15;
+  return description === `topoff ${leg} ${address.slice(0, keep)}`;
+}
+
+/**
  * Tracks whether each leg of a `dc-auto-top` account is still being cranked.
  *
  * Both legs are self-rescheduling: a run reschedules itself as its last step, so a
@@ -25,14 +41,15 @@ export async function monitorAutoTopOff(autoTopOff: PublicKey, label: string) {
   const address = autoTopOff.toBase58();
 
   async function publish(leg: Leg, task: PublicKey) {
-    // Two ways a leg has no task: the program parks its own key in the field as a
-    // "nothing scheduled" sentinel, because a zero pubkey cannot be passed as a mutable
-    // account; and a task that kept failing is swept once stale. Both mean the leg is
-    // dead until something reschedules it, and both report 0.
+    // Three ways a leg has no task of its own: the program parks its own key in the
+    // field as a "nothing scheduled" sentinel, because a zero pubkey cannot be passed as
+    // a mutable account; a task that kept failing is swept once stale; and a swept task's
+    // id gets reused, leaving the pointer resolving to somebody else's task. All three
+    // mean the leg is dead until something reschedules it, and all three report 0.
     const acc = task.equals(autoTopOff)
       ? null
       : await tuktukProgram.account.taskV0.fetchNullable(task);
-    if (!acc) {
+    if (!acc || !ownsTask(acc.description, leg, address)) {
       autoTopOffTaskTrigger.set({ name: label, leg, address }, 0);
       return;
     }
