@@ -212,7 +212,9 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
     .try_into()
     .unwrap();
-  let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
+  // Same scale the backstop's baseline reads delegator_rewards_percent at, so the amount
+  // the band is sized against and the amount minted here cannot drift apart.
+  let max_percent = crate::backstop::PERCENT_SCALE;
 
   let delegation_rewards_amount: u64 = (rewards_amount as u128)
     .checked_mul(u128::from(ctx.accounts.dao.delegator_rewards_percent))
@@ -244,12 +246,7 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .checked_add(top_up)
     .unwrap();
   let staker_overflow: u64 = if is_mobile {
-    crate::backstop::staker_overflow(
-      rewards_amount,
-      top_up,
-      ctx.accounts.dao_epoch_info.deployer_cap_hnt,
-      deployer_pool,
-    )
+    crate::backstop::staker_overflow(deployer_pool, ctx.accounts.dao_epoch_info.deployer_cap_hnt)
   } else {
     0
   };

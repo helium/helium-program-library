@@ -230,6 +230,7 @@ pub fn handler<'info>(
       net_emissions_cap,
       mobile_dc_burned,
       mobile_share,
+      delegator_rewards_percent: ctx.accounts.dao.delegator_rewards_percent,
       decimals_factor,
       hnt_price_floor,
       hnt_price_cap,

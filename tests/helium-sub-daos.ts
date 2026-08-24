@@ -1060,7 +1060,7 @@ describe("helium-sub-daos", () => {
                 })
                 .rpc({ skipPreflight: true });
 
-              // Epoch 2: a large carrier burn drives a 0.5x-carrier target well above the
+              // Epoch 2: a large carrier burn drives a 0.8x-carrier target well above the
               // deployer baseline, and burns ~100k HNT so smoothed_hnt_burned (the budget)
               // dwarfs demand. The same Mobile sub-DAO epoch-info account is its prev next.
               await vsrProgram.methods
@@ -1138,7 +1138,7 @@ describe("helium-sub-daos", () => {
                 (di.deployerCapHnt.toNumber() / 3.75) * (emaPrice / priceLower);
 
               expect(mobileShare).to.be.greaterThan(0);
-              // The escrow mint is the 94% data bucket out of the split base plus the whole
+              // The escrow mint is the split base less the delegation slice, plus the whole
               // top-up, and that is what has to land on the target.
               expect(sdi.hntRewardsIssued.toNumber()).to.be.closeTo(
                 target,
