@@ -21,13 +21,16 @@
 //!   escrow to the shared delegator pool. Applied in `issue_rewards_v0`; this module
 //!   computes the ceiling (`deployer_cap_hnt`) and the redirect (`staker_overflow`).
 //!
-//! The floor target is clamped to the ceiling where it is computed, so the two never bind in
-//! the same epoch. The clamp matters because the floor converts its USD target at
+//! The floor target is clamped to the ceiling where it is computed, so the top-up can never
+//! be sized above the ceiling. The clamp matters because the floor converts its USD target at
 //! `ema - 2 * conf` while the cap converts its own at `ema`: a confidence width above ~37% of
-//! the EMA price puts the unclamped target above the ceiling, which would mint a top-up only
-//! for the cap to redirect it to stakers. What the cap still trims is the residual between
-//! the baseline computed here and the pool `issue_rewards_v0` mints from the freshly-smoothed
-//! percent share.
+//! the EMA price puts the unclamped target above the ceiling, and the excess would be minted
+//! only for the cap to redirect it to stakers.
+//!
+//! It does not make the two mutually exclusive. The baseline here is taken at
+//! `previous_percentage` while `issue_rewards_v0` mints at the freshly-smoothed percent share,
+//! so the pool it mints sits a little either side of `baseline + top_up` and the cap can still
+//! trim that residual. The clamp bounds what the residual can be, not whether there is one.
 //!
 //! The two parameters (80% floor share, 300% cap) are hardcoded; changing them requires a
 //! community HIP and program upgrade. Everything else the band needs is read from chain each
@@ -180,8 +183,12 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
   // Floor target: 0.8x carrier-paid USD, in HNT, and never above the ceiling. Without the
   // clamp the two prices can invert the band -- the floor converts at `ema - 2 * conf` and
   // the cap at `ema`, so a confidence width above ~37% of the EMA price puts the target over
-  // the ceiling -- and the top-up would then be minted only to be redirected to stakers by
+  // the ceiling -- and the excess would then be minted only to be redirected to stakers by
   // the cap. Clamping here is what keeps the floor a floor of the same band the cap tops.
+  //
+  // A target that will not convert goes dormant rather than clamping to the ceiling. Both
+  // are representable answers; this one under-delivers on a price too small to trust, which
+  // is the direction read_hnt_price already takes for a price it cannot verify.
   let Some(target_hnt) = scale_dc_to_hnt(
     (input.mobile_dc_burned as u128).saturating_mul(DEPLOYER_TARGET_PERCENT) / 100,
     input.decimals_factor,
