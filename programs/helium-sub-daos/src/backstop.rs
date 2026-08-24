@@ -1,28 +1,36 @@
-//! HIP 149 Decision 1: the Mobile data deployer earnings backstop.
+//! The Mobile data deployer earnings backstop (HIP 149 Decision 1, HIP 150 Decision 2).
 //!
 //! Two coupled mechanisms, both keyed off the per-epoch carrier-paid burn signal
 //! `mobile_sub_dao_epoch_info.dc_burned` (DC has 5 decimals, 1 DC = $0.00001, so
-//! `dc_burned` is a direct USD measure of carrier consumption):
+//! `dc_burned` is a direct USD measure of carrier consumption). A per-Hotspot reward
+//! multiplier reaches both mechanisms through that same signal: the payer burns the
+//! multiplied data credits, so `dc_burned` carries every multiplier in force and the
+//! band applies at each Hotspot's own multiplier without per-Hotspot state on chain.
 //!
 //! - **Floor (target minimum / top-up).** When the Mobile data deployer baseline
-//!   falls below half the carrier-paid USD, the protocol re-emits burned HNT to
+//!   falls below 80% of the carrier-paid USD, the protocol re-emits burned HNT to
 //!   top deployers up to that target. Computed here in `calculate_utility_score_v0`
-//!   and added to DAO-level `total_rewards`. Bounded by recent HNT destruction so
-//!   it never grows net supply, and sharing one burn budget with the existing
-//!   HIP 20 net-emissions re-emit (the two paths never re-mint the same destroyed
-//!   HNT twice).
+//!   and minted by `issue_rewards_v0` straight into the Mobile data rewards escrow,
+//!   so the top-up is sized at the shortfall itself: every HNT of it reaches a
+//!   deployer rather than being shared out by the sub-DAO and bucket splits. Bounded
+//!   by recent HNT destruction so it never grows net supply, and sharing one burn
+//!   budget with the existing HIP 20 net-emissions re-emit (the two paths never
+//!   re-mint the same destroyed HNT twice).
 //! - **Cap (earnings ceiling / overflow-to-stakers).** When the Mobile data bucket
-//!   would pay deployers more than three times the carrier-paid USD, the excess is
-//!   redirected from the rewards escrow to the shared delegator pool. Applied in
-//!   `issue_rewards_v0`; this module only computes the ceiling (`deployer_cap_hnt`).
+//!   and the top-up together would pay deployers more than three times the
+//!   carrier-paid USD, the excess is redirected from the rewards escrow to the shared
+//!   delegator pool. Applied in `issue_rewards_v0`; this module computes the ceiling
+//!   (`deployer_cap_hnt`) and the redirect (`staker_overflow`).
 //!
-//! The floor and the cap are mutually exclusive within an epoch (the floor sits at
-//! a sixth of the cap).
+//! The floor sits at 4/15 of the cap, so both can bind in one epoch only when the Pyth
+//! confidence width exceeds ~37% of the EMA price: the floor converts its USD target at
+//! `ema - 2 * conf` while the cap converts its own at `ema`, and below that ratio the
+//! floor target stays under the ceiling. Nothing on the price feed rules that out, so
+//! the cap is applied to the top-up as well as to the bucket and wins if it happens.
 //!
-//! Parameters (50% floor share, 300% cap, 0.70 Mobile data bucket) are hardcoded;
-//! changing them requires a community HIP and program upgrade. `alpha` (the fraction
-//! of total emission reaching Mobile data deployers) is computed each epoch from the
-//! on-chain Mobile percent share, not a parameter.
+//! Parameters (80% floor share, 300% cap, 0.94 Mobile data bucket) are hardcoded;
+//! changing them requires a community HIP and program upgrade. The Mobile percent share
+//! that scales the baseline is read from chain each epoch, not a parameter.
 
 use anchor_lang::prelude::*;
 
@@ -43,8 +51,16 @@ pub const MOBILE_SUB_DAO: Pubkey = pubkey!("Gm9xDCJawDEKDrrQW6haw94gABaYzQwCq4ZQ
 /// constant and update the cron in the same rollout.
 pub const HNT_PYTH_PRICE_FEED: Pubkey = pubkey!("He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5");
 
-/// Mobile data bucket fraction (HIP 149 Decision 3), as a percentage. Hardcoded.
-pub const MOBILE_DATA_BUCKET_PERCENT: u128 = 70;
+/// Mobile data bucket fraction, as a percentage of the Mobile sub-DAO's emission
+/// (HIP 150 Decision 3). Hardcoded. The Service Provider allocation is zero while the
+/// contribution runs, so the data bucket is everything the sub-DAO emits bar the veHNT
+/// delegation slice. The Mobile verifier's Service Provider share and this constant
+/// describe the same split from two sides and have to move together.
+pub const MOBILE_DATA_BUCKET_PERCENT: u128 = 94;
+
+/// The target minimum, as a percentage of the carrier-paid USD the Mobile sub-DAO's
+/// `dc_burned` measures (HIP 150 Decision 2). Hardcoded.
+pub const DEPLOYER_TARGET_PERCENT: u128 = 80;
 
 /// Inputs to the backstop computation, all already read from on-chain state and
 /// the Pyth price account by the caller.
@@ -80,9 +96,13 @@ pub struct BackstopInput {
 pub struct BackstopOutput {
   /// The existing HIP 20 carrier-burn re-emit, `min(smoothed_hnt_burned, net_emissions_cap)`.
   pub existing_re_emit: u64,
-  /// The target-minimum top-up to add to DAO-level `total_rewards` this epoch.
+  /// The target-minimum top-up, minted whole into the Mobile data rewards escrow this
+  /// epoch. Recorded on `dao_epoch_info` so `issue_rewards_v0` can both exclude it from
+  /// the amount it splits and add it to the Mobile escrow mint.
   pub top_up: u64,
-  /// DAO-level total rewards: `emission + existing_re_emit + top_up`.
+  /// Total HNT minted at DAO level this epoch: `emission + existing_re_emit + top_up`.
+  /// Only `total_rewards - top_up` is split by sub-DAO share and bucket; the whole of it
+  /// is what `current_hnt_supply` has to track.
   pub total_rewards: u64,
   /// The Mobile data deployer earnings ceiling in HNT (`3 x carrier_paid_USD`).
   pub deployer_cap_hnt: u64,
@@ -100,9 +120,9 @@ fn scale_dc_to_hnt(dc_amount: u128, decimals_factor: u128, hnt_price_with_conf: 
     .unwrap_or(u64::MAX)
 }
 
-/// Compute the HIP 149 Decision 1 backstop for one epoch.
+/// Compute the backstop for one epoch.
 ///
-/// The floor tops Mobile data deployers up to `0.5 x carrier_paid_USD`; the cap
+/// The floor tops Mobile data deployers up to `0.8 x carrier_paid_USD`; the cap
 /// (returned as `deployer_cap_hnt`) holds them at no more than `3.0 x carrier_paid_USD`.
 /// The top-up is bounded by `max(0, smoothed_hnt_burned - net_emissions_cap)` so that,
 /// together with the existing re-emit, re-emission never exceeds recent HNT destruction.
@@ -110,7 +130,7 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
   let existing_re_emit = std::cmp::min(input.smoothed_hnt_burned, input.net_emissions_cap);
 
   // carrier_paid_USD = dc_burned x 1e-5. The cap is 3.0x of it (dc_burned*3 in DC units);
-  // the floor target (0.5x) is computed below, after the share guard, since it's only
+  // the floor target (0.8x) is computed below, after the share guard, since it's only
   // used on the top-up path. The cap uses the EMA point price so it binds at exactly 3.0x;
   // the floor uses the lower (confidence-adjusted) price so a minimum is never underpaid.
   let deployer_cap_hnt = scale_dc_to_hnt(
@@ -133,36 +153,31 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
     };
   }
 
-  // Floor target: 0.5x carrier-paid USD (dc_burned/2 in DC units), in HNT.
+  // Floor target: 0.8x carrier-paid USD, in HNT.
   let target_hnt = scale_dc_to_hnt(
-    (input.mobile_dc_burned / 2) as u128,
+    (input.mobile_dc_burned as u128).saturating_mul(DEPLOYER_TARGET_PERCENT) / 100,
     input.decimals_factor,
     input.hnt_price_floor,
   );
 
-  // deployer_baseline = (emission + existing_re_emit) x mobile_share x 0.70.
-  // mobile_share is scaled by u32::MAX; both divisors are nonzero constants.
+  // deployer_baseline = (emission + existing_re_emit) x mobile_share x 0.94: what the
+  // emission schedule and the existing re-emit deliver to Mobile data deployers through the
+  // sub-DAO and bucket splits. mobile_share is scaled by u32::MAX; both divisors are nonzero
+  // constants.
   let share = input.mobile_share as u128;
   let deployer_baseline = (base_total as u128).saturating_mul(share) / (u32::MAX as u128)
     * MOBILE_DATA_BUCKET_PERCENT
     / 100;
 
-  // top_up_demand = (target_hnt - deployer_baseline) / alpha
-  //              = shortfall x u32::MAX x 100 / (mobile_share x 70).
-  // Reverses the same scale used in deployer_baseline. The alpha division sizes a
-  // DAO-level mint so the slice reaching Mobile data deployers equals the shortfall.
+  // top_up_demand = target_hnt - deployer_baseline. The top-up is minted straight into the
+  // Mobile data rewards escrow rather than into the amount those splits divide, so what
+  // reaches deployers is the mint itself and the shortfall needs no grossing up.
   let shortfall = (target_hnt as u128).saturating_sub(deployer_baseline as u128);
-  // If the demand doesn't fit in u64 the inputs are already outside any real range (an
-  // absurdly low price). Fail safe to no top-up for the epoch (I-02) rather than treating
-  // the overflow as "use the whole burn budget"; this matches read_hnt_price, which makes
-  // the backstop dormant on any price that can't be trusted.
-  let top_up_demand: u64 = shortfall
-    .saturating_mul(u32::MAX as u128)
-    .saturating_mul(100)
-    .checked_div(share.saturating_mul(MOBILE_DATA_BUCKET_PERCENT))
-    .unwrap_or(0)
-    .try_into()
-    .unwrap_or(0);
+  // A shortfall that doesn't fit in u64 means the inputs are already outside any real range
+  // (an absurdly low price). Fail safe to no top-up for the epoch (I-02) rather than
+  // treating the overflow as "use the whole burn budget"; this matches read_hnt_price, which
+  // makes the backstop dormant on any price that can't be trusted.
+  let top_up_demand: u64 = shortfall.try_into().unwrap_or(0);
 
   // Burn-bounded: the top-up may use only the burn beyond what the existing re-emit
   // already consumes (HIP 149 shared-budget bound). With existing_re_emit =
@@ -181,26 +196,61 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
   }
 }
 
-/// The HIP 149 earnings-cap overflow: the portion of the Mobile data bucket above the
+/// Split an epoch's stored `total_rewards` into the part that `issue_rewards_v0` divides by
+/// sub-DAO share and bucket, and the top-up it mints whole into the Mobile data rewards
+/// escrow. Returns `(split_base, top_up)`, which sum to `total_rewards` by construction.
+///
+/// `total_rewards` is `emission + min(smoothed_hnt_burned, net_emissions_cap) + top_up`, and
+/// `issue_rewards_v0` holds every term that is not the top-up: the emission schedule and the
+/// net-emissions cap on `DaoV0`, and the epoch's `smoothed_hnt_burned` on the
+/// `DaoEpochInfoV0` that `calculate_utility_score_v0` wrote. So the split is derivable and
+/// needs no field of its own.
+///
+/// The end-of-epoch crank compiles both instructions into a single transaction, so there
+/// they read identical inputs and the split is exact. A manual settlement sends them
+/// separately; a governance change to the schedule or the cap in that window shifts the
+/// split, under-delivering to deployers for one epoch if the base grew. It cannot change how
+/// much HNT is minted, because the two halves returned here always sum to `total_rewards`.
+pub fn split_total_rewards(
+  total_rewards: u64,
+  emission: u64,
+  smoothed_hnt_burned: u64,
+  net_emissions_cap: u64,
+) -> (u64, u64) {
+  let split_base = emission
+    .saturating_add(std::cmp::min(smoothed_hnt_burned, net_emissions_cap))
+    .min(total_rewards);
+  (split_base, total_rewards - split_base)
+}
+
+/// The earnings-cap overflow: the portion of the Mobile data deployer pool above the
 /// deployer ceiling, redirected from the rewards escrow to the shared delegator pool.
 ///
-/// `rewards_amount` is the Mobile sub-DAO's emission this epoch; the data bucket is 0.70
-/// of it. A zero ceiling (no carrier burn / no price oracle this epoch) disables the
-/// redirect, so the full data bucket flows to deployers as before.
+/// The pool the ceiling governs is the data bucket, `MOBILE_DATA_BUCKET_PERCENT` of the
+/// Mobile sub-DAO's emission for the epoch (`rewards_amount`), plus `top_up`, the
+/// backstop's direct mint into the same escrow. A zero ceiling (no carrier burn or no
+/// price oracle this epoch) disables the redirect, so the whole pool flows to deployers.
 ///
-/// Clamped to `escrow` (the deployer portion, `rewards_amount - delegator slice`) so the
-/// redirect can never draw more than the escrow holds: with a high `delegator_rewards_percent`
-/// the 70% data bucket can exceed the escrow, and without this the caller's escrow subtraction
-/// would underflow and panic.
-pub fn staker_overflow(rewards_amount: u64, deployer_cap_hnt: u64, escrow: u64) -> u64 {
+/// Clamped to `deployer_pool`, the escrow mint the redirect draws from, so it can never
+/// draw more than that mint holds: with a high `delegator_rewards_percent` the data bucket
+/// can exceed it, and without the clamp the caller's subtraction would underflow and panic.
+pub fn staker_overflow(
+  rewards_amount: u64,
+  top_up: u64,
+  deployer_cap_hnt: u64,
+  deployer_pool: u64,
+) -> u64 {
   if deployer_cap_hnt == 0 {
     return 0;
   }
   let data_bucket = (rewards_amount as u128)
     .saturating_mul(MOBILE_DATA_BUCKET_PERCENT)
     .checked_div(100)
-    .unwrap_or(0) as u64;
-  data_bucket.saturating_sub(deployer_cap_hnt).min(escrow)
+    .unwrap_or(0)
+    .saturating_add(top_up as u128);
+  u64::try_from(data_bucket.saturating_sub(deployer_cap_hnt as u128))
+    .unwrap_or(u64::MAX)
+    .min(deployer_pool)
 }
 
 #[cfg(test)]
@@ -211,9 +261,11 @@ pub fn staker_overflow(rewards_amount: u64, deployer_cap_hnt: u64, escrow: u64) 
 mod tests {
   use super::*;
 
-  // Worked examples from helium-next/specs/supply.md, adjusted to HIP 149's
-  // shared-budget burn bound. Mobile sub-DAO ~89/11 split => mobile_share ~0.8927.
-  const SHARE_8927: u32 = ((0.8927_f64) * (u32::MAX as f64)) as u32; // alpha ~ 0.625
+  // Mobile sub-DAO ~89/11 split => mobile_share ~0.8927, so the fraction of the split base
+  // reaching Mobile data deployers is 0.8927 x 0.94 ~ 0.839.
+  const SHARE_8927: u32 = ((0.8927_f64) * (u32::MAX as f64)) as u32;
+  /// The share of the split base that reaches Mobile data deployers at SHARE_8927.
+  const BASELINE_FRACTION: f64 = 0.8927 * 0.94;
   const NET_CAP: u64 = 1_644_00000000; // ~1,644 HNT/epoch in bones (8 decimals)
   const EMISSION: u64 = 20_548_00000000; // ~20,548 HNT/epoch
   const DECIMALS_FACTOR: u128 = 100_000_000_000; // 10^11 (8 hnt decimals, -8 expo)
@@ -248,12 +300,13 @@ mod tests {
 
   #[test]
   fn neither_binds_inside_band() {
-    // HNT $1, R_payer $0.10. Baseline ~$0.15/GB sits well above the floor and below
-    // the cap, so no top-up and no overflow.
-    let out = compute_backstop(&base_input(1.0, NET_CAP)); // smoothed = cap => re_emit binds, burn_budget 0
+    // HNT $1: the 80% target is 0.8 x $9,100 / $1 = 7,280 HNT, well under the ~18,620 HNT
+    // baseline, and the baseline is well under the 3 x $9,100 / $1 = 27,300 HNT ceiling.
+    // Smoothed well above net_emissions_cap, so a zero top-up is the floor not binding
+    // rather than an empty burn budget.
+    let out = compute_backstop(&base_input(1.0, 91_000_00000000));
     assert_eq!(out.top_up, 0, "no top-up inside the band");
-    // deployer baseline ~13,870 HNT; cap_hnt = 3 x $9,100 / $1 = 27,300 HNT.
-    let data_bucket = hnt(out.total_rewards) * 0.8927 * 0.70;
+    let data_bucket = hnt(out.total_rewards) * BASELINE_FRACTION;
     assert!(data_bucket < hnt(out.deployer_cap_hnt), "below the cap");
   }
 
@@ -263,15 +316,62 @@ mod tests {
     // so smoothed settles at ~91,000 HNT. Target fully delivered.
     let smoothed = 91_000_00000000;
     let out = compute_backstop(&base_input(0.10, smoothed));
-    // target_hnt = 0.5 x $9,100 / $0.10 = 45,500 HNT.
-    // deployer total delivered = baseline + top_up x alpha should reach 45,500 HNT.
-    let alpha = 0.8927 * 0.70;
-    let baseline = hnt(EMISSION + NET_CAP) * alpha;
-    let delivered = baseline + hnt(out.top_up) * alpha;
+    // target_hnt = 0.8 x $9,100 / $0.10 = 72,800 HNT. The top-up is minted straight into
+    // the escrow, so what deployers receive is the baseline plus the whole top-up rather
+    // than the baseline plus the fraction of it that survives the splits.
+    let baseline = hnt(EMISSION + NET_CAP) * BASELINE_FRACTION;
+    let delivered = baseline + hnt(out.top_up);
     assert!(
-      (delivered - 45_500.0).abs() < 50.0,
-      "delivered {delivered} HNT should reach the 45,500 HNT target"
+      (delivered - 72_800.0).abs() < 50.0,
+      "delivered {delivered} HNT should reach the 72,800 HNT target"
     );
+  }
+
+  #[test]
+  fn split_total_rewards_inverts_the_computation() {
+    // issue_rewards_v0 holds no top-up field: it splits the stored total_rewards back into
+    // the amount it divides and the top-up it mints whole. Pin the inverse across the price
+    // sweep and every burn regime, and pin that the two halves conserve the mint.
+    for price in [0.05, 0.10, 0.20, 1.0, 2.5, 5.0] {
+      for smoothed in [0u64, NET_CAP, NET_CAP + 1, 9_100_00000000, 91_000_00000000] {
+        let out = compute_backstop(&base_input(price, smoothed));
+        let (split_base, top_up) =
+          split_total_rewards(out.total_rewards, EMISSION, smoothed, NET_CAP);
+        assert_eq!(
+          top_up, out.top_up,
+          "price {price}, smoothed {smoothed}: derived top-up differs from the computed one"
+        );
+        assert_eq!(
+          split_base + top_up,
+          out.total_rewards,
+          "price {price}, smoothed {smoothed}: the split lost or invented HNT"
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn split_total_rewards_conserves_under_a_moved_base() {
+    // A manual settlement that changed the emission schedule or the net-emissions cap
+    // between the two instructions moves the derived base. Whichever way it moves, the two
+    // halves still sum to total_rewards, so how much HNT is minted cannot change.
+    let out = compute_backstop(&base_input(0.10, 91_000_00000000));
+    for (emission, net_cap) in [
+      (EMISSION, NET_CAP),
+      (EMISSION * 2, NET_CAP),
+      (EMISSION / 2, NET_CAP),
+      (u64::MAX, NET_CAP),
+      (EMISSION, 0),
+      (EMISSION, u64::MAX),
+    ] {
+      let (split_base, top_up) =
+        split_total_rewards(out.total_rewards, emission, 91_000_00000000, net_cap);
+      assert_eq!(
+        split_base + top_up,
+        out.total_rewards,
+        "emission {emission}, net_cap {net_cap}: the split lost or invented HNT"
+      );
+    }
   }
 
   #[test]
@@ -312,9 +412,9 @@ mod tests {
 
   #[test]
   fn cap_ceiling_computed_for_overflow() {
-    // HNT $2.50: baseline ~$0.38/GB exceeds the $0.30/GB cap. The ceiling in HNT is
-    // 3 x $9,100 / $2.50 = 10,920 HNT. The redirect itself happens in issue_rewards_v0.
-    let out = compute_backstop(&base_input(2.50, NET_CAP));
+    // HNT $2.50: the ~18,620 HNT baseline exceeds the 3 x $9,100 / $2.50 = 10,920 HNT
+    // ceiling, so the cap binds. The redirect itself happens in issue_rewards_v0.
+    let out = compute_backstop(&base_input(2.50, 91_000_00000000));
     assert_eq!(out.top_up, 0, "no top-up when HNT is expensive");
     assert!(
       (hnt(out.deployer_cap_hnt) - 10_920.0).abs() < 5.0,
@@ -342,10 +442,10 @@ mod tests {
 
   #[test]
   fn staker_overflow_redirects_above_cap() {
-    // rewards_amount such that the data bucket (70%) is 13,870 HNT; cap 10,920 HNT.
-    let rewards_amount = (13_870_00000000_u64 * 100) / 70; // data bucket = 13,870 HNT
+    // rewards_amount such that the data bucket (94%) is 13,870 HNT; cap 10,920 HNT.
+    let rewards_amount = (13_870_00000000_u64 * 100) / 94; // data bucket = 13,870 HNT
     let cap = 10_920_00000000;
-    let overflow = staker_overflow(rewards_amount, cap, rewards_amount);
+    let overflow = staker_overflow(rewards_amount, 0, cap, rewards_amount);
     assert!(
       (hnt(overflow) - 2_950.0).abs() < 5.0,
       "overflow {} HNT should be ~2,950",
@@ -354,31 +454,53 @@ mod tests {
   }
 
   #[test]
+  fn staker_overflow_counts_the_top_up() {
+    // The ceiling governs what deployers receive, and the top-up is minted into the same
+    // escrow, so it is inside the pool the ceiling is measured against. Bucket 13,870 HNT
+    // plus a 5,000 HNT top-up against a 15,000 HNT ceiling redirects 3,870.
+    let rewards_amount = (13_870_00000000_u64 * 100) / 94;
+    let top_up = 5_000_00000000;
+    let pool = rewards_amount + top_up;
+    let overflow = staker_overflow(rewards_amount, top_up, 15_000_00000000, pool);
+    assert!(
+      (hnt(overflow) - 3_870.0).abs() < 5.0,
+      "overflow {} HNT should be ~3,870",
+      hnt(overflow)
+    );
+  }
+
+  #[test]
   fn staker_overflow_none_inside_band() {
-    let rewards_amount = (13_870_00000000_u64 * 100) / 70;
+    let rewards_amount = (13_870_00000000_u64 * 100) / 94;
     // cap well above the bucket (HNT cheap): no redirect.
     assert_eq!(
-      staker_overflow(rewards_amount, 27_300_00000000, rewards_amount),
+      staker_overflow(rewards_amount, 0, 27_300_00000000, rewards_amount),
       0
     );
   }
 
   #[test]
   fn staker_overflow_disabled_when_cap_zero() {
-    // No carrier burn / no price oracle => ceiling 0 => the whole bucket stays with
-    // deployers (no accidental redirect of everything to stakers).
-    assert_eq!(staker_overflow(20_000_00000000, 0, 20_000_00000000), 0);
+    // No carrier burn / no price oracle => ceiling 0 => the whole pool stays with
+    // deployers (no accidental redirect of everything to stakers), top-up included.
+    assert_eq!(
+      staker_overflow(20_000_00000000, 5_000_00000000, 0, 25_000_00000000),
+      0
+    );
   }
 
   #[test]
-  fn staker_overflow_clamped_to_escrow() {
-    // Tiny ceiling would push the redirect to ~the whole 70% data bucket, but a high
-    // delegator slice leaves a smaller escrow. The redirect clamps to the escrow so the
-    // caller's escrow subtraction can't underflow.
+  fn staker_overflow_clamped_to_deployer_pool() {
+    // A tiny ceiling would push the redirect to ~the whole 94% data bucket, but a high
+    // delegator slice leaves a smaller escrow mint. The redirect clamps to that mint so
+    // the caller's subtraction can't underflow.
     let rewards_amount = 100_000_00000000_u64;
-    let escrow = 10_000_00000000; // delegators took 90% this epoch
-    let overflow = staker_overflow(rewards_amount, 1, escrow);
-    assert_eq!(overflow, escrow, "redirect never exceeds the escrow");
+    let deployer_pool = 10_000_00000000; // delegators took 90% this epoch
+    let overflow = staker_overflow(rewards_amount, 0, 1, deployer_pool);
+    assert_eq!(
+      overflow, deployer_pool,
+      "redirect never exceeds the escrow mint"
+    );
   }
 
   #[test]
@@ -390,21 +512,53 @@ mod tests {
     assert_eq!(out.total_rewards, EMISSION + NET_CAP);
   }
 
+  /// The deployer pool for an epoch: the data bucket out of the split base, plus the
+  /// top-up minted straight into the same escrow.
+  fn deployer_pool(out: &BackstopOutput) -> u64 {
+    let split_base = out.total_rewards - out.top_up;
+    let rewards_amount = ((split_base as u128) * (SHARE_8927 as u128) / (u32::MAX as u128)) as u64;
+    let bucket = ((rewards_amount as u128) * MOBILE_DATA_BUCKET_PERCENT / 100) as u64;
+    bucket + out.top_up
+  }
+
   #[test]
-  fn floor_and_cap_mutually_exclusive() {
-    // The floor (0.5x) sits below the cap (3.0x) of the same carrier-paid USD, so they
-    // can never both bind. Sweep prices: whenever top_up > 0, the data bucket is below
-    // the cap ceiling; whenever the bucket exceeds the cap, top_up == 0.
+  fn floor_and_cap_mutually_exclusive_at_a_normal_confidence() {
+    // The floor (0.8x) sits below the cap (3.0x) of the same carrier-paid USD whenever the
+    // two prices are close, so they cannot both bind. Sweep prices at zero confidence:
+    // whenever top_up > 0 the deployer pool is below the ceiling, and whenever it exceeds
+    // the ceiling top_up == 0.
     for price in [0.05, 0.10, 0.20, 0.33, 1.0, 1.97, 2.5, 5.0] {
       let out = compute_backstop(&base_input(price, 91_000_00000000));
-      let data_bucket = (out.total_rewards as u128) * (SHARE_8927 as u128) / (u32::MAX as u128)
-        * MOBILE_DATA_BUCKET_PERCENT
-        / 100;
-      let over_cap = (data_bucket as u64) > out.deployer_cap_hnt;
+      let over_cap = deployer_pool(&out) > out.deployer_cap_hnt;
       assert!(
         !(out.top_up > 0 && over_cap),
         "price {price}: floor and cap bound simultaneously"
       );
     }
+  }
+
+  #[test]
+  fn cap_wins_when_the_band_inverts() {
+    // A confidence width above ~37% of the EMA price puts the floor target above the
+    // ceiling, because the floor converts its USD target at `ema - 2 * conf` and the cap
+    // converts its own at `ema`. EMA $1.00 with $0.40 confidence gives a $0.20 floor
+    // price: a 72,800 HNT target against a 27,300 HNT ceiling. Counting the top-up inside
+    // the capped pool is what holds deployers at the ceiling when that happens.
+    let mut input = base_input(1.00, 91_000_00000000);
+    input.hnt_price_floor = hnt_price(0.20);
+    let out = compute_backstop(&input);
+    assert!(out.top_up > 0, "the floor binds");
+
+    let pool = deployer_pool(&out);
+    assert!(pool > out.deployer_cap_hnt, "and so does the cap");
+
+    let split_base = out.total_rewards - out.top_up;
+    let rewards_amount = ((split_base as u128) * (SHARE_8927 as u128) / (u32::MAX as u128)) as u64;
+    let overflow = staker_overflow(rewards_amount, out.top_up, out.deployer_cap_hnt, pool);
+    assert_eq!(
+      pool - overflow,
+      out.deployer_cap_hnt,
+      "the redirect holds deployers at the ceiling"
+    );
   }
 }

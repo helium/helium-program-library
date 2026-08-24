@@ -176,7 +176,7 @@ pub struct DaoEpochInfoV0 {
   pub cumulative_not_emitted: u64,
   pub not_emitted: u64,
   pub smoothed_hnt_burned: u64,
-  // HIP 149 Decision 1 backstop. The Mobile data deployer earnings ceiling in HNT
+  // Backstop earnings ceiling. The Mobile data deployer ceiling in HNT
   // (3 x carrier-paid USD this epoch, converted at the epoch's HNT price).
   // issue_rewards_v0 reads this on the Mobile pass to redirect any overflow above
   // the cap from the rewards escrow to the shared delegator pool. The price itself
