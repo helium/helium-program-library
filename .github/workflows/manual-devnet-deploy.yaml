@@ -44,7 +44,12 @@ jobs:
       - name: Set program information
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
-          PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          # Prefer a devnet-specific id (programs.devnet) when one exists;
+          # most programs share one id across clusters via programs.localnet.
+          PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.devnet.${PROGRAM_NAME} 2>/dev/null | tr -d '"' || true)
+          if [ -z "$PROGRAM_ID" ]; then
+            PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
+          fi
           echo "Program: $PROGRAM_ID"
           echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
           echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
