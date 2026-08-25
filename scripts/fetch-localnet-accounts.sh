@@ -24,10 +24,6 @@ for g in t.get("genesis", []):
 PY
 
 total=$(wc -l < "$PAIRS" | tr -d ' ')
-if [ "$total" -eq 0 ]; then
-  echo "no [[test.validator.account]] entries in Anchor.toml; nothing to fetch" >&2
-  exit 0
-fi
 
 fetched=0; cached=0
 while read -r kind addr file; do
