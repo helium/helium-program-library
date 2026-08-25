@@ -12,7 +12,6 @@ runs:
         ~/.cargo/bin/anchor localnet --skip-build \
           --provider.wallet ~/.config/solana/id.json > /tmp/localnet.log 2>&1 &
         echo $! > /tmp/localnet.pid
-        sleep 2
     - name: Wait for localnet to start
       # A healthy validator answers within a poll or two (~5s), so this bound only ever
       # applies to a broken one. A vanished pid is reported with the log but is not itself fatal:
