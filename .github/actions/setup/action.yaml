@@ -11,20 +11,12 @@ runs:
     # stalls hangs the step until the job's own cap. Observed repeatedly: a fetch of
     # archive.ubuntu.com InRelease going silent for 44 minutes. Retries cover a mirror
     # that fails outright. `timeout-minutes` is not available on composite-action steps,
-    # so the bound has to come from apt itself.
-    - run: >-
-        sudo apt-get
-        -o Acquire::http::Timeout=30
-        -o Acquire::https::Timeout=30
-        -o Acquire::Retries=3
-        update
+    # so the bound is set once in apt.conf.d and every later apt-get in the job inherits it.
+    - run: |
+        printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99ci-timeouts
+        sudo apt-get update
       shell: bash
-    - run: >-
-        sudo apt-get
-        -o Acquire::http::Timeout=30
-        -o Acquire::https::Timeout=30
-        -o Acquire::Retries=3
-        install -y pkg-config build-essential libudev-dev
+    - run: sudo apt-get install -y pkg-config build-essential libudev-dev
       shell: bash
       # TODO: We're on anchor latest because of https://github.com/coral-xyz/anchor/issues/2568
       # On anchor 0.28.1 we can probably stop using 0 as the source
