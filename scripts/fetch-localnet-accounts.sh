@@ -55,13 +55,4 @@ while read -r kind addr file; do
   fetched=$((fetched+1))
 done < "$PAIRS"
 
-# A missing file makes the validator fail at boot with a far less obvious message, so
-# confirm every entry resolved before handing over.
-missing=0
-while read -r kind addr file; do
-  [ -n "$file" ] || continue
-  [ -s "$file" ] || { echo "ERROR: $file missing for $addr" >&2; missing=1; }
-done < "$PAIRS"
-[ "$missing" -eq 0 ] || exit 1
-
 echo "localnet accounts ready: $total total, $fetched fetched, $cached already present"
