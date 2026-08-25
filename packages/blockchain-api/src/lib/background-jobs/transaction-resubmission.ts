@@ -1,6 +1,5 @@
 import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
-import { DEFAULT_MAX_RESUBMISSIONS } from "../utils/resubmission-backoff";
 import {
   getPendingTransactionsForResubmission,
   reapStalePendingBatches,
@@ -11,7 +10,6 @@ import { checkAndUpdateBatchStatus } from "../utils/transaction-status-checker";
 interface ResubmissionServiceConfig {
   intervalMs: number;
   reaperIntervalMs: number;
-  maxRetries: number;
   enabled: boolean;
 }
 
@@ -25,7 +23,6 @@ class TransactionResubmissionService {
     config: ResubmissionServiceConfig = {
       intervalMs: 2000, // 2 seconds
       reaperIntervalMs: 30000, // 30 seconds
-      maxRetries: DEFAULT_MAX_RESUBMISSIONS,
       enabled: true,
     },
   ) {

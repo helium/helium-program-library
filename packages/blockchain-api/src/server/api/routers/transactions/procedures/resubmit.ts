@@ -52,9 +52,11 @@ export const resubmit = publicProcedure.transactions.resubmit.handler(
     } else {
       return {
         success: false,
-        message: "Failed to resubmit transactions",
+        message: result.ineligible
+          ? "Batch is in its resubmission backoff window or at its retry limit; the background service retries it automatically"
+          : "Failed to resubmit transactions",
         error: result.error,
       };
     }
-  }
+  },
 );

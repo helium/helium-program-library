@@ -197,6 +197,9 @@ export async function resubmitTransactionBatch(
   const cutoff = new Date(
     Date.now() - resubmissionBackoffMs(batch.resubmissionCount),
   );
+  if (batch.lastResubmittedAt && batch.lastResubmittedAt > cutoff) {
+    return ineligible;
+  }
   const [claimed] = await TransactionBatch.update(
     {
       resubmissionCount: sequelize.literal("resubmission_count + 1"),
