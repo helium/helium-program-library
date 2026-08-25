@@ -791,6 +791,45 @@ describe("dc-auto-topoff", () => {
       );
     });
 
+    it("marks the leg unscheduled when it cannot fund the crank reward", async () => {
+      // top_off_hnt_v0 debits the crank reward from auto_top_off and, when it cannot do so
+      // while staying rent exempt, records next_hnt_task = auto_top_off rather than erroring:
+      // that marker is what distinguishes "no task scheduled" from "scheduled but not running".
+      // Reaching the branch means raising the queue minimum past what auto_top_off can spend,
+      // which is only possible because the queue's update authority is a test-held key.
+      // Fund HNT first so the DC leg has no unrelated reason to fail while the queue is raised.
+      await createAtaAndTransfer(provider, hntMint, 1000_00000000, me, autoTopOff);
+
+      const setMinCrankReward = async (minCrankReward: anchor.BN) =>
+        tuktukProgram.methods
+          .updateTaskQueueV0({
+            minCrankReward,
+            capacity: null,
+            lookupTables: null,
+            updateAuthority: null,
+            staleTaskAge: null,
+          })
+          .accounts({ payer: me, updateAuthority: me, taskQueue })
+          .rpc({ skipPreflight: true });
+
+      // Anything above auto_top_off's whole balance is comfortably above its balance less rent
+      // exemption, so the shortfall branch is taken for any num_tasks_used.
+      const autoTopOffLamports = await provider.connection.getBalance(autoTopOff);
+      await setMinCrankReward(new anchor.BN(autoTopOffLamports + 1));
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await runAllTasks();
+
+        const after = await program.account.autoTopOffV0.fetch(autoTopOff);
+        expect(after.nextHntTask.toBase58()).to.equal(
+          autoTopOff.toBase58(),
+          "leg should be marked unscheduled, not left pointing at a stale task"
+        );
+      } finally {
+        await setMinCrankReward(new anchor.BN(1));
+      }
+    });
+
     it("should close the auto topoff", async () => {
       await program.methods
         .closeAutoTopOffV0()
