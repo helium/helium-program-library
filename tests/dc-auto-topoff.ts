@@ -41,6 +41,7 @@ import {
   queueAuthorityKey,
 } from "../packages/dc-auto-top-sdk/src";
 import { init as initTuktukDca } from "../packages/tuktuk-dca-sdk/src";
+import { dcaKey } from "../packages/tuktuk-dca-sdk/src/pdas";
 import { DataCredits } from "../target/types/data_credits";
 import { DcAutoTop } from "../target/types/dc_auto_top";
 import { TuktukDca } from "../target/types/tuktuk_dca";
@@ -756,6 +757,37 @@ describe("dc-auto-topoff", () => {
       expect(dcaMintAccountFinal.amount.toString()).to.equal(
         "0",
         "All DCA mint tokens should be consumed"
+      );
+
+      // A DCA that fails to drain and close leaves its PDA occupied, and `init` on an
+      // occupied PDA fails, which takes the no-reschedule path and stops the HNT leg. The
+      // slot therefore has to advance, and it has to advance *before* the next task is
+      // compiled -- a task compiled against the old slot would fail its seeds constraint
+      // when the next run passes the new index. Asserting the compiled account list is
+      // what pins the ordering; asserting dcaIndex alone would still pass if the task
+      // derivation kept using a literal 0.
+      const autoTopOffAfterDca = await program.account.autoTopOffV0.fetch(
+        autoTopOff
+      );
+      expect(autoTopOffAfterDca.dcaIndex).to.equal(
+        1,
+        "dca_index should advance once per DCA created"
+      );
+
+      const nextHntTaskAcc = await tuktukProgram.account.taskV0.fetch(
+        autoTopOffAfterDca.nextHntTask
+      );
+      const nextTaskAccounts =
+        nextHntTaskAcc.transaction.compiledV0![0].accounts.map((a) =>
+          a.toBase58()
+        );
+      expect(nextTaskAccounts).to.include(
+        dcaKey(autoTopOff, dcaMint, hntMint, 1)[0].toBase58(),
+        "next HNT task must target the next DCA slot"
+      );
+      expect(nextTaskAccounts).to.not.include(
+        dcaKey(autoTopOff, dcaMint, hntMint, 0)[0].toBase58(),
+        "next HNT task must not reuse the slot the last DCA occupied"
       );
     });
 

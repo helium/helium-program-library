@@ -270,6 +270,7 @@ pub fn handler<'info>(
       let swap_amount_per_order = auto_top_off.dca_swap_amount;
       let interval_seconds = auto_top_off.dca_interval_seconds;
       let dca_signer = auto_top_off.dca_signer;
+      let dca_index = auto_top_off.dca_index;
       drop(auto_top_off);
 
       // Calculate rent needed for DCA account and associated token account
@@ -322,7 +323,7 @@ pub fn handler<'info>(
           seeds,
         ),
         InitializeDcaArgsV0 {
-          index: 0,
+          index: dca_index,
           num_orders: num_orders as u32,
           swap_amount_per_order,
           interval_seconds,
@@ -337,6 +338,11 @@ pub fn handler<'info>(
       // Add DCA tasks to our task list
       let result_tasks = dca_result.get();
       dca_tasks.extend(result_tasks.tasks.clone());
+
+      // Advance the slot before the next task is compiled below, so the next run targets a fresh
+      // PDA whether or not this DCA drains and closes. `init` on an occupied PDA fails, and that
+      // failure would take the no-reschedule path and stop the HNT leg.
+      ctx.accounts.auto_top_off.load_mut()?.dca_index = dca_index.wrapping_add(1);
     }
   }
 
