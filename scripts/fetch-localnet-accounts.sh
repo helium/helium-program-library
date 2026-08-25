@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Populate the account dumps that Anchor.toml's [[test.validator.account]] entries
-# reference, so localnet starts from local files instead of cloning at boot. Anchor.toml
+# Populate the dumps that Anchor.toml's [[test.validator.account]] and [[test.genesis]]
+# entries reference, so localnet starts from local files instead of cloning at boot. Anchor.toml
 # is the only source of truth: both the addresses and the destination paths are read
 # from it, so the two cannot drift.
 set -euo pipefail
