@@ -9,9 +9,9 @@ export const DEFAULT_MAX_RESUBMISSIONS = 10;
  * this per-batch window is what stops one batch from being resubmitted on
  * every tick of every replica.
  */
-export function resubmissionBackoffMs(resubmissionCount: number): number {
+export const resubmissionBackoffMs = (resubmissionCount: number): number => {
   return Math.min(
     RESUBMISSION_BACKOFF_BASE_MS * 2 ** Math.max(resubmissionCount - 1, 0),
     RESUBMISSION_BACKOFF_CAP_MS,
   );
-}
+};

@@ -11,15 +11,14 @@ export interface SolTransferPlan {
  * The fee payer signs and funds every transaction in the bundle, so the source
  * keeps nothing back for fees or rent and its whole balance is transferable.
  */
-export function planSolTransfer(
-  mint: string,
+export const planSolTransfer = (
   requestedLamports: bigint,
   liveBalanceLamports: bigint,
-): SolTransferPlan {
+): SolTransferPlan => {
   if (liveBalanceLamports <= BigInt(0)) {
     return {
       lamports: null,
-      warning: `Skipping ${mint}: no balance to migrate`,
+      warning: "Skipping SOL transfer: no balance to migrate",
     };
   }
 
@@ -31,4 +30,4 @@ export function planSolTransfer(
   }
 
   return { lamports: requestedLamports };
-}
+};

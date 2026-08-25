@@ -230,7 +230,6 @@ export const migrate = publicProcedure.migration.migrate.handler(
         const requested = BigInt(token.amount);
         if (requested <= BigInt(0)) continue;
         const { lamports, warning } = planSolTransfer(
-          token.mint,
           requested,
           remainingSourceLamports,
         );
