@@ -7,6 +7,10 @@ import { defineAssociations } from "../models/associations";
 import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
+import {
+  DEFAULT_MAX_RESUBMISSIONS,
+  resubmissionBackoffMs,
+} from "./resubmission-backoff";
 import { submitTransactionBatch } from "./transaction-submission";
 import { checkAndUpdateBatchStatus } from "./transaction-status-checker";
 
@@ -21,13 +25,15 @@ export interface ResubmissionResult {
   newSignatures?: string[];
   error?: string;
   batchId: string;
+  /** The batch lost the atomic claim: another replica holds it, it is inside its backoff window / past its retry cap, or it is no longer pending. Expected, not a failure. */
+  ineligible?: boolean;
 }
 
 /**
  * Resubmit a single transaction that has expired or failed
  */
 export async function resubmitSingleTransaction(
-  pendingTx: PendingTransaction
+  pendingTx: PendingTransaction,
 ): Promise<ResubmissionResult> {
   if (!pendingTx.serializedTransaction) {
     return {
@@ -61,14 +67,14 @@ export async function resubmitSingleTransaction(
 
     // Deserialize and resubmit the transaction
     const transaction = VersionedTransaction.deserialize(
-      Buffer.from(pendingTx.serializedTransaction, "base64")
+      Buffer.from(pendingTx.serializedTransaction, "base64"),
     );
 
     const signature = await connection.sendRawTransaction(
       transaction.serialize(),
       {
         skipPreflight: true,
-      }
+      },
     );
 
     // Update the transaction record with new signature
@@ -91,7 +97,7 @@ export async function resubmitSingleTransaction(
     try {
       if (pendingTx.serializedTransaction) {
         const transaction = VersionedTransaction.deserialize(
-          Buffer.from(pendingTx.serializedTransaction, "base64")
+          Buffer.from(pendingTx.serializedTransaction, "base64"),
         );
         explorerUrl = getExplorerUrl(transaction);
         chewingGlassExplorerUrl = getChewingGlassExplorerUrl(transaction);
@@ -140,7 +146,7 @@ export async function resubmitSingleTransaction(
  */
 export async function resubmitTransactionBatch(
   batch: TransactionBatch,
-  pendingTransactions: PendingTransaction[]
+  pendingTransactions: PendingTransaction[],
 ): Promise<ResubmissionResult> {
   if (pendingTransactions.length === 0) {
     return {
@@ -161,7 +167,7 @@ export async function resubmitTransactionBatch(
 
   // Check if all transactions have serialized data
   const missingSerialized = pendingTransactions.filter(
-    (tx) => !tx.serializedTransaction
+    (tx) => !tx.serializedTransaction,
   );
   if (missingSerialized.length > 0) {
     return {
@@ -171,10 +177,55 @@ export async function resubmitTransactionBatch(
     };
   }
 
+  // Count the attempt before making it: an attempt that keeps throwing has to
+  // back off too. The WHERE re-checks the count we read, so the increment
+  // doubles as a compare-and-swap claim — a concurrent replica (or a client
+  // hammering transactions.resubmit) that already bumped the count loses the
+  // update and skips instead of double-submitting; the same predicate drops a
+  // batch that left "pending" between our status check and this claim.
+  // Written silently so updated_at stays the stale-batch reaper's clock.
+  const ineligible: ResubmissionResult = {
+    success: false,
+    error:
+      "Batch is not eligible for resubmission (backoff window or retry limit)",
+    batchId: batch.id,
+    ineligible: true,
+  };
+  if (batch.resubmissionCount >= DEFAULT_MAX_RESUBMISSIONS) {
+    return ineligible;
+  }
+  const cutoff = new Date(
+    Date.now() - resubmissionBackoffMs(batch.resubmissionCount),
+  );
+  if (batch.lastResubmittedAt && batch.lastResubmittedAt > cutoff) {
+    return ineligible;
+  }
+  const [claimed] = await TransactionBatch.update(
+    {
+      resubmissionCount: sequelize.literal("resubmission_count + 1"),
+      lastResubmittedAt: new Date(),
+    },
+    {
+      where: {
+        id: batch.id,
+        status: "pending",
+        resubmissionCount: batch.resubmissionCount,
+        [Op.or]: [
+          { lastResubmittedAt: null },
+          { lastResubmittedAt: { [Op.lte]: cutoff } },
+        ],
+      },
+      silent: true,
+    },
+  );
+  if (claimed === 0) {
+    return ineligible;
+  }
+
   try {
     // Prepare transactions for resubmission using existing submission logic
     const serializedTransactions = pendingTransactions.map(
-      (tx) => tx.serializedTransaction!
+      (tx) => tx.serializedTransaction!,
     );
 
     // Use the existing submission logic with the same parameters as the original batch
@@ -199,13 +250,10 @@ export async function resubmitTransactionBatch(
               signature: newSignature,
               status: "pending",
             },
-            { transaction: dbTransaction }
+            { transaction: dbTransaction },
           );
         }
       }
-
-      // Update batch status (no Jito bundle ID since we're not using Jito for resubmission)
-      await batch.update({ status: "pending" }, { transaction: dbTransaction });
 
       await dbTransaction.commit();
 
@@ -229,11 +277,11 @@ export async function resubmitTransactionBatch(
         // Limit to first 3 to avoid too much data
         if (pendingTx.serializedTransaction) {
           const transaction = VersionedTransaction.deserialize(
-            Buffer.from(pendingTx.serializedTransaction, "base64")
+            Buffer.from(pendingTx.serializedTransaction, "base64"),
           );
           explorerLinks.push(getExplorerUrl(transaction));
           chewingGlassExplorerLinks.push(
-            getChewingGlassExplorerUrl(transaction)
+            getChewingGlassExplorerUrl(transaction),
           );
         }
       }
@@ -284,7 +332,11 @@ export async function resubmitTransactionBatch(
 
 /**
  * Get all pending transactions that need resubmission
- * Excludes Jito bundles since they cannot be resubmitted
+ * Excludes Jito bundles since they cannot be resubmitted. The retry cap and the
+ * backoff window are enforced by the atomic claim in resubmitTransactionBatch,
+ * not here, so that a batch inside its backoff window (or past its retry cap)
+ * is still selected and status-checked instead of sitting "pending" until the
+ * stale-batch reaper picks it up.
  */
 export async function getPendingTransactionsForResubmission(): Promise<{
   batches: Array<{
@@ -334,7 +386,7 @@ async function expirePendingBatch(batch: TransactionBatch): Promise<void> {
       {
         where: { batchId: batch.id, status: "pending" },
         transaction: dbTransaction,
-      }
+      },
     );
     batch.status = "expired";
     await batch.save({ transaction: dbTransaction });
