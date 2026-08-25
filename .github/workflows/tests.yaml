@@ -18,6 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
+      # Every other job takes its compiler from setup-anchor's `rustup default 1.85.0`; this one
+      # does not run setup-anchor, so without a version here it takes whatever the runner image
+      # ships and the gate drifts away from the code. It cannot simply reuse 1.85.0: the clippy
+      # flags below name lints that only exist in a later release, and an unknown lint is itself
+      # an error under `-D warnings`. Bump this deliberately, and expect new lints when you do.
+      - run: rustup install 1.98.0 --component clippy,rustfmt --profile minimal && rustup default 1.98.0
       - uses: actions/cache@v4
         name: Cache Cargo registry + index
         id: cache-cargo-build
