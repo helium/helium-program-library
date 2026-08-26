@@ -29,7 +29,6 @@ import {
 import { BankrunProvider } from "anchor-bankrun";
 import { ProgramTestContext } from "solana-bankrun";
 import { expect } from "chai";
-import { createHash } from "crypto";
 import { autoTopOffKey, queueAuthorityKey } from "../packages/dc-auto-top-sdk/src";
 import { dcaKey } from "../packages/tuktuk-dca-sdk/src/pdas";
 import { DcAutoTop } from "../target/types/dc_auto_top";
@@ -61,47 +60,12 @@ const USDC_PRICE_FEED = new PublicKey(
   "6HAuqASbHEh4w4REJEUUUCginTLfj1kwCh215ZLtMkrT"
 );
 
-/**
- * `AutoTopOffV0` field offsets, discriminator included. Reaching the rent-shortfall branch
- * needs an account holding barely more than its own rent exemption, and
- * `initialize_auto_top_off_v0` funds one properly, so the state is written directly rather
- * than produced. `state.rs`'s layout test pins these same offsets from the Rust side.
- */
-const OFF = {
-  authority: 8,
-  dataCredits: 40,
-  taskQueue: 72,
-  subDao: 104,
-  nextTask: 136,
-  nextHntTask: 168,
-  delegatedDataCredits: 200,
-  dcMint: 232,
-  hntMint: 264,
-  dao: 296,
-  hntPriceOracle: 328,
-  hntAccount: 360,
-  dcAccount: 392,
-  escrowAccount: 424,
-  circuitBreaker: 456,
-  bump: 488,
-  queueAuthorityBump: 489,
-  dcaIndex: 490,
-  threshold: 496,
-  schedule: 504,
-  dcaUrl: 632,
-  dcaSigner: 760,
-  hntThreshold: 792,
-  dcaMint: 800,
-  dcaMintAccount: 832,
-  dcaSwapAmount: 864,
-  dcaIntervalSeconds: 872,
-  dcaInputPriceOracle: 880,
-  dca: 912,
-  SIZE: 944,
+/** A fixed-width byte array field, as the IDL declares it. */
+const padded = (text: string, width: number) => {
+  const buf = Buffer.alloc(width);
+  Buffer.from(text).copy(buf);
+  return [...buf];
 };
-
-const discriminator = (name: string) =>
-  createHash("sha256").update(`account:${name}`).digest().subarray(0, 8);
 
 describe("dc-auto-topoff under bankrun", () => {
   let ctx: ProgramTestContext;
@@ -115,9 +79,16 @@ describe("dc-auto-topoff under bankrun", () => {
 
   const queueAuthority = queueAuthorityKey()[0];
 
+  const lamportsOf = async (address: PublicKey) =>
+    Number((await ctx.banksClient.getAccount(address))!.lamports);
+
   const send = (instructions: anchor.web3.TransactionInstruction[]) =>
     provider.sendAndConfirm(new Transaction().add(...instructions));
 
+  // spl-utils' createMint/createAtaAndMint are the obvious reuse here and do not work under
+  // bankrun: their existence check calls connection.getAccountInfo, which BankrunConnectionProxy
+  // throws from rather than returning null for a missing account. The idempotent instruction
+  // needs no such check, which is why mini-fanout-bankrun.ts builds these locally too.
   async function createMint(decimals: number): Promise<PublicKey> {
     const kp = Keypair.generate();
     const lamports =
@@ -228,35 +199,47 @@ describe("dc-auto-topoff under bankrun", () => {
     const hntAccount = await ataWith(hntMint, autoTopOff, 10_00000000n);
     const dcaMintAccount = await ataWith(dcaMint, autoTopOff, dcaMintFunding);
 
-    const data = Buffer.alloc(OFF.SIZE);
-    discriminator("AutoTopOffV0").copy(data, 0);
-    const put = (offset: number, key: PublicKey) => key.toBuffer().copy(data, offset);
-    put(OFF.authority, me);
-    put(OFF.taskQueue, taskQueue);
-    // next_task/next_hnt_task pointing at the account itself is the "nothing scheduled"
-    // sentinel schedule_task_v0 requires.
-    put(OFF.nextTask, autoTopOff);
-    put(OFF.nextHntTask, autoTopOff);
-    put(OFF.delegatedDataCredits, delegatedDataCredits);
-    put(OFF.hntMint, hntMint);
-    put(OFF.hntPriceOracle, HNT_PRICE_FEED);
-    put(OFF.hntAccount, hntAccount);
-    put(OFF.dcaMint, dcaMint);
-    put(OFF.dcaMintAccount, dcaMintAccount);
-    put(OFF.dcaInputPriceOracle, USDC_PRICE_FEED);
-    put(OFF.dcaSigner, Keypair.generate().publicKey);
-    data.writeUInt8(bump, OFF.bump);
-    data.writeUInt8(queueAuthorityKey()[1], OFF.queueAuthorityBump);
-    data.writeUInt16LE(0, OFF.dcaIndex);
-    Buffer.from("0 0 16 * * *").copy(data, OFF.schedule);
-    Buffer.from("http://localhost:8129/dca").copy(data, OFF.dcaUrl);
-    // 30 HNT wanted against 10 held, bought 250 units at a time.
-    data.writeBigUInt64LE(30_00000000n, OFF.hntThreshold);
-    data.writeBigUInt64LE(250_000000n, OFF.dcaSwapAmount);
-    data.writeBigUInt64LE(300n, OFF.dcaIntervalSeconds);
+    // Encoded by the program's own coder rather than by hand: AutoTopOffV0 is self-padded,
+    // so borsh and its repr(C) layout agree, and a second copy of the layout here would be
+    // one `state.rs` does not pin.
+    const data = await program.coder.accounts.encode("autoTopOffV0", {
+      authority: me,
+      dataCredits: PublicKey.default,
+      taskQueue,
+      subDao: PublicKey.default,
+      // next_task/next_hnt_task pointing at the account itself is the "nothing scheduled"
+      // sentinel schedule_task_v0 requires.
+      nextTask: autoTopOff,
+      nextHntTask: autoTopOff,
+      delegatedDataCredits,
+      dcMint: PublicKey.default,
+      hntMint,
+      dao: PublicKey.default,
+      hntPriceOracle: HNT_PRICE_FEED,
+      hntAccount,
+      dcAccount: PublicKey.default,
+      escrowAccount: PublicKey.default,
+      circuitBreaker: PublicKey.default,
+      bump,
+      queueAuthorityBump: queueAuthorityKey()[1],
+      dcaIndex: 0,
+      reserved: [0, 0, 0, 0],
+      threshold: new anchor.BN(0),
+      schedule: padded("0 0 16 * * *", 128),
+      dcaUrl: padded("http://localhost:8129/dca", 128),
+      dcaSigner: Keypair.generate().publicKey,
+      // 30 HNT wanted against 10 held, bought 250 units at a time.
+      hntThreshold: new anchor.BN(30_00000000),
+      dcaMint,
+      dcaMintAccount,
+      dcaSwapAmount: new anchor.BN(250_000000),
+      dcaIntervalSeconds: new anchor.BN(300),
+      dcaInputPriceOracle: USDC_PRICE_FEED,
+      dca: PublicKey.default,
+    });
 
     const rentExempt =
-      await provider.connection.getMinimumBalanceForRentExemption(OFF.SIZE);
+      await provider.connection.getMinimumBalanceForRentExemption(data.length);
     ctx.setAccount(autoTopOff, {
       lamports: rentExempt + spendableLamports,
       data,
@@ -306,6 +289,10 @@ describe("dc-auto-topoff under bankrun", () => {
 
     const after = await program.account.autoTopOffV0.fetch(autoTopOff);
     expect(after.dcaIndex).to.equal(1, "the slot should advance once per DCA");
+    expect(after.dca.toBase58()).to.equal(
+      dcaKey(autoTopOff, dcaMint, hntMint, 0)[0].toBase58(),
+      "dca should name the DCA just created, not a slot that has since closed"
+    );
     expect(
       await readAccount(ctx, dcaKey(autoTopOff, dcaMint, hntMint, 0)[0]),
       "the DCA should have been created in slot 0"
@@ -320,7 +307,15 @@ describe("dc-auto-topoff under bankrun", () => {
 
     const task = await tuktukProgram.account.taskV0.fetch(hntTask);
     await warpTo(ctx, BigInt(task.trigger.timestamp![0].toString()) + 1n);
+    const before = await lamportsOf(autoTopOff);
     await crank(hntTask);
+
+    // The reward was debited for two tasks because a DCA was wanted; one task was returned,
+    // so exactly one min_crank_reward (1 in this queue) should have left the account.
+    expect(await lamportsOf(autoTopOff)).to.equal(
+      before - 1,
+      "the unused task's crank reward should have been returned"
+    );
 
     const after = await program.account.autoTopOffV0.fetch(autoTopOff);
     expect(after.nextHntTask.toBase58()).to.not.equal(

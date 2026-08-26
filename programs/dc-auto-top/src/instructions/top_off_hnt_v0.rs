@@ -383,9 +383,23 @@ pub fn handler<'info>(
         // Advance the slot before the next task is compiled below, so the next run targets a
         // fresh PDA whether or not this DCA drains and closes. `init` on an occupied PDA fails,
         // and that failure would take the no-reschedule path and stop the HNT leg.
-        ctx.accounts.auto_top_off.load_mut()?.dca_index = dca_index.wrapping_add(1);
+        //
+        // `dca` names the DCA this account is currently feeding. Nothing else advances it, so
+        // leaving it behind would point it at a slot that has since closed or been abandoned.
+        let mut auto_top_off = ctx.accounts.auto_top_off.load_mut()?;
+        auto_top_off.dca_index = dca_index.wrapping_add(1);
+        auto_top_off.dca = ctx.accounts.dca.key();
       }
     }
+  }
+
+  // The crank reward above was sized for two tasks because a DCA was wanted. Every path that
+  // wants one and does not start it returns only the topoff task, so the second reward is
+  // returned rather than left with the queue: those are the paths taken when the account is
+  // short of lamports or dca_mint, which is when it can least afford to leak either.
+  if needs_dca && dca_tasks.is_empty() {
+    ctx.accounts.task_queue.sub_lamports(min_crank_reward)?;
+    auto_top_off_info.add_lamports(min_crank_reward)?;
   }
 
   // Schedule next HNT topoff task
