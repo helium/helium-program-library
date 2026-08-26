@@ -138,7 +138,7 @@ pub fn get_task_ix_hnt(
       auto_top_off_key.as_ref(),
       auto_top_off.dca_mint.as_ref(),
       auto_top_off.hnt_mint.as_ref(),
-      0_u16.to_le_bytes().as_ref(),
+      auto_top_off.dca_index.to_le_bytes().as_ref(),
     ],
     &tuktuk_dca::ID,
   )

@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.19
+
+### Patch Changes
+
+- [#1267](https://github.com/helium/helium-program-library/pull/1267) [`cf20cc3`](https://github.com/helium/helium-program-library/commit/cf20cc3405a7373d3b078cf8d4f1c7f17e874ea3) Thanks [@bryzettler](https://github.com/bryzettler)! - Remove the pyth_hnt_legacy_cron SOL-balance gauge; the legacy pyth crank is decommissioned
+
 ## 0.11.18
 
 ### Patch Changes
