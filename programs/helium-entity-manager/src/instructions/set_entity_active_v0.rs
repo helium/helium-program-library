@@ -43,8 +43,7 @@ pub fn handler(ctx: Context<SetEntityActiveV0>, args: SetEntityActiveArgsV0) -> 
     && (ctx.accounts.rewardable_entity_config.symbol == "IOT" || TESTING);
 
   let mut info_data = ctx.accounts.info.try_borrow_mut_data()?;
-  let dc_fee: u64;
-  if is_iot {
+  let dc_fee: u64 = if is_iot {
     let mut info = IotHotspotInfoV0::try_deserialize(&mut info_data.as_ref())?;
     let expected_pda = Pubkey::create_program_address(
       iot_info_seeds!(info, ctx.accounts.rewardable_entity_config, args.entity_key),
@@ -60,7 +59,7 @@ pub fn handler(ctx: Context<SetEntityActiveV0>, args: SetEntityActiveArgsV0) -> 
     }
     info.is_active = args.is_active;
     info.try_serialize(&mut *info_data)?;
-    dc_fee = info.dc_onboarding_fee_paid;
+    info.dc_onboarding_fee_paid
   } else if is_mobile {
     let mut info = MobileHotspotInfoV0::try_deserialize(&mut info_data.as_ref())?;
     let expected_pda = Pubkey::create_program_address(
@@ -77,10 +76,10 @@ pub fn handler(ctx: Context<SetEntityActiveV0>, args: SetEntityActiveArgsV0) -> 
     }
     info.is_active = args.is_active;
     info.try_serialize(&mut *info_data)?;
-    dc_fee = info.dc_onboarding_fee_paid;
+    info.dc_onboarding_fee_paid
   } else {
     return Err(ErrorCode::InvalidSettings.into());
-  }
+  };
 
   track_dc_onboarding_fees_v0(
     CpiContext::new_with_signer(
