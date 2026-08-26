@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.23
+
+### Patch Changes
+
+- [#1271](https://github.com/helium/helium-program-library/pull/1271) [`a51205a`](https://github.com/helium/helium-program-library/commit/a51205a1b1c1c6b64386fd26a8ba693d41ada14e) Thanks [@madninja](https://github.com/madninja)! - Seed the dc-auto-top DCA PDA from a per-account `dca_index` instead of a hardcoded `0`, so a DCA that fails to drain and close no longer occupies the slot the next top-off needs. `dca_index` is carved out of `AutoTopOffV0.reserved`, leaving every other field at its existing byte offset.
+
 ## 0.11.22
 
 ### Patch Changes
