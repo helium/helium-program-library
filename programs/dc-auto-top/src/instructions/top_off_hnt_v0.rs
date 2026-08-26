@@ -286,21 +286,44 @@ pub fn handler<'info>(
       let total_rent = dca_rent + ata_rent;
       let rent_needed = total_rent.saturating_sub(ctx.accounts.dca_custom_signer.lamports());
 
+      // Both inputs are checked for the same reason: the run either affords the whole DCA or
+      // does not start it. Anything short reverts the run, and a reverted run never
+      // reschedules, so a shortfall would stop the leg rather than skip a day.
+      //
       // A DCA refunds its rent to the custom signer when it drains and closes, so in steady
       // state rent_needed is 0. An abandoned DCA never refunds, so each replacement draws
-      // fresh rent from here. Debiting past rent exemption fails the whole run, which stops
-      // the leg; skipping the DCA leaves it rescheduling and buys time to refill. Mirrors the
-      // crank-reward check above.
-      let affordable = auto_top_off_info.lamports().saturating_sub(min_rent_exempt) >= rent_needed;
-      if !affordable {
+      // fresh rent from here.
+      let spendable = auto_top_off_info.lamports().saturating_sub(min_rent_exempt);
+      let rent_ok = spendable >= rent_needed;
+      if !rent_ok {
         msg!(
           "Skipping DCA: needs {} lamports rent, {} available above rent exemption",
           rent_needed,
-          auto_top_off_info.lamports().saturating_sub(min_rent_exempt)
+          spendable
         );
       }
 
-      if affordable {
+      // initialize_dca_nested_v0 moves the whole run's USDC up front and takes the order count
+      // as a u32, so a count that does not fit is as unfundable as a balance that falls short.
+      let plan = u32::try_from(num_orders)
+        .ok()
+        .and_then(|orders| {
+          Some((
+            orders,
+            swap_amount_per_order.checked_mul(u64::from(orders))?,
+          ))
+        })
+        .filter(|(_, usdc_needed)| ctx.accounts.dca_mint_account.amount >= *usdc_needed);
+      if plan.is_none() {
+        msg!(
+          "Skipping DCA: {} orders at {} each exceeds the {} dca_mint available",
+          num_orders,
+          swap_amount_per_order,
+          ctx.accounts.dca_mint_account.amount
+        );
+      }
+
+      if let (true, Some((orders, _))) = (rent_ok, plan) {
         // Transfer SOL from auto_top_off to custom signer for DCA rent
         ctx.accounts.auto_top_off.sub_lamports(rent_needed)?;
         ctx.accounts.dca_custom_signer.add_lamports(rent_needed)?;
@@ -342,7 +365,7 @@ pub fn handler<'info>(
           ),
           InitializeDcaArgsV0 {
             index: dca_index,
-            num_orders: num_orders as u32,
+            num_orders: orders,
             swap_amount_per_order,
             interval_seconds,
             slippage_bps_from_oracle: 500, // 5% slippage

@@ -208,7 +208,8 @@ describe("dc-auto-topoff under bankrun", () => {
    */
   async function autoTopOffWith(
     spendableLamports: number,
-    swapPayerLamports = 0
+    swapPayerLamports = 0,
+    dcaMintFunding = 1_000_000_000n
   ) {
     // Set rather than transfer, and set it every time: the payer is one PDA shared by every
     // scenario, and rent_needed is measured against its balance, so a leftover balance from
@@ -225,7 +226,7 @@ describe("dc-auto-topoff under bankrun", () => {
     const delegatedDataCredits = Keypair.generate().publicKey;
     const [autoTopOff, bump] = autoTopOffKey(delegatedDataCredits, me);
     const hntAccount = await ataWith(hntMint, autoTopOff, 10_00000000n);
-    const dcaMintAccount = await ataWith(dcaMint, autoTopOff, 1_000_000_000n);
+    const dcaMintAccount = await ataWith(dcaMint, autoTopOff, dcaMintFunding);
 
     const data = Buffer.alloc(OFF.SIZE);
     discriminator("AutoTopOffV0").copy(data, 0);
@@ -309,6 +310,31 @@ describe("dc-auto-topoff under bankrun", () => {
       await readAccount(ctx, dcaKey(autoTopOff, dcaMint, hntMint, 0)[0]),
       "the DCA should have been created in slot 0"
     ).to.not.equal(null);
+  });
+
+  it("skips the DCA rather than reverting when the USDC is short", async () => {
+    // initialize_dca_nested_v0 moves the whole run's USDC up front, so a short balance fails
+    // the transfer, fails the CPI, and reverts the run -- which never reschedules. The DCA is
+    // sized against a 20 HNT gap, so a single unit of dca_mint cannot cover any of it.
+    const { autoTopOff, hntTask } = await autoTopOffWith(50_000_000, 1_000_000_000, 1n);
+
+    const task = await tuktukProgram.account.taskV0.fetch(hntTask);
+    await warpTo(ctx, BigInt(task.trigger.timestamp![0].toString()) + 1n);
+    await crank(hntTask);
+
+    const after = await program.account.autoTopOffV0.fetch(autoTopOff);
+    expect(after.nextHntTask.toBase58()).to.not.equal(
+      autoTopOff.toBase58(),
+      "leg should have rescheduled itself rather than stopping"
+    );
+    expect(after.dcaIndex).to.equal(
+      0,
+      "no DCA was created, so the slot should not advance"
+    );
+    expect(
+      await readAccount(ctx, dcaKey(autoTopOff, dcaMint, hntMint, 0)[0]),
+      "no DCA account should exist"
+    ).to.equal(null);
   });
 
   it("skips the DCA rather than debiting past rent exemption", async () => {
