@@ -152,7 +152,8 @@ pub fn handler(
       &tuktuk_dca::ID,
     )
     .0,
-    reserved: [0; 6],
+    dca_index: 0,
+    reserved: [0; 4],
   };
 
   Ok(())

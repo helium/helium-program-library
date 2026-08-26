@@ -339,6 +339,7 @@ jobs:
           - tests/mini-fanout-bankrun.ts
           - tests/welcome-pack.ts
           - tests/dc-auto-topoff.ts
+          - tests/dc-auto-topoff-bankrun.ts
           - tests/tuktuk-dca.ts
           - tests/priority-fees.ts
     steps:
