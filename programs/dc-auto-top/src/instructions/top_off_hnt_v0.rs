@@ -161,10 +161,13 @@ pub fn handler<'info>(
 
   let auto_top_off_info = ctx.accounts.auto_top_off.to_account_info();
   let min_rent_exempt = Rent::get()?.minimum_balance(auto_top_off_info.data_len());
-  if auto_top_off_info.lamports() - min_rent_exempt >= total_crank_reward {
+  if auto_top_off_info.lamports().saturating_sub(min_rent_exempt) >= total_crank_reward {
     auto_top_off_info.sub_lamports(total_crank_reward)?;
     ctx.accounts.task_queue.add_lamports(total_crank_reward)?;
   } else {
+    // The immutable borrow taken above is still live here; load_mut would fail on it and
+    // return AccountBorrowFailed instead of marking the leg unscheduled.
+    drop(auto_top_off);
     let mut auto_top_off = ctx.accounts.auto_top_off.load_mut()?;
     auto_top_off.next_hnt_task = auto_top_off_key;
     drop(auto_top_off);
@@ -270,6 +273,7 @@ pub fn handler<'info>(
       let swap_amount_per_order = auto_top_off.dca_swap_amount;
       let interval_seconds = auto_top_off.dca_interval_seconds;
       let dca_signer = auto_top_off.dca_signer;
+      let dca_index = auto_top_off.dca_index;
       drop(auto_top_off);
 
       // Calculate rent needed for DCA account and associated token account
@@ -282,62 +286,120 @@ pub fn handler<'info>(
       let total_rent = dca_rent + ata_rent;
       let rent_needed = total_rent.saturating_sub(ctx.accounts.dca_custom_signer.lamports());
 
-      // Transfer SOL from auto_top_off to custom signer for DCA rent
-      ctx.accounts.auto_top_off.sub_lamports(rent_needed)?;
-      ctx.accounts.dca_custom_signer.add_lamports(rent_needed)?;
+      // Both inputs are checked for the same reason: the run either affords the whole DCA or
+      // does not start it. Anything short reverts the run, and a reverted run never
+      // reschedules, so a shortfall would stop the leg rather than skip a day.
+      //
+      // A DCA refunds its rent to the custom signer when it drains and closes, so in steady
+      // state rent_needed is 0. An abandoned DCA never refunds, so each replacement draws
+      // fresh rent from here.
+      let spendable = auto_top_off_info.lamports().saturating_sub(min_rent_exempt);
+      let rent_ok = spendable >= rent_needed;
+      if !rent_ok {
+        msg!(
+          "Skipping DCA: needs {} lamports rent, {} available above rent exemption",
+          rent_needed,
+          spendable
+        );
+      }
 
-      msg!(
-        "Initializing DCA with {} orders, swap amount per order: {}, interval seconds: {}",
-        num_orders,
-        swap_amount_per_order,
-        interval_seconds
-      );
-      // Initialize new DCA using nested version (no tuktuk accounts needed)
-      let dca_result = initialize_dca_nested_v0(
-        CpiContext::new_with_signer(
-          ctx.accounts.tuktuk_dca_program.to_account_info(),
-          InitializeDcaNestedV0Accounts {
-            core: tuktuk_dca::cpi::accounts::InitializeDcaCore {
-              rent_payer: ctx.accounts.dca_custom_signer.to_account_info(),
-              dca_payer: ctx.accounts.auto_top_off.to_account_info(),
-              authority: ctx.accounts.auto_top_off.to_account_info(),
-              dca: ctx.accounts.dca.to_account_info(),
-              input_mint: ctx.accounts.dca_mint.to_account_info(),
-              output_mint: ctx.accounts.hnt_mint.to_account_info(),
-              destination_token_account: ctx
-                .accounts
-                .dca_destination_token_account
-                .to_account_info(),
-              input_price_oracle: ctx.accounts.dca_input_price_oracle.to_account_info(),
-              output_price_oracle: ctx.accounts.hnt_price_oracle.to_account_info(),
-              input_account: ctx.accounts.dca_input_account.to_account_info(),
-              dca_payer_account: ctx.accounts.dca_mint_account.to_account_info(),
-              task_queue: ctx.accounts.task_queue.to_account_info(),
-              system_program: ctx.accounts.system_program.to_account_info(),
-              associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
-              token_program: ctx.accounts.token_program.to_account_info(),
-            },
-            task: ctx.remaining_accounts[1].to_account_info(),
-          },
-          seeds,
-        ),
-        InitializeDcaArgsV0 {
-          index: 0,
-          num_orders: num_orders as u32,
+      // initialize_dca_nested_v0 moves the whole run's USDC up front and takes the order count
+      // as a u32, so a count that does not fit is as unfundable as a balance that falls short.
+      let plan = u32::try_from(num_orders)
+        .ok()
+        .and_then(|orders| {
+          Some((
+            orders,
+            swap_amount_per_order.checked_mul(u64::from(orders))?,
+          ))
+        })
+        .filter(|(_, usdc_needed)| ctx.accounts.dca_mint_account.amount >= *usdc_needed);
+      if plan.is_none() {
+        msg!(
+          "Skipping DCA: {} orders at {} each exceeds the {} dca_mint available",
+          num_orders,
           swap_amount_per_order,
-          interval_seconds,
-          slippage_bps_from_oracle: 500, // 5% slippage
-          task_id: 0,
-          // This isn't actually used, since we're running in tuktuk it doesn't need to queue.
-          dca_signer,
-          dca_url,
-        },
-      )?;
+          ctx.accounts.dca_mint_account.amount
+        );
+      }
 
-      // Add DCA tasks to our task list
-      let result_tasks = dca_result.get();
-      dca_tasks.extend(result_tasks.tasks.clone());
+      if let (true, Some((orders, _))) = (rent_ok, plan) {
+        // Transfer SOL from auto_top_off to custom signer for DCA rent
+        ctx.accounts.auto_top_off.sub_lamports(rent_needed)?;
+        ctx.accounts.dca_custom_signer.add_lamports(rent_needed)?;
+
+        msg!(
+          "Initializing DCA with {} orders, swap amount per order: {}, interval seconds: {}",
+          num_orders,
+          swap_amount_per_order,
+          interval_seconds
+        );
+        // Initialize new DCA using nested version (no tuktuk accounts needed)
+        let dca_result = initialize_dca_nested_v0(
+          CpiContext::new_with_signer(
+            ctx.accounts.tuktuk_dca_program.to_account_info(),
+            InitializeDcaNestedV0Accounts {
+              core: tuktuk_dca::cpi::accounts::InitializeDcaCore {
+                rent_payer: ctx.accounts.dca_custom_signer.to_account_info(),
+                dca_payer: ctx.accounts.auto_top_off.to_account_info(),
+                authority: ctx.accounts.auto_top_off.to_account_info(),
+                dca: ctx.accounts.dca.to_account_info(),
+                input_mint: ctx.accounts.dca_mint.to_account_info(),
+                output_mint: ctx.accounts.hnt_mint.to_account_info(),
+                destination_token_account: ctx
+                  .accounts
+                  .dca_destination_token_account
+                  .to_account_info(),
+                input_price_oracle: ctx.accounts.dca_input_price_oracle.to_account_info(),
+                output_price_oracle: ctx.accounts.hnt_price_oracle.to_account_info(),
+                input_account: ctx.accounts.dca_input_account.to_account_info(),
+                dca_payer_account: ctx.accounts.dca_mint_account.to_account_info(),
+                task_queue: ctx.accounts.task_queue.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
+                token_program: ctx.accounts.token_program.to_account_info(),
+              },
+              task: ctx.remaining_accounts[1].to_account_info(),
+            },
+            seeds,
+          ),
+          InitializeDcaArgsV0 {
+            index: dca_index,
+            num_orders: orders,
+            swap_amount_per_order,
+            interval_seconds,
+            slippage_bps_from_oracle: 500, // 5% slippage
+            task_id: 0,
+            // This isn't actually used, since we're running in tuktuk it doesn't need to queue.
+            dca_signer,
+            dca_url,
+          },
+        )?;
+
+        // Add DCA tasks to our task list
+        let result_tasks = dca_result.get();
+        dca_tasks.extend(result_tasks.tasks.clone());
+
+        // Advance the slot before the next task is compiled below, so the next run targets a
+        // fresh PDA whether or not this DCA drains and closes. `init` on an occupied PDA fails,
+        // and that failure would take the no-reschedule path and stop the HNT leg.
+        //
+        // `dca` names the DCA this account is currently feeding. Nothing else advances it, so
+        // leaving it behind would point it at a slot that has since closed or been abandoned.
+        let mut auto_top_off = ctx.accounts.auto_top_off.load_mut()?;
+        auto_top_off.dca_index = dca_index.wrapping_add(1);
+        auto_top_off.dca = ctx.accounts.dca.key();
+      }
     }
+  }
+
+  // The crank reward above was sized for two tasks because a DCA was wanted. Every path that
+  // wants one and does not start it returns only the topoff task, so the second reward is
+  // returned rather than left with the queue: those are the paths taken when the account is
+  // short of lamports or dca_mint, which is when it can least afford to leak either.
+  if needs_dca && dca_tasks.is_empty() {
+    ctx.accounts.task_queue.sub_lamports(min_crank_reward)?;
+    auto_top_off_info.add_lamports(min_crank_reward)?;
   }
 
   // Schedule next HNT topoff task

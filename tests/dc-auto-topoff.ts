@@ -41,6 +41,7 @@ import {
   queueAuthorityKey,
 } from "../packages/dc-auto-top-sdk/src";
 import { init as initTuktukDca } from "../packages/tuktuk-dca-sdk/src";
+import { dcaKey } from "../packages/tuktuk-dca-sdk/src/pdas";
 import { DataCredits } from "../target/types/data_credits";
 import { DcAutoTop } from "../target/types/dc_auto_top";
 import { TuktukDca } from "../target/types/tuktuk_dca";
@@ -757,6 +758,76 @@ describe("dc-auto-topoff", () => {
         "0",
         "All DCA mint tokens should be consumed"
       );
+
+      // A DCA that fails to drain and close leaves its PDA occupied, and `init` on an
+      // occupied PDA fails, which takes the no-reschedule path and stops the HNT leg. The
+      // slot therefore has to advance, and it has to advance *before* the next task is
+      // compiled -- a task compiled against the old slot would fail its seeds constraint
+      // when the next run passes the new index. Asserting the compiled account list is
+      // what pins the ordering; asserting dcaIndex alone would still pass if the task
+      // derivation kept using a literal 0.
+      const autoTopOffAfterDca = await program.account.autoTopOffV0.fetch(
+        autoTopOff
+      );
+      expect(autoTopOffAfterDca.dcaIndex).to.equal(
+        1,
+        "dca_index should advance once per DCA created"
+      );
+
+      const nextHntTaskAcc = await tuktukProgram.account.taskV0.fetch(
+        autoTopOffAfterDca.nextHntTask
+      );
+      const nextTaskAccounts =
+        nextHntTaskAcc.transaction.compiledV0![0].accounts.map((a) =>
+          a.toBase58()
+        );
+      expect(nextTaskAccounts).to.include(
+        dcaKey(autoTopOff, dcaMint, hntMint, 1)[0].toBase58(),
+        "next HNT task must target the next DCA slot"
+      );
+      expect(nextTaskAccounts).to.not.include(
+        dcaKey(autoTopOff, dcaMint, hntMint, 0)[0].toBase58(),
+        "next HNT task must not reuse the slot the last DCA occupied"
+      );
+    });
+
+    it("marks the leg unscheduled when it cannot fund the crank reward", async () => {
+      // top_off_hnt_v0 debits the crank reward from auto_top_off and, when it cannot do so
+      // while staying rent exempt, records next_hnt_task = auto_top_off rather than erroring:
+      // that marker is what distinguishes "no task scheduled" from "scheduled but not running".
+      // Reaching the branch means raising the queue minimum past what auto_top_off can spend,
+      // which is only possible because the queue's update authority is a test-held key.
+      // Fund HNT first so the DC leg has no unrelated reason to fail while the queue is raised.
+      await createAtaAndTransfer(provider, hntMint, 1000_00000000, me, autoTopOff);
+
+      const setMinCrankReward = async (minCrankReward: anchor.BN) =>
+        tuktukProgram.methods
+          .updateTaskQueueV0({
+            minCrankReward,
+            capacity: null,
+            lookupTables: null,
+            updateAuthority: null,
+            staleTaskAge: null,
+          })
+          .accounts({ payer: me, updateAuthority: me, taskQueue })
+          .rpc({ skipPreflight: true });
+
+      // Anything above auto_top_off's whole balance is comfortably above its balance less rent
+      // exemption, so the shortfall branch is taken for any num_tasks_used.
+      const autoTopOffLamports = await provider.connection.getBalance(autoTopOff);
+      await setMinCrankReward(new anchor.BN(autoTopOffLamports + 1));
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await runAllTasks();
+
+        const after = await program.account.autoTopOffV0.fetch(autoTopOff);
+        expect(after.nextHntTask.toBase58()).to.equal(
+          autoTopOff.toBase58(),
+          "leg should be marked unscheduled, not left pointing at a stale task"
+        );
+      } finally {
+        await setMinCrankReward(new anchor.BN(1));
+      }
     });
 
     it("should close the auto topoff", async () => {

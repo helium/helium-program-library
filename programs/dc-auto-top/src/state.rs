@@ -22,7 +22,10 @@ pub struct AutoTopOffV0 {
   pub circuit_breaker: Pubkey,
   pub bump: u8,
   pub queue_authority_bump: u8,
-  pub reserved: [u8; 6],
+  // Seeds the next DCA PDA. Advances once per DCA created, so a DCA that fails to drain and
+  // close never occupies the slot the next one needs.
+  pub dca_index: u16,
+  pub reserved: [u8; 4],
   pub threshold: u64,
   pub schedule: [u8; 128],
   pub dca_url: [u8; 128],
@@ -54,4 +57,31 @@ macro_rules! queue_authority_seeds {
   ( $queue_authority_bump:expr ) => {
     &[b"queue_authority".as_ref(), &[$queue_authority_bump]]
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use anchor_lang::Discriminator;
+
+  use super::*;
+
+  /// `dca_index` is carved out of `reserved`, so every other field must sit at the byte offset
+  /// it occupied before. Existing accounts are not migrated; they decode with `dca_index == 0`.
+  #[test]
+  fn layout_is_unchanged_for_existing_accounts() {
+    let v = <AutoTopOffV0 as bytemuck::Zeroable>::zeroed();
+    let base = &v as *const _ as usize;
+    let at = |p: *const u8| p as usize - base + AutoTopOffV0::DISCRIMINATOR.len();
+
+    assert_eq!(
+      std::mem::size_of::<AutoTopOffV0>(),
+      936,
+      "struct size moved"
+    );
+    assert_eq!(at(&v.dca_index as *const _ as *const u8), 490);
+    assert_eq!(at(&v.threshold as *const _ as *const u8), 496);
+    assert_eq!(at(&v.hnt_threshold as *const _ as *const u8), 792);
+    assert_eq!(at(&v.dca_mint_account as *const _ as *const u8), 832);
+    assert_eq!(at(&v.dca_input_price_oracle as *const _ as *const u8), 880);
+  }
 }

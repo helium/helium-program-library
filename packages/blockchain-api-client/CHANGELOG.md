@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.14.3
+
+### Patch Changes
+
+- [#1269](https://github.com/helium/helium-program-library/pull/1269) [`7dcdd47`](https://github.com/helium/helium-program-library/commit/7dcdd47419a0b71eef8f1ef4e5aacf35282d27bd) Thanks [@bryzettler](https://github.com/bryzettler)! - Widen transaction batch tags to TEXT, bound the contract tag at 1000 chars, back off per-batch resubmissions, and clamp migration SOL transfers to the live source balance
+
 ## 0.14.2
 
 ### Patch Changes

@@ -73,8 +73,7 @@ pub fn resize_to_fit_pda<'info, T: AccountSerialize + AccountDeserialize + Owner
   if new_size > old_size && (new_size - old_size) > MAX_PERMITTED_DATA_INCREASE {
     return Err(error!(ErrorCode::InvalidDataIncrease));
   }
-  let total_change;
-  if new_size > old_size {
+  let total_change = if new_size > old_size {
     let lamports_diff = new_minimum_balance.saturating_sub(account.to_account_info().lamports());
     msg!("Resizing to {} with lamports {}", new_size, lamports_diff);
     **payer.to_account_info().lamports.borrow_mut() = payer
@@ -85,7 +84,7 @@ pub fn resize_to_fit_pda<'info, T: AccountSerialize + AccountDeserialize + Owner
       .to_account_info()
       .lamports()
       .saturating_add(lamports_diff);
-    total_change = lamports_diff as i64;
+    lamports_diff as i64
   } else {
     let lamports_diff = new_minimum_balance.saturating_sub(account.to_account_info().lamports());
     msg!(
@@ -101,8 +100,8 @@ pub fn resize_to_fit_pda<'info, T: AccountSerialize + AccountDeserialize + Owner
       .to_account_info()
       .lamports()
       .saturating_sub(lamports_diff);
-    total_change = -(lamports_diff as i64);
-  }
+    -(lamports_diff as i64)
+  };
 
   account.to_account_info().realloc(new_size, false)?;
 
