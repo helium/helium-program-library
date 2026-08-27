@@ -772,6 +772,8 @@ export async function formTransaction({
     connection: provider.connection,
     basePriorityFee,
     ...fullDraft,
+    // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+    deriveLoadedAccountsDataSizeLimit: false,
   });
   const tx = toVersionedTx({
     ...fullDraft,
