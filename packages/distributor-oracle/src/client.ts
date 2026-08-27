@@ -553,6 +553,8 @@ export async function formBulkTransactions({
       addressLookupTableAddresses: [
         isDevnet ? HELIUM_COMMON_LUT_DEVNET : HELIUM_COMMON_LUT,
       ],
+      // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+      deriveLoadedAccountsDataSizeLimit: false,
     }
   );
   const initialTxs = initialTxDrafts.map(toVersionedTx);
@@ -770,6 +772,8 @@ export async function formTransaction({
     connection: provider.connection,
     basePriorityFee,
     ...fullDraft,
+    // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+    deriveLoadedAccountsDataSizeLimit: false,
   });
   const tx = toVersionedTx({
     ...fullDraft,

@@ -803,6 +803,8 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const batchOpts = {
       addressLookupTableAddresses: [lut],
       commitment: "finalized" as const,
+      // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+      deriveLoadedAccountsDataSizeLimit: false,
     };
 
     const addDrafts = (drafts: TransactionDraft[], description: string) => {

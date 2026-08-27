@@ -97,6 +97,8 @@ export const buildAutomationTransactionResponse = async ({
     await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
       addressLookupTableAddresses: [getHeliumLookupTable()],
       commitment: "finalized",
+      // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+      deriveLoadedAccountsDataSizeLimit: false,
     })
   ).map((tx) => toVersionedTx(tx));
 
