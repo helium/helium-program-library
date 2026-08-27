@@ -1,4 +1,5 @@
 ---
+"@helium/blockchain-api": patch
 "@helium/spl-utils": patch
 "@helium/distributor-oracle": patch
 "@helium/voter-stake-registry-hooks": patch
