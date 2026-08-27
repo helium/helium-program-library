@@ -822,6 +822,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
     commitment = "confirmed",
     // Leave unset to let withPriorityFees derive it from simulation.
     loadedAccountsDataSizeLimit,
+    // See withPriorityFees; set false for wallet-signed txs.
+    deriveLoadedAccountsDataSizeLimit,
   }: {
     commitment?: Commitment;
     // Manually specify limit instead of simulating
@@ -839,6 +841,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     // Optional parameter to limit number of instructions per transaction
     maxInstructionsPerTx?: number;
     loadedAccountsDataSizeLimit?: number;
+    deriveLoadedAccountsDataSizeLimit?: boolean;
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
@@ -876,6 +879,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
         addressLookupTables,
         feePayer: provider.wallet.publicKey,
         loadedAccountsDataSizeLimit,
+        deriveLoadedAccountsDataSizeLimit,
       });
       if (useFirstEstimateForAll) {
         // A sim-derived data-size limit was measured against THIS tx's

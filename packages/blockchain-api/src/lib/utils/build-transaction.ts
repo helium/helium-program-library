@@ -74,6 +74,9 @@ export async function buildVersionedTransaction({
       ...draftWithLuts,
       addressLookupTables,
       connection,
+      // The wallet signs this tx and may append guard ixs (Lighthouse) that
+      // load more account data than a sim-derived limit allows.
+      deriveLoadedAccountsDataSizeLimit: false,
     });
   } catch (error) {
     console.warn(
