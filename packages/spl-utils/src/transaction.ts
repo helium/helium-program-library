@@ -923,11 +923,18 @@ export async function batchInstructionsToTxsWithPriorityFee(
           microLamports: 1,
         }),
         // Probe must match the real tx's ix count or the size check
-        // under-measures and a full batch overflows maxTxSize. The ix is a
-        // fixed 5 bytes, so the placeholder value doesn't affect sizing.
-        setLoadedAccountsDataSizeLimit(
-          loadedAccountsDataSizeLimit ?? DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
-        ),
+        // mis-measures: under-counting overflows maxTxSize, over-counting
+        // splits early. The ix is a fixed 5 bytes, so the placeholder value
+        // doesn't affect sizing. Omit it when the real tx won't carry one.
+        ...(loadedAccountsDataSizeLimit != null ||
+        deriveLoadedAccountsDataSizeLimit !== false
+          ? [
+              setLoadedAccountsDataSizeLimit(
+                loadedAccountsDataSizeLimit ??
+                  DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
+              ),
+            ]
+          : []),
         ...currentTxInstructions,
       ],
       addressLookupTableAddresses: addressLookupTableAddresses || [],
