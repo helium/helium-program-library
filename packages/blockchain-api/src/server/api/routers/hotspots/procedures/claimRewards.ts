@@ -118,6 +118,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       // building transactions so the tx packer never splits a hotspot's
       // init/set/distribute ixs across a slice boundary.
       let allClaimable: Array<{ asset: PublicKey; entityKey: string }> = [];
+      const seenAssets = new Set<string>();
       let currentPage = 1;
       const totalPages = Math.ceil(total / limit);
 
@@ -178,12 +179,16 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
           );
 
         // Pagination is not stable across requests, so a hotspot can appear
-        // on two pages. A duplicate produces two identical transactions and
-        // Jito rejects the bundle ("must not contain any duplicate transactions").
-        const seen = new Set(allClaimable.map((h) => h.asset.toBase58()));
-        allClaimable.push(
-          ...pageClaimable.filter((h) => !seen.has(h.asset.toBase58())),
-        );
+        // on two pages. HotspotOwnership can also return one asset as several
+        // rows (composite PK), so duplicates can occur within a page too. A
+        // duplicate produces two identical transactions and Jito rejects the
+        // bundle ("must not contain any duplicate transactions").
+        for (const h of pageClaimable) {
+          const key = h.asset.toBase58();
+          if (seenAssets.has(key)) continue;
+          seenAssets.add(key);
+          allClaimable.push(h);
+        }
       }
 
       const hasMore = allClaimable.length > MAX_DIRECT_CLAIM_HOTSPOTS;
