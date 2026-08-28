@@ -26,7 +26,25 @@ export const get = publicProcedure.transactions.get.handler(
       throw errors.NOT_FOUND({ message: "Batch not found" });
     }
 
-    const result = await checkAndUpdateBatchStatus(batch, commitment);
+    let result: Awaited<ReturnType<typeof checkAndUpdateBatchStatus>>;
+    try {
+      result = await checkAndUpdateBatchStatus(batch, commitment);
+    } catch (error) {
+      // A transient RPC failure (e.g. a 500 from getBlockHeight) must not
+      // surface as a 500 to a client that is polling. Serve the stored state;
+      // the background job re-checks on its next tick.
+      console.error(`Status check failed for batch ${batch.id}:`, error);
+      result = {
+        batchStatus: batch.status,
+        confirmedCount: 0,
+        failedCount: 0,
+        transactionStatuses: (batch.transactions || []).map((tx) => ({
+          signature: tx.signature,
+          status: tx.status,
+          transaction: null,
+        })),
+      };
+    }
 
     return {
       batchId: batch.id,

@@ -177,7 +177,13 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
             withPending,
           );
 
-        allClaimable.push(...pageClaimable);
+        // Pagination is not stable across requests, so a hotspot can appear
+        // on two pages. A duplicate produces two identical transactions and
+        // Jito rejects the bundle ("must not contain any duplicate transactions").
+        const seen = new Set(allClaimable.map((h) => h.asset.toBase58()));
+        allClaimable.push(
+          ...pageClaimable.filter((h) => !seen.has(h.asset.toBase58())),
+        );
       }
 
       const hasMore = allClaimable.length > MAX_DIRECT_CLAIM_HOTSPOTS;

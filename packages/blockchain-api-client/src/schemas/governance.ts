@@ -218,7 +218,9 @@ export const AssignProxiesInputSchema = z.object({
   ),
   expirationTime: z
     .number()
-    .int()
+    // Clients compute this from Date.now() / 1000; floor rather than reject
+    // the fractional seconds.
+    .transform((n) => Math.floor(n))
     .describe("Unix timestamp when the proxy assignment expires"),
 });
 

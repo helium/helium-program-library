@@ -41,9 +41,8 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
 
     const [positionPubkey] = positionKey(positionMintPubkey);
 
-    const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
-      positionPubkey
-    );
+    const positionAcc =
+      await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
 
     if (!positionAcc) {
       throw errors.NOT_FOUND({ message: "Position not found" });
@@ -86,6 +85,13 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
       connection,
       hsdProgram,
     });
+
+    if (!claimResult.hasMore && claimResult.unclaimableEpochs.length > 0) {
+      const { epoch } = claimResult.unclaimableEpochs[0];
+      throw errors.BAD_REQUEST({
+        message: `Rewards for epoch ${epoch} have not been issued yet. Try undelegating again after they are issued.`,
+      });
+    }
 
     if (claimResult.hasMore) {
       const claimGroups: InstructionGroup[] =
