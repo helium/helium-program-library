@@ -1,6 +1,9 @@
 name: Blockchain API E2E Tests
 
 on:
+  # These path filters gate every job below, the 17-job e2e matrix included.
+  # The typecheck step resolves the workspace SDKs (spl-utils, the *-sdk
+  # packages, idls) too, so a change confined to those does not run it.
   push:
     branches: [master]
     paths:
@@ -38,8 +41,10 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # Unit tests need no chain, no secrets and no surfpool, so they run as their
-  # own job and report in about a minute rather than waiting on the matrix.
+  # Unit tests, typecheck and lint need no chain, no secrets and no surfpool,
+  # so they run as their own job and report in about a minute rather than
+  # waiting on the matrix. Tests run first so a lint or type failure cannot
+  # suppress the test signal.
   unit-tests:
     needs: build-idls
     runs-on: ubuntu-latest
@@ -61,6 +66,12 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test:unit
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint:check
 
   e2e-tests:
     needs: build-idls
