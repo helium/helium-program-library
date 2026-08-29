@@ -1,6 +1,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { env } from "@/lib/env";
 import { hasRewardContract } from "@/lib/queries/hotspots";
+import { assertAssetOwner } from "@/lib/utils/asset-ownership";
 import { proofArgsAndAccounts } from "@helium/spl-utils";
 import {
   getAssetIdFromPubkey,
@@ -75,21 +76,17 @@ export const resolveOwnedHotspotCnft = async ({
     });
   }
 
-  const ownerAddress =
-    typeof asset.ownership.owner === "string"
-      ? asset.ownership.owner
-      : asset.ownership.owner.toBase58();
-
   // In Squads propose mode the on-chain owner must be the multisig's vault
   // (walletAddress is only the proposing member); otherwise the wallet itself.
   const expectedOwner = multisigPda ? vaultPda(multisigPda) : payerPubkey;
-  if (ownerAddress !== expectedOwner.toBase58()) {
-    throw errors.UNAUTHORIZED({
-      message: multisigPda
-        ? "Multisig vault is not the owner of this hotspot"
-        : "Wallet is not the owner of this hotspot",
-    });
-  }
+  const ownerAddress = assertAssetOwner({
+    asset,
+    expectedOwner: expectedOwner.toBase58(),
+    message: multisigPda
+      ? "Multisig vault is not the owner of this hotspot"
+      : "Wallet is not the owner of this hotspot",
+    errors,
+  });
 
   const contractExists = await hasRewardContract(hotspotPubkey);
   if (contractExists) {

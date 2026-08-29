@@ -155,6 +155,7 @@ export const hotspotsContract = oc
       .errors({
         BAD_REQUEST: { message: "Invalid parameters", status: 400 },
         NOT_FOUND,
+        UNAUTHORIZED,
         INSUFFICIENT_FUNDS,
       }),
 
@@ -184,6 +185,7 @@ export const hotspotsContract = oc
       .errors({
         NOT_FOUND,
         BAD_REQUEST: { message: "Invalid split configuration", status: 400 },
+        UNAUTHORIZED,
         INSUFFICIENT_FUNDS,
       }),
 
@@ -198,6 +200,7 @@ export const hotspotsContract = oc
       .output(DeleteSplitOutputSchema)
       .errors({
         NOT_FOUND,
+        UNAUTHORIZED,
         INSUFFICIENT_FUNDS,
       }),
     /** Protected: Close automation */

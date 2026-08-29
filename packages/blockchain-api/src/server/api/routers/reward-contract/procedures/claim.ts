@@ -5,6 +5,11 @@ import {
   buildVersionedTransaction,
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
+import { assetOwnerAddress } from "@/lib/utils/asset-ownership";
+import {
+  CLAIM_APPROVAL_MESSAGES,
+  verifyClaimApproval,
+} from "@/lib/utils/claim-approval";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
 import {
   generateTransactionTag,
@@ -38,90 +43,103 @@ export const claim = publicProcedure.rewardContract.claim.handler(
     }
 
     const expirationTs = Math.floor(new Date(expiration).getTime() / 1000);
-    const currentTs = Math.floor(Date.now() / 1000);
-    if (currentTs > expirationTs) {
-      throw errors.BAD_REQUEST({ message: "Invite has expired" });
-    }
 
-    const signatureBytes = Buffer.from(delegateSignature, "base64");
-
-    const feePayerWallet = loadKeypair(process.env.FEE_PAYER_WALLET_PATH!);
-
-    const { provider, connection } = createSolanaConnection(
-      feePayerWallet.publicKey.toString()
-    );
+    // The lookups below only read accounts, so they run under the claimer's
+    // address. The fee payer's key is loaded further down, once the approval it
+    // would be spent on has been verified.
+    const { provider, connection } =
+      createSolanaConnection(signerWalletAddress);
     const assetEndpoint = env.ASSET_ENDPOINT || connection.rpcEndpoint;
     const assetPubkey = new PublicKey(assetId);
 
     const wpProgram = await initWelcomePack(provider);
-    const tuktukProgram = await initTuktuk(provider);
 
     const asset = await getAsset(assetEndpoint, assetPubkey);
     if (!asset) {
       throw errors.NOT_FOUND({ message: "Asset not found" });
     }
-    const assetOwner = new PublicKey(
-      typeof asset.ownership.owner === "string"
-        ? asset.ownership.owner
-        : asset.ownership.owner.toBase58()
-    );
+    const assetOwner = new PublicKey(assetOwnerAddress(asset));
 
-    // When asset is transferred to WelcomePack, assetOwner IS the pack address
-    const directWelcomePack =
-      await wpProgram.account.welcomePackV0.fetchNullable(assetOwner);
-    if (directWelcomePack && directWelcomePack.asset.equals(assetPubkey)) {
-      return buildClaimTransaction({
-        wpProgram,
-        tuktukProgram,
-        welcomePackK: assetOwner,
-        welcomePack: directWelcomePack,
-        assetEndpoint,
-        signerWalletAddress,
-        feePayerWallet,
-        expirationTs,
-        signatureBytes,
-        connection,
-        entityPubKey,
-        errors,
+    const found = await findWelcomePack({
+      wpProgram,
+      assetOwner,
+      assetPubkey,
+    });
+    if (!found) {
+      throw errors.NOT_FOUND({ message: "Reward contract not found." });
+    }
+
+    const approval = verifyClaimApproval({
+      uniqueId: found.welcomePack.uniqueId,
+      expirationTs,
+      owner: found.welcomePack.owner.toBytes(),
+      signatureBase64: delegateSignature,
+      now: Math.floor(Date.now() / 1000),
+    });
+    if (!approval.ok) {
+      throw errors.BAD_REQUEST({
+        message: CLAIM_APPROVAL_MESSAGES[approval.reason],
       });
     }
 
-    // Iteration fallback - assetOwner is a wallet with UserWelcomePacks
-    const [userWelcomePacksK] = userWelcomePacksKey(assetOwner);
-    const userWelcomePacks =
-      await wpProgram.account.userWelcomePacksV0.fetchNullable(
-        userWelcomePacksK
-      );
+    const feePayerWallet = loadKeypair(process.env.FEE_PAYER_WALLET_PATH!);
+    const tuktukProgram = await initTuktuk(provider);
 
-    if (userWelcomePacks) {
-      for (let i = 0; i < (userWelcomePacks.nextId || 0); i++) {
-        const [welcomePackK] = welcomePackKey(assetOwner, i);
-        const welcomePack = await wpProgram.account.welcomePackV0.fetchNullable(
-          welcomePackK
-        );
-
-        if (welcomePack && welcomePack.asset.equals(assetPubkey)) {
-          return buildClaimTransaction({
-            wpProgram,
-            tuktukProgram,
-            welcomePackK,
-            welcomePack,
-            assetEndpoint,
-            signerWalletAddress,
-            feePayerWallet,
-            expirationTs,
-            signatureBytes,
-            connection,
-            entityPubKey,
-            errors,
-          });
-        }
-      }
-    }
-
-    throw errors.NOT_FOUND({ message: "Reward contract not found." });
+    return buildClaimTransaction({
+      wpProgram,
+      tuktukProgram,
+      welcomePackK: found.welcomePackK,
+      welcomePack: found.welcomePack,
+      assetEndpoint,
+      signerWalletAddress,
+      feePayerWallet,
+      expirationTs,
+      signatureBytes: approval.signature,
+      connection,
+      entityPubKey,
+      errors,
+    });
   }
 );
+
+/**
+ * The welcome pack holding this asset, by either of the two ways the asset can
+ * be held: transferred to the pack itself, in which case the asset's owner is
+ * the pack, or still with a wallet that has packs of its own to search.
+ */
+async function findWelcomePack({
+  wpProgram,
+  assetOwner,
+  assetPubkey,
+}: {
+  wpProgram: Awaited<ReturnType<typeof initWelcomePack>>;
+  assetOwner: PublicKey;
+  assetPubkey: PublicKey;
+}) {
+  const directWelcomePack =
+    await wpProgram.account.welcomePackV0.fetchNullable(assetOwner);
+  if (directWelcomePack && directWelcomePack.asset.equals(assetPubkey)) {
+    return { welcomePackK: assetOwner, welcomePack: directWelcomePack };
+  }
+
+  const [userWelcomePacksK] = userWelcomePacksKey(assetOwner);
+  const userWelcomePacks =
+    await wpProgram.account.userWelcomePacksV0.fetchNullable(userWelcomePacksK);
+  if (!userWelcomePacks) {
+    return null;
+  }
+
+  for (let i = 0; i < (userWelcomePacks.nextId || 0); i++) {
+    const [welcomePackK] = welcomePackKey(assetOwner, i);
+    const welcomePack =
+      await wpProgram.account.welcomePackV0.fetchNullable(welcomePackK);
+    if (welcomePack && welcomePack.asset.equals(assetPubkey)) {
+      return { welcomePackK, welcomePack };
+    }
+  }
+
+  return null;
+}
 
 async function buildClaimTransaction({
   wpProgram,

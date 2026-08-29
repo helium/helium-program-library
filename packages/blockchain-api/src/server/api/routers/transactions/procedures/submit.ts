@@ -13,6 +13,7 @@ import {
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import { predictSubmissionType } from "@/lib/utils/submission-helpers";
+import { verifiedFeePayer } from "@/lib/utils/transaction-payer";
 import { v4 as uuidv4 } from "uuid";
 import {
   JitoMissingTipError,
@@ -193,16 +194,26 @@ export const submit = publicProcedure.transactions.submit.handler(
       });
     }
 
-    // Extract payer from the first transaction
-    let payer: string;
+    // Attribute the batch to the first transaction's fee payer. The payer is
+    // recorded as history and is read back as the account that acted, so it is
+    // taken from the signature rather than from the account list: submission
+    // skips preflight, so an unsigned transaction would otherwise be persisted
+    // under whatever account it names.
+    let firstTransaction: VersionedTransaction;
     try {
-      const firstTransaction = VersionedTransaction.deserialize(
+      firstTransaction = VersionedTransaction.deserialize(
         Buffer.from(transactions[0].serializedTransaction, "base64"),
       );
-      payer = firstTransaction.message.staticAccountKeys[0].toBase58();
     } catch {
       throw errors.BAD_REQUEST({
         message: "Failed to decode transaction to extract payer",
+      });
+    }
+
+    const payer = verifiedFeePayer(firstTransaction);
+    if (!payer) {
+      throw errors.BAD_REQUEST({
+        message: "Transaction is not signed by its fee payer",
       });
     }
 

@@ -4,6 +4,7 @@ import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { connectToDb } from "@/lib/utils/db";
 import { scheduleToUtcCron } from "@/lib/utils/misc";
 import animalName from "angry-purple-tiger";
+import { assertAssetOwner } from "@/lib/utils/asset-ownership";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
 import {
   initializeCompressionRecipient,
@@ -14,6 +15,7 @@ import {
 import { init as initMiniFanout } from "@helium/mini-fanout-sdk";
 import {
   batchInstructionsToTxsWithPriorityFee,
+  getAsset,
   HELIUM_COMMON_LUT,
   HELIUM_COMMON_LUT_DEVNET,
   HNT_MINT,
@@ -88,6 +90,22 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
         message: "Schedule frequency, time, and timezone are required",
       });
     }
+
+    // Only the owner may redirect a hotspot's rewards, so the check comes
+    // before anything is looked up or built on the caller's behalf.
+    const asset = await getAsset(
+      env.ASSET_ENDPOINT || env.SOLANA_RPC_URL,
+      new PublicKey(assetId)
+    );
+    if (!asset) {
+      throw errors.NOT_FOUND({ message: "Asset not found" });
+    }
+    assertAssetOwner({
+      asset,
+      expectedOwner: walletAddress,
+      message: "Wallet does not own this hotspot",
+      errors,
+    });
 
     // Build connection and programs
     const { provider, wallet } = createSolanaConnection(walletAddress);

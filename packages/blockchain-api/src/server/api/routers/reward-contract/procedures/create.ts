@@ -2,6 +2,7 @@ import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
 import { createSolanaConnection } from "@/lib/solana";
+import { assertAssetOwner } from "@/lib/utils/asset-ownership";
 import {
   calculateRequiredBalance,
   getTransactionFee,
@@ -87,16 +88,12 @@ export const create = publicProcedure.rewardContract.create.handler(
       throw errors.NOT_FOUND({ message: "Asset not found" });
     }
 
-    const ownerAddress =
-      typeof asset.ownership.owner === "string"
-        ? asset.ownership.owner
-        : asset.ownership.owner.toBase58();
-
-    if (ownerAddress !== signerWalletAddress) {
-      throw errors.UNAUTHORIZED({
-        message: "Wallet does not own the specified entity.",
-      });
-    }
+    assertAssetOwner({
+      asset,
+      expectedOwner: signerWalletAddress,
+      message: "Wallet does not own the specified entity.",
+      errors,
+    });
 
     const ldProgram = await initLd(provider);
     const instructions: TransactionInstruction[] = [];

@@ -91,6 +91,15 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       hntAmount: hntAmount || undefined,
     });
 
+    // The credits land on the recipient rather than the signer whenever one is
+    // named, so the signer is told which account before signing for it.
+    const recipientSuffix =
+      recipient && recipient !== owner ? ` to ${recipient}` : "";
+    const description =
+      (dcAmount
+        ? `Mint ${dcAmount} data credits`
+        : `Burn ${hntAmount} HNT bones for data credits`) + recipientSuffix;
+
     const transactions = txs.map((t) => {
       if (t.signers.length > 0) {
         t.tx.sign(t.signers);
@@ -99,9 +108,7 @@ export const mint = publicProcedure.dataCredits.mint.handler(
         serializedTransaction: serializeTransaction(t.tx),
         metadata: {
           type: "mint_data_credits",
-          description: dcAmount
-            ? `Mint ${dcAmount} data credits`
-            : `Burn ${hntAmount} HNT bones for data credits`,
+          description,
         },
       };
     });

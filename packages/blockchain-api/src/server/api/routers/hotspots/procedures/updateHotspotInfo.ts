@@ -1,6 +1,7 @@
 import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import { createSolanaConnection } from "@/lib/solana";
+import { assertAssetOwner } from "@/lib/utils/asset-ownership";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
@@ -269,16 +270,12 @@ export const updateHotspotInfo =
         throw errors.NOT_FOUND({ message: "Asset not found" });
       }
 
-      const ownerAddress =
-        typeof asset.ownership.owner === "string"
-          ? asset.ownership.owner
-          : asset.ownership.owner.toBase58();
-
-      if (ownerAddress !== walletAddress) {
-        throw errors.UNAUTHORIZED({
-          message: "Wallet does not own this hotspot",
-        });
-      }
+      assertAssetOwner({
+        asset,
+        expectedOwner: walletAddress,
+        message: "Wallet does not own this hotspot",
+        errors,
+      });
 
       const hemProgram = await initHemLocal(provider);
       const [keyToAssetK] = keyToAssetKey(HNT_DAO, entityPubKey);

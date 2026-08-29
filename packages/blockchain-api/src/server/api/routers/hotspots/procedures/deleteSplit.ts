@@ -4,8 +4,11 @@ import { AssetOwner } from "@/lib/models/hotspot";
 import { MiniFanout } from "@/lib/models/mini-fanout";
 import { Recipient } from "@/lib/models/recipient";
 import { createSolanaConnection } from "@/lib/solana";
+import { env } from "@/lib/env";
 import animalName from "angry-purple-tiger";
+import { assertAssetOwner } from "@/lib/utils/asset-ownership";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
+import { getAsset } from "@helium/spl-utils";
 import {
   init as initLd,
   updateCompressionDestination,
@@ -46,6 +49,22 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
     }
 
     const hotspotName = animalName(hotspotPubkey);
+
+    // Only the owner may remove a hotspot's split, so the check comes before
+    // the split is looked up: an unauthorized caller learns nothing about it.
+    const asset = await getAsset(
+      env.ASSET_ENDPOINT || env.SOLANA_RPC_URL,
+      new PublicKey(assetId)
+    );
+    if (!asset) {
+      throw errors.NOT_FOUND({ message: "Asset not found" });
+    }
+    assertAssetOwner({
+      asset,
+      expectedOwner: walletAddress,
+      message: "Wallet does not own this hotspot",
+      errors,
+    });
 
     // Find the hotspot
     const assetOwner = await AssetOwner.findOne({
