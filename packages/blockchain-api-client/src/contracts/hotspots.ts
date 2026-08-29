@@ -364,7 +364,7 @@ export const hotspotsContract = oc
         path: "/update-info",
         summary: "Update hotspot info",
         description:
-          "Creates an unsigned transaction to update hotspot configuration. Requires deviceType discriminant (iot or mobile) to select the correct update path and validate against on-chain network.",
+          "Creates an unsigned transaction to update hotspot configuration. Requires deviceType discriminant (iot or mobile) to select the correct update path and validate against on-chain network. feePayer selects who pays: maker (default, relayed through the onboarding server) or owner (built here, owner pays DC, rent and fees).",
       })
       .input(UpdateHotspotInfoInputSchema)
       .output(UpdateHotspotInfoOutputSchema)
@@ -372,6 +372,10 @@ export const hotspotsContract = oc
         NOT_FOUND,
         UNAUTHORIZED,
         BAD_REQUEST: { message: "Device type mismatch", status: 400 },
+        CONFLICT: {
+          message: "Hotspot cNFT is delegated to another authority",
+          status: 409,
+        },
         INSUFFICIENT_FUNDS,
       }),
   });

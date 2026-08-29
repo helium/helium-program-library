@@ -1,4 +1,9 @@
-import { Keypair, PublicKey } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  VersionedTransaction,
+} from "@solana/web3.js";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
@@ -139,6 +144,62 @@ describe("hotspot-updates", () => {
         data?.transactionData?.transactions?.[0]?.serializedTransaction
       ).to.be.a("string");
       expect(data?.appliedTo?.mobile).to.equal(true);
+
+      // #then tx submits successfully
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        ctx.payer
+      );
+    });
+
+    it("builds an owner-paid update when feePayer is owner", async () => {
+      // #given a Mobile hotspot the wallet owns
+      const entityPubKey = TEST_HOTSPOT_ENTITY_KEY;
+      const walletAddress = ctx.payer.publicKey.toBase58();
+
+      // #when asking for the update with the owner as fee payer
+      const { data, error } = await ctx.safeClient.hotspots.updateHotspotInfo({
+        deviceType: "mobile",
+        walletAddress,
+        entityPubKey,
+        feePayer: "owner",
+        deploymentInfo: {
+          type: "WIFI",
+          antenna: 2,
+          elevation: 11,
+          azimuth: 190,
+          mechanicalDownTilt: 6,
+          electricalDownTilt: 4,
+        },
+      });
+
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data?.appliedTo?.mobile).to.equal(true);
+
+      // #then the wallet is the sole signer and fee payer, and the DC would
+      // come out of its own DC account - no maker co-signature is involved.
+      const tx = VersionedTransaction.deserialize(
+        Buffer.from(
+          data.transactionData.transactions[0].serializedTransaction,
+          "base64"
+        )
+      );
+      expect(tx.message.header.numRequiredSignatures).to.equal(1);
+      expect(tx.message.staticAccountKeys[0].toBase58()).to.equal(
+        walletAddress
+      );
+      expect(
+        tx.message.staticAccountKeys.map((key) => key.toBase58())
+      ).to.include(
+        getAssociatedTokenAddressSync(
+          new PublicKey(TOKEN_MINTS.DC),
+          ctx.payer.publicKey,
+          true
+        ).toBase58()
+      );
 
       // #then tx submits successfully
       await signAndSubmitTransactionData(
