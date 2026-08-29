@@ -2,6 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
+  checkApprovalWindow,
   claimApprovalMessage,
   MAX_CLAIM_APPROVAL_SECONDS,
   verifyClaimApproval,
@@ -31,7 +32,7 @@ const SIGNATURE_BY_OTHER =
   "izvZY+3vc4EoavJ9ryybYEVW/KIb8ZxBjwbQjcSC5eYyALUW8S+lNCczg7RQda/CBPACEK3SABgw4DOmlLGNBA==";
 
 function check(
-  overrides: Partial<Parameters<typeof verifyClaimApproval>[0]> = {}
+  overrides: Partial<Parameters<typeof verifyClaimApproval>[0]> = {},
 ) {
   return verifyClaimApproval({
     uniqueId: UNIQUE_ID,
@@ -46,7 +47,7 @@ function check(
 describe("claimApprovalMessage", () => {
   it("spells the message the welcome-pack program rebuilds", () => {
     expect(claimApprovalMessage(UNIQUE_ID, EXPIRATION_TS)).to.equal(
-      "Approve invite 7 expiring 1800000000"
+      "Approve invite 7 expiring 1800000000",
     );
   });
 });
@@ -93,7 +94,7 @@ describe("verifyClaimApproval", () => {
     const tampered = Buffer.from(SIGNATURE, "base64");
     tampered[0] ^= 1;
     expect(
-      check({ signatureBase64: tampered.toString("base64") })
+      check({ signatureBase64: tampered.toString("base64") }),
     ).to.deep.equal({ ok: false, reason: "invalid_signature" });
   });
 
@@ -151,7 +152,68 @@ describe("verifyClaimApproval", () => {
     // signature says, so a caller cannot learn signature outcomes by sending
     // approvals the program would never accept.
     expect(
-      check({ now: EXPIRATION_TS + 1, signatureBase64: "" })
+      check({ now: EXPIRATION_TS + 1, signatureBase64: "" }),
     ).to.deep.equal({ ok: false, reason: "expired" });
+  });
+});
+
+describe("checkApprovalWindow", () => {
+  it("passes an expiry inside the window", () => {
+    expect(checkApprovalWindow({ expirationTs: EXPIRATION_TS, now: NOW })).to.be
+      .null;
+  });
+
+  it("refuses an expiry that is not a number", () => {
+    expect(checkApprovalWindow({ expirationTs: NaN, now: NOW })).to.equal(
+      "malformed_expiration",
+    );
+  });
+
+  it("refuses an expiry that has passed, and one expiring exactly now", () => {
+    expect(
+      checkApprovalWindow({
+        expirationTs: EXPIRATION_TS,
+        now: EXPIRATION_TS + 1,
+      }),
+    ).to.equal("expired");
+    expect(
+      checkApprovalWindow({ expirationTs: EXPIRATION_TS, now: EXPIRATION_TS }),
+    ).to.equal("expired");
+  });
+
+  it("refuses an expiry reaching past the program's window, at one second over", () => {
+    expect(
+      checkApprovalWindow({
+        expirationTs: NOW + MAX_CLAIM_APPROVAL_SECONDS + 1,
+        now: NOW,
+      }),
+    ).to.equal("window_too_long");
+    expect(
+      checkApprovalWindow({
+        expirationTs: NOW + MAX_CLAIM_APPROVAL_SECONDS,
+        now: NOW,
+      }),
+      "the bound itself is allowed",
+    ).to.be.null;
+  });
+
+  it("decides the same window rejections verifyClaimApproval reports", () => {
+    // One rule, so an endpoint checking the window early cannot answer
+    // differently from the full approval check that follows it.
+    const cases = [
+      { expirationTs: NaN, reason: "malformed_expiration" },
+      { expirationTs: NOW - 1, reason: "expired" },
+      {
+        expirationTs: NOW + MAX_CLAIM_APPROVAL_SECONDS + 1,
+        reason: "window_too_long",
+      },
+    ];
+    for (const { expirationTs, reason } of cases) {
+      expect(checkApprovalWindow({ expirationTs, now: NOW })).to.equal(reason);
+      expect(check({ expirationTs, now: NOW })).to.deep.equal({
+        ok: false,
+        reason,
+      });
+    }
   });
 });

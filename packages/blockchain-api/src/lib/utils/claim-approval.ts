@@ -18,18 +18,25 @@ export const MAX_CLAIM_APPROVAL_SECONDS = 30 * 24 * 60 * 60;
  */
 export function claimApprovalMessage(
   uniqueId: number,
-  expirationTs: number
+  expirationTs: number,
 ): string {
   return `Approve invite ${uniqueId} expiring ${expirationTs}`;
 }
 
 /** Why an approval was refused. Each endpoint maps these to its own errors. */
 export type ClaimApprovalRejection =
-  | "malformed_expiration"
-  | "expired"
-  | "window_too_long"
+  | ClaimApprovalWindowRejection
   | "malformed_signature"
   | "invalid_signature";
+
+/**
+ * The refusals that depend only on the expiry the caller supplied, and so can
+ * be decided before any account is read.
+ */
+export type ClaimApprovalWindowRejection =
+  | "malformed_expiration"
+  | "expired"
+  | "window_too_long";
 
 export type ClaimApprovalResult =
   | { ok: true; signature: Buffer }
@@ -47,6 +54,32 @@ export const CLAIM_APPROVAL_MESSAGES: Record<ClaimApprovalRejection, string> = {
   malformed_signature: "Invalid delegate signature",
   invalid_signature: "Invalid delegate signature",
 };
+
+/**
+ * The half of an approval that reads only the caller's own arguments. An
+ * endpoint calls this before it looks anything up, so a claim that cannot
+ * succeed costs no account reads and its refusal does not depend on whether the
+ * pack behind it still exists. `verifyClaimApproval` applies the same check, so
+ * the window and the signature over it are never decided by separate rules.
+ */
+export function checkApprovalWindow({
+  expirationTs,
+  now,
+}: {
+  expirationTs: number;
+  now: number;
+}): ClaimApprovalWindowRejection | null {
+  if (!Number.isSafeInteger(expirationTs)) {
+    return "malformed_expiration";
+  }
+  if (expirationTs <= now) {
+    return "expired";
+  }
+  if (expirationTs > now + MAX_CLAIM_APPROVAL_SECONDS) {
+    return "window_too_long";
+  }
+  return null;
+}
 
 /**
  * Check a claim approval before anything is built or signed on its behalf.
@@ -70,14 +103,9 @@ export function verifyClaimApproval({
   signatureBase64: string;
   now: number;
 }): ClaimApprovalResult {
-  if (!Number.isSafeInteger(expirationTs)) {
-    return { ok: false, reason: "malformed_expiration" };
-  }
-  if (expirationTs <= now) {
-    return { ok: false, reason: "expired" };
-  }
-  if (expirationTs > now + MAX_CLAIM_APPROVAL_SECONDS) {
-    return { ok: false, reason: "window_too_long" };
+  const windowRejection = checkApprovalWindow({ expirationTs, now });
+  if (windowRejection) {
+    return { ok: false, reason: windowRejection };
   }
 
   // Base64 decoding is lenient, so the length check is what rejects a signature
@@ -89,7 +117,7 @@ export function verifyClaimApproval({
 
   const message = Buffer.from(
     claimApprovalMessage(uniqueId, expirationTs),
-    "utf8"
+    "utf8",
   );
   if (!verifyEd25519(message, signature, owner)) {
     return { ok: false, reason: "invalid_signature" };

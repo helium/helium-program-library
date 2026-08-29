@@ -7,6 +7,7 @@ import {
 } from "@/lib/utils/build-transaction";
 import { assetOwnerAddress } from "@/lib/utils/asset-ownership";
 import {
+  checkApprovalWindow,
   CLAIM_APPROVAL_MESSAGES,
   verifyClaimApproval,
 } from "@/lib/utils/claim-approval";
@@ -37,12 +38,22 @@ export const claim = publicProcedure.rewardContract.claim.handler(
     const { entityPubKey, signerWalletAddress, delegateSignature, expiration } =
       input;
 
+    const expirationTs = Math.floor(new Date(expiration).getTime() / 1000);
+    const now = Math.floor(Date.now() / 1000);
+
+    // An expiry the program would not accept is refused on its own, before the
+    // lookups, so the answer is the same whether or not a pack is still there.
+    const windowRejection = checkApprovalWindow({ expirationTs, now });
+    if (windowRejection) {
+      throw errors.BAD_REQUEST({
+        message: CLAIM_APPROVAL_MESSAGES[windowRejection],
+      });
+    }
+
     const assetId = await getAssetIdFromPubkey(entityPubKey);
     if (!assetId) {
       throw errors.NOT_FOUND({ message: "Hotspot not found" });
     }
-
-    const expirationTs = Math.floor(new Date(expiration).getTime() / 1000);
 
     // The lookups below only read accounts, so they run under the claimer's
     // address. The fee payer's key is loaded further down, once the approval it
@@ -74,7 +85,7 @@ export const claim = publicProcedure.rewardContract.claim.handler(
       expirationTs,
       owner: found.welcomePack.owner.toBytes(),
       signatureBase64: delegateSignature,
-      now: Math.floor(Date.now() / 1000),
+      now,
     });
     if (!approval.ok) {
       throw errors.BAD_REQUEST({
@@ -99,7 +110,7 @@ export const claim = publicProcedure.rewardContract.claim.handler(
       entityPubKey,
       errors,
     });
-  }
+  },
 );
 
 /**
@@ -231,10 +242,10 @@ async function buildClaimTransaction({
           getAssociatedTokenAddressSync(
             rewardsMint,
             new PublicKey(signerWalletAddress),
-            true
+            true,
           ),
           new PublicKey(signerWalletAddress),
-          rewardsMint
+          rewardsMint,
         ),
       ],
       feePayer: feePayerWallet.publicKey,
@@ -265,7 +276,7 @@ async function buildClaimTransaction({
     },
     estimatedSolFee: await toTokenAmountOutput(
       new BN(0),
-      NATIVE_MINT.toBase58()
+      NATIVE_MINT.toBase58(),
     ),
   };
 }

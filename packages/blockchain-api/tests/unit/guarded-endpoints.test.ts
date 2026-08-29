@@ -63,22 +63,60 @@ describe("server code that calls a guard", () => {
       const loaded = callIndex(source, "loadKeypair");
 
       expect(verified, "verifyClaimApproval is not called").to.be.greaterThan(
-        -1
+        -1,
       );
       expect(loaded, "loadKeypair is not called").to.be.greaterThan(-1);
       expect(
         verified,
-        "the fee payer's key is loaded before the approval is verified"
+        "the fee payer's key is loaded before the approval is verified",
       ).to.be.lessThan(loaded);
     });
   }
+
+  for (const file of CLAIM_APPROVAL_GUARDED) {
+    it(`${file} refuses on the approval window before it reads anything`, () => {
+      const source = code(file);
+      const bound = source.match(
+        /const\s+(\w+)\s*=\s*checkApprovalWindow\s*\(/,
+      );
+      expect(bound, "checkApprovalWindow's result is not bound").to.not.be.null;
+
+      // A window that is checked and then discarded reads as a guarded
+      // endpoint and refuses nothing.
+      expect(
+        source,
+        "the window result is computed and not thrown on",
+      ).to.match(
+        new RegExp(`if\\s*\\(\\s*${bound![1]}\\s*\\)\\s*\\{\\s*throw\\b`),
+      );
+
+      const checked = source.search(/\bcheckApprovalWindow\s*\(/);
+      const firstAwait = source.search(/\bawait\b/);
+      expect(firstAwait, "the handler awaits nothing").to.be.greaterThan(-1);
+      // A window checked after a lookup makes the refusal depend on what the
+      // lookup found, so an expired approval for a pack that is gone is
+      // reported as missing rather than as expired.
+      expect(
+        checked,
+        "an account is read before the caller's expiry is checked",
+      ).to.be.lessThan(firstAwait);
+    });
+  }
+
+  it("routers/welcomePacks/procedures/claim.ts answers an expired approval with its own status", () => {
+    // This endpoint separates `expired` from the other refusals, so a caller
+    // can tell a stale invite from a bad one.
+    expect(code("routers/welcomePacks/procedures/claim.ts")).to.match(
+      /reason === "expired"[\s\S]{0,120}errors\.EXPIRED/,
+    );
+  });
 
   it("routers/transactions/procedures/submit.ts attributes a batch to a verified payer", () => {
     expect(
       callIndex(
         code("routers/transactions/procedures/submit.ts"),
-        "verifiedFeePayer"
-      )
+        "verifiedFeePayer",
+      ),
     ).to.be.greaterThan(-1);
   });
 
@@ -88,7 +126,7 @@ describe("server code that calls a guard", () => {
     expect(callIndex(source, "summarizeProcedureInput")).to.be.greaterThan(-1);
     expect(
       source,
-      "an input serialized whole puts every field it carries in the log"
+      "an input serialized whole puts every field it carries in the log",
     ).to.not.match(/JSON\.stringify\s*\(\s*input\b/);
   });
 });
