@@ -9,6 +9,11 @@ pub mod state;
 pub use instructions::*;
 pub use state::*;
 
+// Devnet uses a different program id: the mainnet program keypair was lost, so
+// devnet is deployed from a separately ground keypair.
+#[cfg(feature = "devnet")]
+declare_id!("tdcaoktKw6bDQ5ukLq5fLtje2kCkmHX7Sj9G77jY5dh");
+#[cfg(not(feature = "devnet"))]
 declare_id!("tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN");
 
 #[cfg(not(feature = "no-entrypoint"))]

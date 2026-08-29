@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.14.4
+
+### Patch Changes
+
+- [#1276](https://github.com/helium/helium-program-library/pull/1276) [`d917896`](https://github.com/helium/helium-program-library/commit/d917896aeb9defe0a67fe293451ecdb1e9c00418) Thanks [@bryzettler](https://github.com/bryzettler)! - Add `deriveLoadedAccountsDataSizeLimit` opt-out to `withPriorityFees` and `batchInstructionsToTxsWithPriorityFee`, and disable sim-derived loaded-accounts-data-size limits on wallet-signed transactions in blockchain-api, distributor-oracle, and voter-stake-registry-hooks. Wallets append guard instructions (Lighthouse) after sizing, which exceeded the derived limit and failed with `MaxLoadedAccountsDataSizeExceeded`.
+
+## 0.14.3
+
+### Patch Changes
+
+- [#1269](https://github.com/helium/helium-program-library/pull/1269) [`7dcdd47`](https://github.com/helium/helium-program-library/commit/7dcdd47419a0b71eef8f1ef4e5aacf35282d27bd) Thanks [@bryzettler](https://github.com/bryzettler)! - Widen transaction batch tags to TEXT, bound the contract tag at 1000 chars, back off per-batch resubmissions, and clamp migration SOL transfers to the live source balance
+
 ## 0.14.2
 
 ### Patch Changes
