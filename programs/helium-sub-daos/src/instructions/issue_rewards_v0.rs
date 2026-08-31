@@ -174,7 +174,21 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .try_into()
     .unwrap();
 
-  let total_emissions = ctx.accounts.dao_epoch_info.total_rewards;
+  // The backstop top-up is minted whole into the Mobile data rewards escrow below, so it
+  // takes no HST cut, no sub-DAO share and no delegator slice: what is split here is the
+  // rest of the epoch's DAO-level mint. Every pass subtracts it, so IoT never receives a
+  // share of HNT minted to support Mobile deployers.
+  let (total_emissions, backstop_top_up) = crate::backstop::split_total_rewards(
+    ctx.accounts.dao_epoch_info.total_rewards,
+    ctx
+      .accounts
+      .dao
+      .emission_schedule
+      .get_emissions_at(end_of_epoch_ts)
+      .ok_or_else(|| error!(ErrorCode::ArithmeticError))?,
+    ctx.accounts.dao_epoch_info.smoothed_hnt_burned,
+    ctx.accounts.dao.net_emissions_cap,
+  );
   let hst_percent = ctx
     .accounts
     .dao
@@ -198,34 +212,52 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
     .try_into()
     .unwrap();
-  let max_percent = 100_u64.checked_mul(10_0000000).unwrap();
-
   let delegation_rewards_amount: u64 = (rewards_amount as u128)
     .checked_mul(u128::from(ctx.accounts.dao.delegator_rewards_percent))
     .unwrap()
-    .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
+    // Same scale the backstop's baseline reads delegator_rewards_percent at, so the amount
+    // the band is sized against and the amount minted here cannot drift apart.
+    .checked_div(PERCENT_SCALE as u128)
     .unwrap()
     .try_into()
     .unwrap();
 
-  // HIP 149 Decision 1 earnings cap. On the Mobile sub-DAO pass, hold Mobile data
-  // deployers at no more than three times the carrier-paid USD: any HNT in the data
-  // bucket above the ceiling stored by calculate_utility_score_v0 (deployer_cap_hnt)
-  // is redirected from the rewards escrow to the shared delegator pool. This is a
-  // bucket-to-bucket move inside the already-split sub-DAO emission: total_rewards is
-  // unchanged, the HNT is paid to veHNT delegators instead of deployers, and staker
-  // claims already key off the DAO-level delegation_rewards_issued. A zero ceiling
-  // (no carrier burn this epoch, or no price oracle) disables the redirect.
+  // The Mobile sub-DAO pass carries both halves of the deployer earnings band, from the
+  // ceiling calculate_utility_score_v0 stored and the top-up split out of total_rewards
+  // above:
+  //
+  // - The target minimum is delivered by minting the top-up straight into the rewards
+  //   escrow, so all of it reaches deployers instead of a fraction surviving the splits.
+  // - The earnings cap holds deployers at no more than three times the carrier-paid USD:
+  //   any HNT in the data bucket and top-up above the ceiling is redirected from the
+  //   escrow to the shared delegator pool. That redirect is a bucket-to-bucket move, so
+  //   the HNT is paid to veHNT delegators instead of deployers and staker claims already
+  //   key off the DAO-level delegation_rewards_issued. A zero ceiling (no carrier burn
+  //   this epoch, or no price oracle) disables it.
   let is_mobile = TESTING || ctx.accounts.sub_dao.key() == crate::backstop::MOBILE_SUB_DAO;
-  let escrow_before_overflow = rewards_amount
+  // The top-up is a DAO-level amount, sized once per epoch and recorded once in
+  // total_rewards, so exactly one pass may mint it. In production is_mobile already selects
+  // one pass. Under TESTING it selects every sub-DAO, so pin it to the epoch's first pass
+  // there (num_rewards_issued is incremented after the mints below): N sub-DAOs would
+  // otherwise mint N top-ups against the one the epoch recorded.
+  //
+  // The `!TESTING ||` is load-bearing and must not be simplified away. This instruction is
+  // permissionless and the passes may arrive in any order, so in production the Mobile pass
+  // is not necessarily the first: gating on num_rewards_issued alone would mint no top-up
+  // whenever any other sub-DAO settled first, silently under-delivering the floor against a
+  // total_rewards that already counted it.
+  let is_top_up_pass =
+    is_mobile && (!TESTING || ctx.accounts.dao_epoch_info.num_rewards_issued == 0);
+  let top_up = if is_top_up_pass { backstop_top_up } else { 0 };
+  // What the escrow mint would be before the cap redirect: the deployer portion of the
+  // split (rewards_amount - delegator slice) plus the direct top-up.
+  let deployer_pool = rewards_amount
     .checked_sub(delegation_rewards_amount)
+    .unwrap()
+    .checked_add(top_up)
     .unwrap();
   let staker_overflow: u64 = if is_mobile {
-    crate::backstop::staker_overflow(
-      rewards_amount,
-      ctx.accounts.dao_epoch_info.deployer_cap_hnt,
-      escrow_before_overflow,
-    )
+    crate::backstop::staker_overflow(deployer_pool, ctx.accounts.dao_epoch_info.deployer_cap_hnt)
   } else {
     0
   };
@@ -242,12 +274,14 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
         .mint_delegation_rewards_ctx()
         .with_signer(&[dao_seeds!(ctx.accounts.dao)]),
       MintArgsV0 {
-        amount: delegation_pool_amount, // delegator slice + any HIP 149 earnings-cap overflow
+        amount: delegation_pool_amount, // delegator slice + any earnings-cap overflow
       },
     )?;
   }
 
-  let escrow_amount = escrow_before_overflow.checked_sub(staker_overflow).unwrap();
+  // Includes the backstop top-up on the Mobile pass, so the Mobile verifier picks it up
+  // through hnt_rewards_issued as part of the data pool it distributes pro-rata.
+  let escrow_amount = deployer_pool.checked_sub(staker_overflow).unwrap();
   msg!("Minting {} to rewards escrow", escrow_amount);
   mint_v0(
     ctx

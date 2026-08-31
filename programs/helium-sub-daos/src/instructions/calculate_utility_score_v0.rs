@@ -188,12 +188,12 @@ pub fn handler<'info>(
   let net_emissions_cap = ctx.accounts.dao.net_emissions_cap;
   let smoothed = ctx.accounts.dao_epoch_info.smoothed_hnt_burned;
 
-  // HIP 149 Decision 1 backstop. When a valid, fresh Pyth HNT price and the Mobile
-  // signals are both available, size the deployer target-minimum top-up (added on top of
-  // the existing carrier-burn re-emit) and the earnings-cap ceiling (stored for
-  // issue_rewards_v0 to apply on the Mobile pass). Both passes (IoT and Mobile) read the
-  // same Mobile signals and compute the same total_rewards, so the result is independent
-  // of sub-DAO ordering.
+  // Deployer earnings backstop. When a valid, fresh Pyth HNT price and the Mobile
+  // signals are both available, size the deployer target-minimum top-up (minted straight
+  // to the Mobile data rewards escrow, on top of the existing carrier-burn re-emit) and
+  // the earnings-cap ceiling (both stored for issue_rewards_v0 to apply on the Mobile
+  // pass). Both passes (IoT and Mobile) read the same Mobile signals and compute the same
+  // total_rewards, so the result is independent of sub-DAO ordering.
   //
   // The price account and the Mobile epoch-info accounts are mandatory inputs (the price
   // is pinned above; the Mobile accounts error via mobile_signals if omitted), so a
@@ -230,6 +230,7 @@ pub fn handler<'info>(
       net_emissions_cap,
       mobile_dc_burned,
       mobile_share,
+      delegator_rewards_percent: ctx.accounts.dao.delegator_rewards_percent,
       decimals_factor,
       hnt_price_floor,
       hnt_price_cap,

@@ -88,6 +88,11 @@ impl GetEmissions for Vec<EmissionScheduleItem> {
   }
 }
 
+/// Scale of `DaoV0::delegator_rewards_percent`: 100% with 8 decimals of accuracy, so 100%
+/// is `1e10` and today's 6% is `6e8`. Every site that validates or divides by that field
+/// reads it from here.
+pub const PERCENT_SCALE: u64 = 100 * 10_0000000;
+
 #[account]
 #[derive(Default)]
 pub struct DaoV0 {
@@ -176,7 +181,7 @@ pub struct DaoEpochInfoV0 {
   pub cumulative_not_emitted: u64,
   pub not_emitted: u64,
   pub smoothed_hnt_burned: u64,
-  // HIP 149 Decision 1 backstop. The Mobile data deployer earnings ceiling in HNT
+  // Backstop earnings ceiling (HIP 149 Decision 1). The Mobile data deployer ceiling in HNT
   // (3 x carrier-paid USD this epoch, converted at the epoch's HNT price).
   // issue_rewards_v0 reads this on the Mobile pass to redirect any overflow above
   // the cap from the rewards escrow to the shared delegator pool. The price itself
