@@ -167,22 +167,6 @@ address = "GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E"  # State controller IDL
 filename = "accounts/GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E.json"
 
 [[test.validator.account]]
-address = "5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn"  # Wormhole guardian set index 4
-filename = "accounts/5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn.json"
-
-[[test.validator.account]]
-address = "HTczusLJSAhMJKYrxLjSUUyW7YDsBuyfBG8Tj1KJsgni"  # Wormhole guardian set index 5
-filename = "accounts/HTczusLJSAhMJKYrxLjSUUyW7YDsBuyfBG8Tj1KJsgni.json"
-
-[[test.validator.account]]
-address = "HstYgN21fgNmutTVXjBw54n4ryvP3WrCFbMAjnbdbTzf"  # Wormhole guardian set index 6
-filename = "accounts/HstYgN21fgNmutTVXjBw54n4ryvP3WrCFbMAjnbdbTzf.json"
-
-[[test.validator.account]]
-address = "6GaHgiaQg9Pg346xHq9m7vQ9rJtnH83gQKqJoiAxQa7D"  # Wormhole guardian set index 7
-filename = "accounts/6GaHgiaQg9Pg346xHq9m7vQ9rJtnH83gQKqJoiAxQa7D.json"
-
-[[test.validator.account]]
 address = "DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b"
 filename = "accounts/DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b.json"
 
