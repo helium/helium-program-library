@@ -55,7 +55,7 @@ export const mint = publicProcedure.dataCredits.mint.handler(
     const useJito = shouldUseJitoBundle(txs.length, getCluster());
     const txFees = await getTotalTransactionFees(
       connection,
-      txs.map((t) => t.tx)
+      txs.map((t) => t.tx),
     );
     const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
 
@@ -66,13 +66,13 @@ export const mint = publicProcedure.dataCredits.mint.handler(
     const recipientDcAta = getAssociatedTokenAddressSync(
       DC_MINT,
       recipientPubkey,
-      true
+      true,
     );
     const recipientDcAtaInfo = await connection.getAccountInfo(recipientDcAta);
     const ataRent = recipientDcAtaInfo ? 0 : RENT_COSTS.ATA;
     const requiredBalance = calculateRequiredBalance(
       txFees + jitoTipCost,
-      ataRent
+      ataRent,
     );
 
     const ownerPubkey = new PublicKey(owner);
@@ -89,7 +89,17 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       userAddress: owner,
       dcAmount: dcAmount || undefined,
       hntAmount: hntAmount || undefined,
+      recipient: recipient && recipient !== owner ? recipient : undefined,
     });
+
+    // The credits land on the recipient rather than the signer whenever one is
+    // named, so the signer is told which account before signing for it.
+    const recipientSuffix =
+      recipient && recipient !== owner ? ` to ${recipient}` : "";
+    const description =
+      (dcAmount
+        ? `Mint ${dcAmount} data credits`
+        : `Burn ${hntAmount} HNT bones for data credits`) + recipientSuffix;
 
     const transactions = txs.map((t) => {
       if (t.signers.length > 0) {
@@ -99,9 +109,7 @@ export const mint = publicProcedure.dataCredits.mint.handler(
         serializedTransaction: serializeTransaction(t.tx),
         metadata: {
           type: "mint_data_credits",
-          description: dcAmount
-            ? `Mint ${dcAmount} data credits`
-            : `Burn ${hntAmount} HNT bones for data credits`,
+          description,
         },
       };
     });
@@ -128,5 +136,5 @@ export const mint = publicProcedure.dataCredits.mint.handler(
         recipient: recipient || undefined,
       },
     };
-  }
+  },
 );

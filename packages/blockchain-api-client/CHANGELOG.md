@@ -1,5 +1,30 @@
 # Change Log
 
+## 0.15.1
+
+### Patch Changes
+
+- [#1278](https://github.com/helium/helium-program-library/pull/1278) [`3484cf7`](https://github.com/helium/helium-program-library/commit/3484cf7cbf00ba8d116f4a4121e71808ee5e9b06) Thanks [@bryzettler](https://github.com/bryzettler)! - Fix bugs surfaced in prod logs:
+  - Floor fractional proxy `expirationTime` instead of rejecting it
+  - Dedupe hotspots across claim-rewards pages so Jito bundles never contain duplicate transactions
+  - Refuse to build `closeDelegationV0` while a required epoch has no issued rewards (the program panics otherwise)
+  - Serve the stored batch status when the on-chain status check fails instead of returning 500
+  - Order the paginated hotspot query by asset so pages are stable, and dedupe within a page as well as across pages
+  - Keep the safe-integer bound on proxy `expirationTime` after flooring
+  - Rethrow database errors from the batch status check and build the fallback from a pre-check snapshot
+
+## 0.15.0
+
+### Minor Changes
+
+- [#1279](https://github.com/helium/helium-program-library/pull/1279) [`c31dc01`](https://github.com/helium/helium-program-library/commit/c31dc01c35ebef6fd676e75451dddbefdcad5545) Thanks [@madninja](https://github.com/madninja)! - Add a `feePayer` option to `hotspots/update-info` (`"maker"` default, or `"owner"` to build the update here with the owner paying the fee, DC burn, and any mobile_info resize) and an optional third-party `feePayer` to `tokens/transfer` so a drained wallet's transfer can be paid by another account. Also verify delegate signatures and fee payers before the service signs or attributes anything, and require asset ownership on `updateRewardsDestination`, `createSplit`, and `deleteSplit`.
+
+## 0.14.4
+
+### Patch Changes
+
+- [#1276](https://github.com/helium/helium-program-library/pull/1276) [`d917896`](https://github.com/helium/helium-program-library/commit/d917896aeb9defe0a67fe293451ecdb1e9c00418) Thanks [@bryzettler](https://github.com/bryzettler)! - Add `deriveLoadedAccountsDataSizeLimit` opt-out to `withPriorityFees` and `batchInstructionsToTxsWithPriorityFee`, and disable sim-derived loaded-accounts-data-size limits on wallet-signed transactions in blockchain-api, distributor-oracle, and voter-stake-registry-hooks. Wallets append guard instructions (Lighthouse) after sizing, which exceeded the derived limit and failed with `MaxLoadedAccountsDataSizeExceeded`.
+
 ## 0.14.3
 
 ### Patch Changes

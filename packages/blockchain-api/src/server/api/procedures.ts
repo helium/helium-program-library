@@ -3,6 +3,7 @@ import type { Meta } from "@orpc/contract";
 import { cookies, headers } from "next/headers";
 import { privy } from "@/lib/privy";
 import { env } from "@/lib/env";
+import { summarizeProcedureInput } from "@/lib/utils/log-input";
 import type { User } from "@privy-io/server-auth";
 import { fullApiContract } from "@helium/blockchain-api";
 
@@ -59,13 +60,9 @@ const timingMiddleware = os.middleware(async ({ next, path }, input) => {
 
   const ms = Date.now() - start;
   const ts = new Date().toISOString();
-  const params =
-    input &&
-    typeof input === "object" &&
-    Object.keys(input as object).length > 0
-      ? ` ${JSON.stringify(input)}`
-      : "";
-  console.log(`${ts} [ORPC] ${routePath}${params} ${ms}ms`);
+  console.log(
+    `${ts} [ORPC] ${routePath}${summarizeProcedureInput(input)} ${ms}ms`
+  );
 
   return result;
 });

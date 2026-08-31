@@ -417,7 +417,7 @@ describe("helium-sub-daos", () => {
       );
     });
 
-    describe("HIP 149 backstop", () => {
+    describe("backstop ceiling", () => {
       it("computes the deployer cap when an oracle is supplied", async () => {
         await vsrProgram.methods
           .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
@@ -971,7 +971,7 @@ describe("helium-sub-daos", () => {
             );
           });
 
-          describe("HIP 149 cap redirect", () => {
+          describe("backstop cap redirect", () => {
             it("redirects data-bucket overflow above the cap to the delegator pool", async () => {
               await vsrProgram.methods
                 .setTimeOffsetV0(new BN(1 * 60 * 60 * 24))
@@ -1020,8 +1020,8 @@ describe("helium-sub-daos", () => {
             });
           });
 
-          describe("HIP 149 floor delivery", () => {
-            it("tops deployers up to the price-derived 0.5x-carrier target", async () => {
+          describe("backstop floor delivery", () => {
+            it("tops deployers up to the price-derived 0.8x-carrier target", async () => {
               // Set net_emissions_cap = 0 so the top-up's burn budget is just
               // smoothed_hnt_burned; then a real HNT burn (below) makes that budget far
               // exceed demand, so the top-up is the full price-derived amount (unclamped).
@@ -1060,7 +1060,7 @@ describe("helium-sub-daos", () => {
                 })
                 .rpc({ skipPreflight: true });
 
-              // Epoch 2: a large carrier burn drives a 0.5x-carrier target well above the
+              // Epoch 2: a large carrier burn drives a 0.8x-carrier target well above the
               // deployer baseline, and burns ~100k HNT so smoothed_hnt_burned (the budget)
               // dwarfs demand. The same Mobile sub-DAO epoch-info account is its prev next.
               await vsrProgram.methods
@@ -1090,8 +1090,22 @@ describe("helium-sub-daos", () => {
               await calc().rpc({ skipPreflight: true });
               await calc().rpc({ skipPreflight: true });
 
+              // Issue, so the assertions read the escrow mint the deployers are paid from
+              // rather than a share of total_rewards computed in the test.
+              await program.methods
+                .issueRewardsV0({ epoch })
+                .accountsPartial({
+                  subDao,
+                  supplementVault: null,
+                  councilVault: null,
+                })
+                .rpc({ skipPreflight: true });
+
               const di = await program.account.daoEpochInfoV0.fetch(
                 daoEpochInfo!
+              );
+              const sdi = await program.account.subDaoEpochInfoV0.fetch(
+                subDaoEpochInfo
               );
               const mobileShare = (
                 await program.account.subDaoEpochInfoV0.fetch(
@@ -1099,13 +1113,16 @@ describe("helium-sub-daos", () => {
                 )
               ).previousPercentage;
 
-              // Delivered Mobile data deployer HNT = total_rewards x mobile_share x 0.70.
-              const alpha = (mobileShare / 0xffffffff) * 0.7;
-              const delivered = di.totalRewards.toNumber() * alpha;
+              // net_emissions_cap is 0 above, so the amount still divided by sub-DAO share
+              // and bucket is the bare emission schedule and the rest of total_rewards is
+              // the top-up -- which is exactly how issue_rewards_v0 recovers it.
+              const topUp = di.totalRewards.toNumber() - EPOCH_REWARDS;
+              expect(topUp).to.be.greaterThan(0);
+
               // deployer_cap_hnt is 3x carrier-paid USD converted at the EMA point price;
-              // the floor target is 0.5x converted at the lower-bound price (ema - 2*conf).
-              // So target == (cap / 6) x (ema / price_lower), not simply cap / 6 (the two
-              // coincide only at zero confidence). Read the cloned mainnet price to
+              // the floor target is 0.8x converted at the lower-bound price (ema - 2*conf).
+              // So target == (cap / 3.75) x (ema / price_lower), not simply cap / 3.75 (the
+              // two coincide only at zero confidence). Read the cloned mainnet price to
               // reconstruct the ratio.
               const pythReceiver = new PythSolanaReceiver({
                 connection: provider.connection,
@@ -1118,10 +1135,21 @@ describe("helium-sub-daos", () => {
               const emaConf = priceAcc!.priceMessage.emaConf.toNumber();
               const priceLower = emaPrice - 2 * emaConf;
               const target =
-                (di.deployerCapHnt.toNumber() / 6) * (emaPrice / priceLower);
+                (di.deployerCapHnt.toNumber() / 3.75) * (emaPrice / priceLower);
 
               expect(mobileShare).to.be.greaterThan(0);
-              expect(delivered).to.be.closeTo(target, target * 0.02);
+              // The escrow mint is the split base less the delegation slice, plus the whole
+              // top-up, and that is what has to land on the target.
+              expect(sdi.hntRewardsIssued.toNumber()).to.be.closeTo(
+                target,
+                target * 0.02
+              );
+              // The top-up takes no delegator cut: the delegation mint is 6% of the split
+              // base alone, not of the split base plus the top-up.
+              expect(sdi.delegationRewardsIssued.toNumber()).to.be.closeTo(
+                EPOCH_REWARDS * 0.06,
+                EPOCH_REWARDS * 0.06 * 0.02
+              );
             });
           });
 

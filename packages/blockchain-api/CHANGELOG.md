@@ -1,5 +1,28 @@
 # Change Log
 
+## 0.11.25
+
+### Patch Changes
+
+- [#1278](https://github.com/helium/helium-program-library/pull/1278) [`3484cf7`](https://github.com/helium/helium-program-library/commit/3484cf7cbf00ba8d116f4a4121e71808ee5e9b06) Thanks [@bryzettler](https://github.com/bryzettler)! - Fix bugs surfaced in prod logs:
+  - Floor fractional proxy `expirationTime` instead of rejecting it
+  - Dedupe hotspots across claim-rewards pages so Jito bundles never contain duplicate transactions
+  - Refuse to build `closeDelegationV0` while a required epoch has no issued rewards (the program panics otherwise)
+  - Serve the stored batch status when the on-chain status check fails instead of returning 500
+  - Order the paginated hotspot query by asset so pages are stable, and dedupe within a page as well as across pages
+  - Keep the safe-integer bound on proxy `expirationTime` after flooring
+  - Rethrow database errors from the batch status check and build the fallback from a pre-check snapshot
+
+- Updated dependencies [[`3484cf7`](https://github.com/helium/helium-program-library/commit/3484cf7cbf00ba8d116f4a4121e71808ee5e9b06)]:
+  - @helium/blockchain-api@0.15.1
+
+## 0.11.24
+
+### Patch Changes
+
+- Updated dependencies [[`c31dc01`](https://github.com/helium/helium-program-library/commit/c31dc01c35ebef6fd676e75451dddbefdcad5545)]:
+  - @helium/blockchain-api@0.15.0
+
 ## 0.11.23
 
 ### Patch Changes

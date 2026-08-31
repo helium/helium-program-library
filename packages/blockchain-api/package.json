@@ -1,7 +1,7 @@
 {
   "name": "@helium/blockchain-api-service",
   "private": true,
-  "version": "0.11.23",
+  "version": "0.11.25",
   "description": "Helium Blockchain API - Web application for Helium blockchain",
   "license": "Apache-2.0",
   "repository": {
@@ -16,6 +16,8 @@
     "start": "next start",
     "format:fix": "prettier --check --write \"src/**/*.{js,ts,tsx}\"",
     "lint": "pnpm run format:fix && eslint src/",
+    "lint:check": "eslint src tests",
+    "typecheck": "tsc --noEmit",
     "background-service": "node scripts/start-background-service.js",
     "test:e2e": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register \"tests/e2e/**/*.test.ts\" --timeout 100000",
     "test:e2e:file": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register --timeout 100000",

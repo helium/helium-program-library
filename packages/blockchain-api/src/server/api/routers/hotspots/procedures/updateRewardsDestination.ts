@@ -16,6 +16,7 @@ import {
 } from "@helium/lazy-distributor-sdk";
 import { createSolanaConnection } from "@/lib/solana";
 import { env } from "@/lib/env";
+import { assertAssetOwner } from "@/lib/utils/asset-ownership";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
 import {
   calculateRequiredBalance,
@@ -110,7 +111,17 @@ export const updateRewardsDestination =
           assetEndpoint,
         });
 
-      const { owner } = asset.ownership;
+      // The instruction's authority below is the asset's owner, so a caller who
+      // is not that owner would otherwise get a transaction built in the
+      // owner's name.
+      const owner = new PublicKey(
+        assertAssetOwner({
+          asset,
+          expectedOwner: walletAddress,
+          message: "Wallet does not own this hotspot",
+          errors,
+        })
+      );
       const hotspotName = asset.content?.metadata?.name;
 
       // Build instructions for each lazy distributor

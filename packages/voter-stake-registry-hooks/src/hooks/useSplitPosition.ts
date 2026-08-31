@@ -149,7 +149,9 @@ export const useSplitPosition = () => {
           const sigs = [mintKeypair];
           const drafts = await batchInstructionsToTxsWithPriorityFee(
             provider,
-            instructions
+            instructions,
+            // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+            { deriveLoadedAccountsDataSizeLimit: false }
           );
           const transactions = drafts.map(toVersionedTx);
 

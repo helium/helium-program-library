@@ -86,7 +86,7 @@ describe("single-hotspot claim rewards", () => {
           network,
         });
         const hotspot = pending.byHotspot.find(
-          (h) => BigInt(h.pending.claimable.amount) > 0n
+          (h) => BigInt(h.pending.claimable.amount) > BigInt(0)
         );
         if (hotspot) {
           target = { payer, network, entityPubKey: hotspot.hotspotPubKey };
@@ -104,7 +104,10 @@ describe("single-hotspot claim rewards", () => {
     const walletAddress = payer.publicKey.toBase58();
 
     const before = await claimableFor(walletAddress, network, entityPubKey);
-    expect(before).to.be.greaterThan(0n);
+    expect(
+      before > BigInt(0),
+      `expected claimable rewards on ${entityPubKey}, got ${before}`
+    ).to.eq(true);
 
     const result = await client.hotspots.claimHotspotRewards({
       entityPubKey,
@@ -125,6 +128,9 @@ describe("single-hotspot claim rewards", () => {
 
     // After claiming, the hotspot's claimable rewards should have dropped.
     const remaining = await claimableFor(walletAddress, network, entityPubKey);
-    expect(remaining).to.be.lessThan(before);
+    expect(
+      remaining < before,
+      `expected claimable to drop below ${before}, got ${remaining}`
+    ).to.eq(true);
   });
 });

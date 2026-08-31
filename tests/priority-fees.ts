@@ -198,6 +198,43 @@ describe("withPriorityFees", () => {
     expect(dataSize.data.readUInt32LE(1)).to.eq(64 * 1024);
   });
 
+  it("emits no data-size ix in the sim tx or the output when deriveLoadedAccountsDataSizeLimit is false", async () => {
+    const simTxs: any[] = [];
+    const ixs = await withPriorityFees({
+      connection: stubConnection({
+        sim: {
+          err: null,
+          unitsConsumed: 50000,
+          loadedAccountsDataSize: 100000,
+        },
+        simTxs,
+      }),
+      instructions: [transferIx],
+      feePayer,
+      deriveLoadedAccountsDataSizeLimit: false,
+    });
+    expect(simCbIxs(simTxs[0], COMPUTE_BUDGET_IX_DATA_SIZE).length).to.eq(0);
+    expect(cbIxs(ixs, COMPUTE_BUDGET_IX_DATA_SIZE).length).to.eq(0);
+    // CU sizing is unaffected.
+    const [limit] = cbIxs(ixs, COMPUTE_BUDGET_IX_LIMIT);
+    expect(limit.data.readUInt32LE(1)).to.eq(Math.ceil(50000 * 1.1));
+  });
+
+  it("still emits an explicit loadedAccountsDataSizeLimit when deriveLoadedAccountsDataSizeLimit is false", async () => {
+    const ixs = await withPriorityFees({
+      connection: stubConnection({
+        sim: { err: null, unitsConsumed: 50000, loadedAccountsDataSize: 100000 },
+      }),
+      instructions: [transferIx],
+      feePayer,
+      loadedAccountsDataSizeLimit: 64 * 1024,
+      deriveLoadedAccountsDataSizeLimit: false,
+    });
+    const dataSizes = cbIxs(ixs, COMPUTE_BUDGET_IX_DATA_SIZE);
+    expect(dataSizes.length).to.eq(1);
+    expect(dataSizes[0].data.readUInt32LE(1)).to.eq(64 * 1024);
+  });
+
   it("derives the data-size limit from simulation, rounded up to the 32 KiB quantum", async () => {
     const ixs = await withPriorityFees({
       connection: stubConnection({
