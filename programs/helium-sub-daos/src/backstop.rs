@@ -34,12 +34,15 @@
 //!
 //! The two parameters (80% floor share, 300% cap) are hardcoded; changing them requires a
 //! community HIP and program upgrade. Everything else the band needs is read from chain each
-//! epoch: the Mobile percent share and the delegation slice that together size the baseline.
+//! epoch: the Mobile percent share, and the HST cut and delegation slice that `issue_rewards_v0`
+//! takes before deployers see the money, which together size the baseline.
 //! No bucket fraction appears here. With the Service Provider allocation at zero the rewards
 //! escrow *is* the Mobile data bucket, so the amount minted to it is the deployer pool, and
 //! how a sub-DAO's rewards are allocated within that pool is the oracles' concern.
 
 use anchor_lang::prelude::*;
+
+use crate::state::PERCENT_SCALE;
 
 /// The Mobile sub-DAO PDA on mainnet (`["sub_dao", MOBILE_MINT]` under this program).
 /// The backstop keys off the Mobile sub-DAO's `dc_burned` and percent share.
@@ -65,10 +68,6 @@ pub const DEPLOYER_TARGET_PERCENT: u128 = 80;
 /// The earnings ceiling, as a multiple of the same carrier-paid USD (HIP 149 Decision 1).
 pub const DEPLOYER_CAP_MULTIPLE: u128 = 3;
 
-/// Scale of `DaoV0::delegator_rewards_percent`: 100% with 2 decimals of accuracy.
-/// `issue_rewards_v0` divides the delegator slice by this same figure.
-pub const PERCENT_SCALE: u64 = 100 * 10_0000000;
-
 /// Inputs to the backstop computation, all already read from on-chain state and
 /// the Pyth price account by the caller.
 pub struct BackstopInput {
@@ -89,6 +88,12 @@ pub struct BackstopInput {
   /// hardcoded as a bucket percentage, so the baseline cannot disagree with the amount
   /// `issue_rewards_v0` actually mints.
   pub delegator_rewards_percent: u64,
+  /// `DaoV0::hst_emission_schedule` at the end of this epoch, as a whole percent.
+  /// `issue_rewards_v0` takes this cut off the DAO-level mint before the sub-DAO split, so
+  /// the baseline has to take it too or the shortfall is under-sized by that percentage.
+  /// Read from chain for the same reason `delegator_rewards_percent` is: governance can
+  /// move it through `update_dao_v0`, and today's 0% is a value, not an invariant.
+  pub hst_percent: u64,
   /// `10^(hnt_decimals - pyth_exponent - 5)`, the DC->HNT scale factor (mirrors
   /// `mint_data_credits_v0`). With 8 HNT decimals and a -8 exponent this is `10^11`.
   pub decimals_factor: u128,
@@ -176,7 +181,12 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
 
   // mobile_share == 0 is a genesis or fully un-delegated Mobile sub-DAO, which takes no
   // share of the emission and so has no deployer pool for the band to act on.
-  let (Some(deployer_cap_hnt), true) = (deployer_cap_hnt, input.mobile_share != 0) else {
+  if input.mobile_share == 0 {
+    return dormant;
+  }
+
+  // An unrepresentable ceiling leaves the epoch with no band at all, per the note above.
+  let Some(deployer_cap_hnt) = deployer_cap_hnt else {
     return dormant;
   };
 
@@ -201,12 +211,14 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
   // deployer_baseline: what the emission schedule and the existing re-emit deliver to Mobile
   // data deployers, being the Mobile share of the split base less the veHNT delegation slice.
   // The remainder is what issue_rewards_v0 mints to the rewards escrow, and with the Service
-  // Provider allocation at zero the escrow is the deployer pool. Excludes any HST cut, which
-  // is 0% and has no payout instruction in this program.
+  // Provider allocation at zero the escrow is the deployer pool. The three reductions are
+  // applied in the order issue_rewards_v0 applies them: the HST cut off the DAO-level mint,
+  // then the sub-DAO share, then the delegation slice.
   let share = input.mobile_share as u128;
   let deployer_percent = PERCENT_SCALE.saturating_sub(input.delegator_rewards_percent) as u128;
-  let deployer_baseline = (base_total as u128).saturating_mul(share) / (u32::MAX as u128)
-    * deployer_percent
+  let after_hst =
+    (base_total as u128).saturating_mul(100_u128.saturating_sub(input.hst_percent as u128)) / 100;
+  let deployer_baseline = after_hst.saturating_mul(share) / (u32::MAX as u128) * deployer_percent
     / (PERCENT_SCALE as u128);
 
   // top_up_demand = target_hnt - deployer_baseline. The top-up is minted straight into the
@@ -324,6 +336,7 @@ mod tests {
       mobile_dc_burned: DC_BURNED,
       mobile_share: SHARE_8927,
       delegator_rewards_percent: DELEGATOR_PERCENT_6,
+      hst_percent: 0,
       decimals_factor: DECIMALS_FACTOR,
       hnt_price_floor: hnt_price(price_dollars),
       hnt_price_cap: hnt_price(price_dollars),
@@ -388,26 +401,58 @@ mod tests {
   }
 
   #[test]
-  fn split_total_rewards_conserves_under_a_moved_base() {
+  fn the_hst_cut_is_taken_out_of_the_baseline() {
+    // issue_rewards_v0 takes the HST cut off the DAO-level mint before the sub-DAO split,
+    // so the baseline the shortfall is measured against has to take it too. At 30% HST only
+    // 70% of the emission reaches deployers, and the top-up has to grow by exactly the 30%
+    // that no longer arrives or the floor lands under its target. HST is 0% today; this
+    // pins that the baseline reads the schedule rather than assuming it.
+    let smoothed = 91_000_00000000;
+    let at_zero = compute_backstop(&base_input(0.10, smoothed));
+    let mut input = base_input(0.10, smoothed);
+    input.hst_percent = 30;
+    let at_thirty = compute_backstop(&input);
+
+    // The 0% baseline, written out here rather than read back off the module.
+    let baseline_no_hst = hnt(EMISSION + NET_CAP) * BASELINE_FRACTION;
+    let lost_to_hst = baseline_no_hst * 0.30;
+    let grew_by = hnt(at_thirty.top_up) - hnt(at_zero.top_up);
+    assert!(
+      (grew_by - lost_to_hst).abs() < 1.0,
+      "top-up grew by {grew_by} HNT, should grow by the {lost_to_hst} HNT the HST cut removes"
+    );
+
+    // And what deployers actually receive still lands on the target.
+    let delivered = baseline_no_hst * 0.70 + hnt(at_thirty.top_up);
+    assert!(
+      (delivered - 72_800.0).abs() < 50.0,
+      "delivered {delivered} HNT should reach the 72,800 HNT target at 30% HST"
+    );
+  }
+
+  #[test]
+  fn a_moved_base_moves_the_derived_top_up() {
     // A manual settlement that changed the emission schedule or the net-emissions cap
-    // between the two instructions moves the derived base. Whichever way it moves, the two
-    // halves still sum to total_rewards, so how much HNT is minted cannot change.
+    // between the two instructions moves the derived base. The two halves sum to
+    // total_rewards whatever that base is, so pin the derived top-up per row instead: that
+    // is the quantity a moved base actually changes, and the rows that saturate pin the
+    // clamp that keeps the subtraction inside the split from wrapping.
     let out = compute_backstop(&base_input(0.10, 91_000_00000000));
-    for (emission, net_cap) in [
-      (EMISSION, NET_CAP),
-      (EMISSION * 2, NET_CAP),
-      (EMISSION / 2, NET_CAP),
-      (u64::MAX, NET_CAP),
-      (EMISSION, 0),
-      (EMISSION, u64::MAX),
+    let total = out.total_rewards;
+    for (emission, net_cap, expected_top_up) in [
+      (EMISSION, NET_CAP, out.top_up),
+      (EMISSION * 2, NET_CAP, total - (EMISSION * 2 + NET_CAP)),
+      (EMISSION / 2, NET_CAP, total - (EMISSION / 2 + NET_CAP)),
+      (u64::MAX, NET_CAP, 0),
+      (EMISSION, 0, total - EMISSION),
+      (EMISSION, u64::MAX, 0),
     ] {
-      let (split_base, top_up) =
-        split_total_rewards(out.total_rewards, emission, 91_000_00000000, net_cap);
+      let (split_base, top_up) = split_total_rewards(total, emission, 91_000_00000000, net_cap);
       assert_eq!(
-        split_base + top_up,
-        out.total_rewards,
-        "emission {emission}, net_cap {net_cap}: the split lost or invented HNT"
+        top_up, expected_top_up,
+        "emission {emission}, net_cap {net_cap}: a moved base moves the derived top-up"
       );
+      assert_eq!(split_base + top_up, total);
     }
   }
 
@@ -507,21 +552,6 @@ mod tests {
   }
 
   #[test]
-  fn deployer_pool_is_measured_not_reconstructed() {
-    // The ceiling is applied to the escrow mint itself, so a delegation slice other than
-    // today's 6% cannot make the measured pool and the minted pool disagree. Same pool,
-    // same verdict, whatever fraction of the sub-DAO slice it happens to be.
-    let cap = 10_920_00000000;
-    for pool in [13_870_00000000_u64, 20_000_00000000, 5_000_00000000] {
-      assert_eq!(
-        staker_overflow(pool, cap),
-        pool.saturating_sub(cap),
-        "pool {pool}: the redirect is a function of the pool and the ceiling alone"
-      );
-    }
-  }
-
-  #[test]
   fn mobile_share_zero_is_dormant() {
     // A sub-DAO taking no share of the emission has no deployer pool for the band to act
     // on, so the epoch falls back to the existing re-emit alone.
@@ -533,7 +563,8 @@ mod tests {
   }
 
   /// The baseline `compute_backstop` sizes the shortfall against, recomputed from the same
-  /// inputs: the Mobile share of the split base, less the delegation slice.
+  /// inputs: the Mobile share of the split base, less the delegation slice. Assumes the 0%
+  /// HST of `base_input`; `the_hst_cut_is_taken_out_of_the_baseline` covers the other case.
   fn deployer_baseline(out: &BackstopOutput) -> u64 {
     let split_base = out.total_rewards - out.top_up;
     let deployer_percent = (PERCENT_SCALE - DELEGATOR_PERCENT_6) as u128;

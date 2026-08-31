@@ -212,14 +212,12 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
     .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
     .try_into()
     .unwrap();
-  // Same scale the backstop's baseline reads delegator_rewards_percent at, so the amount
-  // the band is sized against and the amount minted here cannot drift apart.
-  let max_percent = crate::backstop::PERCENT_SCALE;
-
   let delegation_rewards_amount: u64 = (rewards_amount as u128)
     .checked_mul(u128::from(ctx.accounts.dao.delegator_rewards_percent))
     .unwrap()
-    .checked_div(max_percent as u128) // 100% with 2 decimals accuracy
+    // Same scale the backstop's baseline reads delegator_rewards_percent at, so the amount
+    // the band is sized against and the amount minted here cannot drift apart.
+    .checked_div(PERCENT_SCALE as u128)
     .unwrap()
     .try_into()
     .unwrap();
@@ -237,7 +235,14 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   //   key off the DAO-level delegation_rewards_issued. A zero ceiling (no carrier burn
   //   this epoch, or no price oracle) disables it.
   let is_mobile = TESTING || ctx.accounts.sub_dao.key() == crate::backstop::MOBILE_SUB_DAO;
-  let top_up = if is_mobile { backstop_top_up } else { 0 };
+  // The top-up is a DAO-level amount, sized once per epoch and recorded once in
+  // total_rewards, so exactly one pass may mint it. In production is_mobile already selects
+  // one pass. Under TESTING it selects every sub-DAO, so pin it to the epoch's first pass
+  // there (num_rewards_issued is incremented after the mints below): N sub-DAOs would
+  // otherwise mint N top-ups against the one the epoch recorded.
+  let is_top_up_pass =
+    is_mobile && (!TESTING || ctx.accounts.dao_epoch_info.num_rewards_issued == 0);
+  let top_up = if is_top_up_pass { backstop_top_up } else { 0 };
   // What the escrow mint would be before the cap redirect: the deployer portion of the
   // split (rewards_amount - delegator slice) plus the direct top-up.
   let deployer_pool = rewards_amount

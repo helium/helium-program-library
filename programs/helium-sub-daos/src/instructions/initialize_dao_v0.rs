@@ -88,10 +88,7 @@ pub struct InitializeDaoV0<'info> {
 }
 
 pub fn handler(ctx: Context<InitializeDaoV0>, args: InitializeDaoArgsV0) -> Result<()> {
-  require_gte!(
-    100_u64.checked_mul(10_0000000).unwrap(),
-    args.delegator_rewards_percent,
-  );
+  require_gte!(PERCENT_SCALE, args.delegator_rewards_percent);
   ctx.accounts.dao.set_inner(DaoV0 {
     delegator_rewards_percent: args.delegator_rewards_percent,
     hst_emission_schedule: args.hst_emission_schedule,

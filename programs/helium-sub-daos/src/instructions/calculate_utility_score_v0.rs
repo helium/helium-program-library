@@ -187,6 +187,18 @@ pub fn handler<'info>(
     .unwrap();
   let net_emissions_cap = ctx.accounts.dao.net_emissions_cap;
   let smoothed = ctx.accounts.dao_epoch_info.smoothed_hnt_burned;
+  // The cut issue_rewards_v0 takes off the DAO-level mint before the sub-DAO split, which
+  // the deployer baseline has to take too. A schedule with no entry at this timestamp
+  // reads as 0 here rather than halting: issue_rewards_v0 unwraps the same lookup, so such
+  // an epoch issues nothing at all and the baseline is moot; 0 is also the direction that
+  // under-sizes the top-up rather than over-minting.
+  let hst_percent: u64 = ctx
+    .accounts
+    .dao
+    .hst_emission_schedule
+    .get_percent_at(end_of_epoch_ts)
+    .unwrap_or(0)
+    .into();
 
   // Deployer earnings backstop. When a valid, fresh Pyth HNT price and the Mobile
   // signals are both available, size the deployer target-minimum top-up (minted straight
@@ -231,6 +243,7 @@ pub fn handler<'info>(
       mobile_dc_burned,
       mobile_share,
       delegator_rewards_percent: ctx.accounts.dao.delegator_rewards_percent,
+      hst_percent,
       decimals_factor,
       hnt_price_floor,
       hnt_price_cap,

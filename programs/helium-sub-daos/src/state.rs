@@ -88,6 +88,11 @@ impl GetEmissions for Vec<EmissionScheduleItem> {
   }
 }
 
+/// Scale of `DaoV0::delegator_rewards_percent`: 100% with 8 decimals of accuracy, so 100%
+/// is `1e10` and today's 6% is `6e8`. Every site that validates or divides by that field
+/// reads it from here.
+pub const PERCENT_SCALE: u64 = 100 * 10_0000000;
+
 #[account]
 #[derive(Default)]
 pub struct DaoV0 {
