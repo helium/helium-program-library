@@ -149,14 +149,23 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       });
     }
 
-    // Generate transaction tag
+    // Generate transaction tag. The destination is part of it because it is
+    // where the output lands: two swaps that differ only in where the tokens
+    // go are different swaps and must not share a tag.
     const tag = generateTransactionTag({
       type: TRANSACTION_TYPES.SWAP,
       userAddress: userPublicKey,
       inputMint: quoteResponse.inputMint,
       outputMint: quoteResponse.outputMint,
       amount: quoteResponse.inAmount,
+      destinationTokenAccount,
     });
+
+    // A destination names an account other than the signer's own, so the
+    // signer is told where the output goes before signing for it.
+    const destinationSuffix = destinationTokenAccount
+      ? ` to ${destinationTokenAccount}`
+      : "";
 
     return {
       transactions: [
@@ -164,11 +173,12 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
           serializedTransaction: serializeTransaction(tx),
           metadata: {
             type: "swap",
-            description: `Swap ${quoteResponse.inAmount} ${quoteResponse.inputMint} for ${quoteResponse.outAmount} ${quoteResponse.outputMint}`,
+            description: `Swap ${quoteResponse.inAmount} ${quoteResponse.inputMint} for ${quoteResponse.outAmount} ${quoteResponse.outputMint}${destinationSuffix}`,
             inputMint: quoteResponse.inputMint,
             outputMint: quoteResponse.outputMint,
             inputAmount: quoteResponse.inAmount,
             outputAmount: quoteResponse.outAmount,
+            destinationTokenAccount,
           },
         },
       ],
@@ -176,6 +186,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       tag,
       actionMetadata: {
         type: "swap",
+        destinationTokenAccount,
         inputTokenAmount: await toTokenAmountOutput(
           new BN(quoteResponse.inAmount),
           quoteResponse.inputMint

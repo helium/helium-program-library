@@ -1,9 +1,14 @@
 import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
-import { createSolanaConnection, getCluster } from "@/lib/solana";
+import {
+  createSolanaConnection,
+  getAssetEndpoint,
+  getCluster,
+} from "@/lib/solana";
 import { connectToDb } from "@/lib/utils/db";
 import { scheduleToUtcCron } from "@/lib/utils/misc";
 import animalName from "angry-purple-tiger";
+import { fetchOwnedAsset } from "@/lib/utils/asset-ownership";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
 import {
   initializeCompressionRecipient,
@@ -89,6 +94,16 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
       });
     }
 
+    // Only the owner may redirect a hotspot's rewards, so the check comes
+    // before anything is looked up or built on the caller's behalf.
+    const asset = await fetchOwnedAsset({
+      assetEndpoint: getAssetEndpoint(),
+      assetId: new PublicKey(assetId),
+      expectedOwner: walletAddress,
+      message: "Wallet does not own this hotspot",
+      errors,
+    });
+
     // Build connection and programs
     const { provider, wallet } = createSolanaConnection(walletAddress);
     const miniFanoutProgram = await initMiniFanout(provider);
@@ -116,6 +131,9 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
             payer: wallet.publicKey,
             assetEndpoint: env.SOLANA_RPC_URL,
             lazyDistributor: new PublicKey(lazyDistributor),
+            // The asset is already in hand from the ownership check above;
+            // reuse it rather than pay for a second DAS round-trip.
+            getAssetFn: async () => asset,
           })
         ).instruction(),
       );
@@ -204,6 +222,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
         assetId: new PublicKey(assetId),
         lazyDistributor: new PublicKey(lazyDistributor),
         destination: pubkeys.miniFanout!,
+        getAssetFn: async () => asset,
       })
     ).instruction();
     instructions.push(setRecipientIx);
