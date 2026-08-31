@@ -240,6 +240,12 @@ pub fn handler(ctx: Context<IssueRewardsV0>, args: IssueRewardsArgsV0) -> Result
   // one pass. Under TESTING it selects every sub-DAO, so pin it to the epoch's first pass
   // there (num_rewards_issued is incremented after the mints below): N sub-DAOs would
   // otherwise mint N top-ups against the one the epoch recorded.
+  //
+  // The `!TESTING ||` is load-bearing and must not be simplified away. This instruction is
+  // permissionless and the passes may arrive in any order, so in production the Mobile pass
+  // is not necessarily the first: gating on num_rewards_issued alone would mint no top-up
+  // whenever any other sub-DAO settled first, silently under-delivering the floor against a
+  // total_rewards that already counted it.
   let is_top_up_pass =
     is_mobile && (!TESTING || ctx.accounts.dao_epoch_info.num_rewards_issued == 0);
   let top_up = if is_top_up_pass { backstop_top_up } else { 0 };

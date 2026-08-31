@@ -34,8 +34,7 @@
 //!
 //! The two parameters (80% floor share, 300% cap) are hardcoded; changing them requires a
 //! community HIP and program upgrade. Everything else the band needs is read from chain each
-//! epoch: the Mobile percent share, and the HST cut and delegation slice that `issue_rewards_v0`
-//! takes before deployers see the money, which together size the baseline.
+//! epoch: the Mobile percent share and the delegation slice that together size the baseline.
 //! No bucket fraction appears here. With the Service Provider allocation at zero the rewards
 //! escrow *is* the Mobile data bucket, so the amount minted to it is the deployer pool, and
 //! how a sub-DAO's rewards are allocated within that pool is the oracles' concern.
@@ -88,12 +87,6 @@ pub struct BackstopInput {
   /// hardcoded as a bucket percentage, so the baseline cannot disagree with the amount
   /// `issue_rewards_v0` actually mints.
   pub delegator_rewards_percent: u64,
-  /// `DaoV0::hst_emission_schedule` at the end of this epoch, as a whole percent.
-  /// `issue_rewards_v0` takes this cut off the DAO-level mint before the sub-DAO split, so
-  /// the baseline has to take it too or the shortfall is under-sized by that percentage.
-  /// Read from chain for the same reason `delegator_rewards_percent` is: governance can
-  /// move it through `update_dao_v0`, and today's 0% is a value, not an invariant.
-  pub hst_percent: u64,
   /// `10^(hnt_decimals - pyth_exponent - 5)`, the DC->HNT scale factor (mirrors
   /// `mint_data_credits_v0`). With 8 HNT decimals and a -8 exponent this is `10^11`.
   pub decimals_factor: u128,
@@ -211,14 +204,12 @@ pub fn compute_backstop(input: &BackstopInput) -> BackstopOutput {
   // deployer_baseline: what the emission schedule and the existing re-emit deliver to Mobile
   // data deployers, being the Mobile share of the split base less the veHNT delegation slice.
   // The remainder is what issue_rewards_v0 mints to the rewards escrow, and with the Service
-  // Provider allocation at zero the escrow is the deployer pool. The three reductions are
-  // applied in the order issue_rewards_v0 applies them: the HST cut off the DAO-level mint,
-  // then the sub-DAO share, then the delegation slice.
+  // Provider allocation at zero the escrow is the deployer pool. Excludes any HST cut, which
+  // is 0% and has no payout instruction in this program.
   let share = input.mobile_share as u128;
   let deployer_percent = PERCENT_SCALE.saturating_sub(input.delegator_rewards_percent) as u128;
-  let after_hst =
-    (base_total as u128).saturating_mul(100_u128.saturating_sub(input.hst_percent as u128)) / 100;
-  let deployer_baseline = after_hst.saturating_mul(share) / (u32::MAX as u128) * deployer_percent
+  let deployer_baseline = (base_total as u128).saturating_mul(share) / (u32::MAX as u128)
+    * deployer_percent
     / (PERCENT_SCALE as u128);
 
   // top_up_demand = target_hnt - deployer_baseline. The top-up is minted straight into the
@@ -336,7 +327,6 @@ mod tests {
       mobile_dc_burned: DC_BURNED,
       mobile_share: SHARE_8927,
       delegator_rewards_percent: DELEGATOR_PERCENT_6,
-      hst_percent: 0,
       decimals_factor: DECIMALS_FACTOR,
       hnt_price_floor: hnt_price(price_dollars),
       hnt_price_cap: hnt_price(price_dollars),
@@ -398,36 +388,6 @@ mod tests {
         );
       }
     }
-  }
-
-  #[test]
-  fn the_hst_cut_is_taken_out_of_the_baseline() {
-    // issue_rewards_v0 takes the HST cut off the DAO-level mint before the sub-DAO split,
-    // so the baseline the shortfall is measured against has to take it too. At 30% HST only
-    // 70% of the emission reaches deployers, and the top-up has to grow by exactly the 30%
-    // that no longer arrives or the floor lands under its target. HST is 0% today; this
-    // pins that the baseline reads the schedule rather than assuming it.
-    let smoothed = 91_000_00000000;
-    let at_zero = compute_backstop(&base_input(0.10, smoothed));
-    let mut input = base_input(0.10, smoothed);
-    input.hst_percent = 30;
-    let at_thirty = compute_backstop(&input);
-
-    // The 0% baseline, written out here rather than read back off the module.
-    let baseline_no_hst = hnt(EMISSION + NET_CAP) * BASELINE_FRACTION;
-    let lost_to_hst = baseline_no_hst * 0.30;
-    let grew_by = hnt(at_thirty.top_up) - hnt(at_zero.top_up);
-    assert!(
-      (grew_by - lost_to_hst).abs() < 1.0,
-      "top-up grew by {grew_by} HNT, should grow by the {lost_to_hst} HNT the HST cut removes"
-    );
-
-    // And what deployers actually receive still lands on the target.
-    let delivered = baseline_no_hst * 0.70 + hnt(at_thirty.top_up);
-    assert!(
-      (delivered - 72_800.0).abs() < 50.0,
-      "delivered {delivered} HNT should reach the 72,800 HNT target at 30% HST"
-    );
   }
 
   #[test]
@@ -563,8 +523,7 @@ mod tests {
   }
 
   /// The baseline `compute_backstop` sizes the shortfall against, recomputed from the same
-  /// inputs: the Mobile share of the split base, less the delegation slice. Assumes the 0%
-  /// HST of `base_input`; `the_hst_cut_is_taken_out_of_the_baseline` covers the other case.
+  /// inputs: the Mobile share of the split base, less the delegation slice.
   fn deployer_baseline(out: &BackstopOutput) -> u64 {
     let split_base = out.total_rewards - out.top_up;
     let deployer_percent = (PERCENT_SCALE - DELEGATOR_PERCENT_6) as u128;
