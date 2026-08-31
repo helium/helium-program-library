@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.15.0
+
+### Minor Changes
+
+- [#1279](https://github.com/helium/helium-program-library/pull/1279) [`c31dc01`](https://github.com/helium/helium-program-library/commit/c31dc01c35ebef6fd676e75451dddbefdcad5545) Thanks [@madninja](https://github.com/madninja)! - Add a `feePayer` option to `hotspots/update-info` (`"maker"` default, or `"owner"` to build the update here with the owner paying the fee, DC burn, and any mobile_info resize) and an optional third-party `feePayer` to `tokens/transfer` so a drained wallet's transfer can be paid by another account. Also verify delegate signatures and fee payers before the service signs or attributes anything, and require asset ownership on `updateRewardsDestination`, `createSplit`, and `deleteSplit`.
+
 ## 0.14.4
 
 ### Patch Changes
