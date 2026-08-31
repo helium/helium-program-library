@@ -1,7 +1,7 @@
 import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
-import { createSolanaConnection } from "@/lib/solana";
-import { assertAssetOwner } from "@/lib/utils/asset-ownership";
+import { createSolanaConnection, getAssetEndpoint } from "@/lib/solana";
+import { fetchOwnedAsset } from "@/lib/utils/asset-ownership";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
@@ -14,7 +14,7 @@ import { detectHotspotNetworks, getHotspotInfo } from "@/lib/queries/hotspots";
 import animalName from "angry-purple-tiger";
 import { latLngToH3 } from "@/lib/location/h3";
 import OnboardingClient from "@helium/onboarding";
-import { getAsset, proofArgsAndAccounts } from "@helium/spl-utils";
+import { proofArgsAndAccounts } from "@helium/spl-utils";
 import {
   keyToAssetKey,
   decodeEntityKey,
@@ -45,6 +45,7 @@ import {
   hotspotInfoKey,
   locationAssertDcFee,
   locationStakingFee,
+  type OwnerPaidUpdate,
   REWARDABLE_ENTITY_CONFIG,
   RESIZE_PADDING_BYTES,
   resizeTopUpLamports,
@@ -76,7 +77,7 @@ type InputDeploymentInfo = Extract<
 
 // Convert input deploymentInfo to onboarding format (partial)
 function inputToOnboardingDeploymentInfo(
-  info: InputDeploymentInfo | undefined
+  info: InputDeploymentInfo | undefined,
 ): MobileDeploymentInfoV0 | undefined {
   if (!info) return undefined;
 
@@ -97,7 +98,7 @@ function inputToOnboardingDeploymentInfo(
 // null = unset the field, undefined = use the prior value
 function mergeDeploymentInfo(
   existing: MobileDeploymentInfoV0 | null | undefined,
-  newInfo: InputDeploymentInfo | undefined
+  newInfo: InputDeploymentInfo | undefined,
 ): MobileDeploymentInfoV0 | undefined {
   if (!newInfo) return existing ?? undefined;
   if (!existing) return inputToOnboardingDeploymentInfo(newInfo);
@@ -138,7 +139,7 @@ function mergeDeploymentInfo(
             ? serial === null
               ? null
               : serial
-            : existingWifi.serial ?? null,
+            : (existingWifi.serial ?? null),
       },
     };
   }
@@ -146,10 +147,12 @@ function mergeDeploymentInfo(
   if (existingType === "CBRS" && newType === "CBRS" && existing.cbrsInfoV0) {
     const { type: _, ...cbrs } = newInfo;
     return {
-      cbrsInfoV0:
-        cbrs.radioInfos !== undefined
-          ? cbrs.radioInfos
-          : existing.cbrsInfoV0.radioInfos,
+      cbrsInfoV0: {
+        radioInfos:
+          cbrs.radioInfos !== undefined
+            ? cbrs.radioInfos
+            : existing.cbrsInfoV0.radioInfos,
+      },
     };
   }
 
@@ -190,10 +193,10 @@ async function estimateMobileResizeRent({
   };
   const encoded = await program.coder.accounts.encode(
     "mobileHotspotInfoV0",
-    next
+    next,
   );
   const rentExempt = await connection.getMinimumBalanceForRentExemption(
-    encoded.length + RESIZE_PADDING_BYTES
+    encoded.length + RESIZE_PADDING_BYTES,
   );
   return resizeTopUpLamports(rentExempt, account.lamports);
 }
@@ -201,7 +204,7 @@ async function estimateMobileResizeRent({
 /** DC the owner holds, treating a missing token account as a zero balance. */
 async function dcBalance(
   connection: Connection,
-  owner: PublicKey
+  owner: PublicKey,
 ): Promise<bigint> {
   try {
     return (await getAccount(connection, dcBurnerFor(owner))).amount;
@@ -233,6 +236,8 @@ async function dcFeeForUpdate({
   info: HotspotInfo;
   newLocation: BN | null;
 }): Promise<BN> {
+  if (!newLocation) return new BN(0);
+
   const config = await (
     program.account as any
   ).rewardableEntityConfigV0.fetchNullable(REWARDABLE_ENTITY_CONFIG[network]);
@@ -245,7 +250,7 @@ async function dcFeeForUpdate({
           config.settings,
           network === "iot"
             ? { network: "iot", isFullHotspot: !!info.iot?.isFullHotspot }
-            : { network: "mobile", deviceType: info.mobile?.deviceType ?? {} }
+            : { network: "mobile", deviceType: info.mobile?.deviceType ?? {} },
         )
       : null,
   });
@@ -262,16 +267,12 @@ export const updateHotspotInfo =
       }
 
       const { connection, provider } = createSolanaConnection(walletAddress);
-      const assetEndpoint = env.ASSET_ENDPOINT || connection.rpcEndpoint;
+      const assetEndpoint = getAssetEndpoint();
       const assetPubkey = new PublicKey(assetId);
 
-      const asset = await getAsset(assetEndpoint, assetPubkey);
-      if (!asset) {
-        throw errors.NOT_FOUND({ message: "Asset not found" });
-      }
-
-      assertAssetOwner({
-        asset,
+      const asset = await fetchOwnedAsset({
+        assetEndpoint,
+        assetId: assetPubkey,
         expectedOwner: walletAddress,
         message: "Wallet does not own this hotspot",
         errors,
@@ -280,11 +281,11 @@ export const updateHotspotInfo =
       const hemProgram = await initHemLocal(provider);
       const [keyToAssetK] = keyToAssetKey(HNT_DAO, entityPubKey);
       const keyToAsset = await (hemProgram.account as any).keyToAssetV0.fetch(
-        keyToAssetK
+        keyToAssetK,
       );
       const entityKey = decodeEntityKey(
         keyToAsset.entityKey,
-        keyToAsset.keySerialization
+        keyToAsset.keySerialization,
       );
 
       if (!entityKey) {
@@ -338,40 +339,24 @@ export const updateHotspotInfo =
           : null;
         const info = await getHotspotInfo(provider, entityKey);
 
-        let updateIx;
+        let update: OwnerPaidUpdate;
         if (input.deviceType === "iot") {
-          updateIx = await buildOwnerPaidUpdateInstruction({
-            program: hemProgram,
-            owner,
-            entityKey,
-            merkleTree: accounts.merkleTree,
-            proofArgs: args,
-            remainingAccounts,
-            update: {
-              network: "iot",
-              location: newLocation,
-              elevation: toOnChainElevation(input.elevation),
-              gain: toOnChainGain(input.gain),
-            },
-          });
+          update = {
+            network: "iot",
+            location: newLocation,
+            elevation: toOnChainElevation(input.elevation),
+            gain: toOnChainGain(input.gain),
+          };
         } else {
           const mergedDeploymentInfo = mergeDeploymentInfo(
             info.mobile?.deploymentInfo ?? undefined,
-            input.deploymentInfo
+            input.deploymentInfo,
           );
-          updateIx = await buildOwnerPaidUpdateInstruction({
-            program: hemProgram,
-            owner,
-            entityKey,
-            merkleTree: accounts.merkleTree,
-            proofArgs: args,
-            remainingAccounts,
-            update: {
-              network: "mobile",
-              location: newLocation,
-              deploymentInfo: mergedDeploymentInfo ?? null,
-            },
-          });
+          update = {
+            network: "mobile",
+            location: newLocation,
+            deploymentInfo: mergedDeploymentInfo ?? null,
+          };
           rentLamports = await estimateMobileResizeRent({
             connection,
             program: hemProgram,
@@ -380,10 +365,20 @@ export const updateHotspotInfo =
             location: newLocation,
             deploymentInfo: withPreservedWifiSerial(
               mergedDeploymentInfo,
-              info.mobile?.deploymentInfo ?? undefined
+              info.mobile?.deploymentInfo ?? undefined,
             ),
           });
         }
+
+        const updateIx = await buildOwnerPaidUpdateInstruction({
+          program: hemProgram,
+          owner,
+          entityKey,
+          merkleTree: accounts.merkleTree,
+          proofArgs: args,
+          remainingAccounts,
+          update,
+        });
 
         const dcFee = await dcFeeForUpdate({
           program: hemProgram,
@@ -425,7 +420,9 @@ export const updateHotspotInfo =
             solanaAddress: walletAddress,
             location: h3?.iot,
             elevation: input.elevation,
-            gain: input.gain,
+            // The onboarding wire field is tenths of a dBi, like the on-chain
+            // i32; the input is decimal dBi in both fee-payer modes.
+            gain: toOnChainGain(input.gain) ?? undefined,
             format: "v0",
           });
           const txs = response.data?.solanaTransactions ?? [];
@@ -450,7 +447,7 @@ export const updateHotspotInfo =
           // Merge existing with new deploymentInfo
           const mergedDeploymentInfo = mergeDeploymentInfo(
             existingDeploymentInfo,
-            input.deploymentInfo
+            input.deploymentInfo,
           );
 
           const response = await onboardingClient.updateMobileMetadata({
@@ -484,7 +481,7 @@ export const updateHotspotInfo =
 
         // Calculate fees from external transactions (format: v0 ensures VersionedTransaction)
         const vtxs = rawTxBytes.map((bytes) =>
-          VersionedTransaction.deserialize(bytes)
+          VersionedTransaction.deserialize(bytes),
         );
         totalFee = await getTotalTransactionFees(connection, vtxs);
       }
@@ -497,7 +494,7 @@ export const updateHotspotInfo =
 
       // Check wallet has sufficient balance using actual transaction fees
       const walletBalance = await connection.getBalance(
-        new PublicKey(walletAddress)
+        new PublicKey(walletAddress),
       );
       const required = calculateRequiredBalance(totalFee, rentLamports);
       if (walletBalance < required) {
@@ -541,9 +538,9 @@ export const updateHotspotInfo =
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(totalFee + rentLamports),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
         appliedTo,
       };
-    }
+    },
   );

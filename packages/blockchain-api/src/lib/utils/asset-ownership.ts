@@ -1,8 +1,14 @@
-import type { Asset } from "@helium/spl-utils";
+import { getAsset, type Asset } from "@helium/spl-utils";
+import type { PublicKey } from "@solana/web3.js";
 
 /** The error builder an ownership refusal is raised through. */
 type AssetOwnerErrors = {
   UNAUTHORIZED: (opts: { message: string }) => Error;
+};
+
+/** `fetchOwnedAsset` also refuses an asset the endpoint does not know. */
+type OwnedAssetErrors = AssetOwnerErrors & {
+  NOT_FOUND: (opts: { message: string }) => Error;
 };
 
 /**
@@ -40,4 +46,36 @@ export function assertAssetOwner({
     throw errors.UNAUTHORIZED({ message });
   }
   return ownerAddress;
+}
+
+/**
+ * Fetch a cNFT and refuse the caller unless `expectedOwner` owns it, handing
+ * back the asset so the endpoint never pays for a second DAS round-trip.
+ *
+ * `assetEndpoint` comes in rather than being read from the environment here so
+ * this module stays importable under the unit runner, which resolves no `@/`
+ * aliases; endpoints pass `getAssetEndpoint()` from `@/lib/solana`.
+ * `getAssetFn` exists for tests.
+ */
+export async function fetchOwnedAsset({
+  assetEndpoint,
+  assetId,
+  expectedOwner,
+  message,
+  errors,
+  getAssetFn = getAsset,
+}: {
+  assetEndpoint: string;
+  assetId: PublicKey;
+  expectedOwner: string;
+  message: string;
+  errors: OwnedAssetErrors;
+  getAssetFn?: (url: string, assetId: PublicKey) => Promise<Asset | undefined>;
+}): Promise<Asset> {
+  const asset = await getAssetFn(assetEndpoint, assetId);
+  if (!asset) {
+    throw errors.NOT_FOUND({ message: "Asset not found" });
+  }
+  assertAssetOwner({ asset, expectedOwner, message, errors });
+  return asset;
 }

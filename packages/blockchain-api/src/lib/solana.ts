@@ -17,9 +17,14 @@ export function getCluster(): string {
   return process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "mainnet";
 }
 
+/** The DAS endpoint asset reads go through; the RPC when none is configured. */
+export function getAssetEndpoint(): string {
+  return env.ASSET_ENDPOINT || env.SOLANA_RPC_URL;
+}
+
 export function loadKeypair(keypair: string): Keypair {
   return Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
+    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString())),
   );
 }
 
@@ -36,7 +41,7 @@ function getConnection(): Connection {
 }
 
 export function createSolanaConnection(
-  walletAddress: string
+  walletAddress: string,
 ): SolanaConnection {
   const connection = getConnection();
   const wallet = {
@@ -51,7 +56,7 @@ export function createSolanaConnection(
   const provider = new AnchorProvider(
     connection,
     wallet,
-    AnchorProvider.defaultOptions()
+    AnchorProvider.defaultOptions(),
   );
 
   return {

@@ -55,7 +55,7 @@ export const mint = publicProcedure.dataCredits.mint.handler(
     const useJito = shouldUseJitoBundle(txs.length, getCluster());
     const txFees = await getTotalTransactionFees(
       connection,
-      txs.map((t) => t.tx)
+      txs.map((t) => t.tx),
     );
     const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
 
@@ -66,13 +66,13 @@ export const mint = publicProcedure.dataCredits.mint.handler(
     const recipientDcAta = getAssociatedTokenAddressSync(
       DC_MINT,
       recipientPubkey,
-      true
+      true,
     );
     const recipientDcAtaInfo = await connection.getAccountInfo(recipientDcAta);
     const ataRent = recipientDcAtaInfo ? 0 : RENT_COSTS.ATA;
     const requiredBalance = calculateRequiredBalance(
       txFees + jitoTipCost,
-      ataRent
+      ataRent,
     );
 
     const ownerPubkey = new PublicKey(owner);
@@ -89,6 +89,7 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       userAddress: owner,
       dcAmount: dcAmount || undefined,
       hntAmount: hntAmount || undefined,
+      recipient: recipient && recipient !== owner ? recipient : undefined,
     });
 
     // The credits land on the recipient rather than the signer whenever one is
@@ -135,5 +136,5 @@ export const mint = publicProcedure.dataCredits.mint.handler(
         recipient: recipient || undefined,
       },
     };
-  }
+  },
 );

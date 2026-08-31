@@ -3,12 +3,10 @@ import { connectToDb } from "@/lib/utils/db";
 import { AssetOwner } from "@/lib/models/hotspot";
 import { MiniFanout } from "@/lib/models/mini-fanout";
 import { Recipient } from "@/lib/models/recipient";
-import { createSolanaConnection } from "@/lib/solana";
-import { env } from "@/lib/env";
+import { createSolanaConnection, getAssetEndpoint } from "@/lib/solana";
 import animalName from "angry-purple-tiger";
-import { assertAssetOwner } from "@/lib/utils/asset-ownership";
+import { fetchOwnedAsset } from "@/lib/utils/asset-ownership";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
-import { getAsset } from "@helium/spl-utils";
 import {
   init as initLd,
   updateCompressionDestination,
@@ -52,15 +50,9 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
 
     // Only the owner may remove a hotspot's split, so the check comes before
     // the split is looked up: an unauthorized caller learns nothing about it.
-    const asset = await getAsset(
-      env.ASSET_ENDPOINT || env.SOLANA_RPC_URL,
-      new PublicKey(assetId)
-    );
-    if (!asset) {
-      throw errors.NOT_FOUND({ message: "Asset not found" });
-    }
-    assertAssetOwner({
-      asset,
+    const asset = await fetchOwnedAsset({
+      assetEndpoint: getAssetEndpoint(),
+      assetId: new PublicKey(assetId),
       expectedOwner: walletAddress,
       message: "Wallet does not own this hotspot",
       errors,
@@ -96,9 +88,8 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
     const { provider, connection } = createSolanaConnection(walletAddress);
     const program = await initMiniFanout(provider);
     const miniFanoutK = new PublicKey(assetOwner.recipient.split.address);
-    const miniFanout = await program.account.miniFanoutV0.fetchNullable(
-      miniFanoutK
-    );
+    const miniFanout =
+      await program.account.miniFanoutV0.fetchNullable(miniFanoutK);
 
     if (!miniFanout) {
       throw errors.NOT_FOUND({ message: "Fanout not found" });
@@ -106,7 +97,7 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
 
     // Check wallet has sufficient balance for transaction fees
     const walletBalance = await connection.getBalance(
-      new PublicKey(walletAddress)
+      new PublicKey(walletAddress),
     );
     const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
     if (walletBalance < required) {
@@ -138,6 +129,9 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
         assetId: new PublicKey(assetId),
         lazyDistributor: new PublicKey(assetOwner.recipient.lazyDistributor),
         destination: null,
+        // The asset is already in hand from the ownership check above;
+        // reuse it rather than pay for a second DAS round-trip.
+        getAssetFn: async () => asset,
       })
     ).instruction();
 
@@ -179,8 +173,8 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(txFee),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

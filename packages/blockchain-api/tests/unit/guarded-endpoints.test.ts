@@ -52,7 +52,14 @@ describe("server code that calls a guard", () => {
 
   for (const file of ASSET_OWNER_GUARDED) {
     it(`${file} checks the caller owns the asset`, () => {
-      expect(callIndex(code(file), "assertAssetOwner")).to.be.greaterThan(-1);
+      // Either guard suffices: fetchOwnedAsset calls assertAssetOwner itself.
+      const source = code(file);
+      expect(
+        Math.max(
+          callIndex(source, "assertAssetOwner"),
+          callIndex(source, "fetchOwnedAsset"),
+        ),
+      ).to.be.greaterThan(-1);
     });
   }
 
