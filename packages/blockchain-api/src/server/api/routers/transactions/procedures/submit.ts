@@ -13,6 +13,7 @@ import {
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import { predictSubmissionType } from "@/lib/utils/submission-helpers";
+import { verifiedFeePayer } from "@/lib/utils/transaction-payer";
 import { v4 as uuidv4 } from "uuid";
 import {
   JitoMissingTipError,
@@ -42,12 +43,11 @@ function captureSubmissionError(
     tag?: string;
     payer: string;
     transactions: SubmitInputTx[];
-  }
+  },
 ): void {
   const baseTags: Record<string, unknown> = {
     batch_size: context.batchSize,
     parallel: context.parallel,
-    tag: context.tag,
   };
 
   const baseExtra: Record<string, unknown> = {
@@ -146,7 +146,7 @@ function captureSubmissionError(
   for (const tx of context.transactions.slice(0, 3)) {
     try {
       const deserialized = VersionedTransaction.deserialize(
-        Buffer.from(tx.serializedTransaction, "base64")
+        Buffer.from(tx.serializedTransaction, "base64"),
       );
       explorerLinks.push(getExplorerUrl(deserialized));
       chewingGlassExplorerLinks.push(getChewingGlassExplorerUrl(deserialized));
@@ -194,16 +194,26 @@ export const submit = publicProcedure.transactions.submit.handler(
       });
     }
 
-    // Extract payer from the first transaction
-    let payer: string;
+    // Attribute the batch to the first transaction's fee payer. The payer is
+    // recorded as history and is read back as the account that acted, so it is
+    // taken from the signature rather than from the account list: submission
+    // skips preflight, so an unsigned transaction would otherwise be persisted
+    // under whatever account it names.
+    let firstTransaction: VersionedTransaction;
     try {
-      const firstTransaction = VersionedTransaction.deserialize(
-        Buffer.from(transactions[0].serializedTransaction, "base64")
+      firstTransaction = VersionedTransaction.deserialize(
+        Buffer.from(transactions[0].serializedTransaction, "base64"),
       );
-      payer = firstTransaction.message.staticAccountKeys[0].toBase58();
     } catch {
       throw errors.BAD_REQUEST({
         message: "Failed to decode transaction to extract payer",
+      });
+    }
+
+    const payer = verifiedFeePayer(firstTransaction);
+    if (!payer) {
+      throw errors.BAD_REQUEST({
+        message: "Transaction is not signed by its fee payer",
       });
     }
 
@@ -220,7 +230,7 @@ export const submit = publicProcedure.transactions.submit.handler(
       const simulationPromises = transactions.map(async (tx, index) => {
         try {
           const transaction = VersionedTransaction.deserialize(
-            Buffer.from(tx.serializedTransaction, "base64")
+            Buffer.from(tx.serializedTransaction, "base64"),
           );
           const simulation = await connection.simulateTransaction(transaction, {
             commitment: simulationCommitment,
@@ -260,7 +270,7 @@ export const submit = publicProcedure.transactions.submit.handler(
       if (ff) {
         const failedTxMeta = transactions[ff.index]?.metadata;
         const firstRealMeta = transactions.find(
-          (t) => t.metadata?.type && t.metadata.type !== "jito_tip"
+          (t) => t.metadata?.type && t.metadata.type !== "jito_tip",
         )?.metadata;
         const actionType =
           (failedTxMeta?.type as string | undefined) ??
@@ -268,12 +278,12 @@ export const submit = publicProcedure.transactions.submit.handler(
           "unknown";
         const { category, detail } = classifySimulationLogs(
           ff.error ?? "",
-          ff.logs ?? []
+          ff.logs ?? [],
         );
 
         Sentry.captureException(
           new Error(
-            `Transaction simulation failed [${category}] (${actionType}): ${detail}`
+            `Transaction simulation failed [${category}] (${actionType}): ${detail}`,
           ),
           {
             level: "error",
@@ -302,7 +312,7 @@ export const submit = publicProcedure.transactions.submit.handler(
               chewing_glass_explorer_link: ff?.chewingGlassLink,
               simulation_logs: ff?.logs,
             },
-          }
+          },
         );
 
         if (category === "account_not_found") {
@@ -330,7 +340,7 @@ export const submit = publicProcedure.transactions.submit.handler(
 
     const cluster = getCluster();
     const serializedTransactions = transactions.map(
-      (tx) => tx.serializedTransaction
+      (tx) => tx.serializedTransaction,
     );
     // Derive actionType from first transaction metadata or actionMetadata
     const actionType =
@@ -380,6 +390,25 @@ export const submit = publicProcedure.transactions.submit.handler(
             };
           }
         }
+        // Everything that is not the dedup short-circuit above is a real
+        // failure, and it is rethrown below outside captureSubmissionError —
+        // capture it here or it stays invisible. A unique violation whose
+        // winning batch has already left "pending" lands here too, so it no
+        // longer escapes as a silent 500.
+        Sentry.captureException(error, {
+          level: "error",
+          tags: {
+            error_type: "tag_reservation_failed",
+            action_type: actionType,
+          },
+          extra: {
+            tag,
+            tag_length: tag.length,
+            parallel,
+            payer,
+            batch_size: transactions.length,
+          },
+        });
         throw error;
       }
     }
@@ -398,7 +427,7 @@ export const submit = publicProcedure.transactions.submit.handler(
       // locked as pending forever.
       if (tag) {
         await TransactionBatch.destroy({ where: { id: batchId } }).catch(
-          () => {}
+          () => {},
         );
       }
 
@@ -453,7 +482,7 @@ export const submit = publicProcedure.transactions.submit.handler(
             submissionType: result.submissionType,
             jitoBundleId: result.jitoBundleId,
           },
-          { where: { id: batchId }, transaction: dbTransaction }
+          { where: { id: batchId }, transaction: dbTransaction },
         );
       } else {
         await TransactionBatch.create(
@@ -469,7 +498,7 @@ export const submit = publicProcedure.transactions.submit.handler(
             actionType,
             actionMetadata,
           },
-          { transaction: dbTransaction }
+          { transaction: dbTransaction },
         );
       }
 
@@ -479,7 +508,7 @@ export const submit = publicProcedure.transactions.submit.handler(
 
         // Decode transaction to get blockhash
         const transaction = VersionedTransaction.deserialize(
-          Buffer.from(txData.serializedTransaction, "base64")
+          Buffer.from(txData.serializedTransaction, "base64"),
         );
 
         return PendingTransaction.create(
@@ -494,7 +523,7 @@ export const submit = publicProcedure.transactions.submit.handler(
             metadata: txData.metadata,
             serializedTransaction: txData.serializedTransaction,
           },
-          { transaction: dbTransaction }
+          { transaction: dbTransaction },
         );
       });
 
@@ -509,5 +538,5 @@ export const submit = publicProcedure.transactions.submit.handler(
     }
 
     return { batchId };
-  }
+  },
 );

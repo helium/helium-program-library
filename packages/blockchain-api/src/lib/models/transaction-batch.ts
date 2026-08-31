@@ -26,6 +26,8 @@ export interface TransactionBatchAttributes {
   actionType?: string;
   actionMetadata?: Record<string, unknown>;
   confirmedAt?: Date;
+  resubmissionCount: number;
+  lastResubmittedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   transactions?: PendingTransaction[];
@@ -43,6 +45,8 @@ class TransactionBatch extends Model implements TransactionBatchAttributes {
   declare actionType?: string;
   declare actionMetadata?: Record<string, unknown>;
   declare confirmedAt?: Date;
+  declare resubmissionCount: number;
+  declare lastResubmittedAt?: Date;
   declare createdAt: Date;
   declare updatedAt: Date;
   declare transactions?: PendingTransaction[];
@@ -79,7 +83,8 @@ TransactionBatch.init(
       allowNull: false,
     },
     tag: {
-      type: DataTypes.STRING,
+      // TEXT, not STRING: client-supplied tags can exceed varchar(255).
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     payer: {
@@ -100,6 +105,17 @@ TransactionBatch.init(
       type: DataTypes.DATE,
       allowNull: true,
       field: "confirmed_at",
+    },
+    resubmissionCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: "resubmission_count",
+    },
+    lastResubmittedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "last_resubmitted_at",
     },
   },
   {

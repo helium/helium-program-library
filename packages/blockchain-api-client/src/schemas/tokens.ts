@@ -15,6 +15,9 @@ export const TransferInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   destination: z.string().min(32),
   tokenAmount: TokenAmountInputSchema,
+  feePayer: WalletAddressSchema.optional().describe(
+    "Account that pays the transaction fee and the rent for the recipient's associated token account, when one has to be created. Defaults to walletAddress, which is the source authority either way; naming a different account lets a wallet be emptied. The transaction then needs both signatures. Not valid with multisig."
+  ),
   ...squadsProposeFields,
 });
 

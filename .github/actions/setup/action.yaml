@@ -7,7 +7,14 @@ runs:
     # serve corrupt indexes and fail apt-get update; nothing here needs them.
     - run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod* /etc/apt/sources.list.d/azure-cli*
       shell: bash
-    - run: sudo apt-get update
+    # apt has no timeout by default, so a mirror that accepts the connection and then
+    # stalls hangs the step until the job's own cap. Observed repeatedly: a fetch of
+    # archive.ubuntu.com InRelease going silent for 44 minutes. Retries cover a mirror
+    # that fails outright. `timeout-minutes` is not available on composite-action steps,
+    # so the bound is set once in apt.conf.d and every later apt-get in the job inherits it.
+    - run: |
+        printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99ci-timeouts
+        sudo apt-get update
       shell: bash
     - run: sudo apt-get install -y pkg-config build-essential libudev-dev
       shell: bash

@@ -268,11 +268,17 @@ export async function withPriorityFees({
   // simulation's measured size, or left unset (runtime 64 MiB default) when
   // no simulation validated a ceiling.
   loadedAccountsDataSizeLimit,
+  // Set false for txs a wallet signs. Wallets (Phantom, Solflare) append
+  // guard ixs (Lighthouse, ~424 KiB of program data) after we size the tx;
+  // a sim-derived limit with 10% headroom then fails on-chain with
+  // MaxLoadedAccountsDataSizeExceeded. An explicit limit is still honored.
+  deriveLoadedAccountsDataSizeLimit = true,
   ...rest
 }: {
   connection: Connection;
   computeUnits?: number;
   basePriorityFee?: number;
+  deriveLoadedAccountsDataSizeLimit?: boolean;
   // Headroom multiplier applied to the simulated CU consumption AND to the
   // sim-derived loaded-accounts-data-size request — one knob scales both.
   computeScaleUp?: number;
@@ -313,7 +319,10 @@ export async function withPriorityFees({
     // The ceiling the sim tx validates against when we insert our own
     // ComputeBudget ixs below.
     const simCeiling =
-      loadedAccountsDataSizeLimit ?? DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT;
+      loadedAccountsDataSizeLimit ??
+      (deriveLoadedAccountsDataSizeLimit
+        ? DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
+        : undefined);
     // LUTs are needed to compile the sim tx; the blockhash is not —
     // simulation replaces it (replaceRecentBlockhash), so a placeholder
     // satisfies toVersionedTx without a getLatestBlockhash RPC.
@@ -331,9 +340,11 @@ export async function withPriorityFees({
     // Only true when our data-size ix actually enters the sim tx. When the
     // caller brought their own data-size ix the sim runs under their ceiling
     // instead, and nothing has validated ours.
-    const simValidatesDataSizeCeiling = !callerComputeBudgetTypes(
-      tx.instructions
-    ).has(COMPUTE_BUDGET_IX_DATA_SIZE);
+    const simValidatesDataSizeCeiling =
+      simCeiling != null &&
+      !callerComputeBudgetTypes(tx.instructions).has(
+        COMPUTE_BUDGET_IX_DATA_SIZE
+      );
     const ixWithComputeUnits = prependComputeBudgetIxs(tx.instructions, {
       computeUnits: MAX_COMPUTE_UNITS,
       microLamports: 1,
@@ -384,7 +395,7 @@ export async function withPriorityFees({
       }
     }
     computeUnits = budget.computeUnits;
-    if (loadedAccountsDataSizeLimit == null) {
+    if (loadedAccountsDataSizeLimit == null && simCeiling != null) {
       if (budget.simulated && budget.loadedAccountsDataSize) {
         // Request measured size × headroom, rounded up to the 32 KiB fee
         // quantum — mirrors the CU model. Clamp to the default ceiling only

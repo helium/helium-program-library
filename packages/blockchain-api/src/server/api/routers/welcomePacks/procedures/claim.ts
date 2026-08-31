@@ -6,6 +6,12 @@ import {
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
 import {
+  checkApprovalWindow,
+  CLAIM_APPROVAL_MESSAGES,
+  verifyClaimApproval,
+  type ClaimApprovalRejection,
+} from "@/lib/utils/claim-approval";
+import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
@@ -34,25 +40,49 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
       });
     }
 
-    // Verify expiration
-    const currentTs = Math.floor(Date.now() / 1000);
-    if (currentTs > parseInt(expirationTs)) {
-      throw errors.EXPIRED({ message: "Invite has expired" });
+    const expiration = parseInt(expirationTs);
+    const now = Math.floor(Date.now() / 1000);
+
+    // An expired approval is its own status here, so both points an approval
+    // can be refused from map the reason the same way.
+    const rejectApproval = (reason: ClaimApprovalRejection) =>
+      reason === "expired"
+        ? errors.EXPIRED({ message: CLAIM_APPROVAL_MESSAGES.expired })
+        : errors.BAD_REQUEST({ message: CLAIM_APPROVAL_MESSAGES[reason] });
+
+    // An expiry the program would not accept is refused on its own, before the
+    // pack is read.
+    const windowRejection = checkApprovalWindow({
+      expirationTs: expiration,
+      now,
+    });
+    if (windowRejection) {
+      throw rejectApproval(windowRejection);
     }
 
-    const signatureBytes = Buffer.from(signature, "base64");
+    // Reading the pack only reads accounts, so it runs under the claimer's
+    // address. The fee payer's key is loaded further down, once the approval it
+    // would be spent on has been verified.
+    const { provider } = createSolanaConnection(walletAddress);
+    const program = await init(provider);
+    const welcomePack = await program.account.welcomePackV0.fetch(
+      new PublicKey(packAddress),
+    );
+
+    const approval = verifyClaimApproval({
+      uniqueId: welcomePack.uniqueId,
+      expirationTs: expiration,
+      owner: welcomePack.owner.toBytes(),
+      signatureBase64: signature,
+      now,
+    });
+    if (!approval.ok) {
+      throw rejectApproval(approval.reason);
+    }
+    const signatureBytes = approval.signature;
 
     const feePayerWallet = loadKeypair(process.env.FEE_PAYER_WALLET_PATH!);
-
-    // Initialize connection and programs
-    const { provider } = createSolanaConnection(
-      feePayerWallet.publicKey.toString()
-    );
-    const program = await init(provider);
     const tuktukProgram = await initTuktuk(provider);
-    const welcomePack = await program.account.welcomePackV0.fetch(
-      new PublicKey(packAddress)
-    );
 
     // Prepare claim transaction
     const {
@@ -67,19 +97,19 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
         welcomePack: new PublicKey(packAddress),
         claimApproval: {
           uniqueId: welcomePack.uniqueId,
-          expirationTimestamp: new BN(parseInt(expirationTs)),
+          expirationTimestamp: new BN(expiration),
         },
         claimApprovalSignature: signatureBytes,
         payer: feePayerWallet.publicKey,
         getAssetFn: (_, assetId) =>
           getAsset(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId
+            assetId,
           ),
         getAssetProofFn: (_, assetId) =>
           getAssetProof(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId
+            assetId,
           ),
       })
     ).prepare();
@@ -94,10 +124,10 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
             getAssociatedTokenAddressSync(
               rewardsMint!,
               new PublicKey(walletAddress),
-              true
+              true,
             ),
             new PublicKey(walletAddress),
-            rewardsMint!
+            rewardsMint!,
           ),
         ],
         feePayer: feePayerWallet.publicKey,
@@ -133,8 +163,8 @@ export const claim = publicProcedure.welcomePacks.claim.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(0),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

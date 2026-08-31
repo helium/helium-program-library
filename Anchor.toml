@@ -64,99 +64,111 @@ test = "pnpm exec ts-mocha -p ./tsconfig.test.json -t 1000000 tests/**/*.ts"
 [test]
 startup_wait = 20000
 
+# Programs are preloaded from .so dumps rather than cloned. Loading them as raw
+# account pairs instead exhausts the validator's program cache.
+
+[[test.genesis]]
+address = "tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA"  # tuktuk
+program = "accounts/tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA.so"
+
+[[test.genesis]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"  # token-metadata
+program = "accounts/metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s.so"
+
+[[test.genesis]]
+address = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"  # bubblegum
+program = "accounts/BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY.so"
+
+[[test.genesis]]
+address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"  # noop
+program = "accounts/noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV.so"
+
+[[test.genesis]]
+address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"  # account compression
+program = "accounts/cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK.so"
+
+[[test.genesis]]
+address = "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S"  # spl governance program
+program = "accounts/hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S.so"
+
+[[test.genesis]]
+address = "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs"  # Proposal
+program = "accounts/propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs.so"
+
+[[test.genesis]]
+address = "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p"  # NFT Proxy
+program = "accounts/nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p.so"
+
+[[test.genesis]]
+address = "orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f"  # Org program
+program = "accounts/orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f.so"
+
+[[test.genesis]]
+address = "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM"  # State controller program
+program = "accounts/stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM.so"
+
+[[test.genesis]]
+address = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"  # Pyth price oracle program
+program = "accounts/rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ.so"
+
+[[test.genesis]]
+address = "HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ"  # Wormhole
+program = "accounts/HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ.so"
+
+[[test.genesis]]
+address = "SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu"  # Squads multisig program
+program = "accounts/SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu.so"
+
 [test.validator]
-url = "https://api.mainnet-beta.solana.com"
 bind_address = "127.0.0.1"
 
-[[test.validator.clone]]
-address = "tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA" # tuktuk
+[[test.validator.account]]
+address = "HGBovqKte26DbEMBma3T1TvvdmAFYSSgjncRoKECqfXq"  # tuktuk config
+filename = "accounts/HGBovqKte26DbEMBma3T1TvvdmAFYSSgjncRoKECqfXq.json"
 
-[[test.validator.clone]]
-address = "HGBovqKte26DbEMBma3T1TvvdmAFYSSgjncRoKECqfXq" # tuktuk config
+[[test.validator.account]]
+address = "GkUxZMcw2RbwZ64VL3MvBtYNV8zim3y7UfzabFTybAUJ"  # tuktuk-idl
+filename = "accounts/GkUxZMcw2RbwZ64VL3MvBtYNV8zim3y7UfzabFTybAUJ.json"
 
-[[test.validator.clone]]
-address = "GkUxZMcw2RbwZ64VL3MvBtYNV8zim3y7UfzabFTybAUJ" # tuktuk-idl
+[[test.validator.account]]
+address = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"  # associated-token-program
+filename = "accounts/ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL.json"
 
-[[test.validator.clone]]
-address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" # token-metadata
+[[test.validator.account]]
+address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33"  # hnt feed needed for dc auto top
+filename = "accounts/4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33.json"
 
-[[test.validator.clone]]
-address = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" # associated-token-program
+[[test.validator.account]]
+address = "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5"  # pro-receiver-owned HNT/USD feed for the data-credits mint pin and tuktuk-dca
+filename = "accounts/He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5.json"
 
-[[test.validator.clone]]
-address = "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY" # bubblegum
+[[test.validator.account]]
+address = "6HAuqASbHEh4w4REJEUUUCginTLfj1kwCh215ZLtMkrT"  # pro-receiver-owned USDC/USD price feed for tuktuk-dca
+filename = "accounts/6HAuqASbHEh4w4REJEUUUCginTLfj1kwCh215ZLtMkrT.json"
 
-[[test.validator.clone]]
-address = "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV" # noop
+[[test.validator.account]]
+address = "ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk"  # required by spl governance
+filename = "accounts/ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk.json"
 
-[[test.validator.clone]]
-address = "4DdmDswskDxXGpwHrXUfn2CNUm9rt21ac79GHNTN3J33" # hnt feed needed for dc auto top
+[[test.validator.account]]
+address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA"  # Proposal IDL
+filename = "accounts/66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA.json"
 
-[[test.validator.clone]]
-address = "He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5" # pro-receiver-owned HNT/USD feed for the data-credits mint pin and tuktuk-dca
+[[test.validator.account]]
+address = "CNjepJnCPddZwd8xGS3M2QpZuCbfVRNvi3jfBehKHKHw"  # NFT Proxy IDL
+filename = "accounts/CNjepJnCPddZwd8xGS3M2QpZuCbfVRNvi3jfBehKHKHw.json"
 
-[[test.validator.clone]]
-address = "6HAuqASbHEh4w4REJEUUUCginTLfj1kwCh215ZLtMkrT" # pro-receiver-owned USDC/USD price feed for tuktuk-dca
+[[test.validator.account]]
+address = "CjVhwk3gdDXB8iUZCUP9M6QaRvoBGkM7FX9qAf6Qm4sG"  # Org program IDL
+filename = "accounts/CjVhwk3gdDXB8iUZCUP9M6QaRvoBGkM7FX9qAf6Qm4sG.json"
 
-[[test.validator.clone]]
-address = "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK" # account compression
+[[test.validator.account]]
+address = "GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E"  # State controller IDL
+filename = "accounts/GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E.json"
 
-[[test.validator.clone]]
-address = "hgovkRU6Ghe1Qoyb54HdSLdqN7VtxaifBzRmh9jtd3S" # spl governance program
-
-[[test.validator.clone]]
-address = "ENmcpFCpxN1CqyUjuog9yyUVfdXBKF3LVCwLr7grJZpk" # required by spl governance 
-
-[[test.validator.clone]]
-address = "propFYxqmVcufMhk5esNMrexq2ogHbbC2kP9PU1qxKs" # Proposal
-
-[[test.validator.clone]]
-address = "66t3XARU6Ja3zj91gDZ2KoNLJHEMTYPSKqJWYb6PJJBA" # Proposal IDL
-
-[[test.validator.clone]]
-address = "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p" # NFT Proxy
-
-[[test.validator.clone]]
-address = "CNjepJnCPddZwd8xGS3M2QpZuCbfVRNvi3jfBehKHKHw" # NFT Proxy IDL
-
-[[test.validator.clone]]
-address = "orgdXvHVLkWgBYerptASkAwkZAE563CJUu717dMNx5f" # Org program
-
-[[test.validator.clone]]
-address = "CjVhwk3gdDXB8iUZCUP9M6QaRvoBGkM7FX9qAf6Qm4sG" # Org program IDL
-
-[[test.validator.clone]]
-address = "stcfiqW3fwD9QCd8Bqr1NBLrs7dftZHBQe7RiMMA4aM" # State controller program
-
-[[test.validator.clone]]
-address = "GPQNABq6s63uqzHRwZN9e2GcxtzG4yLP5AnJer7DkB9E" # State controller IDL
-
-# Pyth price oracle program
-[[test.validator.clone]]
-address = "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"
-
-# Wormhole
-[[test.validator.clone]]
-address = "HDwcJBJXjL9FpJ7UBsYBtaDjsBUhuLCUYoz3zr8SWWaQ"
-
-[[test.validator.clone]]
-address = "5gxPdahvSzcKySxXxPuRXZZ9s6h8hZ88XDVKavWpaQGn" # Wormhole guardian set index 4
-
-[[test.validator.clone]]
-address = "HTczusLJSAhMJKYrxLjSUUyW7YDsBuyfBG8Tj1KJsgni" # Wormhole guardian set index 5
-
-[[test.validator.clone]]
-address = "HstYgN21fgNmutTVXjBw54n4ryvP3WrCFbMAjnbdbTzf" # Wormhole guardian set index 6
-
-[[test.validator.clone]]
-address = "6GaHgiaQg9Pg346xHq9m7vQ9rJtnH83gQKqJoiAxQa7D" # Wormhole guardian set index 7
-
-[[test.validator.clone]]
+[[test.validator.account]]
 address = "DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b"
-
-# Squads multisig program
-[[test.validator.clone]]
-address = "SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu"
+filename = "accounts/DaWUKXCyXsnzcvLUyeJRWou8KTn7XtadgTsdhJ6RHS7b.json"
 
 # [[test.validator.clone]]
 # address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

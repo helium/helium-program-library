@@ -1,15 +1,5 @@
 import { publicProcedure } from "../../../procedures";
-import {
-  PublicKey,
-  SystemProgram,
-  Connection,
-  TransactionInstruction,
-} from "@solana/web3.js";
-import {
-  createAssociatedTokenAccountIdempotentInstruction,
-  createTransferCheckedInstruction,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
+import { PublicKey, Connection } from "@solana/web3.js";
 import {
   buildVersionedTransaction,
   serializeTransaction,
@@ -18,11 +8,7 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
-import {
-  TOKEN_MINTS,
-  TOKEN_NAMES,
-  getTokenDecimals,
-} from "@/lib/constants/tokens";
+import { TOKEN_MINTS, TOKEN_NAMES } from "@/lib/constants/tokens";
 import {
   getTransactionFee,
   calculateRequiredBalance,
@@ -34,77 +20,27 @@ import {
   buildActionProposal,
   proposalTransactionData,
 } from "../../squads/procedures/helpers";
+import {
+  buildTransferInstructions,
+  transferSolShortfall,
+} from "./transfer-helpers";
 import BN from "bn.js";
-
-/**
- * Build the raw transfer instructions with `authority` as the source owner and
- * fee payer for any created associated token account. Shared by the direct
- * transfer path (authority = wallet) and the Squads propose path (authority =
- * vault).
- */
-async function buildTransferInstructions({
-  connection,
-  authority,
-  destination,
-  mint,
-  rawAmount,
-  isSol,
-}: {
-  connection: Connection;
-  authority: PublicKey;
-  destination: PublicKey;
-  mint: string;
-  rawAmount: bigint;
-  isSol: boolean;
-}): Promise<{ instructions: TransactionInstruction[]; needsAta: boolean }> {
-  if (isSol) {
-    return {
-      instructions: [
-        SystemProgram.transfer({
-          fromPubkey: authority,
-          toPubkey: destination,
-          lamports: rawAmount,
-        }),
-      ],
-      needsAta: false,
-    };
-  }
-
-  const mintKey = new PublicKey(mint);
-  const senderAta = getAssociatedTokenAddressSync(mintKey, authority, true);
-  const destAta = getAssociatedTokenAddressSync(mintKey, destination, true);
-  const [destAtaInfo, decimals] = await Promise.all([
-    connection.getAccountInfo(destAta),
-    getTokenDecimals(mint),
-  ]);
-  const needsAta = !destAtaInfo;
-
-  return {
-    instructions: [
-      createAssociatedTokenAccountIdempotentInstruction(
-        authority,
-        destAta,
-        destination,
-        mintKey
-      ),
-      createTransferCheckedInstruction(
-        senderAta,
-        mintKey,
-        destAta,
-        authority,
-        rawAmount,
-        decimals
-      ),
-    ],
-    needsAta,
-  };
-}
 
 export const transfer = publicProcedure.tokens.transfer.handler(
   async ({ input, errors }) => {
     const { walletAddress, destination, tokenAmount } = input;
 
-    const feePayer = new PublicKey(walletAddress);
+    // A Squads action is built from the vault, and the proposing member already
+    // pays the outer transaction's fee — both roles a fee payer could fill are
+    // taken, so naming one can only mean the caller expects something else.
+    if (input.feePayer && input.multisig) {
+      throw errors.BAD_REQUEST({
+        message: "feePayer is not supported with multisig",
+      });
+    }
+
+    const authority = new PublicKey(walletAddress);
+    const payer = input.feePayer ? new PublicKey(input.feePayer) : authority;
     const destKey = new PublicKey(destination);
     const connection = new Connection(process.env.SOLANA_RPC_URL!);
 
@@ -137,13 +73,14 @@ export const transfer = publicProcedure.tokens.transfer.handler(
         await buildActionProposal({
           connection,
           multisigPda,
-          member: feePayer,
+          member: authority,
           memo: input.memo,
           buildInstructions: async (vault) =>
             (
               await buildTransferInstructions({
                 connection,
                 authority: vault,
+                payer: vault,
                 destination: destKey,
                 mint: tokenAmount.mint,
                 rawAmount,
@@ -187,7 +124,8 @@ export const transfer = publicProcedure.tokens.transfer.handler(
     // ---- Direct transfer from the wallet ----
     const { instructions, needsAta } = await buildTransferInstructions({
       connection,
-      authority: feePayer,
+      authority,
+      payer,
       destination: destKey,
       mint: tokenAmount.mint,
       rawAmount,
@@ -196,7 +134,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
 
     const tx = await buildVersionedTransaction({
       connection,
-      draft: { instructions, feePayer, addressLookupTableAddresses: [] },
+      draft: { instructions, feePayer: payer, addressLookupTableAddresses: [] },
     });
 
     const tag = generateTransactionTag({
@@ -205,25 +143,31 @@ export const transfer = publicProcedure.tokens.transfer.handler(
       destination,
       mint: tokenAmount.mint,
       amount: tokenAmount.amount,
+      feePayer: input.feePayer,
     });
 
     // For SOL transfers, no rent. For SPL, ATA rent if needed
     const rentCost = needsAta ? RENT_COSTS.ATA : 0;
-    const [txFee, walletBalance] = await Promise.all([
+    // A native SOL transfer's lamports leave the authority, so its balance is
+    // its own check whenever a separate account pays the fee.
+    const authorityPaysTransfer = isSol && !payer.equals(authority);
+    const [txFee, payerBalance, authorityBalance] = await Promise.all([
       getTransactionFee(connection, tx),
-      connection.getBalance(feePayer),
+      connection.getBalance(payer),
+      authorityPaysTransfer ? connection.getBalance(authority) : null,
     ]);
     const estimatedSolFeeLamports = calculateRequiredBalance(txFee, rentCost);
 
-    const totalCost = isSol
-      ? Number(rawAmount) + estimatedSolFeeLamports
-      : estimatedSolFeeLamports;
-    if (walletBalance < totalCost) {
+    const shortfall = transferSolShortfall({
+      payerBalance,
+      payerLamports: estimatedSolFeeLamports,
+      transferLamports: isSol ? Number(rawAmount) : 0,
+      authorityBalance,
+    });
+    if (shortfall) {
       throw errors.INSUFFICIENT_FUNDS({
-        message: isSol
-          ? "Insufficient SOL balance for transfer and transaction fees"
-          : "Insufficient SOL balance for transaction fees",
-        data: { required: totalCost, available: walletBalance },
+        message: shortfall.message,
+        data: { required: shortfall.required, available: shortfall.available },
       });
     }
 

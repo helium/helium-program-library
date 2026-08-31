@@ -1,3 +1,4 @@
+import { BorshInstructionCoder } from "@coral-xyz/anchor";
 import { delegatedPositionKey } from "@helium/helium-sub-daos-sdk";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
@@ -1222,6 +1223,11 @@ describe("governance", () => {
     }): Promise<string[]> {
       const { vsrProgram, provider } = await getPrograms(ctx);
       const hplCronsProgram = await initHplCrons(provider);
+      // `Program.coder.instruction` is typed as the `InstructionCoder`
+      // interface, which declares only `encode`. Build the Borsh coder from
+      // each program's IDL to get `decode`.
+      const vsrCoder = new BorshInstructionCoder(vsrProgram.idl);
+      const hplCronsCoder = new BorshInstructionCoder(hplCronsProgram.idl);
       const names: string[] = [];
       for (const t of txData.transactions) {
         const tx = VersionedTransaction.deserialize(
@@ -1232,10 +1238,10 @@ describe("governance", () => {
           const programId = keys[ix.programIdIndex];
           const data = Buffer.from(ix.data);
           if (programId.equals(vsrProgram.programId)) {
-            const decoded = vsrProgram.coder.instruction.decode(data);
+            const decoded = vsrCoder.decode(data);
             if (decoded) names.push(decoded.name);
           } else if (programId.equals(hplCronsProgram.programId)) {
-            const decoded = hplCronsProgram.coder.instruction.decode(data);
+            const decoded = hplCronsCoder.decode(data);
             if (decoded) names.push(decoded.name);
           }
         }

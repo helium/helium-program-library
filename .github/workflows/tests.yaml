@@ -15,9 +15,16 @@ jobs:
   test-rust-lint:
     name: Test Rust Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
+      # Every other job takes its compiler from setup-anchor's `rustup default 1.85.0`; this one
+      # does not run setup-anchor, so without a version here it takes whatever the runner image
+      # ships and the gate drifts away from the code. It cannot simply reuse 1.85.0: the clippy
+      # flags below name lints that only exist in a later release, and an unknown lint is itself
+      # an error under `-D warnings`. Bump this deliberately, and expect new lints when you do.
+      - run: rustup install 1.98.0 --component clippy,rustfmt --profile minimal && rustup default 1.98.0
       - uses: actions/cache@v4
         name: Cache Cargo registry + index
         id: cache-cargo-build
@@ -39,6 +46,7 @@ jobs:
     name: Check @helium/idls Changeset
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v3
         with:
@@ -130,6 +138,7 @@ jobs:
   test-unit:
     name: Rust Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
@@ -149,6 +158,7 @@ jobs:
   test-atomic-data-publisher:
     name: Atomic Data Publisher Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16
@@ -186,30 +196,27 @@ jobs:
   build:
     name: Build Anchor
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+      - uses: ./.github/actions/localnet-accounts/
 
   test-devflow:
     needs: build
     name: Test Development Workflow
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
       - uses: ./.github/actions/setup-ts/
-      - name: Start Anchor Localnet
-        run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 2
-      - name: Wait for localnet to start
-        run: |
-          while [[ "$(curl -s http://localhost:8899/health)" != "ok" ]]; do
-            echo "Waiting for local Anchor network to start..."
-            sleep 5
-          done
+      - uses: ./.github/actions/localnet-accounts/
+      - uses: ./.github/actions/start-localnet/
       - name: Run bootstrap script
         run: ./scripts/bootstrap.sh
 
@@ -217,6 +224,7 @@ jobs:
     needs: build
     name: Test Helium Vote Service
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/
@@ -229,6 +237,7 @@ jobs:
     needs: build
     name: Test Docker Builds
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -284,6 +293,7 @@ jobs:
     needs: build
     name: Test Rust Builds
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -305,6 +315,7 @@ jobs:
     needs: build
     name: Test Anchor Contracts
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -328,6 +339,7 @@ jobs:
           - tests/mini-fanout-bankrun.ts
           - tests/welcome-pack.ts
           - tests/dc-auto-topoff.ts
+          - tests/dc-auto-topoff-bankrun.ts
           - tests/tuktuk-dca.ts
           - tests/priority-fees.ts
     steps:
@@ -336,14 +348,8 @@ jobs:
         with:
           testing: true
       - uses: ./.github/actions/setup-ts/
-      - name: Start Anchor Localnet
-        run: ~/.cargo/bin/anchor localnet --skip-build --provider.wallet ~/.config/solana/id.json & sleep 2
-      - name: Wait for localnet to start
-        run: |
-          while [[ "$(curl -s http://localhost:8899/health)" != "ok" ]]; do
-            echo "Waiting for local Anchor network to start..."
-            sleep 5
-          done
+      - uses: ./.github/actions/localnet-accounts/
+      - uses: ./.github/actions/start-localnet/
       - run: ANCHOR_WALLET=${HOME}/.config/solana/id.json pnpm exec ts-mocha -p ./tsconfig.test.json -t 1000000 --exit $TEST
         env:
           TESTING: true

@@ -35,6 +35,7 @@ import {
   requirePositionOwnershipWithMessage,
   getCurrentSeasonEnd,
   buildClaimInstructions,
+  type ClaimInstructionsResult,
   buildBatchedTransactions,
   PREPAID_TX_FEES,
   TASK_QUEUE,
@@ -230,10 +231,12 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       info.delegatedPositionAcc = null;
     }
 
-    let claimResult = {
-      instructionBatches: [] as TransactionInstruction[][],
+    let claimResult: ClaimInstructionsResult = {
+      instructionBatches: [],
       hasMore: false,
       hasRewards: false,
+      rewardMints: [],
+      unclaimableEpochs: [],
     };
 
     if (positionsNeedingClaim.length > 0) {
@@ -297,6 +300,20 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           ),
         };
       }
+    }
+
+    // closeDelegationV0 panics if any required epoch is still unclaimed.
+    // changeDelegationV0 tolerates it, so only the expired closes matter here.
+    const expiredMints = new Set(
+      expiredPositionInfos.map((info) => info.positionMintPubkey.toBase58())
+    );
+    const blocking = claimResult.unclaimableEpochs.find((u) =>
+      expiredMints.has(u.positionMint.toBase58())
+    );
+    if (blocking) {
+      throw errors.BAD_REQUEST({
+        message: `Rewards for epoch ${blocking.epoch} have not been issued yet. Try delegating again after they are issued.`,
+      });
     }
 
     const allGroups: InstructionGroup[] = [];

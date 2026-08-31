@@ -361,6 +361,15 @@ const LocationSchema = z.object({
   lng: z.number().min(-180).max(180),
 });
 
+/**
+ * Who pays for the update. `maker` relays the onboarding server, where the
+ * maker co-signs and covers the DC; `owner` builds the update instruction here
+ * and the hotspot owner pays the DC, the resize rent and the transaction fee.
+ */
+const UpdateHotspotInfoFeePayerSchema = z
+  .enum(["maker", "owner"])
+  .default("maker");
+
 const IotUpdateSchema = z.object({
   deviceType: z.literal("iot"),
   entityPubKey: HeliumPublicKeySchema,
@@ -369,6 +378,7 @@ const IotUpdateSchema = z.object({
   gain: z.number().optional(),
   elevation: z.number().optional(),
   azimuth: z.number().min(0).max(360).optional(),
+  feePayer: UpdateHotspotInfoFeePayerSchema,
 });
 
 const MobileUpdateSchema = z.object({
@@ -377,6 +387,7 @@ const MobileUpdateSchema = z.object({
   walletAddress: WalletAddressSchema,
   location: LocationSchema.optional(),
   deploymentInfo: DeploymentInfoSchema.optional(),
+  feePayer: UpdateHotspotInfoFeePayerSchema,
 });
 
 export const UpdateHotspotInfoInputSchema = z.discriminatedUnion("deviceType", [

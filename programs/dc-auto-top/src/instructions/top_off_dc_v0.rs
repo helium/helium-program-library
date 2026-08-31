@@ -222,7 +222,7 @@ pub fn handler<'info>(
     .ok_or(ErrorCode::ArithmeticError)?;
 
   let min_rent_exempt = Rent::get()?.minimum_balance(auto_top_off_acc.data_len());
-  if auto_top_off_acc.lamports() - min_rent_exempt >= total_crank_reward {
+  if auto_top_off_acc.lamports().saturating_sub(min_rent_exempt) >= total_crank_reward {
     auto_top_off_acc.sub_lamports(total_crank_reward)?;
     ctx.accounts.task_queue.add_lamports(total_crank_reward)?;
   } else {

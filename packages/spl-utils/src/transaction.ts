@@ -822,6 +822,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
     commitment = "confirmed",
     // Leave unset to let withPriorityFees derive it from simulation.
     loadedAccountsDataSizeLimit,
+    // See withPriorityFees; set false for wallet-signed txs.
+    deriveLoadedAccountsDataSizeLimit,
   }: {
     commitment?: Commitment;
     // Manually specify limit instead of simulating
@@ -839,6 +841,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     // Optional parameter to limit number of instructions per transaction
     maxInstructionsPerTx?: number;
     loadedAccountsDataSizeLimit?: number;
+    deriveLoadedAccountsDataSizeLimit?: boolean;
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
@@ -876,6 +879,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
         addressLookupTables,
         feePayer: provider.wallet.publicKey,
         loadedAccountsDataSizeLimit,
+        deriveLoadedAccountsDataSizeLimit,
       });
       if (useFirstEstimateForAll) {
         // A sim-derived data-size limit was measured against THIS tx's
@@ -919,11 +923,18 @@ export async function batchInstructionsToTxsWithPriorityFee(
           microLamports: 1,
         }),
         // Probe must match the real tx's ix count or the size check
-        // under-measures and a full batch overflows maxTxSize. The ix is a
-        // fixed 5 bytes, so the placeholder value doesn't affect sizing.
-        setLoadedAccountsDataSizeLimit(
-          loadedAccountsDataSizeLimit ?? DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
-        ),
+        // mis-measures: under-counting overflows maxTxSize, over-counting
+        // splits early. The ix is a fixed 5 bytes, so the placeholder value
+        // doesn't affect sizing. Omit it when the real tx won't carry one.
+        ...(loadedAccountsDataSizeLimit != null ||
+        deriveLoadedAccountsDataSizeLimit !== false
+          ? [
+              setLoadedAccountsDataSizeLimit(
+                loadedAccountsDataSizeLimit ??
+                  DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
+              ),
+            ]
+          : []),
         ...currentTxInstructions,
       ],
       addressLookupTableAddresses: addressLookupTableAddresses || [],
