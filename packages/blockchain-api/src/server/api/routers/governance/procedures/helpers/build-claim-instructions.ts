@@ -67,6 +67,13 @@ export interface ClaimInstructionsResult {
   hasMore: boolean;
   hasRewards: boolean;
   rewardMints: PublicKey[];
+  /**
+   * Epochs that closeDelegationV0 requires claimed but whose rewards have not
+   * been issued yet. The program asserts last_claimed_epoch >= curr_epoch - 1
+   * (capped by lockup end / expiration) and panics otherwise, so a close built
+   * while this is non-empty will fail on-chain.
+   */
+  unclaimableEpochs: { positionMint: PublicKey; epoch: number }[];
 }
 
 export interface BuildClaimInstructionsParams {
@@ -129,6 +136,7 @@ export async function buildClaimInstructions(
     epoch: BN;
     subDao: PublicKey;
     subDaoAcc: SubDaoAccount;
+    requiredForClose: boolean;
   };
 
   const maxEpochsThisCall = MAX_TXS_PER_CALL * EPOCHS_PER_BATCH;
@@ -143,6 +151,14 @@ export async function buildClaimInstructions(
     const isConstant = lockupKind === "constant";
     const isDecayed = !isConstant && lockup.endTs.lte(new BN(unixNow));
     const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
+    // Mirrors to_claim_to_epoch in close_delegation_v0.rs
+    const isCliff = lockupKind === "cliff";
+    const closeRequiresThroughEpoch = Math.min(
+      isDecayed && isCliff
+        ? decayedEpoch.toNumber() - 1
+        : currentEpoch.toNumber() - 1,
+      expirationCapEpoch(position.delegatedPosition.expirationTs) - 1
+    );
 
     const subDao = position.delegatedPosition.subDao;
     const subDaoAcc = subDaos[subDao.toBase58()];
@@ -181,6 +197,7 @@ export async function buildClaimInstructions(
           epoch: new BN(e),
           subDao,
           subDaoAcc,
+          requiredForClose: e <= closeRequiresThroughEpoch,
         });
       }
     }
@@ -192,8 +209,11 @@ export async function buildClaimInstructions(
       hasMore: false,
       hasRewards: false,
       rewardMints: [],
+      unclaimableEpochs: [],
     };
   }
+
+  const unclaimableEpochs: ClaimInstructionsResult["unclaimableEpochs"] = [];
 
   const allInstructionBatches: TransactionInstruction[][] = [];
   const rewardMintSet = new Set<string>();
@@ -209,84 +229,97 @@ export async function buildClaimInstructions(
     );
 
     const batchInstructions = await Promise.all(
-      chunk.map(async ({ position, epoch, subDao, subDaoAcc }, index) => {
-        const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
-        if (!subDaoEpochInfoAccount) return null;
+      chunk.map(
+        async (
+          { position, epoch, subDao, subDaoAcc, requiredForClose },
+          index
+        ) => {
+          const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
+          const subDaoEpochInfoData = subDaoEpochInfoAccount
+            ? hsdProgram.coder.accounts.decode(
+                "subDaoEpochInfoV0",
+                subDaoEpochInfoAccount.data
+              )
+            : null;
 
-        const subDaoEpochInfoData = hsdProgram.coder.accounts.decode(
-          "subDaoEpochInfoV0",
-          subDaoEpochInfoAccount.data
-        );
+          if (!subDaoEpochInfoData?.rewardsIssuedAt) {
+            if (requiredForClose) {
+              unclaimableEpochs.push({
+                positionMint: position.mint,
+                epoch: epoch.toNumber(),
+              });
+            }
+            return null;
+          }
 
-        if (!subDaoEpochInfoData.rewardsIssuedAt) return null;
+          const commonAccounts = {
+            position: position.pubkey,
+            mint: position.mint,
+            positionTokenAccount: getAssociatedTokenAddressSync(
+              position.mint,
+              walletPubkey,
+              true
+            ),
+            positionAuthority: walletPubkey,
+            registrar: position.account.registrar,
+            dao: DAO,
+            subDao,
+            delegatedPosition: position.delegatedPositionKey,
+            vsrProgram: VSR_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
+            circuitBreakerProgram: CIRCUIT_BREAKER_PROGRAM_ID,
+            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          };
 
-        const commonAccounts = {
-          position: position.pubkey,
-          mint: position.mint,
-          positionTokenAccount: getAssociatedTokenAddressSync(
-            position.mint,
-            walletPubkey,
-            true
-          ),
-          positionAuthority: walletPubkey,
-          registrar: position.account.registrar,
-          dao: DAO,
-          subDao,
-          delegatedPosition: position.delegatedPositionKey,
-          vsrProgram: VSR_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
-          circuitBreakerProgram: CIRCUIT_BREAKER_PROGRAM_ID,
-          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        };
-
-        if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
-          rewardMintSet.add(daoAcc.hntMint.toBase58());
-          return hsdProgram.methods
-            .claimRewardsV1({ epoch })
-            .accountsStrict({
-              ...commonAccounts,
-              payer: walletPubkey,
-              hntMint: daoAcc.hntMint,
-              daoEpochInfo: daoEpochInfoKey(
-                subDaoAcc.dao,
-                epoch.mul(new BN(EPOCH_LENGTH))
-              )[0],
-              delegatorPool: daoAcc.delegatorPool,
-              delegatorAta: getAssociatedTokenAddressSync(
-                daoAcc.hntMint,
-                walletPubkey,
-                true
-              ),
-              delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
-                daoAcc.delegatorPool
-              )[0],
-            })
-            .instruction();
-        } else {
-          rewardMintSet.add(subDaoAcc.dntMint.toBase58());
-          return hsdProgram.methods
-            .claimRewardsV0({ epoch })
-            .accountsStrict({
-              ...commonAccounts,
-              dntMint: subDaoAcc.dntMint,
-              subDaoEpochInfo: subDaoEpochInfoKey(
-                subDao,
-                epoch.mul(new BN(EPOCH_LENGTH))
-              )[0],
-              delegatorPool: subDaoAcc.delegatorPool,
-              delegatorAta: getAssociatedTokenAddressSync(
-                subDaoAcc.dntMint,
-                walletPubkey,
-                true
-              ),
-              delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
-                subDaoAcc.delegatorPool
-              )[0],
-            })
-            .instruction();
+          if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
+            rewardMintSet.add(daoAcc.hntMint.toBase58());
+            return hsdProgram.methods
+              .claimRewardsV1({ epoch })
+              .accountsStrict({
+                ...commonAccounts,
+                payer: walletPubkey,
+                hntMint: daoAcc.hntMint,
+                daoEpochInfo: daoEpochInfoKey(
+                  subDaoAcc.dao,
+                  epoch.mul(new BN(EPOCH_LENGTH))
+                )[0],
+                delegatorPool: daoAcc.delegatorPool,
+                delegatorAta: getAssociatedTokenAddressSync(
+                  daoAcc.hntMint,
+                  walletPubkey,
+                  true
+                ),
+                delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
+                  daoAcc.delegatorPool
+                )[0],
+              })
+              .instruction();
+          } else {
+            rewardMintSet.add(subDaoAcc.dntMint.toBase58());
+            return hsdProgram.methods
+              .claimRewardsV0({ epoch })
+              .accountsStrict({
+                ...commonAccounts,
+                dntMint: subDaoAcc.dntMint,
+                subDaoEpochInfo: subDaoEpochInfoKey(
+                  subDao,
+                  epoch.mul(new BN(EPOCH_LENGTH))
+                )[0],
+                delegatorPool: subDaoAcc.delegatorPool,
+                delegatorAta: getAssociatedTokenAddressSync(
+                  subDaoAcc.dntMint,
+                  walletPubkey,
+                  true
+                ),
+                delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
+                  subDaoAcc.delegatorPool
+                )[0],
+              })
+              .instruction();
+          }
         }
-      })
+      )
     );
 
     const validInstructions = batchInstructions.filter(truthy);
@@ -300,5 +333,6 @@ export async function buildClaimInstructions(
     hasMore: hitCap,
     hasRewards: allInstructionBatches.length > 0,
     rewardMints: [...rewardMintSet].map((m) => new PublicKey(m)),
+    unclaimableEpochs,
   };
 }

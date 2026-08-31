@@ -62,11 +62,11 @@ const IOT_SUB_DAO_KEY = subDaoKey(IOT_MINT)[0];
 const MOBILE_SUB_DAO_KEY = subDaoKey(MOBILE_MINT)[0];
 export const IOT_CONFIG_KEY = rewardableEntityConfigKey(
   IOT_SUB_DAO_KEY,
-  "IOT"
+  "IOT",
 )[0];
 export const MOBILE_CONFIG_KEY = rewardableEntityConfigKey(
   MOBILE_SUB_DAO_KEY,
-  "MOBILE"
+  "MOBILE",
 )[0];
 
 interface GetHotspotsOptions {
@@ -78,7 +78,7 @@ interface GetHotspotsOptions {
 
 const HNT_DAO = daoKey(HNT_MINT)[0];
 export function toHotspot(
-  hotspotOwnership: HotspotOwnershipAttributes
+  hotspotOwnership: HotspotOwnershipAttributes,
 ): Hotspot {
   const decodedAddress = hotspotOwnership.encodedEntityKey;
 
@@ -97,7 +97,7 @@ export function toHotspot(
       typeof hotspotOwnership.entityKey === "string"
         ? Buffer.from(hotspotOwnership.entityKey, "utf-8")
         : hotspotOwnership.entityKey,
-      hotspotOwnership.keySerialization as any
+      hotspotOwnership.keySerialization as any,
     )[0].toBase58(),
     entityKey: decodedAddress ? decodedAddress : "",
     name: decodedAddress ? animalName(decodedAddress) : "",
@@ -136,7 +136,7 @@ function toHotspotFromAsset(owner: string, asset: any): Hotspot {
 
 export async function getNumRecipientsNeeded(
   owner: string,
-  lazyDistributorAddress: string = HNT_LAZY_DISTRIBUTOR_ADDRESS
+  lazyDistributorAddress: string = HNT_LAZY_DISTRIBUTOR_ADDRESS,
 ): Promise<number> {
   if (env.NO_PG === "true") {
     const allAssets = await searchAssetsWithPageInfo(env.ASSET_ENDPOINT!, {
@@ -158,12 +158,11 @@ export async function getNumRecipientsNeeded(
       (asset) =>
         recipientKey(
           new PublicKey(lazyDistributorAddress),
-          new PublicKey(asset.id)
-        )[0]
+          new PublicKey(asset.id),
+        )[0],
     );
-    const recipients = await lazyProgram.account.recipientV0.fetchMultiple(
-      recipientKeys
-    );
+    const recipients =
+      await lazyProgram.account.recipientV0.fetchMultiple(recipientKeys);
     return recipients.filter((r) => !r).length;
   } else {
     await connectToDb();
@@ -216,29 +215,29 @@ export async function getHotspotsByOwner({
 
     // Fetch keyToAsset accounts in a single cached batch to ensure entityKey is decoded reliably
     const keyToAssetPubkeys = await Promise.all(
-      allAssets.items.map((asset) => keyToAssetForAsset(asset))
+      allAssets.items.map((asset) => keyToAssetForAsset(asset)),
     );
     // @ts-ignore
     const keyToAssets = await hemProgram.account.keyToAssetV0.fetchMultiple(
-      keyToAssetPubkeys.filter(Boolean) as PublicKey[]
+      keyToAssetPubkeys.filter(Boolean) as PublicKey[],
     );
 
     // Decode entity keys using helper
     const entityKeys = keyToAssets.map((kta: any) =>
       kta?.entityKey
         ? decodeEntityKey(kta.entityKey, kta.keySerialization)
-        : undefined
+        : undefined,
     );
 
     // Prepare hotspot info keys from env-provided configs (optional)
     const iotInfoPubkeys = entityKeys.length
       ? entityKeys.map((ek) =>
-          ek ? iotInfoKey(new PublicKey(IOT_CONFIG_KEY), ek)[0] : null
+          ek ? iotInfoKey(new PublicKey(IOT_CONFIG_KEY), ek)[0] : null,
         )
       : [];
     const mobileInfoPubkeys = entityKeys.length
       ? entityKeys.map((ek) =>
-          ek ? mobileInfoKey(new PublicKey(MOBILE_CONFIG_KEY), ek)[0] : null
+          ek ? mobileInfoKey(new PublicKey(MOBILE_CONFIG_KEY), ek)[0] : null,
         )
       : [];
 
@@ -247,14 +246,14 @@ export async function getHotspotsByOwner({
       iotInfoPubkeys.length > 0
         ? // @ts-ignore
           await hemProgram.account.iotHotspotInfoV0.fetchMultiple(
-            iotInfoPubkeys.filter(Boolean) as PublicKey[]
+            iotInfoPubkeys.filter(Boolean) as PublicKey[],
           )
         : [];
     const mobileInfos =
       mobileInfoPubkeys.length > 0
         ? // @ts-ignore
           await hemProgram.account.mobileHotspotInfoV0.fetchMultiple(
-            mobileInfoPubkeys.filter(Boolean) as PublicKey[]
+            mobileInfoPubkeys.filter(Boolean) as PublicKey[],
           )
         : [];
 
@@ -267,7 +266,7 @@ export async function getHotspotsByOwner({
         iotInfos.length > 0 && iotInfoPubkeys[index]
           ? iotInfos[
               (iotInfoPubkeys.filter(Boolean) as PublicKey[]).indexOf(
-                iotInfoPubkeys[index] as PublicKey
+                iotInfoPubkeys[index] as PublicKey,
               )
             ]
           : undefined;
@@ -275,7 +274,7 @@ export async function getHotspotsByOwner({
         mobileInfos.length > 0 && mobileInfoPubkeys[index]
           ? mobileInfos[
               (mobileInfoPubkeys.filter(Boolean) as PublicKey[]).indexOf(
-                mobileInfoPubkeys[index] as PublicKey
+                mobileInfoPubkeys[index] as PublicKey,
               )
             ]
           : undefined;
@@ -327,6 +326,7 @@ export async function getHotspotsByOwner({
     const { count: total, rows } = await HotspotOwnership.findAndCountAll({
       limit,
       offset,
+      order: [["asset", "ASC"]],
       where: {
         destination: owner,
       },
@@ -357,7 +357,7 @@ export async function getHotspotsByOwner({
 
 export async function getHotspotInfo(
   provider: AnchorProvider,
-  entityKey: string
+  entityKey: string,
 ): Promise<HotspotInfo> {
   const hemProgram = await initHemLocal(provider);
 
@@ -374,7 +374,7 @@ export async function getHotspotInfo(
 
 export async function detectHotspotNetworks(
   provider: AnchorProvider,
-  entityKey: string
+  entityKey: string,
 ): Promise<HotspotNetworks> {
   if (env.NO_PG === "false") {
     await connectToDb();
@@ -396,13 +396,12 @@ export async function detectHotspotNetworks(
 
 export async function getHotspotInfoByAsset(
   provider: AnchorProvider,
-  assetId: PublicKey
+  assetId: PublicKey,
 ): Promise<HotspotInfo & { entityKey: string }> {
   const hemProgram = await initHemLocal(provider);
 
-  const keyToAsset = await hemProgram.account.keyToAssetV0.fetchNullable(
-    assetId
-  );
+  const keyToAsset =
+    await hemProgram.account.keyToAssetV0.fetchNullable(assetId);
 
   if (!keyToAsset) {
     throw new Error("Asset not found in keyToAsset registry");
@@ -410,7 +409,7 @@ export async function getHotspotInfoByAsset(
 
   const entityKey = decodeEntityKey(
     keyToAsset.entityKey,
-    keyToAsset.keySerialization
+    keyToAsset.keySerialization,
   );
 
   if (!entityKey) {
@@ -423,7 +422,7 @@ export async function getHotspotInfoByAsset(
 }
 
 export async function hasRewardContract(
-  entityPubKey: string
+  entityPubKey: string,
 ): Promise<boolean> {
   const assetId = await getAssetIdFromPubkey(entityPubKey);
   if (!assetId) return false;
@@ -452,11 +451,10 @@ export async function hasRewardContract(
   const ldProgram = await initLd(provider);
   const [recipientK] = recipientKey(
     new PublicKey(HNT_LAZY_DISTRIBUTOR_ADDRESS),
-    assetPubkey
+    assetPubkey,
   );
-  const recipientAcc = await ldProgram.account.recipientV0.fetchNullable(
-    recipientK
-  );
+  const recipientAcc =
+    await ldProgram.account.recipientV0.fetchNullable(recipientK);
 
   if (recipientAcc && !recipientAcc.destination.equals(PublicKey.default)) {
     const mfProgram = await initMiniFanout(provider);
@@ -465,9 +463,8 @@ export async function hasRewardContract(
     // Verify the destination is actually a mini fanout account
     let miniFanoutAccount = null;
     try {
-      miniFanoutAccount = await mfProgram.account.miniFanoutV0.fetchNullable(
-        miniFanout
-      );
+      miniFanoutAccount =
+        await mfProgram.account.miniFanoutV0.fetchNullable(miniFanout);
     } catch {
       // Destination exists but is not a MiniFanout account - treat as no contract
     }
