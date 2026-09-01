@@ -4,7 +4,7 @@ use anchor_spl::{
   token::{self, Mint, Token, TokenAccount, Transfer},
 };
 
-use crate::{fanout_seeds, FanoutV0, FanoutVoucherV0};
+use crate::{errors::ErrorCode, fanout_seeds, FanoutV0, FanoutVoucherV0, TWELVE_PREC};
 
 #[derive(Accounts)]
 pub struct DistributeV0<'info> {
@@ -27,6 +27,7 @@ pub struct DistributeV0<'info> {
     payer = payer,
     associated_token::mint = fanout_mint,
     associated_token::authority = owner,
+    constraint = to_account.key() != token_account.key() @ ErrorCode::InvalidDestination,
   )]
   pub to_account: Box<Account<'info, TokenAccount>>,
   #[account(
@@ -61,45 +62,11 @@ impl<'info> DistributeV0<'info> {
   }
 }
 
-const TWELVE_PREC: u128 = 1_000000000000;
-
 pub fn handler(ctx: Context<DistributeV0>) -> Result<()> {
   let curr_balance = ctx.accounts.token_account.amount;
-  let inflow = curr_balance
-    .checked_sub(ctx.accounts.fanout.last_snapshot_amount)
-    .unwrap();
-  let tss = ctx.accounts.fanout.total_staked_shares;
-  let shares_diff = ctx.accounts.fanout.total_shares.checked_sub(tss).unwrap();
-  let unstaked_correction = (inflow as u128)
-    .checked_mul(shares_diff as u128)
-    .unwrap()
-    .checked_div(tss as u128)
-    .unwrap() as u64;
+  ctx.accounts.fanout.accrue_inflow(curr_balance)?;
 
-  ctx.accounts.fanout.total_inflow = ctx
-    .accounts
-    .fanout
-    .total_inflow
-    .checked_add(inflow)
-    .unwrap()
-    .checked_add(unstaked_correction)
-    .unwrap();
-
-  let last_inflow = ctx.accounts.voucher.total_inflow;
-  let total_shares = ctx.accounts.fanout.total_shares;
-  let inflow_diff = ctx
-    .accounts
-    .fanout
-    .total_inflow
-    .checked_sub(last_inflow)
-    .unwrap();
-  let dist_amount = u128::from(inflow_diff)
-    .checked_mul(TWELVE_PREC) // Add 12 precision on dust
-    .unwrap()
-    .checked_mul(ctx.accounts.voucher.shares as u128)
-    .unwrap()
-    .checked_div(total_shares as u128)
-    .unwrap();
+  let dist_amount = ctx.accounts.fanout.owed_to(&ctx.accounts.voucher)?;
 
   let mut dist_amount_u64: u64 = dist_amount
     .checked_div(TWELVE_PREC)
@@ -137,7 +104,14 @@ pub fn handler(ctx: Context<DistributeV0>) -> Result<()> {
     dist_amount_u64,
   )?;
 
-  ctx.accounts.fanout.last_snapshot_amount = curr_balance.checked_sub(dist_amount_u64).unwrap();
+  // The snapshot tracks the balance that has already been folded into
+  // `total_inflow`, so it drops by what this distribution took out of the vault.
+  ctx.accounts.fanout.last_snapshot_amount = ctx
+    .accounts
+    .fanout
+    .last_snapshot_amount
+    .checked_sub(dist_amount_u64)
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
   ctx.accounts.voucher.total_inflow = ctx.accounts.fanout.total_inflow;
   ctx.accounts.voucher.total_distributed = ctx
     .accounts
