@@ -41,12 +41,20 @@ export interface BuildTransactionOptions {
   connection: Connection;
   draft: TransactionDraft;
   signers?: Keypair[];
+  // Set the CU limit from the static table instead of simulation. Required
+  // for txs that execute after other txs in a bundle: a standalone sim runs
+  // against pre-bundle state and can measure a cheaper code path than the one
+  // taken on-chain (e.g. claim_rewards_v1 only CPIs clear_recent_proposals_v0
+  // once earlier claims have advanced last_claimed_epoch), so its 1.1x
+  // headroom under-requests and the tx dies with ProgramFailedToComplete.
+  useTableComputeUnits?: boolean;
 }
 
 export async function buildVersionedTransaction({
   connection,
   draft,
   signers = [],
+  useTableComputeUnits = false,
 }: BuildTransactionOptions): Promise<VersionedTransaction> {
   const draftWithLuts = {
     ...draft,
@@ -68,12 +76,16 @@ export async function buildVersionedTransaction({
     // their own fetch when addressLookupTables is already populated.
     addressLookupTables = await getAddressLookupTableAccounts(
       connection,
-      draftWithLuts.addressLookupTableAddresses
+      draftWithLuts.addressLookupTableAddresses,
     );
     instructionsWithFees = await withPriorityFees({
       ...draftWithLuts,
       addressLookupTables,
       connection,
+      // An explicit computeUnits skips withPriorityFees' simulation.
+      computeUnits: useTableComputeUnits
+        ? tableComputeUnitsForInstructions(draftWithLuts.instructions)
+        : undefined,
       // The wallet signs this tx and may append guard ixs (Lighthouse) that
       // load more account data than a sim-derived limit allows.
       deriveLoadedAccountsDataSizeLimit: false,
@@ -81,11 +93,11 @@ export async function buildVersionedTransaction({
   } catch (error) {
     console.warn(
       "[buildVersionedTransaction] Priority fee estimation failed, using CU table fallback:",
-      error
+      error,
     );
     instructionsWithFees = prependComputeBudgetIxs(draftWithLuts.instructions, {
       computeUnits: tableComputeUnitsForInstructions(
-        draftWithLuts.instructions
+        draftWithLuts.instructions,
       ),
       // Floor price, matching withPriorityFees' basePriorityFee default —
       // no network path left to estimate a real one.
@@ -107,14 +119,14 @@ export async function buildVersionedTransaction({
           instructions: instructionsWithFees,
           recentBlockhash: (await blockhashPromise).blockhash,
         },
-        "finalized"
-      )
+        "finalized",
+      ),
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("encoding overruns")) {
       throw new Error(
-        `Transaction too large to serialize (${instructionsWithFees.length} instructions). Split into smaller batches.`
+        `Transaction too large to serialize (${instructionsWithFees.length} instructions). Split into smaller batches.`,
       );
     }
     throw error;
@@ -205,7 +217,7 @@ export async function buildSingleTransactionResponse({
     },
     estimatedSolFee: await toTokenAmountOutput(
       new BN(required),
-      NATIVE_MINT.toBase58()
+      NATIVE_MINT.toBase58(),
     ),
   };
 }

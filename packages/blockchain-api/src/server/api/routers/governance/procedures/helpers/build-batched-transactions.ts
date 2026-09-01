@@ -36,6 +36,13 @@ export interface BuildBatchedTransactionsParams {
   connection: Connection;
   feePayer: PublicKey;
   maxTxs?: number;
+  // Size CU limits from the static table instead of standalone simulation.
+  // Pass true when the batched txs run sequentially in a Jito bundle and a
+  // later tx's cost depends on earlier txs' state changes (delegation claims:
+  // the catch-up claim CPIs clear_recent_proposals_v0 only after prior claims
+  // in the bundle have advanced last_claimed_epoch, which a standalone sim
+  // never sees). See BuildTransactionOptions.useTableComputeUnits.
+  useTableComputeUnits?: boolean;
 }
 
 export interface BuildBatchedTransactionsResult {
@@ -57,7 +64,7 @@ const DUMMY_BLOCKHASH = "1".repeat(32);
 function measureSize(
   instructions: TransactionInstruction[],
   feePayer: PublicKey,
-  addressLookupTables: AddressLookupTableAccount[]
+  addressLookupTables: AddressLookupTableAccount[],
 ): number {
   const tx = toVersionedTx({
     feePayer,
@@ -70,7 +77,7 @@ function measureSize(
 
 function mergeMetadata(
   a: { type: string; description: string; [key: string]: unknown },
-  b: { type: string; description: string; [key: string]: unknown }
+  b: { type: string; description: string; [key: string]: unknown },
 ): { type: string; description: string; [key: string]: unknown } {
   return { ...a, description: `${a.description}; ${b.description}` };
 }
@@ -86,13 +93,15 @@ async function buildOrSplit(
   metadata: { type: string; description: string; [key: string]: unknown },
   signers: Keypair[],
   connection: Connection,
-  feePayer: PublicKey
+  feePayer: PublicKey,
+  useTableComputeUnits: boolean,
 ): Promise<BuiltTransaction[]> {
   try {
     const tx = await buildVersionedTransaction({
       connection,
       draft: { instructions, feePayer },
       signers: signers.length > 0 ? signers : undefined,
+      useTableComputeUnits,
     });
     return [{ serializedTransaction: serializeTransaction(tx), metadata, tx }];
   } catch (error) {
@@ -108,14 +117,16 @@ async function buildOrSplit(
           metadata,
           signers,
           connection,
-          feePayer
+          feePayer,
+          useTableComputeUnits,
         ),
         buildOrSplit(
           instructions.slice(mid),
           metadata,
           signers,
           connection,
-          feePayer
+          feePayer,
+          useTableComputeUnits,
         ),
       ]);
       return [...first, ...second];
@@ -146,6 +157,7 @@ export async function buildBatchedTransactions({
   connection,
   feePayer,
   maxTxs = MAX_TXS_PER_CALL,
+  useTableComputeUnits = false,
 }: BuildBatchedTransactionsParams): Promise<BuildBatchedTransactionsResult> {
   if (groups.length === 0) {
     return { transactions: [], versionedTransactions: [], hasMore: false };
@@ -181,7 +193,7 @@ export async function buildBatchedTransactions({
       const size = measureSize(
         group.instructions,
         feePayer,
-        addressLookupTables
+        addressLookupTables,
       );
       isOversized = size > MAX_TX_SIZE - SIZE_MARGIN;
     } catch {
@@ -227,7 +239,7 @@ export async function buildBatchedTransactions({
       throw new Error(
         `Single instruction exceeds max transaction size (${size} > ${
           MAX_TX_SIZE - SIZE_MARGIN
-        })`
+        })`,
       );
     } else {
       packedBatches.push({
@@ -263,8 +275,15 @@ export async function buildBatchedTransactions({
   const built = (
     await Promise.all(
       packedBatches.map(({ instructions, metadata, signers }) =>
-        buildOrSplit(instructions, metadata, signers, connection, feePayer)
-      )
+        buildOrSplit(
+          instructions,
+          metadata,
+          signers,
+          connection,
+          feePayer,
+          useTableComputeUnits,
+        ),
+      ),
     )
   ).flat();
 
