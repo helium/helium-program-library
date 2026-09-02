@@ -83,26 +83,25 @@ export interface BuildClaimInstructionsParams {
   hsdProgram: HsdProgram;
 }
 
+// getMultipleAccounts caps out at 100 keys per call, so anything longer is
+// split. The splits are independent reads, so they go out together: a claim
+// spanning five batches of 128 epochs is 10 round trips, and awaiting them one
+// at a time costs ten times a single round trip in request latency.
 async function getMultipleAccounts(
   connection: Connection,
-  keys: PublicKey[]
+  keys: PublicKey[],
 ): Promise<(Awaited<ReturnType<Connection["getAccountInfo"]>> | null)[]> {
-  const batchSize = 100;
-  const batches = Math.ceil(keys.length / batchSize);
-  const results: (Awaited<ReturnType<Connection["getAccountInfo"]>> | null)[] =
-    [];
+  const batches = await Promise.all(
+    chunks(keys, 100).map((batchKeys) =>
+      connection.getMultipleAccountsInfo(batchKeys),
+    ),
+  );
 
-  for (let i = 0; i < batches; i++) {
-    const batchKeys = keys.slice(i * batchSize, (i + 1) * batchSize);
-    const batchResults = await connection.getMultipleAccountsInfo(batchKeys);
-    results.push(...batchResults);
-  }
-
-  return results;
+  return batches.flat();
 }
 
 export async function buildClaimInstructions(
-  params: BuildClaimInstructionsParams
+  params: BuildClaimInstructionsParams,
 ): Promise<ClaimInstructionsResult> {
   const { positions, walletPubkey, connection, hsdProgram } = params;
 
@@ -111,7 +110,7 @@ export async function buildClaimInstructions(
   const currentEpoch = new BN(unixNow).div(new BN(EPOCH_LENGTH));
 
   const subDaoKeys = new Set(
-    positions.map((p) => p.delegatedPosition.subDao.toBase58())
+    positions.map((p) => p.delegatedPosition.subDao.toBase58()),
   );
 
   type SubDaoAccount = Awaited<
@@ -122,8 +121,8 @@ export async function buildClaimInstructions(
       async (key): Promise<[string, SubDaoAccount]> => [
         key,
         await hsdProgram.account.subDaoV0.fetch(new PublicKey(key)),
-      ]
-    )
+      ],
+    ),
   );
   const subDaos: Record<string, SubDaoAccount> =
     Object.fromEntries(subDaoEntries);
@@ -157,7 +156,7 @@ export async function buildClaimInstructions(
       isDecayed && isCliff
         ? decayedEpoch.toNumber() - 1
         : currentEpoch.toNumber() - 1,
-      expirationCapEpoch(position.delegatedPosition.expirationTs) - 1
+      expirationCapEpoch(position.delegatedPosition.expirationTs) - 1,
     );
 
     const subDao = position.delegatedPosition.subDao;
@@ -171,7 +170,7 @@ export async function buildClaimInstructions(
       isDecayed
         ? decayedEpoch.add(new BN(1)).toNumber()
         : currentEpoch.toNumber(),
-      expirationCapEpoch(expirationTs)
+      expirationCapEpoch(expirationTs),
     );
     const endEpoch = Math.min(rawEndEpoch, bitmapWindowEnd);
 
@@ -213,126 +212,136 @@ export async function buildClaimInstructions(
     };
   }
 
-  const unclaimableEpochs: ClaimInstructionsResult["unclaimableEpochs"] = [];
-
-  const allInstructionBatches: TransactionInstruction[][] = [];
   const rewardMintSet = new Set<string>();
 
-  for (const chunk of chunks(allEpochsToClaim, EPOCHS_PER_BATCH)) {
-    const subDaoEpochInfoKeys = chunk.map(
-      ({ epoch, subDao }) =>
-        subDaoEpochInfoKey(subDao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
-    );
-    const subDaoEpochInfoAccounts = await getMultipleAccounts(
-      connection,
-      subDaoEpochInfoKeys
-    );
+  // One batch's epoch infos do not depend on any other batch's, so all of them
+  // are read at once. Awaiting them batch by batch put the whole claim's round
+  // trips end to end, which is where a five-batch claim spent most of its time.
+  const builtChunks = await Promise.all(
+    chunks(allEpochsToClaim, EPOCHS_PER_BATCH).map(async (chunk) => {
+      const unclaimableEpochs: ClaimInstructionsResult["unclaimableEpochs"] =
+        [];
+      const subDaoEpochInfoKeys = chunk.map(
+        ({ epoch, subDao }) =>
+          subDaoEpochInfoKey(subDao, epoch.mul(new BN(EPOCH_LENGTH)))[0],
+      );
+      const subDaoEpochInfoAccounts = await getMultipleAccounts(
+        connection,
+        subDaoEpochInfoKeys,
+      );
 
-    const batchInstructions = await Promise.all(
-      chunk.map(
-        async (
-          { position, epoch, subDao, subDaoAcc, requiredForClose },
-          index
-        ) => {
-          const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
-          const subDaoEpochInfoData = subDaoEpochInfoAccount
-            ? hsdProgram.coder.accounts.decode(
-                "subDaoEpochInfoV0",
-                subDaoEpochInfoAccount.data
-              )
-            : null;
+      const batchInstructions = await Promise.all(
+        chunk.map(
+          async (
+            { position, epoch, subDao, subDaoAcc, requiredForClose },
+            index,
+          ) => {
+            const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
+            const subDaoEpochInfoData = subDaoEpochInfoAccount
+              ? hsdProgram.coder.accounts.decode(
+                  "subDaoEpochInfoV0",
+                  subDaoEpochInfoAccount.data,
+                )
+              : null;
 
-          if (!subDaoEpochInfoData?.rewardsIssuedAt) {
-            if (requiredForClose) {
-              unclaimableEpochs.push({
-                positionMint: position.mint,
-                epoch: epoch.toNumber(),
-              });
+            if (!subDaoEpochInfoData?.rewardsIssuedAt) {
+              if (requiredForClose) {
+                unclaimableEpochs.push({
+                  positionMint: position.mint,
+                  epoch: epoch.toNumber(),
+                });
+              }
+              return null;
             }
-            return null;
-          }
 
-          const commonAccounts = {
-            position: position.pubkey,
-            mint: position.mint,
-            positionTokenAccount: getAssociatedTokenAddressSync(
-              position.mint,
-              walletPubkey,
-              true
-            ),
-            positionAuthority: walletPubkey,
-            registrar: position.account.registrar,
-            dao: DAO,
-            subDao,
-            delegatedPosition: position.delegatedPositionKey,
-            vsrProgram: VSR_PROGRAM_ID,
-            systemProgram: SystemProgram.programId,
-            circuitBreakerProgram: CIRCUIT_BREAKER_PROGRAM_ID,
-            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-            tokenProgram: TOKEN_PROGRAM_ID,
-          };
+            const commonAccounts = {
+              position: position.pubkey,
+              mint: position.mint,
+              positionTokenAccount: getAssociatedTokenAddressSync(
+                position.mint,
+                walletPubkey,
+                true,
+              ),
+              positionAuthority: walletPubkey,
+              registrar: position.account.registrar,
+              dao: DAO,
+              subDao,
+              delegatedPosition: position.delegatedPositionKey,
+              vsrProgram: VSR_PROGRAM_ID,
+              systemProgram: SystemProgram.programId,
+              circuitBreakerProgram: CIRCUIT_BREAKER_PROGRAM_ID,
+              associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+              tokenProgram: TOKEN_PROGRAM_ID,
+            };
 
-          if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
-            rewardMintSet.add(daoAcc.hntMint.toBase58());
-            return hsdProgram.methods
-              .claimRewardsV1({ epoch })
-              .accountsStrict({
-                ...commonAccounts,
-                payer: walletPubkey,
-                hntMint: daoAcc.hntMint,
-                daoEpochInfo: daoEpochInfoKey(
-                  subDaoAcc.dao,
-                  epoch.mul(new BN(EPOCH_LENGTH))
-                )[0],
-                delegatorPool: daoAcc.delegatorPool,
-                delegatorAta: getAssociatedTokenAddressSync(
-                  daoAcc.hntMint,
-                  walletPubkey,
-                  true
-                ),
-                delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
-                  daoAcc.delegatorPool
-                )[0],
-              })
-              .instruction();
-          } else {
-            rewardMintSet.add(subDaoAcc.dntMint.toBase58());
-            return hsdProgram.methods
-              .claimRewardsV0({ epoch })
-              .accountsStrict({
-                ...commonAccounts,
-                dntMint: subDaoAcc.dntMint,
-                subDaoEpochInfo: subDaoEpochInfoKey(
-                  subDao,
-                  epoch.mul(new BN(EPOCH_LENGTH))
-                )[0],
-                delegatorPool: subDaoAcc.delegatorPool,
-                delegatorAta: getAssociatedTokenAddressSync(
-                  subDaoAcc.dntMint,
-                  walletPubkey,
-                  true
-                ),
-                delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
-                  subDaoAcc.delegatorPool
-                )[0],
-              })
-              .instruction();
-          }
-        }
-      )
-    );
+            if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
+              rewardMintSet.add(daoAcc.hntMint.toBase58());
+              return hsdProgram.methods
+                .claimRewardsV1({ epoch })
+                .accountsStrict({
+                  ...commonAccounts,
+                  payer: walletPubkey,
+                  hntMint: daoAcc.hntMint,
+                  daoEpochInfo: daoEpochInfoKey(
+                    subDaoAcc.dao,
+                    epoch.mul(new BN(EPOCH_LENGTH)),
+                  )[0],
+                  delegatorPool: daoAcc.delegatorPool,
+                  delegatorAta: getAssociatedTokenAddressSync(
+                    daoAcc.hntMint,
+                    walletPubkey,
+                    true,
+                  ),
+                  delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
+                    daoAcc.delegatorPool,
+                  )[0],
+                })
+                .instruction();
+            } else {
+              rewardMintSet.add(subDaoAcc.dntMint.toBase58());
+              return hsdProgram.methods
+                .claimRewardsV0({ epoch })
+                .accountsStrict({
+                  ...commonAccounts,
+                  dntMint: subDaoAcc.dntMint,
+                  subDaoEpochInfo: subDaoEpochInfoKey(
+                    subDao,
+                    epoch.mul(new BN(EPOCH_LENGTH)),
+                  )[0],
+                  delegatorPool: subDaoAcc.delegatorPool,
+                  delegatorAta: getAssociatedTokenAddressSync(
+                    subDaoAcc.dntMint,
+                    walletPubkey,
+                    true,
+                  ),
+                  delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
+                    subDaoAcc.delegatorPool,
+                  )[0],
+                })
+                .instruction();
+            }
+          },
+        ),
+      );
 
-    const validInstructions = batchInstructions.filter(truthy);
-    if (validInstructions.length > 0) {
-      allInstructionBatches.push(validInstructions);
-    }
-  }
+      return {
+        instructions: batchInstructions.filter(truthy),
+        unclaimableEpochs,
+      };
+    }),
+  );
+
+  const allInstructionBatches = builtChunks
+    .map(({ instructions }) => instructions)
+    .filter((instructions) => instructions.length > 0);
 
   return {
     instructionBatches: allInstructionBatches,
     hasMore: hitCap,
     hasRewards: allInstructionBatches.length > 0,
     rewardMints: [...rewardMintSet].map((m) => new PublicKey(m)),
-    unclaimableEpochs,
+    unclaimableEpochs: builtChunks.flatMap(
+      ({ unclaimableEpochs }) => unclaimableEpochs,
+    ),
   };
 }
