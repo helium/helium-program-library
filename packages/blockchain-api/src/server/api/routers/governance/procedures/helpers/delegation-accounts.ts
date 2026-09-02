@@ -1,5 +1,5 @@
 import {
-  subDaoEpochInfoKey,
+  EPOCH_LENGTH,
   PROGRAM_ID as HSD_PROGRAM_ID,
 } from "@helium/helium-sub-daos-sdk";
 import { PROGRAM_ID as VSR_PROGRAM_ID } from "@helium/voter-stake-registry-sdk";
@@ -23,7 +23,7 @@ export interface DelegationAccountsArgs {
   wallet: PublicKey;
   position: PublicKey;
   positionMint: PublicKey;
-  /** `position.lockup.effective_end_ts()`. */
+  /** `position.lockup.effective_end_ts()`, from `lockupEffectiveEndTs`. */
   lockupEndTs: BN;
   /** `position.genesis_end`. */
   genesisEndTs: BN;
@@ -34,7 +34,11 @@ export interface DelegationAccountsArgs {
   dao: PublicKey;
   delegatedPosition: PublicKey;
   subDao: PublicKey;
-  /** The program's `registrar.clock_unix_timestamp()`. */
+  /**
+   * The cluster clock's `unix_timestamp`. The program reads
+   * `registrar.clock_unix_timestamp()`, which adds `registrar.time_offset` —
+   * a test-only dial that is zero on mainnet, so the two agree there.
+   */
   now: BN;
 }
 
@@ -77,8 +81,38 @@ const sharedAccounts = (args: DelegationAccountsArgs) => ({
   systemProgram: SystemProgram.programId,
 });
 
-const epochInfo = (subDao: PublicKey, ts: BN) =>
-  subDaoEpochInfoKey(subDao, ts, HSD_PROGRAM_ID)[0];
+/** `i64::MAX`, the end a lockup that never unlocks reports. */
+const I64_MAX = new BN("9223372036854775807");
+
+/**
+ * `Lockup::effective_end_ts` in voter-stake-registry's state.rs: a constant
+ * lockup has no end, so the program uses `i64::MAX`. The SDK's
+ * `getLockupEffectiveEndTs` narrows that to `Number.MAX_SAFE_INTEGER - 1`,
+ * which sits in a different epoch and fails the seeds check.
+ */
+export const lockupEffectiveEndTs = (lockup: {
+  kind: object;
+  endTs: BN;
+}): BN =>
+  (Object.keys(lockup.kind)[0] as string) === "constant"
+    ? I64_MAX
+    : lockup.endTs;
+
+/**
+ * The `sub_dao_epoch_info` PDA. The epoch comes from BN division rather than
+ * `subDaoEpochInfoKey`, whose `currentEpoch` narrows the timestamp through
+ * `BN.toNumber()` and throws on the `i64::MAX` a constant lockup carries.
+ */
+const epochInfo = (subDao: PublicKey, ts: BN) => {
+  const epochSeed = Buffer.alloc(8);
+  epochSeed.writeBigUInt64LE(
+    BigInt(ts.div(new BN(EPOCH_LENGTH)).toString(10)),
+  );
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("sub_dao_epoch_info", "utf-8"), subDao.toBuffer(), epochSeed],
+    HSD_PROGRAM_ID,
+  )[0];
+};
 
 export function closeDelegationAccounts(
   args: DelegationAccountsArgs & {

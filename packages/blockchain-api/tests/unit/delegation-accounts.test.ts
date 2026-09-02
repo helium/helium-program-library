@@ -1,4 +1,8 @@
-import { EPOCH_LENGTH, subDaoEpochInfoKey } from "@helium/helium-sub-daos-sdk";
+import {
+  EPOCH_LENGTH,
+  PROGRAM_ID as HSD_PROGRAM_ID,
+  subDaoEpochInfoKey,
+} from "@helium/helium-sub-daos-sdk";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PROGRAM_ID as VSR_PROGRAM_ID } from "@helium/voter-stake-registry-sdk";
@@ -10,6 +14,7 @@ import {
   closeDelegationAccounts,
   delegateAccounts,
   extendExpirationAccounts,
+  lockupEffectiveEndTs,
 } from "../../src/server/api/routers/governance/procedures/helpers/delegation-accounts";
 
 const epochStart = (epoch: number) => new BN(epoch * EPOCH_LENGTH);
@@ -49,6 +54,66 @@ const base = {
 
 const epochInfo = (sub: PublicKey, epoch: number) =>
   subDaoEpochInfoKey(sub, epochStart(epoch))[0].toBase58();
+
+/**
+ * The sub-DAO epoch info PDA for an epoch too large for `subDaoEpochInfoKey`,
+ * which narrows its timestamp through `BN.toNumber()`.
+ */
+const epochInfoForBigEpoch = (sub: PublicKey, epoch: bigint) => {
+  const seed = Buffer.alloc(8);
+  seed.writeBigUInt64LE(epoch);
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("sub_dao_epoch_info", "utf-8"), sub.toBuffer(), seed],
+    HSD_PROGRAM_ID,
+  )[0].toBase58();
+};
+
+// floor(i64::MAX / EPOCH_LENGTH), the epoch a constant lockup closes in.
+const I64_MAX_EPOCH = BigInt("106751991167300");
+
+describe("lockupEffectiveEndTs", () => {
+  it("reports i64::MAX for a constant lockup", () => {
+    // #given a lockup that never unlocks
+    const lockup = { kind: { constant: {} }, endTs: LOCKUP_END };
+
+    // #when its effective end is taken
+    const endTs = lockupEffectiveEndTs(lockup);
+
+    // #then it matches Lockup::effective_end_ts, not MAX_SAFE_INTEGER
+    expect(endTs.toString()).to.equal("9223372036854775807");
+  });
+
+  it("reports the stored end for a cliff lockup", () => {
+    // #given a lockup with a real end
+    const lockup = { kind: { cliff: {} }, endTs: LOCKUP_END };
+
+    // #when its effective end is taken
+    const endTs = lockupEffectiveEndTs(lockup);
+
+    // #then the stored end is used as is
+    expect(endTs.toString()).to.equal(LOCKUP_END.toString());
+  });
+
+  it("keys a never-expiring constant lockup off the i64::MAX epoch", () => {
+    // #given a constant lockup on a delegation that never expires
+    const lockupEndTs = lockupEffectiveEndTs({
+      kind: { constant: {} },
+      endTs: new BN(0),
+    });
+
+    // #when the close accounts are derived
+    const accounts = closeDelegationAccounts({
+      ...base,
+      lockupEndTs,
+      expirationTs: new BN(0),
+    });
+
+    // #then the closing epoch is the one the program computes
+    expect(accounts.closingTimeSubDaoEpochInfo.toBase58()).to.equal(
+      epochInfoForBigEpoch(subDao, I64_MAX_EPOCH),
+    );
+  });
+});
 
 describe("closeDelegationAccounts", () => {
   it("keys the closing epoch off the delegation's expiration", () => {
