@@ -12,13 +12,18 @@ import {
   JitoBundleSubmissionError,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
-import { predictSubmissionType } from "@/lib/utils/submission-helpers";
+import {
+  isClientCraftedBundleTag,
+  predictSubmissionType,
+} from "@/lib/utils/submission-helpers";
 import { verifiedFeePayer } from "@/lib/utils/transaction-payer";
 import { v4 as uuidv4 } from "uuid";
-import { deriveLastValidBlockHeight } from "@/lib/utils/blockhash-expiry";
+import {
+  deriveLastValidBlockHeight,
+  probeBlockhashValidity,
+} from "@/lib/utils/blockhash-expiry";
 import {
   JitoMissingTipError,
-  probeBlockhashValidity,
   SingleTransactionSubmissionError,
   submitTransactionBatch,
 } from "@/lib/utils/transaction-submission";
@@ -246,21 +251,22 @@ export const submit = publicProcedure.transactions.submit.handler(
     // the resubmission loop until its retry cap. Reject it here so the client
     // can rebuild and re-sign, and so the recorded lifetime always belongs to a
     // blockhash the cluster still accepts.
+    //
+    // Only a client-crafted bundle can arrive stale — the user signs it at
+    // their own pace. A server-built bundle carries a blockhash this service
+    // minted moments ago, so it pays no probe round trip.
     const connection = new Connection(env.SOLANA_RPC_URL);
+    const probesBlockhashes = isClientCraftedBundleTag(tag);
     const [latestBlockhash, blockhashValidity] = await Promise.all([
       connection.getLatestBlockhash({ commitment: "finalized" }),
-      probeBlockhashValidity(connection, transactionBlockhashes),
+      probeBlockhashValidity(
+        connection,
+        probesBlockhashes ? transactionBlockhashes : [],
+      ),
     ]);
 
-    const lastValidBlockHeights = transactionBlockhashes.map((blockhash) =>
-      deriveLastValidBlockHeight({
-        blockhashValid: blockhashValidity.get(blockhash) ?? true,
-        latestLastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      }),
-    );
-
-    const expiredIndex = lastValidBlockHeights.findIndex(
-      (height) => height === undefined,
+    const expiredIndex = transactionBlockhashes.findIndex(
+      (blockhash) => blockhashValidity.get(blockhash) === false,
     );
     if (expiredIndex >= 0) {
       throw errors.BLOCKHASH_EXPIRED({
@@ -270,6 +276,18 @@ export const submit = publicProcedure.transactions.submit.handler(
         },
       });
     }
+
+    // A probe that could not answer records no lifetime rather than the fresh
+    // blockhash's, which belongs to a different blockhash entirely: the resubmit
+    // probe decides that transaction's fate instead of a fiction decided here.
+    const lastValidBlockHeights = transactionBlockhashes.map((blockhash) =>
+      probesBlockhashes
+        ? deriveLastValidBlockHeight({
+            blockhashValid: blockhashValidity.get(blockhash),
+            latestLastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+          })
+        : latestBlockhash.lastValidBlockHeight,
+    );
 
     // Simulate transactions before submission (except for sequential batches)
     if (simulate && (parallel || transactions.length === 1)) {
