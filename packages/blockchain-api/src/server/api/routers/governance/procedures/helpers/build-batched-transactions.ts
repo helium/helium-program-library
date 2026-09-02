@@ -176,12 +176,10 @@ export async function buildBatchedTransactions({
   const isMainnet = cluster === "mainnet" || cluster === "mainnet-beta";
   const effectiveMaxTxs = isMainnet ? maxTxs - 1 : maxTxs;
 
-  // The same lookup table and blockhash go into every transaction this call
-  // produces, so both are read once here and handed to each build. Read per
-  // transaction they were N round trips for one answer.
-  const [addressLookupTables, { blockhash }] = await Promise.all([
-    getAddressLookupTableAccounts(connection, [getHeliumLookupTable()]),
-    connection.getLatestBlockhash("finalized"),
+  // The same lookup table goes into every transaction this call produces, and
+  // packing needs it to measure sizes, so it is read once up front.
+  const addressLookupTables = await getAddressLookupTableAccounts(connection, [
+    getHeliumLookupTable(),
   ]);
 
   const packedBatches: {
@@ -284,6 +282,11 @@ export async function buildBatchedTransactions({
       stoppedEarly = true;
     }
   }
+
+  // The same blockhash goes into every transaction, and it starts ageing the
+  // moment it is read, so it is read after packing rather than before: the
+  // signer gets the full validity window instead of what packing left of it.
+  const { blockhash } = await connection.getLatestBlockhash("finalized");
 
   const built = (
     await Promise.all(
