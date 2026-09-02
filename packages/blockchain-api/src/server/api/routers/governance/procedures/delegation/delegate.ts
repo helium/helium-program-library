@@ -323,6 +323,28 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     const allGroups: InstructionGroup[] = [];
     let newClaimBots = 0;
 
+    // Every automated position queues its own tuktuk task, so all the ids are
+    // reserved from one bitmap read up front. Reading the bitmap per position
+    // hands out ids the earlier positions in this same bundle already took, and
+    // the duplicate task account makes the bundle fail on-chain.
+    const taskQueueAcc = automationEnabled
+      ? await import("@helium/tuktuk-sdk")
+          .then((m) => m.init(provider))
+          .then((tuktukProgram) =>
+            tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE),
+          )
+      : null;
+    const reservedTaskIds = taskQueueAcc
+      ? nextAvailableTaskIds(taskQueueAcc.taskBitmap, positionInfos.length)
+      : [];
+    if (taskQueueAcc && reservedTaskIds.length < positionInfos.length) {
+      throw errors.BAD_REQUEST({
+        message:
+          "The automation task queue does not have enough free slots. Try again later or delegate fewer positions at a time.",
+      });
+    }
+    let nextReservedTaskIdIndex = 0;
+
     for (const instructions of claimResult.instructionBatches) {
       allGroups.push({
         instructions,
@@ -542,17 +564,8 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           );
         }
 
-        const tuktukProgram = await import("@helium/tuktuk-sdk").then((m) =>
-          m.init(provider),
-        );
-        const taskQueueAcc =
-          await tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE);
-
         if (taskQueueAcc) {
-          const nextAvailable = nextAvailableTaskIds(
-            taskQueueAcc.taskBitmap,
-            1,
-          )[0];
+          const nextAvailable = reservedTaskIds[nextReservedTaskIdIndex++];
           const task = taskKey(TASK_QUEUE, nextAvailable)[0];
 
           automationInstructions.push(

@@ -11,6 +11,7 @@ import {
   delegationClaimBotKey,
   init as initHplCrons,
 } from "@helium/hpl-crons-sdk";
+import { init as initTuktuk, taskKey } from "@helium/tuktuk-sdk";
 import {
   Keypair,
   LAMPORTS_PER_SOL,
@@ -26,6 +27,7 @@ import { isDefinedError } from "@orpc/client";
 import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
+import { confineTaskQueueFreeIds } from "./helpers/tuktuk";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import {
   ensureFunds,
@@ -839,9 +841,15 @@ describe("governance", () => {
 
   describe("delegation with automatic reward claiming", () => {
     let walletAddress: string;
+    let restoreTaskQueue: (() => Promise<void>) | undefined;
 
     before(async () => {
       walletAddress = ctx.payer.publicKey.toBase58();
+    });
+
+    after(async () => {
+      await restoreTaskQueue?.();
+      restoreTaskQueue = undefined;
     });
 
     it("does not include claim transactions for new delegation", async () => {
@@ -877,6 +885,75 @@ describe("governance", () => {
         ctx.payer
       );
       expect(sigs).to.have.length(1);
+    });
+
+    it("queues a distinct task per position when two are automated at once", async () => {
+      // #given a task queue whose two free ids share a bitmap byte, so every
+      // read of the bitmap offers the same first free id
+      const taskQueue = new PublicKey(DEFAULT_HPL_CRONS_TASK_QUEUE);
+      const { provider } = await getPrograms(ctx);
+      const tuktukProgram = await initTuktuk(provider);
+      const { freeIds, restore } = await confineTaskQueueFreeIds(
+        ctx.connection,
+        tuktukProgram,
+        taskQueue,
+        2
+      );
+      restoreTaskQueue = restore;
+
+      // #given two undelegated positions
+      const first = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+      const second = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+
+      // #when delegating both with automation in a single request
+      const { data, error } = await ctx.safeClient.governance.delegatePositions({
+        walletAddress,
+        positionMints: [first.positionMint, second.positionMint],
+        subDaoMint: MOBILE_MINT.toBase58(),
+        automationEnabled: true,
+      });
+
+      // #then the whole bundle lands - two bots sharing one task id would fail
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data.hasMore).to.equal(false);
+      const sigs = await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        ctx.payer
+      );
+      expect(sigs.length).to.equal(data.transactionData.transactions.length);
+
+      // #then each claim bot holds one of the two ids the queue had free
+      const hplCronsProgram = await initHplCrons(provider);
+      const [firstBot, secondBot] = await Promise.all(
+        [first.positionMint, second.positionMint].map((mint) => {
+          const [positionPubkey] = positionKey(new PublicKey(mint));
+          const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+          const [botPubkey] = delegationClaimBotKey(
+            taskQueue,
+            delegatedPosPubkey
+          );
+          return hplCronsProgram.account.delegationClaimBotV0.fetch(botPubkey);
+        })
+      );
+      expect(firstBot.queued).to.equal(true);
+      expect(secondBot.queued).to.equal(true);
+      const expectedTasks = freeIds
+        .map((id) => taskKey(taskQueue, id)[0].toBase58())
+        .sort();
+      expect(
+        [firstBot.nextTask.toBase58(), secondBot.nextTask.toBase58()].sort()
+      ).to.deep.equal(expectedTasks);
     });
   });
 
