@@ -364,10 +364,6 @@ export const create = publicProcedure.governance.createPosition.handler(
         groups,
         connection,
         feePayer: walletPubkey,
-        // The delegate tx acts on the position the create tx mints, so a
-        // standalone sim of it fails outright against pre-bundle state
-        // (see BuildBatchedTransactionsParams).
-        useTableComputeUnits: true,
       });
 
     const cluster = getCluster();

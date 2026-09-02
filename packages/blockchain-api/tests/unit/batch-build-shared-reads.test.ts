@@ -1,4 +1,10 @@
-import { Connection, Keypair, TransactionInstruction } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram,
+  Connection,
+  Keypair,
+  TransactionInstruction,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { expect } from "chai";
 import { before, describe, it } from "mocha";
 
@@ -18,7 +24,7 @@ const NOOP_PROGRAM = Keypair.generate().publicKey;
  * every transaction in one build.
  */
 const makeCountingConnection = () => {
-  const state = { blockhashCalls: 0, accountBatchCalls: 0 };
+  const state = { blockhashCalls: 0, accountBatchCalls: 0, simulateCalls: 0 };
 
   const connection = {
     rpcEndpoint: "http://localhost:0",
@@ -35,11 +41,30 @@ const makeCountingConnection = () => {
       return keys.map(() => null);
     },
     getRecentPrioritizationFees: async () => [],
+    simulateTransaction: async () => {
+      state.simulateCalls++;
+      return { value: { err: null, unitsConsumed: 1234, logs: [] } };
+    },
     _rpcRequest: async () => ({ result: { priorityFeeEstimate: 1 } }),
     _buildArgs: (args: unknown[]) => args,
   } as unknown as Connection;
 
   return { connection, state };
+};
+
+/** The CU limit the static table asks for when it prices no instruction. */
+const TABLE_MAX_COMPUTE_UNITS = 1_400_000;
+
+/** The compute unit limit a built transaction carries, or undefined. */
+const computeUnitLimit = (tx: VersionedTransaction): number | undefined => {
+  const programId = ComputeBudgetProgram.programId.toBase58();
+  for (const ix of tx.message.compiledInstructions) {
+    const key = tx.message.staticAccountKeys[ix.programIdIndex];
+    if (key?.toBase58() === programId && ix.data[0] === 2) {
+      return Buffer.from(ix.data).readUInt32LE(1);
+    }
+  }
+  return undefined;
 };
 
 /** ~600 bytes of data, so two of these cannot share one 1232-byte tx. */
@@ -84,7 +109,6 @@ describe("buildBatchedTransactions shared reads", () => {
       groups: [makeBigGroup("one"), makeBigGroup("two"), makeBigGroup("three")],
       connection,
       feePayer: FEE_PAYER,
-      useTableComputeUnits: true,
     });
 
     // #then every transaction was built from the same two reads
@@ -97,5 +121,23 @@ describe("buildBatchedTransactions shared reads", () => {
       state.accountBatchCalls,
       "each transaction fetched the lookup table again",
     ).to.equal(1);
+  });
+
+  it("sizes CU limits from the static table unless told otherwise", async () => {
+    // #given a connection that would happily answer a simulation
+    const { connection, state } = makeCountingConnection();
+
+    // #when a batch is built without naming the option
+    const { versionedTransactions } = await buildBatchedTransactions({
+      groups: [makeBigGroup("one")],
+      connection,
+      feePayer: FEE_PAYER,
+    });
+
+    // #then the table priced it and nothing was simulated
+    expect(state.simulateCalls, "the builder simulated the batch").to.equal(0);
+    expect(computeUnitLimit(versionedTransactions[0])).to.equal(
+      TABLE_MAX_COMPUTE_UNITS,
+    );
   });
 });

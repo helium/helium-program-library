@@ -37,10 +37,9 @@ export interface BuildBatchedTransactionsParams {
   feePayer: PublicKey;
   maxTxs?: number;
   // Size CU limits from the static table instead of standalone simulation.
-  // Pass true for any Jito bundle producer: a later tx's cost can depend on
-  // earlier txs' state, which a standalone sim never sees, and table sizing
-  // is deterministic and state-independent across the whole bundle. See
-  // BuildTransactionOptions.useTableComputeUnits.
+  // On by default: every batch this builds goes out as a Jito bundle, and a
+  // later tx's cost can depend on earlier txs' state, which a standalone sim
+  // never sees. See BuildTransactionOptions.useTableComputeUnits.
   useTableComputeUnits?: boolean;
 }
 
@@ -167,7 +166,7 @@ export async function buildBatchedTransactions({
   connection,
   feePayer,
   maxTxs = MAX_TXS_PER_CALL,
-  useTableComputeUnits = false,
+  useTableComputeUnits = true,
 }: BuildBatchedTransactionsParams): Promise<BuildBatchedTransactionsResult> {
   if (groups.length === 0) {
     return { transactions: [], versionedTransactions: [], hasMore: false };

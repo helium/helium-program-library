@@ -155,9 +155,6 @@ export const unassign = publicProcedure.governance.unassignProxies.handler(
         groups,
         connection,
         feePayer: walletPubkey,
-        // Unassignments are independent; size the whole bundle from the table
-        // so CU limits are deterministic and state-independent.
-        useTableComputeUnits: true,
       });
 
     const cluster = getCluster();

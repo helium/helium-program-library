@@ -123,9 +123,6 @@ export const claimRewards =
         groups: allGroups,
         connection,
         feePayer: walletPubkey,
-        // Claim txs run sequentially in a Jito bundle; a standalone sim
-        // under-measures later txs (see BuildBatchedTransactionsParams).
-        useTableComputeUnits: true,
       });
 
       const cluster = getCluster();

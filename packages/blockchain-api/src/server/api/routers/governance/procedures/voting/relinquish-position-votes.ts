@@ -161,9 +161,6 @@ export const relinquishPositionVotes =
           groups,
           connection,
           feePayer: walletPubkey,
-          // Relinquish txs run sequentially in a Jito bundle; a standalone sim
-          // under-measures later txs (see BuildBatchedTransactionsParams).
-          useTableComputeUnits: true,
         });
 
       const cluster = getCluster();

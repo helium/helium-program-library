@@ -320,9 +320,6 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           groups: claimGroups,
           connection,
           feePayer: walletPubkey,
-          // Claim txs run sequentially in a Jito bundle; a standalone sim
-          // under-measures later txs (see BuildBatchedTransactionsParams).
-          useTableComputeUnits: true,
         });
 
         const claimTxFee = await getTotalTransactionFees(
@@ -668,9 +665,6 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       groups: allGroups,
       connection,
       feePayer: walletPubkey,
-      // Claim txs run sequentially in a Jito bundle; a standalone sim
-      // under-measures later txs (see BuildBatchedTransactionsParams).
-      useTableComputeUnits: true,
     });
 
     const txFees = await getTotalTransactionFees(

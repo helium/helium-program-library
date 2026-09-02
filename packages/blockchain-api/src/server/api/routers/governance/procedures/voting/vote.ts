@@ -402,9 +402,6 @@ export const vote = publicProcedure.governance.vote.handler(
         groups,
         connection,
         feePayer: walletPubkey,
-        // Vote txs run sequentially in a Jito bundle; a standalone sim
-        // under-measures later txs (see BuildBatchedTransactionsParams).
-        useTableComputeUnits: true,
       });
 
     const cluster = getCluster();

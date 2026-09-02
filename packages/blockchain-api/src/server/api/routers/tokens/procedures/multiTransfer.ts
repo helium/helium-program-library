@@ -124,9 +124,6 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
         groups,
         connection,
         feePayer,
-        // Transfers are independent; size the whole bundle from the table so
-        // CU limits are deterministic and state-independent.
-        useTableComputeUnits: true,
       });
 
     if (hasMore) {

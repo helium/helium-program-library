@@ -110,9 +110,6 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
         groups: claimGroups,
         connection,
         feePayer: walletPubkey,
-        // Claim txs run sequentially in a Jito bundle; a standalone sim
-        // under-measures later txs (see BuildBatchedTransactionsParams).
-        useTableComputeUnits: true,
       });
 
       const cluster = getCluster();
@@ -217,9 +214,6 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
       groups: allGroups,
       connection,
       feePayer: walletPubkey,
-      // Claim txs run sequentially in a Jito bundle; a standalone sim
-      // under-measures later txs (see BuildBatchedTransactionsParams).
-      useTableComputeUnits: true,
     });
 
     const undelegateCluster = getCluster();
