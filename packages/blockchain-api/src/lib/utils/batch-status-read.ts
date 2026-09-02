@@ -1,13 +1,18 @@
 import type { BatchStatus } from "../models/transaction-batch";
 import {
   decideBatchStatus,
+  isSettledTransactionStatus,
   type BatchStatusDecision,
   type BatchTransactionRow,
 } from "./batch-status";
+import {
+  probeBlockhashValidity,
+  type BlockhashProbeRpc,
+} from "./blockhash-expiry";
 import type { MinimalSignatureStatus } from "./submission-helpers";
 
 /** The slice of a Solana `Connection` the read phase uses. */
-export interface BatchStatusRpc {
+export interface BatchStatusRpc extends BlockhashProbeRpc {
   getBlockHeight(config: {
     commitment: "confirmed" | "finalized";
   }): Promise<number>;
@@ -15,6 +20,11 @@ export interface BatchStatusRpc {
     signatures: string[],
     config: { searchTransactionHistory: boolean },
   ): Promise<{ value: (MinimalSignatureStatus | null)[] }>;
+}
+
+export interface BatchStatusReadResult extends BatchStatusDecision {
+  /** The height the decision was made at, so a caller need not read it again. */
+  currentBlockHeight: number;
 }
 
 /**
@@ -36,7 +46,7 @@ export async function readBatchStatus(params: {
   commitment?: "confirmed" | "finalized";
   /** Status the bundle check already produced, for a Jito batch. */
   jitoBatchStatus?: BatchStatus;
-}): Promise<BatchStatusDecision | null> {
+}): Promise<BatchStatusReadResult | null> {
   const {
     rpc,
     batchId,
@@ -45,28 +55,41 @@ export async function readBatchStatus(params: {
     jitoBatchStatus,
   } = params;
 
+  const open = transactions.filter(
+    (tx) => !isSettledTransactionStatus(tx.status),
+  );
+
   let currentBlockHeight: number;
   let signatureStatuses: Map<string, MinimalSignatureStatus | null>;
+  let blockhashValidity: Map<string, boolean>;
   try {
-    currentBlockHeight = await rpc.getBlockHeight({ commitment });
-    signatureStatuses = await fetchSignatureStatuses(
-      rpc,
-      batchId,
-      transactions,
-    );
+    [currentBlockHeight, signatureStatuses, blockhashValidity] =
+      await Promise.all([
+        rpc.getBlockHeight({ commitment }),
+        fetchSignatureStatuses(rpc, batchId, open),
+        probeBlockhashValidity(
+          rpc,
+          open.flatMap((tx) => (tx.blockhash ? [tx.blockhash] : [])),
+          commitment,
+        ),
+      ]);
   } catch (error) {
     console.error(`Cluster read failed for batch ${batchId}:`, error);
     return null;
   }
 
-  return decideBatchStatus({
-    batchId,
-    transactions,
-    signatureStatuses,
+  return {
+    ...decideBatchStatus({
+      batchId,
+      transactions,
+      signatureStatuses,
+      currentBlockHeight,
+      blockhashValidity,
+      commitment,
+      jitoBatchStatus,
+    }),
     currentBlockHeight,
-    commitment,
-    jitoBatchStatus,
-  });
+  };
 }
 
 /**
@@ -75,9 +98,8 @@ export async function readBatchStatus(params: {
  * answers null for a signature that confirmed moments ago, which used to leave
  * a landed batch pending and resubmitting.
  *
- * Placeholder signatures (`${batchId}-${index}`) were never sent, and rows that
- * already reached a terminal status are not re-read — a signature the cluster
- * has aged out must not un-confirm a row.
+ * Placeholder signatures (`${batchId}-${index}`) were never sent, so there is
+ * nothing to look up.
  */
 async function fetchSignatureStatuses(
   rpc: BatchStatusRpc,
@@ -85,9 +107,7 @@ async function fetchSignatureStatuses(
   transactions: readonly BatchTransactionRow[],
 ): Promise<Map<string, MinimalSignatureStatus | null>> {
   const signatures = transactions
-    .filter(
-      (tx) => tx.status === "pending" && !tx.signature.startsWith(batchId),
-    )
+    .filter((tx) => !tx.signature.startsWith(batchId))
     .map((tx) => tx.signature);
 
   if (signatures.length === 0) {

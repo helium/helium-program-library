@@ -6,16 +6,13 @@ import { env } from "../env";
 import { defineAssociations } from "../models/associations";
 import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
-import { decideBatchExpiry } from "./blockhash-expiry";
+import { readBatchStatus } from "./batch-status-read";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import {
   DEFAULT_MAX_RESUBMISSIONS,
   resubmissionBackoffMs,
 } from "./resubmission-backoff";
-import {
-  probeBlockhashValidity,
-  submitTransactionBatch,
-} from "./transaction-submission";
+import { submitTransactionBatch } from "./transaction-submission";
 import { checkAndUpdateBatchStatus } from "./transaction-status-checker";
 
 // A batch that has been pending this long has either landed/failed on-chain
@@ -212,24 +209,41 @@ export async function resubmitTransactionBatch(
   // slots and draws "bundle contains an expired blockhash" from Jito. Checked
   // before the claim below so a dead batch never consumes a retry slot, and it
   // is expired rather than left pending so the (tag, payer) lock is released.
+  //
+  // The cluster's own view of the signatures decides this, not the blockhash
+  // probe alone: a batch that landed in its last valid block carries a dead
+  // blockhash and a confirmed signature, and expiring it on the blockhash would
+  // record a landed batch as expired for good.
   const connection = new Connection(env.SOLANA_RPC_URL);
-  const [currentBlockHeight, blockhashValidity] = await Promise.all([
-    connection.getBlockHeight("confirmed"),
-    probeBlockhashValidity(
-      connection,
-      pendingTransactions.flatMap((tx) => (tx.blockhash ? [tx.blockhash] : [])),
-    ),
-  ]);
-  const expiry = decideBatchExpiry({
+  const decision = await readBatchStatus({
+    rpc: connection,
+    batchId: batch.id,
     transactions: pendingTransactions,
-    currentBlockHeight,
-    blockhashValidity,
   });
-  if (expiry.expired) {
+  if (!decision) {
+    return {
+      success: false,
+      error: "Cluster status could not be read, skipping resubmission",
+      batchId: batch.id,
+      ineligible: true,
+    };
+  }
+  if (decision.confirmedCount > 0) {
+    return {
+      success: false,
+      error: `Batch already landed ${decision.confirmedCount} of ${pendingTransactions.length} transactions on-chain`,
+      batchId: batch.id,
+      ineligible: true,
+    };
+  }
+  const expiredCount = decision.transactionStatuses.filter(
+    (ts) => ts.status === "expired",
+  ).length;
+  if (expiredCount > 0) {
     await expirePendingBatch(batch);
     return {
       success: false,
-      error: expiry.reason,
+      error: `Blockhash expired at block height ${decision.currentBlockHeight} for ${expiredCount} of ${pendingTransactions.length} transactions`,
       batchId: batch.id,
       expired: true,
     };
@@ -439,8 +453,19 @@ async function expirePendingBatch(batch: TransactionBatch): Promise<void> {
         transaction: dbTransaction,
       },
     );
-    batch.status = "expired";
-    await batch.save({ transaction: dbTransaction });
+    // Guarded like the row update above: a batch that left "pending" between
+    // the read and here has already been resolved by a status check, and must
+    // not be dragged back to "expired".
+    const [expiredBatches] = await TransactionBatch.update(
+      { status: "expired" },
+      {
+        where: { id: batch.id, status: "pending" },
+        transaction: dbTransaction,
+      },
+    );
+    if (expiredBatches > 0) {
+      batch.status = "expired";
+    }
     await dbTransaction.commit();
   } catch (error) {
     await dbTransaction.rollback();

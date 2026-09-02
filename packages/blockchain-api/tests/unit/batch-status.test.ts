@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
   decideBatchStatus,
+  isTransactionExpired,
   type BatchTransactionRow,
 } from "../../src/lib/utils/batch-status";
 import type { MinimalSignatureStatus } from "../../src/lib/utils/submission-helpers";
@@ -117,6 +118,64 @@ describe("decideBatchStatus", () => {
     expect(decision.transactionStatuses[0].status).to.equal("expired");
   });
 
+  it("leaves a batch that has no transaction rows yet pending", () => {
+    const decision = decideBatchStatus({
+      batchId: BATCH_ID,
+      transactions: [],
+      signatureStatuses: new Map(),
+      currentBlockHeight: 250,
+    });
+
+    expect(decision.batchStatus).to.equal("pending");
+    expect(decision.confirmedCount).to.equal(0);
+  });
+
+  it("lets a row we called expired flip to confirmed once the cluster reports it", () => {
+    const decision = decideBatchStatus({
+      batchId: BATCH_ID,
+      transactions: [
+        { signature: "sigA", status: "expired", lastValidBlockHeight: 300 },
+      ],
+      signatureStatuses: new Map([["sigA", confirmed]]),
+      currentBlockHeight: 900,
+    });
+
+    expect(decision.transactionStatuses[0].status).to.equal("confirmed");
+    expect(decision.batchStatus).to.equal("confirmed");
+  });
+
+  it("keeps a failed row failed once the cluster no longer reports it", () => {
+    const decision = decideBatchStatus({
+      batchId: BATCH_ID,
+      transactions: [
+        { signature: "sigA", status: "failed", lastValidBlockHeight: 300 },
+      ],
+      signatureStatuses: new Map(),
+      currentBlockHeight: 250,
+    });
+
+    expect(decision.transactionStatuses[0].status).to.equal("failed");
+  });
+
+  it("expires a row whose own blockhash the cluster rejects, however long its stored lifetime says", () => {
+    const decision = decideBatchStatus({
+      batchId: BATCH_ID,
+      transactions: [
+        {
+          signature: "sigA",
+          status: "pending",
+          blockhash: "hashA",
+          lastValidBlockHeight: 100_000,
+        },
+      ],
+      signatureStatuses: new Map([["sigA", null]]),
+      currentBlockHeight: 250,
+      blockhashValidity: new Map([["hashA", false]]),
+    });
+
+    expect(decision.transactionStatuses[0].status).to.equal("expired");
+  });
+
   it("rolls the batch up over rows that already reached a terminal status", () => {
     const decision = decideBatchStatus({
       batchId: BATCH_ID,
@@ -192,5 +251,70 @@ describe("decideBatchStatus", () => {
     });
 
     expect(decision.batchStatus).to.equal("failed");
+  });
+});
+
+describe("isTransactionExpired", () => {
+  it("expires a transaction past its last valid block height", () => {
+    expect(
+      isTransactionExpired({
+        transaction: { blockhash: "hashA", lastValidBlockHeight: 200 },
+        currentBlockHeight: 250,
+      }),
+    ).to.equal(true);
+  });
+
+  it("keeps a transaction on the last block its blockhash is valid for", () => {
+    expect(
+      isTransactionExpired({
+        transaction: { blockhash: "hashA", lastValidBlockHeight: 250 },
+        currentBlockHeight: 250,
+      }),
+    ).to.equal(false);
+  });
+
+  it("expires a row that predates lastValidBlockHeight, whose lifetime cannot be checked", () => {
+    expect(
+      isTransactionExpired({
+        transaction: { blockhash: "hashA" },
+        currentBlockHeight: 250,
+      }),
+    ).to.equal(true);
+  });
+
+  it("lets the transaction's own blockhash outrank its stored lifetime, either way", () => {
+    expect(
+      isTransactionExpired({
+        transaction: { blockhash: "hashA", lastValidBlockHeight: 100_000 },
+        currentBlockHeight: 250,
+        blockhashValidity: new Map([["hashA", false]]),
+      }),
+    ).to.equal(true);
+
+    expect(
+      isTransactionExpired({
+        transaction: { blockhash: "hashA", lastValidBlockHeight: 1 },
+        currentBlockHeight: 250,
+        blockhashValidity: new Map([["hashA", true]]),
+      }),
+    ).to.equal(false);
+  });
+
+  it("falls back to the stored lifetime for a blockhash the probe could not answer for", () => {
+    expect(
+      isTransactionExpired({
+        transaction: { blockhash: "hashB", lastValidBlockHeight: 200 },
+        currentBlockHeight: 250,
+        blockhashValidity: new Map([["hashA", true]]),
+      }),
+    ).to.equal(true);
+  });
+
+  it("expires a transaction when no block height could be read to check it against", () => {
+    expect(
+      isTransactionExpired({
+        transaction: { blockhash: "hashA", lastValidBlockHeight: 200 },
+      }),
+    ).to.equal(true);
   });
 });

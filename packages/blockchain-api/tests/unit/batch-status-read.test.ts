@@ -19,6 +19,7 @@ interface RpcCalls {
   blockHeightCalls: number;
   signatureCalls: string[][];
   searchedHistory: boolean[];
+  probedBlockhashes: string[];
 }
 
 const fakeRpc = (
@@ -27,12 +28,14 @@ const fakeRpc = (
     statuses?: (
       signatures: string[],
     ) => Promise<(MinimalSignatureStatus | null)[]>;
+    blockhashValid?: (blockhash: string) => Promise<boolean>;
   } = {},
 ): { rpc: BatchStatusRpc; calls: RpcCalls } => {
   const calls: RpcCalls = {
     blockHeightCalls: 0,
     signatureCalls: [],
     searchedHistory: [],
+    probedBlockhashes: [],
   };
 
   const rpc: BatchStatusRpc = {
@@ -48,14 +51,21 @@ const fakeRpc = (
         : signatures.map(() => null);
       return { value };
     },
+    async isBlockhashValid(blockhash) {
+      calls.probedBlockhashes.push(blockhash);
+      const value = overrides.blockhashValid
+        ? await overrides.blockhashValid(blockhash)
+        : true;
+      return { value };
+    },
   };
 
   return { rpc, calls };
 };
 
 describe("readBatchStatus", () => {
-  it("skips the batch when the block-height read fails, without reading signatures", async () => {
-    const { rpc, calls } = fakeRpc({
+  it("skips the batch when the block-height read fails", async () => {
+    const { rpc } = fakeRpc({
       blockHeight: () => Promise.reject(new Error("503 Service Unavailable")),
     });
 
@@ -66,7 +76,6 @@ describe("readBatchStatus", () => {
     });
 
     expect(decision).to.equal(null);
-    expect(calls.signatureCalls).to.deep.equal([]);
   });
 
   it("skips the batch when the signature-status read fails", async () => {
@@ -120,5 +129,50 @@ describe("readBatchStatus", () => {
     });
 
     expect(calls.signatureCalls).to.deep.equal([["sig-c"]]);
+  });
+
+  it("reports the height the decision was made at so the caller need not read it again", async () => {
+    const { rpc } = fakeRpc({ blockHeight: () => Promise.resolve(4242) });
+
+    const decision = await readBatchStatus({
+      rpc,
+      batchId: BATCH_ID,
+      transactions: [pendingRow("sig-a")],
+    });
+
+    expect(decision?.currentBlockHeight).to.equal(4242);
+  });
+
+  it("probes each open row's own blockhash once and expires the rows it rejects", async () => {
+    const { rpc, calls } = fakeRpc({
+      blockhashValid: () => Promise.resolve(false),
+    });
+
+    const decision = await readBatchStatus({
+      rpc,
+      batchId: BATCH_ID,
+      transactions: [
+        { ...pendingRow("sig-a"), blockhash: "hashA" },
+        { ...pendingRow("sig-b"), blockhash: "hashA" },
+      ],
+    });
+
+    expect(calls.probedBlockhashes).to.deep.equal(["hashA"]);
+    expect(decision?.batchStatus).to.equal("failed");
+  });
+
+  it("does not probe the blockhash of a row that already settled", async () => {
+    const { rpc, calls } = fakeRpc();
+
+    await readBatchStatus({
+      rpc,
+      batchId: BATCH_ID,
+      transactions: [
+        { signature: "sig-a", status: "confirmed", blockhash: "hashA" },
+        { ...pendingRow("sig-b"), blockhash: "hashB" },
+      ],
+    });
+
+    expect(calls.probedBlockhashes).to.deep.equal(["hashB"]);
   });
 });
