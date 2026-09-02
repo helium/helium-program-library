@@ -55,6 +55,9 @@ import {
   toLockupKindArg,
   LockupKindType,
   buildBatchedTransactions,
+  getAutomationRentLamports,
+  DELEGATED_POSITION_SPACE,
+  POSITION_SPACE,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
 import { canSign } from "@/lib/utils/can-sign";
@@ -361,28 +364,28 @@ export const create = publicProcedure.governance.createPosition.handler(
     // lets a low-SOL wallet pass this check, then fail on-chain inside
     // initializePositionV0 with a System ResultWithNegativeLamports surfaced as
     // an opaque Custom(1) bundle-simulation error instead of INSUFFICIENT_FUNDS.
-    const [positionRent, delegatedPositionRent, claimBotRent] =
+    const automates = Boolean(subDaoMint) && automationEnabled;
+    const [positionRent, delegatedPositionRent, automationRent] =
       await Promise.all([
-        connection.getMinimumBalanceForRentExemption(
-          vsrProgram.account.positionV0.size,
-        ),
+        connection.getMinimumBalanceForRentExemption(POSITION_SPACE),
         subDaoMint
           ? connection.getMinimumBalanceForRentExemption(
-              hsdProgram.account.delegatedPositionV0.size,
+              DELEGATED_POSITION_SPACE,
             )
           : Promise.resolve(0),
-        subDaoMint && automationEnabled
-          ? connection.getMinimumBalanceForRentExemption(
-              hplCronsProgram.account.delegationClaimBotV0.size,
-            )
-          : Promise.resolve(0),
+        getAutomationRentLamports({
+          connection,
+          walletPubkey,
+          newClaimBots: automates ? 1 : 0,
+          createsHntAta: automates,
+        }),
       ]);
     const createdAccountRent =
       positionRent +
       RENT_COSTS.ATA + // position NFT token account
       delegatedPositionRent +
-      claimBotRent +
-      (subDaoMint && automationEnabled ? RENT_COSTS.TUKTUK_TASK : 0); // delegation claim task
+      automationRent +
+      (automates ? RENT_COSTS.TUKTUK_TASK : 0); // delegation claim task
 
     const estimatedSolFeeLamports =
       (await getTotalTransactionFees(connection, versionedTransactions)) +

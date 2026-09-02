@@ -42,6 +42,7 @@ import {
   HNT_EPOCH,
   getLockupKind,
   LockupKind,
+  getAutomationRentLamports,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
 
@@ -320,6 +321,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     }
 
     const allGroups: InstructionGroup[] = [];
+    let newClaimBots = 0;
 
     for (const instructions of claimResult.instructionBatches) {
       allGroups.push({
@@ -513,6 +515,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         }
 
         if (!delegationClaimBot) {
+          newClaimBots++;
           automationInstructions.push(
             await hplCronsProgram.methods
               .initDelegationClaimBotV0()
@@ -656,7 +659,19 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     const automationCost = automationEnabled
       ? positionMints.length * PREPAID_TX_FEES * LAMPORTS_PER_SOL
       : 0;
-    const estimatedSolFeeLamports = txFees + jitoTipCost + automationCost;
+    // initDelegationClaimBotV0 allocates a claim-bot account per position the
+    // wallet must fund rent for. Omitting it lets a low-SOL wallet pass this
+    // check and then fail on-chain with an opaque Custom(1).
+    const automationRent = await getAutomationRentLamports({
+      connection,
+      walletPubkey,
+      newClaimBots,
+      // startDelegationClaimBotV1 requires an existing delegator ATA here;
+      // unlike createPosition this path never creates one.
+      createsHntAta: false,
+    });
+    const estimatedSolFeeLamports =
+      txFees + jitoTipCost + automationCost + automationRent;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < estimatedSolFeeLamports) {

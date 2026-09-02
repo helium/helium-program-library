@@ -7,7 +7,10 @@ import {
   proxyVoteMarkerKey,
   voteMarkerKey,
 } from "@helium/voter-stake-registry-sdk";
-import { init as initHplCrons } from "@helium/hpl-crons-sdk";
+import {
+  delegationClaimBotKey,
+  init as initHplCrons,
+} from "@helium/hpl-crons-sdk";
 import {
   Keypair,
   LAMPORTS_PER_SOL,
@@ -24,7 +27,16 @@ import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
 import { signAndSubmitTransactionData } from "./helpers/tx";
-import { ensureFunds, ensureTokenBalance } from "./helpers/wallet";
+import {
+  ensureFunds,
+  ensureTokenBalance,
+  setBalanceExactly,
+} from "./helpers/wallet";
+import {
+  DELEGATED_POSITION_SPACE,
+  DELEGATION_CLAIM_BOT_SPACE,
+  POSITION_SPACE,
+} from "../../src/server/api/routers/governance/procedures/helpers/rent";
 import {
   DEFAULT_HPL_CRONS_TASK_QUEUE,
   TEST_PROXY_ADDRESS,
@@ -2025,6 +2037,79 @@ describe("governance", () => {
         expect(error.code).to.equal("BAD_REQUEST");
         expect(error.message).to.include("No proxy assignments");
       });
+    });
+  });
+  describe("createPosition SOL preflight", () => {
+    it("rejects a wallet below the quote and quotes the spaces the programs allocate", async () => {
+      // #given a wallet holding HNT and the quote for an automated position
+      const wallet = Keypair.generate();
+      await ensureFunds(wallet.publicKey, LAMPORTS_PER_SOL);
+      await ensureTokenBalance(wallet.publicKey, HNT_MINT, 10);
+
+      const request = {
+        walletAddress: wallet.publicKey.toBase58(),
+        tokenAmount: { amount: "100000000", mint: HNT_MINT.toBase58() },
+        lockupKind: "cliff" as const,
+        lockupPeriodsInDays: 365,
+        subDaoMint: MOBILE_MINT.toBase58(),
+        automationEnabled: true,
+      };
+
+      const { data: quote, error: quoteError } =
+        await ctx.safeClient.governance.createPosition(request);
+      if (quoteError) {
+        expect.fail(`Unexpected error: ${JSON.stringify(quoteError)}`);
+      }
+      const required = Number(quote.estimatedSolFee!.amount);
+
+      // #when the wallet is one lamport short of the quote
+      await setBalanceExactly(wallet, required - 1, ctx.payer);
+      const { error: shortError } =
+        await ctx.safeClient.governance.createPosition(request);
+
+      // #then preflight rejects it before anything is signed
+      if (!isDefinedError(shortError)) {
+        expect.fail(
+          `Expected defined ORPCError - but got: ${JSON.stringify(shortError)}`,
+        );
+      }
+      expect(shortError.code).to.equal("INSUFFICIENT_FUNDS");
+      expect((shortError.data as { required: number }).required).to.equal(
+        required,
+      );
+
+      // #when a funded wallet runs the same flow
+      await ensureFunds(wallet.publicKey, LAMPORTS_PER_SOL);
+      const { data, error } =
+        await ctx.safeClient.governance.createPosition(request);
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        wallet,
+      );
+
+      // #then the rent-bearing accounts are the sizes the quote priced
+      const positionMint = data.transactionData.transactions[0].metadata
+        ?.positionMint as string;
+      const [positionPubkey] = positionKey(new PublicKey(positionMint));
+      const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+      const [claimBotPubkey] = delegationClaimBotKey(
+        new PublicKey(DEFAULT_HPL_CRONS_TASK_QUEUE),
+        delegatedPosPubkey,
+      );
+      const [positionInfo, delegatedPosInfo, claimBotInfo] =
+        await ctx.connection.getMultipleAccountsInfo([
+          positionPubkey,
+          delegatedPosPubkey,
+          claimBotPubkey,
+        ]);
+
+      expect(positionInfo?.data.length).to.equal(POSITION_SPACE);
+      expect(delegatedPosInfo?.data.length).to.equal(DELEGATED_POSITION_SPACE);
+      expect(claimBotInfo?.data.length).to.equal(DELEGATION_CLAIM_BOT_SPACE);
     });
   });
 });

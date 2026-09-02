@@ -4,9 +4,12 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SystemProgram,
+  TransactionMessage,
 } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, getMint } from "@solana/spl-token";
 import { getSurfpoolRpcUrl } from "./surfpool";
+import { sendAndConfirmInstructions } from "./tx";
 
 export function loadKeypairFromPath(pathEnv: string): Keypair {
   if (pathEnv && fs.existsSync(pathEnv)) {
@@ -43,7 +46,7 @@ export function loadKeypair2FromEnv(): Keypair {
 export async function ensureFunds(
   pubkey: PublicKey,
   minLamports: number,
-  rpcUrl = getSurfpoolRpcUrl()
+  rpcUrl = getSurfpoolRpcUrl(),
 ): Promise<void> {
   const connection = new Connection(rpcUrl, "confirmed");
   const current = await connection.getBalance(pubkey);
@@ -55,7 +58,7 @@ export async function ensureFunds(
     const sig = await connection.requestAirdrop(pubkey, Math.ceil(needed));
     await connection.confirmTransaction(
       { signature: sig, blockhash, lastValidBlockHeight },
-      "confirmed"
+      "confirmed",
     );
     return;
   } catch {}
@@ -73,13 +76,81 @@ export async function ensureFunds(
   } catch {}
 }
 
+/**
+ * Move `wallet` to an exact lamport balance by transferring the difference to
+ * or from `funder`. Surfpool exposes no balance cheat code, and transfers are
+ * exact: draining, the wallet also pays its own signature fee; topping up,
+ * `funder` pays it.
+ */
+export async function setBalanceExactly(
+  wallet: Keypair,
+  targetLamports: number,
+  funder: Keypair,
+  rpcUrl = getSurfpoolRpcUrl(),
+): Promise<void> {
+  const connection = new Connection(rpcUrl, "confirmed");
+  const current = await connection.getBalance(wallet.publicKey);
+  if (current === targetLamports) return;
+
+  const drain = current > targetLamports;
+  const payer = drain ? wallet : funder;
+  const fee = await feeForTransfer(connection, payer.publicKey);
+  const lamports = drain
+    ? current - targetLamports - fee
+    : targetLamports - current;
+
+  if (lamports < 0) {
+    throw new Error(
+      `Cannot reach ${targetLamports} from ${current}: the ${fee}-lamport transfer fee overshoots`,
+    );
+  }
+
+  await sendAndConfirmInstructions(connection, payer, [
+    SystemProgram.transfer({
+      fromPubkey: payer.publicKey,
+      toPubkey: drain ? funder.publicKey : wallet.publicKey,
+      lamports,
+    }),
+  ]);
+
+  const after = await connection.getBalance(wallet.publicKey);
+  if (after !== targetLamports) {
+    throw new Error(`Expected balance ${targetLamports}, got ${after}`);
+  }
+}
+
+async function feeForTransfer(
+  connection: Connection,
+  payer: PublicKey,
+): Promise<number> {
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  const message = new TransactionMessage({
+    payerKey: payer,
+    recentBlockhash: blockhash,
+    instructions: [
+      SystemProgram.transfer({
+        fromPubkey: payer,
+        toPubkey: payer,
+        lamports: 0,
+      }),
+    ],
+  }).compileToLegacyMessage();
+  const { value } = await connection.getFeeForMessage(message);
+  if (value == null) {
+    throw new Error(
+      "Could not price the transfer used to set an exact balance",
+    );
+  }
+  return value;
+}
+
 /** Raw surfpool token-account write. `state: "frozen"` mimics DC tokens
  * (kept frozen by the data credits program). Throws on RPC error. */
 export async function setTokenAccount(
   owner: PublicKey,
   mint: PublicKey,
   fields: { amount: number; state?: "frozen" },
-  rpcUrl = getSurfpoolRpcUrl()
+  rpcUrl = getSurfpoolRpcUrl(),
 ): Promise<void> {
   const res = await fetch(rpcUrl, {
     method: "POST",
@@ -106,7 +177,7 @@ export async function ensureTokenBalance(
   owner: PublicKey,
   mint: PublicKey,
   amount: number,
-  rpcUrl = getSurfpoolRpcUrl()
+  rpcUrl = getSurfpoolRpcUrl(),
 ): Promise<PublicKey> {
   const connection = new Connection(rpcUrl, "confirmed");
   const ata = getAssociatedTokenAddressSync(mint, owner, true);
@@ -117,12 +188,12 @@ export async function ensureTokenBalance(
     const rawAmount = Math.ceil(amount * Math.pow(10, decimals));
 
     console.log(
-      `Setting ${amount} tokens (${rawAmount} raw with ${decimals} decimals)`
+      `Setting ${amount} tokens (${rawAmount} raw with ${decimals} decimals)`,
     );
 
     await setTokenAccount(owner, mint, { amount: rawAmount }, rpcUrl);
     console.log(
-      `Set token balance for ${owner.toBase58()} (${ata.toBase58()}) to ${amount} tokens`
+      `Set token balance for ${owner.toBase58()} (${ata.toBase58()}) to ${amount} tokens`,
     );
   } catch (e) {
     console.warn("Failed to set token balance:", e);

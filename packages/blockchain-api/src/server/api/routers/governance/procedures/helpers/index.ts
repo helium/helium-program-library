@@ -5,3 +5,4 @@ export * from "./get-current-season";
 export * from "./constants";
 export * from "./build-claim-instructions";
 export * from "./build-batched-transactions";
+export * from "./rent";
