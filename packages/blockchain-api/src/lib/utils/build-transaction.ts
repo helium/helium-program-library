@@ -41,12 +41,17 @@ export interface BuildTransactionOptions {
   connection: Connection;
   draft: TransactionDraft;
   signers?: Keypair[];
-  // Set the CU limit from the static table instead of simulation. Required
-  // for txs that execute after other txs in a bundle: a standalone sim runs
-  // against pre-bundle state and can measure a cheaper code path than the one
-  // taken on-chain (e.g. claim_rewards_v1 only CPIs clear_recent_proposals_v0
-  // once earlier claims have advanced last_claimed_epoch), so its 1.1x
-  // headroom under-requests and the tx dies with ProgramFailedToComplete.
+  // Set the CU limit from the static table instead of simulation. Pass true
+  // for any Jito bundle producer, for two reasons. First, a later tx's cost
+  // can depend on earlier txs' state, and a standalone sim runs against
+  // pre-bundle state: it either fails outright (delegate_v0 on a position
+  // minted in tx[0], which does not exist yet) or measures a cheaper code
+  // path than the one taken on-chain (claim_rewards_v1 only CPIs
+  // clear_recent_proposals_v0 once earlier claims have advanced
+  // last_claimed_epoch), so its 1.1x headroom under-requests and the tx dies
+  // with ProgramFailedToComplete. Second, table sizing is deterministic and
+  // state-independent, so a bundle's CU limits do not vary with whatever the
+  // chain looked like when it was built.
   useTableComputeUnits?: boolean;
 }
 

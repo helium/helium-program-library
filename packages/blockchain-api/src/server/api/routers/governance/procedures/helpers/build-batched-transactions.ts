@@ -37,11 +37,10 @@ export interface BuildBatchedTransactionsParams {
   feePayer: PublicKey;
   maxTxs?: number;
   // Size CU limits from the static table instead of standalone simulation.
-  // Pass true when the batched txs run sequentially in a Jito bundle and a
-  // later tx's cost depends on earlier txs' state changes (delegation claims:
-  // the catch-up claim CPIs clear_recent_proposals_v0 only after prior claims
-  // in the bundle have advanced last_claimed_epoch, which a standalone sim
-  // never sees). See BuildTransactionOptions.useTableComputeUnits.
+  // Pass true for any Jito bundle producer: a later tx's cost can depend on
+  // earlier txs' state, which a standalone sim never sees, and table sizing
+  // is deterministic and state-independent across the whole bundle. See
+  // BuildTransactionOptions.useTableComputeUnits.
   useTableComputeUnits?: boolean;
 }
 

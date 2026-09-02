@@ -62,17 +62,22 @@ const readIdlDir = (dir: string, names: Map<string, string>): void => {
   }
 };
 
-// `${programId}:${discHex}` -> "programLabel.ixName". Reads target/idl
-// (the just-built IDLs) rather than @helium/idls so the check-cu-table CI
-// gate names instructions from the code under test, not the last published
-// package. Requires an `anchor build` — without it, names come up empty.
-export const loadIxNames = (): Map<string, string> => {
+// `${programId}:${discHex}` -> "programLabel.ixName" from target/idl (the
+// just-built IDLs) rather than @helium/idls, so the check-cu-table CI gate
+// names instructions from the code under test, not the last published
+// package. Requires an `anchor build` — without it this is empty, which is
+// the signal check-cu-table refuses to run on.
+export const loadBuiltIxNames = (): Map<string, string> => {
   const names = new Map<string, string>();
   readIdlDir(path.join(REPO, "target/idl"), names);
-  // An empty result still means "no anchor build" — check-cu-table refuses to
-  // run on it. Overlay the external IDLs only after that signal is intact,
-  // so committed files can never make an unbuilt tree look built.
-  if (names.size === 0) return names;
+  return names;
+};
+
+// The built IDLs plus the committed external ones. Overlaid unconditionally:
+// sample-cu runs against mainnet on an unbuilt tree and still needs the
+// external names.
+export const loadIxNames = (): Map<string, string> => {
+  const names = loadBuiltIxNames();
   readIdlDir(EXTERNAL_IDL_DIR, names);
   return names;
 };

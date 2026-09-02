@@ -363,6 +363,12 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:b3fd74f09eb38f77": 29279,
   // hpl_crons.queue_delegation_claim_v0 (n=1264, med=311318, max=346130)
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:7a169de76dc89b02": 327897,
+  // nft_proxy.initialize_proxy_config_v0 (n=1, med=11734, max=11734)
+  // [mainnet, from ProxyConfig account history]
+  "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p:08f2f7d6d010bd81": 11734,
+  // nft_proxy.update_proxy_config_v0 (n=1, med=9623, max=9623)
+  // [mainnet, from ProxyConfig account history]
+  "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p:a5da8f6929a3b2e1": 9623,
   // nft_proxy.assign_proxy_v0 (n=2342, med=16866, max=35115)
   "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p:6bd6c57cf8dea919": 23115,
   // nft_proxy.unassign_proxy_v0 (n=178, med=7740, max=7906)
