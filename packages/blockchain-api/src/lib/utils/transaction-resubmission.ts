@@ -240,7 +240,28 @@ export async function resubmitTransactionBatch(
     (ts) => ts.status === "expired",
   ).length;
   if (expiredCount > 0) {
-    await expirePendingBatch(batch);
+    try {
+      await expirePendingBatch(batch);
+    } catch (error) {
+      console.error(`Failed to expire batch ${batch.id}:`, error);
+      Sentry.captureException(error, {
+        level: "error",
+        tags: {
+          error_type: "transaction_batch_expiry_failed",
+          resubmission_type: "batch",
+          submission_type: batch.submissionType,
+        },
+        extra: { batch_id: batch.id, batch_size: pendingTransactions.length },
+      });
+      // The batch stays pending, so the next tick decides it again rather than
+      // this one resubmitting a batch it has already read as dead.
+      return {
+        success: false,
+        error: "Failed to record batch expiry, skipping resubmission",
+        batchId: batch.id,
+        ineligible: true,
+      };
+    }
     return {
       success: false,
       error: `Blockhash expired at block height ${decision.currentBlockHeight} for ${expiredCount} of ${pendingTransactions.length} transactions`,
