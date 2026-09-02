@@ -173,10 +173,6 @@ class TransactionResubmissionService {
             console.log(
               `Resubmitted ${stillPending.length} transactions in batch ${batch.id}`,
             );
-          } else if (result.expired) {
-            console.log(
-              `Expired batch ${batch.id} instead of resubmitting: ${result.error}`,
-            );
           } else if (!result.ineligible) {
             console.error(
               `Failed to resubmit batch ${batch.id}:`,

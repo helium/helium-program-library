@@ -1,5 +1,6 @@
 import { createServer, Server } from "http";
 import { AddressInfo } from "net";
+import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
 import {
   delegatedPositionKey,
   EPOCH_LENGTH,
@@ -33,16 +34,13 @@ import {
 } from "./helpers/surfpool";
 
 /**
- * Where Anchor keeps a program's IDL. `Program.fetchIdl` reads exactly this
- * account, so a request that asks for none of them fetched no IDL — and every
- * account resolver in `@helium/helium-sub-daos-sdk` starts by fetching one.
+ * `idlAddress` is where Anchor keeps a program's IDL. `Program.fetchIdl` reads
+ * exactly this account, so a request that asks for none of them fetched no IDL
+ * — and every account resolver in `@helium/helium-sub-daos-sdk` starts by
+ * fetching one.
+ *
+ * IDL account to program name, filled in once the addresses are derived.
  */
-const idlAddress = async (programId: PublicKey) => {
-  const [base] = PublicKey.findProgramAddressSync([], programId);
-  return PublicKey.createWithSeed(base, "anchor:idl", programId);
-};
-
-/** IDL account to program name, filled in once the addresses are derived. */
 const idlAccounts = new Map<string, string>();
 
 const collectIdlAccounts = async () => {

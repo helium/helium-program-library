@@ -22,18 +22,29 @@ export interface BatchStatusDecision {
   batchStatus: BatchStatus;
 }
 
+/** Rows that landed, and rows that can never land — expired counts as failed. */
+function countOutcomes(
+  statuses: readonly Pick<BatchTransactionDecision, "status">[],
+): { confirmedCount: number; failedCount: number } {
+  return {
+    confirmedCount: statuses.filter((s) => s.status === "confirmed").length,
+    failedCount: statuses.filter(
+      (s) => s.status === "failed" || s.status === "expired",
+    ).length,
+  };
+}
+
 /** The batch's stored state, reported as a decision when the cluster could not be read. */
 export function storedBatchStatus(
   batchStatus: BatchStatus,
   transactions: readonly Pick<BatchTransactionRow, "signature" | "status">[],
 ): BatchStatusDecision {
+  const { confirmedCount, failedCount } = countOutcomes(transactions);
+
   return {
     batchStatus,
-    confirmedCount: transactions.filter((tx) => tx.status === "confirmed")
-      .length,
-    failedCount: transactions.filter(
-      (tx) => tx.status === "failed" || tx.status === "expired",
-    ).length,
+    confirmedCount,
+    failedCount,
     transactionStatuses: transactions.map((tx) => ({
       signature: tx.signature,
       status: tx.status,
@@ -138,12 +149,7 @@ export function decideBatchStatus(params: {
     ),
   }));
 
-  const confirmedCount = transactionStatuses.filter(
-    (ts) => ts.status === "confirmed",
-  ).length;
-  const failedCount = transactionStatuses.filter(
-    (ts) => ts.status === "failed" || ts.status === "expired",
-  ).length;
+  const { confirmedCount, failedCount } = countOutcomes(transactionStatuses);
 
   let batchStatus: BatchStatus = jitoBatchStatus;
   // A batch with no rows yet is a reservation mid-submission, not a batch whose

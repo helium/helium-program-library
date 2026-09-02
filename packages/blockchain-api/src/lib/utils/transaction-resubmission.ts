@@ -6,7 +6,6 @@ import { env } from "../env";
 import { defineAssociations } from "../models/associations";
 import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
-import { readBatchStatus } from "./batch-status-read";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import {
   DEFAULT_MAX_RESUBMISSIONS,
@@ -28,8 +27,6 @@ export interface ResubmissionResult {
   batchId: string;
   /** The batch lost the atomic claim: another replica holds it, it is inside its backoff window / past its retry cap, or it is no longer pending. Expected, not a failure. */
   ineligible?: boolean;
-  /** The batch's blockhash is out of range, so it was marked expired instead of resubmitted. Expected, not a failure. */
-  expired?: boolean;
 }
 
 /**
@@ -202,72 +199,6 @@ export async function resubmitTransactionBatch(
   );
   if (batch.lastResubmittedAt && batch.lastResubmittedAt > cutoff) {
     return ineligible;
-  }
-
-  // A batch is resubmitted with the blockhashes it was signed with, so once one
-  // of them leaves range the batch can never land: retrying it burns retry
-  // slots and draws "bundle contains an expired blockhash" from Jito. Checked
-  // before the claim below so a dead batch never consumes a retry slot, and it
-  // is expired rather than left pending so the (tag, payer) lock is released.
-  //
-  // The cluster's own view of the signatures decides this, not the blockhash
-  // probe alone: a batch that landed in its last valid block carries a dead
-  // blockhash and a confirmed signature, and expiring it on the blockhash would
-  // record a landed batch as expired for good.
-  const connection = new Connection(env.SOLANA_RPC_URL);
-  const decision = await readBatchStatus({
-    rpc: connection,
-    batchId: batch.id,
-    transactions: pendingTransactions,
-  });
-  if (!decision) {
-    return {
-      success: false,
-      error: "Cluster status could not be read, skipping resubmission",
-      batchId: batch.id,
-      ineligible: true,
-    };
-  }
-  if (decision.confirmedCount > 0) {
-    return {
-      success: false,
-      error: `Batch already landed ${decision.confirmedCount} of ${pendingTransactions.length} transactions on-chain`,
-      batchId: batch.id,
-      ineligible: true,
-    };
-  }
-  const expiredCount = decision.transactionStatuses.filter(
-    (ts) => ts.status === "expired",
-  ).length;
-  if (expiredCount > 0) {
-    try {
-      await expirePendingBatch(batch);
-    } catch (error) {
-      console.error(`Failed to expire batch ${batch.id}:`, error);
-      Sentry.captureException(error, {
-        level: "error",
-        tags: {
-          error_type: "transaction_batch_expiry_failed",
-          resubmission_type: "batch",
-          submission_type: batch.submissionType,
-        },
-        extra: { batch_id: batch.id, batch_size: pendingTransactions.length },
-      });
-      // The batch stays pending, so the next tick decides it again rather than
-      // this one resubmitting a batch it has already read as dead.
-      return {
-        success: false,
-        error: "Failed to record batch expiry, skipping resubmission",
-        batchId: batch.id,
-        ineligible: true,
-      };
-    }
-    return {
-      success: false,
-      error: `Blockhash expired at block height ${decision.currentBlockHeight} for ${expiredCount} of ${pendingTransactions.length} transactions`,
-      batchId: batch.id,
-      expired: true,
-    };
   }
 
   const [claimed] = await TransactionBatch.update(

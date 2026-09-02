@@ -1,38 +1,6 @@
 import { expect } from "chai";
 import { describe, it } from "mocha";
-import {
-  deriveLastValidBlockHeight,
-  probeBlockhashValidity,
-} from "../../src/lib/utils/blockhash-expiry";
-
-describe("deriveLastValidBlockHeight", () => {
-  it("records a lifetime for a transaction whose own blockhash the cluster still accepts", () => {
-    expect(
-      deriveLastValidBlockHeight({
-        blockhashValid: true,
-        latestLastValidBlockHeight: 400,
-      }),
-    ).to.equal(400);
-  });
-
-  it("records no lifetime for a transaction whose own blockhash is already dead", () => {
-    expect(
-      deriveLastValidBlockHeight({
-        blockhashValid: false,
-        latestLastValidBlockHeight: 400,
-      }),
-    ).to.equal(undefined);
-  });
-
-  it("records no lifetime when the probe could not answer, rather than a different blockhash's", () => {
-    expect(
-      deriveLastValidBlockHeight({
-        blockhashValid: undefined,
-        latestLastValidBlockHeight: 400,
-      }),
-    ).to.equal(undefined);
-  });
-});
+import { probeBlockhashValidity } from "../../src/lib/utils/blockhash-expiry";
 
 describe("probeBlockhashValidity", () => {
   it("asks once per distinct blockhash", async () => {

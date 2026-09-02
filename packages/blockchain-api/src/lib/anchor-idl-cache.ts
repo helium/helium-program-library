@@ -20,13 +20,12 @@ const idlCache = new Map<string, Promise<Idl>>();
 
 /**
  * An IDL only changes when the program is upgraded, so it is read once per
- * process rather than once per request. Anchor's account resolvers call the
- * SDKs' `init` on every unresolved account, which without this is one IDL read
- * per resolver call.
+ * process rather than once per request. Every request that builds a program
+ * through `initCachedProgram` otherwise pays one IDL read per program.
  *
  * The tradeoff: a program upgrade is not picked up until the process restarts.
  */
-export async function fetchCachedIdl(
+async function fetchCachedIdl(
   programId: PublicKey,
   provider: AnchorProvider,
 ): Promise<Idl> {

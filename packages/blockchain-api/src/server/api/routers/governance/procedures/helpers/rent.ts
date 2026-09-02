@@ -1,7 +1,8 @@
-import { chunks, HNT_MINT } from "@helium/spl-utils";
+import { HNT_MINT } from "@helium/spl-utils";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { RENT_COSTS } from "@/lib/utils/balance-validation";
+import { getMultipleAccounts } from "./build-claim-instructions";
 
 /**
  * Space `init_delegation_claim_bot_v0` allocates for a DelegationClaimBotV0:
@@ -111,12 +112,14 @@ export async function getMissingEpochInfoRentLamports({
 }): Promise<number> {
   if (epochInfoKeys.length === 0) return 0;
 
+  // The current-epoch and end-epoch keys coincide for a position closing in the
+  // epoch it is delegated in, and the wallet only pays for that account once.
+  const uniqueKeys = [
+    ...new Map(epochInfoKeys.map((key) => [key.toBase58(), key])).values(),
+  ];
+
   const [infos, rent] = await Promise.all([
-    Promise.all(
-      chunks(epochInfoKeys, 100).map((keys) =>
-        connection.getMultipleAccountsInfo(keys),
-      ),
-    ).then((r) => r.flat()),
+    getMultipleAccounts(connection, uniqueKeys),
     connection.getMinimumBalanceForRentExemption(SUB_DAO_EPOCH_INFO_SPACE),
   ]);
 

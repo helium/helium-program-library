@@ -30,13 +30,13 @@ export interface BatchStatusResult {
 /**
  * Check Jito bundle status.
  *
- * `unread` says Jito could not be reached or answered with an error. A bundle
- * that could not be read contributes no status of its own, so the cluster's
- * view of the batch's signatures decides on its own.
+ * A bundle Jito could not be reached for, or answered with an error for,
+ * contributes no status of its own, so the cluster's view of the batch's
+ * signatures decides on its own.
  */
 export async function checkJitoBundleStatus(
   batch: TransactionBatch,
-): Promise<{ status: BatchStatus; jitoBundleStatus?: any; unread?: boolean }> {
+): Promise<{ status: BatchStatus; jitoBundleStatus?: any }> {
   let batchStatus: BatchStatus = "pending";
   let jitoBundleStatus = null;
 
@@ -51,7 +51,7 @@ export async function checkJitoBundleStatus(
         console.error(
           `Jito bundle status read failed for batch ${batch.id}: HTTP ${response.status}`,
         );
-        return { status: batchStatus, jitoBundleStatus, unread: true };
+        return { status: batchStatus, jitoBundleStatus };
       }
 
       const result = await response.json();
@@ -70,7 +70,7 @@ export async function checkJitoBundleStatus(
       }
     } catch (error) {
       console.error("Failed to check Jito bundle status:", error);
-      return { status: batchStatus, jitoBundleStatus, unread: true };
+      return { status: batchStatus, jitoBundleStatus };
     }
   }
 
@@ -89,12 +89,10 @@ export async function checkAndUpdateBatchStatus(
   // Every row of the batch, not just the still-pending ones a caller happened
   // to load: the batch rollup below is over the whole batch, so a batch whose
   // other transactions already confirmed rolls up to "partial", not "failed".
-  const transactions = await PendingTransaction.findAll({
-    where: { batchId: batch.id },
-  });
-
-  // Check Jito bundle status first
-  const jitoResult = await checkJitoBundleStatus(batch);
+  const [transactions, jitoResult] = await Promise.all([
+    PendingTransaction.findAll({ where: { batchId: batch.id } }),
+    checkJitoBundleStatus(batch),
+  ]);
   const jitoBundleStatus = jitoResult.jitoBundleStatus;
 
   const decision = await readBatchStatus({
@@ -102,7 +100,7 @@ export async function checkAndUpdateBatchStatus(
     batchId: batch.id,
     transactions,
     commitment,
-    jitoBatchStatus: jitoResult.unread ? "pending" : jitoResult.status,
+    jitoBatchStatus: jitoResult.status,
   });
 
   // The cluster could not be read. Leave the batch exactly as it is

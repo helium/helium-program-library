@@ -22,11 +22,6 @@ export interface BatchStatusRpc extends BlockhashProbeRpc {
   ): Promise<{ value: (MinimalSignatureStatus | null)[] }>;
 }
 
-export interface BatchStatusReadResult extends BatchStatusDecision {
-  /** The height the decision was made at, so a caller need not read it again. */
-  currentBlockHeight: number;
-}
-
 /**
  * Read the cluster's view of a batch and decide what its rows should become.
  *
@@ -46,7 +41,7 @@ export async function readBatchStatus(params: {
   commitment?: "confirmed" | "finalized";
   /** Status the bundle check already produced, for a Jito batch. */
   jitoBatchStatus?: BatchStatus;
-}): Promise<BatchStatusReadResult | null> {
+}): Promise<BatchStatusDecision | null> {
   const {
     rpc,
     batchId,
@@ -78,18 +73,15 @@ export async function readBatchStatus(params: {
     return null;
   }
 
-  return {
-    ...decideBatchStatus({
-      batchId,
-      transactions,
-      signatureStatuses,
-      currentBlockHeight,
-      blockhashValidity,
-      commitment,
-      jitoBatchStatus,
-    }),
+  return decideBatchStatus({
+    batchId,
+    transactions,
+    signatureStatuses,
     currentBlockHeight,
-  };
+    blockhashValidity,
+    commitment,
+    jitoBatchStatus,
+  });
 }
 
 /**

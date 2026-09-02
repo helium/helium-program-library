@@ -60,7 +60,6 @@ import {
   DELEGATED_POSITION_SPACE,
   DELEGATION_CLAIM_TASK_SPACE,
   POSITION_SPACE,
-  SUB_DAO_EPOCH_INFO_SPACE,
   TOKEN_METADATA_CREATE_FEE,
   TOKEN_METADATA_SPACE,
 } from "../helpers";
@@ -385,6 +384,7 @@ export const create = publicProcedure.governance.createPosition.handler(
       epochInfoRent,
       claimTaskRent,
       automationRent,
+      walletBalance,
     ] = await Promise.all([
       connection.getMinimumBalanceForRentExemption(POSITION_SPACE),
       connection.getMinimumBalanceForRentExemption(TOKEN_METADATA_SPACE),
@@ -403,6 +403,7 @@ export const create = publicProcedure.governance.createPosition.handler(
         newClaimBots: automates ? 1 : 0,
         createsHntAta: automates,
       }),
+      connection.getBalance(walletPubkey),
     ]);
     const createdAccountRent =
       positionRent +
@@ -423,7 +424,6 @@ export const create = publicProcedure.governance.createPosition.handler(
       MIN_WALLET_RENT_LAMPORTS +
       (automationEnabled ? PREPAID_TX_FEES * LAMPORTS_PER_SOL : 0);
 
-    const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to create position",

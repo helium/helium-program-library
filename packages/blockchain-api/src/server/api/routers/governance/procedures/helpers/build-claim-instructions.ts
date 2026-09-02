@@ -87,7 +87,7 @@ export interface BuildClaimInstructionsParams {
 // split. The splits are independent reads, so they go out together: a claim
 // spanning five batches of 128 epochs is 10 round trips, and awaiting them one
 // at a time costs ten times a single round trip in request latency.
-async function getMultipleAccounts(
+export async function getMultipleAccounts(
   connection: Connection,
   keys: PublicKey[],
 ): Promise<(Awaited<ReturnType<Connection["getAccountInfo"]>> | null)[]> {

@@ -18,10 +18,7 @@ import {
 } from "@/lib/utils/submission-helpers";
 import { verifiedFeePayer } from "@/lib/utils/transaction-payer";
 import { v4 as uuidv4 } from "uuid";
-import {
-  deriveLastValidBlockHeight,
-  probeBlockhashValidity,
-} from "@/lib/utils/blockhash-expiry";
+import { probeBlockhashValidity } from "@/lib/utils/blockhash-expiry";
 import {
   JitoMissingTipError,
   SingleTransactionSubmissionError,
@@ -277,16 +274,14 @@ export const submit = publicProcedure.transactions.submit.handler(
       });
     }
 
-    // A probe that could not answer records no lifetime rather than the fresh
-    // blockhash's, which belongs to a different blockhash entirely: the resubmit
-    // probe decides that transaction's fate instead of a fiction decided here.
-    const lastValidBlockHeights = transactionBlockhashes.map((blockhash) =>
-      probesBlockhashes
-        ? deriveLastValidBlockHeight({
-            blockhashValid: blockhashValidity.get(blockhash),
-            latestLastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-          })
-        : latestBlockhash.lastValidBlockHeight,
+    // The stored lifetime is only an upper bound: a transaction cannot outlive the
+    // blockhash the cluster just handed out. Whether its own, possibly older,
+    // blockhash is still in range is decided on every status read by probing that
+    // blockhash (see isTransactionExpired), so the bound is never used to keep a
+    // dead batch alive — and a row with no bound at all would be read as expired
+    // the first time the probe cannot answer.
+    const lastValidBlockHeights = transactionBlockhashes.map(
+      () => latestBlockhash.lastValidBlockHeight,
     );
 
     // Simulate transactions before submission (except for sequential batches)
@@ -562,27 +557,21 @@ export const submit = publicProcedure.transactions.submit.handler(
         );
       }
 
-      // Create individual transaction records. One at a time: they all run on
-      // the single connection the database transaction pins, which cannot serve
-      // concurrent queries.
-      for (const [i, txData] of transactions.entries()) {
-        const signature = result.signatures?.[i] || null;
-
-        await PendingTransaction.create(
-          {
-            signature: signature || `${batchId}-${i}`,
-            blockhash: transactionBlockhashes[i],
-            lastValidBlockHeight: lastValidBlockHeights[i],
-            status: "pending",
-            type: txData.metadata?.type || "batch",
-            batchId,
-            payer,
-            metadata: txData.metadata,
-            serializedTransaction: txData.serializedTransaction,
-          },
-          { transaction: dbTransaction },
-        );
-      }
+      // One statement on the connection the database transaction pins.
+      await PendingTransaction.bulkCreate(
+        transactions.map((txData, i) => ({
+          signature: result.signatures?.[i] || `${batchId}-${i}`,
+          blockhash: transactionBlockhashes[i],
+          lastValidBlockHeight: lastValidBlockHeights[i],
+          status: "pending",
+          type: txData.metadata?.type || "batch",
+          batchId,
+          payer,
+          metadata: txData.metadata,
+          serializedTransaction: txData.serializedTransaction,
+        })),
+        { transaction: dbTransaction },
+      );
 
       // Commit the transaction
       await dbTransaction.commit();

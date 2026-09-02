@@ -131,18 +131,6 @@ describe("readBatchStatus", () => {
     expect(calls.signatureCalls).to.deep.equal([["sig-c"]]);
   });
 
-  it("reports the height the decision was made at so the caller need not read it again", async () => {
-    const { rpc } = fakeRpc({ blockHeight: () => Promise.resolve(4242) });
-
-    const decision = await readBatchStatus({
-      rpc,
-      batchId: BATCH_ID,
-      transactions: [pendingRow("sig-a")],
-    });
-
-    expect(decision?.currentBlockHeight).to.equal(4242);
-  });
-
   it("probes each open row's own blockhash once and expires the rows it rejects", async () => {
     const { rpc, calls } = fakeRpc({
       blockhashValid: () => Promise.resolve(false),

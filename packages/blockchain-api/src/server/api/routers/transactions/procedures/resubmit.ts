@@ -84,10 +84,7 @@ export const resubmit = publicProcedure.transactions.resubmit.handler(
       };
     } else {
       let message = "Failed to resubmit transactions";
-      if (result.expired) {
-        message =
-          "Batch was signed with a blockhash the cluster no longer accepts; it has been marked expired and must be rebuilt and signed again";
-      } else if (result.ineligible) {
+      if (result.ineligible) {
         message =
           "Batch is in its resubmission backoff window or at its retry limit; the background service retries it automatically";
       }

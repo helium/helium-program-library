@@ -28,7 +28,7 @@ import {
   positionKey,
   PROGRAM_ID as VSR_PROGRAM_ID,
 } from "@helium/voter-stake-registry-sdk";
-import { NATIVE_MINT, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { NATIVE_MINT } from "@solana/spl-token";
 import {
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -695,6 +695,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       epochInfoRent,
       delegatedPositionRent,
       claimTaskRent,
+      walletBalance,
     ] = await Promise.all([
       getAutomationRentLamports({
         connection,
@@ -704,14 +705,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         // unlike createPosition this path never creates one.
         createsHntAta: false,
       }),
-      getMissingEpochInfoRentLamports({
-        connection,
-        epochInfoKeys: [
-          ...new Map(
-            epochInfoKeys.map((key) => [key.toBase58(), key]),
-          ).values(),
-        ],
-      }),
+      getMissingEpochInfoRentLamports({ connection, epochInfoKeys }),
       newDelegations > 0
         ? connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE)
         : Promise.resolve(0),
@@ -720,6 +714,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
             DELEGATION_CLAIM_TASK_SPACE,
           )
         : Promise.resolve(0),
+      connection.getBalance(walletPubkey),
     ]);
 
     // tuktuk moves the queue's minimum crank reward onto every task it queues.
@@ -738,7 +733,6 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       queuedTaskCrankReward +
       MIN_WALLET_RENT_LAMPORTS;
 
-    const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",
