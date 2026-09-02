@@ -26,4 +26,6 @@ pub enum ErrorCode {
   InvalidCpiContext,
   #[msg("Invalid pre task")]
   InvalidPreTask,
+  #[msg("Missing a free task account for a task being returned")]
+  MissingFreeTask,
 }

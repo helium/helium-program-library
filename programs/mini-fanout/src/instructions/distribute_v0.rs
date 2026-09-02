@@ -23,9 +23,11 @@ pub struct DistributeV0<'info> {
   pub mini_fanout: Box<Account<'info, MiniFanoutV0>>,
   #[account(mut)]
   pub task_queue: Box<Account<'info, TaskQueueV0>>,
-  /// CHECK: Make sure this is empty, pre task needs to be run before task.
+  /// CHECK: A queued pre task has to run before the distribution it precedes. A fanout that
+  /// queues none has nothing to wait for, and this handler only writes the slot, so the
+  /// account there does not gate it.
   #[account(
-    constraint = next_pre_task.data_is_empty() || next_pre_task.key() == mini_fanout.key() @ ErrorCode::PreTaskNotRun
+    constraint = mini_fanout.pre_task.is_none() || next_pre_task.data_is_empty() || next_pre_task.key() == mini_fanout.key() @ ErrorCode::PreTaskNotRun
   )]
   pub next_pre_task: UncheckedAccount<'info>,
   #[account(mut)]
@@ -41,12 +43,6 @@ pub struct DistributeV0<'info> {
 }
 
 impl Share {
-  pub fn as_u32(&self) -> u32 {
-    match self {
-      Share::Share { amount } => *amount,
-      Share::Fixed { amount: _ } => 0,
-    }
-  }
   pub fn as_u128(&self) -> u128 {
     match self {
       Share::Share { amount } => *amount as u128,
@@ -148,12 +144,28 @@ pub fn handler<'info>(
   }
 
   // 4. Calculate total shares for percent distribution
-  let total_shares: u32 = share_indices
+  let total_shares: u128 = share_indices
     .iter()
-    .map(|&i| mini_fanout.shares[i].share.as_u32())
+    .map(|&i| mini_fanout.shares[i].share.as_u128())
     .sum();
 
-  // 5. Assign share payouts
+  // 5. Settle what a share member is still owed from a distribution whose transfer
+  // could not land, off the top and in order, so the proportional split below divides
+  // only what is left.
+  let mut owed_payouts = vec![0u64; mini_fanout.shares.len()];
+  for &i in &share_indices {
+    let owed = mini_fanout.shares[i].total_owed as u128;
+    if owed == 0 {
+      continue;
+    }
+    let paid = owed.min(remaining);
+    // `owed` came from a u64 and `paid` is clamped to it, so both fit.
+    mini_fanout.shares[i].total_owed = (owed - paid) as u64;
+    owed_payouts[i] = paid as u64;
+    remaining = remaining.saturating_sub(paid);
+  }
+
+  // 6. Assign share payouts
   for &i in &share_indices {
     let share = &mini_fanout.shares[i];
     let share_val = share.share.as_u128();
@@ -162,7 +174,7 @@ pub fn handler<'info>(
       .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
       .checked_mul(DUST_PRECISION)
       .ok_or_else(|| error!(ErrorCode::ArithmeticError))?
-      .checked_div(total_shares as u128)
+      .checked_div(total_shares)
       .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
     let payout =
       u64::try_from(amount / DUST_PRECISION).map_err(|_| error!(ErrorCode::ArithmeticError))?;
@@ -180,6 +192,9 @@ pub fn handler<'info>(
       payouts[i] = payout;
       new_dusts[i] = dust as u128;
     }
+    payouts[i] = payouts[i]
+      .checked_add(owed_payouts[i])
+      .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
   }
 
   let token_account_info = token_account.to_account_info();
@@ -237,8 +252,28 @@ pub fn handler<'info>(
     });
   }
 
-  mini_fanout.next_task = ctx.remaining_accounts[mini_fanout.shares.len()].key();
-  mini_fanout.next_pre_task = ctx.remaining_accounts[mini_fanout.shares.len() + 1].key();
+  // tuktuk takes one free task account per task returned and validates it as it is
+  // taken, and a validation that fails takes this write with it, so a recorded slot is
+  // one it accepted. The pre task slot is recorded only when a pre task takes it; the
+  // fanout's own key is the sentinel for there being no next pre task.
+  let self_key = mini_fanout.key();
+  let pre_task = mini_fanout.pre_task_to_queue()?;
+  let free_task_base = mini_fanout.shares.len();
+  let free_task_at = |offset: usize| -> Result<Pubkey> {
+    Ok(
+      ctx
+        .remaining_accounts
+        .get(free_task_base + offset)
+        .ok_or_else(|| error!(ErrorCode::MissingFreeTask))?
+        .key(),
+    )
+  };
+
+  mini_fanout.next_task = free_task_at(0)?;
+  mini_fanout.next_pre_task = match pre_task {
+    Some(_) => free_task_at(1)?,
+    None => self_key,
+  };
 
   // Schedule next task via tuktuk CPI if funds available, else set next_task = Pubkey::default()
   let next_time = get_next_time(mini_fanout)?;
@@ -247,19 +282,17 @@ pub fn handler<'info>(
     trigger: TriggerV0::Timestamp(next_time),
     transaction: TransactionSourceV0::CompiledV0(compiled_tx),
     crank_reward: None,
-    free_tasks: 2,
-    description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
+    // One slot for the next distribution, and a second only when it queues a pre task.
+    free_tasks: if pre_task.is_some() { 2 } else { 1 },
+    description: format!("dist {}", &self_key.to_string()[..(32 - 9)]),
   }];
-  if let Some(pre_task) = mini_fanout.pre_task_to_queue()? {
+  if let Some(pre_task) = pre_task {
     tasks.push(TaskReturnV0 {
       trigger: TriggerV0::Timestamp(next_time - 1),
       transaction: pre_task,
       crank_reward: None,
       free_tasks: 0,
-      description: format!(
-        "pre dist {}",
-        &mini_fanout.key().to_string()[..(32 - 9 - 4)]
-      ),
+      description: format!("pre dist {}", &self_key.to_string()[..(32 - 9 - 4)]),
     });
   }
 

@@ -55,7 +55,9 @@ export async function run(args: any = process.argv) {
   // scheduleTaskV0 only accepts a fanout whose next_task/next_pre_task are
   // already the "nothing scheduled" sentinel (pointing at the fanout itself,
   // or legacy: at the program id) -- see its on-chain constraint. Anything
-  // else means a task is genuinely still live, and dequeuing a live task
+  // else is either a live task or a key left over from a free task slot the fanout
+  // recorded but never owned. schedule_task_v0 accepts the latter, since its account is
+  // empty, and normalises it to the sentinel; a live task it refuses. Dequeuing a live task
   // requires a CPI signature from the mini-fanout program's own
   // queue_authority PDA (see queue_authority_seeds! in state.rs), which only
   // update_mini_fanout_v0 / close_mini_fanout_v0 can produce -- both of which
@@ -67,10 +69,31 @@ export async function run(args: any = process.argv) {
     miniFanout: (typeof allMiniFanouts)[number],
     task: PublicKey
   ) => task.equals(program.programId) || task.equals(miniFanout.publicKey);
+  // A recorded key whose account does not exist is a free task slot the fanout claimed
+  // but never owned, which schedule_task_v0 accepts and normalises to the sentinel. Only
+  // a key with an account behind it is a task that is genuinely still live.
+  const claimed = miniFanouts.flatMap((mf) =>
+    [mf.account.nextTask, mf.account.nextPreTask].filter(
+      (task) => !isIdleSentinel(mf, task)
+    )
+  );
+  const existing = new Set<string>();
+  for (let i = 0; i < claimed.length; i += 100) {
+    const chunk = claimed.slice(i, i + 100);
+    const infos = await provider.connection.getMultipleAccountsInfo(chunk);
+    infos.forEach((info, j) => {
+      if (info) {
+        existing.add(chunk[j].toBase58());
+      }
+    });
+  }
+  const isIdle = (
+    miniFanout: (typeof allMiniFanouts)[number],
+    task: PublicKey
+  ) => isIdleSentinel(miniFanout, task) || !existing.has(task.toBase58());
   const idle = miniFanouts.filter((mf) => {
     const ok =
-      isIdleSentinel(mf, mf.account.nextTask) &&
-      isIdleSentinel(mf, mf.account.nextPreTask);
+      isIdle(mf, mf.account.nextTask) && isIdle(mf, mf.account.nextPreTask);
     if (!ok) {
       console.log(
         `Skipping ${mf.publicKey.toBase58()}: still has a live scheduled task; ` +

@@ -26,6 +26,8 @@ pub struct MiniFanoutV0 {
   pub queue_authority_bump: u8,
   pub shares: Vec<MiniFanoutShareV0>,
   pub seed: Vec<u8>,
+  // Set to mini_fanout.key() when there is no next pre task, for the same reason as
+  // next_task above. A fanout that queues no pre task holds this value.
   pub next_pre_task: Pubkey,
   pub pre_task: Option<TransactionSourceV0>,
 }

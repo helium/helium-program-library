@@ -132,11 +132,19 @@ pub fn get_next_time(mini_fanout: &MiniFanoutV0) -> Result<i64> {
 pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Result<()> {
   let mini_fanout = &mut ctx.mini_fanout;
   let next_time = get_next_time(mini_fanout)?;
+  let pre_task = mini_fanout.pre_task_to_queue()?;
+  let queues_pre_task = pre_task.is_some();
+  let self_key = mini_fanout.key();
   mini_fanout.next_task = ctx.task.key();
+  // A fanout that queues no pre task holds the sentinel, so one whose recorded key is
+  // empty returns to the state a fresh fanout starts in.
+  mini_fanout.next_pre_task = match &pre_task {
+    Some(_) => ctx.pre_task.key(),
+    None => self_key,
+  };
 
   // CPI to tuktuk to queue the tasks
-  if let Some(pre_task) = mini_fanout.pre_task_to_queue()? {
-    mini_fanout.next_pre_task = ctx.pre_task.key();
+  if let Some(pre_task) = pre_task {
     queue_task_v0(
       CpiContext::new_with_signer(
         ctx.tuktuk_program.to_account_info(),
@@ -182,7 +190,8 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
       trigger: TriggerV0::Timestamp(next_time),
       transaction: TransactionSourceV0::CompiledV0(compiled_tx),
       crank_reward: None,
-      free_tasks: 2,
+      // One slot for the next distribution, and a second only when it queues a pre task.
+      free_tasks: if queues_pre_task { 2 } else { 1 },
       id: args.task_id,
       description: format!("dist {}", &mini_fanout.key().to_string()[..(32 - 9)]),
     },
