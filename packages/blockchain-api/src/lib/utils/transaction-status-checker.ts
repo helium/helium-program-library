@@ -6,8 +6,7 @@ import PendingTransaction, {
 } from "../models/pending-transaction";
 import TransactionBatch, { BatchStatus } from "../models/transaction-batch";
 import { sequelize } from "../db";
-import { decideBatchStatus } from "./batch-status";
-import type { MinimalSignatureStatus } from "./submission-helpers";
+import { readBatchStatus } from "./batch-status-read";
 
 export interface TransactionStatusResult {
   signature: string;
@@ -20,38 +19,11 @@ export interface BatchStatusResult {
   failedCount: number;
   transactionStatuses: TransactionStatusResult[];
   jitoBundleStatus?: any;
-}
-
-/**
- * Read the cluster's view of every signature that still needs one, in a single
- * call. `searchTransactionHistory` matters: without it the production RPC
- * answers null for a signature that confirmed moments ago, which used to leave
- * a landed batch pending and resubmitting.
- *
- * Placeholder signatures (`${batchId}-${index}`) were never sent, and rows that
- * already reached a terminal status are not re-read — a signature the cluster
- * has aged out must not un-confirm a row.
- */
-async function fetchSignatureStatuses(
-  connection: Connection,
-  batch: TransactionBatch,
-  transactions: PendingTransaction[],
-): Promise<Map<string, MinimalSignatureStatus | null>> {
-  const signatures = transactions
-    .filter(
-      (tx) => tx.status === "pending" && !tx.signature.startsWith(batch.id),
-    )
-    .map((tx) => tx.signature);
-
-  if (signatures.length === 0) {
-    return new Map();
-  }
-
-  const { value } = await connection.getSignatureStatuses(signatures, {
-    searchTransactionHistory: true,
-  });
-
-  return new Map(signatures.map((signature, i) => [signature, value[i]]));
+  /**
+   * The cluster could not be read, so nothing was decided or written and the
+   * statuses below are the stored ones. Callers must not act on them.
+   */
+  skipped?: boolean;
 }
 
 /**
@@ -103,40 +75,56 @@ export async function checkAndUpdateBatchStatus(
 ): Promise<BatchStatusResult> {
   const connection = new Connection(env.SOLANA_RPC_URL);
 
+  // Every row of the batch, not just the still-pending ones a caller happened
+  // to load: the batch rollup below is over the whole batch, so a batch whose
+  // other transactions already confirmed rolls up to "partial", not "failed".
+  const transactions = await PendingTransaction.findAll({
+    where: { batchId: batch.id },
+  });
+
+  // Check Jito bundle status first
+  const jitoResult = await checkJitoBundleStatus(batch);
+  const jitoBundleStatus = jitoResult.jitoBundleStatus;
+
+  const decision = await readBatchStatus({
+    rpc: connection,
+    batchId: batch.id,
+    transactions,
+    commitment,
+    jitoBatchStatus: jitoResult.status,
+  });
+
+  // The cluster could not be read. Leave the batch exactly as it is and report
+  // the stored state: a resubmission attempt or an expiry decided from a failed
+  // read would be decided from no information at all.
+  if (!decision) {
+    return {
+      batchStatus: batch.status,
+      confirmedCount: transactions.filter((tx) => tx.status === "confirmed")
+        .length,
+      failedCount: transactions.filter(
+        (tx) => tx.status === "failed" || tx.status === "expired",
+      ).length,
+      transactionStatuses: transactions.map((tx) => ({
+        signature: tx.signature,
+        status: tx.status,
+      })),
+      jitoBundleStatus,
+      skipped: true,
+    };
+  }
+
+  const { transactionStatuses, confirmedCount, failedCount, batchStatus } =
+    decision;
+
+  // Every network read is done. Only now open the database transaction, and
+  // write through it one statement at a time: a single pooled connection
+  // cannot serve concurrent queries, and a failed read inside an open
+  // transaction leaves it aborted for every statement that follows.
   const dbTransaction = await sequelize.transaction();
+  let confirmedSignatures: string[];
 
   try {
-    // Every row of the batch, not just the still-pending ones a caller happened
-    // to load: the batch rollup below is over the whole batch, so a batch whose
-    // other transactions already confirmed rolls up to "partial", not "failed".
-    const transactions = await PendingTransaction.findAll({
-      where: { batchId: batch.id },
-      transaction: dbTransaction,
-    });
-
-    // Fetch current block height once for all expiry checks
-    const currentBlockHeight = await connection.getBlockHeight({ commitment });
-
-    // Check Jito bundle status first
-    const jitoResult = await checkJitoBundleStatus(batch);
-    const jitoBundleStatus = jitoResult.jitoBundleStatus;
-
-    const signatureStatuses = await fetchSignatureStatuses(
-      connection,
-      batch,
-      transactions,
-    );
-
-    const { transactionStatuses, confirmedCount, failedCount, batchStatus } =
-      decideBatchStatus({
-        batchId: batch.id,
-        transactions,
-        signatureStatuses,
-        currentBlockHeight,
-        commitment,
-        jitoBatchStatus: jitoResult.status,
-      });
-
     // Persist the rows whose status moved, and remember which ones just landed
     // so the indexers are told exactly once.
     const newlyConfirmed: string[] = [];
@@ -169,27 +157,7 @@ export async function checkAndUpdateBatchStatus(
     // Commit the transaction
     await dbTransaction.commit();
 
-    // Notify indexers for confirmed transactions AFTER committing the transaction
-    // This prevents indexer errors from aborting the database transaction
-    for (const signature of newlyConfirmed) {
-      try {
-        await notifyIndexers(signature);
-      } catch (error) {
-        // Log but don't throw - indexer notification is not critical
-        console.error(
-          `Error notifying indexers for transaction ${signature}:`,
-          error,
-        );
-      }
-    }
-
-    return {
-      batchStatus,
-      confirmedCount,
-      failedCount,
-      transactionStatuses,
-      jitoBundleStatus,
-    };
+    confirmedSignatures = newlyConfirmed;
   } catch (error) {
     // Rollback the transaction on any error
     try {
@@ -201,6 +169,28 @@ export async function checkAndUpdateBatchStatus(
     console.error("Failed to update database:", error);
     throw error;
   }
+
+  // Notify indexers for confirmed transactions AFTER committing the transaction
+  // This prevents indexer errors from aborting the database transaction
+  for (const signature of confirmedSignatures) {
+    try {
+      await notifyIndexers(signature);
+    } catch (error) {
+      // Log but don't throw - indexer notification is not critical
+      console.error(
+        `Error notifying indexers for transaction ${signature}:`,
+        error,
+      );
+    }
+  }
+
+  return {
+    batchStatus,
+    confirmedCount,
+    failedCount,
+    transactionStatuses,
+    jitoBundleStatus,
+  };
 }
 
 /**

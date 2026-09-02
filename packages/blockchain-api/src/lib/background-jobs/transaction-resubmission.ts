@@ -143,6 +143,13 @@ class TransactionResubmissionService {
       // Use the existing working logic to check and update batch status
       const result = await checkAndUpdateBatchStatus(batch, "confirmed");
 
+      // The cluster could not be read this tick, so nothing is known about
+      // where these transactions stand. Resubmitting on that would burn a retry
+      // slot on a batch that may well have landed.
+      if (result.skipped) {
+        return;
+      }
+
       // If batch is no longer pending, we're done
       if (result.batchStatus !== "pending") {
         return;

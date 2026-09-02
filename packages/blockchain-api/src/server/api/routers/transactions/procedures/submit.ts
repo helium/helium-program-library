@@ -544,11 +544,13 @@ export const submit = publicProcedure.transactions.submit.handler(
         );
       }
 
-      // Create individual transaction records
-      const pendingTransactionPromises = transactions.map(async (txData, i) => {
+      // Create individual transaction records. One at a time: they all run on
+      // the single connection the database transaction pins, which cannot serve
+      // concurrent queries.
+      for (const [i, txData] of transactions.entries()) {
         const signature = result.signatures?.[i] || null;
 
-        return PendingTransaction.create(
+        await PendingTransaction.create(
           {
             signature: signature || `${batchId}-${i}`,
             blockhash: transactionBlockhashes[i],
@@ -562,9 +564,7 @@ export const submit = publicProcedure.transactions.submit.handler(
           },
           { transaction: dbTransaction },
         );
-      });
-
-      await Promise.all(pendingTransactionPromises);
+      }
 
       // Commit the transaction
       await dbTransaction.commit();

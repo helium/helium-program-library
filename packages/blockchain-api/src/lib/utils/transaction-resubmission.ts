@@ -485,7 +485,9 @@ export async function reapStalePendingBatches(): Promise<void> {
     try {
       if ((batch.transactions ?? []).length > 0) {
         const result = await checkAndUpdateBatchStatus(batch, "confirmed");
-        if (result.batchStatus !== "pending") {
+        // A batch whose status could not be read this tick keeps its lock for
+        // one more reaper interval rather than being expired on no evidence.
+        if (result.skipped || result.batchStatus !== "pending") {
           continue;
         }
       }
