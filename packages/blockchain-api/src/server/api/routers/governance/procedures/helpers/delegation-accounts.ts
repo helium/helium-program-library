@@ -65,6 +65,20 @@ const closingTsFromSeason = (lockupEndTs: BN, seasonEndTs: BN): BN =>
 const genesisEndTsOrClosing = (genesisEndTs: BN, now: BN, closingTs: BN): BN =>
   genesisEndTs.lte(now) ? closingTs : genesisEndTs;
 
+/** The epoch-info accounts an instruction closing at `closingTs` touches. */
+const epochInfoAccounts = (
+  subDao: PublicKey,
+  args: Pick<DelegationAccountsArgs, "now" | "genesisEndTs">,
+  closingTs: BN,
+) => ({
+  subDaoEpochInfo: epochInfo(subDao, args.now),
+  closingTimeSubDaoEpochInfo: epochInfo(subDao, closingTs),
+  genesisEndSubDaoEpochInfo: epochInfo(
+    subDao,
+    genesisEndTsOrClosing(args.genesisEndTs, args.now, closingTs),
+  ),
+});
+
 const sharedAccounts = (args: DelegationAccountsArgs) => ({
   payer: args.wallet,
   position: args.position,
@@ -105,9 +119,7 @@ export const lockupEffectiveEndTs = (lockup: {
  */
 const epochInfo = (subDao: PublicKey, ts: BN) => {
   const epochSeed = Buffer.alloc(8);
-  epochSeed.writeBigUInt64LE(
-    BigInt(ts.div(new BN(EPOCH_LENGTH)).toString(10)),
-  );
+  epochSeed.writeBigUInt64LE(BigInt(ts.div(new BN(EPOCH_LENGTH)).toString(10)));
   return PublicKey.findProgramAddressSync(
     [Buffer.from("sub_dao_epoch_info", "utf-8"), subDao.toBuffer(), epochSeed],
     HSD_PROGRAM_ID,
@@ -128,12 +140,7 @@ export function closeDelegationAccounts(
   return {
     ...sharedAccounts(args),
     positionAuthority: args.wallet,
-    subDaoEpochInfo: epochInfo(args.subDao, args.now),
-    closingTimeSubDaoEpochInfo: epochInfo(args.subDao, closingTs),
-    genesisEndSubDaoEpochInfo: epochInfo(
-      args.subDao,
-      genesisEndTsOrClosing(args.genesisEndTs, args.now, closingTs),
-    ),
+    ...epochInfoAccounts(args.subDao, args, closingTs),
     vsrProgram: VSR_PROGRAM_ID,
   };
 }
@@ -149,12 +156,7 @@ export function delegateAccounts(
   return {
     ...sharedAccounts(args),
     positionAuthority: args.wallet,
-    subDaoEpochInfo: epochInfo(args.subDao, args.now),
-    closingTimeSubDaoEpochInfo: epochInfo(args.subDao, closingTs),
-    genesisEndSubDaoEpochInfo: epochInfo(
-      args.subDao,
-      genesisEndTsOrClosing(args.genesisEndTs, args.now, closingTs),
-    ),
+    ...epochInfoAccounts(args.subDao, args, closingTs),
     vsrProgram: VSR_PROGRAM_ID,
     proxyConfig: args.proxyConfig,
   };
@@ -173,23 +175,16 @@ export function changeDelegationAccounts(
     args.expirationTs,
   );
   const closingTs = closingTsFromSeason(args.lockupEndTs, args.seasonEndTs);
+  const old = epochInfoAccounts(args.oldSubDao, args, oldClosingTs);
 
   return {
     ...sharedAccounts(args),
     positionAuthority: args.wallet,
     oldSubDao: args.oldSubDao,
-    oldSubDaoEpochInfo: epochInfo(args.oldSubDao, args.now),
-    oldClosingTimeSubDaoEpochInfo: epochInfo(args.oldSubDao, oldClosingTs),
-    oldGenesisEndSubDaoEpochInfo: epochInfo(
-      args.oldSubDao,
-      genesisEndTsOrClosing(args.genesisEndTs, args.now, oldClosingTs),
-    ),
-    subDaoEpochInfo: epochInfo(args.subDao, args.now),
-    closingTimeSubDaoEpochInfo: epochInfo(args.subDao, closingTs),
-    genesisEndSubDaoEpochInfo: epochInfo(
-      args.subDao,
-      genesisEndTsOrClosing(args.genesisEndTs, args.now, closingTs),
-    ),
+    oldSubDaoEpochInfo: old.subDaoEpochInfo,
+    oldClosingTimeSubDaoEpochInfo: old.closingTimeSubDaoEpochInfo,
+    oldGenesisEndSubDaoEpochInfo: old.genesisEndSubDaoEpochInfo,
+    ...epochInfoAccounts(args.subDao, args, closingTs),
     vsrProgram: VSR_PROGRAM_ID,
     proxyConfig: args.proxyConfig,
   };
@@ -206,6 +201,8 @@ export function extendExpirationAccounts(
     args.expirationTs,
   );
   const closingTs = closingTsFromSeason(args.lockupEndTs, args.seasonEndTs);
+  const { closingTimeSubDaoEpochInfo, genesisEndSubDaoEpochInfo } =
+    epochInfoAccounts(args.subDao, args, closingTs);
 
   // No `position_authority` or `vsr_program`: extend_expiration_ts_v0 checks
   // the signer against `position_token_account.owner` directly.
@@ -213,11 +210,8 @@ export function extendExpirationAccounts(
     ...sharedAccounts(args),
     authority: args.wallet,
     oldClosingTimeSubDaoEpochInfo: epochInfo(args.subDao, oldClosingTs),
-    closingTimeSubDaoEpochInfo: epochInfo(args.subDao, closingTs),
-    genesisEndSubDaoEpochInfo: epochInfo(
-      args.subDao,
-      genesisEndTsOrClosing(args.genesisEndTs, args.now, closingTs),
-    ),
+    closingTimeSubDaoEpochInfo,
+    genesisEndSubDaoEpochInfo,
     proxyConfig: args.proxyConfig,
   };
 }

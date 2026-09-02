@@ -22,6 +22,25 @@ export interface BatchStatusDecision {
   batchStatus: BatchStatus;
 }
 
+/** The batch's stored state, reported as a decision when the cluster could not be read. */
+export function storedBatchStatus(
+  batchStatus: BatchStatus,
+  transactions: readonly Pick<BatchTransactionRow, "signature" | "status">[],
+): BatchStatusDecision {
+  return {
+    batchStatus,
+    confirmedCount: transactions.filter((tx) => tx.status === "confirmed")
+      .length,
+    failedCount: transactions.filter(
+      (tx) => tx.status === "failed" || tx.status === "expired",
+    ).length,
+    transactionStatuses: transactions.map((tx) => ({
+      signature: tx.signature,
+      status: tx.status,
+    })),
+  };
+}
+
 /** Confirmation levels that count as landed for the commitment that was asked for. */
 const LANDED_LEVELS: Record<"confirmed" | "finalized", readonly string[]> = {
   confirmed: ["confirmed", "finalized"],

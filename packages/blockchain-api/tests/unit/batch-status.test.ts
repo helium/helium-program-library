@@ -3,6 +3,7 @@ import { describe, it } from "mocha";
 import {
   decideBatchStatus,
   isTransactionExpired,
+  storedBatchStatus,
   type BatchTransactionRow,
 } from "../../src/lib/utils/batch-status";
 import type { MinimalSignatureStatus } from "../../src/lib/utils/submission-helpers";
@@ -316,5 +317,28 @@ describe("isTransactionExpired", () => {
         transaction: { blockhash: "hashA", lastValidBlockHeight: 200 },
       }),
     ).to.equal(true);
+  });
+});
+
+describe("storedBatchStatus", () => {
+  it("reports the stored rows as the decision, counting expired rows as failed", () => {
+    const result = storedBatchStatus("pending", [
+      { signature: "sigA", status: "confirmed" },
+      { signature: "sigB", status: "failed" },
+      { signature: "sigC", status: "expired" },
+      { signature: "sigD", status: "pending" },
+    ]);
+
+    expect(result).to.deep.equal({
+      batchStatus: "pending",
+      confirmedCount: 1,
+      failedCount: 2,
+      transactionStatuses: [
+        { signature: "sigA", status: "confirmed" },
+        { signature: "sigB", status: "failed" },
+        { signature: "sigC", status: "expired" },
+        { signature: "sigD", status: "pending" },
+      ],
+    });
   });
 });

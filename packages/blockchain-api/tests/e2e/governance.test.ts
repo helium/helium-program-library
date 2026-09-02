@@ -1,5 +1,8 @@
 import { BorshInstructionCoder } from "@coral-xyz/anchor";
-import { delegatedPositionKey } from "@helium/helium-sub-daos-sdk";
+import {
+  delegatedPositionKey,
+  EPOCH_LENGTH,
+} from "@helium/helium-sub-daos-sdk";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import {
@@ -637,7 +640,6 @@ describe("governance", () => {
   });
 
   describe("delegation", () => {
-    const EPOCH_LENGTH = 86400;
     let walletAddress: string;
 
     before(async () => {

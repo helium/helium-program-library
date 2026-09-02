@@ -38,7 +38,6 @@ import {
 import BN from "bn.js";
 import {
   getTotalTransactionFees,
-  BASE_SIGNATURE_FEE_LAMPORTS,
   MIN_WALLET_RENT_LAMPORTS,
   RENT_COSTS,
 } from "@/lib/utils/balance-validation";
@@ -370,11 +369,9 @@ export const create = publicProcedure.governance.createPosition.handler(
     const bundled =
       (cluster === "mainnet" || cluster === "mainnet-beta") &&
       versionedTransactions.length > 1;
-    // The tip rides in a transaction of its own appended at submit time, so its
-    // own base fee is outside getTotalTransactionFees' view of the built txs.
-    const jitoTipCost = bundled
-      ? getJitoTipAmountLamports() + BASE_SIGNATURE_FEE_LAMPORTS
-      : 0;
+    // The tip transaction is already in versionedTransactions, so only the tip
+    // amount itself is added here.
+    const jitoTipCost = bundled ? getJitoTipAmountLamports() : 0;
     // initializePositionV0 and the delegate/automation instructions create
     // several accounts the wallet must fund rent for. Counting only the mint
     // lets a low-SOL wallet pass this check, then fail on-chain inside

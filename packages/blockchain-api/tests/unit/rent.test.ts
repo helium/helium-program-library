@@ -1,4 +1,4 @@
-import { Connection, Keypair } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import { RENT_COSTS } from "../../src/lib/utils/balance-validation";
@@ -133,7 +133,10 @@ describe("getMissingEpochInfoRentLamports", () => {
   it("charges only for the epoch-info accounts that do not exist yet", async () => {
     const rent = await getMissingEpochInfoRentLamports({
       connection: epochConnection([true, false]),
-      epochInfoKeys: [Keypair.generate().publicKey, Keypair.generate().publicKey],
+      epochInfoKeys: [
+        Keypair.generate().publicKey,
+        Keypair.generate().publicKey,
+      ],
     });
 
     expect(rent).to.equal(epochRent);
@@ -142,10 +145,37 @@ describe("getMissingEpochInfoRentLamports", () => {
   it("charges nothing when both already exist", async () => {
     const rent = await getMissingEpochInfoRentLamports({
       connection: epochConnection([true, true]),
-      epochInfoKeys: [Keypair.generate().publicKey, Keypair.generate().publicKey],
+      epochInfoKeys: [
+        Keypair.generate().publicKey,
+        Keypair.generate().publicKey,
+      ],
     });
 
     expect(rent).to.equal(0);
+  });
+
+  it("splits the existence read into chunks the RPC accepts", async () => {
+    // getMultipleAccounts rejects more than 100 keys with "Too many inputs
+    // provided", which a change-delegation of 50+ positions reaches.
+    const requestedSizes: number[] = [];
+    const connection = {
+      getMultipleAccountsInfo: async (keys: PublicKey[]) => {
+        requestedSizes.push(keys.length);
+        return keys.map(() => null);
+      },
+      getMinimumBalanceForRentExemption: async () => epochRent,
+    } as unknown as Connection;
+
+    const rent = await getMissingEpochInfoRentLamports({
+      connection,
+      epochInfoKeys: Array.from(
+        { length: 150 },
+        () => Keypair.generate().publicKey,
+      ),
+    });
+
+    expect(requestedSizes).to.deep.equal([100, 50]);
+    expect(rent).to.equal(150 * epochRent);
   });
 
   it("makes no RPC calls when the position is not delegated", async () => {

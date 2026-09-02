@@ -70,12 +70,6 @@ import {
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
 
-/** A delegation instruction plus the epoch-info accounts it may have to open. */
-interface DelegationBuild {
-  instructions: TransactionInstruction[];
-  epochInfoKeys: PublicKey[];
-}
-
 export const delegate = publicProcedure.governance.delegatePositions.handler(
   async ({ input, errors }) => {
     const {
@@ -150,6 +144,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       delegatedPositionAccounts,
       positionOwnership,
       delegationClaimBots,
+      taskQueueAcc,
     ] = await Promise.all([
       vsrProgram.account.positionV0.fetchMultiple(positionPubkeys),
       hsdProgram.account.delegatedPositionV0.fetchMultiple(delegatedPosKeys),
@@ -163,6 +158,13 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       hplCronsProgram.account.delegationClaimBotV0.fetchMultiple(
         delegationClaimBotKeys,
       ),
+      automationEnabled
+        ? import("@helium/tuktuk-sdk")
+            .then((m) => initCachedProgram(m.init, m.PROGRAM_ID, provider))
+            .then((tuktukProgram) =>
+              tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE),
+            )
+        : Promise.resolve(null),
     ]);
 
     const registrarCache = new Map<
@@ -385,18 +387,12 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     }
 
     const allGroups: InstructionGroup[] = [];
+    const epochInfoKeys: PublicKey[] = [];
 
     // Every automated position queues its own tuktuk task, so all the ids are
     // reserved from one bitmap read up front. Reading the bitmap per position
     // hands out ids the earlier positions in this same bundle already took, and
     // the duplicate task account makes the bundle fail on-chain.
-    const taskQueueAcc = automationEnabled
-      ? await import("@helium/tuktuk-sdk")
-          .then((m) => initCachedProgram(m.init, m.PROGRAM_ID, provider))
-          .then((tuktukProgram) =>
-            tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE),
-          )
-      : null;
     const reservedTaskIds = taskQueueAcc
       ? nextAvailableTaskIds(taskQueueAcc.taskBitmap, positionInfos.length)
       : [];
@@ -428,18 +424,19 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     }
 
     /**
-     * What each position needs, decided before anything is built. The builds
-     * below run concurrently, so a rejection there would surface whichever
-     * position's RPC happened to finish first; every rejection this endpoint
-     * owns is raised here instead, in position order and delegation before
-     * automation.
+     * What each position needs, decided before anything is built. Every
+     * rejection this endpoint owns is raised here rather than partway through
+     * the build below, in position order and delegation before automation.
      */
     const positionPlans = positionInfos.map((info, index) => {
       const { positionAcc, delegatedPositionAcc, proxyConfig } = info;
       const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, now);
 
       let delegation: "delegate" | "change" | "extend" | null = null;
-      if (!delegatedPositionAcc || !delegatedPositionAcc.subDao.equals(subDaoK)) {
+      if (
+        !delegatedPositionAcc ||
+        !delegatedPositionAcc.subDao.equals(subDaoK)
+      ) {
         if (!seasonEnd) {
           throw errors.BAD_REQUEST({
             message: "No valid expiration timestamp found",
@@ -481,7 +478,6 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         // bitmap read, so no two positions in this bundle claim the same task.
         taskId:
           automationEnabled && taskQueueAcc ? reservedTaskIds[index] : null,
-        closesClaimBot: !automationEnabled && claimBot !== null,
       };
     });
 
@@ -489,179 +485,140 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       (plan) => plan.createsClaimBot,
     ).length;
 
-    // Nothing one position builds depends on another's, so all of them build
-    // at once: this endpoint is routinely asked for dozens of positions, and
-    // one round trip of instruction building each would run end to end.
-    const builtPerPosition = await Promise.all(
-      positionPlans.map(async (plan) => {
-        const { info, seasonEnd, delegation, claimBot, claimBotKey } = plan;
-        const {
-          positionMintPubkey,
-          positionPubkey,
-          delegatedPosKey,
-          delegatedPositionAcc,
-        } = info;
+    for (const plan of positionPlans) {
+      const { info, seasonEnd, delegation, claimBot, claimBotKey } = plan;
+      const {
+        positionMintPubkey,
+        positionPubkey,
+        delegatedPosKey,
+        delegatedPositionAcc,
+      } = info;
 
-        const buildDelegation = async (): Promise<DelegationBuild> => {
-          if (delegation === "delegate") {
-            const accounts = delegateAccounts({
-              ...positionAccountArgs(info),
-              subDao: subDaoK,
-              seasonEndTs: seasonEnd!,
-            });
-            return {
-              instructions: [
-                await hsdProgram.methods
-                  .delegateV0()
-                  .accountsStrict(accounts)
-                  .instruction(),
-              ],
-              epochInfoKeys: [
-                accounts.subDaoEpochInfo,
-                accounts.closingTimeSubDaoEpochInfo,
-                accounts.genesisEndSubDaoEpochInfo,
-              ],
-            };
-          }
+      const delegationInstructions: TransactionInstruction[] = [];
 
-          if (delegation === "change") {
-            const accounts = changeDelegationAccounts({
-              ...positionAccountArgs(info),
-              subDao: subDaoK,
-              oldSubDao: delegatedPositionAcc!.subDao,
-              expirationTs: delegatedPositionAcc!.expirationTs,
-              seasonEndTs: seasonEnd!,
-            });
-            return {
-              instructions: [
-                await hsdProgram.methods
-                  .changeDelegationV0()
-                  .accountsStrict(accounts)
-                  .instruction(),
-              ],
-              epochInfoKeys: [
-                accounts.subDaoEpochInfo,
-                accounts.closingTimeSubDaoEpochInfo,
-                accounts.genesisEndSubDaoEpochInfo,
-                accounts.oldSubDaoEpochInfo,
-                accounts.oldClosingTimeSubDaoEpochInfo,
-                accounts.oldGenesisEndSubDaoEpochInfo,
-              ],
-            };
-          }
+      if (delegation === "delegate") {
+        const accounts = delegateAccounts({
+          ...positionAccountArgs(info),
+          subDao: subDaoK,
+          seasonEndTs: seasonEnd!,
+        });
+        delegationInstructions.push(
+          await hsdProgram.methods
+            .delegateV0()
+            .accountsStrict(accounts)
+            .instruction(),
+        );
+        epochInfoKeys.push(
+          accounts.subDaoEpochInfo,
+          accounts.closingTimeSubDaoEpochInfo,
+          accounts.genesisEndSubDaoEpochInfo,
+        );
+      } else if (delegation === "change") {
+        const accounts = changeDelegationAccounts({
+          ...positionAccountArgs(info),
+          subDao: subDaoK,
+          oldSubDao: delegatedPositionAcc!.subDao,
+          expirationTs: delegatedPositionAcc!.expirationTs,
+          seasonEndTs: seasonEnd!,
+        });
+        delegationInstructions.push(
+          await hsdProgram.methods
+            .changeDelegationV0()
+            .accountsStrict(accounts)
+            .instruction(),
+        );
+        epochInfoKeys.push(
+          accounts.subDaoEpochInfo,
+          accounts.closingTimeSubDaoEpochInfo,
+          accounts.genesisEndSubDaoEpochInfo,
+          accounts.oldSubDaoEpochInfo,
+          accounts.oldClosingTimeSubDaoEpochInfo,
+          accounts.oldGenesisEndSubDaoEpochInfo,
+        );
+      } else if (delegation === "extend") {
+        const accounts = extendExpirationAccounts({
+          ...positionAccountArgs(info),
+          subDao: delegatedPositionAcc!.subDao,
+          expirationTs: delegatedPositionAcc!.expirationTs,
+          seasonEndTs: seasonEnd!,
+        });
+        delegationInstructions.push(
+          await hsdProgram.methods
+            .extendExpirationTsV0()
+            .accountsStrict(accounts)
+            .instruction(),
+        );
+        epochInfoKeys.push(
+          accounts.closingTimeSubDaoEpochInfo,
+          accounts.genesisEndSubDaoEpochInfo,
+        );
+      }
 
-          if (delegation === "extend") {
-            const accounts = extendExpirationAccounts({
-              ...positionAccountArgs(info),
-              subDao: delegatedPositionAcc!.subDao,
-              expirationTs: delegatedPositionAcc!.expirationTs,
-              seasonEndTs: seasonEnd!,
-            });
-            return {
-              instructions: [
-                await hsdProgram.methods
-                  .extendExpirationTsV0()
-                  .accountsStrict(accounts)
-                  .instruction(),
-              ],
-              epochInfoKeys: [
-                accounts.closingTimeSubDaoEpochInfo,
-                accounts.genesisEndSubDaoEpochInfo,
-              ],
-            };
-          }
+      const claimBotArgs = {
+        wallet: walletPubkey,
+        taskQueue: TASK_QUEUE,
+        position: positionPubkey,
+        positionMint: positionMintPubkey,
+        delegatedPosition: delegatedPosKey,
+        delegationClaimBot: claimBotKey,
+      };
 
-          return { instructions: [], epochInfoKeys: [] };
-        };
+      const automationInstructions: TransactionInstruction[] = [];
 
-        const claimBotArgs = {
-          wallet: walletPubkey,
-          taskQueue: TASK_QUEUE,
-          position: positionPubkey,
-          positionMint: positionMintPubkey,
-          delegatedPosition: delegatedPosKey,
-          delegationClaimBot: claimBotKey,
-        };
+      if (!automationEnabled) {
+        if (claimBot) {
+          automationInstructions.push(
+            await hplCronsProgram.methods
+              .closeDelegationClaimBotV0()
+              .accountsStrict(
+                closeDelegationClaimBotAccounts({
+                  ...claimBotArgs,
+                  nextTask: claimBot.nextTask,
+                  rentRefund: claimBot.rentRefund,
+                }),
+              )
+              .instruction(),
+          );
+        }
+      } else {
+        if (plan.createsClaimBot) {
+          automationInstructions.push(
+            await hplCronsProgram.methods
+              .initDelegationClaimBotV0()
+              .accountsStrict(initDelegationClaimBotAccounts(claimBotArgs))
+              .instruction(),
+            SystemProgram.transfer({
+              fromPubkey: walletPubkey,
+              toPubkey: claimBotKey,
+              lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
+            }),
+          );
+        }
 
-        const buildAutomation = async (): Promise<TransactionInstruction[]> => {
-          if (!automationEnabled) {
-            if (!plan.closesClaimBot) {
-              return [];
-            }
+        if (plan.taskId !== null) {
+          const task = taskKey(TASK_QUEUE, plan.taskId)[0];
+          automationInstructions.push(
+            await hplCronsProgram.methods
+              .startDelegationClaimBotV1({ taskId: plan.taskId })
+              .accountsStrict(
+                startDelegationClaimBotAccounts({
+                  ...claimBotArgs,
+                  task,
+                  nextTask:
+                    !claimBot || claimBot.nextTask.equals(PublicKey.default)
+                      ? task
+                      : claimBot.nextTask,
+                  rentRefund: claimBot?.rentRefund || walletPubkey,
+                  subDao: subDaoK,
+                  dao: subDaoAcc.dao,
+                  hntMint: HNT_MINT,
+                }),
+              )
+              .instruction(),
+          );
+        }
+      }
 
-            return [
-              await hplCronsProgram.methods
-                .closeDelegationClaimBotV0()
-                .accountsStrict(
-                  closeDelegationClaimBotAccounts({
-                    ...claimBotArgs,
-                    nextTask: claimBot!.nextTask,
-                    rentRefund: claimBot!.rentRefund,
-                  }),
-                )
-                .instruction(),
-            ];
-          }
-
-          const instructions: TransactionInstruction[] = [];
-
-          if (plan.createsClaimBot) {
-            instructions.push(
-              await hplCronsProgram.methods
-                .initDelegationClaimBotV0()
-                .accountsStrict(initDelegationClaimBotAccounts(claimBotArgs))
-                .instruction(),
-              SystemProgram.transfer({
-                fromPubkey: walletPubkey,
-                toPubkey: claimBotKey,
-                lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
-              }),
-            );
-          }
-
-          if (plan.taskId !== null) {
-            const task = taskKey(TASK_QUEUE, plan.taskId)[0];
-            instructions.push(
-              await hplCronsProgram.methods
-                .startDelegationClaimBotV1({ taskId: plan.taskId })
-                .accountsStrict(
-                  startDelegationClaimBotAccounts({
-                    ...claimBotArgs,
-                    task,
-                    nextTask:
-                      !claimBot || claimBot.nextTask.equals(PublicKey.default)
-                        ? task
-                        : claimBot.nextTask,
-                    rentRefund: claimBot?.rentRefund || walletPubkey,
-                    subDao: subDaoK,
-                    dao: subDaoAcc.dao,
-                    hntMint: HNT_MINT,
-                  }),
-                )
-                .instruction(),
-            );
-          }
-
-          return instructions;
-        };
-
-        const [delegationBuild, automationInstructions] = await Promise.all([
-          buildDelegation(),
-          buildAutomation(),
-        ]);
-
-        return {
-          delegationInstructions: delegationBuild.instructions,
-          epochInfoKeys: delegationBuild.epochInfoKeys,
-          automationInstructions,
-        };
-      }),
-    );
-
-    for (const {
-      delegationInstructions,
-      automationInstructions,
-    } of builtPerPosition) {
       if (delegationInstructions.length > 0) {
         allGroups.push({
           instructions: delegationInstructions,
@@ -748,9 +705,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         connection,
         epochInfoKeys: [
           ...new Map(
-            builtPerPosition
-              .flatMap(({ epochInfoKeys }) => epochInfoKeys)
-              .map((key) => [key.toBase58(), key]),
+            epochInfoKeys.map((key) => [key.toBase58(), key]),
           ).values(),
         ],
       }),

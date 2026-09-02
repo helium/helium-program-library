@@ -1,4 +1,4 @@
-import { HNT_MINT } from "@helium/spl-utils";
+import { chunks, HNT_MINT } from "@helium/spl-utils";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { RENT_COSTS } from "@/lib/utils/balance-validation";
@@ -112,7 +112,11 @@ export async function getMissingEpochInfoRentLamports({
   if (epochInfoKeys.length === 0) return 0;
 
   const [infos, rent] = await Promise.all([
-    connection.getMultipleAccountsInfo(epochInfoKeys),
+    Promise.all(
+      chunks(epochInfoKeys, 100).map((keys) =>
+        connection.getMultipleAccountsInfo(keys),
+      ),
+    ).then((r) => r.flat()),
     connection.getMinimumBalanceForRentExemption(SUB_DAO_EPOCH_INFO_SPACE),
   ]);
 

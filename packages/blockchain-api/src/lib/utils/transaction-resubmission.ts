@@ -335,7 +335,6 @@ export async function resubmitTransactionBatch(
       // reaper's clock and a resubmitting batch cannot outrun it.
       await batch.update(
         {
-          submissionType: submissionResult.submissionType,
           jitoBundleId: submissionResult.jitoBundleId ?? batch.jitoBundleId,
         },
         { transaction: dbTransaction, silent: true },

@@ -2,6 +2,7 @@ import { createServer, Server } from "http";
 import { AddressInfo } from "net";
 import {
   delegatedPositionKey,
+  EPOCH_LENGTH,
   PROGRAM_ID as HSD_PROGRAM_ID,
 } from "@helium/helium-sub-daos-sdk";
 import {
@@ -30,8 +31,6 @@ import {
   getSurfpoolRpcUrl,
   stopSurfpool,
 } from "./helpers/surfpool";
-
-const EPOCH_LENGTH = 86400;
 
 /**
  * Where Anchor keeps a program's IDL. `Program.fetchIdl` reads exactly this

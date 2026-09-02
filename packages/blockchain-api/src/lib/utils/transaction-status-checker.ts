@@ -7,6 +7,7 @@ import PendingTransaction, {
 import TransactionBatch, { BatchStatus } from "../models/transaction-batch";
 import { sequelize } from "../db";
 import { readBatchStatus } from "./batch-status-read";
+import { storedBatchStatus } from "./batch-status";
 
 export interface TransactionStatusResult {
   signature: string;
@@ -30,8 +31,8 @@ export interface BatchStatusResult {
  * Check Jito bundle status.
  *
  * `unread` says Jito could not be reached or answered with an error. A bundle
- * outage must not read as "pending": the batch would then be decided, and
- * written, from a partial view — so the caller skips the tick instead.
+ * that could not be read contributes no status of its own, so the cluster's
+ * view of the batch's signatures decides on its own.
  */
 export async function checkJitoBundleStatus(
   batch: TransactionBatch,
@@ -96,31 +97,20 @@ export async function checkAndUpdateBatchStatus(
   const jitoResult = await checkJitoBundleStatus(batch);
   const jitoBundleStatus = jitoResult.jitoBundleStatus;
 
-  const decision = jitoResult.unread
-    ? null
-    : await readBatchStatus({
-        rpc: connection,
-        batchId: batch.id,
-        transactions,
-        commitment,
-        jitoBatchStatus: jitoResult.status,
-      });
+  const decision = await readBatchStatus({
+    rpc: connection,
+    batchId: batch.id,
+    transactions,
+    commitment,
+    jitoBatchStatus: jitoResult.unread ? "pending" : jitoResult.status,
+  });
 
-  // The cluster (or Jito) could not be read. Leave the batch exactly as it is
+  // The cluster could not be read. Leave the batch exactly as it is
   // and report the stored state: a resubmission attempt or an expiry decided
   // from a failed read would be decided from no information at all.
   if (!decision) {
     return {
-      batchStatus: batch.status,
-      confirmedCount: transactions.filter((tx) => tx.status === "confirmed")
-        .length,
-      failedCount: transactions.filter(
-        (tx) => tx.status === "failed" || tx.status === "expired",
-      ).length,
-      transactionStatuses: transactions.map((tx) => ({
-        signature: tx.signature,
-        status: tx.status,
-      })),
+      ...storedBatchStatus(batch.status, transactions),
       jitoBundleStatus,
       clusterUnread: true,
     };
@@ -134,12 +124,11 @@ export async function checkAndUpdateBatchStatus(
   // cannot serve concurrent queries, and a failed read inside an open
   // transaction leaves it aborted for every statement that follows.
   const dbTransaction = await sequelize.transaction();
-  let confirmedSignatures: string[];
+  const newlyConfirmed: string[] = [];
 
   try {
     // Persist the rows whose status moved, and remember which ones just landed
     // so the indexers are told exactly once.
-    const newlyConfirmed: string[] = [];
     for (const [i, pendingTx] of transactions.entries()) {
       const status = transactionStatuses[i].status;
       if (status === pendingTx.status) {
@@ -193,8 +182,6 @@ export async function checkAndUpdateBatchStatus(
 
     // Commit the transaction
     await dbTransaction.commit();
-
-    confirmedSignatures = newlyConfirmed;
   } catch (error) {
     // Rollback the transaction on any error
     try {
@@ -209,7 +196,7 @@ export async function checkAndUpdateBatchStatus(
 
   // Notify indexers for confirmed transactions AFTER committing the transaction
   // This prevents indexer errors from aborting the database transaction
-  for (const signature of confirmedSignatures) {
+  for (const signature of newlyConfirmed) {
     try {
       await notifyIndexers(signature);
     } catch (error) {
