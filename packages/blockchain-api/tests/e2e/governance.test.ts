@@ -16,7 +16,6 @@ import {
 } from "@helium/hpl-crons-sdk";
 import { init as initTuktuk, taskKey } from "@helium/tuktuk-sdk";
 import {
-  ComputeBudgetProgram,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -62,20 +61,6 @@ import {
   createHeliumOrgVotingProposal,
   ProposalSetup,
 } from "./helpers/proposal";
-
-/** The priority fee a transaction's compute-budget instructions commit it to. */
-const priorityFeeLamports = (tx: VersionedTransaction): number => {
-  let unitLimit = 200_000;
-  let microLamportsPerUnit = 0;
-  for (const ix of tx.message.compiledInstructions) {
-    const programId = tx.message.staticAccountKeys[ix.programIdIndex];
-    if (!programId?.equals(ComputeBudgetProgram.programId)) continue;
-    const data = Buffer.from(ix.data);
-    if (data[0] === 2) unitLimit = data.readUInt32LE(1);
-    if (data[0] === 3) microLamportsPerUnit = Number(data.readBigUInt64LE(1));
-  }
-  return Math.ceil((unitLimit * microLamportsPerUnit) / 1_000_000);
-};
 
 describe("governance", () => {
   let ctx: TestCtx;
@@ -2306,23 +2291,37 @@ describe("governance", () => {
       // #then the whole bundle lands on exactly that balance, leaving the
       // wallet its rent floor and nothing else: every lamport the quote asked
       // for was spent, so it priced exactly what the bundle costs
-      await signAndSubmitTransactionData(
+      const signatures = await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
         wallet,
       );
-      // Surfpool's getFeeForMessage prices signatures only (mainnet's adds
-      // the compute-unit price), so the quote made here omits the priority
-      // fee each transaction carries. Add it back before comparing.
-      const priorityFees = data.transactionData.transactions
-        .map((t) =>
-          VersionedTransaction.deserialize(
-            Buffer.from(t.serializedTransaction, "base64"),
+      // The quote priced each transaction with getFeeForMessage, which
+      // surfpool answers without the compute-unit price the runtime then
+      // charges (mainnet's includes it). Add back whatever the cluster
+      // charged beyond that answer before comparing.
+      const { blockhash } = await ctx.connection.getLatestBlockhash();
+      let unquotedFees = 0;
+      for (const [i, signature] of signatures.entries()) {
+        const tx = VersionedTransaction.deserialize(
+          Buffer.from(
+            data.transactionData.transactions[i].serializedTransaction,
+            "base64",
           ),
-        )
-        .reduce((sum, tx) => sum + priorityFeeLamports(tx), 0);
+        );
+        tx.message.recentBlockhash = blockhash;
+        const charged = (
+          await ctx.connection.getTransaction(signature, {
+            commitment: "confirmed",
+            maxSupportedTransactionVersion: 0,
+          })
+        )!.meta!.fee;
+        const quoted = (await ctx.connection.getFeeForMessage(tx.message))
+          .value!;
+        unquotedFees += charged - quoted;
+      }
       expect(
-        (await ctx.connection.getBalance(wallet.publicKey)) + priorityFees,
+        (await ctx.connection.getBalance(wallet.publicKey)) + unquotedFees,
       ).to.equal(MIN_WALLET_RENT_LAMPORTS);
 
       // #then the rent-bearing accounts are the sizes the quote priced
