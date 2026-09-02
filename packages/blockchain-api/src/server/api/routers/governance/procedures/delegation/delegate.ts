@@ -485,6 +485,9 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       (plan) => plan.createsClaimBot,
     ).length;
 
+    // Every instruction below is built with accountsStrict, so Anchor never
+    // runs its resolvers and nothing here touches the network: a plain loop
+    // costs the same as building them concurrently.
     for (const plan of positionPlans) {
       const { info, seasonEnd, delegation, claimBot, claimBotKey } = plan;
       const {

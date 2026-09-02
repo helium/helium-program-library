@@ -329,10 +329,12 @@ export async function resubmitTransactionBatch(
         }
       }
 
-      // Keep the batch row describing the submission that is actually in
-      // flight, so a status check reads the resubmitted bundle's id rather than
-      // the first attempt's. Silent so updated_at stays the stale-batch
-      // reaper's clock and a resubmitting batch cannot outrun it.
+      // Keep the bundle id pointing at the submission that is actually in
+      // flight, so a status check reads the resubmitted bundle rather than the
+      // first attempt's. The submission type is not rewritten: submitting a
+      // batch's last pending row reports "single" for a multi-row batch.
+      // Silent so updated_at stays the stale-batch reaper's clock and a
+      // resubmitting batch cannot outrun it.
       await batch.update(
         {
           jitoBundleId: submissionResult.jitoBundleId ?? batch.jitoBundleId,
