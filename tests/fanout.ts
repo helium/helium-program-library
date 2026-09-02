@@ -11,7 +11,12 @@ import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Keypair, ComputeBudgetProgram, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
 import { expect } from "chai";
-import { init, membershipVoucherKey, PROGRAM_ID } from "../packages/fanout-sdk";
+import {
+  fanoutKey,
+  init,
+  membershipVoucherKey,
+  PROGRAM_ID,
+} from "../packages/fanout-sdk";
 import { random } from "./utils/string";
 
 describe("fanout", () => {
@@ -63,6 +68,69 @@ describe("fanout", () => {
     expect(fanoutAcc.name).to.eq(fanoutName);
   });
 
+  it("refuses a fanout whose membership mint has no supply", async () => {
+    const emptyMint = await createMint(provider, 0, me);
+
+    let err: any;
+    try {
+      await program.methods
+        .initializeFanoutV0({ name: random() })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
+        .accountsPartial({
+          authority: me,
+          membershipMint: emptyMint,
+          fanoutMint,
+        })
+        .rpc({ skipPreflight: false });
+    } catch (e: any) {
+      err = e;
+    }
+
+    expect(err, "a fanout with no shares was accepted").to.not.eq(undefined);
+    expect(err.error?.errorCode?.code).to.eq("NoShares");
+  });
+
+  it("pays a balance that was in the vault before creation", async () => {
+    const name = random();
+    const fanout = fanoutKey(name)[0];
+    // Funded before the fanout exists, so the accumulator has to start empty
+    // for anyone to ever be owed it.
+    await createAtaAndMint(provider, fanoutMint, 100, fanout);
+
+    await program.methods
+      .initializeFanoutV0({ name })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+      ])
+      .accountsPartial({ authority: me, membershipMint, fanoutMint })
+      .rpc({ skipPreflight: true });
+
+    const wallet = Keypair.generate();
+    const mint = Keypair.generate();
+    const voucher = membershipVoucherKey(mint.publicKey)[0];
+    await program.methods
+      .stakeV0({ amount: new anchor.BN(100) })
+      .preInstructions(
+        await createMintInstructions(provider, 0, voucher, voucher, mint)
+      )
+      .accountsPartial({ fanout, recipient: wallet.publicKey, mint: mint.publicKey })
+      .signers([mint])
+      .rpc({ skipPreflight: true });
+
+    await program.methods
+      .distributeV0()
+      .accountsPartial({ fanout, owner: wallet.publicKey, mint: mint.publicKey })
+      .rpc({ skipPreflight: true });
+
+    const paid = await getAccount(
+      provider.connection,
+      getAssociatedTokenAddressSync(fanoutMint, wallet.publicKey)
+    );
+    expect(paid.amount).to.eq(BigInt(100));
+  });
+
   describe("with fanout", () => {
     let fanout: PublicKey | undefined;
     let tokenAccount: PublicKey | undefined;
@@ -83,6 +151,54 @@ describe("fanout", () => {
         })
         .rpcAndKeys({ skipPreflight: true }));
     });
+
+    async function stake(
+      mint: Keypair,
+      recipient: PublicKey,
+      amount: number,
+      opts: { staker?: Keypair; skipPreflight?: boolean } = {}
+    ): Promise<void> {
+      const { staker, skipPreflight = true } = opts;
+      const voucher = membershipVoucherKey(mint.publicKey)[0];
+
+      await program.methods
+        .stakeV0({
+          amount: new anchor.BN(amount),
+        })
+        .preInstructions(
+          await createMintInstructions(provider, 0, voucher, voucher, mint)
+        )
+        .accountsPartial({
+          fanout,
+          recipient,
+          mint: mint.publicKey,
+          ...(staker ? { staker: staker.publicKey } : {}),
+        })
+        .signers(staker ? [mint, staker] : [mint])
+        .rpc({ skipPreflight });
+    }
+
+    async function distribute(mint: Keypair, owner: PublicKey): Promise<void> {
+      await program.methods
+        .distributeV0()
+        .accountsPartial({
+          fanout,
+          owner,
+          mint: mint.publicKey,
+        })
+        .rpc({ skipPreflight: true });
+    }
+
+    async function balanceOf(
+      mint: PublicKey,
+      owner: PublicKey
+    ): Promise<bigint> {
+      const account = await getAccount(
+        provider.connection,
+        getAssociatedTokenAddressSync(mint, owner)
+      );
+      return account.amount;
+    }
 
     it("allows you to stake membership tokens", async () => {
       const recipient = Keypair.generate();
@@ -122,6 +238,100 @@ describe("fanout", () => {
       expect(voucherAcc.totalDust.toNumber()).to.eq(0);
     });
 
+    it("refuses a stake beyond the fanout's total shares", async () => {
+      const mint = Keypair.generate();
+      const recipient = Keypair.generate();
+
+      // total_shares is the membership supply at creation, which is 100.
+      await createAtaAndMint(provider, membershipMint, 1);
+
+      let err: any;
+      try {
+        // Keep preflight on: a preflight failure surfaces as an AnchorError
+        // with code and logs, while a post-send confirmation failure races
+        // anchor's getTransaction log fetch and can come back as an opaque
+        // SendTransactionError with neither.
+        await stake(mint, recipient.publicKey, 101, { skipPreflight: false });
+      } catch (e: any) {
+        err = e;
+      }
+
+      expect(err, "stake of 101 was accepted").to.not.eq(undefined);
+      expect(err.error?.errorCode?.code).to.eq("TooManyShares");
+    });
+
+    it("refuses a stake of zero shares", async () => {
+      let err: any;
+      try {
+        await stake(Keypair.generate(), me, 0, { skipPreflight: false });
+      } catch (e: any) {
+        err = e;
+      }
+
+      expect(err, "a zero stake was accepted").to.not.eq(undefined);
+      expect(err.error?.errorCode?.code).to.eq("ZeroStake");
+    });
+
+    it("refuses a distribution whose destination is the vault", async () => {
+      const mint = Keypair.generate();
+      // The receipt has to sit in an account owned by the fanout for `owner` to
+      // validate, so mint it straight to the fanout PDA.
+      await stake(mint, fanout!, 100);
+
+      let err: any;
+      try {
+        await program.methods
+          .distributeV0()
+          .accountsPartial({ fanout, owner: fanout!, mint: mint.publicKey })
+          .rpc({ skipPreflight: false });
+      } catch (e: any) {
+        err = e;
+      }
+
+      expect(err, "distribute to the vault was accepted").to.not.eq(undefined);
+      expect(err.error?.errorCode?.code).to.eq("InvalidDestination");
+    });
+
+    it("pays a balance that arrived before the first stake to the first staker", async () => {
+      const member = { wallet: Keypair.generate(), mint: Keypair.generate() };
+
+      // Nothing is staked, so there is no share count to scale this by and it
+      // waits for the first fold.
+      await createAtaAndMint(provider, fanoutMint, 100, fanout!);
+      await stake(member.mint, member.wallet.publicKey, 100);
+      await distribute(member.mint, member.wallet.publicKey);
+      expect(await balanceOf(fanoutMint, member.wallet.publicKey)).to.eq(
+        BigInt(100)
+      );
+
+      await createAtaAndMint(provider, fanoutMint, 40, fanout!);
+      await distribute(member.mint, member.wallet.publicKey);
+      expect(await balanceOf(fanoutMint, member.wallet.publicKey)).to.eq(
+        BigInt(140)
+      );
+    });
+
+    it("pays a vault balance to the shares staked when it arrived", async () => {
+      const early = { wallet: Keypair.generate(), mint: Keypair.generate() };
+      const late = { wallet: Keypair.generate(), mint: Keypair.generate() };
+
+      await stake(early.mint, early.wallet.publicKey, 20);
+      await createAtaAndMint(provider, fanoutMint, 100, fanout!);
+      await stake(late.mint, late.wallet.publicKey, 80);
+
+      await distribute(early.mint, early.wallet.publicKey);
+      await distribute(late.mint, late.wallet.publicKey);
+
+      // The 100 arrived while `early` held every staked share, so all of it is
+      // owed to `early` however many shares stake afterwards.
+      expect(await balanceOf(fanoutMint, early.wallet.publicKey)).to.eq(
+        BigInt(100)
+      );
+      expect(await balanceOf(fanoutMint, late.wallet.publicKey)).to.eq(
+        BigInt(0)
+      );
+    });
+
     describe("with staked positions", () => {
       let positions: { wallet: Keypair; mint: Keypair; amount: number }[];
 
@@ -139,23 +349,102 @@ describe("fanout", () => {
           },
         ];
         for (const { mint, wallet, amount } of positions) {
-          const voucher = membershipVoucherKey(mint.publicKey)[0];
-
-          await program.methods
-            .stakeV0({
-              amount: new anchor.BN(amount),
-            })
-            .preInstructions(
-              await createMintInstructions(provider, 0, voucher, voucher, mint)
-            )
-            .accountsPartial({
-              fanout,
-              recipient: wallet.publicKey,
-              mint: mint.publicKey,
-            })
-            .signers([mint])
-            .rpc({ skipPreflight: true });
+          await stake(mint, wallet.publicKey, amount);
         }
+      });
+
+      it("pays a re-staked position from the inflow that follows it", async () => {
+        const [first, second] = positions;
+
+        await createAtaAndMint(provider, fanoutMint, 100, fanout!);
+        await distribute(first.mint, first.wallet.publicKey);
+        await distribute(second.mint, second.wallet.publicKey);
+
+        await program.methods
+          .unstakeV0()
+          .accountsPartial({
+            mint: first.mint.publicKey,
+            solDestination: me,
+            voucherAuthority: first.wallet.publicKey,
+          })
+          .signers([first.wallet])
+          .rpc({ skipPreflight: true });
+
+        const restaked = Keypair.generate();
+        await stake(restaked, first.wallet.publicKey, first.amount, {
+          staker: first.wallet,
+        });
+
+        await createAtaAndMint(provider, fanoutMint, 100, fanout!);
+        await distribute(restaked, first.wallet.publicKey);
+        await distribute(second.mint, second.wallet.publicKey);
+
+        // Each round of 100 splits 20/80, and the re-staked voucher shares the
+        // second round on the same terms as the first.
+        expect(await balanceOf(fanoutMint, first.wallet.publicKey)).to.eq(
+          BigInt(2 * first.amount)
+        );
+        expect(await balanceOf(fanoutMint, second.wallet.publicKey)).to.eq(
+          BigInt(2 * second.amount)
+        );
+      });
+
+      it("releases an uncollected entitlement to the vouchers that remain", async () => {
+        const [first, second] = positions;
+
+        await createAtaAndMint(provider, fanoutMint, 100, fanout!);
+        await distribute(second.mint, second.wallet.publicKey);
+        expect(await balanceOf(fanoutMint, second.wallet.publicKey)).to.eq(
+          BigInt(second.amount)
+        );
+
+        // `first` leaves without collecting its 20.
+        await program.methods
+          .unstakeV0()
+          .accountsPartial({
+            mint: first.mint.publicKey,
+            solDestination: me,
+            voucherAuthority: first.wallet.publicKey,
+          })
+          .signers([first.wallet])
+          .rpc({ skipPreflight: true });
+
+        await distribute(second.mint, second.wallet.publicKey);
+        expect(await balanceOf(fanoutMint, second.wallet.publicKey)).to.eq(
+          BigInt(100)
+        );
+
+        const vault = getAssociatedTokenAddressSync(fanoutMint, fanout!, true);
+        expect((await getAccount(provider.connection, vault)).amount).to.eq(
+          BigInt(0)
+        );
+      });
+
+      it("unstakes a position holding more than its shares", async () => {
+        const [first, second] = positions;
+        const voucher = membershipVoucherKey(first.mint.publicKey)[0];
+        // More than the shares left staked after this voucher closes, so the
+        // stake account balance and the voucher's shares cannot be confused.
+        const surplus = 81;
+
+        await createAtaAndMint(provider, membershipMint, surplus, voucher);
+
+        await program.methods
+          .unstakeV0()
+          .accountsPartial({
+            mint: first.mint.publicKey,
+            solDestination: me,
+            voucherAuthority: first.wallet.publicKey,
+          })
+          .signers([first.wallet])
+          .rpc({ skipPreflight: true });
+
+        expect(await balanceOf(membershipMint, first.wallet.publicKey)).to.eq(
+          BigInt(first.amount + surplus)
+        );
+
+        const fanoutAcc = await program.account.fanoutV0.fetch(fanout!);
+        expect(fanoutAcc.totalStakedShares.toNumber()).to.eq(second.amount);
       });
 
       it("allows you to unstake", async () => {
@@ -182,22 +471,15 @@ describe("fanout", () => {
       });
 
       it("splits funds, accounting for dust", async () => {
-        async function distribute() {
+        async function distributeAll() {
           for (const { wallet, mint } of positions) {
-            await program.methods
-              .distributeV0()
-              .accountsPartial({
-                fanout,
-                owner: wallet.publicKey,
-                mint: mint.publicKey,
-              })
-              .rpc({ skipPreflight: true });
+            await distribute(mint, wallet.publicKey);
           }
         }
 
         await createAtaAndTransfer(provider, fanoutMint, 4, me, fanout);
 
-        await distribute();
+        await distributeAll();
 
         for (const { wallet, amount } of positions) {
           const toAccount = await getAccount(
@@ -212,7 +494,7 @@ describe("fanout", () => {
 
         await createAtaAndTransfer(provider, fanoutMint, 1, me, fanout);
 
-        await distribute();
+        await distributeAll();
 
         for (const { wallet, amount } of positions) {
           const toAccount = await getAccount(

@@ -10,7 +10,7 @@ use anchor_spl::{
   token::{self, Mint, MintTo, Token, TokenAccount, Transfer},
 };
 
-use crate::{fanout_seeds, voucher_seeds, FanoutV0, FanoutVoucherV0};
+use crate::{errors::ErrorCode, fanout_seeds, voucher_seeds, FanoutV0, FanoutVoucherV0};
 
 #[cfg(feature = "devnet")]
 const URL: &str = "https://fanout.nft.test-helium.com";
@@ -143,6 +143,30 @@ impl<'info> StakeV0<'info> {
 }
 
 pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
+  // Whatever is already in the vault belongs to the shares staked ahead of this
+  // one, so attribute it before this stake joins the staked set.
+  ctx
+    .accounts
+    .fanout
+    .accrue_inflow(ctx.accounts.token_account.amount)?;
+
+  // Every voucher in the membership collection is a real position.
+  require_gt!(args.amount, 0, ErrorCode::ZeroStake);
+
+  let total_staked_shares = ctx
+    .accounts
+    .fanout
+    .total_staked_shares
+    .checked_add(args.amount)
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
+  // Every share a distribution pays against is one of `total_shares`, which is
+  // fixed at the membership supply the fanout was created with.
+  require_gte!(
+    ctx.accounts.fanout.total_shares,
+    total_staked_shares,
+    ErrorCode::TooManyShares
+  );
+
   // Create voucher
   ctx.accounts.voucher.set_inner(FanoutVoucherV0 {
     fanout: ctx.accounts.fanout.key(),
@@ -150,16 +174,11 @@ pub fn handler(ctx: Context<StakeV0>, args: StakeArgsV0) -> Result<()> {
     total_distributed: 0,
     shares: args.amount,
     stake_account: ctx.accounts.stake_account.key(),
-    total_inflow: ctx.accounts.token_account.amount,
+    total_inflow: ctx.accounts.fanout.total_inflow,
     total_dust: 0,
     bump_seed: ctx.bumps.voucher,
   });
-  ctx.accounts.fanout.total_staked_shares = ctx
-    .accounts
-    .fanout
-    .total_staked_shares
-    .checked_add(args.amount)
-    .unwrap();
+  ctx.accounts.fanout.total_staked_shares = total_staked_shares;
 
   // Stake tokens
   token::transfer(ctx.accounts.stake_ctx(), args.amount)?;

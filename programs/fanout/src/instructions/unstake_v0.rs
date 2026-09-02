@@ -1,4 +1,4 @@
-use crate::{state::*, voucher_seeds};
+use crate::{errors::ErrorCode, state::*, voucher_seeds, TWELVE_PREC};
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Burn, CloseAccount, Mint, Token, TokenAccount, Transfer};
@@ -102,12 +102,33 @@ impl<'info> UnstakeV0<'info> {
 /// CloseAccount an empty voucher
 pub fn handler(ctx: Context<UnstakeV0>) -> Result<()> {
   let signer_seeds: &[&[&[u8]]] = &[voucher_seeds!(ctx.accounts.voucher)];
+  // Release what this voucher was owed and never collected, so the next fold
+  // pays it to the vouchers that remain rather than leaving it in the vault
+  // with no watermark able to reach it.
+  let owed = u64::try_from(
+    ctx
+      .accounts
+      .fanout
+      .owed_to(&ctx.accounts.voucher)?
+      .checked_div(TWELVE_PREC)
+      .ok_or_else(|| error!(ErrorCode::ArithmeticError))?,
+  )
+  .map_err(|_| error!(ErrorCode::ArithmeticError))?;
+  ctx.accounts.fanout.last_snapshot_amount = ctx
+    .accounts
+    .fanout
+    .last_snapshot_amount
+    .checked_sub(owed)
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
+
+  // `total_staked_shares` is the sum of the live vouchers' `shares`, so closing
+  // this voucher removes exactly what it contributed.
   ctx.accounts.fanout.total_staked_shares = ctx
     .accounts
     .fanout
     .total_staked_shares
-    .checked_sub(ctx.accounts.stake_account.amount)
-    .unwrap();
+    .checked_sub(ctx.accounts.voucher.shares)
+    .ok_or_else(|| error!(ErrorCode::ArithmeticError))?;
 
   // Give back the stake and burn the receipt
   token::transfer(
