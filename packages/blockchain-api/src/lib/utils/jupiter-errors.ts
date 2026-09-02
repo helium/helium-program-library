@@ -58,7 +58,9 @@ export const classifyJupiterError = ({
 
   const errorCode = parseErrorCode(body);
   const clientMessage =
-    errorCode === undefined ? undefined : CLIENT_ERROR_MESSAGES[errorCode];
+    errorCode !== undefined && Object.hasOwn(CLIENT_ERROR_MESSAGES, errorCode)
+      ? CLIENT_ERROR_MESSAGES[errorCode]
+      : undefined;
   if (clientMessage !== undefined) {
     return { kind: "BAD_REQUEST", message: clientMessage };
   }

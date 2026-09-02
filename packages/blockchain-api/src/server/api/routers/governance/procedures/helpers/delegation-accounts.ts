@@ -35,9 +35,8 @@ export interface DelegationAccountsArgs {
   delegatedPosition: PublicKey;
   subDao: PublicKey;
   /**
-   * The cluster clock's `unix_timestamp`. The program reads
-   * `registrar.clock_unix_timestamp()`, which adds `registrar.time_offset` —
-   * a test-only dial that is zero on mainnet, so the two agree there.
+   * `registrar.clock_unix_timestamp()`: the cluster clock's `unix_timestamp`
+   * plus `registrar.time_offset`.
    */
   now: BN;
 }

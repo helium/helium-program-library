@@ -20,6 +20,7 @@ interface RpcCalls {
   signatureCalls: string[][];
   searchedHistory: boolean[];
   probedBlockhashes: string[];
+  probeCommitments: (string | undefined)[];
 }
 
 const fakeRpc = (
@@ -36,6 +37,7 @@ const fakeRpc = (
     signatureCalls: [],
     searchedHistory: [],
     probedBlockhashes: [],
+    probeCommitments: [],
   };
 
   const rpc: BatchStatusRpc = {
@@ -51,8 +53,9 @@ const fakeRpc = (
         : signatures.map(() => null);
       return { value };
     },
-    async isBlockhashValid(blockhash) {
+    async isBlockhashValid(blockhash, config) {
       calls.probedBlockhashes.push(blockhash);
+      calls.probeCommitments.push(config?.commitment);
       const value = overrides.blockhashValid
         ? await overrides.blockhashValid(blockhash)
         : true;
@@ -162,5 +165,21 @@ describe("readBatchStatus", () => {
     });
 
     expect(calls.probedBlockhashes).to.deep.equal(["hashB"]);
+  });
+
+  it("probes blockhash validity at confirmed even when the caller asked for finalized", async () => {
+    // isBlockhashValid at finalized answers false for a blockhash that is
+    // merely young, and a false probe expires the row. A finalized status
+    // check would otherwise write every just-landed batch as expired.
+    const { rpc, calls } = fakeRpc();
+
+    await readBatchStatus({
+      rpc,
+      batchId: BATCH_ID,
+      commitment: "finalized",
+      transactions: [{ ...pendingRow("sig-a"), blockhash: "hashA" }],
+    });
+
+    expect(calls.probeCommitments).to.deep.equal(["confirmed"]);
   });
 });

@@ -274,13 +274,15 @@ describe("isTransactionExpired", () => {
     ).to.equal(false);
   });
 
-  it("expires a row that predates lastValidBlockHeight, whose lifetime cannot be checked", () => {
+  it("keeps a row whose blockhash went unprobed and whose lifetime was never stored", () => {
+    // Nothing says this row expired: the probe did not answer and there is no
+    // lifetime to compare against. It stays pending for the reaper to bound.
     expect(
       isTransactionExpired({
         transaction: { blockhash: "hashA" },
         currentBlockHeight: 250,
       }),
-    ).to.equal(true);
+    ).to.equal(false);
   });
 
   it("lets the transaction's own blockhash outrank its stored lifetime, either way", () => {
@@ -311,12 +313,13 @@ describe("isTransactionExpired", () => {
     ).to.equal(true);
   });
 
-  it("expires a transaction when no block height could be read to check it against", () => {
+  it("keeps a transaction whose lifetime could not be checked against a block height", () => {
+    // No read answered, so nothing says it expired; the reaper bounds it.
     expect(
       isTransactionExpired({
         transaction: { blockhash: "hashA", lastValidBlockHeight: 200 },
       }),
-    ).to.equal(true);
+    ).to.equal(false);
   });
 });
 

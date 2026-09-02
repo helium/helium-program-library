@@ -2,6 +2,7 @@ import {
   ComputeBudgetProgram,
   Connection,
   Keypair,
+  PublicKey,
   TransactionInstruction,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -16,7 +17,11 @@ type BatcherModule =
   typeof import("../../src/server/api/routers/governance/procedures/helpers/build-batched-transactions");
 
 const FEE_PAYER = Keypair.generate().publicKey;
-const NOOP_PROGRAM = Keypair.generate().publicKey;
+/** Tabled per program, so the table prices it without an entry per ix. */
+const MEMO_PROGRAM = new PublicKey(
+  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+);
+const UNTABLED_PROGRAM = Keypair.generate().publicKey;
 
 /**
  * Counts the reads every transaction in a batch would otherwise repeat: the
@@ -52,8 +57,8 @@ const makeCountingConnection = () => {
   return { connection, state };
 };
 
-/** The CU limit the static table asks for when it prices no instruction. */
-const TABLE_MAX_COMPUTE_UNITS = 1_400_000;
+/** The memo program's table ceiling (15k) under FALLBACK_CU_MARGIN (2.0). */
+const MEMO_TABLE_COMPUTE_UNITS = 30_000;
 
 /** The compute unit limit a built transaction carries, or undefined. */
 const computeUnitLimit = (tx: VersionedTransaction): number | undefined => {
@@ -68,10 +73,10 @@ const computeUnitLimit = (tx: VersionedTransaction): number | undefined => {
 };
 
 /** ~600 bytes of data, so two of these cannot share one 1232-byte tx. */
-const makeBigGroup = (description: string) => ({
+const makeBigGroup = (description: string, programId = MEMO_PROGRAM) => ({
   instructions: [
     new TransactionInstruction({
-      programId: NOOP_PROGRAM,
+      programId,
       keys: [],
       data: Buffer.alloc(600, 1),
     }),
@@ -137,7 +142,28 @@ describe("buildBatchedTransactions shared reads", () => {
     // #then the table priced it and nothing was simulated
     expect(state.simulateCalls, "the builder simulated the batch").to.equal(0);
     expect(computeUnitLimit(versionedTransactions[0])).to.equal(
-      TABLE_MAX_COMPUTE_UNITS,
+      MEMO_TABLE_COMPUTE_UNITS,
     );
+  });
+
+  it("refuses to build a bundle transaction the table cannot price", async () => {
+    // #given an instruction with no table entry
+    const { connection } = makeCountingConnection();
+
+    // #when it is built for a bundle, which sizes from the table by choice
+    let failure: unknown;
+    try {
+      await buildBatchedTransactions({
+        groups: [makeBigGroup("one", UNTABLED_PROGRAM)],
+        connection,
+        feePayer: FEE_PAYER,
+      });
+    } catch (error) {
+      failure = error;
+    }
+
+    // #then the miss is a build failure naming the key, not a 1.4M CU request
+    expect(failure).to.be.instanceOf(Error);
+    expect((failure as Error).message).to.include(UNTABLED_PROGRAM.toBase58());
   });
 });

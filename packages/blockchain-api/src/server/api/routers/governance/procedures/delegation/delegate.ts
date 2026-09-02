@@ -127,6 +127,8 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         ReturnType<typeof proxyProgram.account.proxyConfigV0.fetch>
       >;
       needsChange: boolean;
+      /** `registrar.clock_unix_timestamp()` for this position's registrar. */
+      now: BN;
     }[] = [];
 
     const positionMintPubkeys = positionMints.map((m) => new PublicKey(m));
@@ -186,16 +188,6 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
 
       requireOwnedPosition(positionOwnership[i], positionMints[i], errors);
 
-      const lockupKind = getLockupKind(positionAcc.lockup);
-      if (
-        lockupKind !== LockupKind.CONSTANT &&
-        positionAcc.lockup.endTs.lte(now)
-      ) {
-        throw errors.BAD_REQUEST({
-          message: "Position lockup has fully decayed and cannot be delegated",
-        });
-      }
-
       const registrarKey = positionAcc.registrar.toBase58();
       let registrar = registrarCache.get(registrarKey);
       if (!registrar) {
@@ -203,6 +195,21 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           positionAcc.registrar,
         );
         registrarCache.set(registrarKey, registrar);
+      }
+
+      // The program judges every lockup, expiration and season against
+      // `registrar.clock_unix_timestamp()`, which is the cluster clock plus
+      // the registrar's time_offset. Zero on mainnet; tests dial it forward.
+      const positionNow = now.add(registrar.timeOffset);
+
+      const lockupKind = getLockupKind(positionAcc.lockup);
+      if (
+        lockupKind !== LockupKind.CONSTANT &&
+        positionAcc.lockup.endTs.lte(positionNow)
+      ) {
+        throw errors.BAD_REQUEST({
+          message: "Position lockup has fully decayed and cannot be delegated",
+        });
       }
 
       const proxyConfigKey = registrar.proxyConfig.toBase58();
@@ -239,6 +246,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         registrar,
         proxyConfig,
         needsChange,
+        now: positionNow,
       });
     }
 
@@ -257,7 +265,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       proxyConfig: info.registrar.proxyConfig,
       dao: subDaoAcc.dao,
       delegatedPosition: info.delegatedPosKey,
-      now,
+      now: info.now,
     });
 
     const tag = generateTransactionTag({
@@ -271,7 +279,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       (info) =>
         !info.needsChange &&
         info.delegatedPositionAcc &&
-        info.delegatedPositionAcc.expirationTs.lt(now),
+        info.delegatedPositionAcc.expirationTs.lt(info.now),
     );
 
     for (const info of expiredPositionInfos) {
@@ -430,7 +438,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
      */
     const positionPlans = positionInfos.map((info, index) => {
       const { positionAcc, delegatedPositionAcc, proxyConfig } = info;
-      const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, now);
+      const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, info.now);
 
       let delegation: "delegate" | "change" | "extend" | null = null;
       if (

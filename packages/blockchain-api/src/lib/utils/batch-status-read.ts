@@ -62,10 +62,16 @@ export async function readBatchStatus(params: {
       await Promise.all([
         rpc.getBlockHeight({ commitment }),
         fetchSignatureStatuses(rpc, batchId, open),
+        // Always probed at "confirmed", whatever commitment the caller asked
+        // for: the probe answers "can this still land at all", not "has it
+        // landed at the level asked for". At "finalized" the cluster answers
+        // against a bank ~32 slots back, so a blockhash younger than that is
+        // reported invalid and a transaction that is about to land would be
+        // written expired.
         probeBlockhashValidity(
           rpc,
           open.flatMap((tx) => (tx.blockhash ? [tx.blockhash] : [])),
-          commitment,
+          "confirmed",
         ),
       ]);
   } catch (error) {

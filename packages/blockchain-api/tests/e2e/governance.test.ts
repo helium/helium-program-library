@@ -16,6 +16,7 @@ import {
 } from "@helium/hpl-crons-sdk";
 import { init as initTuktuk, taskKey } from "@helium/tuktuk-sdk";
 import {
+  ComputeBudgetProgram,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
@@ -42,6 +43,7 @@ import {
   DELEGATION_CLAIM_BOT_SPACE,
   POSITION_SPACE,
 } from "../../src/server/api/routers/governance/procedures/helpers/rent";
+import { MIN_WALLET_RENT_LAMPORTS } from "../../src/lib/utils/balance-validation";
 import {
   DEFAULT_HPL_CRONS_TASK_QUEUE,
   TEST_PROXY_ADDRESS,
@@ -60,6 +62,20 @@ import {
   createHeliumOrgVotingProposal,
   ProposalSetup,
 } from "./helpers/proposal";
+
+/** The priority fee a transaction's compute-budget instructions commit it to. */
+const priorityFeeLamports = (tx: VersionedTransaction): number => {
+  let unitLimit = 200_000;
+  let microLamportsPerUnit = 0;
+  for (const ix of tx.message.compiledInstructions) {
+    const programId = tx.message.staticAccountKeys[ix.programIdIndex];
+    if (!programId?.equals(ComputeBudgetProgram.programId)) continue;
+    const data = Buffer.from(ix.data);
+    if (data[0] === 2) unitLimit = data.readUInt32LE(1);
+    if (data[0] === 3) microLamportsPerUnit = Number(data.readBigUInt64LE(1));
+  }
+  return Math.ceil((unitLimit * microLamportsPerUnit) / 1_000_000);
+};
 
 describe("governance", () => {
   let ctx: TestCtx;
@@ -2287,12 +2303,27 @@ describe("governance", () => {
       }
       expect(Number(data.estimatedSolFee!.amount)).to.equal(required);
 
-      // #then the whole bundle lands on exactly that balance
+      // #then the whole bundle lands on exactly that balance, leaving the
+      // wallet its rent floor and nothing else: every lamport the quote asked
+      // for was spent, so it priced exactly what the bundle costs
       await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,
         wallet,
       );
+      // Surfpool's getFeeForMessage prices signatures only (mainnet's adds
+      // the compute-unit price), so the quote made here omits the priority
+      // fee each transaction carries. Add it back before comparing.
+      const priorityFees = data.transactionData.transactions
+        .map((t) =>
+          VersionedTransaction.deserialize(
+            Buffer.from(t.serializedTransaction, "base64"),
+          ),
+        )
+        .reduce((sum, tx) => sum + priorityFeeLamports(tx), 0);
+      expect(
+        (await ctx.connection.getBalance(wallet.publicKey)) + priorityFees,
+      ).to.equal(MIN_WALLET_RENT_LAMPORTS);
 
       // #then the rent-bearing accounts are the sizes the quote priced
       const positionMint = data.transactionData.transactions[0].metadata

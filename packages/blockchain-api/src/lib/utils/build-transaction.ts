@@ -82,6 +82,15 @@ export async function buildVersionedTransaction({
     : connection.getLatestBlockhash("finalized");
   blockhashPromise.catch(() => {});
 
+  // Sized outside the try below: a table miss on a transaction that chose the
+  // table is a build failure, and the catch would otherwise price it at the
+  // 1.4M maximum and carry on.
+  const tableComputeUnitLimit = useTableComputeUnits
+    ? tableComputeUnitsForInstructions(draftWithLuts.instructions, {
+        throwOnMiss: true,
+      })
+    : undefined;
+
   let instructionsWithFees: TransactionInstruction[];
   let addressLookupTables: AddressLookupTableAccount[] | undefined;
   try {
@@ -98,9 +107,7 @@ export async function buildVersionedTransaction({
       addressLookupTables,
       connection,
       // An explicit computeUnits skips withPriorityFees' simulation.
-      computeUnits: useTableComputeUnits
-        ? tableComputeUnitsForInstructions(draftWithLuts.instructions)
-        : undefined,
+      computeUnits: tableComputeUnitLimit,
       // The wallet signs this tx and may append guard ixs (Lighthouse) that
       // load more account data than a sim-derived limit allows.
       deriveLoadedAccountsDataSizeLimit: false,

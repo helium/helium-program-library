@@ -153,6 +153,27 @@ describe("tableComputeUnitsForInstructions", () => {
     expect(logged[0]).to.include(programId.toBase58());
     expect(logged[0]).to.include("0102030405060708");
   });
+
+  it("throws on a miss when the caller chose the table over simulation", () => {
+    // A bundle producer sizes from the table by choice; an untabled
+    // instruction there is a build failure, not a quiet 1.4M CU request.
+    const programId = Keypair.generate().publicKey;
+    const data = Buffer.from("0102030405060708", "hex");
+    const unknown = new TransactionInstruction({ programId, keys: [], data });
+
+    expect(() =>
+      tableComputeUnitsForInstructions([transferIx, unknown], {
+        throwOnMiss: true,
+      })
+    )
+      .to.throw(Error)
+      .with.property("message")
+      .that.includes(programId.toBase58())
+      .and.includes("0102030405060708");
+    expect(
+      tableComputeUnitsForInstructions([transferIx], { throwOnMiss: true })
+    ).to.be.lessThan(MAX_COMPUTE_UNITS);
+  });
 });
 
 describe("tableComputeUnits", () => {

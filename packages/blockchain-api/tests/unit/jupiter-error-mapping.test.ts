@@ -29,6 +29,22 @@ describe("classifyJupiterError", () => {
     });
   });
 
+  it("does not read an error code off Object.prototype", () => {
+    // A code such as "constructor" indexes the message table's prototype and
+    // would otherwise turn a function into the client's message.
+    const classification = classifyJupiterError({
+      status: 500,
+      body: '{"errorCode":"constructor"}',
+      operation: "Failed to get quote from Jupiter",
+    });
+
+    expect(classification).to.deep.equal({
+      kind: "JUPITER_ERROR",
+      message:
+        'Failed to get quote from Jupiter: HTTP 500: {"errorCode":"constructor"}',
+    });
+  });
+
   it("maps Jupiter rate limiting to a rate-limited result", () => {
     const classification = classifyJupiterError({
       status: 429,

@@ -7,7 +7,7 @@ import PendingTransaction, {
 import TransactionBatch, { BatchStatus } from "../models/transaction-batch";
 import { sequelize } from "../db";
 import { readBatchStatus } from "./batch-status-read";
-import { storedBatchStatus } from "./batch-status";
+import { rollupBatchStatus, storedBatchStatus } from "./batch-status";
 
 export interface TransactionStatusResult {
   signature: string;
@@ -114,9 +114,6 @@ export async function checkAndUpdateBatchStatus(
     };
   }
 
-  const { transactionStatuses, confirmedCount, failedCount, batchStatus } =
-    decision;
-
   // Every network read is done. Only now open the database transaction, and
   // write through it one statement at a time: a single pooled connection
   // cannot serve concurrent queries, and a failed read inside an open
@@ -128,7 +125,7 @@ export async function checkAndUpdateBatchStatus(
     // Persist the rows whose status moved, and remember which ones just landed
     // so the indexers are told exactly once.
     for (const [i, pendingTx] of transactions.entries()) {
-      const status = transactionStatuses[i].status;
+      const status = decision.transactionStatuses[i].status;
       if (status === pendingTx.status) {
         continue;
       }
@@ -148,6 +145,8 @@ export async function checkAndUpdateBatchStatus(
         },
       );
       if (updated === 0) {
+        // Whatever moved the row is what the batch rolls up over below.
+        await pendingTx.reload({ transaction: dbTransaction });
         continue;
       }
       if (status === "confirmed") {
@@ -157,12 +156,22 @@ export async function checkAndUpdateBatchStatus(
       pendingTx.status = status;
     }
 
-    // Update batch status in database
+    // The batch is rolled up from the row statuses that are now stored, not
+    // from the decision: a row whose write lost the compare-and-swap above
+    // carries the other writer's status, and the batch must agree with its
+    // rows.
+    const { batchStatus } = rollupBatchStatus(transactions, jitoResult.status);
+
     const isTerminal =
       batchStatus === "confirmed" ||
       batchStatus === "failed" ||
       batchStatus === "partial";
-    if (batchStatus !== batch.status) {
+    if (batchStatus === "pending" && batch.status !== "pending") {
+      // A tick that learned nothing does not reopen a batch: "pending" is the
+      // rollup's default, and a reaped batch with no rows would otherwise be
+      // pulled back to pending, re-taking the (tag, payer) submit lock and
+      // resetting the reaper's clock, for as long as a client polls it.
+    } else if (batchStatus !== batch.status) {
       const confirmedAt =
         isTerminal && !batch.confirmedAt ? new Date() : batch.confirmedAt;
       const [updated] = await TransactionBatch.update(
@@ -206,11 +215,9 @@ export async function checkAndUpdateBatchStatus(
     }
   }
 
+  // Reported from the rows as stored, for the same reason the batch is.
   return {
-    batchStatus,
-    confirmedCount,
-    failedCount,
-    transactionStatuses,
+    ...storedBatchStatus(batch.status, transactions),
     jitoBundleStatus,
   };
 }

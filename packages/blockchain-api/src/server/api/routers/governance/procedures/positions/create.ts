@@ -422,7 +422,7 @@ export const create = publicProcedure.governance.createPosition.handler(
       mintRent +
       createdAccountRent +
       MIN_WALLET_RENT_LAMPORTS +
-      (automationEnabled ? PREPAID_TX_FEES * LAMPORTS_PER_SOL : 0);
+      (automates ? PREPAID_TX_FEES * LAMPORTS_PER_SOL : 0);
 
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({

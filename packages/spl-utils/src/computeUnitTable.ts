@@ -4,15 +4,17 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 
-// Fallback compute-unit table, used when transaction simulation fails.
+// Static compute-unit table. It sizes every transaction built with
+// useTableComputeUnits (Jito bundle producers, whose later transactions
+// cannot be simulated against bundle state) and is the fallback when
+// simulation fails anywhere else.
 //
 // Key: `${programId}:${first 8 bytes of ix data as hex}` (anchor discriminator).
 // Value: p95 consumed CU for that instruction (raw, no margin), measured on
 // the WORST-CASE path: no accounts pre-initialized, so every init/
 // init_if_needed pays account creation. Steady-state calls that hit existing
-// accounts consume less than the table says — that's intentional. This is a
-// fallback for when simulation fails; simulation is what gives the tight,
-// state-aware number.
+// accounts consume less than the table says — that's intentional. Where
+// simulation can run, it gives the tight, state-aware number.
 //
 // MAINTENANCE RULE: every new instruction that ships to mainnet must get an
 // entry here — and existing entries must be re-measured when an instruction's
@@ -400,9 +402,10 @@ export const MAX_COMPUTE_UNITS = 1400000;
 // a sim-failure fallback should never under-request CU and fail the tx on-chain.
 // Sized above the largest overshoot we measured (localnet ran up to ~1.8x the
 // raw p95 for PDA-grinding instructions like distribute_v0 / schedule_task_v0),
-// so 2.0 leaves headroom. The fallback is only hit when live simulation is
-// unavailable, so over-requesting here costs a little and never fails a tx.
-// The primary path (simulation x computeScaleUp) is unaffected.
+// so 2.0 leaves headroom. Over-requesting costs resource fees under
+// SIMD-0553 on every table-sized transaction; under-requesting fails the tx
+// on-chain, which is the worse trade. The simulation path
+// (simulation x computeScaleUp) is unaffected.
 export const FALLBACK_CU_MARGIN = 2.0;
 
 export const COMPUTE_BUDGET_PROGRAM_ID =
@@ -429,17 +432,40 @@ const PROGRAM_CU_CEILINGS: Record<string, number> = {
   MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr: 15000,
 };
 
+export interface TableComputeUnitsOptions {
+  /**
+   * Throw on a table miss instead of returning MAX_COMPUTE_UNITS. For callers
+   * that size from the table by choice (useTableComputeUnits) rather than as
+   * a fallback: an untabled instruction there is a bug to fix before the
+   * transaction ships, not a case to overpay for quietly.
+   */
+  throwOnMiss?: boolean;
+}
+
 /**
  * Sum table CU over (programId base58, ix data) pairs, apply
- * FALLBACK_CU_MARGIN. Returns MAX_COMPUTE_UNITS if any instruction is
- * unknown (conservative: the tx still lands).
+ * FALLBACK_CU_MARGIN. On a miss, returns MAX_COMPUTE_UNITS (conservative: the
+ * tx still lands) or throws when `throwOnMiss` is set.
  *
- * A miss is loud. Under SIMD-0553 the requested limit is what gets billed, so
- * every transaction carrying an untabled instruction pays for 1.4M CU until
- * the table gains an entry for it. The log carries the key `sampleCu` needs to
- * add that entry. Sentry is not available here, so it goes to console.
+ * A miss is loud either way. Under SIMD-0553 the requested limit is what gets
+ * billed, so every transaction carrying an untabled instruction pays for 1.4M
+ * CU until the table gains an entry for it. The message carries the key
+ * `sampleCu` needs to add that entry. Sentry is not available here, so the
+ * fallback goes to console.
  */
-const sumTableCu = (pairs: [string, Uint8Array][]): number => {
+const sumTableCu = (
+  pairs: [string, Uint8Array][],
+  { throwOnMiss = false }: TableComputeUnitsOptions = {}
+): number => {
+  const miss = (reason: string): number => {
+    if (throwOnMiss) {
+      throw new Error(`[computeUnitTable] ${reason}`);
+    }
+    console.error(
+      `[computeUnitTable] ${reason}; requesting the ${MAX_COMPUTE_UNITS} CU maximum for this transaction`
+    );
+    return MAX_COMPUTE_UNITS;
+  };
   let total = 0;
   for (const [programId, data] of pairs) {
     if (programId === COMPUTE_BUDGET_PROGRAM_ID) {
@@ -449,44 +475,41 @@ const sumTableCu = (pairs: [string, Uint8Array][]): number => {
       INSTRUCTION_CU_TABLE[cuTableKey(programId, data)] ??
       PROGRAM_CU_CEILINGS[programId];
     if (cu === undefined) {
-      console.error(
-        `[computeUnitTable] No CU table entry for ${cuTableKey(
-          programId,
-          data
-        )}; requesting the ${MAX_COMPUTE_UNITS} CU maximum for this transaction`
-      );
-      return MAX_COMPUTE_UNITS;
+      return miss(`No CU table entry for ${cuTableKey(programId, data)}`);
     }
     total += cu;
   }
   if (total === 0) {
-    console.error(
-      "[computeUnitTable] No table-priced instructions in this transaction; requesting the " +
-        `${MAX_COMPUTE_UNITS} CU maximum`
-    );
-    return MAX_COMPUTE_UNITS;
+    return miss("No table-priced instructions in this transaction");
   }
   return Math.min(MAX_COMPUTE_UNITS, Math.ceil(total * FALLBACK_CU_MARGIN));
 };
 
 /**
- * Estimate a compute unit limit for a transaction from the static table,
- * for use when simulation fails.
+ * Estimate a compute unit limit for a transaction from the static table.
  */
-export const tableComputeUnits = (tx: VersionedTransaction): number =>
+export const tableComputeUnits = (
+  tx: VersionedTransaction,
+  options?: TableComputeUnitsOptions
+): number =>
   sumTableCu(
     tx.message.compiledInstructions.map((ix) => [
       // Program ids are always in static keys; they cannot be LUT-loaded.
-      // A missing key is malformed — "" misses the table and yields MAX.
+      // A missing key is malformed — "" misses the table.
       tx.message.staticAccountKeys[ix.programIdIndex]?.toBase58() ?? "",
       ix.data,
-    ])
+    ]),
+    options
   );
 
 /**
  * Same as tableComputeUnits, for un-compiled instruction lists.
  */
 export const tableComputeUnitsForInstructions = (
-  instructions: TransactionInstruction[]
+  instructions: TransactionInstruction[],
+  options?: TableComputeUnitsOptions
 ): number =>
-  sumTableCu(instructions.map((ix) => [ix.programId.toBase58(), ix.data]));
+  sumTableCu(
+    instructions.map((ix) => [ix.programId.toBase58(), ix.data]),
+    options
+  );

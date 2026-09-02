@@ -288,7 +288,7 @@ export async function buildBatchedTransactions({
   // signer gets the full validity window instead of what packing left of it.
   const { blockhash } = await connection.getLatestBlockhash("finalized");
 
-  const built = (
+  let built = (
     await Promise.all(
       packedBatches.map(({ instructions, metadata, signers }) =>
         buildOrSplit(
@@ -303,6 +303,14 @@ export async function buildBatchedTransactions({
       ),
     )
   ).flat();
+
+  // buildOrSplit can turn one packed batch into several transactions, so the
+  // cap applied while packing does not bound what was built. Re-apply it
+  // here: a mainnet bundle is at most maxTxs including the tip.
+  if (built.length > effectiveMaxTxs) {
+    built = built.slice(0, effectiveMaxTxs);
+    stoppedEarly = true;
+  }
 
   const transactions = built.map(({ serializedTransaction, metadata }) => ({
     serializedTransaction,

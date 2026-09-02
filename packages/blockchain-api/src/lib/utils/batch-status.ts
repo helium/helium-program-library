@@ -77,9 +77,13 @@ export function isSettledTransactionStatus(status: TransactionStatus): boolean {
  * reached it, because the stored lifetime is only ever an upper bound — a
  * transaction signed minutes ago carries a blockhash that dies well before the
  * one the cluster handed out at submit time. Without an answer it falls back to
- * that bound, and a row with neither (written before the column existed, or
- * read on a tick with no block height) counts as expired: a resubmission is the
- * wrong place to guess.
+ * that bound.
+ *
+ * With neither answer the row stays open when it has a blockhash: the probe
+ * failing is not evidence, and a row called expired here rolls its batch up to
+ * failed for good. The stale-batch reaper owns "we can never know" and bounds
+ * it at its own timeout. A row with no blockhash at all predates the column
+ * and cannot be re-read, so it counts as expired.
  */
 export function isTransactionExpired(params: {
   transaction: Pick<BatchTransactionRow, "blockhash" | "lastValidBlockHeight">;
@@ -99,7 +103,7 @@ export function isTransactionExpired(params: {
     transaction.lastValidBlockHeight == null ||
     currentBlockHeight === undefined
   ) {
-    return true;
+    return !transaction.blockhash;
   }
   return currentBlockHeight > transaction.lastValidBlockHeight;
 }
@@ -149,18 +153,33 @@ export function decideBatchStatus(params: {
     ),
   }));
 
-  const { confirmedCount, failedCount } = countOutcomes(transactionStatuses);
+  return {
+    transactionStatuses,
+    ...rollupBatchStatus(transactionStatuses, jitoBatchStatus),
+  };
+}
+
+/**
+ * The batch's status from its rows' statuses. Also applied by the persistence
+ * layer over the statuses that actually landed, since a row another writer
+ * moved first keeps that writer's status.
+ */
+export function rollupBatchStatus(
+  statuses: readonly Pick<BatchTransactionDecision, "status">[],
+  jitoBatchStatus: BatchStatus = "pending",
+): Pick<BatchStatusDecision, "confirmedCount" | "failedCount" | "batchStatus"> {
+  const { confirmedCount, failedCount } = countOutcomes(statuses);
 
   let batchStatus: BatchStatus = jitoBatchStatus;
   // A batch with no rows yet is a reservation mid-submission, not a batch whose
   // every transaction confirmed.
-  if (transactions.length > 0 && confirmedCount === transactions.length) {
+  if (statuses.length > 0 && confirmedCount === statuses.length) {
     batchStatus = "confirmed";
   } else if (failedCount > 0) {
     batchStatus = confirmedCount > 0 ? "partial" : "failed";
   }
 
-  return { transactionStatuses, confirmedCount, failedCount, batchStatus };
+  return { confirmedCount, failedCount, batchStatus };
 }
 
 function decideTransactionStatus(
