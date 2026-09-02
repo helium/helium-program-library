@@ -70,3 +70,40 @@ export function classifySimulationLogs(
     detail: errorMessage.slice(0, 100) || "unknown",
   };
 }
+
+/**
+ * Classify a Jito bundle simulation failure from the transaction that actually
+ * failed. Only that transaction's logs are classified and reported: a flat
+ * concatenation of the whole bundle attributes a preceding successful
+ * transaction's "Program X failed" line to the failure, and hides an empty log
+ * list behind the earlier transaction's logs.
+ *
+ * When no transaction carries an error (a bundle-level failure), the whole
+ * bundle's logs are the best available evidence.
+ */
+export function classifyBundleSimulationFailure(
+  transactionResults: Array<{ logs?: string[]; err?: unknown }>
+): {
+  category: string;
+  detail: string;
+  failedTransactionIndex?: number;
+  logs: string[];
+} {
+  const failedIndex = transactionResults.findIndex((r) => r.err);
+  const failed =
+    failedIndex === -1 ? undefined : transactionResults[failedIndex];
+  const logs = failed
+    ? (failed.logs ?? [])
+    : transactionResults.flatMap((r) => r.logs ?? []);
+  const errStr = failed?.err
+    ? typeof failed.err === "string"
+      ? failed.err
+      : JSON.stringify(failed.err)
+    : "";
+
+  return {
+    ...classifySimulationLogs(errStr, logs),
+    failedTransactionIndex: failedIndex === -1 ? undefined : failedIndex,
+    logs,
+  };
+}

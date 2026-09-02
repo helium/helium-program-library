@@ -27,5 +27,7 @@ export const SIMULATION_FAILED = {
   data: z.object({
     logs: z.array(z.string()).optional(),
     link: z.string().optional(),
+    /** Index in the submitted batch of the transaction that failed to simulate. */
+    failedTransactionIndex: z.number().optional(),
   }),
 } as const;

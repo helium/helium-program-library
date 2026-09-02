@@ -94,6 +94,7 @@ function captureSubmissionError(
         ...baseExtra,
         failure_detail: error.detail,
         summary: error.summary,
+        failed_transaction_index: error.failedTransactionIndex,
         simulation_logs: error.logs,
         transaction_results: error.transactionResults,
         explorer_links: error.explorerLinks,
@@ -448,6 +449,7 @@ export const submit = publicProcedure.transactions.submit.handler(
               message: `Transaction payer ${payer} has 0 SOL`,
               data: {
                 logs: error.logs,
+                failedTransactionIndex: error.failedTransactionIndex,
               },
             });
           }
@@ -456,6 +458,7 @@ export const submit = publicProcedure.transactions.submit.handler(
           message: error.message,
           data: {
             logs: error.logs,
+            failedTransactionIndex: error.failedTransactionIndex,
           },
         });
       }

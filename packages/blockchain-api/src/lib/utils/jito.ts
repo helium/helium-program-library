@@ -7,7 +7,7 @@ import {
 } from "@solana/web3.js";
 import { populateMissingDraftInfo, toVersionedTx } from "@helium/spl-utils";
 import { env } from "../env";
-import { classifySimulationLogs } from "./simulation-classifier";
+import { classifyBundleSimulationFailure } from "./simulation-classifier";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { createTtlCache } from "./ttl-cache";
 
@@ -138,6 +138,10 @@ export interface BundleSimulationErrorFields {
   explorerLinks: (string | null)[];
   chewingGlassExplorerLinks: (string | null)[];
   bundleSize: number;
+  /** Index of the transaction that failed, if any transaction carried an error. */
+  failedTransactionIndex?: number;
+  /** Logs the failure is reported with: the failing transaction's own logs. */
+  logs: string[];
   tag?: string;
   payer?: string;
   transactionMetadata?: Array<Record<string, unknown> | undefined>;
@@ -153,6 +157,7 @@ export class BundleSimulationError extends Error {
   public readonly explorerLinks: (string | null)[];
   public readonly chewingGlassExplorerLinks: (string | null)[];
   public readonly bundleSize: number;
+  public readonly failedTransactionIndex?: number;
   public readonly tag?: string;
   public readonly payer?: string;
   public readonly transactionMetadata?: Array<
@@ -172,10 +177,11 @@ export class BundleSimulationError extends Error {
     this.explorerLinks = fields.explorerLinks;
     this.chewingGlassExplorerLinks = fields.chewingGlassExplorerLinks;
     this.bundleSize = fields.bundleSize;
+    this.failedTransactionIndex = fields.failedTransactionIndex;
     this.tag = fields.tag;
     this.payer = fields.payer;
     this.transactionMetadata = fields.transactionMetadata;
-    this.logs = fields.transactionResults.flatMap((r) => r.logs ?? []);
+    this.logs = fields.logs;
   }
 }
 
@@ -228,22 +234,6 @@ function stringifySummary(summary: unknown): string {
   } catch {
     return String(summary);
   }
-}
-
-/**
- * Classify bundle simulation failure using the shared classifier.
- */
-function classifyBundleSimulationFailure(
-  txResults: Array<{ logs?: string[]; err?: unknown }>
-): { category: string; detail: string } {
-  const allLogs = txResults.flatMap((r) => r.logs ?? []);
-  const firstErr = txResults.find((r) => r.err);
-  const errStr = firstErr?.err
-    ? typeof firstErr.err === "string"
-      ? firstErr.err
-      : JSON.stringify(firstErr.err)
-    : "";
-  return classifySimulationLogs(errStr, allLogs);
 }
 
 /**
@@ -325,12 +315,14 @@ export async function simulateJitoBundle(
       } = r as Record<string, unknown>;
       return rest as typeof r;
     });
-    const { category, detail } = classifyBundleSimulationFailure(txResults);
+    const { category, detail, failedTransactionIndex, logs } =
+      classifyBundleSimulationFailure(txResults);
     const actionType = deriveActionType(context);
 
     console.error(
       `[simulateBundle] Bundle simulation failed: ${summaryStr}\n` +
         `Category: ${category} | Action: ${actionType}\n` +
+        `Failed transaction: ${failedTransactionIndex ?? "unknown"}\n` +
         `Bundle size: ${serializedTransactions.length}\n` +
         `Transaction results:\n` +
         txResults
@@ -349,6 +341,8 @@ export async function simulateJitoBundle(
       detail,
       summary: summaryStr,
       transactionResults: txResults,
+      failedTransactionIndex,
+      logs,
       explorerLinks: deserializedTxs.map((tx) => {
         try {
           return getExplorerUrl(tx);
