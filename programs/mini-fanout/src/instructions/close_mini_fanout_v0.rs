@@ -110,7 +110,10 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
       &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
     ))?;
   }
-  if ctx.accounts.next_pre_task.key() != ctx.accounts.mini_fanout.key()
+  // Only a fanout that queues a pre task ever owned the account in that slot, so only it
+  // may close one. Anything else there belongs to whoever queued it.
+  if ctx.accounts.mini_fanout.pre_task.is_some()
+    && ctx.accounts.next_pre_task.key() != ctx.accounts.mini_fanout.key()
     && !ctx.accounts.next_pre_task.data_is_empty()
   {
     dequeue_task_v0(CpiContext::new_with_signer(

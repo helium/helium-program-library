@@ -115,7 +115,10 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
       &[queue_authority_seeds!(mini_fanout)],
     ))?;
   }
-  if !ctx.accounts.next_pre_task.data_is_empty()
+  // Only a fanout that queues a pre task ever owned the account in that slot, so only it
+  // may close one. Anything else there belongs to whoever queued it.
+  if mini_fanout.pre_task.is_some()
+    && !ctx.accounts.next_pre_task.data_is_empty()
     && ctx.accounts.next_pre_task.key() != mini_fanout.key()
   {
     dequeue_task_v0(CpiContext::new_with_signer(
@@ -131,30 +134,33 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
     ))?;
   }
 
+  // `schedule_impl` writes `next_task` and `next_pre_task` on the fanout it is given, and
+  // `get_task_ix` reads `next_pre_task` back to build the account list the queued task
+  // carries. Those have to be the same value, so the fanout's own copy takes what the
+  // scheduled transaction was built against rather than recomputing it.
+  let mut scheduled = ScheduleTaskV0 {
+    payer: ctx.accounts.payer.clone(),
+    mini_fanout: mini_fanout.clone(),
+    next_task: ctx.accounts.next_task.clone(),
+    tuktuk_program: ctx.accounts.tuktuk_program.clone(),
+    queue_authority: ctx.accounts.queue_authority.clone(),
+    task_queue_authority: ctx.accounts.task_queue_authority.clone(),
+    task_queue: ctx.accounts.task_queue.clone(),
+    system_program: ctx.accounts.system_program.clone(),
+    task: ctx.accounts.new_task.clone(),
+    next_pre_task: ctx.accounts.next_pre_task.clone(),
+    pre_task: ctx.accounts.new_pre_task.clone(),
+  };
   schedule_impl(
-    &mut ScheduleTaskV0 {
-      payer: ctx.accounts.payer.clone(),
-      mini_fanout: mini_fanout.clone(),
-      next_task: ctx.accounts.next_task.clone(),
-      tuktuk_program: ctx.accounts.tuktuk_program.clone(),
-      queue_authority: ctx.accounts.queue_authority.clone(),
-      task_queue_authority: ctx.accounts.task_queue_authority.clone(),
-      task_queue: ctx.accounts.task_queue.clone(),
-      system_program: ctx.accounts.system_program.clone(),
-      task: ctx.accounts.new_task.clone(),
-      next_pre_task: ctx.accounts.next_pre_task.clone(),
-      pre_task: ctx.accounts.new_pre_task.clone(),
-    },
+    &mut scheduled,
     ScheduleTaskArgsV0 {
       task_id: args.new_task_id,
       pre_task_id: args.new_pre_task_id,
     },
   )?;
 
-  if mini_fanout.pre_task.is_some() {
-    mini_fanout.next_pre_task = ctx.accounts.new_pre_task.key();
-  }
-  mini_fanout.next_task = ctx.accounts.new_task.key();
+  mini_fanout.next_task = scheduled.mini_fanout.next_task;
+  mini_fanout.next_pre_task = scheduled.mini_fanout.next_pre_task;
 
   Ok(())
 }
