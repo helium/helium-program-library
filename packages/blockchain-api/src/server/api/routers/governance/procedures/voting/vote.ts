@@ -54,9 +54,8 @@ export const vote = publicProcedure.governance.vote.handler(
     const tuktukProgram = await initTuktuk(provider);
     const proxyProgram = await initProxy(provider);
 
-    const proposalAcc = await proposalProgram.account.proposalV0.fetchNullable(
-      proposalPubkey
-    );
+    const proposalAcc =
+      await proposalProgram.account.proposalV0.fetchNullable(proposalPubkey);
 
     if (!proposalAcc) {
       throw errors.NOT_FOUND({ message: "Proposal not found" });
@@ -74,11 +73,11 @@ export const vote = publicProcedure.governance.vote.handler(
 
     const proposalConfigAcc =
       await proposalProgram.account.proposalConfigV0.fetch(
-        proposalAcc.proposalConfig
+        proposalAcc.proposalConfig,
       );
     const resolutionSettings =
       await stateControllerProgram.account.resolutionSettingsV0.fetchNullable(
-        proposalConfigAcc.stateController
+        proposalConfigAcc.stateController,
       );
 
     let endTs: BN;
@@ -88,7 +87,7 @@ export const vote = publicProcedure.governance.vote.handler(
       const startTs = new BN(proposalAcc.state.voting.startTs);
       const offsetNode = resolutionSettings.settings.nodes.find(
         (node: { offsetFromStartTs?: { offset: BN } }) =>
-          typeof node.offsetFromStartTs !== "undefined"
+          typeof node.offsetFromStartTs !== "undefined",
       );
       const offset = offsetNode?.offsetFromStartTs?.offset ?? new BN(0);
       endTs = startTs.add(offset);
@@ -97,9 +96,8 @@ export const vote = publicProcedure.governance.vote.handler(
         message: "Unable to determine voting end time",
       });
     }
-    const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-      TASK_QUEUE
-    );
+    const taskQueueAcc =
+      await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE);
 
     type VoteMarkerV0 = Awaited<
       ReturnType<typeof vsrProgram.account.voteMarkerV0.fetchNullable>
@@ -124,7 +122,7 @@ export const vote = publicProcedure.governance.vote.handler(
     const positionMintPubkeys = positionMints.map((m) => new PublicKey(m));
     const positionPubkeys = positionMintPubkeys.map((m) => positionKey(m)[0]);
     const markerKeys = positionMintPubkeys.map(
-      (m) => voteMarkerKey(m, proposalPubkey)[0]
+      (m) => voteMarkerKey(m, proposalPubkey)[0],
     );
 
     const [positionAccounts, markerAccounts] = await Promise.all([
@@ -137,7 +135,7 @@ export const vote = publicProcedure.governance.vote.handler(
     const isOwnerByIndex = await validatePositionOwnershipBatch(
       connection,
       positionMintPubkeys,
-      walletPubkey
+      walletPubkey,
     );
 
     // For non-owned positions we must confirm a proxy assignment exists. Resolve
@@ -151,18 +149,18 @@ export const vote = publicProcedure.governance.vote.handler(
         if (acc && !isOwnerByIndex[i]) {
           registrarKeySet.add(acc.registrar.toBase58());
         }
-      }
+      },
     );
     const registrarKeysToFetch: string[] = Array.from(registrarKeySet);
     const registrarAccounts = registrarKeysToFetch.length
       ? await vsrProgram.account.registrar.fetchMultiple(
-          registrarKeysToFetch.map((k: string) => new PublicKey(k))
+          registrarKeysToFetch.map((k: string) => new PublicKey(k)),
         )
       : [];
     const registrarByKey = new Map<string, (typeof registrarAccounts)[number]>(
       registrarKeysToFetch.map(
-        (k: string, i: number) => [k, registrarAccounts[i]] as const
-      )
+        (k: string, i: number) => [k, registrarAccounts[i]] as const,
+      ),
     );
 
     const proxyAssignmentIndexes: number[] = [];
@@ -177,15 +175,15 @@ export const vote = publicProcedure.governance.vote.handler(
             proxyAssignmentKey(
               registrar.proxyConfig,
               positionMintPubkeys[i],
-              walletPubkey
-            )[0]
+              walletPubkey,
+            )[0],
           );
         }
       }
     }
     const proxyAssignmentAccounts = proxyAssignmentKeys.length
       ? await proxyProgram.account.proxyAssignmentV0.fetchMultiple(
-          proxyAssignmentKeys
+          proxyAssignmentKeys,
         )
       : [];
     const proxyAssignmentByIndex = new Map<
@@ -262,7 +260,7 @@ export const vote = publicProcedure.governance.vote.handler(
     const totalTaskIds = (hasProxies ? 2 : 0) + ownedTaskIdsNeeded;
     const nextAvailable = nextAvailableTaskIds(
       taskQueueAcc.taskBitmap,
-      totalTaskIds
+      totalTaskIds,
     );
 
     const allInstructions: TransactionInstruction[][] = [];
@@ -270,7 +268,7 @@ export const vote = publicProcedure.governance.vote.handler(
     if (hasProxies) {
       const proxyVoteMarkerK = proxyVoteMarkerKey(
         walletPubkey,
-        proposalPubkey
+        proposalPubkey,
       )[0];
       const proxyMarkerAcc =
         await vsrProgram.account.proxyMarkerV0.fetchNullable(proxyVoteMarkerK);
@@ -286,14 +284,14 @@ export const vote = publicProcedure.governance.vote.handler(
               voter: walletPubkey,
               marker: proxyVoteMarkerK,
             })
-            .instruction()
+            .instruction(),
         );
 
         const task1 = nextAvailable.pop()!;
         const task2 = nextAvailable.pop()!;
         const queueAuthority = PublicKey.findProgramAddressSync(
           [Buffer.from("queue_authority")],
-          hplCronsProgram.programId
+          hplCronsProgram.programId,
         )[0];
 
         proxyInstructions.push(
@@ -314,10 +312,10 @@ export const vote = publicProcedure.governance.vote.handler(
               ])[0],
               taskQueueAuthority: taskQueueAuthorityKey(
                 TASK_QUEUE,
-                queueAuthority
+                queueAuthority,
               )[0],
             })
-            .instruction()
+            .instruction(),
         );
 
         if (!proxyMarkerAcc) {
@@ -337,10 +335,10 @@ export const vote = publicProcedure.governance.vote.handler(
                 tuktukProgram: tuktukProgram.programId,
                 taskQueueAuthority: taskQueueAuthorityKey(
                   TASK_QUEUE,
-                  queueAuthority
+                  queueAuthority,
                 )[0],
               })
-              .instruction()
+              .instruction(),
           );
         }
 
@@ -360,7 +358,7 @@ export const vote = publicProcedure.governance.vote.handler(
             position: data.positionPubkey,
             marker: data.markerKey,
           })
-          .instruction()
+          .instruction(),
       );
 
       if (data.needsTask) {
@@ -380,7 +378,7 @@ export const vote = publicProcedure.governance.vote.handler(
               task: taskKey(TASK_QUEUE, freeTaskId)[0],
               taskQueue: TASK_QUEUE,
             })
-            .instruction()
+            .instruction(),
         );
       }
 
@@ -404,6 +402,9 @@ export const vote = publicProcedure.governance.vote.handler(
         groups,
         connection,
         feePayer: walletPubkey,
+        // Vote txs run sequentially in a Jito bundle; a standalone sim
+        // under-measures later txs (see BuildBatchedTransactionsParams).
+        useTableComputeUnits: true,
       });
 
     const cluster = getCluster();
@@ -447,9 +448,9 @@ export const vote = publicProcedure.governance.vote.handler(
       hasMore,
       estimatedSolFee: await toTokenAmountOutput(
         new BN(totalFee),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
       skipped,
     };
-  }
+  },
 );
