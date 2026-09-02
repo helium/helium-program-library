@@ -281,16 +281,19 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:8a913c33b9a7a29e": 37226,
   // voter_stake_registry.proxied_vote_v1 (n=3, med=11519, max=11519) [localnet]
   "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:beb055c81df8007f": 11519,
-  // voter_stake_registry.relinquish_vote_v1 (n=1, med=33121, max=33121) [localnet]
-  "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:8ec941e27088f866": 33121,
+  // voter_stake_registry.relinquish_vote_v1 (n=16, med=68798, max=75401);
+  // mainnet costs ~2x the localnet sample it replaced
+  "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:8ec941e27088f866": 75401,
   // voter_stake_registry.reset_lockup_v0 (n=3, med=7545, max=8921)
   "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:a3c456f96074ecc2": 8921,
   // voter_stake_registry.set_time_offset_v0 (n=29, med=2995, max=2995) [localnet]
   "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:ade7d9e2b2f79057": 2995,
   // voter_stake_registry.transfer_v0 (n=5, med=25457, max=34455) [localnet]
   "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:a2b6c16166557fbd": 34455,
-  // voter_stake_registry.vote_v0 (n=10, med=63786, max=67869) [localnet]
-  "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:522f14166c3bf573": 67869,
+  // voter_stake_registry.vote_v0 (n=1007, med=116367, max=350893);
+  // cost scales with the proposal's choice count, so mainnet runs far above
+  // the localnet sample it replaced
+  "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:522f14166c3bf573": 199539,
   // voter_stake_registry.withdraw_v0 — localnet p95 32598 (incl. account init);
   // mainnet (n=1, med=20875, max=20875) never hit the init path, so keep the higher value
   "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:f07fcfe44519fd61": 32598,
@@ -360,6 +363,30 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:b3fd74f09eb38f77": 29279,
   // hpl_crons.queue_delegation_claim_v0 (n=1264, med=311318, max=346130)
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:7a169de76dc89b02": 327897,
+  // nft_proxy.assign_proxy_v0 (n=2342, med=16866, max=35115)
+  "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p:6bd6c57cf8dea919": 23115,
+  // nft_proxy.unassign_proxy_v0 (n=178, med=7740, max=7906)
+  "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p:1768ebdc8bb829dd": 7906,
+  // nft_proxy.unassign_expired_proxy_v0 (n=264, med=3379, max=3379)
+  "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p:a5ddf180d5556b14": 3379,
+  // nft_proxy.close_expired_proxy_v0 (n=281, med=2190, max=2190)
+  "nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p:15971c9c1db8613a": 2190,
+  // hpl_crons.queue_proxy_vote_v0 (n=95, med=61130, max=71513)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:65c66c00c6a7d26b": 67013,
+  // hpl_crons.queue_relinquish_expired_vote_marker_v0 (n=495, med=64178, max=76181)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:a7cdabd11aa26a5c": 70141,
+  // hpl_crons.queue_relinquish_expired_proxy_vote_marker_v0 (n=5, med=58129, max=61477)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:20974d436927fd12": 61477,
+  // voter_stake_registry.relinquish_expired_vote_v0 (n=1810, med=7073, max=10481)
+  "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:cab85852f51468b2": 7925,
+  // voter_stake_registry.relinquish_expired_proxy_vote_v0 (n=8, med=5131, max=5131)
+  "hvsrNC3NKbcryqDs2DocYHZ9yPKEVzdSjQG6RVtK1s8:ab73be8a98feee94": 5131,
+  // hpl_crons.requeue_proxy_vote_v0 (n=291, med=24057, max=24096)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:169ccc384c9c6e2e": 24096,
+  // hpl_crons.requeue_relinquish_expired_vote_marker_v0 (n=291, med=29275, max=36811)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:c4a1c3e477c622f1": 33057,
+  // hpl_crons.add_wallet_to_entity_cron_v0 (n=3, med=42415, max=46869)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:52d395b621f826dd": 46869,
 };
 
 export const MAX_COMPUTE_UNITS = 1400000;

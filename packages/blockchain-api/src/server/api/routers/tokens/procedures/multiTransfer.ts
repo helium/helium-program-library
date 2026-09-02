@@ -124,8 +124,8 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
         groups,
         connection,
         feePayer,
-        // Transfer txs run sequentially in a Jito bundle; a standalone sim
-        // under-measures later txs (see BuildBatchedTransactionsParams).
+        // Transfers are independent; size the whole bundle from the table so
+        // CU limits are deterministic and state-independent.
         useTableComputeUnits: true,
       });
 
