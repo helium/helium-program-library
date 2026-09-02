@@ -37,7 +37,10 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import BN from "bn.js";
-import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
+import {
+  getTotalTransactionFees,
+  MIN_WALLET_RENT_LAMPORTS,
+} from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
@@ -58,11 +61,20 @@ import {
   getLockupKind,
   LockupKind,
   getAutomationRentLamports,
+  getMissingEpochInfoRentLamports,
+  DELEGATED_POSITION_SPACE,
+  DELEGATION_CLAIM_TASK_SPACE,
   initDelegationClaimBotAccounts,
   startDelegationClaimBotAccounts,
   closeDelegationClaimBotAccounts,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
+
+/** A delegation instruction plus the epoch-info accounts it may have to open. */
+interface DelegationBuild {
+  instructions: TransactionInstruction[];
+  epochInfoKeys: PublicKey[];
+}
 
 export const delegate = publicProcedure.governance.delegatePositions.handler(
   async ({ input, errors }) => {
@@ -490,56 +502,76 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           delegatedPositionAcc,
         } = info;
 
-        const buildDelegation = async (): Promise<TransactionInstruction[]> => {
+        const buildDelegation = async (): Promise<DelegationBuild> => {
           if (delegation === "delegate") {
-            return [
-              await hsdProgram.methods
-                .delegateV0()
-                .accountsStrict(
-                  delegateAccounts({
-                    ...positionAccountArgs(info),
-                    subDao: subDaoK,
-                    seasonEndTs: seasonEnd!,
-                  }),
-                )
-                .instruction(),
-            ];
+            const accounts = delegateAccounts({
+              ...positionAccountArgs(info),
+              subDao: subDaoK,
+              seasonEndTs: seasonEnd!,
+            });
+            return {
+              instructions: [
+                await hsdProgram.methods
+                  .delegateV0()
+                  .accountsStrict(accounts)
+                  .instruction(),
+              ],
+              epochInfoKeys: [
+                accounts.subDaoEpochInfo,
+                accounts.closingTimeSubDaoEpochInfo,
+                accounts.genesisEndSubDaoEpochInfo,
+              ],
+            };
           }
 
           if (delegation === "change") {
-            return [
-              await hsdProgram.methods
-                .changeDelegationV0()
-                .accountsStrict(
-                  changeDelegationAccounts({
-                    ...positionAccountArgs(info),
-                    subDao: subDaoK,
-                    oldSubDao: delegatedPositionAcc!.subDao,
-                    expirationTs: delegatedPositionAcc!.expirationTs,
-                    seasonEndTs: seasonEnd!,
-                  }),
-                )
-                .instruction(),
-            ];
+            const accounts = changeDelegationAccounts({
+              ...positionAccountArgs(info),
+              subDao: subDaoK,
+              oldSubDao: delegatedPositionAcc!.subDao,
+              expirationTs: delegatedPositionAcc!.expirationTs,
+              seasonEndTs: seasonEnd!,
+            });
+            return {
+              instructions: [
+                await hsdProgram.methods
+                  .changeDelegationV0()
+                  .accountsStrict(accounts)
+                  .instruction(),
+              ],
+              epochInfoKeys: [
+                accounts.subDaoEpochInfo,
+                accounts.closingTimeSubDaoEpochInfo,
+                accounts.genesisEndSubDaoEpochInfo,
+                accounts.oldSubDaoEpochInfo,
+                accounts.oldClosingTimeSubDaoEpochInfo,
+                accounts.oldGenesisEndSubDaoEpochInfo,
+              ],
+            };
           }
 
           if (delegation === "extend") {
-            return [
-              await hsdProgram.methods
-                .extendExpirationTsV0()
-                .accountsStrict(
-                  extendExpirationAccounts({
-                    ...positionAccountArgs(info),
-                    subDao: delegatedPositionAcc!.subDao,
-                    expirationTs: delegatedPositionAcc!.expirationTs,
-                    seasonEndTs: seasonEnd!,
-                  }),
-                )
-                .instruction(),
-            ];
+            const accounts = extendExpirationAccounts({
+              ...positionAccountArgs(info),
+              subDao: delegatedPositionAcc!.subDao,
+              expirationTs: delegatedPositionAcc!.expirationTs,
+              seasonEndTs: seasonEnd!,
+            });
+            return {
+              instructions: [
+                await hsdProgram.methods
+                  .extendExpirationTsV0()
+                  .accountsStrict(accounts)
+                  .instruction(),
+              ],
+              epochInfoKeys: [
+                accounts.closingTimeSubDaoEpochInfo,
+                accounts.genesisEndSubDaoEpochInfo,
+              ],
+            };
           }
 
-          return [];
+          return { instructions: [], epochInfoKeys: [] };
         };
 
         const claimBotArgs = {
@@ -613,10 +645,16 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           return instructions;
         };
 
-        const [delegationInstructions, automationInstructions] =
-          await Promise.all([buildDelegation(), buildAutomation()]);
+        const [delegationBuild, automationInstructions] = await Promise.all([
+          buildDelegation(),
+          buildAutomation(),
+        ]);
 
-        return { delegationInstructions, automationInstructions };
+        return {
+          delegationInstructions: delegationBuild.instructions,
+          epochInfoKeys: delegationBuild.epochInfoKeys,
+          automationInstructions,
+        };
       }),
     );
 
@@ -678,22 +716,69 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       versionedTransactions.length > 1
         ? getJitoTipAmountLamports()
         : 0;
-    const automationCost = automationEnabled
-      ? positionMints.length * PREPAID_TX_FEES * LAMPORTS_PER_SOL
+    // Only a position that gets a new claim bot is topped up; an existing bot
+    // keeps whatever balance it already holds.
+    const automationCost = newClaimBots * PREPAID_TX_FEES * LAMPORTS_PER_SOL;
+
+    const queuedTasks = positionPlans.filter(
+      (plan) => plan.taskId !== null,
+    ).length;
+    const newDelegations = positionPlans.filter(
+      (plan) => plan.delegation === "delegate",
+    ).length;
+
+    // Every account these instructions open is rent the wallet pays. Omitting
+    // any of them lets a low-SOL wallet pass this check and then fail on-chain
+    // with a System ResultWithNegativeLamports surfaced as an opaque Custom(1).
+    const [
+      automationRent,
+      epochInfoRent,
+      delegatedPositionRent,
+      claimTaskRent,
+    ] = await Promise.all([
+      getAutomationRentLamports({
+        connection,
+        walletPubkey,
+        newClaimBots,
+        // startDelegationClaimBotV1 requires an existing delegator ATA here;
+        // unlike createPosition this path never creates one.
+        createsHntAta: false,
+      }),
+      getMissingEpochInfoRentLamports({
+        connection,
+        epochInfoKeys: [
+          ...new Map(
+            builtPerPosition
+              .flatMap(({ epochInfoKeys }) => epochInfoKeys)
+              .map((key) => [key.toBase58(), key]),
+          ).values(),
+        ],
+      }),
+      newDelegations > 0
+        ? connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE)
+        : Promise.resolve(0),
+      queuedTasks > 0
+        ? connection.getMinimumBalanceForRentExemption(
+            DELEGATION_CLAIM_TASK_SPACE,
+          )
+        : Promise.resolve(0),
+    ]);
+
+    // tuktuk moves the queue's minimum crank reward onto every task it queues.
+    const queuedTaskCrankReward = taskQueueAcc
+      ? taskQueueAcc.minCrankReward.toNumber() * queuedTasks
       : 0;
-    // initDelegationClaimBotV0 allocates a claim-bot account per position the
-    // wallet must fund rent for. Omitting it lets a low-SOL wallet pass this
-    // check and then fail on-chain with an opaque Custom(1).
-    const automationRent = await getAutomationRentLamports({
-      connection,
-      walletPubkey,
-      newClaimBots,
-      // startDelegationClaimBotV1 requires an existing delegator ATA here;
-      // unlike createPosition this path never creates one.
-      createsHntAta: false,
-    });
+
     const estimatedSolFeeLamports =
-      txFees + jitoTipCost + automationCost + automationRent;
+      txFees +
+      jitoTipCost +
+      automationCost +
+      automationRent +
+      epochInfoRent +
+      newDelegations * delegatedPositionRent +
+      queuedTasks * claimTaskRent +
+      queuedTaskCrankReward +
+      MIN_WALLET_RENT_LAMPORTS;
 
     const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < estimatedSolFeeLamports) {
