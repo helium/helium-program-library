@@ -146,7 +146,7 @@ class TransactionResubmissionService {
       // The cluster could not be read this tick, so nothing is known about
       // where these transactions stand. Resubmitting on that would burn a retry
       // slot on a batch that may well have landed.
-      if (result.skipped) {
+      if (result.clusterUnread) {
         return;
       }
 

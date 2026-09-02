@@ -23,15 +23,19 @@ export interface BatchStatusResult {
    * The cluster could not be read, so nothing was decided or written and the
    * statuses below are the stored ones. Callers must not act on them.
    */
-  skipped?: boolean;
+  clusterUnread?: boolean;
 }
 
 /**
- * Check Jito bundle status
+ * Check Jito bundle status.
+ *
+ * `unread` says Jito could not be reached or answered with an error. A bundle
+ * outage must not read as "pending": the batch would then be decided, and
+ * written, from a partial view — so the caller skips the tick instead.
  */
 export async function checkJitoBundleStatus(
   batch: TransactionBatch,
-): Promise<{ status: BatchStatus; jitoBundleStatus?: any }> {
+): Promise<{ status: BatchStatus; jitoBundleStatus?: any; unread?: boolean }> {
   let batchStatus: BatchStatus = "pending";
   let jitoBundleStatus = null;
 
@@ -42,24 +46,30 @@ export async function checkJitoBundleStatus(
         [[batch.jitoBundleId]],
       );
 
-      if (response.ok) {
-        const result = await response.json();
-        if (
-          result.result &&
-          result.result.value &&
-          result.result.value.length > 0
-        ) {
-          jitoBundleStatus = result.result.value[0];
+      if (!response.ok) {
+        console.error(
+          `Jito bundle status read failed for batch ${batch.id}: HTTP ${response.status}`,
+        );
+        return { status: batchStatus, jitoBundleStatus, unread: true };
+      }
 
-          if (jitoBundleStatus.status === "Failed") {
-            batchStatus = "failed";
-          } else if (jitoBundleStatus.status === "Landed") {
-            batchStatus = "confirmed";
-          }
+      const result = await response.json();
+      if (
+        result.result &&
+        result.result.value &&
+        result.result.value.length > 0
+      ) {
+        jitoBundleStatus = result.result.value[0];
+
+        if (jitoBundleStatus.status === "Failed") {
+          batchStatus = "failed";
+        } else if (jitoBundleStatus.status === "Landed") {
+          batchStatus = "confirmed";
         }
       }
     } catch (error) {
       console.error("Failed to check Jito bundle status:", error);
+      return { status: batchStatus, jitoBundleStatus, unread: true };
     }
   }
 
@@ -86,17 +96,19 @@ export async function checkAndUpdateBatchStatus(
   const jitoResult = await checkJitoBundleStatus(batch);
   const jitoBundleStatus = jitoResult.jitoBundleStatus;
 
-  const decision = await readBatchStatus({
-    rpc: connection,
-    batchId: batch.id,
-    transactions,
-    commitment,
-    jitoBatchStatus: jitoResult.status,
-  });
+  const decision = jitoResult.unread
+    ? null
+    : await readBatchStatus({
+        rpc: connection,
+        batchId: batch.id,
+        transactions,
+        commitment,
+        jitoBatchStatus: jitoResult.status,
+      });
 
-  // The cluster could not be read. Leave the batch exactly as it is and report
-  // the stored state: a resubmission attempt or an expiry decided from a failed
-  // read would be decided from no information at all.
+  // The cluster (or Jito) could not be read. Leave the batch exactly as it is
+  // and report the stored state: a resubmission attempt or an expiry decided
+  // from a failed read would be decided from no information at all.
   if (!decision) {
     return {
       batchStatus: batch.status,
@@ -110,7 +122,7 @@ export async function checkAndUpdateBatchStatus(
         status: tx.status,
       })),
       jitoBundleStatus,
-      skipped: true,
+      clusterUnread: true,
     };
   }
 
@@ -133,12 +145,29 @@ export async function checkAndUpdateBatchStatus(
       if (status === pendingTx.status) {
         continue;
       }
+      // The rows were read before the network round trips, so another replica
+      // (or this batch's other poller) may have moved one since. Guarding on
+      // the status the decision was made from makes the write a
+      // compare-and-swap: a row that moved keeps whatever moved it, and the
+      // indexers are told about a landing exactly once.
+      const [updated] = await PendingTransaction.update(
+        {
+          status,
+          ...(status === "confirmed" ? { serializedTransaction: null } : {}),
+        },
+        {
+          where: { id: pendingTx.id, status: pendingTx.status },
+          transaction: dbTransaction,
+        },
+      );
+      if (updated === 0) {
+        continue;
+      }
       if (status === "confirmed") {
         newlyConfirmed.push(pendingTx.signature);
         pendingTx.serializedTransaction = undefined;
       }
       pendingTx.status = status;
-      await pendingTx.save({ transaction: dbTransaction });
     }
 
     // Update batch status in database
@@ -147,11 +176,19 @@ export async function checkAndUpdateBatchStatus(
       batchStatus === "failed" ||
       batchStatus === "partial";
     if (batchStatus !== batch.status) {
-      batch.status = batchStatus;
-      if (isTerminal && !batch.confirmedAt) {
-        batch.confirmedAt = new Date();
+      const confirmedAt =
+        isTerminal && !batch.confirmedAt ? new Date() : batch.confirmedAt;
+      const [updated] = await TransactionBatch.update(
+        { status: batchStatus, confirmedAt },
+        {
+          where: { id: batch.id, status: batch.status },
+          transaction: dbTransaction,
+        },
+      );
+      if (updated > 0) {
+        batch.status = batchStatus;
+        batch.confirmedAt = confirmedAt;
       }
-      await batch.save({ transaction: dbTransaction });
     }
 
     // Commit the transaction

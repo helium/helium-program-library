@@ -30,8 +30,8 @@ export const get = publicProcedure.transactions.get.handler(
     }
 
     // Snapshot the stored state before the check: checkAndUpdateBatchStatus
-    // mutates the loaded instances in memory before committing, and a rollback
-    // does not revert them.
+    // re-reads the batch's rows and mutates the loaded instances in memory
+    // before committing, and a rollback does not revert them.
     const storedBatchStatus = batch.status;
     const storedStatuses = (batch.transactions || []).map((tx) => ({
       signature: tx.signature,
@@ -53,7 +53,9 @@ export const get = publicProcedure.transactions.get.handler(
         batchStatus: storedBatchStatus,
         confirmedCount: storedStatuses.filter((t) => t.status === "confirmed")
           .length,
-        failedCount: storedStatuses.filter((t) => t.status === "failed").length,
+        failedCount: storedStatuses.filter(
+          (t) => t.status === "failed" || t.status === "expired",
+        ).length,
         transactionStatuses: storedStatuses,
       };
     }
