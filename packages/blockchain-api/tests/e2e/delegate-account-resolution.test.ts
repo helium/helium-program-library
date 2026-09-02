@@ -4,17 +4,22 @@ import {
   delegatedPositionKey,
   PROGRAM_ID as HSD_PROGRAM_ID,
 } from "@helium/helium-sub-daos-sdk";
-import { PROGRAM_ID as HPL_CRONS_PROGRAM_ID } from "@helium/hpl-crons-sdk";
+import {
+  delegationClaimBotKey,
+  PROGRAM_ID as HPL_CRONS_PROGRAM_ID,
+} from "@helium/hpl-crons-sdk";
 import { PROGRAM_ID as PROXY_PROGRAM_ID } from "@helium/nft-proxy-sdk";
 import { MOBILE_MINT } from "@helium/spl-utils";
 import {
   positionKey,
   PROGRAM_ID as VSR_PROGRAM_ID,
 } from "@helium/voter-stake-registry-sdk";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { setupTestCtx, TestCtx } from "./helpers/context";
+import { DEFAULT_HPL_CRONS_TASK_QUEUE } from "./helpers/constants";
 import {
   createAndFundPosition,
   setDelegatedPositionExpiration,
@@ -106,6 +111,18 @@ const idlReads = (calls: RpcCall[]) =>
       .map(([, name]) => name);
   });
 
+/**
+ * How many single-account reads asked for this address. A batched read is a
+ * `getMultipleAccounts`, so anything counted here is a round trip the request
+ * spent on one position alone.
+ */
+const singleAccountReads = (calls: RpcCall[], account: PublicKey) =>
+  calls.filter(
+    (rpcCall) =>
+      rpcCall.method === "getAccountInfo" &&
+      JSON.stringify(rpcCall.params).includes(account.toBase58()),
+  ).length;
+
 describe("delegatePositions account resolution", () => {
   let ctx: TestCtx;
   let rpc: Awaited<ReturnType<typeof startRecordingRpc>>;
@@ -173,5 +190,59 @@ describe("delegatePositions account resolution", () => {
     expect(
       result.transactionData.transactions.map((tx) => tx.metadata?.type),
     ).to.include("delegation_close_expired");
+  });
+
+  it("reads ownership and claim bots in batches, not once per position", async () => {
+    // #given two undelegated positions to automate in one request
+    const positions = await Promise.all([
+      createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+        subDaoMint: MOBILE_MINT,
+      }),
+      createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+        subDaoMint: MOBILE_MINT,
+      }),
+    ]);
+
+    const taskQueue = new PublicKey(DEFAULT_HPL_CRONS_TASK_QUEUE);
+    const perPositionAccounts = positions.flatMap(({ positionMint }) => {
+      const mint = new PublicKey(positionMint);
+      const [positionPubkey] = positionKey(mint);
+      const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+      return [
+        // The ownership check's ATA.
+        getAssociatedTokenAddressSync(mint, ctx.payer.publicKey, true),
+        // The claim bot, read to decide whether one must be created.
+        delegationClaimBotKey(taskQueue, delegatedPosPubkey)[0],
+      ];
+    });
+
+    // #when the endpoint builds the request
+    rpc.calls.length = 0;
+    const { data, error } = await ctx.safeClient.governance.delegatePositions({
+      walletAddress: ctx.payer.publicKey.toBase58(),
+      positionMints: positions.map(({ positionMint }) => positionMint),
+      subDaoMint: MOBILE_MINT.toBase58(),
+      automationEnabled: true,
+    });
+
+    // #then it read none of the per-position accounts on its own
+    if (error) {
+      expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+    }
+    expect(
+      data.transactionData.transactions.map((tx) => tx.metadata?.type),
+    ).to.include("delegation_automation");
+    for (const account of perPositionAccounts) {
+      expect(
+        singleAccountReads(rpc.calls, account),
+        `${account.toBase58()} was read one position at a time`,
+      ).to.equal(0);
+    }
   });
 });

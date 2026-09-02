@@ -86,6 +86,24 @@ export async function requirePositionOwnership<T extends OwnershipErrorHandler>(
   return tokenAccount;
 }
 
+/**
+ * The ownership rejection, for callers that already know the answer — a
+ * {@link validatePositionOwnershipBatch} result, say. Keeps the message
+ * identical to the per-position check.
+ */
+export function requireOwnedPosition<T extends OwnershipErrorHandler>(
+  isOwner: boolean,
+  positionIdentifier: string,
+  errors: T
+): void {
+  if (!isOwner) {
+    throwOwnershipError(
+      errors,
+      `Wallet does not own position ${positionIdentifier}`
+    );
+  }
+}
+
 export async function requirePositionOwnershipWithMessage<
   T extends OwnershipErrorHandler
 >(
@@ -100,11 +118,6 @@ export async function requirePositionOwnershipWithMessage<
     positionMint,
     wallet
   );
-  if (!isOwner) {
-    throwOwnershipError(
-      errors,
-      `Wallet does not own position ${positionIdentifier}`
-    );
-  }
+  requireOwnedPosition(isOwner, positionIdentifier, errors);
   return tokenAccount;
 }

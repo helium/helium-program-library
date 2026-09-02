@@ -41,7 +41,8 @@ import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
-  requirePositionOwnershipWithMessage,
+  requireOwnedPosition,
+  validatePositionOwnershipBatch,
   getCurrentSeasonEnd,
   changeDelegationAccounts,
   closeDelegationAccounts,
@@ -56,6 +57,9 @@ import {
   getLockupKind,
   LockupKind,
   getAutomationRentLamports,
+  initDelegationClaimBotAccounts,
+  startDelegationClaimBotAccounts,
+  closeDelegationClaimBotAccounts,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
 
@@ -124,9 +128,28 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       (p) => delegatedPositionKey(p)[0],
     );
 
-    const [positionAccounts, delegatedPositionAccounts] = await Promise.all([
+    const delegationClaimBotKeys = delegatedPosKeys.map(
+      (p) => delegationClaimBotKey(TASK_QUEUE, p)[0],
+    );
+
+    const [
+      positionAccounts,
+      delegatedPositionAccounts,
+      positionOwnership,
+      delegationClaimBots,
+    ] = await Promise.all([
       vsrProgram.account.positionV0.fetchMultiple(positionPubkeys),
       hsdProgram.account.delegatedPositionV0.fetchMultiple(delegatedPosKeys),
+      // One getMultipleAccounts per 100 positions instead of one
+      // getAccountInfo per position.
+      validatePositionOwnershipBatch(
+        connection,
+        positionMintPubkeys,
+        walletPubkey,
+      ),
+      hplCronsProgram.account.delegationClaimBotV0.fetchMultiple(
+        delegationClaimBotKeys,
+      ),
     ]);
 
     const registrarCache = new Map<
@@ -146,13 +169,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         });
       }
 
-      await requirePositionOwnershipWithMessage(
-        connection,
-        positionMintPubkeys[i],
-        walletPubkey,
-        positionMints[i],
-        errors,
-      );
+      requireOwnedPosition(positionOwnership[i], positionMints[i], errors);
 
       const lockupKind = getLockupKind(positionAcc.lockup);
       if (
@@ -358,7 +375,6 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     }
 
     const allGroups: InstructionGroup[] = [];
-    let newClaimBots = 0;
 
     // Every automated position queues its own tuktuk task, so all the ids are
     // reserved from one bitmap read up front. Reading the bitmap per position
@@ -380,7 +396,6 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           "The automation task queue does not have enough free slots. Try again later or delegate fewer positions at a time.",
       });
     }
-    let nextReservedTaskIdIndex = 0;
 
     for (const instructions of claimResult.instructionBatches) {
       allGroups.push({
@@ -402,86 +417,215 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       });
     }
 
-    for (const info of positionInfos) {
-      const {
-        positionMintPubkey,
-        positionPubkey,
-        positionAcc,
-        delegatedPosKey,
-        delegatedPositionAcc,
-        proxyConfig,
-      } = info;
+    /**
+     * What each position needs, decided before anything is built. The builds
+     * below run concurrently, so a rejection there would surface whichever
+     * position's RPC happened to finish first; every rejection this endpoint
+     * owns is raised here instead, in position order and delegation before
+     * automation, exactly as the serial loop raised them.
+     */
+    const positionPlans = positionInfos.map((info, index) => {
+      const { positionAcc, delegatedPositionAcc, proxyConfig } = info;
+      const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, now);
 
-      const delegationInstructions: TransactionInstruction[] = [];
-
-      if (!delegatedPositionAcc) {
-        const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, now);
+      let delegation: "delegate" | "change" | "extend" | null = null;
+      if (!delegatedPositionAcc || !delegatedPositionAcc.subDao.equals(subDaoK)) {
         if (!seasonEnd) {
           throw errors.BAD_REQUEST({
             message: "No valid expiration timestamp found",
           });
         }
-
-        delegationInstructions.push(
-          await hsdProgram.methods
-            .delegateV0()
-            .accountsStrict(
-              delegateAccounts({
-                ...positionAccountArgs(info),
-                subDao: subDaoK,
-                seasonEndTs: seasonEnd,
-              }),
-            )
-            .instruction(),
+        delegation = delegatedPositionAcc ? "change" : "delegate";
+      } else if (seasonEnd) {
+        const newExpirationTs = Math.min(
+          seasonEnd.toNumber(),
+          getLockupEffectiveEndTs(positionAcc.lockup).toNumber(),
         );
-      } else if (!delegatedPositionAcc.subDao.equals(subDaoK)) {
-        const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, now);
-        if (!seasonEnd) {
-          throw errors.BAD_REQUEST({
-            message: "No valid expiration timestamp found",
-          });
+        if (delegatedPositionAcc.expirationTs.lt(new BN(newExpirationTs))) {
+          delegation = "extend";
         }
+      }
 
-        delegationInstructions.push(
-          await hsdProgram.methods
-            .changeDelegationV0()
-            .accountsStrict(
-              changeDelegationAccounts({
-                ...positionAccountArgs(info),
-                subDao: subDaoK,
-                oldSubDao: delegatedPositionAcc.subDao,
-                expirationTs: delegatedPositionAcc.expirationTs,
-                seasonEndTs: seasonEnd,
-              }),
-            )
-            .instruction(),
-        );
-      } else {
-        const seasonEnd = getCurrentSeasonEnd(proxyConfig.seasons, now);
-        if (seasonEnd) {
-          const lockupEnd = getLockupEffectiveEndTs(positionAcc.lockup);
-          const newExpirationTs = Math.min(
-            seasonEnd.toNumber(),
-            lockupEnd.toNumber(),
-          );
-          if (delegatedPositionAcc.expirationTs.lt(new BN(newExpirationTs))) {
-            delegationInstructions.push(
+      const claimBot = delegationClaimBots[index];
+
+      if (
+        automationEnabled &&
+        delegatedPositionAcc &&
+        delegatedPositionAcc.lastClaimedEpoch.toNumber() < HNT_EPOCH &&
+        !info.needsChange
+      ) {
+        throw errors.BAD_REQUEST({
+          message:
+            "Must claim IOT/MOBILE delegation rewards before enabling automation",
+        });
+      }
+
+      return {
+        info,
+        seasonEnd,
+        delegation,
+        claimBot,
+        claimBotKey: delegationClaimBotKeys[index],
+        createsClaimBot: automationEnabled && !claimBot,
+        // One id per automated position, taken by index from the single
+        // bitmap read, so no two positions in this bundle claim the same task.
+        taskId:
+          automationEnabled && taskQueueAcc ? reservedTaskIds[index] : null,
+        closesClaimBot: !automationEnabled && claimBot !== null,
+      };
+    });
+
+    const newClaimBots = positionPlans.filter(
+      (plan) => plan.createsClaimBot,
+    ).length;
+
+    // Nothing one position builds depends on another's, so all of them build
+    // at once. Serially this was one round trip of instruction building per
+    // position, and the endpoint is routinely asked for dozens.
+    const builtPerPosition = await Promise.all(
+      positionPlans.map(async (plan) => {
+        const { info, seasonEnd, delegation, claimBot, claimBotKey } = plan;
+        const {
+          positionMintPubkey,
+          positionPubkey,
+          delegatedPosKey,
+          delegatedPositionAcc,
+        } = info;
+
+        const buildDelegation = async (): Promise<TransactionInstruction[]> => {
+          if (delegation === "delegate") {
+            return [
+              await hsdProgram.methods
+                .delegateV0()
+                .accountsStrict(
+                  delegateAccounts({
+                    ...positionAccountArgs(info),
+                    subDao: subDaoK,
+                    seasonEndTs: seasonEnd!,
+                  }),
+                )
+                .instruction(),
+            ];
+          }
+
+          if (delegation === "change") {
+            return [
+              await hsdProgram.methods
+                .changeDelegationV0()
+                .accountsStrict(
+                  changeDelegationAccounts({
+                    ...positionAccountArgs(info),
+                    subDao: subDaoK,
+                    oldSubDao: delegatedPositionAcc!.subDao,
+                    expirationTs: delegatedPositionAcc!.expirationTs,
+                    seasonEndTs: seasonEnd!,
+                  }),
+                )
+                .instruction(),
+            ];
+          }
+
+          if (delegation === "extend") {
+            return [
               await hsdProgram.methods
                 .extendExpirationTsV0()
                 .accountsStrict(
                   extendExpirationAccounts({
                     ...positionAccountArgs(info),
-                    subDao: delegatedPositionAcc.subDao,
-                    expirationTs: delegatedPositionAcc.expirationTs,
-                    seasonEndTs: seasonEnd,
+                    subDao: delegatedPositionAcc!.subDao,
+                    expirationTs: delegatedPositionAcc!.expirationTs,
+                    seasonEndTs: seasonEnd!,
+                  }),
+                )
+                .instruction(),
+            ];
+          }
+
+          return [];
+        };
+
+        const claimBotArgs = {
+          wallet: walletPubkey,
+          taskQueue: TASK_QUEUE,
+          position: positionPubkey,
+          positionMint: positionMintPubkey,
+          delegatedPosition: delegatedPosKey,
+          delegationClaimBot: claimBotKey,
+        };
+
+        const buildAutomation = async (): Promise<TransactionInstruction[]> => {
+          if (!automationEnabled) {
+            if (!plan.closesClaimBot) {
+              return [];
+            }
+
+            return [
+              await hplCronsProgram.methods
+                .closeDelegationClaimBotV0()
+                .accountsStrict(
+                  closeDelegationClaimBotAccounts({
+                    ...claimBotArgs,
+                    nextTask: claimBot!.nextTask,
+                    rentRefund: claimBot!.rentRefund,
+                  }),
+                )
+                .instruction(),
+            ];
+          }
+
+          const instructions: TransactionInstruction[] = [];
+
+          if (plan.createsClaimBot) {
+            instructions.push(
+              await hplCronsProgram.methods
+                .initDelegationClaimBotV0()
+                .accountsStrict(initDelegationClaimBotAccounts(claimBotArgs))
+                .instruction(),
+              SystemProgram.transfer({
+                fromPubkey: walletPubkey,
+                toPubkey: claimBotKey,
+                lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
+              }),
+            );
+          }
+
+          if (plan.taskId !== null) {
+            const task = taskKey(TASK_QUEUE, plan.taskId)[0];
+            instructions.push(
+              await hplCronsProgram.methods
+                .startDelegationClaimBotV1({ taskId: plan.taskId })
+                .accountsStrict(
+                  startDelegationClaimBotAccounts({
+                    ...claimBotArgs,
+                    task,
+                    nextTask:
+                      !claimBot || claimBot.nextTask.equals(PublicKey.default)
+                        ? task
+                        : claimBot.nextTask,
+                    rentRefund: claimBot?.rentRefund || walletPubkey,
+                    subDao: subDaoK,
+                    dao: subDaoAcc.dao,
+                    hntMint: HNT_MINT,
                   }),
                 )
                 .instruction(),
             );
           }
-        }
-      }
 
+          return instructions;
+        };
+
+        const [delegationInstructions, automationInstructions] =
+          await Promise.all([buildDelegation(), buildAutomation()]);
+
+        return { delegationInstructions, automationInstructions };
+      }),
+    );
+
+    for (const {
+      delegationInstructions,
+      automationInstructions,
+    } of builtPerPosition) {
       if (delegationInstructions.length > 0) {
         allGroups.push({
           instructions: delegationInstructions,
@@ -490,115 +634,6 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
             description: "Delegate position to sub-DAO",
           },
         });
-      }
-
-      const automationInstructions: TransactionInstruction[] = [];
-
-      const delegationClaimBotK = delegationClaimBotKey(
-        TASK_QUEUE,
-        delegatedPosKey,
-      )[0];
-      const delegationClaimBot =
-        await hplCronsProgram.account.delegationClaimBotV0.fetchNullable(
-          delegationClaimBotK,
-        );
-
-      if (automationEnabled) {
-        if (
-          delegatedPositionAcc &&
-          delegatedPositionAcc.lastClaimedEpoch.toNumber() < HNT_EPOCH &&
-          !info.needsChange
-        ) {
-          throw errors.BAD_REQUEST({
-            message:
-              "Must claim IOT/MOBILE delegation rewards before enabling automation",
-          });
-        }
-
-        if (!delegationClaimBot) {
-          newClaimBots++;
-          automationInstructions.push(
-            await hplCronsProgram.methods
-              .initDelegationClaimBotV0()
-              .accountsPartial({
-                delegatedPosition: delegatedPosKey,
-                position: positionPubkey,
-                taskQueue: TASK_QUEUE,
-                mint: positionMintPubkey,
-                positionTokenAccount: getAssociatedTokenAddressSync(
-                  positionMintPubkey,
-                  walletPubkey,
-                  true,
-                ),
-              })
-              .instruction(),
-          );
-
-          automationInstructions.push(
-            SystemProgram.transfer({
-              fromPubkey: walletPubkey,
-              toPubkey: delegationClaimBotK,
-              lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
-            }),
-          );
-        }
-
-        if (taskQueueAcc) {
-          const nextAvailable = reservedTaskIds[nextReservedTaskIdIndex++];
-          const task = taskKey(TASK_QUEUE, nextAvailable)[0];
-
-          automationInstructions.push(
-            await hplCronsProgram.methods
-              .startDelegationClaimBotV1({
-                taskId: nextAvailable,
-              })
-              .accountsPartial({
-                delegationClaimBot: delegationClaimBotK,
-                subDao: subDaoK,
-                mint: positionMintPubkey,
-                hntMint: HNT_MINT,
-                positionAuthority: walletPubkey,
-                positionTokenAccount: getAssociatedTokenAddressSync(
-                  positionMintPubkey,
-                  walletPubkey,
-                  true,
-                ),
-                taskQueue: TASK_QUEUE,
-                delegatedPosition: delegatedPosKey,
-                systemProgram: SystemProgram.programId,
-                delegatorAta: getAssociatedTokenAddressSync(
-                  HNT_MINT,
-                  walletPubkey,
-                  true,
-                ),
-                task,
-                nextTask:
-                  !delegationClaimBot ||
-                  delegationClaimBot.nextTask.equals(PublicKey.default)
-                    ? task
-                    : delegationClaimBot.nextTask,
-                rentRefund: delegationClaimBot?.rentRefund || walletPubkey,
-              })
-              .instruction(),
-          );
-        }
-      } else if (delegationClaimBot) {
-        automationInstructions.push(
-          await hplCronsProgram.methods
-            .closeDelegationClaimBotV0()
-            .accountsPartial({
-              delegationClaimBot: delegationClaimBotK,
-              taskQueue: TASK_QUEUE,
-              position: positionPubkey,
-              delegatedPosition: delegatedPosKey,
-              positionTokenAccount: getAssociatedTokenAddressSync(
-                positionMintPubkey,
-                walletPubkey,
-                true,
-              ),
-            })
-            .instruction(),
-        );
       }
 
       if (automationInstructions.length > 0) {
