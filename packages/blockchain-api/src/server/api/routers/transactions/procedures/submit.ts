@@ -15,8 +15,10 @@ import {
 import { predictSubmissionType } from "@/lib/utils/submission-helpers";
 import { verifiedFeePayer } from "@/lib/utils/transaction-payer";
 import { v4 as uuidv4 } from "uuid";
+import { deriveLastValidBlockHeight } from "@/lib/utils/blockhash-expiry";
 import {
   JitoMissingTipError,
+  probeBlockhashValidity,
   SingleTransactionSubmissionError,
   submitTransactionBatch,
 } from "@/lib/utils/transaction-submission";
@@ -224,10 +226,53 @@ export const submit = publicProcedure.transactions.submit.handler(
       });
     }
 
+    let transactionBlockhashes: string[];
+    try {
+      transactionBlockhashes = transactions.map(
+        (tx) =>
+          VersionedTransaction.deserialize(
+            Buffer.from(tx.serializedTransaction, "base64"),
+          ).message.recentBlockhash,
+      );
+    } catch {
+      throw errors.BAD_REQUEST({
+        message: "Failed to decode transaction",
+      });
+    }
+
+    // A transaction only lands while its own blockhash is in range. A bundle
+    // the user took too long to sign is already dead on arrival: submitting it
+    // draws "bundle contains an expired blockhash" from Jito and then sits in
+    // the resubmission loop until its retry cap. Reject it here so the client
+    // can rebuild and re-sign, and so the recorded lifetime always belongs to a
+    // blockhash the cluster still accepts.
+    const connection = new Connection(env.SOLANA_RPC_URL);
+    const [latestBlockhash, blockhashValidity] = await Promise.all([
+      connection.getLatestBlockhash({ commitment: "finalized" }),
+      probeBlockhashValidity(connection, transactionBlockhashes),
+    ]);
+
+    const lastValidBlockHeights = transactionBlockhashes.map((blockhash) =>
+      deriveLastValidBlockHeight({
+        blockhashValid: blockhashValidity.get(blockhash) ?? true,
+        latestLastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      }),
+    );
+
+    const expiredIndex = lastValidBlockHeights.findIndex(
+      (height) => height === undefined,
+    );
+    if (expiredIndex >= 0) {
+      throw errors.BLOCKHASH_EXPIRED({
+        data: {
+          blockhash: transactionBlockhashes[expiredIndex],
+          failedTransactionIndex: expiredIndex,
+        },
+      });
+    }
+
     // Simulate transactions before submission (except for sequential batches)
     if (simulate && (parallel || transactions.length === 1)) {
-      const connection = new Connection(env.SOLANA_RPC_URL);
-
       const simulationPromises = transactions.map(async (tx, index) => {
         try {
           const transaction = VersionedTransaction.deserialize(
@@ -442,7 +487,6 @@ export const submit = publicProcedure.transactions.submit.handler(
 
       if (error instanceof BundleSimulationError) {
         if (error.category === "account_not_found") {
-          const connection = new Connection(env.SOLANA_RPC_URL);
           const balance = await connection.getBalance(new PublicKey(payer));
           if (balance === 0) {
             throw errors.SIMULATION_FAILED({
@@ -467,11 +511,6 @@ export const submit = publicProcedure.transactions.submit.handler(
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-
-    const connection = new Connection(env.SOLANA_RPC_URL);
-    const { lastValidBlockHeight } = await connection.getLatestBlockhash({
-      commitment: "finalized",
-    });
 
     // Use database transaction to ensure data consistency
     const dbTransaction = await sequelize.transaction();
@@ -509,16 +548,11 @@ export const submit = publicProcedure.transactions.submit.handler(
       const pendingTransactionPromises = transactions.map(async (txData, i) => {
         const signature = result.signatures?.[i] || null;
 
-        // Decode transaction to get blockhash
-        const transaction = VersionedTransaction.deserialize(
-          Buffer.from(txData.serializedTransaction, "base64"),
-        );
-
         return PendingTransaction.create(
           {
             signature: signature || `${batchId}-${i}`,
-            blockhash: transaction.message.recentBlockhash,
-            lastValidBlockHeight,
+            blockhash: transactionBlockhashes[i],
+            lastValidBlockHeight: lastValidBlockHeights[i],
             status: "pending",
             type: txData.metadata?.type || "batch",
             batchId,

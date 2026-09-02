@@ -6,12 +6,16 @@ import { env } from "../env";
 import { defineAssociations } from "../models/associations";
 import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
+import { decideBatchExpiry } from "./blockhash-expiry";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import {
   DEFAULT_MAX_RESUBMISSIONS,
   resubmissionBackoffMs,
 } from "./resubmission-backoff";
-import { submitTransactionBatch } from "./transaction-submission";
+import {
+  probeBlockhashValidity,
+  submitTransactionBatch,
+} from "./transaction-submission";
 import { checkAndUpdateBatchStatus } from "./transaction-status-checker";
 
 // A batch that has been pending this long has either landed/failed on-chain
@@ -27,6 +31,8 @@ export interface ResubmissionResult {
   batchId: string;
   /** The batch lost the atomic claim: another replica holds it, it is inside its backoff window / past its retry cap, or it is no longer pending. Expected, not a failure. */
   ineligible?: boolean;
+  /** The batch's blockhash is out of range, so it was marked expired instead of resubmitted. Expected, not a failure. */
+  expired?: boolean;
 }
 
 /**
@@ -200,6 +206,35 @@ export async function resubmitTransactionBatch(
   if (batch.lastResubmittedAt && batch.lastResubmittedAt > cutoff) {
     return ineligible;
   }
+
+  // A batch is resubmitted with the blockhashes it was signed with, so once one
+  // of them leaves range the batch can never land: retrying it burns retry
+  // slots and draws "bundle contains an expired blockhash" from Jito. Checked
+  // before the claim below so a dead batch never consumes a retry slot, and it
+  // is expired rather than left pending so the (tag, payer) lock is released.
+  const connection = new Connection(env.SOLANA_RPC_URL);
+  const [currentBlockHeight, blockhashValidity] = await Promise.all([
+    connection.getBlockHeight("confirmed"),
+    probeBlockhashValidity(
+      connection,
+      pendingTransactions.flatMap((tx) => (tx.blockhash ? [tx.blockhash] : [])),
+    ),
+  ]);
+  const expiry = decideBatchExpiry({
+    transactions: pendingTransactions,
+    currentBlockHeight,
+    blockhashValidity,
+  });
+  if (expiry.expired) {
+    await expirePendingBatch(batch);
+    return {
+      success: false,
+      error: expiry.reason,
+      batchId: batch.id,
+      expired: true,
+    };
+  }
+
   const [claimed] = await TransactionBatch.update(
     {
       resubmissionCount: sequelize.literal("resubmission_count + 1"),

@@ -1,4 +1,4 @@
-import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { Commitment, Connection, VersionedTransaction } from "@solana/web3.js";
 import { env } from "../env";
 import { v4 as uuidv4 } from "uuid";
 import bs58 from "bs58";
@@ -72,6 +72,38 @@ async function bundleHasTipAccount(
         message.isAccountWritable(i) && tipAccounts.has(key.toBase58()),
     ),
   );
+}
+
+/**
+ * Ask the cluster which of these blockhashes it still accepts. One request per
+ * distinct blockhash — a batch normally shares one. A blockhash the RPC fails
+ * to answer for is left out of the result so the caller falls back to the
+ * lifetime it recorded instead of guessing.
+ */
+export async function probeBlockhashValidity(
+  connection: Connection,
+  blockhashes: readonly string[],
+  commitment: Commitment = "confirmed",
+): Promise<Map<string, boolean>> {
+  const validity = new Map<string, boolean>();
+
+  await Promise.all(
+    [...new Set(blockhashes)].map(async (blockhash) => {
+      try {
+        const { value } = await connection.isBlockhashValid(blockhash, {
+          commitment,
+        });
+        validity.set(blockhash, value);
+      } catch (error) {
+        console.warn(
+          `[probeBlockhashValidity] Failed to check blockhash ${blockhash}:`,
+          error,
+        );
+      }
+    }),
+  );
+
+  return validity;
 }
 
 function isBlockhashNotFoundError(error: unknown): boolean {

@@ -402,7 +402,10 @@ export async function submitJitoBundle(
 
     return result.result;
   } catch (error) {
-    console.error("Jito bundle submission failed:", error);
+    console.error(
+      `Jito bundle submission failed (tag=${context?.tag ?? "none"}):`,
+      error
+    );
 
     throw new JitoBundleSubmissionError(
       `Jito bundle submission failed: ${
