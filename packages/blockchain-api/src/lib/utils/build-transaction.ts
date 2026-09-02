@@ -35,6 +35,12 @@ export interface TransactionDraft {
   instructions: TransactionInstruction[];
   feePayer: PublicKey;
   addressLookupTableAddresses?: PublicKey[];
+  // Already-resolved lookup tables and blockhash. Both are the same answer for
+  // every transaction a multi-transaction build produces, so a caller that
+  // builds several passes them in once instead of paying a round trip per
+  // transaction.
+  addressLookupTables?: AddressLookupTableAccount[];
+  recentBlockhash?: string;
 }
 
 export interface BuildTransactionOptions {
@@ -71,7 +77,9 @@ export async function buildVersionedTransaction({
   // withPriorityFees doesn't need a blockhash (simulation replaces it), so
   // fetch it concurrently with fee/CU estimation. Observe now so an early
   // throw below doesn't leave an unhandled rejection.
-  const blockhashPromise = connection.getLatestBlockhash("finalized");
+  const blockhashPromise = draftWithLuts.recentBlockhash
+    ? Promise.resolve({ blockhash: draftWithLuts.recentBlockhash })
+    : connection.getLatestBlockhash("finalized");
   blockhashPromise.catch(() => {});
 
   let instructionsWithFees: TransactionInstruction[];
@@ -79,10 +87,12 @@ export async function buildVersionedTransaction({
   try {
     // Resolve LUTs once; withPriorityFees and the compile below both skip
     // their own fetch when addressLookupTables is already populated.
-    addressLookupTables = await getAddressLookupTableAccounts(
-      connection,
-      draftWithLuts.addressLookupTableAddresses,
-    );
+    addressLookupTables =
+      draftWithLuts.addressLookupTables ??
+      (await getAddressLookupTableAccounts(
+        connection,
+        draftWithLuts.addressLookupTableAddresses,
+      ));
     instructionsWithFees = await withPriorityFees({
       ...draftWithLuts,
       addressLookupTables,

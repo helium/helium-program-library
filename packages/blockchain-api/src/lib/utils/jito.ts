@@ -13,7 +13,7 @@ import { createTtlCache } from "./ttl-cache";
 
 export function shouldUseJitoBundle(
   transactionsLength: number,
-  cluster: string
+  cluster: string,
 ): boolean {
   return (
     (cluster === "mainnet" || cluster === "mainnet-beta") &&
@@ -23,7 +23,7 @@ export function shouldUseJitoBundle(
 
 export async function jitoBlockEngineRequest(
   method: string,
-  params: unknown[]
+  params: unknown[],
 ): Promise<Response> {
   return fetch(`${env.JITO_BLOCK_ENGINE_URL}/api/v1/bundles`, {
     method: "POST",
@@ -42,7 +42,7 @@ export async function jitoBlockEngineRequest(
 
 async function jitoRpcRequest(
   method: string,
-  params: unknown[]
+  params: unknown[],
 ): Promise<Response> {
   return fetch(env.SOLANA_RPC_URL, {
     method: "POST",
@@ -97,12 +97,12 @@ async function resolveJitoTipAccount(): Promise<string> {
     console.warn(
       `Failed to fetch Jito tip accounts, using fallback: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
 
     if (!env.JITO_TIP_ACCOUNT) {
       throw new Error(
-        "Failed to fetch Jito tip accounts and JITO_TIP_ACCOUNT fallback not configured"
+        "Failed to fetch Jito tip accounts and JITO_TIP_ACCOUNT fallback not configured",
       );
     }
     return env.JITO_TIP_ACCOUNT;
@@ -114,7 +114,7 @@ export function getJitoTipAmountLamports(): number {
 }
 
 export async function getJitoTipInstruction(
-  wallet: PublicKey
+  wallet: PublicKey,
 ): Promise<TransactionInstruction> {
   const tipAccount = await resolveJitoTipAccount();
 
@@ -166,7 +166,7 @@ export class BundleSimulationError extends Error {
 
   constructor(fields: BundleSimulationErrorFields) {
     super(
-      `Jito bundle simulation failed [${fields.category}] (${fields.actionType}): ${fields.detail}`
+      `Jito bundle simulation failed [${fields.category}] (${fields.actionType}): ${fields.detail}`,
     );
     this.name = "BundleSimulationError";
     this.category = fields.category;
@@ -205,7 +205,7 @@ export class JitoBundleSubmissionError extends Error {
       payer?: string;
       transactionMetadata?: Array<Record<string, unknown> | undefined>;
     },
-    cause?: unknown
+    cause?: unknown,
   ) {
     super(message);
     this.name = "JitoBundleSubmissionError";
@@ -249,13 +249,13 @@ function deriveActionType(context?: JitoBundleContext): string {
 
 export async function simulateJitoBundle(
   serializedTransactions: string[],
-  context?: JitoBundleContext
+  context?: JitoBundleContext,
 ): Promise<void> {
   const deserializedTxs = serializedTransactions.map((tx) =>
-    VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
+    VersionedTransaction.deserialize(Buffer.from(tx, "base64")),
   );
   const base64Txs = deserializedTxs.map((transaction) =>
-    Buffer.from(transaction.serialize()).toString("base64")
+    Buffer.from(transaction.serialize()).toString("base64"),
   );
 
   const nullConfigs = base64Txs.map(() => null);
@@ -286,7 +286,7 @@ export async function simulateJitoBundle(
 
   if (!response.ok) {
     throw new Error(
-      `simulateBundle HTTP ${response.status}: ${JSON.stringify(rpcResponse)}`
+      `simulateBundle HTTP ${response.status}: ${JSON.stringify(rpcResponse)}`,
     );
   }
 
@@ -294,7 +294,7 @@ export async function simulateJitoBundle(
     throw new Error(
       `simulateBundle RPC error: ${
         rpcResponse.error.message || JSON.stringify(rpcResponse.error)
-      }`
+      }`,
     );
   }
 
@@ -330,9 +330,9 @@ export async function simulateJitoBundle(
             (r, i) =>
               `  tx[${i}]: error=${JSON.stringify(r.err ?? null)}, ` +
               `unitsConsumed=${r.unitsConsumed ?? "N/A"}\n` +
-              (r.logs ?? []).map((l) => `    ${l}`).join("\n")
+              (r.logs ?? []).map((l) => `    ${l}`).join("\n"),
           )
-          .join("\n")
+          .join("\n"),
     );
 
     throw new BundleSimulationError({
@@ -367,13 +367,13 @@ export async function simulateJitoBundle(
 
 export async function submitJitoBundle(
   serializedTransactions: string[],
-  context?: JitoBundleContext
+  context?: JitoBundleContext,
 ): Promise<string> {
   const deserializedTxs = serializedTransactions.map((tx) =>
-    VersionedTransaction.deserialize(Buffer.from(tx, "base64"))
+    VersionedTransaction.deserialize(Buffer.from(tx, "base64")),
   );
   const transactions = deserializedTxs.map((transaction) =>
-    Buffer.from(transaction.serialize()).toString("base64")
+    Buffer.from(transaction.serialize()).toString("base64"),
   );
 
   try {
@@ -385,8 +385,8 @@ export async function submitJitoBundle(
     if (!response.ok) {
       throw new Error(
         `HTTP error! status: ${response.status}: ${JSON.stringify(
-          await response.json()
-        )}`
+          await response.json(),
+        )}`,
       );
     }
 
@@ -396,7 +396,7 @@ export async function submitJitoBundle(
       throw new Error(
         `Jito API error: ${
           result.error.message || JSON.stringify(result.error)
-        }`
+        }`,
       );
     }
 
@@ -404,7 +404,7 @@ export async function submitJitoBundle(
   } catch (error) {
     console.error(
       `Jito bundle submission failed (tag=${context?.tag ?? "none"}):`,
-      error
+      error,
     );
 
     throw new JitoBundleSubmissionError(
@@ -431,13 +431,16 @@ export async function submitJitoBundle(
         payer: context?.payer,
         transactionMetadata: context?.transactionMetadata,
       },
-      error
+      error,
     );
   }
 }
 
 export async function getJitoTipTransaction(
-  wallet: PublicKey
+  wallet: PublicKey,
+  // The blockhash the rest of the bundle was built on. Passing it saves a
+  // round trip and keeps the tip's expiry in step with the bundle it tips.
+  recentBlockhash?: string,
 ): Promise<VersionedTransaction> {
   const tipAccount = await resolveJitoTipAccount();
 
@@ -455,9 +458,10 @@ export async function getJitoTipTransaction(
           }),
         ],
         feePayer: wallet,
+        recentBlockhash,
       },
-      "finalized"
-    )
+      "finalized",
+    ),
   );
 }
 

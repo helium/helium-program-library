@@ -94,11 +94,20 @@ async function buildOrSplit(
   connection: Connection,
   feePayer: PublicKey,
   useTableComputeUnits: boolean,
+  shared: {
+    addressLookupTables: AddressLookupTableAccount[];
+    blockhash: string;
+  },
 ): Promise<BuiltTransaction[]> {
   try {
     const tx = await buildVersionedTransaction({
       connection,
-      draft: { instructions, feePayer },
+      draft: {
+        instructions,
+        feePayer,
+        addressLookupTables: shared.addressLookupTables,
+        recentBlockhash: shared.blockhash,
+      },
       signers: signers.length > 0 ? signers : undefined,
       useTableComputeUnits,
     });
@@ -118,6 +127,7 @@ async function buildOrSplit(
           connection,
           feePayer,
           useTableComputeUnits,
+          shared,
         ),
         buildOrSplit(
           instructions.slice(mid),
@@ -126,6 +136,7 @@ async function buildOrSplit(
           connection,
           feePayer,
           useTableComputeUnits,
+          shared,
         ),
       ]);
       return [...first, ...second];
@@ -166,8 +177,12 @@ export async function buildBatchedTransactions({
   const isMainnet = cluster === "mainnet" || cluster === "mainnet-beta";
   const effectiveMaxTxs = isMainnet ? maxTxs - 1 : maxTxs;
 
-  const addressLookupTables = await getAddressLookupTableAccounts(connection, [
-    getHeliumLookupTable(),
+  // The same lookup table and blockhash go into every transaction this call
+  // produces, so both are read once here and handed to each build. Read per
+  // transaction they were N round trips for one answer.
+  const [addressLookupTables, { blockhash }] = await Promise.all([
+    getAddressLookupTableAccounts(connection, [getHeliumLookupTable()]),
+    connection.getLatestBlockhash("finalized"),
   ]);
 
   const packedBatches: {
@@ -281,6 +296,7 @@ export async function buildBatchedTransactions({
           connection,
           feePayer,
           useTableComputeUnits,
+          { addressLookupTables, blockhash },
         ),
       ),
     )
@@ -293,7 +309,7 @@ export async function buildBatchedTransactions({
   const versionedTransactions = built.map(({ tx }) => tx);
 
   if (shouldUseJitoBundle(transactions.length, cluster)) {
-    const tipTx = await getJitoTipTransaction(feePayer);
+    const tipTx = await getJitoTipTransaction(feePayer, blockhash);
     transactions.push({
       serializedTransaction: serializeTransaction(tipTx),
       metadata: { type: "jito_tip", description: "Jito bundle tip" },
