@@ -419,7 +419,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
      * below run concurrently, so a rejection there would surface whichever
      * position's RPC happened to finish first; every rejection this endpoint
      * owns is raised here instead, in position order and delegation before
-     * automation, exactly as the serial loop raised them.
+     * automation.
      */
     const positionPlans = positionInfos.map((info, index) => {
       const { positionAcc, delegatedPositionAcc, proxyConfig } = info;
@@ -477,8 +477,8 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     ).length;
 
     // Nothing one position builds depends on another's, so all of them build
-    // at once. Serially this was one round trip of instruction building per
-    // position, and the endpoint is routinely asked for dozens.
+    // at once: this endpoint is routinely asked for dozens of positions, and
+    // one round trip of instruction building each would run end to end.
     const builtPerPosition = await Promise.all(
       positionPlans.map(async (plan) => {
         const { info, seasonEnd, delegation, claimBot, claimBotKey } = plan;

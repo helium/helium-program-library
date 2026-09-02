@@ -214,9 +214,9 @@ export async function buildClaimInstructions(
 
   const rewardMintSet = new Set<string>();
 
-  // One batch's epoch infos do not depend on any other batch's, so all of them
-  // are read at once. Awaiting them batch by batch put the whole claim's round
-  // trips end to end, which is where a five-batch claim spent most of its time.
+  // One batch's epoch infos do not depend on any other batch's, so every
+  // batch's reads go out at once rather than end to end: a multi-batch claim
+  // spends most of its time in these round trips.
   const builtChunks = await Promise.all(
     chunks(allEpochsToClaim, EPOCHS_PER_BATCH).map(async (chunk) => {
       const unclaimableEpochs: ClaimInstructionsResult["unclaimableEpochs"] =
