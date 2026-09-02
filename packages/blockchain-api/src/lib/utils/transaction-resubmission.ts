@@ -228,13 +228,17 @@ export async function resubmitTransactionBatch(
       (tx) => tx.serializedTransaction!,
     );
 
-    // Use the existing submission logic with the same parameters as the original batch
+    // Use the existing submission logic with the same parameters as the original
+    // batch, including the path it took: re-deciding would send a batch that
+    // first went out over plain RPC as a Jito bundle, which Jito then rejects
+    // for containing an already-processed transaction.
     const submissionResult = await submitTransactionBatch({
       transactions: serializedTransactions,
       parallel: batch.parallel,
       tag: batch.tag,
       payer: batch.payer,
       transactionMetadata: pendingTransactions.map((tx) => tx.metadata),
+      submissionType: batch.submissionType,
     });
 
     // Update the pending transactions with new signatures
@@ -254,6 +258,18 @@ export async function resubmitTransactionBatch(
           );
         }
       }
+
+      // Keep the batch row describing the submission that is actually in
+      // flight, so a status check reads the resubmitted bundle's id rather than
+      // the first attempt's. Silent so updated_at stays the stale-batch
+      // reaper's clock and a resubmitting batch cannot outrun it.
+      await batch.update(
+        {
+          submissionType: submissionResult.submissionType,
+          jitoBundleId: submissionResult.jitoBundleId ?? batch.jitoBundleId,
+        },
+        { transaction: dbTransaction, silent: true },
+      );
 
       await dbTransaction.commit();
 

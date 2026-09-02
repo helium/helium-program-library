@@ -12,6 +12,7 @@ import {
   getJitoTipAccounts,
 } from "./jito";
 import { isBundleLanded, isClientCraftedBundleTag } from "./submission-helpers";
+import type { SubmissionType } from "../models/transaction-batch";
 
 export class SingleTransactionSubmissionError extends Error {
   public readonly explorerLink: string | null;
@@ -109,11 +110,19 @@ export interface TransactionBatchPayload {
   tag?: string;
   payer?: string;
   transactionMetadata?: Array<Record<string, unknown> | undefined>;
+  /**
+   * Pin the submission path to the one this batch already took. Set on
+   * resubmission: a batch first submitted over plain RPC (a client-crafted
+   * bundle with no Jito tip, or a non-mainnet cluster) must never come back as
+   * a Jito bundle, or Jito rejects its already-processed transactions and the
+   * batch resubmits forever.
+   */
+  submissionType?: SubmissionType;
 }
 
 export interface BatchSubmissionResult {
   batchId: string;
-  submissionType: "single" | "parallel" | "sequential" | "jito_bundle";
+  submissionType: SubmissionType;
   signatures?: string[];
   jitoBundleId?: string;
 }
@@ -216,8 +225,14 @@ export async function submitTransactionBatch(
       };
     };
 
-    // Multiple transactions
-    if (shouldUseJitoBundle(payload.transactions.length, cluster)) {
+    // Multiple transactions. A pinned submission type decides the path on its
+    // own; only a fresh submission gets to pick.
+    const useJitoBundle =
+      payload.submissionType === undefined
+        ? shouldUseJitoBundle(payload.transactions.length, cluster)
+        : payload.submissionType === "jito_bundle";
+
+    if (useJitoBundle) {
       const bundleTransactions = payload.transactions.map((tx) =>
         VersionedTransaction.deserialize(Buffer.from(tx, "base64")),
       );

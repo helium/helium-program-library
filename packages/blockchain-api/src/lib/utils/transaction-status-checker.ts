@@ -1,4 +1,4 @@
-import { Connection, VersionedTransactionResponse } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
 import { env } from "../env";
 import { jitoBlockEngineRequest } from "./jito";
 import PendingTransaction, {
@@ -6,11 +6,12 @@ import PendingTransaction, {
 } from "../models/pending-transaction";
 import TransactionBatch, { BatchStatus } from "../models/transaction-batch";
 import { sequelize } from "../db";
+import { decideBatchStatus } from "./batch-status";
+import type { MinimalSignatureStatus } from "./submission-helpers";
 
 export interface TransactionStatusResult {
   signature: string;
   status: TransactionStatus;
-  transaction: VersionedTransactionResponse | null;
 }
 
 export interface BatchStatusResult {
@@ -22,59 +23,42 @@ export interface BatchStatusResult {
 }
 
 /**
- * Check the status of a single transaction
+ * Read the cluster's view of every signature that still needs one, in a single
+ * call. `searchTransactionHistory` matters: without it the production RPC
+ * answers null for a signature that confirmed moments ago, which used to leave
+ * a landed batch pending and resubmitting.
+ *
+ * Placeholder signatures (`${batchId}-${index}`) were never sent, and rows that
+ * already reached a terminal status are not re-read — a signature the cluster
+ * has aged out must not un-confirm a row.
  */
-export async function checkTransactionStatus(
-  pendingTx: PendingTransaction,
-  batch: TransactionBatch,
+async function fetchSignatureStatuses(
   connection: Connection,
-  commitment: "confirmed" | "finalized" = "confirmed",
-  currentBlockHeight?: number
-): Promise<TransactionStatusResult> {
-  let txStatus: TransactionStatus = pendingTx.status;
-  let transaction = null;
+  batch: TransactionBatch,
+  transactions: PendingTransaction[],
+): Promise<Map<string, MinimalSignatureStatus | null>> {
+  const signatures = transactions
+    .filter(
+      (tx) => tx.status === "pending" && !tx.signature.startsWith(batch.id),
+    )
+    .map((tx) => tx.signature);
 
-  // Skip checking if signature is still a placeholder (batch ID format)
-  if (!pendingTx.signature.startsWith(batch.id)) {
-    // Check transaction status on-chain
-    const tx = await connection.getTransaction(pendingTx.signature, {
-      maxSupportedTransactionVersion: 0,
-      commitment,
-    });
-
-    if (tx && tx.meta?.err) {
-      txStatus = "failed";
-    } else if (tx) {
-      txStatus = "confirmed";
-      transaction = tx;
-      // Note: notifyIndexers is called outside the transaction to avoid aborting it
-    } else {
-      // Check if blockhash has expired by comparing block heights
-      if (pendingTx.lastValidBlockHeight && currentBlockHeight !== undefined) {
-        if (currentBlockHeight > pendingTx.lastValidBlockHeight) {
-          txStatus = "expired";
-        } else {
-          txStatus = "pending";
-        }
-      } else {
-        // Fallback for old records without lastValidBlockHeight
-        txStatus = "expired";
-      }
-    }
+  if (signatures.length === 0) {
+    return new Map();
   }
 
-  return {
-    signature: pendingTx.signature,
-    status: txStatus,
-    transaction,
-  };
+  const { value } = await connection.getSignatureStatuses(signatures, {
+    searchTransactionHistory: true,
+  });
+
+  return new Map(signatures.map((signature, i) => [signature, value[i]]));
 }
 
 /**
  * Check Jito bundle status
  */
 export async function checkJitoBundleStatus(
-  batch: TransactionBatch
+  batch: TransactionBatch,
 ): Promise<{ status: BatchStatus; jitoBundleStatus?: any }> {
   let batchStatus: BatchStatus = "pending";
   let jitoBundleStatus = null;
@@ -83,7 +67,7 @@ export async function checkJitoBundleStatus(
     try {
       const response = await jitoBlockEngineRequest(
         "getInflightBundleStatuses",
-        [[batch.jitoBundleId]]
+        [[batch.jitoBundleId]],
       );
 
       if (response.ok) {
@@ -115,98 +99,58 @@ export async function checkJitoBundleStatus(
  */
 export async function checkAndUpdateBatchStatus(
   batch: TransactionBatch,
-  commitment: "confirmed" | "finalized" = "confirmed"
+  commitment: "confirmed" | "finalized" = "confirmed",
 ): Promise<BatchStatusResult> {
   const connection = new Connection(env.SOLANA_RPC_URL);
-  const transactions = batch.transactions || [];
 
-  let batchStatus: BatchStatus = "pending";
-  let confirmedCount = 0;
-  let failedCount = 0;
   const dbTransaction = await sequelize.transaction();
 
   try {
+    // Every row of the batch, not just the still-pending ones a caller happened
+    // to load: the batch rollup below is over the whole batch, so a batch whose
+    // other transactions already confirmed rolls up to "partial", not "failed".
+    const transactions = await PendingTransaction.findAll({
+      where: { batchId: batch.id },
+      transaction: dbTransaction,
+    });
+
     // Fetch current block height once for all expiry checks
     const currentBlockHeight = await connection.getBlockHeight({ commitment });
 
     // Check Jito bundle status first
     const jitoResult = await checkJitoBundleStatus(batch);
-    batchStatus = jitoResult.status;
     const jitoBundleStatus = jitoResult.jitoBundleStatus;
 
-    // Check individual transaction statuses
-    // Only catch network errors from checkTransactionStatus - database errors will naturally abort the transaction
-    const transactionStatusPromises = transactions.map(
-      async (pendingTx: PendingTransaction) => {
-        try {
-          const result = await checkTransactionStatus(
-            pendingTx,
-            batch,
-            connection,
-            commitment,
-            currentBlockHeight
-          );
-
-          // Count statuses
-          if (result.status === "confirmed") {
-            confirmedCount++;
-          } else if (
-            result.status === "failed" ||
-            result.status === "expired"
-          ) {
-            failedCount++;
-          }
-
-          // Update transaction status in database
-          // If this fails, it will abort the transaction and bubble up to outer catch
-          if (result.status !== pendingTx.status) {
-            pendingTx.status = result.status;
-
-            if (result.status === "confirmed") {
-              pendingTx.serializedTransaction = undefined;
-              await pendingTx.save({ transaction: dbTransaction });
-            } else {
-              await pendingTx.save({ transaction: dbTransaction });
-            }
-          }
-
-          return result;
-        } catch (error) {
-          // Only catch non-database errors (network timeouts, etc.) so they don't abort the transaction
-          // Database errors will naturally abort the transaction and bubble up
-          if (
-            error &&
-            typeof error === "object" &&
-            "name" in error &&
-            error.name === "SequelizeDatabaseError"
-          ) {
-            throw error;
-          }
-          // Log network/other errors and continue with current status
-          console.error(
-            `Error checking status for transaction ${pendingTx.signature}:`,
-            error
-          );
-          return {
-            signature: pendingTx.signature,
-            status: pendingTx.status,
-            transaction: null,
-          };
-        }
-      }
+    const signatureStatuses = await fetchSignatureStatuses(
+      connection,
+      batch,
+      transactions,
     );
 
-    const transactionStatuses = await Promise.all(transactionStatusPromises);
+    const { transactionStatuses, confirmedCount, failedCount, batchStatus } =
+      decideBatchStatus({
+        batchId: batch.id,
+        transactions,
+        signatureStatuses,
+        currentBlockHeight,
+        commitment,
+        jitoBatchStatus: jitoResult.status,
+      });
 
-    // Determine overall batch status
-    if (confirmedCount === transactions.length) {
-      batchStatus = "confirmed";
-    } else if (failedCount > 0) {
-      if (confirmedCount > 0) {
-        batchStatus = "partial";
-      } else {
-        batchStatus = "failed";
+    // Persist the rows whose status moved, and remember which ones just landed
+    // so the indexers are told exactly once.
+    const newlyConfirmed: string[] = [];
+    for (const [i, pendingTx] of transactions.entries()) {
+      const status = transactionStatuses[i].status;
+      if (status === pendingTx.status) {
+        continue;
       }
+      if (status === "confirmed") {
+        newlyConfirmed.push(pendingTx.signature);
+        pendingTx.serializedTransaction = undefined;
+      }
+      pendingTx.status = status;
+      await pendingTx.save({ transaction: dbTransaction });
     }
 
     // Update batch status in database
@@ -227,17 +171,14 @@ export async function checkAndUpdateBatchStatus(
 
     // Notify indexers for confirmed transactions AFTER committing the transaction
     // This prevents indexer errors from aborting the database transaction
-    const confirmedTransactions = transactionStatuses.filter(
-      (ts) => ts.status === "confirmed" && ts.transaction !== null
-    );
-    for (const confirmedTx of confirmedTransactions) {
+    for (const signature of newlyConfirmed) {
       try {
-        await notifyIndexers(confirmedTx.signature);
+        await notifyIndexers(signature);
       } catch (error) {
         // Log but don't throw - indexer notification is not critical
         console.error(
-          `Error notifying indexers for transaction ${confirmedTx.signature}:`,
-          error
+          `Error notifying indexers for transaction ${signature}:`,
+          error,
         );
       }
     }

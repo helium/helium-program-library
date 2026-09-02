@@ -36,7 +36,6 @@ export const get = publicProcedure.transactions.get.handler(
     const storedStatuses = (batch.transactions || []).map((tx) => ({
       signature: tx.signature,
       status: tx.status,
-      transaction: null,
     }));
 
     let result: BatchStatusResult;
