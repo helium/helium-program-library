@@ -1,6 +1,6 @@
 import { HNT_MINT } from "@helium/spl-utils";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { RENT_COSTS } from "@/lib/utils/balance-validation";
 
 /**
@@ -32,6 +32,34 @@ export const DELEGATED_POSITION_SPACE = 60 + 8 + 176;
  * empty `recent_proposals`, which under-quotes the wallet by 91 bytes.
  */
 export const POSITION_SPACE = 8 + 176 + 60;
+
+/**
+ * Space `sub_dao_epoch_info` accounts are opened with in `delegate_v0`:
+ * `SubDaoEpochInfoV0::SIZE` (programs/helium-sub-daos/src/state.rs). Both the
+ * current-epoch and closing-time accounts are `init_if_needed` with the wallet
+ * as payer, so a first delegation into an epoch nobody has touched pays for
+ * them. Mainnet accounts read back at 204 bytes.
+ */
+export const SUB_DAO_EPOCH_INFO_SPACE = 204;
+
+/**
+ * Space Metaplex allocates for the token metadata `initialize_position_v0`
+ * creates alongside the position NFT, plus the flat fee Token Metadata has
+ * charged on create since v1.10. Neither is derivable from an IDL in this
+ * repo; both are the values the accounts and the wallet actually move on
+ * mainnet (metadata reads back at 607 bytes).
+ */
+export const TOKEN_METADATA_SPACE = 607;
+export const TOKEN_METADATA_CREATE_FEE = 0.01 * LAMPORTS_PER_SOL;
+
+/**
+ * Space tuktuk allocates for the task `start_delegation_claim_bot_v1` queues.
+ * `queue_task_v0` sizes a TaskV0 from the serialized transaction it carries, so
+ * this is specific to the delegation-claim task and is not the size behind
+ * `RENT_COSTS.TUKTUK_TASK` (that one is the mini-fanout task). Queued tasks
+ * also carry the task queue's `minCrankReward` on top of rent.
+ */
+export const DELEGATION_CLAIM_TASK_SPACE = 877;
 
 /**
  * Rent the delegation-automation instructions charge the wallet on top of the
@@ -67,4 +95,26 @@ export async function getAutomationRentLamports({
     newClaimBots * claimBotRent +
     (createsHntAta && !hntAtaInfo ? RENT_COSTS.ATA : 0)
   );
+}
+
+/**
+ * Rent for the `sub_dao_epoch_info` accounts `delegate_v0` opens on demand. The
+ * epoch a wallet delegates into is usually already funded by an earlier
+ * delegator, so charge only for the ones that are still missing.
+ */
+export async function getMissingEpochInfoRentLamports({
+  connection,
+  epochInfoKeys,
+}: {
+  connection: Connection;
+  epochInfoKeys: PublicKey[];
+}): Promise<number> {
+  if (epochInfoKeys.length === 0) return 0;
+
+  const [infos, rent] = await Promise.all([
+    connection.getMultipleAccountsInfo(epochInfoKeys),
+    connection.getMinimumBalanceForRentExemption(SUB_DAO_EPOCH_INFO_SPACE),
+  ]);
+
+  return infos.filter((info) => info === null).length * rent;
 }

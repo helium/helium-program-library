@@ -46,7 +46,7 @@ export function loadKeypair2FromEnv(): Keypair {
 export async function ensureFunds(
   pubkey: PublicKey,
   minLamports: number,
-  rpcUrl = getSurfpoolRpcUrl(),
+  rpcUrl = getSurfpoolRpcUrl()
 ): Promise<void> {
   const connection = new Connection(rpcUrl, "confirmed");
   const current = await connection.getBalance(pubkey);
@@ -58,7 +58,7 @@ export async function ensureFunds(
     const sig = await connection.requestAirdrop(pubkey, Math.ceil(needed));
     await connection.confirmTransaction(
       { signature: sig, blockhash, lastValidBlockHeight },
-      "confirmed",
+      "confirmed"
     );
     return;
   } catch {}
@@ -86,7 +86,7 @@ export async function setBalanceExactly(
   wallet: Keypair,
   targetLamports: number,
   funder: Keypair,
-  rpcUrl = getSurfpoolRpcUrl(),
+  rpcUrl = getSurfpoolRpcUrl()
 ): Promise<void> {
   const connection = new Connection(rpcUrl, "confirmed");
   const current = await connection.getBalance(wallet.publicKey);
@@ -150,7 +150,7 @@ export async function setTokenAccount(
   owner: PublicKey,
   mint: PublicKey,
   fields: { amount: number; state?: "frozen" },
-  rpcUrl = getSurfpoolRpcUrl(),
+  rpcUrl = getSurfpoolRpcUrl()
 ): Promise<void> {
   const res = await fetch(rpcUrl, {
     method: "POST",
@@ -188,12 +188,12 @@ export async function ensureTokenBalance(
     const rawAmount = Math.ceil(amount * Math.pow(10, decimals));
 
     console.log(
-      `Setting ${amount} tokens (${rawAmount} raw with ${decimals} decimals)`,
+      `Setting ${amount} tokens (${rawAmount} raw with ${decimals} decimals)`
     );
 
     await setTokenAccount(owner, mint, { amount: rawAmount }, rpcUrl);
     console.log(
-      `Set token balance for ${owner.toBase58()} (${ata.toBase58()}) to ${amount} tokens`,
+      `Set token balance for ${owner.toBase58()} (${ata.toBase58()}) to ${amount} tokens`
     );
   } catch (e) {
     console.warn("Failed to set token balance:", e);

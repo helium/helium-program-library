@@ -2,7 +2,10 @@ import { Connection, Keypair } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import { RENT_COSTS } from "../../src/lib/utils/balance-validation";
-import { getAutomationRentLamports } from "../../src/server/api/routers/governance/procedures/helpers/rent";
+import {
+  getAutomationRentLamports,
+  getMissingEpochInfoRentLamports,
+} from "../../src/server/api/routers/governance/procedures/helpers/rent";
 
 const wallet = Keypair.generate().publicKey;
 
@@ -107,6 +110,60 @@ describe("getAutomationRentLamports", () => {
       walletPubkey: wallet,
       newClaimBots: 0,
       createsHntAta: false,
+    });
+
+    expect(rent).to.equal(0);
+    expect(calls).to.equal(0);
+  });
+});
+
+describe("getMissingEpochInfoRentLamports", () => {
+  const epochRent = 2_310_720;
+
+  const epochConnection = (present: boolean[]): Connection =>
+    ({
+      getMultipleAccountsInfo: async () =>
+        present.map((exists) => (exists ? { lamports: 1 } : null)),
+      getMinimumBalanceForRentExemption: async (space: number) => {
+        expect(space).to.equal(204);
+        return epochRent;
+      },
+    }) as unknown as Connection;
+
+  it("charges only for the epoch-info accounts that do not exist yet", async () => {
+    const rent = await getMissingEpochInfoRentLamports({
+      connection: epochConnection([true, false]),
+      epochInfoKeys: [Keypair.generate().publicKey, Keypair.generate().publicKey],
+    });
+
+    expect(rent).to.equal(epochRent);
+  });
+
+  it("charges nothing when both already exist", async () => {
+    const rent = await getMissingEpochInfoRentLamports({
+      connection: epochConnection([true, true]),
+      epochInfoKeys: [Keypair.generate().publicKey, Keypair.generate().publicKey],
+    });
+
+    expect(rent).to.equal(0);
+  });
+
+  it("makes no RPC calls when the position is not delegated", async () => {
+    let calls = 0;
+    const connection = {
+      getMultipleAccountsInfo: async () => {
+        calls++;
+        return [];
+      },
+      getMinimumBalanceForRentExemption: async () => {
+        calls++;
+        return epochRent;
+      },
+    } as unknown as Connection;
+
+    const rent = await getMissingEpochInfoRentLamports({
+      connection,
+      epochInfoKeys: [],
     });
 
     expect(rent).to.equal(0);

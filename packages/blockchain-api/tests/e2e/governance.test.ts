@@ -2040,7 +2040,7 @@ describe("governance", () => {
     });
   });
   describe("createPosition SOL preflight", () => {
-    it("rejects a wallet below the quote and quotes the spaces the programs allocate", async () => {
+    it("quotes exactly the SOL an automated position spends", async () => {
       // #given a wallet holding HNT and the quote for an automated position
       const wallet = Keypair.generate();
       await ensureFunds(wallet.publicKey, LAMPORTS_PER_SOL);
@@ -2078,13 +2078,16 @@ describe("governance", () => {
         required,
       );
 
-      // #when a funded wallet runs the same flow
-      await ensureFunds(wallet.publicKey, LAMPORTS_PER_SOL);
+      // #when the wallet holds exactly the quote
+      await setBalanceExactly(wallet, required, ctx.payer);
       const { data, error } =
         await ctx.safeClient.governance.createPosition(request);
       if (error) {
         expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
       }
+      expect(Number(data.estimatedSolFee!.amount)).to.equal(required);
+
+      // #then the whole bundle lands on exactly that balance
       await signAndSubmitTransactionData(
         ctx.connection,
         data.transactionData,

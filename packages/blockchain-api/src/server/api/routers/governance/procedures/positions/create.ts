@@ -38,6 +38,7 @@ import {
 import BN from "bn.js";
 import {
   getTotalTransactionFees,
+  BASE_SIGNATURE_FEE_LAMPORTS,
   MIN_WALLET_RENT_LAMPORTS,
   RENT_COSTS,
 } from "@/lib/utils/balance-validation";
@@ -56,8 +57,13 @@ import {
   LockupKindType,
   buildBatchedTransactions,
   getAutomationRentLamports,
+  getMissingEpochInfoRentLamports,
   DELEGATED_POSITION_SPACE,
+  DELEGATION_CLAIM_TASK_SPACE,
   POSITION_SPACE,
+  SUB_DAO_EPOCH_INFO_SPACE,
+  TOKEN_METADATA_CREATE_FEE,
+  TOKEN_METADATA_SPACE,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
 import { canSign } from "@/lib/utils/can-sign";
@@ -171,6 +177,13 @@ export const create = publicProcedure.governance.createPosition.handler(
         .instruction(),
     );
 
+    // Rent the delegate tx may charge, only knowable while its instructions are
+    // built: the epoch-info accounts delegateV0 opens on demand, and the crank
+    // reward tuktuk moves onto a queued task.
+    const epochInfoKeys: PublicKey[] = [];
+    let queuedTaskCrankReward = 0;
+    let queuesClaimTask = false;
+
     if (subDaoMint) {
       const subDaoMintPubkey = new PublicKey(subDaoMint);
       const [delegateSubDaoK] = subDaoKey(subDaoMintPubkey);
@@ -204,6 +217,8 @@ export const create = publicProcedure.governance.createPosition.handler(
           expirationTs,
         ),
       );
+
+      epochInfoKeys.push(subDaoEpochInfo, endSubDaoEpochInfoKey);
 
       delegateInstructions.push(
         await hsdProgram.methods
@@ -270,6 +285,8 @@ export const create = publicProcedure.governance.createPosition.handler(
           await tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE);
 
         if (taskQueueAcc) {
+          queuesClaimTask = true;
+          queuedTaskCrankReward = taskQueueAcc.minCrankReward.toNumber();
           const nextAvailable = nextAvailableTaskIds(
             taskQueueAcc.taskBitmap,
             1,
@@ -354,38 +371,56 @@ export const create = publicProcedure.governance.createPosition.handler(
       });
 
     const cluster = getCluster();
-    const jitoTipCost =
+    const bundled =
       (cluster === "mainnet" || cluster === "mainnet-beta") &&
-      versionedTransactions.length > 1
-        ? getJitoTipAmountLamports()
-        : 0;
+      versionedTransactions.length > 1;
+    // The tip rides in a transaction of its own appended at submit time, so its
+    // own base fee is outside getTotalTransactionFees' view of the built txs.
+    const jitoTipCost = bundled
+      ? getJitoTipAmountLamports() + BASE_SIGNATURE_FEE_LAMPORTS
+      : 0;
     // initializePositionV0 and the delegate/automation instructions create
     // several accounts the wallet must fund rent for. Counting only the mint
     // lets a low-SOL wallet pass this check, then fail on-chain inside
     // initializePositionV0 with a System ResultWithNegativeLamports surfaced as
     // an opaque Custom(1) bundle-simulation error instead of INSUFFICIENT_FUNDS.
     const automates = Boolean(subDaoMint) && automationEnabled;
-    const [positionRent, delegatedPositionRent, automationRent] =
-      await Promise.all([
-        connection.getMinimumBalanceForRentExemption(POSITION_SPACE),
-        subDaoMint
-          ? connection.getMinimumBalanceForRentExemption(
-              DELEGATED_POSITION_SPACE,
-            )
-          : Promise.resolve(0),
-        getAutomationRentLamports({
-          connection,
-          walletPubkey,
-          newClaimBots: automates ? 1 : 0,
-          createsHntAta: automates,
-        }),
-      ]);
+    const [
+      positionRent,
+      metadataRent,
+      delegatedPositionRent,
+      epochInfoRent,
+      claimTaskRent,
+      automationRent,
+    ] = await Promise.all([
+      connection.getMinimumBalanceForRentExemption(POSITION_SPACE),
+      connection.getMinimumBalanceForRentExemption(TOKEN_METADATA_SPACE),
+      subDaoMint
+        ? connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE)
+        : Promise.resolve(0),
+      getMissingEpochInfoRentLamports({ connection, epochInfoKeys }),
+      queuesClaimTask
+        ? connection.getMinimumBalanceForRentExemption(
+            DELEGATION_CLAIM_TASK_SPACE,
+          )
+        : Promise.resolve(0),
+      getAutomationRentLamports({
+        connection,
+        walletPubkey,
+        newClaimBots: automates ? 1 : 0,
+        createsHntAta: automates,
+      }),
+    ]);
     const createdAccountRent =
       positionRent +
-      RENT_COSTS.ATA + // position NFT token account
+      metadataRent +
+      TOKEN_METADATA_CREATE_FEE +
+      RENT_COSTS.ATA * 2 + // position NFT token account and the deposit vault
       delegatedPositionRent +
+      epochInfoRent +
       automationRent +
-      (automates ? RENT_COSTS.TUKTUK_TASK : 0); // delegation claim task
+      claimTaskRent +
+      queuedTaskCrankReward;
 
     const estimatedSolFeeLamports =
       (await getTotalTransactionFees(connection, versionedTransactions)) +
