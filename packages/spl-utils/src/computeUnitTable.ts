@@ -433,6 +433,11 @@ const PROGRAM_CU_CEILINGS: Record<string, number> = {
  * Sum table CU over (programId base58, ix data) pairs, apply
  * FALLBACK_CU_MARGIN. Returns MAX_COMPUTE_UNITS if any instruction is
  * unknown (conservative: the tx still lands).
+ *
+ * A miss is loud. Under SIMD-0553 the requested limit is what gets billed, so
+ * every transaction carrying an untabled instruction pays for 1.4M CU until
+ * the table gains an entry for it. The log carries the key `sampleCu` needs to
+ * add that entry. Sentry is not available here, so it goes to console.
  */
 const sumTableCu = (pairs: [string, Uint8Array][]): number => {
   let total = 0;
@@ -444,11 +449,21 @@ const sumTableCu = (pairs: [string, Uint8Array][]): number => {
       INSTRUCTION_CU_TABLE[cuTableKey(programId, data)] ??
       PROGRAM_CU_CEILINGS[programId];
     if (cu === undefined) {
+      console.error(
+        `[computeUnitTable] No CU table entry for ${cuTableKey(
+          programId,
+          data
+        )}; requesting the ${MAX_COMPUTE_UNITS} CU maximum for this transaction`
+      );
       return MAX_COMPUTE_UNITS;
     }
     total += cu;
   }
   if (total === 0) {
+    console.error(
+      "[computeUnitTable] No table-priced instructions in this transaction; requesting the " +
+        `${MAX_COMPUTE_UNITS} CU maximum`
+    );
     return MAX_COMPUTE_UNITS;
   }
   return Math.min(MAX_COMPUTE_UNITS, Math.ceil(total * FALLBACK_CU_MARGIN));

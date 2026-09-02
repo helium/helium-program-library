@@ -128,6 +128,31 @@ describe("tableComputeUnitsForInstructions", () => {
     const cbOnly = [ComputeBudgetProgram.setComputeUnitLimit({ units: 1 })];
     expect(tableComputeUnitsForInstructions(cbOnly)).to.eq(MAX_COMPUTE_UNITS);
   });
+
+  it("names the missing program and discriminator so the table can be extended", () => {
+    // The requested limit is what gets billed, so a silent MAX is a standing
+    // overcharge on every transaction carrying the untabled instruction.
+    const programId = Keypair.generate().publicKey;
+    const data = Buffer.from("0102030405060708", "hex");
+    const unknown = new TransactionInstruction({ programId, keys: [], data });
+
+    const logged: string[] = [];
+    const realError = console.error;
+    console.error = (...args: any[]) => {
+      logged.push(args.join(" "));
+    };
+    try {
+      expect(tableComputeUnitsForInstructions([unknown])).to.eq(
+        MAX_COMPUTE_UNITS
+      );
+    } finally {
+      console.error = realError;
+    }
+
+    expect(logged.length).to.eq(1);
+    expect(logged[0]).to.include(programId.toBase58());
+    expect(logged[0]).to.include("0102030405060708");
+  });
 });
 
 describe("tableComputeUnits", () => {
