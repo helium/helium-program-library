@@ -966,7 +966,9 @@ describe("governance", () => {
       walletAddress = ctx.payer.publicKey.toBase58();
     });
 
-    after(async () => {
+    // Per test, not per block: a confined bitmap left in place would hand the
+    // following test the same handful of free task ids.
+    afterEach(async () => {
       await restoreTaskQueue?.();
       restoreTaskQueue = undefined;
     });

@@ -17,11 +17,12 @@ import {
 } from "@solana/web3.js";
 import { getSurfpoolRpcUrl } from "./surfpool";
 
+/** Raw surfpool account write. Throws on RPC error, like `setTokenAccount`. */
 async function setAccountData(
   address: PublicKey,
   accountInfo: { data: Buffer; owner: PublicKey; lamports: number }
 ): Promise<void> {
-  await fetch(getSurfpoolRpcUrl(), {
+  const res = await fetch(getSurfpoolRpcUrl(), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -38,6 +39,10 @@ async function setAccountData(
       ],
     }),
   });
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(`setAccount failed: ${JSON.stringify(json.error)}`);
+  }
 }
 
 function freeBitsInByte(byte: number): number[] {
