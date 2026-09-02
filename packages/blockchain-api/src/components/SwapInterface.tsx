@@ -98,6 +98,16 @@ export function SwapInterface() {
         return;
       }
 
+      // A swap from a mint to itself is circular arbitrage, which the API
+      // rejects. Short-circuit it here so the 500ms debounce doesn't stream
+      // rejected quote requests while the selection is bad.
+      if (fromToken.address === toToken.address) {
+        setQuote(null);
+        setToAmount("");
+        setError("Select two different tokens to swap");
+        return;
+      }
+
       setError(null);
 
       const amountInSmallestUnit = (
@@ -215,19 +225,23 @@ export function SwapInterface() {
     setFromAmount(balance.toString());
   };
 
-  // Filter tokens based on search
+  // Filter tokens based on search. Each picker also drops the counterpart
+  // token: a mint cannot be swapped for itself, so offering it can only
+  // produce a rejected quote.
   const filteredFromTokens = tokens.filter(
     (token) =>
-      token.symbol.toLowerCase().includes(fromTokenSearch.toLowerCase()) ||
-      token.name.toLowerCase().includes(fromTokenSearch.toLowerCase()) ||
-      token.address.toLowerCase().includes(fromTokenSearch.toLowerCase())
+      token.address !== toToken?.address &&
+      (token.symbol.toLowerCase().includes(fromTokenSearch.toLowerCase()) ||
+        token.name.toLowerCase().includes(fromTokenSearch.toLowerCase()) ||
+        token.address.toLowerCase().includes(fromTokenSearch.toLowerCase()))
   );
 
   const filteredToTokens = tokens.filter(
     (token) =>
-      token.symbol.toLowerCase().includes(toTokenSearch.toLowerCase()) ||
-      token.name.toLowerCase().includes(toTokenSearch.toLowerCase()) ||
-      token.address.toLowerCase().includes(toTokenSearch.toLowerCase())
+      token.address !== fromToken?.address &&
+      (token.symbol.toLowerCase().includes(toTokenSearch.toLowerCase()) ||
+        token.name.toLowerCase().includes(toTokenSearch.toLowerCase()) ||
+        token.address.toLowerCase().includes(toTokenSearch.toLowerCase()))
   );
 
   // Load tokens on component mount

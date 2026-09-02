@@ -5,13 +5,21 @@ export const GetTokensInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
-export const GetQuoteInputSchema = z.object({
-  inputMint: z.string().min(1),
-  outputMint: z.string().min(1),
-  amount: z.string().min(1),
-  swapMode: z.enum(["ExactIn", "ExactOut"]).default("ExactIn"),
-  slippageBps: z.coerce.number().min(0).max(10000).default(50),
-});
+export const GetQuoteInputSchema = z
+  .object({
+    inputMint: z.string().min(1),
+    outputMint: z.string().min(1),
+    amount: z.string().min(1),
+    swapMode: z.enum(["ExactIn", "ExactOut"]).default("ExactIn"),
+    slippageBps: z.coerce.number().min(0).max(10000).default(50),
+  })
+  // A quote from a mint to itself is circular arbitrage, which Jupiter refuses
+  // with CIRCULAR_ARBITRAGE_IS_DISABLED. Reject it here so the caller gets a
+  // 400 instead of a Jupiter error surfaced as a 500.
+  .refine((input) => input.inputMint !== input.outputMint, {
+    message: "inputMint and outputMint must be different",
+    path: ["outputMint"],
+  });
 
 export const QuoteResponseSchema = z
   .object({
