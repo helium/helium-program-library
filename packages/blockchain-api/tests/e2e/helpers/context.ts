@@ -27,6 +27,12 @@ export interface SetupTestCtxOptions {
    * Override HPL_CRONS_TASK_QUEUE env var
    */
   taskQueue?: string;
+  /**
+   * RPC url the API server reads, for tests that observe its calls. The test's
+   * own connection stays on surfpool, whose websocket transaction confirmation
+   * a plain HTTP stand-in cannot serve.
+   */
+  serverRpcUrl?: string;
 }
 
 export async function setupTestCtx(
@@ -38,6 +44,9 @@ export async function setupTestCtx(
     );
   }
   applyMinimalServerEnv();
+  if (options.serverRpcUrl) {
+    process.env.SOLANA_RPC_URL = options.serverRpcUrl;
+  }
   await ensureSurfpool();
   await ensureNextServer();
 

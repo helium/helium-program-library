@@ -111,12 +111,17 @@ export async function ensureSubDaoEpochsCurrent(ctx: TestCtx): Promise<void> {
   }
 }
 
+const DELEGATED_POSITION_START_TS_OFFSET = 120;
 const DELEGATED_POSITION_EXPIRATION_TS_OFFSET = 146;
 
 export async function setDelegatedPositionExpiration(
   ctx: TestCtx,
   delegatedPositionPubkey: PublicKey,
-  newExpirationTs: number
+  newExpirationTs: number,
+  // A delegation always starts before it expires. Backdating the start is only
+  // needed when the new expiration is in the past, since the vehnt math
+  // measures the delegation from its start.
+  newStartTs?: number
 ): Promise<void> {
   const accountInfo = await ctx.connection.getAccountInfo(
     delegatedPositionPubkey
@@ -130,6 +135,12 @@ export async function setDelegatedPositionExpiration(
     BigInt(newExpirationTs),
     DELEGATED_POSITION_EXPIRATION_TS_OFFSET
   );
+  if (newStartTs !== undefined) {
+    newData.writeBigInt64LE(
+      BigInt(newStartTs),
+      DELEGATED_POSITION_START_TS_OFFSET
+    );
+  }
 
   await fetch(getSurfpoolRpcUrl(), {
     method: "POST",

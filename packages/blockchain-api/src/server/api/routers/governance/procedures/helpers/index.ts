@@ -6,3 +6,4 @@ export * from "./constants";
 export * from "./build-claim-instructions";
 export * from "./build-batched-transactions";
 export * from "./rent";
+export * from "./delegation-accounts";

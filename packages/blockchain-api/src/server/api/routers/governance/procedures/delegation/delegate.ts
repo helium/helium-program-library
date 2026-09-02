@@ -1,4 +1,5 @@
 import { publicProcedure } from "@/server/api/procedures";
+import { initCachedProgram } from "@/lib/anchor-idl-cache";
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
   generateTransactionTag,
@@ -8,17 +9,25 @@ import {
   delegatedPositionKey,
   getLockupEffectiveEndTs,
   init as initHsd,
-  subDaoEpochInfoKey,
+  PROGRAM_ID as HSD_PROGRAM_ID,
   subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import {
   delegationClaimBotKey,
   init as initHplCrons,
+  PROGRAM_ID as HPL_CRONS_PROGRAM_ID,
 } from "@helium/hpl-crons-sdk";
-import { init as initProxy } from "@helium/nft-proxy-sdk";
+import {
+  init as initProxy,
+  PROGRAM_ID as PROXY_PROGRAM_ID,
+} from "@helium/nft-proxy-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
 import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
-import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
+import {
+  init as initVsr,
+  positionKey,
+  PROGRAM_ID as VSR_PROGRAM_ID,
+} from "@helium/voter-stake-registry-sdk";
 import { NATIVE_MINT, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   LAMPORTS_PER_SOL,
@@ -34,6 +43,10 @@ import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
   requirePositionOwnershipWithMessage,
   getCurrentSeasonEnd,
+  changeDelegationAccounts,
+  closeDelegationAccounts,
+  delegateAccounts,
+  extendExpirationAccounts,
   buildClaimInstructions,
   type ClaimInstructionsResult,
   buildBatchedTransactions,
@@ -59,10 +72,13 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     const walletPubkey = new PublicKey(walletAddress);
     const subDaoMintPubkey = new PublicKey(subDaoMint);
 
-    const vsrProgram = await initVsr(provider);
-    const hsdProgram = await initHsd(provider);
-    const proxyProgram = await initProxy(provider);
-    const hplCronsProgram = await initHplCrons(provider);
+    const [vsrProgram, hsdProgram, proxyProgram, hplCronsProgram] =
+      await Promise.all([
+        initCachedProgram(initVsr, VSR_PROGRAM_ID, provider),
+        initCachedProgram(initHsd, HSD_PROGRAM_ID, provider),
+        initCachedProgram(initProxy, PROXY_PROGRAM_ID, provider),
+        initCachedProgram(initHplCrons, HPL_CRONS_PROGRAM_ID, provider),
+      ]);
 
     const [subDaoK] = subDaoKey(subDaoMintPubkey);
     const subDaoAcc = await hsdProgram.account.subDaoV0.fetchNullable(subDaoK);
@@ -194,6 +210,24 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       });
     }
 
+    /**
+     * The per-position half of every delegation instruction's account list.
+     * Supplied explicitly so `accountsStrict` leaves Anchor no account to
+     * resolve, and its resolvers make no RPC calls.
+     */
+    const positionAccountArgs = (info: (typeof positionInfos)[number]) => ({
+      wallet: walletPubkey,
+      position: info.positionPubkey,
+      positionMint: info.positionMintPubkey,
+      lockupEndTs: getLockupEffectiveEndTs(info.positionAcc.lockup),
+      genesisEndTs: info.positionAcc.genesisEnd,
+      registrar: info.positionAcc.registrar,
+      proxyConfig: info.registrar.proxyConfig,
+      dao: subDaoAcc.dao,
+      delegatedPosition: info.delegatedPosKey,
+      now,
+    });
+
     const tag = generateTransactionTag({
       type: TRANSACTION_TYPES.DELEGATION_DELEGATE,
       walletAddress,
@@ -223,10 +257,13 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       expiredCloseInstructions.push(
         await hsdProgram.methods
           .closeDelegationV0()
-          .accountsPartial({
-            position: info.positionPubkey,
-            subDao: info.delegatedPositionAcc!.subDao,
-          })
+          .accountsStrict(
+            closeDelegationAccounts({
+              ...positionAccountArgs(info),
+              subDao: info.delegatedPositionAcc!.subDao,
+              expirationTs: info.delegatedPositionAcc!.expirationTs,
+            }),
+          )
           .instruction(),
       );
       info.delegatedPositionAcc = null;
@@ -329,7 +366,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     // the duplicate task account makes the bundle fail on-chain.
     const taskQueueAcc = automationEnabled
       ? await import("@helium/tuktuk-sdk")
-          .then((m) => m.init(provider))
+          .then((m) => initCachedProgram(m.init, m.PROGRAM_ID, provider))
           .then((tuktukProgram) =>
             tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE),
           )
@@ -385,30 +422,16 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           });
         }
 
-        const lockupEnd = getLockupEffectiveEndTs(positionAcc.lockup);
-        const closingTs = BN.min(seasonEnd, lockupEnd);
-
-        const subDaoEpochInfo = subDaoEpochInfoKey(subDaoK, now)[0];
-        const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
-          subDaoK,
-          closingTs,
-        )[0];
-        const genesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
-          subDaoK,
-          positionAcc.genesisEnd.lt(now) ? closingTs : positionAcc.genesisEnd,
-        )[0];
-
         delegationInstructions.push(
           await hsdProgram.methods
             .delegateV0()
-            .accountsPartial({
-              position: positionPubkey,
-              subDao: subDaoK,
-              dao: subDaoAcc.dao,
-              subDaoEpochInfo,
-              closingTimeSubDaoEpochInfo,
-              genesisEndSubDaoEpochInfo,
-            })
+            .accountsStrict(
+              delegateAccounts({
+                ...positionAccountArgs(info),
+                subDao: subDaoK,
+                seasonEndTs: seasonEnd,
+              }),
+            )
             .instruction(),
         );
       } else if (!delegatedPositionAcc.subDao.equals(subDaoK)) {
@@ -419,47 +442,18 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
           });
         }
 
-        const newExpirationTs = Math.min(
-          seasonEnd.toNumber(),
-          getLockupEffectiveEndTs(positionAcc.lockup).toNumber(),
-        );
-
-        const oldExpirationTs = delegatedPositionAcc.expirationTs;
-        const oldSubDaoEpochInfo = subDaoEpochInfoKey(
-          delegatedPositionAcc.subDao,
-          now,
-        )[0];
-        const newSubDaoEpochInfo = subDaoEpochInfoKey(subDaoK, now)[0];
-        const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
-          subDaoK,
-          newExpirationTs,
-        )[0];
-        const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
-          delegatedPositionAcc.subDao,
-          positionAcc.genesisEnd.lt(now)
-            ? oldExpirationTs
-            : positionAcc.genesisEnd,
-        )[0];
-        const genesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
-          subDaoK,
-          positionAcc.genesisEnd.lt(now)
-            ? newExpirationTs
-            : positionAcc.genesisEnd,
-        )[0];
-
         delegationInstructions.push(
           await hsdProgram.methods
             .changeDelegationV0()
-            .accountsPartial({
-              position: positionPubkey,
-              subDao: subDaoK,
-              oldSubDao: delegatedPositionAcc.subDao,
-              oldSubDaoEpochInfo,
-              oldGenesisEndSubDaoEpochInfo,
-              subDaoEpochInfo: newSubDaoEpochInfo,
-              closingTimeSubDaoEpochInfo,
-              genesisEndSubDaoEpochInfo,
-            })
+            .accountsStrict(
+              changeDelegationAccounts({
+                ...positionAccountArgs(info),
+                subDao: subDaoK,
+                oldSubDao: delegatedPositionAcc.subDao,
+                expirationTs: delegatedPositionAcc.expirationTs,
+                seasonEndTs: seasonEnd,
+              }),
+            )
             .instruction(),
         );
       } else {
@@ -471,32 +465,17 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
             lockupEnd.toNumber(),
           );
           if (delegatedPositionAcc.expirationTs.lt(new BN(newExpirationTs))) {
-            const oldExpirationTs = delegatedPositionAcc.expirationTs;
-            const oldClosingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
-              delegatedPositionAcc.subDao,
-              oldExpirationTs,
-            )[0];
-            const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
-              delegatedPositionAcc.subDao,
-              newExpirationTs,
-            )[0];
-            const genesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
-              delegatedPositionAcc.subDao,
-              positionAcc.genesisEnd.lt(now)
-                ? newExpirationTs
-                : positionAcc.genesisEnd,
-            )[0];
-
             delegationInstructions.push(
               await hsdProgram.methods
                 .extendExpirationTsV0()
-                .accountsPartial({
-                  position: positionPubkey,
-                  subDao: delegatedPositionAcc.subDao,
-                  oldClosingTimeSubDaoEpochInfo,
-                  closingTimeSubDaoEpochInfo,
-                  genesisEndSubDaoEpochInfo,
-                })
+                .accountsStrict(
+                  extendExpirationAccounts({
+                    ...positionAccountArgs(info),
+                    subDao: delegatedPositionAcc.subDao,
+                    expirationTs: delegatedPositionAcc.expirationTs,
+                    seasonEndTs: seasonEnd,
+                  }),
+                )
                 .instruction(),
             );
           }

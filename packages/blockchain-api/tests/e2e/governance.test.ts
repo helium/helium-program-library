@@ -637,6 +637,7 @@ describe("governance", () => {
   });
 
   describe("delegation", () => {
+    const EPOCH_LENGTH = 86400;
     let walletAddress: string;
 
     before(async () => {
@@ -684,6 +685,124 @@ describe("governance", () => {
         delegatedPosPubkey
       );
       expect(delegatedInfo).to.not.be.null;
+    });
+
+    it("re-delegates a position whose delegation expired", async () => {
+      // #given a MOBILE delegation whose expiration has passed
+      const result = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+        subDaoMint: MOBILE_MINT,
+      });
+
+      const { hsdProgram } = await getPrograms(ctx);
+      const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
+      const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
+      const now = Number(clockInfo!.data.readBigInt64LE(32));
+      // Expire it inside the current epoch, whose sub-DAO epoch info
+      // delegating already created: closing a delegation cannot create it.
+      const epochStart = Math.floor(now / EPOCH_LENGTH) * EPOCH_LENGTH;
+      await setDelegatedPositionExpiration(
+        ctx,
+        delegatedPosPubkey,
+        Math.max(epochStart + 1, now - 60),
+        // The delegation has to have started before it expired, and inside
+        // this epoch, which is where delegating put it.
+        epochStart
+      );
+      await ensureSubDaoEpochsCurrent(ctx);
+
+      // #when delegating it to the same sub-DAO again
+      const { data, error } = await ctx.safeClient.governance.delegatePositions(
+        {
+          walletAddress,
+          positionMints: [result.positionMint],
+          subDaoMint: MOBILE_MINT.toBase58(),
+          automationEnabled: false,
+        }
+      );
+
+      // #then the close and the fresh delegation both land on-chain, which
+      // only holds if every epoch-info account was derived as the program
+      // derives it
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(
+        data.transactionData.transactions.map((tx) => tx.metadata?.type)
+      ).to.include("delegation_close_expired");
+
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        ctx.payer
+      );
+
+      const delegatedAfter = await hsdProgram.account.delegatedPositionV0.fetch(
+        delegatedPosPubkey
+      );
+      expect(delegatedAfter.expirationTs.toNumber()).to.be.greaterThan(now);
+    });
+
+    it("extends the expiration when re-delegating to the same sub-DAO", async () => {
+      // #given a MOBILE delegation expiring well before its season ends
+      const result = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+        subDaoMint: MOBILE_MINT,
+      });
+
+      const { hsdProgram } = await getPrograms(ctx);
+      const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
+      const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
+      const now = Number(clockInfo!.data.readBigInt64LE(32));
+      // Still in the current epoch, so the epoch info the delegation closes
+      // out of is the one delegating created.
+      const epochStart = Math.floor(now / EPOCH_LENGTH) * EPOCH_LENGTH;
+      const shortExpiration = Math.min(now + 60, epochStart + EPOCH_LENGTH - 1);
+      await setDelegatedPositionExpiration(
+        ctx,
+        delegatedPosPubkey,
+        shortExpiration
+      );
+      await ensureSubDaoEpochsCurrent(ctx);
+
+      // #when delegating it to the sub-DAO it is already delegated to
+      const { data, error } = await ctx.safeClient.governance.delegatePositions(
+        {
+          walletAddress,
+          positionMints: [result.positionMint],
+          subDaoMint: MOBILE_MINT.toBase58(),
+          automationEnabled: false,
+        }
+      );
+
+      // #then the extension lands on-chain
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        ctx.payer
+      );
+
+      const delegatedAfter = await hsdProgram.account.delegatedPositionV0.fetch(
+        delegatedPosPubkey
+      );
+      expect(delegatedAfter.expirationTs.toNumber()).to.be.greaterThan(
+        shortExpiration
+      );
     });
 
     it("extends delegation expiration", async () => {
