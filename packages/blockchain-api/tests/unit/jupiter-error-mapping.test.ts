@@ -39,6 +39,30 @@ describe("classifyJupiterError", () => {
     expect(classification).to.deep.equal({ kind: "RATE_LIMITED" });
   });
 
+  it("keeps a rate-limited response rate-limited even when it echoes a client error code", () => {
+    const classification = classifyJupiterError({
+      status: 429,
+      body: '{"errorCode":"TOKEN_NOT_TRADABLE"}',
+      operation: "Failed to get quote from Jupiter",
+    });
+
+    expect(classification).to.deep.equal({ kind: "RATE_LIMITED" });
+  });
+
+  it("reports an upstream failure whose body merely mentions a code as a Jupiter error", () => {
+    const classification = classifyJupiterError({
+      status: 502,
+      body: "upstream refused request for CIRCULAR_ARBITRAGE_IS_DISABLED",
+      operation: "Failed to get quote from Jupiter",
+    });
+
+    expect(classification).to.deep.equal({
+      kind: "JUPITER_ERROR",
+      message:
+        "Failed to get quote from Jupiter: HTTP 502: upstream refused request for CIRCULAR_ARBITRAGE_IS_DISABLED",
+    });
+  });
+
   it("reports an unrecognized failure as a Jupiter error carrying the status", () => {
     const classification = classifyJupiterError({
       status: 502,
