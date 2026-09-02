@@ -5,6 +5,7 @@ import WalletHistoryCursor from "../models/wallet-history-cursor";
 import PendingTransaction from "../models/pending-transaction";
 import { fetchWalletTransactions } from "./helius";
 import { classifyTransaction } from "./transaction-classifier";
+import { Op } from "sequelize";
 
 const MAX_INITIAL_PAGES = 10;
 const PAGE_SIZE = 100;
@@ -38,6 +39,19 @@ export async function syncWalletHistory(wallet: string): Promise<void> {
       break;
     }
 
+    // One lookup per page instead of one per transaction; blockchain-api
+    // already knows these signatures and history reads them from batches.
+    const knownPending = new Set(
+      (
+        await PendingTransaction.findAll({
+          where: {
+            signature: { [Op.in]: transactions.map((tx) => tx.signature) },
+          },
+          attributes: ["signature"],
+        })
+      ).map((row) => row.signature),
+    );
+
     for (const tx of transactions) {
       // If we have a cursor and encounter a signature we've already seen, stop
       if (hasCursor && tx.signature === cursor.lastSignature) {
@@ -51,12 +65,7 @@ export async function syncWalletHistory(wallet: string): Promise<void> {
         newestSlot = tx.slot;
       }
 
-      // Skip if this signature already exists in pending_transactions (blockchain-api source)
-      const existingPending = await PendingTransaction.findOne({
-        where: { signature: tx.signature },
-        attributes: ["id"],
-      });
-      if (existingPending) {
+      if (knownPending.has(tx.signature)) {
         continue;
       }
 
@@ -87,7 +96,7 @@ export async function syncWalletHistory(wallet: string): Promise<void> {
         ) {
           console.error(
             `Failed to insert wallet history for ${tx.signature}:`,
-            error
+            error,
           );
         }
       }
