@@ -15,35 +15,7 @@ import {
   PublicKey,
   sendAndConfirmRawTransaction,
 } from "@solana/web3.js";
-import { getSurfpoolRpcUrl } from "./surfpool";
-
-/** Raw surfpool account write. Throws on RPC error, like `setTokenAccount`. */
-async function setAccountData(
-  address: PublicKey,
-  accountInfo: { data: Buffer; owner: PublicKey; lamports: number }
-): Promise<void> {
-  const res = await fetch(getSurfpoolRpcUrl(), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "surfnet_setAccount",
-      params: [
-        address.toBase58(),
-        {
-          data: accountInfo.data.toString("hex"),
-          owner: accountInfo.owner.toBase58(),
-          lamports: accountInfo.lamports,
-        },
-      ],
-    }),
-  });
-  const json = await res.json();
-  if (json.error) {
-    throw new Error(`setAccount failed: ${JSON.stringify(json.error)}`);
-  }
-}
+import { setSurfnetAccount } from "./surfpool";
 
 function freeBitsInByte(byte: number): number[] {
   const bits: number[] = [];
@@ -97,7 +69,7 @@ export async function confineTaskQueueFreeIds(
   );
   const confinedData = Buffer.from(accountInfo.data);
   confined.copy(confinedData, bitmapOffset);
-  await setAccountData(taskQueue, { ...accountInfo, data: confinedData });
+  await setSurfnetAccount(taskQueue, { ...accountInfo, data: confinedData });
 
   return {
     freeIds,
@@ -106,7 +78,7 @@ export async function confineTaskQueueFreeIds(
       for (const id of freeIds) {
         restoredData[bitmapOffset + Math.floor(id / 8)] |= 1 << (id % 8);
       }
-      await setAccountData(taskQueue, { ...accountInfo, data: restoredData });
+      await setSurfnetAccount(taskQueue, { ...accountInfo, data: restoredData });
     },
   };
 }

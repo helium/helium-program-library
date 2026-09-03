@@ -13,6 +13,20 @@
  * rebuilt. sequelize-cli does not wrap migrations in a transaction, which
  * CREATE INDEX CONCURRENTLY could not run inside anyway.
  *
+ * Every replica runs db:migrate on start, so two can reach this at once. An
+ * index mid-build also shows as invalid, and the second replica would drop the
+ * first one's live build and fail its start. A session advisory lock serialises
+ * them: the second waits, then finds the valid index and keeps it. Session
+ * locks belong to one connection, so the whole migration runs on a single
+ * client taken from the pool rather than through sequelize's pooled query.
+ *
+ * The lock is polled with pg_try_advisory_lock rather than taken with the
+ * blocking pg_advisory_lock. A session parked inside pg_advisory_lock holds an
+ * open snapshot, and CREATE INDEX CONCURRENTLY waits for exactly those
+ * snapshots before it can finish, so the holder and the waiter deadlock and
+ * postgres kills one of them. Each try is its own short statement, so the
+ * waiter holds no snapshot between attempts.
+ *
  * @type {import('sequelize-cli').Migration}
  */
 const INDEXES = [
@@ -20,32 +34,67 @@ const INDEXES = [
   { name: "idx_pending_transactions_batch_id", column: "batch_id" },
 ];
 
+/** Arbitrary but fixed; only this migration takes it. */
+const ADVISORY_LOCK_KEY = 20260902;
+
 module.exports = {
   async up(queryInterface) {
-    for (const { name, column } of INDEXES) {
-      // to_regclass resolves through the search path, the same way the
-      // unqualified CREATE INDEX below does, so a same-named index in another
-      // schema is not mistaken for this one. It yields NULL when none exists.
-      const [rows] = await queryInterface.sequelize.query(
-        `SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(:name)`,
-        { replacements: { name } },
-      );
-      if (rows.length > 0 && rows[0].indisvalid) {
-        continue;
+    const manager = queryInterface.sequelize.connectionManager;
+    const client = await manager.getConnection({ type: "write" });
+    try {
+      for (let attempt = 0; ; attempt++) {
+        const { rows } = await client.query(
+          "SELECT pg_try_advisory_lock($1) AS got",
+          [ADVISORY_LOCK_KEY],
+        );
+        if (rows[0].got) {
+          break;
+        }
+        if (attempt === 0) {
+          console.log(
+            "Waiting for another db:migrate run to finish building the pending_transactions indexes",
+          );
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-      if (rows.length > 0) {
-        await queryInterface.sequelize.query(`DROP INDEX IF EXISTS "${name}"`);
+      try {
+        for (const { name, column } of INDEXES) {
+          // to_regclass resolves through the search path, the same way the
+          // unqualified CREATE INDEX below does, so a same-named index in
+          // another schema is not mistaken for this one. It yields NULL when
+          // none exists.
+          const { rows } = await client.query(
+            "SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass($1)",
+            [name],
+          );
+          if (rows.length > 0 && rows[0].indisvalid) {
+            continue;
+          }
+          if (rows.length > 0) {
+            // CONCURRENTLY so the drop waits for readers instead of taking
+            // ACCESS EXCLUSIVE on the table and queueing the submit path
+            // behind a long read.
+            await client.query(`DROP INDEX CONCURRENTLY IF EXISTS "${name}"`);
+          }
+          await client.query(
+            `CREATE INDEX CONCURRENTLY "${name}" ON "pending_transactions" ("${column}")`,
+          );
+        }
+      } finally {
+        await client.query("SELECT pg_advisory_unlock($1)", [
+          ADVISORY_LOCK_KEY,
+        ]);
       }
-      await queryInterface.addIndex("pending_transactions", [column], {
-        name,
-        concurrently: true,
-      });
+    } finally {
+      manager.releaseConnection(client);
     }
   },
 
   async down(queryInterface) {
     for (const { name } of INDEXES) {
-      await queryInterface.sequelize.query(`DROP INDEX IF EXISTS "${name}"`);
+      await queryInterface.sequelize.query(
+        `DROP INDEX CONCURRENTLY IF EXISTS "${name}"`,
+      );
     }
   },
 };

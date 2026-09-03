@@ -2,7 +2,7 @@ import { HNT_MINT } from "@helium/spl-utils";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { RENT_COSTS } from "@/lib/utils/balance-validation";
-import { getMultipleAccounts } from "./build-claim-instructions";
+import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
 
 /**
  * Space `init_delegation_claim_bot_v0` allocates for a DelegationClaimBotV0:

@@ -13,7 +13,7 @@ import { getCurrentSeasonEnd } from "../../../src/server/api/routers/governance/
 import { TestCtx } from "./context";
 import { signAndSubmitTransactionData } from "./tx";
 import { ensureFunds, ensureTokenBalance } from "./wallet";
-import { getSurfpoolRpcUrl } from "./surfpool";
+import { setSurfnetAccount } from "./surfpool";
 
 /**
  * Initialize Anchor programs for on-chain state verification
@@ -91,23 +91,7 @@ export async function ensureSubDaoEpochsCurrent(ctx: TestCtx): Promise<void> {
       VEHNT_LAST_CALCULATED_TS_OFFSET
     );
 
-    await fetch(getSurfpoolRpcUrl(), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "surfnet_setAccount",
-        params: [
-          subDaoK.toBase58(),
-          {
-            data: newData.toString("hex"),
-            owner: accountInfo.owner.toBase58(),
-            lamports: accountInfo.lamports,
-          },
-        ],
-      }),
-    });
+    await setSurfnetAccount(subDaoK, { ...accountInfo, data: newData });
   }
 }
 
@@ -142,23 +126,7 @@ export async function setDelegatedPositionExpiration(
     );
   }
 
-  await fetch(getSurfpoolRpcUrl(), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "surfnet_setAccount",
-      params: [
-        delegatedPositionPubkey.toBase58(),
-        {
-          data: newData.toString("hex"),
-          owner: accountInfo.owner.toBase58(),
-          lamports: accountInfo.lamports,
-        },
-      ],
-    }),
-  });
+  await setSurfnetAccount(delegatedPositionPubkey, { ...accountInfo, data: newData });
 }
 
 const POSITION_LOCKUP_END_TS_OFFSET = 80;
@@ -176,23 +144,7 @@ export async function setPositionLockupEndTs(
   const newData = Buffer.from(accountInfo.data);
   newData.writeBigInt64LE(BigInt(newEndTs), POSITION_LOCKUP_END_TS_OFFSET);
 
-  await fetch(getSurfpoolRpcUrl(), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "surfnet_setAccount",
-      params: [
-        positionPubkey.toBase58(),
-        {
-          data: newData.toString("hex"),
-          owner: accountInfo.owner.toBase58(),
-          lamports: accountInfo.lamports,
-        },
-      ],
-    }),
-  });
+  await setSurfnetAccount(positionPubkey, { ...accountInfo, data: newData });
 }
 
 // Registrar layout: 8-byte discriminator, then four pubkeys, then time_offset.
@@ -216,23 +168,7 @@ export async function setRegistrarTimeOffset(
   const newData = Buffer.from(accountInfo.data);
   newData.writeBigInt64LE(BigInt(offsetSeconds), REGISTRAR_TIME_OFFSET_OFFSET);
 
-  await fetch(getSurfpoolRpcUrl(), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "surfnet_setAccount",
-      params: [
-        registrarPubkey.toBase58(),
-        {
-          data: newData.toString("hex"),
-          owner: accountInfo.owner.toBase58(),
-          lamports: accountInfo.lamports,
-        },
-      ],
-    }),
-  });
+  await setSurfnetAccount(registrarPubkey, { ...accountInfo, data: newData });
 }
 
 interface CreatePositionOptions {

@@ -9,7 +9,7 @@ import {
 import { MOBILE_MINT } from "@helium/spl-utils";
 import { positionKey } from "@helium/voter-stake-registry-sdk";
 import { isDefinedError } from "@orpc/client";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { DEFAULT_HPL_CRONS_TASK_QUEUE } from "./helpers/constants";
@@ -142,6 +142,54 @@ describe("delegatePositions automation", () => {
       }
       expect(error.code).to.equal("BAD_REQUEST");
       expect(error.message).to.include("fully decayed");
+    } finally {
+      await setRegistrarTimeOffset(ctx, registrar, 0);
+    }
+  });
+
+  it("judges delegation expiry on the registrar clock, not the cluster clock", async () => {
+    // #given a delegated constant position whose registrar clock is dialed
+    // past the delegation's expiration, as extend_expiration_ts_v0 would see
+    // it. A constant lockup never decays, so only the expiry check can trip.
+    const { positionMint } = await createAndFundPosition(ctx, {
+      amount: "100000000",
+      lockupKind: "constant",
+      lockupPeriodsInDays: 365,
+      subDaoMint: MOBILE_MINT,
+      automationEnabled: false,
+    });
+    const { vsrProgram, hsdProgram } = await getPrograms(ctx);
+    const [positionPubkey] = positionKey(new PublicKey(positionMint));
+    const { registrar } = await vsrProgram.account.positionV0.fetch(
+      positionPubkey,
+    );
+    const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+    const { expirationTs } =
+      await hsdProgram.account.delegatedPositionV0.fetch(delegatedPosPubkey);
+    const clockInfo = await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+    const clusterNow = Number(clockInfo!.data.readBigInt64LE(32));
+    await setRegistrarTimeOffset(
+      ctx,
+      registrar,
+      expirationTs.toNumber() - clusterNow + 3600,
+    );
+
+    try {
+      // #when the delegation is extended
+      const { error } = await ctx.safeClient.governance.extendDelegation({
+        walletAddress,
+        positionMint,
+      });
+
+      // #then the request is refused rather than built for the program to
+      // reject: on the cluster clock alone the delegation is still live
+      if (!isDefinedError(error)) {
+        expect.fail(
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+        );
+      }
+      expect(error.code).to.equal("BAD_REQUEST");
+      expect(error.message).to.include("Delegation has expired");
     } finally {
       await setRegistrarTimeOffset(ctx, registrar, 0);
     }
