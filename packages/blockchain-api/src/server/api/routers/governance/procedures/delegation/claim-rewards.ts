@@ -40,7 +40,7 @@ export const claimRewards =
       const positionMintPubkeys = positionMints.map((m) => new PublicKey(m));
       const positionPubkeys = positionMintPubkeys.map((m) => positionKey(m)[0]);
       const delegatedPosKeys = positionPubkeys.map(
-        (p) => delegatedPositionKey(p)[0]
+        (p) => delegatedPositionKey(p)[0],
       );
 
       const [positionAccounts, delegatedPositionAccounts] = await Promise.all([
@@ -62,7 +62,7 @@ export const claimRewards =
           positionMintPubkeys[i],
           walletPubkey,
           positionMints[i],
-          errors
+          errors,
         );
 
         const delegatedPositionAcc = delegatedPositionAccounts[i];
@@ -100,7 +100,7 @@ export const claimRewards =
           hasMore: false,
           estimatedSolFee: await toTokenAmountOutput(
             new BN(0),
-            NATIVE_MINT.toBase58()
+            NATIVE_MINT.toBase58(),
           ),
         };
       }
@@ -112,7 +112,7 @@ export const claimRewards =
             type: "delegation_claim_rewards",
             description: "Claim delegation rewards",
           },
-        })
+        }),
       );
 
       const {
@@ -137,11 +137,10 @@ export const claimRewards =
 
       // Check which reward ATAs need creation
       const rewardAtaKeys = claimResult.rewardMints.map((mint) =>
-        getAssociatedTokenAddressSync(mint, walletPubkey, true)
+        getAssociatedTokenAddressSync(mint, walletPubkey, true),
       );
-      const rewardAtaAccounts = await connection.getMultipleAccountsInfo(
-        rewardAtaKeys
-      );
+      const rewardAtaAccounts =
+        await connection.getMultipleAccountsInfo(rewardAtaKeys);
       const missingAtaCount = rewardAtaAccounts.filter((a) => !a).length;
       const ataRent = missingAtaCount * RENT_COSTS.ATA;
 
@@ -167,8 +166,8 @@ export const claimRewards =
         hasMore: claimResult.hasMore || batchHasMore,
         estimatedSolFee: await toTokenAmountOutput(
           new BN(txFee),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
-    }
+    },
   );

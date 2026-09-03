@@ -35,18 +35,37 @@ export interface TransactionDraft {
   instructions: TransactionInstruction[];
   feePayer: PublicKey;
   addressLookupTableAddresses?: PublicKey[];
+  // Already-resolved lookup tables and blockhash. Both are the same answer for
+  // every transaction a multi-transaction build produces, so a caller that
+  // builds several passes them in once instead of paying a round trip per
+  // transaction.
+  addressLookupTables?: AddressLookupTableAccount[];
+  recentBlockhash?: string;
 }
 
 export interface BuildTransactionOptions {
   connection: Connection;
   draft: TransactionDraft;
   signers?: Keypair[];
+  // Set the CU limit from the static table instead of simulation. Pass true
+  // for any Jito bundle producer, for two reasons. First, a later tx's cost
+  // can depend on earlier txs' state, and a standalone sim runs against
+  // pre-bundle state: it either fails outright (delegate_v0 on a position
+  // minted in tx[0], which does not exist yet) or measures a cheaper code
+  // path than the one taken on-chain (claim_rewards_v1 only CPIs
+  // clear_recent_proposals_v0 once earlier claims have advanced
+  // last_claimed_epoch), so its 1.1x headroom under-requests and the tx dies
+  // with ProgramFailedToComplete. Second, table sizing is deterministic and
+  // state-independent, so a bundle's CU limits do not vary with whatever the
+  // chain looked like when it was built.
+  useTableComputeUnits?: boolean;
 }
 
 export async function buildVersionedTransaction({
   connection,
   draft,
   signers = [],
+  useTableComputeUnits = false,
 }: BuildTransactionOptions): Promise<VersionedTransaction> {
   const draftWithLuts = {
     ...draft,
@@ -58,22 +77,37 @@ export async function buildVersionedTransaction({
   // withPriorityFees doesn't need a blockhash (simulation replaces it), so
   // fetch it concurrently with fee/CU estimation. Observe now so an early
   // throw below doesn't leave an unhandled rejection.
-  const blockhashPromise = connection.getLatestBlockhash("finalized");
+  const blockhashPromise = draftWithLuts.recentBlockhash
+    ? Promise.resolve({ blockhash: draftWithLuts.recentBlockhash })
+    : connection.getLatestBlockhash("finalized");
   blockhashPromise.catch(() => {});
+
+  // Sized outside the try below: a table miss on a transaction that chose the
+  // table is a build failure, and the catch would otherwise price it at the
+  // 1.4M maximum and carry on.
+  const tableComputeUnitLimit = useTableComputeUnits
+    ? tableComputeUnitsForInstructions(draftWithLuts.instructions, {
+        throwOnMiss: true,
+      })
+    : undefined;
 
   let instructionsWithFees: TransactionInstruction[];
   let addressLookupTables: AddressLookupTableAccount[] | undefined;
   try {
     // Resolve LUTs once; withPriorityFees and the compile below both skip
     // their own fetch when addressLookupTables is already populated.
-    addressLookupTables = await getAddressLookupTableAccounts(
-      connection,
-      draftWithLuts.addressLookupTableAddresses
-    );
+    addressLookupTables =
+      draftWithLuts.addressLookupTables ??
+      (await getAddressLookupTableAccounts(
+        connection,
+        draftWithLuts.addressLookupTableAddresses,
+      ));
     instructionsWithFees = await withPriorityFees({
       ...draftWithLuts,
       addressLookupTables,
       connection,
+      // An explicit computeUnits skips withPriorityFees' simulation.
+      computeUnits: tableComputeUnitLimit,
       // The wallet signs this tx and may append guard ixs (Lighthouse) that
       // load more account data than a sim-derived limit allows.
       deriveLoadedAccountsDataSizeLimit: false,
@@ -81,11 +115,11 @@ export async function buildVersionedTransaction({
   } catch (error) {
     console.warn(
       "[buildVersionedTransaction] Priority fee estimation failed, using CU table fallback:",
-      error
+      error,
     );
     instructionsWithFees = prependComputeBudgetIxs(draftWithLuts.instructions, {
       computeUnits: tableComputeUnitsForInstructions(
-        draftWithLuts.instructions
+        draftWithLuts.instructions,
       ),
       // Floor price, matching withPriorityFees' basePriorityFee default —
       // no network path left to estimate a real one.
@@ -107,14 +141,14 @@ export async function buildVersionedTransaction({
           instructions: instructionsWithFees,
           recentBlockhash: (await blockhashPromise).blockhash,
         },
-        "finalized"
-      )
+        "finalized",
+      ),
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes("encoding overruns")) {
       throw new Error(
-        `Transaction too large to serialize (${instructionsWithFees.length} instructions). Split into smaller batches.`
+        `Transaction too large to serialize (${instructionsWithFees.length} instructions). Split into smaller batches.`,
       );
     }
     throw error;
@@ -205,7 +239,7 @@ export async function buildSingleTransactionResponse({
     },
     estimatedSolFee: await toTokenAmountOutput(
       new BN(required),
-      NATIVE_MINT.toBase58()
+      NATIVE_MINT.toBase58(),
     ),
   };
 }

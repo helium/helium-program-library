@@ -39,9 +39,8 @@ export const relinquishPositionVotes =
       const proposalProgram = await initProposal(provider);
 
       const [positionPubkey] = positionKey(positionMintPubkey);
-      const positionAcc = await vsrProgram.account.positionV0.fetchNullable(
-        positionPubkey
-      );
+      const positionAcc =
+        await vsrProgram.account.positionV0.fetchNullable(positionPubkey);
 
       if (!positionAcc) {
         throw errors.NOT_FOUND({ message: "Position not found" });
@@ -51,7 +50,7 @@ export const relinquishPositionVotes =
         connection,
         positionMintPubkey,
         walletPubkey,
-        errors
+        errors,
       );
 
       if (positionAcc.numActiveVotes === 0) {
@@ -62,7 +61,7 @@ export const relinquishPositionVotes =
 
       const organizationAcc =
         await orgProgram.account.organizationV0.fetchNullable(
-          organizationPubkey
+          organizationPubkey,
         );
 
       if (!organizationAcc) {
@@ -92,7 +91,7 @@ export const relinquishPositionVotes =
 
       const markerAccounts =
         await vsrProgram.account.voteMarkerV0.fetchMultiple(
-          proposals.map(({ markerPubkey }) => markerPubkey)
+          proposals.map(({ markerPubkey }) => markerPubkey),
         );
 
       const markersWithChoices = proposals.flatMap((proposal, index) => {
@@ -129,7 +128,7 @@ export const relinquishPositionVotes =
                   voter: walletPubkey,
                   position: positionPubkey,
                 })
-                .instruction()
+                .instruction(),
             );
           }
         } else {
@@ -143,7 +142,7 @@ export const relinquishPositionVotes =
                 proposal: pubkey,
                 systemProgram: SystemProgram.programId,
               })
-              .instruction()
+              .instruction(),
           );
         }
 
@@ -203,8 +202,8 @@ export const relinquishPositionVotes =
         hasMore,
         estimatedSolFee: await toTokenAmountOutput(
           new BN(totalFee),
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
       };
-    }
+    },
   );

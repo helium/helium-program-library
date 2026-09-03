@@ -2,6 +2,7 @@ import { QuoteResponse, QuoteResponseSchema } from "@helium/blockchain-api";
 import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import { createTtlCache } from "@/lib/utils/ttl-cache";
+import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
 
 // Quotes are polled repeatedly and often re-requested with identical params.
 // A short TTL plus in-flight coalescing collapses those bursts into a single
@@ -42,25 +43,18 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
         const errorText = await quoteResponse.text();
         console.error("Jupiter API error:", errorText);
 
-        // TOKEN_NOT_TRADABLE is a client issue (e.g. wallet requesting a non-tradable token),
-        // not a server error — return 400 so it doesn't get sent to Sentry.
-        if (errorText.includes("TOKEN_NOT_TRADABLE")) {
-          throw errors.BAD_REQUEST({
-            message: `Token is not tradable`,
-          });
+        const classification = classifyJupiterError({
+          status: quoteResponse.status,
+          body: errorText,
+          operation: "Failed to get quote from Jupiter",
+        });
+        if (classification.kind === "BAD_REQUEST") {
+          throw errors.BAD_REQUEST({ message: classification.message });
         }
-
-        // Surface Jupiter rate limiting as a 429 so clients can back off instead
-        // of us spamming Sentry with JUPITER_ERROR 500s.
-        if (quoteResponse.status === 429) {
+        if (classification.kind === "RATE_LIMITED") {
           throw errors.RATE_LIMITED();
         }
-
-        throw errors.JUPITER_ERROR({
-          message: `Failed to get quote from Jupiter: HTTP ${
-            quoteResponse.status
-          }: ${errorText.slice(0, 500)}`,
-        });
+        throw errors.JUPITER_ERROR({ message: classification.message });
       }
 
       const raw = await quoteResponse.json();

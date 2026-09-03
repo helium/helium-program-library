@@ -30,25 +30,27 @@ export const PROGRAMS: Record<string, string> = {
   topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU: "dc_auto_top",
   hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu: "hpl_crons",
   tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN: "tuktuk_dca",
+  nprx42sXf5rpVnwBWEdRg1d8tuCWsTuVLys1pRWwE6p: "nft_proxy",
 };
 
-// `${programId}:${discHex}` -> "programLabel.ixName". Reads target/idl
-// (the just-built IDLs) rather than @helium/idls so the check-cu-table CI
-// gate names instructions from the code under test, not the last published
-// package. Requires an `anchor build` — without it, names come up empty.
-export const loadIxNames = (): Map<string, string> => {
-  const names = new Map<string, string>();
+// IDLs for programs this repo calls but does not build (modular-governance),
+// so `anchor build` never writes them to target/idl. Fetched from the
+// program's on-chain IDL account and committed; refresh after a program
+// upgrade that adds or renames instructions.
+const EXTERNAL_IDL_DIR = path.join(__dirname, "external-idl");
+
+// Read every `<programLabel>.json` in dir into names, keyed by table key.
+const readIdlDir = (dir: string, names: Map<string, string>): void => {
   const byLabel = Object.fromEntries(
     Object.entries(PROGRAMS).map(([pid, label]) => [label, pid])
   );
-  const idlDir = path.join(REPO, "target/idl");
-  if (!fs.existsSync(idlDir)) return names;
-  for (const f of fs.readdirSync(idlDir)) {
+  if (!fs.existsSync(dir)) return;
+  for (const f of fs.readdirSync(dir)) {
     if (!f.endsWith(".json")) continue;
     const label = f.slice(0, -5);
     const pid = byLabel[label];
     if (!pid) continue;
-    const idl = JSON.parse(fs.readFileSync(path.join(idlDir, f), "utf8"));
+    const idl = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
     for (const ix of idl.instructions || []) {
       if (ix.discriminator) {
         names.set(
@@ -58,6 +60,25 @@ export const loadIxNames = (): Map<string, string> => {
       }
     }
   }
+};
+
+// `${programId}:${discHex}` -> "programLabel.ixName" from target/idl (the
+// just-built IDLs) rather than @helium/idls, so the check-cu-table CI gate
+// names instructions from the code under test, not the last published
+// package. Requires an `anchor build` — without it this is empty, which is
+// the signal check-cu-table refuses to run on.
+export const loadBuiltIxNames = (): Map<string, string> => {
+  const names = new Map<string, string>();
+  readIdlDir(path.join(REPO, "target/idl"), names);
+  return names;
+};
+
+// The built IDLs plus the committed external ones. Overlaid unconditionally:
+// sample-cu runs against mainnet on an unbuilt tree and still needs the
+// external names.
+export const loadIxNames = (): Map<string, string> => {
+  const names = loadBuiltIxNames();
+  readIdlDir(EXTERNAL_IDL_DIR, names);
   return names;
 };
 

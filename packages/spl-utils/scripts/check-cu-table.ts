@@ -16,7 +16,12 @@ import {
   INSTRUCTION_CU_TABLE,
 } from "../src/computeUnitTable";
 import { cuTableFromSamples, sampleComputeUnits } from "../src/cuSampler";
-import { formatTableEntry, loadIxNames, PROGRAMS } from "./cuTableHelpers";
+import {
+  formatTableEntry,
+  loadBuiltIxNames,
+  loadIxNames,
+  PROGRAMS,
+} from "./cuTableHelpers";
 
 // Localnet CU varies run-to-run: tests mint fresh random keypairs, so PDA
 // bump grinding (1500 CU per find_program_address iteration) shifts each
@@ -32,16 +37,18 @@ const main = async () => {
     process.env.RPC_URL || "http://127.0.0.1:8899",
     "confirmed"
   );
-  const names = loadIxNames();
   // With no IDLs every sampled key would be skipped as unlabeled and the
-  // gate would pass green having verified nothing — refuse instead.
-  if (names.size === 0) {
+  // gate would pass green having verified nothing — refuse instead. Checked
+  // on the built names alone: the committed external IDLs would otherwise
+  // make an unbuilt tree look built.
+  if (loadBuiltIxNames().size === 0) {
     console.error(
       "check-cu-table: no instruction names loaded (target/idl missing or" +
         " empty). Run `anchor build` first."
     );
     process.exit(1);
   }
+  const names = loadIxNames();
   const results = await sampleComputeUnits(connection, {
     programs: PROGRAMS,
     sigsPerProgram: parseInt(process.env.SIGS || "1000", 10),
