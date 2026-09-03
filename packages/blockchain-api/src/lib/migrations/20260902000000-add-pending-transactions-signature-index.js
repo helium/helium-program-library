@@ -42,13 +42,18 @@ module.exports = {
     const manager = queryInterface.sequelize.connectionManager;
     const client = await manager.getConnection({ type: "write" });
     try {
-      for (;;) {
+      for (let attempt = 0; ; attempt++) {
         const { rows } = await client.query(
           "SELECT pg_try_advisory_lock($1) AS got",
           [ADVISORY_LOCK_KEY],
         );
         if (rows[0].got) {
           break;
+        }
+        if (attempt === 0) {
+          console.log(
+            "Waiting for another db:migrate run to finish building the pending_transactions indexes",
+          );
         }
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
