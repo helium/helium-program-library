@@ -9,6 +9,12 @@ on:
     tags:
       - "program-*" # Push events to matching program-*, i.e. program-circuit-breaker-0.0.1
 
+# Each run creates a Squads proposal at the multisig's next transaction index. Runs for tags
+# pushed together race on that index and the losers fail with ConstraintSeeds, so serialize.
+concurrency:
+  group: release-program-mainnet
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
