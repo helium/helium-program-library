@@ -1,5 +1,72 @@
 # Change Log
 
+## 0.11.26
+
+### Patch Changes
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Harden batch status tracking. Landed batches are resolved from one batched
+  signature-status read, the status transaction is held only for writes, a status
+  update that loses the compare-and-swap reloads the row instead of overwriting a
+  terminal state, and a tick Jito cannot answer is skipped rather than marked
+  failed. Manual resubmits check batch status first, keep the stored submission
+  type, and no longer double-count the Jito tip's signature fee.
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Size every Jito bundle producer's compute unit limits from the static CU table.
+  Standalone simulation cannot see the state earlier transactions in a bundle
+  leave behind, so a later claim or delegate transaction could exceed its limit
+  and fail the bundle with `ProgramFailedToComplete`. `buildVersionedTransaction`
+  and `buildBatchedTransactions` take `useTableComputeUnits`, on by default for
+  batched builds, and the governance bundle endpoints (claim, delegate,
+  undelegate, vote, relinquish, proxy assign and unassign, create position) use
+  it. `tableComputeUnitsForInstructions` gains `throwOnMiss`, so a bundle
+  carrying an untabled instruction fails the build naming the missing key instead
+  of quietly requesting 1.4M CU. The table gains mainnet-measured entries for the
+  nft_proxy, hpl_crons vote-queue and voter_stake_registry expired-vote
+  instructions, and re-measures `vote_v0` and `relinquish_vote_v1` from mainnet.
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Report the transaction that actually failed a Jito bundle simulation: the error
+  data, the Sentry extras and the classifier all use the failing transaction's own
+  logs plus its index, instead of a flat concatenation of every transaction's logs.
+  `SIMULATION_FAILED` data carries the new optional `failedTransactionIndex`.
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Make `delegatePositions` correct and fast for many positions. Ownership, claim
+  bots, registrars and proxy configs are read in batches instead of once per
+  position, the claim-bot instructions carry every account explicitly so Anchor
+  fetches no IDL or related account per position, and each position reserves its
+  own tuktuk task id so a bundle no longer collides with itself. Lockups,
+  expirations and seasons are judged on the registrar clock, constant lockups are
+  recognized by the program's `i64::MAX` sentinel, and a season is current only
+  while `start <= now < end`, so a request past the last season is refused instead
+  of signing a bundle that panics in `delegate_v0`. The funds preflight prices
+  delegation rent from program-declared account sizes and the per-bot prepay, and
+  `createPosition` quotes every lamport the bundle charges the wallet.
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Stop resubmitting batches whose blockhash has expired. Expiry is decided from
+  each transaction's own blockhash against the cluster's block height before a
+  retry slot is consumed, and expired transactions are marked `expired` instead
+  of retrying to the cap while Jito answers "bundle contains an expired
+  blockhash". Submitting a transaction the cluster no longer accepts returns the
+  new `BLOCKHASH_EXPIRED` error, carrying the blockhash and the index of the
+  transaction in the batch, instead of a raw Jito message.
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Reject a swap quote whose input and output mint are the same. `GetQuoteInput`
+  now requires the two mints to differ, so the request fails as a 400 before it
+  reaches Jupiter instead of coming back as a `JUPITER_ERROR` 500 carrying
+  Jupiter's `CIRCULAR_ARBITRAGE_IS_DISABLED`. Jupiter's client-side error codes
+  (`CIRCULAR_ARBITRAGE_IS_DISABLED`, `TOKEN_NOT_TRADABLE`) map to `BAD_REQUEST`
+  for both `swap.getQuote` and `swap.getInstructions`, and the swap UI leaves the
+  counterpart token out of each picker so the pair can no longer be selected.
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Surface Jupiter rate limiting from `swap.getQuote` and `swap.getInstructions`
+  as `RATE_LIMITED` (429) so clients back off, classified before Jupiter's error
+  codes so a 429 body is never mistaken for a bad request.
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Fix transactions.history pinning the database CPU. Index pending_transactions on signature and batch_id (built concurrently, so the submit path keeps writing), and look up already-known signatures with one query per Helius page instead of one query per transaction.
+
+- Updated dependencies [[`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7), [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7), [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7), [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7)]:
+  - @helium/spl-utils@0.13.2
+  - @helium/blockchain-api@0.15.2
+
 ## 0.11.25
 
 ### Patch Changes
