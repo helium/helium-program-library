@@ -10,6 +10,7 @@ import {
   PROGRAM_ID as CIRCUIT_BREAKER_PROGRAM_ID,
 } from "@helium/circuit-breaker-sdk";
 import { chunks, HNT_MINT, truthy } from "@helium/spl-utils";
+import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
 import {
   isClaimed,
   PROGRAM_ID as VSR_PROGRAM_ID,
@@ -81,23 +82,6 @@ export interface BuildClaimInstructionsParams {
   walletPubkey: PublicKey;
   connection: Connection;
   hsdProgram: HsdProgram;
-}
-
-// getMultipleAccounts caps out at 100 keys per call, so anything longer is
-// split. The splits are independent reads, so they go out together: a claim
-// spanning five batches of 128 epochs is 10 round trips, and awaiting them one
-// at a time costs ten times a single round trip in request latency.
-export async function getMultipleAccounts(
-  connection: Connection,
-  keys: PublicKey[],
-): Promise<(Awaited<ReturnType<Connection["getAccountInfo"]>> | null)[]> {
-  const batches = await Promise.all(
-    chunks(keys, 100).map((batchKeys) =>
-      connection.getMultipleAccountsInfo(batchKeys),
-    ),
-  );
-
-  return batches.flat();
 }
 
 export async function buildClaimInstructions(

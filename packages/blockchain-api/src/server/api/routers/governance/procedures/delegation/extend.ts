@@ -80,7 +80,10 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
 
     const clock = await connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
     const unixTime = clock!.data.readBigInt64LE(8 * 4);
-    const now = new BN(Number(unixTime));
+    // The program judges the lockup, expiration and season against
+    // `registrar.clock_unix_timestamp()`, the cluster clock plus the
+    // registrar's time_offset. Zero on mainnet; tests dial it forward.
+    const now = new BN(Number(unixTime)).add(registrar.timeOffset);
 
     const lockupKind = getLockupKind(positionAcc.lockup);
     if (

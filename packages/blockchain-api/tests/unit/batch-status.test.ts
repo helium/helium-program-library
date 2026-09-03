@@ -231,6 +231,20 @@ describe("decideBatchStatus", () => {
     expect(decision.transactionStatuses[0].status).to.equal("pending");
   });
 
+  it("does not expire a confirmed transaction awaiting finalization once its blockhash leaves range", () => {
+    const decision = decideBatchStatus({
+      batchId: BATCH_ID,
+      transactions: [{ ...pendingRow("sigA"), blockhash: "hashA" }],
+      signatureStatuses: new Map([["sigA", confirmed]]),
+      currentBlockHeight: 400,
+      blockhashValidity: new Map([["hashA", false]]),
+      commitment: "finalized",
+    });
+
+    expect(decision.transactionStatuses[0].status).to.equal("pending");
+    expect(decision.batchStatus).to.equal("pending");
+  });
+
   it("keeps the status the bundle check produced when no transaction resolved", () => {
     const decision = decideBatchStatus({
       batchId: BATCH_ID,

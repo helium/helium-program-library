@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "child_process";
+import type { PublicKey } from "@solana/web3.js";
 import fs from "fs";
 
 type JsonRpcResponse<T> = {
@@ -209,4 +210,32 @@ export async function stopSurfpool(timeoutMs = 10_000): Promise<void> {
 
   ensurePromise = null;
   startInProgress = false;
+}
+
+/** Raw surfpool account write. Throws on RPC error, like `setTokenAccount`. */
+export async function setSurfnetAccount(
+  address: PublicKey,
+  accountInfo: { data: Buffer; owner: PublicKey; lamports: number }
+): Promise<void> {
+  const res = await fetch(getSurfpoolRpcUrl(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "surfnet_setAccount",
+      params: [
+        address.toBase58(),
+        {
+          data: accountInfo.data.toString("hex"),
+          owner: accountInfo.owner.toBase58(),
+          lamports: accountInfo.lamports,
+        },
+      ],
+    }),
+  });
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(`setAccount failed: ${JSON.stringify(json.error)}`);
+  }
 }
