@@ -47,6 +47,9 @@ async function jsonRpc<T = unknown>(
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
     signal: AbortSignal.timeout(HEALTH_REQUEST_TIMEOUT_MS),
   });
+  if (!res.ok) {
+    throw new Error(`${method} failed: HTTP ${res.status}`);
+  }
   return res.json() as Promise<JsonRpcResponse<T>>;
 }
 
