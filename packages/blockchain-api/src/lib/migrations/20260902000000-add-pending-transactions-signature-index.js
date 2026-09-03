@@ -20,6 +20,13 @@
  * locks belong to one connection, so the whole migration runs on a single
  * client taken from the pool rather than through sequelize's pooled query.
  *
+ * The lock is polled with pg_try_advisory_lock rather than taken with the
+ * blocking pg_advisory_lock. A session parked inside pg_advisory_lock holds an
+ * open snapshot, and CREATE INDEX CONCURRENTLY waits for exactly those
+ * snapshots before it can finish, so the holder and the waiter deadlock and
+ * postgres kills one of them. Each try is its own short statement, so the
+ * waiter holds no snapshot between attempts.
+ *
  * @type {import('sequelize-cli').Migration}
  */
 const INDEXES = [
@@ -35,7 +42,16 @@ module.exports = {
     const manager = queryInterface.sequelize.connectionManager;
     const client = await manager.getConnection({ type: "write" });
     try {
-      await client.query("SELECT pg_advisory_lock($1)", [ADVISORY_LOCK_KEY]);
+      for (;;) {
+        const { rows } = await client.query(
+          "SELECT pg_try_advisory_lock($1) AS got",
+          [ADVISORY_LOCK_KEY],
+        );
+        if (rows[0].got) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
       try {
         for (const { name, column } of INDEXES) {
           // to_regclass resolves through the search path, the same way the

@@ -234,6 +234,9 @@ export async function setSurfnetAccount(
       ],
     }),
   });
+  if (!res.ok) {
+    throw new Error(`setAccount failed: HTTP ${res.status}`);
+  }
   const json = await res.json();
   if (json.error) {
     throw new Error(`setAccount failed: ${JSON.stringify(json.error)}`);
