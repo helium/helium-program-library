@@ -252,6 +252,46 @@ describe("mini-fanout under bankrun", () => {
     };
   }
 
+  /**
+   * Rewrite the fanout's stored `next_pre_task` to `key`. A fanout holding a claim on a
+   * slot it does not own is a state no instruction writes, so only a direct rewrite of
+   * the account produces it.
+   */
+  async function plantNextPreTask(miniFanout: PublicKey, key: PublicKey) {
+    const original = await readAccount(ctx, miniFanout);
+    const before = program.coder.accounts.decode(
+      "miniFanoutV0",
+      Buffer.from(original!)
+    );
+    const planted = Buffer.from(original!);
+    const at = planted.indexOf(Buffer.from(before.nextPreTask.toBytes()));
+    expect(at).to.be.greaterThan(-1);
+    planted.set(key.toBytes(), at);
+    await overwriteAccountData(ctx, miniFanout, planted);
+  }
+
+  /** Reschedule through `update_mini_fanout_v0`, changing nothing but the task ids. */
+  async function rescheduleViaUpdate(miniFanout: PublicKey) {
+    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(
+      taskQueue
+    );
+    const [newPreTaskId, newTaskId] = nextAvailableTaskIds(taskBitmap, 2, true);
+    await program.methods
+      .updateMiniFanoutV0({ shares: null, schedule: null, newTaskId, newPreTaskId })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+      ])
+      .accounts({
+        payer: me,
+        owner: me,
+        miniFanout,
+        newTask: taskKey(taskQueue, newTaskId)[0],
+        newPreTask: taskKey(taskQueue, newPreTaskId)[0],
+        taskRentRefund: me,
+      })
+      .rpc();
+  }
+
   const crank = async (task: PublicKey) =>
     send([
       ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
@@ -326,6 +366,91 @@ describe("mini-fanout under bankrun", () => {
     );
   });
 
+  it("records no next pre task when the fanout has none", async () => {
+    const wallet = Keypair.generate();
+    await ataWith(wallet.publicKey, 0);
+
+    const { miniFanout, task } = await scheduledFanout({
+      seed: "no-pre-task",
+      shares: [shareOf(wallet.publicKey, 100)],
+      preTask: null,
+    });
+
+    // schedule_task_v0 queued this one, so this is the declaration at that call site.
+    const queued = await tuktukProgram.account.taskV0.fetch(task);
+    expect(queued.freeTasks).to.equal(1);
+
+    await warpTo(ctx, BigInt(queued.trigger.timestamp![0].toString()));
+    await crank(task);
+
+    const acc = await program.account.miniFanoutV0.fetch(miniFanout);
+    // The fanout's own key is the sentinel for there being no next pre task, so the
+    // second free task slot is not recorded and distribute_v0 stays runnable.
+    expect(acc.nextPreTask.toBase58()).to.equal(miniFanout.toBase58());
+    // One slot for the next distribution, and none for a pre task it will not queue.
+    const next = await tuktukProgram.account.taskV0.fetch(acc.nextTask);
+    expect(next.freeTasks).to.equal(1);
+
+    // Runnable again next cycle, which is what the sentinel buys.
+    await warpTo(ctx, BigInt(next.trigger.timestamp![0].toString()));
+    await crank(acc.nextTask);
+    const after = await program.account.miniFanoutV0.fetch(miniFanout);
+    expect(after.nextPreTask.toBase58()).to.equal(miniFanout.toBase58());
+  });
+
+  it("pays a share member what it was owed once its account exists", async () => {
+    const [wallet1, wallet2] = [Keypair.generate(), Keypair.generate()];
+    const wallet1Ata = await ataWith(wallet1.publicKey, 0);
+
+    const { miniFanout, task, preTask } = await scheduledFanout({
+      seed: "settles-owed",
+      shares: [shareOf(wallet1.publicKey, 50), shareOf(wallet2.publicKey, 50)],
+    });
+
+    const distribute = await reachDistribution(task, preTask);
+    await distribute();
+
+    const acc = await program.account.miniFanoutV0.fetch(miniFanout);
+    expect(acc.shares[1].totalOwed.toNumber()).to.be.greaterThan(0);
+
+    // Give wallet2 somewhere to receive, then reach the next distribution.
+    const wallet2Ata = await ataWith(wallet2.publicKey, 0);
+    const again = await reachDistribution(acc.nextTask, acc.nextPreTask);
+    await again();
+
+    const settled = await program.account.miniFanoutV0.fetch(miniFanout);
+    expect(settled.shares[1].totalOwed.toNumber()).to.equal(0);
+
+    // Settling comes off the top, so the whole pool goes to the member that was
+    // behind and the two end on the even split the weights describe. The member
+    // already paid receives nothing further, which is what stops the settlement
+    // being a second payout of the same tokens.
+    const fanoutAta = getAssociatedTokenAddressSync(mint, miniFanout, true);
+    expect(Number(await tokenAmount(ctx, wallet1Ata))).to.equal(FANOUT_AMOUNT / 2);
+    expect(Number(await tokenAmount(ctx, wallet2Ata))).to.equal(FANOUT_AMOUNT / 2);
+    expect(Number(await tokenAmount(ctx, fanoutAta))).to.equal(0);
+  });
+
+  it("distributes when the share weights exceed a u32", async () => {
+    const [wallet1, wallet2] = [Keypair.generate(), Keypair.generate()];
+    const ata1 = await ataWith(wallet1.publicKey, 0);
+    const ata2 = await ataWith(wallet2.publicKey, 0);
+
+    // Two weights whose sum is wider than a u32, which is the width the running
+    // total has to carry.
+    const half = 0xffffffff;
+    const { task, preTask } = await scheduledFanout({
+      seed: "wide-weights",
+      shares: [shareOf(wallet1.publicKey, half), shareOf(wallet2.publicKey, half)],
+    });
+
+    const distribute = await reachDistribution(task, preTask);
+    await distribute();
+
+    expect(Number(await tokenAmount(ctx, ata1))).to.equal(FANOUT_AMOUNT / 2);
+    expect(Number(await tokenAmount(ctx, ata2))).to.equal(FANOUT_AMOUNT / 2);
+  });
+
   it("distributes to 6 wallets in one transaction", async () => {
     const wallets = Array.from({ length: 6 }, () => Keypair.generate());
     const atas = [];
@@ -387,6 +512,147 @@ describe("mini-fanout under bankrun", () => {
     expect(await programErrorLogs(distribute())).to.match(
       /Error Code: InvalidPreTask\. Error Number: 6011\./
     );
+  });
+
+  it("clears a stale next pre task when it reschedules", async () => {
+    const wallet = Keypair.generate();
+    await ataWith(wallet.publicKey, 0);
+    const { miniFanout } = await scheduledFanout({
+      seed: "clears-stale",
+      shares: [shareOf(wallet.publicKey, 100)],
+      preTask: null,
+    });
+
+    // Plant a key no instruction writes: a fanout holding a claim on a slot it does not
+    // own is the state this clears, and only a direct rewrite can produce it.
+    const stale = Keypair.generate().publicKey;
+    await plantNextPreTask(miniFanout, stale);
+    expect(
+      (await program.account.miniFanoutV0.fetch(miniFanout)).nextPreTask.toBase58()
+    ).to.equal(stale.toBase58());
+
+    await rescheduleViaUpdate(miniFanout);
+
+    const after = await program.account.miniFanoutV0.fetch(miniFanout);
+    expect(after.nextPreTask.toBase58()).to.equal(miniFanout.toBase58());
+
+    // The queued transaction carries the `next_pre_task` `get_task_ix` read, and
+    // `distribute_v0` checks it against the stored one, so running the task is what
+    // says the two agree.
+    const queued = await tuktukProgram.account.taskV0.fetch(after.nextTask);
+    await warpTo(ctx, BigInt(queued.trigger.timestamp![0].toString()));
+    await crank(after.nextTask);
+    expect(
+      (await program.account.miniFanoutV0.fetch(miniFanout)).nextPreTask.toBase58()
+    ).to.equal(miniFanout.toBase58());
+  });
+
+  it("clears a stale next pre task when a delegate changes", async () => {
+    const wallet = Keypair.generate();
+    await ataWith(wallet.publicKey, 0);
+    const { miniFanout } = await scheduledFanout({
+      seed: "clears-stale-delegate",
+      shares: [shareOf(wallet.publicKey, 100)],
+      preTask: null,
+    });
+
+    const stale = Keypair.generate().publicKey;
+    await plantNextPreTask(miniFanout, stale);
+
+    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    const [newPreTaskId, newTaskId] = nextAvailableTaskIds(taskBitmap, 2, true);
+    await program.methods
+      .updateWalletDelegateV0({
+        newTaskId,
+        newPreTaskId,
+        delegate: Keypair.generate().publicKey,
+        index: 0,
+      })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+      ])
+      .accounts({
+        payer: me,
+        wallet: wallet.publicKey,
+        miniFanout,
+        newTask: taskKey(taskQueue, newTaskId)[0],
+        newPreTask: taskKey(taskQueue, newPreTaskId)[0],
+      })
+      .signers([wallet])
+      .rpc();
+
+    expect(
+      (await program.account.miniFanoutV0.fetch(miniFanout)).nextPreTask.toBase58()
+    ).to.equal(miniFanout.toBase58());
+  });
+
+  it("clears a stale next pre task whose account is not empty", async () => {
+    const wallet = Keypair.generate();
+    await ataWith(wallet.publicKey, 0);
+    const { miniFanout } = await scheduledFanout({
+      seed: "stuck-nonempty",
+      shares: [shareOf(wallet.publicKey, 100)],
+      preTask: null,
+    });
+
+    // Plant a key whose account is live and is not a task: the shape a recorded free task
+    // slot takes once something else occupies that id. A fanout with no pre task never
+    // owned the slot, so it must neither close what is there nor be trapped by it.
+    await plantNextPreTask(miniFanout, taskQueue);
+    const queueBefore = await readAccount(ctx, taskQueue);
+
+    await rescheduleViaUpdate(miniFanout);
+
+    // Repaired, and the account that was sitting in the slot is still there.
+    expect(
+      (await program.account.miniFanoutV0.fetch(miniFanout)).nextPreTask.toBase58()
+    ).to.equal(miniFanout.toBase58());
+    expect((await readAccount(ctx, taskQueue))!.length).to.equal(queueBefore!.length);
+  });
+
+  it("changes a delegate on a fanout with nothing scheduled", async () => {
+    const wallet = Keypair.generate();
+    await ataWith(wallet.publicKey, 0);
+    // No scheduleTaskV0, so next_task is still the sentinel initialize wrote.
+    const {
+      pubkeys: { miniFanout },
+    } = await program.methods
+      .initializeMiniFanoutV0({
+        seed: Buffer.from("unscheduled-delegate", "utf-8"),
+        shares: [shareOf(wallet.publicKey, 100)],
+        schedule: HOURLY,
+        preTask: null,
+      })
+      .accounts({ payer: me, owner: me, taskQueue, rentRefund: me, mint })
+      .rpcAndKeys();
+    await send([
+      SystemProgram.transfer({
+        fromPubkey: me,
+        toPubkey: miniFanout!,
+        lamports: 1000000000,
+      }),
+    ]);
+
+    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    const [newPreTaskId, newTaskId] = nextAvailableTaskIds(taskBitmap, 2, true);
+    const delegate = Keypair.generate().publicKey;
+    await program.methods
+      .updateWalletDelegateV0({ newTaskId, newPreTaskId, delegate, index: 0 })
+      .preInstructions([
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+      ])
+      .accounts({
+        payer: me,
+        wallet: wallet.publicKey,
+        miniFanout: miniFanout!,
+        newTask: taskKey(taskQueue, newTaskId)[0],
+        newPreTask: taskKey(taskQueue, newPreTaskId)[0],
+      })
+      .signers([wallet])
+      .rpc();
+
+    const acc = await program.account.miniFanoutV0.fetch(miniFanout!);
+    expect(acc.shares[0].delegate.toBase58()).to.equal(delegate.toBase58());
   });
 
   it("rewrites an account the programs would not produce", async () => {

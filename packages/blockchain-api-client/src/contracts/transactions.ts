@@ -15,7 +15,7 @@ import {
   HistoryOutputSchema,
 } from "../schemas/transactions";
 import { BAD_REQUEST, CONFLICT, NOT_FOUND } from "../errors/common";
-import { SIMULATION_FAILED } from "../errors/solana";
+import { BLOCKHASH_EXPIRED, SIMULATION_FAILED } from "../errors/solana";
 
 export const transactionsContract = oc.tag("Transactions").router({
   submit: oc
@@ -28,6 +28,7 @@ export const transactionsContract = oc.tag("Transactions").router({
     .output(SubmitOutputSchema)
     .errors({
       BAD_REQUEST,
+      BLOCKHASH_EXPIRED,
       CONFLICT,
       SIMULATION_FAILED,
     }),

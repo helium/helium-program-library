@@ -12,9 +12,13 @@ import {
   JitoBundleSubmissionError,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
-import { predictSubmissionType } from "@/lib/utils/submission-helpers";
+import {
+  isClientCraftedBundleTag,
+  predictSubmissionType,
+} from "@/lib/utils/submission-helpers";
 import { verifiedFeePayer } from "@/lib/utils/transaction-payer";
 import { v4 as uuidv4 } from "uuid";
+import { probeBlockhashValidity } from "@/lib/utils/blockhash-expiry";
 import {
   JitoMissingTipError,
   SingleTransactionSubmissionError,
@@ -94,6 +98,7 @@ function captureSubmissionError(
         ...baseExtra,
         failure_detail: error.detail,
         summary: error.summary,
+        failed_transaction_index: error.failedTransactionIndex,
         simulation_logs: error.logs,
         transaction_results: error.transactionResults,
         explorer_links: error.explorerLinks,
@@ -223,10 +228,64 @@ export const submit = publicProcedure.transactions.submit.handler(
       });
     }
 
+    let transactionBlockhashes: string[];
+    try {
+      transactionBlockhashes = transactions.map(
+        (tx) =>
+          VersionedTransaction.deserialize(
+            Buffer.from(tx.serializedTransaction, "base64"),
+          ).message.recentBlockhash,
+      );
+    } catch {
+      throw errors.BAD_REQUEST({
+        message: "Failed to decode transaction",
+      });
+    }
+
+    // A transaction only lands while its own blockhash is in range. A bundle
+    // the user took too long to sign is already dead on arrival: submitting it
+    // draws "bundle contains an expired blockhash" from Jito and then sits in
+    // the resubmission loop until its retry cap. Reject it here so the client
+    // can rebuild and re-sign, and so the recorded lifetime always belongs to a
+    // blockhash the cluster still accepts.
+    //
+    // Only a client-crafted bundle can arrive stale — the user signs it at
+    // their own pace. A server-built bundle carries a blockhash this service
+    // minted moments ago, so it pays no probe round trip.
+    const connection = new Connection(env.SOLANA_RPC_URL);
+    const probesBlockhashes = isClientCraftedBundleTag(tag);
+    const [latestBlockhash, blockhashValidity] = await Promise.all([
+      connection.getLatestBlockhash({ commitment: "finalized" }),
+      probeBlockhashValidity(
+        connection,
+        probesBlockhashes ? transactionBlockhashes : [],
+      ),
+    ]);
+
+    const expiredIndex = transactionBlockhashes.findIndex(
+      (blockhash) => blockhashValidity.get(blockhash) === false,
+    );
+    if (expiredIndex >= 0) {
+      throw errors.BLOCKHASH_EXPIRED({
+        data: {
+          blockhash: transactionBlockhashes[expiredIndex],
+          failedTransactionIndex: expiredIndex,
+        },
+      });
+    }
+
+    // The stored lifetime is only an upper bound: a transaction cannot outlive the
+    // blockhash the cluster just handed out. Whether its own, possibly older,
+    // blockhash is still in range is decided on every status read by probing that
+    // blockhash (see isTransactionExpired), so the bound is never used to keep a
+    // dead batch alive — and a row with no bound at all would be read as expired
+    // the first time the probe cannot answer.
+    const lastValidBlockHeights = transactionBlockhashes.map(
+      () => latestBlockhash.lastValidBlockHeight,
+    );
+
     // Simulate transactions before submission (except for sequential batches)
     if (simulate && (parallel || transactions.length === 1)) {
-      const connection = new Connection(env.SOLANA_RPC_URL);
-
       const simulationPromises = transactions.map(async (tx, index) => {
         try {
           const transaction = VersionedTransaction.deserialize(
@@ -441,13 +500,13 @@ export const submit = publicProcedure.transactions.submit.handler(
 
       if (error instanceof BundleSimulationError) {
         if (error.category === "account_not_found") {
-          const connection = new Connection(env.SOLANA_RPC_URL);
           const balance = await connection.getBalance(new PublicKey(payer));
           if (balance === 0) {
             throw errors.SIMULATION_FAILED({
               message: `Transaction payer ${payer} has 0 SOL`,
               data: {
                 logs: error.logs,
+                failedTransactionIndex: error.failedTransactionIndex,
               },
             });
           }
@@ -456,6 +515,7 @@ export const submit = publicProcedure.transactions.submit.handler(
           message: error.message,
           data: {
             logs: error.logs,
+            failedTransactionIndex: error.failedTransactionIndex,
           },
         });
       }
@@ -464,11 +524,6 @@ export const submit = publicProcedure.transactions.submit.handler(
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
-
-    const connection = new Connection(env.SOLANA_RPC_URL);
-    const { lastValidBlockHeight } = await connection.getLatestBlockhash({
-      commitment: "finalized",
-    });
 
     // Use database transaction to ensure data consistency
     const dbTransaction = await sequelize.transaction();
@@ -502,32 +557,21 @@ export const submit = publicProcedure.transactions.submit.handler(
         );
       }
 
-      // Create individual transaction records
-      const pendingTransactionPromises = transactions.map(async (txData, i) => {
-        const signature = result.signatures?.[i] || null;
-
-        // Decode transaction to get blockhash
-        const transaction = VersionedTransaction.deserialize(
-          Buffer.from(txData.serializedTransaction, "base64"),
-        );
-
-        return PendingTransaction.create(
-          {
-            signature: signature || `${batchId}-${i}`,
-            blockhash: transaction.message.recentBlockhash,
-            lastValidBlockHeight,
-            status: "pending",
-            type: txData.metadata?.type || "batch",
-            batchId,
-            payer,
-            metadata: txData.metadata,
-            serializedTransaction: txData.serializedTransaction,
-          },
-          { transaction: dbTransaction },
-        );
-      });
-
-      await Promise.all(pendingTransactionPromises);
+      // One statement on the connection the database transaction pins.
+      await PendingTransaction.bulkCreate(
+        transactions.map((txData, i) => ({
+          signature: result.signatures?.[i] || `${batchId}-${i}`,
+          blockhash: transactionBlockhashes[i],
+          lastValidBlockHeight: lastValidBlockHeights[i],
+          status: "pending",
+          type: txData.metadata?.type || "batch",
+          batchId,
+          payer,
+          metadata: txData.metadata,
+          serializedTransaction: txData.serializedTransaction,
+        })),
+        { transaction: dbTransaction },
+      );
 
       // Commit the transaction
       await dbTransaction.commit();

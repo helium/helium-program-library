@@ -55,6 +55,13 @@ import {
   toLockupKindArg,
   LockupKindType,
   buildBatchedTransactions,
+  getAutomationRentLamports,
+  getMissingEpochInfoRentLamports,
+  DELEGATED_POSITION_SPACE,
+  DELEGATION_CLAIM_TASK_SPACE,
+  POSITION_SPACE,
+  TOKEN_METADATA_CREATE_FEE,
+  TOKEN_METADATA_SPACE,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
 import { canSign } from "@/lib/utils/can-sign";
@@ -107,7 +114,7 @@ export const create = publicProcedure.governance.createPosition.handler(
 
     const registrarAcc = await vsrProgram.account.registrar.fetch(registrar);
     const proxyConfig = await proxyProgram.account.proxyConfigV0.fetch(
-      registrarAcc.proxyConfig
+      registrarAcc.proxyConfig,
     );
 
     const mintKeypair = Keypair.generate();
@@ -116,7 +123,7 @@ export const create = publicProcedure.governance.createPosition.handler(
     const delegateInstructions: TransactionInstruction[] = [];
 
     const mintRent = await connection.getMinimumBalanceForRentExemption(
-      MintLayout.span
+      MintLayout.span,
     );
 
     instructions.push(
@@ -126,7 +133,7 @@ export const create = publicProcedure.governance.createPosition.handler(
         lamports: mintRent,
         space: MintLayout.span,
         programId: TOKEN_PROGRAM_ID,
-      })
+      }),
     );
 
     instructions.push(
@@ -134,8 +141,8 @@ export const create = publicProcedure.governance.createPosition.handler(
         mintKeypair.publicKey,
         0,
         position,
-        position
-      )
+        position,
+      ),
     );
 
     instructions.push(
@@ -152,7 +159,7 @@ export const create = publicProcedure.governance.createPosition.handler(
           depositMint: mintPubkey,
           recipient: walletPubkey,
         })
-        .instruction()
+        .instruction(),
     );
 
     instructions.push(
@@ -165,15 +172,21 @@ export const create = publicProcedure.governance.createPosition.handler(
           position,
           mint: mintPubkey,
         })
-        .instruction()
+        .instruction(),
     );
+
+    // Rent the delegate tx may charge, only knowable while its instructions are
+    // built: the epoch-info accounts delegateV0 opens on demand, and the crank
+    // reward tuktuk moves onto a queued task.
+    const epochInfoKeys: PublicKey[] = [];
+    let queuedTaskCrankReward = 0;
+    let queuesClaimTask = false;
 
     if (subDaoMint) {
       const subDaoMintPubkey = new PublicKey(subDaoMint);
       const [delegateSubDaoK] = subDaoKey(subDaoMintPubkey);
-      const subDaoAcc = await hsdProgram.account.subDaoV0.fetchNullable(
-        delegateSubDaoK
-      );
+      const subDaoAcc =
+        await hsdProgram.account.subDaoV0.fetchNullable(delegateSubDaoK);
 
       if (!subDaoAcc) {
         throw errors.BAD_REQUEST({
@@ -199,9 +212,11 @@ export const create = publicProcedure.governance.createPosition.handler(
             kind: toLockupKindArg(lockupKind as LockupKindType),
             endTs,
           }),
-          expirationTs
-        )
+          expirationTs,
+        ),
       );
+
+      epochInfoKeys.push(subDaoEpochInfo, endSubDaoEpochInfoKey);
 
       delegateInstructions.push(
         await hsdProgram.methods
@@ -216,7 +231,7 @@ export const create = publicProcedure.governance.createPosition.handler(
             closingTimeSubDaoEpochInfo: endSubDaoEpochInfoKey,
             genesisEndSubDaoEpochInfo: endSubDaoEpochInfoKey,
           })
-          .instruction()
+          .instruction(),
       );
 
       if (automationEnabled) {
@@ -227,8 +242,8 @@ export const create = publicProcedure.governance.createPosition.handler(
             walletPubkey,
             getAssociatedTokenAddressSync(HNT_MINT, walletPubkey, true),
             walletPubkey,
-            HNT_MINT
-          )
+            HNT_MINT,
+          ),
         );
 
         delegateInstructions.push(
@@ -242,15 +257,15 @@ export const create = publicProcedure.governance.createPosition.handler(
               positionTokenAccount: getAssociatedTokenAddressSync(
                 mintKeypair.publicKey,
                 walletPubkey,
-                true
+                true,
               ),
             })
-            .instruction()
+            .instruction(),
         );
 
         const delegationClaimBotK = delegationClaimBotKey(
           TASK_QUEUE,
-          delegatedPosKey
+          delegatedPosKey,
         )[0];
 
         delegateInstructions.push(
@@ -258,19 +273,21 @@ export const create = publicProcedure.governance.createPosition.handler(
             fromPubkey: walletPubkey,
             toPubkey: delegationClaimBotK,
             lamports: BigInt(PREPAID_TX_FEES * LAMPORTS_PER_SOL),
-          })
+          }),
         );
 
         const tuktukProgram = await import("@helium/tuktuk-sdk").then((m) =>
-          m.init(provider)
+          m.init(provider),
         );
         const taskQueueAcc =
           await tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE);
 
         if (taskQueueAcc) {
+          queuesClaimTask = true;
+          queuedTaskCrankReward = taskQueueAcc.minCrankReward.toNumber();
           const nextAvailable = nextAvailableTaskIds(
             taskQueueAcc.taskBitmap,
-            1
+            1,
           )[0];
           const task = taskKey(TASK_QUEUE, nextAvailable)[0];
 
@@ -288,7 +305,7 @@ export const create = publicProcedure.governance.createPosition.handler(
                 positionTokenAccount: getAssociatedTokenAddressSync(
                   mintKeypair.publicKey,
                   walletPubkey,
-                  true
+                  true,
                 ),
                 taskQueue: TASK_QUEUE,
                 delegatedPosition: delegatedPosKey,
@@ -296,13 +313,13 @@ export const create = publicProcedure.governance.createPosition.handler(
                 delegatorAta: getAssociatedTokenAddressSync(
                   HNT_MINT,
                   walletPubkey,
-                  true
+                  true,
                 ),
                 task,
                 nextTask: task,
                 rentRefund: walletPubkey,
               })
-              .instruction()
+              .instruction(),
           );
         }
       }
@@ -348,38 +365,56 @@ export const create = publicProcedure.governance.createPosition.handler(
       });
 
     const cluster = getCluster();
-    const jitoTipCost =
+    const bundled =
       (cluster === "mainnet" || cluster === "mainnet-beta") &&
-      versionedTransactions.length > 1
-        ? getJitoTipAmountLamports()
-        : 0;
+      versionedTransactions.length > 1;
+    // The tip transaction is already in versionedTransactions, so only the tip
+    // amount itself is added here.
+    const jitoTipCost = bundled ? getJitoTipAmountLamports() : 0;
     // initializePositionV0 and the delegate/automation instructions create
     // several accounts the wallet must fund rent for. Counting only the mint
     // lets a low-SOL wallet pass this check, then fail on-chain inside
     // initializePositionV0 with a System ResultWithNegativeLamports surfaced as
     // an opaque Custom(1) bundle-simulation error instead of INSUFFICIENT_FUNDS.
-    const [positionRent, delegatedPositionRent, claimBotRent] =
-      await Promise.all([
-        connection.getMinimumBalanceForRentExemption(
-          vsrProgram.account.positionV0.size
-        ),
-        subDaoMint
-          ? connection.getMinimumBalanceForRentExemption(
-              hsdProgram.account.delegatedPositionV0.size
-            )
-          : Promise.resolve(0),
-        subDaoMint && automationEnabled
-          ? connection.getMinimumBalanceForRentExemption(
-              hplCronsProgram.account.delegationClaimBotV0.size
-            )
-          : Promise.resolve(0),
-      ]);
+    const automates = Boolean(subDaoMint) && automationEnabled;
+    const [
+      positionRent,
+      metadataRent,
+      delegatedPositionRent,
+      epochInfoRent,
+      claimTaskRent,
+      automationRent,
+      walletBalance,
+    ] = await Promise.all([
+      connection.getMinimumBalanceForRentExemption(POSITION_SPACE),
+      connection.getMinimumBalanceForRentExemption(TOKEN_METADATA_SPACE),
+      subDaoMint
+        ? connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE)
+        : Promise.resolve(0),
+      getMissingEpochInfoRentLamports({ connection, epochInfoKeys }),
+      queuesClaimTask
+        ? connection.getMinimumBalanceForRentExemption(
+            DELEGATION_CLAIM_TASK_SPACE,
+          )
+        : Promise.resolve(0),
+      getAutomationRentLamports({
+        connection,
+        walletPubkey,
+        newClaimBots: automates ? 1 : 0,
+        createsHntAta: automates,
+      }),
+      connection.getBalance(walletPubkey),
+    ]);
     const createdAccountRent =
       positionRent +
-      RENT_COSTS.ATA + // position NFT token account
+      metadataRent +
+      TOKEN_METADATA_CREATE_FEE +
+      RENT_COSTS.ATA * 2 + // position NFT token account and the deposit vault
       delegatedPositionRent +
-      claimBotRent +
-      (subDaoMint && automationEnabled ? RENT_COSTS.TUKTUK_TASK : 0); // delegation claim task
+      epochInfoRent +
+      automationRent +
+      claimTaskRent +
+      queuedTaskCrankReward;
 
     const estimatedSolFeeLamports =
       (await getTotalTransactionFees(connection, versionedTransactions)) +
@@ -387,9 +422,8 @@ export const create = publicProcedure.governance.createPosition.handler(
       mintRent +
       createdAccountRent +
       MIN_WALLET_RENT_LAMPORTS +
-      (automationEnabled ? PREPAID_TX_FEES * LAMPORTS_PER_SOL : 0);
+      (automates ? PREPAID_TX_FEES * LAMPORTS_PER_SOL : 0);
 
-    const walletBalance = await connection.getBalance(walletPubkey);
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to create position",
@@ -404,7 +438,7 @@ export const create = publicProcedure.governance.createPosition.handler(
     const depositAta = getAssociatedTokenAddressSync(
       mintPubkey,
       walletPubkey,
-      true
+      true,
     );
     const depositAtaInfo = await connection
       .getTokenAccountBalance(depositAta)
@@ -431,7 +465,7 @@ export const create = publicProcedure.governance.createPosition.handler(
           type: "position_create",
           tokenAmount: await toTokenAmountOutput(
             new BN(tokenAmount.amount),
-            tokenAmount.mint
+            tokenAmount.mint,
           ),
           tokenName: TOKEN_NAMES[tokenAmount.mint],
           lockupKind,
@@ -440,8 +474,8 @@ export const create = publicProcedure.governance.createPosition.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

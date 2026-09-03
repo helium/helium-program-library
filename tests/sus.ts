@@ -14,6 +14,7 @@ import {
   SPL_NOOP_PROGRAM_ID,
 } from "@solana/spl-account-compression";
 import {
+  ACCOUNT_SIZE,
   createAssociatedTokenAccountIdempotentInstruction,
   createTransferInstruction,
   getAssociatedTokenAddressSync,
@@ -85,9 +86,20 @@ describe("sus", () => {
     expect(writableAccounts[2].owner?.toBase58()).to.eq(SUS.toBase58());
     expect(writableAccounts[2].metadata?.decimals).to.eq(8);
 
-    console.log(balanceChanges[0]);
+    // SUS funds the token account this transaction creates and pays the fee, so its SOL
+    // change is the rent-exempt minimum for that account plus the fee. Both are cluster
+    // parameters read from the chain rather than written here: the rent-exempt minimum for a
+    // token account is a devnet setting that moves, and a literal cannot track it. `sus`
+    // reports the change it observes in simulation, so the two are computed independently.
+    const [rentExemption, feeResponse] = await Promise.all([
+      connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE),
+      connection.getFeeForMessage(transaction.compileMessage()),
+    ]);
+    expect(feeResponse.value, "fee for the simulated message").to.not.be.null;
+    const expectedSolChange = BigInt(-(rentExemption + feeResponse.value!));
+
     expect(balanceChanges[0].owner.toBase58()).to.eq(SUS.toBase58());
-    expect(balanceChanges[0].amount).to.eq(BigInt(-2044280));
+    expect(balanceChanges[0].amount).to.eq(expectedSolChange);
 
     expect(balanceChanges[1].owner.toBase58()).to.eq(
       PublicKey.default.toBase58()

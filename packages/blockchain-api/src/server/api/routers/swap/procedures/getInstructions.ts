@@ -17,6 +17,7 @@ import {
 import { NATIVE_MINT } from "@solana/spl-token";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { TOKEN_NAMES } from "@/lib/constants/tokens";
+import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
 import BN from "bn.js";
 
 /**
@@ -59,14 +60,19 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     if (!instructionsResponse.ok) {
       const errorText = await instructionsResponse.text();
       console.error("Jupiter API error:", errorText);
-      if (instructionsResponse.status === 429) {
+
+      const classification = classifyJupiterError({
+        status: instructionsResponse.status,
+        body: errorText,
+        operation: "Failed to get swap instructions from Jupiter",
+      });
+      if (classification.kind === "BAD_REQUEST") {
+        throw errors.BAD_REQUEST({ message: classification.message });
+      }
+      if (classification.kind === "RATE_LIMITED") {
         throw errors.RATE_LIMITED();
       }
-      throw errors.JUPITER_ERROR({
-        message: `Failed to get swap instructions from Jupiter: HTTP ${
-          instructionsResponse.status
-        }: ${errorText.slice(0, 500)}`,
-      });
+      throw errors.JUPITER_ERROR({ message: classification.message });
     }
 
     const instructions = await instructionsResponse.json();

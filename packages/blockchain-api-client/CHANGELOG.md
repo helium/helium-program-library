@@ -1,5 +1,30 @@
 # Change Log
 
+## 0.15.2
+
+### Patch Changes
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Report the transaction that actually failed a Jito bundle simulation: the error
+  data, the Sentry extras and the classifier all use the failing transaction's own
+  logs plus its index, instead of a flat concatenation of every transaction's logs.
+  `SIMULATION_FAILED` data carries the new optional `failedTransactionIndex`.
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Stop resubmitting batches whose blockhash has expired. Expiry is decided from
+  each transaction's own blockhash against the cluster's block height before a
+  retry slot is consumed, and expired transactions are marked `expired` instead
+  of retrying to the cap while Jito answers "bundle contains an expired
+  blockhash". Submitting a transaction the cluster no longer accepts returns the
+  new `BLOCKHASH_EXPIRED` error, carrying the blockhash and the index of the
+  transaction in the batch, instead of a raw Jito message.
+
+- [#1286](https://github.com/helium/helium-program-library/pull/1286) [`d7b31af`](https://github.com/helium/helium-program-library/commit/d7b31afab5d4441db2a461dddec31d37c4e6e8c7) Thanks [@bryzettler](https://github.com/bryzettler)! - Reject a swap quote whose input and output mint are the same. `GetQuoteInput`
+  now requires the two mints to differ, so the request fails as a 400 before it
+  reaches Jupiter instead of coming back as a `JUPITER_ERROR` 500 carrying
+  Jupiter's `CIRCULAR_ARBITRAGE_IS_DISABLED`. Jupiter's client-side error codes
+  (`CIRCULAR_ARBITRAGE_IS_DISABLED`, `TOKEN_NOT_TRADABLE`) map to `BAD_REQUEST`
+  for both `swap.getQuote` and `swap.getInstructions`, and the swap UI leaves the
+  counterpart token out of each picker so the pair can no longer be selected.
+
 ## 0.15.1
 
 ### Patch Changes

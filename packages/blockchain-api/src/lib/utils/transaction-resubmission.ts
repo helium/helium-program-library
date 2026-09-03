@@ -1,8 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
-import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { VersionedTransaction } from "@solana/web3.js";
 import { Op } from "sequelize";
 import { sequelize } from "../db";
-import { env } from "../env";
 import { defineAssociations } from "../models/associations";
 import PendingTransaction from "../models/pending-transaction";
 import TransactionBatch from "../models/transaction-batch";
@@ -27,117 +26,6 @@ export interface ResubmissionResult {
   batchId: string;
   /** The batch lost the atomic claim: another replica holds it, it is inside its backoff window / past its retry cap, or it is no longer pending. Expected, not a failure. */
   ineligible?: boolean;
-}
-
-/**
- * Resubmit a single transaction that has expired or failed
- */
-export async function resubmitSingleTransaction(
-  pendingTx: PendingTransaction,
-): Promise<ResubmissionResult> {
-  if (!pendingTx.serializedTransaction) {
-    return {
-      success: false,
-      error: "No serialized transaction available for resubmission",
-      batchId: pendingTx.batchId || "",
-    };
-  }
-
-  try {
-    const connection = new Connection(env.SOLANA_RPC_URL);
-
-    // Check if blockhash has expired
-    if (pendingTx.lastValidBlockHeight) {
-      const currentBlockHeight = await connection.getBlockHeight();
-      if (currentBlockHeight > pendingTx.lastValidBlockHeight) {
-        return {
-          success: false,
-          error: "Blockhash expired, cannot resubmit",
-          batchId: pendingTx.batchId || "",
-        };
-      }
-    } else {
-      // No lastValidBlockHeight stored — assume expired for safety
-      return {
-        success: false,
-        error: "Blockhash expired, cannot resubmit",
-        batchId: pendingTx.batchId || "",
-      };
-    }
-
-    // Deserialize and resubmit the transaction
-    const transaction = VersionedTransaction.deserialize(
-      Buffer.from(pendingTx.serializedTransaction, "base64"),
-    );
-
-    const signature = await connection.sendRawTransaction(
-      transaction.serialize(),
-      {
-        skipPreflight: true,
-      },
-    );
-
-    // Update the transaction record with new signature
-    await pendingTx.update({
-      signature,
-      status: "pending",
-    });
-
-    return {
-      success: true,
-      newSignatures: [signature],
-      batchId: pendingTx.batchId || "",
-    };
-  } catch (error) {
-    console.error("Failed to resubmit single transaction:", error);
-
-    // Capture resubmission error with explorer link if available
-    let explorerUrl: string | undefined;
-    let chewingGlassExplorerUrl: string | undefined;
-    try {
-      if (pendingTx.serializedTransaction) {
-        const transaction = VersionedTransaction.deserialize(
-          Buffer.from(pendingTx.serializedTransaction, "base64"),
-        );
-        explorerUrl = getExplorerUrl(transaction);
-        chewingGlassExplorerUrl = getChewingGlassExplorerUrl(transaction);
-      }
-    } catch {
-      // Ignore errors when generating explorer link
-    }
-
-    Sentry.captureException(error, {
-      level: "error",
-      tags: {
-        error_type: "transaction_resubmission_failed",
-        resubmission_type: "single",
-      },
-      extra: {
-        error_message: error instanceof Error ? error.message : "Unknown error",
-        batch_id: pendingTx.batchId,
-        transaction_signature: pendingTx.signature,
-        transaction_type: pendingTx.type,
-        blockhash: pendingTx.blockhash,
-        explorer_link: explorerUrl,
-        chewing_glass_explorer_link: chewingGlassExplorerUrl,
-      },
-      contexts: {
-        transaction: {
-          batch_id: pendingTx.batchId,
-          transaction_signature: pendingTx.signature,
-          transaction_type: pendingTx.type,
-          explorer_link: explorerUrl,
-          chewing_glass_explorer_link: chewingGlassExplorerUrl,
-        },
-      },
-    });
-
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-      batchId: pendingTx.batchId || "",
-    };
-  }
 }
 
 /**
@@ -200,6 +88,7 @@ export async function resubmitTransactionBatch(
   if (batch.lastResubmittedAt && batch.lastResubmittedAt > cutoff) {
     return ineligible;
   }
+
   const [claimed] = await TransactionBatch.update(
     {
       resubmissionCount: sequelize.literal("resubmission_count + 1"),
@@ -228,13 +117,17 @@ export async function resubmitTransactionBatch(
       (tx) => tx.serializedTransaction!,
     );
 
-    // Use the existing submission logic with the same parameters as the original batch
+    // Use the existing submission logic with the same parameters as the original
+    // batch, including the path it took: re-deciding would send a batch that
+    // first went out over plain RPC as a Jito bundle, which Jito then rejects
+    // for containing an already-processed transaction.
     const submissionResult = await submitTransactionBatch({
       transactions: serializedTransactions,
       parallel: batch.parallel,
       tag: batch.tag,
       payer: batch.payer,
       transactionMetadata: pendingTransactions.map((tx) => tx.metadata),
+      submissionType: batch.submissionType,
     });
 
     // Update the pending transactions with new signatures
@@ -254,6 +147,19 @@ export async function resubmitTransactionBatch(
           );
         }
       }
+
+      // Keep the bundle id pointing at the submission that is actually in
+      // flight, so a status check reads the resubmitted bundle rather than the
+      // first attempt's. The submission type is not rewritten: submitting a
+      // batch's last pending row reports "single" for a multi-row batch.
+      // Silent so updated_at stays the stale-batch reaper's clock and a
+      // resubmitting batch cannot outrun it.
+      await batch.update(
+        {
+          jitoBundleId: submissionResult.jitoBundleId ?? batch.jitoBundleId,
+        },
+        { transaction: dbTransaction, silent: true },
+      );
 
       await dbTransaction.commit();
 
@@ -388,8 +294,19 @@ async function expirePendingBatch(batch: TransactionBatch): Promise<void> {
         transaction: dbTransaction,
       },
     );
-    batch.status = "expired";
-    await batch.save({ transaction: dbTransaction });
+    // Guarded like the row update above: a batch that left "pending" between
+    // the read and here has already been resolved by a status check, and must
+    // not be dragged back to "expired".
+    const [expiredBatches] = await TransactionBatch.update(
+      { status: "expired" },
+      {
+        where: { id: batch.id, status: "pending" },
+        transaction: dbTransaction,
+      },
+    );
+    if (expiredBatches > 0) {
+      batch.status = "expired";
+    }
     await dbTransaction.commit();
   } catch (error) {
     await dbTransaction.rollback();
@@ -434,7 +351,9 @@ export async function reapStalePendingBatches(): Promise<void> {
     try {
       if ((batch.transactions ?? []).length > 0) {
         const result = await checkAndUpdateBatchStatus(batch, "confirmed");
-        if (result.batchStatus !== "pending") {
+        // A batch whose status could not be read this tick keeps its lock for
+        // one more reaper interval rather than being expired on no evidence.
+        if (result.clusterUnread || result.batchStatus !== "pending") {
           continue;
         }
       }

@@ -9,7 +9,7 @@ use anchor_spl::{
 };
 use mpl_token_metadata::types::CollectionDetails;
 
-use crate::FanoutV0;
+use crate::{errors::ErrorCode, FanoutV0};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeFanoutArgsV0 {
@@ -82,6 +82,9 @@ pub struct InitializeFanoutV0<'info> {
 }
 
 pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -> Result<()> {
+  // `total_shares` is fixed here, and every distribution divides by it.
+  require_gt!(ctx.accounts.membership_mint.supply, 0, ErrorCode::NoShares);
+
   let signer_seeds: &[&[&[u8]]] = &[&[b"fanout", args.name.as_bytes(), &[ctx.bumps.fanout]]];
 
   token::mint_to(
@@ -163,8 +166,10 @@ pub fn handler(ctx: Context<InitializeFanoutV0>, args: InitializeFanoutArgsV0) -
     name: args.name,
     total_shares: ctx.accounts.membership_mint.supply,
     total_staked_shares: 0,
-    last_snapshot_amount: ctx.accounts.token_account.amount,
-    total_inflow: ctx.accounts.token_account.amount,
+    // Empty, so a balance already in the vault is the first fold's arrival
+    // rather than a baseline no voucher can reach.
+    last_snapshot_amount: 0,
+    total_inflow: 0,
     bump_seed: ctx.bumps.fanout,
   });
 

@@ -1,5 +1,8 @@
 import { BorshInstructionCoder } from "@coral-xyz/anchor";
-import { delegatedPositionKey } from "@helium/helium-sub-daos-sdk";
+import {
+  delegatedPositionKey,
+  EPOCH_LENGTH,
+} from "@helium/helium-sub-daos-sdk";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import {
@@ -7,7 +10,11 @@ import {
   proxyVoteMarkerKey,
   voteMarkerKey,
 } from "@helium/voter-stake-registry-sdk";
-import { init as initHplCrons } from "@helium/hpl-crons-sdk";
+import {
+  delegationClaimBotKey,
+  init as initHplCrons,
+} from "@helium/hpl-crons-sdk";
+import { init as initTuktuk, taskKey } from "@helium/tuktuk-sdk";
 import {
   Keypair,
   LAMPORTS_PER_SOL,
@@ -23,8 +30,19 @@ import { isDefinedError } from "@orpc/client";
 import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
+import { confineTaskQueueFreeIds } from "./helpers/tuktuk";
 import { signAndSubmitTransactionData } from "./helpers/tx";
-import { ensureFunds, ensureTokenBalance } from "./helpers/wallet";
+import {
+  ensureFunds,
+  ensureTokenBalance,
+  setBalanceExactly,
+} from "./helpers/wallet";
+import {
+  DELEGATED_POSITION_SPACE,
+  DELEGATION_CLAIM_BOT_SPACE,
+  POSITION_SPACE,
+} from "../../src/server/api/routers/governance/procedures/helpers/rent";
+import { MIN_WALLET_RENT_LAMPORTS } from "../../src/lib/utils/balance-validation";
 import {
   DEFAULT_HPL_CRONS_TASK_QUEUE,
   TEST_PROXY_ADDRESS,
@@ -672,6 +690,124 @@ describe("governance", () => {
       expect(delegatedInfo).to.not.be.null;
     });
 
+    it("re-delegates a position whose delegation expired", async () => {
+      // #given a MOBILE delegation whose expiration has passed
+      const result = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+        subDaoMint: MOBILE_MINT,
+      });
+
+      const { hsdProgram } = await getPrograms(ctx);
+      const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
+      const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
+      const now = Number(clockInfo!.data.readBigInt64LE(32));
+      // Expire it inside the current epoch, whose sub-DAO epoch info
+      // delegating already created: closing a delegation cannot create it.
+      const epochStart = Math.floor(now / EPOCH_LENGTH) * EPOCH_LENGTH;
+      await setDelegatedPositionExpiration(
+        ctx,
+        delegatedPosPubkey,
+        Math.max(epochStart + 1, now - 60),
+        // The delegation has to have started before it expired, and inside
+        // this epoch, which is where delegating put it.
+        epochStart
+      );
+      await ensureSubDaoEpochsCurrent(ctx);
+
+      // #when delegating it to the same sub-DAO again
+      const { data, error } = await ctx.safeClient.governance.delegatePositions(
+        {
+          walletAddress,
+          positionMints: [result.positionMint],
+          subDaoMint: MOBILE_MINT.toBase58(),
+          automationEnabled: false,
+        }
+      );
+
+      // #then the close and the fresh delegation both land on-chain, which
+      // only holds if every epoch-info account was derived as the program
+      // derives it
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(
+        data.transactionData.transactions.map((tx) => tx.metadata?.type)
+      ).to.include("delegation_close_expired");
+
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        ctx.payer
+      );
+
+      const delegatedAfter = await hsdProgram.account.delegatedPositionV0.fetch(
+        delegatedPosPubkey
+      );
+      expect(delegatedAfter.expirationTs.toNumber()).to.be.greaterThan(now);
+    });
+
+    it("extends the expiration when re-delegating to the same sub-DAO", async () => {
+      // #given a MOBILE delegation expiring well before its season ends
+      const result = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+        subDaoMint: MOBILE_MINT,
+      });
+
+      const { hsdProgram } = await getPrograms(ctx);
+      const [positionPubkey] = positionKey(new PublicKey(result.positionMint));
+      const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
+      const now = Number(clockInfo!.data.readBigInt64LE(32));
+      // Still in the current epoch, so the epoch info the delegation closes
+      // out of is the one delegating created.
+      const epochStart = Math.floor(now / EPOCH_LENGTH) * EPOCH_LENGTH;
+      const shortExpiration = Math.min(now + 60, epochStart + EPOCH_LENGTH - 1);
+      await setDelegatedPositionExpiration(
+        ctx,
+        delegatedPosPubkey,
+        shortExpiration
+      );
+      await ensureSubDaoEpochsCurrent(ctx);
+
+      // #when delegating it to the sub-DAO it is already delegated to
+      const { data, error } = await ctx.safeClient.governance.delegatePositions(
+        {
+          walletAddress,
+          positionMints: [result.positionMint],
+          subDaoMint: MOBILE_MINT.toBase58(),
+          automationEnabled: false,
+        }
+      );
+
+      // #then the extension lands on-chain
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        ctx.payer
+      );
+
+      const delegatedAfter = await hsdProgram.account.delegatedPositionV0.fetch(
+        delegatedPosPubkey
+      );
+      expect(delegatedAfter.expirationTs.toNumber()).to.be.greaterThan(
+        shortExpiration
+      );
+    });
+
     it("extends delegation expiration", async () => {
       // #given position delegated to MOBILE with expiration set to 1 hour from now
       const result = await createAndFundPosition(ctx, {
@@ -827,9 +963,17 @@ describe("governance", () => {
 
   describe("delegation with automatic reward claiming", () => {
     let walletAddress: string;
+    let restoreTaskQueue: (() => Promise<void>) | undefined;
 
     before(async () => {
       walletAddress = ctx.payer.publicKey.toBase58();
+    });
+
+    // Per test, not per block: a confined bitmap left in place would hand the
+    // following test the same handful of free task ids.
+    afterEach(async () => {
+      await restoreTaskQueue?.();
+      restoreTaskQueue = undefined;
     });
 
     it("does not include claim transactions for new delegation", async () => {
@@ -865,6 +1009,75 @@ describe("governance", () => {
         ctx.payer
       );
       expect(sigs).to.have.length(1);
+    });
+
+    it("queues a distinct task per position when two are automated at once", async () => {
+      // #given a task queue whose two free ids share a bitmap byte, so every
+      // read of the bitmap offers the same first free id
+      const taskQueue = new PublicKey(DEFAULT_HPL_CRONS_TASK_QUEUE);
+      const { provider } = await getPrograms(ctx);
+      const tuktukProgram = await initTuktuk(provider);
+      const { freeIds, restore } = await confineTaskQueueFreeIds(
+        ctx.connection,
+        tuktukProgram,
+        taskQueue,
+        2
+      );
+      restoreTaskQueue = restore;
+
+      // #given two undelegated positions
+      const first = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+      const second = await createAndFundPosition(ctx, {
+        amount: "100000000",
+        lockupKind: "cliff",
+        lockupPeriodsInDays: 365,
+      });
+
+      // #when delegating both with automation in a single request
+      const { data, error } = await ctx.safeClient.governance.delegatePositions({
+        walletAddress,
+        positionMints: [first.positionMint, second.positionMint],
+        subDaoMint: MOBILE_MINT.toBase58(),
+        automationEnabled: true,
+      });
+
+      // #then the whole bundle lands - two bots sharing one task id would fail
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(data.hasMore).to.equal(false);
+      const sigs = await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        ctx.payer
+      );
+      expect(sigs.length).to.equal(data.transactionData.transactions.length);
+
+      // #then each claim bot holds one of the two ids the queue had free
+      const hplCronsProgram = await initHplCrons(provider);
+      const [firstBot, secondBot] = await Promise.all(
+        [first.positionMint, second.positionMint].map((mint) => {
+          const [positionPubkey] = positionKey(new PublicKey(mint));
+          const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+          const [botPubkey] = delegationClaimBotKey(
+            taskQueue,
+            delegatedPosPubkey
+          );
+          return hplCronsProgram.account.delegationClaimBotV0.fetch(botPubkey);
+        })
+      );
+      expect(firstBot.queued).to.equal(true);
+      expect(secondBot.queued).to.equal(true);
+      const expectedTasks = freeIds
+        .map((id) => taskKey(taskQueue, id)[0].toBase58())
+        .sort();
+      expect(
+        [firstBot.nextTask.toBase58(), secondBot.nextTask.toBase58()].sort()
+      ).to.deep.equal(expectedTasks);
     });
   });
 
@@ -2025,6 +2238,111 @@ describe("governance", () => {
         expect(error.code).to.equal("BAD_REQUEST");
         expect(error.message).to.include("No proxy assignments");
       });
+    });
+  });
+  describe("createPosition SOL preflight", () => {
+    it("quotes exactly the SOL an automated position spends", async () => {
+      // #given a wallet holding HNT and the quote for an automated position
+      const wallet = Keypair.generate();
+      await ensureFunds(wallet.publicKey, LAMPORTS_PER_SOL);
+      await ensureTokenBalance(wallet.publicKey, HNT_MINT, 10);
+
+      const request = {
+        walletAddress: wallet.publicKey.toBase58(),
+        tokenAmount: { amount: "100000000", mint: HNT_MINT.toBase58() },
+        lockupKind: "cliff" as const,
+        lockupPeriodsInDays: 365,
+        subDaoMint: MOBILE_MINT.toBase58(),
+        automationEnabled: true,
+      };
+
+      const { data: quote, error: quoteError } =
+        await ctx.safeClient.governance.createPosition(request);
+      if (quoteError) {
+        expect.fail(`Unexpected error: ${JSON.stringify(quoteError)}`);
+      }
+      const required = Number(quote.estimatedSolFee!.amount);
+
+      // #when the wallet is one lamport short of the quote
+      await setBalanceExactly(wallet, required - 1, ctx.payer);
+      const { error: shortError } =
+        await ctx.safeClient.governance.createPosition(request);
+
+      // #then preflight rejects it before anything is signed
+      if (!isDefinedError(shortError)) {
+        expect.fail(
+          `Expected defined ORPCError - but got: ${JSON.stringify(shortError)}`,
+        );
+      }
+      expect(shortError.code).to.equal("INSUFFICIENT_FUNDS");
+      expect((shortError.data as { required: number }).required).to.equal(
+        required,
+      );
+
+      // #when the wallet holds exactly the quote
+      await setBalanceExactly(wallet, required, ctx.payer);
+      const { data, error } =
+        await ctx.safeClient.governance.createPosition(request);
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      expect(Number(data.estimatedSolFee!.amount)).to.equal(required);
+
+      // #then the whole bundle lands on exactly that balance, leaving the
+      // wallet its rent floor and nothing else: every lamport the quote asked
+      // for was spent, so it priced exactly what the bundle costs
+      const signatures = await signAndSubmitTransactionData(
+        ctx.connection,
+        data.transactionData,
+        wallet,
+      );
+      // The quote priced each transaction with getFeeForMessage, which
+      // surfpool answers without the compute-unit price the runtime then
+      // charges (mainnet's includes it). Add back whatever the cluster
+      // charged beyond that answer before comparing.
+      const { blockhash } = await ctx.connection.getLatestBlockhash();
+      let unquotedFees = 0;
+      for (const [i, signature] of signatures.entries()) {
+        const tx = VersionedTransaction.deserialize(
+          Buffer.from(
+            data.transactionData.transactions[i].serializedTransaction,
+            "base64",
+          ),
+        );
+        tx.message.recentBlockhash = blockhash;
+        const charged = (
+          await ctx.connection.getTransaction(signature, {
+            commitment: "confirmed",
+            maxSupportedTransactionVersion: 0,
+          })
+        )!.meta!.fee;
+        const quoted = (await ctx.connection.getFeeForMessage(tx.message))
+          .value!;
+        unquotedFees += charged - quoted;
+      }
+      expect(
+        (await ctx.connection.getBalance(wallet.publicKey)) + unquotedFees,
+      ).to.equal(MIN_WALLET_RENT_LAMPORTS);
+
+      // #then the rent-bearing accounts are the sizes the quote priced
+      const positionMint = data.transactionData.transactions[0].metadata
+        ?.positionMint as string;
+      const [positionPubkey] = positionKey(new PublicKey(positionMint));
+      const [delegatedPosPubkey] = delegatedPositionKey(positionPubkey);
+      const [claimBotPubkey] = delegationClaimBotKey(
+        new PublicKey(DEFAULT_HPL_CRONS_TASK_QUEUE),
+        delegatedPosPubkey,
+      );
+      const [positionInfo, delegatedPosInfo, claimBotInfo] =
+        await ctx.connection.getMultipleAccountsInfo([
+          positionPubkey,
+          delegatedPosPubkey,
+          claimBotPubkey,
+        ]);
+
+      expect(positionInfo?.data.length).to.equal(POSITION_SPACE);
+      expect(delegatedPosInfo?.data.length).to.equal(DELEGATED_POSITION_SPACE);
+      expect(claimBotInfo?.data.length).to.equal(DELEGATION_CLAIM_BOT_SPACE);
     });
   });
 });

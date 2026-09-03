@@ -289,6 +289,27 @@ pub fn staker_overflow(deployer_pool: u64, deployer_cap_hnt: u64) -> u64 {
   deployer_pool.saturating_sub(deployer_cap_hnt)
 }
 
+/// Whether this `issue_rewards_v0` pass mints the epoch's backstop top-up.
+///
+/// The top-up is a DAO-level amount, sized once by `calculate_utility_score_v0` and recorded
+/// once in `total_rewards`, so exactly one pass may mint it. `is_mobile` selects that pass in
+/// production. Under a `TESTING` build `is_mobile` is every sub-DAO, so the epoch's first pass
+/// is used instead: N sub-DAOs would otherwise mint N top-ups against the one the epoch
+/// recorded. `num_rewards_issued` is incremented after the mints, so 0 identifies the first.
+///
+/// In production the Mobile pass mints it whatever position it settles in: `issue_rewards_v0`
+/// is permissionless and the passes may arrive in any order.
+pub fn mints_top_up(is_mobile: bool, num_rewards_issued: u32) -> bool {
+  mints_top_up_with(is_mobile, crate::TESTING, num_rewards_issued)
+}
+
+/// The same decision over an explicit `testing`, which only the tests below supply: `TESTING`
+/// is false under `cargo test`, so the first-pass arm is reachable no other way. Private, so
+/// the value production runs on is the constant `mints_top_up` closes over.
+fn mints_top_up_with(is_mobile: bool, testing: bool, num_rewards_issued: u32) -> bool {
+  is_mobile && (!testing || num_rewards_issued == 0)
+}
+
 #[cfg(test)]
 // HNT amounts are written as whole-HNT then 8 decimals (e.g. 1_644_00000000) for
 // readability against the spec's HNT figures; same precedent as the treasury mint
@@ -509,6 +530,64 @@ mod tests {
     let pool = 10_000_00000000;
     assert_eq!(staker_overflow(pool, 1), pool - 1);
     assert!(staker_overflow(pool, 1) <= pool);
+  }
+
+  #[test]
+  fn the_mobile_pass_mints_whatever_position_it_settles_in() {
+    // issue_rewards_v0 is permissionless with no ordering guarantee, so in production the
+    // Mobile pass may be the epoch's first or arrive after any number of others. 0 is the
+    // ordinary mainnet case and is asserted here rather than only through the wrapper.
+    for already_issued in [0u32, 1, 2, 7] {
+      assert!(
+        mints_top_up_with(true, false, already_issued),
+        "num_rewards_issued {already_issued}: the Mobile pass mints the top-up whatever \
+         order it arrives in"
+      );
+    }
+  }
+
+  #[test]
+  fn only_the_first_pass_mints_under_testing() {
+    // Under TESTING every sub-DAO is a Mobile pass, and the epoch records one top-up, so
+    // one pass mints it: the first.
+    assert!(mints_top_up_with(true, true, 0), "the first pass mints it");
+    for already_issued in [1u32, 2, 7] {
+      assert!(
+        !mints_top_up_with(true, true, already_issued),
+        "num_rewards_issued {already_issued}: later passes must not mint it again"
+      );
+    }
+  }
+
+  #[test]
+  fn the_wrapper_passes_the_build_s_own_testing_value() {
+    // mints_top_up closes TESTING over, so this is what pins that it forwards the build's
+    // own value. Each arm asserts what its build promises, and each catches one substituted
+    // literal: the default build catches `true`, a TESTING build catches `false`. CI runs
+    // `cargo test` without TESTING, so the second arm is exercised only locally.
+    assert!(mints_top_up(true, 0), "the first pass always mints it");
+    if crate::TESTING {
+      assert!(
+        !mints_top_up(true, 3),
+        "under TESTING only the epoch's first pass mints it"
+      );
+    } else {
+      assert!(
+        mints_top_up(true, 3),
+        "in production the Mobile pass mints it whatever order it arrives in"
+      );
+    }
+    assert!(!mints_top_up(false, 0), "and still only the Mobile pass");
+  }
+
+  #[test]
+  fn a_non_mobile_pass_never_mints() {
+    // The top-up supports Mobile data deployers, so no other sub-DAO's pass carries it --
+    // in production that is the whole of the gate.
+    for already_issued in [0u32, 1, 7] {
+      assert!(!mints_top_up_with(false, false, already_issued));
+      assert!(!mints_top_up_with(false, true, already_issued));
+    }
   }
 
   #[test]

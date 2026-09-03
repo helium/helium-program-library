@@ -1,7 +1,7 @@
 name: Blockchain API E2E Tests
 
 on:
-  # These path filters gate every job below, the 17-job e2e matrix included.
+  # These path filters gate every job below, the 19-job e2e matrix included.
   # The typecheck step resolves the workspace SDKs (spl-utils, the *-sdk
   # packages, idls) too, so a change confined to those does not run it.
   push:
@@ -17,7 +17,7 @@ on:
 jobs:
   # Build anchor once and share the generated types/IDLs as an artifact. The
   # matrix jobs only need target/types (to build @helium/idls); having each of
-  # them run build-anchor meant 17 full rebuilds whenever the cache was evicted
+  # them run build-anchor meant 19 full rebuilds whenever the cache was evicted
   # (the repo sits at the 10GB Actions cache cap), and a cold anchor build
   # can't finish inside the matrix jobs' 20-minute timeout.
   build-idls:
@@ -73,6 +73,27 @@ jobs:
       - name: Lint
         run: pnpm lint:check
 
+      # The matrix below is a hand-written list, and a test file it omits does
+      # not run in CI without anything on the PR page saying so. Two files are
+      # excluded here: transaction-classifier boots no surfpool and classifies
+      # real transactions read from SOLANA_RPC_URL, and data-credits predates
+      # this check and has never run in CI, so whether it passes is unknown.
+      - name: Check every e2e test file is in the matrix
+        working-directory: ${{ github.workspace }}
+        run: |
+          missing=0
+          for f in packages/blockchain-api/tests/e2e/*.test.ts; do
+            name=$(basename "$f")
+            case "$name" in
+              transaction-classifier.test.ts|data-credits.test.ts) continue ;;
+            esac
+            if ! grep -q "file: $name" .github/workflows/blockchain-api-e2e.yml; then
+              echo "::error::$name is not in the e2e matrix in .github/workflows/blockchain-api-e2e.yml"
+              missing=1
+            fi
+          done
+          exit $missing
+
   e2e-tests:
     needs: build-idls
     runs-on: ubuntu-latest
@@ -117,6 +138,10 @@ jobs:
             file: governance.test.ts
           - name: migration
             file: migration.test.ts
+          - name: delegate-account-resolution
+            file: delegate-account-resolution.test.ts
+          - name: delegate-automation
+            file: delegate-automation.test.ts
 
     name: ${{ matrix.test.name }}
 
