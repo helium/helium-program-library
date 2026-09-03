@@ -1,5 +1,16 @@
 # Change Log
 
+## 0.11.27
+
+### Patch Changes
+
+- [#1295](https://github.com/helium/helium-program-library/pull/1295) [`9865d3e`](https://github.com/helium/helium-program-library/commit/9865d3e1a4db5972da30d8c629c3adad9f39cb68) Thanks [@bryzettler](https://github.com/bryzettler)! - A transaction the cluster reports confirmed is no longer written expired, and
+  its batch failed, when it is polled at finalized after its blockhash leaves
+  range. The extend-delegation procedure judges lockup, expiration and season on
+  the registrar clock, matching delegate. The pending_transactions index migration
+  serialises concurrent replicas with an advisory lock and drops an invalid
+  leftover index concurrently.
+
 ## 0.11.26
 
 ### Patch Changes
