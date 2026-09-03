@@ -220,27 +220,14 @@ export async function setSurfnetAccount(
   address: PublicKey,
   accountInfo: { data: Buffer; owner: PublicKey; lamports: number }
 ): Promise<void> {
-  const res = await fetch(getSurfpoolRpcUrl(), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "surfnet_setAccount",
-      params: [
-        address.toBase58(),
-        {
-          data: accountInfo.data.toString("hex"),
-          owner: accountInfo.owner.toBase58(),
-          lamports: accountInfo.lamports,
-        },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`setAccount failed: HTTP ${res.status}`);
-  }
-  const json = await res.json();
+  const json = await jsonRpc("surfnet_setAccount", [
+    address.toBase58(),
+    {
+      data: accountInfo.data.toString("hex"),
+      owner: accountInfo.owner.toBase58(),
+      lamports: accountInfo.lamports,
+    },
+  ]);
   if (json.error) {
     throw new Error(`setAccount failed: ${JSON.stringify(json.error)}`);
   }
