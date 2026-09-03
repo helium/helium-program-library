@@ -54,8 +54,8 @@ describe("summarizeProcedureInput", () => {
 
   it("keeps the order and separates the fields", () => {
     expect(
-      summarizeProcedureInput({ walletAddress: "abc", amount: "5" })
-    ).to.equal(' {walletAddress="abc", amount}');
+      summarizeProcedureInput({ walletAddress: "abc", memo: "5" })
+    ).to.equal(' {walletAddress="abc", memo}');
   });
 
   it("logs no part of a bank account, not even the fields it lists", () => {
