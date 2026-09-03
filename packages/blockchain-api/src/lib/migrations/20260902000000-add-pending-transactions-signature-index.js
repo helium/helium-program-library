@@ -23,11 +23,11 @@ const INDEXES = [
 module.exports = {
   async up(queryInterface) {
     for (const { name, column } of INDEXES) {
+      // to_regclass resolves through the search path, the same way the
+      // unqualified CREATE INDEX below does, so a same-named index in another
+      // schema is not mistaken for this one. It yields NULL when none exists.
       const [rows] = await queryInterface.sequelize.query(
-        `SELECT i.indisvalid
-           FROM pg_index i
-           JOIN pg_class c ON c.oid = i.indexrelid
-          WHERE c.relname = :name`,
+        `SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(:name)`,
         { replacements: { name } },
       );
       if (rows.length > 0 && rows[0].indisvalid) {

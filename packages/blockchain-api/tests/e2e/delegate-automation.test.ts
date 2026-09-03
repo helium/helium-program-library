@@ -8,12 +8,17 @@ import {
 } from "@helium/hpl-crons-sdk";
 import { MOBILE_MINT } from "@helium/spl-utils";
 import { positionKey } from "@helium/voter-stake-registry-sdk";
+import { isDefinedError } from "@orpc/client";
 import { PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { DEFAULT_HPL_CRONS_TASK_QUEUE } from "./helpers/constants";
 import { setupTestCtx, TestCtx } from "./helpers/context";
-import { createAndFundPosition, getPrograms } from "./helpers/governance";
+import {
+  createAndFundPosition,
+  getPrograms,
+  setRegistrarTimeOffset,
+} from "./helpers/governance";
 import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { signAndSubmitTransactionData } from "./helpers/tx";
@@ -102,5 +107,43 @@ describe("delegatePositions automation", () => {
         delegatedPosPubkey,
       ),
     ).to.not.equal(null);
+  });
+
+  it("judges lockup decay on the registrar clock, not the cluster clock", async () => {
+    // #given a year-long cliff position whose registrar clock is dialed past
+    // its lockup end, as delegate_v0 would see it
+    const { positionMint } = await createAndFundPosition(ctx, {
+      amount: "100000000",
+      lockupKind: "cliff",
+      lockupPeriodsInDays: 365,
+    });
+    const { vsrProgram } = await getPrograms(ctx);
+    const [positionPubkey] = positionKey(new PublicKey(positionMint));
+    const { registrar } = await vsrProgram.account.positionV0.fetch(
+      positionPubkey,
+    );
+    await setRegistrarTimeOffset(ctx, registrar, 366 * 24 * 60 * 60);
+
+    try {
+      // #when the position is delegated
+      const { error } = await ctx.safeClient.governance.delegatePositions({
+        walletAddress,
+        positionMints: [positionMint],
+        subDaoMint: MOBILE_MINT.toBase58(),
+        automationEnabled: false,
+      });
+
+      // #then the request is refused rather than built for the program to
+      // reject: on the cluster clock alone the lockup is a year from decaying
+      if (!isDefinedError(error)) {
+        expect.fail(
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`,
+        );
+      }
+      expect(error.code).to.equal("BAD_REQUEST");
+      expect(error.message).to.include("fully decayed");
+    } finally {
+      await setRegistrarTimeOffset(ctx, registrar, 0);
+    }
   });
 });

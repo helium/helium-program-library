@@ -146,6 +146,54 @@ describe("buildBatchedTransactions shared reads", () => {
     );
   });
 
+  it("stops at maxTxs and reports the groups it left behind", async () => {
+    // #given four groups that each need a transaction of their own
+    const { connection } = makeCountingConnection();
+
+    // #when only two transactions may be built
+    const { transactions, versionedTransactions, hasMore } =
+      await buildBatchedTransactions({
+        groups: [
+          makeBigGroup("one"),
+          makeBigGroup("two"),
+          makeBigGroup("three"),
+          makeBigGroup("four"),
+        ],
+        connection,
+        feePayer: FEE_PAYER,
+        maxTxs: 2,
+      });
+
+    // #then the batch holds exactly two and says more remain
+    expect(versionedTransactions).to.have.length(2);
+    expect(transactions).to.have.length(2);
+    expect(hasMore).to.equal(true);
+  });
+
+  it("splits a group too large for one transaction before packing", async () => {
+    // #given one group whose three instructions cannot share a transaction
+    const { connection } = makeCountingConnection();
+    const oversize = {
+      instructions: [
+        ...makeBigGroup("a").instructions,
+        ...makeBigGroup("b").instructions,
+        ...makeBigGroup("c").instructions,
+      ],
+      metadata: { type: "test", description: "oversize" },
+    };
+
+    // #when it is built with room for all of it
+    const { versionedTransactions, hasMore } = await buildBatchedTransactions({
+      groups: [oversize],
+      connection,
+      feePayer: FEE_PAYER,
+    });
+
+    // #then each instruction landed in its own transaction and nothing was left
+    expect(versionedTransactions).to.have.length(3);
+    expect(hasMore).to.equal(false);
+  });
+
   it("refuses to build a bundle transaction the table cannot price", async () => {
     // #given an instruction with no table entry
     const { connection } = makeCountingConnection();

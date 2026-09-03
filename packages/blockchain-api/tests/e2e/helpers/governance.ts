@@ -195,6 +195,46 @@ export async function setPositionLockupEndTs(
   });
 }
 
+// Registrar layout: 8-byte discriminator, then four pubkeys, then time_offset.
+const REGISTRAR_TIME_OFFSET_OFFSET = 8 + 32 * 4;
+
+/**
+ * Dials the registrar's debug clock. The programs judge lockups, expirations
+ * and seasons against the cluster clock plus this offset, so every position on
+ * the registrar moves forward in time at once. Reset it to 0 when done.
+ */
+export async function setRegistrarTimeOffset(
+  ctx: TestCtx,
+  registrarPubkey: PublicKey,
+  offsetSeconds: number
+): Promise<void> {
+  const accountInfo = await ctx.connection.getAccountInfo(registrarPubkey);
+  if (!accountInfo) {
+    throw new Error("Registrar account not found");
+  }
+
+  const newData = Buffer.from(accountInfo.data);
+  newData.writeBigInt64LE(BigInt(offsetSeconds), REGISTRAR_TIME_OFFSET_OFFSET);
+
+  await fetch(getSurfpoolRpcUrl(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "surfnet_setAccount",
+      params: [
+        registrarPubkey.toBase58(),
+        {
+          data: newData.toString("hex"),
+          owner: accountInfo.owner.toBase58(),
+          lamports: accountInfo.lamports,
+        },
+      ],
+    }),
+  });
+}
+
 interface CreatePositionOptions {
   amount: string;
   lockupKind: "cliff" | "constant";
