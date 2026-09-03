@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.26
+
+### Patch Changes
+
+- [`7c98844`](https://github.com/helium/helium-program-library/commit/7c98844cf1c888e5998d4c947c8927e3c248bd82) Thanks [@bryzettler](https://github.com/bryzettler)! - Sync IDL metadata versions with the mainnet-deployed programs: helium-sub-daos 0.2.48, fanout 0.1.3, mini-fanout 0.1.6.
+
 ## 0.11.25
 
 ### Patch Changes
