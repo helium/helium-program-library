@@ -2,6 +2,7 @@ import { BorshInstructionCoder } from "@coral-xyz/anchor";
 import {
   delegatedPositionKey,
   EPOCH_LENGTH,
+  subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
@@ -172,6 +173,8 @@ describe("governance", () => {
       expect(position!.lockup.kind).to.equal("cliff");
       expect(Number(position!.lockup.endTs)).to.be.greaterThan(0);
       expect(position!.numActiveVotes).to.equal(0);
+      expect(position!.delegation, "undelegated position has no delegation").to
+        .be.null;
     });
 
     it("extends position lockup", async () => {
@@ -1113,6 +1116,35 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(0);
       expect(data?.hasMore).to.equal(false);
+    });
+
+    it("reports the fresh delegation with nothing claimable in getPositions", async () => {
+      // #given the freshly delegated position and the cluster clock
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
+      const currentEpoch = Math.floor(
+        Number(clockInfo!.data.readBigInt64LE(32)) / EPOCH_LENGTH
+      );
+
+      // #when listing positions
+      const { data, error } = await ctx.safeClient.governance.getPositions({
+        wallet: walletAddress,
+      });
+
+      // #then the delegation mirrors delegate_v0 and matches the empty claim
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      const position = data!.find((p) => p.positionMint === positionMint);
+      expect(position?.delegation).to.not.be.null;
+      expect(position!.delegation!.subDao).to.equal(
+        subDaoKey(MOBILE_MINT)[0].toBase58()
+      );
+      expect(position!.delegation!.lastClaimedEpoch).to.equal(currentEpoch);
+      expect(position!.delegation!.expirationTs).to.be.greaterThan(0);
+      expect(position!.delegation!.claimableEpochCount).to.equal(0);
+      expect(position!.delegation!.unissuedRequiredEpochCount).to.equal(0);
     });
   });
 
