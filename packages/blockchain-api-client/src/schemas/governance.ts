@@ -277,6 +277,34 @@ const RelinquishAllVotesMetadataSchema = z.object({
   votesRelinquished: z.number().optional(),
 });
 
+export const PositionDelegationSchema = z.object({
+  subDao: PublicKeySchema.describe("Sub-DAO the position is delegated to"),
+  lastClaimedEpoch: z
+    .number()
+    .int()
+    .describe(
+      "Latest epoch through which rewards are contiguously claimed; the first candidate epoch is lastClaimedEpoch + 1",
+    ),
+  expirationTs: z
+    .number()
+    .int()
+    .describe(
+      "Raw on-chain delegation expiration unix timestamp; 0 means a legacy delegation with no expiration",
+    ),
+  claimableEpochCount: z
+    .number()
+    .int()
+    .describe(
+      "Epochs claimDelegationRewards would emit a claim instruction for right now: unclaimed, in the claimable range, and with rewards issued",
+    ),
+  unissuedRequiredEpochCount: z
+    .number()
+    .int()
+    .describe(
+      "Unclaimed epochs that undelegatePosition requires claimed but whose rewards have not been issued yet; undelegate returns BAD_REQUEST while this is non-zero",
+    ),
+});
+
 export const PositionSchema = z.object({
   positionMint: z.string().describe("Mint address of the position NFT"),
   position: z.string().describe("Position PDA address"),
@@ -292,6 +320,9 @@ export const PositionSchema = z.object({
     startTs: z.string().describe("Lockup start unix timestamp"),
     endTs: z.string().describe("Lockup end unix timestamp"),
   }),
+  delegation: PositionDelegationSchema.nullable().describe(
+    "Delegation state, or null when the position is not delegated",
+  ),
 });
 
 export const GetPositionsResponseSchema = z.array(PositionSchema);

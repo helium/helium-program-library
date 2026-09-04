@@ -56,7 +56,7 @@ export const governanceContract = oc
         path: "/positions/wallet/{wallet}",
         summary: "List wallet governance positions",
         description:
-          "List all voter-stake-registry positions owned by a wallet, including deposited amount, governing mint, and lockup info.",
+          "List all voter-stake-registry positions owned by a wallet, including deposited amount, governing mint, lockup info, and delegation state. For a delegated position, claimableEpochCount is the number of epochs claimDelegationRewards would build claim instructions for right now, and unissuedRequiredEpochCount is the number of epochs undelegatePosition is waiting on rewards issuance for.",
       })
       .input(GetPositionsInputSchema)
       .errors({ BAD_REQUEST, RATE_LIMITED })
