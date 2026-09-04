@@ -1,7 +1,6 @@
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
-import { RENT_COSTS } from "../../src/lib/utils/balance-validation";
 import {
   getAutomationRentLamports,
   getMissingEpochInfoRentLamports,
@@ -46,7 +45,7 @@ describe("getAutomationRentLamports", () => {
 
   it("counts the delegator HNT ATA when it does not exist yet", async () => {
     const connection = stubConnection({
-      rentBySpace: () => 2_324_640,
+      rentBySpace: (space) => (space === 165 ? 1_855_569 : 2_324_640),
       accountExists: false,
     });
 
@@ -57,7 +56,7 @@ describe("getAutomationRentLamports", () => {
       createsHntAta: true,
     });
 
-    expect(rent).to.equal(2_324_640 + RENT_COSTS.ATA);
+    expect(rent).to.equal(2_324_640 + 1_855_569);
   });
 
   it("skips the HNT ATA rent when the account already exists", async () => {

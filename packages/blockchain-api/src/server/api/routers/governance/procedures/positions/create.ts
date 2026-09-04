@@ -21,6 +21,7 @@ import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
 import {
+  ACCOUNT_SIZE,
   MintLayout,
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -39,7 +40,6 @@ import BN from "bn.js";
 import {
   getTotalTransactionFees,
   MIN_WALLET_RENT_LAMPORTS,
-  RENT_COSTS,
 } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import {
@@ -380,6 +380,7 @@ export const create = publicProcedure.governance.createPosition.handler(
     const [
       positionRent,
       metadataRent,
+      ataRent,
       delegatedPositionRent,
       epochInfoRent,
       claimTaskRent,
@@ -388,6 +389,7 @@ export const create = publicProcedure.governance.createPosition.handler(
     ] = await Promise.all([
       connection.getMinimumBalanceForRentExemption(POSITION_SPACE),
       connection.getMinimumBalanceForRentExemption(TOKEN_METADATA_SPACE),
+      connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE),
       subDaoMint
         ? connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE)
         : Promise.resolve(0),
@@ -409,7 +411,7 @@ export const create = publicProcedure.governance.createPosition.handler(
       positionRent +
       metadataRent +
       TOKEN_METADATA_CREATE_FEE +
-      RENT_COSTS.ATA * 2 + // position NFT token account and the deposit vault
+      ataRent * 2 + // position NFT token account and the deposit vault
       delegatedPositionRent +
       epochInfoRent +
       automationRent +
