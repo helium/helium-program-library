@@ -1,7 +1,6 @@
 import { HNT_MINT } from "@helium/spl-utils";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { ACCOUNT_SIZE, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { RENT_COSTS } from "@/lib/utils/balance-validation";
 import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
 
 /**
@@ -81,7 +80,7 @@ export async function getAutomationRentLamports({
 }): Promise<number> {
   if (newClaimBots === 0 && !createsHntAta) return 0;
 
-  const [claimBotRent, hntAtaInfo] = await Promise.all([
+  const [claimBotRent, hntAtaInfo, ataRent] = await Promise.all([
     newClaimBots > 0
       ? connection.getMinimumBalanceForRentExemption(DELEGATION_CLAIM_BOT_SPACE)
       : Promise.resolve(0),
@@ -90,11 +89,13 @@ export async function getAutomationRentLamports({
           getAssociatedTokenAddressSync(HNT_MINT, walletPubkey, true),
         )
       : Promise.resolve(null),
+    createsHntAta
+      ? connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE)
+      : Promise.resolve(0),
   ]);
 
   return (
-    newClaimBots * claimBotRent +
-    (createsHntAta && !hntAtaInfo ? RENT_COSTS.ATA : 0)
+    newClaimBots * claimBotRent + (createsHntAta && !hntAtaInfo ? ataRent : 0)
   );
 }
 
