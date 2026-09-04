@@ -7,7 +7,7 @@ import { NATIVE_MINT } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { stopNextServer } from "./helpers/next";
-import { stopSurfpool } from "./helpers/surfpool";
+import { setSurfnetAccount, stopSurfpool } from "./helpers/surfpool";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import { setupTestCtx, TestCtx } from "./helpers/context";
 import {
@@ -19,6 +19,36 @@ import nacl from "tweetnacl";
 
 describe("welcome-pack", () => {
   let ctx: TestCtx;
+
+  // TODO: remove once the welcome-pack program with the refund moved after the
+  // bubblegum CPI is deployed to mainnet. The test pack was funded under the
+  // old rent regime, so under current rent claim_welcome_pack_v0 computes a
+  // nonzero refund and credits rent_refund before the bubblegum transfer CPI,
+  // where the same wallet is a read-only account, failing the runtime's
+  // balance check with UnbalancedInstruction. Top the pack down to exactly
+  // sol_amount + fanout cost so the refund branch stays dead, as it was on
+  // mainnet when the pack was created.
+  const fundPackToExactClaimCost = async (pack: PublicKey) => {
+    const info = await ctx.connection.getAccountInfo(pack);
+    if (!info) throw new Error("welcome pack not found");
+    // MiniFanoutV0::size(...) for this pack's schedule, 2 shares and the
+    // RemoteV0 pre_task url; ATA_SIZE = 165; FANOUT_FUNDING_AMOUNT = 0.01 SOL.
+    const MINI_FANOUT_SIZE = 695;
+    const ATA_SIZE = 165;
+    const FANOUT_FUNDING_AMOUNT = 10_000_000;
+    const SOL_AMOUNT = 10_000_000;
+    const fanoutCost =
+      (await ctx.connection.getMinimumBalanceForRentExemption(
+        MINI_FANOUT_SIZE
+      )) +
+      (await ctx.connection.getMinimumBalanceForRentExemption(ATA_SIZE)) +
+      FANOUT_FUNDING_AMOUNT;
+    await setSurfnetAccount(pack, {
+      data: info.data,
+      owner: info.owner,
+      lamports: fanoutCost + SOL_AMOUNT,
+    });
+  };
 
   before(async () => {
     ctx = await setupTestCtx({
@@ -177,6 +207,7 @@ describe("welcome-pack", () => {
     const claimer = Keypair.generate();
 
     const welcomePackAddress = "G8dRECzZRLMf6bjswi7F9KZvNQbnjzqcwGbXyj21gw8v";
+    await fundPackToExactClaimCost(new PublicKey(welcomePackAddress));
     // Fetch canonical message and expiration from server
     const inviteResult = await ctx.client.welcomePacks.invite({
       packAddress: welcomePackAddress,
@@ -207,7 +238,7 @@ describe("welcome-pack", () => {
     );
 
     const afterBal = await ctx.connection.getBalance(claimer.publicKey);
-    expect(afterBal).to.eq(3595720);
+    expect(afterBal).to.eq(4449958);
 
     const provider = new AnchorProvider(
       ctx.connection,
