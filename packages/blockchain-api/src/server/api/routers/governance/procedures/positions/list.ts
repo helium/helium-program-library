@@ -3,11 +3,14 @@ import { createSolanaConnection } from "@/lib/solana";
 import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
+  daoEpochInfoKey,
+  daoKey,
   delegatedPositionKey,
   EPOCH_LENGTH,
   init as initHsd,
   subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
+import { HNT_MINT } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import BN from "bn.js";
@@ -56,6 +59,7 @@ const fetchDelegations = async ({
   hsdProgram: HsdProgram;
   owned: OwnedPosition[];
 }) => {
+  const dao = daoKey(HNT_MINT)[0];
   const delegated: (DelegatedPositionV0 | null)[] =
     await hsdProgram.account.delegatedPositionV0.fetchMultiple(
       owned.map((p) => delegatedPositionKey(p.position)[0])
@@ -77,36 +81,63 @@ const fetchDelegations = async ({
     });
   });
 
-  // Positions on the same sub-DAO share epoch infos; read each once.
+  // Positions on the same sub-DAO share sub-DAO epoch infos, and every
+  // position shares the DAO epoch infos; read each once.
   const epochInfoKeys = new Map<string, PublicKey>();
+  const daoEpochInfoKeys = new Map<number, PublicKey>();
   ranges.forEach((range, i) => {
     if (!range) return;
     const subDao = delegated[i]!.subDao;
     for (const epoch of range.unclaimedEpochs) {
+      const epochTs = new BN(epoch).mul(new BN(EPOCH_LENGTH));
       const id = epochInfoId(subDao, epoch);
       if (!epochInfoKeys.has(id)) {
-        epochInfoKeys.set(
-          id,
-          subDaoEpochInfoKey(subDao, new BN(epoch).mul(new BN(EPOCH_LENGTH)))[0]
-        );
+        epochInfoKeys.set(id, subDaoEpochInfoKey(subDao, epochTs)[0]);
+      }
+      if (!daoEpochInfoKeys.has(epoch)) {
+        daoEpochInfoKeys.set(epoch, daoEpochInfoKey(dao, epochTs)[0]);
       }
     }
   });
 
   const ids = [...epochInfoKeys.keys()];
-  const infos = await getMultipleAccounts(
-    connection,
-    ids.map((id) => epochInfoKeys.get(id)!)
+  const epochs = [...daoEpochInfoKeys.keys()];
+  const [infos, daoInfos] = await Promise.all([
+    getMultipleAccounts(
+      connection,
+      ids.map((id) => epochInfoKeys.get(id)!)
+    ),
+    getMultipleAccounts(
+      connection,
+      epochs.map((epoch) => daoEpochInfoKeys.get(epoch)!)
+    ),
+  ]);
+  const daoEpochInfoByEpoch = new Map<
+    number,
+    Awaited<ReturnType<HsdProgram["account"]["daoEpochInfoV0"]["fetch"]>> | null
+  >(
+    epochs.map((epoch, i) => {
+      const info = daoInfos[i];
+      return [
+        epoch,
+        info
+          ? hsdProgram.coder.accounts.decode("daoEpochInfoV0", info.data)
+          : null,
+      ];
+    })
   );
   const issued = new Set(
     ids.filter((id, i) => {
       const info = infos[i];
-      return (
-        info &&
-        isEpochInfoIssued(
-          hsdProgram.coder.accounts.decode("subDaoEpochInfoV0", info.data)
-        )
-      );
+      if (!info) return false;
+      const epoch = Number(id.split(":")[1]);
+      return isEpochInfoIssued({
+        subDaoEpochInfo: hsdProgram.coder.accounts.decode(
+          "subDaoEpochInfoV0",
+          info.data
+        ),
+        daoEpochInfo: daoEpochInfoByEpoch.get(epoch),
+      });
     })
   );
 

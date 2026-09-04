@@ -1144,6 +1144,7 @@ describe("governance", () => {
       expect(position!.delegation!.lastClaimedEpoch).to.equal(currentEpoch);
       expect(position!.delegation!.expirationTs).to.be.greaterThan(0);
       expect(position!.delegation!.claimableEpochCount).to.equal(0);
+      expect(position!.delegation!.requiredUnclaimedEpochCount).to.equal(0);
       expect(position!.delegation!.unissuedRequiredEpochCount).to.equal(0);
     });
   });

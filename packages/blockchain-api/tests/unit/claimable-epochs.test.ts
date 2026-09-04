@@ -4,6 +4,7 @@ import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
   getClaimableEpochRange,
+  isEpochInfoIssued,
   summarizeClaimableEpochs,
 } from "../../src/server/api/routers/governance/procedures/helpers/claimable-epochs";
 
@@ -61,8 +62,22 @@ describe("getClaimableEpochRange", () => {
     expect(r.unclaimedEpochs).to.deep.eq([]);
     expect(summarizeClaimableEpochs(r, allIssued)).to.deep.eq({
       claimableEpochCount: 0,
+      requiredUnclaimedEpochCount: 0,
       unissuedRequiredEpochCount: 0,
     });
+  });
+
+  it("never includes the current epoch when a cliff ended earlier today", () => {
+    // #given a cliff whose end_ts is inside the current epoch
+    const r = range({
+      lastClaimedEpoch: CURRENT_EPOCH - 3,
+      lockupEndTs: UNIX_NOW - 1,
+    });
+
+    // #then decayedEpoch + 1 would be tomorrow, but the range still stops today
+    expect(r.rawEndEpoch).to.eq(CURRENT_EPOCH);
+    expect(r.unclaimedEpochs).to.deep.eq([CURRENT_EPOCH - 2, CURRENT_EPOCH - 1]);
+    expect(r.closeRequiresThroughEpoch).to.eq(CURRENT_EPOCH - 1);
   });
 
   it("stops at the current epoch for a live delegation", () => {
@@ -167,6 +182,7 @@ describe("summarizeClaimableEpochs", () => {
     // #then yesterday's epoch is required for close but not claimable yet
     expect(summary).to.deep.eq({
       claimableEpochCount: 2,
+      requiredUnclaimedEpochCount: 3,
       unissuedRequiredEpochCount: 1,
     });
   });
@@ -182,7 +198,55 @@ describe("summarizeClaimableEpochs", () => {
     expect(r.unclaimedEpochs).to.deep.eq([endEpoch]);
     expect(summarizeClaimableEpochs(r, noneIssued)).to.deep.eq({
       claimableEpochCount: 0,
+      requiredUnclaimedEpochCount: 0,
       unissuedRequiredEpochCount: 0,
     });
+  });
+});
+
+describe("isEpochInfoIssued", () => {
+  const issuedSubDao = {
+    rewardsIssuedAt: new BN(UNIX_NOW),
+    hntRewardsIssued: new BN(1),
+  };
+
+  it("waits for the DAO to finish issuing on HNT-era epochs", () => {
+    // #given this sub-DAO issued but the other has not, so the DAO is not done
+    const halfway = {
+      doneIssuingRewards: false,
+      delegationRewardsIssued: new BN(1),
+    };
+    // #then claim_rewards_v1 would fail with EpochNotClosed, so not issued
+    expect(
+      isEpochInfoIssued({ subDaoEpochInfo: issuedSubDao, daoEpochInfo: halfway })
+    ).to.eq(false);
+    expect(
+      isEpochInfoIssued({ subDaoEpochInfo: issuedSubDao, daoEpochInfo: null })
+    ).to.eq(false);
+    expect(
+      isEpochInfoIssued({
+        subDaoEpochInfo: issuedSubDao,
+        daoEpochInfo: { ...halfway, doneIssuingRewards: true },
+      })
+    ).to.eq(true);
+  });
+
+  it("uses the sub-DAO flag for legacy DNT epochs", () => {
+    const legacy = { ...issuedSubDao, hntRewardsIssued: new BN(0) };
+    expect(
+      isEpochInfoIssued({ subDaoEpochInfo: legacy, daoEpochInfo: null })
+    ).to.eq(true);
+    expect(
+      isEpochInfoIssued({
+        subDaoEpochInfo: { ...legacy, rewardsIssuedAt: null },
+        daoEpochInfo: null,
+      })
+    ).to.eq(false);
+  });
+
+  it("treats a missing sub-DAO epoch info as unissued", () => {
+    expect(
+      isEpochInfoIssued({ subDaoEpochInfo: null, daoEpochInfo: null })
+    ).to.eq(false);
   });
 });

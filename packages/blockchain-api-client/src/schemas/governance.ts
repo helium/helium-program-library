@@ -297,11 +297,17 @@ export const PositionDelegationSchema = z.object({
     .describe(
       "Epochs claimDelegationRewards would emit a claim instruction for right now: unclaimed, in the claimable range, and with rewards issued",
     ),
+  requiredUnclaimedEpochCount: z
+    .number()
+    .int()
+    .describe(
+      "Unclaimed epochs that undelegatePosition must claim before closing, whether or not their rewards are issued yet; 0 means undelegate closes with no claim step",
+    ),
   unissuedRequiredEpochCount: z
     .number()
     .int()
     .describe(
-      "Unclaimed epochs that undelegatePosition requires claimed but whose rewards have not been issued yet; undelegate returns BAD_REQUEST while this is non-zero",
+      "The subset of requiredUnclaimedEpochCount whose rewards have not been issued yet; undelegate returns BAD_REQUEST while this is non-zero",
     ),
 });
 

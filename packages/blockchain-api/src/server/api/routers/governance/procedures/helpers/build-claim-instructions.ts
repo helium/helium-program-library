@@ -169,10 +169,15 @@ export async function buildClaimInstructions(
         ({ epoch, subDao }) =>
           subDaoEpochInfoKey(subDao, epoch.mul(new BN(EPOCH_LENGTH)))[0],
       );
-      const subDaoEpochInfoAccounts = await getMultipleAccounts(
-        connection,
-        subDaoEpochInfoKeys,
+      const daoEpochInfoKeys = chunk.map(
+        ({ epoch, subDaoAcc }) =>
+          daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0],
       );
+      const [subDaoEpochInfoAccounts, daoEpochInfoAccounts] =
+        await Promise.all([
+          getMultipleAccounts(connection, subDaoEpochInfoKeys),
+          getMultipleAccounts(connection, daoEpochInfoKeys),
+        ]);
 
       const batchInstructions = await Promise.all(
         chunk.map(
@@ -188,7 +193,21 @@ export async function buildClaimInstructions(
                 )
               : null;
 
-            if (!isEpochInfoIssued(subDaoEpochInfoData)) {
+            const daoEpochInfoAccount = daoEpochInfoAccounts[index];
+            const daoEpochInfoData = daoEpochInfoAccount
+              ? hsdProgram.coder.accounts.decode(
+                  "daoEpochInfoV0",
+                  daoEpochInfoAccount.data,
+                )
+              : null;
+
+            if (
+              !subDaoEpochInfoData ||
+              !isEpochInfoIssued({
+                subDaoEpochInfo: subDaoEpochInfoData,
+                daoEpochInfo: daoEpochInfoData,
+              })
+            ) {
               if (requiredForClose) {
                 unclaimableEpochs.push({
                   positionMint: position.mint,

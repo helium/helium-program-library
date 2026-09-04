@@ -32,7 +32,7 @@ export interface ClaimableEpochRange {
   /**
    * Exclusive. `currentEpoch` (the current epoch is never claimable), or
    * `epoch(lockup.endTs) + 1` once a non-constant lockup has ended, capped by
-   * the delegation's expiration.
+   * the current epoch and the delegation's expiration.
    */
   rawEndEpoch: number;
   /**
@@ -79,6 +79,7 @@ export const getClaimableEpochRange = ({
   const startEpoch = lastClaimedEpoch + 1;
   const bitmapWindowEnd = lastClaimedEpoch + 129;
   const rawEndEpoch = Math.min(
+    currentEpoch,
     isDecayed ? decayedEpoch + 1 : currentEpoch,
     expirationCap,
   );
@@ -107,18 +108,48 @@ export const getClaimableEpochRange = ({
   };
 };
 
+export interface EpochIssuanceAccounts {
+  subDaoEpochInfo:
+    | { rewardsIssuedAt: BN | null; hntRewardsIssued: BN }
+    | null
+    | undefined;
+  daoEpochInfo:
+    | { doneIssuingRewards: boolean; delegationRewardsIssued: BN }
+    | null
+    | undefined;
+}
+
 /**
- * Whether a `SubDaoEpochInfoV0` has had its rewards issued. Claims for an
- * unissued epoch fail on-chain (`EpochNotClosed`), so the claim builder skips
- * them and getPositions does not count them as claimable.
+ * Whether a claim for this epoch would pass the on-chain issuance gate. HNT-era
+ * epochs (`hntRewardsIssued > 0`) go through claim_rewards_v1, which requires
+ * `DaoEpochInfoV0.doneIssuingRewards`: that flips only after the last sub-DAO
+ * issues, so the per-sub-DAO `rewardsIssuedAt` is set too early. Legacy epochs
+ * go through claim_rewards_v0, which checks `rewardsIssuedAt`. An unissued
+ * epoch fails with `EpochNotClosed`, so the claim builder skips it and
+ * getPositions does not count it as claimable.
  */
-export const isEpochInfoIssued = (
-  epochInfo: { rewardsIssuedAt: BN | null } | null | undefined,
-): boolean => !!epochInfo?.rewardsIssuedAt;
+export const isEpochInfoIssued = ({
+  subDaoEpochInfo,
+  daoEpochInfo,
+}: EpochIssuanceAccounts): boolean => {
+  if (!subDaoEpochInfo) return false;
+  if (subDaoEpochInfo.hntRewardsIssued.gt(new BN(0))) {
+    return (
+      !!daoEpochInfo?.doneIssuingRewards &&
+      daoEpochInfo.delegationRewardsIssued.gt(new BN(0))
+    );
+  }
+  return !!subDaoEpochInfo.rewardsIssuedAt;
+};
 
 export interface ClaimableEpochSummary {
   /** Unclaimed epochs in range whose rewards are issued: what a claim emits now. */
   claimableEpochCount: number;
+  /**
+   * Unclaimed epochs close_delegation_v0 requires, issued or not. Zero means
+   * undelegatePosition can close without claiming anything first.
+   */
+  requiredUnclaimedEpochCount: number;
   /**
    * Unclaimed epochs close_delegation_v0 requires that are not issued yet:
    * what undelegatePosition rejects with BAD_REQUEST.
@@ -131,13 +162,20 @@ export const summarizeClaimableEpochs = (
   isIssued: (epoch: number) => boolean,
 ): ClaimableEpochSummary => {
   let claimableEpochCount = 0;
+  let requiredUnclaimedEpochCount = 0;
   let unissuedRequiredEpochCount = 0;
   for (const epoch of range.unclaimedEpochs) {
+    const required = epoch <= range.closeRequiresThroughEpoch;
+    if (required) requiredUnclaimedEpochCount++;
     if (isIssued(epoch)) {
       claimableEpochCount++;
-    } else if (epoch <= range.closeRequiresThroughEpoch) {
+    } else if (required) {
       unissuedRequiredEpochCount++;
     }
   }
-  return { claimableEpochCount, unissuedRequiredEpochCount };
+  return {
+    claimableEpochCount,
+    requiredUnclaimedEpochCount,
+    unissuedRequiredEpochCount,
+  };
 };
