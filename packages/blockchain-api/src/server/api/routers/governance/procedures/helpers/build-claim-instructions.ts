@@ -11,10 +11,7 @@ import {
 } from "@helium/circuit-breaker-sdk";
 import { chunks, HNT_MINT, truthy } from "@helium/spl-utils";
 import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
-import {
-  isClaimed,
-  PROGRAM_ID as VSR_PROGRAM_ID,
-} from "@helium/voter-stake-registry-sdk";
+import { PROGRAM_ID as VSR_PROGRAM_ID } from "@helium/voter-stake-registry-sdk";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
@@ -28,21 +25,13 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import BN from "bn.js";
-import { getLockupKind, MAX_TXS_PER_CALL } from "./constants";
+import { getClaimableEpochRange, isEpochInfoIssued } from "./claimable-epochs";
+import { MAX_TXS_PER_CALL } from "./constants";
 
 type HsdProgram = Awaited<ReturnType<typeof initHsd>>;
 
 const DAO = daoKey(HNT_MINT)[0];
 const EPOCHS_PER_BATCH = 128;
-
-// Epochs at or after the delegation's expiration pay zero rewards and
-// close_delegation_v0 no longer requires claiming them. The epoch containing
-// expiration_ts still pays, so the exclusive end-epoch bound is
-// epoch(expiration - 1) + 1. An expirationTs of 0 means no expiration.
-export const expirationCapEpoch = (expirationTs: BN): number =>
-  expirationTs.isZero()
-    ? Number.MAX_SAFE_INTEGER
-    : expirationTs.sub(new BN(1)).div(new BN(EPOCH_LENGTH)).toNumber() + 1;
 
 interface PositionInfo {
   mint: PublicKey;
@@ -91,7 +80,6 @@ export async function buildClaimInstructions(
 
   const clock = await connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
   const unixNow = Number(clock!.data.readBigInt64LE(8 * 4));
-  const currentEpoch = new BN(unixNow).div(new BN(EPOCH_LENGTH));
 
   const subDaoKeys = new Set(
     positions.map((p) => p.delegatedPosition.subDao.toBase58()),
@@ -129,60 +117,32 @@ export async function buildClaimInstructions(
   for (const position of positions) {
     if (hitCap) break;
 
-    const { lockup } = position.account;
-    const lockupKind = getLockupKind(lockup);
-    const isConstant = lockupKind === "constant";
-    const isDecayed = !isConstant && lockup.endTs.lte(new BN(unixNow));
-    const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH));
-    // Mirrors to_claim_to_epoch in close_delegation_v0.rs
-    const isCliff = lockupKind === "cliff";
-    const closeRequiresThroughEpoch = Math.min(
-      isDecayed && isCliff
-        ? decayedEpoch.toNumber() - 1
-        : currentEpoch.toNumber() - 1,
-      expirationCapEpoch(position.delegatedPosition.expirationTs) - 1,
-    );
-
     const subDao = position.delegatedPosition.subDao;
     const subDaoAcc = subDaos[subDao.toBase58()];
 
-    const { lastClaimedEpoch, claimedEpochsBitmap, expirationTs } =
-      position.delegatedPosition;
-    const startEpoch = lastClaimedEpoch.add(new BN(1));
-    const bitmapWindowEnd = lastClaimedEpoch.add(new BN(129)).toNumber();
-    const rawEndEpoch = Math.min(
-      isDecayed
-        ? decayedEpoch.add(new BN(1)).toNumber()
-        : currentEpoch.toNumber(),
-      expirationCapEpoch(expirationTs),
-    );
-    const endEpoch = Math.min(rawEndEpoch, bitmapWindowEnd);
+    const range = getClaimableEpochRange({
+      lockup: position.account.lockup,
+      delegatedPosition: position.delegatedPosition,
+      unixNow,
+    });
 
-    if (rawEndEpoch > bitmapWindowEnd) {
+    if (range.rawEndEpoch > range.bitmapWindowEnd) {
       hitCap = true;
     }
 
-    for (let e = startEpoch.toNumber(); e < endEpoch; e++) {
+    for (const e of range.unclaimedEpochs) {
       if (allEpochsToClaim.length >= maxEpochsThisCall) {
         hitCap = true;
         break;
       }
 
-      if (
-        !isClaimed({
-          epoch: e,
-          lastClaimedEpoch: lastClaimedEpoch.toNumber(),
-          claimedEpochsBitmap,
-        })
-      ) {
-        allEpochsToClaim.push({
-          position,
-          epoch: new BN(e),
-          subDao,
-          subDaoAcc,
-          requiredForClose: e <= closeRequiresThroughEpoch,
-        });
-      }
+      allEpochsToClaim.push({
+        position,
+        epoch: new BN(e),
+        subDao,
+        subDaoAcc,
+        requiredForClose: e <= range.closeRequiresThroughEpoch,
+      });
     }
   }
 
@@ -228,7 +188,7 @@ export async function buildClaimInstructions(
                 )
               : null;
 
-            if (!subDaoEpochInfoData?.rewardsIssuedAt) {
+            if (!isEpochInfoIssued(subDaoEpochInfoData)) {
               if (requiredForClose) {
                 unclaimableEpochs.push({
                   positionMint: position.mint,

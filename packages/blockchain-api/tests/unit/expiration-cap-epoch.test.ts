@@ -2,7 +2,7 @@ import { EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
 import BN from "bn.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
-import { expirationCapEpoch } from "../../src/server/api/routers/governance/procedures/helpers/build-claim-instructions";
+import { expirationCapEpoch } from "../../src/server/api/routers/governance/procedures/helpers/claimable-epochs";
 
 const epochStart = (epoch: number) => new BN(epoch).mul(new BN(EPOCH_LENGTH));
 
