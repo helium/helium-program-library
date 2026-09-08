@@ -123,6 +123,8 @@ describe("getMissingEpochInfoRentLamports", () => {
 
   const epochConnection = (present: boolean[]): Connection =>
     ({
+      // Unique per stub so getRentLamports' module-level cache never crosses tests.
+      rpcEndpoint: `stub://${Keypair.generate().publicKey.toBase58()}`,
       getMultipleAccountsInfo: async () =>
         present.map((exists) => (exists ? { lamports: 1 } : null)),
       getMinimumBalanceForRentExemption: async (space: number) => {
@@ -160,6 +162,7 @@ describe("getMissingEpochInfoRentLamports", () => {
     // provided", which a change-delegation of 50+ positions reaches.
     const requestedSizes: number[] = [];
     const connection = {
+      rpcEndpoint: `stub://${Keypair.generate().publicKey.toBase58()}`,
       getMultipleAccountsInfo: async (keys: PublicKey[]) => {
         requestedSizes.push(keys.length);
         return keys.map(() => null);

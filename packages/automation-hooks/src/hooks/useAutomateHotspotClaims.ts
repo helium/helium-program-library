@@ -195,7 +195,7 @@ export const useAutomateHotspotClaims = ({
     return duration * minCrankReward;
   }, [duration, totalHotspots, taskQueue]);
   const { account } = useAccount(ata);
-  const { result: rent, loading: loadingRent } = useAsync(async () => {
+  const { result: rent, loading: loadingRent, error: rentError } = useAsync(async () => {
     const connection = provider?.connection;
     if (!connection) return undefined;
     const [walletMin, recipient, ataRent, ...base] = await Promise.all(
@@ -444,7 +444,7 @@ export const useAutomateHotspotClaims = ({
 
   return {
     loading: loading || removing || loadingRent,
-    error: error || removeError,
+    error: error || removeError || rentError,
     execute,
     remove,
     hasExistingAutomation: !!cronJobAccount && !cronJobAccount.removedFromQueue,
@@ -455,8 +455,10 @@ export const useAutomateHotspotClaims = ({
     rentFee,
     recipientFee,
     solFee: (crankSolFee + pdaWalletSolFee) / LAMPORTS_PER_SOL,
+    // A failed rent lookup must block rather than quote 0 rent.
     insufficientSol:
-      !loadingSol && !loadingRent && totalSolNeeded > availableUserBalance,
+      !!rentError ||
+      (!loadingSol && !loadingRent && totalSolNeeded > availableUserBalance),
     isOutOfSol: cronJobAccount?.removedFromQueue || false,
   };
 };

@@ -1,13 +1,18 @@
 import { publicProcedure } from "@/server/api/procedures";
+import { initCachedProgram } from "@/lib/anchor-idl-cache";
 import { createSolanaConnection } from "@/lib/solana";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
   daoKey,
   delegatedPositionKey,
   init as initHsd,
+  PROGRAM_ID as HSD_PROGRAM_ID,
 } from "@helium/helium-sub-daos-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
-import { init as initVsr } from "@helium/voter-stake-registry-sdk";
+import {
+  init as initVsr,
+  PROGRAM_ID as VSR_PROGRAM_ID,
+} from "@helium/voter-stake-registry-sdk";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { headers } from "next/headers";
 import {
@@ -126,8 +131,8 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
 
     const { connection, provider } = createSolanaConnection(wallet);
     const [vsrProgram, hsdProgram] = await Promise.all([
-      initVsr(provider),
-      initHsd(provider),
+      initCachedProgram(initVsr, VSR_PROGRAM_ID, provider),
+      initCachedProgram(initHsd, HSD_PROGRAM_ID, provider),
     ]);
 
     const owned = await getPositionsForOwner({
