@@ -159,123 +159,129 @@ export async function buildClaimInstructions(
 
   const rewardMintSet = new Set<string>();
 
-  // One batch's epoch infos do not depend on any other batch's, so every
-  // batch's reads go out at once rather than end to end: a multi-batch claim
-  // spends most of its time in these round trips.
+  // Positions on the same sub-DAO share epoch infos across batches, so read
+  // every epoch info once up front and index into it per batch.
+  const allInfos = await fetchEpochInfos({
+    connection,
+    hsdProgram,
+    dao: DAO,
+    entries: allEpochsToClaim.map(({ epoch, subDao }) => ({
+      subDao,
+      epoch: epoch.toNumber(),
+    })),
+  });
+
   const builtChunks = await Promise.all(
-    chunks(allEpochsToClaim, EPOCHS_PER_BATCH).map(async (chunk) => {
-      const unclaimableEpochs: ClaimInstructionsResult["unclaimableEpochs"] =
-        [];
-      const infos = await fetchEpochInfos({
-        connection,
-        hsdProgram,
-        dao: DAO,
-        entries: chunk.map(({ epoch, subDao }) => ({
-          subDao,
-          epoch: epoch.toNumber(),
-        })),
-      });
+    chunks(allEpochsToClaim, EPOCHS_PER_BATCH).map(
+      async (chunk, chunkIndex) => {
+        const unclaimableEpochs: ClaimInstructionsResult["unclaimableEpochs"] =
+          [];
+        const infos = allInfos.slice(
+          chunkIndex * EPOCHS_PER_BATCH,
+          chunkIndex * EPOCHS_PER_BATCH + chunk.length,
+        );
 
-      const batchInstructions = await Promise.all(
-        chunk.map(
-          async (
-            { position, epoch, subDao, subDaoAcc, requiredForClose },
-            index,
-          ) => {
-            const subDaoEpochInfoData = infos[index].subDaoEpochInfo;
-            const daoEpochInfoData = infos[index].daoEpochInfo;
+        const batchInstructions = await Promise.all(
+          chunk.map(
+            async (
+              { position, epoch, subDao, subDaoAcc, requiredForClose },
+              index,
+            ) => {
+              const subDaoEpochInfoData = infos[index].subDaoEpochInfo;
+              const daoEpochInfoData = infos[index].daoEpochInfo;
 
-            if (
-              !subDaoEpochInfoData ||
-              !isEpochInfoIssued({
-                subDaoEpochInfo: subDaoEpochInfoData,
-                daoEpochInfo: daoEpochInfoData,
-              })
-            ) {
-              if (requiredForClose) {
-                unclaimableEpochs.push({
-                  positionMint: position.mint,
-                  epoch: epoch.toNumber(),
-                });
+              if (
+                !subDaoEpochInfoData ||
+                !isEpochInfoIssued({
+                  subDaoEpochInfo: subDaoEpochInfoData,
+                  daoEpochInfo: daoEpochInfoData,
+                })
+              ) {
+                if (requiredForClose) {
+                  unclaimableEpochs.push({
+                    positionMint: position.mint,
+                    epoch: epoch.toNumber(),
+                  });
+                }
+                return null;
               }
-              return null;
-            }
 
-            const commonAccounts = {
-              position: position.pubkey,
-              mint: position.mint,
-              positionTokenAccount: getAssociatedTokenAddressSync(
-                position.mint,
-                walletPubkey,
-                true,
-              ),
-              positionAuthority: walletPubkey,
-              registrar: position.account.registrar,
-              dao: DAO,
-              subDao,
-              delegatedPosition: position.delegatedPositionKey,
-              vsrProgram: VSR_PROGRAM_ID,
-              systemProgram: SystemProgram.programId,
-              circuitBreakerProgram: CIRCUIT_BREAKER_PROGRAM_ID,
-              associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-              tokenProgram: TOKEN_PROGRAM_ID,
-            };
+              const commonAccounts = {
+                position: position.pubkey,
+                mint: position.mint,
+                positionTokenAccount: getAssociatedTokenAddressSync(
+                  position.mint,
+                  walletPubkey,
+                  true,
+                ),
+                positionAuthority: walletPubkey,
+                registrar: position.account.registrar,
+                dao: DAO,
+                subDao,
+                delegatedPosition: position.delegatedPositionKey,
+                vsrProgram: VSR_PROGRAM_ID,
+                systemProgram: SystemProgram.programId,
+                circuitBreakerProgram: CIRCUIT_BREAKER_PROGRAM_ID,
+                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+                tokenProgram: TOKEN_PROGRAM_ID,
+              };
 
-            if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
-              rewardMintSet.add(daoAcc.hntMint.toBase58());
-              return hsdProgram.methods
-                .claimRewardsV1({ epoch })
-                .accountsStrict({
-                  ...commonAccounts,
-                  payer: walletPubkey,
-                  hntMint: daoAcc.hntMint,
-                  daoEpochInfo: daoEpochInfoKey(
-                    subDaoAcc.dao,
-                    epoch.mul(new BN(EPOCH_LENGTH)),
-                  )[0],
-                  delegatorPool: daoAcc.delegatorPool,
-                  delegatorAta: getAssociatedTokenAddressSync(
-                    daoAcc.hntMint,
-                    walletPubkey,
-                    true,
-                  ),
-                  delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
-                    daoAcc.delegatorPool,
-                  )[0],
-                })
-                .instruction();
-            } else {
-              rewardMintSet.add(subDaoAcc.dntMint.toBase58());
-              return hsdProgram.methods
-                .claimRewardsV0({ epoch })
-                .accountsStrict({
-                  ...commonAccounts,
-                  dntMint: subDaoAcc.dntMint,
-                  subDaoEpochInfo: subDaoEpochInfoKey(
-                    subDao,
-                    epoch.mul(new BN(EPOCH_LENGTH)),
-                  )[0],
-                  delegatorPool: subDaoAcc.delegatorPool,
-                  delegatorAta: getAssociatedTokenAddressSync(
-                    subDaoAcc.dntMint,
-                    walletPubkey,
-                    true,
-                  ),
-                  delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
-                    subDaoAcc.delegatorPool,
-                  )[0],
-                })
-                .instruction();
-            }
-          },
-        ),
-      );
+              if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
+                rewardMintSet.add(daoAcc.hntMint.toBase58());
+                return hsdProgram.methods
+                  .claimRewardsV1({ epoch })
+                  .accountsStrict({
+                    ...commonAccounts,
+                    payer: walletPubkey,
+                    hntMint: daoAcc.hntMint,
+                    daoEpochInfo: daoEpochInfoKey(
+                      subDaoAcc.dao,
+                      epoch.mul(new BN(EPOCH_LENGTH)),
+                    )[0],
+                    delegatorPool: daoAcc.delegatorPool,
+                    delegatorAta: getAssociatedTokenAddressSync(
+                      daoAcc.hntMint,
+                      walletPubkey,
+                      true,
+                    ),
+                    delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
+                      daoAcc.delegatorPool,
+                    )[0],
+                  })
+                  .instruction();
+              } else {
+                rewardMintSet.add(subDaoAcc.dntMint.toBase58());
+                return hsdProgram.methods
+                  .claimRewardsV0({ epoch })
+                  .accountsStrict({
+                    ...commonAccounts,
+                    dntMint: subDaoAcc.dntMint,
+                    subDaoEpochInfo: subDaoEpochInfoKey(
+                      subDao,
+                      epoch.mul(new BN(EPOCH_LENGTH)),
+                    )[0],
+                    delegatorPool: subDaoAcc.delegatorPool,
+                    delegatorAta: getAssociatedTokenAddressSync(
+                      subDaoAcc.dntMint,
+                      walletPubkey,
+                      true,
+                    ),
+                    delegatorPoolCircuitBreaker: accountWindowedBreakerKey(
+                      subDaoAcc.delegatorPool,
+                    )[0],
+                  })
+                  .instruction();
+              }
+            },
+          ),
+        );
 
-      return {
-        instructions: batchInstructions.filter(truthy),
-        unclaimableEpochs,
-      };
-    }),
+        return {
+          instructions: batchInstructions.filter(truthy),
+          unclaimableEpochs,
+        };
+      },
+    ),
   );
 
   const allInstructionBatches = builtChunks

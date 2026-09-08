@@ -61,15 +61,16 @@ const fetchDelegations = async ({
   owned: OwnedPosition[];
 }) => {
   const dao = daoKey(HNT_MINT)[0];
-  const delegated: (DelegatedPositionV0 | null)[] =
-    await hsdProgram.account.delegatedPositionV0.fetchMultiple(
+  const [delegated, clock] = await Promise.all([
+    hsdProgram.account.delegatedPositionV0.fetchMultiple(
       owned.map((p) => delegatedPositionKey(p.position)[0]),
-    );
+    ) as Promise<(DelegatedPositionV0 | null)[]>,
+    connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY),
+  ]);
   if (delegated.every((d) => !d)) {
     return owned.map(() => null);
   }
 
-  const clock = await connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
   const unixNow = Number(clock!.data.readBigInt64LE(8 * 4));
 
   const ranges: (ClaimableEpochRange | null)[] = owned.map((p, i) => {
