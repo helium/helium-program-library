@@ -237,7 +237,11 @@ pub fn handler<'info>(
 
   // Pay min crank reward to task_queue from mini_fanout, if available
   let min_rent_exempt = Rent::get()?.minimum_balance(mini_fanout_info.data_len());
-  if mini_fanout_info.lamports() - min_rent_exempt >= ctx.accounts.task_queue.min_crank_reward * 2 {
+  // saturating_sub: accounts funded before a Rent sysvar increase can sit
+  // below the current minimum, and a bare subtraction would panic.
+  if mini_fanout_info.lamports().saturating_sub(min_rent_exempt)
+    >= ctx.accounts.task_queue.min_crank_reward * 2
+  {
     mini_fanout.sub_lamports(ctx.accounts.task_queue.min_crank_reward * 2)?;
     ctx
       .accounts
