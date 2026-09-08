@@ -44,12 +44,11 @@ import {
 import { Asset, getAsset, HNT_MINT, toNumber } from "@helium/spl-utils";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { createMemoInstruction } from "@solana/spl-memo";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { ACCOUNT_SIZE, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
   Keypair,
-  LAMPORTS_PER_SOL,
   MessageCompiledInstruction,
   PublicKey,
   SystemProgram,
@@ -63,11 +62,10 @@ import Fastify, {
 } from "fastify";
 import fs from "fs";
 import {
-  ATA_RENT,
   DAO,
   DNT,
   MAX_CLAIMS_PER_TX,
-  RECIPIENT_RENT,
+  recipientSpace,
 } from "./constants";
 import { Database, DeviceType, RewardableEntity } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
@@ -747,10 +745,24 @@ export class OracleServer {
     );
     const ataExists =
       !!(await this.ldProgram.provider.connection.getAccountInfo(ata));
+    const connection = this.ldProgram.provider.connection;
+    const [walletMinRent, recipientRent, ataRent] = await Promise.all([
+      connection.getMinimumBalanceForRentExemption(0),
+      recipientAcc
+        ? 0
+        : this.ldProgram.account.lazyDistributorV0
+            .fetch(this.lazyDistributor)
+            .then((ld) =>
+              connection.getMinimumBalanceForRentExemption(
+                recipientSpace(ld.oracles.length)
+              )
+            ),
+      ataExists ? 0 : connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE),
+    ]);
     const neededBalance =
-      (!ataExists || !recipientAcc ? 0.00089088 * LAMPORTS_PER_SOL : 0) +
-      (recipientAcc ? 0 : RECIPIENT_RENT) +
-      (ataExists ? 0 : ATA_RENT);
+      (!ataExists || !recipientAcc ? walletMinRent : 0) +
+      recipientRent +
+      ataRent;
 
     const instructions: TransactionInstruction[] = [];
     if (balance < neededBalance) {
@@ -997,7 +1009,11 @@ export class OracleServer {
         )
       )?.lamports || 0;
     const fees = taskQueueAcc.minCrankReward.toNumber() * (entities.length + 1);
-    const neededBalance = 0.00089088 * LAMPORTS_PER_SOL + fees;
+    const walletMinRent =
+      await this.ldProgram.provider.connection.getMinimumBalanceForRentExemption(
+        0
+      );
+    const neededBalance = walletMinRent + fees;
     const instructions: TransactionInstruction[] = [];
     if (balance < neededBalance) {
       instructions.push(
