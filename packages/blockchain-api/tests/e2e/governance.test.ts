@@ -2331,8 +2331,9 @@ describe("governance", () => {
       );
       // The quote priced each transaction with getFeeForMessage, which
       // surfpool answers without the compute-unit price the runtime then
-      // charges (mainnet's includes it). Add back whatever the cluster
-      // charged beyond that answer before comparing.
+      // charges (mainnet's includes it). Surfpool's meta.fee leaves it out
+      // too, so read what was really charged off the ledger: lamports are
+      // conserved across a transaction except for its fee.
       const { blockhash } = await ctx.connection.getLatestBlockhash();
       let unquotedFees = 0;
       for (const [i, signature] of signatures.entries()) {
@@ -2343,12 +2344,15 @@ describe("governance", () => {
           ),
         );
         tx.message.recentBlockhash = blockhash;
-        const charged = (
+        const meta = (
           await ctx.connection.getTransaction(signature, {
             commitment: "confirmed",
             maxSupportedTransactionVersion: 0,
           })
-        )!.meta!.fee;
+        )!.meta!;
+        const sum = (balances: number[]) =>
+          balances.reduce((a, b) => a + b, 0);
+        const charged = sum(meta.preBalances) - sum(meta.postBalances);
         const quoted = (await ctx.connection.getFeeForMessage(tx.message))
           .value!;
         unquotedFees += charged - quoted;
