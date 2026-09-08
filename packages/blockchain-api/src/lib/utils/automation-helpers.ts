@@ -1,4 +1,4 @@
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 export type Schedule = "daily" | "weekly" | "monthly";
 
@@ -11,15 +11,58 @@ export type Schedule = "daily" | "weekly" | "monthly";
 export const ENTITY_CLAIM_CRON_NAME = "entity_claim";
 
 // Constants from useAutomateHotspotClaims hook
-export const BASE_AUTOMATION_RENT = 0.02098095;
 export const TASK_RETURN_ACCOUNT_SIZE = 0.01;
-export const MIN_RENT = 0.00089088;
 export const EST_TX_FEE = 0.000001;
-export const RECIPIENT_RENT = 0.00242208;
-export const ATA_RENT = 0.002039 * LAMPORTS_PER_SOL;
 
-// Minimum rent requirements in lamports (for calculating available balances)
-export const PDA_WALLET_RENT_LAMPORTS = Math.ceil(MIN_RENT * LAMPORTS_PER_SOL);
+/**
+ * Byte sizes of the accounts init_entity_claim_cron_v0 creates through the
+ * tuktuk cron program's initialize_cron_job_v0 (tuktuk
+ * solana-programs/programs/cron/src/instructions/initialize_cron_job_v0.rs).
+ * `space = 8 + 60 + size_of::<T>() + name.len() [+ schedule.len()]`, with the
+ * name fixed to ENTITY_CLAIM_CRON_NAME. size_of values reflect the deployed
+ * program's structs (CronJobV0 carries a `next_schedule_task: Pubkey` the
+ * IDL shows). Verified against mainnet: UserCronJobsV0 112 bytes,
+ * CronJobV0 301 bytes with a 13-char schedule, CronJobNameMappingV0 144 bytes.
+ */
+export const USER_CRON_JOBS_SPACE = 8 + 60 + 44;
+export const CRON_JOB_NAME_MAPPING_SPACE =
+  8 + 60 + 64 + ENTITY_CLAIM_CRON_NAME.length;
+export const cronJobSpace = (scheduleLen: number) =>
+  8 + 60 + 208 + ENTITY_CLAIM_CRON_NAME.length + scheduleLen;
+/**
+ * initialize_cron_job_v0 funds task_return_account_1 with
+ * `Rent::minimum_balance(1024)` and queues the "queue entity_claim" schedule
+ * task. That TaskV0 measured 738 bytes on mainnet (compiled queue_cron_tasks
+ * transaction); its rent is refunded when the task runs.
+ */
+export const TASK_RETURN_ACCOUNT_FUNDING_SPACE = 1024;
+export const ENTITY_CLAIM_SCHEDULE_TASK_SPACE = 738;
+/**
+ * Longest six-column crontab getScheduleCronString produces:
+ * "SS MM HH DD * *". Used to size the cron job before a schedule is chosen.
+ */
+export const MAX_PRESET_SCHEDULE_LEN = 15;
+
+/**
+ * Lamports locked up when an entity-claim cron job is first created: rent for
+ * the three cron accounts, the task-return-account funding and the schedule
+ * task. Replaces the old hardcoded BASE_AUTOMATION_RENT (0.02098095 SOL).
+ */
+export async function getBaseAutomationRentLamports(
+  connection: Connection,
+  scheduleLen: number = MAX_PRESET_SCHEDULE_LEN
+): Promise<number> {
+  const rents = await Promise.all(
+    [
+      USER_CRON_JOBS_SPACE,
+      cronJobSpace(scheduleLen),
+      CRON_JOB_NAME_MAPPING_SPACE,
+      TASK_RETURN_ACCOUNT_FUNDING_SPACE,
+      ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
+    ].map((space) => connection.getMinimumBalanceForRentExemption(space))
+  );
+  return rents.reduce((sum, rent) => sum + rent, 0);
+}
 
 /**
  * Convert a schedule type to a cron string.
@@ -177,6 +220,7 @@ export interface CalculatePeriodsRemainingParams {
   pdaWalletCostPerClaimLamports: number;
   recipientRentLamports?: number;
   cronJobRentLamports: number; // Minimum rent for cron job account (calculated from account data length)
+  pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet, priced from the cluster
   ataRentLamports?: number; // ATA rent if ATA doesn't exist (will be locked up)
   taskReturnAccountRentLamports?: number; // Task return account rent if it doesn't exist (will be locked up)
 }
@@ -186,8 +230,8 @@ export interface CalculatePeriodsRemainingParams {
  * Returns the period length and number of periods remaining for each pool, plus the minimum.
  *
  * Accounts for minimum rent requirements:
- * - Cron job: rent for the account with its data (BASE_AUTOMATION_RENT)
- * - PDA wallet: minimum rent for account with 0 data (MIN_RENT)
+ * - Cron job: rent for the account with its data (cronJobRentLamports)
+ * - PDA wallet: minimum rent for account with 0 data (pdaWalletRentLamports)
  * - Recipient rent: already committed rent for recipients
  */
 export function calculatePeriodsRemaining(
@@ -206,6 +250,7 @@ export function calculatePeriodsRemaining(
     pdaWalletCostPerClaimLamports,
     recipientRentLamports = 0,
     cronJobRentLamports,
+    pdaWalletRentLamports,
     ataRentLamports = 0,
     taskReturnAccountRentLamports = 0,
   } = params;
@@ -221,7 +266,7 @@ export function calculatePeriodsRemaining(
   const availablePdaWalletBalance = Math.max(
     0,
     pdaWalletBalanceLamports -
-      PDA_WALLET_RENT_LAMPORTS -
+      pdaWalletRentLamports -
       recipientRentLamports -
       ataRentLamports
   );
@@ -309,6 +354,7 @@ export interface CalculateFundingForAdditionalDurationParams {
   pdaWalletCostPerClaimLamports: number;
   recipientRentLamports: number;
   cronJobRentLamports: number;
+  pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet, priced from the cluster
   additionalDuration: number;
   ataRentLamports?: number; // ATA rent if ATA doesn't exist (will be locked up)
   taskReturnAccountRentLamports?: number; // Task return account rent if it doesn't exist (will be locked up)
@@ -334,6 +380,7 @@ export function calculateFundingForAdditionalDuration(
     pdaWalletCostPerClaimLamports,
     recipientRentLamports,
     cronJobRentLamports,
+    pdaWalletRentLamports,
     additionalDuration,
     ataRentLamports = 0,
     taskReturnAccountRentLamports = 0,
@@ -351,7 +398,7 @@ export function calculateFundingForAdditionalDuration(
 
   const pdaWalletBalanceAfterRent =
     pdaWalletBalanceLamports -
-    PDA_WALLET_RENT_LAMPORTS -
+    pdaWalletRentLamports -
     recipientRentLamports -
     ataRentLamports;
   const pdaWalletRentShortfall = Math.max(0, -pdaWalletBalanceAfterRent);
@@ -364,7 +411,7 @@ export function calculateFundingForAdditionalDuration(
   // The shortfall covers rent in order: PDA wallet rent, then recipient rent, then ATA rent
   // Calculate PDA wallet rent shortfall (how much shortfall is just for PDA wallet rent)
   const pdaWalletBalanceAfterPdaRentOnly =
-    pdaWalletBalanceLamports - PDA_WALLET_RENT_LAMPORTS;
+    pdaWalletBalanceLamports - pdaWalletRentLamports;
   const pdaWalletRentShortfallOnly = Math.max(
     0,
     -pdaWalletBalanceAfterPdaRentOnly

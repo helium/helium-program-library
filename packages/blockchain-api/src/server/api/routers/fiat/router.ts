@@ -26,7 +26,7 @@ import {
   calculateRequiredBalance,
   BASE_TX_FEE_LAMPORTS,
   getTransactionFee,
-  RENT_COSTS,
+  ATA_SPACE,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import {
@@ -511,18 +511,18 @@ const sendFunds = publicProcedure.fiat.sendFunds.handler(
     let rentCost = 0;
     const userAtaInfo = await connection.getAccountInfo(myUsdcAta);
     if (!userAtaInfo) {
-      rentCost += RENT_COSTS.ATA;
+      rentCost += (await connection.getMinimumBalanceForRentExemption(ATA_SPACE));
     }
     const destAtaInfo = await connection.getAccountInfo(ata);
     if (!destAtaInfo) {
-      rentCost += RENT_COSTS.ATA;
+      rentCost += (await connection.getMinimumBalanceForRentExemption(ATA_SPACE));
     }
 
     if (rentCost > 0) {
       const walletBalance = await connection.getBalance(
         new PublicKey(userAddress)
       );
-      const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
+      const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, rentCost);
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance to complete transfer",

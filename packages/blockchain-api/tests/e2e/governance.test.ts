@@ -43,7 +43,7 @@ import {
   DELEGATION_CLAIM_BOT_SPACE,
   POSITION_SPACE,
 } from "../../src/server/api/routers/governance/procedures/helpers/rent";
-import { MIN_WALLET_RENT_LAMPORTS } from "../../src/lib/utils/balance-validation";
+import { getMinWalletRentLamports } from "../../src/lib/utils/balance-validation";
 import {
   DEFAULT_HPL_CRONS_TASK_QUEUE,
   TEST_PROXY_ADDRESS,
@@ -2355,7 +2355,7 @@ describe("governance", () => {
       }
       expect(
         (await ctx.connection.getBalance(wallet.publicKey)) + unquotedFees,
-      ).to.equal(MIN_WALLET_RENT_LAMPORTS);
+      ).to.equal(await getMinWalletRentLamports(ctx.connection));
 
       // #then the rent-bearing accounts are the sizes the quote priced
       const positionMint = data.transactionData.transactions[0].metadata

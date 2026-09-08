@@ -50,7 +50,10 @@ import {
 } from "@/lib/utils/jito";
 import {
   getTotalTransactionFees,
-  RENT_COSTS,
+  MINI_FANOUT_DIST_TASK_SPACE,
+  MINI_FANOUT_PRE_TASK_SPACE,
+  miniFanoutSpace,
+  RECIPIENT_SPACE,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -253,9 +256,28 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     }
 
     // Rent includes mini fanout account + 2 tuktuk tasks (task + preTask) + optional recipient
-    const recipientRent = recipientAcc ? 0 : RENT_COSTS.RECIPIENT;
-    const rentCost =
-      RENT_COSTS.MINI_FANOUT + RENT_COSTS.TUKTUK_TASK * 2 + recipientRent;
+    const [fanoutRent, distTaskRent, preTaskRent, recipientRent] =
+      await Promise.all([
+        provider.connection.getMinimumBalanceForRentExemption(
+          miniFanoutSpace({
+            numShares: rewardsSplit.length,
+            scheduleLen: rewardsSchedule.length,
+            preTaskUrlLen: `${oracleUrl}/v1/tuktuk/asset/${assetId}`.length,
+          })
+        ),
+        provider.connection.getMinimumBalanceForRentExemption(
+          MINI_FANOUT_DIST_TASK_SPACE
+        ),
+        provider.connection.getMinimumBalanceForRentExemption(
+          MINI_FANOUT_PRE_TASK_SPACE
+        ),
+        recipientAcc
+          ? 0
+          : provider.connection.getMinimumBalanceForRentExemption(
+              RECIPIENT_SPACE
+            ),
+      ]);
+    const rentCost = fanoutRent + distTaskRent + preTaskRent + recipientRent;
     const txFees = await getTotalTransactionFees(provider.connection, txs);
     const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
     const estimatedSolFeeLamports =

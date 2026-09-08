@@ -10,9 +10,17 @@ import {
   toTokenAmountOutput,
 } from "@/lib/utils/token-math";
 import {
+  ATA_SPACE,
   BASE_TX_FEE_LAMPORTS,
-  RENT_COSTS,
+  MINI_FANOUT_DIST_TASK_SPACE,
+  MINI_FANOUT_PRE_TASK_SPACE,
+  miniFanoutSpace,
+  RECIPIENT_SPACE,
+  USER_WELCOME_PACKS_SPACE,
+  welcomePackSpace,
 } from "@/lib/utils/balance-validation";
+import { env } from "@/lib/env";
+import { toSixColumnCron } from "@/lib/utils/misc";
 import { solToLamportsBN } from "@/lib/utils/token-math";
 import BN from "bn.js";
 
@@ -21,7 +29,8 @@ const FANOUT_FUNDING_AMOUNT = solToLamportsBN(0.01);
 export const estimateCreationCost =
   publicProcedure.rewardContract.estimateCreationCost.handler(
     async ({ input, errors }) => {
-      const { entityPubKey, delegateWalletAddress, recipients } = input;
+      const { entityPubKey, delegateWalletAddress, recipients, rewardSchedule } =
+        input;
 
       const assetId = await getAssetIdFromPubkey(entityPubKey);
       if (!assetId) {
@@ -44,17 +53,53 @@ export const estimateCreationCost =
 
       let rentFee = new BN(0);
       if (!recipientAcc) {
-        rentFee = rentFee.add(new BN(RENT_COSTS.RECIPIENT));
+        rentFee = rentFee.add(
+          new BN(
+            await connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE)
+          )
+        );
       }
 
       const hasClaimable = recipients.some((r) => r.type === "CLAIMABLE");
       let recipientGift = new BN(0);
       let transactionFees = new BN(BASE_TX_FEE_LAMPORTS);
+      const scheduleLen = toSixColumnCron(rewardSchedule).length;
+      const fanoutSpace = miniFanoutSpace({
+        numShares: recipients.length,
+        scheduleLen,
+        preTaskUrlLen: `${env.ORACLE_URL}/v1/tuktuk/asset/${assetId}`.length,
+      });
 
       if (hasClaimable) {
-        rentFee = rentFee.add(
-          new BN(RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS)
-        );
+        const numFixedShares = recipients.filter(
+          (r) => r.receives.type === "FIXED"
+        ).length;
+        const [welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent] =
+          await Promise.all([
+            connection.getMinimumBalanceForRentExemption(
+              welcomePackSpace({
+                numFixedShares,
+                numPercentageShares: recipients.length - numFixedShares,
+                scheduleLen,
+              })
+            ),
+            connection.getMinimumBalanceForRentExemption(
+              USER_WELCOME_PACKS_SPACE
+            ),
+            recipients.length > 1
+              ? connection.getMinimumBalanceForRentExemption(fanoutSpace)
+              : 0,
+            recipients.length > 1
+              ? connection.getMinimumBalanceForRentExemption(ATA_SPACE)
+              : 0,
+          ]);
+        rentFee = rentFee.add(new BN(welcomePackRent + userWelcomePacksRent));
+        if (recipients.length > 1) {
+          // initialize_welcome_pack_v0 escrows the future fanout's rent, its
+          // HNT ATA rent and FANOUT_FUNDING_AMOUNT alongside the pack.
+          rentFee = rentFee.add(new BN(fanoutRent + ataRent));
+          transactionFees = transactionFees.add(FANOUT_FUNDING_AMOUNT);
+        }
         const claimableRecipient = recipients.find(
           (r) => r.type === "CLAIMABLE"
         );
@@ -66,9 +111,16 @@ export const estimateCreationCost =
         }
       } else {
         // Mini-fanout path: rent for miniFanout account + 2 tuktuk tasks (task + preTask)
-        rentFee = rentFee.add(
-          new BN(RENT_COSTS.MINI_FANOUT + RENT_COSTS.TUKTUK_TASK * 2)
-        );
+        const [fanoutRent, distTaskRent, preTaskRent] = await Promise.all([
+          connection.getMinimumBalanceForRentExemption(fanoutSpace),
+          connection.getMinimumBalanceForRentExemption(
+            MINI_FANOUT_DIST_TASK_SPACE
+          ),
+          connection.getMinimumBalanceForRentExemption(
+            MINI_FANOUT_PRE_TASK_SPACE
+          ),
+        ]);
+        rentFee = rentFee.add(new BN(fanoutRent + distTaskRent + preTaskRent));
         // Funding for future scheduled transaction fees
         transactionFees = transactionFees.add(FANOUT_FUNDING_AMOUNT);
       }

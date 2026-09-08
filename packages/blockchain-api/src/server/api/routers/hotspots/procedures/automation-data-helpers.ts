@@ -29,10 +29,13 @@ import {
   calculateCronJobCostPerClaim,
   calculatePdaWalletCostPerClaim,
   ENTITY_CLAIM_CRON_NAME,
-  RECIPIENT_RENT,
-  ATA_RENT,
   TASK_RETURN_ACCOUNT_SIZE,
 } from "@/lib/utils/automation-helpers";
+import {
+  ATA_SPACE,
+  getMinWalletRentLamports,
+  RECIPIENT_SPACE,
+} from "@/lib/utils/balance-validation";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { HNT_MINT } from "@helium/spl-utils";
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
@@ -140,7 +143,9 @@ export interface AutomationData {
   minCrankReward: number;
   cronJobCostPerClaimLamports: number;
   pdaWalletCostPerClaimLamports: number;
+  hotspotsNeedingRecipient: number;
   recipientRentLamports: number;
+  pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet
   ataRentLamports: number; // ATA rent if ATA doesn't exist (will be locked up)
   taskReturnAccountRentLamports: number; // Task return account rent if it doesn't exist (will be locked up)
   cronJob: PublicKey;
@@ -221,15 +226,19 @@ export async function fetchAutomationData(
 
   // Calculate recipient rent that's already committed
   const hotspotsNeedingRecipient = await getNumRecipientsNeeded(walletAddress);
-  const recipientRentLamports =
+  const [pdaWalletRentLamports, recipientRent, ataRent] = await Promise.all([
+    getMinWalletRentLamports(provider.connection),
     hotspotsNeedingRecipient > 0
-      ? hotspotsNeedingRecipient * RECIPIENT_RENT * LAMPORTS_PER_SOL
-      : 0;
+      ? provider.connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE)
+      : 0,
+    provider.connection.getMinimumBalanceForRentExemption(ATA_SPACE),
+  ]);
+  const recipientRentLamports = hotspotsNeedingRecipient * recipientRent;
 
   // Check if ATA exists - if not, rent will be needed and locked up
   const ata = getAssociatedTokenAddressSync(HNT_MINT, wallet, true);
   const ataAccount = await provider.connection.getAccountInfo(ata);
-  const ataRentLamports = ataAccount ? 0 : ATA_RENT;
+  const ataRentLamports = ataAccount ? 0 : ataRent;
 
   // Check if task return account exists
   // Task return accounts are derived from the cron job key
@@ -255,7 +264,9 @@ export async function fetchAutomationData(
     minCrankReward,
     cronJobCostPerClaimLamports,
     pdaWalletCostPerClaimLamports,
+    hotspotsNeedingRecipient,
     recipientRentLamports,
+    pdaWalletRentLamports,
     ataRentLamports,
     taskReturnAccountRentLamports,
     cronJob,

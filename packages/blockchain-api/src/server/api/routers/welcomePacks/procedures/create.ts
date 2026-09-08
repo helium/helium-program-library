@@ -6,7 +6,11 @@ import {
   calculateRequiredBalance,
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
-  RENT_COSTS,
+  ATA_SPACE,
+  miniFanoutSpace,
+  RECIPIENT_SPACE,
+  USER_WELCOME_PACKS_SPACE,
+  welcomePackSpace,
 } from "@/lib/utils/balance-validation";
 import {
   buildVersionedTransaction,
@@ -35,6 +39,10 @@ import BN from "bn.js";
 /**
  * Create a new welcome pack.
  */
+// programs/welcome-pack initialize_welcome_pack_v0.rs FANOUT_FUNDING_AMOUNT:
+// SOL escrowed for the future fanout's scheduled distributions.
+const FANOUT_FUNDING_AMOUNT = 10_000_000;
+
 export const create = publicProcedure.welcomePacks.create.handler(
   async ({ input, errors }) => {
     const {
@@ -117,16 +125,55 @@ export const create = publicProcedure.welcomePacks.create.handler(
 
     // Check wallet has sufficient balance
     const walletBalance = await connection.getBalance(wallet.publicKey);
-    let rentCost = RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS;
-    if (!recipient) {
-      rentCost += RENT_COSTS.RECIPIENT;
-    }
+    const numFixedShares = rewardsSplit.filter(
+      (split) => split.type === "fixed"
+    ).length;
+    // With more than one split, initialize_welcome_pack_v0 also escrows the
+    // future mini fanout's rent, its HNT ATA rent and FANOUT_FUNDING_AMOUNT.
+    const fanoutSpace =
+      rewardsSplit.length > 1
+        ? miniFanoutSpace({
+            numShares: rewardsSplit.length,
+            scheduleLen: rewardsSchedule.length,
+            preTaskUrlLen: `${env.ORACLE_URL}/v1/tuktuk/asset/${assetId}`.length,
+          })
+        : 0;
+    const [
+      welcomePackRent,
+      userWelcomePacksRent,
+      recipientRent,
+      fanoutRent,
+      ataRent,
+    ] = await Promise.all([
+      connection.getMinimumBalanceForRentExemption(
+        welcomePackSpace({
+          numFixedShares,
+          numPercentageShares: rewardsSplit.length - numFixedShares,
+          scheduleLen: rewardsSchedule.length,
+        })
+      ),
+      connection.getMinimumBalanceForRentExemption(USER_WELCOME_PACKS_SPACE),
+      recipient
+        ? 0
+        : connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE),
+      fanoutSpace
+        ? connection.getMinimumBalanceForRentExemption(fanoutSpace)
+        : 0,
+      fanoutSpace ? connection.getMinimumBalanceForRentExemption(ATA_SPACE) : 0,
+    ]);
+    let rentCost =
+      welcomePackRent +
+      userWelcomePacksRent +
+      recipientRent +
+      fanoutRent +
+      ataRent +
+      (fanoutSpace ? FANOUT_FUNDING_AMOUNT : 0);
     // Add gifted SOL amount
     rentCost += (
       await resolveTokenAmountInput(solAmount, NATIVE_MINT.toBase58())
     ).toNumber();
 
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
+    const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, rentCost);
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to create welcome pack",

@@ -3,7 +3,7 @@ import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
   getTotalTransactionFees,
   calculateRequiredBalance,
-  RENT_COSTS,
+  ATA_SPACE,
 } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -142,10 +142,10 @@ export const claimRewards =
       const rewardAtaAccounts =
         await connection.getMultipleAccountsInfo(rewardAtaKeys);
       const missingAtaCount = rewardAtaAccounts.filter((a) => !a).length;
-      const ataRent = missingAtaCount * RENT_COSTS.ATA;
+      const ataRent = missingAtaCount * (await connection.getMinimumBalanceForRentExemption(ATA_SPACE));
 
       const walletBalance = await connection.getBalance(walletPubkey);
-      const totalRequired = calculateRequiredBalance(txFee, ataRent);
+      const totalRequired = await calculateRequiredBalance(connection, txFee, ataRent);
       if (walletBalance < totalRequired) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance for transaction fees",

@@ -113,7 +113,7 @@ export const burnHotspot = publicProcedure.hotspots.burnHotspot.handler(
 
     // ---- Direct burn from the wallet ----
     const walletBalance = await connection.getBalance(payerPubkey);
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
+    const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, 0);
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",

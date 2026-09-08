@@ -39,7 +39,7 @@ import {
 import BN from "bn.js";
 import {
   getTotalTransactionFees,
-  MIN_WALLET_RENT_LAMPORTS,
+  getMinWalletRentLamports,
 } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -739,7 +739,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       newDelegations * delegatedPositionRent +
       queuedTasks * claimTaskRent +
       queuedTaskCrankReward +
-      MIN_WALLET_RENT_LAMPORTS;
+      (await getMinWalletRentLamports(connection));
 
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({

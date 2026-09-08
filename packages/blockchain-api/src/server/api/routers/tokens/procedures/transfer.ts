@@ -12,7 +12,7 @@ import { TOKEN_MINTS, TOKEN_NAMES } from "@/lib/constants/tokens";
 import {
   getTransactionFee,
   calculateRequiredBalance,
-  RENT_COSTS,
+  ATA_SPACE,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -115,7 +115,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
           },
         }),
         estimatedSolFee: await toTokenAmountOutput(
-          new BN(calculateRequiredBalance(feeLamports, 0)),
+          new BN(await calculateRequiredBalance(connection, feeLamports, 0)),
           NATIVE_MINT.toBase58()
         ),
       };
@@ -147,7 +147,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
     });
 
     // For SOL transfers, no rent. For SPL, ATA rent if needed
-    const rentCost = needsAta ? RENT_COSTS.ATA : 0;
+    const rentCost = needsAta ? (await connection.getMinimumBalanceForRentExemption(ATA_SPACE)) : 0;
     // A native SOL transfer's lamports leave the authority, so its balance is
     // its own check whenever a separate account pays the fee.
     const authorityPaysTransfer = isSol && !payer.equals(authority);
@@ -156,7 +156,7 @@ export const transfer = publicProcedure.tokens.transfer.handler(
       connection.getBalance(payer),
       authorityPaysTransfer ? connection.getBalance(authority) : null,
     ]);
-    const estimatedSolFeeLamports = calculateRequiredBalance(txFee, rentCost);
+    const estimatedSolFeeLamports = await calculateRequiredBalance(connection, txFee, rentCost);
 
     const shortfall = transferSolShortfall({
       payerBalance,

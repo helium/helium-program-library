@@ -22,7 +22,7 @@ import {
   calculateRequiredBalance,
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
-  RENT_COSTS,
+  RECIPIENT_SPACE,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -87,8 +87,8 @@ export const updateRewardsDestination =
 
       if (recipientsNeeded > 0) {
         const walletBalance = await connection.getBalance(wallet.publicKey);
-        const rentCost = RENT_COSTS.RECIPIENT * recipientsNeeded;
-        const required = calculateRequiredBalance(
+        const rentCost = (await connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE)) * recipientsNeeded;
+        const required = await calculateRequiredBalance(connection, 
           BASE_TX_FEE_LAMPORTS,
           rentCost
         );
@@ -190,7 +190,7 @@ export const updateRewardsDestination =
         timestamp: Date.now(),
       });
 
-      const rentCost = RENT_COSTS.RECIPIENT * recipientsNeeded;
+      const rentCost = (await connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE)) * recipientsNeeded;
       const txFee = await getTransactionFee(connection, tx);
       const estimatedSolFeeLamports = txFee + rentCost;
 

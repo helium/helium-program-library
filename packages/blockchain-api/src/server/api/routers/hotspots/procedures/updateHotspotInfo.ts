@@ -496,7 +496,7 @@ export const updateHotspotInfo =
       const walletBalance = await connection.getBalance(
         new PublicKey(walletAddress),
       );
-      const required = calculateRequiredBalance(totalFee, rentLamports);
+      const required = await calculateRequiredBalance(connection, totalFee, rentLamports);
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance for transaction fees",

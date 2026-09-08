@@ -16,7 +16,7 @@ import { TOKEN_MINTS, TOKEN_NAMES } from "@/lib/constants/tokens";
 import {
   calculateRequiredBalance,
   getTotalTransactionFees,
-  RENT_COSTS,
+  ATA_SPACE,
 } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -148,10 +148,10 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
       versionedTransactions,
     );
     const jitoTipCost = jitoTipIncluded ? getJitoTipAmountLamports() : 0;
-    const ataRent = needsAtaCount * RENT_COSTS.ATA;
+    const ataRent = needsAtaCount * (await connection.getMinimumBalanceForRentExemption(ATA_SPACE));
     const tokenCost = isSol ? Number(totalAmount) : 0;
     const requiredBalance =
-      calculateRequiredBalance(txFee, ataRent) + jitoTipCost + tokenCost;
+      (await calculateRequiredBalance(connection, txFee, ataRent)) + jitoTipCost + tokenCost;
 
     const walletBalance = await connection.getBalance(feePayer);
     if (walletBalance < requiredBalance) {

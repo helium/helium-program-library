@@ -164,7 +164,7 @@ export const issueDataOnlyHotspot =
         getTransactionFee(connection, eccSignedTx),
         connection.getBalance(owner),
       ]);
-      const required = calculateRequiredBalance(totalFee, 0);
+      const required = await calculateRequiredBalance(connection, totalFee, 0);
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance for transaction fees",

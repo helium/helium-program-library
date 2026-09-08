@@ -39,7 +39,7 @@ import {
 import BN from "bn.js";
 import {
   getTotalTransactionFees,
-  MIN_WALLET_RENT_LAMPORTS,
+  getMinWalletRentLamports,
 } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import {
@@ -423,7 +423,7 @@ export const create = publicProcedure.governance.createPosition.handler(
       jitoTipCost +
       mintRent +
       createdAccountRent +
-      MIN_WALLET_RENT_LAMPORTS +
+      (await getMinWalletRentLamports(connection)) +
       (automates ? PREPAID_TX_FEES * LAMPORTS_PER_SOL : 0);
 
     if (walletBalance < estimatedSolFeeLamports) {

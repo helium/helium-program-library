@@ -13,7 +13,7 @@ import {
   calculateRequiredBalance,
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
-  RENT_COSTS,
+  ATA_SPACE,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -42,9 +42,9 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
     // Check wallet has sufficient balance
     const connection = new Connection(process.env.SOLANA_RPC_URL!);
     const ataExists = await connection.getAccountInfo(hntTokenAccount);
-    const rentCost = ataExists ? 0 : RENT_COSTS.ATA;
+    const rentCost = ataExists ? 0 : (await connection.getMinimumBalanceForRentExemption(ATA_SPACE));
     const walletBalance = await connection.getBalance(wallet);
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
+    const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, rentCost);
 
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({

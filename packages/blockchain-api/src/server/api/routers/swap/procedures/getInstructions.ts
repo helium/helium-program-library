@@ -12,7 +12,7 @@ import {
 import {
   calculateRequiredBalance,
   getTransactionFee,
-  RENT_COSTS,
+  ATA_SPACE,
 } from "@/lib/utils/balance-validation";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -141,12 +141,12 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       connection.getBalance(new PublicKey(userPublicKey)),
       getTransactionFee(connection, tx),
     ]);
-    const rentCost = destinationTokenAccount ? 0 : RENT_COSTS.ATA;
+    const rentCost = destinationTokenAccount ? 0 : (await connection.getMinimumBalanceForRentExemption(ATA_SPACE));
     const solInputAmount =
       quoteResponse.inputMint === NATIVE_MINT.toBase58()
         ? Number(quoteResponse.inAmount)
         : 0;
-    const required = calculateRequiredBalance(txFee, rentCost + solInputAmount);
+    const required = await calculateRequiredBalance(connection, txFee, rentCost + solInputAmount);
 
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({

@@ -7,7 +7,11 @@ import {
   calculateRequiredBalance,
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
-  RENT_COSTS,
+  ATA_SPACE,
+  miniFanoutSpace,
+  RECIPIENT_SPACE,
+  USER_WELCOME_PACKS_SPACE,
+  welcomePackSpace,
 } from "@/lib/utils/balance-validation";
 import {
   buildVersionedTransaction,
@@ -113,12 +117,51 @@ export const create = publicProcedure.rewardContract.create.handler(
     );
     let rentCost = 0;
     if (!recipientAcc) {
-      rentCost += RENT_COSTS.RECIPIENT;
+      rentCost += (await connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE));
     }
 
     if (hasClaimable) {
       // Welcome pack path - add pack rent + gifted SOL
-      rentCost += RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS;
+      // With more than one recipient, initialize_welcome_pack_v0 also escrows
+      // the future mini fanout's rent, its HNT ATA rent and FANOUT_FUNDING_AMOUNT.
+      const numFixedShares = recipients.filter(
+        (r) => r.receives.type === "FIXED",
+      ).length;
+      const scheduleLen = toSixColumnCron(rewardSchedule).length;
+      const fanoutSpace =
+        recipients.length > 1
+          ? miniFanoutSpace({
+              numShares: recipients.length,
+              scheduleLen,
+              preTaskUrlLen: `${env.ORACLE_URL}/v1/tuktuk/asset/${assetId}`
+                .length,
+            })
+          : 0;
+      const [welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent] =
+        await Promise.all([
+          connection.getMinimumBalanceForRentExemption(
+            welcomePackSpace({
+              numFixedShares,
+              numPercentageShares: recipients.length - numFixedShares,
+              scheduleLen,
+            }),
+          ),
+          connection.getMinimumBalanceForRentExemption(
+            USER_WELCOME_PACKS_SPACE,
+          ),
+          fanoutSpace
+            ? connection.getMinimumBalanceForRentExemption(fanoutSpace)
+            : 0,
+          fanoutSpace
+            ? connection.getMinimumBalanceForRentExemption(ATA_SPACE)
+            : 0,
+        ]);
+      rentCost +=
+        welcomePackRent +
+        userWelcomePacksRent +
+        fanoutRent +
+        ataRent +
+        (fanoutSpace ? FANOUT_FUNDING_AMOUNT : 0);
       const claimableRecipient = recipients.find((r) => r.type === "CLAIMABLE");
       if (claimableRecipient?.type === "CLAIMABLE") {
         rentCost += (
@@ -133,7 +176,7 @@ export const create = publicProcedure.rewardContract.create.handler(
       rentCost += FANOUT_FUNDING_AMOUNT;
     }
 
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
+    const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, rentCost);
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to create reward contract",
