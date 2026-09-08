@@ -1,27 +1,11 @@
+import { DELEGATED_POSITION_SPACE } from "@helium/helium-sub-daos-sdk";
+import { DELEGATION_CLAIM_BOT_SPACE } from "@helium/hpl-crons-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
 import { ACCOUNT_SIZE, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
 
-/**
- * Space `init_delegation_claim_bot_v0` allocates for a DelegationClaimBotV0:
- * `8 + 60 + DelegationClaimBotV0::INIT_SPACE` (see
- * programs/hpl-crons/src/instructions/init_delegation_claim_bot_v0.rs; the
- * struct in programs/hpl-crons/src/state.rs is 138 bytes). The IDL-derived
- * `.size` Anchor reports is 8 + 138 — it omits the 60-byte header the program
- * reserves, so pricing rent off it under-quotes the wallet by 60 bytes.
- */
-export const DELEGATION_CLAIM_BOT_SPACE = 8 + 60 + 138;
-
-/**
- * Space `delegate_v0` allocates for a DelegatedPositionV0:
- * `60 + 8 + std::mem::size_of::<DelegatedPositionV0>()` (see
- * programs/helium-sub-daos/src/instructions/delegation/delegate_v0.rs; the
- * struct in programs/helium-sub-daos/src/state.rs lays out to 176 bytes, its
- * u128 bitmap forcing 16-byte alignment). Anchor's IDL-derived `.size` is the
- * 158-byte borsh encoding, which under-quotes the wallet by 86 bytes.
- */
-export const DELEGATED_POSITION_SPACE = 60 + 8 + 176;
+export { DELEGATION_CLAIM_BOT_SPACE, DELEGATED_POSITION_SPACE };
 
 /**
  * Space `initialize_position_v0` allocates for a PositionV0:

@@ -1,47 +1,31 @@
+import {
+  CRON_JOB_NAME_MAPPING_SPACE,
+  cronJobSpace,
+  ENTITY_CLAIM_CRON_NAME,
+  ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
+  MAX_PRESET_SCHEDULE_LEN,
+  TASK_RETURN_ACCOUNT_FUNDING_SPACE,
+  USER_CRON_JOBS_SPACE,
+} from "@helium/hpl-crons-sdk";
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 export type Schedule = "daily" | "weekly" | "monthly";
 
-/**
- * Cron-job name-mapping alias. hpl_crons hardcodes this in
- * init_entity_claim_cron_v0, and the name-mapping PDA is keyed by
- * (authority, name) — so a wallet has exactly one entity-claim cron. close and
- * requeue must pass this same name mapping.
- */
-export const ENTITY_CLAIM_CRON_NAME = "entity_claim";
+// Sizes and the cron name live in @helium/hpl-crons-sdk so the hooks and
+// this service price the same accounts.
+export {
+  CRON_JOB_NAME_MAPPING_SPACE,
+  cronJobSpace,
+  ENTITY_CLAIM_CRON_NAME,
+  ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
+  MAX_PRESET_SCHEDULE_LEN,
+  TASK_RETURN_ACCOUNT_FUNDING_SPACE,
+  USER_CRON_JOBS_SPACE,
+};
 
 // Constants from useAutomateHotspotClaims hook
 export const TASK_RETURN_ACCOUNT_SIZE = 0.01;
 export const EST_TX_FEE = 0.000001;
-
-/**
- * Byte sizes of the accounts init_entity_claim_cron_v0 creates through the
- * tuktuk cron program's initialize_cron_job_v0 (tuktuk
- * solana-programs/programs/cron/src/instructions/initialize_cron_job_v0.rs).
- * `space = 8 + 60 + size_of::<T>() + name.len() [+ schedule.len()]`, with the
- * name fixed to ENTITY_CLAIM_CRON_NAME. size_of values reflect the deployed
- * program's structs (CronJobV0 carries a `next_schedule_task: Pubkey` the
- * IDL shows). Verified against mainnet: UserCronJobsV0 112 bytes,
- * CronJobV0 301 bytes with a 13-char schedule, CronJobNameMappingV0 144 bytes.
- */
-export const USER_CRON_JOBS_SPACE = 8 + 60 + 44;
-export const CRON_JOB_NAME_MAPPING_SPACE =
-  8 + 60 + 64 + ENTITY_CLAIM_CRON_NAME.length;
-export const cronJobSpace = (scheduleLen: number) =>
-  8 + 60 + 208 + ENTITY_CLAIM_CRON_NAME.length + scheduleLen;
-/**
- * initialize_cron_job_v0 funds task_return_account_1 with
- * `Rent::minimum_balance(1024)` and queues the "queue entity_claim" schedule
- * task. That TaskV0 measured 738 bytes on mainnet (compiled queue_cron_tasks
- * transaction); its rent is refunded when the task runs.
- */
-export const TASK_RETURN_ACCOUNT_FUNDING_SPACE = 1024;
-export const ENTITY_CLAIM_SCHEDULE_TASK_SPACE = 738;
-/**
- * Longest six-column crontab getScheduleCronString produces:
- * "SS MM HH DD * *". Used to size the cron job before a schedule is chosen.
- */
-export const MAX_PRESET_SCHEDULE_LEN = 15;
 
 /**
  * Lamports locked up when an entity-claim cron job is first created: rent for

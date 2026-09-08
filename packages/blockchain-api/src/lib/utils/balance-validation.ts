@@ -3,6 +3,7 @@ import {
   VersionedTransaction,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
+import { recipientSpace } from "@helium/lazy-distributor-sdk";
 import { ACCOUNT_SIZE } from "@solana/spl-token";
 import {
   COMPUTE_BUDGET_IX_LIMIT,
@@ -35,16 +36,7 @@ export const getMinWalletRentLamports = (connection: Connection) =>
 /** SPL token account (ATA). */
 export const ATA_SPACE = ACCOUNT_SIZE;
 
-/**
- * RecipientV0, as allocated by initialize_recipient_v0 /
- * initialize_compression_recipient_v0 (programs/lazy-distributor):
- *   space = 8 + 60 + size_of::<RecipientV0>() + 8 * oracles.len()
- * size_of::<RecipientV0>() = 144. set_current_rewards later shrinks it via
- * resize_to_fit without refunding, so the init size is what the payer funds.
- * Mainnet recipients read back at 220 bytes (one oracle).
- */
-export const recipientSpace = (numOracles: number) =>
-  8 + 60 + 144 + 8 * numOracles;
+export { recipientSpace };
 /** RecipientV0 for the HNT lazy distributor, which has one oracle. */
 export const RECIPIENT_SPACE = recipientSpace(1);
 

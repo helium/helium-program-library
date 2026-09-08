@@ -36,6 +36,7 @@ import {
   lazyDistributorKey,
   PROGRAM_ID as LD_PID,
   recipientKey,
+  recipientSpace,
 } from "@helium/lazy-distributor-sdk";
 import {
   init as initRewards,
@@ -65,7 +66,6 @@ import {
   DAO,
   DNT,
   MAX_CLAIMS_PER_TX,
-  recipientSpace,
 } from "./constants";
 import { Database, DeviceType, RewardableEntity } from "./database";
 import { register, totalRewardsGauge } from "./metrics";

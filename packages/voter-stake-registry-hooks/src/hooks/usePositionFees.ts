@@ -1,17 +1,12 @@
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { useConnection } from "@solana/wallet-adapter-react";
+import { DELEGATED_POSITION_SPACE } from "@helium/helium-sub-daos-sdk";
 import { useSolOwnedAmount } from "@helium/helium-react-hooks";
+import { DELEGATION_CLAIM_BOT_SPACE } from "@helium/hpl-crons-sdk";
 import { useMemo } from "react";
 import { useAsync } from "react-async-hook";
 
 export const PREPAID_TX_FEES = 0.01;
-// Byte sizes priced at runtime with getMinimumBalanceForRentExemption so the
-// fees follow the cluster's Rent sysvar. Derived and verified in
-// packages/blockchain-api .../governance/procedures/helpers/rent.ts.
-/** DelegationClaimBotV0: 8 + 60 + size_of (138). */
-export const DELEGATION_CLAIM_BOT_SPACE = 206;
-/** DelegatedPositionV0: 60 + 8 + size_of (176). */
-export const DELEGATED_POSITION_SPACE = 244;
 
 export interface UsePositionFeesProps {
   numPositions: number;

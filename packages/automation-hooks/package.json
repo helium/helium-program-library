@@ -38,6 +38,7 @@
     "@helium/helium-react-hooks": "workspace:^",
     "@helium/hpl-crons-sdk": "workspace:^",
     "@helium/idls": "workspace:^",
+    "@helium/lazy-distributor-sdk": "workspace:^",
     "@helium/spl-utils": "workspace:^",
     "@helium/tuktuk-sdk": "^0.0.9",
     "@solana/wallet-adapter-base": "^0.9.22",

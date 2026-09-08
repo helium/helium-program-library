@@ -9,9 +9,16 @@ import {
   useSolOwnedAmount,
 } from "@helium/helium-react-hooks";
 import {
+  CRON_JOB_NAME_MAPPING_SPACE,
+  cronJobSpace,
+  ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
   entityCronAuthorityKey,
   init as initHplCrons,
+  MAX_PRESET_SCHEDULE_LEN,
+  TASK_RETURN_ACCOUNT_FUNDING_SPACE,
+  USER_CRON_JOBS_SPACE,
 } from "@helium/hpl-crons-sdk";
+import { recipientSpace } from "@helium/lazy-distributor-sdk";
 import { HNT_MINT, sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import {
   customSignerKey,
@@ -136,23 +143,20 @@ const EST_TX_FEE = 0.000001;
 
 // Byte sizes of the accounts automation setup pays rent for, priced at
 // runtime with getMinimumBalanceForRentExemption so fees follow the cluster's
-// Rent sysvar. Mirrors packages/blockchain-api balance-validation.ts and
-// automation-helpers.ts, where each size is derived and verified.
-/** RecipientV0 for the HNT lazy distributor (one oracle): 8 + 60 + 144 + 8. */
-const RECIPIENT_SPACE = 220;
+// Rent sysvar. The sizes are derived and verified in the owning SDKs.
+/** RecipientV0 for the HNT lazy distributor, which has one oracle. */
+const RECIPIENT_SPACE = recipientSpace(1);
 /**
  * Accounts tuktuk cron initialize_cron_job_v0 creates for the "entity_claim"
- * cron: UserCronJobsV0, CronJobV0 (with the longest preset schedule,
- * "SS MM HH DD * *"), CronJobNameMappingV0, the task_return_account_1
- * funding (Rent::minimum_balance(1024)) and the schedule TaskV0 (738 bytes
- * on mainnet). Replaces the old BASE_AUTOMATION_RENT of 0.02098095 SOL.
+ * cron, sized for the longest preset schedule. Replaces the old
+ * BASE_AUTOMATION_RENT of 0.02098095 SOL.
  */
 const BASE_AUTOMATION_SPACES = [
-  8 + 60 + 44,
-  8 + 60 + 208 + "entity_claim".length + 15,
-  8 + 60 + 64 + "entity_claim".length,
-  1024,
-  738,
+  USER_CRON_JOBS_SPACE,
+  cronJobSpace(MAX_PRESET_SCHEDULE_LEN),
+  CRON_JOB_NAME_MAPPING_SPACE,
+  TASK_RETURN_ACCOUNT_FUNDING_SPACE,
+  ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
 ];
 
 export const useAutomateHotspotClaims = ({
