@@ -56,7 +56,7 @@ export const TOKEN_METADATA_CREATE_FEE = 0.01 * LAMPORTS_PER_SOL;
  * Space tuktuk allocates for the task `start_delegation_claim_bot_v1` queues.
  * `queue_task_v0` sizes a TaskV0 from the serialized transaction it carries, so
  * this is specific to the delegation-claim task and is not the size behind
- * `MINI_FANOUT_DIST_TASK_SPACE` (that one is the mini-fanout task). Queued tasks
+ * `miniFanoutDistTaskSpace` (that one is the mini-fanout task). Queued tasks
  * also carry the task queue's `minCrankReward` on top of rent.
  */
 export const DELEGATION_CLAIM_TASK_SPACE = 877;

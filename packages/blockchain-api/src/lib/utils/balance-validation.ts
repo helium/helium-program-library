@@ -104,13 +104,35 @@ export const miniFanoutSpace = ({
   60; // RESERVE
 
 /**
- * Tuktuk TaskV0 accounts schedule_task_v0 queues (rent is refunded when the
- * task runs). Sizes depend on the compiled distribute tx; measured on mainnet:
- * distribute tasks read back at 498–597 bytes (larger with more shares),
- * pre tasks at 335 bytes.
+ * Tuktuk TaskV0 accounts mini-fanout schedule_task_v0 queues (rent is
+ * refunded when the task runs). The deployed tuktuk queue_task_v0 allocates
+ * `8 + size_of::<TaskV0>() + transaction.size() + 4 + description.len() + 60`
+ * (helium/tuktuk main, solana-programs/programs/tuktuk queue_task_v0.rs and
+ * state.rs) and never resizes, so the account is that big regardless of what
+ * borsh needs. size_of::<TaskV0>() is 216: solved from two tasks a surfpool
+ * fork of mainnet queued (645 bytes for a 2-share distribute task, 453 for a
+ * pre task with a 97-char url), and both fit. Both descriptions the program
+ * writes are 28 chars.
  */
-export const MINI_FANOUT_DIST_TASK_SPACE = 597;
-export const MINI_FANOUT_PRE_TASK_SPACE = 335;
+const TUKTUK_TASK_BASE_SPACE = 8 + 216 + 4 + 28 + 60;
+
+/**
+ * DistributeV0 compiles to 7 + numShares accounts (program id, 6 fixed, one
+ * ATA per share) and one instruction with 6 + numShares account indexes and
+ * an 8-byte discriminator (programs/mini-fanout schedule_task_v0.rs
+ * get_task_ix). Shares that resolve to the same ATA dedupe to a smaller
+ * account, so this is an upper bound.
+ */
+export const miniFanoutDistTaskSpace = (numShares: number) =>
+  TUKTUK_TASK_BASE_SPACE +
+  4 + // TransactionSourceV0::size CompiledV0 prefix
+  (3 + 1) + // header
+  (4 + (7 + numShares) * 32) + // accounts
+  (4 + (1 + 4 + (6 + numShares) + 4 + 8)); // instructions
+
+/** The RemoteV0 pre task: `4 + 32 + 4 + url.len()` for the transaction. */
+export const miniFanoutPreTaskSpace = (preTaskUrlLen: number) =>
+  TUKTUK_TASK_BASE_SPACE + 4 + 32 + 4 + preTaskUrlLen;
 
 /**
  * Calculate total SOL required for a transaction.

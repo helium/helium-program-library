@@ -32,7 +32,11 @@ import {
 } from "@helium/lazy-distributor-sdk";
 import { getAsset, getAssetProof, HNT_MINT } from "@helium/spl-utils";
 import { NATIVE_MINT } from "@solana/spl-token";
-import { init, initializeWelcomePack } from "@helium/welcome-pack-sdk";
+import {
+  init,
+  initializeWelcomePack,
+  userWelcomePacksKey,
+} from "@helium/welcome-pack-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 
@@ -138,6 +142,10 @@ export const create = publicProcedure.welcomePacks.create.handler(
             preTaskUrlLen: `${env.ORACLE_URL}/v1/tuktuk/asset/${assetId}`.length,
           })
         : 0;
+    const userWelcomePacksAccount =
+      await program.account.userWelcomePacksV0.fetchNullable(
+        userWelcomePacksKey(new PublicKey(walletAddress))[0]
+      );
     const [
       welcomePackRent,
       userWelcomePacksRent,
@@ -152,7 +160,11 @@ export const create = publicProcedure.welcomePacks.create.handler(
           scheduleLen: rewardsSchedule.length,
         })
       ),
-      connection.getMinimumBalanceForRentExemption(USER_WELCOME_PACKS_SPACE),
+      userWelcomePacksAccount
+        ? 0
+        : connection.getMinimumBalanceForRentExemption(
+            USER_WELCOME_PACKS_SPACE
+          ),
       recipient
         ? 0
         : connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE),
@@ -161,17 +173,19 @@ export const create = publicProcedure.welcomePacks.create.handler(
         : 0,
       fanoutSpace ? connection.getMinimumBalanceForRentExemption(ATA_SPACE) : 0,
     ]);
-    let rentCost =
-      welcomePackRent +
-      userWelcomePacksRent +
-      recipientRent +
-      fanoutRent +
-      ataRent +
-      (fanoutSpace ? FANOUT_FUNDING_AMOUNT : 0);
-    // Add gifted SOL amount
-    rentCost += (
+    const giftLamports = (
       await resolveTokenAmountInput(solAmount, NATIVE_MINT.toBase58())
     ).toNumber();
+    // The escrow (gift + fanout cost) is transferred into the pack account on
+    // top of whatever its init rent already left there, so the pack costs the
+    // larger of the two rather than their sum.
+    const fanoutCost = fanoutSpace
+      ? fanoutRent + ataRent + FANOUT_FUNDING_AMOUNT
+      : 0;
+    const rentCost =
+      Math.max(welcomePackRent, giftLamports + fanoutCost) +
+      userWelcomePacksRent +
+      recipientRent;
 
     const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, rentCost);
     if (walletBalance < required) {
@@ -253,10 +267,6 @@ export const create = publicProcedure.welcomePacks.create.handler(
       },
     });
 
-    const userWelcomePacksAccount =
-      await program.account.userWelcomePacksV0.fetchNullable(
-        new PublicKey(pubkeys.userWelcomePacks!)
-      );
     const lazyDistributorAcc = await ldProgram.account.lazyDistributorV0.fetch(
       lazyDistributor
     );

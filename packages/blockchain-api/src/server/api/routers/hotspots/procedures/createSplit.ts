@@ -49,9 +49,10 @@ import {
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import {
+  ATA_SPACE,
   getTotalTransactionFees,
-  MINI_FANOUT_DIST_TASK_SPACE,
-  MINI_FANOUT_PRE_TASK_SPACE,
+  miniFanoutDistTaskSpace,
+  miniFanoutPreTaskSpace,
   miniFanoutSpace,
   RECIPIENT_SPACE,
 } from "@/lib/utils/balance-validation";
@@ -255,21 +256,23 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
       txs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
     }
 
-    // Rent includes mini fanout account + 2 tuktuk tasks (task + preTask) + optional recipient
-    const [fanoutRent, distTaskRent, preTaskRent, recipientRent] =
+    // Rent includes mini fanout account + its HNT ATA + 2 tuktuk tasks (task + preTask) + optional recipient
+    const preTaskUrlLen = `${oracleUrl}/v1/tuktuk/asset/${assetId}`.length;
+    const [fanoutRent, ataRent, distTaskRent, preTaskRent, recipientRent] =
       await Promise.all([
         provider.connection.getMinimumBalanceForRentExemption(
           miniFanoutSpace({
             numShares: rewardsSplit.length,
             scheduleLen: rewardsSchedule.length,
-            preTaskUrlLen: `${oracleUrl}/v1/tuktuk/asset/${assetId}`.length,
+            preTaskUrlLen,
           })
         ),
+        provider.connection.getMinimumBalanceForRentExemption(ATA_SPACE),
         provider.connection.getMinimumBalanceForRentExemption(
-          MINI_FANOUT_DIST_TASK_SPACE
+          miniFanoutDistTaskSpace(rewardsSplit.length)
         ),
         provider.connection.getMinimumBalanceForRentExemption(
-          MINI_FANOUT_PRE_TASK_SPACE
+          miniFanoutPreTaskSpace(preTaskUrlLen)
         ),
         recipientAcc
           ? 0
@@ -277,11 +280,14 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
               RECIPIENT_SPACE
             ),
       ]);
-    const rentCost = fanoutRent + distTaskRent + preTaskRent + recipientRent;
+    const rentCost =
+      fanoutRent + ataRent + distTaskRent + preTaskRent + recipientRent;
     const txFees = await getTotalTransactionFees(provider.connection, txs);
     const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
+    // Each queued task pays the queue's min crank reward
+    const crankRewards = 2 * taskQueueAcc!.minCrankReward.toNumber();
     const estimatedSolFeeLamports =
-      txFees + jitoTipCost + rentCost + FANOUT_FUNDING_AMOUNT;
+      txFees + jitoTipCost + rentCost + crankRewards + FANOUT_FUNDING_AMOUNT;
 
     const walletBalance = await provider.connection.getBalance(
       new PublicKey(walletAddress),

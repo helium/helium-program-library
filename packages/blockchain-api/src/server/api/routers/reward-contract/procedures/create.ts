@@ -8,6 +8,8 @@ import {
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
   ATA_SPACE,
+  miniFanoutDistTaskSpace,
+  miniFanoutPreTaskSpace,
   miniFanoutSpace,
   RECIPIENT_SPACE,
   USER_WELCOME_PACKS_SPACE,
@@ -120,6 +122,18 @@ export const create = publicProcedure.rewardContract.create.handler(
       rentCost += (await connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE));
     }
 
+    const welcomePackProgram = hasClaimable ? await init(provider) : undefined;
+    const uwpAcc = welcomePackProgram
+      ? await welcomePackProgram.account.userWelcomePacksV0.fetchNullable(
+          userWelcomePacksKey(new PublicKey(delegateWalletAddress))[0],
+        )
+      : null;
+    const taskQueueId = new PublicKey(process.env.HPL_CRONS_TASK_QUEUE!);
+    const tuktukProgram = hasClaimable ? undefined : await initTuktuk(provider);
+    const taskQueueAcc =
+      tuktukProgram &&
+      (await tuktukProgram.account.taskQueueV0.fetchNullable(taskQueueId));
+
     if (hasClaimable) {
       // Welcome pack path - add pack rent + gifted SOL
       // With more than one recipient, initialize_welcome_pack_v0 also escrows
@@ -146,9 +160,11 @@ export const create = publicProcedure.rewardContract.create.handler(
               scheduleLen,
             }),
           ),
-          connection.getMinimumBalanceForRentExemption(
-            USER_WELCOME_PACKS_SPACE,
-          ),
+          uwpAcc
+            ? 0
+            : connection.getMinimumBalanceForRentExemption(
+                USER_WELCOME_PACKS_SPACE,
+              ),
           fanoutSpace
             ? connection.getMinimumBalanceForRentExemption(fanoutSpace)
             : 0,
@@ -156,24 +172,56 @@ export const create = publicProcedure.rewardContract.create.handler(
             ? connection.getMinimumBalanceForRentExemption(ATA_SPACE)
             : 0,
         ]);
+      const claimableRecipient = recipients.find((r) => r.type === "CLAIMABLE");
+      const giftLamports =
+        claimableRecipient?.type === "CLAIMABLE"
+          ? (
+              await resolveTokenAmountInput(
+                claimableRecipient.giftedCurrency,
+                NATIVE_MINT.toBase58(),
+              )
+            ).toNumber()
+          : 0;
+      // The escrow (gift + fanout cost) is transferred into the pack account
+      // on top of whatever its init rent already left there, so the pack
+      // costs the larger of the two rather than their sum.
+      const fanoutCost = fanoutSpace
+        ? fanoutRent + ataRent + FANOUT_FUNDING_AMOUNT
+        : 0;
       rentCost +=
-        welcomePackRent +
-        userWelcomePacksRent +
+        Math.max(welcomePackRent, giftLamports + fanoutCost) +
+        userWelcomePacksRent;
+    } else {
+      // Mini-fanout path: the fanout, its HNT ATA, the two tuktuk tasks
+      // initialize_mini_fanout_v0 queues (each paid the queue's min crank
+      // reward) and FANOUT_FUNDING_AMOUNT.
+      const scheduleLen = toSixColumnCron(rewardSchedule).length;
+      const preTaskUrlLen = `${env.ORACLE_URL}/v1/tuktuk/asset/${assetId}`
+        .length;
+      const [fanoutRent, ataRent, distTaskRent, preTaskRent] =
+        await Promise.all([
+          connection.getMinimumBalanceForRentExemption(
+            miniFanoutSpace({
+              numShares: recipients.length,
+              scheduleLen,
+              preTaskUrlLen,
+            }),
+          ),
+          connection.getMinimumBalanceForRentExemption(ATA_SPACE),
+          connection.getMinimumBalanceForRentExemption(
+            miniFanoutDistTaskSpace(recipients.length),
+          ),
+          connection.getMinimumBalanceForRentExemption(
+            miniFanoutPreTaskSpace(preTaskUrlLen),
+          ),
+        ]);
+      rentCost +=
         fanoutRent +
         ataRent +
-        (fanoutSpace ? FANOUT_FUNDING_AMOUNT : 0);
-      const claimableRecipient = recipients.find((r) => r.type === "CLAIMABLE");
-      if (claimableRecipient?.type === "CLAIMABLE") {
-        rentCost += (
-          await resolveTokenAmountInput(
-            claimableRecipient.giftedCurrency,
-            NATIVE_MINT.toBase58(),
-          )
-        ).toNumber();
-      }
-    } else {
-      // Mini-fanout path - add funding amount
-      rentCost += FANOUT_FUNDING_AMOUNT;
+        distTaskRent +
+        preTaskRent +
+        2 * taskQueueAcc!.minCrankReward.toNumber() +
+        FANOUT_FUNDING_AMOUNT;
     }
 
     const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, rentCost);
@@ -185,13 +233,8 @@ export const create = publicProcedure.rewardContract.create.handler(
     }
 
     if (hasClaimable) {
-      const program = await init(provider);
+      const program = welcomePackProgram!;
 
-      const [uwpKey] = userWelcomePacksKey(
-        new PublicKey(delegateWalletAddress),
-      );
-      const uwpAcc =
-        await program.account.userWelcomePacksV0.fetchNullable(uwpKey);
       if (uwpAcc && uwpAcc.nextId > 0) {
         const packKeys = Array.from(
           { length: uwpAcc.nextId },
@@ -261,7 +304,6 @@ export const create = publicProcedure.rewardContract.create.handler(
       instructions.push(ix);
     } else {
       const miniFanoutProgram = await initMiniFanout(provider);
-      const tuktukProgram = await initTuktuk(provider);
       const [miniFanoutK] = miniFanoutKey(
         new PublicKey(signerWalletAddress),
         assetPubkey.toBuffer(),
@@ -276,7 +318,6 @@ export const create = publicProcedure.rewardContract.create.handler(
         });
       }
 
-      const taskQueueId = new PublicKey(process.env.HPL_CRONS_TASK_QUEUE!);
       const oracleSigner = new PublicKey(env.ORACLE_SIGNER);
       const oracleUrl = env.ORACLE_URL;
 
@@ -336,9 +377,6 @@ export const create = publicProcedure.rewardContract.create.handler(
           lamports: FANOUT_FUNDING_AMOUNT,
         }),
       );
-
-      const taskQueueAcc =
-        await tuktukProgram.account.taskQueueV0.fetchNullable(taskQueueId);
 
       const [taskId, preTaskId] = nextAvailableTaskIds(
         taskQueueAcc!.taskBitmap,
