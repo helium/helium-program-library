@@ -65,12 +65,17 @@ export const usePositionsFees = ({
     const botFee = automationEnabled
       ? (numPositions - numDelegationClaimBots) * (rent?.bot ?? 0)
       : 0;
+    // Only positions not yet delegated create a DelegatedPositionV0.
     const delegationFee =
-      numDelegatedPositions > 0
-        ? 0
-        : numDelegatedPositions * (rent?.delegatedPosition ?? 0);
+      (numPositions - numDelegatedPositions) * (rent?.delegatedPosition ?? 0);
     return botFee + delegationFee;
-  }, [numDelegationClaimBots, numDelegatedPositions, automationEnabled, rent]);
+  }, [
+    numPositions,
+    numDelegationClaimBots,
+    numDelegatedPositions,
+    automationEnabled,
+    rent,
+  ]);
 
   const prepaidTxFees = automationEnabled
     ? (numPositions - numDelegationClaimBots) * PREPAID_TX_FEES
