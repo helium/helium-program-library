@@ -9,14 +9,9 @@ import {
   useSolOwnedAmount,
 } from "@helium/helium-react-hooks";
 import {
-  CRON_JOB_NAME_MAPPING_SPACE,
-  cronJobSpace,
-  ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
+  entityClaimCronSpaces,
   entityCronAuthorityKey,
   init as initHplCrons,
-  MAX_PRESET_SCHEDULE_LEN,
-  TASK_RETURN_ACCOUNT_FUNDING_SPACE,
-  USER_CRON_JOBS_SPACE,
 } from "@helium/hpl-crons-sdk";
 import { recipientSpace } from "@helium/lazy-distributor-sdk";
 import { HNT_MINT, sendInstructionsWithPriorityFee } from "@helium/spl-utils";
@@ -146,18 +141,6 @@ const EST_TX_FEE = 0.000001;
 // Rent sysvar. The sizes are derived and verified in the owning SDKs.
 /** RecipientV0 for the HNT lazy distributor, which has one oracle. */
 const RECIPIENT_SPACE = recipientSpace(1);
-/**
- * Accounts tuktuk cron initialize_cron_job_v0 creates for the "entity_claim"
- * cron, sized for the longest preset schedule. Replaces the old
- * BASE_AUTOMATION_RENT of 0.02098095 SOL.
- */
-const BASE_AUTOMATION_SPACES = [
-  USER_CRON_JOBS_SPACE,
-  cronJobSpace(MAX_PRESET_SCHEDULE_LEN),
-  CRON_JOB_NAME_MAPPING_SPACE,
-  TASK_RETURN_ACCOUNT_FUNDING_SPACE,
-  ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
-];
 
 export const useAutomateHotspotClaims = ({
   schedule,
@@ -216,7 +199,7 @@ export const useAutomateHotspotClaims = ({
     const connection = provider?.connection;
     if (!connection) return undefined;
     const [walletMin, recipient, ataRent, ...base] = await Promise.all(
-      [0, RECIPIENT_SPACE, ACCOUNT_SIZE, ...BASE_AUTOMATION_SPACES].map(
+      [0, RECIPIENT_SPACE, ACCOUNT_SIZE, ...entityClaimCronSpaces()].map(
         (space) => connection.getMinimumBalanceForRentExemption(space)
       )
     );
@@ -254,6 +237,7 @@ export const useAutomateHotspotClaims = ({
       if (!provider || !authority || !cronJob || !wallet) {
         throw new Error("Missing required parameters");
       }
+      if (!rent) throw new Error("Rent not loaded");
       const hplCronsProgram = await initHplCrons(provider);
       const tuktukProgram = await initTuktuk(provider);
 
@@ -365,11 +349,7 @@ export const useAutomateHotspotClaims = ({
             fromPubkey: wallet,
             toPubkey: pdaWallet,
             lamports:
-              pdaWalletSolFee +
-              hotspotsNeedingRecipient *
-                (await provider.connection.getMinimumBalanceForRentExemption(
-                  RECIPIENT_SPACE
-                )),
+              pdaWalletSolFee + hotspotsNeedingRecipient * rent.recipient,
           })
         );
       }
@@ -463,7 +443,7 @@ export const useAutomateHotspotClaims = ({
   const availableUserBalance = userSolBalance - minimumRequiredBalance;
 
   return {
-    loading: loading || removing,
+    loading: loading || removing || loadingRent,
     error: error || removeError,
     execute,
     remove,

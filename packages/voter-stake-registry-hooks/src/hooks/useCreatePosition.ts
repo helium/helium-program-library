@@ -53,7 +53,12 @@ export const useCreatePosition = ({
   );
   const queryClient = useQueryClient();
 
-  const { rentFee, prepaidTxFees, insufficientBalance } = usePositionFees({
+  const {
+    rentFee,
+    prepaidTxFees,
+    insufficientBalance,
+    loading: loadingFees,
+  } = usePositionFees({
     automationEnabled,
     isDelegated: true,
     hasDelegationClaimBot: false,
@@ -305,7 +310,7 @@ export const useCreatePosition = ({
 
   return {
     error,
-    loading,
+    loading: loading || loadingFees,
     rentFee,
     prepaidTxFees,
     insufficientBalance,

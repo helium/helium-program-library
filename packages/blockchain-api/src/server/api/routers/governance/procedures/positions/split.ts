@@ -22,7 +22,10 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import BN from "bn.js";
-import { getTransactionFee } from "@/lib/utils/balance-validation";
+import {
+  getTransactionFee,
+  getRentLamports,
+} from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { TOKEN_NAMES } from "@/lib/constants/tokens";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -65,9 +68,8 @@ export const split = publicProcedure.governance.splitPosition.handler(
     const hsdProgram = await initHsd(provider);
     const [sourcePositionPubkey] = positionKey(sourcePositionMintPubkey);
 
-    const sourcePositionAcc = await vsrProgram.account.positionV0.fetchNullable(
-      sourcePositionPubkey
-    );
+    const sourcePositionAcc =
+      await vsrProgram.account.positionV0.fetchNullable(sourcePositionPubkey);
 
     if (!sourcePositionAcc) {
       throw errors.NOT_FOUND({ message: "Source position not found" });
@@ -77,11 +79,11 @@ export const split = publicProcedure.governance.splitPosition.handler(
       connection,
       sourcePositionMintPubkey,
       walletPubkey,
-      errors
+      errors,
     );
 
     const registrar = await vsrProgram.account.registrar.fetch(
-      sourcePositionAcc.registrar
+      sourcePositionAcc.registrar,
     );
     const depositMint =
       registrar.votingMints[sourcePositionAcc.votingMintConfigIdx].mint;
@@ -104,9 +106,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
     const newMintKeypair = Keypair.generate();
     const [targetPositionPubkey] = positionKey(newMintKeypair.publicKey);
 
-    const mintRent = await connection.getMinimumBalanceForRentExemption(
-      MintLayout.span
-    );
+    const mintRent = await getRentLamports(connection, MintLayout.span);
 
     const instructions: TransactionInstruction[] = [];
 
@@ -117,7 +117,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
         lamports: mintRent,
         space: MintLayout.span,
         programId: TOKEN_PROGRAM_ID,
-      })
+      }),
     );
 
     instructions.push(
@@ -125,8 +125,8 @@ export const split = publicProcedure.governance.splitPosition.handler(
         newMintKeypair.publicKey,
         0,
         targetPositionPubkey,
-        targetPositionPubkey
-      )
+        targetPositionPubkey,
+      ),
     );
 
     instructions.push(
@@ -143,7 +143,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
           depositMint,
           recipient: walletPubkey,
         })
-        .instruction()
+        .instruction(),
     );
 
     instructions.push(
@@ -154,8 +154,8 @@ export const split = publicProcedure.governance.splitPosition.handler(
         sourcePositionPubkey,
         targetPositionPubkey,
         depositMint,
-        { amount: amountBN }
-      )
+        { amount: amountBN },
+      ),
     );
 
     if (amountBN.eq(sourcePositionAcc.amountDepositedNative)) {
@@ -165,7 +165,7 @@ export const split = publicProcedure.governance.splitPosition.handler(
           .accountsPartial({
             position: sourcePositionPubkey,
           })
-          .instruction()
+          .instruction(),
       );
     }
 
@@ -218,8 +218,8 @@ export const split = publicProcedure.governance.splitPosition.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

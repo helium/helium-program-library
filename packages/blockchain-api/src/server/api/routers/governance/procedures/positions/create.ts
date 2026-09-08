@@ -40,6 +40,7 @@ import BN from "bn.js";
 import {
   getTotalTransactionFees,
   getMinWalletRentLamports,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import {
@@ -122,9 +123,7 @@ export const create = publicProcedure.governance.createPosition.handler(
     const instructions: TransactionInstruction[] = [];
     const delegateInstructions: TransactionInstruction[] = [];
 
-    const mintRent = await connection.getMinimumBalanceForRentExemption(
-      MintLayout.span,
-    );
+    const mintRent = await getRentLamports(connection, MintLayout.span);
 
     instructions.push(
       SystemProgram.createAccount({
@@ -387,17 +386,15 @@ export const create = publicProcedure.governance.createPosition.handler(
       automationRent,
       walletBalance,
     ] = await Promise.all([
-      connection.getMinimumBalanceForRentExemption(POSITION_SPACE),
-      connection.getMinimumBalanceForRentExemption(TOKEN_METADATA_SPACE),
-      connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE),
+      getRentLamports(connection, POSITION_SPACE),
+      getRentLamports(connection, TOKEN_METADATA_SPACE),
+      getRentLamports(connection, ACCOUNT_SIZE),
       subDaoMint
-        ? connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE)
+        ? getRentLamports(connection, DELEGATED_POSITION_SPACE)
         : Promise.resolve(0),
       getMissingEpochInfoRentLamports({ connection, epochInfoKeys }),
       queuesClaimTask
-        ? connection.getMinimumBalanceForRentExemption(
-            DELEGATION_CLAIM_TASK_SPACE,
-          )
+        ? getRentLamports(connection, DELEGATION_CLAIM_TASK_SPACE)
         : Promise.resolve(0),
       getAutomationRentLamports({
         connection,

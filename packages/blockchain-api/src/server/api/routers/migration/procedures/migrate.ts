@@ -11,9 +11,11 @@ import {
 import { getJitoTipInstruction, shouldUseJitoBundle } from "@/lib/utils/jito";
 import {
   ATA_SPACE,
+  FANOUT_FUNDING_AMOUNT,
   getTotalTransactionFees,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
-import { toTokenAmountOutput, solToLamportsBN } from "@/lib/utils/token-math";
+import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { TOKEN_MINTS } from "@/lib/constants/tokens";
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
 import {
@@ -106,7 +108,6 @@ function markLeafOwnerAsSigner(
   return ix;
 }
 
-const FANOUT_FUNDING_AMOUNT = solToLamportsBN(0.01).toNumber();
 const MAX_JITO_BUNDLE_TXS = 5;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
@@ -605,8 +606,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
         const sourceBalance = Number(remainingSourceLamports);
         // closeMiniFanoutV0 uses the owner as payer when creating the owner's
         // token ATA, so we fund the owner with ATA rent if needed.
-        const ataRentLamports =
-          await connection.getMinimumBalanceForRentExemption(ATA_SPACE);
+        const ataRentLamports = await getRentLamports(connection, ATA_SPACE);
         if (sourceBalance < ataRentLamports) {
           closeGroup.push(
             SystemProgram.transfer({

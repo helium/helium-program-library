@@ -1,7 +1,22 @@
-import { EPOCH_LENGTH } from "@helium/helium-sub-daos-sdk";
+import {
+  daoEpochInfoKey,
+  EPOCH_LENGTH,
+  init as initHsd,
+  subDaoEpochInfoKey,
+} from "@helium/helium-sub-daos-sdk";
 import { isClaimed } from "@helium/voter-stake-registry-sdk";
+import { Connection, PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
+import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
 import { getLockupKind } from "./constants";
+
+export type HsdProgram = Awaited<ReturnType<typeof initHsd>>;
+export type SubDaoEpochInfoV0 = Awaited<
+  ReturnType<HsdProgram["account"]["subDaoEpochInfoV0"]["fetch"]>
+>;
+export type DaoEpochInfoV0 = Awaited<
+  ReturnType<HsdProgram["account"]["daoEpochInfoV0"]["fetch"]>
+>;
 
 // Epochs at or after the delegation's expiration pay zero rewards and
 // close_delegation_v0 no longer requires claiming them. The epoch containing
@@ -140,6 +155,84 @@ export const isEpochInfoIssued = ({
     );
   }
   return !!subDaoEpochInfo.rewardsIssuedAt;
+};
+
+/**
+ * The sub-DAO and DAO epoch infos each `(subDao, epoch)` claim needs, in two
+ * batched reads. Entries on the same sub-DAO share a sub-DAO epoch info and
+ * every entry in an epoch shares its DAO epoch info, so each account is read
+ * once no matter how many entries point at it.
+ */
+export const fetchEpochInfos = async ({
+  connection,
+  hsdProgram,
+  dao,
+  entries,
+}: {
+  connection: Connection;
+  hsdProgram: HsdProgram;
+  dao: PublicKey;
+  entries: { subDao: PublicKey; epoch: number }[];
+}): Promise<
+  {
+    subDaoEpochInfo: SubDaoEpochInfoV0 | null;
+    daoEpochInfo: DaoEpochInfoV0 | null;
+  }[]
+> => {
+  const subDaoEpochInfoKeys = new Map<string, PublicKey>();
+  const daoEpochInfoKeys = new Map<number, PublicKey>();
+  for (const { subDao, epoch } of entries) {
+    const epochTs = new BN(epoch).mul(new BN(EPOCH_LENGTH));
+    const id = `${subDao.toBase58()}:${epoch}`;
+    if (!subDaoEpochInfoKeys.has(id)) {
+      subDaoEpochInfoKeys.set(id, subDaoEpochInfoKey(subDao, epochTs)[0]);
+    }
+    if (!daoEpochInfoKeys.has(epoch)) {
+      daoEpochInfoKeys.set(epoch, daoEpochInfoKey(dao, epochTs)[0]);
+    }
+  }
+
+  const ids = [...subDaoEpochInfoKeys.keys()];
+  const epochs = [...daoEpochInfoKeys.keys()];
+  const [subDaoInfos, daoInfos] = await Promise.all([
+    getMultipleAccounts(
+      connection,
+      ids.map((id) => subDaoEpochInfoKeys.get(id)!),
+    ),
+    getMultipleAccounts(
+      connection,
+      epochs.map((epoch) => daoEpochInfoKeys.get(epoch)!),
+    ),
+  ]);
+
+  const subDaoEpochInfoById = new Map<string, SubDaoEpochInfoV0 | null>(
+    ids.map((id, i) => {
+      const info = subDaoInfos[i];
+      return [
+        id,
+        info
+          ? hsdProgram.coder.accounts.decode("subDaoEpochInfoV0", info.data)
+          : null,
+      ];
+    }),
+  );
+  const daoEpochInfoByEpoch = new Map<number, DaoEpochInfoV0 | null>(
+    epochs.map((epoch, i) => {
+      const info = daoInfos[i];
+      return [
+        epoch,
+        info
+          ? hsdProgram.coder.accounts.decode("daoEpochInfoV0", info.data)
+          : null,
+      ];
+    }),
+  );
+
+  return entries.map(({ subDao, epoch }) => ({
+    subDaoEpochInfo:
+      subDaoEpochInfoById.get(`${subDao.toBase58()}:${epoch}`) ?? null,
+    daoEpochInfo: daoEpochInfoByEpoch.get(epoch) ?? null,
+  }));
 };
 
 export interface ClaimableEpochSummary {

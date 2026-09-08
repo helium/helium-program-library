@@ -14,6 +14,7 @@ import {
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
   ATA_SPACE,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -36,15 +37,21 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
     const hntTokenAccount = getAssociatedTokenAddressSync(
       HNT_MINT,
       wallet,
-      true // allowOwnerOffCurve
+      true, // allowOwnerOffCurve
     );
 
     // Check wallet has sufficient balance
     const connection = new Connection(process.env.SOLANA_RPC_URL!);
     const ataExists = await connection.getAccountInfo(hntTokenAccount);
-    const rentCost = ataExists ? 0 : (await connection.getMinimumBalanceForRentExemption(ATA_SPACE));
+    const rentCost = ataExists
+      ? 0
+      : await getRentLamports(connection, ATA_SPACE);
     const walletBalance = await connection.getBalance(wallet);
-    const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, rentCost);
+    const required = await calculateRequiredBalance(
+      connection,
+      BASE_TX_FEE_LAMPORTS,
+      rentCost,
+    );
 
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
@@ -59,7 +66,7 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
         wallet, // payer
         hntTokenAccount, // associated token account
         wallet, // owner
-        HNT_MINT // mint
+        HNT_MINT, // mint
       );
 
     const tx = await buildVersionedTransaction({
@@ -89,8 +96,8 @@ export const createHntAccount = publicProcedure.tokens.createHntAccount.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

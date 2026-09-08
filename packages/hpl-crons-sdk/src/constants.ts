@@ -58,3 +58,14 @@ export const ENTITY_CLAIM_SCHEDULE_TASK_SPACE = 738;
  * "SS MM HH DD * *". Used to size the cron job before a schedule is chosen.
  */
 export const MAX_PRESET_SCHEDULE_LEN = 15;
+
+/** Byte sizes of the accounts init_entity_claim_cron_v0 creates and funds. */
+export const entityClaimCronSpaces = (
+  scheduleLen: number = MAX_PRESET_SCHEDULE_LEN
+) => [
+  USER_CRON_JOBS_SPACE,
+  cronJobSpace(scheduleLen),
+  CRON_JOB_NAME_MAPPING_SPACE,
+  TASK_RETURN_ACCOUNT_FUNDING_SPACE,
+  ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
+];

@@ -32,6 +32,7 @@ import {
   getTransactionFee,
   calculateRequiredBalance,
   BASE_TX_FEE_LAMPORTS,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import {
   buildVersionedTransaction,
@@ -195,7 +196,8 @@ async function estimateMobileResizeRent({
     "mobileHotspotInfoV0",
     next,
   );
-  const rentExempt = await connection.getMinimumBalanceForRentExemption(
+  const rentExempt = await getRentLamports(
+    connection,
     encoded.length + RESIZE_PADDING_BYTES,
   );
   return resizeTopUpLamports(rentExempt, account.lamports);
@@ -496,7 +498,11 @@ export const updateHotspotInfo =
       const walletBalance = await connection.getBalance(
         new PublicKey(walletAddress),
       );
-      const required = await calculateRequiredBalance(connection, totalFee, rentLamports);
+      const required = await calculateRequiredBalance(
+        connection,
+        totalFee,
+        rentLamports,
+      );
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance for transaction fees",

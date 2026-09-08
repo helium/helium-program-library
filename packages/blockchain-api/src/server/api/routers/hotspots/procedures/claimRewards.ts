@@ -45,6 +45,7 @@ import {
   RECIPIENT_SPACE,
   recipientSpace,
   BASE_TX_FEE_LAMPORTS,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -263,10 +264,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       const numOracles = ldAcc.oracles.length;
       const newRecipientSize = 191 + 9 * numOracles;
       const [rentExemptForNewSize, recipientRent] = await Promise.all([
-        connection.getMinimumBalanceForRentExemption(newRecipientSize),
-        connection.getMinimumBalanceForRentExemption(
-          recipientSpace(numOracles),
-        ),
+        getRentLamports(connection, newRecipientSize),
+        getRentLamports(connection, recipientSpace(numOracles)),
       ]);
       const resizeCost = recipientAccountInfos.reduce(
         (sum: number, info: { lamports: number } | null) => {
@@ -360,9 +359,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     const pdaWalletFundingNeededLamports =
       CLAIMER_MIN_LAMPORTS +
       hotspotsNeedingRecipient *
-        (await provider.connection.getMinimumBalanceForRentExemption(
-          RECIPIENT_SPACE,
-        ));
+        (await getRentLamports(provider.connection, RECIPIENT_SPACE));
     const pdaWalletLamportsShortfall = Math.max(
       0,
       pdaWalletFundingNeededLamports - pdaWalletBalanceLamports,

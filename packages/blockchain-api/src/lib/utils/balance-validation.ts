@@ -10,6 +10,7 @@ import {
   COMPUTE_BUDGET_IX_PRICE,
   MAX_COMPUTE_UNITS,
 } from "@helium/spl-utils";
+import { createTtlCache } from "./ttl-cache";
 
 // Base signature fee (5000 lamports per signature)
 export const BASE_SIGNATURE_FEE_LAMPORTS = 5000;
@@ -21,20 +22,35 @@ export const BASE_SIGNATURE_FEE_LAMPORTS = 5000;
 // these call sites then.
 export const BASE_TX_FEE_LAMPORTS = 50000; // 0.00005 SOL
 
+const rentCache = createTtlCache<number>({ ttlMs: 60 * 60 * 1000 });
+
+/**
+ * Rent-exempt minimum for `space` bytes. Cached per endpoint: the Rent sysvar
+ * only changes at feature activation, and most handlers price several
+ * accounts per request.
+ */
+export const getRentLamports = (connection: Connection, space: number) =>
+  rentCache(`${connection.rpcEndpoint}:${space}`, () =>
+    connection.getMinimumBalanceForRentExemption(space),
+  );
+
 /**
  * Minimum balance a wallet must keep: the rent-exempt minimum for a 0-byte
  * account, priced from the cluster so it follows the Rent sysvar.
  */
 export const getMinWalletRentLamports = (connection: Connection) =>
-  connection.getMinimumBalanceForRentExemption(0);
+  getRentLamports(connection, 0);
 
 // Byte sizes of the accounts non-automation endpoints create. Price them at
-// call time with connection.getMinimumBalanceForRentExemption (batch with
-// Promise.all) rather than hardcoding lamports, so gates track the cluster's
-// Rent sysvar. Automation account sizes live in automation-helpers.ts.
+// call time with getRentLamports (batch with Promise.all) rather than
+// hardcoding lamports, so gates track the cluster's Rent sysvar. Automation
+// account sizes live in automation-helpers.ts.
 
 /** SPL token account (ATA). */
 export const ATA_SPACE = ACCOUNT_SIZE;
+
+/** Lamports initialize_mini_fanout_v0 / initialize_welcome_pack_v0 fund a new fanout with for future task fees (0.01 SOL). */
+export const FANOUT_FUNDING_AMOUNT = 10_000_000;
 
 export { recipientSpace };
 /** RecipientV0 for the HNT lazy distributor, which has one oracle. */
@@ -67,7 +83,7 @@ export const welcomePackSpace = ({
 }) =>
   Math.max(
     8 + 60 + 264,
-    225 + 41 * numFixedShares + 37 * numPercentageShares + scheduleLen + 64
+    225 + 41 * numFixedShares + 37 * numPercentageShares + scheduleLen + 64,
   );
 
 /**
@@ -126,6 +142,69 @@ export const miniFanoutDistTaskSpace = (numShares: number) =>
 export const miniFanoutPreTaskSpace = (preTaskUrlLen: number) =>
   TUKTUK_TASK_BASE_SPACE + 4 + 32 + 4 + preTaskUrlLen;
 
+/** Rent for the accounts initialize_mini_fanout_v0 creates: the fanout, its HNT ATA and its two tuktuk tasks. */
+export const getMiniFanoutRentParts = async (
+  connection: Connection,
+  {
+    numShares,
+    scheduleLen,
+    preTaskUrlLen,
+  }: { numShares: number; scheduleLen: number; preTaskUrlLen: number },
+) => {
+  const [fanoutRent, ataRent, distTaskRent, preTaskRent] = await Promise.all([
+    getRentLamports(
+      connection,
+      miniFanoutSpace({ numShares, scheduleLen, preTaskUrlLen }),
+    ),
+    getRentLamports(connection, ATA_SPACE),
+    getRentLamports(connection, miniFanoutDistTaskSpace(numShares)),
+    getRentLamports(connection, miniFanoutPreTaskSpace(preTaskUrlLen)),
+  ]);
+  return { fanoutRent, ataRent, distTaskRent, preTaskRent };
+};
+
+/**
+ * Rent for the accounts initialize_welcome_pack_v0 creates or escrows: the
+ * pack, the UserWelcomePacksV0 (0 when it already exists) and, with more than
+ * one recipient, the future fanout and its HNT ATA (0 otherwise).
+ */
+export const getWelcomePackRentParts = async (
+  connection: Connection,
+  {
+    numFixedShares,
+    numPercentageShares,
+    scheduleLen,
+    preTaskUrlLen,
+    userWelcomePacksExists,
+  }: {
+    numFixedShares: number;
+    numPercentageShares: number;
+    scheduleLen: number;
+    preTaskUrlLen: number;
+    userWelcomePacksExists: boolean;
+  },
+) => {
+  const numShares = numFixedShares + numPercentageShares;
+  const [welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent] =
+    await Promise.all([
+      getRentLamports(
+        connection,
+        welcomePackSpace({ numFixedShares, numPercentageShares, scheduleLen }),
+      ),
+      userWelcomePacksExists
+        ? 0
+        : getRentLamports(connection, USER_WELCOME_PACKS_SPACE),
+      numShares > 1
+        ? getRentLamports(
+            connection,
+            miniFanoutSpace({ numShares, scheduleLen, preTaskUrlLen }),
+          )
+        : 0,
+      numShares > 1 ? getRentLamports(connection, ATA_SPACE) : 0,
+    ]);
+  return { welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent };
+};
+
 /**
  * Calculate total SOL required for a transaction.
  * Returns the total required lamports (tx fees + rent + min wallet balance).
@@ -133,7 +212,7 @@ export const miniFanoutPreTaskSpace = (preTaskUrlLen: number) =>
 export async function calculateRequiredBalance(
   connection: Connection,
   estimatedTxFeeLamports: number = BASE_TX_FEE_LAMPORTS,
-  estimatedRentCostLamports: number = 0
+  estimatedRentCostLamports: number = 0,
 ): Promise<number> {
   return (
     estimatedTxFeeLamports +
@@ -150,7 +229,7 @@ export async function calculateRequiredBalance(
  */
 export async function getTransactionFee(
   connection: Connection,
-  tx: VersionedTransaction
+  tx: VersionedTransaction,
 ): Promise<number> {
   try {
     const { value } = await connection.getFeeForMessage(tx.message);
@@ -213,13 +292,13 @@ function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
   if (computeUnitLimit == null) {
     computeUnitLimit = Math.min(
       MAX_COMPUTE_UNITS,
-      200_000 * numOtherInstructions
+      200_000 * numOtherInstructions,
     );
   }
 
   // Priority fee = (price in microlamports * CU limit) / 1_000_000
   const priorityFee = Math.ceil(
-    (computeUnitPrice * computeUnitLimit) / 1_000_000
+    (computeUnitPrice * computeUnitLimit) / 1_000_000,
   );
 
   return baseFee + priorityFee;
@@ -230,10 +309,10 @@ function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
  */
 export async function getTotalTransactionFees(
   connection: Connection,
-  txs: VersionedTransaction[]
+  txs: VersionedTransaction[],
 ): Promise<number> {
   const fees = await Promise.all(
-    txs.map((tx) => getTransactionFee(connection, tx))
+    txs.map((tx) => getTransactionFee(connection, tx)),
   );
   return fees.reduce((total, fee) => total + fee, 0);
 }

@@ -35,6 +35,7 @@ import {
   ATA_SPACE,
   getMinWalletRentLamports,
   RECIPIENT_SPACE,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { HNT_MINT } from "@helium/spl-utils";
@@ -50,12 +51,12 @@ import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 export async function liveCronTransactionIds(
   connection: Connection,
   cronJob: PublicKey,
-  nextTransactionId: number
+  nextTransactionId: number,
 ): Promise<number[]> {
   if (nextTransactionId <= 0) return [];
   const keys = Array.from(
     { length: nextTransactionId },
-    (_, i) => cronJobTransactionKey(cronJob, i)[0]
+    (_, i) => cronJobTransactionKey(cronJob, i)[0],
   );
   // We only need existence, so fetch no account data. getMultipleAccountsInfo
   // caps at 100 keys per call, so chunk the list.
@@ -64,7 +65,7 @@ export async function liveCronTransactionIds(
     infos.push(
       ...(await connection.getMultipleAccountsInfo(keys.slice(i, i + 100), {
         dataSlice: { offset: 0, length: 0 },
-      }))
+      })),
     );
   }
   return keys.map((_, i) => i).filter((i) => infos[i] != null);
@@ -82,12 +83,12 @@ export async function buildTeardownInstructions(
   cronJob: PublicKey,
   authority: PublicKey,
   rentRefund: PublicKey,
-  nextTransactionId: number
+  nextTransactionId: number,
 ): Promise<TransactionInstruction[]> {
   const liveTxIds = await liveCronTransactionIds(
     connection,
     cronJob,
-    nextTransactionId
+    nextTransactionId,
   );
 
   return [
@@ -100,8 +101,8 @@ export async function buildTeardownInstructions(
             rentRefund,
             cronJobTransaction: cronJobTransactionKey(cronJob, txId)[0],
           })
-          .instruction()
-      )
+          .instruction(),
+      ),
     )),
     await hplCronsProgram.methods
       .closeEntityClaimCronV0()
@@ -110,7 +111,7 @@ export async function buildTeardownInstructions(
         rentRefund,
         cronJobNameMapping: cronJobNameMappingKey(
           authority,
-          ENTITY_CLAIM_CRON_NAME
+          ENTITY_CLAIM_CRON_NAME,
         )[0],
       })
       .instruction(),
@@ -122,11 +123,10 @@ export async function buildTeardownInstructions(
  * Throws when the queue has no free slots.
  */
 export async function nextFreeTaskKey(
-  tuktukProgram: Awaited<ReturnType<typeof initTuktuk>>
+  tuktukProgram: Awaited<ReturnType<typeof initTuktuk>>,
 ): Promise<PublicKey> {
-  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-    TASK_QUEUE_ID
-  );
+  const taskQueueAcc =
+    await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID);
   const [taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1, false);
   if (taskId == null) {
     throw new Error("No available task IDs in task queue");
@@ -143,7 +143,6 @@ export interface AutomationData {
   minCrankReward: number;
   cronJobCostPerClaimLamports: number;
   pdaWalletCostPerClaimLamports: number;
-  hotspotsNeedingRecipient: number;
   recipientRentLamports: number;
   pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet
   ataRentLamports: number; // ATA rent if ATA doesn't exist (will be locked up)
@@ -160,7 +159,7 @@ export interface AutomationData {
  */
 export async function fetchAutomationData(
   walletAddress: string,
-  provider: anchor.AnchorProvider
+  provider: anchor.AnchorProvider,
 ): Promise<AutomationData> {
   const wallet = new PublicKey(walletAddress);
 
@@ -177,33 +176,30 @@ export async function fetchAutomationData(
   ])[0];
 
   // Fetch cron job account
-  const cronJobAccount = await cronProgram.account.cronJobV0.fetchNullable(
-    cronJob
-  );
+  const cronJobAccount =
+    await cronProgram.account.cronJobV0.fetchNullable(cronJob);
 
   // Fetch task queue for minCrankReward
-  const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
-    TASK_QUEUE_ID
-  );
+  const taskQueueAcc =
+    await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID);
   const minCrankReward = taskQueueAcc?.minCrankReward?.toNumber() || 10000;
 
   // Get current balances and calculate rent
-  const cronJobSolanaAccount = await provider.connection.getAccountInfo(
-    cronJob
-  );
+  const cronJobSolanaAccount =
+    await provider.connection.getAccountInfo(cronJob);
   const cronJobBalanceLamports = cronJobSolanaAccount?.lamports ?? 0;
 
   // Calculate minimum rent for cron job account based on its data length
   // If account doesn't exist, rent is 0
   const cronJobRentLamports = cronJobSolanaAccount
-    ? await provider.connection.getMinimumBalanceForRentExemption(
-        cronJobSolanaAccount.data.length
+    ? await getRentLamports(
+        provider.connection,
+        cronJobSolanaAccount.data.length,
       )
     : 0;
 
-  const pdaWalletBalanceLamports = await provider.connection.getBalance(
-    pdaWallet
-  );
+  const pdaWalletBalanceLamports =
+    await provider.connection.getBalance(pdaWallet);
 
   // Get hotspot count
   const hotspotsData = await getHotspotsByOwner({
@@ -218,10 +214,10 @@ export async function fetchAutomationData(
   const numCronTransactions = cronJobAccount?.nextTransactionId || 0;
   const cronJobCostPerClaimLamports = calculateCronJobCostPerClaim(
     minCrankReward,
-    numCronTransactions
+    numCronTransactions,
   );
   const pdaWalletCostPerClaimLamports = calculatePdaWalletCostPerClaim(
-    totalHotspots || 1
+    totalHotspots || 1,
   );
 
   // Calculate recipient rent that's already committed
@@ -229,9 +225,9 @@ export async function fetchAutomationData(
   const [pdaWalletRentLamports, recipientRent, ataRent] = await Promise.all([
     getMinWalletRentLamports(provider.connection),
     hotspotsNeedingRecipient > 0
-      ? provider.connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE)
+      ? getRentLamports(provider.connection, RECIPIENT_SPACE)
       : 0,
-    provider.connection.getMinimumBalanceForRentExemption(ATA_SPACE),
+    getRentLamports(provider.connection, ATA_SPACE),
   ]);
   const recipientRentLamports = hotspotsNeedingRecipient * recipientRent;
 
@@ -246,11 +242,10 @@ export async function fetchAutomationData(
   // We check the first one - if it doesn't exist, we need to account for rent
   const [taskReturnAccount1] = PublicKey.findProgramAddressSync(
     [Buffer.from("task_return_account_1"), cronJob.toBuffer()],
-    PROGRAM_ID
+    PROGRAM_ID,
   );
-  const taskReturnAccountInfo = await provider.connection.getAccountInfo(
-    taskReturnAccount1
-  );
+  const taskReturnAccountInfo =
+    await provider.connection.getAccountInfo(taskReturnAccount1);
   const taskReturnAccountRentLamports = taskReturnAccountInfo
     ? 0
     : Math.ceil(TASK_RETURN_ACCOUNT_SIZE * LAMPORTS_PER_SOL);
@@ -264,7 +259,6 @@ export async function fetchAutomationData(
     minCrankReward,
     cronJobCostPerClaimLamports,
     pdaWalletCostPerClaimLamports,
-    hotspotsNeedingRecipient,
     recipientRentLamports,
     pdaWalletRentLamports,
     ataRentLamports,

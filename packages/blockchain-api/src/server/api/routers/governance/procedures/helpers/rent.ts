@@ -4,6 +4,7 @@ import { HNT_MINT } from "@helium/spl-utils";
 import { ACCOUNT_SIZE, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
+import { getRentLamports } from "@/lib/utils/balance-validation";
 
 export { DELEGATION_CLAIM_BOT_SPACE, DELEGATED_POSITION_SPACE };
 
@@ -66,7 +67,7 @@ export async function getAutomationRentLamports({
 
   const [claimBotRent, hntAtaInfo, ataRent] = await Promise.all([
     newClaimBots > 0
-      ? connection.getMinimumBalanceForRentExemption(DELEGATION_CLAIM_BOT_SPACE)
+      ? getRentLamports(connection, DELEGATION_CLAIM_BOT_SPACE)
       : Promise.resolve(0),
     createsHntAta
       ? connection.getAccountInfo(
@@ -74,7 +75,7 @@ export async function getAutomationRentLamports({
         )
       : Promise.resolve(null),
     createsHntAta
-      ? connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE)
+      ? getRentLamports(connection, ACCOUNT_SIZE)
       : Promise.resolve(0),
   ]);
 
@@ -105,7 +106,7 @@ export async function getMissingEpochInfoRentLamports({
 
   const [infos, rent] = await Promise.all([
     getMultipleAccounts(connection, uniqueKeys),
-    connection.getMinimumBalanceForRentExemption(SUB_DAO_EPOCH_INFO_SPACE),
+    getRentLamports(connection, SUB_DAO_EPOCH_INFO_SPACE),
   ]);
 
   return infos.filter((info) => info === null).length * rent;

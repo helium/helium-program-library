@@ -29,7 +29,6 @@ export const getAutomationStatus =
         pdaWalletBalanceLamports,
         cronJobCostPerClaimLamports,
         pdaWalletCostPerClaimLamports,
-        hotspotsNeedingRecipient,
         recipientRentLamports,
         pdaWalletRentLamports,
         ataRentLamports,
@@ -131,5 +130,5 @@ export const getAutomationStatus =
         cronJobBalance: cronJobBalanceLamports.toString(),
         pdaWalletBalance: pdaWalletBalanceLamports.toString(),
       };
-    }
+    },
   );

@@ -1,5 +1,5 @@
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
 import { DELEGATED_POSITION_SPACE } from "@helium/helium-sub-daos-sdk";
 import { useSolOwnedAmount } from "@helium/helium-react-hooks";
 import { DELEGATION_CLAIM_BOT_SPACE } from "@helium/hpl-crons-sdk";
@@ -44,8 +44,10 @@ export const usePositionsFees = ({
   wallet: wallet,
 }: UsePositionFeesProps) => {
   const { amount: userLamports } = useSolOwnedAmount(wallet);
-  const { connection } = useConnection();
-  const { result: rent } = useAsync(async () => {
+  const { provider } = useHeliumVsrState();
+  const { result: rent, loading } = useAsync(async () => {
+    const connection = provider?.connection;
+    if (!connection) return undefined;
     const [bot, delegatedPosition] = await Promise.all([
       connection.getMinimumBalanceForRentExemption(DELEGATION_CLAIM_BOT_SPACE),
       connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE),
@@ -54,7 +56,7 @@ export const usePositionsFees = ({
       bot: bot / LAMPORTS_PER_SOL,
       delegatedPosition: delegatedPosition / LAMPORTS_PER_SOL,
     };
-  }, [connection]);
+  }, [provider?.connection]);
 
   const rentFee = useMemo(() => {
     const botFee = automationEnabled
@@ -85,5 +87,6 @@ export const usePositionsFees = ({
     prepaidTxFees,
     totalFees,
     insufficientBalance,
+    loading,
   };
 };

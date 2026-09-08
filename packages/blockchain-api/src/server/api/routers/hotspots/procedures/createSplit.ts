@@ -34,10 +34,7 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
-import {
-  resolveTokenAmountInput,
-  solToLamportsBN,
-} from "@/lib/utils/token-math";
+import { resolveTokenAmountInput } from "@/lib/utils/token-math";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
@@ -49,19 +46,16 @@ import {
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import {
-  ATA_SPACE,
+  FANOUT_FUNDING_AMOUNT,
+  getMiniFanoutRentParts,
   getTotalTransactionFees,
-  miniFanoutDistTaskSpace,
-  miniFanoutPreTaskSpace,
-  miniFanoutSpace,
   RECIPIENT_SPACE,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
-import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
-
-const FANOUT_FUNDING_AMOUNT = solToLamportsBN(0.01).toNumber();
+import { preTaskUrl, TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
 /**
  * Create a split configuration for a hotspot with reward distribution.
@@ -144,7 +138,6 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     }
 
     const oracleSigner = new PublicKey(process.env.ORACLE_SIGNER!);
-    const oracleUrl = process.env.ORACLE_URL!;
 
     const { instruction: initIx, pubkeys } = await miniFanoutProgram.methods
       .initializeMiniFanoutV0({
@@ -168,7 +161,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
         schedule: rewardsSchedule,
         preTask: {
           remoteV0: {
-            url: `${oracleUrl}/v1/tuktuk/asset/${assetId}`,
+            url: preTaskUrl(assetId),
             signer: oracleSigner,
           },
         },
@@ -257,28 +250,17 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     }
 
     // Rent includes mini fanout account + its HNT ATA + 2 tuktuk tasks (task + preTask) + optional recipient
-    const preTaskUrlLen = `${oracleUrl}/v1/tuktuk/asset/${assetId}`.length;
-    const [fanoutRent, ataRent, distTaskRent, preTaskRent, recipientRent] =
+    const preTaskUrlLen = preTaskUrl(assetId).length;
+    const [{ fanoutRent, ataRent, distTaskRent, preTaskRent }, recipientRent] =
       await Promise.all([
-        provider.connection.getMinimumBalanceForRentExemption(
-          miniFanoutSpace({
-            numShares: rewardsSplit.length,
-            scheduleLen: rewardsSchedule.length,
-            preTaskUrlLen,
-          })
-        ),
-        provider.connection.getMinimumBalanceForRentExemption(ATA_SPACE),
-        provider.connection.getMinimumBalanceForRentExemption(
-          miniFanoutDistTaskSpace(rewardsSplit.length)
-        ),
-        provider.connection.getMinimumBalanceForRentExemption(
-          miniFanoutPreTaskSpace(preTaskUrlLen)
-        ),
+        getMiniFanoutRentParts(provider.connection, {
+          numShares: rewardsSplit.length,
+          scheduleLen: rewardsSchedule.length,
+          preTaskUrlLen,
+        }),
         recipientAcc
           ? 0
-          : provider.connection.getMinimumBalanceForRentExemption(
-              RECIPIENT_SPACE
-            ),
+          : getRentLamports(provider.connection, RECIPIENT_SPACE),
       ]);
     const rentCost =
       fanoutRent + ataRent + distTaskRent + preTaskRent + recipientRent;

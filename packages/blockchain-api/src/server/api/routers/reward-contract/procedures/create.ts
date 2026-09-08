@@ -1,19 +1,18 @@
 import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
+import { preTaskUrl, TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 import { createSolanaConnection, getAssetEndpoint } from "@/lib/solana";
 import { fetchOwnedAsset } from "@/lib/utils/asset-ownership";
 import {
   calculateRequiredBalance,
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
-  ATA_SPACE,
-  miniFanoutDistTaskSpace,
-  miniFanoutPreTaskSpace,
-  miniFanoutSpace,
+  FANOUT_FUNDING_AMOUNT,
+  getMiniFanoutRentParts,
+  getWelcomePackRentParts,
   RECIPIENT_SPACE,
-  USER_WELCOME_PACKS_SPACE,
-  welcomePackSpace,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import {
   buildVersionedTransaction,
@@ -23,7 +22,6 @@ import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
 import { toSixColumnCron } from "@/lib/utils/misc";
 import {
   resolveTokenAmountInput,
-  solToLamportsBN,
   toTokenAmountOutput,
 } from "@/lib/utils/token-math";
 import {
@@ -56,8 +54,6 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import BN from "bn.js";
-
-const FANOUT_FUNDING_AMOUNT = solToLamportsBN(0.01).toNumber();
 
 export const create = publicProcedure.rewardContract.create.handler(
   async ({ input, errors }) => {
@@ -119,7 +115,7 @@ export const create = publicProcedure.rewardContract.create.handler(
     );
     let rentCost = 0;
     if (!recipientAcc) {
-      rentCost += (await connection.getMinimumBalanceForRentExemption(RECIPIENT_SPACE));
+      rentCost += await getRentLamports(connection, RECIPIENT_SPACE);
     }
 
     const welcomePackProgram = hasClaimable ? await init(provider) : undefined;
@@ -128,11 +124,11 @@ export const create = publicProcedure.rewardContract.create.handler(
           userWelcomePacksKey(new PublicKey(delegateWalletAddress))[0],
         )
       : null;
-    const taskQueueId = new PublicKey(process.env.HPL_CRONS_TASK_QUEUE!);
+    const taskQueueId = TASK_QUEUE_ID;
     const tuktukProgram = hasClaimable ? undefined : await initTuktuk(provider);
     const taskQueueAcc =
       tuktukProgram &&
-      (await tuktukProgram.account.taskQueueV0.fetchNullable(taskQueueId));
+      (await tuktukProgram.account.taskQueueV0.fetch(taskQueueId));
 
     if (hasClaimable) {
       // Welcome pack path - add pack rent + gifted SOL
@@ -142,36 +138,15 @@ export const create = publicProcedure.rewardContract.create.handler(
         (r) => r.receives.type === "FIXED",
       ).length;
       const scheduleLen = toSixColumnCron(rewardSchedule).length;
-      const fanoutSpace =
-        recipients.length > 1
-          ? miniFanoutSpace({
-              numShares: recipients.length,
-              scheduleLen,
-              preTaskUrlLen: `${env.ORACLE_URL}/v1/tuktuk/asset/${assetId}`
-                .length,
-            })
-          : 0;
-      const [welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent] =
-        await Promise.all([
-          connection.getMinimumBalanceForRentExemption(
-            welcomePackSpace({
-              numFixedShares,
-              numPercentageShares: recipients.length - numFixedShares,
-              scheduleLen,
-            }),
-          ),
-          uwpAcc
-            ? 0
-            : connection.getMinimumBalanceForRentExemption(
-                USER_WELCOME_PACKS_SPACE,
-              ),
-          fanoutSpace
-            ? connection.getMinimumBalanceForRentExemption(fanoutSpace)
-            : 0,
-          fanoutSpace
-            ? connection.getMinimumBalanceForRentExemption(ATA_SPACE)
-            : 0,
-        ]);
+      const hasFanout = recipients.length > 1;
+      const { welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent } =
+        await getWelcomePackRentParts(connection, {
+          numFixedShares,
+          numPercentageShares: recipients.length - numFixedShares,
+          scheduleLen,
+          preTaskUrlLen: preTaskUrl(assetId).length,
+          userWelcomePacksExists: !!uwpAcc,
+        });
       const claimableRecipient = recipients.find((r) => r.type === "CLAIMABLE");
       const giftLamports =
         claimableRecipient?.type === "CLAIMABLE"
@@ -185,7 +160,7 @@ export const create = publicProcedure.rewardContract.create.handler(
       // The escrow (gift + fanout cost) is transferred into the pack account
       // on top of whatever its init rent already left there, so the pack
       // costs the larger of the two rather than their sum.
-      const fanoutCost = fanoutSpace
+      const fanoutCost = hasFanout
         ? fanoutRent + ataRent + FANOUT_FUNDING_AMOUNT
         : 0;
       rentCost +=
@@ -196,25 +171,12 @@ export const create = publicProcedure.rewardContract.create.handler(
       // initialize_mini_fanout_v0 queues (each paid the queue's min crank
       // reward) and FANOUT_FUNDING_AMOUNT.
       const scheduleLen = toSixColumnCron(rewardSchedule).length;
-      const preTaskUrlLen = `${env.ORACLE_URL}/v1/tuktuk/asset/${assetId}`
-        .length;
-      const [fanoutRent, ataRent, distTaskRent, preTaskRent] =
-        await Promise.all([
-          connection.getMinimumBalanceForRentExemption(
-            miniFanoutSpace({
-              numShares: recipients.length,
-              scheduleLen,
-              preTaskUrlLen,
-            }),
-          ),
-          connection.getMinimumBalanceForRentExemption(ATA_SPACE),
-          connection.getMinimumBalanceForRentExemption(
-            miniFanoutDistTaskSpace(recipients.length),
-          ),
-          connection.getMinimumBalanceForRentExemption(
-            miniFanoutPreTaskSpace(preTaskUrlLen),
-          ),
-        ]);
+      const { fanoutRent, ataRent, distTaskRent, preTaskRent } =
+        await getMiniFanoutRentParts(connection, {
+          numShares: recipients.length,
+          scheduleLen,
+          preTaskUrlLen: preTaskUrl(assetId).length,
+        });
       rentCost +=
         fanoutRent +
         ataRent +
@@ -224,7 +186,11 @@ export const create = publicProcedure.rewardContract.create.handler(
         FANOUT_FUNDING_AMOUNT;
     }
 
-    const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, rentCost);
+    const required = await calculateRequiredBalance(
+      connection,
+      BASE_TX_FEE_LAMPORTS,
+      rentCost,
+    );
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to create reward contract",
@@ -319,7 +285,6 @@ export const create = publicProcedure.rewardContract.create.handler(
       }
 
       const oracleSigner = new PublicKey(env.ORACLE_SIGNER);
-      const oracleUrl = env.ORACLE_URL;
 
       const shares = await Promise.all(
         recipients.map(async (r) => {
@@ -355,7 +320,7 @@ export const create = publicProcedure.rewardContract.create.handler(
           schedule: toSixColumnCron(rewardSchedule),
           preTask: {
             remoteV0: {
-              url: `${oracleUrl}/v1/tuktuk/asset/${assetId}`,
+              url: preTaskUrl(assetId),
               signer: oracleSigner,
             },
           },

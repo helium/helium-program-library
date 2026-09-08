@@ -2,7 +2,6 @@ import {
   daoEpochInfoKey,
   daoKey,
   EPOCH_LENGTH,
-  init as initHsd,
   subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
 import {
@@ -10,7 +9,6 @@ import {
   PROGRAM_ID as CIRCUIT_BREAKER_PROGRAM_ID,
 } from "@helium/circuit-breaker-sdk";
 import { chunks, HNT_MINT, truthy } from "@helium/spl-utils";
-import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
 import { PROGRAM_ID as VSR_PROGRAM_ID } from "@helium/voter-stake-registry-sdk";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -25,10 +23,13 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import BN from "bn.js";
-import { getClaimableEpochRange, isEpochInfoIssued } from "./claimable-epochs";
+import {
+  fetchEpochInfos,
+  getClaimableEpochRange,
+  isEpochInfoIssued,
+} from "./claimable-epochs";
+import type { HsdProgram } from "./claimable-epochs";
 import { MAX_TXS_PER_CALL } from "./constants";
-
-type HsdProgram = Awaited<ReturnType<typeof initHsd>>;
 
 const DAO = daoKey(HNT_MINT)[0];
 const EPOCHS_PER_BATCH = 128;
@@ -165,19 +166,15 @@ export async function buildClaimInstructions(
     chunks(allEpochsToClaim, EPOCHS_PER_BATCH).map(async (chunk) => {
       const unclaimableEpochs: ClaimInstructionsResult["unclaimableEpochs"] =
         [];
-      const subDaoEpochInfoKeys = chunk.map(
-        ({ epoch, subDao }) =>
-          subDaoEpochInfoKey(subDao, epoch.mul(new BN(EPOCH_LENGTH)))[0],
-      );
-      const daoEpochInfoKeys = chunk.map(
-        ({ epoch, subDaoAcc }) =>
-          daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0],
-      );
-      const [subDaoEpochInfoAccounts, daoEpochInfoAccounts] =
-        await Promise.all([
-          getMultipleAccounts(connection, subDaoEpochInfoKeys),
-          getMultipleAccounts(connection, daoEpochInfoKeys),
-        ]);
+      const infos = await fetchEpochInfos({
+        connection,
+        hsdProgram,
+        dao: DAO,
+        entries: chunk.map(({ epoch, subDao }) => ({
+          subDao,
+          epoch: epoch.toNumber(),
+        })),
+      });
 
       const batchInstructions = await Promise.all(
         chunk.map(
@@ -185,21 +182,8 @@ export async function buildClaimInstructions(
             { position, epoch, subDao, subDaoAcc, requiredForClose },
             index,
           ) => {
-            const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
-            const subDaoEpochInfoData = subDaoEpochInfoAccount
-              ? hsdProgram.coder.accounts.decode(
-                  "subDaoEpochInfoV0",
-                  subDaoEpochInfoAccount.data,
-                )
-              : null;
-
-            const daoEpochInfoAccount = daoEpochInfoAccounts[index];
-            const daoEpochInfoData = daoEpochInfoAccount
-              ? hsdProgram.coder.accounts.decode(
-                  "daoEpochInfoV0",
-                  daoEpochInfoAccount.data,
-                )
-              : null;
+            const subDaoEpochInfoData = infos[index].subDaoEpochInfo;
+            const daoEpochInfoData = infos[index].daoEpochInfo;
 
             if (
               !subDaoEpochInfoData ||
