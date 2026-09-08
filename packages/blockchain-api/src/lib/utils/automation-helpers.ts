@@ -3,7 +3,7 @@ import {
   ENTITY_CLAIM_CRON_NAME,
   MAX_PRESET_SCHEDULE_LEN,
 } from "@helium/hpl-crons-sdk";
-import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
 import { getRentLamports } from "./balance-validation";
 
 export type Schedule = "daily" | "weekly" | "monthly";

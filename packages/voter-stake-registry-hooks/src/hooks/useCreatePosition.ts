@@ -60,7 +60,7 @@ export const useCreatePosition = ({
     loading: loadingFees,
   } = usePositionFees({
     automationEnabled,
-    isDelegated: true,
+    isDelegated: false,
     hasDelegationClaimBot: false,
     wallet: provider?.wallet?.publicKey,
   });

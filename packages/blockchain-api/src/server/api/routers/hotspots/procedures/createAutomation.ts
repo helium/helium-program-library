@@ -23,7 +23,6 @@ import {
 } from "@helium/spl-utils";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import {
-  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   TransactionInstruction,

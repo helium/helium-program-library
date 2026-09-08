@@ -15,6 +15,11 @@ import {
   HNT_LAZY_DISTRIBUTOR_ADDRESS,
 } from "./helpers/constants";
 import { verifyEstimatedSolFee } from "./helpers/estimate";
+import {
+  ATA_SPACE,
+  FANOUT_FUNDING_AMOUNT,
+  miniFanoutSpace,
+} from "../../src/lib/utils/balance-validation";
 import nacl from "tweetnacl";
 
 describe("welcome-pack", () => {
@@ -23,25 +28,27 @@ describe("welcome-pack", () => {
   // TODO: remove once the welcome-pack program with the refund moved after the
   // bubblegum CPI is deployed to mainnet. The test pack was funded under the
   // old rent regime, so under current rent claim_welcome_pack_v0 computes a
-  // nonzero refund and credits rent_refund before the bubblegum transfer CPI,
-  // where the same wallet is a read-only account, failing the runtime's
-  // balance check with UnbalancedInstruction. Top the pack down to exactly
+  // nonzero refund and credited rent_refund before
+  // update_compression_destination_v0, a CPI that passes welcome_pack but not
+  // rent_refund, so the runtime saw an unbalanced caller and failed with
+  // UnbalancedInstruction. Top the pack down to exactly
   // sol_amount + fanout cost so the refund branch stays dead, as it was on
   // mainnet when the pack was created.
   const fundPackToExactClaimCost = async (pack: PublicKey) => {
     const info = await ctx.connection.getAccountInfo(pack);
     if (!info) throw new Error("welcome pack not found");
-    // MiniFanoutV0::size(...) for this pack's schedule, 2 shares and the
-    // RemoteV0 pre_task url; ATA_SIZE = 165; FANOUT_FUNDING_AMOUNT = 0.01 SOL.
-    const MINI_FANOUT_SIZE = 695;
-    const ATA_SIZE = 165;
-    const FANOUT_FUNDING_AMOUNT = 10_000_000;
+    // 2 shares, the pack's 12-byte schedule and the 97-byte RemoteV0 pre_task url.
+    const MINI_FANOUT_SIZE = miniFanoutSpace({
+      numShares: 2,
+      scheduleLen: 12,
+      preTaskUrlLen: 97,
+    });
     const SOL_AMOUNT = 10_000_000;
     const fanoutCost =
       (await ctx.connection.getMinimumBalanceForRentExemption(
         MINI_FANOUT_SIZE
       )) +
-      (await ctx.connection.getMinimumBalanceForRentExemption(ATA_SIZE)) +
+      (await ctx.connection.getMinimumBalanceForRentExemption(ATA_SPACE)) +
       FANOUT_FUNDING_AMOUNT;
     await setSurfnetAccount(pack, {
       data: info.data,

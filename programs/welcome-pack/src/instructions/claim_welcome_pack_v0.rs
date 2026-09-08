@@ -260,9 +260,11 @@ pub fn handler<'info>(
     &[welcome_pack_seeds!(welcome_pack)],
   )?;
 
-  // Refund excess rent only after the bubblegum CPI: rent_refund may be a
-  // read-only account of that CPI (e.g. asset_return_address), and a lamport
-  // change made before the call fails the runtime's balance check.
+  // Refund excess rent only after update_compression_destination_v0 and the
+  // bubblegum transfer. The runtime syncs only a CPI's own accounts back before
+  // the call, so a welcome_pack debit paired with a credit to a rent_refund
+  // that the CPI does not pass leaves the caller unbalanced and fails with
+  // UnbalancedInstruction.
   let rent_refunded_amount = welcome_pack
     .get_lamports()
     .saturating_sub(if needs_fanout { fanout_cost } else { 0 })

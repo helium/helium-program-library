@@ -77,6 +77,11 @@ export class OracleServer {
   app: FastifyInstance;
   port = 8080;
   server: string | undefined;
+  private rentCache = new Map<
+    number,
+    { value: Promise<number>; expiresAt: number }
+  >();
+  private oracleCount?: Promise<number>;
 
   constructor(
     // tuktuk is on a different version of anchor, so this has to be done.
@@ -129,6 +134,30 @@ export class OracleServer {
 
   public async close() {
     await this.app.close();
+  }
+
+  // Rent only changes at feature activation; refresh hourly like blockchain-api.
+  private minRent(space: number): Promise<number> {
+    const now = Date.now();
+    const hit = this.rentCache.get(space);
+    if (hit && hit.expiresAt > now) return hit.value;
+    const value =
+      this.ldProgram.provider.connection.getMinimumBalanceForRentExemption(
+        space
+      );
+    this.rentCache.set(space, { value, expiresAt: now + 60 * 60 * 1000 });
+    value.catch(() => this.rentCache.delete(space));
+    return value;
+  }
+
+  private getOracleCount(): Promise<number> {
+    if (!this.oracleCount) {
+      this.oracleCount = this.ldProgram.account.lazyDistributorV0
+        .fetch(this.lazyDistributor)
+        .then((ld) => ld.oracles.length);
+      this.oracleCount.catch(() => (this.oracleCount = undefined));
+    }
+    return this.oracleCount;
   }
 
   private addRoutes() {
@@ -745,19 +774,12 @@ export class OracleServer {
     );
     const ataExists =
       !!(await this.ldProgram.provider.connection.getAccountInfo(ata));
-    const connection = this.ldProgram.provider.connection;
     const [walletMinRent, recipientRent, ataRent] = await Promise.all([
-      connection.getMinimumBalanceForRentExemption(0),
+      this.minRent(0),
       recipientAcc
         ? 0
-        : this.ldProgram.account.lazyDistributorV0
-            .fetch(this.lazyDistributor)
-            .then((ld) =>
-              connection.getMinimumBalanceForRentExemption(
-                recipientSpace(ld.oracles.length)
-              )
-            ),
-      ataExists ? 0 : connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE),
+        : this.getOracleCount().then((n) => this.minRent(recipientSpace(n))),
+      ataExists ? 0 : this.minRent(ACCOUNT_SIZE),
     ]);
     const neededBalance =
       (!ataExists || !recipientAcc ? walletMinRent : 0) +
@@ -1009,10 +1031,7 @@ export class OracleServer {
         )
       )?.lamports || 0;
     const fees = taskQueueAcc.minCrankReward.toNumber() * (entities.length + 1);
-    const walletMinRent =
-      await this.ldProgram.provider.connection.getMinimumBalanceForRentExemption(
-        0
-      );
+    const walletMinRent = await this.minRent(0);
     const neededBalance = walletMinRent + fees;
     const instructions: TransactionInstruction[] = [];
     if (balance < neededBalance) {

@@ -14,6 +14,8 @@ const stubConnection = (opts: {
   onRentRequest?: (space: number) => void;
 }): Connection =>
   ({
+    // Unique per stub so getRentLamports' module-level cache never crosses tests.
+    rpcEndpoint: `stub://${Keypair.generate().publicKey.toBase58()}`,
     getMinimumBalanceForRentExemption: async (space: number) => {
       opts.onRentRequest?.(space);
       return opts.rentBySpace?.(space) ?? 0;
