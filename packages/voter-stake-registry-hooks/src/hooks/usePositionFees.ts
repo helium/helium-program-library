@@ -46,7 +46,7 @@ export const usePositionsFees = ({
   const { amount: userLamports, loading: loadingSol } =
     useSolOwnedAmount(wallet);
   const { provider } = useHeliumVsrState();
-  const { result: rent, loading, error } = useAsync(async () => {
+  const { result: rent, error } = useAsync(async () => {
     const connection = provider?.connection;
     if (!connection) return undefined;
     const [bot, delegatedPosition] = await Promise.all([
@@ -80,10 +80,13 @@ export const usePositionsFees = ({
     : 0;
   const totalFees = rentFee + prepaidTxFees;
 
+  // No provider yet (wallet still connecting) resolves undefined rather than
+  // pending, so treat missing rent as loading instead of quoting 0.
+  const loading = loadingSol || (!rent && !error);
   // A failed rent lookup must block rather than quote 0 rent.
   const insufficientBalance =
     !!error ||
-    (!loadingSol && (userLamports ?? BigInt(0)) < totalFees * LAMPORTS_PER_SOL);
+    (!loading && (userLamports ?? BigInt(0)) < totalFees * LAMPORTS_PER_SOL);
 
   return {
     rentFee,

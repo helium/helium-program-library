@@ -43,8 +43,15 @@ import { PREPAID_TX_FEES, usePositionFees } from "./usePositionFees";
 const SECS_PER_DAY = 86400;
 export const useCreatePosition = ({
   automationEnabled = false,
+  delegating = automationEnabled,
 }: {
   automationEnabled?: boolean;
+  /**
+   * Whether createPosition will be called with a subDao. Only a delegated
+   * position pays DelegatedPositionV0 rent, so an undelegated lock-up must
+   * not be quoted (or blocked on) it. Automation implies delegation.
+   */
+  delegating?: boolean;
 }) => {
   const { provider } = useHeliumVsrState();
   const { result: client } = useAsync(
@@ -60,7 +67,8 @@ export const useCreatePosition = ({
     loading: loadingFees,
   } = usePositionFees({
     automationEnabled,
-    isDelegated: false,
+    // A position that will not delegate needs no DelegatedPositionV0.
+    isDelegated: !delegating,
     hasDelegationClaimBot: false,
     wallet: provider?.wallet?.publicKey,
   });
