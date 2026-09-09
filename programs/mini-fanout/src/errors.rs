@@ -28,4 +28,6 @@ pub enum ErrorCode {
   InvalidPreTask,
   #[msg("Missing a free task account for a task being returned")]
   MissingFreeTask,
+  #[msg("Fanout balance is below the current rent-exempt minimum; top it up")]
+  BelowRentExempt,
 }
