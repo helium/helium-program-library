@@ -77,11 +77,12 @@ export class OracleServer {
   app: FastifyInstance;
   port = 8080;
   server: string | undefined;
-  private rentCache = new Map<
-    number,
+  // Rent only changes at feature activation and the oracle set only by
+  // admin action; refresh both hourly like blockchain-api.
+  private ttlCache = new Map<
+    string,
     { value: Promise<number>; expiresAt: number }
   >();
-  private oracleCount?: Promise<number>;
 
   constructor(
     // tuktuk is on a different version of anchor, so this has to be done.
@@ -136,28 +137,33 @@ export class OracleServer {
     await this.app.close();
   }
 
-  // Rent only changes at feature activation; refresh hourly like blockchain-api.
-  private minRent(space: number): Promise<number> {
+  private cachedHourly(
+    key: string,
+    load: () => Promise<number>
+  ): Promise<number> {
     const now = Date.now();
-    const hit = this.rentCache.get(space);
+    const hit = this.ttlCache.get(key);
     if (hit && hit.expiresAt > now) return hit.value;
-    const value =
-      this.ldProgram.provider.connection.getMinimumBalanceForRentExemption(
-        space
-      );
-    this.rentCache.set(space, { value, expiresAt: now + 60 * 60 * 1000 });
-    value.catch(() => this.rentCache.delete(space));
+    const value = load();
+    this.ttlCache.set(key, { value, expiresAt: now + 60 * 60 * 1000 });
+    value.catch(() => this.ttlCache.delete(key));
     return value;
   }
 
+  private minRent(space: number): Promise<number> {
+    return this.cachedHourly(`rent:${space}`, () =>
+      this.ldProgram.provider.connection.getMinimumBalanceForRentExemption(
+        space
+      )
+    );
+  }
+
   private getOracleCount(): Promise<number> {
-    if (!this.oracleCount) {
-      this.oracleCount = this.ldProgram.account.lazyDistributorV0
+    return this.cachedHourly("oracleCount", () =>
+      this.ldProgram.account.lazyDistributorV0
         .fetch(this.lazyDistributor)
-        .then((ld) => ld.oracles.length);
-      this.oracleCount.catch(() => (this.oracleCount = undefined));
-    }
-    return this.oracleCount;
+        .then((ld) => ld.oracles.length)
+    );
   }
 
   private addRoutes() {
