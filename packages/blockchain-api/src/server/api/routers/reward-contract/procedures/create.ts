@@ -126,9 +126,13 @@ export const create = publicProcedure.rewardContract.create.handler(
       : null;
     const taskQueueId = TASK_QUEUE_ID;
     const tuktukProgram = hasClaimable ? undefined : await initTuktuk(provider);
-    const taskQueueAcc =
+    // Read early only for min_crank_reward; the task bitmap is re-read right
+    // before picking task ids so the window for another caller to take them
+    // stays as short as it was.
+    const minCrankReward =
       tuktukProgram &&
-      (await tuktukProgram.account.taskQueueV0.fetch(taskQueueId));
+      (await tuktukProgram.account.taskQueueV0.fetch(taskQueueId))
+        .minCrankReward;
 
     if (hasClaimable) {
       // Welcome pack path - add pack rent + gifted SOL
@@ -182,7 +186,7 @@ export const create = publicProcedure.rewardContract.create.handler(
         ataRent +
         distTaskRent +
         preTaskRent +
-        2 * taskQueueAcc!.minCrankReward.toNumber() +
+        2 * minCrankReward!.toNumber() +
         FANOUT_FUNDING_AMOUNT;
     }
 
@@ -343,8 +347,10 @@ export const create = publicProcedure.rewardContract.create.handler(
         }),
       );
 
+      const taskQueueAcc =
+        await tuktukProgram!.account.taskQueueV0.fetch(taskQueueId);
       const [taskId, preTaskId] = nextAvailableTaskIds(
-        taskQueueAcc!.taskBitmap,
+        taskQueueAcc.taskBitmap,
         2,
       );
 
