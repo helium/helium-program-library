@@ -48,11 +48,15 @@ export const cronJobSpace = (scheduleLen: number) =>
 /**
  * initialize_cron_job_v0 funds task_return_account_1 with
  * `Rent::minimum_balance(1024)` and queues the "queue entity_claim" schedule
- * task. That TaskV0 measured 738 bytes on mainnet (compiled queue_cron_tasks
- * transaction); its rent is refunded when the task runs.
+ * task. tuktuk sizes a TaskV0 by its compiled transaction, and the one init
+ * compiles is 800 bytes (measured on a mainnet fork by the blockchain-api
+ * automation e2e). Do not measure this from a live cron job: once the job
+ * has run, queue_cron_tasks requeues the schedule task at 738 bytes, paid
+ * from the cron's own funding rather than by the wallet. The init task's
+ * rent is refunded when it runs.
  */
 export const TASK_RETURN_ACCOUNT_FUNDING_SPACE = 1024;
-export const ENTITY_CLAIM_SCHEDULE_TASK_SPACE = 738;
+export const ENTITY_CLAIM_SCHEDULE_TASK_SPACE = 800;
 /**
  * Longest six-column crontab the daily/weekly/monthly presets produce:
  * "SS MM HH DD * *". Used to size the cron job before a schedule is chosen.

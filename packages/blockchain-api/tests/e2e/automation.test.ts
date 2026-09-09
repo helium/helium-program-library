@@ -1,4 +1,25 @@
-import { Connection, Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+} from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import {
+  cronJobKey,
+  cronJobNameMappingKey,
+  init as initCron,
+  userCronJobsKey,
+} from "@helium/cron-sdk";
+import {
+  CRON_JOB_NAME_MAPPING_SPACE,
+  cronJobSpace,
+  ENTITY_CLAIM_CRON_NAME,
+  ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
+  entityCronAuthorityKey,
+  TASK_RETURN_ACCOUNT_FUNDING_SPACE,
+  USER_CRON_JOBS_SPACE,
+} from "@helium/hpl-crons-sdk";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
@@ -199,6 +220,42 @@ describe("automation endpoints", () => {
           `Automation setup failed: ${JSON.stringify(status, null, 2)}`
         );
       }
+    });
+
+    it("sizes the rent quote from the accounts the cron actually allocates", async () => {
+      // The quote is priced off entityClaimCronSpaces; measure the accounts
+      // init_entity_claim_cron_v0 created on chain rather than re-running
+      // that model, so a wrong byte size in the SDK fails here.
+      const authority = entityCronAuthorityKey(payer.publicKey)[0];
+      const cronJob = cronJobKey(authority, 0)[0];
+      const cronProgram = await initCron(
+        new AnchorProvider(connection, {} as any, {})
+      );
+      const cronJobAcc = await cronProgram.account.cronJobV0.fetch(cronJob);
+      const [taskReturnAccount1] = PublicKey.findProgramAddressSync(
+        [Buffer.from("task_return_account_1"), cronJob.toBuffer()],
+        cronProgram.programId
+      );
+      const [userCronJobs, cronJobInfo, nameMapping, scheduleTask, taskReturn] =
+        await connection.getMultipleAccountsInfo([
+          userCronJobsKey(authority)[0],
+          cronJob,
+          cronJobNameMappingKey(authority, ENTITY_CLAIM_CRON_NAME)[0],
+          cronJobAcc.nextScheduleTask,
+          taskReturnAccount1,
+        ]);
+
+      expect(userCronJobs?.data.length).to.equal(USER_CRON_JOBS_SPACE);
+      expect(cronJobInfo?.data.length).to.equal(cronJobSpace(DAILY_CRON.length));
+      expect(nameMapping?.data.length).to.equal(CRON_JOB_NAME_MAPPING_SPACE);
+      expect(scheduleTask?.data.length).to.equal(
+        ENTITY_CLAIM_SCHEDULE_TASK_SPACE
+      );
+      expect(taskReturn?.lamports).to.equal(
+        await connection.getMinimumBalanceForRentExemption(
+          TASK_RETURN_ACCOUNT_FUNDING_SPACE
+        )
+      );
     });
 
     it("reports the raw cron schedule on status", async () => {
