@@ -85,7 +85,7 @@
       "sha.js": "^2.4.12",
       "@helium/crypto": "^4.14.2",
       "@types/bn.js": "^5.2.0",
-      "@solana/web3.js": "1.98.2"
+      "@solana/web3.js": "1.99.0"
     },
     "peerDependencyRules": {
       "allowedVersions": {

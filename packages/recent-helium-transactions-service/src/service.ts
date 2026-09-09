@@ -66,7 +66,7 @@ export class RecentTransactionsService {
         const fetchedTx = await this.connection.getParsedTransaction(
           signature,
           {
-            maxSupportedTransactionVersion: 0,
+            maxSupportedTransactionVersion: 1,
             commitment: "confirmed",
           }
         );

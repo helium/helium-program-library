@@ -124,7 +124,7 @@ export const sampleComputeUnits = async (
       if (chunk.length === 0) continue;
       if (throttleMs > 0 && start > 0) await sleep(throttleMs);
       const txs = await connection.getParsedTransactions(chunk, {
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
       });
 
       for (let i = 0; i < txs.length; i++) {

@@ -2347,7 +2347,7 @@ describe("governance", () => {
         const meta = (
           await ctx.connection.getTransaction(signature, {
             commitment: "confirmed",
-            maxSupportedTransactionVersion: 0,
+            maxSupportedTransactionVersion: 1,
           })
         )!.meta!;
         const sum = (balances: number[]) =>
