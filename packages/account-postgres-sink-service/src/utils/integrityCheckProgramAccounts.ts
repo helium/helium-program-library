@@ -72,18 +72,35 @@ export const integrityCheckProgramAccounts = async ({
     let limiter: pLimit.Limit;
     const program = new anchor.Program(idl, provider);
     const snapshotSlot = await connection.getSlot("finalized");
-    const snapshotBlockTime = await getBlockTimeWithRetry({
-      slot: snapshotSlot,
-      provider,
-    });
 
-    if (!snapshotBlockTime) {
-      throw new Error(`Unable to get blocktime for slot ${snapshotSlot}`);
+    // Anchor the lookback to chain time, then derive the window from it; slot
+    // duration is no longer a fixed 400ms on mainnet. The finalized tip can be
+    // skipped or not yet served by a lagging replica, so walk backwards (every
+    // slot behind the tip already exists) instead of trusting one probe.
+    let snapshotBlockTime: number | null = null;
+    const BLOCK_TIME_ATTEMPTS = 10;
+    for (let i = 0; i < BLOCK_TIME_ATTEMPTS && !snapshotBlockTime; i++) {
+      const attemptSlot = snapshotSlot - i;
+      try {
+        snapshotBlockTime = await getBlockTimeWithRetry({
+          slot: attemptSlot,
+          maxSlotIncrement: 0,
+          provider,
+        });
+      } catch (err) {
+        console.log(`Failed to get blocktime for slot ${attemptSlot}`, err);
+      }
     }
 
-    // Derive the lookback from chain time rather than a slot count; slot
-    // duration is no longer a fixed 400ms on mainnet.
-    const blockTime24HoursAgo = snapshotBlockTime - 24 * 60 * 60;
+    if (!snapshotBlockTime) {
+      throw new Error(
+        `Unable to get any blocktime in the ${BLOCK_TIME_ATTEMPTS} slots up to ${snapshotSlot}`
+      );
+    }
+
+    // Look back one hour past the daily schedule so consecutive runs overlap
+    // and a late start or clock drift cannot leave a band nothing examines.
+    const lookbackBlockTime = snapshotBlockTime - 25 * 60 * 60;
 
     const txIdsByAccountId: { [key: string]: string[] } = {};
     const corrections: {
@@ -97,7 +114,7 @@ export const integrityCheckProgramAccounts = async ({
     const txSignatureChunks = chunks(
       await getTransactionSignaturesUptoBlockTime({
         programId,
-        blockTime: blockTime24HoursAgo,
+        blockTime: lookbackBlockTime,
         provider,
       }),
       100
