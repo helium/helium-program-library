@@ -15,6 +15,7 @@ const UNIX_NOW = epochStart(CURRENT_EPOCH) + 5;
 
 const CLIFF = { cliff: {} };
 const CONSTANT = { constant: {} };
+const NONE = { none: {} };
 
 const range = ({
   lockupKind = CLIFF,
@@ -128,6 +129,39 @@ describe("getClaimableEpochRange", () => {
     // start) while to_claim_to_epoch only requires the one before it
     expect(r.unclaimedEpochs).to.deep.eq([endEpoch - 1, endEpoch]);
     expect(r.closeRequiresThroughEpoch).to.eq(endEpoch - 1);
+  });
+
+  it("keeps enumerating through the current epoch for a decayed non-cliff lockup", () => {
+    // #given a `none` lockup that ended 30 epochs ago
+    const endEpoch = CURRENT_EPOCH - 30;
+    const r = range({
+      lockupKind: NONE,
+      lastClaimedEpoch: endEpoch - 2,
+      lockupEndTs: epochStart(endEpoch) + 10,
+    });
+
+    // #then to_claim_to_epoch only stops early for a cliff, so close requires
+    // every epoch through yesterday and the range must enumerate them all
+    expect(r.closeRequiresThroughEpoch).to.eq(CURRENT_EPOCH - 1);
+    expect(r.rawEndEpoch).to.eq(CURRENT_EPOCH);
+    expect(r.unclaimedEpochs[0]).to.eq(endEpoch - 1);
+    expect(r.unclaimedEpochs[r.unclaimedEpochs.length - 1]).to.eq(
+      CURRENT_EPOCH - 1
+    );
+    expect(
+      summarizeClaimableEpochs(r, allIssued).requiredUnclaimedEpochCount
+    ).to.eq(r.unclaimedEpochs.length);
+  });
+
+  it("treats a cliff ending exactly now as not yet decayed, like close_delegation_v0", () => {
+    // #given lockup_end_ts == curr_ts; the program tests `lockup_end_ts < curr_ts`
+    const r = range({
+      lastClaimedEpoch: CURRENT_EPOCH - 3,
+      lockupEndTs: UNIX_NOW,
+    });
+
+    expect(r.closeRequiresThroughEpoch).to.eq(CURRENT_EPOCH - 1);
+    expect(r.unclaimedEpochs).to.deep.eq([CURRENT_EPOCH - 2, CURRENT_EPOCH - 1]);
   });
 
   it("ignores lockup end for a constant lockup", () => {

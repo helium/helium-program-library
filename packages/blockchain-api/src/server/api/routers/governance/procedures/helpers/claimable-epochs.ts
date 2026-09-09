@@ -46,8 +46,11 @@ export interface ClaimableEpochRange {
   startEpoch: number;
   /**
    * Exclusive. `currentEpoch` (the current epoch is never claimable), or
-   * `epoch(lockup.endTs) + 1` once a non-constant lockup has ended, capped by
-   * the current epoch and the delegation's expiration.
+   * `epoch(lockup.endTs) + 1` once a cliff lockup has ended, capped by the
+   * current epoch and the delegation's expiration. Mirrors `to_claim_to_epoch`
+   * in close_delegation_v0.rs: only a decayed cliff stops early, so a decayed
+   * non-cliff lockup keeps enumerating (zero-reward) epochs that close still
+   * requires claimed.
    */
   rawEndEpoch: number;
   /**
@@ -80,13 +83,15 @@ export const getClaimableEpochRange = ({
   const currentEpoch = Math.floor(unixNow / EPOCH_LENGTH);
   const lockupKind = getLockupKind(lockup);
   const isConstant = lockupKind === "constant";
-  const isDecayed = !isConstant && lockup.endTs.lte(new BN(unixNow));
+  // `lockup_end_ts < curr_ts` in close_delegation_v0.rs.
+  const isDecayed = !isConstant && lockup.endTs.lt(new BN(unixNow));
   const decayedEpoch = lockup.endTs.div(new BN(EPOCH_LENGTH)).toNumber();
   const isCliff = lockupKind === "cliff";
+  const isDecayedCliff = isDecayed && isCliff;
   const expirationCap = expirationCapEpoch(delegatedPosition.expirationTs);
 
   const closeRequiresThroughEpoch = Math.min(
-    isDecayed && isCliff ? decayedEpoch - 1 : currentEpoch - 1,
+    isDecayedCliff ? decayedEpoch - 1 : currentEpoch - 1,
     expirationCap - 1,
   );
 
@@ -95,7 +100,7 @@ export const getClaimableEpochRange = ({
   const bitmapWindowEnd = lastClaimedEpoch + 129;
   const rawEndEpoch = Math.min(
     currentEpoch,
-    isDecayed ? decayedEpoch + 1 : currentEpoch,
+    isDecayedCliff ? decayedEpoch + 1 : currentEpoch,
     expirationCap,
   );
   const endEpoch = Math.min(rawEndEpoch, bitmapWindowEnd);
@@ -235,8 +240,13 @@ export const fetchEpochInfos = async ({
   }));
 };
 
+/**
+ * Counts are over `range.unclaimedEpochs`, which stops at the 128-epoch bitmap
+ * window, so each is capped at 128. Zero versus non-zero is exact; a
+ * delegation further behind than the window under-reports the magnitude.
+ */
 export interface ClaimableEpochSummary {
-  /** Unclaimed epochs in range whose rewards are issued: what a claim emits now. */
+  /** Unclaimed epochs in the claimable window whose rewards are issued. */
   claimableEpochCount: number;
   /**
    * Unclaimed epochs close_delegation_v0 requires, issued or not. Zero means

@@ -295,19 +295,19 @@ export const PositionDelegationSchema = z.object({
     .number()
     .int()
     .describe(
-      "Epochs claimDelegationRewards would emit a claim instruction for right now: unclaimed, in the claimable range, and with rewards issued",
+      "Unclaimed epochs in this position's claimable window (at most 128 past lastClaimedEpoch) whose rewards are issued. claimDelegationRewards batches across positions and caps epochs per call, so it may emit fewer than this in one call; it is not an emit count",
     ),
   requiredUnclaimedEpochCount: z
     .number()
     .int()
     .describe(
-      "Unclaimed epochs that undelegatePosition must claim before closing, whether or not their rewards are issued yet; 0 means undelegate closes with no claim step",
+      "Unclaimed epochs that undelegatePosition must claim before closing, whether or not their rewards are issued yet, counted within the 128-epoch bitmap window so a delegation further behind reports 128; 0 means undelegate closes with no claim step",
     ),
   unissuedRequiredEpochCount: z
     .number()
     .int()
     .describe(
-      "The subset of requiredUnclaimedEpochCount whose rewards have not been issued yet; undelegate returns BAD_REQUEST while this is non-zero",
+      "The subset of requiredUnclaimedEpochCount whose rewards have not been issued yet (same 128 cap); undelegate returns BAD_REQUEST while this is non-zero",
     ),
 });
 
