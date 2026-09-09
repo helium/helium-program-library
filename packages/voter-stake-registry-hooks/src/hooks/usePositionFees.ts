@@ -43,7 +43,8 @@ export const usePositionsFees = ({
   numDelegationClaimBots = 0,
   wallet: wallet,
 }: UsePositionFeesProps) => {
-  const { amount: userLamports } = useSolOwnedAmount(wallet);
+  const { amount: userLamports, loading: loadingSol } =
+    useSolOwnedAmount(wallet);
   const { provider } = useHeliumVsrState();
   const { result: rent, loading, error } = useAsync(async () => {
     const connection = provider?.connection;
@@ -81,7 +82,8 @@ export const usePositionsFees = ({
 
   // A failed rent lookup must block rather than quote 0 rent.
   const insufficientBalance =
-    !!error || (userLamports && userLamports < totalFees * LAMPORTS_PER_SOL);
+    !!error ||
+    (!loadingSol && (userLamports ?? 0n) < totalFees * LAMPORTS_PER_SOL);
 
   return {
     rentFee,

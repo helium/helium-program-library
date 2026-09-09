@@ -164,8 +164,10 @@ export async function fetchAutomationData(
   const wallet = new PublicKey(walletAddress);
 
   // Initialize programs
-  const cronProgram = await initCron(provider);
-  const tuktukProgram = await initTuktuk(provider);
+  const [cronProgram, tuktukProgram] = await Promise.all([
+    initCron(provider),
+    initTuktuk(provider),
+  ]);
 
   // Derive keys
   const authority = entityCronAuthorityKey(wallet)[0];
@@ -174,20 +176,43 @@ export async function fetchAutomationData(
     Buffer.from("claim_payer"),
     wallet.toBuffer(),
   ])[0];
+  const ata = getAssociatedTokenAddressSync(HNT_MINT, wallet, true);
+  // Task return accounts are derived from the cron job key
+  // There are two task return accounts (task_return_account_1 and task_return_account_2)
+  // We check the first one - if it doesn't exist, we need to account for rent
+  const [taskReturnAccount1] = PublicKey.findProgramAddressSync(
+    [Buffer.from("task_return_account_1"), cronJob.toBuffer()],
+    PROGRAM_ID,
+  );
 
-  // Fetch cron job account
-  const cronJobAccount =
-    await cronProgram.account.cronJobV0.fetchNullable(cronJob);
+  // These reads do not depend on each other, so issue them together
+  const [
+    cronJobAccount,
+    taskQueueAcc,
+    cronJobSolanaAccount,
+    pdaWalletBalanceLamports,
+    hotspotsData,
+    hotspotsNeedingRecipient,
+    ataAccount,
+    taskReturnAccountInfo,
+  ] = await Promise.all([
+    cronProgram.account.cronJobV0.fetchNullable(cronJob),
+    tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID),
+    provider.connection.getAccountInfo(cronJob),
+    provider.connection.getBalance(pdaWallet),
+    getHotspotsByOwner({
+      owner: walletAddress,
+      page: 1,
+      limit: 1,
+    }),
+    getNumRecipientsNeeded(walletAddress),
+    provider.connection.getAccountInfo(ata),
+    provider.connection.getAccountInfo(taskReturnAccount1),
+  ]);
 
-  // Fetch task queue for minCrankReward
-  const taskQueueAcc =
-    await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID);
   const minCrankReward = taskQueueAcc?.minCrankReward?.toNumber() || 10000;
-
-  // Get current balances and calculate rent
-  const cronJobSolanaAccount =
-    await provider.connection.getAccountInfo(cronJob);
   const cronJobBalanceLamports = cronJobSolanaAccount?.lamports ?? 0;
+  const totalHotspots = hotspotsData.total;
 
   // Calculate minimum rent for cron job account based on its data length
   // If account doesn't exist, rent is 0
@@ -197,17 +222,6 @@ export async function fetchAutomationData(
         cronJobSolanaAccount.data.length,
       )
     : 0;
-
-  const pdaWalletBalanceLamports =
-    await provider.connection.getBalance(pdaWallet);
-
-  // Get hotspot count
-  const hotspotsData = await getHotspotsByOwner({
-    owner: walletAddress,
-    page: 1,
-    limit: 1,
-  });
-  const totalHotspots = hotspotsData.total;
 
   // Calculate cost per claim for each pool
   // If cron job doesn't exist, numCronTransactions is 0 (no transactions yet)
@@ -221,7 +235,6 @@ export async function fetchAutomationData(
   );
 
   // Calculate recipient rent that's already committed
-  const hotspotsNeedingRecipient = await getNumRecipientsNeeded(walletAddress);
   const [pdaWalletRentLamports, recipientRent, ataRent] = await Promise.all([
     getMinWalletRentLamports(provider.connection),
     hotspotsNeedingRecipient > 0
@@ -231,21 +244,9 @@ export async function fetchAutomationData(
   ]);
   const recipientRentLamports = hotspotsNeedingRecipient * recipientRent;
 
-  // Check if ATA exists - if not, rent will be needed and locked up
-  const ata = getAssociatedTokenAddressSync(HNT_MINT, wallet, true);
-  const ataAccount = await provider.connection.getAccountInfo(ata);
+  // If the ATA doesn't exist, rent will be needed and locked up
   const ataRentLamports = ataAccount ? 0 : ataRent;
 
-  // Check if task return account exists
-  // Task return accounts are derived from the cron job key
-  // There are two task return accounts (task_return_account_1 and task_return_account_2)
-  // We check the first one - if it doesn't exist, we need to account for rent
-  const [taskReturnAccount1] = PublicKey.findProgramAddressSync(
-    [Buffer.from("task_return_account_1"), cronJob.toBuffer()],
-    PROGRAM_ID,
-  );
-  const taskReturnAccountInfo =
-    await provider.connection.getAccountInfo(taskReturnAccount1);
   const taskReturnAccountRentLamports = taskReturnAccountInfo
     ? 0
     : Math.ceil(TASK_RETURN_ACCOUNT_SIZE * LAMPORTS_PER_SOL);

@@ -210,6 +210,7 @@ export const useAutomateHotspotClaims = ({
       baseAutomation: base.reduce((sum, lamports) => sum + lamports, 0),
     };
   }, [provider?.connection]);
+  const rentPending = !rent && !rentError;
   const pdaWalletFundingNeeded = useMemo(() => {
     const minCrankReward = taskQueue?.minCrankReward?.toNumber() || 10000;
     return (
@@ -443,7 +444,7 @@ export const useAutomateHotspotClaims = ({
   const availableUserBalance = userSolBalance - minimumRequiredBalance;
 
   return {
-    loading: loading || removing || loadingRent,
+    loading: loading || removing || loadingRent || rentPending,
     error: error || removeError || rentError,
     execute,
     remove,
@@ -458,7 +459,7 @@ export const useAutomateHotspotClaims = ({
     // A failed rent lookup must block rather than quote 0 rent.
     insufficientSol:
       !!rentError ||
-      (!loadingSol && !loadingRent && totalSolNeeded > availableUserBalance),
+      (!loadingSol && !rentPending && totalSolNeeded > availableUserBalance),
     isOutOfSol: cronJobAccount?.removedFromQueue || false,
   };
 };
