@@ -828,7 +828,15 @@ describe("governance", () => {
         SYSVAR_CLOCK_PUBKEY
       );
       const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
-      const shortExpiration = clockTimestamp + 3600;
+      // Keep the rewritten expiration inside the current epoch. Delegating
+      // recorded the vehnt correction on the epoch info for the real
+      // expiration, and extend_expiration_ts_v0 subtracts it from whichever
+      // epoch info the old expiration names, which underflows on a fresh one.
+      const epochStart = Math.floor(clockTimestamp / EPOCH_LENGTH) * EPOCH_LENGTH;
+      const shortExpiration = Math.min(
+        clockTimestamp + 3600,
+        epochStart + EPOCH_LENGTH - 1
+      );
       await setDelegatedPositionExpiration(
         ctx,
         delegatedPosPubkey,
