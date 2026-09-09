@@ -83,7 +83,7 @@ export const usePositionsFees = ({
   // A failed rent lookup must block rather than quote 0 rent.
   const insufficientBalance =
     !!error ||
-    (!loadingSol && (userLamports ?? 0n) < totalFees * LAMPORTS_PER_SOL);
+    (!loadingSol && (userLamports ?? BigInt(0)) < totalFees * LAMPORTS_PER_SOL);
 
   return {
     rentFee,
