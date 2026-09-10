@@ -195,7 +195,11 @@ export const useAutomateHotspotClaims = ({
     return duration * minCrankReward;
   }, [duration, totalHotspots, taskQueue]);
   const { account } = useAccount(ata);
-  const { result: rent, error: rentError } = useAsync(async () => {
+  const {
+    result: rent,
+    error: rentError,
+    loading: loadingRent,
+  } = useAsync(async () => {
     const connection = provider?.connection;
     if (!connection) return undefined;
     const [walletMin, recipient, ataRent, ...base] = await Promise.all(
@@ -213,8 +217,9 @@ export const useAutomateHotspotClaims = ({
   // No provider yet resolves undefined rather than pending, so missing rent
   // without an error is still loading (it clears once the provider connects).
   // The fee quotes and insufficientSol below are not final while this holds;
-  // gate on `loading` as well as `insufficientSol`.
-  const rentPending = !rent && !rentError;
+  // gate on `loading` as well as `insufficientSol`. `loadingRent` covers the
+  // refetch when the connection changes, where `rent` still holds the old quote.
+  const rentPending = loadingRent || (!rent && !rentError);
   const pdaWalletFundingNeeded = useMemo(() => {
     const minCrankReward = taskQueue?.minCrankReward?.toNumber() || 10000;
     return (
