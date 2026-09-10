@@ -1,5 +1,19 @@
 # Change Log
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1302](https://github.com/helium/helium-program-library/pull/1302) [`7d0fec1`](https://github.com/helium/helium-program-library/commit/7d0fec10a7a979d220f0062dec202ce6372d7071) Thanks [@bryzettler](https://github.com/bryzettler)! - Bump @helium/tuktuk-sdk, @helium/tuktuk-idls and @helium/cron-sdk to ^0.1.1, matching the
+  tuktuk 0.2.10 and cron 0.3.1 programs deployed to mainnet in August 2026. The new IDLs decode
+  the error codes those releases added and expose queueCronTasksV1 / requeueCronTaskV1.
+
+  `nextAvailableTaskIds` now takes the task queue's `capacity` as a required fourth argument
+  (and `random` as the third) so it never returns an id in the bitmap's padding bits past
+  capacity, which the program rejects with InvalidTaskId once a queue is nearly full. Every
+  call site passes the fetched TaskQueueV0's capacity. `@helium/hpl-crons-sdk` no longer
+  ships its own two-argument copy; it re-exports the tuktuk-sdk function.
+
 ## 0.11.19
 
 ### Patch Changes
