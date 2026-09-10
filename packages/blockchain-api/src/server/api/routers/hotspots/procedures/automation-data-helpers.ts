@@ -127,10 +127,12 @@ export async function nextFreeTaskKey(
 ): Promise<PublicKey> {
   const taskQueueAcc =
     await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID);
-  const [taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1, false);
-  if (taskId == null) {
-    throw new Error("No available task IDs in task queue");
-  }
+  const [taskId] = nextAvailableTaskIds(
+    taskQueueAcc.taskBitmap,
+    1,
+    false,
+    taskQueueAcc.capacity,
+  );
   return taskKey(TASK_QUEUE_ID, taskId)[0];
 }
 

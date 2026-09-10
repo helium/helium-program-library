@@ -658,6 +658,8 @@ export const migrate = publicProcedure.migration.migrate.handler(
         const [taskId, preTaskId] = nextAvailableTaskIds(
           taskQueueAcc!.taskBitmap,
           2,
+          false,
+          taskQueueAcc!.capacity,
         );
         const scheduleIx = await (
           await miniFanoutProgram.methods

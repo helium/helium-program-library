@@ -713,7 +713,7 @@ dependencies = [
 
 [[package]]
 name = "dc-auto-top"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "hpl-crons"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1231,7 +1231,7 @@ dependencies = [
 
 [[package]]
 name = "mini-fanout"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3276,7 +3276,7 @@ dependencies = [
 
 [[package]]
 name = "tuktuk-dca"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3291,9 +3291,9 @@ dependencies = [
 
 [[package]]
 name = "tuktuk-program"
-version = "0.3.2"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "902b147e0b1c2e5510fc189c7a41a7c2b81ebb098980710ca620e58883389eef"
+checksum = "3b5de1a288422266b9a5c54e4f306c7a820ce3c698777c5c3498906802336006"
 dependencies = [
  "anchor-lang",
 ]

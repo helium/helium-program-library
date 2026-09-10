@@ -67,7 +67,9 @@ export async function run(args: any = process.argv) {
   );
   const nextAvailable = nextAvailableTaskIds(
     taskQueueAcc.taskBitmap,
-    bots.length
+    bots.length,
+    false,
+    taskQueueAcc.capacity
   );
   const botsWithDelegatedPositions = bots.map((bot, index) => ({
     ...bot,

@@ -402,14 +402,22 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     // reserved from one bitmap read up front. Reading the bitmap per position
     // hands out ids the earlier positions in this same bundle already took, and
     // the duplicate task account makes the bundle fail on-chain.
-    const reservedTaskIds = taskQueueAcc
-      ? nextAvailableTaskIds(taskQueueAcc.taskBitmap, positionInfos.length)
-      : [];
-    if (taskQueueAcc && reservedTaskIds.length < positionInfos.length) {
-      throw errors.BAD_REQUEST({
-        message:
-          "The automation task queue does not have enough free slots. Try again later or delegate fewer positions at a time.",
-      });
+    // nextAvailableTaskIds throws when the queue holds fewer free ids than asked.
+    let reservedTaskIds: number[] = [];
+    if (taskQueueAcc) {
+      try {
+        reservedTaskIds = nextAvailableTaskIds(
+          taskQueueAcc.taskBitmap,
+          positionInfos.length,
+          false,
+          taskQueueAcc.capacity,
+        );
+      } catch {
+        throw errors.BAD_REQUEST({
+          message:
+            "The automation task queue does not have enough free slots. Try again later or delegate fewer positions at a time.",
+        });
+      }
     }
 
     for (const instructions of claimResult.instructionBatches) {

@@ -191,7 +191,12 @@ export const relinquishVote = publicProcedure.governance.relinquishVote.handler(
         const taskQueueAcc =
           await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE);
 
-        const task1 = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)[0];
+        const task1 = nextAvailableTaskIds(
+          taskQueueAcc.taskBitmap,
+          1,
+          false,
+          taskQueueAcc.capacity,
+        )[0];
         const queueAuthority = PublicKey.findProgramAddressSync(
           [Buffer.from("queue_authority")],
           hplCronsProgram.programId,

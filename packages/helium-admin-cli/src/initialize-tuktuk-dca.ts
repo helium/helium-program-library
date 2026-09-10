@@ -142,7 +142,12 @@ export async function run(args: any = process.argv) {
   const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
     TASK_QUEUE_ID
   );
-  const [nextTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 1);
+  const [nextTask] = nextAvailableTaskIds(
+    taskQueue.taskBitmap,
+    1,
+    false,
+    taskQueue.capacity
+  );
 
   const instructions: TransactionInstruction[] = [];
 

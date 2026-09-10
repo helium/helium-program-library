@@ -195,7 +195,12 @@ export async function run(args: any = process.argv) {
   const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
     TASK_QUEUE_ID
   );
-  const [nextTask, nextHntTask] = nextAvailableTaskIds(taskQueue.taskBitmap, 2);
+  const [nextTask, nextHntTask] = nextAvailableTaskIds(
+    taskQueue.taskBitmap,
+    2,
+    false,
+    taskQueue.capacity
+  );
 
   const autoTopOffAcc =
     await dcAutoTopoffProgram.account.autoTopOffV0.fetchNullable(autoTopOff!);

@@ -392,7 +392,9 @@ export const useDelegatePositions = ({
             if (automationEnabled && subDao) {
               const nextAvailable = await nextAvailableTaskIds(
                 taskQueue!.taskBitmap,
-                1
+                1,
+                false,
+                taskQueue!.capacity
               )[0];
               const task = taskKey(TASK_QUEUE, nextAvailable)[0];
               if (

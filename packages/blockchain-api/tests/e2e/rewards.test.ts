@@ -160,7 +160,12 @@ describe("rewards endpoints", () => {
     const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
       TASK_QUEUE_ID
     );
-    let nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 6);
+    let nextAvailable = nextAvailableTaskIds(
+      taskQueueAcc.taskBitmap,
+      6,
+      false,
+      taskQueueAcc.capacity
+    );
     await runAllTasks(
       provider,
       tuktukProgram,
@@ -171,7 +176,12 @@ describe("rewards endpoints", () => {
     );
     await sleep(2000);
     let prevAvailable = nextAvailable;
-    nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 6);
+    nextAvailable = nextAvailableTaskIds(
+      taskQueueAcc.taskBitmap,
+      6,
+      false,
+      taskQueueAcc.capacity
+    );
     await runAllTasks(
       provider,
       tuktukProgram,

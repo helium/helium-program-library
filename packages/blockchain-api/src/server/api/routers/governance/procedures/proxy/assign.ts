@@ -286,6 +286,8 @@ export const assign = publicProcedure.governance.assignProxies.handler(
       const nextAvailable = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         activeProxyVotes.length,
+        false,
+        taskQueueAcc.capacity,
       );
       const queueAuthority = PublicKey.findProgramAddressSync(
         [Buffer.from("queue_authority")],

@@ -248,7 +248,9 @@ export const useAssignProxies = () => {
           );
           const nextAvailable = nextAvailableTaskIds(
             taskQueueAcc.taskBitmap,
-            activeProxyVotes.length
+            activeProxyVotes.length,
+            false,
+            taskQueueAcc.capacity
           );
           const queueAuthority = PublicKey.findProgramAddressSync(
             [Buffer.from("queue_authority")],

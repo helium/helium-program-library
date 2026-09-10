@@ -101,7 +101,9 @@ export async function run(args: any = process.argv) {
 
   const nextAvailable = nextAvailableTaskIds(
     taskQueueAcc.taskBitmap,
-    proxyMarkers.length
+    proxyMarkers.length,
+    false,
+    taskQueueAcc.capacity
   );
   const instructions: TransactionInstruction[] = [];
   const org = organizationKey("Helium")[0];

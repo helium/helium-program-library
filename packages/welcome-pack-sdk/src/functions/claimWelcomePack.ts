@@ -69,7 +69,9 @@ export async function claimWelcomePack({
   ]);
   const [nextPreTaskId, nextTaskId] = nextAvailableTaskIds(
     taskQueueAcc.taskBitmap,
-    2
+    2,
+    false,
+    taskQueueAcc.capacity
   );
   const queueAuthority = queueAuthorityKey()[0];
   return program.methods

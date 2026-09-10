@@ -261,6 +261,8 @@ export const vote = publicProcedure.governance.vote.handler(
     const nextAvailable = nextAvailableTaskIds(
       taskQueueAcc.taskBitmap,
       totalTaskIds,
+      false,
+      taskQueueAcc.capacity,
     );
 
     const allInstructions: TransactionInstruction[][] = [];

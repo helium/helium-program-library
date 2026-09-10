@@ -40,7 +40,7 @@
     "@helium/idls": "workspace:^",
     "@helium/lazy-distributor-sdk": "workspace:^",
     "@helium/spl-utils": "workspace:^",
-    "@helium/tuktuk-sdk": "^0.0.9",
+    "@helium/tuktuk-sdk": "^0.1.1",
     "@solana/wallet-adapter-base": "^0.9.22",
     "@solana/web3.js": "^1.91.1",
     "axios": "^1.9.0",

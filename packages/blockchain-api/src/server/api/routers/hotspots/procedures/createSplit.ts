@@ -189,6 +189,8 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     const [taskId, preTaskId] = nextAvailableTaskIds(
       taskQueueAcc!.taskBitmap,
       2,
+      false,
+      taskQueueAcc!.capacity,
     );
 
     // Schedule a task for the mini fanout

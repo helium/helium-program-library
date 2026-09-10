@@ -57,7 +57,12 @@ export async function run(args: any = process.argv) {
   const tuktukProgram = await initTuktuk(provider);
   const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
   const instructions: TransactionInstruction[] = [];
-  const task1 = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)[0];
+  const task1 = nextAvailableTaskIds(
+    taskQueueAcc.taskBitmap,
+    1,
+    false,
+    taskQueueAcc.capacity
+  )[0];
   const queueAuthority = PublicKey.findProgramAddressSync(
     [Buffer.from("queue_authority")],
     PROGRAM_ID
