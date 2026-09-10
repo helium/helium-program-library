@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.11.19
+
+### Patch Changes
+
+- [#1302](https://github.com/helium/helium-program-library/pull/1302) [`7d0fec1`](https://github.com/helium/helium-program-library/commit/7d0fec10a7a979d220f0062dec202ce6372d7071) Thanks [@bryzettler](https://github.com/bryzettler)! - Bump @helium/tuktuk-sdk, @helium/tuktuk-idls and @helium/cron-sdk to ^0.1.1. The delegate
+  endpoint keeps returning BAD_REQUEST when the automation task queue has fewer free slots
+  than positions, now that `nextAvailableTaskIds` throws instead of returning a short list.
+
 ## 0.11.18
 
 ### Patch Changes
