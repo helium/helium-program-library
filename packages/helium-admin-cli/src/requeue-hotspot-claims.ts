@@ -50,7 +50,12 @@ export async function run(args: any = process.argv) {
   const cronProgram = await initCron(provider);
   const tuktukProgram = await initTuktuk(provider);
   const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
-  const nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)[0];
+  const nextAvailable = nextAvailableTaskIds(
+    taskQueueAcc.taskBitmap,
+    1,
+    false,
+    taskQueueAcc.capacity
+  )[0];
   const [task] = taskKey(taskQueue, nextAvailable);
   const authority = entityCronAuthorityKey(provider.wallet.publicKey)[0];
   const cronJob = cronJobKey(authority, 0)[0];

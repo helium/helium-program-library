@@ -322,7 +322,8 @@ describe("dc-auto-topoff", () => {
       const [nextTask, nextHntTask] = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         2,
-        false
+        false,
+        taskQueueAcc.capacity
       );
 
       const now = new Date();
@@ -398,7 +399,8 @@ describe("dc-auto-topoff", () => {
       const [nextTask, nextHntTask] = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         2,
-        false
+        false,
+        taskQueueAcc.capacity
       );
 
       // Update the auto topoff configuration
@@ -579,7 +581,8 @@ describe("dc-auto-topoff", () => {
       const [nextHntTask2, nextTask2] = nextAvailableTaskIds(
         taskQueueAcc2.taskBitmap,
         2,
-        false
+        false,
+        taskQueueAcc2.capacity
       );
 
       // Update the auto topoff with specific DCA configuration for this test

@@ -204,7 +204,12 @@ export async function run(args: any = process.argv) {
   const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(
     TASK_QUEUE_ID
   );
-  const [taskId, preTaskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 2);
+  const [taskId, preTaskId] = nextAvailableTaskIds(
+    taskQueueAcc.taskBitmap,
+    2,
+    false,
+    taskQueueAcc.capacity
+  );
   instructions.push(
     await program.methods
       .scheduleTaskV0({ taskId, preTaskId })

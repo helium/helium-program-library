@@ -107,7 +107,12 @@ export async function run(args: any = process.argv) {
   const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
     TASK_QUEUE_ID
   );
-  const freeTasks = nextAvailableTaskIds(taskQueue.taskBitmap, idle.length * 2);
+  const freeTasks = nextAvailableTaskIds(
+    taskQueue.taskBitmap,
+    idle.length * 2,
+    false,
+    taskQueue.capacity
+  );
   for (let i = 0; i < idle.length; i += batchSize) {
     // Log progress every 100 positions
     if (i > 0 && i % 100 === 0) {

@@ -62,7 +62,12 @@ export async function run(args: any = process.argv) {
   const hsdProgram = await initHsd(provider);
   const tuktukProgram = await initTuktuk(provider);
   const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
-  const nextAvailable = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1)[0];
+  const nextAvailable = nextAvailableTaskIds(
+    taskQueueAcc.taskBitmap,
+    1,
+    false,
+    taskQueueAcc.capacity
+  )[0];
   const [task] = taskKey(taskQueue, nextAvailable);
   const position = new PublicKey(argv.position);
   const positionAcc = await vsrProgram.account.positionV0.fetch(position);

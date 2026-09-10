@@ -225,10 +225,14 @@ describe("mini-fanout under bankrun", () => {
       }),
     ]);
 
-    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(
-      taskQueue
+    const { taskBitmap, capacity } =
+      await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    const [preTaskId, taskId] = nextAvailableTaskIds(
+      taskBitmap,
+      2,
+      false,
+      capacity
     );
-    const [preTaskId, taskId] = nextAvailableTaskIds(taskBitmap, 2, false);
     await program.methods
       .scheduleTaskV0({ taskId, preTaskId })
       .preInstructions([
@@ -272,10 +276,14 @@ describe("mini-fanout under bankrun", () => {
 
   /** Reschedule through `update_mini_fanout_v0`, changing nothing but the task ids. */
   async function rescheduleViaUpdate(miniFanout: PublicKey) {
-    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(
-      taskQueue
+    const { taskBitmap, capacity } =
+      await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    const [newPreTaskId, newTaskId] = nextAvailableTaskIds(
+      taskBitmap,
+      2,
+      true,
+      capacity
     );
-    const [newPreTaskId, newTaskId] = nextAvailableTaskIds(taskBitmap, 2, true);
     await program.methods
       .updateMiniFanoutV0({ shares: null, schedule: null, newTaskId, newPreTaskId })
       .preInstructions([
@@ -603,8 +611,14 @@ describe("mini-fanout under bankrun", () => {
     const stale = Keypair.generate().publicKey;
     await plantNextPreTask(miniFanout, stale);
 
-    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
-    const [newPreTaskId, newTaskId] = nextAvailableTaskIds(taskBitmap, 2, true);
+    const { taskBitmap, capacity } =
+      await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    const [newPreTaskId, newTaskId] = nextAvailableTaskIds(
+      taskBitmap,
+      2,
+      true,
+      capacity
+    );
     await program.methods
       .updateWalletDelegateV0({
         newTaskId,
@@ -677,8 +691,14 @@ describe("mini-fanout under bankrun", () => {
       }),
     ]);
 
-    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
-    const [newPreTaskId, newTaskId] = nextAvailableTaskIds(taskBitmap, 2, true);
+    const { taskBitmap, capacity } =
+      await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    const [newPreTaskId, newTaskId] = nextAvailableTaskIds(
+      taskBitmap,
+      2,
+      true,
+      capacity
+    );
     const delegate = Keypair.generate().publicKey;
     await program.methods
       .updateWalletDelegateV0({ newTaskId, newPreTaskId, delegate, index: 0 })

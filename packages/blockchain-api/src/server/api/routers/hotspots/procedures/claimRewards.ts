@@ -329,7 +329,12 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
     const tuktukProgram = await initTuktuk(provider);
     const taskQueueAcc =
       await tuktukProgram.account.taskQueueV0.fetch(TASK_QUEUE_ID);
-    const [taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1);
+    const [taskId] = nextAvailableTaskIds(
+      taskQueueAcc.taskBitmap,
+      1,
+      false,
+      taskQueueAcc.capacity,
+    );
 
     const queueAuthority = PublicKey.findProgramAddressSync(
       [Buffer.from("queue_authority")],

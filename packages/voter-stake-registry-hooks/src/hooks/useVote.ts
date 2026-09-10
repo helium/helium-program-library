@@ -205,7 +205,9 @@ export const useVote = (proposalKey: PublicKey) => {
         );
         const nextAvailable = nextAvailableTaskIds(
           taskQueue.taskBitmap,
-          (hasProxies ? 2 : 0) + votingPositions.length
+          (hasProxies ? 2 : 0) + votingPositions.length,
+          false,
+          taskQueue.capacity
         );
 
         const proxyVoteInstructions: TransactionInstruction[] = [];

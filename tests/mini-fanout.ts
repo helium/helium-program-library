@@ -257,7 +257,8 @@ describe("mini-fanout", () => {
       const [preTaskId, taskId] = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         2,
-        true
+        true,
+        taskQueueAcc.capacity
       );
       return program.methods
         .scheduleTaskV0({ taskId, preTaskId })
@@ -348,7 +349,8 @@ describe("mini-fanout", () => {
       const [nextPreTask, nextTask] = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         2,
-        true
+        true,
+        taskQueueAcc.capacity
       );
 
       const {
@@ -405,7 +407,8 @@ describe("mini-fanout", () => {
       const [nextPreTask, nextTask] = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         2,
-        true
+        true,
+        taskQueueAcc.capacity
       );
       await program.methods
         .updateMiniFanoutV0({
@@ -460,7 +463,8 @@ describe("mini-fanout", () => {
       const [nextPreTask, nextTask] = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         2,
-        true
+        true,
+        taskQueueAcc.capacity
       );
       await program.methods
         .updateWalletDelegateV0({
@@ -563,7 +567,8 @@ describe("mini-fanout", () => {
       const [nextPreTask, nextTask] = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         2,
-        true
+        true,
+        taskQueueAcc.capacity
       );
 
       console.log("creating fanout");

@@ -287,6 +287,8 @@ export const create = publicProcedure.governance.createPosition.handler(
           const nextAvailable = nextAvailableTaskIds(
             taskQueueAcc.taskBitmap,
             1,
+            false,
+            taskQueueAcc.capacity,
           )[0];
           const task = taskKey(TASK_QUEUE, nextAvailable)[0];
 

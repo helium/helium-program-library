@@ -247,10 +247,14 @@ describe("dc-auto-topoff under bankrun", () => {
       executable: false,
     });
 
-    const { taskBitmap } = await tuktukProgram.account.taskQueueV0.fetch(
-      taskQueue
+    const { taskBitmap, capacity } =
+      await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+    const [taskId, hntTaskId] = nextAvailableTaskIds(
+      taskBitmap,
+      2,
+      false,
+      capacity
     );
-    const [taskId, hntTaskId] = nextAvailableTaskIds(taskBitmap, 2, false);
     await program.methods
       .scheduleTaskV0({ taskId, hntTaskId })
       .preInstructions([

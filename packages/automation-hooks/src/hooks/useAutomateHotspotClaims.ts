@@ -257,7 +257,8 @@ export const useAutomateHotspotClaims = ({
       const nextAvailable = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         1,
-        false
+        false,
+        taskQueueAcc.capacity
       )[0];
       const [task] = taskKey(TASK_QUEUE, nextAvailable);
 

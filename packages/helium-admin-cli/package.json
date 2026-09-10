@@ -66,7 +66,7 @@
     "@helium/spl-utils": "workspace:^",
     "@helium/treasury-management-sdk": "workspace:^",
     "@helium/tuktuk-dca-sdk": "workspace:^",
-    "@helium/tuktuk-sdk": "^0.0.9",
+    "@helium/tuktuk-sdk": "^0.1.1",
     "@helium/voter-stake-registry-sdk": "workspace:^",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-account-compression": "^0.1.7",

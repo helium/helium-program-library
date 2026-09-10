@@ -222,7 +222,12 @@ describe("tuktuk-dca", () => {
 
       const taskQueueAcc =
         await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
-      const [taskId] = nextAvailableTaskIds(taskQueueAcc.taskBitmap, 1);
+      const [taskId] = nextAvailableTaskIds(
+        taskQueueAcc.taskBitmap,
+        1,
+        false,
+        taskQueueAcc.capacity,
+      );
       task = taskKey(taskQueue, taskId)[0];
 
       // Mint USDC to the authority's account

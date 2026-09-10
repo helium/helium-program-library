@@ -352,6 +352,8 @@ export const create = publicProcedure.rewardContract.create.handler(
       const [taskId, preTaskId] = nextAvailableTaskIds(
         taskQueueAcc.taskBitmap,
         2,
+        false,
+        taskQueueAcc.capacity,
       );
 
       const scheduleIx = await miniFanoutProgram.methods
