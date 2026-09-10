@@ -206,6 +206,34 @@ export const getWelcomePackRentParts = async (
 };
 
 /**
+ * Lamports the payer spends on the pack account itself. The escrow (gift +
+ * fanout cost) is transferred into the pack account on top of whatever its
+ * init rent already left there, so the pack costs the larger of the two
+ * rather than their sum.
+ */
+export const getWelcomePackCost = ({
+  welcomePackRent,
+  fanoutRent,
+  ataRent,
+  giftLamports,
+  hasFanout,
+}: {
+  welcomePackRent: number;
+  fanoutRent: number;
+  ataRent: number;
+  giftLamports: number;
+  hasFanout: boolean;
+}) => {
+  const fanoutCost = hasFanout
+    ? fanoutRent + ataRent + FANOUT_FUNDING_AMOUNT
+    : 0;
+  return {
+    fanoutCost,
+    packCost: Math.max(welcomePackRent, giftLamports + fanoutCost),
+  };
+};
+
+/**
  * Calculate total SOL required for a transaction.
  * Returns the total required lamports (tx fees + rent + min wallet balance).
  */

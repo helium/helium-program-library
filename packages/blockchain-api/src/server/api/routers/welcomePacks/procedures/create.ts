@@ -6,8 +6,8 @@ import {
   calculateRequiredBalance,
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
-  FANOUT_FUNDING_AMOUNT,
   getWelcomePackRentParts,
+  getWelcomePackCost,
   RECIPIENT_SPACE,
   getRentLamports,
 } from "@/lib/utils/balance-validation";
@@ -150,16 +150,14 @@ export const create = publicProcedure.welcomePacks.create.handler(
     const giftLamports = (
       await resolveTokenAmountInput(solAmount, NATIVE_MINT.toBase58())
     ).toNumber();
-    // The escrow (gift + fanout cost) is transferred into the pack account on
-    // top of whatever its init rent already left there, so the pack costs the
-    // larger of the two rather than their sum.
-    const fanoutCost = hasFanout
-      ? fanoutRent + ataRent + FANOUT_FUNDING_AMOUNT
-      : 0;
-    const rentCost =
-      Math.max(welcomePackRent, giftLamports + fanoutCost) +
-      userWelcomePacksRent +
-      recipientRent;
+    const { packCost } = getWelcomePackCost({
+      welcomePackRent,
+      fanoutRent,
+      ataRent,
+      giftLamports,
+      hasFanout,
+    });
+    const rentCost = packCost + userWelcomePacksRent + recipientRent;
 
     const required = await calculateRequiredBalance(
       connection,

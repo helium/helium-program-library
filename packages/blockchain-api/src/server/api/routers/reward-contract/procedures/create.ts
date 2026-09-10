@@ -11,6 +11,7 @@ import {
   FANOUT_FUNDING_AMOUNT,
   getMiniFanoutRentParts,
   getWelcomePackRentParts,
+  getWelcomePackCost,
   RECIPIENT_SPACE,
   getRentLamports,
 } from "@/lib/utils/balance-validation";
@@ -161,15 +162,14 @@ export const create = publicProcedure.rewardContract.create.handler(
               )
             ).toNumber()
           : 0;
-      // The escrow (gift + fanout cost) is transferred into the pack account
-      // on top of whatever its init rent already left there, so the pack
-      // costs the larger of the two rather than their sum.
-      const fanoutCost = hasFanout
-        ? fanoutRent + ataRent + FANOUT_FUNDING_AMOUNT
-        : 0;
-      rentCost +=
-        Math.max(welcomePackRent, giftLamports + fanoutCost) +
-        userWelcomePacksRent;
+      const { packCost } = getWelcomePackCost({
+        welcomePackRent,
+        fanoutRent,
+        ataRent,
+        giftLamports,
+        hasFanout,
+      });
+      rentCost += packCost + userWelcomePacksRent;
     } else {
       // Mini-fanout path: the fanout, its HNT ATA, the two tuktuk tasks
       // initialize_mini_fanout_v0 queues (each paid the queue's min crank

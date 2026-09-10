@@ -35,6 +35,10 @@ import type {
   OwnedPosition,
 } from "../helpers";
 
+// Clock sysvar layout: slot, epoch_start_timestamp, epoch,
+// leader_schedule_epoch (u64 each), then unix_timestamp.
+const CLOCK_UNIX_TIMESTAMP_OFFSET = 8 * 4;
+
 // Courtesy throttle (per-process, XFF-keyed) on a public endpoint whose cost
 // is server-side RPC fan-out.
 const getPositionsIpRateLimiter = createRateLimiter({
@@ -71,7 +75,9 @@ const fetchDelegations = async ({
     return owned.map(() => null);
   }
 
-  const unixNow = Number(clock!.data.readBigInt64LE(8 * 4));
+  const unixNow = Number(
+    clock!.data.readBigInt64LE(CLOCK_UNIX_TIMESTAMP_OFFSET),
+  );
 
   const ranges: (ClaimableEpochRange | null)[] = owned.map((p, i) => {
     const delegation = delegated[i];

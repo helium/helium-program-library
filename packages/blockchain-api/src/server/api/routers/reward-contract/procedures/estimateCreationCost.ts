@@ -15,6 +15,7 @@ import {
   FANOUT_FUNDING_AMOUNT,
   getMiniFanoutRentParts,
   getWelcomePackRentParts,
+  getWelcomePackCost,
   RECIPIENT_SPACE,
   getRentLamports,
 } from "@/lib/utils/balance-validation";
@@ -90,20 +91,20 @@ export const estimateCreationCost =
         }
         // With more than one recipient, initialize_welcome_pack_v0 escrows the
         // future fanout's rent, its HNT ATA rent and FANOUT_FUNDING_AMOUNT
-        // alongside the gift. The escrow is transferred into the pack account
-        // on top of whatever its init rent already left there, so the pack
-        // costs the larger of the two rather than their sum.
-        const funding =
-          recipients.length > 1 ? new BN(FANOUT_FUNDING_AMOUNT) : new BN(0);
-        const fanoutCost = new BN(fanoutRent + ataRent).add(funding);
-        const packCost = BN.max(
-          new BN(welcomePackRent),
-          recipientGift.add(fanoutCost),
-        );
+        // alongside the gift.
+        const hasFanout = recipients.length > 1;
+        const { packCost } = getWelcomePackCost({
+          welcomePackRent,
+          fanoutRent,
+          ataRent,
+          giftLamports: recipientGift.toNumber(),
+          hasFanout,
+        });
+        const funding = new BN(hasFanout ? FANOUT_FUNDING_AMOUNT : 0);
         // The gift and funding are reported on their own lines; the rest of
         // the pack's cost is rent.
         transactionFees = transactionFees.add(funding);
-        rentFee = rentFee.add(packCost.sub(recipientGift).sub(funding));
+        rentFee = rentFee.add(new BN(packCost).sub(recipientGift).sub(funding));
         rentFee = rentFee.add(new BN(userWelcomePacksRent));
       } else {
         // Mini-fanout path: rent for the miniFanout account, its HNT ATA and
