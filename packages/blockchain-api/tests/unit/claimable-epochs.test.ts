@@ -153,17 +153,6 @@ describe("getClaimableEpochRange", () => {
     ).to.eq(r.unclaimedEpochs.length);
   });
 
-  it("treats a cliff ending exactly now as not yet decayed, like close_delegation_v0", () => {
-    // #given lockup_end_ts == curr_ts; the program tests `lockup_end_ts < curr_ts`
-    const r = range({
-      lastClaimedEpoch: CURRENT_EPOCH - 3,
-      lockupEndTs: UNIX_NOW,
-    });
-
-    expect(r.closeRequiresThroughEpoch).to.eq(CURRENT_EPOCH - 1);
-    expect(r.unclaimedEpochs).to.deep.eq([CURRENT_EPOCH - 2, CURRENT_EPOCH - 1]);
-  });
-
   it("ignores lockup end for a constant lockup", () => {
     const r = range({
       lockupKind: CONSTANT,

@@ -246,8 +246,16 @@ describe("automation endpoints", () => {
         ]);
 
       expect(userCronJobs?.data.length).to.equal(USER_CRON_JOBS_SPACE);
+      // The quote sizes the cron job for MAX_PRESET_SCHEDULE_LEN (15), a
+      // deliberate upper bound over any preset; this pins the formula at the
+      // length actually allocated, not the bound the quote plugs into it.
       expect(cronJobInfo?.data.length).to.equal(cronJobSpace(DAILY_CRON.length));
       expect(nameMapping?.data.length).to.equal(CRON_JOB_NAME_MAPPING_SPACE);
+      // Precondition: the cron has not fired yet. The wallet pays for the
+      // 800-byte task init_entity_claim_cron_v0 queues; once queue_cron_tasks
+      // runs it requeues the schedule task at 738 bytes from the cron's own
+      // funding. Measuring after that would "correct" the SDK constant down
+      // and restore the under-quote this test exists to catch.
       expect(scheduleTask?.data.length).to.equal(
         ENTITY_CLAIM_SCHEDULE_TASK_SPACE
       );

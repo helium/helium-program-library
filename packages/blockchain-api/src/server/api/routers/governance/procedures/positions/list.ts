@@ -84,7 +84,12 @@ const fetchDelegations = async ({
   });
 
   // Positions on the same sub-DAO share sub-DAO epoch infos, and every
-  // position shares the DAO epoch infos; read each once.
+  // position shares the DAO epoch infos; read each once. That dedupe is what
+  // bounds the cost: unique (subDao, epoch) pairs cannot exceed the number of
+  // sub-DAOs times the epochs delegation has existed (~1.3k), whatever the
+  // position count, so the worst case is a few thousand PDA derivations and
+  // a few dozen getMultipleAccounts calls. No per-position cap on top of the
+  // 128-epoch bitmap window; the IP rate limiter bounds the request rate.
   const entries: { subDao: PublicKey; epoch: number }[] = [];
   ranges.forEach((range, i) => {
     if (!range) return;
