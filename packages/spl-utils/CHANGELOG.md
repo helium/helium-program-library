@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.13.3
+
+### Patch Changes
+
+- [#1299](https://github.com/helium/helium-program-library/pull/1299) [`991210f`](https://github.com/helium/helium-program-library/commit/991210f9290d8fc97166722489ca511dbbb8194e) Thanks [@bryzettler](https://github.com/bryzettler)! - Request `maxSupportedTransactionVersion: 1` on getTransaction / getTransactions / getParsedTransaction(s) calls and bump @solana/web3.js to 1.99.0 so version 1 transactions decode after Agave 4.2.
+
 ## 0.13.2
 
 ### Patch Changes
