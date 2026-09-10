@@ -43,13 +43,14 @@ import { PREPAID_TX_FEES, usePositionFees } from "./usePositionFees";
 const SECS_PER_DAY = 86400;
 export const useCreatePosition = ({
   automationEnabled = false,
-  delegating = automationEnabled,
+  delegating = true,
 }: {
   automationEnabled?: boolean;
   /**
    * Whether createPosition will be called with a subDao. Only a delegated
-   * position pays DelegatedPositionV0 rent, so an undelegated lock-up must
-   * not be quoted (or blocked on) it. Automation implies delegation.
+   * position pays DelegatedPositionV0 rent, so an undelegated lock-up can
+   * opt out of being quoted (or blocked on) it. Defaults to true so a caller
+   * that does not say errs on over-quoting rather than failing on chain.
    */
   delegating?: boolean;
 }) => {
