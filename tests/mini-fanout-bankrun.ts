@@ -514,6 +514,50 @@ describe("mini-fanout under bankrun", () => {
     );
   });
 
+  it("refuses to distribute while the fanout sits below the rent minimum", async () => {
+    const wallet = Keypair.generate();
+    const walletAta = await ataWith(wallet.publicKey, 0);
+
+    const { miniFanout, task, preTask } = await scheduledFanout({
+      seed: "below-rent",
+      shares: [shareOf(wallet.publicKey, 100)],
+    });
+
+    // A fanout funded before a Rent sysvar increase: the account exists, the program will
+    // never write it into this state, and only bankrun can take its lamports away.
+    const before = await ctx.banksClient.getAccount(miniFanout);
+    const minimum = await provider.connection.getMinimumBalanceForRentExemption(
+      before!.data.length
+    );
+    const setLamports = (lamports: number) =>
+      ctx.setAccount(miniFanout, {
+        lamports,
+        data: before!.data,
+        owner: new PublicKey(before!.owner),
+        executable: before!.executable,
+      });
+    await setLamports(minimum - 1);
+
+    const distribute = await reachDistribution(task, preTask);
+    expect(await programErrorLogs(distribute())).to.match(
+      /Error Code: BelowRentExempt\. Error Number: 6013\./
+    );
+    // Nothing committed: no payout, and the task is still queued rather than consumed.
+    expect(Number(await tokenAmount(ctx, walletAta))).to.equal(0);
+    expect(await tuktukProgram.account.taskV0.fetchNullable(task)).to.not.be
+      .null;
+
+    // Topped up, the same task runs and the fanout resumes without being rescheduled. The
+    // memo only keeps this from being byte-identical to the transaction that just failed.
+    await setLamports(before!.lamports);
+    await send([
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+      ...(await runTask({ program: tuktukProgram, task, crankTurner: me })),
+      createMemoInstruction("topped up", []),
+    ]);
+    expect(Number(await tokenAmount(ctx, walletAta))).to.equal(FANOUT_AMOUNT);
+  });
+
   it("clears a stale next pre task when it reschedules", async () => {
     const wallet = Keypair.generate();
     await ataWith(wallet.publicKey, 0);
