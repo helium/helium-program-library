@@ -1,5 +1,42 @@
 # Change Log
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1299](https://github.com/helium/helium-program-library/pull/1299) [`2f6c363`](https://github.com/helium/helium-program-library/commit/2f6c36318d674c6360f2cec411df9e1dffbefdfb) Thanks [@bryzettler](https://github.com/bryzettler)! - governance.getPositions now returns a `delegation` object per position (null
+  when not delegated) with the sub-DAO, lastClaimedEpoch, raw expirationTs,
+  `claimableEpochCount` (epochs claimDelegationRewards would build instructions
+  for right now), `requiredUnclaimedEpochCount` (unclaimed epochs
+  close_delegation_v0 requires, issued or not) and `unissuedRequiredEpochCount`
+  (the subset of those undelegatePosition is waiting on issuance for). The counts
+  come from the same epoch-range and issuance test the claim builder uses, which
+  now lives in a shared helper.
+
+  The issuance test now gates HNT-era epochs on `DaoEpochInfoV0.doneIssuingRewards`
+  (what claim_rewards_v1 checks) instead of the per-sub-DAO `rewardsIssuedAt`,
+  which is set before the last sub-DAO has issued. Claims built in that window
+  used to fail on-chain with EpochNotClosed.
+
+  Note for consumers: web-helium-world currently mirrors this epoch range in
+  `src/lib/governance/reward-math.ts` (`claimUpperBoundEpoch` /
+  `payableUpperBoundEpoch`) and should switch to `claimableEpochCount` /
+  `unissuedRequiredEpochCount` once it adopts this version.
+
+### Patch Changes
+
+- Updated dependencies [[`2f6c363`](https://github.com/helium/helium-program-library/commit/2f6c36318d674c6360f2cec411df9e1dffbefdfb), [`35e7e30`](https://github.com/helium/helium-program-library/commit/35e7e302596eda528af6d8a327e9bfbb285b789c), [`1e752e6`](https://github.com/helium/helium-program-library/commit/1e752e6af23e3f0f4eb96978c13b7188d6162943), [`991210f`](https://github.com/helium/helium-program-library/commit/991210f9290d8fc97166722489ca511dbbb8194e)]:
+  - @helium/blockchain-api@0.16.0
+  - @helium/idls@0.11.27
+  - @helium/hpl-crons-sdk@0.12.0
+  - @helium/helium-sub-daos-sdk@0.12.0
+  - @helium/lazy-distributor-sdk@0.12.0
+  - @helium/distributor-oracle@0.12.0
+  - @helium/spl-utils@0.13.3
+  - @helium/data-credits-sdk@0.12.1
+  - @helium/helium-entity-manager-sdk@0.11.19
+  - @helium/welcome-pack-sdk@0.11.19
+
 ## 0.11.27
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.27
+
+### Patch Changes
+
+- [#1299](https://github.com/helium/helium-program-library/pull/1299) [`35e7e30`](https://github.com/helium/helium-program-library/commit/35e7e302596eda528af6d8a327e9bfbb285b789c) Thanks [@bryzettler](https://github.com/bryzettler)! - mini-fanout: `distribute_v0` fails with a new `BelowRentExempt` error when the fanout sits under the current rent minimum, so the task stays queued and resumes once it is topped up, and crank reward math is overflow-checked.
+
 ## 0.11.26
 
 ### Patch Changes

@@ -1,5 +1,31 @@
 # Change Log
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1299](https://github.com/helium/helium-program-library/pull/1299) [`1e752e6`](https://github.com/helium/helium-program-library/commit/1e752e6af23e3f0f4eb96978c13b7188d6162943) Thanks [@bryzettler](https://github.com/bryzettler)! - Price account rent from the cluster's Rent sysvar instead of hardcoded lamports.
+  The SDKs export the byte sizes of the accounts they own (`entityClaimCronSpaces`,
+  `cronJobSpace`, `DELEGATED_POSITION_SPACE`, `DELEGATION_CLAIM_BOT_SPACE`,
+  `recipientSpace`, ...). `AUTOMATION_BOT_FEE` and `DELEGATION_FEE` are removed from
+  voter-stake-registry-hooks and `RECIPIENT_RENT` / `ATA_RENT` from distributor-oracle;
+  `usePositionsFees` and `useAutomateHotspotClaims` now report `loading` while rent is
+  being fetched. `usePositionsFees` charges `DelegatedPositionV0` rent per position
+  not yet delegated instead of skipping it whenever any position is delegated.
+  `useCreatePosition` takes a new `delegating` option (default `true`) so callers
+  that lock without delegating pass `delegating: false` and are not quoted
+  delegation rent.
+
+### Patch Changes
+
+- Updated dependencies [[`35e7e30`](https://github.com/helium/helium-program-library/commit/35e7e302596eda528af6d8a327e9bfbb285b789c), [`1e752e6`](https://github.com/helium/helium-program-library/commit/1e752e6af23e3f0f4eb96978c13b7188d6162943), [`991210f`](https://github.com/helium/helium-program-library/commit/991210f9290d8fc97166722489ca511dbbb8194e)]:
+  - @helium/idls@0.11.27
+  - @helium/hpl-crons-sdk@0.12.0
+  - @helium/helium-sub-daos-sdk@0.12.0
+  - @helium/lazy-distributor-sdk@0.12.0
+  - @helium/spl-utils@0.13.3
+  - @helium/helium-entity-manager-sdk@0.11.19
+
 ## 0.11.20
 
 ### Patch Changes
