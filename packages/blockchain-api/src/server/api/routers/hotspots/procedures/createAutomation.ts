@@ -1,7 +1,7 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
-  BASE_AUTOMATION_RENT,
   calculateFundingForAdditionalDuration,
+  getBaseAutomationRentLamports,
   ENTITY_CLAIM_CRON_NAME,
   resolveScheduleToCron,
 } from "@/lib/utils/automation-helpers";
@@ -23,7 +23,6 @@ import {
 } from "@helium/spl-utils";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import {
-  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -148,6 +147,7 @@ export const createAutomation =
         cronJobCostPerClaimLamports,
         pdaWalletCostPerClaimLamports,
         recipientRentLamports,
+        pdaWalletRentLamports,
         ataRentLamports,
         taskReturnAccountRentLamports,
         pdaWallet,
@@ -158,7 +158,10 @@ export const createAutomation =
       // rent that will be locked up when the account is created
       const effectiveCronJobRentLamports = existingCronJobAccount
         ? cronJobRentLamports
-        : Math.ceil(BASE_AUTOMATION_RENT * LAMPORTS_PER_SOL);
+        : await getBaseAutomationRentLamports(
+            provider.connection,
+            cronSchedule.length,
+          );
 
       // ATA rent and task return account rent are included from automationData
       const { cronJobFundingLamports, pdaWalletFundingLamports } =
@@ -169,6 +172,7 @@ export const createAutomation =
           pdaWalletCostPerClaimLamports,
           recipientRentLamports,
           cronJobRentLamports: effectiveCronJobRentLamports,
+          pdaWalletRentLamports,
           additionalDuration: duration,
           ataRentLamports,
           taskReturnAccountRentLamports,

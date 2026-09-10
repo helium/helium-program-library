@@ -100,7 +100,12 @@ export const useDelegatePositions = ({
   );
   const { info: proxyConfig } = useProxyConfig(registrar?.proxyConfig);
 
-  const { rentFee, prepaidTxFees, insufficientBalance } = usePositionsFees({
+  const {
+    rentFee,
+    prepaidTxFees,
+    insufficientBalance,
+    loading: loadingFees,
+  } = usePositionsFees({
     automationEnabled,
     numPositions: positions.length,
     numDelegatedPositions: useMemo(
@@ -461,7 +466,7 @@ export const useDelegatePositions = ({
 
   return {
     error,
-    loading,
+    loading: loading || loadingFees,
     rentFee,
     prepaidTxFees,
     insufficientBalance,

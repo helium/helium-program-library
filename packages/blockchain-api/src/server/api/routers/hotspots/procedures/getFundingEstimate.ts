@@ -3,9 +3,8 @@ import { createSolanaConnection } from "@/lib/solana";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 import {
-  BASE_AUTOMATION_RENT,
+  getBaseAutomationRentLamports,
   TASK_RETURN_ACCOUNT_SIZE,
-  PDA_WALLET_RENT_LAMPORTS,
   calculateFundingForAdditionalDuration,
 } from "@/lib/utils/automation-helpers";
 import { fetchAutomationData } from "./automation-data-helpers";
@@ -32,6 +31,7 @@ export const getFundingEstimate =
         cronJobCostPerClaimLamports,
         pdaWalletCostPerClaimLamports,
         recipientRentLamports,
+        pdaWalletRentLamports,
         ataRentLamports,
         taskReturnAccountRentLamports,
       } = automationData;
@@ -40,7 +40,9 @@ export const getFundingEstimate =
       // This matches the logic in getAutomationStatus
       const rentFee = cronJobAccount
         ? 0
-        : BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE;
+        : (await getBaseAutomationRentLamports(provider.connection)) /
+            LAMPORTS_PER_SOL +
+          TASK_RETURN_ACCOUNT_SIZE;
 
       const {
         cronJobFundingLamports,
@@ -53,6 +55,7 @@ export const getFundingEstimate =
         pdaWalletCostPerClaimLamports,
         recipientRentLamports,
         cronJobRentLamports,
+        pdaWalletRentLamports,
         additionalDuration: duration,
         ataRentLamports,
         taskReturnAccountRentLamports,

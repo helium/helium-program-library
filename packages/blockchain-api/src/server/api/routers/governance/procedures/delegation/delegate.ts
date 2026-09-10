@@ -39,7 +39,8 @@ import {
 import BN from "bn.js";
 import {
   getTotalTransactionFees,
-  MIN_WALLET_RENT_LAMPORTS,
+  getMinWalletRentLamports,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -715,12 +716,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       }),
       getMissingEpochInfoRentLamports({ connection, epochInfoKeys }),
       newDelegations > 0
-        ? connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE)
+        ? getRentLamports(connection, DELEGATED_POSITION_SPACE)
         : Promise.resolve(0),
       queuedTasks > 0
-        ? connection.getMinimumBalanceForRentExemption(
-            DELEGATION_CLAIM_TASK_SPACE,
-          )
+        ? getRentLamports(connection, DELEGATION_CLAIM_TASK_SPACE)
         : Promise.resolve(0),
       connection.getBalance(walletPubkey),
     ]);
@@ -739,7 +738,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
       newDelegations * delegatedPositionRent +
       queuedTasks * claimTaskRent +
       queuedTaskCrankReward +
-      MIN_WALLET_RENT_LAMPORTS;
+      (await getMinWalletRentLamports(connection));
 
     if (walletBalance < estimatedSolFeeLamports) {
       throw errors.INSUFFICIENT_FUNDS({

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "child_process";
+import type { PublicKey } from "@solana/web3.js";
 import fs from "fs";
 
 type JsonRpcResponse<T> = {
@@ -46,6 +47,9 @@ async function jsonRpc<T = unknown>(
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
     signal: AbortSignal.timeout(HEALTH_REQUEST_TIMEOUT_MS),
   });
+  if (!res.ok) {
+    throw new Error(`${method} failed: HTTP ${res.status}`);
+  }
   return res.json() as Promise<JsonRpcResponse<T>>;
 }
 
@@ -71,6 +75,47 @@ export async function surfpoolHealthy(
   return false;
 }
 
+const RENT_SYSVAR = "SysvarRent111111111111111111111111111111111";
+
+/**
+ * Surfpool seeds the Rent sysvar from LiteSVM defaults (3480 lamports per
+ * byte-year, 2.0 threshold) instead of cloning it from the datasource. Mainnet
+ * now runs cheaper rent, so accounts created there at the exact minimum fail
+ * Anchor's rent-exempt check on the fork (init_if_needed on an existing
+ * SubDaoEpochInfoV0, for example). Copy the real sysvar in so both the
+ * runtime and getMinimumBalanceForRentExemption agree with mainnet.
+ */
+async function syncRentSysvar(rpcUrl: string): Promise<void> {
+  const datasource =
+    process.env.SURFPOOL_DATASOURCE_RPC_URL ||
+    "https://api.mainnet-beta.solana.com";
+  const res = await jsonRpc<{
+    value: { data: [string, string]; owner: string; lamports: number } | null;
+  }>("getAccountInfo", [RENT_SYSVAR, { encoding: "base64" }], datasource);
+  if (res.error || !res.result?.value) {
+    throw new Error(
+      `[surfpool] Failed to read Rent sysvar from ${datasource}: ${JSON.stringify(
+        res.error
+      )}`
+    );
+  }
+  const { data, owner, lamports } = res.result.value;
+  const set = await jsonRpc(
+    "surfnet_setAccount",
+    [
+      RENT_SYSVAR,
+      { data: Buffer.from(data[0], "base64").toString("hex"), owner, lamports },
+    ],
+    rpcUrl
+  );
+  if (set.error) {
+    throw new Error(
+      `[surfpool] Failed to set Rent sysvar: ${JSON.stringify(set.error)}`
+    );
+  }
+  console.log("[surfpool] Synced Rent sysvar from datasource");
+}
+
 export async function ensureSurfpool(
   opts: SurfpoolOptions = {}
 ): Promise<void> {
@@ -94,6 +139,7 @@ export async function ensureSurfpool(
     console.log(`[surfpool] Checking health at ${rpcUrl}...`);
     if (await surfpoolHealthy(rpcUrl)) {
       console.log("[surfpool] Already healthy");
+      await syncRentSysvar(rpcUrl);
       return;
     }
 
@@ -160,6 +206,7 @@ Set SURFPOOL_CMD/SURFPOOL_START_ARGS to your CLI, or run Surfpool externally and
     while (Date.now() - start < healthTimeoutMs) {
       if (await surfpoolHealthy(rpcUrl)) {
         console.log("[surfpool] Became healthy");
+        await syncRentSysvar(rpcUrl);
         startInProgress = false;
         return;
       }
@@ -209,4 +256,22 @@ export async function stopSurfpool(timeoutMs = 10_000): Promise<void> {
 
   ensurePromise = null;
   startInProgress = false;
+}
+
+/** Raw surfpool account write. Throws on RPC error, like `setTokenAccount`. */
+export async function setSurfnetAccount(
+  address: PublicKey,
+  accountInfo: { data: Buffer; owner: PublicKey; lamports: number }
+): Promise<void> {
+  const json = await jsonRpc("surfnet_setAccount", [
+    address.toBase58(),
+    {
+      data: accountInfo.data.toString("hex"),
+      owner: accountInfo.owner.toBase58(),
+      lamports: accountInfo.lamports,
+    },
+  ]);
+  if (json.error) {
+    throw new Error(`setAccount failed: ${JSON.stringify(json.error)}`);
+  }
 }

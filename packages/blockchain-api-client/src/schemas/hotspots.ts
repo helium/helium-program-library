@@ -301,7 +301,7 @@ export const AutomationStatusOutputSchema = z.object({
       nextRun: z.string(), // ISO date string
     })
     .optional(),
-  rentFee: z.number(), // Initial setup rent (BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE) if automation doesn't exist, 0 otherwise
+  rentFee: z.number(), // Initial setup rent (cron accounts priced from the cluster Rent sysvar + TASK_RETURN_ACCOUNT_SIZE) if automation doesn't exist, 0 otherwise
   recipientFee: z.number(), // SOL needed for recipient accounts (if any)
   operationalSol: z.number(), // Total operational SOL needed for automation claims (cronJobFunding + pdaWalletFunding)
   remainingClaims: z.number().optional(),
@@ -318,7 +318,7 @@ export const AutomationStatusOutputSchema = z.object({
 });
 
 export const FundingEstimateOutputSchema = z.object({
-  rentFee: z.number(), // Initial setup rent (BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE) if automation doesn't exist, 0 otherwise
+  rentFee: z.number(), // Initial setup rent (cron accounts priced from the cluster Rent sysvar + TASK_RETURN_ACCOUNT_SIZE) if automation doesn't exist, 0 otherwise
   cronJobFunding: z.number(), // SOL needed for cron job account operations
   pdaWalletFunding: z.number(), // SOL needed for PDA wallet operations
   recipientFee: z.number(), // SOL needed for recipient accounts (if any)

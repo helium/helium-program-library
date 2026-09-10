@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.11.27
+
+### Patch Changes
+
+- [#1299](https://github.com/helium/helium-program-library/pull/1299) [`35e7e30`](https://github.com/helium/helium-program-library/commit/35e7e302596eda528af6d8a327e9bfbb285b789c) Thanks [@bryzettler](https://github.com/bryzettler)! - mini-fanout: `distribute_v0` fails with a new `BelowRentExempt` error when the fanout sits under the current rent minimum, so the task stays queued and resumes once it is topped up, and crank reward math is overflow-checked.
+
+## 0.11.26
+
+### Patch Changes
+
+- [`7c98844`](https://github.com/helium/helium-program-library/commit/7c98844cf1c888e5998d4c947c8927e3c248bd82) Thanks [@bryzettler](https://github.com/bryzettler)! - Sync IDL metadata versions with the mainnet-deployed programs: helium-sub-daos 0.2.48, fanout 0.1.3, mini-fanout 0.1.6.
+
 ## 0.11.25
 
 ### Patch Changes

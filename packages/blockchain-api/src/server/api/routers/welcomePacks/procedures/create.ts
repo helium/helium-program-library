@@ -6,8 +6,12 @@ import {
   calculateRequiredBalance,
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
-  RENT_COSTS,
+  getWelcomePackRentParts,
+  getWelcomePackCost,
+  RECIPIENT_SPACE,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
+import { preTaskUrl } from "@/lib/constants/tuktuk";
 import {
   buildVersionedTransaction,
   serializeTransaction,
@@ -28,7 +32,11 @@ import {
 } from "@helium/lazy-distributor-sdk";
 import { getAsset, getAssetProof, HNT_MINT } from "@helium/spl-utils";
 import { NATIVE_MINT } from "@solana/spl-token";
-import { init, initializeWelcomePack } from "@helium/welcome-pack-sdk";
+import {
+  init,
+  initializeWelcomePack,
+  userWelcomePacksKey,
+} from "@helium/welcome-pack-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 
@@ -109,24 +117,53 @@ export const create = publicProcedure.welcomePacks.create.handler(
 
     const recipientK = recipientKey(
       new PublicKey(lazyDistributor),
-      new PublicKey(assetId)
+      new PublicKey(assetId),
     )[0];
-    const recipient = await ldProgram.account.recipientV0.fetchNullable(
-      recipientK
-    );
+    const recipient =
+      await ldProgram.account.recipientV0.fetchNullable(recipientK);
 
     // Check wallet has sufficient balance
     const walletBalance = await connection.getBalance(wallet.publicKey);
-    let rentCost = RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS;
-    if (!recipient) {
-      rentCost += RENT_COSTS.RECIPIENT;
-    }
-    // Add gifted SOL amount
-    rentCost += (
+    const numFixedShares = rewardsSplit.filter(
+      (split) => split.type === "fixed",
+    ).length;
+    // With more than one split, initialize_welcome_pack_v0 also escrows the
+    // future mini fanout's rent, its HNT ATA rent and FANOUT_FUNDING_AMOUNT.
+    const hasFanout = rewardsSplit.length > 1;
+    const userWelcomePacksAccount =
+      await program.account.userWelcomePacksV0.fetchNullable(
+        userWelcomePacksKey(new PublicKey(walletAddress))[0],
+      );
+    const [
+      { welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent },
+      recipientRent,
+    ] = await Promise.all([
+      getWelcomePackRentParts(connection, {
+        numFixedShares,
+        numPercentageShares: rewardsSplit.length - numFixedShares,
+        scheduleLen: rewardsSchedule.length,
+        preTaskUrlLen: preTaskUrl(assetId).length,
+        userWelcomePacksExists: !!userWelcomePacksAccount,
+      }),
+      recipient ? 0 : getRentLamports(connection, RECIPIENT_SPACE),
+    ]);
+    const giftLamports = (
       await resolveTokenAmountInput(solAmount, NATIVE_MINT.toBase58())
     ).toNumber();
+    const { packCost } = getWelcomePackCost({
+      welcomePackRent,
+      fanoutRent,
+      ataRent,
+      giftLamports,
+      hasFanout,
+    });
+    const rentCost = packCost + userWelcomePacksRent + recipientRent;
 
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
+    const required = await calculateRequiredBalance(
+      connection,
+      BASE_TX_FEE_LAMPORTS,
+      rentCost,
+    );
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to create welcome pack",
@@ -146,7 +183,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
             assetEndpoint: env.ASSET_ENDPOINT,
             lazyDistributor: new PublicKey(lazyDistributor),
           })
-        ).instruction()
+        ).instruction(),
       );
     }
 
@@ -157,7 +194,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
         owner: new PublicKey(walletAddress),
         solAmount: await resolveTokenAmountInput(
           solAmount,
-          NATIVE_MINT.toBase58()
+          NATIVE_MINT.toBase58(),
         ),
         rentRefund: new PublicKey(rentRefund),
         assetReturnAddress: new PublicKey(assetReturnAddress),
@@ -173,24 +210,24 @@ export const create = publicProcedure.welcomePacks.create.handler(
                     fixed: {
                       amount: await resolveTokenAmountInput(
                         split.tokenAmount,
-                        HNT_MINT.toBase58()
+                        HNT_MINT.toBase58(),
                       ),
                     },
                   },
                   wallet: new PublicKey(split.address),
-                }
-          )
+                },
+          ),
         ),
         rewardsSchedule,
         getAssetFn: (_, assetId) =>
           getAsset(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId
+            assetId,
           ),
         getAssetProofFn: (_, assetId) =>
           getAssetProof(
             env.ASSET_ENDPOINT || program.provider.connection.rpcEndpoint,
-            assetId
+            assetId,
           ),
         assetEndpoint: env.ASSET_ENDPOINT,
         lazyDistributor: new PublicKey(lazyDistributor),
@@ -206,13 +243,8 @@ export const create = publicProcedure.welcomePacks.create.handler(
       },
     });
 
-    const userWelcomePacksAccount =
-      await program.account.userWelcomePacksV0.fetchNullable(
-        new PublicKey(pubkeys.userWelcomePacks!)
-      );
-    const lazyDistributorAcc = await ldProgram.account.lazyDistributorV0.fetch(
-      lazyDistributor
-    );
+    const lazyDistributorAcc =
+      await ldProgram.account.lazyDistributorV0.fetch(lazyDistributor);
 
     const welcomePack: WelcomePackWithStatus = {
       address: pubkeys.welcomePack!.toBase58(),
@@ -226,7 +258,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
               address: split.address,
               type: split.type,
               tokenAmount: split.tokenAmount,
-            }
+            },
       ),
       rewardsSchedule,
       solAmount: solAmount.amount,
@@ -268,7 +300,7 @@ export const create = publicProcedure.welcomePacks.create.handler(
           assetId,
           solAmount: await toTokenAmountOutput(
             new BN(input.solAmount.amount),
-            input.solAmount.mint
+            input.solAmount.mint,
           ),
           recipientCount: input.rewardsSplit.length,
           recipients: input.rewardsSplit.map((s) => s.address),
@@ -276,8 +308,8 @@ export const create = publicProcedure.welcomePacks.create.handler(
       },
       estimatedSolFee: await toTokenAmountOutput(
         new BN(estimatedSolFeeLamports),
-        NATIVE_MINT.toBase58()
+        NATIVE_MINT.toBase58(),
       ),
     };
-  }
+  },
 );

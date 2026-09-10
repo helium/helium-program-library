@@ -3,11 +3,14 @@ import {
   VersionedTransaction,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
+import { recipientSpace } from "@helium/lazy-distributor-sdk";
+import { ACCOUNT_SIZE } from "@solana/spl-token";
 import {
   COMPUTE_BUDGET_IX_LIMIT,
   COMPUTE_BUDGET_IX_PRICE,
   MAX_COMPUTE_UNITS,
 } from "@helium/spl-utils";
+import { createTtlCache } from "./ttl-cache";
 
 // Base signature fee (5000 lamports per signature)
 export const BASE_SIGNATURE_FEE_LAMPORTS = 5000;
@@ -19,37 +22,230 @@ export const BASE_SIGNATURE_FEE_LAMPORTS = 5000;
 // these call sites then.
 export const BASE_TX_FEE_LAMPORTS = 50000; // 0.00005 SOL
 
-// Minimum rent-exempt balance (wallet must stay above this)
-export const MIN_WALLET_RENT_LAMPORTS = 890880; // 0.00089088 SOL
+const rentCache = createTtlCache<number>({ ttlMs: 60 * 60 * 1000 });
 
-// Account creation rent costs (lamports)
-// Note: Automation-related rent (CRON_JOB, TASK_RETURN_ACCOUNT) already exists in automation-helpers.ts
-// These are for non-automation endpoints
-// Values derived from e2e test measurements - kept slightly conservative to ensure sufficient funds
-export const RENT_COSTS = {
-  ATA: 2039280, // ~0.002039 SOL - from automation-helpers.ts ATA_RENT
-  RECIPIENT: 2422080, // ~0.00242208 SOL - from automation-helpers.ts RECIPIENT_RENT
-  // Welcome pack rent values derived from e2e test measurements
-  // InitializeWelcomePack also updates compression destination and transfers asset
-  WELCOME_PACK: 15200000, // ~0.0152 SOL (measured: includes account creation + operations)
-  USER_WELCOME_PACKS: 2600000, // ~0.0026 SOL (measured from actual account creation)
-  // Mini-fanout rent values derived from e2e test measurements
-  MINI_FANOUT: 10560000, // ~0.01056 SOL (measured from actual account creation)
-  TUKTUK_TASK: 3325000, // ~0.003325 SOL per task (mini-fanout creates 2 tasks: task + preTask)
-} as const;
+/**
+ * Rent-exempt minimum for `space` bytes. Cached per endpoint: the Rent sysvar
+ * only changes at feature activation, and most handlers price several
+ * accounts per request.
+ */
+export const getRentLamports = (connection: Connection, space: number) =>
+  rentCache(`${connection.rpcEndpoint}:${space}`, () =>
+    connection.getMinimumBalanceForRentExemption(space),
+  );
+
+/**
+ * Minimum balance a wallet must keep: the rent-exempt minimum for a 0-byte
+ * account, priced from the cluster so it follows the Rent sysvar.
+ */
+export const getMinWalletRentLamports = (connection: Connection) =>
+  getRentLamports(connection, 0);
+
+// Byte sizes of the accounts non-automation endpoints create. Price them at
+// call time with getRentLamports (batch with Promise.all) rather than
+// hardcoding lamports, so gates track the cluster's Rent sysvar. Automation
+// account sizes live in automation-helpers.ts.
+
+/** SPL token account (ATA). */
+export const ATA_SPACE = ACCOUNT_SIZE;
+
+/** Lamports initialize_mini_fanout_v0 / initialize_welcome_pack_v0 fund a new fanout with for future task fees (0.01 SOL). */
+export const FANOUT_FUNDING_AMOUNT = 10_000_000;
+
+export { recipientSpace };
+/** RecipientV0 for the HNT lazy distributor, which has one oracle. */
+export const RECIPIENT_SPACE = recipientSpace(1);
+
+/**
+ * UserWelcomePacksV0 (programs/welcome-pack initialize_welcome_pack_v0):
+ *   space = 8 + 60 + size_of::<UserWelcomePacksV0>(), size_of = 44.
+ * Mainnet accounts read back at 112 bytes.
+ */
+export const USER_WELCOME_PACKS_SPACE = 8 + 60 + 44;
+
+/**
+ * WelcomePackV0 (programs/welcome-pack initialize_welcome_pack_v0). Allocated
+ * at 8 + 60 + size_of::<WelcomePackV0>() (size_of = 264), then resize_to_fit
+ * grows it to the borsh size + 64 when that is larger:
+ *   8 disc + 4 id + 5 * 32 pubkeys + 8 sol_amount
+ *   + 4 + shares (32 wallet + 1 tag + 4 u32 | 8 u64)
+ *   + 4 + schedule.len + 32 asset_return_address + 1 bump + 4 unique_id
+ * Mainnet packs read back at 375/377 (2 shares) and 413 (3 shares) bytes.
+ */
+export const welcomePackSpace = ({
+  numFixedShares,
+  numPercentageShares,
+  scheduleLen,
+}: {
+  numFixedShares: number;
+  numPercentageShares: number;
+  scheduleLen: number;
+}) =>
+  Math.max(
+    8 + 60 + 264,
+    225 + 41 * numFixedShares + 37 * numPercentageShares + scheduleLen + 64,
+  );
+
+/**
+ * MiniFanoutV0::size (programs/mini-fanout initialize_mini_fanout_v0.rs) for
+ * the RemoteV0 pre-task every caller here queues, seeded by the 32-byte asset
+ * key. Mainnet fanouts read back at 568–778 bytes (1–5 shares).
+ */
+export const miniFanoutSpace = ({
+  numShares,
+  scheduleLen,
+  preTaskUrlLen,
+}: {
+  numShares: number;
+  scheduleLen: number;
+  preTaskUrlLen: number;
+}) =>
+  8 + // discriminator
+  8 * 32 + // owner, namespace, mint, token_account, task_queue, next_task, rent_refund, next_pre_task
+  1 + // bump
+  (4 + scheduleLen) +
+  1 + // queue_authority_bump
+  (4 + numShares * 89) + // MiniFanoutShareV0::size() = 89
+  (4 + 32) + // seed
+  1 + // pre_task Option tag
+  (1 + 4 + preTaskUrlLen + 32) + // RemoteV0 { url, signer }
+  60; // RESERVE
+
+/**
+ * Tuktuk TaskV0 accounts mini-fanout schedule_task_v0 queues (rent is
+ * refunded when the task runs). The deployed tuktuk queue_task_v0 allocates
+ * `8 + size_of::<TaskV0>() + transaction.size() + 4 + description.len() + 60`
+ * (helium/tuktuk main, solana-programs/programs/tuktuk queue_task_v0.rs and
+ * state.rs) and never resizes, so the account is that big regardless of what
+ * borsh needs. size_of::<TaskV0>() is 216: solved from two tasks a surfpool
+ * fork of mainnet queued (645 bytes for a 2-share distribute task, 453 for a
+ * pre task with a 97-char url), and both fit. Both descriptions the program
+ * writes are 28 chars.
+ */
+const TUKTUK_TASK_BASE_SPACE = 8 + 216 + 4 + 28 + 60;
+
+/**
+ * DistributeV0 compiles to 7 + numShares accounts (program id, 6 fixed, one
+ * ATA per share) and one instruction with 6 + numShares account indexes and
+ * an 8-byte discriminator (programs/mini-fanout schedule_task_v0.rs
+ * get_task_ix). Shares that resolve to the same ATA dedupe to a smaller
+ * account, so this is an upper bound.
+ */
+export const miniFanoutDistTaskSpace = (numShares: number) =>
+  TUKTUK_TASK_BASE_SPACE +
+  4 + // TransactionSourceV0::size CompiledV0 prefix
+  (3 + 1) + // header
+  (4 + (7 + numShares) * 32) + // accounts
+  (4 + (1 + 4 + (6 + numShares) + 4 + 8)); // instructions
+
+/** The RemoteV0 pre task: `4 + 32 + 4 + url.len()` for the transaction. */
+export const miniFanoutPreTaskSpace = (preTaskUrlLen: number) =>
+  TUKTUK_TASK_BASE_SPACE + 4 + 32 + 4 + preTaskUrlLen;
+
+/** Rent for the accounts initialize_mini_fanout_v0 creates: the fanout, its HNT ATA and its two tuktuk tasks. */
+export const getMiniFanoutRentParts = async (
+  connection: Connection,
+  {
+    numShares,
+    scheduleLen,
+    preTaskUrlLen,
+  }: { numShares: number; scheduleLen: number; preTaskUrlLen: number },
+) => {
+  const [fanoutRent, ataRent, distTaskRent, preTaskRent] = await Promise.all([
+    getRentLamports(
+      connection,
+      miniFanoutSpace({ numShares, scheduleLen, preTaskUrlLen }),
+    ),
+    getRentLamports(connection, ATA_SPACE),
+    getRentLamports(connection, miniFanoutDistTaskSpace(numShares)),
+    getRentLamports(connection, miniFanoutPreTaskSpace(preTaskUrlLen)),
+  ]);
+  return { fanoutRent, ataRent, distTaskRent, preTaskRent };
+};
+
+/**
+ * Rent for the accounts initialize_welcome_pack_v0 creates or escrows: the
+ * pack, the UserWelcomePacksV0 (0 when it already exists) and, with more than
+ * one recipient, the future fanout and its HNT ATA (0 otherwise).
+ */
+export const getWelcomePackRentParts = async (
+  connection: Connection,
+  {
+    numFixedShares,
+    numPercentageShares,
+    scheduleLen,
+    preTaskUrlLen,
+    userWelcomePacksExists,
+  }: {
+    numFixedShares: number;
+    numPercentageShares: number;
+    scheduleLen: number;
+    preTaskUrlLen: number;
+    userWelcomePacksExists: boolean;
+  },
+) => {
+  const numShares = numFixedShares + numPercentageShares;
+  const [welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent] =
+    await Promise.all([
+      getRentLamports(
+        connection,
+        welcomePackSpace({ numFixedShares, numPercentageShares, scheduleLen }),
+      ),
+      userWelcomePacksExists
+        ? 0
+        : getRentLamports(connection, USER_WELCOME_PACKS_SPACE),
+      numShares > 1
+        ? getRentLamports(
+            connection,
+            miniFanoutSpace({ numShares, scheduleLen, preTaskUrlLen }),
+          )
+        : 0,
+      numShares > 1 ? getRentLamports(connection, ATA_SPACE) : 0,
+    ]);
+  return { welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent };
+};
+
+/**
+ * Lamports the payer spends on the pack account itself. The escrow (gift +
+ * fanout cost) is transferred into the pack account on top of whatever its
+ * init rent already left there, so the pack costs the larger of the two
+ * rather than their sum.
+ */
+export const getWelcomePackCost = ({
+  welcomePackRent,
+  fanoutRent,
+  ataRent,
+  giftLamports,
+  hasFanout,
+}: {
+  welcomePackRent: number;
+  fanoutRent: number;
+  ataRent: number;
+  giftLamports: number;
+  hasFanout: boolean;
+}) => {
+  const fanoutCost = hasFanout
+    ? fanoutRent + ataRent + FANOUT_FUNDING_AMOUNT
+    : 0;
+  return {
+    fanoutCost,
+    packCost: Math.max(welcomePackRent, giftLamports + fanoutCost),
+  };
+};
 
 /**
  * Calculate total SOL required for a transaction.
  * Returns the total required lamports (tx fees + rent + min wallet balance).
  */
-export function calculateRequiredBalance(
+export async function calculateRequiredBalance(
+  connection: Connection,
   estimatedTxFeeLamports: number = BASE_TX_FEE_LAMPORTS,
-  estimatedRentCostLamports: number = 0
-): number {
+  estimatedRentCostLamports: number = 0,
+): Promise<number> {
   return (
     estimatedTxFeeLamports +
     estimatedRentCostLamports +
-    MIN_WALLET_RENT_LAMPORTS
+    (await getMinWalletRentLamports(connection))
   );
 }
 
@@ -61,7 +257,7 @@ export function calculateRequiredBalance(
  */
 export async function getTransactionFee(
   connection: Connection,
-  tx: VersionedTransaction
+  tx: VersionedTransaction,
 ): Promise<number> {
   try {
     const { value } = await connection.getFeeForMessage(tx.message);
@@ -124,13 +320,13 @@ function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
   if (computeUnitLimit == null) {
     computeUnitLimit = Math.min(
       MAX_COMPUTE_UNITS,
-      200_000 * numOtherInstructions
+      200_000 * numOtherInstructions,
     );
   }
 
   // Priority fee = (price in microlamports * CU limit) / 1_000_000
   const priorityFee = Math.ceil(
-    (computeUnitPrice * computeUnitLimit) / 1_000_000
+    (computeUnitPrice * computeUnitLimit) / 1_000_000,
   );
 
   return baseFee + priorityFee;
@@ -141,10 +337,10 @@ function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
  */
 export async function getTotalTransactionFees(
   connection: Connection,
-  txs: VersionedTransaction[]
+  txs: VersionedTransaction[],
 ): Promise<number> {
   const fees = await Promise.all(
-    txs.map((tx) => getTransactionFee(connection, tx))
+    txs.map((tx) => getTransactionFee(connection, tx)),
   );
   return fees.reduce((total, fee) => total + fee, 0);
 }

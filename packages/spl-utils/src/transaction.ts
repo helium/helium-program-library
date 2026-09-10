@@ -417,7 +417,7 @@ export async function sendAndConfirmWithRetry(
     if (confirmation.err) {
       const tx = await connection.getTransaction(txid, {
         commitment: "confirmed",
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
       });
       console.error(tx?.meta?.logMessages?.join("\n"));
       console.error(confirmation.err);
@@ -433,7 +433,7 @@ export async function sendAndConfirmWithRetry(
 
     const tx = await connection.getTransaction(txid, {
       commitment: "confirmed",
-      maxSupportedTransactionVersion: 0,
+      maxSupportedTransactionVersion: 1,
     });
     if (tx && tx.meta && tx.meta.logMessages) {
       console.error(tx.meta.logMessages.join("\n"));
@@ -649,7 +649,7 @@ export async function bulkSendRawTransactions(
           failureIndexes.map((index) =>
             connection.getTransaction(txids[index!], {
               commitment: "confirmed",
-              maxSupportedTransactionVersion: 0,
+              maxSupportedTransactionVersion: 1,
             })
           )
         );
@@ -682,7 +682,7 @@ async function getAllTxns(
     await Promise.all(
       chunks(txids, MAX_GET_SIGNATURE_STATUSES_QUERY_ITEMS).map((txids) =>
         connection.getTransactions(txids, {
-          maxSupportedTransactionVersion: 0,
+          maxSupportedTransactionVersion: 1,
           commitment: "confirmed",
         })
       )

@@ -190,19 +190,7 @@ pub fn handler<'info>(
     + rent.minimum_balance(ATA_SIZE)
     + FANOUT_FUNDING_AMOUNT;
 
-  // Transfer the sol amount to the claimer
   let needs_fanout = welcome_pack.rewards_split.len() > 1;
-  let rent_refunded_amount = welcome_pack
-    .get_lamports()
-    .saturating_sub(if needs_fanout { fanout_cost } else { 0 })
-    .saturating_sub(welcome_pack.sol_amount);
-  if rent_refunded_amount > 0 {
-    welcome_pack.sub_lamports(rent_refunded_amount)?;
-    ctx
-      .accounts
-      .rent_refund
-      .add_lamports(rent_refunded_amount)?;
-  }
 
   let mut ld_destination = mapped_shares[0].wallet;
   if needs_fanout {
@@ -271,6 +259,23 @@ pub fn handler<'info>(
     &[transfer_accounts.to_account_infos(), remaining_accounts].concat(),
     &[welcome_pack_seeds!(welcome_pack)],
   )?;
+
+  // Refund excess rent only after update_compression_destination_v0 and the
+  // bubblegum transfer. The runtime syncs only a CPI's own accounts back before
+  // the call, so a welcome_pack debit paired with a credit to a rent_refund
+  // that the CPI does not pass leaves the caller unbalanced and fails with
+  // UnbalancedInstruction.
+  let rent_refunded_amount = welcome_pack
+    .get_lamports()
+    .saturating_sub(if needs_fanout { fanout_cost } else { 0 })
+    .saturating_sub(welcome_pack.sol_amount);
+  if rent_refunded_amount > 0 {
+    welcome_pack.sub_lamports(rent_refunded_amount)?;
+    ctx
+      .accounts
+      .rent_refund
+      .add_lamports(rent_refunded_amount)?;
+  }
 
   welcome_pack.close(ctx.accounts.claimer.to_account_info())?;
 

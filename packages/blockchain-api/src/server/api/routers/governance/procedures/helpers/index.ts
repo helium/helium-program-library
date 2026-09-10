@@ -3,6 +3,7 @@ export * from "./list-positions";
 export * from "./dao-instruction";
 export * from "./get-current-season";
 export * from "./constants";
+export * from "./claimable-epochs";
 export * from "./build-claim-instructions";
 export * from "./build-batched-transactions";
 export * from "./rent";

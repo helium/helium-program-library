@@ -1,10 +1,12 @@
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { useHeliumVsrState } from "../contexts/heliumVsrContext";
+import { DELEGATED_POSITION_SPACE } from "@helium/helium-sub-daos-sdk";
 import { useSolOwnedAmount } from "@helium/helium-react-hooks";
+import { DELEGATION_CLAIM_BOT_SPACE } from "@helium/hpl-crons-sdk";
 import { useMemo } from "react";
+import { useAsync } from "react-async-hook";
 
 export const PREPAID_TX_FEES = 0.01;
-export const AUTOMATION_BOT_FEE = 0.00210192;
-export const DELEGATION_FEE = 0.00258912;
 
 export interface UsePositionFeesProps {
   numPositions: number;
@@ -41,29 +43,62 @@ export const usePositionsFees = ({
   numDelegationClaimBots = 0,
   wallet: wallet,
 }: UsePositionFeesProps) => {
-  const { amount: userLamports } = useSolOwnedAmount(wallet);
+  const { amount: userLamports, loading: loadingSol } =
+    useSolOwnedAmount(wallet);
+  const { provider } = useHeliumVsrState();
+  const {
+    result: rent,
+    error,
+    loading: loadingRent,
+  } = useAsync(async () => {
+    const connection = provider?.connection;
+    if (!connection) return undefined;
+    const [bot, delegatedPosition] = await Promise.all([
+      connection.getMinimumBalanceForRentExemption(DELEGATION_CLAIM_BOT_SPACE),
+      connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE),
+    ]);
+    return {
+      bot: bot / LAMPORTS_PER_SOL,
+      delegatedPosition: delegatedPosition / LAMPORTS_PER_SOL,
+    };
+  }, [provider?.connection]);
 
   const rentFee = useMemo(() => {
     const botFee = automationEnabled
-      ? (numPositions - numDelegationClaimBots) * AUTOMATION_BOT_FEE
+      ? (numPositions - numDelegationClaimBots) * (rent?.bot ?? 0)
       : 0;
+    // Only positions not yet delegated create a DelegatedPositionV0.
     const delegationFee =
-      numDelegatedPositions > 0 ? 0 : numDelegatedPositions * DELEGATION_FEE;
+      (numPositions - numDelegatedPositions) * (rent?.delegatedPosition ?? 0);
     return botFee + delegationFee;
-  }, [numDelegationClaimBots, numDelegatedPositions, automationEnabled]);
+  }, [
+    numPositions,
+    numDelegationClaimBots,
+    numDelegatedPositions,
+    automationEnabled,
+    rent,
+  ]);
 
   const prepaidTxFees = automationEnabled
     ? (numPositions - numDelegationClaimBots) * PREPAID_TX_FEES
     : 0;
   const totalFees = rentFee + prepaidTxFees;
 
+  // A refetch keeps the previous quote in `rent`, so `loadingRent` has to gate
+  // too. No provider yet (wallet still connecting) resolves undefined rather
+  // than pending, so also treat missing rent as loading instead of quoting 0.
+  const loading = loadingSol || loadingRent || (!rent && !error);
+  // A failed rent lookup must block rather than quote 0 rent.
   const insufficientBalance =
-    userLamports && userLamports < totalFees * LAMPORTS_PER_SOL;
+    !!error ||
+    (!loading && (userLamports ?? BigInt(0)) < totalFees * LAMPORTS_PER_SOL);
 
   return {
     rentFee,
     prepaidTxFees,
     totalFees,
     insufficientBalance,
+    loading,
+    error,
   };
 };

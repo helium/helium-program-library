@@ -9,8 +9,13 @@ import {
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
 import { getJitoTipInstruction, shouldUseJitoBundle } from "@/lib/utils/jito";
-import { getTotalTransactionFees } from "@/lib/utils/balance-validation";
-import { toTokenAmountOutput, solToLamportsBN } from "@/lib/utils/token-math";
+import {
+  ATA_SPACE,
+  FANOUT_FUNDING_AMOUNT,
+  getTotalTransactionFees,
+  getRentLamports,
+} from "@/lib/utils/balance-validation";
+import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { TOKEN_MINTS } from "@/lib/constants/tokens";
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
 import {
@@ -103,10 +108,6 @@ function markLeafOwnerAsSigner(
   return ix;
 }
 
-const FANOUT_FUNDING_AMOUNT = solToLamportsBN(0.01).toNumber();
-// Rent for an ATA (~0.00204 SOL). closeMiniFanoutV0 uses the owner as payer
-// when creating the owner's token ATA, so we fund the owner if needed.
-const ATA_RENT_LAMPORTS = 2_039_280;
 const MAX_JITO_BUNDLE_TXS = 5;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
@@ -603,12 +604,15 @@ export const migrate = publicProcedure.migration.migrate.handler(
           closeGroup.push(welcomePackCloseIx);
         }
         const sourceBalance = Number(remainingSourceLamports);
-        if (sourceBalance < ATA_RENT_LAMPORTS) {
+        // closeMiniFanoutV0 uses the owner as payer when creating the owner's
+        // token ATA, so we fund the owner with ATA rent if needed.
+        const ataRentLamports = await getRentLamports(connection, ATA_SPACE);
+        if (sourceBalance < ataRentLamports) {
           closeGroup.push(
             SystemProgram.transfer({
               fromPubkey: feePayer,
               toPubkey: sourcePubkey,
-              lamports: ATA_RENT_LAMPORTS - sourceBalance,
+              lamports: ataRentLamports - sourceBalance,
             }),
           );
         }

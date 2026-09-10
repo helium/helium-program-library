@@ -7,7 +7,7 @@ import { NATIVE_MINT } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { stopNextServer } from "./helpers/next";
-import { stopSurfpool } from "./helpers/surfpool";
+import { setSurfnetAccount, stopSurfpool } from "./helpers/surfpool";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import { setupTestCtx, TestCtx } from "./helpers/context";
 import {
@@ -15,10 +15,47 @@ import {
   HNT_LAZY_DISTRIBUTOR_ADDRESS,
 } from "./helpers/constants";
 import { verifyEstimatedSolFee } from "./helpers/estimate";
+import {
+  ATA_SPACE,
+  FANOUT_FUNDING_AMOUNT,
+  miniFanoutSpace,
+} from "../../src/lib/utils/balance-validation";
 import nacl from "tweetnacl";
 
 describe("welcome-pack", () => {
   let ctx: TestCtx;
+
+  // TODO: remove once the welcome-pack program with the refund moved after the
+  // bubblegum CPI is deployed to mainnet. The test pack was funded under the
+  // old rent regime, so under current rent claim_welcome_pack_v0 computes a
+  // nonzero refund and credited rent_refund before
+  // update_compression_destination_v0, a CPI that passes welcome_pack but not
+  // rent_refund, so the runtime saw an unbalanced caller and failed with
+  // UnbalancedInstruction. Top the pack down to exactly
+  // sol_amount + fanout cost so the refund branch stays dead, as it was on
+  // mainnet when the pack was created.
+  const fundPackToExactClaimCost = async (pack: PublicKey) => {
+    const info = await ctx.connection.getAccountInfo(pack);
+    if (!info) throw new Error("welcome pack not found");
+    // 2 shares, the pack's 12-byte schedule and the 97-byte RemoteV0 pre_task url.
+    const MINI_FANOUT_SIZE = miniFanoutSpace({
+      numShares: 2,
+      scheduleLen: 12,
+      preTaskUrlLen: 97,
+    });
+    const SOL_AMOUNT = 10_000_000;
+    const fanoutCost =
+      (await ctx.connection.getMinimumBalanceForRentExemption(
+        MINI_FANOUT_SIZE
+      )) +
+      (await ctx.connection.getMinimumBalanceForRentExemption(ATA_SPACE)) +
+      FANOUT_FUNDING_AMOUNT;
+    await setSurfnetAccount(pack, {
+      data: info.data,
+      owner: info.owner,
+      lamports: fanoutCost + SOL_AMOUNT,
+    });
+  };
 
   before(async () => {
     ctx = await setupTestCtx({
@@ -177,6 +214,7 @@ describe("welcome-pack", () => {
     const claimer = Keypair.generate();
 
     const welcomePackAddress = "G8dRECzZRLMf6bjswi7F9KZvNQbnjzqcwGbXyj21gw8v";
+    await fundPackToExactClaimCost(new PublicKey(welcomePackAddress));
     // Fetch canonical message and expiration from server
     const inviteResult = await ctx.client.welcomePacks.invite({
       packAddress: welcomePackAddress,
@@ -207,7 +245,7 @@ describe("welcome-pack", () => {
     );
 
     const afterBal = await ctx.connection.getBalance(claimer.publicKey);
-    expect(afterBal).to.eq(3595720);
+    expect(afterBal).to.eq(4449958);
 
     const provider = new AnchorProvider(
       ctx.connection,

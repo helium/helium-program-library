@@ -1,6 +1,6 @@
 {
   "name": "@helium/crons",
-  "version": "0.11.19",
+  "version": "0.11.20",
   "description": "scripts to run on a schedule",
   "private": true,
   "publishConfig": {

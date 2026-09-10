@@ -1,5 +1,22 @@
 # Change Log
 
+## 0.11.21
+
+### Patch Changes
+
+- [#1299](https://github.com/helium/helium-program-library/pull/1299) [`991210f`](https://github.com/helium/helium-program-library/commit/991210f9290d8fc97166722489ca511dbbb8194e) Thanks [@bryzettler](https://github.com/bryzettler)! - Request `maxSupportedTransactionVersion: 1` on getTransaction / getTransactions / getParsedTransaction(s) calls and bump @solana/web3.js to 1.99.0 so version 1 transactions decode after Agave 4.2.
+
+- Updated dependencies [[`35e7e30`](https://github.com/helium/helium-program-library/commit/35e7e302596eda528af6d8a327e9bfbb285b789c), [`1e752e6`](https://github.com/helium/helium-program-library/commit/1e752e6af23e3f0f4eb96978c13b7188d6162943), [`991210f`](https://github.com/helium/helium-program-library/commit/991210f9290d8fc97166722489ca511dbbb8194e)]:
+  - @helium/idls@0.11.27
+  - @helium/hpl-crons-sdk@0.12.0
+  - @helium/helium-sub-daos-sdk@0.12.0
+  - @helium/lazy-distributor-sdk@0.12.0
+  - @helium/distributor-oracle@0.12.0
+  - @helium/spl-utils@0.13.3
+  - @helium/data-credits-sdk@0.12.1
+  - @helium/helium-entity-manager-sdk@0.11.19
+  - @helium/hexboosting-sdk@0.11.19
+
 ## 0.11.20
 
 ### Patch Changes

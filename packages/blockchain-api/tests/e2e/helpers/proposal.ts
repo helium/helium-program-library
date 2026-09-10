@@ -19,7 +19,7 @@ import { init as initHsd, daoKey } from "@helium/helium-sub-daos-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
 import { TestCtx } from "./context";
 import { sendAndConfirmInstructions } from "./tx";
-import { getSurfpoolRpcUrl } from "./surfpool";
+import { setSurfnetAccount } from "./surfpool";
 import BN from "bn.js";
 
 interface CreateProposalOptions {
@@ -336,31 +336,6 @@ export async function createTestOrganizationProposal(
 const ORG_AUTHORITY_OFFSET = 12;
 const ORG_DEFAULT_PROPOSAL_CONFIG_OFFSET = 44;
 
-async function surfnetSetAccount(
-  pubkey: PublicKey,
-  data: Buffer,
-  owner: PublicKey,
-  lamports: number
-): Promise<void> {
-  await fetch(getSurfpoolRpcUrl(), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "surfnet_setAccount",
-      params: [
-        pubkey.toBase58(),
-        {
-          data: data.toString("hex"),
-          owner: owner.toBase58(),
-          lamports,
-        },
-      ],
-    }),
-  });
-}
-
 /**
  * Creates a voting proposal under the real "Helium" organization so it is
  * discoverable by the assignProxies procedure (which scans
@@ -452,12 +427,7 @@ export async function createHeliumOrgVotingProposal(
   const newData = Buffer.from(accountInfo.data);
   ctx.payer.publicKey.toBuffer().copy(newData, ORG_AUTHORITY_OFFSET);
   proposalConfig.toBuffer().copy(newData, ORG_DEFAULT_PROPOSAL_CONFIG_OFFSET);
-  await surfnetSetAccount(
-    hntOrg,
-    newData,
-    accountInfo.owner,
-    accountInfo.lamports
-  );
+  await setSurfnetAccount(hntOrg, { ...accountInfo, data: newData });
 
   const initProposalIx = await orgProgram.methods
     .initializeProposalV0({

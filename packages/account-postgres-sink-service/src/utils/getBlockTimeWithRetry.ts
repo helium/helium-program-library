@@ -29,6 +29,7 @@ export const getBlockTimeWithRetry = async ({
       return getBlockTimeWithRetry({
         slot,
         maxRetries: maxRetries - 1,
+        maxSlotIncrement,
         retryInterval,
         provider,
       });

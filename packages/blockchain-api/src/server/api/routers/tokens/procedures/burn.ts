@@ -109,7 +109,7 @@ export const burn = publicProcedure.tokens.burn.handler(
           metadata: { tokenAmount: burnTokenAmount, tokenName },
         }),
         estimatedSolFee: await toTokenAmountOutput(
-          new BN(calculateRequiredBalance(feeLamports, 0)),
+          new BN(await calculateRequiredBalance(connection, feeLamports, 0)),
           NATIVE_MINT.toBase58()
         ),
       };

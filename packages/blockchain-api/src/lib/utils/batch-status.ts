@@ -210,10 +210,14 @@ function decideTransactionStatus(
     if (landed.includes(signatureStatus.confirmationStatus ?? "")) {
       return "confirmed";
     }
+    // Below the commitment asked for, but the cluster has it in a block, so
+    // its blockhash ageing out says nothing about it. Should that block be
+    // forked off, the cluster stops reporting the signature and the next read
+    // expires it.
+    return "pending";
   }
 
-  // Never seen, or seen but not yet confirmed at the commitment asked for: it
-  // can still land until its blockhash goes out of range.
+  // Never seen: it can still land until its blockhash goes out of range.
   return isTransactionExpired({
     transaction: tx,
     currentBlockHeight,

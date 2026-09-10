@@ -1,7 +1,6 @@
 import { createSolanaConnection } from "@/lib/solana";
 import {
-  BASE_AUTOMATION_RENT,
-  RECIPIENT_RENT,
+  getBaseAutomationRentLamports,
   TASK_RETURN_ACCOUNT_SIZE,
   calculateFundingForAdditionalDuration,
   calculatePeriodsRemaining,
@@ -31,12 +30,10 @@ export const getAutomationStatus =
         cronJobCostPerClaimLamports,
         pdaWalletCostPerClaimLamports,
         recipientRentLamports,
+        pdaWalletRentLamports,
         ataRentLamports,
         taskReturnAccountRentLamports,
       } = await fetchAutomationData(walletAddress, provider);
-
-      const hotspotsNeedingRecipient =
-        recipientRentLamports / (RECIPIENT_RENT * LAMPORTS_PER_SOL);
 
       // Calculate funding needed using the same helper as getFundingEstimate
       // Using additionalDuration: 0 to get baseline funding needed (for current state)
@@ -48,6 +45,7 @@ export const getAutomationStatus =
           pdaWalletCostPerClaimLamports,
           recipientRentLamports,
           cronJobRentLamports,
+          pdaWalletRentLamports,
           additionalDuration: 0,
           ataRentLamports,
           taskReturnAccountRentLamports,
@@ -55,8 +53,10 @@ export const getAutomationStatus =
 
       const rentFee = cronJobAccount
         ? 0
-        : BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE;
-      const recipientFee = hotspotsNeedingRecipient * RECIPIENT_RENT;
+        : (await getBaseAutomationRentLamports(provider.connection)) /
+            LAMPORTS_PER_SOL +
+          TASK_RETURN_ACCOUNT_SIZE;
+      const recipientFee = recipientRentLamports / LAMPORTS_PER_SOL;
       const operationalSol =
         (cronJobFundingLamports + pdaWalletFundingLamports) / LAMPORTS_PER_SOL;
 
@@ -103,6 +103,7 @@ export const getAutomationStatus =
           pdaWalletCostPerClaimLamports,
           recipientRentLamports,
           cronJobRentLamports,
+          pdaWalletRentLamports,
           ataRentLamports,
           taskReturnAccountRentLamports,
         });
@@ -129,5 +130,5 @@ export const getAutomationStatus =
         cronJobBalance: cronJobBalanceLamports.toString(),
         pdaWalletBalance: pdaWalletBalanceLamports.toString(),
       };
-    }
+    },
   );

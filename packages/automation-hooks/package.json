@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.18",
+  "version": "0.12.0",
   "description": "React hooks for helium automation",
   "repository": {
     "type": "git",
@@ -38,6 +38,7 @@
     "@helium/helium-react-hooks": "workspace:^",
     "@helium/hpl-crons-sdk": "workspace:^",
     "@helium/idls": "workspace:^",
+    "@helium/lazy-distributor-sdk": "workspace:^",
     "@helium/spl-utils": "workspace:^",
     "@helium/tuktuk-sdk": "^0.0.9",
     "@solana/wallet-adapter-base": "^0.9.22",

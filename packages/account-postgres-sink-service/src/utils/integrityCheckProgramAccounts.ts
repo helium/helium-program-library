@@ -72,37 +72,35 @@ export const integrityCheckProgramAccounts = async ({
     let limiter: pLimit.Limit;
     const program = new anchor.Program(idl, provider);
     const snapshotSlot = await connection.getSlot("finalized");
-    let blockTime24HoursAgo: number | null = null;
-    let attemptSlot = snapshotSlot - Math.floor((24 * 60 * 60 * 1000) / 400); // Slot 24hrs ago (assuming a slot duration of 400ms);
-    const SLOTS_INCREMENT = 2;
 
-    for (
-      let blockTimeAttemps = 0;
-      blockTimeAttemps < 10 && !blockTime24HoursAgo;
-      blockTimeAttemps++
-    ) {
-      blockTime24HoursAgo = await getBlockTimeWithRetry({
-        slot: attemptSlot,
-        provider,
-      });
-
-      if (blockTime24HoursAgo) {
-        break;
-      }
-
-      if (!blockTime24HoursAgo) {
-        attemptSlot += SLOTS_INCREMENT; // move forward 2 slots each attempt
-        console.log(
-          `Failed to get blocktime for slot ${
-            attemptSlot - SLOTS_INCREMENT
-          }, trying slot ${attemptSlot}`
-        );
+    // Anchor the lookback to chain time, then derive the window from it; slot
+    // duration is no longer a fixed 400ms on mainnet. The finalized tip can be
+    // skipped or not yet served by a lagging replica, so walk backwards (every
+    // slot behind the tip already exists) instead of trusting one probe.
+    let snapshotBlockTime: number | null = null;
+    const BLOCK_TIME_ATTEMPTS = 10;
+    for (let i = 0; i < BLOCK_TIME_ATTEMPTS && !snapshotBlockTime; i++) {
+      const attemptSlot = snapshotSlot - i;
+      try {
+        snapshotBlockTime = await getBlockTimeWithRetry({
+          slot: attemptSlot,
+          maxSlotIncrement: 0,
+          provider,
+        });
+      } catch (err) {
+        console.log(`Failed to get blocktime for slot ${attemptSlot}`, err);
       }
     }
 
-    if (!blockTime24HoursAgo) {
-      throw new Error("Unable to get any blocktime in the last 24 hours");
+    if (!snapshotBlockTime) {
+      throw new Error(
+        `Unable to get any blocktime in the ${BLOCK_TIME_ATTEMPTS} slots up to ${snapshotSlot}`
+      );
     }
+
+    // Look back one hour past the daily schedule so consecutive runs overlap
+    // and a late start or clock drift cannot leave a band nothing examines.
+    const lookbackBlockTime = snapshotBlockTime - 25 * 60 * 60;
 
     const txIdsByAccountId: { [key: string]: string[] } = {};
     const corrections: {
@@ -116,7 +114,7 @@ export const integrityCheckProgramAccounts = async ({
     const txSignatureChunks = chunks(
       await getTransactionSignaturesUptoBlockTime({
         programId,
-        blockTime: blockTime24HoursAgo,
+        blockTime: lookbackBlockTime,
         provider,
       }),
       100
@@ -132,7 +130,7 @@ export const integrityCheckProgramAccounts = async ({
               () =>
                 connection.getParsedTransactions(chunk, {
                   commitment: "finalized",
-                  maxSupportedTransactionVersion: 0,
+                  maxSupportedTransactionVersion: 1,
                 }),
               retryOptions
             );
@@ -349,7 +347,7 @@ export const integrityCheckProgramAccounts = async ({
                           latestTxSignature,
                           {
                             commitment: "finalized",
-                            maxSupportedTransactionVersion: 0,
+                            maxSupportedTransactionVersion: 1,
                           }
                         );
 

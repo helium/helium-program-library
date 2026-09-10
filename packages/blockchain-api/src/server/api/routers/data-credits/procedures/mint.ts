@@ -17,7 +17,8 @@ import {
 import {
   calculateRequiredBalance,
   getTotalTransactionFees,
-  RENT_COSTS,
+  ATA_SPACE,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import BN from "bn.js";
 
@@ -69,8 +70,11 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       true,
     );
     const recipientDcAtaInfo = await connection.getAccountInfo(recipientDcAta);
-    const ataRent = recipientDcAtaInfo ? 0 : RENT_COSTS.ATA;
-    const requiredBalance = calculateRequiredBalance(
+    const ataRent = recipientDcAtaInfo
+      ? 0
+      : await getRentLamports(connection, ATA_SPACE);
+    const requiredBalance = await calculateRequiredBalance(
+      connection,
       txFees + jitoTipCost,
       ataRent,
     );

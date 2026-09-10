@@ -336,7 +336,7 @@ if (PG_POOL_SIZE < 5) {
         }
 
         const tx = await provider.connection.getTransaction(signature, {
-          maxSupportedTransactionVersion: 0,
+          maxSupportedTransactionVersion: 1,
           commitment: "confirmed",
         });
         if (!tx) {

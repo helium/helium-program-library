@@ -21,6 +21,7 @@ import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
 import {
+  ACCOUNT_SIZE,
   MintLayout,
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -38,8 +39,8 @@ import {
 import BN from "bn.js";
 import {
   getTotalTransactionFees,
-  MIN_WALLET_RENT_LAMPORTS,
-  RENT_COSTS,
+  getMinWalletRentLamports,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { getJitoTipAmountLamports } from "@/lib/utils/jito";
 import {
@@ -122,9 +123,7 @@ export const create = publicProcedure.governance.createPosition.handler(
     const instructions: TransactionInstruction[] = [];
     const delegateInstructions: TransactionInstruction[] = [];
 
-    const mintRent = await connection.getMinimumBalanceForRentExemption(
-      MintLayout.span,
-    );
+    const mintRent = await getRentLamports(connection, MintLayout.span);
 
     instructions.push(
       SystemProgram.createAccount({
@@ -380,22 +379,22 @@ export const create = publicProcedure.governance.createPosition.handler(
     const [
       positionRent,
       metadataRent,
+      ataRent,
       delegatedPositionRent,
       epochInfoRent,
       claimTaskRent,
       automationRent,
       walletBalance,
     ] = await Promise.all([
-      connection.getMinimumBalanceForRentExemption(POSITION_SPACE),
-      connection.getMinimumBalanceForRentExemption(TOKEN_METADATA_SPACE),
+      getRentLamports(connection, POSITION_SPACE),
+      getRentLamports(connection, TOKEN_METADATA_SPACE),
+      getRentLamports(connection, ACCOUNT_SIZE),
       subDaoMint
-        ? connection.getMinimumBalanceForRentExemption(DELEGATED_POSITION_SPACE)
+        ? getRentLamports(connection, DELEGATED_POSITION_SPACE)
         : Promise.resolve(0),
       getMissingEpochInfoRentLamports({ connection, epochInfoKeys }),
       queuesClaimTask
-        ? connection.getMinimumBalanceForRentExemption(
-            DELEGATION_CLAIM_TASK_SPACE,
-          )
+        ? getRentLamports(connection, DELEGATION_CLAIM_TASK_SPACE)
         : Promise.resolve(0),
       getAutomationRentLamports({
         connection,
@@ -409,7 +408,7 @@ export const create = publicProcedure.governance.createPosition.handler(
       positionRent +
       metadataRent +
       TOKEN_METADATA_CREATE_FEE +
-      RENT_COSTS.ATA * 2 + // position NFT token account and the deposit vault
+      ataRent * 2 + // position NFT token account and the deposit vault
       delegatedPositionRent +
       epochInfoRent +
       automationRent +
@@ -421,7 +420,7 @@ export const create = publicProcedure.governance.createPosition.handler(
       jitoTipCost +
       mintRent +
       createdAccountRent +
-      MIN_WALLET_RENT_LAMPORTS +
+      (await getMinWalletRentLamports(connection)) +
       (automates ? PREPAID_TX_FEES * LAMPORTS_PER_SOL : 0);
 
     if (walletBalance < estimatedSolFeeLamports) {

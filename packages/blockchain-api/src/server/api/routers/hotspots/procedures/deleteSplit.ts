@@ -99,7 +99,7 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
     const walletBalance = await connection.getBalance(
       new PublicKey(walletAddress),
     );
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
+    const required = await calculateRequiredBalance(connection, BASE_TX_FEE_LAMPORTS, 0);
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",

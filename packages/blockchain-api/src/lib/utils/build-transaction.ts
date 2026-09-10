@@ -172,8 +172,8 @@ export function serializeTransaction(tx: VersionedTransaction): string {
  * envelope. Mirrors `buildAutomationTransactionResponse` for the single-tx case.
  *
  * Only for endpoints whose required balance is exactly
- * `calculateRequiredBalance(fee, rentLamports)` and whose reported fee is that
- * same amount; endpoints that add a transfer amount or report a different fee
+ * `calculateRequiredBalance(connection, fee, rentLamports)` and whose reported
+ * fee is that same amount; endpoints that add a transfer amount or report a different fee
  * build their response inline.
  */
 export async function buildSingleTransactionResponse({
@@ -217,7 +217,7 @@ export async function buildSingleTransactionResponse({
     getTransactionFee(connection, tx),
     connection.getBalance(feePayer),
   ]);
-  const required = calculateRequiredBalance(txFee, rentLamports);
+  const required = await calculateRequiredBalance(connection, txFee, rentLamports);
   if (available < required) {
     throw errors.INSUFFICIENT_FUNDS({
       message: insufficientFundsMessage,

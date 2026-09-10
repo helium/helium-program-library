@@ -32,7 +32,7 @@ const connectionConfig: ConnectionConfig & {
   maxSupportedTransactionVersion: number;
 } = {
   commitment: "confirmed",
-  maxSupportedTransactionVersion: 0,
+  maxSupportedTransactionVersion: 1,
 };
 const connection = new Connection(RPC_URL, connectionConfig);
 const service = new RecentTransactionsService(

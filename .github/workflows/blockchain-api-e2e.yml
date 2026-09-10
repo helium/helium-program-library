@@ -9,10 +9,14 @@ on:
     paths:
       - "packages/blockchain-api/**"
       - "packages/blockchain-api-client/**"
+      # The matrix check below reads this file, so an edit here runs it.
+      - ".github/workflows/blockchain-api-e2e.yml"
   pull_request:
     paths:
       - "packages/blockchain-api/**"
       - "packages/blockchain-api-client/**"
+      # The matrix check below reads this file, so an edit here runs it.
+      - ".github/workflows/blockchain-api-e2e.yml"
 
 jobs:
   # Build anchor once and share the generated types/IDLs as an artifact. The
