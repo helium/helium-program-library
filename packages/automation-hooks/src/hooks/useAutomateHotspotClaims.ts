@@ -1,4 +1,4 @@
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { ACCOUNT_SIZE, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   cronJobKey,
   cronJobNameMappingKey,
@@ -9,9 +9,11 @@ import {
   useSolOwnedAmount,
 } from "@helium/helium-react-hooks";
 import {
+  entityClaimCronSpaces,
   entityCronAuthorityKey,
   init as initHplCrons,
 } from "@helium/hpl-crons-sdk";
+import { recipientSpace } from "@helium/lazy-distributor-sdk";
 import { HNT_MINT, sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import {
   customSignerKey,
@@ -26,7 +28,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { useMemo } from "react";
-import { useAsyncCallback } from "react-async-hook";
+import { useAsync, useAsyncCallback } from "react-async-hook";
 import { useCronJob } from "./useCronJob";
 import { useTaskQueue } from "./useTaskQueue";
 import { AnchorProvider } from "@coral-xyz/anchor";
@@ -131,12 +133,14 @@ export const interpretCronString = (
   };
 };
 
-const BASE_AUTOMATION_RENT = 0.02098095;
 const TASK_RETURN_ACCOUNT_SIZE = 0.01;
-const MIN_RENT = 0.00089088;
 const EST_TX_FEE = 0.000001;
-const RECIPIENT_RENT = 0.00242208;
-const ATA_RENT = 0.002039 * LAMPORTS_PER_SOL;
+
+// Byte sizes of the accounts automation setup pays rent for, priced at
+// runtime with getMinimumBalanceForRentExemption so fees follow the cluster's
+// Rent sysvar. The sizes are derived and verified in the owning SDKs.
+/** RecipientV0 for the HNT lazy distributor, which has one oracle. */
+const RECIPIENT_SPACE = recipientSpace(1);
 
 export const useAutomateHotspotClaims = ({
   schedule,
@@ -191,17 +195,42 @@ export const useAutomateHotspotClaims = ({
     return duration * minCrankReward;
   }, [duration, totalHotspots, taskQueue]);
   const { account } = useAccount(ata);
+  const {
+    result: rent,
+    error: rentError,
+    loading: loadingRent,
+  } = useAsync(async () => {
+    const connection = provider?.connection;
+    if (!connection) return undefined;
+    const [walletMin, recipient, ataRent, ...base] = await Promise.all(
+      [0, RECIPIENT_SPACE, ACCOUNT_SIZE, ...entityClaimCronSpaces()].map(
+        (space) => connection.getMinimumBalanceForRentExemption(space)
+      )
+    );
+    return {
+      walletMin,
+      recipient,
+      ata: ataRent,
+      baseAutomation: base.reduce((sum, lamports) => sum + lamports, 0),
+    };
+  }, [provider?.connection]);
+  // No provider yet resolves undefined rather than pending, so missing rent
+  // without an error is still loading (it clears once the provider connects).
+  // The fee quotes and insufficientSol below are not final while this holds;
+  // gate on `loading` as well as `insufficientSol`. `loadingRent` covers the
+  // refetch when the connection changes, where `rent` still holds the old quote.
+  const rentPending = loadingRent || (!rent && !rentError);
   const pdaWalletFundingNeeded = useMemo(() => {
     const minCrankReward = taskQueue?.minCrankReward?.toNumber() || 10000;
     return (
-      MIN_RENT * LAMPORTS_PER_SOL +
-      (account ? 0 : ATA_RENT) +
+      (rent?.walletMin ?? 0) +
+      (account ? 0 : rent?.ata ?? 0) +
       // Actual claim txs
       duration * 20000 * (totalHotspots || 1) +
       // Requeue transactions (5 queues per tx)
       duration * minCrankReward * Math.ceil((totalHotspots || 1) / 5)
     );
-  }, [duration, totalHotspots, taskQueue]);
+  }, [duration, totalHotspots, taskQueue, rent, account]);
   const crankSolFee = useMemo(() => {
     return crankFundingNeeded - (cronJobSolanaAccount?.lamports || 0);
   }, [crankFundingNeeded, cronJobSolanaAccount]);
@@ -218,6 +247,7 @@ export const useAutomateHotspotClaims = ({
       if (!provider || !authority || !cronJob || !wallet) {
         throw new Error("Missing required parameters");
       }
+      if (!rent) throw new Error("Rent not loaded");
       const hplCronsProgram = await initHplCrons(provider);
       const tuktukProgram = await initTuktuk(provider);
 
@@ -329,8 +359,7 @@ export const useAutomateHotspotClaims = ({
             fromPubkey: wallet,
             toPubkey: pdaWallet,
             lamports:
-              pdaWalletSolFee +
-              hotspotsNeedingRecipient * RECIPIENT_RENT * LAMPORTS_PER_SOL,
+              pdaWalletSolFee + hotspotsNeedingRecipient * rent.recipient,
           })
         );
       }
@@ -412,18 +441,20 @@ export const useAutomateHotspotClaims = ({
 
   const rentFee = cronJobAccount
     ? 0
-    : BASE_AUTOMATION_RENT + TASK_RETURN_ACCOUNT_SIZE;
+    : (rent?.baseAutomation ?? 0) / LAMPORTS_PER_SOL + TASK_RETURN_ACCOUNT_SIZE;
 
-  const recipientFee = hotspotsNeedingRecipient * RECIPIENT_RENT;
+  const recipientFee =
+    (hotspotsNeedingRecipient * (rent?.recipient ?? 0)) / LAMPORTS_PER_SOL;
   const totalSolNeeded =
     (crankSolFee + pdaWalletSolFee) / LAMPORTS_PER_SOL + rentFee + recipientFee;
   const userSolBalance = Number(userSol || 0) / LAMPORTS_PER_SOL;
-  const minimumRequiredBalance = MIN_RENT + EST_TX_FEE;
+  const minimumRequiredBalance =
+    (rent?.walletMin ?? 0) / LAMPORTS_PER_SOL + EST_TX_FEE;
   const availableUserBalance = userSolBalance - minimumRequiredBalance;
 
   return {
-    loading: loading || removing,
-    error: error || removeError,
+    loading: loading || removing || rentPending,
+    error: error || removeError || rentError,
     execute,
     remove,
     hasExistingAutomation: !!cronJobAccount && !cronJobAccount.removedFromQueue,
@@ -434,7 +465,10 @@ export const useAutomateHotspotClaims = ({
     rentFee,
     recipientFee,
     solFee: (crankSolFee + pdaWalletSolFee) / LAMPORTS_PER_SOL,
-    insufficientSol: !loadingSol && totalSolNeeded > availableUserBalance,
+    // A failed rent lookup must block rather than quote 0 rent.
+    insufficientSol:
+      !!rentError ||
+      (!loadingSol && !rentPending && totalSolNeeded > availableUserBalance),
     isOutOfSol: cronJobAccount?.removedFromQueue || false,
   };
 };

@@ -12,7 +12,8 @@ import {
 import {
   calculateRequiredBalance,
   getTransactionFee,
-  RENT_COSTS,
+  ATA_SPACE,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -54,7 +55,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
             },
           },
         }),
-      }
+      },
     );
 
     if (!instructionsResponse.ok) {
@@ -113,7 +114,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
                 isWritable: boolean;
               }[];
               data: string;
-            }) => deserializeInstruction(instruction)
+            }) => deserializeInstruction(instruction),
           )
         : []),
       // Swap instruction
@@ -131,7 +132,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
         feePayer: new PublicKey(userPublicKey),
         addressLookupTableAddresses:
           instructions.addressLookupTableAddresses.map(
-            (address: string) => new PublicKey(address)
+            (address: string) => new PublicKey(address),
           ),
       },
     });
@@ -141,12 +142,18 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       connection.getBalance(new PublicKey(userPublicKey)),
       getTransactionFee(connection, tx),
     ]);
-    const rentCost = destinationTokenAccount ? 0 : RENT_COSTS.ATA;
+    const rentCost = destinationTokenAccount
+      ? 0
+      : await getRentLamports(connection, ATA_SPACE);
     const solInputAmount =
       quoteResponse.inputMint === NATIVE_MINT.toBase58()
         ? Number(quoteResponse.inAmount)
         : 0;
-    const required = calculateRequiredBalance(txFee, rentCost + solInputAmount);
+    const required = await calculateRequiredBalance(
+      connection,
+      txFee,
+      rentCost + solInputAmount,
+    );
 
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
@@ -195,15 +202,15 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
         destinationTokenAccount,
         inputTokenAmount: await toTokenAmountOutput(
           new BN(quoteResponse.inAmount),
-          quoteResponse.inputMint
+          quoteResponse.inputMint,
         ),
         outputTokenAmount: await toTokenAmountOutput(
           new BN(quoteResponse.outAmount),
-          quoteResponse.outputMint
+          quoteResponse.outputMint,
         ),
         inputTokenName: TOKEN_NAMES[quoteResponse.inputMint],
         outputTokenName: TOKEN_NAMES[quoteResponse.outputMint],
       },
     };
-  }
+  },
 );

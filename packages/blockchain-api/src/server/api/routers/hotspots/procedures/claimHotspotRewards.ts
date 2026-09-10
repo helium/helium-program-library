@@ -19,7 +19,8 @@ import {
 import {
   getTotalTransactionFees,
   calculateRequiredBalance,
-  RENT_COSTS,
+  RECIPIENT_SPACE,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -120,8 +121,11 @@ export const claimHotspotRewards =
 
       const txFees = await getTotalTransactionFees(connection, vtxs);
       const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
-      const rentCost = recipientAcc ? 0 : RENT_COSTS.RECIPIENT;
-      const requiredLamports = calculateRequiredBalance(
+      const rentCost = recipientAcc
+        ? 0
+        : await getRentLamports(connection, RECIPIENT_SPACE);
+      const requiredLamports = await calculateRequiredBalance(
+        connection,
         txFees + jitoTipCost,
         rentCost,
       );

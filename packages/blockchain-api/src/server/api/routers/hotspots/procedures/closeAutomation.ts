@@ -65,7 +65,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
       cluster === "mainnet" || cluster === "mainnet-beta"
         ? getJitoTipAmountLamports()
         : 0;
-    const required = calculateRequiredBalance(
+    const required = await calculateRequiredBalance(provider.connection, 
       BASE_TX_FEE_LAMPORTS + estimatedJitoTipCost,
       0,
     );

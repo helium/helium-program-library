@@ -1,6 +1,6 @@
 [package]
 name = "welcome-pack"
-version = "0.0.5"
+version = "0.0.6"
 description = "Created with Anchor"
 edition = "2021"
 

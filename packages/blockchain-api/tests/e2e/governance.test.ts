@@ -2,6 +2,7 @@ import { BorshInstructionCoder } from "@coral-xyz/anchor";
 import {
   delegatedPositionKey,
   EPOCH_LENGTH,
+  subDaoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
@@ -42,7 +43,7 @@ import {
   DELEGATION_CLAIM_BOT_SPACE,
   POSITION_SPACE,
 } from "../../src/server/api/routers/governance/procedures/helpers/rent";
-import { MIN_WALLET_RENT_LAMPORTS } from "../../src/lib/utils/balance-validation";
+import { getMinWalletRentLamports } from "../../src/lib/utils/balance-validation";
 import {
   DEFAULT_HPL_CRONS_TASK_QUEUE,
   TEST_PROXY_ADDRESS,
@@ -172,6 +173,8 @@ describe("governance", () => {
       expect(position!.lockup.kind).to.equal("cliff");
       expect(Number(position!.lockup.endTs)).to.be.greaterThan(0);
       expect(position!.numActiveVotes).to.equal(0);
+      expect(position!.delegation, "undelegated position has no delegation").to
+        .be.null;
     });
 
     it("extends position lockup", async () => {
@@ -825,7 +828,15 @@ describe("governance", () => {
         SYSVAR_CLOCK_PUBKEY
       );
       const clockTimestamp = Number(clockInfo!.data.readBigInt64LE(32));
-      const shortExpiration = clockTimestamp + 3600;
+      // Keep the rewritten expiration inside the current epoch. Delegating
+      // recorded the vehnt correction on the epoch info for the real
+      // expiration, and extend_expiration_ts_v0 subtracts it from whichever
+      // epoch info the old expiration names, which underflows on a fresh one.
+      const epochStart = Math.floor(clockTimestamp / EPOCH_LENGTH) * EPOCH_LENGTH;
+      const shortExpiration = Math.min(
+        clockTimestamp + 3600,
+        epochStart + EPOCH_LENGTH - 1
+      );
       await setDelegatedPositionExpiration(
         ctx,
         delegatedPosPubkey,
@@ -1113,6 +1124,36 @@ describe("governance", () => {
       }
       expect(data?.transactionData?.transactions).to.have.length(0);
       expect(data?.hasMore).to.equal(false);
+    });
+
+    it("reports the fresh delegation with nothing claimable in getPositions", async () => {
+      // #given the freshly delegated position and the cluster clock
+      const clockInfo = await ctx.connection.getAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
+      const currentEpoch = Math.floor(
+        Number(clockInfo!.data.readBigInt64LE(32)) / EPOCH_LENGTH
+      );
+
+      // #when listing positions
+      const { data, error } = await ctx.safeClient.governance.getPositions({
+        wallet: walletAddress,
+      });
+
+      // #then the delegation mirrors delegate_v0 and matches the empty claim
+      if (error) {
+        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      }
+      const position = data!.find((p) => p.positionMint === positionMint);
+      expect(position?.delegation).to.not.be.null;
+      expect(position!.delegation!.subDao).to.equal(
+        subDaoKey(MOBILE_MINT)[0].toBase58()
+      );
+      expect(position!.delegation!.lastClaimedEpoch).to.equal(currentEpoch);
+      expect(position!.delegation!.expirationTs).to.be.greaterThan(0);
+      expect(position!.delegation!.claimableEpochCount).to.equal(0);
+      expect(position!.delegation!.requiredUnclaimedEpochCount).to.equal(0);
+      expect(position!.delegation!.unissuedRequiredEpochCount).to.equal(0);
     });
   });
 
@@ -2298,8 +2339,9 @@ describe("governance", () => {
       );
       // The quote priced each transaction with getFeeForMessage, which
       // surfpool answers without the compute-unit price the runtime then
-      // charges (mainnet's includes it). Add back whatever the cluster
-      // charged beyond that answer before comparing.
+      // charges (mainnet's includes it). Surfpool's meta.fee leaves it out
+      // too, so read what was really charged off the ledger: lamports are
+      // conserved across a transaction except for its fee.
       const { blockhash } = await ctx.connection.getLatestBlockhash();
       let unquotedFees = 0;
       for (const [i, signature] of signatures.entries()) {
@@ -2310,19 +2352,22 @@ describe("governance", () => {
           ),
         );
         tx.message.recentBlockhash = blockhash;
-        const charged = (
+        const meta = (
           await ctx.connection.getTransaction(signature, {
             commitment: "confirmed",
-            maxSupportedTransactionVersion: 0,
+            maxSupportedTransactionVersion: 1,
           })
-        )!.meta!.fee;
+        )!.meta!;
+        const sum = (balances: number[]) =>
+          balances.reduce((a, b) => a + b, 0);
+        const charged = sum(meta.preBalances) - sum(meta.postBalances);
         const quoted = (await ctx.connection.getFeeForMessage(tx.message))
           .value!;
         unquotedFees += charged - quoted;
       }
       expect(
         (await ctx.connection.getBalance(wallet.publicKey)) + unquotedFees,
-      ).to.equal(MIN_WALLET_RENT_LAMPORTS);
+      ).to.equal(await getMinWalletRentLamports(ctx.connection));
 
       // #then the rent-bearing accounts are the sizes the quote priced
       const positionMint = data.transactionData.transactions[0].metadata

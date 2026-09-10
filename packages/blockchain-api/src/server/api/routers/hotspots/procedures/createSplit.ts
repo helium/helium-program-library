@@ -34,10 +34,7 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
-import {
-  resolveTokenAmountInput,
-  solToLamportsBN,
-} from "@/lib/utils/token-math";
+import { resolveTokenAmountInput } from "@/lib/utils/token-math";
 import {
   generateTransactionTag,
   TRANSACTION_TYPES,
@@ -49,15 +46,16 @@ import {
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import {
+  FANOUT_FUNDING_AMOUNT,
+  getMiniFanoutRentParts,
   getTotalTransactionFees,
-  RENT_COSTS,
+  RECIPIENT_SPACE,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
-import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
-
-const FANOUT_FUNDING_AMOUNT = solToLamportsBN(0.01).toNumber();
+import { preTaskUrl, TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
 /**
  * Create a split configuration for a hotspot with reward distribution.
@@ -140,7 +138,6 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     }
 
     const oracleSigner = new PublicKey(process.env.ORACLE_SIGNER!);
-    const oracleUrl = process.env.ORACLE_URL!;
 
     const { instruction: initIx, pubkeys } = await miniFanoutProgram.methods
       .initializeMiniFanoutV0({
@@ -164,7 +161,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
         schedule: rewardsSchedule,
         preTask: {
           remoteV0: {
-            url: `${oracleUrl}/v1/tuktuk/asset/${assetId}`,
+            url: preTaskUrl(assetId),
             signer: oracleSigner,
           },
         },
@@ -252,14 +249,27 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
       txs.push(await getJitoTipTransaction(new PublicKey(walletAddress)));
     }
 
-    // Rent includes mini fanout account + 2 tuktuk tasks (task + preTask) + optional recipient
-    const recipientRent = recipientAcc ? 0 : RENT_COSTS.RECIPIENT;
+    // Rent includes mini fanout account + its HNT ATA + 2 tuktuk tasks (task + preTask) + optional recipient
+    const preTaskUrlLen = preTaskUrl(assetId).length;
+    const [{ fanoutRent, ataRent, distTaskRent, preTaskRent }, recipientRent] =
+      await Promise.all([
+        getMiniFanoutRentParts(provider.connection, {
+          numShares: rewardsSplit.length,
+          scheduleLen: rewardsSchedule.length,
+          preTaskUrlLen,
+        }),
+        recipientAcc
+          ? 0
+          : getRentLamports(provider.connection, RECIPIENT_SPACE),
+      ]);
     const rentCost =
-      RENT_COSTS.MINI_FANOUT + RENT_COSTS.TUKTUK_TASK * 2 + recipientRent;
+      fanoutRent + ataRent + distTaskRent + preTaskRent + recipientRent;
     const txFees = await getTotalTransactionFees(provider.connection, txs);
     const jitoTipCost = useJito ? getJitoTipAmountLamports() : 0;
+    // Each queued task pays the queue's min crank reward
+    const crankRewards = 2 * taskQueueAcc!.minCrankReward.toNumber();
     const estimatedSolFeeLamports =
-      txFees + jitoTipCost + rentCost + FANOUT_FUNDING_AMOUNT;
+      txFees + jitoTipCost + rentCost + crankRewards + FANOUT_FUNDING_AMOUNT;
 
     const walletBalance = await provider.connection.getBalance(
       new PublicKey(walletAddress),

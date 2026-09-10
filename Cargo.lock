@@ -1231,7 +1231,7 @@ dependencies = [
 
 [[package]]
 name = "mini-fanout"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3454,7 +3454,7 @@ dependencies = [
 
 [[package]]
 name = "welcome-pack"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",

@@ -34,7 +34,7 @@ export async function fetchWalletTransactions(
         {
           transactionDetails: "full",
           encoding: "jsonParsed",
-          maxSupportedTransactionVersion: 0,
+          maxSupportedTransactionVersion: 1,
           limit: options?.limit ?? 100,
           ...(options?.paginationToken
             ? { paginationToken: options.paginationToken }

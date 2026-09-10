@@ -14,7 +14,6 @@ import {
   getBulkRewards,
 } from "@/utils/distributorOracle";
 import {
-  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -43,7 +42,10 @@ import {
 import {
   getTotalTransactionFees,
   calculateRequiredBalance,
+  RECIPIENT_SPACE,
+  recipientSpace,
   BASE_TX_FEE_LAMPORTS,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -58,9 +60,6 @@ import { batchTag } from "@/lib/utils/claim-rewards-tag";
 // queuing a wallet claim task. Matches CLAIMER_MIN_LAMPORTS in
 // programs/hpl-crons/src/instructions/queue_wallet_claim_v0.rs
 const CLAIMER_MIN_LAMPORTS = 40_000_000;
-
-const RECIPIENT_RENT = 0.00242208;
-const RECIPIENT_RENT_LAMPORTS = Math.ceil(RECIPIENT_RENT * LAMPORTS_PER_SOL);
 
 const HPL_CRONS_PROGRAM_ID = new PublicKey(
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu",
@@ -264,21 +263,21 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       // new_size = 127 + 9*num_oracles + 64 = 191 + 9*num_oracles
       const numOracles = ldAcc.oracles.length;
       const newRecipientSize = 191 + 9 * numOracles;
-      // Solana rent: 19.055441478 lamports per byte-year * 2 years + 128 bytes base
-      // rent.minimum_balance(size) = (size + 128) * 6960 (approx, but use exact formula)
-      const LAMPORTS_PER_BYTE_YEAR = 3480;
-      const rentExemptForNewSize =
-        (newRecipientSize + 128) * LAMPORTS_PER_BYTE_YEAR * 2;
+      const [rentExemptForNewSize, recipientRent] = await Promise.all([
+        getRentLamports(connection, newRecipientSize),
+        getRentLamports(connection, recipientSpace(numOracles)),
+      ]);
       const resizeCost = recipientAccountInfos.reduce(
         (sum: number, info: { lamports: number } | null) => {
-          if (!info) return sum; // New recipients handled by RECIPIENT_RENT_LAMPORTS
+          if (!info) return sum; // New recipients handled by recipientRent
           const deficit = rentExemptForNewSize - info.lamports;
           return sum + Math.max(0, deficit);
         },
         0,
       );
-      const rentCost = numRecipientsNeeded * RECIPIENT_RENT_LAMPORTS;
-      const requiredLamports = calculateRequiredBalance(
+      const rentCost = numRecipientsNeeded * recipientRent;
+      const requiredLamports = await calculateRequiredBalance(
+        connection,
         txFees + jitoTipCost + resizeCost,
         rentCost,
       );
@@ -358,7 +357,9 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
 
     // PDA wallet needs CLAIMER_MIN_LAMPORTS (on-chain check) plus rent for any new recipients
     const pdaWalletFundingNeededLamports =
-      CLAIMER_MIN_LAMPORTS + hotspotsNeedingRecipient * RECIPIENT_RENT_LAMPORTS;
+      CLAIMER_MIN_LAMPORTS +
+      hotspotsNeedingRecipient *
+        (await getRentLamports(provider.connection, RECIPIENT_SPACE));
     const pdaWalletLamportsShortfall = Math.max(
       0,
       pdaWalletFundingNeededLamports - pdaWalletBalanceLamports,
@@ -424,7 +425,8 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       provider.connection.getBalance(new PublicKey(walletAddress)),
       getTotalTransactionFees(provider.connection, vtxs),
     ]);
-    const totalRequired = calculateRequiredBalance(
+    const totalRequired = await calculateRequiredBalance(
+      provider.connection,
       txFees,
       pdaWalletLamportsShortfall,
     );

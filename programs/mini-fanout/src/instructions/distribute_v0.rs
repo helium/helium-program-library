@@ -237,13 +237,28 @@ pub fn handler<'info>(
 
   // Pay min crank reward to task_queue from mini_fanout, if available
   let min_rent_exempt = Rent::get()?.minimum_balance(mini_fanout_info.data_len());
-  if mini_fanout_info.lamports() - min_rent_exempt >= ctx.accounts.task_queue.min_crank_reward * 2 {
-    mini_fanout.sub_lamports(ctx.accounts.task_queue.min_crank_reward * 2)?;
-    ctx
-      .accounts
-      .task_queue
-      .add_lamports(ctx.accounts.task_queue.min_crank_reward * 2)?;
+  // A fanout funded before a Rent sysvar increase can sit below the current
+  // minimum. Fail (rather than panic, or stop scheduling) so the task stays
+  // queued and the fanout resumes on its own once it is topped up.
+  require_gte!(
+    mini_fanout_info.lamports(),
+    min_rent_exempt,
+    ErrorCode::BelowRentExempt
+  );
+  let crank_rewards = ctx
+    .accounts
+    .task_queue
+    .min_crank_reward
+    .checked_mul(2)
+    .ok_or(ErrorCode::ArithmeticError)?;
+  if mini_fanout_info.lamports() - min_rent_exempt >= crank_rewards {
+    mini_fanout.sub_lamports(crank_rewards)?;
+    ctx.accounts.task_queue.add_lamports(crank_rewards)?;
   } else {
+    msg!(
+      "Fanout cannot afford {} lamports of crank rewards; stopping scheduling",
+      crank_rewards
+    );
     mini_fanout.next_task = mini_fanout.key();
     mini_fanout.next_pre_task = mini_fanout.key();
     return Ok(RunTaskReturnV0 {

@@ -52,7 +52,9 @@ async function run() {
         "processed"
       );
       if (tx.value.err) {
-        const tx = await provider.connection.getTransaction(txid);
+        const tx = await provider.connection.getTransaction(txid, {
+          maxSupportedTransactionVersion: 1,
+        });
         console.error(txid, tx!.meta!.logMessages?.join("\n"));
       }
       return !tx.value.err;

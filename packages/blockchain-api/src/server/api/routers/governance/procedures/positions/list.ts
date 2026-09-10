@@ -1,8 +1,19 @@
 import { publicProcedure } from "@/server/api/procedures";
+import { initCachedProgram } from "@/lib/anchor-idl-cache";
 import { createSolanaConnection } from "@/lib/solana";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
-import { init as initVsr } from "@helium/voter-stake-registry-sdk";
-import { PublicKey } from "@solana/web3.js";
+import {
+  daoKey,
+  delegatedPositionKey,
+  init as initHsd,
+  PROGRAM_ID as HSD_PROGRAM_ID,
+} from "@helium/helium-sub-daos-sdk";
+import { HNT_MINT } from "@helium/spl-utils";
+import {
+  init as initVsr,
+  PROGRAM_ID as VSR_PROGRAM_ID,
+} from "@helium/voter-stake-registry-sdk";
+import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { headers } from "next/headers";
 import {
   createRateLimiter,
@@ -10,7 +21,23 @@ import {
   parseRateLimit,
 } from "@/lib/utils/rate-limit";
 import { getLockupKind } from "../helpers/constants";
-import { fetchRegistrarsByKey, getPositionsForOwner } from "../helpers";
+import {
+  fetchEpochInfos,
+  fetchRegistrarsByKey,
+  getClaimableEpochRange,
+  getPositionsForOwner,
+  isEpochInfoIssued,
+  summarizeClaimableEpochs,
+} from "../helpers";
+import type {
+  ClaimableEpochRange,
+  HsdProgram,
+  OwnedPosition,
+} from "../helpers";
+
+// Clock sysvar layout: slot, epoch_start_timestamp, epoch,
+// leader_schedule_epoch (u64 each), then unix_timestamp.
+const CLOCK_UNIX_TIMESTAMP_OFFSET = 8 * 4;
 
 // Courtesy throttle (per-process, XFF-keyed) on a public endpoint whose cost
 // is server-side RPC fan-out.
@@ -18,6 +45,92 @@ const getPositionsIpRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: () => parseRateLimit(process.env.GET_POSITIONS_RATE_LIMIT_PER_IP, 60),
 });
+
+type DelegatedPositionV0 = Awaited<
+  ReturnType<HsdProgram["account"]["delegatedPositionV0"]["fetch"]>
+>;
+
+/**
+ * Delegation output for every owned position, using the same epoch range and
+ * issuance test as buildClaimInstructions so the counts match what a claim or
+ * undelegate call would actually do.
+ */
+const fetchDelegations = async ({
+  connection,
+  hsdProgram,
+  owned,
+}: {
+  connection: Awaited<ReturnType<typeof createSolanaConnection>>["connection"];
+  hsdProgram: HsdProgram;
+  owned: OwnedPosition[];
+}) => {
+  const dao = daoKey(HNT_MINT)[0];
+  const [delegated, clock] = await Promise.all([
+    hsdProgram.account.delegatedPositionV0.fetchMultiple(
+      owned.map((p) => delegatedPositionKey(p.position)[0]),
+    ) as Promise<(DelegatedPositionV0 | null)[]>,
+    connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY),
+  ]);
+  if (delegated.every((d) => !d)) {
+    return owned.map(() => null);
+  }
+
+  const unixNow = Number(
+    clock!.data.readBigInt64LE(CLOCK_UNIX_TIMESTAMP_OFFSET),
+  );
+
+  const ranges: (ClaimableEpochRange | null)[] = owned.map((p, i) => {
+    const delegation = delegated[i];
+    if (!delegation) return null;
+    return getClaimableEpochRange({
+      lockup: p.account.lockup,
+      delegatedPosition: delegation,
+      unixNow,
+    });
+  });
+
+  // Positions on the same sub-DAO share sub-DAO epoch infos, and every
+  // position shares the DAO epoch infos; read each once. That dedupe is what
+  // bounds the cost: unique (subDao, epoch) pairs cannot exceed the number of
+  // sub-DAOs times the epochs delegation has existed (~1.3k), whatever the
+  // position count, so the worst case is a few thousand PDA derivations and
+  // a few dozen getMultipleAccounts calls. No per-position cap on top of the
+  // 128-epoch bitmap window; the IP rate limiter bounds the request rate.
+  const entries: { subDao: PublicKey; epoch: number }[] = [];
+  ranges.forEach((range, i) => {
+    if (!range) return;
+    const subDao = delegated[i]!.subDao;
+    for (const epoch of range.unclaimedEpochs) {
+      entries.push({ subDao, epoch });
+    }
+  });
+
+  const infos = await fetchEpochInfos({
+    connection,
+    hsdProgram,
+    dao,
+    entries,
+  });
+  const issued = new Set(
+    entries
+      .filter((_, i) => isEpochInfoIssued(infos[i]))
+      .map(({ subDao, epoch }) => `${subDao.toBase58()}:${epoch}`),
+  );
+
+  return ranges.map((range, i) => {
+    const delegation = delegated[i];
+    if (!range || !delegation) return null;
+    const { subDao } = delegation;
+    return {
+      subDao: subDao.toBase58(),
+      lastClaimedEpoch: delegation.lastClaimedEpoch.toNumber(),
+      expirationTs: delegation.expirationTs.toNumber(),
+      ...summarizeClaimableEpochs(range, (epoch) =>
+        issued.has(`${subDao.toBase58()}:${epoch}`),
+      ),
+    };
+  });
+};
 
 export const getPositions = publicProcedure.governance.getPositions.handler(
   async ({ input, errors }) => {
@@ -29,7 +142,10 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
     const walletPubkey = new PublicKey(wallet);
 
     const { connection, provider } = createSolanaConnection(wallet);
-    const vsrProgram = await initVsr(provider);
+    const [vsrProgram, hsdProgram] = await Promise.all([
+      initCachedProgram(initVsr, VSR_PROGRAM_ID, provider),
+      initCachedProgram(initHsd, HSD_PROGRAM_ID, provider),
+    ]);
 
     const owned = await getPositionsForOwner({
       connection,
@@ -39,10 +155,13 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
     if (owned.length === 0) return [];
 
     // Registrars are shared across positions — fetch each unique one once.
-    const registrarByKey = await fetchRegistrarsByKey(vsrProgram, owned);
+    const [registrarByKey, delegations] = await Promise.all([
+      fetchRegistrarsByKey(vsrProgram, owned),
+      fetchDelegations({ connection, hsdProgram, owned }),
+    ]);
 
     const positions = await Promise.all(
-      owned.map(async ({ mint, position, account: acc }) => {
+      owned.map(async ({ mint, position, account: acc }, i) => {
         const registrar = registrarByKey.get(acc.registrar.toBase58());
         // An out-of-range votingMintConfigIdx (corrupt/nonstandard registrar
         // data) must drop the position, not 500 the whole response.
@@ -58,7 +177,7 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
           registrar: acc.registrar.toBase58(),
           amountDeposited: await toTokenAmountOutput(
             acc.amountDepositedNative,
-            votingMint
+            votingMint,
           ),
           numActiveVotes: acc.numActiveVotes,
           lockup: {
@@ -66,10 +185,11 @@ export const getPositions = publicProcedure.governance.getPositions.handler(
             startTs: acc.lockup.startTs.toString(),
             endTs: acc.lockup.endTs.toString(),
           },
+          delegation: delegations[i],
         };
-      })
+      }),
     );
 
     return positions.filter((p) => p !== null);
-  }
+  },
 );

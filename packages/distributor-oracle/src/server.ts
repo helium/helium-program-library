@@ -36,6 +36,7 @@ import {
   lazyDistributorKey,
   PROGRAM_ID as LD_PID,
   recipientKey,
+  recipientSpace,
 } from "@helium/lazy-distributor-sdk";
 import {
   init as initRewards,
@@ -44,12 +45,11 @@ import {
 import { Asset, getAsset, HNT_MINT, toNumber } from "@helium/spl-utils";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import { createMemoInstruction } from "@solana/spl-memo";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { ACCOUNT_SIZE, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
   Keypair,
-  LAMPORTS_PER_SOL,
   MessageCompiledInstruction,
   PublicKey,
   SystemProgram,
@@ -63,11 +63,9 @@ import Fastify, {
 } from "fastify";
 import fs from "fs";
 import {
-  ATA_RENT,
   DAO,
   DNT,
   MAX_CLAIMS_PER_TX,
-  RECIPIENT_RENT,
 } from "./constants";
 import { Database, DeviceType, RewardableEntity } from "./database";
 import { register, totalRewardsGauge } from "./metrics";
@@ -79,6 +77,12 @@ export class OracleServer {
   app: FastifyInstance;
   port = 8080;
   server: string | undefined;
+  // Rent only changes at feature activation and the oracle set only by
+  // admin action; refresh both hourly like blockchain-api.
+  private ttlCache = new Map<
+    string,
+    { value: Promise<number>; expiresAt: number }
+  >();
 
   constructor(
     // tuktuk is on a different version of anchor, so this has to be done.
@@ -131,6 +135,35 @@ export class OracleServer {
 
   public async close() {
     await this.app.close();
+  }
+
+  private cachedHourly(
+    key: string,
+    load: () => Promise<number>
+  ): Promise<number> {
+    const now = Date.now();
+    const hit = this.ttlCache.get(key);
+    if (hit && hit.expiresAt > now) return hit.value;
+    const value = load();
+    this.ttlCache.set(key, { value, expiresAt: now + 60 * 60 * 1000 });
+    value.catch(() => this.ttlCache.delete(key));
+    return value;
+  }
+
+  private minRent(space: number): Promise<number> {
+    return this.cachedHourly(`rent:${space}`, () =>
+      this.ldProgram.provider.connection.getMinimumBalanceForRentExemption(
+        space
+      )
+    );
+  }
+
+  private getOracleCount(): Promise<number> {
+    return this.cachedHourly("oracleCount", () =>
+      this.ldProgram.account.lazyDistributorV0
+        .fetch(this.lazyDistributor)
+        .then((ld) => ld.oracles.length)
+    );
   }
 
   private addRoutes() {
@@ -747,10 +780,17 @@ export class OracleServer {
     );
     const ataExists =
       !!(await this.ldProgram.provider.connection.getAccountInfo(ata));
+    const [walletMinRent, recipientRent, ataRent] = await Promise.all([
+      this.minRent(0),
+      recipientAcc
+        ? 0
+        : this.getOracleCount().then((n) => this.minRent(recipientSpace(n))),
+      ataExists ? 0 : this.minRent(ACCOUNT_SIZE),
+    ]);
     const neededBalance =
-      (!ataExists || !recipientAcc ? 0.00089088 * LAMPORTS_PER_SOL : 0) +
-      (recipientAcc ? 0 : RECIPIENT_RENT) +
-      (ataExists ? 0 : ATA_RENT);
+      (!ataExists || !recipientAcc ? walletMinRent : 0) +
+      recipientRent +
+      ataRent;
 
     const instructions: TransactionInstruction[] = [];
     if (balance < neededBalance) {
@@ -997,7 +1037,8 @@ export class OracleServer {
         )
       )?.lamports || 0;
     const fees = taskQueueAcc.minCrankReward.toNumber() * (entities.length + 1);
-    const neededBalance = 0.00089088 * LAMPORTS_PER_SOL + fees;
+    const walletMinRent = await this.minRent(0);
+    const neededBalance = walletMinRent + fees;
     const instructions: TransactionInstruction[] = [];
     if (balance < neededBalance) {
       instructions.push(

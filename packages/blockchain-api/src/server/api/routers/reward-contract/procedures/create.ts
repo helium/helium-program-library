@@ -1,13 +1,19 @@
 import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
+import { preTaskUrl, TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 import { createSolanaConnection, getAssetEndpoint } from "@/lib/solana";
 import { fetchOwnedAsset } from "@/lib/utils/asset-ownership";
 import {
   calculateRequiredBalance,
   getTransactionFee,
   BASE_TX_FEE_LAMPORTS,
-  RENT_COSTS,
+  FANOUT_FUNDING_AMOUNT,
+  getMiniFanoutRentParts,
+  getWelcomePackRentParts,
+  getWelcomePackCost,
+  RECIPIENT_SPACE,
+  getRentLamports,
 } from "@/lib/utils/balance-validation";
 import {
   buildVersionedTransaction,
@@ -17,7 +23,6 @@ import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
 import { toSixColumnCron } from "@/lib/utils/misc";
 import {
   resolveTokenAmountInput,
-  solToLamportsBN,
   toTokenAmountOutput,
 } from "@/lib/utils/token-math";
 import {
@@ -50,8 +55,6 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import BN from "bn.js";
-
-const FANOUT_FUNDING_AMOUNT = solToLamportsBN(0.01).toNumber();
 
 export const create = publicProcedure.rewardContract.create.handler(
   async ({ input, errors }) => {
@@ -113,27 +116,85 @@ export const create = publicProcedure.rewardContract.create.handler(
     );
     let rentCost = 0;
     if (!recipientAcc) {
-      rentCost += RENT_COSTS.RECIPIENT;
+      rentCost += await getRentLamports(connection, RECIPIENT_SPACE);
     }
+
+    const welcomePackProgram = hasClaimable ? await init(provider) : undefined;
+    const uwpAcc = welcomePackProgram
+      ? await welcomePackProgram.account.userWelcomePacksV0.fetchNullable(
+          userWelcomePacksKey(new PublicKey(delegateWalletAddress))[0],
+        )
+      : null;
+    const taskQueueId = TASK_QUEUE_ID;
+    const tuktukProgram = hasClaimable ? undefined : await initTuktuk(provider);
+    // Read early only for min_crank_reward; the task bitmap is re-read right
+    // before picking task ids so the window for another caller to take them
+    // stays as short as it was.
+    const minCrankReward =
+      tuktukProgram &&
+      (await tuktukProgram.account.taskQueueV0.fetch(taskQueueId))
+        .minCrankReward;
 
     if (hasClaimable) {
       // Welcome pack path - add pack rent + gifted SOL
-      rentCost += RENT_COSTS.WELCOME_PACK + RENT_COSTS.USER_WELCOME_PACKS;
+      // With more than one recipient, initialize_welcome_pack_v0 also escrows
+      // the future mini fanout's rent, its HNT ATA rent and FANOUT_FUNDING_AMOUNT.
+      const numFixedShares = recipients.filter(
+        (r) => r.receives.type === "FIXED",
+      ).length;
+      const scheduleLen = toSixColumnCron(rewardSchedule).length;
+      const hasFanout = recipients.length > 1;
+      const { welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent } =
+        await getWelcomePackRentParts(connection, {
+          numFixedShares,
+          numPercentageShares: recipients.length - numFixedShares,
+          scheduleLen,
+          preTaskUrlLen: preTaskUrl(assetId).length,
+          userWelcomePacksExists: !!uwpAcc,
+        });
       const claimableRecipient = recipients.find((r) => r.type === "CLAIMABLE");
-      if (claimableRecipient?.type === "CLAIMABLE") {
-        rentCost += (
-          await resolveTokenAmountInput(
-            claimableRecipient.giftedCurrency,
-            NATIVE_MINT.toBase58(),
-          )
-        ).toNumber();
-      }
+      const giftLamports =
+        claimableRecipient?.type === "CLAIMABLE"
+          ? (
+              await resolveTokenAmountInput(
+                claimableRecipient.giftedCurrency,
+                NATIVE_MINT.toBase58(),
+              )
+            ).toNumber()
+          : 0;
+      const { packCost } = getWelcomePackCost({
+        welcomePackRent,
+        fanoutRent,
+        ataRent,
+        giftLamports,
+        hasFanout,
+      });
+      rentCost += packCost + userWelcomePacksRent;
     } else {
-      // Mini-fanout path - add funding amount
-      rentCost += FANOUT_FUNDING_AMOUNT;
+      // Mini-fanout path: the fanout, its HNT ATA, the two tuktuk tasks
+      // initialize_mini_fanout_v0 queues (each paid the queue's min crank
+      // reward) and FANOUT_FUNDING_AMOUNT.
+      const scheduleLen = toSixColumnCron(rewardSchedule).length;
+      const { fanoutRent, ataRent, distTaskRent, preTaskRent } =
+        await getMiniFanoutRentParts(connection, {
+          numShares: recipients.length,
+          scheduleLen,
+          preTaskUrlLen: preTaskUrl(assetId).length,
+        });
+      rentCost +=
+        fanoutRent +
+        ataRent +
+        distTaskRent +
+        preTaskRent +
+        2 * minCrankReward!.toNumber() +
+        FANOUT_FUNDING_AMOUNT;
     }
 
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, rentCost);
+    const required = await calculateRequiredBalance(
+      connection,
+      BASE_TX_FEE_LAMPORTS,
+      rentCost,
+    );
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance to create reward contract",
@@ -142,13 +203,8 @@ export const create = publicProcedure.rewardContract.create.handler(
     }
 
     if (hasClaimable) {
-      const program = await init(provider);
+      const program = welcomePackProgram!;
 
-      const [uwpKey] = userWelcomePacksKey(
-        new PublicKey(delegateWalletAddress),
-      );
-      const uwpAcc =
-        await program.account.userWelcomePacksV0.fetchNullable(uwpKey);
       if (uwpAcc && uwpAcc.nextId > 0) {
         const packKeys = Array.from(
           { length: uwpAcc.nextId },
@@ -218,7 +274,6 @@ export const create = publicProcedure.rewardContract.create.handler(
       instructions.push(ix);
     } else {
       const miniFanoutProgram = await initMiniFanout(provider);
-      const tuktukProgram = await initTuktuk(provider);
       const [miniFanoutK] = miniFanoutKey(
         new PublicKey(signerWalletAddress),
         assetPubkey.toBuffer(),
@@ -233,9 +288,7 @@ export const create = publicProcedure.rewardContract.create.handler(
         });
       }
 
-      const taskQueueId = new PublicKey(process.env.HPL_CRONS_TASK_QUEUE!);
       const oracleSigner = new PublicKey(env.ORACLE_SIGNER);
-      const oracleUrl = env.ORACLE_URL;
 
       const shares = await Promise.all(
         recipients.map(async (r) => {
@@ -271,7 +324,7 @@ export const create = publicProcedure.rewardContract.create.handler(
           schedule: toSixColumnCron(rewardSchedule),
           preTask: {
             remoteV0: {
-              url: `${oracleUrl}/v1/tuktuk/asset/${assetId}`,
+              url: preTaskUrl(assetId),
               signer: oracleSigner,
             },
           },
@@ -295,10 +348,9 @@ export const create = publicProcedure.rewardContract.create.handler(
       );
 
       const taskQueueAcc =
-        await tuktukProgram.account.taskQueueV0.fetchNullable(taskQueueId);
-
+        await tuktukProgram!.account.taskQueueV0.fetch(taskQueueId);
       const [taskId, preTaskId] = nextAvailableTaskIds(
-        taskQueueAcc!.taskBitmap,
+        taskQueueAcc.taskBitmap,
         2,
       );
 

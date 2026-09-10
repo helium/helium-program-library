@@ -16,7 +16,9 @@ RUN --mount=type=cache,id=cargo-registry-1.68,target=/usr/local/cargo/registry \
     cp /app/target/release/ecc-sig-verifier /app/ecc-sig-verifier
 
 FROM debian:bullseye-slim
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# bullseye is EOL and its apt mirrors are being retired, so the runtime takes
+# the CA bundle from the (bullseye-based) builder instead of installing it.
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
 COPY --from=builder /app/ecc-sig-verifier /app/ecc-sig-verifier
 
 ENV ROCKET_ADDRESS=0.0.0.0

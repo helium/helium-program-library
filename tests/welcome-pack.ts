@@ -291,6 +291,7 @@ describe("welcome-pack", () => {
   describe("with a welcome pack", () => {
     const rewardsSchedule = "* * * * * *";
     let welcomePack: PublicKey;
+    let rentRefund = PublicKey.default;
     beforeEach(async () => {
       const rewardsSplit = [
         {
@@ -318,7 +319,7 @@ describe("welcome-pack", () => {
           getAssetFn,
           getAssetProofFn,
           assetReturnAddress: hotspotOwner.publicKey,
-          rentRefund: PublicKey.default,
+          rentRefund,
           owner: hotspotOwner.publicKey,
           payer: me,
         })
@@ -329,8 +330,7 @@ describe("welcome-pack", () => {
       console.log("Welcome pack initialized");
     });
 
-    it("claims a welcome pack", async () => {
-      const claimer = Keypair.generate();
+    const claimAs = async (claimer: Keypair) => {
       const claimApproval = {
         uniqueId: 0,
         expirationTimestamp: new BN(Math.floor(Date.now() / 1000) + 60),
@@ -339,7 +339,6 @@ describe("welcome-pack", () => {
         claimApproval,
         hotspotOwner
       );
-      const miniFanout = miniFanoutKey(welcomePack, hotspot.toBuffer())[0];
       // TODO: Asset proof stuff
       const mock = await createMockCompression({
         collection,
@@ -409,6 +408,12 @@ describe("welcome-pack", () => {
         [claimer]
       );
       console.log("ixns sent");
+    };
+
+    it("claims a welcome pack", async () => {
+      const claimer = Keypair.generate();
+      const miniFanout = miniFanoutKey(welcomePack, hotspot.toBuffer())[0];
+      await claimAs(claimer);
       // Verify mini fanout was created
       const miniFanoutAccount =
         await miniFanoutProgram.account.miniFanoutV0.fetch(miniFanout);
@@ -431,6 +436,43 @@ describe("welcome-pack", () => {
       expect(rewardsRecipient.destination.toBase58()).to.equal(
         miniFanout.toBase58()
       );
+    });
+
+    describe("funded above its claim cost", () => {
+      const rentRefundWallet = Keypair.generate();
+      before(() => {
+        rentRefund = rentRefundWallet.publicKey;
+      });
+      after(() => {
+        rentRefund = PublicKey.default;
+      });
+
+      it("refunds the surplus to rent_refund on claim", async () => {
+        // A pack whose init rent exceeded sol_amount + fanout cost, or that
+        // resize_to_fit topped up, carries lamports beyond what the claim
+        // spends. The refund runs after the bubblegum CPI; moving it back
+        // ahead of that CPI fails with UnbalancedInstruction on mainnet.
+        const extra = 1_234_567;
+        await sendInstructions(provider, [
+          SystemProgram.transfer({
+            fromPubkey: me,
+            toPubkey: welcomePack,
+            lamports: extra,
+          }),
+        ]);
+        const before = await provider.connection.getBalance(
+          rentRefundWallet.publicKey
+        );
+
+        await claimAs(Keypair.generate());
+
+        const after = await provider.connection.getBalance(
+          rentRefundWallet.publicKey
+        );
+        // The pack's own init rent is below sol_amount + fanout cost here, so
+        // the surplus is exactly the top-up.
+        expect(after - before).to.equal(extra);
+      });
     });
 
     it("closes a welcome pack", async () => {

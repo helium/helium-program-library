@@ -204,7 +204,7 @@ describe("hpl-crons", () => {
     for (let i = 0; i < 10 && !executed; i++) {
       executed = await provider.connection.getTransaction(sig, {
         commitment: "confirmed",
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
       });
       if (!executed) await new Promise((r) => setTimeout(r, 500));
     }

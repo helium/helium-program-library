@@ -52,7 +52,7 @@ export const deletePack = publicProcedure.welcomePacks.delete.handler(
     const walletBalance = await provider.connection.getBalance(
       new PublicKey(walletAddress)
     );
-    const required = calculateRequiredBalance(BASE_TX_FEE_LAMPORTS, 0);
+    const required = await calculateRequiredBalance(provider.connection, BASE_TX_FEE_LAMPORTS, 0);
     if (walletBalance < required) {
       throw errors.INSUFFICIENT_FUNDS({
         message: "Insufficient SOL balance for transaction fees",

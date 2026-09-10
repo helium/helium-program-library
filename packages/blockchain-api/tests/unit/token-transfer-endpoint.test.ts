@@ -5,7 +5,6 @@ import { VersionedTransaction } from "@solana/web3.js";
 import { call, ORPCError } from "@orpc/server";
 import { expect } from "chai";
 import { after, afterEach, before, describe, it } from "mocha";
-import { MIN_WALLET_RENT_LAMPORTS } from "../../src/lib/utils/balance-validation";
 
 /**
  * Type-only, so naming the handler here does not import it: the module reads a
@@ -26,6 +25,8 @@ const balances = new Map<string, number>();
 const DEFAULT_BALANCE = 5_000_000_000;
 /** What the stub's getFeeForMessage charges for any transaction. */
 const STUB_TX_FEE = 10000;
+/** What the stub reports as rent-exempt minimum for a 0-data wallet. */
+const STUB_MIN_WALLET_RENT = 810624;
 
 const withContext = (value: unknown) => ({
   context: { apiVersion: "2.0.0", slot: 1 },
@@ -50,6 +51,8 @@ function rpcResult(method: string, params: unknown[]): unknown {
       return withContext(balances.get(params[0] as string) ?? DEFAULT_BALANCE);
     case "getFeeForMessage":
       return withContext(STUB_TX_FEE);
+    case "getMinimumBalanceForRentExemption":
+      return STUB_MIN_WALLET_RENT;
     case "getRecentPrioritizationFees":
       return [];
     default:
@@ -224,7 +227,7 @@ describe("POST /tokens/transfer fee payer", () => {
     // The stub's fee plus the min-wallet buffer, and not a lamport of the
     // 100_000_000 being transferred.
     expect((error as ORPCError<string, unknown>).data).to.deep.eq({
-      required: STUB_TX_FEE + MIN_WALLET_RENT_LAMPORTS,
+      required: STUB_TX_FEE + STUB_MIN_WALLET_RENT,
       available: 1000,
     });
   });

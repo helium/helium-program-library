@@ -96,7 +96,7 @@ export async function run(args: any = process.argv) {
       const chunk = signatures.slice(i, i + chunkSize);
       const txs = await provider.connection.getTransactions(
         chunk.map((sig) => sig.signature),
-        { maxSupportedTransactionVersion: 0, commitment: "confirmed" }
+        { maxSupportedTransactionVersion: 1, commitment: "confirmed" }
       );
 
       for (const tx of txs) {
