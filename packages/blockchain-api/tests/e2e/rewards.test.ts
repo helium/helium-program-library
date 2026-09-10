@@ -175,12 +175,17 @@ describe("rewards endpoints", () => {
       nextAvailable
     );
     await sleep(2000);
-    let prevAvailable = nextAvailable;
+    const prevAvailable = nextAvailable;
+    // The first run queued child tasks into ids from the bitmap read above, so
+    // re-read it before reserving ids for the children to return.
+    const taskQueueAfter = await tuktukProgram.account.taskQueueV0.fetch(
+      TASK_QUEUE_ID
+    );
     nextAvailable = nextAvailableTaskIds(
-      taskQueueAcc.taskBitmap,
+      taskQueueAfter.taskBitmap,
       6,
       false,
-      taskQueueAcc.capacity
+      taskQueueAfter.capacity
     );
     await runAllTasks(
       provider,

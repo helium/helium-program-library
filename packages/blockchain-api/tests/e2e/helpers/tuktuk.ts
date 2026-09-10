@@ -106,6 +106,11 @@ export async function runAllTasks(
     }
   }
 
+  // Copied so handing out ids below does not mutate the caller's list.
+  const freeIdPool = nextAvailableTaskIds
+    ? [...nextAvailableTaskIds]
+    : undefined;
+
   // Execute all tasks
   for (const taskId of taskIds) {
     const task = taskKey(taskQueue, taskId)[0];
@@ -121,11 +126,15 @@ export async function runAllTasks(
       continue;
     }
 
+    // RunTaskV0 rejects any supplied free id that is already in the bitmap, so
+    // every task must get its own ids: hand out a slice per task rather than
+    // sharing one list. Once the list is spent the SDK picks fresh ids itself.
+    const taskFreeIds = freeIdPool?.splice(0, taskAcc.freeTasks);
     const runTaskIxs = await runTask({
       program: tuktukProgram,
       task,
       crankTurner: crankTurner.publicKey,
-      nextAvailableTaskIds,
+      nextAvailableTaskIds: taskFreeIds?.length ? taskFreeIds : undefined,
     });
     const draftIxs = await withPriorityFees({
       connection: provider.connection,
