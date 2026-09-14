@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.13.1
+
+### Patch Changes
+
+- [#1306](https://github.com/helium/helium-program-library/pull/1306) [`60c388a`](https://github.com/helium/helium-program-library/commit/60c388a6754e8018eb184102768772e20fa4fa0a) Thanks [@bryzettler](https://github.com/bryzettler)! - Pass the running tuktuk task to `setCurrentRewardsWrapperV2` as a remaining account. lazy-distributor 0.3.9 requires that task to be a RemoteV0 task signed by the oracle, which binds the oracle signature to the task it was issued for and rejects it under any other task.
+
+- Updated dependencies [[`60c388a`](https://github.com/helium/helium-program-library/commit/60c388a6754e8018eb184102768772e20fa4fa0a)]:
+  - @helium/idls@0.11.28
+
 ## 0.13.0
 
 ### Minor Changes
