@@ -98,6 +98,7 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
     VsrError::MaxChoicesExceeded
   );
 
+  marker.sync_weight();
   marker.choices.push(args.choice);
 
   ctx.accounts.position.num_active_votes += 1;

@@ -520,6 +520,7 @@ describe("voter-stake-registry", () => {
           marker! as PublicKey
         );
         expect(markerA?.choices).to.be.empty;
+        expect(markerA?.weight.toNumber()).to.eq(0);
       });
 
       it("(v0) allows pays the rent for the marker from registrar if possible", async () => {
@@ -635,6 +636,7 @@ describe("voter-stake-registry", () => {
           marker! as PublicKey
         );
         expect(markerA?.choices).to.be.empty;
+        expect(markerA?.weight.toNumber()).to.eq(0);
       });
 
       it("(v1) clears the marker weight when the recount leaves no choices", async () => {
