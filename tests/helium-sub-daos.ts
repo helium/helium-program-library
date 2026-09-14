@@ -27,7 +27,8 @@ import {
 } from "@helium/spl-utils";
 import {
   AccountLayout,
-  createMintToInstruction,
+  createTransferInstruction,
+  getAssociatedTokenAddressSync,
   getMint,
 } from "@solana/spl-token";
 import {
@@ -127,7 +128,13 @@ describe("helium-sub-daos", () => {
   async function depositIntoPosition(position: PublicKey, amountHnt: number) {
     const depositor = Keypair.generate();
     const amount = toBN(amountHnt, 8);
-    await createAtaAndMint(provider, hntMint, amount, depositor.publicKey);
+    await createAtaAndTransfer(
+      provider,
+      hntMint,
+      amount,
+      me,
+      depositor.publicKey
+    );
     await vsrProgram.methods
       .depositV0({ amount })
       .accountsPartial({
@@ -1523,8 +1530,8 @@ describe("helium-sub-daos", () => {
               // by the pool balance.
               const daoAcc = await program.account.daoV0.fetch(dao);
               await sendInstructions(provider, [
-                createMintToInstruction(
-                  hntMint,
+                createTransferInstruction(
+                  getAssociatedTokenAddressSync(hntMint, me),
                   daoAcc.delegatorPool,
                   me,
                   BigInt(EPOCH_REWARDS_PLUS_NET_EMISSIONS) * BigInt(20)
