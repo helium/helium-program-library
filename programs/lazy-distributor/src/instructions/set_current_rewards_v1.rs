@@ -7,7 +7,7 @@ use anchor_lang::{
   Discriminator,
 };
 use shared_utils::resize_to_fit;
-use tuktuk_program::{TaskV0, TransactionSourceV0};
+use tuktuk_program::verify_running_remote_task;
 
 use crate::{ed25519::*, error::ErrorCode, state::*, SetCurrentRewardsArgsV0};
 
@@ -89,10 +89,6 @@ pub struct SetCurrentRewardsTransactionV0 {
   pub asset: Pubkey,
 }
 
-// Pinned by `tests::run_task_v0_shape` against the tuktuk client this program is built with.
-const RUN_TASK_V0_DISCRIMINATOR: [u8; 8] = [52, 184, 39, 129, 126, 245, 176, 237];
-const RUN_TASK_V0_TASK_ACCOUNT: usize = 3;
-
 pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0) -> Result<()> {
   let signer = ctx.accounts.lazy_distributor.oracles[usize::from(args.oracle_index)].oracle;
   let ix_index = load_current_index_checked(&ctx.accounts.sysvar_instructions.to_account_info())?;
@@ -131,40 +127,12 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
     // message to that task and its accounts, and it has already verified the ed25519
     // instruction against the task signer, so tuktuk's check is the authoritative one. The
     // verify_ed25519_ix parse above only picks this branch and repeats that signer check.
-    let run_task_ix: Instruction =
-      load_instruction_at_checked(ix_index as usize, &ctx.accounts.sysvar_instructions)?;
-    require_keys_eq!(
-      run_task_ix.program_id,
-      tuktuk_program::tuktuk::ID,
-      ErrorCode::InvalidRemoteTask
-    );
-    require!(
-      run_task_ix.data.starts_with(&RUN_TASK_V0_DISCRIMINATOR),
-      ErrorCode::InvalidRemoteTask
-    );
-    let task_key = run_task_ix
-      .accounts
-      .get(RUN_TASK_V0_TASK_ACCOUNT)
-      .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?
-      .pubkey;
+    // The oracle appends the task as the last remaining account.
     let task_info = ctx
       .remaining_accounts
-      .iter()
-      .find(|acc| acc.key() == task_key)
+      .last()
       .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?;
-    require_keys_eq!(
-      *task_info.owner,
-      tuktuk_program::tuktuk::ID,
-      ErrorCode::InvalidRemoteTask
-    );
-    let task = TaskV0::try_deserialize(&mut &task_info.data.borrow()[..])?;
-    require!(
-      matches!(
-        task.transaction,
-        TransactionSourceV0::RemoteV0 { signer: task_signer, .. } if task_signer == signer
-      ),
-      ErrorCode::InvalidRemoteTask
-    );
+    verify_running_remote_task(&ctx.accounts.sysvar_instructions, task_info, &signer)?;
   } else {
     return Err(error!(ErrorCode::InvalidDiscriminator));
   }
@@ -207,34 +175,4 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
   )?;
 
   Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-  use anchor_lang::ToAccountMetas;
-
-  use super::*;
-
-  /// The two facts the remote task check reads out of tuktuk's run_task_v0 instruction.
-  #[test]
-  fn run_task_v0_shape() {
-    assert_eq!(
-      RUN_TASK_V0_DISCRIMINATOR,
-      tuktuk_program::tuktuk::client::args::RunTaskV0::DISCRIMINATOR,
-    );
-    let task = Pubkey::new_unique();
-    let metas = tuktuk_program::tuktuk::client::accounts::RunTaskV0 {
-      crank_turner: Pubkey::new_unique(),
-      rent_refund: Pubkey::new_unique(),
-      task_queue: Pubkey::new_unique(),
-      task,
-      system_program: Pubkey::new_unique(),
-      sysvar_instructions: Pubkey::new_unique(),
-    }
-    .to_account_metas(None);
-    assert_eq!(
-      metas.iter().position(|m| m.pubkey == task),
-      Some(RUN_TASK_V0_TASK_ACCOUNT),
-    );
-  }
 }
