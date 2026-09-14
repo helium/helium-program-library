@@ -14,7 +14,7 @@ use tuktuk_program::{
 };
 
 use crate::{
-  errors::ErrorCode, is_pinned_dca_url, queue_authority_seeds, state::*, DCA_SIGNER,
+  errors::ErrorCode, queue_authority_seeds, state::*, DCA_SIGNER, DCA_URL,
   MAX_SLIPPAGE_BPS_FROM_ORACLE,
 };
 
@@ -119,7 +119,7 @@ pub fn initialize_dca_impl(
   // transaction it carries signs as the task queue's custom signers. Both name the pinned
   // DCA service.
   require_eq!(args.dca_signer, DCA_SIGNER, ErrorCode::InvalidDcaSigner);
-  require!(is_pinned_dca_url(&args.dca_url), ErrorCode::InvalidDcaUrl);
+  require!(args.dca_url == DCA_URL, ErrorCode::InvalidDcaUrl);
   require_gt!(
     MAX_SLIPPAGE_BPS_FROM_ORACLE,
     args.slippage_bps_from_oracle,

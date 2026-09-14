@@ -314,15 +314,39 @@ describe("dc-auto-topoff", () => {
   });
 
   it("refuses an auto topoff whose DCA signer or url is not the pinned one", async () => {
-    const initializeWith = (overrides: {
+    // The auto top off PDA is keyed on the delegated data credits, so each case gets its own
+    // router key: the pin is then the only thing that can reject the initialize.
+    const freshDelegatedDataCredits = async () => {
+      const freshRouterKey = (await HeliumKeypair.makeRandom()).address.b58;
+      const fresh = delegatedDataCreditsKey(subDao, freshRouterKey)[0];
+      await dcProgram.methods
+        .delegateDataCreditsV0({
+          routerKey: freshRouterKey,
+          amount: new anchor.BN(0),
+        })
+        .accountsPartial({
+          payer: me,
+          subDao,
+          delegatedDataCredits: fresh,
+          dcMint,
+          dao: daoKey(hntMint)[0],
+          fromAccount: getAssociatedTokenAddressSync(dcMint, me, true),
+          dataCredits: dataCreditsKey(dcMint)[0],
+        })
+        .rpc({ skipPreflight: true });
+      return { routerKey: freshRouterKey, delegatedDataCredits: fresh };
+    };
+
+    const initializeWith = async (overrides: {
       dcaSigner?: PublicKey;
       dcaUrl?: string;
-    }) =>
-      program.methods
+    }) => {
+      const fresh = await freshDelegatedDataCredits();
+      return program.methods
         .initializeAutoTopOffV0({
           schedule: "0 0 * * * *",
           threshold: new anchor.BN(10000000),
-          routerKey,
+          routerKey: fresh.routerKey,
           hntThreshold: new anchor.BN(10000000),
           dcaSwapAmount: new anchor.BN(10000000),
           dcaIntervalSeconds: new anchor.BN(10000000),
@@ -334,11 +358,12 @@ describe("dc-auto-topoff", () => {
           payer: me,
           authority: me,
           taskQueue,
-          delegatedDataCredits,
+          delegatedDataCredits: fresh.delegatedDataCredits,
           hntPriceOracle: PRO_HNT_PRICE_FEED,
           dcaMint,
         })
         .rpc();
+    };
 
     for (const [overrides, errorName] of [
       [{ dcaSigner: Keypair.generate().publicKey }, "InvalidDcaSigner"],
