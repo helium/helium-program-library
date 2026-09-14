@@ -913,6 +913,8 @@ export class OracleServer {
             payer: wallet,
             keyToAsset: new PublicKey(keyToAsset.address!),
           })
+          // The lazy distributor binds the oracle signature to the running tuktuk task.
+          .remainingAccounts([{ pubkey: task, isSigner: false, isWritable: false }])
           .instruction()
       );
 

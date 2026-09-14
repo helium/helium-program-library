@@ -2,12 +2,12 @@ use anchor_lang::{
   prelude::{Pubkey, *},
   solana_program::{
     instruction::Instruction,
-    pubkey,
     sysvar::instructions::{load_current_index_checked, load_instruction_at_checked, ID as IX_ID},
   },
   Discriminator,
 };
 use shared_utils::resize_to_fit;
+use tuktuk_program::{TaskV0, TransactionSourceV0};
 
 use crate::{ed25519::*, error::ErrorCode, state::*, SetCurrentRewardsArgsV0};
 
@@ -89,7 +89,9 @@ pub struct SetCurrentRewardsTransactionV0 {
   pub asset: Pubkey,
 }
 
-const TUKTUK_PID: Pubkey = pubkey!("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
+// Pinned by `tests::run_task_v0_shape` against the tuktuk client this program is built with.
+const RUN_TASK_V0_DISCRIMINATOR: [u8; 8] = [52, 184, 39, 129, 126, 245, 176, 237];
+const RUN_TASK_V0_TASK_ACCOUNT: usize = 3;
 
 pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0) -> Result<()> {
   let signer = ctx.accounts.lazy_distributor.oracles[usize::from(args.oracle_index)].oracle;
@@ -125,17 +127,53 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
       ErrorCode::InvalidLazyDistributor
     );
   } else if discriminator == RemoteTaskTransactionV0::DISCRIMINATOR {
+    // tuktuk only checks the signed message against the task it is running when that task
+    // is a RemoteV0 task. A CompiledV0 task from any queue can carry a replayed oracle
+    // signature in front of it, so bind the signature to the running task here: the task
+    // must be a RemoteV0 task signed by this oracle, and tuktuk then guarantees every CPI
+    // it makes came from a message the oracle signed for that exact task.
     let run_task_ix: Instruction =
       load_instruction_at_checked(ix_index as usize, &ctx.accounts.sysvar_instructions)?;
-    require_eq!(run_task_ix.program_id, TUKTUK_PID);
+    require_keys_eq!(
+      run_task_ix.program_id,
+      tuktuk_program::tuktuk::ID,
+      ErrorCode::InvalidRemoteTask
+    );
+    require!(
+      run_task_ix.data.starts_with(&RUN_TASK_V0_DISCRIMINATOR),
+      ErrorCode::InvalidRemoteTask
+    );
+    let task_key = run_task_ix
+      .accounts
+      .get(RUN_TASK_V0_TASK_ACCOUNT)
+      .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?
+      .pubkey;
+    let task_info = ctx
+      .remaining_accounts
+      .iter()
+      .find(|acc| acc.key() == task_key)
+      .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?;
+    require_keys_eq!(
+      *task_info.owner,
+      tuktuk_program::tuktuk::ID,
+      ErrorCode::InvalidRemoteTask
+    );
+    let task = TaskV0::try_deserialize(&mut &task_info.data.borrow()[..])?;
+    require!(
+      matches!(
+        task.transaction,
+        TransactionSourceV0::RemoteV0 { signer: task_signer, .. } if task_signer == signer
+      ),
+      ErrorCode::InvalidRemoteTask
+    );
   } else {
     return Err(error!(ErrorCode::InvalidDiscriminator));
   }
 
-  // if lazy distributor has an approver, expect 1 remaining_account
+  // if lazy distributor has an approver, expect it as the first remaining_account
   if let Some(expected_approver) = ctx.accounts.lazy_distributor.approver {
     require!(
-      ctx.remaining_accounts.len() == 1,
+      !ctx.remaining_accounts.is_empty(),
       ErrorCode::InvalidApproverSignature
     );
     let approver = &ctx.remaining_accounts[0];
@@ -170,4 +208,34 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
   )?;
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use anchor_lang::ToAccountMetas;
+
+  use super::*;
+
+  /// The two facts the remote task check reads out of tuktuk's run_task_v0 instruction.
+  #[test]
+  fn run_task_v0_shape() {
+    assert_eq!(
+      RUN_TASK_V0_DISCRIMINATOR,
+      tuktuk_program::tuktuk::client::args::RunTaskV0::DISCRIMINATOR,
+    );
+    let task = Pubkey::new_unique();
+    let metas = tuktuk_program::tuktuk::client::accounts::RunTaskV0 {
+      crank_turner: Pubkey::new_unique(),
+      rent_refund: Pubkey::new_unique(),
+      task_queue: Pubkey::new_unique(),
+      task,
+      system_program: Pubkey::new_unique(),
+      sysvar_instructions: Pubkey::new_unique(),
+    }
+    .to_account_metas(None);
+    assert_eq!(
+      metas.iter().position(|m| m.pubkey == task),
+      Some(RUN_TASK_V0_TASK_ACCOUNT),
+    );
+  }
 }

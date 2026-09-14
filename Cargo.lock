@@ -1106,6 +1106,7 @@ dependencies = [
  "solana-program",
  "solana-security-txt",
  "solana-zk-sdk",
+ "tuktuk-program",
 ]
 
 [[package]]
