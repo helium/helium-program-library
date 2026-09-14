@@ -83,6 +83,7 @@ export async function run(args: any = process.argv) {
         .updateEpochTracker({
           epoch: new anchor.BN(argv.epoch),
           authority: provider.wallet.publicKey,
+          taskQueue,
         })
         .accountsStrict({
           authority: provider.wallet.publicKey,
@@ -98,6 +99,7 @@ export async function run(args: any = process.argv) {
         .accountsPartial({
           dao,
           authority: provider.wallet.publicKey,
+          taskQueue,
         })
         .instruction()
     );

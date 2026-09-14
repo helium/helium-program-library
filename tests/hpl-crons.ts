@@ -16,6 +16,8 @@ import {
   ComputeBudgetProgram,
   PublicKey,
   SystemProgram,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { expect } from "chai";
 import { init as initHsd } from "../packages/helium-sub-daos-sdk/src";
@@ -110,6 +112,7 @@ describe("hpl-crons", () => {
         payer: me,
         dao,
         authority: me,
+        taskQueue,
       })
       .rpc({ skipPreflight: true });
   });
@@ -223,6 +226,121 @@ describe("hpl-crons", () => {
     expect(epochAfter.toString()).to.equal(
       epochBefore.add(new anchor.BN(1)).toString()
     );
+  });
+
+  // The epoch tracker names the one task queue whose tasks advance its epoch. The payer PDA is
+  // seeded by whichever queue the instruction is passed, so the tracker's own field is what
+  // decides which queue that is.
+  it("rejects queue_end_epoch driven by a task queue the tracker does not name", async () => {
+    const config = await tuktukProgram.account.tuktukConfigV0.fetch(
+      tuktukConfig
+    );
+    const otherName = `other-${Math.random().toString(36).substring(2, 15)}`;
+    const otherQueue = taskQueueKey(tuktukConfig, config.nextTaskQueueId)[0];
+    await tuktukProgram.methods
+      .initializeTaskQueueV0({
+        name: otherName,
+        minCrankReward: new anchor.BN(1),
+        capacity: 100,
+        lookupTables: [],
+        staleTaskAge: 10000,
+      })
+      .accounts({
+        tuktukConfig,
+        payer: me,
+        updateAuthority: me,
+        taskQueue: otherQueue,
+        taskQueueNameMapping: taskQueueNameMappingKey(
+          tuktukConfig,
+          otherName
+        )[0],
+      })
+      .rpc();
+    await tuktukProgram.methods
+      .addQueueAuthorityV0()
+      .accounts({ payer: me, queueAuthority: me, taskQueue: otherQueue })
+      .rpc();
+
+    const [otherWallet, otherBump] = customSignerKey(otherQueue, [
+      Buffer.from("helium", "utf-8"),
+    ]);
+    await sendInstructions(provider, [
+      SystemProgram.transfer({
+        fromPubkey: me,
+        toPubkey: otherWallet,
+        lamports: 1000000000,
+      }),
+    ]);
+    const otherBumpBuffer = Buffer.alloc(1);
+    otherBumpBuffer.writeUint8(otherBump);
+
+    const [epochTracker] = epochTrackerKey(dao);
+    const { transaction, remainingAccounts } = compileTransaction(
+      [
+        await program.methods
+          .queueEndEpoch()
+          .accountsStrict({
+            payer: otherWallet,
+            taskReturnAccount: taskReturnAccountKey()[0],
+            epochTracker,
+            taskQueue: otherQueue,
+            dao,
+            iotSubDao,
+            mobileSubDao,
+            hntPriceOracle: me,
+            systemProgram: SystemProgram.programId,
+          })
+          .instruction(),
+      ],
+      [[Buffer.from("helium", "utf-8"), otherBumpBuffer]]
+    );
+
+    const otherTask = taskKey(otherQueue, 0)[0];
+    await tuktukProgram.methods
+      .queueTaskV0({
+        id: 0,
+        trigger: { now: {} },
+        crankReward: null,
+        freeTasks: 2,
+        transaction: { compiledV0: [transaction] },
+        description: "queue end epoch from an unnamed queue",
+      })
+      .accountsPartial({ task: otherTask, taskQueue: otherQueue })
+      .remainingAccounts(remainingAccounts)
+      .rpc({ skipPreflight: true });
+
+    const epochBefore = (
+      await program.account.epochTrackerV0.fetch(epochTracker)
+    ).epoch;
+
+    // The bank executes the task either way; simulating returns the program's own log line,
+    // which names the error, where a failed send reports only that the transaction failed.
+    const message = new TransactionMessage({
+      payerKey: me,
+      recentBlockhash: (await provider.connection.getLatestBlockhash())
+        .blockhash,
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ...(await runTask({
+          program: tuktukProgram,
+          task: otherTask,
+          crankTurner: me,
+        })),
+      ],
+    }).compileToV0Message();
+    const sim = await provider.connection.simulateTransaction(
+      new VersionedTransaction(message),
+      { commitment: "confirmed" }
+    );
+
+    expect(sim.value.err, "a task from a queue the tracker does not name must not run").to.not.be
+      .null;
+    expect((sim.value.logs ?? []).join("\n")).to.include("InvalidTaskQueue");
+
+    const epochAfter = (
+      await program.account.epochTrackerV0.fetch(epochTracker)
+    ).epoch;
+    expect(epochAfter.toString()).to.equal(epochBefore.toString());
   });
 
   // A pyth verification chain advances one step at a time, so the task it hands back carries a

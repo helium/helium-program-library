@@ -18,6 +18,9 @@ pub struct InitEpochTracker<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   /// CHECK: The authority to set
   pub authority: AccountInfo<'info>,
+  /// CHECK: Stored as the only task queue allowed to advance this tracker's epoch.
+  #[account(constraint = *task_queue.owner == tuktuk_program::tuktuk::ID)]
+  pub task_queue: UncheckedAccount<'info>,
   pub system_program: Program<'info, System>,
 }
 
@@ -27,6 +30,7 @@ pub fn handler(ctx: Context<InitEpochTracker>) -> Result<()> {
     epoch: current_epoch(Clock::get().unwrap().unix_timestamp) - 1,
     bump_seed: ctx.bumps.epoch_tracker,
     authority: ctx.accounts.authority.key(),
+    task_queue: ctx.accounts.task_queue.key(),
   });
   Ok(())
 }

@@ -7,6 +7,9 @@ pub struct EpochTrackerV0 {
   pub dao: Pubkey,
   pub epoch: u64,
   pub bump_seed: u8,
+  /// The tuktuk task queue that drives this dao's end-epoch automation. Only a task run by
+  /// this queue may advance `epoch`.
+  pub task_queue: Pubkey,
 }
 
 #[account]

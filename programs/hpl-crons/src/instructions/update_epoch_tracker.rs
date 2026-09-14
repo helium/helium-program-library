@@ -5,6 +5,7 @@ use crate::EpochTrackerV0;
 pub struct UpdateEpochTrackerArgs {
   pub epoch: Option<u64>,
   pub authority: Option<Pubkey>,
+  pub task_queue: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -20,6 +21,9 @@ pub fn handler(ctx: Context<UpdateEpochTracker>, args: UpdateEpochTrackerArgs) -
   }
   if let Some(authority) = args.authority {
     ctx.accounts.epoch_tracker.authority = authority;
+  }
+  if let Some(task_queue) = args.task_queue {
+    ctx.accounts.epoch_tracker.task_queue = task_queue;
   }
 
   Ok(())
