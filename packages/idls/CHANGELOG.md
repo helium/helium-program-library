@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.28
+
+### Patch Changes
+
+- [#1306](https://github.com/helium/helium-program-library/pull/1306) [`60c388a`](https://github.com/helium/helium-program-library/commit/60c388a6754e8018eb184102768772e20fa4fa0a) Thanks [@bryzettler](https://github.com/bryzettler)! - Regenerate the lazy-distributor IDL with the new `InvalidRemoteTask` error variant.
+
 ## 0.11.27
 
 ### Patch Changes
