@@ -127,11 +127,10 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
       ErrorCode::InvalidLazyDistributor
     );
   } else if discriminator == RemoteTaskTransactionV0::DISCRIMINATOR {
-    // tuktuk only checks the signed message against the task it is running when that task
-    // is a RemoteV0 task. A CompiledV0 task from any queue can carry a replayed oracle
-    // signature in front of it, so bind the signature to the running task here: the task
-    // must be a RemoteV0 task signed by this oracle, and tuktuk then guarantees every CPI
-    // it makes came from a message the oracle signed for that exact task.
+    // The running task must be a RemoteV0 task signed by this oracle. tuktuk binds the signed
+    // message to that task and its accounts, and it has already verified the ed25519
+    // instruction against the task signer, so tuktuk's check is the authoritative one. The
+    // verify_ed25519_ix parse above only picks this branch and repeats that signer check.
     let run_task_ix: Instruction =
       load_instruction_at_checked(ix_index as usize, &ctx.accounts.sysvar_instructions)?;
     require_keys_eq!(
