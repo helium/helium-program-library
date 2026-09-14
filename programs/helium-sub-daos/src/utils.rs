@@ -32,6 +32,53 @@ impl OrArithError<SignedPreciseNumber> for Option<SignedPreciseNumber> {
 
 pub const EPOCH_LENGTH: i64 = 24 * 60 * 60;
 
+/// The position as its delegation counts it. A delegation is sized from the HNT deposited when it
+/// was made (`DelegatedPositionV0::hnt_amount`); `sub_dao.vehnt_delegated` and each epoch's
+/// `vehnt_at_epoch_start` are built from that amount, and every veHNT figure for a delegated
+/// position is computed on it. Lockup and genesis fields are read from the live position.
+/// `recent_proposals` is not an input to any veHNT calculation and is left empty.
+pub fn delegated_position_view(
+  position: &PositionV0,
+  delegated_position: &DelegatedPositionV0,
+) -> PositionV0 {
+  PositionV0 {
+    registrar: position.registrar,
+    mint: position.mint,
+    lockup: position.lockup.clone(),
+    amount_deposited_native: delegated_position.hnt_amount,
+    voting_mint_config_idx: position.voting_mint_config_idx,
+    num_active_votes: position.num_active_votes,
+    genesis_end: position.genesis_end,
+    bump_seed: position.bump_seed,
+    vote_controller: position.vote_controller,
+    registrar_paid_rent: position.registrar_paid_rent,
+    recent_proposals: Vec::new(),
+  }
+}
+
+#[cfg(test)]
+mod delegated_position_view_tests {
+  use super::*;
+
+  #[test]
+  fn reads_the_delegated_amount_and_the_live_lockup() {
+    let position = PositionV0 {
+      amount_deposited_native: 11_000,
+      genesis_end: 7,
+      voting_mint_config_idx: 2,
+      ..Default::default()
+    };
+    let delegated_position = DelegatedPositionV0 {
+      hnt_amount: 1_000,
+      ..Default::default()
+    };
+    let view = delegated_position_view(&position, &delegated_position);
+    assert_eq!(view.amount_deposited_native, 1_000);
+    assert_eq!(view.genesis_end, 7);
+    assert_eq!(view.voting_mint_config_idx, 2);
+  }
+}
+
 pub fn current_epoch(unix_timestamp: i64) -> u64 {
   (unix_timestamp / (EPOCH_LENGTH)).try_into().unwrap()
 }

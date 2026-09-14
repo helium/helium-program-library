@@ -25,7 +25,11 @@ import {
   toBN,
   toNumber,
 } from "@helium/spl-utils";
-import { AccountLayout, getMint } from "@solana/spl-token";
+import {
+  AccountLayout,
+  createMintToInstruction,
+  getMint,
+} from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
   Keypair,
@@ -118,6 +122,23 @@ describe("helium-sub-daos", () => {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const me = provider.wallet.publicKey;
+
+  // A delegation is sized when it is made; later deposits into the position are not part of it.
+  async function depositIntoPosition(position: PublicKey, amountHnt: number) {
+    const depositor = Keypair.generate();
+    const amount = toBN(amountHnt, 8);
+    await createAtaAndMint(provider, hntMint, amount, depositor.publicKey);
+    await vsrProgram.methods
+      .depositV0({ amount })
+      .accountsPartial({
+        registrar,
+        position,
+        mint: hntMint,
+        depositAuthority: depositor.publicKey,
+      })
+      .signers([depositor])
+      .rpc({ skipPreflight: true });
+  }
 
   before(async () => {
     program = await initHSD(
@@ -1246,6 +1267,43 @@ describe("helium-sub-daos", () => {
                 !!(await provider.connection.getAccountInfo(delegatedPosition!))
               );
             });
+
+            it("closes a delegation at the delegated amount", async () => {
+              await depositIntoPosition(
+                basePosition,
+                basePositionOptions.lockupAmount * 10
+              );
+
+              await program.methods
+                .closeDelegationV0()
+                .accountsPartial({
+                  position: basePosition,
+                  subDao,
+                  positionAuthority: positionAuthorityKp.publicKey,
+                })
+                .signers([positionAuthorityKp])
+                .rpc({ skipPreflight: true });
+
+              // Only `position` is still delegated, so the sub-DAO carries exactly its veHNT.
+              const sdAcc = await program.account.subDaoV0.fetch(subDao);
+              const positionAcc = await vsrProgram.account.positionV0.fetch(
+                position
+              );
+              const endTs = positionAcc.lockup.endTs.toNumber();
+              const startTs = positionAcc.lockup.startTs.toNumber();
+              const multiplier =
+                typeof positionAcc.lockup.kind.cliff === "undefined"
+                  ? 1
+                  : (endTs - sdAcc.vehntLastCalculatedTs.toNumber()) /
+                    (endTs - startTs);
+              const expectedVehnt =
+                options.lockupAmount * options.expectedMultiplier * multiplier;
+              expectBnAccuracy(
+                toBN(expectedVehnt, 8).mul(new BN("1000000000000")),
+                sdAcc.vehntDelegated,
+                0.0000000001
+              );
+            });
           });
 
           describe("with calculated rewards", () => {
@@ -1323,8 +1381,8 @@ describe("helium-sub-daos", () => {
               expect(Boolean(acc.rewardsIssuedAt)).to.be.true;
             });
 
-            it("claim rewards", async () => {
-              // Create and vote on two proposals
+            // Claims are gated on the position having voted on the dao's recent proposals.
+            async function voteOnTwoProposals() {
               const {
                 pubkeys: { proposalConfig },
               } = await proposalProgram.methods
@@ -1396,6 +1454,10 @@ describe("helium-sub-daos", () => {
                   })
                   .rpc({ skipPreflight: true });
               }
+            }
+
+            it("claim rewards", async () => {
+              await voteOnTwoProposals();
               // issue rewards
               await sendInstructions(provider, [
                 await program.methods
@@ -1430,6 +1492,66 @@ describe("helium-sub-daos", () => {
               const postAtaBalance = AccountLayout.decode(
                 (await provider.connection.getAccountInfo(delegatorAta!))?.data!
               ).amount;
+              expect(
+                Number(postAtaBalance) - Number(preAtaBalance)
+              ).to.be.within(
+                EPOCH_REWARDS_PLUS_NET_EMISSIONS *
+                  (delegatorRewardsPercent(6).toNumber() / 10_000000000) -
+                  5,
+                EPOCH_REWARDS_PLUS_NET_EMISSIONS *
+                  (delegatorRewardsPercent(6).toNumber() / 10_000000000) +
+                  5
+              );
+            });
+
+            it("pays rewards on the delegated amount", async () => {
+              await voteOnTwoProposals();
+              await sendInstructions(provider, [
+                await program.methods
+                  .issueRewardsV0({
+                    epoch,
+                  })
+                  .accountsPartial({
+                    subDao,
+                    supplementVault: null,
+                    councilVault: null,
+                  })
+                  .instruction(),
+              ]);
+
+              // Fund the pool well above one epoch's delegator share so the claim is not capped
+              // by the pool balance.
+              const daoAcc = await program.account.daoV0.fetch(dao);
+              await sendInstructions(provider, [
+                createMintToInstruction(
+                  hntMint,
+                  daoAcc.delegatorPool,
+                  me,
+                  BigInt(EPOCH_REWARDS_PLUS_NET_EMISSIONS) * BigInt(20)
+                ),
+              ]);
+              await depositIntoPosition(position, options.lockupAmount * 10);
+
+              const method = program.methods
+                .claimRewardsV1({
+                  epoch,
+                })
+                .accountsPartial({
+                  position,
+                  subDao,
+                  payer: positionAuthorityKp.publicKey,
+                  positionAuthority: positionAuthorityKp.publicKey,
+                })
+                .signers([positionAuthorityKp]);
+              const { delegatorAta } = await method.pubkeys();
+              const preAtaBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(delegatorAta!))?.data!
+              ).amount;
+              await method.rpc({ skipPreflight: true });
+              const postAtaBalance = AccountLayout.decode(
+                (await provider.connection.getAccountInfo(delegatorAta!))?.data!
+              ).amount;
+
               expect(
                 Number(postAtaBalance) - Number(preAtaBalance)
               ).to.be.within(
