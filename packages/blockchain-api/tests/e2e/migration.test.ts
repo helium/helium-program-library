@@ -869,13 +869,23 @@ describe("migration", () => {
       (t: any) => t.metadata?.description !== "Jito tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
+    // Pin each tx's signer set rather than an aggregate. An existential over
+    // the batch still passes when a regression drops "source" from the cNFT
+    // transfer, as long as some other tx in the batch still requires it.
+    // Every tx here is either source-signed or fee-payer-only, and both kinds
+    // occur, so assert exactly that. Joined to a string because chai's oneOf
+    // does not deep-compare arrays.
+    const signerSets = migrationTxs.map((t: any) =>
+      (t.metadata?.signers ?? []).join(",")
+    );
     for (const t of migrationTxs) {
       expect(t.metadata?.type).to.equal("migration");
-      expect(t.metadata?.signers).to.not.include("destination");
     }
-    expect(
-      migrationTxs.some((t: any) => t.metadata?.signers?.includes("source"))
-    ).to.equal(true);
+    for (const s of signerSets) {
+      expect(s).to.be.oneOf(["source", ""]);
+    }
+    expect(signerSets).to.include("source");
+    expect(signerSets).to.include("");
 
     // Sign and submit — fee payer already signed server-side
     await signAndSubmitTransactionData(

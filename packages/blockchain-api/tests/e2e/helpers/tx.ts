@@ -23,6 +23,7 @@ export async function signAndSubmitTransactionData(
   const { blockhash, lastValidBlockHeight } =
     await connection.getLatestBlockhash("confirmed");
   const signatures: string[] = [];
+  let signedAny = false;
   for (const t of txData.transactions) {
     const tx = VersionedTransaction.deserialize(
       Buffer.from(t.serializedTransaction, "base64")
@@ -41,6 +42,7 @@ export async function signAndSubmitTransactionData(
     );
     if (requiredSigners.some((k) => k.equals(signer.publicKey))) {
       tx.sign([signer]);
+      signedAny = true;
     }
     const sig = await connection.sendRawTransaction(tx.serialize(), {
       skipPreflight: false,
@@ -50,6 +52,14 @@ export async function signAndSubmitTransactionData(
       "confirmed"
     );
     signatures.push(sig);
+  }
+  // A batch that never needed the caller's key would otherwise submit
+  // happily and read as coverage of a signature the route no longer asks for.
+  if (txData.transactions.length > 0 && !signedAny) {
+    throw new Error(
+      `signAndSubmitTransactionData: no tx required ${signer.publicKey.toBase58()}; ` +
+        "the batch was entirely server-signed"
+    );
   }
   return signatures;
 }
