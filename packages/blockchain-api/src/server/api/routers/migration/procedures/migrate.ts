@@ -174,6 +174,13 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     const feePayerKeypair = loadKeypair(env.FEE_PAYER_WALLET_PATH);
     const feePayer = feePayerKeypair.publicKey;
+    // Every returned tx is signed by the fee payer. A source equal to the fee
+    // payer would make it sign a sweep of its own balance to the destination.
+    if (sourcePubkey.equals(feePayer)) {
+      throw errors.BAD_REQUEST({
+        message: "Source wallet must not be the fee payer",
+      });
+    }
 
     const { provider: sourceProvider, connection } =
       createSolanaConnection(sourceWallet);

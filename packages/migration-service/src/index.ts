@@ -283,6 +283,11 @@ server.post<{
   if (request.body.attestation !== ATTESTATION) {
     return reply.code(400).send({ error: "Invalid attestation" });
   }
+  // The service signs every tx it returns as fee payer. With `from` set to
+  // its own wallet it would sign a sweep of its own balance to `to`.
+  if (from.equals(provider.wallet.publicKey)) {
+    return reply.code(400).send({ error: "Invalid source wallet" });
+  }
 
   return (await getMigrateTransactions(from, to)).map(
     (tx) => Buffer.from(tx.serialize()).toJSON().data
