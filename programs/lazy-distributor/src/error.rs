@@ -43,4 +43,7 @@ pub enum ErrorCode {
 
   #[msg("Invalid approver")]
   InvalidApprover,
+
+  #[msg("Remote task transaction must run under a tuktuk remote task signed by this oracle")]
+  InvalidRemoteTask,
 }
