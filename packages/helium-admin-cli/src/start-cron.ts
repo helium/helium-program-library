@@ -107,6 +107,23 @@ export async function run(args: any = process.argv) {
   const epochTrackerAcc = await program.account.epochTrackerV0.fetch(
     epochTracker
   );
+  // queue_end_epoch only runs under the queue the tracker names, so point the tracker at the
+  // queue this bootstrap uses before queueing the task.
+  if (!epochTrackerAcc.taskQueue.equals(taskQueue)) {
+    ixs.push(
+      await program.methods
+        .updateEpochTracker({
+          epoch: null,
+          authority: null,
+          taskQueue,
+        })
+        .accountsStrict({
+          authority: provider.wallet.publicKey,
+          epochTracker,
+        })
+        .instruction()
+    );
+  }
   const { transaction, remainingAccounts } = compileTransaction(
     [
       await program.methods

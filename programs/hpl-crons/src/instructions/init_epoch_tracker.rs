@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use helium_sub_daos::DaoV0;
+use tuktuk_program::TaskQueueV0;
 
 use crate::{current_epoch, EpochTrackerV0};
 
@@ -18,9 +19,8 @@ pub struct InitEpochTracker<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   /// CHECK: The authority to set
   pub authority: AccountInfo<'info>,
-  /// CHECK: Stored as the only task queue allowed to advance this tracker's epoch.
-  #[account(constraint = *task_queue.owner == tuktuk_program::tuktuk::ID)]
-  pub task_queue: UncheckedAccount<'info>,
+  /// Stored as the only task queue allowed to advance this tracker's epoch.
+  pub task_queue: Box<Account<'info, TaskQueueV0>>,
   pub system_program: Program<'info, System>,
 }
 

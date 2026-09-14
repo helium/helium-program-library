@@ -307,14 +307,16 @@ describe("hpl-crons", () => {
       })
       .accountsPartial({ task: otherTask, taskQueue: otherQueue })
       .remainingAccounts(remainingAccounts)
-      .rpc({ skipPreflight: true });
+      .rpc({ skipPreflight: true, commitment: "confirmed" });
 
     const epochBefore = (
       await program.account.epochTrackerV0.fetch(epochTracker)
     ).epoch;
 
     // The bank executes the task either way; simulating returns the program's own log line,
-    // which names the error, where a failed send reports only that the transaction failed.
+    // which names the error, where a failed send reports only that the transaction failed. The
+    // node supplies the blockhash, so a simulation cannot fail as BlockhashNotFound before the
+    // program runs and leave the assertion reading an empty log.
     const message = new TransactionMessage({
       payerKey: me,
       recentBlockhash: (await provider.connection.getLatestBlockhash())
@@ -330,7 +332,7 @@ describe("hpl-crons", () => {
     }).compileToV0Message();
     const sim = await provider.connection.simulateTransaction(
       new VersionedTransaction(message),
-      { commitment: "confirmed" }
+      { commitment: "confirmed", replaceRecentBlockhash: true }
     );
 
     expect(sim.value.err, "a task from a queue the tracker does not name must not run").to.not.be
@@ -341,6 +343,124 @@ describe("hpl-crons", () => {
       await program.account.epochTrackerV0.fetch(epochTracker)
     ).epoch;
     expect(epochAfter.toString()).to.equal(epochBefore.toString());
+  });
+
+  // A tracker whose task_queue is the default key names no queue, so nothing advances its epoch
+  // until update_epoch_tracker points it at a live one. Setting it is what re-arms the cron.
+  it("runs queue_end_epoch again once the tracker names the live queue", async () => {
+    const taskId = 50;
+    const [epochTracker] = epochTrackerKey(dao);
+    const [customWallet, bump] = customSignerKey(taskQueue, [
+      Buffer.from("helium", "utf-8"),
+    ]);
+    const bumpBuffer = Buffer.alloc(1);
+    bumpBuffer.writeUint8(bump);
+
+    await program.methods
+      .updateEpochTracker({
+        epoch: null,
+        authority: null,
+        taskQueue: PublicKey.default,
+      })
+      .accountsStrict({
+        authority: me,
+        epochTracker,
+      })
+      .rpc();
+
+    const { transaction, remainingAccounts } = compileTransaction(
+      [
+        await program.methods
+          .queueEndEpoch()
+          .accountsStrict({
+            payer: customWallet,
+            taskReturnAccount: taskReturnAccountKey()[0],
+            epochTracker,
+            taskQueue,
+            dao,
+            iotSubDao,
+            mobileSubDao,
+            hntPriceOracle: me,
+            systemProgram: SystemProgram.programId,
+          })
+          .instruction(),
+      ],
+      [[Buffer.from("helium", "utf-8"), bumpBuffer]]
+    );
+
+    const task = taskKey(taskQueue, taskId)[0];
+    await tuktukProgram.methods
+      .queueTaskV0({
+        id: taskId,
+        trigger: { now: {} },
+        crankReward: null,
+        freeTasks: 2,
+        transaction: { compiledV0: [transaction] },
+        description: "queue end epoch across a queue change",
+      })
+      .accountsPartial({ task, taskQueue })
+      .remainingAccounts(remainingAccounts)
+      .rpc({ skipPreflight: true, commitment: "confirmed" });
+
+    const epochBefore = (
+      await program.account.epochTrackerV0.fetch(epochTracker)
+    ).epoch;
+
+    // Simulating surfaces the program's own log line, which names the error, where a failed
+    // send reports only that the transaction failed. The node supplies the blockhash, so a
+    // simulation cannot fail as BlockhashNotFound before the program runs and leave the
+    // assertion reading an empty log.
+    const message = new TransactionMessage({
+      payerKey: me,
+      recentBlockhash: (await provider.connection.getLatestBlockhash())
+        .blockhash,
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ...(await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: me,
+        })),
+      ],
+    }).compileToV0Message();
+    const sim = await provider.connection.simulateTransaction(
+      new VersionedTransaction(message),
+      { commitment: "confirmed", replaceRecentBlockhash: true }
+    );
+    expect(sim.value.err, "the tracker names no queue, so the task must not run").to.not.be
+      .null;
+    expect((sim.value.logs ?? []).join("\n")).to.include("InvalidTaskQueue");
+    expect(
+      (await program.account.epochTrackerV0.fetch(epochTracker)).epoch.toString()
+    ).to.equal(epochBefore.toString());
+
+    await program.methods
+      .updateEpochTracker({
+        epoch: null,
+        authority: null,
+        taskQueue,
+      })
+      .accountsStrict({
+        authority: me,
+        epochTracker,
+      })
+      .rpc();
+
+    await sendInstructions(provider, [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+      ...(await runTask({
+        program: tuktukProgram,
+        task,
+        crankTurner: me,
+      })),
+    ]);
+
+    const epochAfter = (
+      await program.account.epochTrackerV0.fetch(epochTracker)
+    ).epoch;
+    expect(epochAfter.toString()).to.equal(
+      epochBefore.add(new anchor.BN(1)).toString()
+    );
   });
 
   // A pyth verification chain advances one step at a time, so the task it hands back carries a
