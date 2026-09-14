@@ -1,5 +1,33 @@
 # Change Log
 
+## 0.13.1
+
+### Patch Changes
+
+- [#1306](https://github.com/helium/helium-program-library/pull/1306) [`60c388a`](https://github.com/helium/helium-program-library/commit/60c388a6754e8018eb184102768772e20fa4fa0a) Thanks [@bryzettler](https://github.com/bryzettler)! - Pass the running tuktuk task to `setCurrentRewardsWrapperV2` as a remaining account. lazy-distributor 0.3.9 requires that task to be a RemoteV0 task signed by the oracle, which binds the oracle signature to the task it was issued for and rejects it under any other task.
+
+- Updated dependencies [[`60c388a`](https://github.com/helium/helium-program-library/commit/60c388a6754e8018eb184102768772e20fa4fa0a)]:
+  - @helium/idls@0.11.28
+
+## 0.13.0
+
+### Minor Changes
+
+- [#1302](https://github.com/helium/helium-program-library/pull/1302) [`7d0fec1`](https://github.com/helium/helium-program-library/commit/7d0fec10a7a979d220f0062dec202ce6372d7071) Thanks [@bryzettler](https://github.com/bryzettler)! - Bump @helium/tuktuk-sdk, @helium/tuktuk-idls and @helium/cron-sdk to ^0.1.1, matching the
+  tuktuk 0.2.10 and cron 0.3.1 programs deployed to mainnet in August 2026. The new IDLs decode
+  the error codes those releases added and expose queueCronTasksV1 / requeueCronTaskV1.
+
+  `nextAvailableTaskIds` now takes the task queue's `capacity` as a required fourth argument
+  (and `random` as the third) so it never returns an id in the bitmap's padding bits past
+  capacity, which the program rejects with InvalidTaskId once a queue is nearly full. Every
+  call site passes the fetched TaskQueueV0's capacity. `@helium/hpl-crons-sdk` no longer
+  ships its own two-argument copy; it re-exports the tuktuk-sdk function.
+
+### Patch Changes
+
+- Updated dependencies [[`7d0fec1`](https://github.com/helium/helium-program-library/commit/7d0fec10a7a979d220f0062dec202ce6372d7071)]:
+  - @helium/hpl-crons-sdk@0.13.0
+
 ## 0.12.0
 
 ### Minor Changes

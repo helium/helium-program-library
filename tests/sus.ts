@@ -22,6 +22,7 @@ import {
 import {
   AccountMeta,
   Connection,
+  Keypair,
   PublicKey,
   Transaction,
   TransactionInstruction,
@@ -45,12 +46,15 @@ describe("sus", () => {
       feePayer: SUS,
       recentBlockhash: (await connection.getLatestBlockhash()).blockhash,
     });
-    const dest = getAssociatedTokenAddressSync(HNT_MINT, PublicKey.default);
+    // A fresh owner guarantees the token account does not already exist on devnet, so the
+    // idempotent create always runs and the rent charge below is always observed.
+    const destOwner = Keypair.generate().publicKey;
+    const dest = getAssociatedTokenAddressSync(HNT_MINT, destOwner);
     transaction.add(
       createAssociatedTokenAccountIdempotentInstruction(
         SUS,
         dest,
-        PublicKey.default,
+        destOwner,
         HNT_MINT
       ),
       createTransferInstruction(
@@ -78,9 +82,7 @@ describe("sus", () => {
     expect(writableAccounts[0].changedInSimulation).to.be.true;
 
     expect(writableAccounts[1].name).to.eq("HNT Token Account");
-    expect(writableAccounts[1].owner?.toBase58()).to.eq(
-      "11111111111111111111111111111111"
-    );
+    expect(writableAccounts[1].owner?.toBase58()).to.eq(destOwner.toBase58());
 
     expect(writableAccounts[2].name).to.eq("HNT Token Account");
     expect(writableAccounts[2].owner?.toBase58()).to.eq(SUS.toBase58());
@@ -101,9 +103,7 @@ describe("sus", () => {
     expect(balanceChanges[0].owner.toBase58()).to.eq(SUS.toBase58());
     expect(balanceChanges[0].amount).to.eq(expectedSolChange);
 
-    expect(balanceChanges[1].owner.toBase58()).to.eq(
-      PublicKey.default.toBase58()
-    );
+    expect(balanceChanges[1].owner.toBase58()).to.eq(destOwner.toBase58());
     expect(balanceChanges[1].amount).to.eq(BigInt(1000000000));
 
     expect(balanceChanges[2].owner.toBase58()).to.eq(SUS.toBase58());

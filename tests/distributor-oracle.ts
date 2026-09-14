@@ -23,7 +23,17 @@ import {
   sendAndConfirmWithRetry,
   sendInstructions,
 } from "@helium/spl-utils";
-import { init as initTuktuk } from "@helium/tuktuk-sdk";
+import {
+  compileTransaction,
+  customSignerKey,
+  init as initTuktuk,
+  RemoteTaskTransactionV0,
+  runTask,
+  taskKey,
+  taskQueueKey,
+  taskQueueNameMappingKey,
+  tuktukConfigKey,
+} from "@helium/tuktuk-sdk";
 import {
   ComputeBudgetProgram,
   Ed25519Program,
@@ -36,6 +46,7 @@ import {
 } from "@solana/web3.js";
 import chai, { assert, expect } from "chai";
 import chaiHttp from "chai-http";
+import { sign } from "tweetnacl";
 import fs from "fs";
 import * as client from "../packages/distributor-oracle/src/client";
 import {
@@ -626,6 +637,136 @@ describe("distributor-oracle", () => {
       recipientAcc.currentRewards[0]?.toNumber(),
       Number(await oracleServer.db.getCurrentRewards(asset))
     );
+  });
+
+  // Mainnet claims run set_current_rewards_wrapper_v2 under a tuktuk RemoteV0 task. The wrapper
+  // has to forward that task to the lazy distributor behind the approver it signs for.
+  describe("with a tuktuk remote task", () => {
+    const payerSeed = Buffer.from("do_test", "utf-8");
+    let taskQueue: PublicKey;
+    let taskPayer: PublicKey;
+    let taskPayerSeeds: Buffer[];
+
+    beforeEach(async () => {
+      const taskQueueName = `do-${Math.random().toString(36).substring(2, 15)}`;
+      const tuktukConfig = tuktukConfigKey()[0];
+      const config =
+        await tuktukProgram.account.tuktukConfigV0.fetch(tuktukConfig);
+      taskQueue = taskQueueKey(tuktukConfig, config.nextTaskQueueId)[0];
+      await tuktukProgram.methods
+        .initializeTaskQueueV0({
+          name: taskQueueName,
+          minCrankReward: new anchor.BN(1),
+          capacity: 100,
+          lookupTables: [],
+          staleTaskAge: 10000,
+        })
+        .accounts({
+          tuktukConfig,
+          payer: me,
+          updateAuthority: me,
+          taskQueue,
+          taskQueueNameMapping: taskQueueNameMappingKey(
+            tuktukConfig,
+            taskQueueName
+          )[0],
+        })
+        .rpc();
+      await tuktukProgram.methods
+        .addQueueAuthorityV0()
+        .accounts({ payer: me, queueAuthority: me, taskQueue })
+        .rpc();
+
+      const [payer, bump] = customSignerKey(taskQueue, [payerSeed]);
+      const bumpBuffer = Buffer.alloc(1);
+      bumpBuffer.writeUint8(bump);
+      taskPayer = payer;
+      taskPayerSeeds = [payerSeed, bumpBuffer];
+      await sendInstructions(provider, [
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: taskPayer,
+          lamports: LAMPORTS_PER_SOL,
+        }),
+      ]);
+    });
+
+    it("sets rewards through the wrapper with the running task", async () => {
+      const keyToAsset = keyToAssetKey(daoK, ecc)[0];
+      const task = taskKey(taskQueue, 0)[0];
+      await tuktukProgram.methods
+        .queueTaskV0({
+          id: 0,
+          trigger: { now: {} },
+          crankReward: null,
+          freeTasks: 0,
+          transaction: {
+            remoteV0: {
+              url: "https://example.com/rewards",
+              signer: oracle.publicKey,
+            },
+          },
+          description: "set current rewards",
+        })
+        .accountsPartial({ task, taskQueue })
+        .rpc({ skipPreflight: true });
+      const { queuedAt } = await tuktukProgram.account.taskV0.fetch(task);
+
+      const currentRewards = new anchor.BN(
+        await oracleServer.db.getCurrentRewards(asset)
+      );
+      const ix = await rewardsProgram.methods
+        .setCurrentRewardsWrapperV2({ currentRewards, oracleIndex: 0 })
+        .accountsPartial({
+          lazyDistributor,
+          recipient,
+          keyToAsset,
+          payer: taskPayer,
+          lazyDistributorProgram: LD_PID,
+        })
+        .remainingAccounts([
+          { pubkey: task, isSigner: false, isWritable: false },
+        ])
+        .instruction();
+      const { transaction, remainingAccounts } = compileTransaction(
+        [ix],
+        [taskPayerSeeds]
+      );
+      const remoteTaskTransaction = await RemoteTaskTransactionV0.serialize(
+        tuktukProgram.coder.accounts,
+        new RemoteTaskTransactionV0({
+          task,
+          taskQueuedAt: queuedAt,
+          transaction: {
+            ...transaction,
+            accounts: remainingAccounts.map((acc) => acc.pubkey),
+          },
+        })
+      );
+      const signature = Buffer.from(
+        sign.detached(Uint8Array.from(remoteTaskTransaction), oracle.secretKey)
+      );
+
+      await sendInstructions(provider, [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+        ...(await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: me,
+          fetcher: async () => ({
+            remoteTaskTransaction,
+            remainingAccounts,
+            signature,
+          }),
+        })),
+      ]);
+
+      const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
+      assert.equal(
+        recipientAcc.currentRewards[0]?.toNumber(),
+        currentRewards.toNumber()
+      );
+    });
   });
 
   describe("Transaction validation tests", () => {

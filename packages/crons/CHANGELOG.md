@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.11.21
+
+### Patch Changes
+
+- Updated dependencies [[`7d0fec1`](https://github.com/helium/helium-program-library/commit/7d0fec10a7a979d220f0062dec202ce6372d7071)]:
+  - @helium/distributor-oracle@0.13.0
+
 ## 0.11.20
 
 ### Patch Changes

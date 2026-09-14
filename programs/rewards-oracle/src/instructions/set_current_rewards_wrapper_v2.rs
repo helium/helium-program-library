@@ -44,12 +44,15 @@ pub struct SetCurrentRewardsWrapperV2<'info> {
   pub sysvar_instructions: AccountInfo<'info>,
 }
 
-pub fn handler(
-  ctx: Context<SetCurrentRewardsWrapperV2>,
+pub fn handler<'info>(
+  ctx: Context<'_, '_, 'info, 'info, SetCurrentRewardsWrapperV2<'info>>,
   args: SetCurrentRewardsWrapperArgsV1,
 ) -> Result<()> {
   let mut approver = ctx.accounts.oracle_signer.to_account_info().clone();
   approver.is_signer = true;
+  // Remaining accounts (the running tuktuk task) are passed through to the lazy distributor.
+  let mut remaining_accounts = vec![approver];
+  remaining_accounts.extend(ctx.remaining_accounts.iter().cloned());
   let cpi_accounts = SetCurrentRewardsV1 {
     payer: ctx.accounts.payer.to_account_info(),
     lazy_distributor: ctx.accounts.lazy_distributor.to_account_info(),
@@ -65,7 +68,7 @@ pub fn handler(
       cpi_accounts,
       signer_seeds,
     )
-    .with_remaining_accounts(vec![approver]),
+    .with_remaining_accounts(remaining_accounts),
     SetCurrentRewardsArgsV0 {
       oracle_index: args.oracle_index,
       current_rewards: args.current_rewards,

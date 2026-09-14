@@ -8,8 +8,27 @@ import {
   createNft,
   sendInstructions,
 } from "@helium/spl-utils";
+import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
+import {
+  compileTransaction,
+  customSignerKey,
+  init as initTuktuk,
+  RemoteTaskTransactionV0,
+  runTask,
+  taskKey,
+  taskQueueKey,
+  taskQueueNameMappingKey,
+  tuktukConfigKey,
+} from "@helium/tuktuk-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { Ed25519Program, Keypair, PublicKey } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram,
+  Ed25519Program,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+} from "@solana/web3.js";
 import { assert, expect } from "chai";
 import { sign } from "tweetnacl";
 import {
@@ -610,6 +629,299 @@ describe("lazy-distributor", () => {
           );
           expect(balance2.value.uiAmount).to.eq(5);
         });
+      });
+    });
+
+    // tuktuk verifies the oracle-signed payload against the task it is running only for RemoteV0
+    // tasks. set_current_rewards_v1 requires that running task, passed as a remaining account, to
+    // be a RemoteV0 task signed by the oracle, so a payload cannot be reused under any other task.
+    describe("with a tuktuk remote task", () => {
+      const taskQueueName = `ld-${Math.random().toString(36).substring(2, 15)}`;
+      const payerSeed = Buffer.from("ld_test", "utf-8");
+
+      let tuktukProgram: Program<Tuktuk>;
+      let taskQueue: PublicKey;
+      let taskPayer: PublicKey;
+      let taskPayerSeeds: Buffer[];
+      let recipientA: PublicKey;
+      let recipientB: PublicKey;
+      let nextTaskId = 0;
+
+      const taskMeta = (task: PublicKey) => ({
+        pubkey: task,
+        isSigner: false,
+        isWritable: false,
+      });
+
+      const initRecipient = async (nftMint: PublicKey) => {
+        const method = program.methods.initializeRecipientV0().accountsPartial({
+          lazyDistributor,
+          mint: nftMint,
+        });
+        await method.rpc({ skipPreflight: true });
+        return (await method.pubkeys()).recipient!;
+      };
+
+      const queueRemoteTask = async () => {
+        const id = nextTaskId++;
+        const task = taskKey(taskQueue, id)[0];
+        await tuktukProgram.methods
+          .queueTaskV0({
+            id,
+            trigger: { now: {} },
+            crankReward: null,
+            freeTasks: 0,
+            transaction: {
+              remoteV0: { url: "https://example.com/rewards", signer: me },
+            },
+            description: "set current rewards",
+          })
+          .accountsPartial({ task, taskQueue })
+          .rpc({ skipPreflight: true });
+        const { queuedAt } = await tuktukProgram.account.taskV0.fetch(task);
+        return { task, queuedAt };
+      };
+
+      // What the oracle server does: compile the reward instruction into a transaction, then sign
+      // the hash tuktuk recomputes from the task it is running.
+      const signRewardTask = async (
+        task: PublicKey,
+        taskQueuedAt: anchor.BN,
+        recipient: PublicKey,
+        currentRewards: anchor.BN
+      ) => {
+        const ix = await program.methods
+          .setCurrentRewardsV1({ currentRewards, oracleIndex: 0 })
+          .accountsPartial({
+            lazyDistributor,
+            recipient,
+            payer: taskPayer,
+          })
+          .remainingAccounts([taskMeta(task)])
+          .instruction();
+        const { transaction, remainingAccounts } = compileTransaction(
+          [ix],
+          [taskPayerSeeds]
+        );
+        const remoteTaskTransaction = await RemoteTaskTransactionV0.serialize(
+          tuktukProgram.coder.accounts,
+          new RemoteTaskTransactionV0({
+            task,
+            taskQueuedAt,
+            transaction: {
+              ...transaction,
+              accounts: remainingAccounts.map((acc) => acc.pubkey),
+            },
+          })
+        );
+        return {
+          remoteTaskTransaction,
+          remainingAccounts,
+          signature: Buffer.from(
+            sign.detached(
+              Uint8Array.from(remoteTaskTransaction),
+              wallet.secretKey
+            )
+          ),
+        };
+      };
+
+      // A compiled task queued by someone else. tuktuk runs whatever instruction it was queued
+      // with, here a much larger reward for a recipient the oracle never signed for, preceded by
+      // an oracle signature that was issued for a different task.
+      const replayUnderOwnTask = async (
+        signed: Awaited<ReturnType<typeof signRewardTask>>,
+        task: PublicKey | null
+      ) => {
+        const id = nextTaskId++;
+        const ownTask = taskKey(taskQueue, id)[0];
+        const ix = await program.methods
+          .setCurrentRewardsV1({
+            currentRewards: new anchor.BN("100000000000"),
+            oracleIndex: 0,
+          })
+          .accountsPartial({
+            lazyDistributor,
+            recipient: recipientB,
+            payer: taskPayer,
+          })
+          .remainingAccounts(task ? [taskMeta(task)] : [])
+          .instruction();
+        const { transaction, remainingAccounts } = compileTransaction(
+          [ix],
+          [taskPayerSeeds]
+        );
+        await tuktukProgram.methods
+          .queueTaskV0({
+            id,
+            trigger: { now: {} },
+            crankReward: null,
+            freeTasks: 0,
+            transaction: { compiledV0: [transaction] },
+            description: "replayed rewards",
+          })
+          .accountsPartial({ task: ownTask, taskQueue })
+          .remainingAccounts(remainingAccounts)
+          .rpc({ skipPreflight: true });
+
+        const tx = new Transaction();
+        tx.add(
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+          Ed25519Program.createInstructionWithPublicKey({
+            publicKey: me.toBytes(),
+            message: signed.remoteTaskTransaction,
+            signature: signed.signature,
+          }),
+          ...(await runTask({
+            program: tuktukProgram,
+            task: ownTask,
+            crankTurner: me,
+          }))
+        );
+        try {
+          await provider.sendAndConfirm(tx);
+        } catch (e: any) {
+          return [e.message, ...(e.logs || [])].join("\n");
+        }
+        return null;
+      };
+
+      const expectRejectedWith = (logs: string | null, errorName: string) => {
+        expect(logs, "expected the replay to be rejected on chain").to.be.a(
+          "string"
+        );
+        expect(logs).to.include(errorName);
+      };
+
+      before(async () => {
+        tuktukProgram = await initTuktuk(provider);
+        const tuktukConfig = tuktukConfigKey()[0];
+        const config =
+          await tuktukProgram.account.tuktukConfigV0.fetch(tuktukConfig);
+        taskQueue = taskQueueKey(tuktukConfig, config.nextTaskQueueId)[0];
+        await tuktukProgram.methods
+          .initializeTaskQueueV0({
+            name: taskQueueName,
+            minCrankReward: new anchor.BN(1),
+            capacity: 100,
+            lookupTables: [],
+            staleTaskAge: 10000,
+          })
+          .accounts({
+            tuktukConfig,
+            payer: me,
+            updateAuthority: me,
+            taskQueue,
+            taskQueueNameMapping: taskQueueNameMappingKey(
+              tuktukConfig,
+              taskQueueName
+            )[0],
+          })
+          .rpc();
+        await tuktukProgram.methods
+          .addQueueAuthorityV0()
+          .accounts({ payer: me, queueAuthority: me, taskQueue })
+          .rpc();
+
+        const [payer, bump] = customSignerKey(taskQueue, [payerSeed]);
+        const bumpBuffer = Buffer.alloc(1);
+        bumpBuffer.writeUint8(bump);
+        taskPayer = payer;
+        taskPayerSeeds = [payerSeed, bumpBuffer];
+        // The task's transaction is signed for by a tuktuk custom signer, which pays the
+        // recipient's rent the way the distributor oracle's claim payer does.
+        await sendInstructions(provider, [
+          SystemProgram.transfer({
+            fromPubkey: me,
+            toPubkey: taskPayer,
+            lamports: 1000000000,
+          }),
+        ]);
+      });
+
+      beforeEach(async () => {
+        recipientA = await initRecipient(mint);
+        const { mintKey } = await createNft(provider, me);
+        recipientB = await initRecipient(mintKey);
+      });
+
+      it("allows the oracle to set the rewards it signed for", async () => {
+        const { task, queuedAt } = await queueRemoteTask();
+        const signed = await signRewardTask(
+          task,
+          queuedAt,
+          recipientA,
+          new anchor.BN("5000000")
+        );
+
+        await sendInstructions(provider, [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+          ...(await runTask({
+            program: tuktukProgram,
+            task,
+            crankTurner: me,
+            fetcher: async () => signed,
+          })),
+        ]);
+
+        const recipientAcc =
+          await program.account.recipientV0.fetch(recipientA);
+        expect(recipientAcc.currentRewards[0]!.toNumber()).to.eq(5000000);
+      });
+
+      it("rejects a signed payload replayed with no task", async () => {
+        const { task, queuedAt } = await queueRemoteTask();
+        const signed = await signRewardTask(
+          task,
+          queuedAt,
+          recipientA,
+          new anchor.BN("5000000")
+        );
+
+        expectRejectedWith(
+          await replayUnderOwnTask(signed, null),
+          "InvalidRemoteTask"
+        );
+        const recipientAcc =
+          await program.account.recipientV0.fetch(recipientB);
+        expect(recipientAcc.currentRewards[0]).to.be.null;
+      });
+
+      it("rejects a signed payload replayed under a compiled task", async () => {
+        const { task, queuedAt } = await queueRemoteTask();
+        const signed = await signRewardTask(
+          task,
+          queuedAt,
+          recipientA,
+          new anchor.BN("5000000")
+        );
+        const ownTask = taskKey(taskQueue, nextTaskId)[0];
+
+        expectRejectedWith(
+          await replayUnderOwnTask(signed, ownTask),
+          "NotRemoteTaskFromSigner"
+        );
+        const recipientAcc =
+          await program.account.recipientV0.fetch(recipientB);
+        expect(recipientAcc.currentRewards[0]).to.be.null;
+      });
+
+      it("rejects a signed payload replayed against the task it was signed for", async () => {
+        const { task, queuedAt } = await queueRemoteTask();
+        const signed = await signRewardTask(
+          task,
+          queuedAt,
+          recipientA,
+          new anchor.BN("5000000")
+        );
+
+        expectRejectedWith(
+          await replayUnderOwnTask(signed, task),
+          "TaskMismatch"
+        );
+        const recipientAcc =
+          await program.account.recipientV0.fetch(recipientB);
+        expect(recipientAcc.currentRewards[0]).to.be.null;
       });
     });
 

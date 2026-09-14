@@ -1093,7 +1093,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1106,6 +1106,7 @@ dependencies = [
  "solana-program",
  "solana-security-txt",
  "solana-zk-sdk",
+ "tuktuk-program",
 ]
 
 [[package]]
@@ -1707,7 +1708,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "rewards-oracle"
-version = "0.2.10"
+version = "0.2.11"
 dependencies = [
  "anchor-lang",
  "default-env",
@@ -3291,9 +3292,9 @@ dependencies = [
 
 [[package]]
 name = "tuktuk-program"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b5de1a288422266b9a5c54e4f306c7a820ce3c698777c5c3498906802336006"
+checksum = "c49439ab61abbf48509239f0fca38d3b1ac4556f07f5fa93f4fd5e01d354fc10"
 dependencies = [
  "anchor-lang",
 ]

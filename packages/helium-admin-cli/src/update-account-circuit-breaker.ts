@@ -65,7 +65,7 @@ export async function run(args: any = process.argv) {
             ? new BN(argv.windowSizeSeconds)
             : circuitBreaker.config.windowSizeSeconds,
           thresholdType: circuitBreaker.config.thresholdType,
-          threshold: argv.threshold
+          threshold: argv.threshold !== undefined
             ? new BN(argv.threshold)
             : circuitBreaker.config.threshold,
         },

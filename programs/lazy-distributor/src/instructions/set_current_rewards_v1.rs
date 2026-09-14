@@ -2,12 +2,12 @@ use anchor_lang::{
   prelude::{Pubkey, *},
   solana_program::{
     instruction::Instruction,
-    pubkey,
     sysvar::instructions::{load_current_index_checked, load_instruction_at_checked, ID as IX_ID},
   },
   Discriminator,
 };
 use shared_utils::resize_to_fit;
+use tuktuk_program::verify_running_remote_task;
 
 use crate::{ed25519::*, error::ErrorCode, state::*, SetCurrentRewardsArgsV0};
 
@@ -89,8 +89,6 @@ pub struct SetCurrentRewardsTransactionV0 {
   pub asset: Pubkey,
 }
 
-const TUKTUK_PID: Pubkey = pubkey!("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
-
 pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0) -> Result<()> {
   let signer = ctx.accounts.lazy_distributor.oracles[usize::from(args.oracle_index)].oracle;
   let ix_index = load_current_index_checked(&ctx.accounts.sysvar_instructions.to_account_info())?;
@@ -125,17 +123,24 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
       ErrorCode::InvalidLazyDistributor
     );
   } else if discriminator == RemoteTaskTransactionV0::DISCRIMINATOR {
-    let run_task_ix: Instruction =
-      load_instruction_at_checked(ix_index as usize, &ctx.accounts.sysvar_instructions)?;
-    require_eq!(run_task_ix.program_id, TUKTUK_PID);
+    // The running task must be a RemoteV0 task signed by this oracle. tuktuk binds the signed
+    // message to that task and its accounts, and it has already verified the ed25519
+    // instruction against the task signer, so tuktuk's check is the authoritative one. The
+    // verify_ed25519_ix parse above only picks this branch and repeats that signer check.
+    // The oracle appends the task as the last remaining account.
+    let task_info = ctx
+      .remaining_accounts
+      .last()
+      .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?;
+    verify_running_remote_task(&ctx.accounts.sysvar_instructions, task_info, &signer)?;
   } else {
     return Err(error!(ErrorCode::InvalidDiscriminator));
   }
 
-  // if lazy distributor has an approver, expect 1 remaining_account
+  // if lazy distributor has an approver, expect it as the first remaining_account
   if let Some(expected_approver) = ctx.accounts.lazy_distributor.approver {
     require!(
-      ctx.remaining_accounts.len() == 1,
+      !ctx.remaining_accounts.is_empty(),
       ErrorCode::InvalidApproverSignature
     );
     let approver = &ctx.remaining_accounts[0];
