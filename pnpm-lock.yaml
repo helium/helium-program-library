@@ -2432,18 +2432,36 @@ importers:
         specifier: ^17.7.1
         version: 17.7.2
     devDependencies:
+      '@swc-node/register':
+        specifier: ^1.11.1
+        version: 1.11.1(@swc/core@1.15.18(@swc/helpers@0.5.19))(@swc/types@0.1.25)(typescript@5.9.3)
+      '@swc/core':
+        specifier: ^1.13.5
+        version: 1.15.18(@swc/helpers@0.5.19)
       '@types/bn.js':
         specifier: ^5.2.0
         version: 5.2.0
+      '@types/chai':
+        specifier: ^4.3.0
+        version: 4.3.5
       '@types/cli-progress':
         specifier: ^3.11.0
         version: 3.11.0
+      '@types/mocha':
+        specifier: ^9.0.0
+        version: 9.1.1
       '@types/pg':
         specifier: ^8.6.6
         version: 8.18.0
+      chai:
+        specifier: ^4.3.4
+        version: 4.3.8
       git-format-staged:
         specifier: ^2.1.3
         version: 2.1.3
+      mocha:
+        specifier: ^9.0.3
+        version: 9.2.2
       ts-loader:
         specifier: ^9.2.3
         version: 9.4.4(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.19)))

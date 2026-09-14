@@ -181,6 +181,14 @@ export const migrate = publicProcedure.migration.migrate.handler(
         message: "Source wallet must not be the fee payer",
       });
     }
+    // A destination equal to the fee payer parks assets in a wallet the guard
+    // above bars as a source, so nothing could move them back out through this
+    // route. Keep it symmetric.
+    if (destPubkey.equals(feePayer)) {
+      throw errors.BAD_REQUEST({
+        message: "Destination wallet must not be the fee payer",
+      });
+    }
 
     const { provider: sourceProvider, connection } =
       createSolanaConnection(sourceWallet);

@@ -33,7 +33,15 @@ export async function signAndSubmitTransactionData(
     if (!hasExistingSignatures) {
       tx.message.recentBlockhash = blockhash;
     }
-    tx.sign([signer]);
+    // Only sign txs that list this key as a required signer; a server-signed
+    // fee-payer-only tx in the batch would otherwise make web3.js throw.
+    const requiredSigners = tx.message.staticAccountKeys.slice(
+      0,
+      tx.message.header.numRequiredSignatures
+    );
+    if (requiredSigners.some((k) => k.equals(signer.publicKey))) {
+      tx.sign([signer]);
+    }
     const sig = await connection.sendRawTransaction(tx.serialize(), {
       skipPreflight: false,
     });
