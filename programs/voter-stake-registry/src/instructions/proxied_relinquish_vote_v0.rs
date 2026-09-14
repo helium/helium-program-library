@@ -109,8 +109,8 @@ pub fn handler(ctx: Context<ProxiedRelinquishVoteV0>, args: RelinquishVoteArgsV1
     },
   )?;
 
+  marker.sync_weight();
   if marker.choices.is_empty() {
-    marker.weight = 0;
     ctx
       .accounts
       .position

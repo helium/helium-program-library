@@ -102,8 +102,8 @@ pub fn handler(ctx: Context<RelinquishVoteV1>, args: RelinquishVoteArgsV1) -> Re
     },
   )?;
 
+  marker.sync_weight();
   if marker.choices.is_empty() {
-    marker.weight = 0;
     ctx
       .accounts
       .position

@@ -118,6 +118,7 @@ pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
   };
   marker.weight = weight;
   marker.choices = ctx.accounts.proxy_marker.choices.clone();
+  marker.sync_weight();
 
   ctx.accounts.position.num_active_votes += choices_to_add.len() as u16;
   ctx.accounts.position.num_active_votes -= choices_to_remove.len() as u16;

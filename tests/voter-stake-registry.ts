@@ -637,6 +637,80 @@ describe("voter-stake-registry", () => {
         expect(markerA?.choices).to.be.empty;
       });
 
+      it("(v1) clears the marker weight when the recount leaves no choices", async () => {
+        await program.methods
+          .setTimeOffsetV0(new anchor.BN(0))
+          .accountsPartial({ registrar })
+          .rpc();
+
+        const vote = async (choice: number) => {
+          await program.methods
+            .proxiedVoteV1({ choice })
+            .accountsPartial({
+              proposal,
+              voter: delegatee.publicKey,
+            })
+            .signers([delegatee])
+            .rpc({ skipPreflight: true });
+          return count();
+        };
+        const relinquish = async (choice: number) => {
+          await program.methods
+            .proxiedRelinquishVoteV1({ choice })
+            .accountsPartial({
+              proposal,
+              voter: delegatee.publicKey,
+            })
+            .signers([delegatee])
+            .rpc({ skipPreflight: true });
+          return count();
+        };
+        const count = async () => {
+          const {
+            pubkeys: { marker },
+          } = await program.methods
+            .countProxyVoteV0()
+            .accountsPartial({
+              proposal,
+              position,
+              voter: delegatee.publicKey,
+              proxyAssignment,
+              proposalConfig,
+              stateController: me,
+              onVoteHook: PublicKey.default,
+            })
+            .rpcAndKeys({ skipPreflight: true });
+          return program.account.voteMarkerV0.fetch(marker! as PublicKey);
+        };
+
+        const voted = await vote(0);
+        expect(voted.choices).to.deep.eq([0]);
+        expect(voted.weight.gtn(0)).to.be.true;
+
+        const relinquished = await relinquish(0);
+        expect(relinquished.choices).to.be.empty;
+        expect(relinquished.weight.toNumber()).to.eq(0);
+
+        // The next vote takes a fresh weight from the decayed position.
+        await program.methods
+          .setTimeOffsetV0(new anchor.BN(100 * SECS_PER_DAY))
+          .accountsPartial({ registrar })
+          .rpc();
+
+        const revoted = await vote(0);
+        expect(revoted.choices).to.deep.eq([0]);
+        expect(revoted.weight.gtn(0)).to.be.true;
+        expect(revoted.weight.lt(voted.weight)).to.be.true;
+
+        const acct = await proposalProgram.account.proposalV0.fetch(proposal!);
+        expect(acct.choices[0].weight.eq(revoted.weight)).to.be.true;
+
+        await program.methods
+          .setTimeOffsetV0(new anchor.BN(0))
+          .accountsPartial({ registrar })
+          .rpc();
+      });
+
       it("(v1) allows pays the rent for the marker from registrar if possible", async () => {
         await sendInstructions(provider, [
           SystemProgram.transfer({
