@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.22
+
+### Patch Changes
+
+- [`fc8b879`](https://github.com/helium/helium-program-library/commit/fc8b8795b485cb0ea91af4ab503ba2e7e7929811) Thanks [@bryzettler](https://github.com/bryzettler)! - Reject migrate requests whose source or destination wallet is the service fee payer. A request with `from` set to the service's own key made the service sign away its own balance. migration-service also gains the `from != to` and on-curve destination checks blockchain-api already had.
+
 ## 0.11.21
 
 ### Patch Changes
