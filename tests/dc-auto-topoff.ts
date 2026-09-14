@@ -56,6 +56,8 @@ import {
 } from "./utils/fixtures";
 import {
   createDcaServer,
+  DCA_TEST_SIGNER,
+  DCA_TEST_URL,
   runAllTasks as runAllTasksUtil,
   calculateExpectedOutput,
 } from "./utils/dca-test-server";
@@ -176,7 +178,7 @@ describe("dc-auto-topoff", () => {
       .rpc({ skipPreflight: true });
 
     // Set up DCA server
-    dcaSigner = Keypair.generate();
+    dcaSigner = DCA_TEST_SIGNER;
     await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: me,
@@ -202,7 +204,6 @@ describe("dc-auto-topoff", () => {
       taskQueue,
       outputMint: hntMint,
       dcaSigner,
-      port: 8124, // Different port from tuktuk-dca test
     });
   });
 
@@ -291,7 +292,7 @@ describe("dc-auto-topoff", () => {
         dcaSwapAmount: new anchor.BN(10000000),
         dcaIntervalSeconds: new anchor.BN(10000000),
         dcaSigner: dcaSigner.publicKey,
-        dcaUrl: "http://localhost:8124/dca",
+        dcaUrl: DCA_TEST_URL,
       })
       .accounts({
         dcaInputPriceOracle: USDC_PRICE_FEED,
@@ -310,6 +311,51 @@ describe("dc-auto-topoff", () => {
       Buffer.from(autoTopOffAcc.schedule).toString("utf-8").replace(/\0/g, "")
     ).to.equal("0 0 * * * *");
     expect(autoTopOffAcc.threshold.toString()).to.equal("10000000");
+  });
+
+  it("refuses an auto topoff whose DCA signer or url is not the pinned one", async () => {
+    const initializeWith = (overrides: {
+      dcaSigner?: PublicKey;
+      dcaUrl?: string;
+    }) =>
+      program.methods
+        .initializeAutoTopOffV0({
+          schedule: "0 0 * * * *",
+          threshold: new anchor.BN(10000000),
+          routerKey,
+          hntThreshold: new anchor.BN(10000000),
+          dcaSwapAmount: new anchor.BN(10000000),
+          dcaIntervalSeconds: new anchor.BN(10000000),
+          dcaSigner: overrides.dcaSigner ?? DCA_TEST_SIGNER.publicKey,
+          dcaUrl: overrides.dcaUrl ?? DCA_TEST_URL,
+        })
+        .accounts({
+          dcaInputPriceOracle: USDC_PRICE_FEED,
+          payer: me,
+          authority: me,
+          taskQueue,
+          delegatedDataCredits,
+          hntPriceOracle: PRO_HNT_PRICE_FEED,
+          dcaMint,
+        })
+        .rpc();
+
+    for (const [overrides, errorName] of [
+      [{ dcaSigner: Keypair.generate().publicKey }, "InvalidDcaSigner"],
+      [{ dcaUrl: `${DCA_TEST_URL}.other.example` }, "InvalidDcaUrl"],
+    ] as const) {
+      let caught: any = null;
+      try {
+        await initializeWith(overrides);
+      } catch (e: any) {
+        caught = e;
+      }
+      expect(caught, `expected ${errorName}, got no error`).to.not.be.null;
+      expect(
+        `${caught}${JSON.stringify(caught.logs ?? [])}`,
+        `expected ${errorName}`
+      ).to.include(errorName);
+    }
   });
 
   describe("with an auto topoff", () => {
@@ -344,7 +390,7 @@ describe("dc-auto-topoff", () => {
           dcaSwapAmount: new anchor.BN(10000000),
           dcaIntervalSeconds: new anchor.BN(10000000),
           dcaSigner: dcaSigner.publicKey,
-          dcaUrl: "http://localhost:8124/dca",
+          dcaUrl: DCA_TEST_URL,
         })
         .accounts({
           dcaInputPriceOracle: USDC_PRICE_FEED,

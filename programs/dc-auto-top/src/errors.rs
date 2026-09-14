@@ -16,4 +16,10 @@ pub enum ErrorCode {
 
   #[msg("Pyth price not found")]
   PythPriceNotFound,
+
+  #[msg("Remote task signer must be the pinned DCA signer")]
+  InvalidDcaSigner,
+
+  #[msg("Remote task url must address the pinned DCA service")]
+  InvalidDcaUrl,
 }

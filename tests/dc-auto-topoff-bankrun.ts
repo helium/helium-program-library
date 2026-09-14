@@ -39,6 +39,7 @@ import {
   startBankrun,
   warpTo,
 } from "./utils/bankrun";
+import { DCA_TEST_SIGNER, DCA_TEST_URL } from "./utils/dca-test-server";
 
 const DC_AUTO_TOP = new PublicKey(
   "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU"
@@ -180,7 +181,8 @@ describe("dc-auto-topoff under bankrun", () => {
   async function autoTopOffWith(
     spendableLamports: number,
     swapPayerLamports = 0,
-    dcaMintFunding = 1_000_000_000n
+    dcaMintFunding = 1_000_000_000n,
+    pin: { dcaUrl?: string; dcaSigner?: PublicKey } = {}
   ) {
     // Set rather than transfer, and set it every time: the payer is one PDA shared by every
     // scenario, and rent_needed is measured against its balance, so a leftover balance from
@@ -226,8 +228,8 @@ describe("dc-auto-topoff under bankrun", () => {
       reserved: [0, 0, 0, 0],
       threshold: new anchor.BN(0),
       schedule: padded("0 0 16 * * *", 128),
-      dcaUrl: padded("http://localhost:8129/dca", 128),
-      dcaSigner: Keypair.generate().publicKey,
+      dcaUrl: padded(pin.dcaUrl ?? DCA_TEST_URL, 128),
+      dcaSigner: pin.dcaSigner ?? DCA_TEST_SIGNER.publicKey,
       // 30 HNT wanted against 10 held, bought 250 units at a time.
       hntThreshold: new anchor.BN(30_00000000),
       dcaMint,
@@ -334,6 +336,47 @@ describe("dc-auto-topoff under bankrun", () => {
       await readAccount(ctx, dcaKey(autoTopOff, dcaMint, hntMint, 0)[0]),
       "no DCA account should exist"
     ).to.equal(null);
+  });
+
+  // A stored dca_signer or dca_url that does not name the pinned DCA service fails the CPI
+  // into tuktuk-dca, which reverts the run.
+  async function expectDcaRejected(
+    pin: { dcaUrl?: string; dcaSigner?: PublicKey },
+    errorName: string
+  ) {
+    const { hntTask } = await autoTopOffWith(
+      50_000_000,
+      1_000_000_000,
+      1_000_000_000n,
+      pin
+    );
+    const task = await tuktukProgram.account.taskV0.fetch(hntTask);
+    await warpTo(ctx, BigInt(task.trigger.timestamp![0].toString()) + 1n);
+    let caught: any = null;
+    try {
+      await crank(hntTask);
+    } catch (e: any) {
+      caught = e;
+    }
+    expect(caught, `expected ${errorName}, got no error`).to.not.equal(null);
+    expect(
+      `${caught}${JSON.stringify(caught.logs ?? [])}`,
+      `expected ${errorName}`
+    ).to.include(errorName);
+  }
+
+  it("refuses a DCA whose signer is not the pinned one", async () => {
+    await expectDcaRejected(
+      { dcaSigner: Keypair.generate().publicKey },
+      "InvalidDcaSigner"
+    );
+  });
+
+  it("refuses a DCA whose url only shares the pinned prefix", async () => {
+    await expectDcaRejected(
+      { dcaUrl: `${DCA_TEST_URL}.other.example` },
+      "InvalidDcaUrl"
+    );
   });
 
   it("skips the DCA rather than debiting past rent exemption", async () => {
