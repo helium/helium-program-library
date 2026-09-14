@@ -24,6 +24,15 @@ describe("POST /ledger/migrate", () => {
   const post = (server: ReturnType<typeof Fastify>, body: object) =>
     server.inject({ method: "POST", url: "/ledger/migrate", payload: body });
 
+  it("refuses to register without a real fee payer", () => {
+    expect(() =>
+      registerLedgerMigrate(Fastify(), {
+        feePayer: PublicKey.default,
+        getMigrateTransactions: async () => [],
+      })
+    ).to.throw(/feePayer/);
+  });
+
   it("builds transactions for a valid request", async () => {
     const { server, calls } = setup();
     const res = await post(server, {

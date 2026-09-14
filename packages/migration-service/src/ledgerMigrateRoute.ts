@@ -17,6 +17,14 @@ export const registerLedgerMigrate = (
     ) => Promise<VersionedTransaction[]>;
   },
 ) => {
+  // The guard below is only as good as the key it compares against, and that
+  // key now arrives from the caller. An all-zero default would compare against
+  // a key nobody holds and accept the request the guard exists to refuse.
+  if (deps.feePayer.equals(PublicKey.default)) {
+    throw new Error(
+      "registerLedgerMigrate: feePayer must be the service wallet",
+    );
+  }
   server.post<{
     Body: { from: string; to: string; attestation: string };
   }>("/ledger/migrate", async (request, reply) => {
