@@ -56,9 +56,12 @@ import {
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import type { TestCtx } from "./helpers/context";
 import fs from "fs";
+import os from "os";
+import path from "path";
 
 describe("migration", () => {
   let payer: Keypair;
+  let feePayer: Keypair;
   let destination: Keypair;
   let connection: Connection;
   let client: RouterClient<typeof appRouter>;
@@ -83,20 +86,22 @@ describe("migration", () => {
     // Set Jito tip account fallback (Jito API not available in test env)
     process.env.JITO_TIP_ACCOUNT = destination.publicKey.toBase58();
 
-    // Set up fee payer — must be set before ensureNextServer so the server's env picks it up
-    const keyPath =
-      process.env.TEST_WALLET_KEYPAIR_PATH || "/tmp/test-fee-payer.json";
-    if (!process.env.TEST_WALLET_KEYPAIR_PATH) {
-      fs.writeFileSync(keyPath, JSON.stringify(Array.from(payer.secretKey)));
-    }
+    // Set up fee payer — must be set before ensureNextServer so the server's
+    // env picks it up. It has to be a different key from `payer`: the route
+    // rejects a source or destination equal to the fee payer, and `payer` is
+    // the source wallet throughout this suite.
+    feePayer = Keypair.generate();
+    const keyPath = path.join(os.tmpdir(), "migration-test-fee-payer.json");
+    fs.writeFileSync(keyPath, JSON.stringify(Array.from(feePayer.secretKey)));
     process.env.FEE_PAYER_WALLET_PATH = keyPath;
 
     await ensureSurfpool();
     await ensureNextServer();
     connection = new Connection(getSurfpoolRpcUrl(), "confirmed");
 
-    // Ensure payer has funds
+    // Ensure payer and fee payer have funds
     await ensureFunds(payer.publicKey, 1 * LAMPORTS_PER_SOL);
+    await ensureFunds(feePayer.publicKey, 1 * LAMPORTS_PER_SOL);
 
     // Ensure payer has USDC
     const usdcMint = new PublicKey(TOKEN_MINTS.USDC);
@@ -343,6 +348,40 @@ describe("migration", () => {
     } catch (error: any) {
       expect(error).to.be.instanceOf(ORPCError);
       expect(error.code).to.equal("BAD_REQUEST");
+    }
+  });
+
+  it("rejects the fee payer as source wallet", async () => {
+    // Every returned tx carries the fee payer's signature; a source equal to it
+    // would have the server sign away its own balance.
+    try {
+      await client.migration.migrate({
+        sourceWallet: feePayer.publicKey.toBase58(),
+        destinationWallet: Keypair.generate().publicKey.toBase58(),
+        hotspots: [],
+        tokens: [],
+      });
+      expect.fail("Should have rejected the fee payer as source");
+    } catch (error: any) {
+      expect(error).to.be.instanceOf(ORPCError);
+      expect(error.code).to.equal("BAD_REQUEST");
+      expect(error.message).to.include("fee payer");
+    }
+  });
+
+  it("rejects the fee payer as destination wallet", async () => {
+    try {
+      await client.migration.migrate({
+        sourceWallet: Keypair.generate().publicKey.toBase58(),
+        destinationWallet: feePayer.publicKey.toBase58(),
+        hotspots: [],
+        tokens: [],
+      });
+      expect.fail("Should have rejected the fee payer as destination");
+    } catch (error: any) {
+      expect(error).to.be.instanceOf(ORPCError);
+      expect(error.code).to.equal("BAD_REQUEST");
+      expect(error.message).to.include("fee payer");
     }
   });
 
@@ -823,15 +862,30 @@ describe("migration", () => {
     expect(result.transactionData.transactions.length).to.be.greaterThan(0);
 
     // Hotspot with split: fee payer acts as namespace signer (signed server-side),
-    // source wallet signs as cNFT owner and old fanout owner. No destination signing needed.
+    // source wallet signs as cNFT owner and old fanout owner. No destination
+    // signing needed. The new-fanout group (init + fund + schedule) is fee
+    // payer only, but the batcher packs groups greedily, so whether it lands
+    // in its own tx depends on instruction sizes.
     const migrationTxs = result.transactionData.transactions.filter(
       (t: any) => t.metadata?.description !== "Jito tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
+    // Pin each tx's signer set rather than an aggregate. An existential over
+    // the batch still passes when a regression drops "source" from the cNFT
+    // transfer, as long as some other tx in the batch still requires it.
+    // Every tx here is either source-signed or fee-payer-only, so assert
+    // exactly that. Joined to a string because chai's oneOf does not
+    // deep-compare arrays.
+    const signerSets = migrationTxs.map((t: any) =>
+      (t.metadata?.signers ?? []).join(",")
+    );
     for (const t of migrationTxs) {
       expect(t.metadata?.type).to.equal("migration");
-      expect(t.metadata?.signers).to.deep.equal(["source"]);
     }
+    for (const s of signerSets) {
+      expect(s).to.be.oneOf(["source", ""]);
+    }
+    expect(signerSets).to.include("source");
 
     // Sign and submit — fee payer already signed server-side
     await signAndSubmitTransactionData(

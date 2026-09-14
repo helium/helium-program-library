@@ -24,6 +24,7 @@ import { LAZY_TRANSACTIONS_NAME } from "./env";
 import { getMigrateTransactions } from "./ledger";
 import { provider, wallet } from "./solana";
 import { decompress, decompressSigners, shouldThrottle } from "./utils";
+import { registerLedgerMigrate } from "./ledgerMigrateRoute";
 import {
   estimateComputeBudget,
   estimatePrioritizationFee,
@@ -273,20 +274,9 @@ async function getTransactions(
   return [];
 }
 
-const ATTESTATION =
-  "I attest that both the source and destination wallets are owned and controlled by the same individual or entity, and that I have legal authority to perform this transaction on behalf of that individual or entity.";
-server.post<{
-  Body: { from: string; to: string; attestation: string };
-}>("/ledger/migrate", async (request, reply) => {
-  const from = new PublicKey(request.body.from);
-  const to = new PublicKey(request.body.to);
-  if (request.body.attestation !== ATTESTATION) {
-    return reply.code(400).send({ error: "Invalid attestation" });
-  }
-
-  return (await getMigrateTransactions(from, to)).map(
-    (tx) => Buffer.from(tx.serialize()).toJSON().data
-  );
+registerLedgerMigrate(server, {
+  feePayer: provider.wallet.publicKey,
+  getMigrateTransactions,
 });
 
 server.get<{
