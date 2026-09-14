@@ -864,7 +864,8 @@ describe("migration", () => {
     // Hotspot with split: fee payer acts as namespace signer (signed server-side),
     // source wallet signs as cNFT owner and old fanout owner. No destination
     // signing needed. The new-fanout group (init + fund + schedule) is fee
-    // payer only, so not every tx carries the source signer.
+    // payer only, but the batcher packs groups greedily, so whether it lands
+    // in its own tx depends on instruction sizes.
     const migrationTxs = result.transactionData.transactions.filter(
       (t: any) => t.metadata?.description !== "Jito tip"
     );
@@ -872,9 +873,9 @@ describe("migration", () => {
     // Pin each tx's signer set rather than an aggregate. An existential over
     // the batch still passes when a regression drops "source" from the cNFT
     // transfer, as long as some other tx in the batch still requires it.
-    // Every tx here is either source-signed or fee-payer-only, and both kinds
-    // occur, so assert exactly that. Joined to a string because chai's oneOf
-    // does not deep-compare arrays.
+    // Every tx here is either source-signed or fee-payer-only, so assert
+    // exactly that. Joined to a string because chai's oneOf does not
+    // deep-compare arrays.
     const signerSets = migrationTxs.map((t: any) =>
       (t.metadata?.signers ?? []).join(",")
     );
@@ -885,7 +886,6 @@ describe("migration", () => {
       expect(s).to.be.oneOf(["source", ""]);
     }
     expect(signerSets).to.include("source");
-    expect(signerSets).to.include("");
 
     // Sign and submit — fee payer already signed server-side
     await signAndSubmitTransactionData(
