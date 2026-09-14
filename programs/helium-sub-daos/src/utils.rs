@@ -81,6 +81,8 @@ mod delegated_position_view_tests {
     };
     let view = delegated_position_view(&position, &delegated_position);
     assert_eq!(view.amount_deposited_native, 1_000);
+    assert_eq!(view.lockup.kind, LockupKind::Cliff);
+    assert_eq!(view.lockup.start_ts, 3);
     assert_eq!(view.lockup.end_ts, 5);
     assert_eq!(view.genesis_end, 7);
     assert_eq!(view.voting_mint_config_idx, 2);

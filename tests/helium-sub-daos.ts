@@ -1310,6 +1310,14 @@ describe("helium-sub-daos", () => {
                 sdAcc.vehntDelegated,
                 0.0000000001
               );
+              expect(sdAcc.vehntFallRate.toNumber()).to.be.closeTo(
+                typeof positionAcc.lockup.kind.cliff !== "undefined"
+                  ? ((options.lockupAmount * options.expectedMultiplier) /
+                      (endTs - startTs)) *
+                      100000000000000000000
+                  : 0,
+                1
+              );
             });
           });
 
