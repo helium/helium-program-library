@@ -1,5 +1,21 @@
 # Change Log
 
+## 0.11.29
+
+### Patch Changes
+
+- [#1313](https://github.com/helium/helium-program-library/pull/1313) [`a1f5f05`](https://github.com/helium/helium-program-library/commit/a1f5f0527696d43b2886e053009794047c41a399) Thanks [@madninja](https://github.com/madninja)! - Bind the dc-auto-top HNT refill to the schedule and accounts it was queued for. `AutoTopOffV0` gains `next_task_time` and `next_hnt_task_time`, each leg refuses to run before its recorded time, `top_off_hnt_v0` requires the DCA destination to be the top off's own HNT account, and the DCA swap payer is pinned to the task queue's `dca_swap_payer` custom signer.
+
+- [#1317](https://github.com/helium/helium-program-library/pull/1317) [`02e0531`](https://github.com/helium/helium-program-library/commit/02e0531a8aab694beb31659040c9643e6c3750f0) Thanks [@madninja](https://github.com/madninja)! - Price the DCA repay floor in output minor units. `DcaV0` now records `input_decimals` and `output_decimals` (taken from the two reserved bytes), and `check_repay_v0` scales the oracle price ratio by the mint decimal difference as well as the Pyth exponent difference. `check_repay_v0` also requires that it is running inside the DCA's own tuktuk task. `close_dca_v0` no longer parses the recorded task, so a DCA whose task is gone can still be closed. dc-auto-top gains `close_dca_v0` for the DCAs its HNT refill leg creates, reachable from the new `close-auto-top-off-dca` admin command. Adds the `MissingNextTask` error code to tuktuk-dca and `InvalidDcaAuthority` to dc-auto-top.
+
+- [#1310](https://github.com/helium/helium-program-library/pull/1310) [`4bafa5a`](https://github.com/helium/helium-program-library/commit/4bafa5ac5fcd1b2ae1b15dd1d1abafbba156f69a) Thanks [@madninja](https://github.com/madninja)! - Pin the DCA remote task's signer and url. tuktuk-dca and dc-auto-top now reject a `dca_signer` other than the production DCA signer, a `dca_url` other than the pinned DCA service url, and slippage of a whole 100%. Adds the `InvalidDcaSigner`, `InvalidDcaUrl` and `InvalidSlippage` error codes.
+
+- [#1312](https://github.com/helium/helium-program-library/pull/1312) [`7a111ad`](https://github.com/helium/helium-program-library/commit/7a111adf7db3ec693bfd3af74be6860a44769910) Thanks [@madninja](https://github.com/madninja)! - `EpochTrackerV0` gains a `task_queue` field naming the tuktuk queue allowed to advance its epoch, `queue_end_epoch` requires the passed queue to match it, `init_epoch_tracker` takes the queue, and `update_epoch_tracker` can set it.
+
+- [#1314](https://github.com/helium/helium-program-library/pull/1314) [`d9b66ee`](https://github.com/helium/helium-program-library/commit/d9b66eede68b29e57841152a9634f7c1029e02bb) Thanks [@madninja](https://github.com/madninja)! - Remove the finished migration instructions and their hardcoded authority from helium-sub-daos (`temp_update_sub_dao_epoch_info`, `temp_backfill_dao_recent_proposals`, `temp_claim_buggy_rewards`), helium-entity-manager (`temp_backfill_mobile_info`), lazy-distributor (`temp_update_matching_destination`) and voter-stake-registry (`temp_release_position_v0`). The IDLs for those four programs no longer expose these instructions.
+
+- [#1318](https://github.com/helium/helium-program-library/pull/1318) [`1870f9e`](https://github.com/helium/helium-program-library/commit/1870f9e4f3408e69cd21ee1c05748e1876a16164) Thanks [@madninja](https://github.com/madninja)! - Size the dc-auto-top HNT refill to what it can pay for and finish in one slot, and stop an update from stranding the leg. `top_off_hnt_v0` buys `min(gap, balance / swap amount, ceil(slot seconds / interval))` orders instead of skipping the whole DCA when the balance is short, and prices HNT against the pinned feed constant rather than the stored field, `update_auto_top_off_v0` leaves both task fields on the "nothing scheduled" sentinel after dequeuing, takes `dca_mint` and `dca_mint_account` as an optional pair and refuses a mint change while the account it spends from still holds a balance, and no longer writes `hnt_price_oracle`; `UpdateAutoTopOffArgsV0` drops that field and `TopOffDcV0` drops its `has_one`, since data-credits pins the feed itself.
+
 ## 0.11.28
 
 ### Patch Changes
