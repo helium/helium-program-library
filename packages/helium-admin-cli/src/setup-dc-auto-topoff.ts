@@ -97,7 +97,7 @@ export async function run(args: any = process.argv) {
     },
     hntPriceOracle: {
       type: "string",
-      describe: "Pubkey of the HNT price oracle",
+      describe: "Pubkey of the HNT price oracle, read when initializing",
     },
     hntThreshold: {
       type: "number",
@@ -372,9 +372,6 @@ export async function run(args: any = process.argv) {
       .updateAutoTopOffV0({
         schedule: argv.schedule ? argv.schedule : null,
         threshold: argv.threshold ? new anchor.BN(argv.threshold) : null,
-        hntPriceOracle: argv.hntPriceOracle
-          ? new PublicKey(argv.hntPriceOracle)
-          : null,
         hntThreshold: argv.hntThreshold
           ? new anchor.BN(argv.hntThreshold)
           : null,
@@ -396,9 +393,19 @@ export async function run(args: any = process.argv) {
         taskRentRefund,
         hntTaskRentRefund,
         authority: autoTopOffAcc.authority,
-        dcaMint: argv.dcaMint
-          ? new PublicKey(argv.dcaMint)
-          : autoTopOffAcc.dcaMint,
+        // The leg keeps the mint it has unless this run is changing it, and a change carries
+        // the account it is spent from today so the program can see that it holds nothing.
+        dcaMint: argv.dcaMint ? new PublicKey(argv.dcaMint) : null,
+        dcaMintAccount: argv.dcaMint
+          ? getAssociatedTokenAddressSync(
+              new PublicKey(argv.dcaMint),
+              autoTopOff!,
+              true,
+            )
+          : null,
+        currentDcaMintAccount: argv.dcaMint
+          ? autoTopOffAcc.dcaMintAccount
+          : null,
       })
       .instruction();
     instructions.push(updateIx);
@@ -412,7 +419,10 @@ export async function run(args: any = process.argv) {
       .accountsPartial({
         payer: authority,
         autoTopOff: autoTopOff!,
-        nextTask: autoTopOffAcc.nextTask,
+        // update_auto_top_off_v0 above dequeued both legs and left each field naming the top
+        // off itself, which is how both spell "nothing scheduled".
+        nextTask: autoTopOff!,
+        nextHntTask: autoTopOff!,
         task: taskKey(TASK_QUEUE_ID, nextTask)[0],
         hntTask: taskKey(TASK_QUEUE_ID, nextHntTask)[0],
         taskQueue: TASK_QUEUE_ID,

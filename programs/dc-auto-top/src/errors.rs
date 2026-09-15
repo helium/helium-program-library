@@ -28,4 +28,13 @@ pub enum ErrorCode {
 
   #[msg("Next task must be a free task the run was given")]
   InvalidFreeTask,
+
+  #[msg("DCA interval seconds must be greater than zero")]
+  InvalidDcaInterval,
+
+  #[msg("DCA mint and DCA mint account must be passed together")]
+  IncompleteDcaMintChange,
+
+  #[msg("Changing the DCA mint requires the stored DCA account, holding nothing")]
+  DcaMintAccountNotEmpty,
 }

@@ -14,6 +14,7 @@ import {
   tuktukConfigKey,
 } from "@helium/tuktuk-sdk";
 import {
+  AccountLayout,
   createAssociatedTokenAccountIdempotentInstruction,
   createInitializeMint2Instruction,
   createMintToInstruction,
@@ -37,6 +38,7 @@ import { DcAutoTop } from "../target/types/dc_auto_top";
 import {
   ensureCloned,
   ensureDumped,
+  overwriteAccountData,
   readAccount,
   startBankrun,
   warpTo,
@@ -377,7 +379,6 @@ describe("dc-auto-topoff under bankrun", () => {
       .updateAutoTopOffV0({
         schedule: null,
         threshold: null,
-        hntPriceOracle: null,
         hntThreshold: null,
         dcaSwapAmount: null,
         dcaIntervalSeconds: null,
@@ -392,9 +393,33 @@ describe("dc-auto-topoff under bankrun", () => {
         nextHntTask: state.nextHntTask,
         taskRentRefund: await refundFor(state.nextTask),
         hntTaskRentRefund: await refundFor(state.nextHntTask),
-        dcaMint,
+        // The mint is not being changed, so the leg keeps the one it has.
+        dcaMint: null,
+        dcaMintAccount: null,
+        currentDcaMintAccount: null,
       })
       .rpc();
+  }
+
+  /**
+   * Frees both task addresses and puts them back in the fields, leaving the top off naming
+   * addresses no task occupies. That is the state a run leaves behind: it records the free
+   * task it was handed, and the slot is reusable the moment that task is gone.
+   */
+  async function freeRecordedLegs(autoTopOff: PublicKey) {
+    const { nextTask, nextHntTask } =
+      await program.account.autoTopOffV0.fetch(autoTopOff);
+    await dequeueBothLegs(autoTopOff);
+    const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+    await overwriteAccountData(
+      ctx,
+      autoTopOff,
+      await program.coder.accounts.encode("autoTopOffV0", {
+        ...state,
+        nextTask,
+        nextHntTask,
+      }),
+    );
   }
 
   /**
@@ -482,6 +507,53 @@ describe("dc-auto-topoff under bankrun", () => {
       ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
       ...(await runTask({ program: tuktukProgram, task, crankTurner: me })),
     ]);
+
+  const tokenBalance = async (account: PublicKey) =>
+    AccountLayout.decode((await readAccount(ctx, account))!).amount;
+
+  /** The DCA the HNT leg opened at `index`, decoded through tuktuk-dca's own IDL. */
+  const dcaAt = async (autoTopOff: PublicKey, index: number) => {
+    const dcaProgram = new anchor.Program(
+      require("../target/idl/tuktuk_dca.json"),
+      provider,
+    );
+    return dcaProgram.account.dcaV0.fetch(
+      dcaKey(autoTopOff, dcaMint, hntMint, index)[0],
+    ) as Promise<{ initialNumOrders: number; numOrders: number }>;
+  };
+
+  /**
+   * The HNT one order buys, from the two feeds the leg reads and at the leg's own decimals.
+   * Derived rather than assumed so a fixture can name a gap in whole orders.
+   */
+  async function hntPerOrder(swapAmount: anchor.BN): Promise<anchor.BN> {
+    const { PythSolanaReceiver } =
+      await import("@pythnetwork/pyth-solana-receiver");
+    const receiver = new PythSolanaReceiver({
+      connection: provider.connection,
+      wallet: provider.wallet as anchor.Wallet,
+    }).receiver;
+    const decode = async (feed: PublicKey) =>
+      receiver.coder.accounts.decode(
+        "priceUpdateV2",
+        (await readAccount(ctx, feed))!,
+      ).priceMessage;
+    const input = await decode(USDC_PRICE_FEED);
+    const output = await decode(HNT_PRICE_FEED);
+    const expoDiff = input.exponent - output.exponent;
+    const scale = new anchor.BN(10).pow(new anchor.BN(Math.abs(expoDiff)));
+    const product = swapAmount.mul(input.price);
+    let perOrder: anchor.BN;
+    if (expoDiff > 0) {
+      perOrder = product.mul(scale).div(output.price);
+    } else if (expoDiff < 0) {
+      perOrder = product.div(output.price).div(scale);
+    } else {
+      perOrder = product.div(output.price);
+    }
+    // The DCA mint has 6 decimals against HNT's 8.
+    return perOrder.muln(100);
+  }
 
   // The control for the test below. Identical fixture but funded, so it establishes that
   // everything other than the rent shortfall is satisfied -- without it, "no DCA was created"
@@ -619,7 +691,7 @@ describe("dc-auto-topoff under bankrun", () => {
       const { nextHntTaskTime } = await program.account.autoTopOffV0.fetch(
         autoTopOff
       );
-      await dequeueBothLegs(autoTopOff);
+      await freeRecordedLegs(autoTopOff);
       const task = await queueTopOffAt({ autoTopOff, taskId: hntTaskId, ...options });
       return { autoTopOff, task, dueAt: BigInt(nextHntTaskTime.toString()) };
     }
@@ -654,7 +726,7 @@ describe("dc-auto-topoff under bankrun", () => {
       const { nextHntTaskTime } = await program.account.autoTopOffV0.fetch(
         autoTopOff
       );
-      await dequeueBothLegs(autoTopOff);
+      await freeRecordedLegs(autoTopOff);
       const task = await queueTopOffAt({
         autoTopOff,
         taskId: hntTaskId,
@@ -662,6 +734,201 @@ describe("dc-auto-topoff under bankrun", () => {
       });
       await warpTo(ctx, BigInt(nextHntTaskTime.toString()) + 1n);
       await expectError("InvalidFreeTask", crank(task));
+    });
+  });
+
+  describe("sizing the refill", () => {
+    const swapAmount = new anchor.BN(250_000000);
+
+    /**
+     * A top off whose gap is exactly `orders` orders wide, so the order count the leg derives
+     * from the gap is that number and any smaller count is a cap the leg applied.
+     */
+    async function gapOf(
+      orders: number,
+      overrides: Record<string, unknown> = {},
+      dcaMintFunding = 1_000_000_000n,
+    ) {
+      const perOrder = await hntPerOrder(swapAmount);
+      return autoTopOffWith(50_000_000, 1_000_000_000, dcaMintFunding, {
+        dcaSwapAmount: swapAmount,
+        // The fixture funds the HNT account with 10 HNT.
+        hntThreshold: new anchor.BN(10_00000000).add(perOrder.muln(orders)),
+        ...overrides,
+      });
+    }
+
+    it("buys the orders the balance covers rather than skipping the refill", async () => {
+      // Daily, so the slot is 86400 seconds and at a 300 second interval leaves room for far
+      // more than ten orders: the balance is the only cap that can bind here.
+      const affordable = 3;
+      const { autoTopOff, hntTask } = await gapOf(
+        10,
+        {},
+        BigInt(swapAmount.muln(affordable).toString()),
+      );
+      const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+      const before = await tokenBalance(state.dcaMintAccount);
+
+      const task = await tuktukProgram.account.taskV0.fetch(hntTask);
+      await warpTo(ctx, BigInt(task.trigger.timestamp![0].toString()) + 1n);
+      await crank(hntTask);
+
+      const dca = await dcaAt(autoTopOff, 0);
+      expect(dca.initialNumOrders).to.equal(
+        affordable,
+        "the DCA should carry every order the balance covers",
+      );
+      expect(
+        (before - (await tokenBalance(state.dcaMintAccount))).toString(),
+      ).to.equal(
+        swapAmount.muln(affordable).toString(),
+        "the DCA should have taken one swap amount per order",
+      );
+    });
+
+    it("buys no more orders than come due before the next run", async () => {
+      // Hourly, so the slot the leg is about to schedule is 3600 seconds wide.
+      const { autoTopOff, hntTask } = await gapOf(
+        10,
+        { schedule: padded("0 0 * * * *", 128) },
+        BigInt(swapAmount.muln(10).toString()),
+      );
+      const task = await tuktukProgram.account.taskV0.fetch(hntTask);
+      // 1500 seconds short of the next slot, against a 300 second order interval.
+      await warpTo(
+        ctx,
+        BigInt(task.trigger.timestamp![0].toString()) + 3600n - 1500n,
+      );
+      await crank(hntTask);
+
+      const dca = await dcaAt(autoTopOff, 0);
+      expect(dca.initialNumOrders).to.equal(
+        5,
+        "1500 seconds at 300 per order is five orders",
+      );
+    });
+  });
+
+  describe("an update that dequeues both legs", () => {
+    it("leaves both legs unscheduled, so they can be scheduled again", async () => {
+      const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
+      await dequeueBothLegs(autoTopOff);
+
+      const after = await program.account.autoTopOffV0.fetch(autoTopOff);
+      expect(after.nextTask.toBase58()).to.equal(
+        autoTopOff.toBase58(),
+        "the dequeued DC task should read as nothing scheduled",
+      );
+      expect(after.nextHntTask.toBase58()).to.equal(
+        autoTopOff.toBase58(),
+        "the dequeued HNT task should read as nothing scheduled",
+      );
+
+      const { taskBitmap, capacity } =
+        await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+      const [taskId, hntTaskId] = nextAvailableTaskIds(
+        taskBitmap,
+        2,
+        false,
+        capacity,
+      );
+      await program.methods
+        .scheduleTaskV0({ taskId, hntTaskId })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
+        .accounts({
+          payer: me,
+          autoTopOff,
+          task: taskKey(taskQueue, taskId)[0],
+          hntTask: taskKey(taskQueue, hntTaskId)[0],
+        })
+        .rpc();
+
+      const scheduled = await program.account.autoTopOffV0.fetch(autoTopOff);
+      expect(scheduled.nextTask.toBase58()).to.equal(
+        taskKey(taskQueue, taskId)[0].toBase58(),
+      );
+      expect(scheduled.nextHntTask.toBase58()).to.equal(
+        taskKey(taskQueue, hntTaskId)[0].toBase58(),
+      );
+    });
+
+    it("leaves the DCA mint alone when it is not passed", async () => {
+      const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
+      const before = await program.account.autoTopOffV0.fetch(autoTopOff);
+      await dequeueBothLegs(autoTopOff);
+
+      const after = await program.account.autoTopOffV0.fetch(autoTopOff);
+      expect(after.dcaMint.toBase58()).to.equal(before.dcaMint.toBase58());
+      expect(after.dcaMintAccount.toBase58()).to.equal(
+        before.dcaMintAccount.toBase58(),
+      );
+    });
+  });
+
+  describe("moving the DCA mint", () => {
+    /** Points the leg at `newMint`, handing back the account it spends from today. */
+    async function changeMintTo(autoTopOff: PublicKey, newMint: PublicKey) {
+      const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+      await program.methods
+        .updateAutoTopOffV0({
+          schedule: null,
+          threshold: null,
+          hntThreshold: null,
+          dcaSwapAmount: null,
+          dcaIntervalSeconds: null,
+          dcaInputPriceOracle: null,
+        })
+        .accounts({
+          authority: me,
+          payer: me,
+          autoTopOff,
+          taskQueue,
+          nextTask: state.nextTask,
+          nextHntTask: state.nextHntTask,
+          taskRentRefund: me,
+          hntTaskRentRefund: me,
+          dcaMint: newMint,
+          dcaMintAccount: getAssociatedTokenAddressSync(
+            newMint,
+            autoTopOff,
+            true,
+          ),
+          currentDcaMintAccount: state.dcaMintAccount,
+        })
+        .rpc();
+    }
+
+    it("refuses while the account it spends from still holds a balance", async () => {
+      const { autoTopOff } = await autoTopOffWith(
+        50_000_000,
+        1_000_000_000,
+        1_000_000_000n,
+      );
+      await expectError(
+        "DcaMintAccountNotEmpty",
+        changeMintTo(autoTopOff, await createMint(6)),
+      );
+    });
+
+    // The control for the test above: the same change, differing only in the balance left
+    // behind, so the refusal there is the balance and not the rest of the fixture.
+    it("moves both fields once that account is empty", async () => {
+      const { autoTopOff } = await autoTopOffWith(
+        50_000_000,
+        1_000_000_000,
+        0n,
+      );
+      const newMint = await createMint(6);
+      await changeMintTo(autoTopOff, newMint);
+
+      const after = await program.account.autoTopOffV0.fetch(autoTopOff);
+      expect(after.dcaMint.toBase58()).to.equal(newMint.toBase58());
+      expect(after.dcaMintAccount.toBase58()).to.equal(
+        getAssociatedTokenAddressSync(newMint, autoTopOff, true).toBase58(),
+      );
     });
   });
 
@@ -744,7 +1011,7 @@ describe("dc-auto-topoff under bankrun", () => {
     };
 
     // Before its time, the recorded address buys a second task nothing.
-    await dequeueBothLegs(autoTopOff);
+    await freeRecordedLegs(autoTopOff);
     await expectError("TaskNotDue", crank(await queueDcTopOffAt(taskId)));
 
     // At its time the leg runs, and the run moves the leg on to the next slot.
@@ -759,7 +1026,7 @@ describe("dc-auto-topoff under bankrun", () => {
 
     // So a second task at the address the run just recorded is early in its turn.
     const rescheduled = await tuktukProgram.account.taskV0.fetch(after.nextTask);
-    await dequeueBothLegs(autoTopOff);
+    await freeRecordedLegs(autoTopOff);
     await expectError("TaskNotDue", crank(await queueDcTopOffAt(rescheduled.id)));
   });
 });

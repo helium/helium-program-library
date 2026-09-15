@@ -118,11 +118,8 @@ pub fn verify_running_in_tuktuk(
   );
 
   // Verify that the next_task account matches the task being executed
-  // The first account in the instruction should be the task account
-  require!(
-    !current_ix.accounts.is_empty(),
-    ErrorCode::InvalidCpiContext
-  );
+  // The task account is the fourth account run_task_v0 names.
+  require_gt!(current_ix.accounts.len(), 3, ErrorCode::InvalidCpiContext);
   require_eq!(
     current_ix.accounts[3].pubkey,
     task_id,
@@ -147,11 +144,8 @@ pub fn handler<'info>(
   // The address in `next_hnt_task` is a task queue slot, and a slot is reusable once the task it
   // held is gone. The recorded time is what makes the leg run on its own schedule: it is due once,
   // and the reschedule below moves it to the next slot.
-  require_gte!(
-    Clock::get()?.unix_timestamp,
-    auto_top_off.next_hnt_task_time,
-    ErrorCode::TaskNotDue
-  );
+  let now = Clock::get()?.unix_timestamp;
+  require_gte!(now, auto_top_off.next_hnt_task_time, ErrorCode::TaskNotDue);
   let task_queue_key = ctx.accounts.task_queue.key();
   let dca_free_task = free_task_key(&task_queue_key, &free_task_ids, 1)?;
   require_keys_eq!(
@@ -238,15 +232,14 @@ pub fn handler<'info>(
       let output_price_message = ctx.accounts.hnt_price_oracle.price_message;
 
       // Verify prices are not older than 5 minutes
-      let current_time = Clock::get()?.unix_timestamp;
       require_gte!(
         input_price_message.publish_time,
-        current_time.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
+        now.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
         ErrorCode::PythPriceNotFound
       );
       require_gte!(
         output_price_message.publish_time,
-        current_time.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
+        now.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
         ErrorCode::PythPriceNotFound
       );
 
@@ -327,9 +320,9 @@ pub fn handler<'info>(
       let total_rent = dca_rent + ata_rent;
       let rent_needed = total_rent.saturating_sub(ctx.accounts.dca_custom_signer.lamports());
 
-      // Both inputs are checked for the same reason: the run either affords the whole DCA or
-      // does not start it. Anything short reverts the run, and a reverted run never
-      // reschedules, so a shortfall would stop the leg rather than skip a day.
+      // Rent is all-or-nothing, so it is checked rather than debited: debiting past the
+      // account's own rent exemption reverts the run, and a reverted run never reschedules,
+      // so a shortfall would stop the leg rather than skip a day.
       //
       // A DCA refunds its rent to the custom signer when it drains and closes, so in steady
       // state rent_needed is 0. An abandoned DCA never refunds, so each replacement draws
@@ -344,34 +337,40 @@ pub fn handler<'info>(
         );
       }
 
-      // initialize_dca_nested_v0 moves the whole run's USDC up front and takes the order count
-      // as a u32, so a count that does not fit is as unfundable as a balance that falls short.
-      let plan = u32::try_from(num_orders)
-        .ok()
-        .and_then(|orders| {
-          Some((
-            orders,
-            swap_amount_per_order.checked_mul(u64::from(orders))?,
-          ))
-        })
-        .filter(|(_, usdc_needed)| ctx.accounts.dca_mint_account.amount >= *usdc_needed);
-      if plan.is_none() {
+      // The run buys the part of the gap it can pay for now and finish before the next run:
+      // the whole gap when the balance and the slot both cover it, and the largest prefix of
+      // it otherwise. `initialize_dca_nested_v0` moves the whole order count's input up front,
+      // so the balance is the hard cap; the orders drain one interval apart, so a count that
+      // outlasts the slot would still be running when the next run opens its own DCA.
+      let affordable = ctx
+        .accounts
+        .dca_mint_account
+        .amount
+        .checked_div(swap_amount_per_order)
+        .unwrap_or_default();
+      let slot_seconds = u64::try_from(next_time.saturating_sub(now)).unwrap_or_default();
+      let within_slot = slot_seconds
+        .checked_div(interval_seconds)
+        .unwrap_or_default();
+      // The count is a u32 on the wire, so anything past that is another ceiling on it.
+      let orders = u32::try_from(num_orders.min(affordable).min(within_slot)).unwrap_or(u32::MAX);
+      if orders == 0 {
         msg!(
-          "Skipping DCA: {} orders at {} each exceeds the {} dca_mint available",
-          num_orders,
+          "Skipping DCA: {} dca_mint at {} per order buys no order inside {} seconds",
+          ctx.accounts.dca_mint_account.amount,
           swap_amount_per_order,
-          ctx.accounts.dca_mint_account.amount
+          slot_seconds
         );
       }
 
-      if let (true, Some((orders, _))) = (rent_ok, plan) {
+      if rent_ok && orders > 0 {
         // Transfer SOL from auto_top_off to custom signer for DCA rent
         ctx.accounts.auto_top_off.sub_lamports(rent_needed)?;
         ctx.accounts.dca_custom_signer.add_lamports(rent_needed)?;
 
         msg!(
           "Initializing DCA with {} orders, swap amount per order: {}, interval seconds: {}",
-          num_orders,
+          orders,
           swap_amount_per_order,
           interval_seconds
         );
@@ -418,8 +417,7 @@ pub fn handler<'info>(
         )?;
 
         // Add DCA tasks to our task list
-        let result_tasks = dca_result.get();
-        dca_tasks.extend(result_tasks.tasks.clone());
+        dca_tasks.extend(dca_result.get().tasks);
 
         // Advance the slot before the next task is compiled below, so the next run targets a
         // fresh PDA whether or not this DCA drains and closes. `init` on an occupied PDA fails,

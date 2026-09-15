@@ -113,6 +113,10 @@ pub fn handler(
   require_eq!(args.dca_signer, DCA_SIGNER, ErrorCode::InvalidDcaSigner);
   require!(args.dca_url == DCA_URL, ErrorCode::InvalidDcaUrl);
 
+  // The HNT leg divides the slot by this to size a DCA, and a DCA whose orders never come due
+  // drains nothing.
+  require_gt!(args.dca_interval_seconds, 0, ErrorCode::InvalidDcaInterval);
+
   let mut auto_top_off = ctx.accounts.auto_top_off.load_init()?;
   let arr = args.schedule.as_bytes();
   let mut schedule = [0; 128];
