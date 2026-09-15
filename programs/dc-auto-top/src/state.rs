@@ -38,6 +38,12 @@ pub struct AutoTopOffV0 {
   pub dca_interval_seconds: u64,
   pub dca_input_price_oracle: Pubkey,
   pub dca: Pubkey,
+  // When each leg is next due, as recorded by whatever queued the task sitting in `next_task` /
+  // `next_hnt_task`. A leg refuses to run before its own time, and every run that reschedules
+  // advances the time to the slot after it, so each leg runs at most once per slot whichever
+  // task occupies the address.
+  pub next_task_time: i64,
+  pub next_hnt_task_time: i64,
 }
 
 #[macro_export]
@@ -65,8 +71,10 @@ mod tests {
 
   use super::*;
 
-  /// `dca_index` is carved out of `reserved`, so every other field must sit at the byte offset
-  /// it occupied before. Existing accounts are not migrated; they decode with `dca_index == 0`.
+  /// `dca_index` is carved out of `reserved` and the two task times are appended past the last
+  /// field, so every other field sits at the byte offset it occupied before. Existing accounts
+  /// are not migrated; they decode with `dca_index == 0` and both times at 0, and the run that
+  /// reschedules each leg stamps that leg's real time.
   #[test]
   fn layout_is_unchanged_for_existing_accounts() {
     let v = <AutoTopOffV0 as bytemuck::Zeroable>::zeroed();
@@ -75,7 +83,7 @@ mod tests {
 
     assert_eq!(
       std::mem::size_of::<AutoTopOffV0>(),
-      936,
+      952,
       "struct size moved"
     );
     assert_eq!(at(&v.dca_index as *const _ as *const u8), 490);
@@ -83,5 +91,14 @@ mod tests {
     assert_eq!(at(&v.hnt_threshold as *const _ as *const u8), 792);
     assert_eq!(at(&v.dca_mint_account as *const _ as *const u8), 832);
     assert_eq!(at(&v.dca_input_price_oracle as *const _ as *const u8), 880);
+    assert_eq!(at(&v.next_task_time as *const _ as *const u8), 944);
+    assert_eq!(at(&v.next_hnt_task_time as *const _ as *const u8), 952);
+  }
+
+  /// The two live accounts were allocated at 1004 bytes, which every field including the two
+  /// appended times has to fit inside for `AccountLoader::load` to reach them.
+  #[test]
+  fn live_accounts_hold_every_field() {
+    assert!(AutoTopOffV0::DISCRIMINATOR.len() + std::mem::size_of::<AutoTopOffV0>() <= 1004);
   }
 }

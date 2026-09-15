@@ -160,6 +160,9 @@ pub fn handler(
     .0,
     dca_index: 0,
     reserved: [0; 4],
+    // Neither leg is scheduled yet; schedule_task_v0 records both times when it queues them.
+    next_task_time: 0,
+    next_hnt_task_time: 0,
   };
 
   Ok(())

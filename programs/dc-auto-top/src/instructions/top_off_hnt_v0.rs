@@ -17,7 +17,9 @@ use tuktuk_dca::{
 };
 use tuktuk_program::{tuktuk, RunTaskReturnV0, TaskReturnV0, TransactionSourceV0, TriggerV0};
 
-use crate::{auto_top_off_seeds, errors::ErrorCode, get_next_time, get_task_ix_hnt, state::*};
+use crate::{
+  auto_top_off_seeds, errors::ErrorCode, free_task_key, get_next_time, get_task_ix_hnt, state::*,
+};
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
@@ -64,8 +66,11 @@ pub struct TopOffHntV0<'info> {
   /// CHECK: DCA input account
   #[account(mut)]
   pub dca_input_account: UncheckedAccount<'info>,
-  /// CHECK: DCA destination token account
-  #[account(mut)]
+  /// CHECK: The DCA buys HNT for the top-off, so its output lands in the top-off's own HNT account.
+  #[account(
+    mut,
+    constraint = dca_destination_token_account.key() == hnt_account.key() @ ErrorCode::InvalidDcaDestination,
+  )]
   pub dca_destination_token_account: UncheckedAccount<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
@@ -77,12 +82,21 @@ pub struct TopOffHntV0<'info> {
   /// in the Anchor framework yet, so this is the safe approach.
   #[account(address = IX_ID)]
   pub instruction_sysvar: AccountInfo<'info>,
-  /// CHECK: Custom signer for DCA operations
-  #[account(mut)]
+  /// The task queue's own DCA swap payer: it funds the DCA's rent and is refunded when the DCA
+  /// closes, so it is the only account allowed to pay that rent here.
+  #[account(
+    mut,
+    seeds = [b"custom", task_queue.key().as_ref(), b"dca_swap_payer"],
+    bump,
+    seeds::program = tuktuk::ID,
+  )]
   pub dca_custom_signer: Signer<'info>,
 }
 
-pub fn verify_running_in_tuktuk(instruction_sysvar: AccountInfo, task_id: Pubkey) -> Result<()> {
+pub fn verify_running_in_tuktuk(
+  instruction_sysvar: AccountInfo,
+  task_id: Pubkey,
+) -> Result<Vec<u16>> {
   // Validate that this instruction is being called via CPI from tuktuk for the next_task
   let current_ix = get_instruction_relative(0, &instruction_sysvar)
     .map_err(|_| error!(ErrorCode::InvalidCpiContext))?;
@@ -115,7 +129,10 @@ pub fn verify_running_in_tuktuk(instruction_sysvar: AccountInfo, task_id: Pubkey
     ErrorCode::InvalidCpiContext
   );
 
-  Ok(())
+  // tuktuk appends one account per free task id after the accounts the task itself names, and
+  // these ids are what those appended accounts are checked against.
+  Vec::<u16>::try_from_slice(&current_ix.data[8..])
+    .map_err(|_| error!(ErrorCode::InvalidCpiContext))
 }
 
 pub fn handler<'info>(
@@ -123,19 +140,43 @@ pub fn handler<'info>(
 ) -> Result<RunTaskReturnV0> {
   let auto_top_off_key = ctx.accounts.auto_top_off.key();
   let mut auto_top_off = ctx.accounts.auto_top_off.load_mut()?;
-  verify_running_in_tuktuk(
+  let free_task_ids = verify_running_in_tuktuk(
     ctx.accounts.instruction_sysvar.to_account_info(),
     auto_top_off.next_hnt_task,
   )?;
+  // The address in `next_hnt_task` is a task queue slot, and a slot is reusable once the task it
+  // held is gone. The recorded time is what makes the leg run on its own schedule: it is due once,
+  // and the reschedule below moves it to the next slot.
+  require_gte!(
+    Clock::get()?.unix_timestamp,
+    auto_top_off.next_hnt_task_time,
+    ErrorCode::TaskNotDue
+  );
+  let task_queue_key = ctx.accounts.task_queue.key();
+  let dca_free_task = free_task_key(&task_queue_key, &free_task_ids, 1)?;
+  require_keys_eq!(
+    ctx.remaining_accounts[0].key(),
+    free_task_key(&task_queue_key, &free_task_ids, 0)?,
+    ErrorCode::InvalidFreeTask
+  );
+  require_keys_eq!(
+    ctx.remaining_accounts[1].key(),
+    dca_free_task,
+    ErrorCode::InvalidFreeTask
+  );
   auto_top_off.next_hnt_task = ctx.remaining_accounts[0].key();
+  // HNT always 5 minutes after the DC. The schedule is not touched between here and the task
+  // returned at the end, which carries this same time as its trigger.
+  let next_time = get_next_time(&auto_top_off)? + if TESTING { 0 } else { 5 * 60 };
+  auto_top_off.next_hnt_task_time = next_time;
 
   // Switch to immutable borrow so we can cpi
   drop(auto_top_off);
   let auto_top_off = ctx.accounts.auto_top_off.load()?;
 
-  // Remaining accounts:
+  // Remaining accounts, both checked above against the run's own free task ids:
   // [0] = next_hnt_task (for HNT topoff)
-  // [1] = dca_task_id (u16 encoded as bytes, optional if DCA needed)
+  // [1] = the task the DCA is initialized into, when one is started
 
   // Check if we need to start a DCA to maintain HNT threshold
   let mut dca_tasks = vec![];
@@ -410,9 +451,8 @@ pub fn handler<'info>(
   const MAX_FREE_TASKS: u8 = 2;
 
   let auto_top_off = ctx.accounts.auto_top_off.load()?;
-  // HNT always 5 minutes after the DC
-  let next_time = get_next_time(&auto_top_off)? + if TESTING { 0 } else { 5 * 60 };
   let compiled_tx = get_task_ix_hnt(auto_top_off_key, &auto_top_off)?;
+
   let mut tasks = vec![TaskReturnV0 {
     trigger: TriggerV0::Timestamp(next_time),
     transaction: TransactionSourceV0::CompiledV0(compiled_tx),

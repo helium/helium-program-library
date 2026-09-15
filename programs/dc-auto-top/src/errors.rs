@@ -22,4 +22,10 @@ pub enum ErrorCode {
 
   #[msg("Remote task url must address the pinned DCA service")]
   InvalidDcaUrl,
+
+  #[msg("DCA destination must be the top off's HNT account")]
+  InvalidDcaDestination,
+
+  #[msg("Next task must be a free task the run was given")]
+  InvalidFreeTask,
 }
