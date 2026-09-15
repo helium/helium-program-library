@@ -2,11 +2,13 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
 import {
+  compileTransaction,
   customSignerKey,
   init as initTuktuk,
   nextAvailableTaskIds,
   runTask,
   taskKey,
+  taskQueueAuthorityKey,
   taskQueueKey,
   taskQueueNameMappingKey,
   tuktukConfigKey,
@@ -78,6 +80,10 @@ describe("dc-auto-topoff under bankrun", () => {
   let taskQueue: PublicKey;
   let hntMint: PublicKey;
   let dcaMint: PublicKey;
+  // A second authority on the same queue, standing in for the other programs that hold one on
+  // the production queue. What it queues is its own: it picks the id, and so the address, and it
+  // picks the transaction the task carries.
+  let otherAuthority: Keypair;
 
   const queueAuthority = queueAuthorityKey()[0];
 
@@ -173,7 +179,31 @@ describe("dc-auto-topoff under bankrun", () => {
       .addQueueAuthorityV0()
       .accounts({ payer: me, queueAuthority, taskQueue })
       .rpc();
+
+    otherAuthority = Keypair.generate();
+    await tuktukProgram.methods
+      .addQueueAuthorityV0()
+      .accounts({
+        payer: me,
+        queueAuthority: otherAuthority.publicKey,
+        taskQueue,
+      })
+      .rpc();
   });
+
+  /** Asserts the run failed, and failed for the named reason rather than any other. */
+  async function expectError(name: string, run: Promise<unknown>) {
+    let failure: string | null = null;
+    try {
+      await run;
+    } catch (e: any) {
+      failure = [e.message, e.toString(), ...(e.logs ?? [])].join("\n");
+    }
+    expect(failure, `expected ${name}, but the run succeeded`).to.not.equal(
+      null
+    );
+    expect(failure, `expected ${name}, got: ${failure}`).to.contain(name);
+  }
 
   /**
    * An AutoTopOffV0 written straight to the ledger, holding `spendableLamports` above its own
@@ -239,6 +269,9 @@ describe("dc-auto-topoff under bankrun", () => {
       dcaIntervalSeconds: new anchor.BN(300),
       dcaInputPriceOracle: USDC_PRICE_FEED,
       dca: PublicKey.default,
+      // Nothing is scheduled yet; schedule_task_v0 below records both times.
+      nextTaskTime: new anchor.BN(0),
+      nextHntTaskTime: new anchor.BN(0),
     });
 
     const rentExempt =
@@ -271,7 +304,115 @@ describe("dc-auto-topoff under bankrun", () => {
       })
       .rpc();
 
-    return { autoTopOff, hntTask: taskKey(taskQueue, hntTaskId)[0] };
+    return {
+      autoTopOff,
+      taskId,
+      hntTaskId,
+      hntTask: taskKey(taskQueue, hntTaskId)[0],
+    };
+  }
+
+  /**
+   * Frees both task addresses the top off recorded, leaving `next_task` / `next_hnt_task`
+   * naming addresses no task occupies.
+   */
+  async function dequeueBothLegs(autoTopOff: PublicKey) {
+    const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+    await program.methods
+      .updateAutoTopOffV0({
+        schedule: null,
+        threshold: null,
+        hntPriceOracle: null,
+        hntThreshold: null,
+        dcaSwapAmount: null,
+        dcaIntervalSeconds: null,
+        dcaInputPriceOracle: null,
+      })
+      .accounts({
+        authority: me,
+        payer: me,
+        autoTopOff,
+        taskQueue,
+        nextTask: state.nextTask,
+        nextHntTask: state.nextHntTask,
+        taskRentRefund: me,
+        hntTaskRentRefund: me,
+        dcaMint,
+      })
+      .rpc();
+  }
+
+  /**
+   * Puts a task of the other authority's own making at `taskId`, carrying a top_off_hnt_v0 call
+   * whose accounts this caller chose.
+   */
+  async function queueTopOffAt({
+    autoTopOff,
+    taskId,
+    destination,
+    swapPayerSeed = "dca_swap_payer",
+  }: {
+    autoTopOff: PublicKey;
+    taskId: number;
+    destination?: PublicKey;
+    swapPayerSeed?: string;
+  }) {
+    const seed = Buffer.from(swapPayerSeed);
+    const [swapPayer, bump] = customSignerKey(taskQueue, [seed]);
+    const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+    const dca = dcaKey(autoTopOff, dcaMint, hntMint, state.dcaIndex)[0];
+    const instruction = await program.methods
+      .topOffHntV0()
+      .accounts({
+        autoTopOff,
+        taskQueue,
+        hntAccount: state.hntAccount,
+        hntMint,
+        dcaMint,
+        dcaMintAccount: state.dcaMintAccount,
+        dcaInputPriceOracle: USDC_PRICE_FEED,
+        hntPriceOracle: HNT_PRICE_FEED,
+        dca,
+        dcaInputAccount: getAssociatedTokenAddressSync(dcaMint, dca, true),
+        dcaDestinationTokenAccount: destination ?? state.hntAccount,
+        dcaCustomSigner: swapPayer,
+      })
+      .instruction();
+    // compileTransaction leaves the account list out of the transaction; queue_task_v0 folds the
+    // remaining accounts into it, which is what keeps the queued task inside a transaction size.
+    const { transaction, remainingAccounts } = compileTransaction(
+      [instruction],
+      [[seed, Buffer.from([bump])]]
+    );
+    await tuktukProgram.methods
+      .queueTaskV0({
+        id: taskId,
+        trigger: { now: {} },
+        transaction: { compiledV0: [transaction] },
+        crankReward: null,
+        freeTasks: 2,
+        description: "second hnt topoff",
+      })
+      .accounts({
+        payer: me,
+        queueAuthority: otherAuthority.publicKey,
+        taskQueueAuthority: taskQueueAuthorityKey(
+          taskQueue,
+          otherAuthority.publicKey
+        )[0],
+        taskQueue,
+        task: taskKey(taskQueue, taskId)[0],
+      })
+      .remainingAccounts(
+        remainingAccounts.map((account) => ({
+          ...account,
+          isSigner: false,
+          isWritable: false,
+        }))
+      )
+      .signers([otherAuthority])
+      .rpc();
+    return taskKey(taskQueue, taskId)[0];
   }
 
   const crank = async (task: PublicKey) =>
@@ -292,9 +433,14 @@ describe("dc-auto-topoff under bankrun", () => {
 
     const task = await tuktukProgram.account.taskV0.fetch(hntTask);
     await warpTo(ctx, BigInt(task.trigger.timestamp![0].toString()) + 1n);
+    const before = await program.account.autoTopOffV0.fetch(autoTopOff);
     await crank(hntTask);
 
     const after = await program.account.autoTopOffV0.fetch(autoTopOff);
+    expect(
+      after.nextHntTaskTime.toNumber(),
+      "the leg should now be due at the slot after the one it just ran"
+    ).to.be.greaterThan(before.nextHntTaskTime.toNumber());
     expect(after.dcaIndex).to.equal(1, "the slot should advance once per DCA");
     expect(after.dca.toBase58()).to.equal(
       dcaKey(autoTopOff, dcaMint, hntMint, 0)[0].toBase58(),
@@ -394,5 +540,46 @@ describe("dc-auto-topoff under bankrun", () => {
       await readAccount(ctx, dcaKey(autoTopOff, dcaMint, hntMint, 0)[0]),
       "no DCA account should exist"
     ).to.equal(null);
+  });
+
+  describe("a second task at the address the HNT leg recorded", () => {
+    /**
+     * Frees the recorded address and lets the other authority put its own task there, so the
+     * only thing the run has going for it is that the address matches.
+     */
+    async function reoccupy(
+      options: { destination?: PublicKey; swapPayerSeed?: string } = {}
+    ) {
+      const { autoTopOff, hntTaskId } = await autoTopOffWith(
+        50_000_000,
+        1_000_000_000
+      );
+      const { nextHntTaskTime } = await program.account.autoTopOffV0.fetch(
+        autoTopOff
+      );
+      await dequeueBothLegs(autoTopOff);
+      const task = await queueTopOffAt({ autoTopOff, taskId: hntTaskId, ...options });
+      return { autoTopOff, task, dueAt: BigInt(nextHntTaskTime.toString()) };
+    }
+
+    it("does not run before the leg is due", async () => {
+      // Every other account is the one the top off itself would have named, so the time is the
+      // only thing left to reject it on.
+      const { task } = await reoccupy();
+      await expectError("TaskNotDue", crank(task));
+    });
+
+    it("does not send the DCA output anywhere but the top off's HNT account", async () => {
+      const destination = await ataWith(hntMint, Keypair.generate().publicKey, 0n);
+      const { task, dueAt } = await reoccupy({ destination });
+      await warpTo(ctx, dueAt + 1n);
+      await expectError("InvalidDcaDestination", crank(task));
+    });
+
+    it("does not pay DCA rent to a signer other than the queue's swap payer", async () => {
+      const { task, dueAt } = await reoccupy({ swapPayerSeed: "other_payer" });
+      await warpTo(ctx, dueAt + 1n);
+      await expectError("ConstraintSeeds", crank(task));
+    });
   });
 });

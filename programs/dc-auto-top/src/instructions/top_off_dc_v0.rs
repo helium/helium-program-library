@@ -137,6 +137,14 @@ pub fn handler<'info>(
     ctx.accounts.instruction_sysvar.to_account_info(),
     auto_top_off.next_task,
   )?;
+  // The address in `next_task` is a task queue slot, and a slot is reusable once the task it held
+  // is gone. The recorded time is what makes the leg run on its own schedule: it is due once, and
+  // the reschedule below moves it to the next slot.
+  require_gte!(
+    Clock::get()?.unix_timestamp,
+    auto_top_off.next_task_time,
+    ErrorCode::TaskNotDue
+  );
 
   let dc_amount = auto_top_off
     .threshold
@@ -242,6 +250,9 @@ pub fn handler<'info>(
   let auto_top_off = ctx.accounts.auto_top_off.load()?;
   let next_time = get_next_time(&auto_top_off)?;
   let compiled_tx = get_task_ix_dc(auto_top_off_key, &auto_top_off)?;
+  drop(auto_top_off);
+  ctx.accounts.auto_top_off.load_mut()?.next_task_time = next_time;
+
   let tasks = vec![TaskReturnV0 {
     trigger: TriggerV0::Timestamp(next_time),
     transaction: TransactionSourceV0::CompiledV0(compiled_tx),

@@ -64,8 +64,11 @@ pub struct TopOffHntV0<'info> {
   /// CHECK: DCA input account
   #[account(mut)]
   pub dca_input_account: UncheckedAccount<'info>,
-  /// CHECK: DCA destination token account
-  #[account(mut)]
+  /// CHECK: The DCA buys HNT for the top-off, so its output lands in the top-off's own HNT account.
+  #[account(
+    mut,
+    constraint = dca_destination_token_account.key() == hnt_account.key() @ ErrorCode::InvalidDcaDestination,
+  )]
   pub dca_destination_token_account: UncheckedAccount<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
@@ -77,8 +80,14 @@ pub struct TopOffHntV0<'info> {
   /// in the Anchor framework yet, so this is the safe approach.
   #[account(address = IX_ID)]
   pub instruction_sysvar: AccountInfo<'info>,
-  /// CHECK: Custom signer for DCA operations
-  #[account(mut)]
+  /// The task queue's own DCA swap payer: it funds the DCA's rent and is refunded when the DCA
+  /// closes, so it is the one address this instruction moves lamports to.
+  #[account(
+    mut,
+    seeds = [b"custom", task_queue.key().as_ref(), b"dca_swap_payer"],
+    bump,
+    seeds::program = tuktuk::ID,
+  )]
   pub dca_custom_signer: Signer<'info>,
 }
 
@@ -127,7 +136,19 @@ pub fn handler<'info>(
     ctx.accounts.instruction_sysvar.to_account_info(),
     auto_top_off.next_hnt_task,
   )?;
+  // The address in `next_hnt_task` is a task queue slot, and a slot is reusable once the task it
+  // held is gone. The recorded time is what makes the leg run on its own schedule: it is due once,
+  // and the reschedule below moves it to the next slot.
+  require_gte!(
+    Clock::get()?.unix_timestamp,
+    auto_top_off.next_hnt_task_time,
+    ErrorCode::TaskNotDue
+  );
   auto_top_off.next_hnt_task = ctx.remaining_accounts[0].key();
+  // HNT always 5 minutes after the DC. The schedule is not touched between here and the task
+  // returned at the end, which carries this same time as its trigger.
+  let next_time = get_next_time(&auto_top_off)? + if TESTING { 0 } else { 5 * 60 };
+  auto_top_off.next_hnt_task_time = next_time;
 
   // Switch to immutable borrow so we can cpi
   drop(auto_top_off);
@@ -410,9 +431,8 @@ pub fn handler<'info>(
   const MAX_FREE_TASKS: u8 = 2;
 
   let auto_top_off = ctx.accounts.auto_top_off.load()?;
-  // HNT always 5 minutes after the DC
-  let next_time = get_next_time(&auto_top_off)? + if TESTING { 0 } else { 5 * 60 };
   let compiled_tx = get_task_ix_hnt(auto_top_off_key, &auto_top_off)?;
+
   let mut tasks = vec![TaskReturnV0 {
     trigger: TriggerV0::Timestamp(next_time),
     transaction: TransactionSourceV0::CompiledV0(compiled_tx),
