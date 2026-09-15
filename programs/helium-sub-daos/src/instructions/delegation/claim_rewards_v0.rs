@@ -12,7 +12,9 @@ use voter_stake_registry::{
   VoterStakeRegistry,
 };
 
-use crate::{current_epoch, error::ErrorCode, state::*, ClaimRewardsArgsV0, TESTING};
+use crate::{
+  current_epoch, delegated_position_view, error::ErrorCode, state::*, ClaimRewardsArgsV0, TESTING,
+};
 
 #[derive(Accounts)]
 #[instruction(args: ClaimRewardsArgsV0)]
@@ -122,10 +124,11 @@ pub fn handler(ctx: Context<ClaimRewardsV0>, args: ClaimRewardsArgsV0) -> Result
     }
   }
 
-  let delegated_vehnt_at_epoch = position.voting_power(
-    voting_mint_config,
-    ctx.accounts.sub_dao_epoch_info.start_ts(),
-  )?;
+  let delegated_vehnt_at_epoch = delegated_position_view(position, delegated_position)
+    .voting_power(
+      voting_mint_config,
+      ctx.accounts.sub_dao_epoch_info.start_ts(),
+    )?;
 
   msg!("Staked {} veHNT at start of epoch with {} total veHNT delegated to subdao and {} total rewards to subdao",
     delegated_vehnt_at_epoch,

@@ -9,8 +9,8 @@ use voter_stake_registry::{
 
 use super::CloseDelegationAccounts;
 use crate::{
-  caclulate_vhnt_info, current_epoch, get_sub_dao_epoch_info_seed, id, state::*,
-  update_subdao_vehnt, PrecisePosition, VehntInfo, TESTING,
+  caclulate_vhnt_info, current_epoch, delegated_position_view, get_sub_dao_epoch_info_seed, id,
+  state::*, update_subdao_vehnt, PrecisePosition, VehntInfo, TESTING,
 };
 
 pub fn get_genesis_end_epoch_bytes(
@@ -157,7 +157,7 @@ pub struct CloseDelegationV0<'info> {
 
 pub fn raw_handler(accounts: &mut CloseDelegationAccounts, sde_bump: u8) -> Result<()> {
   // load the vehnt information
-  let position = &accounts.position;
+  let position = &delegated_position_view(accounts.position, accounts.delegated_position);
   let registrar = &accounts.registrar;
   let voting_mint_config = &registrar.voting_mints[position.voting_mint_config_idx as usize];
   let curr_ts = registrar.clock_unix_timestamp();
