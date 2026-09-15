@@ -292,7 +292,10 @@ describe("tuktuk-dca", () => {
     let destinationWallet: PublicKey = destinationKeypair.publicKey;
     let destinationTokenAccount: PublicKey;
     let task: PublicKey;
-    const numOrders = 4;
+    // Both overridden by the large-order suite below, which needs an order whose oracle
+    // arithmetic does not fit in 64 bits.
+    let numOrders = 4;
+    let swapAmountPerOrder = new BN(235_000000); // 235 USDC per order
     const intervalSeconds = new anchor.BN(1);
     // Overridden by the shortfall suite below, which needs a floor the fake swap can miss.
     let slippageBps = 0; // 0% slippage, we know the output
@@ -334,10 +337,8 @@ describe("tuktuk-dca", () => {
       );
       task = taskKey(taskQueue, taskId)[0];
 
-      // Mint USDC to the authority's account
-      // swap_amount_per_order will be 235 USDC per order x 4 orders = 940 USDC total
-      const swapAmountPerOrder = new BN(235_000000); // 235 USDC per order
-      const totalAmount = swapAmountPerOrder.muln(numOrders); // 940 USDC total
+      // Mint USDC to the authority's account: swap_amount_per_order per order, numOrders of them
+      const totalAmount = swapAmountPerOrder.muln(numOrders);
       await createAtaAndMint(provider, usdcMint, totalAmount, me);
 
       console.log("Initializing DCA", {
@@ -598,8 +599,6 @@ describe("tuktuk-dca", () => {
 
       it("refuses the repayment", async () => {
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        // Sent through the provider rather than runAllTasks, which reports a failed run
-        // without the logs the error name is read from.
         // Sent raw rather than through runAllTasks, which reports a failed run without the
         // logs the error name is read from. The crank turner pays, as it does there.
         const runTaskIxs = await runTask({
@@ -620,6 +619,60 @@ describe("tuktuk-dca", () => {
           provider.connection.sendRawTransaction(tx.serialize()),
           "SlippageExceeded",
         );
+      });
+    });
+
+    describe("with an order too large for 64-bit intermediates", () => {
+      before(() => {
+        // 2,000 USDC. At an 8-decimal price and a scale of 2, the input amount times the
+        // scale factor times the price passes 2^64, so the floor has to be computed wider.
+        numOrders = 1;
+        swapAmountPerOrder = new BN(2_000_000000);
+      });
+
+      after(() => {
+        numOrders = 4;
+        swapAmountPerOrder = new BN(235_000000);
+      });
+
+      it("prices the floor and settles the order", async () => {
+        const before = (
+          await getAccount(provider.connection, destinationTokenAccount)
+        ).amount;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // This DCA's own task only, sent raw with the crank turner paying, so a run that
+        // failed to price the floor surfaces here rather than in an unrelated task.
+        const runTaskIxs = await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: crankTurner.publicKey,
+        });
+        const tx = new Transaction().add(
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+          ...runTaskIxs,
+        );
+        tx.recentBlockhash = (
+          await provider.connection.getLatestBlockhash("confirmed")
+        ).blockhash;
+        tx.feePayer = crankTurner.publicKey;
+        tx.sign(crankTurner);
+        const signature = await provider.connection.sendRawTransaction(
+          tx.serialize(),
+        );
+        await provider.connection.confirmTransaction(signature, "confirmed");
+
+        const after = (
+          await getAccount(provider.connection, destinationTokenAccount)
+        ).amount;
+        expect(Number(after - before)).to.be.greaterThan(
+          0,
+          "the order should have settled",
+        );
+        expect(
+          await program.account.dcaV0.fetchNullable(dca),
+          "the only order ran, so the DCA should have closed",
+        ).to.be.null;
       });
     });
   });

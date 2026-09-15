@@ -13,7 +13,7 @@ use tuktuk_program::{
   TaskQueueAuthorityV0, TaskV0,
 };
 
-use crate::{dca_seeds, errors::ErrorCode, queue_authority_seeds, state::*};
+use crate::{dca_seeds, queue_authority_seeds, state::*};
 
 #[derive(Accounts)]
 pub struct CloseDcaV0<'info> {
@@ -28,7 +28,6 @@ pub struct CloseDcaV0<'info> {
     has_one = rent_refund,
     has_one = input_mint,
     has_one = input_account,
-    constraint = dca.load()?.is_swapping == 0 @ ErrorCode::SwapInProgress,
   )]
   pub dca: AccountLoader<'info, DcaV0>,
   pub input_mint: Account<'info, Mint>,
@@ -119,6 +118,11 @@ pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
     && !ctx.accounts.next_task.data_is_empty()
   {
     let next_task = try_from!(Account<TaskV0>, ctx.accounts.next_task)?;
+    // A task id can be reused once the original is gone, so only a task queued for this DCA is
+    // dequeued.
+    if next_task.queued_at != ctx.accounts.dca.load()?.queued_at {
+      return Ok(());
+    }
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {

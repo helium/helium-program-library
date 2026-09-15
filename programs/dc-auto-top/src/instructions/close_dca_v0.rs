@@ -36,8 +36,8 @@ pub struct CloseDcaV0<'info> {
   /// The DCA's own input account, drained into `dca_mint_account` by the CPI below.
   #[account(mut)]
   pub dca_input_account: Box<Account<'info, TokenAccount>>,
-  /// The top-off's own input token account: the DCA is its authority's associated account for
-  /// the input mint, which is the only destination tuktuk-dca's close accepts.
+  /// The top-off's own input token account. tuktuk-dca's close only pays out to the authority's
+  /// associated account for the input mint, and this is that account for the top-off.
   #[account(mut)]
   pub dca_mint_account: Box<Account<'info, TokenAccount>>,
   /// CHECK: tuktuk-dca's queue authority, checked by the program being called.

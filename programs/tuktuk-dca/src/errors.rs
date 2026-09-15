@@ -31,7 +31,4 @@ pub enum ErrorCode {
 
   #[msg("The run must supply the task the next order is queued into")]
   MissingNextTask,
-
-  #[msg("A swap is in progress")]
-  SwapInProgress,
 }

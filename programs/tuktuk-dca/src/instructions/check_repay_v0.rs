@@ -63,7 +63,7 @@ pub fn handler(ctx: Context<CheckRepayV0>, _args: CheckRepayArgsV0) -> Result<Ru
   let dca_key = ctx.accounts.dca.key();
   let mut dca = ctx.accounts.dca.load_mut()?;
   // The binding comes before the state check so that a call from outside the DCA's own task is
-  // refused whatever state the DCA is in.
+  // refused as InvalidCpiContext rather than LendNotCalled.
   verify_running_in_tuktuk(
     ctx.accounts.instruction_sysvar.to_account_info(),
     dca.next_task,
@@ -125,26 +125,31 @@ pub fn handler(ctx: Context<CheckRepayV0>, _args: CheckRepayArgsV0) -> Result<Ru
         .and_then(|expo_diff| expo_diff.checked_add(decimal_diff))
     })
     .ok_or(ErrorCode::ArithmeticError)?;
-  let scale_factor = 10_u64
+  let scale_factor = 10_u128
     .checked_pow(scale.unsigned_abs())
     .ok_or(ErrorCode::ArithmeticError)?;
   let input_amount = dca.swap_input_amount;
+  let input_amount_u128 = u128::from(input_amount);
+  let input_price = u128::from(input_price_with_conf);
+  let output_price = u128::from(output_price_with_conf);
 
   // Calculate expected output based on the input amount and oracle prices
   // We multiply by input price first, then divide by output price to avoid integer truncation
   let expected_repayment_amount = if scale > 0 {
-    input_amount
+    input_amount_u128
       .checked_mul(scale_factor)
-      .and_then(|amount| amount.checked_mul(input_price_with_conf))
-      .and_then(|amount| amount.checked_div(output_price_with_conf))
+      .and_then(|amount| amount.checked_mul(input_price))
+      .and_then(|amount| amount.checked_div(output_price))
   } else {
     // `scale_factor` is 1 when the two exponents and the two decimals cancel out.
-    input_amount
-      .checked_mul(input_price_with_conf)
-      .and_then(|amount| amount.checked_div(output_price_with_conf))
+    input_amount_u128
+      .checked_mul(input_price)
+      .and_then(|amount| amount.checked_div(output_price))
       .and_then(|amount| amount.checked_div(scale_factor))
   }
   .ok_or(ErrorCode::ArithmeticError)?;
+  let expected_repayment_amount =
+    u64::try_from(expected_repayment_amount).map_err(|_| ErrorCode::ArithmeticError)?;
 
   let expected_repayment_amount_with_slippage = expected_repayment_amount
     .checked_mul(u64::from(dca.slippage_bps_from_oracle))

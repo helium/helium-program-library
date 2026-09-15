@@ -625,6 +625,16 @@ describe("dc-auto-topoff under bankrun", () => {
     let dca: PublicKey;
     let dcaMintAccount: PublicKey;
     let closeAccounts: Record<string, PublicKey>;
+    let dcaQueuedAt: anchor.BN;
+
+    /** The DCA's task is gone: run, dequeued, or closed as stale. Its address stays on the DCA. */
+    const emptyTheTask = () =>
+      ctx.setAccount(closeAccounts.nextTask, {
+        lamports: 0,
+        data: Buffer.alloc(0),
+        owner: SystemProgram.programId,
+        executable: false,
+      });
 
     beforeEach(async () => {
       const created = await autoTopOffWith(50_000_000, 1_000_000_000);
@@ -636,15 +646,7 @@ describe("dc-auto-topoff under bankrun", () => {
       dca = dcaKey(autoTopOff, dcaMint, hntMint, 0)[0];
       dcaMintAccount = getAssociatedTokenAddressSync(dcaMint, autoTopOff, true);
       const dcaAcc = await tuktukDcaProgram.account.dcaV0.fetch(dca);
-
-      // The DCA's task is gone: run, dequeued, or closed as stale. The address stays on the
-      // DCA, so this is the state a close has to survive.
-      ctx.setAccount(dcaAcc.nextTask, {
-        lamports: 0,
-        data: Buffer.alloc(0),
-        owner: SystemProgram.programId,
-        executable: false,
-      });
+      dcaQueuedAt = dcaAcc.queuedAt;
 
       const dcaQueueAuthority = dcaQueueAuthorityKey()[0];
       closeAccounts = {
@@ -666,6 +668,7 @@ describe("dc-auto-topoff under bankrun", () => {
     });
 
     it("returns the unspent input and closes the DCA", async () => {
+      emptyTheTask();
       const held = await tokenBalance(dcaMintAccount);
       const inDca = await tokenBalance(closeAccounts.dcaInputAccount);
       expect(Number(inDca)).to.be.greaterThan(
@@ -682,6 +685,32 @@ describe("dc-auto-topoff under bankrun", () => {
         (held + inDca).toString()
       );
       expect(await readAccount(ctx, dca)).to.equal(null);
+    });
+
+    it("leaves a task at the recorded address that this DCA did not queue", async () => {
+      // A task id is reusable once the task that held it is gone, so the address alone does
+      // not say the task belongs to this DCA; `queued_at` does.
+      const task = await tuktukProgram.account.taskV0.fetch(
+        closeAccounts.nextTask
+      );
+      await overwriteAccountData(
+        ctx,
+        closeAccounts.nextTask,
+        await tuktukProgram.coder.accounts.encode("taskV0", {
+          ...task,
+          queuedAt: dcaQueuedAt.addn(1),
+        })
+      );
+
+      await program.methods.closeDcaV0().accountsPartial(closeAccounts).rpc();
+
+      expect(
+        await readAccount(ctx, closeAccounts.nextTask),
+        "the other DCA's task should still be queued"
+      ).to.not.equal(null);
+      expect(await readAccount(ctx, dca), "the DCA should be closed").to.equal(
+        null
+      );
     });
 
     it("refuses a signer that is not the top off's authority", async () => {
