@@ -259,16 +259,6 @@ describe("dc-auto-topoff under bankrun", () => {
     expect(failure, `expected ${name}, got: ${failure}`).to.contain(name);
   }
 
-  // The token account's `amount`, read off its bytes: bankrun's connection proxy has no
-  // getTokenAccountBalance.
-  const tokenBalance = async (address: PublicKey) => {
-    const data = await readAccount(ctx, address);
-    if (data === null) {
-      throw new Error(`token account ${address.toBase58()} does not exist`);
-    }
-    return data.readBigUInt64LE(64);
-  };
-
   /**
    * An AutoTopOffV0 written straight to the ledger, holding `spendableLamports` above its own
    * rent exemption. HNT sits below hnt_threshold so the run wants a DCA.
