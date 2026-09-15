@@ -362,10 +362,16 @@ describe("dc-auto-topoff under bankrun", () => {
   async function dequeueBothLegs(autoTopOff: PublicKey) {
     const state = await program.account.autoTopOffV0.fetch(autoTopOff);
     // dequeue_task_v0 refunds to the task's own rent_refund, which is the payer for a task
-    // queue_task_v0 created and the queue itself for one a run returned.
+    // queue_task_v0 created and the queue itself for one a run returned. A leg that was already
+    // dequeued has no task to read, and update_auto_top_off_v0 skips it, so any address does.
+    // Read through banksClient: anchor's fetchNullable goes through BankrunConnectionProxy,
+    // which throws on a missing account rather than returning null.
     const refundFor = async (task: PublicKey) => {
-      const account = await tuktukProgram.account.taskV0.fetchNullable(task);
-      return account ? account.rentRefund : me;
+      const data = await readAccount(ctx, task);
+      return data && data.length > 0
+        ? (tuktukProgram.coder.accounts.decode("taskV0", data)
+            .rentRefund as PublicKey)
+        : me;
     };
     await program.methods
       .updateAutoTopOffV0({
