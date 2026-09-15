@@ -57,13 +57,6 @@ pub mod helium_sub_daos {
     update_sub_dao_v0::handler(ctx, args)
   }
 
-  pub fn temp_update_sub_dao_epoch_info(
-    ctx: Context<TempUpdateSubDaoEpochInfo>,
-    args: TempUpdateSubDaoEpochInfoArgs,
-  ) -> Result<()> {
-    temp_update_sub_dao_epoch_info::handler(ctx, args)
-  }
-
   pub fn update_sub_dao_vehnt_v0(
     ctx: Context<UpdateSubDaoVeHntV0>,
     args: UpdateSubDaoVeHntArgsV0,
@@ -149,24 +142,11 @@ pub mod helium_sub_daos {
     track_vote_v0::handler(ctx)
   }
 
-  pub fn temp_backfill_dao_recent_proposals(
-    ctx: Context<TempBackfillDaoRecentProposals>,
-  ) -> Result<()> {
-    instructions::temp_backfill_dao_recent_proposals::handler(ctx)
-  }
-
   pub fn add_recent_proposal_to_dao_v0(ctx: Context<AddRecentProposalToDaoV0>) -> Result<()> {
     add_recent_proposal_to_dao_v0::handler(ctx)
   }
 
   pub fn change_delegation_v0(ctx: Context<ChangeDelegationV0>) -> Result<()> {
     change_delegation_v0::handler(ctx)
-  }
-
-  pub fn temp_claim_buggy_rewards(
-    ctx: Context<TempClaimBuggyRewards>,
-    args: ClaimRewardsArgsV0,
-  ) -> Result<()> {
-    temp_claim_buggy_rewards::handler(ctx, args)
   }
 }
