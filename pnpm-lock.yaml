@@ -2563,6 +2563,9 @@ importers:
       '@helium/data-credits-sdk':
         specifier: workspace:^
         version: link:../data-credits-sdk
+      '@helium/dc-auto-top-sdk':
+        specifier: workspace:^
+        version: link:../dc-auto-top-sdk
       '@helium/helium-entity-manager-sdk':
         specifier: workspace:^
         version: link:../helium-entity-manager-sdk
@@ -2584,6 +2587,12 @@ importers:
       '@helium/spl-utils':
         specifier: workspace:^
         version: link:../spl-utils
+      '@helium/tuktuk-dca-sdk':
+        specifier: workspace:^
+        version: link:../tuktuk-dca-sdk
+      '@helium/tuktuk-sdk':
+        specifier: ^0.1.1
+        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@metaplex-foundation/mpl-bubblegum':
         specifier: ^0.7.0
         version: 0.7.0(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
