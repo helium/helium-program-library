@@ -173,7 +173,6 @@ describe("tuktuk-dca", () => {
     dcaServer = await createDcaServer({
       program,
       provider,
-      taskQueue,
       outputMint: hntMint,
       dcaSigner,
     });

@@ -19,6 +19,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { TuktukDca } from "../../target/types/tuktuk_dca";
 import { sendInstructions } from "@helium/spl-utils";
+import { dcaTaskBindingError } from "../../packages/tuktuk-dca-service/src/binding";
 
 // tuktuk-dca pins the remote task's signer and url. A TESTING build pins them to these,
 // so every suite that creates a DCA uses this keypair and serves from this url.
@@ -62,7 +63,6 @@ function calculateExpectedOutput(
 export interface DcaServerConfig {
   program: Program<TuktukDca>;
   provider: anchor.AnchorProvider;
-  taskQueue: PublicKey;
   outputMint: PublicKey;
   dcaSigner: Keypair;
   port?: number;
@@ -74,7 +74,6 @@ export async function createDcaServer(
   const {
     program,
     provider,
-    taskQueue,
     outputMint,
     dcaSigner,
     port = DCA_TEST_PORT,
@@ -86,12 +85,22 @@ export async function createDcaServer(
     try {
       const dca = new PublicKey(request.params.dcaKey);
       const task = new PublicKey(request.body.task);
+      const taskQueue = new PublicKey(request.body.task_queue);
       const taskQueuedAt = new BN(request.body.task_queued_at);
 
       const dcaAccount = await program.account.dcaV0.fetch(dca);
 
+      const bindingError = dcaTaskBindingError(
+        { task, taskQueue, taskQueuedAt },
+        dcaAccount
+      );
+      if (bindingError) {
+        reply.status(400).send({ error: bindingError });
+        return;
+      }
+
       // Get swap payer PDA
-      const [swapPayer, bump] = customSignerKey(taskQueue, [
+      const [swapPayer, bump] = customSignerKey(dcaAccount.taskQueue, [
         Buffer.from("dca_swap_payer"),
       ]);
       const bumpBuffer = Buffer.alloc(1);

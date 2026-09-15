@@ -18,6 +18,7 @@ import {
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
+import { dcaTaskBindingError } from "./binding";
 import {
   DCA_SIGNER,
   JUPITER_API_KEY,
@@ -188,8 +189,17 @@ server.post<{
     // Fetch DCA account
     const dcaAccount = await dcaProgram.account.dcaV0.fetch(dca);
 
+    const bindingError = dcaTaskBindingError(
+      { task, taskQueue, taskQueuedAt },
+      dcaAccount
+    );
+    if (bindingError) {
+      reply.status(400).send({ error: bindingError });
+      return;
+    }
+
     // Get swap payer PDA
-    const [swapPayer, bump] = customSignerKey(taskQueue, [
+    const [swapPayer, bump] = customSignerKey(dcaAccount.taskQueue, [
       Buffer.from("dca_swap_payer"),
     ]);
     const bumpBuffer = Buffer.alloc(1);
