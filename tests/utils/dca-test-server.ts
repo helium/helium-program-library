@@ -20,6 +20,12 @@ import { sign } from "tweetnacl";
 import { TuktukDca } from "../../target/types/tuktuk_dca";
 import { sendInstructions } from "@helium/spl-utils";
 
+// tuktuk-dca pins the remote task's signer and url. A TESTING build pins them to these,
+// so every suite that creates a DCA uses this keypair and serves from this url.
+export const DCA_TEST_SIGNER = Keypair.fromSeed(Buffer.alloc(32, 1));
+export const DCA_TEST_PORT = 8123;
+export const DCA_TEST_URL = `http://localhost:${DCA_TEST_PORT}/dca`;
+
 // Calculate expected output based on oracle prices (matching check_repay_v0 logic)
 function calculateExpectedOutput(
   swapAmount: BN,
@@ -71,7 +77,7 @@ export async function createDcaServer(
     taskQueue,
     outputMint,
     dcaSigner,
-    port = 8123,
+    port = DCA_TEST_PORT,
   } = config;
 
   const dcaServer = Fastify({ logger: false });

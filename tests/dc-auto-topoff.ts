@@ -56,9 +56,12 @@ import {
 } from "./utils/fixtures";
 import {
   createDcaServer,
+  DCA_TEST_SIGNER,
+  DCA_TEST_URL,
   runAllTasks as runAllTasksUtil,
   calculateExpectedOutput,
 } from "./utils/dca-test-server";
+import { expectAnchorError } from "./utils/expectAnchorError";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { customSignerKey } from "@helium/tuktuk-sdk";
 import { createAtaAndMint } from "@helium/spl-utils";
@@ -176,7 +179,7 @@ describe("dc-auto-topoff", () => {
       .rpc({ skipPreflight: true });
 
     // Set up DCA server
-    dcaSigner = Keypair.generate();
+    dcaSigner = DCA_TEST_SIGNER;
     await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: me,
@@ -202,7 +205,6 @@ describe("dc-auto-topoff", () => {
       taskQueue,
       outputMint: hntMint,
       dcaSigner,
-      port: 8124, // Different port from tuktuk-dca test
     });
   });
 
@@ -291,7 +293,7 @@ describe("dc-auto-topoff", () => {
         dcaSwapAmount: new anchor.BN(10000000),
         dcaIntervalSeconds: new anchor.BN(10000000),
         dcaSigner: dcaSigner.publicKey,
-        dcaUrl: "http://localhost:8124/dca",
+        dcaUrl: DCA_TEST_URL,
       })
       .accounts({
         dcaInputPriceOracle: USDC_PRICE_FEED,
@@ -310,6 +312,66 @@ describe("dc-auto-topoff", () => {
       Buffer.from(autoTopOffAcc.schedule).toString("utf-8").replace(/\0/g, "")
     ).to.equal("0 0 * * * *");
     expect(autoTopOffAcc.threshold.toString()).to.equal("10000000");
+  });
+
+  it("refuses an auto topoff whose DCA signer or url is not the pinned one", async () => {
+    // The auto top off PDA is keyed on the delegated data credits, so each case gets its own
+    // router key: the pin is then the only thing that can reject the initialize.
+    const freshDelegatedDataCredits = async () => {
+      const freshRouterKey = (await HeliumKeypair.makeRandom()).address.b58;
+      const fresh = delegatedDataCreditsKey(subDao, freshRouterKey)[0];
+      await dcProgram.methods
+        .delegateDataCreditsV0({
+          routerKey: freshRouterKey,
+          amount: new anchor.BN(0),
+        })
+        .accountsPartial({
+          payer: me,
+          subDao,
+          delegatedDataCredits: fresh,
+          dcMint,
+          dao: daoKey(hntMint)[0],
+          fromAccount: getAssociatedTokenAddressSync(dcMint, me, true),
+          dataCredits: dataCreditsKey(dcMint)[0],
+        })
+        .rpc({ skipPreflight: true });
+      return { routerKey: freshRouterKey, delegatedDataCredits: fresh };
+    };
+
+    const initializeWith = async (overrides: {
+      dcaSigner?: PublicKey;
+      dcaUrl?: string;
+    }) => {
+      const fresh = await freshDelegatedDataCredits();
+      return program.methods
+        .initializeAutoTopOffV0({
+          schedule: "0 0 * * * *",
+          threshold: new anchor.BN(10000000),
+          routerKey: fresh.routerKey,
+          hntThreshold: new anchor.BN(10000000),
+          dcaSwapAmount: new anchor.BN(10000000),
+          dcaIntervalSeconds: new anchor.BN(10000000),
+          dcaSigner: overrides.dcaSigner ?? DCA_TEST_SIGNER.publicKey,
+          dcaUrl: overrides.dcaUrl ?? DCA_TEST_URL,
+        })
+        .accounts({
+          dcaInputPriceOracle: USDC_PRICE_FEED,
+          payer: me,
+          authority: me,
+          taskQueue,
+          delegatedDataCredits: fresh.delegatedDataCredits,
+          hntPriceOracle: PRO_HNT_PRICE_FEED,
+          dcaMint,
+        })
+        .rpc();
+    };
+
+    for (const [overrides, errorName] of [
+      [{ dcaSigner: Keypair.generate().publicKey }, "InvalidDcaSigner"],
+      [{ dcaUrl: `${DCA_TEST_URL}.other.example` }, "InvalidDcaUrl"],
+    ] as const) {
+      await expectAnchorError(initializeWith(overrides), errorName);
+    }
   });
 
   describe("with an auto topoff", () => {
@@ -344,7 +406,7 @@ describe("dc-auto-topoff", () => {
           dcaSwapAmount: new anchor.BN(10000000),
           dcaIntervalSeconds: new anchor.BN(10000000),
           dcaSigner: dcaSigner.publicKey,
-          dcaUrl: "http://localhost:8124/dca",
+          dcaUrl: DCA_TEST_URL,
         })
         .accounts({
           dcaInputPriceOracle: USDC_PRICE_FEED,

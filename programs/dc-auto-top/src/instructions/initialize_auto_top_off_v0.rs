@@ -10,6 +10,7 @@ use clockwork_cron::Schedule;
 use data_credits::{DataCreditsV0, DelegatedDataCreditsV0};
 use helium_sub_daos::{DaoV0, SubDaoV0};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+use tuktuk_dca::{DCA_SIGNER, DCA_URL};
 use tuktuk_program::TaskQueueV0;
 
 use crate::{errors::ErrorCode, state::*};
@@ -106,6 +107,11 @@ pub fn handler(
     msg!("Invalid schedule {}", e);
     ErrorCode::InvalidSchedule
   })?;
+
+  // These are handed to tuktuk-dca on every HNT refill, where they become the remote task's
+  // signer and url. Both name the pinned DCA service.
+  require_eq!(args.dca_signer, DCA_SIGNER, ErrorCode::InvalidDcaSigner);
+  require!(args.dca_url == DCA_URL, ErrorCode::InvalidDcaUrl);
 
   let mut auto_top_off = ctx.accounts.auto_top_off.load_init()?;
   let arr = args.schedule.as_bytes();

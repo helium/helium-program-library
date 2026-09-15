@@ -36,8 +36,11 @@ import { TuktukDca } from "../target/types/tuktuk_dca";
 import {
   calculateExpectedOutput,
   createDcaServer,
+  DCA_TEST_SIGNER,
+  DCA_TEST_URL,
   runAllTasks as runAllTasksUtil,
 } from "./utils/dca-test-server";
+import { expectAnchorError } from "./utils/expectAnchorError";
 import { ensureTuktukDcaIdl } from "./utils/fixtures";
 
 export const ANCHOR_PATH = "anchor";
@@ -75,7 +78,7 @@ describe("tuktuk-dca", () => {
     tuktukProgram = await initTuktuk(provider);
 
     // DCA signer will also be the swap source for simplicity
-    dcaSigner = Keypair.generate();
+    dcaSigner = DCA_TEST_SIGNER;
 
     await sendInstructions(provider, [
       SystemProgram.transfer({
@@ -173,7 +176,6 @@ describe("tuktuk-dca", () => {
       taskQueue,
       outputMint: hntMint,
       dcaSigner,
-      port: 8123,
     });
     console.log("DCA server started");
   });
@@ -182,6 +184,101 @@ describe("tuktuk-dca", () => {
     if (dcaServer) {
       await dcaServer.close();
     }
+  });
+
+  describe("the pinned remote task", () => {
+    const rejectedIndex = 9;
+
+    async function initializeWith(overrides: {
+      dcaSigner?: PublicKey;
+      dcaUrl?: string;
+      slippageBpsFromOracle?: number;
+    }) {
+      const authority = Keypair.generate();
+      await sendInstructions(provider, [
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: authority.publicKey,
+          lamports: LAMPORTS_PER_SOL,
+        }),
+      ]);
+      const destinationWallet = Keypair.generate().publicKey;
+      await createAtaAndMint(provider, hntMint, new BN(0), destinationWallet);
+      const swapAmountPerOrder = new BN(1_000000);
+      await createAtaAndMint(provider, usdcMint, swapAmountPerOrder, me);
+
+      const taskQueueAcc =
+        await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+      const [taskId] = nextAvailableTaskIds(
+        taskQueueAcc.taskBitmap,
+        1,
+        false,
+        taskQueueAcc.capacity,
+      );
+
+      return program.methods
+        .initializeDcaV0({
+          index: rejectedIndex,
+          numOrders: 1,
+          swapAmountPerOrder,
+          intervalSeconds: new anchor.BN(1),
+          slippageBpsFromOracle: overrides.slippageBpsFromOracle ?? 0,
+          taskId,
+          dcaSigner: overrides.dcaSigner ?? DCA_TEST_SIGNER.publicKey,
+          dcaUrl: overrides.dcaUrl ?? DCA_TEST_URL,
+        })
+        .accountsPartial({
+          core: {
+            rentPayer: me,
+            dcaPayer: me,
+            authority: authority.publicKey,
+            inputMint: usdcMint,
+            outputMint: hntMint,
+            inputPriceOracle: USDC_PRICE_FEED,
+            outputPriceOracle: HNT_PRICE_FEED,
+            destinationTokenAccount: getAssociatedTokenAddressSync(
+              hntMint,
+              destinationWallet,
+              true,
+            ),
+            taskQueue,
+          },
+          task: taskKey(taskQueue, taskId)[0],
+          queueAuthority,
+          taskQueueAuthority: taskQueueAuthorityKey(taskQueue, queueAuthority)[0],
+        })
+        .signers([authority])
+        .rpc({ skipPreflight: false });
+    }
+
+
+    it("rejects a signer other than the pinned one", async () => {
+      await expectAnchorError(
+        initializeWith({ dcaSigner: Keypair.generate().publicKey }),
+        "InvalidDcaSigner",
+      );
+    });
+
+    it("rejects a url whose host only shares the pinned prefix", async () => {
+      await expectAnchorError(
+        initializeWith({ dcaUrl: `${DCA_TEST_URL}.other.example` }),
+        "InvalidDcaUrl",
+      );
+    });
+
+    it("rejects a url for another host", async () => {
+      await expectAnchorError(
+        initializeWith({ dcaUrl: "http://other.example/dca" }),
+        "InvalidDcaUrl",
+      );
+    });
+
+    it("rejects slippage of a whole 100%", async () => {
+      await expectAnchorError(
+        initializeWith({ slippageBpsFromOracle: 10000 }),
+        "InvalidSlippage",
+      );
+    });
   });
 
   describe("with an initialized dca", () => {
@@ -259,7 +356,7 @@ describe("tuktuk-dca", () => {
           slippageBpsFromOracle: slippageBps,
           taskId,
           dcaSigner: dcaSigner.publicKey,
-          dcaUrl: "http://localhost:8123/dca",
+          dcaUrl: DCA_TEST_URL,
         })
         .accountsPartial({
           core: {
