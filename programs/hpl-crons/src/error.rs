@@ -16,4 +16,6 @@ pub enum ErrorCode {
   TooManyAccounts,
   #[msg("Free tasks exceeds the maximum for this instruction")]
   TooManyFreeTasks,
+  #[msg("Task queue does not match the epoch tracker's task queue")]
+  InvalidTaskQueue,
 }

@@ -16,6 +16,8 @@ import {
   ComputeBudgetProgram,
   PublicKey,
   SystemProgram,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { expect } from "chai";
 import { init as initHsd } from "../packages/helium-sub-daos-sdk/src";
@@ -110,39 +112,43 @@ describe("hpl-crons", () => {
         payer: me,
         dao,
         authority: me,
+        taskQueue,
       })
       .rpc({ skipPreflight: true });
   });
 
-  // Regression test for the mainnet outage where queue_end_epoch blew the 32KB
-  // SBF heap ("memory allocation failed, out of memory") while serializing the
-  // two compiled return transactions. Mirrors the production flow exactly:
-  // start-cron.ts queues the bootstrap task, then a crank turner runs it.
-  it("runs queue_end_epoch through tuktuk without exhausting the heap", async () => {
-    const [customWallet, bump] = customSignerKey(taskQueue, [
+  // Compiles queue_end_epoch under `queue`'s custom "helium" signer, which pays the task
+  // return account's rent, and queues it as task `taskId` on that queue.
+  const queueEndEpochTask = async ({
+    queue,
+    taskId,
+    description,
+  }: {
+    queue: PublicKey;
+    taskId: number;
+    description: string;
+  }) => {
+    const [payer, bump] = customSignerKey(queue, [
       Buffer.from("helium", "utf-8"),
     ]);
-    // The custom signer PDA pays rent for the task return account
     await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: me,
-        toPubkey: customWallet,
+        toPubkey: payer,
         lamports: 1000000000,
       }),
     ]);
-
     const bumpBuffer = Buffer.alloc(1);
     bumpBuffer.writeUint8(bump);
-    const [epochTracker] = epochTrackerKey(dao);
     const { transaction, remainingAccounts } = compileTransaction(
       [
         await program.methods
           .queueEndEpoch()
           .accountsStrict({
-            payer: customWallet,
+            payer,
             taskReturnAccount: taskReturnAccountKey()[0],
-            epochTracker,
-            taskQueue,
+            epochTracker: epochTrackerKey(dao)[0],
+            taskQueue: queue,
             dao,
             iotSubDao,
             mobileSubDao,
@@ -153,29 +159,60 @@ describe("hpl-crons", () => {
       ],
       [[Buffer.from("helium", "utf-8"), bumpBuffer]]
     );
-
-    const epochBefore = (
-      await program.account.epochTrackerV0.fetch(epochTracker)
-    ).epoch;
-
-    const task = taskKey(taskQueue, 0)[0];
+    const task = taskKey(queue, taskId)[0];
     await tuktukProgram.methods
       .queueTaskV0({
-        id: 0,
+        id: taskId,
         trigger: { now: {} },
         crankReward: null,
         freeTasks: 2,
-        transaction: {
-          compiledV0: [transaction],
-        },
-        description: `queue end epoch ${epochBefore.add(new anchor.BN(1))}`,
+        transaction: { compiledV0: [transaction] },
+        description,
       })
-      .accountsPartial({
-        task,
-        taskQueue,
-      })
+      .accountsPartial({ task, taskQueue: queue })
       .remainingAccounts(remainingAccounts)
-      .rpc({ skipPreflight: true });
+      .rpc({ skipPreflight: true, commitment: "confirmed" });
+    return task;
+  };
+
+  // Simulates running `task`. The simulation returns the program's own log line, which names
+  // the error, where a failed send reports only that the transaction failed; the node supplies
+  // the blockhash, so the simulation cannot fail before the program runs and leave the
+  // assertion reading an empty log.
+  const simulateRunTask = async (task: PublicKey) => {
+    const message = new TransactionMessage({
+      payerKey: me,
+      recentBlockhash: (await provider.connection.getLatestBlockhash())
+        .blockhash,
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ...(await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: me,
+        })),
+      ],
+    }).compileToV0Message();
+    return provider.connection.simulateTransaction(
+      new VersionedTransaction(message),
+      { commitment: "confirmed", replaceRecentBlockhash: true }
+    );
+  };
+
+  // Regression test for the mainnet outage where queue_end_epoch blew the 32KB
+  // SBF heap ("memory allocation failed, out of memory") while serializing the
+  // two compiled return transactions. Mirrors the production flow exactly:
+  // start-cron.ts queues the bootstrap task, then a crank turner runs it.
+  it("runs queue_end_epoch through tuktuk without exhausting the heap", async () => {
+    const [epochTracker] = epochTrackerKey(dao);
+    const epochBefore = (
+      await program.account.epochTrackerV0.fetch(epochTracker)
+    ).epoch;
+    const task = await queueEndEpochTask({
+      queue: taskQueue,
+      taskId: 0,
+      description: `queue end epoch ${epochBefore.add(new anchor.BN(1))}`,
+    });
 
     // This is the step that OOMed on mainnet: RunTaskV0 CPIs into
     // queue_end_epoch, which compiles the 5-instruction end-epoch transaction
@@ -216,6 +253,112 @@ describe("hpl-crons", () => {
       "queue_end_epoch compute has regressed; the linear scans that keep the heap down are the " +
         "likely cause, and the crank turner's limit is what this has to stay under"
     ).to.be.lessThan(900000);
+
+    const epochAfter = (
+      await program.account.epochTrackerV0.fetch(epochTracker)
+    ).epoch;
+    expect(epochAfter.toString()).to.equal(
+      epochBefore.add(new anchor.BN(1)).toString()
+    );
+  });
+
+  // The epoch tracker names the one task queue whose tasks advance its epoch. The payer PDA is
+  // seeded by whichever queue the instruction is passed, so the tracker's own field is what
+  // decides which queue that is.
+  it("rejects queue_end_epoch driven by a task queue the tracker does not name", async () => {
+    const config = await tuktukProgram.account.tuktukConfigV0.fetch(
+      tuktukConfig
+    );
+    const otherName = `other-${Math.random().toString(36).substring(2, 15)}`;
+    const otherQueue = taskQueueKey(tuktukConfig, config.nextTaskQueueId)[0];
+    await tuktukProgram.methods
+      .initializeTaskQueueV0({
+        name: otherName,
+        minCrankReward: new anchor.BN(1),
+        capacity: 100,
+        lookupTables: [],
+        staleTaskAge: 10000,
+      })
+      .accounts({
+        tuktukConfig,
+        payer: me,
+        updateAuthority: me,
+        taskQueue: otherQueue,
+        taskQueueNameMapping: taskQueueNameMappingKey(
+          tuktukConfig,
+          otherName
+        )[0],
+      })
+      .rpc();
+    await tuktukProgram.methods
+      .addQueueAuthorityV0()
+      .accounts({ payer: me, queueAuthority: me, taskQueue: otherQueue })
+      .rpc();
+
+    const otherTask = await queueEndEpochTask({
+      queue: otherQueue,
+      taskId: 0,
+      description: "queue end epoch from an unnamed queue",
+    });
+
+    const sim = await simulateRunTask(otherTask);
+    expect(sim.value.err, "a task from a queue the tracker does not name must not run").to.not.be
+      .null;
+    expect((sim.value.logs ?? []).join("\n")).to.include("InvalidTaskQueue");
+  });
+
+  // A tracker whose task_queue is the default key names no queue, so nothing advances its epoch
+  // until update_epoch_tracker points it at a live one. Setting it is what re-arms the cron.
+  it("runs queue_end_epoch again once the tracker names the live queue", async () => {
+    const [epochTracker] = epochTrackerKey(dao);
+
+    await program.methods
+      .updateEpochTracker({
+        epoch: null,
+        authority: null,
+        taskQueue: PublicKey.default,
+      })
+      .accountsStrict({
+        authority: me,
+        epochTracker,
+      })
+      .rpc();
+
+    const task = await queueEndEpochTask({
+      queue: taskQueue,
+      taskId: 50,
+      description: "queue end epoch across a queue change",
+    });
+
+    const epochBefore = (
+      await program.account.epochTrackerV0.fetch(epochTracker)
+    ).epoch;
+
+    const sim = await simulateRunTask(task);
+    expect(sim.value.err, "the tracker names no queue, so the task must not run").to.not.be
+      .null;
+    expect((sim.value.logs ?? []).join("\n")).to.include("InvalidTaskQueue");
+
+    await program.methods
+      .updateEpochTracker({
+        epoch: null,
+        authority: null,
+        taskQueue,
+      })
+      .accountsStrict({
+        authority: me,
+        epochTracker,
+      })
+      .rpc();
+
+    await sendInstructions(provider, [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+      ...(await runTask({
+        program: tuktukProgram,
+        task,
+        crankTurner: me,
+      })),
+    ]);
 
     const epochAfter = (
       await program.account.epochTrackerV0.fetch(epochTracker)

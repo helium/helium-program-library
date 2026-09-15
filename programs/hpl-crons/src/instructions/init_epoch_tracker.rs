@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use helium_sub_daos::DaoV0;
+use tuktuk_program::TaskQueueV0;
 
 use crate::{current_epoch, EpochTrackerV0};
 
@@ -18,6 +19,8 @@ pub struct InitEpochTracker<'info> {
   pub dao: Box<Account<'info, DaoV0>>,
   /// CHECK: The authority to set
   pub authority: AccountInfo<'info>,
+  /// Stored as the only task queue allowed to advance this tracker's epoch.
+  pub task_queue: Box<Account<'info, TaskQueueV0>>,
   pub system_program: Program<'info, System>,
 }
 
@@ -27,6 +30,7 @@ pub fn handler(ctx: Context<InitEpochTracker>) -> Result<()> {
     epoch: current_epoch(Clock::get().unwrap().unix_timestamp) - 1,
     bump_seed: ctx.bumps.epoch_tracker,
     authority: ctx.accounts.authority.key(),
+    task_queue: ctx.accounts.task_queue.key(),
   });
   Ok(())
 }

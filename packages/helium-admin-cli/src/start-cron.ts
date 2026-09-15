@@ -83,6 +83,7 @@ export async function run(args: any = process.argv) {
         .updateEpochTracker({
           epoch: new anchor.BN(argv.epoch),
           authority: provider.wallet.publicKey,
+          taskQueue,
         })
         .accountsStrict({
           authority: provider.wallet.publicKey,
@@ -98,13 +99,36 @@ export async function run(args: any = process.argv) {
         .accountsPartial({
           dao,
           authority: provider.wallet.publicKey,
+          taskQueue,
         })
         .instruction()
     );
   }
-  const epochTrackerAcc = await program.account.epochTrackerV0.fetch(
+  const epochTrackerAcc = await program.account.epochTrackerV0.fetchNullable(
     epochTracker
   );
+  // queue_end_epoch only runs under the queue the tracker names, so point the tracker at the
+  // queue this bootstrap uses before queueing the task. A tracker initialised above already
+  // names it, and so does the --epoch update.
+  if (
+    epochTrackerAcc &&
+    !argv.epoch &&
+    !epochTrackerAcc.taskQueue.equals(taskQueue)
+  ) {
+    ixs.push(
+      await program.methods
+        .updateEpochTracker({
+          epoch: null,
+          authority: null,
+          taskQueue,
+        })
+        .accountsStrict({
+          authority: provider.wallet.publicKey,
+          epochTracker,
+        })
+        .instruction()
+    );
+  }
   const { transaction, remainingAccounts } = compileTransaction(
     [
       await program.methods
@@ -141,7 +165,7 @@ export async function run(args: any = process.argv) {
         transaction: {
           compiledV0: [transaction],
         },
-        description: `queue end epoch ${epochTrackerAcc.epoch}`,
+        description: `queue end epoch ${epochTrackerAcc?.epoch ?? "init"}`,
       })
       .accountsPartial({
         task,

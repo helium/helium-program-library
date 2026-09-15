@@ -35,6 +35,7 @@ pub struct QueueEndEpoch<'info> {
   pub payer: Signer<'info>,
   #[account(
     mut,
+    has_one = task_queue @ ErrorCode::InvalidTaskQueue,
     seeds = [b"epoch_tracker", dao.key().as_ref()],
     bump = epoch_tracker.bump_seed,
   )]
@@ -53,7 +54,8 @@ pub struct QueueEndEpoch<'info> {
     bump,
   )]
   pub task_return_account: AccountInfo<'info>,
-  /// CHECK: Just used for key
+  /// CHECK: Used for its key, which seeds the payer PDA and the tasks the return value
+  /// schedules. It is the queue the epoch tracker names.
   #[account(constraint = *task_queue.owner == tuktuk_program::tuktuk::ID)]
   pub task_queue: UncheckedAccount<'info>,
   pub system_program: Program<'info, System>,
