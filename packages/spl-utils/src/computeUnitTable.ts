@@ -351,6 +351,8 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:30728631ae0f54d1": 26461,
   // hpl_crons.close_entity_claim_cron_v0 (n=11, med=33442, max=55887)
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:e00545309cad3477": 55887,
+  // hpl_crons.update_epoch_tracker (n=2, med=1805, max=1805)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:71b78362d83a323b": 1805,
   // hpl_crons.init_delegation_claim_bot_v0 (n=32, med=13292, max=19505)
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:59d043dd74967d7c": 19434,
   // hpl_crons.start_delegation_claim_bot_v1 (n=33, med=167535, max=182621)
