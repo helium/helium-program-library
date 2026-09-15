@@ -63,6 +63,32 @@ const HNT_PRICE_FEED = new PublicKey(
 const USDC_PRICE_FEED = new PublicKey(
   "6HAuqASbHEh4w4REJEUUUCginTLfj1kwCh215ZLtMkrT"
 );
+const DATA_CREDITS_PROGRAM = new PublicKey(
+  "credMBJhYFzfn7NxBMdU4aUqFggAjgztaCcv2Fo6fPT"
+);
+const CIRCUIT_BREAKER_PROGRAM = new PublicKey(
+  "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g"
+);
+// The DC leg parses the dao, the delegated data credits and its escrow, and each has_one ties
+// the next to the one before. Cloned as a set so they agree, the way they do on chain.
+const DAO = new PublicKey("BQ3MCuTT5zVBhNfQ4SjMh3NPVhFy73MPV8rjfq5d1zie");
+const DELEGATED_DATA_CREDITS = new PublicKey(
+  "6KCixqdRqQ1c85y6HK1f2q5EmxyiZnfM1fnG6xRHgLg8"
+);
+const ESCROW_ACCOUNT = new PublicKey(
+  "38ZMM7WVJdUx4FxUyezuCrtLmhDv5bwDcMzJESVMSRoT"
+);
+const DC_MINT = new PublicKey("dcuc8Amr83Wz27ZkQ2K9NS6r8zRpf1J6cvArEBDZDmm");
+const MAINNET_HNT_MINT = new PublicKey(
+  "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux"
+);
+const DATA_CREDITS = new PublicKey(
+  "D1LbvrJQ9K2WbGPMbM3Fnrf5PSsDH1TDpjqJdHuvs81n"
+);
+const SUB_DAO = new PublicKey("Gm9xDCJawDEKDrrQW6haw94gABaYzQwCq4ZQU8h8bd22");
+const CIRCUIT_BREAKER = new PublicKey(
+  "sZgXQVqAv9atfSuwNJnHgSf4tqsos6kRajANmBaBmSx"
+);
 
 /** A fixed-width byte array field, as the IDL declares it. */
 const padded = (text: string, width: number) => {
@@ -131,17 +157,24 @@ describe("dc-auto-topoff under bankrun", () => {
 
   before(async () => {
     ensureDumped("tuktuk", TUKTUK);
+    ensureDumped("data_credits", DATA_CREDITS_PROGRAM);
+    ensureDumped("circuit_breaker", CIRCUIT_BREAKER_PROGRAM);
     ctx = await startBankrun(
       [
         { name: "dc_auto_top", programId: DC_AUTO_TOP },
         { name: "tuktuk", programId: TUKTUK },
         { name: "tuktuk_dca", programId: TUKTUK_DCA },
+        { name: "data_credits", programId: DATA_CREDITS_PROGRAM },
+        { name: "circuit_breaker", programId: CIRCUIT_BREAKER_PROGRAM },
       ],
       [
         ensureCloned("tuktuk_config", TUKTUK_CONFIG),
         ensureCloned("tuktuk_idl", TUKTUK_IDL),
         ensureCloned("hnt_price_feed", HNT_PRICE_FEED),
         ensureCloned("usdc_price_feed", USDC_PRICE_FEED),
+        ensureCloned("dao", DAO),
+        ensureCloned("delegated_data_credits", DELEGATED_DATA_CREDITS),
+        ensureCloned("dc_escrow", ESCROW_ACCOUNT),
       ]
     );
     provider = new BankrunProvider(ctx);
@@ -213,8 +246,14 @@ describe("dc-auto-topoff under bankrun", () => {
     spendableLamports: number,
     swapPayerLamports = 0,
     dcaMintFunding = 1_000_000_000n,
-    pin: { dcaUrl?: string; dcaSigner?: PublicKey } = {}
+    overrides: Record<string, unknown> & {
+      dcaUrl?: string;
+      dcaSigner?: PublicKey;
+    } = {}
   ) {
+    // The url is stored padded and the signer as a key, so both are applied by hand below
+    // rather than spread with the other field overrides.
+    const { dcaUrl, dcaSigner, ...fieldOverrides } = overrides;
     // Set rather than transfer, and set it every time: the payer is one PDA shared by every
     // scenario, and rent_needed is measured against its balance, so a leftover balance from
     // an earlier test silently turns the shortfall case into the funded one.
@@ -227,7 +266,10 @@ describe("dc-auto-topoff under bankrun", () => {
       owner: SystemProgram.programId,
       executable: false,
     });
-    const delegatedDataCredits = Keypair.generate().publicKey;
+    // Seeds the top off, so it cannot come from `overrides` after the fact.
+    const delegatedDataCredits =
+      (overrides.delegatedDataCredits as PublicKey) ??
+      Keypair.generate().publicKey;
     const [autoTopOff, bump] = autoTopOffKey(delegatedDataCredits, me);
     const hntAccount = await ataWith(hntMint, autoTopOff, 10_00000000n);
     const dcaMintAccount = await ataWith(dcaMint, autoTopOff, dcaMintFunding);
@@ -259,8 +301,8 @@ describe("dc-auto-topoff under bankrun", () => {
       reserved: [0, 0, 0, 0],
       threshold: new anchor.BN(0),
       schedule: padded("0 0 16 * * *", 128),
-      dcaUrl: padded(pin.dcaUrl ?? DCA_TEST_URL, 128),
-      dcaSigner: pin.dcaSigner ?? DCA_TEST_SIGNER.publicKey,
+      dcaUrl: padded(dcaUrl ?? DCA_TEST_URL, 128),
+      dcaSigner: dcaSigner ?? DCA_TEST_SIGNER.publicKey,
       // 30 HNT wanted against 10 held, bought 250 units at a time.
       hntThreshold: new anchor.BN(30_00000000),
       dcaMint,
@@ -272,6 +314,7 @@ describe("dc-auto-topoff under bankrun", () => {
       // Nothing is scheduled yet; schedule_task_v0 below records both times.
       nextTaskTime: new anchor.BN(0),
       nextHntTaskTime: new anchor.BN(0),
+      ...fieldOverrides,
     });
 
     const rentExempt =
@@ -318,6 +361,12 @@ describe("dc-auto-topoff under bankrun", () => {
    */
   async function dequeueBothLegs(autoTopOff: PublicKey) {
     const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+    // dequeue_task_v0 refunds to the task's own rent_refund, which is the payer for a task
+    // queue_task_v0 created and the queue itself for one a run returned.
+    const refundFor = async (task: PublicKey) => {
+      const account = await tuktukProgram.account.taskV0.fetchNullable(task);
+      return account ? account.rentRefund : me;
+    };
     await program.methods
       .updateAutoTopOffV0({
         schedule: null,
@@ -335,8 +384,8 @@ describe("dc-auto-topoff under bankrun", () => {
         taskQueue,
         nextTask: state.nextTask,
         nextHntTask: state.nextHntTask,
-        taskRentRefund: me,
-        hntTaskRentRefund: me,
+        taskRentRefund: await refundFor(state.nextTask),
+        hntTaskRentRefund: await refundFor(state.nextHntTask),
         dcaMint,
       })
       .rpc();
@@ -581,5 +630,103 @@ describe("dc-auto-topoff under bankrun", () => {
       await warpTo(ctx, dueAt + 1n);
       await expectError("ConstraintSeeds", crank(task));
     });
+  });
+
+  it("runs the DC leg on its own schedule, not on the address alone", async () => {
+    const { autoTopOff, taskId } = await autoTopOffWith(
+      50_000_000,
+      1_000_000_000,
+      1_000_000_000n,
+      {
+        delegatedDataCredits: DELEGATED_DATA_CREDITS,
+        dataCredits: DATA_CREDITS,
+        subDao: SUB_DAO,
+        dao: DAO,
+        dcMint: DC_MINT,
+        hntMint: MAINNET_HNT_MINT,
+        escrowAccount: ESCROW_ACCOUNT,
+        circuitBreaker: CIRCUIT_BREAKER,
+        dcAccount: Keypair.generate().publicKey,
+      }
+    );
+
+    /** The DC top off call the leg's own task carries, as schedule_task_v0 compiles it. */
+    const dcTopOffIx = async (state: any) =>
+      program.methods
+        .topOffDcV0()
+        .accounts({
+          autoTopOff,
+          taskQueue,
+          delegatedDataCredits: DELEGATED_DATA_CREDITS,
+          dataCredits: DATA_CREDITS,
+          dcMint: DC_MINT,
+          hntMint: MAINNET_HNT_MINT,
+          dao: DAO,
+          subDao: SUB_DAO,
+          fromAccount: state.dcAccount,
+          fromHntAccount: state.hntAccount,
+          hntAccount: state.hntAccount,
+          hntPriceOracle: HNT_PRICE_FEED,
+          escrowAccount: ESCROW_ACCOUNT,
+          circuitBreaker: CIRCUIT_BREAKER,
+        })
+        .instruction();
+
+    /** Puts the other authority's own task at `id`, carrying that same call. */
+    const queueDcTopOffAt = async (id: number) => {
+      const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+      const { transaction, remainingAccounts } = compileTransaction(
+        [await dcTopOffIx(state)],
+        []
+      );
+      await tuktukProgram.methods
+        .queueTaskV0({
+          id,
+          trigger: { now: {} },
+          transaction: { compiledV0: [transaction] },
+          crankReward: null,
+          freeTasks: 1,
+          description: "second dc topoff",
+        })
+        .accounts({
+          payer: me,
+          queueAuthority: otherAuthority.publicKey,
+          taskQueueAuthority: taskQueueAuthorityKey(
+            taskQueue,
+            otherAuthority.publicKey
+          )[0],
+          taskQueue,
+          task: taskKey(taskQueue, id)[0],
+        })
+        .remainingAccounts(
+          remainingAccounts.map((account) => ({
+            ...account,
+            isSigner: false,
+            isWritable: false,
+          }))
+        )
+        .signers([otherAuthority])
+        .rpc();
+      return taskKey(taskQueue, id)[0];
+    };
+
+    // Before its time, the recorded address buys a second task nothing.
+    await dequeueBothLegs(autoTopOff);
+    await expectError("TaskNotDue", crank(await queueDcTopOffAt(taskId)));
+
+    // At its time the leg runs, and the run moves the leg on to the next slot.
+    const due = await program.account.autoTopOffV0.fetch(autoTopOff);
+    await warpTo(ctx, BigInt(due.nextTaskTime.toString()) + 1n);
+    await crank(taskKey(taskQueue, taskId)[0]);
+    const after = await program.account.autoTopOffV0.fetch(autoTopOff);
+    expect(
+      after.nextTaskTime.toNumber(),
+      "the leg should now be due at the slot after the one it just ran"
+    ).to.be.greaterThan(due.nextTaskTime.toNumber());
+
+    // So a second task at the address the run just recorded is early in its turn.
+    const rescheduled = await tuktukProgram.account.taskV0.fetch(after.nextTask);
+    await dequeueBothLegs(autoTopOff);
+    await expectError("TaskNotDue", crank(await queueDcTopOffAt(rescheduled.id)));
   });
 });
