@@ -33,8 +33,12 @@ import { BankrunProvider } from "anchor-bankrun";
 import { ProgramTestContext } from "solana-bankrun";
 import { expect } from "chai";
 import { autoTopOffKey, queueAuthorityKey } from "../packages/dc-auto-top-sdk/src";
-import { dcaKey } from "../packages/tuktuk-dca-sdk/src/pdas";
+import {
+  dcaKey,
+  queueAuthorityKey as dcaQueueAuthorityKey,
+} from "../packages/tuktuk-dca-sdk/src/pdas";
 import { DcAutoTop } from "../target/types/dc_auto_top";
+import { TuktukDca } from "../target/types/tuktuk_dca";
 import {
   ensureCloned,
   ensureDumped,
@@ -103,6 +107,7 @@ describe("dc-auto-topoff under bankrun", () => {
   let ctx: ProgramTestContext;
   let provider: BankrunProvider;
   let program: Program<DcAutoTop>;
+  let tuktukDcaProgram: Program<TuktukDca>;
   let tuktukProgram: Program<Tuktuk>;
   let me: PublicKey;
   let taskQueue: PublicKey;
@@ -184,6 +189,10 @@ describe("dc-auto-topoff under bankrun", () => {
       require("../target/idl/dc_auto_top.json"),
       provider
     );
+    tuktukDcaProgram = new Program<TuktukDca>(
+      require("../target/idl/tuktuk_dca.json"),
+      provider
+    );
     tuktukProgram = await initTuktuk(provider);
     me = provider.wallet.publicKey;
 
@@ -221,6 +230,16 @@ describe("dc-auto-topoff under bankrun", () => {
       .accounts({
         payer: me,
         queueAuthority: otherAuthority.publicKey,
+        taskQueue,
+      })
+      .rpc();
+    // tuktuk-dca dequeues a DCA's task under its own queue authority, so that one has to be on
+    // the queue as well for close_dca_v0 to reach it.
+    await tuktukProgram.methods
+      .addQueueAuthorityV0()
+      .accounts({
+        payer: me,
+        queueAuthority: dcaQueueAuthorityKey()[0],
         taskQueue,
       })
       .rpc();
@@ -589,6 +608,128 @@ describe("dc-auto-topoff under bankrun", () => {
       await readAccount(ctx, dcaKey(autoTopOff, dcaMint, hntMint, 0)[0]),
       "the DCA should have been created in slot 0"
     ).to.not.equal(null);
+  });
+
+  describe("closing a DCA the refill leg created", () => {
+    let autoTopOff: PublicKey;
+    let dca: PublicKey;
+    let dcaMintAccount: PublicKey;
+    let closeAccounts: Record<string, PublicKey>;
+    let dcaQueuedAt: anchor.BN;
+
+    /** The DCA's task is gone: run, dequeued, or closed as stale. Its address stays on the DCA. */
+    const emptyTheTask = () =>
+      ctx.setAccount(closeAccounts.nextTask, {
+        lamports: 0,
+        data: Buffer.alloc(0),
+        owner: SystemProgram.programId,
+        executable: false,
+      });
+
+    beforeEach(async () => {
+      const created = await autoTopOffWith(50_000_000, 1_000_000_000);
+      autoTopOff = created.autoTopOff;
+      const task = await tuktukProgram.account.taskV0.fetch(created.hntTask);
+      await warpTo(ctx, BigInt(task.trigger.timestamp![0].toString()) + 1n);
+      await crank(created.hntTask);
+
+      dca = dcaKey(autoTopOff, dcaMint, hntMint, 0)[0];
+      dcaMintAccount = getAssociatedTokenAddressSync(dcaMint, autoTopOff, true);
+      const dcaAcc = await tuktukDcaProgram.account.dcaV0.fetch(dca);
+      dcaQueuedAt = dcaAcc.queuedAt;
+
+      const dcaQueueAuthority = dcaQueueAuthorityKey()[0];
+      closeAccounts = {
+        authority: me,
+        autoTopOff,
+        dca,
+        dcaMint,
+        dcaInputAccount: getAssociatedTokenAddressSync(dcaMint, dca, true),
+        dcaMintAccount,
+        queueAuthority: dcaQueueAuthority,
+        taskQueueAuthority: taskQueueAuthorityKey(
+          taskQueue,
+          dcaQueueAuthority
+        )[0],
+        rentRefund: dcaAcc.rentRefund,
+        taskQueue,
+        nextTask: dcaAcc.nextTask,
+      };
+    });
+
+    it("returns the unspent input and closes the DCA", async () => {
+      emptyTheTask();
+      const held = await tokenBalance(dcaMintAccount);
+      const inDca = await tokenBalance(closeAccounts.dcaInputAccount);
+      expect(Number(inDca)).to.be.greaterThan(
+        0,
+        "the DCA should be holding input"
+      );
+
+      await program.methods
+        .closeDcaV0()
+        .accountsPartial(closeAccounts)
+        .rpc();
+
+      expect((await tokenBalance(dcaMintAccount)).toString()).to.equal(
+        (held + inDca).toString()
+      );
+      expect(await readAccount(ctx, dca)).to.equal(null);
+    });
+
+    it("leaves a task at the recorded address that this DCA did not queue", async () => {
+      // A task id is reusable once the task that held it is gone, so the address alone does
+      // not say the task belongs to this DCA; `queued_at` does.
+      const task = await tuktukProgram.account.taskV0.fetch(
+        closeAccounts.nextTask
+      );
+      await overwriteAccountData(
+        ctx,
+        closeAccounts.nextTask,
+        await tuktukProgram.coder.accounts.encode("taskV0", {
+          ...task,
+          queuedAt: dcaQueuedAt.addn(1),
+        })
+      );
+
+      await program.methods.closeDcaV0().accountsPartial(closeAccounts).rpc();
+
+      expect(
+        await readAccount(ctx, closeAccounts.nextTask),
+        "the other DCA's task should still be queued"
+      ).to.not.equal(null);
+      expect(await readAccount(ctx, dca), "the DCA should be closed").to.equal(
+        null
+      );
+    });
+
+    it("refuses a signer that is not the top off's authority", async () => {
+      const stranger = Keypair.generate();
+      await expectAnchorError(
+        provider.sendAndConfirm(
+          new Transaction().add(
+            await program.methods
+              .closeDcaV0()
+              .accountsPartial({ ...closeAccounts, authority: stranger.publicKey })
+              .instruction()
+          ),
+          [stranger]
+        ),
+        "ConstraintHasOne"
+      );
+    });
+
+    it("refuses a token destination other than the top off's own", async () => {
+      const stranger = Keypair.generate().publicKey;
+      const strangerAccount = await ataWith(dcaMint, stranger, 0n);
+      await expectAnchorError(
+        program.methods
+          .closeDcaV0()
+          .accountsPartial({ ...closeAccounts, dcaMintAccount: strangerAccount })
+          .rpc(),
+        "ConstraintHasOne"
+      );
+    });
   });
 
   it("skips the DCA rather than reverting when the USDC is short", async () => {

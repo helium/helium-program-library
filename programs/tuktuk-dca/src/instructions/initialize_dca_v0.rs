@@ -176,7 +176,8 @@ pub fn initialize_dca_impl(
     dca_signer: args.dca_signer,
     dca_url,
     rent_refund: core.rent_payer.key(),
-    reserved: [0; 2],
+    input_decimals: core.input_mint.decimals,
+    output_decimals: core.output_mint.decimals,
   };
 
   Ok(TaskReturnV0 {

@@ -37,4 +37,7 @@ pub enum ErrorCode {
 
   #[msg("Changing the DCA mint requires the stored DCA account, holding nothing")]
   DcaMintAccountNotEmpty,
+
+  #[msg("The DCA's authority must be this auto top off")]
+  InvalidDcaAuthority,
 }

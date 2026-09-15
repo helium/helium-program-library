@@ -26,6 +26,7 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAccount,
   getAssociatedTokenAddressSync,
+  getMint,
 } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
@@ -772,7 +773,9 @@ describe("dc-auto-topoff", () => {
         calculateExpectedOutput(
           dcaSwapAmount,
           inputPriceUpdate,
-          outputPriceUpdate
+          outputPriceUpdate,
+          (await getMint(provider.connection, dcaMint)).decimals,
+          (await getMint(provider.connection, hntMint)).decimals
         )
       );
       // Allow for 1 bone tolerance due to rounding in DCA calculations
