@@ -202,7 +202,6 @@ describe("dc-auto-topoff", () => {
     dcaServer = await createDcaServer({
       program: tuktukDcaProgram,
       provider,
-      taskQueue,
       outputMint: hntMint,
       dcaSigner,
     });

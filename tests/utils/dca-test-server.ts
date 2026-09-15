@@ -62,7 +62,6 @@ function calculateExpectedOutput(
 export interface DcaServerConfig {
   program: Program<TuktukDca>;
   provider: anchor.AnchorProvider;
-  taskQueue: PublicKey;
   outputMint: PublicKey;
   dcaSigner: Keypair;
   port?: number;
@@ -74,7 +73,6 @@ export async function createDcaServer(
   const {
     program,
     provider,
-    taskQueue,
     outputMint,
     dcaSigner,
     port = DCA_TEST_PORT,
@@ -86,12 +84,32 @@ export async function createDcaServer(
     try {
       const dca = new PublicKey(request.params.dcaKey);
       const task = new PublicKey(request.body.task);
+      const requestTaskQueue = new PublicKey(request.body.task_queue);
       const taskQueuedAt = new BN(request.body.task_queued_at);
 
       const dcaAccount = await program.account.dcaV0.fetch(dca);
 
+      // The signature only covers the task and queue this DCA names, so the
+      // request has to match the on-chain account before anything is built.
+      if (!task.equals(dcaAccount.nextTask)) {
+        reply.status(400).send({ error: "task does not match dca next_task" });
+        return;
+      }
+      if (!requestTaskQueue.equals(dcaAccount.taskQueue)) {
+        reply
+          .status(400)
+          .send({ error: "task_queue does not match dca task_queue" });
+        return;
+      }
+      if (!taskQueuedAt.eq(dcaAccount.queuedAt)) {
+        reply
+          .status(400)
+          .send({ error: "task_queued_at does not match dca queued_at" });
+        return;
+      }
+
       // Get swap payer PDA
-      const [swapPayer, bump] = customSignerKey(taskQueue, [
+      const [swapPayer, bump] = customSignerKey(dcaAccount.taskQueue, [
         Buffer.from("dca_swap_payer"),
       ]);
       const bumpBuffer = Buffer.alloc(1);
