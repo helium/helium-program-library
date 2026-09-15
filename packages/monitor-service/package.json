@@ -39,6 +39,7 @@
     "@helium/lazy-transactions-sdk": "workspace:^",
     "@helium/price-oracle-sdk": "workspace:^",
     "@helium/spl-utils": "workspace:^",
+    "@helium/tuktuk-dca-sdk": "workspace:^",
     "@helium/tuktuk-sdk": "^0.1.1",
     "@metaplex-foundation/mpl-bubblegum": "^0.7.0",
     "@pythnetwork/pyth-solana-receiver": "^0.10.2",

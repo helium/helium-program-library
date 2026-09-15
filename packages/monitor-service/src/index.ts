@@ -236,9 +236,9 @@ async function run() {
     );
   }
 
-  // The DCA leg buys its HNT with the USDC held here, transferring a whole run's worth
-  // up front. A shortfall reverts the run rather than shrinking it, which stops the leg
-  // rescheduling itself, so this balance is watched alongside the HNT it buys.
+  // The DCA leg buys its HNT with the USDC held here, moving a whole run's worth up
+  // front. A shortfall shrinks or skips the DCA but the leg still reschedules itself, so
+  // the trigger gauge stays healthy and this balance needs its own alert.
   await monitiorAssociatedTokenBalance(
     carrierAutoTopOff,
     USDC_MINT,
