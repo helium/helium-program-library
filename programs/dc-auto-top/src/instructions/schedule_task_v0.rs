@@ -20,7 +20,7 @@ use tuktuk_program::{
 
 use crate::{queue_authority_seeds, state::*, ASSOCIATED_TOKEN_PROGRAM_ID, TESTING};
 
-const HNT_PRICE_ORACLE: Pubkey = pubkey!("He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5");
+pub const HNT_PRICE_ORACLE: Pubkey = pubkey!("He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5");
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ScheduleTaskArgsV0 {
@@ -150,7 +150,7 @@ pub fn get_task_ix_hnt(
     hnt_mint: auto_top_off.hnt_mint,
     dca_mint: auto_top_off.dca_mint,
     dca_mint_account: auto_top_off.dca_mint_account,
-    hnt_price_oracle: auto_top_off.hnt_price_oracle,
+    hnt_price_oracle: HNT_PRICE_ORACLE,
     dca_input_price_oracle: auto_top_off.dca_input_price_oracle,
     dca,
     dca_input_account: Pubkey::find_program_address(

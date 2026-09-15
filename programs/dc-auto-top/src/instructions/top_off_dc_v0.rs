@@ -30,7 +30,6 @@ pub struct TopOffDcV0<'info> {
     has_one = data_credits,
     has_one = sub_dao,
     has_one = delegated_data_credits,
-    has_one = hnt_price_oracle,
     has_one = hnt_account,
     has_one = dao,
   )]
@@ -70,7 +69,8 @@ pub struct TopOffDcV0<'info> {
   #[account(mut)]
   pub hnt_account: Box<Account<'info, TokenAccount>>,
 
-  /// CHECK: Checked by loading with pyth. Also double checked by the has_one on data credits instance.
+  /// CHECK: The feed is pinned by data_credits, which has_one's it off its own state and
+  /// loads it with pyth, so the mint reverts on anything else.
   pub hnt_price_oracle: UncheckedAccount<'info>,
 
   /// CHECK: Verified by cpi, has_one
@@ -118,11 +118,8 @@ pub fn verify_running_in_tuktuk(
   );
 
   // Verify that the next_task account matches the task being executed
-  // The first account in the instruction should be the task account
-  require!(
-    !current_ix.accounts.is_empty(),
-    ErrorCode::InvalidCpiContext
-  );
+  // The task account is the fourth account run_task_v0 names.
+  require_gt!(current_ix.accounts.len(), 3, ErrorCode::InvalidCpiContext);
   require_eq!(
     current_ix.accounts[3].pubkey,
     task_id,

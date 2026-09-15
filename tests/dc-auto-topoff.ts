@@ -469,7 +469,6 @@ describe("dc-auto-topoff", () => {
         .updateAutoTopOffV0({
           schedule: "0 0 * * * *",
           threshold: new anchor.BN(10000000),
-          hntPriceOracle: null,
           hntThreshold: null,
           dcaSwapAmount: null,
           dcaIntervalSeconds: null,
@@ -483,7 +482,10 @@ describe("dc-auto-topoff", () => {
           autoTopOff,
           taskRentRefund,
           hntTaskRentRefund,
-          dcaMint: dcaMint,
+          // Neither update changes the mint, so the leg keeps the one it has.
+          dcaMint: null,
+          dcaMintAccount: null,
+          currentDcaMintAccount: null,
         })
         .rpc({ skipPreflight: true });
 
@@ -659,7 +661,6 @@ describe("dc-auto-topoff", () => {
         .updateAutoTopOffV0({
           schedule: `${nextSeconds} ${nextMinutes} * * * *`, // Run in 2 seconds
           threshold: new anchor.BN(0), // No dc threshold or it'll mess with our expected HNT
-          hntPriceOracle: PRO_HNT_PRICE_FEED,
           hntThreshold,
           dcaSwapAmount,
           dcaIntervalSeconds,
@@ -673,7 +674,10 @@ describe("dc-auto-topoff", () => {
           autoTopOff,
           taskRentRefund,
           hntTaskRentRefund,
-          dcaMint: dcaMint,
+          // Neither update changes the mint, so the leg keeps the one it has.
+          dcaMint: null,
+          dcaMintAccount: null,
+          currentDcaMintAccount: null,
         })
         .rpc({ skipPreflight: true });
 
