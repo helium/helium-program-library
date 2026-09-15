@@ -121,31 +121,38 @@ describe("hpl-crons", () => {
   // SBF heap ("memory allocation failed, out of memory") while serializing the
   // two compiled return transactions. Mirrors the production flow exactly:
   // start-cron.ts queues the bootstrap task, then a crank turner runs it.
-  it("runs queue_end_epoch through tuktuk without exhausting the heap", async () => {
-    const [customWallet, bump] = customSignerKey(taskQueue, [
+  // Compiles queue_end_epoch under `queue`'s custom "helium" signer, which pays the task
+  // return account's rent, and queues it as task `taskId` on that queue.
+  const queueEndEpochTask = async ({
+    queue,
+    taskId,
+    description,
+  }: {
+    queue: PublicKey;
+    taskId: number;
+    description: string;
+  }) => {
+    const [payer, bump] = customSignerKey(queue, [
       Buffer.from("helium", "utf-8"),
     ]);
-    // The custom signer PDA pays rent for the task return account
     await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: me,
-        toPubkey: customWallet,
+        toPubkey: payer,
         lamports: 1000000000,
       }),
     ]);
-
     const bumpBuffer = Buffer.alloc(1);
     bumpBuffer.writeUint8(bump);
-    const [epochTracker] = epochTrackerKey(dao);
     const { transaction, remainingAccounts } = compileTransaction(
       [
         await program.methods
           .queueEndEpoch()
           .accountsStrict({
-            payer: customWallet,
+            payer,
             taskReturnAccount: taskReturnAccountKey()[0],
-            epochTracker,
-            taskQueue,
+            epochTracker: epochTrackerKey(dao)[0],
+            taskQueue: queue,
             dao,
             iotSubDao,
             mobileSubDao,
@@ -156,29 +163,56 @@ describe("hpl-crons", () => {
       ],
       [[Buffer.from("helium", "utf-8"), bumpBuffer]]
     );
-
-    const epochBefore = (
-      await program.account.epochTrackerV0.fetch(epochTracker)
-    ).epoch;
-
-    const task = taskKey(taskQueue, 0)[0];
+    const task = taskKey(queue, taskId)[0];
     await tuktukProgram.methods
       .queueTaskV0({
-        id: 0,
+        id: taskId,
         trigger: { now: {} },
         crankReward: null,
         freeTasks: 2,
-        transaction: {
-          compiledV0: [transaction],
-        },
-        description: `queue end epoch ${epochBefore.add(new anchor.BN(1))}`,
+        transaction: { compiledV0: [transaction] },
+        description,
       })
-      .accountsPartial({
-        task,
-        taskQueue,
-      })
+      .accountsPartial({ task, taskQueue: queue })
       .remainingAccounts(remainingAccounts)
-      .rpc({ skipPreflight: true });
+      .rpc({ skipPreflight: true, commitment: "confirmed" });
+    return task;
+  };
+
+  // Simulates running `task`. The simulation returns the program's own log line, which names
+  // the error, where a failed send reports only that the transaction failed; the node supplies
+  // the blockhash, so the simulation cannot fail before the program runs and leave the
+  // assertion reading an empty log.
+  const simulateRunTask = async (task: PublicKey) => {
+    const message = new TransactionMessage({
+      payerKey: me,
+      recentBlockhash: (await provider.connection.getLatestBlockhash())
+        .blockhash,
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ...(await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: me,
+        })),
+      ],
+    }).compileToV0Message();
+    return provider.connection.simulateTransaction(
+      new VersionedTransaction(message),
+      { commitment: "confirmed", replaceRecentBlockhash: true }
+    );
+  };
+
+  it("runs queue_end_epoch through tuktuk without exhausting the heap", async () => {
+    const [epochTracker] = epochTrackerKey(dao);
+    const epochBefore = (
+      await program.account.epochTrackerV0.fetch(epochTracker)
+    ).epoch;
+    const task = await queueEndEpochTask({
+      queue: taskQueue,
+      taskId: 0,
+      description: `queue end epoch ${epochBefore.add(new anchor.BN(1))}`,
+    });
 
     // This is the step that OOMed on mainnet: RunTaskV0 CPIs into
     // queue_end_epoch, which compiles the 5-instruction end-epoch transaction
@@ -261,80 +295,18 @@ describe("hpl-crons", () => {
       .accounts({ payer: me, queueAuthority: me, taskQueue: otherQueue })
       .rpc();
 
-    const [otherWallet, otherBump] = customSignerKey(otherQueue, [
-      Buffer.from("helium", "utf-8"),
-    ]);
-    await sendInstructions(provider, [
-      SystemProgram.transfer({
-        fromPubkey: me,
-        toPubkey: otherWallet,
-        lamports: 1000000000,
-      }),
-    ]);
-    const otherBumpBuffer = Buffer.alloc(1);
-    otherBumpBuffer.writeUint8(otherBump);
-
     const [epochTracker] = epochTrackerKey(dao);
-    const { transaction, remainingAccounts } = compileTransaction(
-      [
-        await program.methods
-          .queueEndEpoch()
-          .accountsStrict({
-            payer: otherWallet,
-            taskReturnAccount: taskReturnAccountKey()[0],
-            epochTracker,
-            taskQueue: otherQueue,
-            dao,
-            iotSubDao,
-            mobileSubDao,
-            hntPriceOracle: me,
-            systemProgram: SystemProgram.programId,
-          })
-          .instruction(),
-      ],
-      [[Buffer.from("helium", "utf-8"), otherBumpBuffer]]
-    );
-
-    const otherTask = taskKey(otherQueue, 0)[0];
-    await tuktukProgram.methods
-      .queueTaskV0({
-        id: 0,
-        trigger: { now: {} },
-        crankReward: null,
-        freeTasks: 2,
-        transaction: { compiledV0: [transaction] },
-        description: "queue end epoch from an unnamed queue",
-      })
-      .accountsPartial({ task: otherTask, taskQueue: otherQueue })
-      .remainingAccounts(remainingAccounts)
-      .rpc({ skipPreflight: true, commitment: "confirmed" });
+    const otherTask = await queueEndEpochTask({
+      queue: otherQueue,
+      taskId: 0,
+      description: "queue end epoch from an unnamed queue",
+    });
 
     const epochBefore = (
       await program.account.epochTrackerV0.fetch(epochTracker)
     ).epoch;
 
-    // The bank executes the task either way; simulating returns the program's own log line,
-    // which names the error, where a failed send reports only that the transaction failed. The
-    // node supplies the blockhash, so a simulation cannot fail as BlockhashNotFound before the
-    // program runs and leave the assertion reading an empty log.
-    const message = new TransactionMessage({
-      payerKey: me,
-      recentBlockhash: (await provider.connection.getLatestBlockhash())
-        .blockhash,
-      instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-        ...(await runTask({
-          program: tuktukProgram,
-          task: otherTask,
-          crankTurner: me,
-        })),
-      ],
-    }).compileToV0Message();
-    const sim = await provider.connection.simulateTransaction(
-      new VersionedTransaction(message),
-      { commitment: "confirmed", replaceRecentBlockhash: true }
-    );
-
+    const sim = await simulateRunTask(otherTask);
     expect(sim.value.err, "a task from a queue the tracker does not name must not run").to.not.be
       .null;
     expect((sim.value.logs ?? []).join("\n")).to.include("InvalidTaskQueue");
@@ -348,13 +320,7 @@ describe("hpl-crons", () => {
   // A tracker whose task_queue is the default key names no queue, so nothing advances its epoch
   // until update_epoch_tracker points it at a live one. Setting it is what re-arms the cron.
   it("runs queue_end_epoch again once the tracker names the live queue", async () => {
-    const taskId = 50;
     const [epochTracker] = epochTrackerKey(dao);
-    const [customWallet, bump] = customSignerKey(taskQueue, [
-      Buffer.from("helium", "utf-8"),
-    ]);
-    const bumpBuffer = Buffer.alloc(1);
-    bumpBuffer.writeUint8(bump);
 
     await program.methods
       .updateEpochTracker({
@@ -368,65 +334,17 @@ describe("hpl-crons", () => {
       })
       .rpc();
 
-    const { transaction, remainingAccounts } = compileTransaction(
-      [
-        await program.methods
-          .queueEndEpoch()
-          .accountsStrict({
-            payer: customWallet,
-            taskReturnAccount: taskReturnAccountKey()[0],
-            epochTracker,
-            taskQueue,
-            dao,
-            iotSubDao,
-            mobileSubDao,
-            hntPriceOracle: me,
-            systemProgram: SystemProgram.programId,
-          })
-          .instruction(),
-      ],
-      [[Buffer.from("helium", "utf-8"), bumpBuffer]]
-    );
-
-    const task = taskKey(taskQueue, taskId)[0];
-    await tuktukProgram.methods
-      .queueTaskV0({
-        id: taskId,
-        trigger: { now: {} },
-        crankReward: null,
-        freeTasks: 2,
-        transaction: { compiledV0: [transaction] },
-        description: "queue end epoch across a queue change",
-      })
-      .accountsPartial({ task, taskQueue })
-      .remainingAccounts(remainingAccounts)
-      .rpc({ skipPreflight: true, commitment: "confirmed" });
+    const task = await queueEndEpochTask({
+      queue: taskQueue,
+      taskId: 50,
+      description: "queue end epoch across a queue change",
+    });
 
     const epochBefore = (
       await program.account.epochTrackerV0.fetch(epochTracker)
     ).epoch;
 
-    // Simulating surfaces the program's own log line, which names the error, where a failed
-    // send reports only that the transaction failed. The node supplies the blockhash, so a
-    // simulation cannot fail as BlockhashNotFound before the program runs and leave the
-    // assertion reading an empty log.
-    const message = new TransactionMessage({
-      payerKey: me,
-      recentBlockhash: (await provider.connection.getLatestBlockhash())
-        .blockhash,
-      instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-        ...(await runTask({
-          program: tuktukProgram,
-          task,
-          crankTurner: me,
-        })),
-      ],
-    }).compileToV0Message();
-    const sim = await provider.connection.simulateTransaction(
-      new VersionedTransaction(message),
-      { commitment: "confirmed", replaceRecentBlockhash: true }
-    );
+    const sim = await simulateRunTask(task);
     expect(sim.value.err, "the tracker names no queue, so the task must not run").to.not.be
       .null;
     expect((sim.value.logs ?? []).join("\n")).to.include("InvalidTaskQueue");
