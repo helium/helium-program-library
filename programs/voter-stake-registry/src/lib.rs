@@ -129,10 +129,6 @@ pub mod voter_stake_registry {
     instructions::update_registrar_v0::handler(ctx)
   }
 
-  pub fn temp_release_position_v0(ctx: Context<TempReleasePositionV0>) -> Result<()> {
-    instructions::temp_release_position_v0::handler(ctx)
-  }
-
   pub fn relinquish_expired_proxy_vote_v0(
     ctx: Context<RelinquishExpiredProxyVoteV0>,
   ) -> Result<()> {
