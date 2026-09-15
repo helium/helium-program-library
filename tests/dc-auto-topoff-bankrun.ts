@@ -502,9 +502,14 @@ describe("dc-auto-topoff under bankrun", () => {
     return taskKey(taskQueue, taskId)[0];
   }
 
+  // Every transaction in one bankrun context carries the same blockhash, so two cranks of the
+  // same task address would sign identically and the second would be refused as already
+  // processed. Counting the limit down keeps each one its own transaction, well above the
+  // ~250k any run consumes.
+  let crankBudget = 1400000;
   const crank = async (task: PublicKey) =>
     send([
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: crankBudget-- }),
       ...(await runTask({ program: tuktukProgram, task, crankTurner: me })),
     ]);
 
@@ -808,6 +813,31 @@ describe("dc-auto-topoff under bankrun", () => {
         "1500 seconds at 300 per order is five orders",
       );
     });
+
+    it("still buys the order that fires now when the interval outlasts the slot", async () => {
+      // Hourly again, but a 7200 second order interval is wider than the 1500 seconds left in
+      // the slot, so only the order that fires straight away comes due before the next run.
+      const { autoTopOff, hntTask } = await gapOf(
+        10,
+        {
+          schedule: padded("0 0 * * * *", 128),
+          dcaIntervalSeconds: new anchor.BN(7200),
+        },
+        BigInt(swapAmount.muln(10).toString()),
+      );
+      const task = await tuktukProgram.account.taskV0.fetch(hntTask);
+      await warpTo(
+        ctx,
+        BigInt(task.trigger.timestamp![0].toString()) + 3600n - 1500n,
+      );
+      await crank(hntTask);
+
+      const dca = await dcaAt(autoTopOff, 0);
+      expect(dca.initialNumOrders).to.equal(
+        1,
+        "the first order fires now, so one order always fits the slot",
+      );
+    });
   });
 
   describe("an update that dequeues both legs", () => {
@@ -864,6 +894,83 @@ describe("dc-auto-topoff under bankrun", () => {
       expect(after.dcaMint.toBase58()).to.equal(before.dcaMint.toBase58());
       expect(after.dcaMintAccount.toBase58()).to.equal(
         before.dcaMintAccount.toBase58(),
+      );
+    });
+
+    /** The update, with every argument and optional account the caller chooses. */
+    async function update(
+      autoTopOff: PublicKey,
+      args: Record<string, unknown>,
+      accounts: Record<string, unknown>,
+    ) {
+      const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+      await program.methods
+        .updateAutoTopOffV0({
+          schedule: null,
+          threshold: null,
+          hntThreshold: null,
+          dcaSwapAmount: null,
+          dcaIntervalSeconds: null,
+          dcaInputPriceOracle: null,
+          ...args,
+        } as any)
+        .accounts({
+          authority: me,
+          payer: me,
+          autoTopOff,
+          taskQueue,
+          nextTask: state.nextTask,
+          nextHntTask: state.nextHntTask,
+          taskRentRefund: me,
+          hntTaskRentRefund: me,
+          dcaMint: null,
+          dcaMintAccount: null,
+          currentDcaMintAccount: null,
+          ...accounts,
+        })
+        .rpc();
+    }
+
+    it("refuses an interval of zero, which would come due never", async () => {
+      const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000, 0n);
+      await expectError(
+        "InvalidDcaInterval",
+        update(autoTopOff, { dcaIntervalSeconds: new anchor.BN(0) }, {}),
+      );
+    });
+
+    it("refuses a mint without the account it is spent from", async () => {
+      const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000, 0n);
+      const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+      await expectError(
+        "IncompleteDcaMintChange",
+        update(
+          autoTopOff,
+          {},
+          {
+            dcaMint: await createMint(6),
+            dcaMintAccount: null,
+            currentDcaMintAccount: state.dcaMintAccount,
+          },
+        ),
+      );
+    });
+
+    it("refuses an account the top off does not own", async () => {
+      const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000, 0n);
+      const state = await program.account.autoTopOffV0.fetch(autoTopOff);
+      const newMint = await createMint(6);
+      await expectError(
+        "ConstraintTokenOwner",
+        update(
+          autoTopOff,
+          {},
+          {
+            dcaMint: newMint,
+            dcaMintAccount: await ataWith(newMint, me, 0n),
+            currentDcaMintAccount: state.dcaMintAccount,
+          },
+        ),
       );
     });
   });

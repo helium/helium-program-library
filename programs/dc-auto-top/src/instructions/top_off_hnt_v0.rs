@@ -19,6 +19,7 @@ use tuktuk_program::{tuktuk, RunTaskReturnV0, TaskReturnV0, TransactionSourceV0,
 
 use crate::{
   auto_top_off_seeds, errors::ErrorCode, free_task_key, get_next_time, get_task_ix_hnt, state::*,
+  HNT_PRICE_ORACLE,
 };
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
@@ -32,7 +33,6 @@ pub struct TopOffHntV0<'info> {
     has_one = dca_mint,
     has_one = dca_mint_account,
     has_one = dca_input_price_oracle,
-    has_one = hnt_price_oracle,
     has_one = hnt_mint,
   )]
   pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
@@ -55,8 +55,10 @@ pub struct TopOffHntV0<'info> {
     constraint = dca_input_price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceNotFound,
   )]
   pub dca_input_price_oracle: Account<'info, PriceUpdateV2>,
-  /// CHECK: Checked by loading with pyth
+  /// The feed the DCA prices HNT against, pinned to the same address the task this run
+  /// executes was compiled with.
   #[account(
+    address = HNT_PRICE_ORACLE,
     constraint = hnt_price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceNotFound,
   )]
   pub hnt_price_oracle: Account<'info, PriceUpdateV2>,
@@ -340,8 +342,9 @@ pub fn handler<'info>(
       // The run buys the part of the gap it can pay for now and finish before the next run:
       // the whole gap when the balance and the slot both cover it, and the largest prefix of
       // it otherwise. `initialize_dca_nested_v0` moves the whole order count's input up front,
-      // so the balance is the hard cap; the orders drain one interval apart, so a count that
-      // outlasts the slot would still be running when the next run opens its own DCA.
+      // so the balance is the hard cap; the orders drain one interval apart, so a count whose
+      // last order lands after the next run would still be running when that run opens its own
+      // DCA.
       let affordable = ctx
         .accounts
         .dca_mint_account
@@ -349,9 +352,13 @@ pub fn handler<'info>(
         .checked_div(swap_amount_per_order)
         .unwrap_or_default();
       let slot_seconds = u64::try_from(next_time.saturating_sub(now)).unwrap_or_default();
-      let within_slot = slot_seconds
-        .checked_div(interval_seconds)
-        .unwrap_or_default();
+      // The first order fires now and the rest every interval, so the orders that finish
+      // before the next run are the ceiling of the ratio, and one always fits.
+      let within_slot = if interval_seconds == 0 {
+        0
+      } else {
+        slot_seconds.div_ceil(interval_seconds)
+      };
       // The count is a u32 on the wire, so anything past that is another ceiling on it.
       let orders = u32::try_from(num_orders.min(affordable).min(within_slot)).unwrap_or(u32::MAX);
       if orders == 0 {

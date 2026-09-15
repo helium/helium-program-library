@@ -357,15 +357,15 @@ export async function run(args: any = process.argv) {
     }
   } else if (autoTopOffAcc) {
     const queueAuthority = queueAuthorityKey()[0];
-    const taskRentRefund =
-      (await tuktukProgram.account.taskV0.fetchNullable(autoTopOffAcc.nextTask))
-        ?.rentRefund || authority;
-    const hntTaskRentRefund =
-      (
-        await tuktukProgram.account.taskV0.fetchNullable(
-          autoTopOffAcc.nextHntTask
-        )
-      )?.rentRefund || authority;
+    // A leg with nothing scheduled stores the auto top off's own address, which is not a task
+    // account, so fetching it there would fail to decode.
+    const rentRefundFor = async (task: PublicKey) =>
+      task.equals(autoTopOff!)
+        ? authority
+        : (await tuktukProgram.account.taskV0.fetchNullable(task))?.rentRefund ||
+          authority;
+    const taskRentRefund = await rentRefundFor(autoTopOffAcc.nextTask);
+    const hntTaskRentRefund = await rentRefundFor(autoTopOffAcc.nextHntTask);
 
     // Update the auto topoff configuration
     const updateIx = await dcAutoTopoffProgram.methods
