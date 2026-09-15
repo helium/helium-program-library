@@ -21,9 +21,9 @@ pub struct VoteMarkerV0 {
 }
 
 impl VoteMarkerV0 {
-  /// A marker with no choices carries no weight. Runs before a choice is added
-  /// and after choices are removed, so the cached weight belongs to the votes
-  /// the marker holds.
+  /// A marker with no choices carries no weight. Runs after choices are
+  /// removed, so the cached weight belongs to the votes the marker holds and
+  /// a vote on an empty marker takes a fresh weight from the position.
   pub fn sync_weight(&mut self) {
     if self.choices.is_empty() {
       self.weight = 0;

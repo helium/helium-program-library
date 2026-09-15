@@ -108,14 +108,13 @@ pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
   let voting_mint_config =
     &ctx.accounts.registrar.voting_mints[usize::from(ctx.accounts.position.voting_mint_config_idx)];
 
-  marker.sync_weight();
-  let weight = if marker.weight > 0 {
-    marker.weight
-  } else {
+  let weight = if marker.choices.is_empty() {
     ctx.accounts.position.voting_power(
       voting_mint_config,
       ctx.accounts.registrar.clock_unix_timestamp(),
     )?
+  } else {
+    marker.weight
   };
   marker.weight = weight;
   marker.choices = ctx.accounts.proxy_marker.choices.clone();
