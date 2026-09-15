@@ -40,6 +40,7 @@ import {
   warpTo,
 } from "./utils/bankrun";
 import { DCA_TEST_SIGNER, DCA_TEST_URL } from "./utils/dca-test-server";
+import { expectAnchorError } from "./utils/expectAnchorError";
 
 const DC_AUTO_TOP = new PublicKey(
   "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU"
@@ -352,17 +353,7 @@ describe("dc-auto-topoff under bankrun", () => {
     );
     const task = await tuktukProgram.account.taskV0.fetch(hntTask);
     await warpTo(ctx, BigInt(task.trigger.timestamp![0].toString()) + 1n);
-    let caught: any = null;
-    try {
-      await crank(hntTask);
-    } catch (e: any) {
-      caught = e;
-    }
-    expect(caught, `expected ${errorName}, got no error`).to.not.equal(null);
-    expect(
-      `${caught}${JSON.stringify(caught.logs ?? [])}`,
-      `expected ${errorName}`
-    ).to.include(errorName);
+    await expectAnchorError(crank(hntTask), errorName);
   }
 
   it("refuses a DCA whose signer is not the pinned one", async () => {

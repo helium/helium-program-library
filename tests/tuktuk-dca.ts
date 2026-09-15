@@ -40,6 +40,7 @@ import {
   DCA_TEST_URL,
   runAllTasks as runAllTasksUtil,
 } from "./utils/dca-test-server";
+import { expectAnchorError } from "./utils/expectAnchorError";
 import { ensureTuktukDcaIdl } from "./utils/fixtures";
 
 export const ANCHOR_PATH = "anchor";
@@ -250,46 +251,30 @@ describe("tuktuk-dca", () => {
         .rpc({ skipPreflight: false });
     }
 
-    async function expectRejection(
-      promise: Promise<unknown>,
-      errorName: string,
-    ) {
-      let caught: any = null;
-      try {
-        await promise;
-      } catch (e: any) {
-        caught = e;
-      }
-      expect(caught, `expected ${errorName}, got no error`).to.not.be.null;
-      expect(
-        `${caught}${JSON.stringify(caught.logs ?? [])}`,
-        `expected ${errorName}`,
-      ).to.include(errorName);
-    }
 
     it("rejects a signer other than the pinned one", async () => {
-      await expectRejection(
+      await expectAnchorError(
         initializeWith({ dcaSigner: Keypair.generate().publicKey }),
         "InvalidDcaSigner",
       );
     });
 
     it("rejects a url whose host only shares the pinned prefix", async () => {
-      await expectRejection(
+      await expectAnchorError(
         initializeWith({ dcaUrl: `${DCA_TEST_URL}.other.example` }),
         "InvalidDcaUrl",
       );
     });
 
     it("rejects a url for another host", async () => {
-      await expectRejection(
+      await expectAnchorError(
         initializeWith({ dcaUrl: "http://other.example/dca" }),
         "InvalidDcaUrl",
       );
     });
 
     it("rejects slippage of a whole 100%", async () => {
-      await expectRejection(
+      await expectAnchorError(
         initializeWith({ slippageBpsFromOracle: 10000 }),
         "InvalidSlippage",
       );

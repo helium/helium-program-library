@@ -61,6 +61,7 @@ import {
   runAllTasks as runAllTasksUtil,
   calculateExpectedOutput,
 } from "./utils/dca-test-server";
+import { expectAnchorError } from "./utils/expectAnchorError";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { customSignerKey } from "@helium/tuktuk-sdk";
 import { createAtaAndMint } from "@helium/spl-utils";
@@ -369,17 +370,7 @@ describe("dc-auto-topoff", () => {
       [{ dcaSigner: Keypair.generate().publicKey }, "InvalidDcaSigner"],
       [{ dcaUrl: `${DCA_TEST_URL}.other.example` }, "InvalidDcaUrl"],
     ] as const) {
-      let caught: any = null;
-      try {
-        await initializeWith(overrides);
-      } catch (e: any) {
-        caught = e;
-      }
-      expect(caught, `expected ${errorName}, got no error`).to.not.be.null;
-      expect(
-        `${caught}${JSON.stringify(caught.logs ?? [])}`,
-        `expected ${errorName}`
-      ).to.include(errorName);
+      await expectAnchorError(initializeWith(overrides), errorName);
     }
   });
 
