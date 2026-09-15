@@ -25,4 +25,7 @@ pub enum ErrorCode {
 
   #[msg("DCA destination must be the top off's HNT account")]
   InvalidDcaDestination,
+
+  #[msg("Next task must be a free task the run was given")]
+  InvalidFreeTask,
 }

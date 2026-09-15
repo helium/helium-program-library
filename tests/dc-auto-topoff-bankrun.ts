@@ -406,11 +406,13 @@ describe("dc-auto-topoff under bankrun", () => {
     taskId,
     destination,
     swapPayerSeed = "dca_swap_payer",
+    extraAccount,
   }: {
     autoTopOff: PublicKey;
     taskId: number;
     destination?: PublicKey;
     swapPayerSeed?: string;
+    extraAccount?: PublicKey;
   }) {
     const seed = Buffer.from(swapPayerSeed);
     const [swapPayer, bump] = customSignerKey(taskQueue, [seed]);
@@ -432,6 +434,11 @@ describe("dc-auto-topoff under bankrun", () => {
         dcaDestinationTokenAccount: destination ?? state.hntAccount,
         dcaCustomSigner: swapPayer,
       })
+      .remainingAccounts(
+        extraAccount
+          ? [{ pubkey: extraAccount, isSigner: false, isWritable: false }]
+          : []
+      )
       .instruction();
     // compileTransaction leaves the account list out of the transaction; queue_task_v0 folds the
     // remaining accounts into it, which is what keeps the queued task inside a transaction size.
@@ -635,6 +642,26 @@ describe("dc-auto-topoff under bankrun", () => {
       const { task, dueAt } = await reoccupy({ swapPayerSeed: "other_payer" });
       await warpTo(ctx, dueAt + 1n);
       await expectError("ConstraintSeeds", crank(task));
+    });
+
+    it("does not record a next task that is not the free task tuktuk was given", async () => {
+      // The extra account lands ahead of the free tasks tuktuk appends, so remaining_accounts[0]
+      // is a live account rather than the free task this run's own ids name.
+      const { autoTopOff, hntTaskId } = await autoTopOffWith(
+        50_000_000,
+        1_000_000_000
+      );
+      const { nextHntTaskTime } = await program.account.autoTopOffV0.fetch(
+        autoTopOff
+      );
+      await dequeueBothLegs(autoTopOff);
+      const task = await queueTopOffAt({
+        autoTopOff,
+        taskId: hntTaskId,
+        extraAccount: autoTopOff,
+      });
+      await warpTo(ctx, BigInt(nextHntTaskTime.toString()) + 1n);
+      await expectError("InvalidFreeTask", crank(task));
     });
   });
 

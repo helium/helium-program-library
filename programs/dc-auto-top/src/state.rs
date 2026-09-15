@@ -39,8 +39,9 @@ pub struct AutoTopOffV0 {
   pub dca_input_price_oracle: Pubkey,
   pub dca: Pubkey,
   // When each leg is next due, as recorded by whatever queued the task sitting in `next_task` /
-  // `next_hnt_task`. A leg refuses to run before its own time, and every run advances the time to
-  // the slot after it, so each leg runs at most once per slot whichever task occupies the address.
+  // `next_hnt_task`. A leg refuses to run before its own time, and every run that reschedules
+  // advances the time to the slot after it, so each leg runs at most once per slot whichever
+  // task occupies the address.
   pub next_task_time: i64,
   pub next_hnt_task_time: i64,
 }

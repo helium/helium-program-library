@@ -18,7 +18,9 @@ use data_credits::{
 use helium_sub_daos::DaoV0;
 use tuktuk_program::{tuktuk, RunTaskReturnV0, TaskReturnV0, TransactionSourceV0, TriggerV0};
 
-use crate::{auto_top_off_seeds, errors::ErrorCode, get_next_time, get_task_ix_dc, state::*};
+use crate::{
+  auto_top_off_seeds, errors::ErrorCode, free_task_key, get_next_time, get_task_ix_dc, state::*,
+};
 
 #[derive(Accounts)]
 pub struct TopOffDcV0<'info> {
@@ -91,7 +93,10 @@ pub struct TopOffDcV0<'info> {
   pub instruction_sysvar: AccountInfo<'info>,
 }
 
-pub fn verify_running_in_tuktuk(instruction_sysvar: AccountInfo, task_id: Pubkey) -> Result<()> {
+pub fn verify_running_in_tuktuk(
+  instruction_sysvar: AccountInfo,
+  task_id: Pubkey,
+) -> Result<Vec<u16>> {
   // Validate that this instruction is being called via CPI from tuktuk for the next_task
   let current_ix = get_instruction_relative(0, &instruction_sysvar)
     .map_err(|_| error!(ErrorCode::InvalidCpiContext))?;
@@ -124,7 +129,10 @@ pub fn verify_running_in_tuktuk(instruction_sysvar: AccountInfo, task_id: Pubkey
     ErrorCode::InvalidCpiContext
   );
 
-  Ok(())
+  // tuktuk appends one account per free task id after the accounts the task itself names, and
+  // these ids are what those appended accounts are checked against.
+  Vec::<u16>::try_from_slice(&current_ix.data[8..])
+    .map_err(|_| error!(ErrorCode::InvalidCpiContext))
 }
 
 pub fn handler<'info>(
@@ -133,7 +141,7 @@ pub fn handler<'info>(
   let auto_top_off_acc = ctx.accounts.auto_top_off.to_account_info();
   let auto_top_off_key = auto_top_off_acc.key();
   let mut auto_top_off = ctx.accounts.auto_top_off.load_mut()?;
-  verify_running_in_tuktuk(
+  let free_task_ids = verify_running_in_tuktuk(
     ctx.accounts.instruction_sysvar.to_account_info(),
     auto_top_off.next_task,
   )?;
@@ -150,6 +158,11 @@ pub fn handler<'info>(
     .threshold
     .saturating_sub(ctx.accounts.escrow_account.amount);
 
+  require_keys_eq!(
+    ctx.remaining_accounts[0].key(),
+    free_task_key(&ctx.accounts.task_queue.key(), &free_task_ids, 0)?,
+    ErrorCode::InvalidFreeTask
+  );
   auto_top_off.next_task = ctx.remaining_accounts[0].key();
 
   // Extract the fields needed for seeds before dropping auto_top_off

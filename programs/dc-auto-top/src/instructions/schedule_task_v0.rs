@@ -295,6 +295,21 @@ pub fn compile_transaction_efficient(
   })
 }
 
+/// The address of the `index`th free task tuktuk handed this run, derived from the id the run
+/// was called with. Errors rather than indexing when the run was given fewer ids than that.
+pub fn free_task_key(task_queue: &Pubkey, free_task_ids: &[u16], index: usize) -> Result<Pubkey> {
+  let id = free_task_ids
+    .get(index)
+    .ok_or_else(|| error!(crate::errors::ErrorCode::InvalidFreeTask))?;
+  Ok(
+    Pubkey::find_program_address(
+      &[b"task", task_queue.as_ref(), &id.to_le_bytes()],
+      &tuktuk::ID,
+    )
+    .0,
+  )
+}
+
 pub fn get_next_time(auto_top_off: &AutoTopOffV0) -> Result<i64> {
   let schedule_str_raw = String::from_utf8(auto_top_off.schedule.to_vec()).unwrap();
   let schedule = Schedule::from_str(schedule_str_raw.trim_matches(char::from(0)))
