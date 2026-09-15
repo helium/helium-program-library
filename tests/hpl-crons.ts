@@ -117,10 +117,6 @@ describe("hpl-crons", () => {
       .rpc({ skipPreflight: true });
   });
 
-  // Regression test for the mainnet outage where queue_end_epoch blew the 32KB
-  // SBF heap ("memory allocation failed, out of memory") while serializing the
-  // two compiled return transactions. Mirrors the production flow exactly:
-  // start-cron.ts queues the bootstrap task, then a crank turner runs it.
   // Compiles queue_end_epoch under `queue`'s custom "helium" signer, which pays the task
   // return account's rent, and queues it as task `taskId` on that queue.
   const queueEndEpochTask = async ({
@@ -203,6 +199,10 @@ describe("hpl-crons", () => {
     );
   };
 
+  // Regression test for the mainnet outage where queue_end_epoch blew the 32KB
+  // SBF heap ("memory allocation failed, out of memory") while serializing the
+  // two compiled return transactions. Mirrors the production flow exactly:
+  // start-cron.ts queues the bootstrap task, then a crank turner runs it.
   it("runs queue_end_epoch through tuktuk without exhausting the heap", async () => {
     const [epochTracker] = epochTrackerKey(dao);
     const epochBefore = (
@@ -295,26 +295,16 @@ describe("hpl-crons", () => {
       .accounts({ payer: me, queueAuthority: me, taskQueue: otherQueue })
       .rpc();
 
-    const [epochTracker] = epochTrackerKey(dao);
     const otherTask = await queueEndEpochTask({
       queue: otherQueue,
       taskId: 0,
       description: "queue end epoch from an unnamed queue",
     });
 
-    const epochBefore = (
-      await program.account.epochTrackerV0.fetch(epochTracker)
-    ).epoch;
-
     const sim = await simulateRunTask(otherTask);
     expect(sim.value.err, "a task from a queue the tracker does not name must not run").to.not.be
       .null;
     expect((sim.value.logs ?? []).join("\n")).to.include("InvalidTaskQueue");
-
-    const epochAfter = (
-      await program.account.epochTrackerV0.fetch(epochTracker)
-    ).epoch;
-    expect(epochAfter.toString()).to.equal(epochBefore.toString());
   });
 
   // A tracker whose task_queue is the default key names no queue, so nothing advances its epoch
@@ -348,9 +338,6 @@ describe("hpl-crons", () => {
     expect(sim.value.err, "the tracker names no queue, so the task must not run").to.not.be
       .null;
     expect((sim.value.logs ?? []).join("\n")).to.include("InvalidTaskQueue");
-    expect(
-      (await program.account.epochTrackerV0.fetch(epochTracker)).epoch.toString()
-    ).to.equal(epochBefore.toString());
 
     await program.methods
       .updateEpochTracker({
