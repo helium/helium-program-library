@@ -19,6 +19,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { TuktukDca } from "../../target/types/tuktuk_dca";
 import { sendInstructions } from "@helium/spl-utils";
+import { dcaTaskBindingError } from "../../packages/tuktuk-dca-service/src/binding";
 
 // tuktuk-dca pins the remote task's signer and url. A TESTING build pins them to these,
 // so every suite that creates a DCA uses this keypair and serves from this url.
@@ -84,27 +85,17 @@ export async function createDcaServer(
     try {
       const dca = new PublicKey(request.params.dcaKey);
       const task = new PublicKey(request.body.task);
-      const requestTaskQueue = new PublicKey(request.body.task_queue);
+      const taskQueue = new PublicKey(request.body.task_queue);
       const taskQueuedAt = new BN(request.body.task_queued_at);
 
       const dcaAccount = await program.account.dcaV0.fetch(dca);
 
-      // The signature only covers the task and queue this DCA names, so the
-      // request has to match the on-chain account before anything is built.
-      if (!task.equals(dcaAccount.nextTask)) {
-        reply.status(400).send({ error: "task does not match dca next_task" });
-        return;
-      }
-      if (!requestTaskQueue.equals(dcaAccount.taskQueue)) {
-        reply
-          .status(400)
-          .send({ error: "task_queue does not match dca task_queue" });
-        return;
-      }
-      if (!taskQueuedAt.eq(dcaAccount.queuedAt)) {
-        reply
-          .status(400)
-          .send({ error: "task_queued_at does not match dca queued_at" });
+      const bindingError = dcaTaskBindingError(
+        { task, taskQueue, taskQueuedAt },
+        dcaAccount
+      );
+      if (bindingError) {
+        reply.status(400).send({ error: bindingError });
         return;
       }
 

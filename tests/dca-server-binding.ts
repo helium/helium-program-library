@@ -2,6 +2,7 @@ import { BN } from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import { FastifyInstance } from "fastify";
+import { dcaTaskBindingError } from "../packages/tuktuk-dca-service/src/binding";
 import { createDcaServer } from "./utils/dca-test-server";
 
 // The DCA account the stubbed program returns; the request has to name all three
@@ -60,6 +61,17 @@ describe("dca server task binding", () => {
     });
   }
 
+  it("accepts a request that names the dca's task and queue", () => {
+    expect(
+      dcaTaskBindingError(
+        { task: NEXT_TASK, taskQueue: TASK_QUEUE, taskQueuedAt: QUEUED_AT },
+        { nextTask: NEXT_TASK, taskQueue: TASK_QUEUE, queuedAt: QUEUED_AT },
+      ),
+    ).to.equal(null);
+  });
+
+  // The stub provider has no connection, so a request that clears the guards
+  // fails at the balance read with a 500; only a 400 here means a guard fired.
   it("passes the binding checks when the request names the dca's task and queue", async () => {
     const res = await post(body());
     expect(res.statusCode).to.not.equal(400);
