@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.11.21
+
+### Patch Changes
+
+- [#1263](https://github.com/helium/helium-program-library/pull/1263) [`9ac3b40`](https://github.com/helium/helium-program-library/commit/9ac3b40395a6bf740916e7046d1a28e6451fb068) Thanks [@madninja](https://github.com/madninja)! - Add dc-auto-top liveness and DCA-input gauges to monitor-service. `solana_auto_top_off_task_trigger{name,leg}` reports the trigger time of the tuktuk task each leg points at, or 0 when none is scheduled, so `time() - value` detects a leg that has stopped rescheduling itself whatever the cause. Alongside the `dc` and `hnt` legs there is a `dca` leg for the DCA the HNT leg funds, whose series is dropped once that DCA has no orders left. The auto-top-off USDC balances and the USDC/USD pyth feed publish time are now exported too, covering the two inputs the HNT leg's DCA depends on.
+
+- Updated dependencies [[`a1f5f05`](https://github.com/helium/helium-program-library/commit/a1f5f0527696d43b2886e053009794047c41a399), [`02e0531`](https://github.com/helium/helium-program-library/commit/02e0531a8aab694beb31659040c9643e6c3750f0), [`4bafa5a`](https://github.com/helium/helium-program-library/commit/4bafa5ac5fcd1b2ae1b15dd1d1abafbba156f69a), [`7a111ad`](https://github.com/helium/helium-program-library/commit/7a111adf7db3ec693bfd3af74be6860a44769910), [`d9b66ee`](https://github.com/helium/helium-program-library/commit/d9b66eede68b29e57841152a9634f7c1029e02bb), [`1870f9e`](https://github.com/helium/helium-program-library/commit/1870f9e4f3408e69cd21ee1c05748e1876a16164)]:
+  - @helium/idls@0.11.29
+
 ## 0.11.20
 
 ### Patch Changes

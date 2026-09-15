@@ -1,5 +1,18 @@
 # Change Log
 
+## 0.12.1
+
+### Patch Changes
+
+- [#1317](https://github.com/helium/helium-program-library/pull/1317) [`02e0531`](https://github.com/helium/helium-program-library/commit/02e0531a8aab694beb31659040c9643e6c3750f0) Thanks [@madninja](https://github.com/madninja)! - Price the DCA repay floor in output minor units. `DcaV0` now records `input_decimals` and `output_decimals` (taken from the two reserved bytes), and `check_repay_v0` scales the oracle price ratio by the mint decimal difference as well as the Pyth exponent difference. `check_repay_v0` also requires that it is running inside the DCA's own tuktuk task. `close_dca_v0` no longer parses the recorded task, so a DCA whose task is gone can still be closed. dc-auto-top gains `close_dca_v0` for the DCAs its HNT refill leg creates, reachable from the new `close-auto-top-off-dca` admin command. Adds the `MissingNextTask` error code to tuktuk-dca and `InvalidDcaAuthority` to dc-auto-top.
+
+- [#1312](https://github.com/helium/helium-program-library/pull/1312) [`7a111ad`](https://github.com/helium/helium-program-library/commit/7a111adf7db3ec693bfd3af74be6860a44769910) Thanks [@madninja](https://github.com/madninja)! - `EpochTrackerV0` gains a `task_queue` field naming the tuktuk queue allowed to advance its epoch, `queue_end_epoch` requires the passed queue to match it, `init_epoch_tracker` takes the queue, and `update_epoch_tracker` can set it.
+
+- [#1318](https://github.com/helium/helium-program-library/pull/1318) [`1870f9e`](https://github.com/helium/helium-program-library/commit/1870f9e4f3408e69cd21ee1c05748e1876a16164) Thanks [@madninja](https://github.com/madninja)! - Size the dc-auto-top HNT refill to what it can pay for and finish in one slot, and stop an update from stranding the leg. `top_off_hnt_v0` buys `min(gap, balance / swap amount, ceil(slot seconds / interval))` orders instead of skipping the whole DCA when the balance is short, and prices HNT against the pinned feed constant rather than the stored field, `update_auto_top_off_v0` leaves both task fields on the "nothing scheduled" sentinel after dequeuing, takes `dca_mint` and `dca_mint_account` as an optional pair and refuses a mint change while the account it spends from still holds a balance, and no longer writes `hnt_price_oracle`; `UpdateAutoTopOffArgsV0` drops that field and `TopOffDcV0` drops its `has_one`, since data-credits pins the feed itself.
+
+- Updated dependencies [[`a1f5f05`](https://github.com/helium/helium-program-library/commit/a1f5f0527696d43b2886e053009794047c41a399), [`02e0531`](https://github.com/helium/helium-program-library/commit/02e0531a8aab694beb31659040c9643e6c3750f0), [`4bafa5a`](https://github.com/helium/helium-program-library/commit/4bafa5ac5fcd1b2ae1b15dd1d1abafbba156f69a), [`7a111ad`](https://github.com/helium/helium-program-library/commit/7a111adf7db3ec693bfd3af74be6860a44769910), [`d9b66ee`](https://github.com/helium/helium-program-library/commit/d9b66eede68b29e57841152a9634f7c1029e02bb), [`1870f9e`](https://github.com/helium/helium-program-library/commit/1870f9e4f3408e69cd21ee1c05748e1876a16164)]:
+  - @helium/idls@0.11.29
+
 ## 0.12.0
 
 ### Minor Changes
