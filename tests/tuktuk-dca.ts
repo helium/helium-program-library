@@ -4,6 +4,7 @@ import {
   customSignerKey,
   init as initTuktuk,
   nextAvailableTaskIds,
+  runTask,
   taskKey,
   taskQueueAuthorityKey,
   taskQueueKey,
@@ -20,10 +21,12 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import {
+  ComputeBudgetProgram,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
+  Transaction,
 } from "@solana/web3.js";
 import { expect } from "chai";
 import { FastifyInstance } from "fastify";
@@ -36,8 +39,12 @@ import { TuktukDca } from "../target/types/tuktuk_dca";
 import {
   calculateExpectedOutput,
   createDcaServer,
+  DCA_TEST_SIGNER,
+  DCA_TEST_URL,
   runAllTasks as runAllTasksUtil,
+  setDcaServerRepayBps,
 } from "./utils/dca-test-server";
+import { expectAnchorError } from "./utils/expectAnchorError";
 import { ensureTuktukDcaIdl } from "./utils/fixtures";
 
 export const ANCHOR_PATH = "anchor";
@@ -75,7 +82,7 @@ describe("tuktuk-dca", () => {
     tuktukProgram = await initTuktuk(provider);
 
     // DCA signer will also be the swap source for simplicity
-    dcaSigner = Keypair.generate();
+    dcaSigner = DCA_TEST_SIGNER;
 
     await sendInstructions(provider, [
       SystemProgram.transfer({
@@ -170,10 +177,8 @@ describe("tuktuk-dca", () => {
     dcaServer = await createDcaServer({
       program,
       provider,
-      taskQueue,
       outputMint: hntMint,
       dcaSigner,
-      port: 8123,
     });
     console.log("DCA server started");
   });
@@ -184,6 +189,101 @@ describe("tuktuk-dca", () => {
     }
   });
 
+  describe("the pinned remote task", () => {
+    const rejectedIndex = 9;
+
+    async function initializeWith(overrides: {
+      dcaSigner?: PublicKey;
+      dcaUrl?: string;
+      slippageBpsFromOracle?: number;
+    }) {
+      const authority = Keypair.generate();
+      await sendInstructions(provider, [
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: authority.publicKey,
+          lamports: LAMPORTS_PER_SOL,
+        }),
+      ]);
+      const destinationWallet = Keypair.generate().publicKey;
+      await createAtaAndMint(provider, hntMint, new BN(0), destinationWallet);
+      const swapAmountPerOrder = new BN(1_000000);
+      await createAtaAndMint(provider, usdcMint, swapAmountPerOrder, me);
+
+      const taskQueueAcc =
+        await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+      const [taskId] = nextAvailableTaskIds(
+        taskQueueAcc.taskBitmap,
+        1,
+        false,
+        taskQueueAcc.capacity,
+      );
+
+      return program.methods
+        .initializeDcaV0({
+          index: rejectedIndex,
+          numOrders: 1,
+          swapAmountPerOrder,
+          intervalSeconds: new anchor.BN(1),
+          slippageBpsFromOracle: overrides.slippageBpsFromOracle ?? 0,
+          taskId,
+          dcaSigner: overrides.dcaSigner ?? DCA_TEST_SIGNER.publicKey,
+          dcaUrl: overrides.dcaUrl ?? DCA_TEST_URL,
+        })
+        .accountsPartial({
+          core: {
+            rentPayer: me,
+            dcaPayer: me,
+            authority: authority.publicKey,
+            inputMint: usdcMint,
+            outputMint: hntMint,
+            inputPriceOracle: USDC_PRICE_FEED,
+            outputPriceOracle: HNT_PRICE_FEED,
+            destinationTokenAccount: getAssociatedTokenAddressSync(
+              hntMint,
+              destinationWallet,
+              true,
+            ),
+            taskQueue,
+          },
+          task: taskKey(taskQueue, taskId)[0],
+          queueAuthority,
+          taskQueueAuthority: taskQueueAuthorityKey(taskQueue, queueAuthority)[0],
+        })
+        .signers([authority])
+        .rpc({ skipPreflight: false });
+    }
+
+
+    it("rejects a signer other than the pinned one", async () => {
+      await expectAnchorError(
+        initializeWith({ dcaSigner: Keypair.generate().publicKey }),
+        "InvalidDcaSigner",
+      );
+    });
+
+    it("rejects a url whose host only shares the pinned prefix", async () => {
+      await expectAnchorError(
+        initializeWith({ dcaUrl: `${DCA_TEST_URL}.other.example` }),
+        "InvalidDcaUrl",
+      );
+    });
+
+    it("rejects a url for another host", async () => {
+      await expectAnchorError(
+        initializeWith({ dcaUrl: "http://other.example/dca" }),
+        "InvalidDcaUrl",
+      );
+    });
+
+    it("rejects slippage of a whole 100%", async () => {
+      await expectAnchorError(
+        initializeWith({ slippageBpsFromOracle: 10000 }),
+        "InvalidSlippage",
+      );
+    });
+  });
+
   describe("with an initialized dca", () => {
     const dcaIndex = 0;
     let dca: PublicKey;
@@ -192,13 +292,20 @@ describe("tuktuk-dca", () => {
     let destinationWallet: PublicKey = destinationKeypair.publicKey;
     let destinationTokenAccount: PublicKey;
     let task: PublicKey;
-    const numOrders = 4;
+    // Both overridden by the large-order suite below, which needs an order whose oracle
+    // arithmetic does not fit in 64 bits.
+    let numOrders = 4;
+    let swapAmountPerOrder = new BN(235_000000); // 235 USDC per order
     const intervalSeconds = new anchor.BN(1);
-    const slippageBps = 0; // 0% slippage, we know the output
+    // Overridden by the shortfall suite below, which needs a floor the fake swap can miss.
+    let slippageBps = 0; // 0% slippage, we know the output
     const crankTurner = Keypair.generate();
-    const dcaAuthority = Keypair.generate();
+    // A fresh authority per test, so each one gets its own DCA at `dcaIndex` whether or not the
+    // test before it left its DCA open.
+    let dcaAuthority: Keypair;
 
     beforeEach(async () => {
+      dcaAuthority = Keypair.generate();
       await sendInstructions(provider, [
         SystemProgram.transfer({
           fromPubkey: me,
@@ -230,10 +337,8 @@ describe("tuktuk-dca", () => {
       );
       task = taskKey(taskQueue, taskId)[0];
 
-      // Mint USDC to the authority's account
-      // swap_amount_per_order will be 235 USDC per order x 4 orders = 940 USDC total
-      const swapAmountPerOrder = new BN(235_000000); // 235 USDC per order
-      const totalAmount = swapAmountPerOrder.muln(numOrders); // 940 USDC total
+      // Mint USDC to the authority's account: swap_amount_per_order per order, numOrders of them
+      const totalAmount = swapAmountPerOrder.muln(numOrders);
       await createAtaAndMint(provider, usdcMint, totalAmount, me);
 
       console.log("Initializing DCA", {
@@ -259,7 +364,7 @@ describe("tuktuk-dca", () => {
           slippageBpsFromOracle: slippageBps,
           taskId,
           dcaSigner: dcaSigner.publicKey,
-          dcaUrl: "http://localhost:8123/dca",
+          dcaUrl: DCA_TEST_URL,
         })
         .accountsPartial({
           core: {
@@ -353,6 +458,8 @@ describe("tuktuk-dca", () => {
           expectedSwapAmount,
           usdcPriceUpdate,
           hntPriceUpdate,
+          6,
+          8,
         );
         console.log(`Expected HNT output: ${expectedHntOutput.toString()}`);
 
@@ -445,6 +552,128 @@ describe("tuktuk-dca", () => {
       // Verify DCA is closed
       const dcaAccount = await program.account.dcaV0.fetchNullable(dca);
       expect(dcaAccount).to.be.null;
+    });
+
+    it("refuses a close that sends the input somewhere other than the authority's account", async () => {
+      const stranger = Keypair.generate().publicKey;
+      await createAtaAndMint(provider, usdcMint, new BN(0), stranger);
+
+      await expectAnchorError(
+        program.methods
+          .closeDcaV0()
+          .accountsPartial({
+            dca,
+            authority: dcaAuthority.publicKey,
+            authorityInputAccount: getAssociatedTokenAddressSync(
+              usdcMint,
+              stranger,
+              true,
+            ),
+          })
+          .signers([dcaAuthority])
+          .rpc(),
+        "ConstraintTokenOwner",
+      );
+    });
+
+    it("refuses a check_repay called outside the DCA's own task", async () => {
+      await expectAnchorError(
+        program.methods
+          .checkRepayV0({})
+          .accountsPartial({ dca })
+          .rpc(),
+        "InvalidCpiContext",
+      );
+    });
+
+    describe("when the swap repays less than fair value", () => {
+      before(() => {
+        slippageBps = 50;
+        setDcaServerRepayBps(9900);
+      });
+
+      after(() => {
+        slippageBps = 0;
+        setDcaServerRepayBps(10000);
+      });
+
+      it("refuses the repayment", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Sent raw rather than through runAllTasks, which reports a failed run without the
+        // logs the error name is read from. The crank turner pays, as it does there.
+        const runTaskIxs = await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: crankTurner.publicKey,
+        });
+        const tx = new Transaction().add(
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+          ...runTaskIxs,
+        );
+        tx.recentBlockhash = (
+          await provider.connection.getLatestBlockhash("confirmed")
+        ).blockhash;
+        tx.feePayer = crankTurner.publicKey;
+        tx.sign(crankTurner);
+        await expectAnchorError(
+          provider.connection.sendRawTransaction(tx.serialize()),
+          "SlippageExceeded",
+        );
+      });
+    });
+
+    describe("with an order too large for 64-bit intermediates", () => {
+      before(() => {
+        // 2,000 USDC. At an 8-decimal price and a scale of 2, the input amount times the
+        // scale factor times the price passes 2^64, so the floor has to be computed wider.
+        numOrders = 1;
+        swapAmountPerOrder = new BN(2_000_000000);
+      });
+
+      after(() => {
+        numOrders = 4;
+        swapAmountPerOrder = new BN(235_000000);
+      });
+
+      it("prices the floor and settles the order", async () => {
+        const before = (
+          await getAccount(provider.connection, destinationTokenAccount)
+        ).amount;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // This DCA's own task only, sent raw with the crank turner paying, so a run that
+        // failed to price the floor surfaces here rather than in an unrelated task.
+        const runTaskIxs = await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: crankTurner.publicKey,
+        });
+        const tx = new Transaction().add(
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+          ...runTaskIxs,
+        );
+        tx.recentBlockhash = (
+          await provider.connection.getLatestBlockhash("confirmed")
+        ).blockhash;
+        tx.feePayer = crankTurner.publicKey;
+        tx.sign(crankTurner);
+        const signature = await provider.connection.sendRawTransaction(
+          tx.serialize(),
+        );
+        await provider.connection.confirmTransaction(signature, "confirmed");
+
+        const after = (
+          await getAccount(provider.connection, destinationTokenAccount)
+        ).amount;
+        expect(Number(after - before)).to.be.greaterThan(
+          0,
+          "the order should have settled",
+        );
+        expect(
+          await program.account.dcaV0.fetchNullable(dca),
+          "the only order ran, so the DCA should have closed",
+        ).to.be.null;
+      });
     });
   });
 });

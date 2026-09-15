@@ -1,36 +1,24 @@
-use std::{
-  collections::{HashMap, HashSet},
-  rc::Rc,
-};
+use std::collections::{HashMap, HashSet};
 
-use anchor_client::{Client, Cluster};
 use anchor_lang::AccountDeserialize;
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
   nonblocking::rpc_client::RpcClient,
-  rpc_config::{RpcProgramAccountsConfig, RpcSendTransactionConfig},
+  rpc_config::RpcProgramAccountsConfig,
   rpc_filter::{Memcmp, RpcFilterType},
 };
-use solana_program::system_program;
-use solana_sdk::{
-  compute_budget::ComputeBudgetInstruction, pubkey::Pubkey, signature::read_keypair_file,
-  signer::Signer, transaction::Transaction,
-};
+use solana_sdk::pubkey::Pubkey;
 
 use super::*;
 use crate::cli::epoch_info::get_sub_dao_epoch_infos;
 
 #[derive(Debug, Clone, clap::Args)]
 /// Fetches all delegated positions and total HNT, veHNT, and subDAO delegations.
-pub struct Delegated {
-  #[arg(short, long)]
-  pub keypair: String,
-}
+pub struct Delegated {}
 
-use anchor_lang::prelude::*;
 use helium_sub_daos::{
-  accounts::TempUpdateSubDaoEpochInfo, apply_fall_rate_factor, caclulate_vhnt_info, current_epoch,
-  DelegatedPositionV0, SubDaoEpochInfoV0, SubDaoV0, TempUpdateSubDaoEpochInfoArgs,
+  apply_fall_rate_factor, caclulate_vhnt_info, current_epoch, DelegatedPositionV0,
+  SubDaoEpochInfoV0, SubDaoV0,
 };
 
 #[allow(unused)]
@@ -79,7 +67,7 @@ pub struct FullPosition {
 
 const BATCH_SIZE: usize = 100;
 impl Delegated {
-  pub async fn run(self, rpc_client: RpcClient, solana_url: String) -> MyResult {
+  pub async fn run(self, rpc_client: RpcClient, _solana_url: String) -> MyResult {
     let mut total_hnt = 0_u64;
     let mut total_vehnt = 0_u128;
     let mut mobile_vehnt = 0_u128;
@@ -360,21 +348,6 @@ impl Delegated {
       total_hnt += position.delegated_position.hnt_amount
     }
 
-    let signer = read_keypair_file(self.keypair).unwrap();
-    let anchor_client = Client::new_with_options(
-      Cluster::Custom(
-        solana_url.clone(),
-        solana_url
-          .clone()
-          .replace("https", "wss")
-          .replace("http", "ws"),
-      ),
-      Rc::new(signer.insecure_clone()),
-      CommitmentConfig::confirmed(),
-    );
-    let program = anchor_client
-      .program(Pubkey::from_str("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR").unwrap())
-      .unwrap();
     for (key, value) in epoch_infos_by_subdao_and_epoch.iter() {
       if let Some(new_value) = new_epoch_infos_by_subdao_and_epoch.get(key) {
         for (inner_key, sub_dao_epoch_info) in value.iter() {
@@ -407,66 +380,6 @@ impl Delegated {
                   new_sub_dao_epoch_info.1.epoch,
                   inner_key
                 );
-                // Uncomment if endpoint added back and needed.
-                loop {
-                  println!("Correcting...");
-                  let update_instructions = program
-                    .request()
-                    .args(helium_sub_daos::instruction::TempUpdateSubDaoEpochInfo {
-                      args: TempUpdateSubDaoEpochInfoArgs {
-                        fall_rates_from_closing_positions: if has_fall_rate_diff {
-                          Some(new_sub_dao_epoch_info.1.fall_rates_from_closing_positions)
-                        } else {
-                          None
-                        },
-                        vehnt_in_closing_positions: if has_vehnt_diff {
-                          Some(new_sub_dao_epoch_info.1.vehnt_in_closing_positions)
-                        } else {
-                          None
-                        },
-                        epoch: *inner_key,
-                      },
-                    })
-                    .accounts(TempUpdateSubDaoEpochInfo {
-                      sub_dao_epoch_info: new_sub_dao_epoch_info.0,
-                      authority: Pubkey::from_str("hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW")
-                        .unwrap(),
-                      sub_dao: new_sub_dao_epoch_info.1.sub_dao,
-                      system_program: system_program::id(),
-                    })
-                    .instructions()
-                    .unwrap();
-                  let blockhash = rpc_client.get_latest_blockhash().await?;
-                  let mut instructions = vec![
-                    ComputeBudgetInstruction::set_compute_unit_limit(200000),
-                    ComputeBudgetInstruction::set_compute_unit_price(
-                      (f64::from(5000) / (600000_f64 * 0.000001_f64)).ceil() as u64,
-                    ),
-                  ];
-                  instructions.push(update_instructions[0].clone());
-                  let transaction = Transaction::new_signed_with_payer(
-                    &instructions,
-                    Some(&signer.pubkey()),
-                    &[&signer],
-                    blockhash,
-                  );
-                  let res = rpc_client
-                    .send_and_confirm_transaction_with_spinner_and_config(
-                      &transaction,
-                      CommitmentConfig::confirmed(),
-                      RpcSendTransactionConfig {
-                        skip_preflight: true,
-                        ..RpcSendTransactionConfig::default()
-                      },
-                    )
-                    .await;
-                  if res.is_ok() {
-                    println!("Success {}", res.unwrap());
-                    break;
-                  } else {
-                    println!("Err {}", res.err().unwrap());
-                  }
-                }
               }
             }
           }

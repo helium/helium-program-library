@@ -187,13 +187,6 @@ pub mod helium_entity_manager {
     onboard_data_only_mobile_hotspot_v0::handler(ctx, args)
   }
 
-  pub fn temp_backfill_mobile_info<'info>(
-    ctx: Context<'_, '_, '_, 'info, TempBackfillMobileInfo<'info>>,
-    args: TempBackfillMobileInfoArgs,
-  ) -> Result<()> {
-    temp_backfill_mobile_info::handler(ctx, args)
-  }
-
   pub fn swap_maker_stake(ctx: Context<SwapMakerStake>) -> Result<()> {
     swap_maker_stake::handler(ctx)
   }

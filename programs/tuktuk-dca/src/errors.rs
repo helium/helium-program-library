@@ -19,4 +19,16 @@ pub enum ErrorCode {
 
   #[msg("Invalid number of orders remaining")]
   InvalidNumOrders,
+
+  #[msg("Remote task signer must be the pinned DCA signer")]
+  InvalidDcaSigner,
+
+  #[msg("Remote task url must address the pinned DCA service")]
+  InvalidDcaUrl,
+
+  #[msg("Slippage from oracle must be less than 100%")]
+  InvalidSlippage,
+
+  #[msg("The run must supply the task the next order is queued into")]
+  MissingNextTask,
 }

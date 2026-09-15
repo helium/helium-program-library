@@ -19,44 +19,56 @@ import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { TuktukDca } from "../../target/types/tuktuk_dca";
 import { sendInstructions } from "@helium/spl-utils";
+import { dcaTaskBindingError } from "../../packages/tuktuk-dca-service/src/binding";
 
-// Calculate expected output based on oracle prices (matching check_repay_v0 logic)
+// tuktuk-dca pins the remote task's signer and url. A TESTING build pins them to these,
+// so every suite that creates a DCA uses this keypair and serves from this url.
+export const DCA_TEST_SIGNER = Keypair.fromSeed(Buffer.alloc(32, 1));
+export const DCA_TEST_PORT = 8123;
+export const DCA_TEST_URL = `http://localhost:${DCA_TEST_PORT}/dca`;
+
+// Fair value of a swap in output minor units, matching check_repay_v0: the oracle price ratio
+// is between whole tokens, so one signed power of ten carries both the Pyth exponent difference
+// and the two mints' decimal difference.
 function calculateExpectedOutput(
   swapAmount: BN,
   inputPriceUpdate: any,
-  outputPriceUpdate: any
+  outputPriceUpdate: any,
+  inputDecimals: number,
+  outputDecimals: number
 ): BN {
   const inputPriceWithConf = inputPriceUpdate.priceMessage.price;
   const outputPriceWithConf = outputPriceUpdate.priceMessage.price;
 
-  const expoDiff =
+  const scale =
     inputPriceUpdate.priceMessage.exponent -
-    outputPriceUpdate.priceMessage.exponent;
-  let expectedOutput: BN;
-  if (expoDiff > 0) {
-    expectedOutput = swapAmount
-      .mul(new BN(10).pow(new BN(Math.abs(expoDiff))))
-      .mul(inputPriceWithConf)
-      .div(outputPriceWithConf);
-  } else if (expoDiff < 0) {
-    expectedOutput = swapAmount
-      .mul(inputPriceWithConf)
-      .div(outputPriceWithConf)
-      .div(new BN(10).pow(new BN(Math.abs(expoDiff))));
-  } else {
-    expectedOutput = swapAmount
+    outputPriceUpdate.priceMessage.exponent +
+    (outputDecimals - inputDecimals);
+  const scaleFactor = new BN(10).pow(new BN(Math.abs(scale)));
+  if (scale > 0) {
+    return swapAmount
+      .mul(scaleFactor)
       .mul(inputPriceWithConf)
       .div(outputPriceWithConf);
   }
+  return swapAmount
+    .mul(inputPriceWithConf)
+    .div(outputPriceWithConf)
+    .div(scaleFactor);
+}
 
-  // Extra two decimals on HNT
-  return expectedOutput.mul(new BN(100));
+// Basis points of fair value the running server repays. 10000 is a fair swap; anything less
+// is a swap the repay floor should refuse once slippage is tighter than the shortfall. The DCA
+// url is pinned to one port, so a suite changes this rather than starting a second server.
+let repayBps = 10000;
+
+export function setDcaServerRepayBps(bps: number) {
+  repayBps = bps;
 }
 
 export interface DcaServerConfig {
   program: Program<TuktukDca>;
   provider: anchor.AnchorProvider;
-  taskQueue: PublicKey;
   outputMint: PublicKey;
   dcaSigner: Keypair;
   port?: number;
@@ -68,10 +80,9 @@ export async function createDcaServer(
   const {
     program,
     provider,
-    taskQueue,
     outputMint,
     dcaSigner,
-    port = 8123,
+    port = DCA_TEST_PORT,
   } = config;
 
   const dcaServer = Fastify({ logger: false });
@@ -80,12 +91,22 @@ export async function createDcaServer(
     try {
       const dca = new PublicKey(request.params.dcaKey);
       const task = new PublicKey(request.body.task);
+      const taskQueue = new PublicKey(request.body.task_queue);
       const taskQueuedAt = new BN(request.body.task_queued_at);
 
       const dcaAccount = await program.account.dcaV0.fetch(dca);
 
+      const bindingError = dcaTaskBindingError(
+        { task, taskQueue, taskQueuedAt },
+        dcaAccount
+      );
+      if (bindingError) {
+        reply.status(400).send({ error: bindingError });
+        return;
+      }
+
       // Get swap payer PDA
-      const [swapPayer, bump] = customSignerKey(taskQueue, [
+      const [swapPayer, bump] = customSignerKey(dcaAccount.taskQueue, [
         Buffer.from("dca_swap_payer"),
       ]);
       const bumpBuffer = Buffer.alloc(1);
@@ -132,8 +153,10 @@ export async function createDcaServer(
       const expectedOutput = calculateExpectedOutput(
         swapAmount,
         inputPriceUpdate,
-        outputPriceUpdate
-      );
+        outputPriceUpdate,
+        dcaAccount.inputDecimals,
+        dcaAccount.outputDecimals
+      ).muln(repayBps).divn(10000);
 
       console.log(`Swap Amount (input): ${swapAmount.toString()}`);
       console.log(

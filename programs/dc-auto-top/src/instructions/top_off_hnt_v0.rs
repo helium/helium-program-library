@@ -17,7 +17,10 @@ use tuktuk_dca::{
 };
 use tuktuk_program::{tuktuk, RunTaskReturnV0, TaskReturnV0, TransactionSourceV0, TriggerV0};
 
-use crate::{auto_top_off_seeds, errors::ErrorCode, get_next_time, get_task_ix_hnt, state::*};
+use crate::{
+  auto_top_off_seeds, errors::ErrorCode, free_task_key, get_next_time, get_task_ix_hnt, state::*,
+  HNT_PRICE_ORACLE,
+};
 
 pub const TESTING: bool = std::option_env!("TESTING").is_some();
 
@@ -30,7 +33,6 @@ pub struct TopOffHntV0<'info> {
     has_one = dca_mint,
     has_one = dca_mint_account,
     has_one = dca_input_price_oracle,
-    has_one = hnt_price_oracle,
     has_one = hnt_mint,
   )]
   pub auto_top_off: AccountLoader<'info, AutoTopOffV0>,
@@ -53,8 +55,10 @@ pub struct TopOffHntV0<'info> {
     constraint = dca_input_price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceNotFound,
   )]
   pub dca_input_price_oracle: Account<'info, PriceUpdateV2>,
-  /// CHECK: Checked by loading with pyth
+  /// The feed the DCA prices HNT against, pinned to the same address the task this run
+  /// executes was compiled with.
   #[account(
+    address = HNT_PRICE_ORACLE,
     constraint = hnt_price_oracle.verification_level == VerificationLevel::Full @ ErrorCode::PythPriceNotFound,
   )]
   pub hnt_price_oracle: Account<'info, PriceUpdateV2>,
@@ -64,8 +68,11 @@ pub struct TopOffHntV0<'info> {
   /// CHECK: DCA input account
   #[account(mut)]
   pub dca_input_account: UncheckedAccount<'info>,
-  /// CHECK: DCA destination token account
-  #[account(mut)]
+  /// CHECK: The DCA buys HNT for the top-off, so its output lands in the top-off's own HNT account.
+  #[account(
+    mut,
+    constraint = dca_destination_token_account.key() == hnt_account.key() @ ErrorCode::InvalidDcaDestination,
+  )]
   pub dca_destination_token_account: UncheckedAccount<'info>,
   pub associated_token_program: Program<'info, AssociatedToken>,
   pub token_program: Program<'info, Token>,
@@ -77,12 +84,21 @@ pub struct TopOffHntV0<'info> {
   /// in the Anchor framework yet, so this is the safe approach.
   #[account(address = IX_ID)]
   pub instruction_sysvar: AccountInfo<'info>,
-  /// CHECK: Custom signer for DCA operations
-  #[account(mut)]
+  /// The task queue's own DCA swap payer: it funds the DCA's rent and is refunded when the DCA
+  /// closes, so it is the only account allowed to pay that rent here.
+  #[account(
+    mut,
+    seeds = [b"custom", task_queue.key().as_ref(), b"dca_swap_payer"],
+    bump,
+    seeds::program = tuktuk::ID,
+  )]
   pub dca_custom_signer: Signer<'info>,
 }
 
-pub fn verify_running_in_tuktuk(instruction_sysvar: AccountInfo, task_id: Pubkey) -> Result<()> {
+pub fn verify_running_in_tuktuk(
+  instruction_sysvar: AccountInfo,
+  task_id: Pubkey,
+) -> Result<Vec<u16>> {
   // Validate that this instruction is being called via CPI from tuktuk for the next_task
   let current_ix = get_instruction_relative(0, &instruction_sysvar)
     .map_err(|_| error!(ErrorCode::InvalidCpiContext))?;
@@ -104,18 +120,18 @@ pub fn verify_running_in_tuktuk(instruction_sysvar: AccountInfo, task_id: Pubkey
   );
 
   // Verify that the next_task account matches the task being executed
-  // The first account in the instruction should be the task account
-  require!(
-    !current_ix.accounts.is_empty(),
-    ErrorCode::InvalidCpiContext
-  );
+  // The task account is the fourth account run_task_v0 names.
+  require_gt!(current_ix.accounts.len(), 3, ErrorCode::InvalidCpiContext);
   require_eq!(
     current_ix.accounts[3].pubkey,
     task_id,
     ErrorCode::InvalidCpiContext
   );
 
-  Ok(())
+  // tuktuk appends one account per free task id after the accounts the task itself names, and
+  // these ids are what those appended accounts are checked against.
+  Vec::<u16>::try_from_slice(&current_ix.data[8..])
+    .map_err(|_| error!(ErrorCode::InvalidCpiContext))
 }
 
 pub fn handler<'info>(
@@ -123,19 +139,40 @@ pub fn handler<'info>(
 ) -> Result<RunTaskReturnV0> {
   let auto_top_off_key = ctx.accounts.auto_top_off.key();
   let mut auto_top_off = ctx.accounts.auto_top_off.load_mut()?;
-  verify_running_in_tuktuk(
+  let free_task_ids = verify_running_in_tuktuk(
     ctx.accounts.instruction_sysvar.to_account_info(),
     auto_top_off.next_hnt_task,
   )?;
+  // The address in `next_hnt_task` is a task queue slot, and a slot is reusable once the task it
+  // held is gone. The recorded time is what makes the leg run on its own schedule: it is due once,
+  // and the reschedule below moves it to the next slot.
+  let now = Clock::get()?.unix_timestamp;
+  require_gte!(now, auto_top_off.next_hnt_task_time, ErrorCode::TaskNotDue);
+  let task_queue_key = ctx.accounts.task_queue.key();
+  let dca_free_task = free_task_key(&task_queue_key, &free_task_ids, 1)?;
+  require_keys_eq!(
+    ctx.remaining_accounts[0].key(),
+    free_task_key(&task_queue_key, &free_task_ids, 0)?,
+    ErrorCode::InvalidFreeTask
+  );
+  require_keys_eq!(
+    ctx.remaining_accounts[1].key(),
+    dca_free_task,
+    ErrorCode::InvalidFreeTask
+  );
   auto_top_off.next_hnt_task = ctx.remaining_accounts[0].key();
+  // HNT always 5 minutes after the DC. The schedule is not touched between here and the task
+  // returned at the end, which carries this same time as its trigger.
+  let next_time = get_next_time(&auto_top_off)? + if TESTING { 0 } else { 5 * 60 };
+  auto_top_off.next_hnt_task_time = next_time;
 
   // Switch to immutable borrow so we can cpi
   drop(auto_top_off);
   let auto_top_off = ctx.accounts.auto_top_off.load()?;
 
-  // Remaining accounts:
+  // Remaining accounts, both checked above against the run's own free task ids:
   // [0] = next_hnt_task (for HNT topoff)
-  // [1] = dca_task_id (u16 encoded as bytes, optional if DCA needed)
+  // [1] = the task the DCA is initialized into, when one is started
 
   // Check if we need to start a DCA to maintain HNT threshold
   let mut dca_tasks = vec![];
@@ -197,15 +234,14 @@ pub fn handler<'info>(
       let output_price_message = ctx.accounts.hnt_price_oracle.price_message;
 
       // Verify prices are not older than 5 minutes
-      let current_time = Clock::get()?.unix_timestamp;
       require_gte!(
         input_price_message.publish_time,
-        current_time.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
+        now.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
         ErrorCode::PythPriceNotFound
       );
       require_gte!(
         output_price_message.publish_time,
-        current_time.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
+        now.saturating_sub(if TESTING { 6000000 } else { 5 * 60 }.into()),
         ErrorCode::PythPriceNotFound
       );
 
@@ -286,9 +322,9 @@ pub fn handler<'info>(
       let total_rent = dca_rent + ata_rent;
       let rent_needed = total_rent.saturating_sub(ctx.accounts.dca_custom_signer.lamports());
 
-      // Both inputs are checked for the same reason: the run either affords the whole DCA or
-      // does not start it. Anything short reverts the run, and a reverted run never
-      // reschedules, so a shortfall would stop the leg rather than skip a day.
+      // Rent is all-or-nothing, so it is checked rather than debited: debiting past the
+      // account's own rent exemption reverts the run, and a reverted run never reschedules,
+      // so a shortfall would stop the leg rather than skip a day.
       //
       // A DCA refunds its rent to the custom signer when it drains and closes, so in steady
       // state rent_needed is 0. An abandoned DCA never refunds, so each replacement draws
@@ -303,34 +339,45 @@ pub fn handler<'info>(
         );
       }
 
-      // initialize_dca_nested_v0 moves the whole run's USDC up front and takes the order count
-      // as a u32, so a count that does not fit is as unfundable as a balance that falls short.
-      let plan = u32::try_from(num_orders)
-        .ok()
-        .and_then(|orders| {
-          Some((
-            orders,
-            swap_amount_per_order.checked_mul(u64::from(orders))?,
-          ))
-        })
-        .filter(|(_, usdc_needed)| ctx.accounts.dca_mint_account.amount >= *usdc_needed);
-      if plan.is_none() {
+      // The run buys the part of the gap it can pay for now and finish before the next run:
+      // the whole gap when the balance and the slot both cover it, and the largest prefix of
+      // it otherwise. `initialize_dca_nested_v0` moves the whole order count's input up front,
+      // so the balance is the hard cap; the orders drain one interval apart, so a count whose
+      // last order lands after the next run would still be running when that run opens its own
+      // DCA.
+      let affordable = ctx
+        .accounts
+        .dca_mint_account
+        .amount
+        .checked_div(swap_amount_per_order)
+        .unwrap_or_default();
+      let slot_seconds = u64::try_from(next_time.saturating_sub(now)).unwrap_or_default();
+      // The first order fires now and the rest every interval, so the orders that finish
+      // before the next run are the ceiling of the ratio, and one always fits.
+      let within_slot = if interval_seconds == 0 {
+        0
+      } else {
+        slot_seconds.div_ceil(interval_seconds)
+      };
+      // The count is a u32 on the wire, so anything past that is another ceiling on it.
+      let orders = u32::try_from(num_orders.min(affordable).min(within_slot)).unwrap_or(u32::MAX);
+      if orders == 0 {
         msg!(
-          "Skipping DCA: {} orders at {} each exceeds the {} dca_mint available",
-          num_orders,
+          "Skipping DCA: {} dca_mint at {} per order buys no order inside {} seconds",
+          ctx.accounts.dca_mint_account.amount,
           swap_amount_per_order,
-          ctx.accounts.dca_mint_account.amount
+          slot_seconds
         );
       }
 
-      if let (true, Some((orders, _))) = (rent_ok, plan) {
+      if rent_ok && orders > 0 {
         // Transfer SOL from auto_top_off to custom signer for DCA rent
         ctx.accounts.auto_top_off.sub_lamports(rent_needed)?;
         ctx.accounts.dca_custom_signer.add_lamports(rent_needed)?;
 
         msg!(
           "Initializing DCA with {} orders, swap amount per order: {}, interval seconds: {}",
-          num_orders,
+          orders,
           swap_amount_per_order,
           interval_seconds
         );
@@ -377,8 +424,7 @@ pub fn handler<'info>(
         )?;
 
         // Add DCA tasks to our task list
-        let result_tasks = dca_result.get();
-        dca_tasks.extend(result_tasks.tasks.clone());
+        dca_tasks.extend(dca_result.get().tasks);
 
         // Advance the slot before the next task is compiled below, so the next run targets a
         // fresh PDA whether or not this DCA drains and closes. `init` on an occupied PDA fails,
@@ -410,9 +456,8 @@ pub fn handler<'info>(
   const MAX_FREE_TASKS: u8 = 2;
 
   let auto_top_off = ctx.accounts.auto_top_off.load()?;
-  // HNT always 5 minutes after the DC
-  let next_time = get_next_time(&auto_top_off)? + if TESTING { 0 } else { 5 * 60 };
   let compiled_tx = get_task_ix_hnt(auto_top_off_key, &auto_top_off)?;
+
   let mut tasks = vec![TaskReturnV0 {
     trigger: TriggerV0::Timestamp(next_time),
     transaction: TransactionSourceV0::CompiledV0(compiled_tx),

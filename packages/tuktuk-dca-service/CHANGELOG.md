@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.20
+
+### Patch Changes
+
+- [#1315](https://github.com/helium/helium-program-library/pull/1315) [`57dfecb`](https://github.com/helium/helium-program-library/commit/57dfecbf6a9325baff1330708c1c0c0b93d3d596) Thanks [@madninja](https://github.com/madninja)! - Bind the DCA swap endpoint to the task and queue named by the DCA account: the request's task, task_queue and task_queued_at must match next_task, task_queue and queued_at, and the swap payer is derived from the account's task queue.
+
 ## 0.11.19
 
 ### Patch Changes

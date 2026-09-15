@@ -15,13 +15,12 @@ use tuktuk_program::{
   TaskQueueAuthorityV0,
 };
 
-use crate::{queue_authority_seeds, state::*};
+use crate::{errors::ErrorCode, queue_authority_seeds, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct UpdateAutoTopOffArgsV0 {
   pub schedule: Option<String>,
   pub threshold: Option<u64>,
-  pub hnt_price_oracle: Option<Pubkey>,
   pub hnt_threshold: Option<u64>,
   pub dca_swap_amount: Option<u64>,
   pub dca_interval_seconds: Option<u64>,
@@ -64,14 +63,20 @@ pub struct UpdateAutoTopOffV0<'info> {
   /// CHECK: HNT task rent refund account
   #[account(mut)]
   pub hnt_task_rent_refund: UncheckedAccount<'info>,
-  pub dca_mint: Account<'info, Mint>,
+  /// The mint the DCA leg spends from. Passed only to change it, together with its account
+  /// below; omitting both leaves the leg pointed where it is.
+  pub dca_mint: Option<Account<'info, Mint>>,
   #[account(
     init_if_needed,
     payer = payer,
     associated_token::mint = dca_mint,
     associated_token::authority = auto_top_off,
   )]
-  pub dca_mint_account: Account<'info, TokenAccount>,
+  pub dca_mint_account: Option<Account<'info, TokenAccount>>,
+  /// The account the leg spends from today. Required when `dca_mint` names a different mint,
+  /// so the balance it still holds is visible to the check below.
+  #[account(address = auto_top_off.load()?.dca_mint_account)]
+  pub current_dca_mint_account: Option<Account<'info, TokenAccount>>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub system_program: Program<'info, System>,
   pub token_program: Program<'info, Token>,
@@ -79,13 +84,14 @@ pub struct UpdateAutoTopOffV0<'info> {
 }
 
 pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -> Result<()> {
+  let auto_top_off_key = ctx.accounts.auto_top_off.key();
   let mut auto_top_off = ctx.accounts.auto_top_off.load_mut()?;
 
   // Update configuration fields
   if let Some(schedule) = args.schedule {
     Schedule::from_str(&schedule).map_err(|e| {
       msg!("Invalid schedule {}", e);
-      crate::errors::ErrorCode::InvalidSchedule
+      ErrorCode::InvalidSchedule
     })?;
     let arr = schedule.as_bytes();
     let mut schedule = [0; 128];
@@ -95,18 +101,36 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
   if let Some(threshold) = args.threshold {
     auto_top_off.threshold = threshold;
   }
-  if let Some(hnt_price_oracle) = args.hnt_price_oracle {
-    auto_top_off.hnt_price_oracle = hnt_price_oracle;
-  }
   if let Some(hnt_threshold) = args.hnt_threshold {
     auto_top_off.hnt_threshold = hnt_threshold;
   }
-  auto_top_off.dca_mint = ctx.accounts.dca_mint.key();
-  auto_top_off.dca_mint_account = ctx.accounts.dca_mint_account.key();
+  // The pair moves together or not at all: writing a mint without the account it is spent
+  // from, or an account without its mint, would point the leg at a balance that is not there.
+  match (&ctx.accounts.dca_mint, &ctx.accounts.dca_mint_account) {
+    (Some(dca_mint), Some(dca_mint_account)) => {
+      // The USDC sitting in the account the leg spends from today is reachable only through
+      // that account, so the mint may only move once it holds nothing.
+      if dca_mint.key() != auto_top_off.dca_mint {
+        let emptied = ctx
+          .accounts
+          .current_dca_mint_account
+          .as_ref()
+          .is_some_and(|current| current.amount == 0);
+        require!(emptied, ErrorCode::DcaMintAccountNotEmpty);
+      }
+      auto_top_off.dca_mint = dca_mint.key();
+      auto_top_off.dca_mint_account = dca_mint_account.key();
+    }
+    (None, None) => {}
+    _ => return Err(error!(ErrorCode::IncompleteDcaMintChange)),
+  }
   if let Some(dca_swap_amount) = args.dca_swap_amount {
     auto_top_off.dca_swap_amount = dca_swap_amount;
   }
   if let Some(dca_interval_seconds) = args.dca_interval_seconds {
+    // The HNT leg divides the slot by this to size a DCA, and a DCA whose orders never come
+    // due drains nothing.
+    require_gt!(dca_interval_seconds, 0, ErrorCode::InvalidDcaInterval);
     auto_top_off.dca_interval_seconds = dca_interval_seconds;
   }
   if let Some(dca_input_price_oracle) = args.dca_input_price_oracle {
@@ -135,6 +159,9 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
       seeds,
     ))?;
   }
+  // The address the field named is gone, and the leg is unscheduled until something queues it
+  // again. `auto_top_off.key()` is how every reader of these fields spells that.
+  auto_top_off.next_task = auto_top_off_key;
 
   if !ctx.accounts.next_hnt_task.data_is_empty()
     && ctx.accounts.next_hnt_task.key() != ctx.accounts.auto_top_off.key()
@@ -151,6 +178,7 @@ pub fn handler(ctx: Context<UpdateAutoTopOffV0>, args: UpdateAutoTopOffArgsV0) -
       seeds,
     ))?;
   }
+  auto_top_off.next_hnt_task = auto_top_off_key;
 
   Ok(())
 }

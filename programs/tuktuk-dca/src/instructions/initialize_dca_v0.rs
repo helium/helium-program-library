@@ -13,7 +13,10 @@ use tuktuk_program::{
   RunTaskReturnV0, TaskQueueAuthorityV0, TaskReturnV0,
 };
 
-use crate::{errors::ErrorCode, queue_authority_seeds, state::*};
+use crate::{
+  errors::ErrorCode, queue_authority_seeds, state::*, DCA_SIGNER, DCA_URL,
+  MAX_SLIPPAGE_BPS_FROM_ORACLE,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitializeDcaArgsV0 {
@@ -112,6 +115,17 @@ pub fn initialize_dca_impl(
   args: &InitializeDcaArgsV0,
   dca_bump: u8,
 ) -> Result<TaskReturnV0> {
+  // The task this returns is signed by `dca_signer` and served from `dca_url`, and the
+  // transaction it carries signs as the task queue's custom signers. Both name the pinned
+  // DCA service.
+  require_eq!(args.dca_signer, DCA_SIGNER, ErrorCode::InvalidDcaSigner);
+  require!(args.dca_url == DCA_URL, ErrorCode::InvalidDcaUrl);
+  require_gt!(
+    MAX_SLIPPAGE_BPS_FROM_ORACLE,
+    args.slippage_bps_from_oracle,
+    ErrorCode::InvalidSlippage
+  );
+
   let dca_key = core.dca.key();
   let mut dca = core.dca.load_init()?;
   let now = Clock::get()?.unix_timestamp;
@@ -162,7 +176,8 @@ pub fn initialize_dca_impl(
     dca_signer: args.dca_signer,
     dca_url,
     rent_refund: core.rent_payer.key(),
-    reserved: [0; 2],
+    input_decimals: core.input_mint.decimals,
+    output_decimals: core.output_mint.decimals,
   };
 
   Ok(TaskReturnV0 {

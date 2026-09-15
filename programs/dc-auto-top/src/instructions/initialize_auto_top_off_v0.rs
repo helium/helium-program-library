@@ -10,6 +10,7 @@ use clockwork_cron::Schedule;
 use data_credits::{DataCreditsV0, DelegatedDataCreditsV0};
 use helium_sub_daos::{DaoV0, SubDaoV0};
 use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
+use tuktuk_dca::{DCA_SIGNER, DCA_URL};
 use tuktuk_program::TaskQueueV0;
 
 use crate::{errors::ErrorCode, state::*};
@@ -107,6 +108,15 @@ pub fn handler(
     ErrorCode::InvalidSchedule
   })?;
 
+  // These are handed to tuktuk-dca on every HNT refill, where they become the remote task's
+  // signer and url. Both name the pinned DCA service.
+  require_eq!(args.dca_signer, DCA_SIGNER, ErrorCode::InvalidDcaSigner);
+  require!(args.dca_url == DCA_URL, ErrorCode::InvalidDcaUrl);
+
+  // The HNT leg divides the slot by this to size a DCA, and a DCA whose orders never come due
+  // drains nothing.
+  require_gt!(args.dca_interval_seconds, 0, ErrorCode::InvalidDcaInterval);
+
   let mut auto_top_off = ctx.accounts.auto_top_off.load_init()?;
   let arr = args.schedule.as_bytes();
   let mut schedule = [0; 128];
@@ -154,6 +164,9 @@ pub fn handler(
     .0,
     dca_index: 0,
     reserved: [0; 4],
+    // Neither leg is scheduled yet; schedule_task_v0 records both times when it queues them.
+    next_task_time: 0,
+    next_hnt_task_time: 0,
   };
 
   Ok(())

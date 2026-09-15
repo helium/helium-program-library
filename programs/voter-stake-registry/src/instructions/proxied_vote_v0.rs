@@ -98,8 +98,6 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
     VsrError::MaxChoicesExceeded
   );
 
-  marker.choices.push(args.choice);
-
   ctx.accounts.position.num_active_votes += 1;
 
   let voting_mint_config =
@@ -107,15 +105,16 @@ pub fn handler(ctx: Context<ProxiedVoteV0>, args: VoteArgsV0) -> Result<()> {
 
   // Use the original voting weight for this nft until all votes removed
   // This prevents inconsistensies with decaying positions
-  let weight = if marker.weight > 0 {
-    marker.weight
-  } else {
+  let weight = if marker.choices.is_empty() {
     ctx.accounts.position.voting_power(
       voting_mint_config,
       ctx.accounts.registrar.clock_unix_timestamp(),
     )?
+  } else {
+    marker.weight
   };
   marker.weight = weight;
+  marker.choices.push(args.choice);
 
   modular_governance::proposal::cpi::vote_v0(
     CpiContext::new_with_signer(

@@ -18,7 +18,9 @@ use voter_stake_registry::{
   ClearRecentProposalsArgsV0, VoterStakeRegistry,
 };
 
-use crate::{current_epoch, dao_seeds, error::ErrorCode, state::*, TESTING};
+use crate::{
+  current_epoch, dao_seeds, delegated_position_view, error::ErrorCode, state::*, TESTING,
+};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct ClaimRewardsArgsV0 {
@@ -161,7 +163,8 @@ pub fn handler(ctx: Context<ClaimRewardsV1>, args: ClaimRewardsArgsV0) -> Result
 
   let epoch_start_ts = ctx.accounts.dao_epoch_info.start_ts();
   let delegated_vehnt_at_epoch = if delegated_position.expiration_ts > epoch_start_ts {
-    position.voting_power(voting_mint_config, epoch_start_ts)?
+    delegated_position_view(position, delegated_position)
+      .voting_power(voting_mint_config, epoch_start_ts)?
   } else {
     0
   };

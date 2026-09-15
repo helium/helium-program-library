@@ -7,8 +7,8 @@ use shared_utils::try_from;
 use voter_stake_registry::state::{PositionV0, Registrar};
 
 use crate::{
-  caclulate_vhnt_info, current_epoch, error::ErrorCode, id, DaoV0, DelegatedPositionV0,
-  SubDaoEpochInfoV0, SubDaoV0,
+  caclulate_vhnt_info, current_epoch, delegated_position_view, error::ErrorCode, id, DaoV0,
+  DelegatedPositionV0, SubDaoEpochInfoV0, SubDaoV0,
 };
 
 pub fn get_genesis_end_epoch_bytes(
@@ -156,16 +156,17 @@ pub fn handler(ctx: Context<ExtendExpirationTsV0>) -> Result<()> {
     "Calculating vehnt info for old expiration ts {}",
     ctx.accounts.delegated_position.expiration_ts
   );
+  let delegated_view = delegated_position_view(position, &ctx.accounts.delegated_position);
   let vehnt_info_old = caclulate_vhnt_info(
     ctx.accounts.delegated_position.start_ts,
-    position,
+    &delegated_view,
     voting_mint_config,
     ctx.accounts.delegated_position.expiration_ts,
   )?;
   ctx.accounts.delegated_position.expiration_ts = expiration_ts;
   let vehnt_info_new = caclulate_vhnt_info(
     ctx.accounts.delegated_position.start_ts,
-    position,
+    &delegated_view,
     voting_mint_config,
     expiration_ts,
   )?;

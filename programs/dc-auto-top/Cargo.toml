@@ -1,6 +1,6 @@
 [package]
 name = "dc-auto-top"
-version = "0.0.12"
+version = "0.0.16"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
@@ -11,7 +11,7 @@ name = "dc_auto_top"
 
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build", "circuit-breaker/idl-build", "lazy-transactions/idl-build", "data-credits/idl-build", "tuktuk-dca/idl-build"]
-devnet = []
+devnet = ["tuktuk-dca/devnet"]
 no-genesis = []
 no-entrypoint = []
 no-idl = []
