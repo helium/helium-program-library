@@ -3,6 +3,7 @@ use anchor_spl::{
   associated_token::AssociatedToken,
   token::{Mint, Token, TokenAccount},
 };
+use shared_utils::try_from;
 use tuktuk_program::{
   tuktuk::{
     self,
@@ -12,7 +13,7 @@ use tuktuk_program::{
   TaskQueueAuthorityV0, TaskV0,
 };
 
-use crate::{dca_seeds, queue_authority_seeds, state::*};
+use crate::{dca_seeds, errors::ErrorCode, queue_authority_seeds, state::*};
 
 #[derive(Accounts)]
 pub struct CloseDcaV0<'info> {
@@ -27,6 +28,7 @@ pub struct CloseDcaV0<'info> {
     has_one = rent_refund,
     has_one = input_mint,
     has_one = input_account,
+    constraint = dca.load()?.is_swapping == 0 @ ErrorCode::SwapInProgress,
   )]
   pub dca: AccountLoader<'info, DcaV0>,
   pub input_mint: Account<'info, Mint>,
@@ -62,9 +64,11 @@ pub struct CloseDcaV0<'info> {
   /// CHECK: task queue account
   #[account(mut)]
   pub task_queue: UncheckedAccount<'info>,
-  /// CHECK: current task account
+  /// CHECK: The task the DCA recorded, matched by `has_one`. Left unparsed so a DCA whose task
+  /// has since been closed, dequeued or reused still closes; it is only dequeued below when the
+  /// account still holds one.
   #[account(mut)]
-  pub next_task: Account<'info, TaskV0>,
+  pub next_task: UncheckedAccount<'info>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
@@ -108,15 +112,20 @@ pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
     &[dca_seeds!(authority, input_mint, output_mint, index, bump)],
   ))?;
 
-  // Only dequeue the task if it's not pointing to itself (which means no task scheduled)
-  if ctx.accounts.next_task.key() != ctx.accounts.dca.key() {
+  // The task is only dequeued while one is actually there: the account points at the DCA itself
+  // when nothing was scheduled, and it is empty once the task has been run, dequeued or closed
+  // as stale.
+  if ctx.accounts.next_task.key() != ctx.accounts.dca.key()
+    && !ctx.accounts.next_task.data_is_empty()
+  {
+    let next_task = try_from!(Account<TaskV0>, ctx.accounts.next_task)?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: if ctx.accounts.next_task.rent_refund == ctx.accounts.rent_refund.key() {
+        rent_refund: if next_task.rent_refund == ctx.accounts.rent_refund.key() {
           ctx.accounts.rent_refund.to_account_info()
         } else {
           ctx.accounts.task_queue.to_account_info()

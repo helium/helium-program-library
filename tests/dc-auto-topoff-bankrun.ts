@@ -33,8 +33,12 @@ import { BankrunProvider } from "anchor-bankrun";
 import { ProgramTestContext } from "solana-bankrun";
 import { expect } from "chai";
 import { autoTopOffKey, queueAuthorityKey } from "../packages/dc-auto-top-sdk/src";
-import { dcaKey } from "../packages/tuktuk-dca-sdk/src/pdas";
+import {
+  dcaKey,
+  queueAuthorityKey as dcaQueueAuthorityKey,
+} from "../packages/tuktuk-dca-sdk/src/pdas";
 import { DcAutoTop } from "../target/types/dc_auto_top";
+import { TuktukDca } from "../target/types/tuktuk_dca";
 import {
   ensureCloned,
   ensureDumped,
@@ -103,6 +107,7 @@ describe("dc-auto-topoff under bankrun", () => {
   let ctx: ProgramTestContext;
   let provider: BankrunProvider;
   let program: Program<DcAutoTop>;
+  let tuktukDcaProgram: Program<TuktukDca>;
   let tuktukProgram: Program<Tuktuk>;
   let me: PublicKey;
   let taskQueue: PublicKey;
@@ -184,6 +189,10 @@ describe("dc-auto-topoff under bankrun", () => {
       require("../target/idl/dc_auto_top.json"),
       provider
     );
+    tuktukDcaProgram = new Program<TuktukDca>(
+      require("../target/idl/tuktuk_dca.json"),
+      provider
+    );
     tuktukProgram = await initTuktuk(provider);
     me = provider.wallet.publicKey;
 
@@ -224,6 +233,16 @@ describe("dc-auto-topoff under bankrun", () => {
         taskQueue,
       })
       .rpc();
+    // tuktuk-dca dequeues a DCA's task under its own queue authority, so that one has to be on
+    // the queue as well for close_dca_v0 to reach it.
+    await tuktukProgram.methods
+      .addQueueAuthorityV0()
+      .accounts({
+        payer: me,
+        queueAuthority: dcaQueueAuthorityKey()[0],
+        taskQueue,
+      })
+      .rpc();
   });
 
   /** Asserts the run failed, and failed for the named reason rather than any other. */
@@ -239,6 +258,16 @@ describe("dc-auto-topoff under bankrun", () => {
     );
     expect(failure, `expected ${name}, got: ${failure}`).to.contain(name);
   }
+
+  // The token account's `amount`, read off its bytes: bankrun's connection proxy has no
+  // getTokenAccountBalance.
+  const tokenBalance = async (address: PublicKey) => {
+    const data = await readAccount(ctx, address);
+    if (data === null) {
+      throw new Error(`token account ${address.toBase58()} does not exist`);
+    }
+    return data.readBigUInt64LE(64);
+  };
 
   /**
    * An AutoTopOffV0 written straight to the ledger, holding `spendableLamports` above its own
@@ -589,6 +618,99 @@ describe("dc-auto-topoff under bankrun", () => {
       await readAccount(ctx, dcaKey(autoTopOff, dcaMint, hntMint, 0)[0]),
       "the DCA should have been created in slot 0"
     ).to.not.equal(null);
+  });
+
+  describe("closing a DCA the refill leg created", () => {
+    let autoTopOff: PublicKey;
+    let dca: PublicKey;
+    let dcaMintAccount: PublicKey;
+    let closeAccounts: Record<string, PublicKey>;
+
+    beforeEach(async () => {
+      const created = await autoTopOffWith(50_000_000, 1_000_000_000);
+      autoTopOff = created.autoTopOff;
+      const task = await tuktukProgram.account.taskV0.fetch(created.hntTask);
+      await warpTo(ctx, BigInt(task.trigger.timestamp![0].toString()) + 1n);
+      await crank(created.hntTask);
+
+      dca = dcaKey(autoTopOff, dcaMint, hntMint, 0)[0];
+      dcaMintAccount = getAssociatedTokenAddressSync(dcaMint, autoTopOff, true);
+      const dcaAcc = await tuktukDcaProgram.account.dcaV0.fetch(dca);
+
+      // The DCA's task is gone: run, dequeued, or closed as stale. The address stays on the
+      // DCA, so this is the state a close has to survive.
+      ctx.setAccount(dcaAcc.nextTask, {
+        lamports: 0,
+        data: Buffer.alloc(0),
+        owner: SystemProgram.programId,
+        executable: false,
+      });
+
+      const dcaQueueAuthority = dcaQueueAuthorityKey()[0];
+      closeAccounts = {
+        authority: me,
+        autoTopOff,
+        dca,
+        dcaMint,
+        dcaInputAccount: getAssociatedTokenAddressSync(dcaMint, dca, true),
+        dcaMintAccount,
+        queueAuthority: dcaQueueAuthority,
+        taskQueueAuthority: taskQueueAuthorityKey(
+          taskQueue,
+          dcaQueueAuthority
+        )[0],
+        rentRefund: dcaAcc.rentRefund,
+        taskQueue,
+        nextTask: dcaAcc.nextTask,
+      };
+    });
+
+    it("returns the unspent input and closes the DCA", async () => {
+      const held = await tokenBalance(dcaMintAccount);
+      const inDca = await tokenBalance(closeAccounts.dcaInputAccount);
+      expect(Number(inDca)).to.be.greaterThan(
+        0,
+        "the DCA should be holding input"
+      );
+
+      await program.methods
+        .closeDcaV0()
+        .accountsPartial(closeAccounts)
+        .rpc();
+
+      expect((await tokenBalance(dcaMintAccount)).toString()).to.equal(
+        (held + inDca).toString()
+      );
+      expect(await readAccount(ctx, dca)).to.equal(null);
+    });
+
+    it("refuses a signer that is not the top off's authority", async () => {
+      const stranger = Keypair.generate();
+      await expectAnchorError(
+        provider.sendAndConfirm(
+          new Transaction().add(
+            await program.methods
+              .closeDcaV0()
+              .accountsPartial({ ...closeAccounts, authority: stranger.publicKey })
+              .instruction()
+          ),
+          [stranger]
+        ),
+        "ConstraintHasOne"
+      );
+    });
+
+    it("refuses a token destination other than the top off's own", async () => {
+      const stranger = Keypair.generate().publicKey;
+      const strangerAccount = await ataWith(dcaMint, stranger, 0n);
+      await expectAnchorError(
+        program.methods
+          .closeDcaV0()
+          .accountsPartial({ ...closeAccounts, dcaMintAccount: strangerAccount })
+          .rpc(),
+        "ConstraintHasOne"
+      );
+    });
   });
 
   it("skips the DCA rather than reverting when the USDC is short", async () => {

@@ -4,6 +4,7 @@ import {
   customSignerKey,
   init as initTuktuk,
   nextAvailableTaskIds,
+  runTask,
   taskKey,
   taskQueueAuthorityKey,
   taskQueueKey,
@@ -20,10 +21,12 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import {
+  ComputeBudgetProgram,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
+  Transaction,
 } from "@solana/web3.js";
 import { expect } from "chai";
 import { FastifyInstance } from "fastify";
@@ -39,6 +42,7 @@ import {
   DCA_TEST_SIGNER,
   DCA_TEST_URL,
   runAllTasks as runAllTasksUtil,
+  setDcaServerRepayBps,
 } from "./utils/dca-test-server";
 import { expectAnchorError } from "./utils/expectAnchorError";
 import { ensureTuktukDcaIdl } from "./utils/fixtures";
@@ -290,11 +294,15 @@ describe("tuktuk-dca", () => {
     let task: PublicKey;
     const numOrders = 4;
     const intervalSeconds = new anchor.BN(1);
-    const slippageBps = 0; // 0% slippage, we know the output
+    // Overridden by the shortfall suite below, which needs a floor the fake swap can miss.
+    let slippageBps = 0; // 0% slippage, we know the output
     const crankTurner = Keypair.generate();
-    const dcaAuthority = Keypair.generate();
+    // A fresh authority per test, so each one gets its own DCA at `dcaIndex` whether or not the
+    // test before it left its DCA open.
+    let dcaAuthority: Keypair;
 
     beforeEach(async () => {
+      dcaAuthority = Keypair.generate();
       await sendInstructions(provider, [
         SystemProgram.transfer({
           fromPubkey: me,
@@ -449,6 +457,8 @@ describe("tuktuk-dca", () => {
           expectedSwapAmount,
           usdcPriceUpdate,
           hntPriceUpdate,
+          6,
+          8,
         );
         console.log(`Expected HNT output: ${expectedHntOutput.toString()}`);
 
@@ -541,6 +551,76 @@ describe("tuktuk-dca", () => {
       // Verify DCA is closed
       const dcaAccount = await program.account.dcaV0.fetchNullable(dca);
       expect(dcaAccount).to.be.null;
+    });
+
+    it("refuses a close that sends the input somewhere other than the authority's account", async () => {
+      const stranger = Keypair.generate().publicKey;
+      await createAtaAndMint(provider, usdcMint, new BN(0), stranger);
+
+      await expectAnchorError(
+        program.methods
+          .closeDcaV0()
+          .accountsPartial({
+            dca,
+            authority: dcaAuthority.publicKey,
+            authorityInputAccount: getAssociatedTokenAddressSync(
+              usdcMint,
+              stranger,
+              true,
+            ),
+          })
+          .signers([dcaAuthority])
+          .rpc(),
+        "ConstraintTokenOwner",
+      );
+    });
+
+    it("refuses a check_repay called outside the DCA's own task", async () => {
+      await expectAnchorError(
+        program.methods
+          .checkRepayV0({})
+          .accountsPartial({ dca })
+          .rpc(),
+        "InvalidCpiContext",
+      );
+    });
+
+    describe("when the swap repays less than fair value", () => {
+      before(() => {
+        slippageBps = 50;
+        setDcaServerRepayBps(9900);
+      });
+
+      after(() => {
+        slippageBps = 0;
+        setDcaServerRepayBps(10000);
+      });
+
+      it("refuses the repayment", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Sent through the provider rather than runAllTasks, which reports a failed run
+        // without the logs the error name is read from.
+        // Sent raw rather than through runAllTasks, which reports a failed run without the
+        // logs the error name is read from. The crank turner pays, as it does there.
+        const runTaskIxs = await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: crankTurner.publicKey,
+        });
+        const tx = new Transaction().add(
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+          ...runTaskIxs,
+        );
+        tx.recentBlockhash = (
+          await provider.connection.getLatestBlockhash("confirmed")
+        ).blockhash;
+        tx.feePayer = crankTurner.publicKey;
+        tx.sign(crankTurner);
+        await expectAnchorError(
+          provider.connection.sendRawTransaction(tx.serialize()),
+          "SlippageExceeded",
+        );
+      });
     });
   });
 });

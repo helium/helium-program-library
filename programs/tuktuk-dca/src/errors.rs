@@ -28,4 +28,10 @@ pub enum ErrorCode {
 
   #[msg("Slippage from oracle must be less than 100%")]
   InvalidSlippage,
+
+  #[msg("The run must supply the task the next order is queued into")]
+  MissingNextTask,
+
+  #[msg("A swap is in progress")]
+  SwapInProgress,
 }

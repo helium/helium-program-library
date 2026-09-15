@@ -27,37 +27,43 @@ export const DCA_TEST_SIGNER = Keypair.fromSeed(Buffer.alloc(32, 1));
 export const DCA_TEST_PORT = 8123;
 export const DCA_TEST_URL = `http://localhost:${DCA_TEST_PORT}/dca`;
 
-// Calculate expected output based on oracle prices (matching check_repay_v0 logic)
+// Fair value of a swap in output minor units, matching check_repay_v0: the oracle price ratio
+// is between whole tokens, so one signed power of ten carries both the Pyth exponent difference
+// and the two mints' decimal difference.
 function calculateExpectedOutput(
   swapAmount: BN,
   inputPriceUpdate: any,
-  outputPriceUpdate: any
+  outputPriceUpdate: any,
+  inputDecimals: number,
+  outputDecimals: number
 ): BN {
   const inputPriceWithConf = inputPriceUpdate.priceMessage.price;
   const outputPriceWithConf = outputPriceUpdate.priceMessage.price;
 
-  const expoDiff =
+  const scale =
     inputPriceUpdate.priceMessage.exponent -
-    outputPriceUpdate.priceMessage.exponent;
-  let expectedOutput: BN;
-  if (expoDiff > 0) {
-    expectedOutput = swapAmount
-      .mul(new BN(10).pow(new BN(Math.abs(expoDiff))))
-      .mul(inputPriceWithConf)
-      .div(outputPriceWithConf);
-  } else if (expoDiff < 0) {
-    expectedOutput = swapAmount
-      .mul(inputPriceWithConf)
-      .div(outputPriceWithConf)
-      .div(new BN(10).pow(new BN(Math.abs(expoDiff))));
-  } else {
-    expectedOutput = swapAmount
+    outputPriceUpdate.priceMessage.exponent +
+    (outputDecimals - inputDecimals);
+  const scaleFactor = new BN(10).pow(new BN(Math.abs(scale)));
+  if (scale > 0) {
+    return swapAmount
+      .mul(scaleFactor)
       .mul(inputPriceWithConf)
       .div(outputPriceWithConf);
   }
+  return swapAmount
+    .mul(inputPriceWithConf)
+    .div(outputPriceWithConf)
+    .div(scaleFactor);
+}
 
-  // Extra two decimals on HNT
-  return expectedOutput.mul(new BN(100));
+// Basis points of fair value the running server repays. 10000 is a fair swap; anything less
+// is a swap the repay floor should refuse once slippage is tighter than the shortfall. The DCA
+// url is pinned to one port, so a suite changes this rather than starting a second server.
+let repayBps = 10000;
+
+export function setDcaServerRepayBps(bps: number) {
+  repayBps = bps;
 }
 
 export interface DcaServerConfig {
@@ -147,8 +153,10 @@ export async function createDcaServer(
       const expectedOutput = calculateExpectedOutput(
         swapAmount,
         inputPriceUpdate,
-        outputPriceUpdate
-      );
+        outputPriceUpdate,
+        dcaAccount.inputDecimals,
+        dcaAccount.outputDecimals
+      ).muln(repayBps).divn(10000);
 
       console.log(`Swap Amount (input): ${swapAmount.toString()}`);
       console.log(
