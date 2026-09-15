@@ -108,6 +108,7 @@ pub fn handler(ctx: Context<CountProxyVoteV0>) -> Result<()> {
   let voting_mint_config =
     &ctx.accounts.registrar.voting_mints[usize::from(ctx.accounts.position.voting_mint_config_idx)];
 
+  marker.sync_weight();
   let weight = if marker.weight > 0 {
     marker.weight
   } else {
