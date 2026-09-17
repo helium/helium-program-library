@@ -67,9 +67,7 @@ export const env = createEnv({
    */
   client: {
     NEXT_PUBLIC_PRIVY_APP_ID: z.string(),
-    NEXT_PUBLIC_SOLANA_URL: z.string().optional(),
     NEXT_PUBLIC_SOLANA_CLUSTER: z.string().optional(),
-    NEXT_PUBLIC_WORLD_HELIUM_URL: z.string().optional(),
   },
   /**
    * You can't destruct `process.env` as a regular object in the Next.js edge runtimes (e.g.
@@ -90,7 +88,6 @@ export const env = createEnv({
     ASSET_OWNER_INDEXER_URL: process.env.ASSET_OWNER_INDEXER_URL,
     ACCOUNT_INDEXER_PASSWORD: process.env.ACCOUNT_INDEXER_PASSWORD,
     ASSET_OWNER_INDEXER_PASSWORD: process.env.ASSET_OWNER_INDEXER_PASSWORD,
-    NEXT_PUBLIC_SOLANA_URL: process.env.NEXT_PUBLIC_SOLANA_URL,
     NEXT_PUBLIC_SOLANA_CLUSTER: process.env.NEXT_PUBLIC_SOLANA_CLUSTER,
     PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
     BRIDGE_API_KEY: process.env.BRIDGE_API_KEY,
@@ -108,7 +105,6 @@ export const env = createEnv({
     ONBOARDING_ENDPOINT: process.env.ONBOARDING_ENDPOINT,
     ECC_VERIFIER_URL: process.env.ECC_VERIFIER_URL,
     FEE_PAYER_WALLET_PATH: process.env.FEE_PAYER_WALLET_PATH,
-    NEXT_PUBLIC_WORLD_HELIUM_URL: process.env.NEXT_PUBLIC_WORLD_HELIUM_URL,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

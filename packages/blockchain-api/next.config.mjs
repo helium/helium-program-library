@@ -5,8 +5,6 @@ const nextConfig = {
   output: "standalone",
   serverExternalPackages: ["@helium/onboarding"],
   transpilePackages: [
-    "@privy-io/react-auth",
-    "@privy-io/js-sdk-core",
     "uuid",
     "@helium/blockchain-api",
   ],

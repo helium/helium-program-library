@@ -33,8 +33,6 @@ ARG SENTRY_RELEASE
 # get replaced at runtime by docker-entrypoint.sh
 ENV NEXT_PUBLIC_PRIVY_APP_ID="__NEXT_PUBLIC_PRIVY_APP_ID__" \
     NEXT_PUBLIC_SOLANA_CLUSTER="__NEXT_PUBLIC_SOLANA_CLUSTER__" \
-    NEXT_PUBLIC_SOLANA_URL="__NEXT_PUBLIC_SOLANA_URL__" \
-    NEXT_PUBLIC_WORLD_HELIUM_URL="__NEXT_PUBLIC_WORLD_HELIUM_URL__" \
     SENTRY_DSN="__SENTRY_DSN__" \
     NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=4096"
@@ -68,7 +66,6 @@ RUN addgroup --system --gid 1001 nodejs && \
     chown -R nextjs:nodejs /app
 
 # Standalone output: in a monorepo, server.js is nested under the package path
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/standalone/packages/blockchain-api/ ./
 COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/static ./.next/static
 
