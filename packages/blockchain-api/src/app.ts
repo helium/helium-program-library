@@ -4,6 +4,7 @@ import Fastify, {
   type FastifyRequest,
 } from "fastify";
 import cors from "@fastify/cors";
+import type { IncomingHttpHeaders } from "http";
 import { rpcHandler } from "@/server/api/handlers/rpc";
 import { openApiHandler } from "@/server/api/handlers/openapi";
 
@@ -14,6 +15,19 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https?:\/\/.*\.heliumvote\.com$/,
   /^https?:\/\/heliumvote\.com$/,
 ];
+
+const toFetchHeaders = (headers: IncomingHttpHeaders): Headers => {
+  const fetchHeaders = new Headers();
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const entry of value) fetchHeaders.append(name, entry);
+    } else {
+      fetchHeaders.set(name, value);
+    }
+  }
+  return fetchHeaders;
+};
 
 export const buildApp = async (): Promise<FastifyInstance> => {
   const app = Fastify();
@@ -39,7 +53,9 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     const rpcRoute = async (req: FastifyRequest, reply: FastifyReply) => {
       const { matched } = await rpcHandler.handle(req, reply, {
         prefix: "/rpc",
-        context: {},
+        // Rate limits key on the client IP of the outer request, and a batch
+        // item can override the headers the plugin would otherwise read
+        context: { reqHeaders: toFetchHeaders(req.headers) },
       });
       if (!matched) return reply.callNotFound();
       return reply;
@@ -48,7 +64,9 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     const apiRoute = async (req: FastifyRequest, reply: FastifyReply) => {
       const { matched } = await openApiHandler.handle(req, reply, {
         prefix: "/api/v1",
-        context: {},
+        // Rate limits key on the client IP of the outer request, and a batch
+        // item can override the headers the plugin would otherwise read
+        context: { reqHeaders: toFetchHeaders(req.headers) },
       });
       if (!matched) return reply.callNotFound();
       return reply;
