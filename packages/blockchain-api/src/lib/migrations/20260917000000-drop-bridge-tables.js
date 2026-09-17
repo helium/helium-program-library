@@ -15,6 +15,9 @@ module.exports = {
     await queryInterface.dropTable("bridge_transfers");
     await queryInterface.dropTable("bank_accounts");
     await queryInterface.dropTable("bridge_users");
+    await queryInterface.sequelize.query(
+      'DROP TYPE IF EXISTS "enum_bridge_users_account_type"',
+    );
   },
 
   async down() {
