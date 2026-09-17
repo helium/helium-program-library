@@ -13,7 +13,6 @@ export const dynamic = "force-dynamic";
  * ORPC OpenAPI handler for the public v1 API.
  *
  * This handler serves REST endpoints and OpenAPI documentation for public routers only.
- * Internal routers (fiat, webhooks) are excluded from docs but accessible via RPC.
  * - REST endpoints are available at /api/v1/*
  * - OpenAPI documentation is available at /api/v1/docs
  */

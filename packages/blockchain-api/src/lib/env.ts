@@ -26,8 +26,6 @@ export const env = createEnv({
     ACCOUNT_INDEXER_PASSWORD: z.string().optional(),
     ASSET_OWNER_INDEXER_PASSWORD: z.string().optional(),
     PRIVY_APP_SECRET: z.string(),
-    BRIDGE_API_KEY: z.string(),
-    BRIDGE_API_URL: z.string().url().default("https://api.bridge.xyz/v0"),
     ORACLE_SIGNER: z
       .string()
       .default("orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"),
@@ -90,8 +88,6 @@ export const env = createEnv({
     ASSET_OWNER_INDEXER_PASSWORD: process.env.ASSET_OWNER_INDEXER_PASSWORD,
     NEXT_PUBLIC_SOLANA_CLUSTER: process.env.NEXT_PUBLIC_SOLANA_CLUSTER,
     PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
-    BRIDGE_API_KEY: process.env.BRIDGE_API_KEY,
-    BRIDGE_API_URL: process.env.BRIDGE_API_URL,
     ORACLE_SIGNER: process.env.ORACLE_SIGNER,
     ORACLE_URL: process.env.ORACLE_URL,
     ORACLE_API_KEY: process.env.ORACLE_API_KEY,
