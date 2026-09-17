@@ -12,7 +12,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "start": "node --import ./lib/instrument.js lib/server.js",
+    "start": "NODE_ENV=production node --import ./lib/instrument.js lib/server.js",
     "format:fix": "prettier --check --write \"src/**/*.{js,ts,tsx}\"",
     "lint": "pnpm run format:fix && eslint src/",
     "lint:check": "eslint src tests",
