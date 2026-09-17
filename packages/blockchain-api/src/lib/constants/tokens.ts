@@ -47,7 +47,7 @@ export async function getTokenDecimals(mint: string): Promise<number> {
   const cached = decimalsCache.get(mint);
   if (cached !== undefined) return cached;
 
-  const { env } = await import("@/lib/env");
+  const { env } = await import("@/lib/env.js");
   const connection = new Connection(env.SOLANA_RPC_URL);
   const mintInfo = await getMint(connection, new PublicKey(mint));
   decimalsCache.set(mint, mintInfo.decimals);
