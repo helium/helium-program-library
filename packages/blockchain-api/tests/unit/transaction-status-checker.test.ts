@@ -80,9 +80,9 @@ describe("checkAndUpdateBatchStatus", () => {
     process.env.PG_PORT = "5432";
     process.env.PRIVY_APP_SECRET = "test";
     process.env.JUPITER_API_KEY = "test";
-    process.env.NEXT_PUBLIC_PRIVY_APP_ID = "test";
+    process.env.PRIVY_APP_ID = "test";
     process.env.NO_PG = "true";
-    process.env.NEXT_PUBLIC_SOLANA_CLUSTER = "devnet";
+    process.env.SOLANA_CLUSTER = "devnet";
     ({ checkAndUpdateBatchStatus } =
       await import("../../src/lib/utils/transaction-status-checker"));
     PendingTransaction = (

@@ -56,8 +56,6 @@
     "@types/chai": "^4.3.0",
     "@types/chai-as-promised": "^7.1.5",
     "@types/mocha": "^9.0.0",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "anchor-bankrun": "^0.5.0",

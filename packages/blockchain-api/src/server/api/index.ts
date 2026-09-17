@@ -12,6 +12,7 @@ import { dataCreditsRouter } from "./routers/data-credits/router";
 import { squadsRouter } from "./routers/squads/router";
 import { implement } from "@orpc/server";
 import { fullApiContract, apiContract } from "@helium/blockchain-api";
+import type { AppContext } from "./procedures";
 
 const sharedRouters = {
   governance: governanceRouter,
@@ -27,12 +28,16 @@ const sharedRouters = {
   squads: squadsRouter,
 };
 
-export const publicRouter = implement(apiContract).router(sharedRouters);
+export const publicRouter = implement(apiContract)
+  .$context<AppContext>()
+  .router(sharedRouters);
 
-export const appRouter = implement(fullApiContract).router({
-  ...sharedRouters,
-  migration: migrationRouter,
-});
+export const appRouter = implement(fullApiContract)
+  .$context<AppContext>()
+  .router({
+    ...sharedRouters,
+    migration: migrationRouter,
+  });
 
 /** Type of the main router for client-side type inference */
 export type ORPCRouter = typeof appRouter;

@@ -1,14 +1,12 @@
-import { BatchHandlerPlugin } from "@orpc/server/plugins";
+import { BatchHandlerPlugin, RequestHeadersPlugin } from "@orpc/server/plugins";
 import { onError } from "@orpc/server";
 import { appRouter } from "@/server/api";
-import { RPCHandler } from "@orpc/server/fetch";
+import { RPCHandler } from "@orpc/server/fastify";
 import { ORPCError } from "@orpc/server";
 import { ValidationError } from "@orpc/server";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@sentry/node";
 
-export const dynamic = "force-dynamic";
-
-const rpcHandler = new RPCHandler(appRouter, {
+export const rpcHandler = new RPCHandler(appRouter, {
   interceptors: [
     onError((error) => {
       // Helper to safely serialize nested objects
@@ -126,39 +124,5 @@ const rpcHandler = new RPCHandler(appRouter, {
       }
     }),
   ],
-  plugins: [new BatchHandlerPlugin()],
+  plugins: [new RequestHeadersPlugin(), new BatchHandlerPlugin()],
 });
-
-async function handleRequest(request: Request) {
-  const url = new URL(request.url);
-  const pathname = url.pathname;
-
-  // Handle batch requests - the BatchHandlerPlugin should detect them by body format
-  // But we need to ensure the path is correct after prefix removal
-  // When path is /rpc/__batch__, after removing /rpc prefix, it becomes /__batch__
-  const isBatchPath =
-    pathname === "/rpc/__batch__" || pathname.endsWith("/__batch__");
-
-  const { response } = await rpcHandler.handle(request, {
-    prefix: "/rpc",
-    context: {}, // Provide initial context if needed
-  });
-
-  // If it's a batch path and we got no response, the BatchHandlerPlugin might not be working
-  // This could be a bug or configuration issue with ORPC
-  if (!response && isBatchPath) {
-    console.error(
-      "[RPC] BatchHandlerPlugin failed to handle batch request. " +
-        "This might indicate a bug in ORPC or incorrect configuration."
-    );
-  }
-
-  return response ?? new Response("Not found", { status: 404 });
-}
-
-export const HEAD = handleRequest;
-export const GET = handleRequest;
-export const POST = handleRequest;
-export const PUT = handleRequest;
-export const PATCH = handleRequest;
-export const DELETE = handleRequest;

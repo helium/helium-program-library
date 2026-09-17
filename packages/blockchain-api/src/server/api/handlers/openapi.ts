@@ -1,13 +1,13 @@
-import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIHandler } from "@orpc/openapi/fastify";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { SmartCoercionPlugin } from "@orpc/json-schema";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { publicRouter } from "@/server/api";
+import { env } from "@/lib/env";
 import { onError } from "@orpc/server";
+import { RequestHeadersPlugin } from "@orpc/server/plugins";
 import { ORPCError } from "@orpc/server";
-import * as Sentry from "@sentry/nextjs";
-
-export const dynamic = "force-dynamic";
+import * as Sentry from "@sentry/node";
 
 /**
  * ORPC OpenAPI handler for the public v1 API.
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * - REST endpoints are available at /api/v1/*
  * - OpenAPI documentation is available at /api/v1/docs
  */
-const openApiHandler = new OpenAPIHandler(publicRouter, {
+export const openApiHandler = new OpenAPIHandler(publicRouter, {
   interceptors: [
     onError((error: any) => {
       // Don't log expected 401 auth errors - they're handled by the frontend
@@ -59,6 +59,7 @@ const openApiHandler = new OpenAPIHandler(publicRouter, {
     }),
   ],
   plugins: [
+    new RequestHeadersPlugin(),
     new SmartCoercionPlugin({
       schemaConverters: [new ZodToJsonSchemaConverter()],
     }),
@@ -95,7 +96,7 @@ const openApiHandler = new OpenAPIHandler(publicRouter, {
         servers: [
           {
             url: `${
-              process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+              env.PUBLIC_URL || `http://localhost:${process.env.PORT ?? 3000}`
             }/api/v1`,
             description: "API Server",
           },
@@ -104,25 +105,3 @@ const openApiHandler = new OpenAPIHandler(publicRouter, {
     }),
   ],
 });
-
-/**
- * Handle incoming requests.
- * Maps requests to the ORPC handler with the /api/v1 prefix.
- */
-async function handleRequest(request: Request) {
-  const { response } = await openApiHandler.handle(request, {
-    prefix: "/api/v1",
-    context: {},
-  });
-
-  return response ?? new Response("Not found", { status: 404 });
-}
-
-// Export handlers for all HTTP methods
-export const HEAD = handleRequest;
-export const GET = handleRequest;
-export const POST = handleRequest;
-export const PUT = handleRequest;
-export const PATCH = handleRequest;
-export const DELETE = handleRequest;
-export const OPTIONS = handleRequest;

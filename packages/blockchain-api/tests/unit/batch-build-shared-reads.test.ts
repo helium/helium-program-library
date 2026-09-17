@@ -95,11 +95,11 @@ describe("buildBatchedTransactions shared reads", () => {
     process.env.PG_PORT = "5432";
     process.env.PRIVY_APP_SECRET = "test";
     process.env.JUPITER_API_KEY = "test";
-    process.env.NEXT_PUBLIC_PRIVY_APP_ID = "test";
+    process.env.PRIVY_APP_ID = "test";
     process.env.NO_PG = "true";
     // Off mainnet the builder appends no Jito tip transaction, which would
     // otherwise reach for a connection of its own.
-    process.env.NEXT_PUBLIC_SOLANA_CLUSTER = "devnet";
+    process.env.SOLANA_CLUSTER = "devnet";
     ({ buildBatchedTransactions } =
       await import("../../src/server/api/routers/governance/procedures/helpers/build-batched-transactions"));
   });

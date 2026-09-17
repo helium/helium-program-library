@@ -24,7 +24,7 @@ import {
   SingleTransactionSubmissionError,
   submitTransactionBatch,
 } from "@/lib/utils/transaction-submission";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@sentry/node";
 import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { classifySimulationLogs } from "@/lib/utils/simulation-classifier";
 import { publicProcedure } from "../../../procedures";
