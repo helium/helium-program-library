@@ -1,19 +1,9 @@
-import { buildApp } from "./app";
-import { defineAssociations } from "./lib/models/associations";
-import { transactionResubmissionService } from "./lib/background-jobs/transaction-resubmission";
+import { buildApp, startBackgroundServices } from "./app";
 
 const start = async () => {
   const app = await buildApp();
 
-  if (process.env.NO_PG !== "true") {
-    try {
-      defineAssociations();
-      transactionResubmissionService.start();
-      console.log("[server] Transaction resubmission service started");
-    } catch (e) {
-      console.error("Failed to start transaction resubmission service:", e);
-    }
-  }
+  startBackgroundServices();
 
   const shutdown = async (signal: string) => {
     console.log(`Received ${signal}, shutting down...`);

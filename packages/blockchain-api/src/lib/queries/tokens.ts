@@ -180,8 +180,7 @@ async function fetchTokenPrices(
     const response = await fetch(
       `https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoIds.join(
         ","
-      )}&vs_currencies=usd`,
-      { next: { revalidate: 300 } } // Cache for 5 minutes
+      )}&vs_currencies=usd`
     );
 
     if (!response.ok) return {};

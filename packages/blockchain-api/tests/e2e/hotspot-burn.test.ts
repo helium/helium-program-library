@@ -6,7 +6,7 @@ import { RPCLink } from "@orpc/client/fetch";
 import type { appRouter } from "@/server/api";
 import type { RouterClient } from "@orpc/server";
 import { applyMinimalServerEnv } from "./helpers/env";
-import { ensureNextServer, stopNextServer } from "./helpers/next";
+import { ensureServer, rpcUrl, stopServer } from "./helpers/server";
 import {
   ensureSurfpool,
   getSurfpoolRpcUrl,
@@ -31,18 +31,18 @@ describe("hotspot burn (fork-only)", () => {
     }
     applyMinimalServerEnv();
     await ensureSurfpool();
-    await ensureNextServer();
+    await ensureServer();
 
     payer = loadKeypairFromEnv();
     connection = new Connection(getSurfpoolRpcUrl(), "confirmed");
     await ensureFunds(payer.publicKey, 0.05 * LAMPORTS_PER_SOL);
 
-    const link = new RPCLink({ url: "http://127.0.0.1:3000/rpc" });
+    const link = new RPCLink({ url: rpcUrl() });
     client = createORPCClient(link);
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

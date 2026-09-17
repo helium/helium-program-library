@@ -7,6 +7,8 @@ import cors from "@fastify/cors";
 import type { IncomingHttpHeaders } from "http";
 import { rpcHandler } from "@/server/api/handlers/rpc";
 import { openApiHandler } from "@/server/api/handlers/openapi";
+import { defineAssociations } from "@/lib/models/associations";
+import { transactionResubmissionService } from "@/lib/background-jobs/transaction-resubmission";
 
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https?:\/\/localhost(:\d+)?$/,
@@ -79,4 +81,15 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   });
 
   return app;
+};
+
+export const startBackgroundServices = (): void => {
+  if (process.env.NO_PG === "true") return;
+  try {
+    defineAssociations();
+    transactionResubmissionService.start();
+    console.log("[server] Transaction resubmission service started");
+  } catch (e) {
+    console.error("Failed to start transaction resubmission service:", e);
+  }
 };
