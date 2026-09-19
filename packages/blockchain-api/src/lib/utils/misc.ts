@@ -1,6 +1,3 @@
-import { clsx, type ClassValue } from "clsx";
-import { Metadata } from "next";
-import { twMerge } from "tailwind-merge";
 export type Schedule = "daily" | "weekly" | "monthly";
 export type ReturnAddress = "me" | "recipient" | "custom";
 
@@ -94,63 +91,3 @@ export const toSixColumnCron = (fiveColCron: string): string =>
 
 export const toFiveColumnCron = (sixColCron: string): string =>
   sixColCron.replace(/^0\s+/, "");
-
-export const truncateAddress = (
-  address: string,
-  startChars: number = 6,
-  endChars: number = 4
-) => {
-  if (address.length <= startChars + endChars) {
-    return address;
-  }
-  return `${address.slice(0, startChars)}....${address.slice(-endChars)}`;
-};
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-export const formMetaTags = (args?: {
-  title?: string;
-  description?: string;
-  openGraphImageAbsoluteUrl?: string;
-  url?: string;
-}) => {
-  const { title, description, openGraphImageAbsoluteUrl, url } = args || {};
-  const metaTitle = title ? `${title} — My Helium` : "My Helium";
-  const metaDescription = description
-    ? description
-    : "Simple Helium Hotspot Hosting.";
-  const metaImage = openGraphImageAbsoluteUrl
-    ? openGraphImageAbsoluteUrl
-    : "https://my.helium.com/images/o-g.png";
-  const metaUrl = url ? url : "https://my.helium.com";
-
-  return {
-    metadataBase: new URL("https://my.helium.com"),
-    icons: ["/favicon.ico"],
-    title: metaTitle,
-    description: metaDescription,
-    itemProps: {
-      name: metaTitle,
-      description: metaDescription,
-      image: metaImage,
-    },
-    twitter: {
-      title: metaTitle,
-      description: metaDescription,
-      image: metaImage,
-      card: "summary_large_image",
-      site: "@helium",
-    },
-    openGraph: {
-      title: metaTitle,
-      description: metaDescription,
-      image: metaImage,
-      url: metaUrl,
-      site_name: "My Helium",
-      locale: "en_US",
-      type: "website",
-    },
-  } as Metadata;
-};

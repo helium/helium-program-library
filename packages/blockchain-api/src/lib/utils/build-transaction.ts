@@ -26,7 +26,7 @@ import {
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 
 export function getHeliumLookupTable(): PublicKey {
-  return env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
+  return env.SOLANA_CLUSTER?.trim() === "devnet"
     ? HELIUM_COMMON_LUT_DEVNET
     : HELIUM_COMMON_LUT;
 }

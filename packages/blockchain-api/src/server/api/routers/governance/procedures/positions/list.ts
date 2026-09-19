@@ -14,7 +14,6 @@ import {
   PROGRAM_ID as VSR_PROGRAM_ID,
 } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { headers } from "next/headers";
 import {
   createRateLimiter,
   getClientIp,
@@ -133,10 +132,14 @@ const fetchDelegations = async ({
 };
 
 export const getPositions = publicProcedure.governance.getPositions.handler(
-  async ({ input, errors }) => {
+  async ({ input, errors, context }) => {
     const { wallet } = input;
 
-    if (!getPositionsIpRateLimiter(getClientIp(await headers()))) {
+    if (
+      !getPositionsIpRateLimiter(
+        getClientIp(context.reqHeaders ?? new Headers())
+      )
+    ) {
       throw errors.RATE_LIMITED();
     }
     const walletPubkey = new PublicKey(wallet);

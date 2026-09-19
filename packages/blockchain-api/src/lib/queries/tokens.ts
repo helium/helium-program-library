@@ -171,26 +171,42 @@ async function fetchTokenMetadata(
   }
 }
 
+const TOKEN_PRICE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const tokenPriceCache = new Map<
+  string,
+  { data: Record<string, number>; expiry: number }
+>();
+
 async function fetchTokenPrices(
   coingeckoIds: string[]
 ): Promise<Record<string, number>> {
   if (coingeckoIds.length === 0) return {};
 
+  const cacheKey = [...coingeckoIds].sort().join(",");
+  const cached = tokenPriceCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.data;
+  }
+
   try {
     const response = await fetch(
       `https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoIds.join(
         ","
-      )}&vs_currencies=usd`,
-      { next: { revalidate: 300 } } // Cache for 5 minutes
+      )}&vs_currencies=usd`
     );
 
     if (!response.ok) return {};
 
     const data = await response.json();
-    return Object.keys(data).reduce((acc, key) => {
+    const prices = Object.keys(data).reduce((acc, key) => {
       acc[key] = data[key].usd;
       return acc;
     }, {} as Record<string, number>);
+    tokenPriceCache.set(cacheKey, {
+      data: prices,
+      expiry: Date.now() + TOKEN_PRICE_TTL_MS,
+    });
+    return prices;
   } catch (error) {
     console.error("Failed to fetch token prices:", error);
     return {};
