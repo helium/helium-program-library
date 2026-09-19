@@ -92,7 +92,6 @@ describe("checkAndUpdateBatchStatus", () => {
       .default;
     ({ sequelize } = await import("../../src/lib/db"));
 
-    originals.getBlockHeight = Connection.prototype.getBlockHeight;
     originals.getSignatureStatuses = Connection.prototype.getSignatureStatuses;
     originals.isBlockhashValid = Connection.prototype.isBlockhashValid;
     originals.findAll = PendingTransaction.findAll;
@@ -100,7 +99,14 @@ describe("checkAndUpdateBatchStatus", () => {
     originals.batchUpdate = TransactionBatch.update;
     originals.transaction = sequelize.transaction;
 
-    Connection.prototype.getBlockHeight = async () => 100;
+    // web3.js assigns `getBlockHeight` on each instance in the constructor,
+    // which would shadow a plain prototype patch and send a real RPC call.
+    // An accessor whose setter drops that assignment keeps the stub in place.
+    Object.defineProperty(Connection.prototype, "getBlockHeight", {
+      configurable: true,
+      get: () => async () => 100,
+      set: () => {},
+    });
     Connection.prototype.getSignatureStatuses = async (signatures: string[]) =>
       ({
         context: { slot: 1 },
@@ -148,7 +154,7 @@ describe("checkAndUpdateBatchStatus", () => {
   });
 
   after(() => {
-    Connection.prototype.getBlockHeight = originals.getBlockHeight as any;
+    delete (Connection.prototype as any).getBlockHeight;
     Connection.prototype.getSignatureStatuses =
       originals.getSignatureStatuses as any;
     Connection.prototype.isBlockhashValid = originals.isBlockhashValid as any;

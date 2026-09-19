@@ -1,5 +1,9 @@
 import { expect } from "chai";
-import { ensureServer, stopServer } from "../e2e/helpers/server";
+import {
+  ensureServer,
+  forgetServerModules,
+  stopServer,
+} from "../e2e/helpers/server";
 
 // A port no other service in this repo binds, so the harness always builds a
 // server instead of adopting one that already answers.
@@ -22,8 +26,20 @@ const applyBaseEnv = (): void => {
 const serverEnv = async () => (await import("../../src/lib/env")).env;
 
 describe("e2e server harness", () => {
+  const saved = {
+    FEE_PAYER_WALLET_PATH: process.env.FEE_PAYER_WALLET_PATH,
+    SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
+  };
+
   after(async () => {
     await stopServer();
+    // The unit suite shares one mocha process. Without this, every later file
+    // imports the server's modules with this file's dead RPC url parsed in.
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    forgetServerModules();
   });
 
   it("gives each server the env set before it was started", async () => {
