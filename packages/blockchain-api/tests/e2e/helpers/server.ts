@@ -13,7 +13,7 @@ const srcDir = resolve(__dirname, "../../../src") + sep;
  * cached, and the test files import nothing from `src/` but types and pure
  * helpers, which are safe to hold a second copy of.
  */
-const forgetServerModules = (): void => {
+export const forgetServerModules = (): void => {
   for (const id of Object.keys(require.cache)) {
     if (id.startsWith(srcDir)) delete require.cache[id];
   }
