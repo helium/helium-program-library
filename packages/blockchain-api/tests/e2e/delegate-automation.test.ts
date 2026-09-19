@@ -19,7 +19,7 @@ import {
   getPrograms,
   setRegistrarTimeOffset,
 } from "./helpers/governance";
-import { stopNextServer } from "./helpers/next";
+import { stopServer } from "./helpers/server";
 import { stopSurfpool } from "./helpers/surfpool";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 
@@ -38,7 +38,7 @@ describe("delegatePositions automation", () => {
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

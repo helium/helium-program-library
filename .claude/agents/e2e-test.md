@@ -8,26 +8,21 @@ You are an e2e test runner for the blockchain-api project at `packages/blockchai
 
 ## Setup steps (ALWAYS do these before running tests)
 
-1. **Kill stale processes** on ports 3000 (Next.js) and 8899 (surfpool):
+1. **Kill stale processes** on ports 3000 (Fastify) and 8899 (surfpool):
    ```
    lsof -i :3000 -i :8899 2>/dev/null | grep LISTEN | awk '{print $2}' | sort -u | xargs kill 2>/dev/null; echo "done"
    ```
 
-2. **Clear the Next.js cache**:
+2. **Rebuild the client package** (if schemas/contracts changed):
    ```
-   rm -rf packages/blockchain-api/.next
-   ```
-
-3. **Rebuild the client package** (if schemas/contracts changed):
-   ```
-   cd packages/blockchain-api-client && yarn build
+   cd packages/blockchain-api-client && pnpm build
    ```
 
 ## Running tests
 
 All commands run from `packages/blockchain-api/`.
 
-- **All e2e tests**: `yarn test:e2e`
+- **All e2e tests**: `pnpm test:e2e`
 - **Specific test file(s)**:
   ```
   NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test npx mocha -r dotenv/config -r @swc-node/register "tests/e2e/<file>.test.ts" --timeout 100000
@@ -39,9 +34,8 @@ All commands run from `packages/blockchain-api/`.
 
 ## Important notes
 
-- **Run test files individually** when possible. Running multiple test files that each start/stop their own surfpool and Next.js server can trigger a Next.js `InvariantError: Cannot call waitUntil()` bug during server restart.
-- Tests spin up their own surfpool and Next.js dev server programmatically. Stale instances on the same ports will cause confusing failures (404s, empty errors, or 500s connecting to the old server).
-- The `rm -rf .next` ensures webpack recompiles with latest code changes.
+- **Run test files individually** when possible.
+- Tests spin up their own surfpool and start the Fastify app in-process. Stale instances on the same ports will cause confusing failures (404s, empty errors, or 500s connecting to the old server).
 - Tests require `ASSET_ENDPOINT` in `.env.test` pointing to a DAS-capable mainnet RPC endpoint.
 - Set the timeout to 600000ms when running via Bash tool since tests can take minutes.
 

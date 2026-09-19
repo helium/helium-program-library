@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "incremental": false,
+    "outDir": "lib",
+    "rootDir": "src",
+    // CommonJS emit (no "type": "module" anywhere). ESM emit is not viable: the
+    // @helium/* workspace libs publish an "import" condition pointing at an
+    // extensionless bundler-only tree (e.g. spl-utils lib/esm/src), which Node's
+    // ESM resolver rejects. NodeNext resolution is what lets this CJS output
+    // read the modern exports maps, including the ESM-only client via its
+    // "module-sync" condition.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "tsc-alias": {
+    "resolveFullPaths": true
+  },
+  // Only the TypeScript sources: src/lib/{config,migrations,models/index}.js are
+  // CommonJS files sequelize-cli loads from src/, not from the emitted lib/
+  "include": ["src/**/*.ts"]
+}
