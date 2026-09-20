@@ -46,4 +46,10 @@ pub enum ErrorCode {
 
   #[msg("Remote task transaction must run under a tuktuk remote task signed by this oracle")]
   InvalidRemoteTask,
+
+  #[msg("Remote task signature does not match the running task and its accounts")]
+  RemoteTaskHashMismatch,
+
+  #[msg("Remote task signature does not authorize this reward")]
+  RemoteRewardNotSigned,
 }
