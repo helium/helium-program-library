@@ -1,6 +1,6 @@
 [package]
 name = "voter-stake-registry"
-version = "0.4.9"
+version = "0.4.10"
 description = "Heliums voter weight plugin for spl-governance"
 license = "GPL-3.0-or-later"
 homepage = "https://github.com/helium/helium-program-library"
@@ -13,6 +13,7 @@ name = "voter_stake_registry"
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
+testing = []
 no-genesis = []
 no-entrypoint = []
 no-idl = []

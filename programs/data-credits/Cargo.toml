@@ -1,6 +1,6 @@
 [package]
 name = "data-credits"
-version = "0.2.7"
+version = "0.2.8"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
@@ -12,6 +12,7 @@ name = "data_credits"
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build", "circuit-breaker/idl-build", "lazy-transactions/idl-build"]
 devnet = []
+testing = []
 no-genesis = []
 no-entrypoint = []
 no-idl = []

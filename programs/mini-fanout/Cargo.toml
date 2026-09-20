@@ -12,6 +12,7 @@ name = "mini_fanout"
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = ["shared-utils/devnet"]
+testing = []
 no-genesis = []
 no-entrypoint = []
 no-idl = []

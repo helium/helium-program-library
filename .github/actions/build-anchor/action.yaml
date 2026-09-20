@@ -6,7 +6,7 @@ inputs:
     required: false
     default: "false"
   testing:
-    description: "Whether to use devnet feature"
+    description: "Whether to build with test values (sets TESTING and the testing feature)"
     required: false
     default: "false"
   program:
@@ -34,6 +34,22 @@ runs:
         path: |
           ./target/
         key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/**') }}-${{ inputs.program }}
-    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/anchor build ${{ (inputs.program != '' && '-p') || '' }} ${{ inputs.program || '' }} ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
+    # The programs refuse to compile when TESTING is set without the `testing` feature, so
+    # a test build carries both.
+    - run: |
+        FEATURES=""
+        if [ "$DEVNET" = "true" ]; then FEATURES="devnet"; fi
+        if [ "$TESTING_BUILD" = "true" ]; then
+          export TESTING=true
+          FEATURES="${FEATURES:+$FEATURES,}testing"
+        fi
+        ARGS=()
+        if [ -n "$PROGRAM" ]; then ARGS+=(-p "$PROGRAM"); fi
+        if [ -n "$FEATURES" ]; then ARGS+=(-- --features "$FEATURES"); fi
+        ~/.cargo/bin/anchor build "${ARGS[@]}"
       if: steps.cache-anchor-build.outputs.cache-hit != 'true'
       shell: bash
+      env:
+        DEVNET: ${{ inputs.devnet }}
+        TESTING_BUILD: ${{ inputs.testing }}
+        PROGRAM: ${{ inputs.program }}

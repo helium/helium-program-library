@@ -1,3 +1,3 @@
 #!/bin/bash
 
-pnpm run clean && pnpm install && TESTING=true anchor build && pnpm run build
+pnpm run clean && pnpm install && TESTING=true anchor build -- --features testing && pnpm run build

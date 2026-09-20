@@ -1,6 +1,6 @@
 [package]
 name = "helium-sub-daos"
-version = "0.2.50"
+version = "0.2.51"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -11,6 +11,7 @@ name = "helium_sub_daos"
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "voter-stake-registry/idl-build", "circuit-breaker/idl-build", "treasury-management/idl-build"]
 devnet = []
+testing = []
 no-genesis = []
 no-entrypoint = []
 no-idl = []

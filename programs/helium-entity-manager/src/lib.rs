@@ -4,6 +4,26 @@ use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8");
 
+// A TESTING build substitutes test values for production ones, so it must never be
+// mistaken for a deployable mainnet program. TESTING comes from the environment, which a
+// build can inherit by accident; the `testing` Cargo feature is the build graph's record
+// that a test build was intended. The deployable mainnet program refuses to compile when
+// the two disagree.
+#[cfg(all(
+  not(feature = "testing"),
+  not(feature = "devnet"),
+  not(feature = "no-entrypoint"),
+  not(feature = "idl-build"),
+  not(test)
+))]
+const _: () = {
+  if option_env!("TESTING").is_some() {
+    panic!(
+      "TESTING is set without the `testing` feature; a mainnet build must not use test values"
+    );
+  }
+};
+
 pub mod constants;
 pub mod error;
 pub mod instructions;

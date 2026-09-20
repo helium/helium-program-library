@@ -16,6 +16,26 @@ declare_id!("tdcaoktKw6bDQ5ukLq5fLtje2kCkmHX7Sj9G77jY5dh");
 #[cfg(not(feature = "devnet"))]
 declare_id!("tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN");
 
+// A TESTING build substitutes test values for production ones, so it must never be
+// mistaken for a deployable mainnet program. TESTING comes from the environment, which a
+// build can inherit by accident; the `testing` Cargo feature is the build graph's record
+// that a test build was intended. The deployable mainnet program refuses to compile when
+// the two disagree.
+#[cfg(all(
+  not(feature = "testing"),
+  not(feature = "devnet"),
+  not(feature = "no-entrypoint"),
+  not(feature = "idl-build"),
+  not(test)
+))]
+const _: () = {
+  if option_env!("TESTING").is_some() {
+    panic!(
+      "TESTING is set without the `testing` feature; a mainnet build must not use test values"
+    );
+  }
+};
+
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
   name: "Tuktuk DCA",

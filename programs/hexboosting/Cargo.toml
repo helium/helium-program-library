@@ -1,6 +1,6 @@
 [package]
 name = "hexboosting"
-version = "0.2.3"
+version = "0.2.4"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
@@ -12,6 +12,7 @@ name = "hexboosting"
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build", "mobile-entity-manager/idl-build", "data-credits/idl-build"]
 devnet = []
+testing = []
 no-genesis = []
 no-entrypoint = []
 no-idl = []

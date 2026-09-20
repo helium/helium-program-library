@@ -172,7 +172,7 @@ pnpm run build
 4. Start localnet
 
 ```
-$: TESTING=true anchor localnet
+$: TESTING=true anchor localnet -- --features testing
 ```
 
 5. Bootstrap localnet
@@ -190,8 +190,12 @@ $: anchor test --provider.cluster localnet --skip-deploy --skip-local-validator 
 If you run into trouble with your installation, run the following command to rebuild everything from scratch.
 
 ```
-$: pnpm run clean && pnpm install && TESTING=true anchor build && pnpm run build
+$: pnpm run clean && pnpm install && TESTING=true anchor build -- --features testing && pnpm run build
 ```
+
+The `TESTING` environment variable and the `testing` Cargo feature travel together. A program
+refuses to compile when `TESTING` is set without `--features testing`, so a mainnet build cannot
+pick up test values from a stray environment variable.
 
 ## Repo layout
 
