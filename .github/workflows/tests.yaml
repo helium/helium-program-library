@@ -1,9 +1,16 @@
 name: Tests
 
+# A push to develop is a cache seed run, not a test run: only the `build` job runs, so that a PR
+# into develop can restore a `testing=true` `target/` cache and the base IDLs its merge commit will
+# be diffed against. Every other job carries
+#   if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
+# to opt out of that run. The gate is a job-level `if:` and never a workflow-level `paths` filter,
+# so a required check can never sit pending.
 on:
   push:
     branches:
       - master
+      - develop
   pull_request:
     branches:
       - master
@@ -14,6 +21,7 @@ env:
 jobs:
   test-rust-lint:
     name: Test Rust Lint
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -137,6 +145,7 @@ jobs:
 
   test-unit:
     name: Rust Unit Tests
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -157,6 +166,7 @@ jobs:
 
   test-testing-guard:
     name: TESTING Build Guard
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -221,6 +231,7 @@ jobs:
 
   test-atomic-data-publisher:
     name: Atomic Data Publisher Tests
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -267,10 +278,20 @@ jobs:
         with:
           testing: true
       - uses: ./.github/actions/localnet-accounts/
+      # The changeset bot's IDL diff needs the IDLs of the commit a PR is based on. Only a develop
+      # run can save them under a SHA a later PR will ask for: a PR run builds a merge commit whose
+      # SHA nothing else ever names. Save only, because this run has nothing to restore.
+      - name: Save base IDLs
+        if: ${{ github.event_name == 'push' && github.ref_name == 'develop' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ./target/idl
+          key: base-idls-${{ github.sha }}
 
   test-devflow:
     needs: build
     name: Test Development Workflow
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -287,6 +308,7 @@ jobs:
   test-helium-vote-service:
     needs: build
     name: Test Helium Vote Service
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -300,6 +322,7 @@ jobs:
   test-migration-service:
     needs: build
     name: Test Migration Service
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -313,6 +336,7 @@ jobs:
   test-docker-builds:
     needs: build
     name: Test Docker Builds
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -369,6 +393,7 @@ jobs:
   test-rust-builds:
     needs: build
     name: Test Rust Builds
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -391,6 +416,7 @@ jobs:
   test-contracts:
     needs: build
     name: Test Anchor Contracts
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
