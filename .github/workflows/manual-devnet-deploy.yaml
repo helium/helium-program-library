@@ -72,10 +72,10 @@ jobs:
 
       - uses: ./.github/actions/setup-anchor/
 
-      # The IDL buffer goes first: it is cheap, so a failure there does not leave a
-      # vault-owned program buffer behind.
-      - uses: ./.github/actions/write-idl-buffer/
-        id: write-idl-buffer
+      # Re-run rules live in this action: the hash-match skip, the vault buffer reuse, the
+      # pending proposal check, and the close of this run's buffer on a failure.
+      - uses: ./.github/actions/deploy-buffers/
+        id: deploy-buffers
         with:
           devnet: true
           network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
@@ -83,25 +83,18 @@ jobs:
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
-
-      - uses: ./.github/actions/write-program-buffer/
-        id: write-program-buffer
-        with:
-          devnet: true
-          network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
-          program: ${{ env.PROGRAM_NAME }}
-          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
-          program-id: ${{ env.PROGRAM_ID }}
-          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          multisig: ${{ secrets.DEVNET_MULTISIG }}
 
       - name: Squads program upgrade
+        # A skipped run has no buffers. The Squads action exits 1 on an empty address.
+        if: steps.deploy-buffers.outputs.skip != 'true'
         uses: helium/squads-program-upgrade@v0.5.0
         with:
           network-url: "https://api.devnet.solana.com"
           program-multisig: ${{ secrets.DEVNET_MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
-          buffer: ${{ steps.write-program-buffer.outputs.buffer }}
-          idl-buffer: ${{ steps.write-idl-buffer.outputs.idl-buffer }}
+          buffer: ${{ steps.deploy-buffers.outputs.buffer }}
+          idl-buffer: ${{ steps.deploy-buffers.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
           authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
           name: "Deploy ${{ inputs.program }}"
