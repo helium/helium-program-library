@@ -4,4 +4,4 @@ Distributes a one-time onboarding bundle to new wallets — typically a small HN
 
 SDK: [`@helium/welcome-pack-sdk`](../../packages/welcome-pack-sdk).
 
-Release / upgrade: push a `program-welcome-pack-<version>` git tag.
+Release / upgrade: add a program changeset that names `welcome-pack` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-welcome-pack-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

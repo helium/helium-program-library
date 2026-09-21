@@ -11,4 +11,4 @@ Deployed as **solana-monitor**. Image: `public.ecr.aws/v0j6k5v6/solana-monitor`.
 | web-cluster / prod | [manifests/web-cluster/prod/helium/solana-monitor.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/solana-monitor.yaml) |
 | web-cluster / sdlc | [manifests/web-cluster/sdlc/helium/solana-monitor.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/sdlc/helium/solana-monitor.yaml) |
 
-Deploy: push a `docker-web-solana-monitor-<version>` git tag.
+Deploy: the service auto-tag bot pushes `docker-web-solana-monitor-<version>` on each merge to `develop` that changes it. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The k8s bump stays manual.

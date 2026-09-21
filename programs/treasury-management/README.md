@@ -4,4 +4,4 @@ Runs a bonding-curve AMM between a sub-DAO's DNT (MOBILE, IOT) and HNT. Hotspot 
 
 SDK: [`@helium/treasury-management-sdk`](../../packages/treasury-management-sdk).
 
-Release / upgrade: push a `program-treasury-management-<version>` git tag.
+Release / upgrade: add a program changeset that names `treasury-management` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-treasury-management-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

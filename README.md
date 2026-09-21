@@ -225,112 +225,215 @@ Every leaf under `programs/`, `packages/`, and `utils/` has its own README that 
 
 ## CI / deployment overview
 
-Everything this repo publishes to the world runs through one of four GitHub Actions workflows:
+Three things leave this repo: npm packages, service images, and Solana programs. Bots drive all three. A person reviews, merges, and votes on Squads. Every hand path below stays valid, and each is the fallback when a bot is down.
 
-| What changes | Triggered by | Workflow |
-| --- | --- | --- |
-| npm packages under `packages/*` | Merge to `develop` with a changeset | [`npm-publish.yaml`](.github/workflows/npm-publish.yaml) |
-| Docker images for services | Git tag `docker-<env>-<service>-<version>` | [`docker-push.yaml`](.github/workflows/docker-push.yaml) |
-| Solana programs on **mainnet** | Git tag `program-<name>-<version>` | [`release-program.yaml`](.github/workflows/release-program.yaml) |
-| Solana programs on **devnet** | Merge to `develop` touching `programs/*`, or the `deploy-to-devnet` PR label | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) |
-| Any program on devnet, manually | GitHub UI ("Run workflow") | [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml) |
+| Workflow                                                                         | Trigger                                                                     | What it does                                                                                                                                 |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`tests.yaml`](.github/workflows/tests.yaml)                                     | Every PR, and push to `develop` or `master`                                 | Tests and lint, plus two release gates: **Release Declaration** (the backstop check) and **Program Version Bumps** (the missing-bump check). |
+| [`changeset-bot.yaml`](.github/workflows/changeset-bot.yaml)                     | PR to `develop` or `master`; manual dispatch                                | Writes the changeset and the program changeset a PR is missing.                                                                              |
+| [`version-programs.yaml`](.github/workflows/version-programs.yaml)               | Push to `develop`; manual dispatch                                          | Turns `.changeset-programs/` into `Cargo.toml` bumps and changelogs on the program release PR.                                               |
+| [`npm-publish.yaml`](.github/workflows/npm-publish.yaml)                         | Push to `develop`                                                           | Opens the "Version Packages" PR, and publishes to npm when that PR merges.                                                                   |
+| [`promotion-pr.yaml`](.github/workflows/promotion-pr.yaml)                       | Push to `develop`; manual dispatch                                          | Keeps one `develop` to `master` **Promotion PR** open while develop is ahead.                                                                |
+| [`back-merge-pr.yaml`](.github/workflows/back-merge-pr.yaml)                     | Push to `master`; manual dispatch                                           | Opens the `master` to `develop` back-merge PR after a hotfix.                                                                                |
+| [`program-auto-tag.yaml`](.github/workflows/program-auto-tag.yaml)               | Push to `master`; manual dispatch                                           | Creates `program-<name>-<version>` for every version on master that has no tag yet.                                                          |
+| [`release-program.yaml`](.github/workflows/release-program.yaml)                 | Git tag `program-<name>-<version>`                                          | Builds the program, uploads the IDL and the release hash, writes the buffers, and opens the Squads proposal.                                 |
+| [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) | Push to `develop` touching `programs/*`, or the `deploy-to-devnet` PR label | The same deploy against devnet. It creates no tag.                                                                                           |
+| [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml)       | Manual dispatch                                                             | One program to devnet from any branch.                                                                                                       |
+| [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml)           | Daily at 13:17 UTC; manual dispatch                                         | Compares each mainnet program with the hash its newest release published.                                                                    |
+| [`service-auto-tag.yaml`](.github/workflows/service-auto-tag.yaml)               | Push to `develop`; manual dispatch                                          | Pushes the next `docker-<env>-<service>-<version>` tag for each opted-in service that changed.                                               |
+| [`docker-push.yaml`](.github/workflows/docker-push.yaml)                         | Git tag `docker-<env>-<service>-<version>`                                  | Builds the service image and pushes it to ECR.                                                                                               |
 
-Each is described in more detail below.
+### What you do in a pull request
 
-### Publishing npm packages
+Open the PR. The changeset bot reads the diff and adds the release notes it is missing:
 
-This repo uses [Changesets](https://github.com/changesets/changesets) for versioning and npm publishing.
+- a changeset in `.changeset/` for each changed npm package;
+- a program changeset in `.changeset-programs/` for each changed program.
 
-1. When you make changes to packages that should be published, create a changeset:
+The bot writes at most one new file in each directory, and it never edits a file that is already there. So to change what a release says, edit the file the bot wrote and push. Your edit stands.
 
-   ```
-   pnpm changeset
-   ```
+The bot skips drafts, its own commits, the release PR heads, the Promotion PR, and the back-merge PR. It also skips a PR from a fork, because a fork's token is read-only. For a fork PR, a maintainer pushes the file to the fork branch.
 
-   This prompts you to pick the changed packages and whether the change is a patch, minor, or major bump. It writes a markdown file in `.changeset/` describing the change.
+Write the files by hand when you prefer, or when the bot is down:
 
-2. Commit the changeset file and merge to `develop`:
+```bash
+pnpm changeset
+```
 
-   ```
-   git add .changeset/
-   git commit -m "chore: add changeset"
-   ```
+That prompts for the changed packages and the level, and writes a file in `.changeset/`. For a program, write the file yourself in [`.changeset-programs/`](.changeset-programs); its [README](.changeset-programs/README.md) gives the format and the levels.
 
-3. When changesets are present on `develop`, the [NPM Publish workflow](.github/workflows/npm-publish.yaml) automatically opens a **"Version Packages"** PR that bumps versions and updates CHANGELOGs.
+The **Release Declaration** check in `tests.yaml` is the backstop. It fails the PR when a changed package or a changed program is named nowhere. It runs on drafts and on forks, and it does not care who wrote the file. Its failure text says: write a changeset by hand or re-run the bot job.
 
-4. Merge the "Version Packages" PR to publish all changed packages to npm. Per-package git tags (e.g. `@helium/blockchain-api@0.11.17`) are created automatically.
+### Releasing npm packages
 
-`workspace:^` dependencies are automatically rewritten to real semver ranges during publish, so external consumers get the correct versions. Packages opt out of publishing by setting `"private": true` in their `package.json`.
+This repo uses [Changesets](https://github.com/changesets/changesets) for npm versioning and publishing. Programs carry no `package.json`, so they stay out of it.
+
+1. Merge the PR with its changeset to `develop`.
+2. `npm-publish.yaml` opens or updates the **"Version Packages"** PR, which bumps the versions and writes the changelogs.
+3. Merge that PR to publish every changed package to npm. Per-package git tags (for example `@helium/blockchain-api@0.11.17`) are created automatically.
+
+`workspace:^` dependencies are rewritten to real semver ranges during publish, so external consumers get the correct versions. A package opts out of publishing with `"private": true` in its `package.json`.
+
+### Releasing a program to mainnet
+
+A mainnet upgrade takes four steps. Nobody bumps a `Cargo.toml` and nobody pushes a `program-*` tag by hand.
+
+**1. The program changeset.** It lands with your PR, as above.
+
+**2. The program release PR.** A push to `develop` with program changesets present runs `version-programs.yaml`, which runs `scripts/version-programs.mjs` and opens or updates the **program release PR** from `program-release/develop`. Merging it bumps each `Cargo.toml`, prepends the entry to each `programs/<name>/CHANGELOG.md`, deletes the files it used, and runs `cargo update --workspace`. It creates no tag.
+
+**3. Promotion.** `promotion-pr.yaml` keeps one `develop` to `master` **Promotion PR** open while develop is ahead. Its body lists the programs a merge deploys with their changelog sections, the programs that changed with no bump, and the unversioned program changesets. It says nothing about npm or services, because promotion does nothing to either. The bot never merges and never approves.
+
+The **Program Version Bumps** check gates that PR. For each program whose current version already has a tag, it diffs from that tag to HEAD and fails when the source changed. A tag is never moved and a version is never reused, so tagged source that changed would deploy under a version already on chain. Clear the failure with a program changeset and a new program release PR.
+
+Merge the Promotion PR with a merge commit. Master takes merge commits only.
+
+**Hotfix straight to master.** Add the program changeset in the hotfix branch and run the version script there:
+
+```bash
+node scripts/version-programs.mjs
+```
+
+Then merge the hotfix. `back-merge-pr.yaml` opens the `master` to `develop` back-merge PR, and a person merges it. Master ahead of develop blocks every later promotion, so merge it soon.
+
+**4. The tag and the deploy.** On each push to master, `program-auto-tag.yaml` creates `program-<name>-<Cargo.toml version>` at the head of master for every program whose version has no tag. It is a state rule, so the next run heals a missed or failed one. A program with no earlier tag is skipped and logged.
+
+The tag starts `release-program.yaml`, which:
+
+- refuses the tag when its version differs from `programs/<name>/Cargo.toml` at the tagged commit, or when the commit is not an ancestor of `origin/master`;
+- builds the IDL and uploads it as a release asset;
+- runs a verifiable `solana-verify` build and uploads `<name>.so.sha256`, the **release hash**, next to the IDL;
+- writes the program and IDL buffers with the Squads vault as their authority;
+- opens the Squads proposal to upgrade the program to the new buffer.
+
+Then sign and execute the proposal in Squads. That step stays manual.
+
+Push a tag by hand when the tag bot is down:
+
+```bash
+git tag program-helium-sub-daos-0.2.7
+git push origin program-helium-sub-daos-0.2.7
+```
+
+A tag is never deleted, moved, or reused. A version is never reused. To correct a release, release the next version.
+
+### Re-running a failed program deploy
+
+Re-run the failed workflow run. The [`deploy-buffers`](.github/actions/deploy-buffers) action holds the rules, and all three deploy workflows use it, so devnet behaves like mainnet:
+
+- The on-chain program already matches the build: the run stops with success and writes nothing.
+- The Squads vault already owns a buffer whose bytes match the build: the run reuses that buffer, so a re-run pays the write once.
+- A pending proposal already names the reused buffer: the run stops with success. Vote on the proposal that is open.
+- An older pending proposal names a different buffer for the program: the run goes on, and Slack names the older proposal so the signers reject it. An execute of the older one after the newer would roll the program back.
+- This run's own buffer is closed when the run fails before the authority transfer.
+
+IDL buffers are never reused. Each run that goes on writes a new one.
+
+> **Run `helium-admin close-buffers` only when no upgrade proposal is pending.** It closes every buffer the vault owns, including the buffer a pending proposal names. That proposal then fails on execute, and the release has to run again.
+>
+> ```bash
+> helium-admin close-buffers -u <rpc-url> --multisig <multisig> --programId <program-id>
+> ```
+
+### The daily hash check
+
+`program-hash-check.yaml` compares each mainnet program with the release hash of its newest release. It takes no action, holds no state, and holds no deploy secret. Each program gets one of three results:
+
+- **deployed**: the chain holds the newest release's binary. Silent.
+- **pending**: the chain holds an older release of this repo. This is normal while a proposal waits for votes. Slack says so once the newest tag is more than 3 days old.
+- **unknown binary**: the chain holds a binary no release of this repo published. Slack says so and the run fails.
+
+A program whose releases carry no `<name>.so.sha256` asset is skipped and named in the run summary. A program enters the check at its first release through this flow.
+
+When a release is rejected in Squads and will never deploy, delete that release's `<name>.so.sha256` asset. The check then compares against the newest release that still has one, and stops reporting the rejected version as pending.
+
+### Verifying a program locally
+
+CI verifies every mainnet build. To repeat one by hand, install [`solana-verify`](https://github.com/Ellipsis-Labs/solana-verifiable-build) and run it against the tagged commit:
+
+```bash
+solana-verify verify-from-repo https://github.com/helium/helium-program-library \
+  --program-id <program-id> \
+  --library-name <library_name> \
+  --commit-hash "$(git rev-list -n 1 program-<name>-<version>)" \
+  --remote
+```
+
+The library name is the program directory name with underscores, for example `helium_sub_daos`. The program id is its entry in `[programs.localnet]` of [`Anchor.toml`](Anchor.toml).
+
+Pass no `-b` image. Without one, `solana-verify` picks the build image from the Rust version in `Cargo.lock`, which is what CI does in [`build-verified`](.github/actions/build-verified). A pinned image gives a different hash.
 
 ### Deploying Docker services
 
-Docker deployments are **decoupled from npm publishing** — you don't need to wait for an npm publish to push a service image. Every deployable service is registered in [`docker-info.json`](docker-info.json):
+Service images are decoupled from npm publishing. Every deployable service is registered in [`docker-info.json`](docker-info.json):
 
 ```jsonc
 {
-  "web":    { "blockchain-api": "./packages/blockchain-api", /* ... */ },
+  "web": { "blockchain-api": "./packages/blockchain-api" /* ... */ },
   "oracle": { "distributor-oracle": "./packages/distributor-oracle" },
-  "data":   { "active-hotspot-oracle": "./utils/active-hotspot-oracle" }
+  "data": { "active-hotspot-oracle": "./utils/active-hotspot-oracle" },
+  "autoTag": ["blockchain-api", "crons" /* ... */],
 }
 ```
 
-- The **top-level key** (`web`, `oracle`, `data`) is the ECR environment. Each maps to its own AWS account & ECR registry:
-  - `web` → `public.ecr.aws/v0j6k5v6/` (the shared Helium public ECR; most services live here and some are deployed into both the web and oracle k8s clusters from this one registry)
-  - `oracle` → `public.ecr.aws/s2o4r1i6/` (used for `distributor-oracle`)
-  - `data` → the data-cluster ECR
+- The **top-level key** (`web`, `oracle`, `data`) is the ECR environment. Each maps to its own AWS account and ECR registry:
+  - `web` to `public.ecr.aws/v0j6k5v6/` (the shared Helium public ECR; most services live here, and some are deployed into both the web and oracle k8s clusters from this one registry)
+  - `oracle` to `public.ecr.aws/s2o4r1i6/` (used for `distributor-oracle`)
+  - `data` to the data-cluster ECR
 - The **second-level key** is the image name (what ECR tags it as).
-- The **value** is the path to the folder containing the `Dockerfile`.
+- The **value** is the path to the folder that holds the `Dockerfile`.
+- **`autoTag`** is the opt-in list for the tag bot. Add the service's image name to it to have tags pushed for you. Leave it out to tag that service by hand.
 
-To release a new image:
+On each push to develop, `service-auto-tag.yaml` pushes `docker-<env>-<service>-<next patch>` for each service in `autoTag` that changed since its last tag. "Changed" means its own path changed; for a service whose `Dockerfile` uses `turbo prune`, a workspace dependency counts too. "Last" is the highest version of that service anywhere in the repo, so the bot continues from a hand tag and never takes a version a branch already used.
+
+Tag a service by hand for a hotfix, a minor, or a major:
 
 ```bash
 git tag docker-web-blockchain-api-0.11.17
 git push origin docker-web-blockchain-api-0.11.17
 ```
 
-The tag format is strict: `docker-<env>-<service>-<version>`. The workflow parses the tag, looks up the source path in `docker-info.json`, logs into the matching ECR with the env-scoped AWS credentials, and pushes `<registry>/<service>:<version>`. Two build styles are supported:
+The tag format is strict: `docker-<env>-<service>-<version>`. `docker-push.yaml` parses the tag, looks the source path up in `docker-info.json`, logs into the matching ECR with the env-scoped AWS credentials, and pushes `<registry>/<service>:<version>`. Two build styles are supported:
 
-- If the service's `Dockerfile` uses `turbo prune` (most JS services), the build context is the repo root and only the workspace packages it depends on are copied in.
+- If the service's `Dockerfile` uses `turbo prune` (most JS services), the build context is the repo root, and only the workspace packages it depends on are copied in.
 - Otherwise (the Rust utils and `geocoder-service`), the build context is the service directory itself.
 
-Once the image is in ECR, update the `image:` field in the matching manifest under [`helium-foundation-k8s`](https://github.com/helium/helium-foundation-k8s) and merge — ArgoCD picks the change up within a few minutes. A full catalogue of where each image is deployed lives in the service's own README.
+**A tag makes an image and deploys nothing.** The k8s bump stays manual: update the `image:` field in the matching manifest under [`helium-foundation-k8s`](https://github.com/helium/helium-foundation-k8s) and merge. ArgoCD picks the change up within a few minutes. A full catalogue of where each image is deployed lives in the service's own README.
 
-### Releasing a program to mainnet
+### Dry run, go-live, and rollback
 
-Mainnet program upgrades go through Squads (multisig) — this repo only builds the verifiable `.so`, stages a buffer, and proposes the upgrade transaction.
+Each bot workflow starts with `env: DRY_RUN: true`. In dry run the bot writes what it would do to the run summary, and writes nothing outside the runner. A `workflow_dispatch` run overrides the flag with its `dry_run` input, for one run.
 
-1. Bump the version in the program's `Cargo.toml`.
-2. Push a tag matching `program-<program-name>-<version>`, e.g.:
+A bot goes live on a **shadow match**: the run summaries say what it would have done, a person confirms that matches what was done by hand, and a one-line PR sets `DRY_RUN: false`. The bar per bot is the changeset bot over 10 PRs, service auto-tag over 3 image releases, the program release PR over 1 version, the Promotion PR bot over 1 cycle, and the tag bot over 1 promotion.
 
-   ```bash
-   git tag program-helium-sub-daos-0.2.7
-   git push origin program-helium-sub-daos-0.2.7
-   ```
+The backstop check and the missing-bump check have no flag. They start as non-required checks and become required at their bot's go-live.
 
-3. [`release-program.yaml`](.github/workflows/release-program.yaml) runs:
-   - builds the program with `anchor build` and uploads the IDL as a GitHub release asset,
-   - runs a **verifiable** Solana build (`solana-verify`) so the on-chain hash is reproducible,
-   - deploys the `.so` and IDL to a buffer account owned by the multisig vault,
-   - opens a Squads proposal to upgrade the program to the new buffer.
-4. Sign and execute the Squads proposal.
+The deploy workflows have no dry run. Devnet is their rehearsal.
 
-### Releasing a program to devnet
-
-Devnet uses a different lazy-signer seed (`devnethelium5` instead of the mainnet `nJWGUMOK`), so program binaries differ between networks. The workflows handle that automatically.
-
-- **Automatic:** any push to `develop` that touches `programs/<name>/**` (outside `shared-utils/`) triggers [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) for each changed program. On a PR into `develop`, add the `deploy-to-devnet` label to deploy preview-style.
-- **Manual:** run [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml) from the Actions UI with the program name + branch. Same Squads-buffer + proposal flow as mainnet, but against the devnet multisig / RPC.
+To roll a bot back, disable the workflow in the Actions UI, then revert its PR.
 
 ### Reusable composite actions
 
 Each workflow above delegates to composite actions in [`.github/actions/`](.github/actions):
 
-- `setup/`, `setup-ts/`, `setup-anchor/`, `setup-solana/` — tool installation.
-- `build-anchor/` — `anchor build` (with optional `testing`/`devnet` lazy-signer seeds).
-- `build-verified/` — verifiable build via `solana-verify` that produces a deterministic `.so`.
-- `write-program-buffer/`, `write-idl-buffer/` — upload the `.so` and the IDL to buffer accounts owned by the multisig. Vendored from `solana-foundation/github-actions`; the source SHA is at the top of each file.
+- `setup/`, `setup-ts/`, `setup-anchor/`, `setup-solana/`: tool installation.
+- `build-anchor/`: `anchor build` (with optional `testing` and `devnet` lazy-signer seeds).
+- `build-program-idl/`, `build-idls/`: IDL builds without a full SBF compile.
+- `build-verified/`: verifiable build through `solana-verify` that produces a deterministic `.so`.
+- `deploy-buffers/`: the deploy re-run rules, in front of the two buffer writes.
+- `write-program-buffer/`, `write-idl-buffer/`: upload the `.so` and the IDL to buffer accounts owned by the multisig. Vendored from `solana-foundation/github-actions`; the source SHA is at the top of each file.
+- `idl-diff/`: the IDL change the changeset bot reads.
 
-If you're adding a new program / service, you shouldn't need to change the workflows themselves — just add the program to `Anchor.toml` / `docker-info.json` and the tag pattern above will pick it up.
+To add a program or a service, you should not need to touch the workflows. Add the program to `Anchor.toml`, or the service to `docker-info.json`, and the rules above pick it up.
+
+### Releasing a program to devnet
+
+Devnet uses a different lazy-signer seed (`devnethelium5` in place of the mainnet `nJWGUMOK`), so program binaries differ between networks. The workflows handle that.
+
+- **Automatic:** a push to `develop` that changes a program runs `develop-release-program.yaml` for that program and for every program that depends on it. On a PR into `develop`, add the `deploy-to-devnet` label to deploy preview-style.
+- **Manual:** run `manual-devnet-deploy.yaml` from the Actions UI with the program name and the branch.
+
+Devnet creates no tag and no version. The run summary is the record: it prints each deployed program with its `Cargo.toml` version and the commit. The deploy itself follows the same re-run rules and the same Squads-buffer and proposal flow as mainnet, against the devnet multisig and RPC.
 
 ## Debugging tuktuk
 

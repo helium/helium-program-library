@@ -6,4 +6,4 @@ Works in tandem with [`helium-entity-manager`](../helium-entity-manager) (which 
 
 SDK: [`@helium/mobile-entity-manager-sdk`](../../packages/mobile-entity-manager-sdk).
 
-Release / upgrade: push a `program-mobile-entity-manager-<version>` git tag.
+Release / upgrade: add a program changeset that names `mobile-entity-manager` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-mobile-entity-manager-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

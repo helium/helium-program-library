@@ -6,4 +6,4 @@ Other programs CPI into this on every meaningful network event: [`data-credits`]
 
 SDK: [`@helium/helium-sub-daos-sdk`](../../packages/helium-sub-daos-sdk).
 
-Release / upgrade: push a `program-helium-sub-daos-<version>` git tag.
+Release / upgrade: add a program changeset that names `helium-sub-daos` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-helium-sub-daos-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
