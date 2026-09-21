@@ -278,6 +278,20 @@ jobs:
         with:
           testing: true
       - uses: ./.github/actions/localnet-accounts/
+      # Every `needs: build` job takes the build from here instead of restoring the same `target/`
+      # cache itself. Only the three directories those jobs read are uploaded: `target/deploy` (the
+      # .so files and program keypairs `anchor localnet --skip-build` loads), `target/idl` and
+      # `target/types` (what `@helium/idls` compiles).
+      - name: Upload anchor build
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-build
+          path: |
+            target/deploy
+            target/idl
+            target/types
+          retention-days: 1
+          if-no-files-found: error
       # The changeset bot's IDL diff needs the IDLs of the commit a PR is based on. Only a develop
       # run can save them under a SHA a later PR will ask for: a PR run builds a merge commit whose
       # SHA nothing else ever names. Save only, because this run has nothing to restore.
@@ -299,6 +313,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
       - uses: ./.github/actions/localnet-accounts/
       - uses: ./.github/actions/start-localnet/
@@ -316,6 +331,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
       - run: pnpm --filter @helium/helium-vote-service test
 
@@ -330,6 +346,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
       - run: pnpm --filter @helium/migration-service test
 
@@ -364,6 +381,7 @@ jobs:
         if: startsWith(matrix.test, 'packages/')
         with:
           testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
         if: startsWith(matrix.test, 'packages/')
       - name: Build idls package
@@ -406,9 +424,14 @@ jobs:
           - utils/vehnt
     steps:
       - uses: actions/checkout@v3
+      # These four crates are `exclude`d from the root workspace, so they never read the workspace
+      # `target/`; the artifact is taken only to keep them off the cache and out of a cold
+      # `anchor build`. What they need from this action is the pinned toolchain and the cargo
+      # registry cache.
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+          target-artifact: anchor-build
       - run: cd $RUST_PATH && cargo build
         env:
           RUST_PATH: ${{ matrix.test }}
@@ -451,6 +474,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
       - uses: ./.github/actions/localnet-accounts/
       - uses: ./.github/actions/start-localnet/
