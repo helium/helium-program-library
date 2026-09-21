@@ -5,21 +5,19 @@ use {default_env::default_env, solana_security_txt::security_txt};
 declare_id!("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8");
 
 // A TESTING build substitutes test values for production ones, so it must never be
-// mistaken for a deployable mainnet program. TESTING comes from the environment, which a
-// build can inherit by accident; the `testing` Cargo feature is the build graph's record
-// that a test build was intended. The deployable mainnet program refuses to compile when
-// the two disagree.
+// mistaken for a deployable mainnet program. TESTING on its own can arrive from an
+// inherited environment; HELIUM_TEST_BUILD is set only by a build that means to be a test
+// build. The deployable mainnet program refuses to compile when the two disagree.
 #[cfg(all(
-  not(feature = "testing"),
   not(feature = "devnet"),
   not(feature = "no-entrypoint"),
   not(feature = "idl-build"),
   not(test)
 ))]
 const _: () = {
-  if option_env!("TESTING").is_some() {
+  if option_env!("TESTING").is_some() && option_env!("HELIUM_TEST_BUILD").is_none() {
     panic!(
-      "TESTING is set without the `testing` feature; a mainnet build must not use test values"
+      "TESTING is set without HELIUM_TEST_BUILD; a mainnet build must not use test values. A deliberate test build sets both."
     );
   }
 };

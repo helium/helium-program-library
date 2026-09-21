@@ -11,7 +11,6 @@ name = "hpl_crons"
 
 [features]
 devnet = ["shared-utils/devnet"]
-testing = []
 default = []
 anchor-debug = []
 cpi = ["no-entrypoint"]

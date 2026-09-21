@@ -12,7 +12,6 @@ name = "dc_auto_top"
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build", "circuit-breaker/idl-build", "lazy-transactions/idl-build", "data-credits/idl-build", "tuktuk-dca/idl-build"]
 devnet = ["tuktuk-dca/devnet"]
-testing = []
 no-genesis = []
 no-entrypoint = []
 no-idl = []

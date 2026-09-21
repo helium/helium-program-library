@@ -12,7 +12,6 @@ name = "data_credits"
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build", "circuit-breaker/idl-build", "lazy-transactions/idl-build"]
 devnet = []
-testing = []
 no-genesis = []
 no-entrypoint = []
 no-idl = []

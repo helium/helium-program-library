@@ -12,7 +12,6 @@ name = "hexboosting"
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "helium-sub-daos/idl-build", "mobile-entity-manager/idl-build", "data-credits/idl-build"]
 devnet = []
-testing = []
 no-genesis = []
 no-entrypoint = []
 no-idl = []

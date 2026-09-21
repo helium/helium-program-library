@@ -12,7 +12,6 @@ name = "lazy_distributor"
 [features]
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 devnet = []
-testing = []
 no-genesis = []
 no-entrypoint = []
 no-idl = []

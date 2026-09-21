@@ -105,7 +105,7 @@ export async function startBankrun(
     if (!looksLikeAProgram(path)) {
       throw new Error(
         `${path} is missing or is not a program. Workspace programs come from ` +
-          `\`TESTING=true anchor build -- --features testing\`; anything else needs ensureDumped().`
+          `\`TESTING=true HELIUM_TEST_BUILD=true anchor build\`; anything else needs ensureDumped().`
       );
     }
     void programId;
