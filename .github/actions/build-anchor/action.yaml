@@ -6,7 +6,7 @@ inputs:
     required: false
     default: "false"
   testing:
-    description: "Whether to build with test values (sets TESTING and the testing feature)"
+    description: "Whether to build with test values (sets TESTING and HELIUM_TEST_BUILD)"
     required: false
     default: "false"
   program:

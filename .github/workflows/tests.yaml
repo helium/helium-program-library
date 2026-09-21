@@ -179,7 +179,9 @@ jobs:
       - name: A leaked TESTING refuses to compile, and a deliberate test build does not
         run: |
           set -euo pipefail
-          PROGRAMS=$(grep -rl 'option_env!("TESTING")' programs/*/src | cut -d/ -f2 | sort -u)
+          # `|| true` so a no-match grep does not abort the step under `set -e`, which would
+          # skip the empty-enumeration refusal below and end the run before it could report.
+          PROGRAMS=$(grep -rl 'option_env!("TESTING")' programs/*/src | cut -d/ -f2 | sort -u || true)
           if [ -z "$PROGRAMS" ]; then
             echo "::error::no program reads TESTING; this check is measuring nothing"
             exit 1

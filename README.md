@@ -197,6 +197,9 @@ $: pnpm run clean && pnpm install && TESTING=true HELIUM_TEST_BUILD=true anchor 
 is set without `HELIUM_TEST_BUILD`, so a mainnet build cannot pick up test values from a stray
 environment variable.
 
+Set both per command, as above, rather than `export`ing them. A shell that carries both gives
+every later build in that shell test values, and the guard passes because the two agree.
+
 ## Repo layout
 
 ```
