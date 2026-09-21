@@ -439,6 +439,8 @@ jobs:
           - tests/helium-entity-manager.ts
           - tests/mobile-entity-manager.ts
           - tests/helium-sub-daos.ts
+          - tests/helium-sub-daos-vehnt-cases-2-3.ts
+          - tests/helium-sub-daos-vehnt-cases-4-5.ts
           - tests/hexboosting.ts
           - tests/hpl-crons.ts
           - tests/lazy-distributor.ts
