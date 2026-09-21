@@ -81,11 +81,10 @@ jobs:
         env:
           PROGRAM: ${{ matrix.program }}
 
-      # Build the program with anchor so we get the IDL
-      - uses: ./.github/actions/build-anchor/
-        id: build-anchor
+      # Only the IDL is taken from anchor; `build-verified` below produces the `.so` that ships.
+      - uses: ./.github/actions/build-program-idl/
+        id: build-program-idl
         with:
-          testing: false
           devnet: true
           program: ${{ env.PROGRAM_NAME }}
 
