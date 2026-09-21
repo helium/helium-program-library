@@ -75,8 +75,19 @@ jobs:
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
 
-      - uses: ./.github/actions/buffer-deploy/
-        id: buffer-deploy
+      # The IDL buffer goes first: it is cheap, so a failure there does not leave a
+      # vault-owned program buffer behind.
+      - uses: ./.github/actions/write-idl-buffer/
+        id: write-idl-buffer
+        with:
+          network: ${{ secrets.SOLANA_DEPLOY_URL }}
+          program: ${{ env.PROGRAM_NAME }}
+          keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer-authority: ${{ secrets.MULTISIG_VAULT }}
+
+      - uses: ./.github/actions/write-program-buffer/
+        id: write-program-buffer
         with:
           network: ${{ secrets.SOLANA_DEPLOY_URL }}
           program: ${{ env.PROGRAM_NAME }}
@@ -103,8 +114,8 @@ jobs:
           network-url: "https://api.mainnet-beta.solana.com"
           program-multisig: ${{ secrets.MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
-          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
-          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
+          buffer: ${{ steps.write-program-buffer.outputs.buffer }}
+          idl-buffer: ${{ steps.write-idl-buffer.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEPLOYER_ADDRESS }}
           authority: ${{ secrets.MULTISIG_VAULT }}
           name: "Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}"

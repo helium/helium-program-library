@@ -202,7 +202,7 @@ every later build in that shell test values, and the guard passes because the tw
 
 The binary a cluster runs is never a local build. `release-program.yaml` builds it in CI from a
 `program-*` tag via `.github/actions/build-verified`, which compiles in a container that
-receives neither variable; `buffer-deploy` uploads that artifact with the Squads vault as its
+receives neither variable; `write-program-buffer` uploads that artifact with the Squads vault as its
 buffer authority, and the upgrade is a multisig proposal. The guard's job is therefore the build
 that is *meant* to be deployable picking up `TESTING` on its own.
 
@@ -328,7 +328,7 @@ Each workflow above delegates to composite actions in [`.github/actions/`](.gith
 - `setup/`, `setup-ts/`, `setup-anchor/`, `setup-solana/` — tool installation.
 - `build-anchor/` — `anchor build` (with optional `testing`/`devnet` lazy-signer seeds).
 - `build-verified/` — verifiable build via `solana-verify` that produces a deterministic `.so`.
-- `buffer-deploy/` — uploads the `.so` and IDL to buffer accounts owned by the multisig.
+- `write-program-buffer/`, `write-idl-buffer/` — upload the `.so` and the IDL to buffer accounts owned by the multisig. Vendored from `solana-foundation/github-actions`; the source SHA is at the top of each file.
 
 If you're adding a new program / service, you shouldn't need to change the workflows themselves — just add the program to `Anchor.toml` / `docker-info.json` and the tag pattern above will pick it up.
 

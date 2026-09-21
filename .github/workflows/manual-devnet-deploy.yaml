@@ -72,8 +72,20 @@ jobs:
 
       - uses: ./.github/actions/setup-anchor/
 
-      - uses: ./.github/actions/buffer-deploy/
-        id: buffer-deploy
+      # The IDL buffer goes first: it is cheap, so a failure there does not leave a
+      # vault-owned program buffer behind.
+      - uses: ./.github/actions/write-idl-buffer/
+        id: write-idl-buffer
+        with:
+          devnet: true
+          network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
+          program: ${{ env.PROGRAM_NAME }}
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+
+      - uses: ./.github/actions/write-program-buffer/
+        id: write-program-buffer
         with:
           devnet: true
           network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
@@ -88,8 +100,8 @@ jobs:
           network-url: "https://api.devnet.solana.com"
           program-multisig: ${{ secrets.DEVNET_MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
-          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
-          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
+          buffer: ${{ steps.write-program-buffer.outputs.buffer }}
+          idl-buffer: ${{ steps.write-idl-buffer.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
           authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
           name: "Deploy ${{ inputs.program }}"

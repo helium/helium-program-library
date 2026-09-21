@@ -1,0 +1,276 @@
+# Vendored from https://github.com/solana-foundation/github-actions
+#   write-program-buffer/action.yaml @ d1e779ca332fc499507fadf97d9c780ffed5a71f
+# This copy is ours. Pull upstream fixes by hand, and update the SHA above when you do.
+#
+# Changes from upstream:
+# - Inputs reach the scripts through `env:`, not `${{ }}` text in the script body.
+# - Input names are the ones the deploy workflows already pass: `network`, `buffer-authority`, `devnet`.
+# - Upstream skips the extend and the authority transfer when `solana program show` fails.
+#   Here that failure stops the action, and so does a program size
+#   that does not parse. The `exists` conditions on the later steps are gone with it.
+# - Cleanup does not remove `./authority-keypair.json`. No step here makes that file.
+#
+# The caller installs the Solana CLI first (`setup-anchor` does it).
+name: "Write Program Buffer"
+description: "Writes the program binary to a buffer and hands the buffer to the buffer authority"
+inputs:
+  devnet:
+    description: "Whether the target is devnet. No step reads it. The devnet workflows pass it."
+    required: false
+    default: "false"
+  network:
+    description: "Solana RPC URL"
+    required: true
+  program:
+    description: "Program name (snake_case). The binary is ./target/deploy/<program>.so"
+    required: true
+  program-id:
+    description: "The program id of the program to upgrade"
+    required: true
+  keypair:
+    description: "The keypair to use for buffer creation"
+    required: true
+  buffer-authority:
+    description: "The address that receives the buffer authority (the Squads vault)"
+    required: true
+  priority-fee:
+    description: "Priority fee in microlamports"
+    required: false
+    default: "100000"
+  max-sign-attempts:
+    description: "Maximum Solana CLI signing attempts for write-buffer"
+    required: false
+    default: "100"
+  write-timeout-minutes:
+    description: "Maximum minutes to let a single write-buffer command run before printing diagnostics"
+    required: false
+    default: "55"
+  retry-attempts:
+    description: "Maximum write-buffer attempts"
+    required: false
+    default: "3"
+  use-rpc:
+    description: "Send write transactions through the configured RPC instead of validator TPUs"
+    required: false
+    default: "true"
+
+outputs:
+  buffer:
+    description: "The buffer address"
+    value: ${{ steps.write-buffer.outputs.buffer }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Write keypair
+      shell: bash
+      run: echo "$DEPLOY_KEYPAIR" > ./deploy-keypair.json && chmod 600 ./deploy-keypair.json
+      env:
+        DEPLOY_KEYPAIR: ${{ inputs.keypair }}
+
+    # This action upgrades an existing program: it writes a buffer for the multisig to apply.
+    # Creating a program at a new address needs that address's own keypair, which no workflow
+    # here holds. Check that precondition before spending anything on a buffer.
+    - name: Require the program on the target cluster
+      id: check-program
+      shell: bash
+      run: |
+        set +e
+        PROGRAM_INFO=$(solana program show "$PROGRAM_ID" -u "$NETWORK" 2>&1)
+        EXIT_CODE=$?
+        set -e
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          # The RPC URL is a secret and the CLI puts it in some errors.
+          echo "${PROGRAM_INFO//"$NETWORK"/<rpc-url>}"
+          echo "::error title=$PROGRAM is not deployed on the target cluster::solana program show failed for $PROGRAM_ID, so there is nothing to upgrade. If the program does not exist there, deploy it once with its program keypair, then re-run."
+          exit 1
+        fi
+
+        CURRENT_SIZE=$(echo "$PROGRAM_INFO" | grep "Data Length:" | sed -E 's/.*Data Length: ([0-9]+).*/\1/' | cut -d ' ' -f1)
+        if ! [[ "$CURRENT_SIZE" =~ ^[0-9]+$ ]]; then
+          echo "::error::Could not read the data length of $PROGRAM_ID (got: $CURRENT_SIZE)"
+          exit 1
+        fi
+        echo "Current program data length: $CURRENT_SIZE"
+        echo "data_len=$CURRENT_SIZE" >> "$GITHUB_OUTPUT"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+
+    - name: Resize program if needed
+      shell: bash
+      run: |
+        MIN_EXTEND_SIZE=10240
+        MAX_PERMITTED_DATA_LENGTH=10485760
+        PROGRAMDATA_METADATA_SIZE=45
+        MAX_PROGRAM_SIZE=$((MAX_PERMITTED_DATA_LENGTH - PROGRAMDATA_METADATA_SIZE))
+
+        REQUIRED_SIZE=$(wc -c < "./target/deploy/$PROGRAM.so")
+        echo "Required size: $REQUIRED_SIZE"
+        echo "Current size: $CURRENT_SIZE"
+
+        if [ "$REQUIRED_SIZE" -gt "$MAX_PROGRAM_SIZE" ]; then
+          echo "Error: program size of $REQUIRED_SIZE bytes exceeds the maximum program size of $MAX_PROGRAM_SIZE bytes"
+          exit 1
+        fi
+
+        if [ "$REQUIRED_SIZE" -gt "$CURRENT_SIZE" ]; then
+          HEADROOM=$((MAX_PROGRAM_SIZE - CURRENT_SIZE))
+          if [ "$HEADROOM" -lt "$MIN_EXTEND_SIZE" ]; then
+            echo "Only $HEADROOM bytes of headroom to the maximum account size, the SIMD-0431 minimum does not apply"
+            MIN_EXTEND_SIZE=$HEADROOM
+          fi
+          EXTEND_SIZE=$((REQUIRED_SIZE - CURRENT_SIZE))
+          if [ "$EXTEND_SIZE" -lt "$MIN_EXTEND_SIZE" ]; then
+            echo "Extend size of $EXTEND_SIZE bytes is below the SIMD-0431 minimum, extending by $MIN_EXTEND_SIZE bytes instead"
+            EXTEND_SIZE=$MIN_EXTEND_SIZE
+          fi
+          echo "Program needs to be extended by $EXTEND_SIZE bytes"
+          echo "Extending from the deployer keypair (permissionless) so the Squads proposal does not need a vault SOL transfer"
+          solana program extend "$PROGRAM_ID" "$EXTEND_SIZE" \
+            --keypair ./deploy-keypair.json \
+            --url "$NETWORK" \
+            --commitment confirmed
+        else
+          echo "Program size is sufficient"
+        fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        CURRENT_SIZE: ${{ steps.check-program.outputs.data_len }}
+
+    - name: Write program buffer
+      id: write-buffer
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        PROGRAM_SO="./target/deploy/$PROGRAM.so"
+        BUFFER_KEYPAIR=$(mktemp ./buffer-keypair.XXXXXX.json)
+        rm -f "$BUFFER_KEYPAIR"
+        solana-keygen new --no-bip39-passphrase --silent --outfile "$BUFFER_KEYPAIR"
+        BUFFER=$(solana-keygen pubkey "$BUFFER_KEYPAIR")
+        DEPLOYER=$(solana-keygen pubkey ./deploy-keypair.json)
+        DUMPED_BUFFER=$(mktemp ./buffer-dump.XXXXXX.so)
+
+        echo "Creating program buffer $BUFFER"
+        echo "Deployer authority: $DEPLOYER"
+        echo "Program artifact size: $(wc -c < "$PROGRAM_SO") bytes"
+        echo "Program artifact sha256: $(shasum -a 256 "$PROGRAM_SO" | awk '{print $1}')"
+        echo "Max sign attempts: $MAX_SIGN_ATTEMPTS"
+        echo "Write timeout: $WRITE_TIMEOUT_MINUTES minutes"
+        echo "Write attempts: $RETRY_ATTEMPTS"
+        echo "Use RPC transport: $USE_RPC"
+
+        USE_RPC_ARGS=()
+        if [ "$USE_RPC" = "true" ]; then
+          USE_RPC_ARGS=(--use-rpc)
+        fi
+
+        ATTEMPT=1
+        STATUS=1
+        while [ "$ATTEMPT" -le "$RETRY_ATTEMPTS" ]; do
+          WRITE_LOG="write-buffer-${ATTEMPT}.log"
+          echo "Starting write attempt $ATTEMPT of $RETRY_ATTEMPTS for buffer $BUFFER"
+
+          set +e
+          timeout "${WRITE_TIMEOUT_MINUTES}m" solana program write-buffer \
+            "$PROGRAM_SO" \
+            --url "$NETWORK" \
+            --keypair ./deploy-keypair.json \
+            --buffer "$BUFFER_KEYPAIR" \
+            --max-sign-attempts "$MAX_SIGN_ATTEMPTS" \
+            --with-compute-unit-price "$PRIORITY_FEE" \
+            "${USE_RPC_ARGS[@]}" \
+            2>&1 | tee "$WRITE_LOG"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$STATUS" -eq 0 ]; then
+            if ! grep -q "Buffer:" "$WRITE_LOG"; then
+              echo "Warning: solana CLI output did not include a Buffer line; using pre-generated buffer address"
+            fi
+
+            echo "Found buffer: $BUFFER"
+            echo "buffer=$BUFFER" >> "$GITHUB_OUTPUT"
+            rm -f "$DUMPED_BUFFER"
+            exit 0
+          fi
+
+          if [ "$STATUS" -eq 124 ]; then
+            echo "Error: Buffer write attempt $ATTEMPT timed out after $WRITE_TIMEOUT_MINUTES minutes"
+          else
+            echo "Error: Buffer write attempt $ATTEMPT failed with exit code $STATUS"
+          fi
+
+          echo "Buffer account: $BUFFER"
+          echo "Checking whether the buffer was written despite the CLI exit status..."
+
+          rm -f "$DUMPED_BUFFER"
+          if solana program dump "$BUFFER" "$DUMPED_BUFFER" -u "$NETWORK"; then
+            echo "Dumped buffer size: $(wc -c < "$DUMPED_BUFFER") bytes"
+            echo "Dumped buffer sha256: $(shasum -a 256 "$DUMPED_BUFFER" | awk '{print $1}')"
+
+            if cmp -s "$PROGRAM_SO" "$DUMPED_BUFFER"; then
+              echo "Buffer contents match the program artifact; continuing with buffer $BUFFER"
+              echo "buffer=$BUFFER" >> "$GITHUB_OUTPUT"
+              rm -f "$DUMPED_BUFFER"
+              exit 0
+            fi
+
+            echo "Dumped buffer does not match the program artifact"
+          else
+            echo "Could not dump buffer $BUFFER"
+          fi
+
+          if [ "$ATTEMPT" -lt "$RETRY_ATTEMPTS" ]; then
+            echo "Retrying the same buffer so solana CLI can write only the missing chunks"
+            ATTEMPT=$((ATTEMPT + 1))
+            continue
+          fi
+
+          echo "Recent transactions for buffer $BUFFER:"
+          solana transaction-history "$BUFFER" -u "$NETWORK" --limit 10 || true
+          echo "Open buffers still owned by deployer $DEPLOYER:"
+          solana program show --buffers --buffer-authority "$DEPLOYER" -u "$NETWORK" || true
+          rm -f "$DUMPED_BUFFER"
+          exit "$STATUS"
+        done
+        rm -f "$DUMPED_BUFFER"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        NETWORK: ${{ inputs.network }}
+        PRIORITY_FEE: ${{ inputs.priority-fee }}
+        MAX_SIGN_ATTEMPTS: ${{ inputs.max-sign-attempts }}
+        WRITE_TIMEOUT_MINUTES: ${{ inputs.write-timeout-minutes }}
+        RETRY_ATTEMPTS: ${{ inputs.retry-attempts }}
+        USE_RPC: ${{ inputs.use-rpc }}
+
+    # We can not set authority and upgrade program in the same instruction so it needs to be here
+    # The rent for the buffer will be returned to the local keypair though once the program gets deployed in squads. So its fine.
+    # If the deploy fails, close the buffer with the multisig (packages/helium-admin-cli/src/close-buffers.ts).
+    - name: Transfer buffer authority
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 10
+        max_attempts: 50
+        shell: bash
+        command: |
+          echo "Transferring buffer authority for $BUFFER to $AUTHORITY"
+          solana program set-buffer-authority "$BUFFER" \
+            --keypair ./deploy-keypair.json \
+            --new-buffer-authority "$AUTHORITY" \
+            --url "$NETWORK"
+      env:
+        BUFFER: ${{ steps.write-buffer.outputs.buffer }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+        NETWORK: ${{ inputs.network }}
+
+    - name: Cleanup
+      if: always()
+      shell: bash
+      run: |
+        rm -f ./deploy-keypair.json
+        rm -f ./buffer-keypair.*.json
