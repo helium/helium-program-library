@@ -201,7 +201,7 @@ Set both per command, as above, rather than `export`ing them. A shell that carri
 every later build in that shell test values, and the guard passes because the two agree.
 
 The binary a cluster runs is never a local build. `release-program.yaml` builds it in CI from a
-signed `program-*` tag via `.github/actions/build-verified`, which compiles in a container that
+`program-*` tag via `.github/actions/build-verified`, which compiles in a container that
 receives neither variable; `buffer-deploy` uploads that artifact with the Squads vault as its
 buffer authority, and the upgrade is a multisig proposal. The guard's job is therefore the build
 that is *meant* to be deployable picking up `TESTING` on its own.
