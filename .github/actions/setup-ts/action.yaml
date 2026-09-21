@@ -1,5 +1,10 @@
 name: "Setup ts"
 description: "Setup ts"
+inputs:
+  save-turbo:
+    description: "Save `.turbo` under this run's exact key. Only the `build-ts` job of a workflow sets this; every other job restores that key and runs the build as a turbo cache hit."
+    required: false
+    default: "false"
 runs:
   using: "composite"
   steps:
@@ -17,11 +22,16 @@ runs:
         key: pnpm-store-${{ runner.os }}-${{ hashFiles('./pnpm-lock.yaml') }}
         restore-keys: |
           pnpm-store-${{ runner.os }}-
-    - uses: actions/cache@v4
-      name: Cache turbo build outputs
+    # Restore and save are split so that only the `build-ts` job of a workflow saves. The exact key
+    # is the run, not the commit: every job of a run restores what `build-ts` saved and its build is
+    # a turbo cache hit, instead of ten-odd jobs each building the workspace and racing to save the
+    # same key. The prefix is the fallback for `build-ts` itself and for a job whose `build-ts` was
+    # skipped: it hands over the newest `.turbo` of any earlier run, so the build is warm.
+    - uses: actions/cache/restore@v4
+      name: Restore turbo build outputs
       with:
         path: .turbo
-        key: turbo-${{ runner.os }}-${{ github.sha }}
+        key: turbo-${{ runner.os }}-${{ github.run_id }}
         restore-keys: |
           turbo-${{ runner.os }}-
     - run: pnpm install --frozen-lockfile
@@ -29,3 +39,9 @@ runs:
     - name: Build packages (skip apps that need runtime env vars)
       run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
       shell: bash
+    - uses: actions/cache/save@v4
+      name: Save turbo build outputs
+      if: inputs.save-turbo == 'true'
+      with:
+        path: .turbo
+        key: turbo-${{ runner.os }}-${{ github.run_id }}
