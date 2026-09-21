@@ -6,7 +6,7 @@ inputs:
     required: false
     default: "false"
   testing:
-    description: "Whether to build with test values (sets TESTING and the testing feature)"
+    description: "Refused. A verified build cannot carry test values; see the build step."
     required: false
     default: "false"
   program:
@@ -43,14 +43,16 @@ runs:
     - run: cargo install solana-verify --version 0.5.0 --locked --force
       if: steps.cache-solana-verify.outputs.cache-hit != 'true'
       shell: bash
-    # The programs refuse to compile when TESTING is set without HELIUM_TEST_BUILD, so a
-    # test build carries both.
+    # A verified build cannot be a test build: solana-verify compiles inside a container
+    # that receives neither TESTING nor HELIUM_TEST_BUILD, so the binary would carry
+    # production values under a test label.
     - run: |
+        if [ "$TESTING_BUILD" = "true" ]; then
+          echo "::error::solana-verify builds in a container that does not receive TESTING, so a verified test build is not possible"
+          exit 1
+        fi
         ARGS=()
         if [ "$DEVNET" = "true" ]; then ARGS+=(-- --features devnet); fi
-        if [ "$TESTING_BUILD" = "true" ]; then
-          export TESTING=true HELIUM_TEST_BUILD=true
-        fi
         ~/.cargo/bin/solana-verify build --library-name "$PROGRAM" "${ARGS[@]}"
       shell: bash
       env:
