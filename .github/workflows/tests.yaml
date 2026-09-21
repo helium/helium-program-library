@@ -50,98 +50,85 @@ jobs:
       # never frees, so errors that are never returned still consume it.
       - run: cargo clippy --all-targets -- -D warnings -D clippy::or_fun_call -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A clippy::manual_is_multiple_of -A ambiguous_glob_reexports -A unexpected-cfgs
 
-  check-idls-changeset:
-    name: Check @helium/idls Changeset
-    if: github.event_name == 'pull_request'
+  backstop:
+    name: Release Declaration
+    # The backstop behind the changeset bot. It reads the bot's own rule
+    # (`scripts/missing-changesets.mjs`) and does not care who wrote the file,
+    # so it runs on drafts and on forks, where the bot cannot: a fork's token
+    # is read-only, so its author reads the fix from this failure.
+    # Skipped on the heads that carry releases rather than declare them: the
+    # two release PRs, the Promotion PR (head develop) and the back-merge PR
+    # (head master). Not a required check yet; issue 55 makes it required.
+    if: >-
+      github.event_name == 'pull_request'
+      && !startsWith(github.head_ref, 'changeset-release/')
+      && !startsWith(github.head_ref, 'program-release/')
+      && github.head_ref != 'develop'
+      && github.head_ref != 'master'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Detect changed programs
-        id: changed
-        run: |
-          BASE=${{ github.event.pull_request.base.sha }}
-          DIRS=$(git diff --name-only "$BASE"...HEAD | grep -E '^programs/[^/]+/(src/|Cargo\.toml)' | cut -d/ -f2 | sort -u | tr '\n' ' ')
-          echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
-          if [ -z "$DIRS" ]; then
-            echo "No program source changes; skipping."
-          else
-            echo "Changed programs: $DIRS"
-          fi
-      - uses: ./.github/actions/setup-anchor/
-        if: steps.changed.outputs.dirs != ''
-      - uses: actions/cache@v4
-        if: steps.changed.outputs.dirs != ''
-        name: Cache Cargo registry + index
+      - uses: actions/setup-node@v4
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-      - name: Require an @helium/idls changeset when the generated IDL changes
-        if: steps.changed.outputs.dirs != ''
-        # @helium/idls has no src/ of its own -- it compiles the generated
-        # target/types, which is gitignored. Changesets tooling only diffs
-        # packages/, so IDL changes never trigger an idls bump on their own
-        # and the published package silently goes stale. Internal-only logic
-        # changes don't alter the IDL, so build the IDL at base and head
-        # (anchor idl build parses the source; no BPF build) and require a
-        # changeset only when the generated IDL actually differs.
+          node-version-file: .node-version
+      - name: Changed packages and programs
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          set -e
-          BASE=${{ github.event.pull_request.base.sha }}
-          DIRS="${{ steps.changed.outputs.dirs }}"
-          mkdir -p /tmp/idl-head /tmp/idl-base
-          for dir in $DIRS; do
-            name=$(echo "$dir" | tr '-' '_')
-            ~/.cargo/bin/anchor idl build -p "$name" > "/tmp/idl-head/$name.json"
-          done
-          git checkout --detach "$BASE"
-          DIFFERING=""
-          for dir in $DIRS; do
-            name=$(echo "$dir" | tr '-' '_')
-            if [ ! -d "programs/$dir" ]; then
-              DIFFERING="$DIFFERING $name(new-program)"
-              continue
-            fi
-            if ! ~/.cargo/bin/anchor idl build -p "$name" > "/tmp/idl-base/$name.json"; then
-              DIFFERING="$DIFFERING $name(base-idl-build-failed)"
-              continue
-            fi
-            # metadata.version tracks the crate version, not the interface --
-            # a version bump alone shouldn't demand an idls republish.
-            if ! diff <(jq -S 'del(.metadata.version)' "/tmp/idl-base/$name.json") \
-                      <(jq -S 'del(.metadata.version)' "/tmp/idl-head/$name.json") > "/tmp/$name.idl.diff"; then
-              DIFFERING="$DIFFERING $name"
-              echo "=== IDL diff for $name ==="
-              cat "/tmp/$name.idl.diff"
-            fi
-          done
-          git checkout -
-          if [ -z "$DIFFERING" ]; then
-            echo "Program sources changed but generated IDLs are identical; no @helium/idls bump needed."
-            exit 0
+          node scripts/changed-packages.mjs "$BASE_SHA" > "$RUNNER_TEMP/packages.json"
+          node scripts/changed-programs.mjs "$BASE_SHA" > "$RUNNER_TEMP/programs.json"
+          echo "programs=$(jq -r 'map(select(.own) | .name) | join(" ")' "$RUNNER_TEMP/programs.json")" >> "$GITHUB_OUTPUT"
+
+      # The `@helium/idls` rule the removed `check-idls-changeset` job held:
+      # only an own-source change can move an IDL, and only a moved IDL makes
+      # the package a changed one. Every step is skipped when no program changed.
+      - name: Diff the IDLs
+        id: idl-diff
+        uses: ./.github/actions/idl-diff/
+        with:
+          programs: ${{ steps.changed.outputs.programs }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          target-artifact: ""
+
+      - name: Every changed package and program declares a release
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          IDL_DIFF: ${{ steps.idl-diff.outputs.diff-file }}
+        run: |
+          args=(--packages "$RUNNER_TEMP/packages.json" --programs "$RUNNER_TEMP/programs.json")
+          if [ -n "$IDL_DIFF" ]; then
+            args+=(--idl-diff "$IDL_DIFF")
           fi
-          echo "IDL changed for:$DIFFERING"
-          ADDED=$(git diff --name-only --diff-filter=A "$BASE"...HEAD -- '.changeset/*.md')
-          if [ -n "$ADDED" ] && grep -l '@helium/idls' $ADDED > /dev/null 2>&1; then
-            echo "Found @helium/idls changeset."
-            exit 0
-          fi
-          # Release PRs (develop -> master) carry the consumed changeset: the
-          # .changeset/*.md was deleted by Version Packages, but the version
-          # bump it produced is in the diff, which proves the flow ran.
-          if git diff "$BASE"...HEAD -- packages/idls/package.json | grep -q '^+.*"version"'; then
-            echo "@helium/idls version already bumped in this PR (changeset consumed)."
-            exit 0
-          fi
-          echo "This PR changes the generated IDL for:$DIFFERING -- but adds no"
-          echo "changeset for @helium/idls, which publishes those generated types."
-          echo "Run: npx changeset -- and include \"@helium/idls\" (patch is usually right)."
-          exit 1
+          node scripts/backstop-check.mjs "$BASE_SHA" HEAD "${args[@]}"
+
+  missing-bump:
+    name: Program Version Bumps
+    # The last gate before program source reaches master. The backstop asks a
+    # PR to declare its releases and an admin can bypass it; this one asks the
+    # tags, which cannot be argued with: a program whose current version is
+    # already tagged and whose source moved since that tag would deploy under a
+    # version that is already on chain. Not a required check yet; issue 50 adds
+    # it to the master ruleset after the shadow match.
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # The check reads every `program-*` tag and diffs from the tagged commit,
+      # so a shallow clone without tags would pass it vacuously.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Every changed program has a version bump
+        run: |
+          node scripts/missing-bump-check.mjs --json "$RUNNER_TEMP/missing-bump.json"
 
   test-unit:
     name: Rust Unit Tests
