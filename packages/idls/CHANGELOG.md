@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.31
+
+### Patch Changes
+
+- [#1328](https://github.com/helium/helium-program-library/pull/1328) [`5c26876`](https://github.com/helium/helium-program-library/commit/5c2687630c4dcd0e926b8aca82b30b3cc4daca80) Thanks [@madninja](https://github.com/madninja)! - Reject trailing instructions re-labelled as signer seeds in lazy-transactions `execute_transaction_v0`. Every caller-supplied signer seed set must derive an address the transaction actually uses, and seeds that do not derive a program address are a typed error rather than a panic. Adds the `InvalidSignerSeeds` and `UnusedSignerSeeds` error codes.
+
 ## 0.11.30
 
 ### Patch Changes
