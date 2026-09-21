@@ -155,6 +155,70 @@ jobs:
       - run: cargo build --locked
       - run: cargo test --lib
 
+  test-testing-guard:
+    name: TESTING Build Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup/
+      - uses: actions/cache@v4
+        name: Cache Cargo registry + index
+        id: cache-cargo-build
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      # Scope: every program whose src reads TESTING, enumerated from the source rather
+      # than from a list, so a new program that reads TESTING without a guard fails here, and
+      # under both default features and `--features devnet`, so a devnet-exempt guard fails too.
+      # Trigger: this workflow has no path filter, so the job runs on every pull request
+      # whatever it touches.
+      - name: A leaked TESTING refuses to compile, and a deliberate test build does not
+        run: |
+          set -euo pipefail
+          # `|| true` so a no-match grep does not abort the step under `set -e`, which would
+          # skip the empty-enumeration refusal below and end the run before it could report.
+          PROGRAMS=$(grep -rl 'option_env!("TESTING")' programs/*/src | cut -d/ -f2 | sort -u || true)
+          if [ -z "$PROGRAMS" ]; then
+            echo "::error::no program reads TESTING; this check is measuring nothing"
+            exit 1
+          fi
+          COUNT=$(printf '%s\n' "$PROGRAMS" | wc -l | tr -d ' ')
+          echo "Programs that read TESTING ($COUNT):"
+          printf '  %s\n' $PROGRAMS
+          CHECKED=0
+          for p in $PROGRAMS; do
+            echo "--- $p"
+            for features in "" "--features devnet"; do
+              if TESTING=1 cargo check -p "$p" $features > /tmp/leak.log 2>&1; then
+                echo "::error::$p compiles with TESTING set and no HELIUM_TEST_BUILD (features: ${features:-default}); the guard is missing or ineffective"
+                exit 1
+              fi
+              # Assert the reason, not just the failure: any other compile error would
+              # otherwise read as the guard doing its job.
+              if ! grep -q "TESTING is set without HELIUM_TEST_BUILD" /tmp/leak.log; then
+                echo "::error::$p failed to compile with TESTING set (features: ${features:-default}), but not because of the guard"
+                tail -40 /tmp/leak.log
+                exit 1
+              fi
+            done
+            if ! TESTING=1 HELIUM_TEST_BUILD=1 cargo check -p "$p" > /tmp/ack.log 2>&1; then
+              echo "::error::$p does not compile as a deliberate test build"
+              tail -40 /tmp/ack.log
+              exit 1
+            fi
+            CHECKED=$((CHECKED + 1))
+          done
+          if [ "$CHECKED" != "$COUNT" ]; then
+            echo "::error::checked $CHECKED of $COUNT programs"
+            exit 1
+          fi
+          echo "Guard verified in $CHECKED programs"
+
   test-atomic-data-publisher:
     name: Atomic Data Publisher Tests
     runs-on: ubuntu-latest

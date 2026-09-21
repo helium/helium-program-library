@@ -172,7 +172,7 @@ pnpm run build
 4. Start localnet
 
 ```
-$: TESTING=true anchor localnet
+$: TESTING=true HELIUM_TEST_BUILD=true anchor localnet
 ```
 
 5. Bootstrap localnet
@@ -190,8 +190,21 @@ $: anchor test --provider.cluster localnet --skip-deploy --skip-local-validator 
 If you run into trouble with your installation, run the following command to rebuild everything from scratch.
 
 ```
-$: pnpm run clean && pnpm install && TESTING=true anchor build && pnpm run build
+$: pnpm run clean && pnpm install && TESTING=true HELIUM_TEST_BUILD=true anchor build && pnpm run build
 ```
+
+`TESTING` and `HELIUM_TEST_BUILD` travel together. A program refuses to compile when `TESTING`
+is set without `HELIUM_TEST_BUILD`, so a mainnet build cannot pick up test values from a stray
+environment variable.
+
+Set both per command, as above, rather than `export`ing them. A shell that carries both gives
+every later build in that shell test values, and the guard passes because the two agree.
+
+The binary a cluster runs is never a local build. `release-program.yaml` builds it in CI from a
+`program-*` tag via `.github/actions/build-verified`, which compiles in a container that
+receives neither variable; `buffer-deploy` uploads that artifact with the Squads vault as its
+buffer authority, and the upgrade is a multisig proposal. The guard's job is therefore the build
+that is *meant* to be deployable picking up `TESTING` on its own.
 
 ## Repo layout
 
