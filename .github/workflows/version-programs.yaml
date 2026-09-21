@@ -1,0 +1,165 @@
+name: Version Programs
+
+# Turns the program changesets in .changeset-programs/ into Cargo.toml bumps and
+# changelogs on the program release PR. It writes no tag: the tag bot creates
+# program-<name>-<version> once the bump reaches master.
+env:
+  # Dry run until go-live. A workflow_dispatch run overrides it.
+  DRY_RUN: true
+  BRANCH: program-release/develop
+  TITLE: "chore: version programs"
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Write nothing outside the runner"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  version:
+    name: Program release PR
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve dry run
+        id: mode
+        env:
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+
+      - name: Check for program changesets
+        id: check
+        run: |
+          found=$(find .changeset-programs -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l)
+          if [ "$found" -gt 0 ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.found == 'true'
+        with:
+          node-version-file: .node-version
+
+      - name: Version programs
+        if: steps.check.outputs.found == 'true'
+        # `bash` for pipefail, so a failing script is not masked by tee.
+        shell: bash
+        run: node scripts/version-programs.mjs | tee "$RUNNER_TEMP/released.txt"
+
+      - name: Write the run summary
+        if: steps.check.outputs.found == 'true'
+        run: |
+          {
+            if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
+              echo "## Program release PR (dry run)"
+              echo
+              echo "Nothing was pushed. The diff below is what the release PR would carry."
+            else
+              echo "## Program release PR"
+            fi
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/released.txt"
+            echo '```'
+            echo
+            echo '```diff'
+            git --no-pager diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
+
+      # The App token, so tests.yaml starts on the PR this job opens. Only the
+      # push and the PR use it; the checkout above used GITHUB_TOKEN.
+      - name: Get an App token
+        id: app-token
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Push the release branch
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add -A
+          git commit -m "chore: version programs"
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/${BRANCH}"
+
+      - name: Open or update the program release PR
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          {
+            echo "Versions the Anchor programs from the program changesets on develop."
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/released.txt"
+            echo '```'
+            echo
+            echo "Merging this PR bumps each \`Cargo.toml\` and writes each changelog. It creates no tag: the tag bot tags each program once the bump reaches \`master\`."
+          } > "$RUNNER_TEMP/body.md"
+          number=$(gh pr list --head "$BRANCH" --base develop --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --base develop --head "$BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          fi
+
+  tag-exists:
+    name: New program versions are untagged
+    if: github.event_name == 'pull_request' && github.head_ref == 'program-release/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Without both, git tag -l finds nothing and the check passes vacuously.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Every bumped version is free
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          failed=0
+          for manifest in $(git diff --name-only "$BASE_SHA" HEAD -- 'programs/*/Cargo.toml'); do
+            name=$(basename "$(dirname "$manifest")")
+            version=$(grep -m1 -E '^version = "' "$manifest" | sed -E 's/^version = "(.*)"$/\1/')
+            tag="program-$name-$version"
+            if [ -n "$(git tag -l "$tag")" ]; then
+              echo "::error file=$manifest::$tag already exists. A tag is never reused: set $name above every tag it already has."
+              failed=1
+            else
+              echo "$tag is free"
+            fi
+          done
+          exit "$failed"
