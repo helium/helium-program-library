@@ -141,10 +141,15 @@ const parseArgs = (argv) => {
   return { base, head, files };
 };
 
-const main = (argv) => {
+/**
+ * The same answer from a command line: the changed names come from the JSON
+ * files the caller wrote, the added changesets from the git history. The
+ * backstop check reads it too, so both sides run one rule.
+ */
+export const missingFromArgv = (argv) => {
   const { base, head, files } = parseArgs(argv);
   const idlDiff = files.idlDiff ? readJson(files.idlDiff) : null;
-  const result = missingChangesets({
+  return missingChangesets({
     packages: readJson(files.packages),
     programs: readJson(files.programs),
     idls: idlDiff?.idls ?? null,
@@ -154,7 +159,10 @@ const main = (argv) => {
     changesets: addedChangesets(base, head, ".changeset"),
     programChangesets: addedChangesets(base, head, ".changeset-programs"),
   });
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+};
+
+const main = (argv) => {
+  process.stdout.write(`${JSON.stringify(missingFromArgv(argv))}\n`);
 };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
