@@ -1,0 +1,116 @@
+name: Back-merge PR
+
+# A hotfix merged straight to master leaves master ahead of develop, and the
+# up-to-date rule then blocks every promotion. This opens the master -> develop
+# PR that fixes that. A person merges it, with a merge commit; the bot never
+# merges, never approves and never pushes to develop.
+env:
+  # Dry run until go-live. A workflow_dispatch run overrides it.
+  DRY_RUN: true
+  TITLE: "chore: back-merge master into develop"
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Write nothing outside the runner"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# One run at a time, newest wins: an older run would count the wrong commits.
+concurrency:
+  group: back-merge-pr
+  cancel-in-progress: true
+
+jobs:
+  back-merge-pr:
+    name: Back-merge PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve dry run
+        id: mode
+        env:
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+
+      # Empty after a promotion merge: master then holds nothing develop lacks.
+      - name: Does master hold commits develop lacks?
+        id: ahead
+        run: |
+          count=$(git rev-list --count origin/develop..HEAD)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Back-merge PR"
+            echo
+            if [ "$count" -eq 0 ]; then
+              echo "develop already holds every commit on master. No back-merge PR."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Describe the back-merge
+        id: describe
+        if: steps.ahead.outputs.count != '0'
+        run: |
+          {
+            echo "Brings the hotfixes on \`master\` back to \`develop\`. Merge it with a merge commit: until develop holds master, the up-to-date rule on master blocks every Promotion PR."
+            echo
+            echo "Commits on master that develop lacks:"
+            echo
+            git --no-pager log --format='- %h %s' origin/develop..HEAD
+            echo
+            echo "A program hotfix carries its own bump. When develop took the same version, the person who merges this PR resolves the collision: develop takes the next version and keeps both changelog entries."
+          } > "$RUNNER_TEMP/body.md"
+
+      - name: Write the run summary
+        if: steps.ahead.outputs.count != '0'
+        env:
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
+        run: |
+          {
+            if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
+              echo "No PR was opened. The PR this run would open, master -> develop:"
+            else
+              echo "master -> develop:"
+            fi
+            echo
+            echo "### $TITLE"
+            echo
+            cat "$RUNNER_TEMP/body.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The App token, so tests.yaml starts on the PR this job opens. The
+      # checkout above used GITHUB_TOKEN.
+      - name: Get an App token
+        id: app-token
+        if: steps.ahead.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      # No merge and no approval. master is its own head, so nothing is pushed.
+      - name: Open or update the back-merge PR
+        if: steps.ahead.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head master --base develop --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base develop --head master --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          fi
