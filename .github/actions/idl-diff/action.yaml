@@ -1,0 +1,151 @@
+name: "IDL Diff"
+description: >
+  How each changed program's IDL differs from the base commit, and the fixed
+  `@helium/idls` bump that follows. The changeset bot and the backstop check
+  both read this, so the rule lives in one place. The caller must check out with
+  `fetch-depth: 0`: the cold base build checks out `base-sha`.
+
+inputs:
+  programs:
+    description: "Space-separated program names, as `scripts/changed-programs.mjs` emits them. Every step is skipped when this is empty."
+    required: true
+  base-sha:
+    description: "The commit the diff is against: the cache key and the cold build's ref. For a PR, `github.event.pull_request.base.sha`."
+    required: true
+  target-artifact:
+    description: "Artifact of this run holding the head build (`target/idl`). Empty runs the `build-idls` action instead."
+    required: false
+    default: "anchor-build"
+
+outputs:
+  diff-file:
+    description: "Path to the JSON from `scripts/idl-diff.mjs`: a level hint and a named difference list per program."
+    value: ${{ steps.diff.outputs.file }}
+  idls-level:
+    description: "`minor`, `patch`, or empty when no IDL changed and `@helium/idls` is not named."
+    value: ${{ steps.diff.outputs.idls-level }}
+  idls-breaking:
+    description: "`true` when a removal or a changed type means the bot must flag a possible break."
+    value: ${{ steps.diff.outputs.idls-breaking }}
+
+runs:
+  using: "composite"
+  steps:
+    # The base IDLs of a develop commit, saved by the seed run of `tests.yaml`
+    # (push to develop). A PR run cannot save them: it builds a merge commit
+    # whose SHA nothing else ever names. Restore comes first because the cache
+    # was saved from `target/idl`, which the head IDLs also land in.
+    - name: Restore base IDLs
+      id: base-idls
+      if: inputs.programs != ''
+      uses: actions/cache/restore@v4
+      with:
+        path: ./target/idl
+        key: base-idls-${{ inputs.base-sha }}
+
+    - name: Set the base IDLs aside
+      if: inputs.programs != '' && steps.base-idls.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/idl-base"
+        cp target/idl/*.json "$RUNNER_TEMP/idl-base/"
+        rm -rf target/idl
+
+    # Head IDLs. The run's own `build` job already built them, so by default
+    # they come from its artifact; `build-idls` is the fallback for a caller
+    # with no build job.
+    - name: Download the head build
+      if: inputs.programs != '' && inputs.target-artifact != ''
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.target-artifact }}
+        path: ./target
+
+    - name: Build the head IDLs
+      if: inputs.programs != '' && inputs.target-artifact == ''
+      uses: ./.github/actions/build-idls/
+
+    - name: Set the head IDLs aside
+      if: inputs.programs != ''
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/idl-head"
+        cp target/idl/*.json "$RUNNER_TEMP/idl-head/"
+
+    # Cold base build: the cache misses whenever the PR's base is not a develop
+    # commit the seed run reached, so this path has to work. `anchor idl build`
+    # parses the source with `cargo test --features idl-build`; it is not a BPF
+    # build.
+    - name: Set up anchor for the cold base build
+      if: inputs.programs != '' && steps.base-idls.outputs.cache-hit != 'true'
+      uses: ./.github/actions/setup-anchor/
+
+    - name: Cache cargo registry for the cold base build
+      if: inputs.programs != '' && steps.base-idls.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: cargo-${{ runner.os }}-idl-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-${{ runner.os }}-idl-
+          cargo-${{ runner.os }}-cargo-build-
+
+    - name: Build the base IDLs cold
+      if: inputs.programs != '' && steps.base-idls.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        BASE_SHA: ${{ inputs.base-sha }}
+        PROGRAMS: ${{ inputs.programs }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/idl-base" "$RUNNER_TEMP/idl-base-types"
+        git checkout --detach "$BASE_SHA"
+        for program in $PROGRAMS; do
+          name="${program//-/_}"
+          # A program that does not exist at base is new: no base IDL, and the
+          # diff step reads every entity of the head IDL as an addition.
+          if [ ! -d "programs/$program" ]; then
+            echo "$program is new at $BASE_SHA; no base IDL"
+            continue
+          fi
+          echo "::group::Base IDL build $name"
+          anchor idl build -p "$name" \
+            -o "$RUNNER_TEMP/idl-base/$name.json" \
+            -t "$RUNNER_TEMP/idl-base-types/$name.ts" \
+            --skip-lint
+          echo "::endgroup::"
+        done
+        git checkout -
+
+    - name: Diff the IDLs
+      id: diff
+      if: inputs.programs != ''
+      shell: bash
+      env:
+        BASE_SHA: ${{ inputs.base-sha }}
+        PROGRAMS: ${{ inputs.programs }}
+      run: |
+        set -euo pipefail
+        file="$RUNNER_TEMP/idl-diff.json"
+        # shellcheck disable=SC2086 # the program list is deliberately split
+        node scripts/idl-diff.mjs \
+          --base-dir "$RUNNER_TEMP/idl-base" \
+          --head-dir "$RUNNER_TEMP/idl-head" \
+          $PROGRAMS > "$file"
+        {
+          echo "file=$file"
+          echo "idls-level=$(jq -r '.idls.level // ""' "$file")"
+          echo "idls-breaking=$(jq -r '.idls.breaking // false' "$file")"
+        } >> "$GITHUB_OUTPUT"
+        {
+          echo "### IDL diff against $BASE_SHA"
+          echo
+          jq -r '"@helium/idls: " + (if .idls == null then "not named" else .idls.level + (if .idls.breaking then " (possible break)" else "" end) end)' "$file"
+          echo
+          jq -r '.programs[] | "- \(.name): \(if .changed then .level else "no IDL change" end)"' "$file"
+        } >> "$GITHUB_STEP_SUMMARY"
