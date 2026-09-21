@@ -1,0 +1,91 @@
+name: Program Hash Check
+
+# An independent witness of the mainnet deploys: once a day it compares what each program
+# holds on chain with what its releases say it must hold. It takes no action in any case,
+# so it needs no deploy secret and no write permission.
+on:
+  schedule:
+    # Daily, off the hour: a run at :00 waits in GitHub's queue.
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Mainnet only, and master is the branch mainnet must match. A dispatch from
+          # another branch still checks master's programs.
+          ref: master
+          # The check reads every `program-<name>-<x.y.z>` tag and its creation date.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/cache@v4
+        name: Cache Solana Verify
+        id: cache-solana-verify
+        with:
+          path: |
+            ~/.cargo/bin/solana-verify
+          key: cargo-${{ runner.os }}-solana-verify-0.5.0
+      # The same pin as `build-verified`, so this check hashes with the binary that
+      # produced the release hash. See that action for why 0.5.0.
+      - run: cargo install solana-verify --version 0.5.0 --locked --force
+        if: steps.cache-solana-verify.outputs.cache-hit != 'true'
+        shell: bash
+      - run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        shell: bash
+
+      - name: Compare the on-chain hashes with the release hashes
+        id: check
+        env:
+          # Reads public releases and their assets. No write scope is granted above.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOLANA_URL: https://solana-rpc.web.helium.io
+        run: |
+          RESULT=$(node scripts/program-hash-check.mjs)
+          echo "$RESULT" | jq -r '.programs[] | "- `\(.program)`: \(.status)" + (if .version then " (newest release \(.version))" else "" end)' >> "$GITHUB_STEP_SUMMARY"
+          NOTICES=$(echo "$RESULT" | jq -r '.notices[]')
+          # Left unset when there is nothing to say, so the Slack step below skips.
+          if [ -n "$NOTICES" ]; then
+            {
+              echo "notices<<NOTICES_EOF"
+              echo "$NOTICES"
+              echo "NOTICES_EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          UNKNOWN=$(echo "$RESULT" | jq -r '[.programs[] | select(.status == "unknown binary") | .program] | join(", ")')
+          echo "unknown=$UNKNOWN" >> "$GITHUB_OUTPUT"
+
+      # Before the failure below, so an unknown binary is on Slack even though the run fails.
+      - name: "Slack: hash check notices"
+        if: steps.check.outputs.notices != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
+          NOTICES: ${{ steps.check.outputs.notices }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo "SLACK_RELEASE_WEBHOOK is not set. No notice sent."
+            exit 0
+          fi
+          TEXT=$(printf '%s\n%s' "$NOTICES" "$RUN_URL")
+          # curl's stderr can hold the webhook URL, so it is dropped.
+          if ! jq -nc --arg text "$TEXT" '{text: $text}' | curl -sS --fail --max-time 30 -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK" > /dev/null 2>&1; then
+            echo "::warning::the Slack notice was not sent"
+          fi
+
+      # A program the chain holds that no release published. Nothing here acts on it; the
+      # run fails so the check does not stay green while the question is open.
+      - name: Fail on an unknown binary
+        if: steps.check.outputs.unknown != ''
+        env:
+          UNKNOWN: ${{ steps.check.outputs.unknown }}
+        run: |
+          echo "::error::unknown binary on chain: ${UNKNOWN}"
+          exit 1
