@@ -154,26 +154,23 @@ describe("lazy-transactions", () => {
 
     const accounts = compiledTransactions[0].accounts;
 
+    // Every rejection below asserts the program's error code, which requires the rejection to
+    // arrive as a parsed AnchorError, which requires preflight. A transaction that lands and
+    // then fails in execution comes back as a confirmation error carrying neither the
+    // program's message nor its logs.
     /// Ensure we fail if you execute the wrong tx
+    const bogus = [
+      {
+        instructions: [
+          createAssociatedTokenAccountInstruction(lazySigner, myAta, me, mint),
+          createTransferInstruction(lazySignerAta, myAta, lazySigner, 1000),
+        ],
+        signerSeeds: [],
+      },
+    ];
+    const { compiledTransactions: badTransactions } = compile(lazySigner, bogus);
+    let bogusErr: any;
     try {
-      const bogus = [
-        {
-          instructions: [
-            createAssociatedTokenAccountInstruction(
-              lazySigner,
-              myAta,
-              me,
-              mint
-            ),
-            createTransferInstruction(lazySignerAta, myAta, lazySigner, 1000),
-          ],
-          signerSeeds: [],
-        },
-      ];
-      const { compiledTransactions: badTransactions } = compile(
-        lazySigner,
-        bogus
-      );
       await program.methods
         .executeTransactionV0({
           instructions: badTransactions[0].instructions,
@@ -182,12 +179,13 @@ describe("lazy-transactions", () => {
         })
         .accountsPartial({ lazyTransactions })
         .remainingAccounts(accounts)
-        .rpc({ skipPreflight: true });
-
-      throw new Error("Should have failed");
+        .rpc({ skipPreflight: false });
     } catch (e: any) {
-      expect(e.toString()).to.not.include("Should have failed");
+      bogusErr = e;
     }
+
+    expect(bogusErr, "a leaf outside the tree was accepted").to.not.eq(undefined);
+    expect(bogusErr.error?.errorCode?.code).to.eq("InvalidData");
 
     // Successful tx
     await program.methods
@@ -212,6 +210,7 @@ describe("lazy-transactions", () => {
       .rpc({ skipPreflight: true });
 
     /// A seed set deriving an address the instructions never reference is rejected
+    let unusedSeedsErr: any;
     try {
       await program.methods
         .executeTransactionV0({
@@ -221,17 +220,18 @@ describe("lazy-transactions", () => {
         })
         .accountsPartial({ lazyTransactions })
         .remainingAccounts(compiledTransactions[3].accounts)
-        .rpc({ skipPreflight: true });
-
-      throw new Error("Should have failed");
+        .rpc({ skipPreflight: false });
     } catch (e: any) {
-      expect(e.toString()).to.not.include("Should have failed");
-      expect(e.toString()).to.include(
-        "Signer seeds derive an address this transaction does not use"
-      );
+      unusedSeedsErr = e;
     }
 
+    expect(unusedSeedsErr, "seeds for an unused account were accepted").to.not.eq(
+      undefined
+    );
+    expect(unusedSeedsErr.error?.errorCode?.code).to.eq("UnusedSignerSeeds");
+
     /// Ensure we fail executing the same tx twice
+    let replayErr: any;
     try {
       await program.methods
         .executeTransactionV0({
@@ -241,13 +241,13 @@ describe("lazy-transactions", () => {
         })
         .accountsPartial({ lazyTransactions })
         .remainingAccounts(accounts)
-        .rpc();
-
-      throw new Error("Should have failed");
+        .rpc({ skipPreflight: false });
     } catch (e: any) {
-      console.log(e.toString());
-      expect(e.toString()).to.include("Transaction has already been executed");
+      replayErr = e;
     }
+
+    expect(replayErr, "a transaction executed twice").to.not.eq(undefined);
+    expect(replayErr.error?.errorCode?.code).to.eq("TransactionAlreadyExecuted");
 
     /// Attempt to close the canopy
     console.log("Closing canopy");
@@ -341,6 +341,7 @@ describe("lazy-transactions", () => {
     // never executes.
     const relabelled = ixToBin(compiled.instructions[1]);
 
+    let relabelErr: any;
     try {
       await program.methods
         .executeTransactionV0({
@@ -350,17 +351,20 @@ describe("lazy-transactions", () => {
         })
         .accountsPartial({ lazyTransactions })
         .remainingAccounts(compiled.accounts)
-        .rpc({ skipPreflight: true });
-
-      throw new Error("Should have failed");
+        .rpc({ skipPreflight: false });
     } catch (e: any) {
-      expect(e.toString()).to.not.include("Should have failed");
-      // Either message is a rejection of the re-labelling: the bytes derive an address the
-      // transaction does not use, or they do not derive a program address at all.
-      expect(e.toString()).to.match(
-        /do not derive a valid program address|derive an address this transaction does not use/
-      );
+      relabelErr = e;
     }
+
+    expect(relabelErr, "re-labelled instruction bytes were accepted as seeds").to.not.eq(
+      undefined
+    );
+    // Either code is a rejection of the re-labelling: the bytes derive an address the
+    // transaction does not use, or they do not derive a program address at all.
+    expect(relabelErr.error?.errorCode?.code).to.be.oneOf([
+      "UnusedSignerSeeds",
+      "InvalidSignerSeeds",
+    ]);
 
     // The honest leaf still executes, and both transfers land.
     const before = await provider.connection.getBalance(dest);
