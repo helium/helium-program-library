@@ -312,8 +312,32 @@ jobs:
           path: ./target/idl
           key: base-idls-${{ github.sha }}
 
-  test-devflow:
+  # `setup-ts` ends in a full workspace build, and ten-odd jobs of this workflow run it. This job
+  # runs it once and saves `.turbo` under the run's exact key; the others restore that key and their
+  # build is a turbo cache hit. It needs `build` because `@helium/idls` compiles `target/types`, so
+  # a TS build without the anchor build would cache a wrong `lib/`. It has no `if:` gate: on the
+  # develop seed run the consumers are skipped, but the save still seeds the prefix every later PR
+  # restores from.
+  build-ts:
     needs: build
+    name: Build TS
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # v4, not the v3 the older jobs pin: actionlint flags v3 as too old, and a new job should
+      # not add a finding. The bump of the rest is its own PR.
+      - uses: actions/checkout@v4
+      - name: Download anchor build
+        uses: actions/download-artifact@v4
+        with:
+          name: anchor-build
+          path: ./target
+      - uses: ./.github/actions/setup-ts/
+        with:
+          save-turbo: true
+
+  test-devflow:
+    needs: [build, build-ts]
     name: Test Development Workflow
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
@@ -331,7 +355,7 @@ jobs:
         run: ./scripts/bootstrap.sh
 
   test-helium-vote-service:
-    needs: build
+    needs: [build, build-ts]
     name: Test Helium Vote Service
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
@@ -346,7 +370,7 @@ jobs:
       - run: pnpm --filter @helium/helium-vote-service test
 
   test-migration-service:
-    needs: build
+    needs: [build, build-ts]
     name: Test Migration Service
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
@@ -361,7 +385,7 @@ jobs:
       - run: pnpm --filter @helium/migration-service test
 
   test-docker-builds:
-    needs: build
+    needs: [build, build-ts]
     name: Test Docker Builds
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
@@ -447,7 +471,7 @@ jobs:
           RUST_PATH: ${{ matrix.test }}
 
   test-contracts:
-    needs: build
+    needs: [build, build-ts]
     name: Test Anchor Contracts
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
