@@ -191,7 +191,7 @@ const showFile = (head, file) => {
  * carries legacy `-v0.0.7` tags and a `-0.2.34-new` suffix that a looser
  * pattern would read as versions.
  */
-const readPrograms = (head, skipped) =>
+export const readPrograms = (head, skipped) =>
   git("ls-tree", "-d", "--name-only", `${head}:programs`)
     .split("\n")
     .filter(Boolean)
