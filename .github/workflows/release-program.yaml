@@ -15,6 +15,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+        with:
+          # The master ancestry guard in "Set tag information" needs `origin/master` and the
+          # history between it and the tag.
+          fetch-depth: 0
 
       - uses: actions/cache@v4
         name: Cache Toml Cli
@@ -35,8 +39,17 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}  # Extract tag name from ref
           echo "Tag name: $TAG"
-          PROGRAM=$(echo $TAG | sed 's/program-\(.*\)-[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/\1/')
-          VERSION=$(echo $TAG | sed 's/.*-\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)$/\1/')
+          # Strict: the tag list holds a `v`-prefixed tag and a `-test` suffixed one, and a loose
+          # parse reads a program name or a version out of both.
+          if [[ ! "$TAG" =~ ^program-(.+)-([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::tag ${TAG} is not program-<name>-<x.y.z>"
+            exit 1
+          fi
+          PROGRAM=${BASH_REMATCH[1]}
+          VERSION=${BASH_REMATCH[2]}
+          # Written before the guards so the Slack step can name a release that a guard stopped.
+          echo "PROGRAM=${PROGRAM}" >> "$GITHUB_ENV"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
 
@@ -45,6 +58,22 @@ jobs:
           # from the tag that named no program Anchor.toml holds.
           if [ -z "$PROGRAM_ID" ]; then
             echo "::error::no program id for '${PROGRAM_NAME}' in Anchor.toml programs.localnet (tag ${TAG})"
+            exit 1
+          fi
+
+          # A tag is never moved or reused, so a tag that disagrees with the source it points at
+          # must stop here, before a build and before a release asset carries its name.
+          CARGO_VERSION=$(~/.cargo/bin/toml get "programs/${PROGRAM}/Cargo.toml" package.version | tr -d '"')
+          if [ "$CARGO_VERSION" != "$VERSION" ]; then
+            echo "::error::tag ${TAG} has version ${VERSION}, programs/${PROGRAM}/Cargo.toml at the tagged commit has '${CARGO_VERSION}'"
+            exit 1
+          fi
+
+          # develop -> master is the gate for a mainnet deploy. A hand tag on any other commit
+          # would deploy code that did not pass it.
+          COMMIT=$(git rev-parse HEAD)
+          if ! git merge-base --is-ancestor "$COMMIT" origin/master; then
+            echo "::error::tag ${TAG} points at commit ${COMMIT}, which is not an ancestor of origin/master"
             exit 1
           fi
 
@@ -74,6 +103,21 @@ jobs:
         with:
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
+
+      # The release hash. The scheduled hash check compares the on-chain program with it. It
+      # uploads before `deploy-buffers`, so a run that the hash-match skip stops still has it.
+      - name: Write the release hash
+        run: |
+          HASH=$(~/.cargo/bin/solana-verify get-executable-hash "target/deploy/${PROGRAM_NAME}.so")
+          echo "$HASH" > "target/deploy/${PROGRAM_NAME}.so.sha256"
+          echo "Release hash: $HASH"
+
+      # The IDL step above made the release for this tag. `--clobber` lets a re-run replace the
+      # asset, as the IDL step does.
+      - name: Push release hash to Github
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" "target/deploy/${PROGRAM_NAME}.so.sha256" --clobber
 
       # Re-run rules live in this action: the hash-match skip, the vault buffer reuse, the
       # pending proposal check, and the close of this run's buffer on a failure.
@@ -115,3 +159,40 @@ jobs:
           authority: ${{ secrets.MULTISIG_VAULT }}
           name: "Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}"
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
+
+      # A second proposal for the same program is open. Signers must reject the old one, or an
+      # execute of it after the new one rolls the program back.
+      - name: "Slack: older pending proposal"
+        if: steps.deploy-buffers.outputs.skip != 'true' && steps.deploy-buffers.outputs.pending-proposal-index != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
+          PENDING: ${{ steps.deploy-buffers.outputs.pending-proposal-index }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo "SLACK_RELEASE_WEBHOOK is not set. No notice sent."
+            exit 0
+          fi
+          TEXT="Program release: proposal created for ${PROGRAM} ${VERSION}. Reject the older pending proposal(s) ${PENDING} for this program. ${RUN_URL}"
+          # The proposal exists by now, so a Slack outage must not fail the release run.
+          # curl's stderr can hold the webhook URL, so it is dropped.
+          if ! jq -nc --arg text "$TEXT" '{text: $text}' | curl -sS --fail --max-time 30 -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK" > /dev/null 2>&1; then
+            echo "::warning::the Slack notice was not sent"
+          fi
+
+      - name: "Slack: release failed"
+        if: failure()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo "SLACK_RELEASE_WEBHOOK is not set. No notice sent."
+            exit 0
+          fi
+          # PROGRAM and VERSION are empty when the tag did not parse. The tag is always there.
+          TEXT="Program release FAILED: ${PROGRAM:-?} ${VERSION:-?} (tag ${GITHUB_REF_NAME}). ${RUN_URL}"
+          # curl's stderr can hold the webhook URL, so it is dropped.
+          if ! jq -nc --arg text "$TEXT" '{text: $text}' | curl -sS --fail --max-time 30 -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK" > /dev/null 2>&1; then
+            echo "::warning::the Slack notice was not sent"
+          fi
