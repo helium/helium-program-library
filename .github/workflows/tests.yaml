@@ -97,6 +97,31 @@ jobs:
           fi
           node scripts/backstop-check.mjs "$BASE_SHA" HEAD "${args[@]}"
 
+  missing-bump:
+    name: Program Version Bumps
+    # The last gate before program source reaches master. The backstop asks a
+    # PR to declare its releases and an admin can bypass it; this one asks the
+    # tags, which cannot be argued with: a program whose current version is
+    # already tagged and whose source moved since that tag would deploy under a
+    # version that is already on chain. Not a required check yet; issue 50 adds
+    # it to the master ruleset after the shadow match.
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # The check reads every `program-*` tag and diffs from the tagged commit,
+      # so a shallow clone without tags would pass it vacuously.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Every changed program has a version bump
+        run: |
+          node scripts/missing-bump-check.mjs --json "$RUNNER_TEMP/missing-bump.json"
+
   test-unit:
     name: Rust Unit Tests
     runs-on: ubuntu-latest

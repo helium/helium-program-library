@@ -71,7 +71,7 @@ export const buildGraph = (metadata) => {
 };
 
 /** The crate a changed file belongs to, or undefined when no crate claims it. */
-const crateFor = (crateDirs, file) => {
+export const crateFor = (crateDirs, file) => {
   for (const [dir, name] of crateDirs) {
     if (file === `${dir}/Cargo.toml` || file.startsWith(`${dir}/src/`)) {
       return name;
