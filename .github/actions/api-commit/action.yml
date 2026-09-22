@@ -1,0 +1,54 @@
+name: "API commit"
+description: "Commit the checkout's changes to a branch through the GitHub GraphQL API, so the commit is authored by the App and marked Verified."
+
+inputs:
+  token:
+    description: "An App installation token with Contents: write. GITHUB_TOKEN would start no downstream workflow run."
+    required: true
+  branch:
+    description: "The unqualified branch to commit on. It must already exist."
+    required: true
+  headline:
+    description: "The commit message headline."
+    required: true
+  body:
+    description: "The commit message body. Omitted from the message when empty."
+    required: false
+    default: ""
+  expected-head-oid:
+    description: "The commit the branch is expected to be at, and the commit the changes are computed against. A moved branch fails the step, and there is no retry: a later run recomputes from the new head."
+    required: true
+
+outputs:
+  commit-oid:
+    description: "The oid of the commit this action created, empty when there was nothing to commit."
+    value: ${{ steps.commit.outputs.commit-oid }}
+
+runs:
+  using: "composite"
+  steps:
+    # `createCommitOnBranch` signs the commit with GitHub's key and forbids a
+    # custom author, so the commit is authored by the App's bot user and shows
+    # as Verified. No `git config user.*` and no `git push` are involved.
+    - name: Commit through the API
+      id: commit
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        BRANCH: ${{ inputs.branch }}
+        HEADLINE: ${{ inputs.headline }}
+        BODY: ${{ inputs.body }}
+        EXPECTED_HEAD_OID: ${{ inputs.expected-head-oid }}
+      run: |
+        set -euo pipefail
+        payload="$RUNNER_TEMP/api-commit-payload.json"
+        "$GITHUB_ACTION_PATH/build-payload.sh" >"$payload"
+        if [ ! -s "$payload" ]; then
+          echo "Nothing to commit."
+          echo "commit-oid=" >>"$GITHUB_OUTPUT"
+          exit 0
+        fi
+        oid=$(gh api graphql --input "$payload" \
+          --jq '.data.createCommitOnBranch.commit.oid')
+        echo "Committed $oid on $BRANCH."
+        echo "commit-oid=$oid" >>"$GITHUB_OUTPUT"

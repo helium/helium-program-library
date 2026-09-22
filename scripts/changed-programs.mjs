@@ -19,10 +19,18 @@ const USAGE =
   "Usage: node scripts/changed-programs.mjs <base> [head] [--base <program>=<ref>]...";
 
 /**
- * Paths that never release: docs and tests. Shared with the changeset bot and
- * the backstop check, which apply it to npm packages too.
+ * Paths that never release. The one no-release judge: the changeset bot and
+ * the backstop check both apply it, to npm packages too, so a PR that changes
+ * nothing else gets no changeset and needs none. As globs: every `.md` file,
+ * `tests/**`, every `.test.ts` file, `.github/**`, and `.scratch/**`.
  */
-export const NO_RELEASE_PATTERNS = [/\.md$/, /(^|\/)docs\//, /(^|\/)tests\//];
+export const NO_RELEASE_PATTERNS = [
+  /\.md$/,
+  /(^|\/)tests\//,
+  /\.test\.ts$/,
+  /^\.github\//,
+  /^\.scratch\//,
+];
 
 export const isNoReleasePath = (file) =>
   NO_RELEASE_PATTERNS.some((pattern) => pattern.test(file));

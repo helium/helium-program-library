@@ -93,13 +93,17 @@ test("Cargo.lock, the root Cargo.toml, tests and docs mark nothing", () => {
   assert.deepEqual(changed, []);
 });
 
-test("the no-release path filter names docs and tests", () => {
+test("the no-release path filter names markdown, tests, workflows, and scratch", () => {
   assert.equal(isNoReleasePath("programs/hexboosting/README.md"), true);
   assert.equal(isNoReleasePath("docs/hexboosting.md"), true);
   assert.equal(isNoReleasePath("tests/hexboosting.ts"), true);
   assert.equal(isNoReleasePath("programs/hexboosting/tests/boost.rs"), true);
+  assert.equal(isNoReleasePath("packages/spl-utils/src/x.test.ts"), true);
+  assert.equal(isNoReleasePath(".github/workflows/tests.yaml"), true);
+  assert.equal(isNoReleasePath(".scratch/feature/plan.md"), true);
   assert.equal(isNoReleasePath("programs/hexboosting/src/lib.rs"), false);
   assert.equal(isNoReleasePath("programs/hexboosting/Cargo.toml"), false);
+  assert.equal(isNoReleasePath("packages/blockchain-api/docs/api.txt"), false);
 });
 
 test("a program's own Cargo.toml change marks it own", () => {

@@ -89,7 +89,7 @@ test("docs and tests inside a package are no-release paths", () => {
         "packages/idls/README.md",
         "packages/idls/CHANGELOG.md",
         "packages/blockchain-api/tests/server.test.ts",
-        "packages/blockchain-api/docs/api.txt",
+        "packages/blockchain-api/src/server.test.ts",
         "tests/helium-sub-daos.ts",
       ],
       manifests,
