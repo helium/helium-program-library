@@ -54,10 +54,27 @@ jobs:
           echo "$RESULT" | jq -r '.programs[] | "- `\(.program)`: \(.status)" + (if .version then " (newest release \(.version))" else "" end)' >> "$GITHUB_STEP_SUMMARY"
           # A pending upgrade past the notice window. The run stays green: a vote is
           # still open, and the annotation is there for whoever reads the run.
-          echo "$RESULT" | jq -r '.notices[]' | while IFS= read -r NOTICE; do
-            echo "::warning title=Pending upgrade::${NOTICE}"
+          # GitHub keeps ten warning annotations per step and drops the rest without
+          # a word, so past ten one more annotation counts how many are left and the
+          # summary, which has no cap, carries them all.
+          NOTICES="$RUNNER_TEMP/notices.txt"
+          echo "$RESULT" | jq -r '.notices[]' > "$NOTICES"
+          TOTAL=$(wc -l < "$NOTICES" | tr -d ' ')
+          SHOWN=$TOTAL
+          if [ "$TOTAL" -gt 10 ]; then
+            SHOWN=10
+          fi
+          N=0
+          while IFS= read -r NOTICE; do
+            N=$((N + 1))
+            if [ "$N" -le "$SHOWN" ]; then
+              echo "::warning title=Pending upgrade::${NOTICE}"
+            fi
             echo "- $NOTICE" >> "$GITHUB_STEP_SUMMARY"
-          done
+          done < "$NOTICES"
+          if [ "$TOTAL" -gt "$SHOWN" ]; then
+            echo "::warning title=Pending upgrade::$((TOTAL - SHOWN)) more pending upgrades, see the run summary"
+          fi
           UNKNOWN=$(echo "$RESULT" | jq -r '[.programs[] | select(.status == "unknown binary") | .program] | join(",")')
           echo "unknown=$UNKNOWN" >> "$GITHUB_OUTPUT"
 
@@ -69,7 +86,12 @@ jobs:
           UNKNOWN: ${{ steps.check.outputs.unknown }}
         run: |
           IFS=',' read -ra PROGRAMS <<< "$UNKNOWN"
-          for PROGRAM in "${PROGRAMS[@]}"; do
+          # Ten error annotations per step is GitHub's cap, and it drops the rest
+          # without a word, so past ten one more annotation counts how many are left.
+          for PROGRAM in "${PROGRAMS[@]:0:10}"; do
             echo "::error title=Unknown binary::${PROGRAM} holds a binary no release published"
           done
+          if [ "${#PROGRAMS[@]}" -gt 10 ]; then
+            echo "::error title=Unknown binary::$((${#PROGRAMS[@]} - 10)) more programs hold a binary no release published"
+          fi
           exit 1

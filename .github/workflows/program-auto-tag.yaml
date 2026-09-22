@@ -137,8 +137,24 @@ jobs:
           if [ "$(jq '.failing | length' "$REPORT")" -gt 0 ]; then
             echo "## Programs changed with no version bump" >> "$GITHUB_STEP_SUMMARY"
           fi
-          jq -r '.failing[] | "\(.name) changed since program-\(.name)-\(.version) with no bump"' "$REPORT" |
-            while read -r line; do
+          LINES="$RUNNER_TEMP/unbumped.txt"
+          jq -r '.failing[] | "\(.name) changed since program-\(.name)-\(.version) with no bump"' "$REPORT" > "$LINES"
+          # GitHub keeps ten warning annotations per step and drops the rest
+          # without a word, so past ten one more annotation counts how many are
+          # left and the summary below, which has no cap, carries them all.
+          total=$(wc -l < "$LINES" | tr -d ' ')
+          shown=$total
+          if [ "$total" -gt 10 ]; then
+            shown=10
+          fi
+          n=0
+          while read -r line; do
+            n=$((n + 1))
+            if [ "$n" -le "$shown" ]; then
               echo "::warning title=No version bump::${line}"
-              echo "- $line" >> "$GITHUB_STEP_SUMMARY"
-            done
+            fi
+            echo "- $line" >> "$GITHUB_STEP_SUMMARY"
+          done < "$LINES"
+          if [ "$total" -gt "$shown" ]; then
+            echo "::warning title=No version bump::$((total - shown)) more programs, see the run summary"
+          fi
