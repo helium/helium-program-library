@@ -137,6 +137,8 @@ const releasesByTag = async () => {
 const releaseHash = async (release, key) => {
   const asset = release?.assets?.find((a) => a.name === `${key}.so.sha256`);
   if (!asset) return null;
+  // GitHub answers an asset URL with a redirect to another host, and fetch
+  // drops `authorization` across it: only a public release asset arrives.
   const response = await fetch(asset.url, {
     headers: githubHeaders("application/octet-stream"),
   });
