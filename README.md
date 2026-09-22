@@ -231,7 +231,7 @@ Three things leave this repo: npm packages, service images, and Solana programs.
 | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`tests.yaml`](.github/workflows/tests.yaml)                                     | Every PR, and push to `develop` or `master`                                 | Tests and lint, plus two release gates: **Release Declaration** (the backstop check) and **Program Version Bumps** (the missing-bump check). |
 | [`changeset-bot.yaml`](.github/workflows/changeset-bot.yaml)                     | PR to `develop` or `master`; manual dispatch                                | Writes the changeset and the program changeset a PR is missing.                                                                              |
-| [`version-programs.yaml`](.github/workflows/version-programs.yaml)               | Push to `develop`; manual dispatch                                          | Turns `.changeset-programs/` into `Cargo.toml` bumps and changelogs on the program release PR.                                               |
+| [`version-programs.yaml`](.github/workflows/version-programs.yaml)               | Push to `develop`; PR to `develop`; manual dispatch                         | Turns `.changeset-programs/` into `Cargo.toml` bumps and changelogs on the program release PR.                                               |
 | [`npm-publish.yaml`](.github/workflows/npm-publish.yaml)                         | Push to `develop`                                                           | Opens the "Version Packages" PR, and publishes to npm when that PR merges.                                                                   |
 | [`promotion-pr.yaml`](.github/workflows/promotion-pr.yaml)                       | Push to `develop`; manual dispatch                                          | Keeps one `develop` to `master` **Promotion PR** open while develop is ahead.                                                                |
 | [`back-merge-pr.yaml`](.github/workflows/back-merge-pr.yaml)                     | Push to `master`; manual dispatch                                           | Opens the `master` to `develop` back-merge PR after a hotfix.                                                                                |
@@ -254,10 +254,10 @@ Open the PR. The changeset bot adds the release notes it is missing:
 
 Nothing reads the diff for meaning. Fixed rules pick every level and every line, in [`scripts/write-changesets.mjs`](scripts/write-changesets.mjs), whose unit tests are those rules:
 
-- **npm level**: `patch` for each changed package. `@helium/idls` takes the level the IDL diff gives: `minor` when a program adds an instruction or an account, `patch` otherwise.
+- **npm level**: `patch` for each changed package. `@helium/idls` takes the level the IDL diff gives: `minor` when a program adds an instruction, an account, a type or a field; `minor` plus a "Possible breaking change: ..." line when one is removed or its type changed; `patch` otherwise. `@helium/idls` with no IDL diff at all — its own files changed and no program moved — is `patch`.
 - **program level**: a program you changed takes that same IDL-diff hint. A program you changed only through a dependency takes `none`, but only when every dependency it came through is a program whose IDL did not move and whose changed files are all instruction handlers, which a dependent never runs. Anything else, a shared crate above all, takes `patch`.
-- **text**: the PR title, with its `type(scope):` prefix stripped. The program file adds a line per program that names the IDL change, or the reason for the level.
-- **no release**: a path that matches `*.md`, `tests/`, `*.test.ts`, `.github/`, or `.scratch/` declares no release, so a PR that touches only those gets no file.
+- **text**: the PR title, with its `type(scope):` prefix stripped and the first letter capitalised. The program file adds a line per program that names the IDL change, or the reason for the level.
+- **no release**: a path that matches `*.md`, `tests/`, `*.test.ts`, `.github/`, or `.scratch/` declares no release, so a PR that touches only those gets no file. That filter is `NO_RELEASE_PATTERNS` in [`scripts/changed-programs.mjs`](scripts/changed-programs.mjs).
 
 The bot writes at most one new file in each directory, and it never edits a file that is already there. So to change what a release says, edit the file the bot wrote and push. Your edit stands, and no later run rewrites it.
 
@@ -292,6 +292,8 @@ A mainnet upgrade takes four steps. Nobody bumps a `Cargo.toml` and nobody pushe
 **1. The program changeset.** It lands with your PR, as above.
 
 **2. The program release PR.** A push to `develop` with program changesets present runs `version-programs.yaml`, which runs `scripts/version-programs.mjs` and opens or updates the **program release PR** from `program-release/develop`. Merging it bumps each `Cargo.toml`, prepends the entry to each `programs/<name>/CHANGELOG.md`, deletes the files it used, and runs `cargo update --workspace`. It creates no tag.
+
+On that PR, the **New program versions are untagged** job of the same workflow checks that every version the PR bumps to is still free of a tag. Do not push commits to `program-release/develop`: the workflow force-moves that branch on every push to `develop`, so edit the changesets on `develop` instead.
 
 **3. Promotion.** `promotion-pr.yaml` keeps one `develop` to `master` **Promotion PR** open while develop is ahead. Its body lists the programs a merge deploys with their changelog sections, the programs that changed with no bump, and the unversioned program changesets. It says nothing about npm or services, because promotion does nothing to either. The bot never merges and never approves.
 
