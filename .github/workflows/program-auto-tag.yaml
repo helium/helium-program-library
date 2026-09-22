@@ -124,22 +124,16 @@ jobs:
 
       # The report half of the missing-bump check; the gate half is on the
       # Promotion PR in tests.yaml. A program that reached master with changed
-      # source and a version that is already tagged fails the run here.
+      # source and a version that is already tagged is a warning here, not a
+      # failure: a red tag-bot run means a tag push failed, nothing else. The
+      # script exits 1 on such a program, so its JSON file stands in for the
+      # exit code; a script error writes no JSON and still fails the step.
       - name: Report programs that changed with no version bump
-        run: node scripts/missing-bump-check.mjs
-
-      - name: "Slack: program auto-tag failed"
-        if: failure()
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ -z "$SLACK_WEBHOOK" ]; then
-            echo "SLACK_RELEASE_WEBHOOK is not set. No notice sent."
-            exit 0
-          fi
-          TEXT="Program auto-tag FAILED on master at ${GITHUB_SHA}. ${RUN_URL}"
-          # curl's stderr can hold the webhook URL, so it is dropped.
-          if ! jq -nc --arg text "$TEXT" '{text: $text}' | curl -sS --fail --max-time 30 -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK" > /dev/null 2>&1; then
-            echo "::warning::the Slack notice was not sent"
-          fi
+          REPORT="$RUNNER_TEMP/missing-bump.json"
+          echo "## Programs changed with no version bump" >> "$GITHUB_STEP_SUMMARY"
+          node scripts/missing-bump-check.mjs --json "$REPORT" || [ -s "$REPORT" ]
+          jq -r '.failing[] | "\(.name) changed since program-\(.name)-\(.version) with no bump"' "$REPORT" |
+            while read -r line; do
+              echo "::warning title=No version bump::${line}"
+            done
