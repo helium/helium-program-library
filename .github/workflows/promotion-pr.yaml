@@ -115,6 +115,7 @@ jobs:
 
       # The App token, so tests.yaml and the missing-bump check start on the PR
       # this job opens. The checkout above used GITHUB_TOKEN.
+      # Scoped to what this job does: opens or edits one PR.
       - name: Get an App token
         id: app-token
         if: steps.ahead.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
@@ -122,6 +123,7 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-pull-requests: write
 
       # No merge and no approval: this step opens or edits, nothing else. A PR
       # a person closed is not reopened; the next push opens a fresh one.

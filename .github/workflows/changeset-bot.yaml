@@ -191,6 +191,7 @@ jobs:
 
       # The App token, so tests.yaml and the backstop start on the bot's
       # commit. A GITHUB_TOKEN commit starts no workflow.
+      # Scoped to what this job does: commits to the PR branch.
       - name: Get an App token
         id: app-token
         if: steps.missing.outputs.run == 'true' && steps.mode.outputs.dry_run != 'true'
@@ -198,6 +199,7 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
 
       # The API form of a no-force push: when the branch moved past the head
       # this run saw, the commit fails and the newer run writes the files.

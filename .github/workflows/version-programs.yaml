@@ -107,6 +107,7 @@ jobs:
 
       # The App token, so tests.yaml starts on the PR this job opens. Only the
       # commit and the PR use it; the checkout above used GITHUB_TOKEN.
+      # Scoped to what this job does: writes the refs and the commit, and opens the PR.
       - name: Get an App token
         id: app-token
         if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
@@ -114,6 +115,8 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
 
       # The release commit goes through the GitHub API, so GitHub signs it and
       # it shows as Verified with the App as its author. It lands on a scratch

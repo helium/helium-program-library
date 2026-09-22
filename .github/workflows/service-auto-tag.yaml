@@ -111,6 +111,7 @@ jobs:
 
       # The App token, so docker-push.yaml starts on the tag: a GITHUB_TOKEN
       # push starts no workflow. The checkout above used GITHUB_TOKEN.
+      # Scoped to what this job does: pushes one tag.
       - name: Get an App token
         id: app-token
         if: steps.name.outputs.tag != ''
@@ -118,6 +119,7 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
 
       # A tag is never moved or reused: the push has no force, so a tag that
       # exists fails the job.
