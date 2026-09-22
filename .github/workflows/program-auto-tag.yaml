@@ -140,12 +140,12 @@ jobs:
           LINES="$RUNNER_TEMP/unbumped.txt"
           jq -r '.failing[] | "\(.name) changed since program-\(.name)-\(.version) with no bump"' "$REPORT" > "$LINES"
           # GitHub keeps ten warning annotations per step and drops the rest
-          # without a word, so past ten one more annotation counts how many are
+          # without a word, so past ten the tenth annotation counts how many are
           # left and the summary below, which has no cap, carries them all.
           total=$(wc -l < "$LINES" | tr -d ' ')
           shown=$total
           if [ "$total" -gt 10 ]; then
-            shown=10
+            shown=9
           fi
           n=0
           while read -r line; do

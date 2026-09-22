@@ -55,14 +55,14 @@ jobs:
           # A pending upgrade past the notice window. The run stays green: a vote is
           # still open, and the annotation is there for whoever reads the run.
           # GitHub keeps ten warning annotations per step and drops the rest without
-          # a word, so past ten one more annotation counts how many are left and the
+          # a word, so past ten the tenth annotation counts how many are left and the
           # summary, which has no cap, carries them all.
           NOTICES="$RUNNER_TEMP/notices.txt"
           echo "$RESULT" | jq -r '.notices[]' > "$NOTICES"
           TOTAL=$(wc -l < "$NOTICES" | tr -d ' ')
           SHOWN=$TOTAL
           if [ "$TOTAL" -gt 10 ]; then
-            SHOWN=10
+            SHOWN=9
           fi
           N=0
           while IFS= read -r NOTICE; do
@@ -87,11 +87,15 @@ jobs:
         run: |
           IFS=',' read -ra PROGRAMS <<< "$UNKNOWN"
           # Ten error annotations per step is GitHub's cap, and it drops the rest
-          # without a word, so past ten one more annotation counts how many are left.
-          for PROGRAM in "${PROGRAMS[@]:0:10}"; do
+          # without a word, so past ten the tenth annotation counts how many are left.
+          SHOWN=${#PROGRAMS[@]}
+          if [ "$SHOWN" -gt 10 ]; then
+            SHOWN=9
+          fi
+          for PROGRAM in "${PROGRAMS[@]:0:$SHOWN}"; do
             echo "::error title=Unknown binary::${PROGRAM} holds a binary no release published"
           done
-          if [ "${#PROGRAMS[@]}" -gt 10 ]; then
-            echo "::error title=Unknown binary::$((${#PROGRAMS[@]} - 10)) more programs hold a binary no release published"
+          if [ "${#PROGRAMS[@]}" -gt "$SHOWN" ]; then
+            echo "::error title=Unknown binary::$((${#PROGRAMS[@]} - SHOWN)) more programs hold a binary no release published"
           fi
           exit 1
