@@ -56,6 +56,26 @@ const listChangesets = (root) =>
     .map((file) => path.join(root, CHANGESET_DIR, file));
 
 /**
+ * One program changeset: its `<program>: <level>` entries and its text, or null
+ * when the file carries no front matter. The Promotion PR body reads the
+ * unversioned changesets through this, so the grammar lives in one place.
+ */
+export const parseProgramChangeset = (content) => {
+  const match = content.match(FRONT_MATTER);
+  if (!match) return null;
+  return {
+    entries: match[1]
+      .split("\n")
+      .filter((line) => line.trim())
+      .map((line) => {
+        const [, name, level] = line.match(ENTRY) || [];
+        return { name, level };
+      }),
+    text: match[2].trim(),
+  };
+};
+
+/**
  * program -> { level, notes: [{ level, text }] }, with every name and level
  * validated. The whole plan is built before any write, so an unknown program or
  * level leaves the tree untouched.
@@ -63,11 +83,10 @@ const listChangesets = (root) =>
 const plan = (programs, files) => {
   const releases = {};
   for (const file of files) {
-    const match = fs.readFileSync(file, "utf8").match(FRONT_MATTER);
-    if (!match) throw new Error(`${file}: no front matter`);
-    const text = match[2].trim();
-    for (const line of match[1].split("\n").filter((l) => l.trim())) {
-      const [, name, level] = line.match(ENTRY) || [];
+    const parsed = parseProgramChangeset(fs.readFileSync(file, "utf8"));
+    if (!parsed) throw new Error(`${file}: no front matter`);
+    const { entries, text } = parsed;
+    for (const { name, level } of entries) {
       if (!programs.includes(name))
         throw new Error(`${file}: unknown program "${name}"`);
       if (!LEVELS.includes(level))

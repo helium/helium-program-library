@@ -1,0 +1,138 @@
+name: Promotion PR
+
+# Keeps one develop -> master PR open whenever develop is ahead. The body says
+# which programs a merge deploys. The bot never merges and never approves: a
+# person does that, with a merge commit, after the checks pass.
+env:
+  # Dry run until go-live. A workflow_dispatch run overrides it.
+  DRY_RUN: true
+  TITLE: "chore: promote develop to master"
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Write nothing outside the runner"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# One run at a time, newest wins: an older run would write a stale body.
+concurrency:
+  group: promotion-pr
+  cancel-in-progress: true
+
+jobs:
+  promotion-pr:
+    name: Promotion PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # The back-merge lookup only. The PR itself goes through the App token.
+      pull-requests: read
+    steps:
+      # The body reads every `program-*` tag and diffs from the tagged commit,
+      # so a shallow clone without tags would name the wrong versions.
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve dry run
+        id: mode
+        env:
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+
+      - name: Is develop ahead of master?
+        id: ahead
+        run: |
+          count=$(git rev-list --count origin/master..HEAD)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -eq 0 ]; then
+            echo "develop is not ahead of master. No Promotion PR." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.ahead.outputs.count != '0'
+        with:
+          node-version-file: .node-version
+
+      # The check's own JSON, so the body and the check on the PR never
+      # disagree. A failure is what the body reports, so it must not fail here.
+      - name: Programs with changes and no bump
+        if: steps.ahead.outputs.count != '0'
+        run: |
+          node scripts/missing-bump-check.mjs --json "$RUNNER_TEMP/missing-bump.json" || true
+
+      # master must be in develop before develop can promote, so an open
+      # back-merge blocks this PR and the body says so.
+      - name: Find an open back-merge PR
+        id: back-merge
+        if: steps.ahead.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --head master --base develop --state open --json url --jq '.[0].url // empty')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Build the body
+        id: body
+        if: steps.ahead.outputs.count != '0'
+        env:
+          BACK_MERGE: ${{ steps.back-merge.outputs.url }}
+        run: |
+          args=(--missing-bump "$RUNNER_TEMP/missing-bump.json")
+          if [ -n "$BACK_MERGE" ]; then
+            args+=(--back-merge "$BACK_MERGE")
+          fi
+          node scripts/promotion-pr-body.mjs "${args[@]}" > "$RUNNER_TEMP/body.md"
+
+      - name: Write the run summary
+        if: steps.ahead.outputs.count != '0'
+        env:
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
+          COUNT: ${{ steps.ahead.outputs.count }}
+        run: |
+          {
+            if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
+              echo "## Promotion PR (dry run)"
+              echo
+              echo "No PR was opened or edited. develop is $COUNT commits ahead of master, and the body below is what the PR would carry."
+            else
+              echo "## Promotion PR"
+            fi
+            echo
+            cat "$RUNNER_TEMP/body.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The App token, so tests.yaml and the missing-bump check start on the PR
+      # this job opens. The checkout above used GITHUB_TOKEN.
+      - name: Get an App token
+        id: app-token
+        if: steps.ahead.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      # No merge and no approval: this step opens or edits, nothing else. A PR
+      # a person closed is not reopened; the next push opens a fresh one.
+      - name: Open or update the Promotion PR
+        if: steps.ahead.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head develop --base master --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base master --head develop --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          fi
