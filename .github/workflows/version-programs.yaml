@@ -7,6 +7,9 @@ env:
   # Dry run until go-live. A workflow_dispatch run overrides it.
   DRY_RUN: true
   BRANCH: program-release/develop
+  # The commit lands here first, so the release branch never sits at a zero
+  # diff between the reset and the commit. Deleted again in the same run.
+  SCRATCH_BRANCH: program-release/develop-${{ github.run_id }}
   TITLE: "chore: version programs"
 
 on:
@@ -73,7 +76,7 @@ jobs:
             if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
               echo "## Program release PR (dry run)"
               echo
-              echo "Nothing was pushed. The diff below is what the release PR would carry."
+              echo "Nothing was written. The diff below is what the release PR would carry."
             else
               echo "## Program release PR"
             fi
@@ -89,8 +92,21 @@ jobs:
         env:
           DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
 
+      - name: Print the mutations (dry run)
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run == 'true'
+        run: |
+          {
+            echo "### The mutations this run would make"
+            echo
+            echo "- \`createRef\` \`refs/heads/$SCRATCH_BRANCH\` at \`$GITHUB_SHA\`"
+            echo "- \`createCommitOnBranch\` on \`$SCRATCH_BRANCH\` with the diff above, headline \`$TITLE\`"
+            echo "- \`updateRef\` \`refs/heads/$BRANCH\` to the new commit, forced"
+            echo "- \`deleteRef\` \`refs/heads/$SCRATCH_BRANCH\`"
+            echo "- \`gh pr create\` or \`gh pr edit\` for \`$BRANCH\` into develop"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # The App token, so tests.yaml starts on the PR this job opens. Only the
-      # push and the PR use it; the checkout above used GITHUB_TOKEN.
+      # commit and the PR use it; the checkout above used GITHUB_TOKEN.
       - name: Get an App token
         id: app-token
         if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
@@ -99,19 +115,78 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-      - name: Push the release branch
+      # The release commit goes through the GitHub API, so GitHub signs it and
+      # it shows as Verified with the App as its author. It lands on a scratch
+      # branch first; the release branch is then moved onto it in one step, so
+      # the PR head never sits at a zero diff.
+      - name: Create the scratch branch
+        id: scratch
         if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-          git switch -c "$BRANCH"
-          git add -A
-          git commit -m "chore: version programs"
-          git push --force \
-            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            "HEAD:refs/heads/${BRANCH}"
+          set -euo pipefail
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          repo_id=$(gh api graphql -F owner='{owner}' -F name='{repo}' \
+            -f query='query($owner:String!,$name:String!){repository(owner:$owner,name:$name){id}}' \
+            --jq .data.repository.id)
+          echo "repo-id=$repo_id" >> "$GITHUB_OUTPUT"
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          ref_id=$(gh api graphql -F repositoryId="$repo_id" \
+            -F name="refs/heads/$SCRATCH_BRANCH" -F oid="$GITHUB_SHA" \
+            -f query='mutation($repositoryId:ID!,$name:String!,$oid:GitObjectID!){createRef(input:{repositoryId:$repositoryId,name:$name,oid:$oid}){ref{id}}}' \
+            --jq .data.createRef.ref.id)
+          echo "ref-id=$ref_id" >> "$GITHUB_OUTPUT"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit the version bumps
+        id: commit
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        uses: ./.github/actions/api-commit
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: ${{ env.SCRATCH_BRANCH }}
+          headline: ${{ env.TITLE }}
+          expected-head-oid: ${{ github.sha }}
+
+      - name: Move the release branch onto the commit
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          COMMIT_OID: ${{ steps.commit.outputs.commit-oid }}
+          REPO_ID: ${{ steps.scratch.outputs.repo-id }}
+        run: |
+          set -euo pipefail
+          if [ -z "$COMMIT_OID" ]; then
+            echo "::error::the program changesets produced no change to commit."
+            exit 1
+          fi
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          ref_id=$(gh api graphql -F owner='{owner}' -F name='{repo}' \
+            -F qualifiedName="refs/heads/$BRANCH" \
+            -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){id}}}' \
+            --jq '.data.repository.ref.id // empty')
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          if [ -n "$ref_id" ]; then
+            gh api graphql -F refId="$ref_id" -F oid="$COMMIT_OID" -F force=true \
+              -f query='mutation($refId:ID!,$oid:GitObjectID!,$force:Boolean){updateRef(input:{refId:$refId,oid:$oid,force:$force}){ref{target{oid}}}}'
+          else
+            gh api graphql -F repositoryId="$REPO_ID" \
+              -F name="refs/heads/$BRANCH" -F oid="$COMMIT_OID" \
+              -f query='mutation($repositoryId:ID!,$name:String!,$oid:GitObjectID!){createRef(input:{repositoryId:$repositoryId,name:$name,oid:$oid}){ref{id}}}'
+          fi
+
+      # Also on failure: a run that dies after createRef leaves no scratch ref.
+      - name: Delete the scratch branch
+        if: always() && steps.scratch.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SCRATCH_REF_ID: ${{ steps.scratch.outputs.ref-id }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          gh api graphql -F refId="$SCRATCH_REF_ID" \
+            -f query='mutation($refId:ID!){deleteRef(input:{refId:$refId}){clientMutationId}}'
 
       - name: Open or update the program release PR
         if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
