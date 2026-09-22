@@ -68,6 +68,13 @@ pub mod tuktuk_dca {
     instructions::lend_v0::handler(ctx)
   }
 
+  pub fn swap_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, SwapV0<'info>>,
+    args: SwapArgsV0,
+  ) -> Result<()> {
+    instructions::swap_v0::handler(ctx, args)
+  }
+
   pub fn check_repay_v0(
     ctx: Context<CheckRepayV0>,
     args: CheckRepayArgsV0,
