@@ -92,6 +92,55 @@ test("a 100 KB file round-trips: jq reads it, argv never does", () => {
   assert.equal(Buffer.from(addition.contents, "base64").toString("utf8"), lock);
 });
 
+test("a binary file keeps its bytes: nothing decodes it as UTF-8", () => {
+  const bytes = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xfe, 0x80, 0x61, 0x62, 0x63,
+  ]);
+  const { root, head } = makeRepo({ "logo.png": "placeholder\n" });
+  writeFileSync(path.join(root, "logo.png"), bytes);
+
+  const { status, stdout, stderr } = build(root, { EXPECTED_HEAD_OID: head });
+  assert.equal(status, 0, stderr);
+
+  const { additions } = JSON.parse(stdout).variables.input.fileChanges;
+  const addition = additions.find((a) => a.path === "logo.png");
+  assert.deepEqual(Buffer.from(addition.contents, "base64"), bytes);
+});
+
+test("a rename becomes one deletion and one addition", () => {
+  const { root, head } = makeRepo({ "a.txt": "a\n" });
+  git(root, "mv", "a.txt", "b.txt");
+
+  const { status, stdout, stderr } = build(root, { EXPECTED_HEAD_OID: head });
+  assert.equal(status, 0, stderr);
+
+  const { additions, deletions } =
+    JSON.parse(stdout).variables.input.fileChanges;
+  assert.deepEqual(deletions, [{ path: "a.txt" }]);
+  assert.deepEqual(
+    additions.map((a) => a.path),
+    ["b.txt"],
+  );
+  assert.equal(
+    Buffer.from(additions[0].contents, "base64").toString("utf8"),
+    "a\n",
+  );
+});
+
+test("a path with bytes past ASCII is not C-quoted", () => {
+  const { root, head } = makeRepo({ "a.txt": "a\n" });
+  writeFileSync(path.join(root, "ünï.txt"), "accents\n");
+
+  const { status, stdout, stderr } = build(root, { EXPECTED_HEAD_OID: head });
+  assert.equal(status, 0, stderr);
+
+  const { additions } = JSON.parse(stdout).variables.input.fileChanges;
+  assert.deepEqual(
+    additions.map((a) => a.path),
+    ["ünï.txt"],
+  );
+});
+
 test("a body becomes the commit message body", () => {
   const { root, head } = makeRepo({ "a.txt": "a\n" });
   writeFileSync(path.join(root, "a.txt"), "b\n");

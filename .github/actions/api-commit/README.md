@@ -34,8 +34,8 @@ bots still `git push` a lightweight tag, which has no badge to lose.
 - `build-payload.sh` turns the worktree into one `fileChanges` object: an
   addition or a change becomes a `FileAddition` with the whole file, a deletion
   becomes a `FileDeletion`, a rename becomes both. File contents reach `jq`
-  through `--rawfile` and the request body reaches `gh` on stdin, so no file
-  crosses argv, which Linux caps at 128 KiB per string. `Cargo.lock` alone is
-  about 117 KB once base64 has grown it.
+  through `--rawfile` as base64 text, and the request body is a file handed to
+  `gh api --input`, so no file content crosses argv, which Linux caps at 128 KiB
+  per string. `Cargo.lock` alone is about 117 KB once base64 has grown it.
 - `build-payload.sh` has unit tests in `build-payload.test.mjs`: run them with
   `node --test .github/actions/api-commit/build-payload.test.mjs`.

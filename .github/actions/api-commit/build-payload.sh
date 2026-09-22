@@ -7,9 +7,10 @@
 # Inputs (environment): GITHUB_REPOSITORY, BRANCH, EXPECTED_HEAD_OID, HEADLINE,
 # and the optional BODY. The working directory is the checkout to commit.
 #
-# File contents reach jq through --rawfile and the body reaches `gh` on stdin,
-# so no file ever crosses argv: Linux caps one argv string at 128 KiB and
-# Cargo.lock alone is about 117 KB once base64 has grown it.
+# File contents reach jq through --rawfile as base64 text, and the body is a
+# file handed to `gh api --input`, so no file content ever crosses argv: Linux
+# caps one argv string at 128 KiB and Cargo.lock alone is about 117 KB once
+# base64 has grown it.
 set -euo pipefail
 
 require() {
@@ -24,20 +25,22 @@ require expected-head-oid "${EXPECTED_HEAD_OID:-}"
 require headline "${HEADLINE:-}"
 
 git add -A
-changes=$(git diff --cached --name-status "$EXPECTED_HEAD_OID")
-if [ -z "$changes" ]; then
+if git diff --cached --quiet "$EXPECTED_HEAD_OID"; then
   exit 0
 fi
 
 file_changes=$(mktemp)
-trap 'rm -f "$file_changes" "$file_changes.next"' EXIT
+changes=$(mktemp)
+trap 'rm -f "$file_changes" "$file_changes.next" "$changes"' EXIT
 echo '{"additions":[],"deletions":[]}' >"$file_changes"
 
 # An addition and a change are the same mutation: a FileAddition replaces
-# whatever is at the path. A rename is a deletion plus an addition.
+# whatever is at the path. A rename is a deletion plus an addition. base64
+# encodes the file before jq sees it, because --rawfile decodes as UTF-8 and
+# would replace the bytes of a binary file with U+FFFD.
 add() {
-  jq --rawfile contents "$1" --arg path "$1" \
-    '.additions += [{path: $path, contents: ($contents | @base64)}]' \
+  jq --rawfile contents <(base64 <"$1" | tr -d '\n') --arg path "$1" \
+    '.additions += [{path: $path, contents: $contents}]' \
     "$file_changes" >"$file_changes.next"
   mv "$file_changes.next" "$file_changes"
 }
@@ -47,11 +50,16 @@ remove() {
   mv "$file_changes.next" "$file_changes"
 }
 
-while IFS=$'\t' read -r status first second; do
+# NUL-separated records: git C-quotes a path holding a byte >= 0x80, a tab, a
+# quote or a backslash unless -z turns the quoting off.
+git diff --cached --name-status -z "$EXPECTED_HEAD_OID" >"$changes"
+while IFS= read -r -d '' status; do
+  IFS= read -r -d '' first
   case "$status" in
     A | M) add "$first" ;;
     D) remove "$first" ;;
     R*)
+      IFS= read -r -d '' second
       remove "$first"
       add "$second"
       ;;
@@ -60,7 +68,7 @@ while IFS=$'\t' read -r status first second; do
       exit 1
       ;;
   esac
-done <<<"$changes"
+done <"$changes"
 
 jq -n \
   --arg repo "$GITHUB_REPOSITORY" \
