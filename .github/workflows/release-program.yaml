@@ -47,9 +47,6 @@ jobs:
           fi
           PROGRAM=${BASH_REMATCH[1]}
           VERSION=${BASH_REMATCH[2]}
-          # Written before the guards so the Slack step can name a release that a guard stopped.
-          echo "PROGRAM=${PROGRAM}" >> "$GITHUB_ENV"
-          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
 
@@ -80,8 +77,12 @@ jobs:
           echo "Program: $PROGRAM"
           echo "Program: $PROGRAM_ID"
           echo "Version: $VERSION"
-          echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
-          echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
+          {
+            echo "PROGRAM=${PROGRAM}"
+            echo "VERSION=${VERSION}"
+            echo "PROGRAM_ID=${PROGRAM_ID}"
+            echo "PROGRAM_NAME=${PROGRAM_NAME}"
+          } >> "$GITHUB_ENV"
 
       # Only the IDL is taken from anchor; `build-verified` below produces the `.so` that ships.
       - uses: ./.github/actions/build-program-idl/
@@ -161,38 +162,13 @@ jobs:
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
 
       # A second proposal for the same program is open. Signers must reject the old one, or an
-      # execute of it after the new one rolls the program back.
-      - name: "Slack: older pending proposal"
+      # execute of it after the new one rolls the program back. The annotation and the summary line
+      # are the whole notice: the person who merged the Promotion PR is watching this run.
+      - name: Report the older pending proposal
         if: steps.deploy-buffers.outputs.skip != 'true' && steps.deploy-buffers.outputs.pending-proposal-index != ''
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
           PENDING: ${{ steps.deploy-buffers.outputs.pending-proposal-index }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ -z "$SLACK_WEBHOOK" ]; then
-            echo "SLACK_RELEASE_WEBHOOK is not set. No notice sent."
-            exit 0
-          fi
-          TEXT="Program release: proposal created for ${PROGRAM} ${VERSION}. Reject the older pending proposal(s) ${PENDING} for this program. ${RUN_URL}"
-          # The proposal exists by now, so a Slack outage must not fail the release run.
-          # curl's stderr can hold the webhook URL, so it is dropped.
-          if ! jq -nc --arg text "$TEXT" '{text: $text}' | curl -sS --fail --max-time 30 -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK" > /dev/null 2>&1; then
-            echo "::warning::the Slack notice was not sent"
-          fi
-
-      - name: "Slack: release failed"
-        if: failure()
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_RELEASE_WEBHOOK }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          if [ -z "$SLACK_WEBHOOK" ]; then
-            echo "SLACK_RELEASE_WEBHOOK is not set. No notice sent."
-            exit 0
-          fi
-          # PROGRAM and VERSION are empty when the tag did not parse. The tag is always there.
-          TEXT="Program release FAILED: ${PROGRAM:-?} ${VERSION:-?} (tag ${GITHUB_REF_NAME}). ${RUN_URL}"
-          # curl's stderr can hold the webhook URL, so it is dropped.
-          if ! jq -nc --arg text "$TEXT" '{text: $text}' | curl -sS --fail --max-time 30 -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK" > /dev/null 2>&1; then
-            echo "::warning::the Slack notice was not sent"
-          fi
+          LINE="${PROGRAM} ${VERSION}: proposal ${PENDING} is still pending"
+          echo "::notice title=Older pending proposal::${LINE}"
+          echo "$LINE" >> "$GITHUB_STEP_SUMMARY"
