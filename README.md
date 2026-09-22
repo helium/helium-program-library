@@ -204,7 +204,7 @@ The binary a cluster runs is never a local build. `release-program.yaml` builds 
 `program-*` tag via `.github/actions/build-verified`, which compiles in a container that
 receives neither variable; `write-program-buffer` uploads that artifact with the Squads vault as its
 buffer authority, and the upgrade is a multisig proposal. The guard's job is therefore the build
-that is *meant* to be deployable picking up `TESTING` on its own.
+that is _meant_ to be deployable picking up `TESTING` on its own.
 
 ## Repo layout
 
@@ -243,14 +243,25 @@ Three things leave this repo: npm packages, service images, and Solana programs.
 | [`service-auto-tag.yaml`](.github/workflows/service-auto-tag.yaml)               | Push to `develop`; manual dispatch                                          | Pushes the next `docker-<env>-<service>-<version>` tag for each opted-in service that changed.                                               |
 | [`docker-push.yaml`](.github/workflows/docker-push.yaml)                         | Git tag `docker-<env>-<service>-<version>`                                  | Builds the service image and pushes it to ECR.                                                                                               |
 
+**Where a bot reports.** No bot sends a message off GitHub. A bot that needs a person writes on its own run: an annotation at the top of the run, and a line in the run summary. A run that must not stay green is red. Read them in the [Actions tab](../../actions), filtered by workflow: `release-program.yaml` for a deploy or a hand tag, `program-hash-check.yaml` for the daily check, `program-auto-tag.yaml` for a program that changed with no version bump.
+
 ### What you do in a pull request
 
-Open the PR. The changeset bot reads the diff and adds the release notes it is missing:
+Open the PR. The changeset bot adds the release notes it is missing:
 
 - a changeset in `.changeset/` for each changed npm package;
 - a program changeset in `.changeset-programs/` for each changed program.
 
-The bot writes at most one new file in each directory, and it never edits a file that is already there. So to change what a release says, edit the file the bot wrote and push. Your edit stands.
+Nothing reads the diff for meaning. Fixed rules pick every level and every line, in [`scripts/write-changesets.mjs`](scripts/write-changesets.mjs), whose unit tests are those rules:
+
+- **npm level**: `patch` for each changed package. `@helium/idls` takes the level the IDL diff gives: `minor` when a program adds an instruction or an account, `patch` otherwise.
+- **program level**: a program you changed takes that same IDL-diff hint. A program you changed only through a dependency takes `none`, but only when every dependency it came through is a program whose IDL did not move and whose changed files are all instruction handlers, which a dependent never runs. Anything else, a shared crate above all, takes `patch`.
+- **text**: the PR title, with its `type(scope):` prefix stripped. The program file adds a line per program that names the IDL change, or the reason for the level.
+- **no release**: a path that matches `*.md`, `tests/`, `*.test.ts`, `.github/`, or `.scratch/` declares no release, so a PR that touches only those gets no file.
+
+The bot writes at most one new file in each directory, and it never edits a file that is already there. So to change what a release says, edit the file the bot wrote and push. Your edit stands, and no later run rewrites it.
+
+The bot commits through the GitHub API with the [`api-commit`](.github/actions/api-commit) action, not `git push`. GitHub signs such a commit with its own key, so the bot's commit shows **Verified**. The commit names the head the run read; a branch that moved since then fails the commit, and the next run writes the files against the new head.
 
 The bot skips drafts, its own commits, the release PR heads, the Promotion PR, and the back-merge PR. It also skips a PR from a fork, because a fork's token is read-only. For a fork PR, a maintainer pushes the file to the fork branch.
 
@@ -324,7 +335,7 @@ Re-run the failed workflow run. The [`deploy-buffers`](.github/actions/deploy-bu
 - The on-chain program already matches the build: the run stops with success and writes nothing.
 - The Squads vault already owns a buffer whose bytes match the build: the run reuses that buffer, so a re-run pays the write once.
 - A pending proposal already names the reused buffer: the run stops with success. Vote on the proposal that is open.
-- An older pending proposal names a different buffer for the program: the run goes on, and Slack names the older proposal so the signers reject it. An execute of the older one after the newer would roll the program back.
+- An older pending proposal names a different buffer for the program: the run goes on, and prints an `Older pending proposal` notice annotation naming its index, plus the same line in the run summary, so the signers reject it. An execute of the older one after the newer would roll the program back.
 - This run's own buffer is closed when the run fails before the authority transfer.
 
 IDL buffers are never reused. Each run that goes on writes a new one.
@@ -340,8 +351,8 @@ IDL buffers are never reused. Each run that goes on writes a new one.
 `program-hash-check.yaml` compares each mainnet program with the release hash of its newest release. It takes no action, holds no state, and holds no deploy secret. Each program gets one of three results:
 
 - **deployed**: the chain holds the newest release's binary. Silent.
-- **pending**: the chain holds an older release of this repo. This is normal while a proposal waits for votes. Slack says so once the newest tag is more than 3 days old.
-- **unknown binary**: the chain holds a binary no release of this repo published. Slack says so and the run fails.
+- **pending**: the chain holds an older release of this repo. This is normal while a proposal waits for votes. Once the newest tag is more than 3 days old, the run prints a `Pending upgrade` warning annotation and a summary line, and stays green: the vote is still open.
+- **unknown binary**: the chain holds a binary no release of this repo published. The run prints an `Unknown binary` error annotation and fails, so the check does not stay green while the question is open.
 
 A program whose releases carry no `<name>.so.sha256` asset is skipped and named in the run summary. A program enters the check at its first release through this flow.
 
@@ -349,19 +360,20 @@ When a release is rejected in Squads and will never deploy, delete that release'
 
 ### Verifying a program locally
 
-CI verifies every mainnet build. To repeat one by hand, install [`solana-verify`](https://github.com/Ellipsis-Labs/solana-verifiable-build) and run it against the tagged commit:
+`release-program.yaml` builds every mainnet program through `solana-verify` and publishes the build's hash as the `<name>.so.sha256` release asset, the **release hash**. The daily hash check compares the chain with it. To repeat that build by hand, install [`solana-verify`](https://github.com/Ellipsis-Labs/solana-verifiable-build) and run it against the tagged commit:
 
 ```bash
 solana-verify verify-from-repo https://github.com/helium/helium-program-library \
   --program-id <program-id> \
   --library-name <library_name> \
-  --commit-hash "$(git rev-list -n 1 program-<name>-<version>)" \
-  --remote
+  --commit-hash "$(git rev-list -n 1 program-<name>-<version>)"
 ```
 
 The library name is the program directory name with underscores, for example `helium_sub_daos`. The program id is its entry in `[programs.localnet]` of [`Anchor.toml`](Anchor.toml).
 
 Pass no `-b` image. Without one, `solana-verify` picks the build image from the Rust version in `Cargo.lock`, which is what CI does in [`build-verified`](.github/actions/build-verified). A pinned image gives a different hash.
+
+The run builds the program in a container and prints the hash it got beside the hash the chain holds. To compare it with the release instead, read the `<name>.so.sha256` asset of the `program-<name>-<version>` release. Nothing is submitted anywhere: the build is local, and the release hash is the only published record.
 
 ### Deploying Docker services
 
@@ -450,7 +462,7 @@ tuktuk -u <URL> task list --task-queue-name hpl-crons --active
 
 ### 2. Reproduce the failure
 
-To see *why* a task is failing, run it yourself with preflight disabled so the RPC returns a signature even though execution fails:
+To see _why_ a task is failing, run it yourself with preflight disabled so the RPC returns a signature even though execution fails:
 
 ```sh
 tuktuk -u <URL> task run --task-queue-name hpl-crons --id <ID> --skip-preflight
