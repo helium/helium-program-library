@@ -1,0 +1,101 @@
+name: Program Hash Check
+
+# An independent witness of the mainnet deploys: once a day it compares what each program
+# holds on chain with what its releases say it must hold. It takes no action in any case,
+# so it needs no secret and no write permission: the run summary and the annotations are
+# the whole report.
+on:
+  schedule:
+    # Daily, off the hour: a run at :00 waits in GitHub's queue.
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Mainnet only, and master is the branch mainnet must match. A dispatch from
+          # another branch still checks master's programs.
+          ref: master
+          # The check reads every `program-<name>-<x.y.z>` tag and its creation date.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/cache@v4
+        name: Cache Solana Verify
+        id: cache-solana-verify
+        with:
+          path: |
+            ~/.cargo/bin/solana-verify
+          key: cargo-${{ runner.os }}-solana-verify-0.5.0
+      # The same pin as `build-verified`, so this check hashes with the binary that
+      # produced the release hash. See that action for why 0.5.0.
+      - run: cargo install solana-verify --version 0.5.0 --locked --force
+        if: steps.cache-solana-verify.outputs.cache-hit != 'true'
+        shell: bash
+      - run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+        shell: bash
+
+      - name: Compare the on-chain hashes with the release hashes
+        id: check
+        env:
+          # The run's own token, not a configured secret: it reads public releases and
+          # their assets for the API rate limit. No write scope is granted above.
+          GITHUB_TOKEN: ${{ github.token }}
+          SOLANA_URL: https://solana-rpc.web.helium.io
+        run: |
+          RESULT=$(node scripts/program-hash-check.mjs)
+          echo "$RESULT" | jq -r '.programs[] | "- `\(.program)`: \(.status)" + (if .version then " (newest release \(.version))" else "" end)' >> "$GITHUB_STEP_SUMMARY"
+          # A pending upgrade past the notice window. The run stays green: a vote is
+          # still open, and the annotation is there for whoever reads the run.
+          # GitHub keeps ten warning annotations per step and drops the rest without
+          # a word, so past ten the tenth annotation counts how many are left and the
+          # summary, which has no cap, carries them all.
+          NOTICES="$RUNNER_TEMP/notices.txt"
+          echo "$RESULT" | jq -r '.notices[]' > "$NOTICES"
+          TOTAL=$(wc -l < "$NOTICES" | tr -d ' ')
+          SHOWN=$TOTAL
+          if [ "$TOTAL" -gt 10 ]; then
+            SHOWN=9
+          fi
+          N=0
+          while IFS= read -r NOTICE; do
+            N=$((N + 1))
+            if [ "$N" -le "$SHOWN" ]; then
+              echo "::warning title=Pending upgrade::${NOTICE}"
+            fi
+            echo "- $NOTICE" >> "$GITHUB_STEP_SUMMARY"
+          done < "$NOTICES"
+          if [ "$TOTAL" -gt "$SHOWN" ]; then
+            echo "::warning title=Pending upgrade::$((TOTAL - SHOWN)) more pending upgrades, see the run summary"
+          fi
+          UNKNOWN=$(echo "$RESULT" | jq -r '[.programs[] | select(.status == "unknown binary") | .program] | join(",")')
+          echo "unknown=$UNKNOWN" >> "$GITHUB_OUTPUT"
+
+      # A program the chain holds that no release published. Nothing here acts on it; the
+      # run fails so the check does not stay green while the question is open.
+      - name: Fail on an unknown binary
+        if: steps.check.outputs.unknown != ''
+        env:
+          UNKNOWN: ${{ steps.check.outputs.unknown }}
+        run: |
+          IFS=',' read -ra PROGRAMS <<< "$UNKNOWN"
+          # Ten error annotations per step is GitHub's cap, and it drops the rest
+          # without a word, so past ten the tenth annotation counts how many are left.
+          SHOWN=${#PROGRAMS[@]}
+          if [ "$SHOWN" -gt 10 ]; then
+            SHOWN=9
+          fi
+          for PROGRAM in "${PROGRAMS[@]:0:$SHOWN}"; do
+            echo "::error title=Unknown binary::${PROGRAM} holds a binary no release published"
+          done
+          if [ "${#PROGRAMS[@]}" -gt "$SHOWN" ]; then
+            echo "::error title=Unknown binary::$((${#PROGRAMS[@]} - SHOWN)) more programs hold a binary no release published"
+          fi
+          exit 1

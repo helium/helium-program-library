@@ -4,4 +4,4 @@ Helium's fork of [Mango's VSR](https://github.com/blockworks-foundation/voter-st
 
 Position NFTs' metadata comes from [`vsr-metadata-service`](../../packages/vsr-metadata-service). React bindings: [`@helium/voter-stake-registry-hooks`](../../packages/voter-stake-registry-hooks). SDK: [`@helium/voter-stake-registry-sdk`](../../packages/voter-stake-registry-sdk).
 
-Release / upgrade: push a `program-voter-stake-registry-<version>` git tag.
+Release / upgrade: add a program changeset that names `voter-stake-registry` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-voter-stake-registry-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

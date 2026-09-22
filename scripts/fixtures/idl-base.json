@@ -1,0 +1,73 @@
+{
+  "address": "circAbCkcqD5Xx6vSqBGoTAtjQbvjkD5QoNAHKYLwvC",
+  "metadata": {
+    "name": "circuit_breaker",
+    "version": "0.1.4",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "burn_v0",
+      "docs": ["Burns tokens through the breaker."],
+      "discriminator": [173, 246, 240, 234, 229, 178, 249, 57],
+      "accounts": [
+        { "name": "from", "writable": true },
+        { "name": "owner", "signer": true },
+        { "name": "circuit_breaker", "writable": true }
+      ],
+      "args": [
+        { "name": "args", "type": { "defined": { "name": "BurnArgsV0" } } }
+      ]
+    },
+    {
+      "name": "initialize_account_windowed_breaker_v0",
+      "discriminator": [8, 1, 2, 3, 4, 5, 6, 7],
+      "accounts": [
+        { "name": "payer", "writable": true, "signer": true },
+        { "name": "circuit_breaker", "writable": true }
+      ],
+      "args": [{ "name": "window_size_seconds", "type": "u64" }]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AccountWindowedCircuitBreakerV0",
+      "discriminator": [134, 11, 69, 100, 90, 132, 174, 187]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "CircuitBreakerTriggered",
+      "msg": "The circuit breaker was triggered"
+    }
+  ],
+  "types": [
+    {
+      "name": "AccountWindowedCircuitBreakerV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "token_account", "type": "pubkey" },
+          { "name": "authority", "type": "pubkey" },
+          { "name": "bump_seed", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "BurnArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [{ "name": "amount", "type": "u64" }]
+      }
+    },
+    {
+      "name": "ThresholdType",
+      "type": {
+        "kind": "enum",
+        "variants": [{ "name": "Percent" }, { "name": "Absolute" }]
+      }
+    }
+  ]
+}

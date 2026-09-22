@@ -1,0 +1,43 @@
+name: "Build Program IDL"
+description: "Generate one program's IDL JSON with `anchor idl build` (a `cargo test --features idl-build`, no SBF compilation)."
+inputs:
+  devnet:
+    description: "Whether to build with the devnet feature"
+    required: false
+    default: "false"
+  program:
+    description: "The program to build the IDL for (snake_case, as in Anchor.toml)"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - uses: ./.github/actions/setup/
+    - uses: ./.github/actions/setup-anchor/
+
+    - uses: actions/cache@v4
+      name: Cache Cargo registry + index
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: cargo-${{ runner.os }}-idl-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-${{ runner.os }}-idl-
+          cargo-${{ runner.os }}-cargo-build-
+
+    # `anchor build` would also produce this IDL, but its SBF half is thrown away: the deploy
+    # workflows take `target/deploy/<program>.so` from `build-verified`, which overwrites whatever
+    # anchor left there. `anchor build --verifiable` is not an option either -- it builds in a
+    # different image and so yields a different hash than the one `solana-verify` publishes.
+    - name: Build IDL
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p target/idl
+        ARGS=(-p "$PROGRAM" -o "target/idl/${PROGRAM}.json" --skip-lint)
+        if [ "$DEVNET" = "true" ]; then ARGS+=(-- --features devnet); fi
+        ~/.cargo/bin/anchor idl build "${ARGS[@]}"
+      env:
+        DEVNET: ${{ inputs.devnet }}
+        PROGRAM: ${{ inputs.program }}

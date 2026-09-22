@@ -12,6 +12,10 @@ inputs:
   program:
     description: "The program to build"
     required: false
+  target-artifact:
+    description: "Name of an artifact of this run that already holds the build (target/deploy, target/idl, target/types). When set, the action downloads it instead of restoring the `target/` cache and running `anchor build`."
+    required: false
+    default: ""
 runs:
   using: "composite"
   steps:
@@ -27,13 +31,34 @@ runs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
         key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-    - name: Cache Anchor Build
-      uses: actions/cache@v4
+    # Key layout: build-<os>-<anchor version>-<anchor sha>-v0002-<devnet>-<testing>-<program>-<hash of programs/>.
+    # The `programs/` hash is last so that everything identifying the build flavour sits in the
+    # restore-keys prefix. A PR that touches `programs/**` can never hit the exact key, and with no
+    # fallback it paid a cold 14 min build: 24 of 30 runs did. The prefix hands it the newest
+    # `target/` for the same anchor version, same devnet/testing flags and same `-p` program --
+    # normally the one the develop seed run saved (tests.yaml `build` job, push to develop).
+    # A prefix hit leaves `cache-hit` false, so `anchor build` still runs; it just runs warm.
+    # Restore and save are split so that the save can be gated on the ref; the exact key and the
+    # prefix are the same on both halves.
+    - name: Restore Anchor Build
+      uses: actions/cache/restore@v4
       id: cache-anchor-build
+      if: inputs.target-artifact == ''
       with:
         path: |
           ./target/
-        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/**') }}-${{ inputs.program }}
+        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**') }}
+        restore-keys: |
+          build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-
+    # A job that only consumes the build takes it from an artifact the run's own `build` job
+    # uploaded. Every `needs: build` job used to call this action itself, so one push restored (and
+    # on a prefix hit rebuilt) the same `target/` in 43 more legs.
+    - name: Download Anchor Build
+      uses: actions/download-artifact@v4
+      if: inputs.target-artifact != ''
+      with:
+        name: ${{ inputs.target-artifact }}
+        path: ./target
     # The programs refuse to compile when TESTING is set without HELIUM_TEST_BUILD, so a
     # test build carries both.
     - run: |
@@ -44,9 +69,20 @@ runs:
           export TESTING=true HELIUM_TEST_BUILD=true
         fi
         ~/.cargo/bin/anchor build "${ARGS[@]}"
-      if: steps.cache-anchor-build.outputs.cache-hit != 'true'
+      if: inputs.target-artifact == '' && steps.cache-anchor-build.outputs.cache-hit != 'true'
       shell: bash
       env:
         DEVNET: ${{ inputs.devnet }}
         TESTING_BUILD: ${{ inputs.testing }}
         PROGRAM: ${{ inputs.program }}
+    # Only develop and master save. The repo's 10 GB cache store sat at 9.72 GB with 7.7 GB of it
+    # per-PR `target/` copies, which evicted the develop seed the PRs are meant to restore. The cost
+    # is that a re-push of a PR that touches `programs/**` no longer hits its own earlier save: it
+    # restores the develop seed through the prefix above and rebuilds warm.
+    - name: Save Anchor Build
+      uses: actions/cache/save@v4
+      if: inputs.target-artifact == '' && steps.cache-anchor-build.outputs.cache-hit != 'true' && (github.ref_name == 'develop' || github.ref_name == 'master')
+      with:
+        path: |
+          ./target/
+        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**') }}

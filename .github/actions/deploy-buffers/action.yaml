@@ -1,0 +1,220 @@
+# The deploy re-run rules, in front of the two vendored buffer writes. All three deploy
+# workflows call this action, so devnet and mainnet follow the same rules:
+# - the on-chain program already matches the build: stop, write nothing;
+# - the vault already owns a buffer with the build's bytes: reuse it;
+# - a pending proposal already names the reused buffer: stop;
+# - an older pending proposal for the program: go on and report its index.
+# Every compare is against ./target/deploy/<program>.so as the caller built it, so a
+# `devnet` feature build compares like any other.
+# IDL buffers have no reuse. Each run that goes on writes a new one.
+#
+# A stop is a success. The caller gates its Squads step on `outputs.skip != 'true'`,
+# because a skipped run has no buffers to pass.
+#
+# The caller installs the Solana and Anchor CLIs first (`setup-anchor` does it).
+name: "Deploy Buffers"
+description: "Writes or reuses the program buffer and writes the IDL buffer, unless the deploy is already done or pending"
+inputs:
+  devnet:
+    description: "Whether the target is devnet"
+    required: false
+    default: "false"
+  network:
+    description: "Solana RPC URL"
+    required: true
+  program:
+    description: "Program name (snake_case). The binary is ./target/deploy/<program>.so"
+    required: true
+  program-id:
+    description: "The program id of the program to upgrade"
+    required: true
+  keypair:
+    description: "The keypair to use for buffer creation"
+    required: true
+  buffer-authority:
+    description: "The Squads vault. It receives the buffer authorities, and its buffers are the reuse candidates"
+    required: true
+  multisig:
+    description: "The Squads v4 multisig whose pending proposals are read"
+    required: true
+
+outputs:
+  skip:
+    description: "'true' when the run stops with success and there are no buffers. Gate the Squads step on it."
+    value: ${{ steps.hash-match.outputs.skip == 'true' || steps.pending.outputs.skip == 'true' }}
+  buffer:
+    description: "The program buffer address, reused or new"
+    value: ${{ steps.reuse.outputs.buffer || steps.write-program-buffer.outputs.buffer }}
+  idl-buffer:
+    description: "The idl buffer address"
+    value: ${{ steps.write-idl-buffer.outputs.idl-buffer }}
+  pending-proposal-index:
+    description: "Transaction indexes of older pending upgrade proposals for this program, comma separated. Empty when there are none."
+    value: ${{ steps.pending.outputs.pending-proposal-index }}
+
+runs:
+  using: "composite"
+  steps:
+    # Same cache key and pin as `build-verified`. A job that ran `build-verified` has the
+    # binary already. The devnet publish job does not build, so it gets it from the cache.
+    - uses: actions/cache@v4
+      name: Cache Solana Verify
+      with:
+        path: |
+          ~/.cargo/bin/solana-verify
+        key: cargo-${{ runner.os }}-solana-verify-0.5.0
+    - run: |
+        if [ ! -x ~/.cargo/bin/solana-verify ]; then
+          cargo install solana-verify --version 0.5.0 --locked --force
+        fi
+      shell: bash
+
+    - name: Skip when the on-chain program matches the build
+      id: hash-match
+      shell: bash
+      run: |
+        set +e
+        ONCHAIN_OUT=$(~/.cargo/bin/solana-verify get-program-hash -u "$NETWORK" "$PROGRAM_ID" 2>&1)
+        EXIT_CODE=$?
+        set -e
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          # The RPC URL is a secret and the CLI puts it in some errors.
+          echo "${ONCHAIN_OUT//"$NETWORK"/<rpc-url>}"
+          echo "::error::Could not read the on-chain hash of $PROGRAM_ID"
+          exit 1
+        fi
+        ONCHAIN_HASH=$(echo "$ONCHAIN_OUT" | tail -n 1)
+        BUILD_HASH=$(~/.cargo/bin/solana-verify get-executable-hash "./target/deploy/$PROGRAM.so" | tail -n 1)
+        echo "On-chain hash: $ONCHAIN_HASH"
+        echo "Build hash:    $BUILD_HASH"
+
+        # The devnet workflows rewrite the lazy signer in the source before the build.
+        NOTE=""
+        if [ "$DEVNET" = "true" ]; then
+          NOTE=" This is a devnet build. Do not compare its hash with a mainnet hash or with the committed source."
+        fi
+
+        if [ "$ONCHAIN_HASH" = "$BUILD_HASH" ]; then
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          echo "- \`$PROGRAM\`: the on-chain program already has the build hash \`$BUILD_HASH\`. Skipped: no buffer, no proposal.$NOTE" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "- \`$PROGRAM\`: build hash \`$BUILD_HASH\`, on-chain hash \`$ONCHAIN_HASH\`.$NOTE" >> "$GITHUB_STEP_SUMMARY"
+        fi
+      env:
+        DEVNET: ${{ inputs.devnet }}
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+
+    # A run that failed after the authority transfer leaves a vault-owned buffer that only a
+    # Squads proposal can close. The re-run takes it back instead of paying rent for a second.
+    - name: Reuse a vault buffer that matches the build
+      id: reuse
+      if: steps.hash-match.outputs.skip != 'true'
+      shell: bash
+      run: |
+        set +e
+        BUFFERS_OUT=$(solana program show --buffers --buffer-authority "$AUTHORITY" -u "$NETWORK" --output json 2>&1)
+        EXIT_CODE=$?
+        set -e
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          echo "${BUFFERS_OUT//"$NETWORK"/<rpc-url>}"
+          echo "::error::Could not list the buffers of $AUTHORITY"
+          exit 1
+        fi
+
+        DUMPED_BUFFER=$(mktemp ./buffer-dump.XXXXXX.so)
+        trap 'rm -f "$DUMPED_BUFFER"' EXIT
+        for CANDIDATE in $(echo "$BUFFERS_OUT" | jq -r '.buffers[].address'); do
+          if solana program dump "$CANDIDATE" "$DUMPED_BUFFER" -u "$NETWORK" > /dev/null 2>&1 \
+            && cmp -s "./target/deploy/$PROGRAM.so" "$DUMPED_BUFFER"; then
+            echo "Buffer $CANDIDATE matches the build"
+            echo "buffer=$CANDIDATE" >> "$GITHUB_OUTPUT"
+            echo "- \`$PROGRAM\`: reused buffer \`$CANDIDATE\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "Buffer $CANDIDATE does not match the build"
+        done
+        echo "No vault-owned buffer matches the build"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+        NETWORK: ${{ inputs.network }}
+
+    # The proposal read needs `@sqds/multisig` from the workspace.
+    - uses: pnpm/action-setup@v4
+      if: steps.hash-match.outputs.skip != 'true'
+    - uses: actions/setup-node@v4
+      if: steps.hash-match.outputs.skip != 'true'
+      with:
+        node-version-file: .node-version
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile --ignore-scripts
+      if: steps.hash-match.outputs.skip != 'true'
+      shell: bash
+
+    - name: Stop when a pending proposal names the reused buffer
+      id: pending
+      if: steps.hash-match.outputs.skip != 'true'
+      shell: bash
+      run: |
+        ARGS=(--multisig "$MULTISIG" --program-id "$PROGRAM_ID")
+        if [ -n "$REUSED_BUFFER" ]; then ARGS+=(--buffer "$REUSED_BUFFER"); fi
+        # The proposal is created against a public RPC. The read uses the RPC the buffer
+        # writes use. The script takes it from SOLANA_URL and keeps it out of its errors.
+        RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs "${ARGS[@]}")
+        echo "$RESULT"
+        SAME=$(echo "$RESULT" | jq -r '.sameBuffer // empty')
+        OLDER=$(echo "$RESULT" | jq -r '.older | map(tostring) | join(",")')
+
+        if [ -n "$SAME" ]; then
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          echo "- \`$PROGRAM\`: pending proposal $SAME already names buffer \`$REUSED_BUFFER\`. Stopped: no new proposal." >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        echo "skip=false" >> "$GITHUB_OUTPUT"
+        echo "pending-proposal-index=$OLDER" >> "$GITHUB_OUTPUT"
+        if [ -n "$OLDER" ]; then
+          echo "- \`$PROGRAM\`: older pending upgrade proposal(s) $OLDER name another buffer. This run makes a new proposal. Signers reject the older one(s)." >> "$GITHUB_STEP_SUMMARY"
+        fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        MULTISIG: ${{ inputs.multisig }}
+        REUSED_BUFFER: ${{ steps.reuse.outputs.buffer }}
+        NETWORK: ${{ inputs.network }}
+
+    # The IDL buffer goes first: it is cheap, so a failure there does not leave a
+    # vault-owned program buffer behind.
+    - uses: ./.github/actions/write-idl-buffer/
+      id: write-idl-buffer
+      if: steps.hash-match.outputs.skip != 'true' && steps.pending.outputs.skip != 'true'
+      with:
+        devnet: ${{ inputs.devnet }}
+        network: ${{ inputs.network }}
+        program: ${{ inputs.program }}
+        keypair: ${{ inputs.keypair }}
+        program-id: ${{ inputs.program-id }}
+        buffer-authority: ${{ inputs.buffer-authority }}
+
+    # On a failure before the authority transfer, this action closes the buffer it made.
+    - uses: ./.github/actions/write-program-buffer/
+      id: write-program-buffer
+      if: steps.hash-match.outputs.skip != 'true' && steps.pending.outputs.skip != 'true' && steps.reuse.outputs.buffer == ''
+      with:
+        devnet: ${{ inputs.devnet }}
+        network: ${{ inputs.network }}
+        program: ${{ inputs.program }}
+        keypair: ${{ inputs.keypair }}
+        program-id: ${{ inputs.program-id }}
+        buffer-authority: ${{ inputs.buffer-authority }}
+
+    - name: Summarize the new buffer
+      if: steps.write-program-buffer.outputs.buffer != ''
+      shell: bash
+      run: |
+        echo "- \`$PROGRAM\`: wrote new buffer \`$BUFFER\`" >> "$GITHUB_STEP_SUMMARY"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        BUFFER: ${{ steps.write-program-buffer.outputs.buffer }}

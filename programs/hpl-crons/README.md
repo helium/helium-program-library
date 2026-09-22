@@ -4,4 +4,4 @@ Stores on-chain "do this Helium action at time T" entries that the [tuktuk](http
 
 SDK: [`@helium/hpl-crons-sdk`](../../packages/hpl-crons-sdk).
 
-Release / upgrade: push a `program-hpl-crons-<version>` git tag.
+Release / upgrade: add a program changeset that names `hpl-crons` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-hpl-crons-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
