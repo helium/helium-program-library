@@ -1,8 +1,9 @@
 name: Changeset Bot
 
-# Writes the changesets a PR is missing. The LLM job holds no write token and no
-# shell: it only writes files in its own checkout. A guard script checks those
-# files, and a separate job with the App token commits them.
+# Writes the changesets a PR is missing, by fixed rules, and commits them to
+# the PR branch through the GitHub API under the App token. One job: detect,
+# write, commit. The rules and their invariants live in
+# scripts/write-changesets.mjs and its tests.
 env:
   # Dry run until go-live. A workflow_dispatch run overrides it.
   DRY_RUN: true
@@ -34,12 +35,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  detect:
-    name: Missing changesets
+  changesets:
+    name: Write missing changesets
     # A job-level gate, not a `paths` filter: a filtered-out workflow reports
-    # nothing. Skipped: drafts, forks (their token is read-only and they must
-    # not reach the LLM key), the bot's own commits, the release PR heads, the
-    # Promotion PR (head develop), and the back-merge PR (head master).
+    # nothing. Skipped: drafts, forks (the backstop carries the message), the
+    # App's own commits, the release PR heads, the Promotion PR (head develop),
+    # and the back-merge PR (head master).
     if: >-
       github.event_name == 'workflow_dispatch' || (
         !github.event.pull_request.draft &&
@@ -56,15 +57,8 @@ jobs:
     continue-on-error: true
     permissions:
       contents: read
+      # `gh pr view` reads the title.
       pull-requests: read
-    outputs:
-      run: ${{ steps.missing.outputs.run }}
-      missing: ${{ steps.missing.outputs.missing }}
-      number: ${{ steps.pr.outputs.number }}
-      head-ref: ${{ steps.pr.outputs.head-ref }}
-      head-sha: ${{ steps.pr.outputs.head-sha }}
-      base-sha: ${{ steps.base.outputs.sha }}
-      dry-run: ${{ steps.mode.outputs.dry_run }}
     steps:
       - name: Resolve dry run
         id: mode
@@ -72,22 +66,26 @@ jobs:
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
         run: echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
 
-      # A dispatch run has no pull_request payload, so it asks the API.
+      # The head the run works from. A pull_request event names it; a dispatch
+      # run has no payload and asks the API. The same sha is the commit's
+      # expected head below, so a branch that moved fails the commit.
       - name: Resolve the pull request
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
           NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          pr=$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefName,headRefOid,baseRefOid,isCrossRepository)
+          pr=$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json title,headRefName,headRefOid,baseRefOid,isCrossRepository)
           if [ "$(jq -r '.isCrossRepository' <<< "$pr")" = "true" ]; then
             echo "::error::#$NUMBER comes from a fork. The bot does not run on forks."
             exit 1
           fi
           {
             echo "number=$NUMBER"
+            echo "title=$(jq -r '.title' <<< "$pr")"
             echo "head-ref=$(jq -r '.headRefName' <<< "$pr")"
-            echo "head-sha=$(jq -r '.headRefOid' <<< "$pr")"
+            echo "head-sha=${EVENT_HEAD_SHA:-$(jq -r '.headRefOid' <<< "$pr")}"
             echo "base-tip=$(jq -r '.baseRefOid' <<< "$pr")"
           } >> "$GITHUB_OUTPUT"
 
@@ -109,6 +107,9 @@ jobs:
         with:
           node-version-file: .node-version
 
+      # Both scripts apply the one no-release path filter, so a PR that only
+      # touches docs, tests, or workflows names nothing and the job ends at
+      # the nothing-missing exit.
       - name: Changed packages and programs
         id: changed
         env:
@@ -137,118 +138,44 @@ jobs:
           args=(--packages "$RUNNER_TEMP/packages.json" --programs "$RUNNER_TEMP/programs.json")
           if [ -n "$IDL_DIFF" ]; then
             args+=(--idl-diff "$IDL_DIFF")
-            cp "$IDL_DIFF" "$RUNNER_TEMP/changeset-bot-idl-diff.json"
           fi
           node scripts/missing-changesets.mjs "$BASE_SHA" HEAD "${args[@]}" > "$RUNNER_TEMP/missing.json"
-          echo "missing=$(cat "$RUNNER_TEMP/missing.json")" >> "$GITHUB_OUTPUT"
           if [ "$(jq -r '.nothingMissing' "$RUNNER_TEMP/missing.json")" = "true" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Nothing is missing. No LLM run." >> "$GITHUB_STEP_SUMMARY"
+            echo "Nothing is missing. No changeset written." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Keep the IDL diff for the LLM job
-        if: steps.missing.outputs.run == 'true' && steps.idl-diff.outputs.diff-file != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: changeset-bot-idl-diff
-          path: ${{ runner.temp }}/changeset-bot-idl-diff.json
-
-  write:
-    name: Write changesets
-    needs: detect
-    if: needs.detect.outputs.run == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    continue-on-error: true
-    # The LLM job. Read-only token, no App token, no secret but the API key.
-    permissions:
-      contents: read
-    outputs:
-      files: ${{ steps.guard.outputs.files }}
-      report: ${{ steps.guard.outputs.report }}
-    steps:
-      # A fresh checkout: the guard reads `git status`, so the tree must hold
-      # nothing but what the LLM wrote. No stored credentials either.
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.detect.outputs.head-sha }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-
-      # Absent when no program changed.
-      - name: Download the IDL diff
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: changeset-bot-idl-diff
-          path: ${{ runner.temp }}/idl-diff
-
-      # The LLM has no shell, so a fixed step hands it the diff as a file.
-      - name: Write the LLM inputs
-        env:
-          BASE_SHA: ${{ needs.detect.outputs.base-sha }}
-          MISSING: ${{ needs.detect.outputs.missing }}
-        run: |
-          mkdir -p .changeset-bot
-          printf '%s\n' "$MISSING" | tee "$RUNNER_TEMP/missing.json" > .changeset-bot/missing.json
-          if [ -f "$RUNNER_TEMP/idl-diff/changeset-bot-idl-diff.json" ]; then
-            cp "$RUNNER_TEMP/idl-diff/changeset-bot-idl-diff.json" .changeset-bot/idl-diff.json
-          fi
-          git diff "$BASE_SHA" HEAD -- . ':(exclude)*.lock' ':(exclude)pnpm-lock.yaml' > .changeset-bot/pr.diff
-
-      - name: Read the prompt
-        id: prompt
-        run: |
-          delimiter="PROMPT_$(openssl rand -hex 16)"
-          {
-            echo "text<<$delimiter"
-            cat .github/changeset-bot-prompt.md
-            echo "$delimiter"
-          } >> "$GITHUB_OUTPUT"
-
-      # `github_token` is the job's read-only token. Without it the action
-      # trades an OIDC token for its own App's token, which can write.
+      # The build left nothing tracked behind (target/ is ignored), so the
+      # files this step writes are the whole commit.
       - name: Write the changesets
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ github.token }}
-          prompt: ${{ steps.prompt.outputs.text }}
-          claude_args: |
-            --allowedTools "Read,Grep,Glob,Write"
-            --disallowedTools "Bash,WebFetch,WebSearch"
-            --max-turns 30
-
-      # A guard failure fails the job here, so `files` stays empty and the
-      # commit job does not run. The guard reads the missing names from the
-      # copy outside the workspace, which the LLM cannot write.
-      - name: Guard the files
-        id: guard
-        # `bash` for pipefail, so a failing guard is not masked by tee.
-        shell: bash
+        id: write
+        if: steps.missing.outputs.run == 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head-sha }}
+          IDL_DIFF: ${{ steps.idl-diff.outputs.diff-file }}
+          TITLE: ${{ steps.pr.outputs.title }}
         run: |
-          rm -rf .changeset-bot
-          node scripts/changeset-bot-guard.mjs "$RUNNER_TEMP/missing.json" | tee "$RUNNER_TEMP/guard.json"
-          echo "files=$(jq -r '.files | join(" ")' "$RUNNER_TEMP/guard.json")" >> "$GITHUB_OUTPUT"
-          echo "report=$(jq -c '.report' "$RUNNER_TEMP/guard.json")" >> "$GITHUB_OUTPUT"
+          args=(--missing "$RUNNER_TEMP/missing.json" --title "$TITLE" --id "bot-${HEAD_SHA:0:7}")
+          if [ -n "$IDL_DIFF" ]; then
+            args+=(--idl-diff "$IDL_DIFF")
+          fi
+          node scripts/write-changesets.mjs "$BASE_SHA" HEAD "${args[@]}" > "$RUNNER_TEMP/written.json"
+          echo "files=$(jq -r 'join(" ")' "$RUNNER_TEMP/written.json")" >> "$GITHUB_OUTPUT"
 
       - name: Write the run summary
+        if: steps.missing.outputs.run == 'true'
         env:
-          FILES: ${{ steps.guard.outputs.files }}
-          DRY_RUN_EFFECTIVE: ${{ needs.detect.outputs.dry-run }}
+          FILES: ${{ steps.write.outputs.files }}
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
         run: |
           {
             if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
               echo "## Changeset bot (dry run)"
               echo
-              echo "Nothing was committed and no comment was written."
+              echo "Nothing was committed."
             else
               echo "## Changeset bot"
             fi
@@ -262,97 +189,23 @@ jobs:
             done
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Only the guarded files leave this job, under their own paths.
-      - name: Stage the guarded files
-        if: steps.guard.outputs.files != ''
-        env:
-          FILES: ${{ steps.guard.outputs.files }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/bot-files"
-          for file in $FILES; do
-            cp --parents "$file" "$RUNNER_TEMP/bot-files/"
-          done
-
-      - name: Keep the guarded files for the commit job
-        if: steps.guard.outputs.files != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: changeset-bot-files
-          path: ${{ runner.temp }}/bot-files
-          # `.changeset` is a hidden directory.
-          include-hidden-files: true
-
-  commit:
-    name: Commit changesets
-    needs: [detect, write]
-    if: needs.write.outputs.files != '' && needs.detect.outputs.dry-run != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.detect.outputs.head-sha }}
-
-      - name: Download the guarded files
-        uses: actions/download-artifact@v4
-        with:
-          name: changeset-bot-files
-          path: .
-
       # The App token, so tests.yaml and the backstop start on the bot's
-      # commit. A GITHUB_TOKEN push starts no workflow.
+      # commit. A GITHUB_TOKEN commit starts no workflow.
       - name: Get an App token
         id: app-token
+        if: steps.missing.outputs.run == 'true' && steps.mode.outputs.dry_run != 'true'
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-      # No force: when the branch moved, the push fails and the newer run
-      # writes the files.
-      - name: Push to the PR branch
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          FILES: ${{ needs.write.outputs.files }}
-          HEAD_REF: ${{ needs.detect.outputs.head-ref }}
-        run: |
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-          # shellcheck disable=SC2086 # the file list is deliberately split
-          git add -- $FILES
-          git commit -m "chore: add changesets"
-          git push \
-            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            "HEAD:refs/heads/${HEAD_REF}"
-
-      - name: Comment on a flag
-        if: fromJSON(needs.write.outputs.report).flagged
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          NUMBER: ${{ needs.detect.outputs.number }}
-          REPORT: ${{ needs.write.outputs.report }}
-        run: |
-          marker="<!-- changeset-bot -->"
-          {
-            echo "$marker"
-            echo "### Changeset bot"
-            echo
-            jq -r 'select(.possibleBreak) | "- **Possible breaking change.** The IDL diff shows a removal or a changed type. The bot wrote `minor` for `@helium/idls`. Edit the changeset to `major` if callers break."' <<< "$REPORT"
-            jq -r 'select(.emptyReason != null) | "- **Empty changeset**, no npm release: \(.emptyReason)"' <<< "$REPORT"
-            jq -r '.dependents[] | "- **Dependent program** `\(.name)`: `\(.level)` (changed through \(.via | join(", ")))"' <<< "$REPORT"
-            if [ "$(jq -r '.dependents | length' <<< "$REPORT")" -gt 0 ]; then
-              echo
-              echo "Program changeset text, with the reason for each dependent program:"
-              echo
-              jq -r '.programText' <<< "$REPORT" | sed 's/^/> /'
-            fi
-          } > "$RUNNER_TEMP/comment.md"
-          id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${NUMBER}/comments" --paginate \
-            --jq "[.[] | select(.body | startswith(\"$marker\"))][0].id // empty")
-          if [ -n "$id" ]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${id}" -F "body=@$RUNNER_TEMP/comment.md"
-          else
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${NUMBER}/comments" -F "body=@$RUNNER_TEMP/comment.md"
-          fi
+      # The API form of a no-force push: when the branch moved past the head
+      # this run saw, the commit fails and the newer run writes the files.
+      - name: Commit to the PR branch
+        if: steps.missing.outputs.run == 'true' && steps.mode.outputs.dry_run != 'true'
+        uses: ./.github/actions/api-commit
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: ${{ steps.pr.outputs.head-ref }}
+          headline: "chore: add changesets"
+          expected-head-oid: ${{ github.event.pull_request.head.sha || steps.pr.outputs.head-sha }}

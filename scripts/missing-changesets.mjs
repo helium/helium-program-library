@@ -76,8 +76,8 @@ export const missingChangesets = ({
     programChangesets.flatMap(({ releases }) => Object.keys(releases)),
   );
   // The hint is the IDL diff's fixed level for the program's own change. A
-  // dependent program has no hint: the LLM picks `none` or `patch` from the
-  // dependency's diff.
+  // dependent program has no hint: `write-changesets.mjs` picks `none` or
+  // `patch` from the dependency's changed files and IDL diff.
   const missingPrograms = programs
     .filter(({ name }) => !namedPrograms.has(name))
     .map((program) =>
