@@ -10,7 +10,7 @@
  * short.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -117,7 +117,9 @@ export const writeChangesets = ({ missing, idlDiff, title, files, id }) => {
     out[`.changeset/${id}.md`] = file(
       missing.npm.map(
         (name) =>
-          `"${name}": ${name === IDLS_PACKAGE ? missing.idls.level : "patch"}`,
+          `"${name}": ${
+            name === IDLS_PACKAGE ? (missing.idls?.level ?? "patch") : "patch"
+          }`,
       ),
       paragraphs,
     );
@@ -163,11 +165,8 @@ export const writeChangesets = ({ missing, idlDiff, title, files, id }) => {
 export const writeFiles = (outputs, root) => {
   const entries = Object.entries(outputs);
   for (const [rel] of entries) {
-    try {
-      readFileSync(path.join(root, rel));
+    if (existsSync(path.join(root, rel))) {
       throw new Error(`${rel} exists; the bot never rewrites a changeset`);
-    } catch (err) {
-      if (err.code !== "ENOENT") throw err;
     }
   }
   for (const [rel, text] of entries) {

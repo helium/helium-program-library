@@ -65,6 +65,24 @@ test("every missing npm package gets patch, and @helium/idls gets the fixed leve
   );
 });
 
+test("@helium/idls with no IDL diff takes patch", () => {
+  const files = write({
+    missing: {
+      npm: ["@helium/idls"],
+      programs: [],
+      idls: null,
+    },
+  });
+  assert.deepEqual(parseChangeset(files[".changeset/bot-abc1234.md"]), {
+    releases: { "@helium/idls": "patch" },
+    summary: "Bind the oracle signature to the task",
+  });
+  assert.doesNotMatch(
+    files[".changeset/bot-abc1234.md"],
+    /Possible breaking change/,
+  );
+});
+
 test("a breaking IDL diff adds the possible-break line naming the items", () => {
   const files = write({
     missing: {
