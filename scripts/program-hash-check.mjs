@@ -3,7 +3,7 @@
  *
  * A read-only witness, run on a schedule. It takes no action: it reports
  * deployed, pending, or unknown binary per program, and prints one JSON object
- * for the workflow to turn into a run summary and Slack lines.
+ * for the workflow to turn into a run summary and annotations.
  *
  * A program whose releases carry no `<name>.so.sha256` asset is skipped, not
  * failed: a program enters the check at its first release through the new flow.
@@ -58,6 +58,7 @@ export const classify = ({ releases, onChainHash, now }) => {
   return {
     status: "pending",
     version: newest.version,
+    tag: newest.tag,
     tagAgeDays,
     notify: tagAgeDays > PENDING_NOTICE_DAYS,
   };
@@ -190,16 +191,15 @@ const main = async () => {
   );
 };
 
-/** The Slack lines this run sends. Silent unless a person must act. */
-const notice = (result) => {
-  if (result.status === "unknown binary") {
-    return [
-      `Program hash check: ${result.program} holds a binary no release published (unknown binary).`,
-    ];
-  }
+/**
+ * The `::warning::` bodies this run prints. Silent unless a person must act.
+ *
+ * An unknown binary is not here: it fails the run through its own step.
+ */
+export const notice = (result) => {
   if (result.status === "pending" && result.notify) {
     return [
-      `Program hash check: ${result.program} ${result.version} is not deployed ${result.tagAgeDays.toFixed(1)} days after its tag.`,
+      `${result.program} ${result.version}: tag ${result.tag} is ${Math.floor(result.tagAgeDays)} days old, not deployed`,
     ];
   }
   return [];
