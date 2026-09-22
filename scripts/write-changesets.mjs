@@ -23,9 +23,13 @@ const USAGE =
 /** `type(scope)!:` conventional-commit prefix. */
 const TITLE_PREFIX = /^[a-z]+(\([^)]*\))?!?:\s+/;
 
-/** The PR title as changeset text: no commit-type prefix, first letter up. */
+/**
+ * The PR title as changeset text: first line only, no commit-type prefix,
+ * first letter up. A changeset line is one line, so a title someone wrote
+ * across several contributes only its first.
+ */
 export const changesetTitle = (title) => {
-  const text = title.trim().replace(TITLE_PREFIX, "");
+  const text = title.split("\n")[0].trim().replace(TITLE_PREFIX, "");
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 

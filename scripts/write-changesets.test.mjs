@@ -44,6 +44,10 @@ test("the title loses its type(scope): prefix and gains a capital", () => {
     "Bind the oracle signature",
   );
   assert.equal(changesetTitle("Bind: the sig"), "Bind: the sig");
+  assert.equal(
+    changesetTitle("fix: bind the sig\nand a second line"),
+    "Bind the sig",
+  );
 });
 
 test("every missing npm package gets patch, and @helium/idls gets the fixed level", () => {

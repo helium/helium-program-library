@@ -83,10 +83,18 @@ jobs:
           fi
           {
             echo "number=$NUMBER"
-            echo "title=$(jq -r '.title' <<< "$pr")"
             echo "head-ref=$(jq -r '.headRefName' <<< "$pr")"
             echo "head-sha=${EVENT_HEAD_SHA:-$(jq -r '.headRefOid' <<< "$pr")}"
             echo "base-tip=$(jq -r '.baseRefOid' <<< "$pr")"
+          } >> "$GITHUB_OUTPUT"
+          # A title is free text and can hold a newline, which a one-line
+          # output would read as another output. The others cannot: they are
+          # branch names and shas.
+          delim="title-$(openssl rand -hex 8)"
+          {
+            echo "title<<$delim"
+            jq -r '.title' <<< "$pr"
+            echo "$delim"
           } >> "$GITHUB_OUTPUT"
 
       - name: Checkout code
