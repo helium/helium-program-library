@@ -435,6 +435,7 @@ Each workflow above delegates to composite actions in [`.github/actions/`](.gith
 - `deploy-buffers/`: the deploy re-run rules, in front of the two buffer writes.
 - `write-program-buffer/`, `write-idl-buffer/`: upload the `.so` and the IDL to buffer accounts owned by the multisig. Vendored from `solana-foundation/github-actions`; the source SHA is at the top of each file.
 - `idl-diff/`: the IDL change the changeset bot reads.
+- `api-commit/`: the commit the changeset bot and the program release PR make, through the GitHub API, so it shows Verified.
 
 To add a program or a service, you should not need to touch the workflows. Add the program to `Anchor.toml`, or the service to `docker-info.json`, and the rules above pick it up.
 
