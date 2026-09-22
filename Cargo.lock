@@ -3277,7 +3277,7 @@ dependencies = [
 
 [[package]]
 name = "tuktuk-dca"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

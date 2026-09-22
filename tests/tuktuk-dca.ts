@@ -43,6 +43,7 @@ import {
   DCA_TEST_URL,
   runAllTasks as runAllTasksUtil,
   setDcaServerRepayBps,
+  setDcaServerSkipLend,
 } from "./utils/dca-test-server";
 import { expectAnchorError } from "./utils/expectAnchorError";
 import { ensureTuktukDcaIdl } from "./utils/fixtures";
@@ -395,7 +396,22 @@ describe("tuktuk-dca", () => {
     });
 
     async function runAllTasks() {
-      await runAllTasksUtil(provider, tuktukProgram, taskQueue, crankTurner);
+      return runAllTasksUtil(provider, tuktukProgram, taskQueue, crankTurner);
+    }
+
+    /** The deepest `Program … invoke [n]` any program reached in this transaction. */
+    async function maxCpiDepth(signature: string): Promise<number> {
+      const tx = await provider.connection.getTransaction(signature, {
+        maxSupportedTransactionVersion: 0,
+        commitment: "confirmed",
+      });
+      const logs = tx?.meta?.logMessages ?? [];
+      expect(logs.length, `no logs for ${signature}`).to.be.greaterThan(0);
+      return Math.max(
+        ...logs
+          .filter((l) => l.includes(" invoke ["))
+          .map((l) => Number(l.split("invoke [")[1].replace("]", ""))),
+      );
     }
 
     it("executes a full DCA swap cycle through multiple runs", async () => {
@@ -467,7 +483,27 @@ describe("tuktuk-dca", () => {
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Run all tasks
-        await runAllTasks();
+        const runSignatures = await runAllTasks();
+
+        // A DCA run spends CPI stack frames, and the runtime allows five. Here the wrapped
+        // callee is the token program, which calls nothing further, so the run bottoms out at
+        // three: run_task_v0, then swap_v0, then the token program. Mainnet spends two more,
+        // because a Jupiter route is three frames deep on its own (Jupiter, the AMM, the token
+        // program) where this stand-in is one -- which puts the real chain at the limit with
+        // nothing to spare. A frame added anywhere on this side is therefore a frame the real
+        // route does not have, so this number is pinned rather than bounded.
+        // An empty list would make the loop below a no-op and the assertion vacuous.
+        expect(
+          runSignatures.length,
+          "no task ran, so the depth assertion would assert nothing",
+        ).to.be.greaterThan(0);
+        for (const signature of runSignatures) {
+          expect(
+            await maxCpiDepth(signature),
+            `CPI depth changed for ${signature}. Mainnet runs this chain two frames deeper, ` +
+              `and the runtime limit is five, so any increase here overflows a real route.`,
+          ).to.equal(3);
+        }
 
         // Verify state after swap
         const dcaAccountNow = await program.account.dcaV0.fetchNullable(dca);
@@ -583,6 +619,68 @@ describe("tuktuk-dca", () => {
           .accountsPartial({ dca })
           .rpc(),
         "InvalidCpiContext",
+      );
+    });
+
+    // swap_v0 runs only as a CPI from the DCA's own run_task_v0, the same binding
+    // check_repay_v0 carries. Called directly it must refuse on the binding, not on state.
+    it("refuses a swap called outside a tuktuk task run", async () => {
+      await expectAnchorError(
+        program.methods
+          .swapV0({ data: Buffer.from([]) })
+          .accountsPartial({ dca })
+          .rpc(),
+        "InvalidCpiContext",
+      );
+    });
+
+    // swap_v0 runs only in the window lend_v0 opens. The server leaves lend_v0 and
+    // check_repay_v0 out of this run, so the swap is alone in the task and swap_v0's own guard
+    // is the one that refuses it; with check_repay_v0 present its guard would refuse first.
+    describe("when the swap runs without a lend", () => {
+      before(() => {
+        setDcaServerSkipLend(true);
+      });
+
+      after(() => {
+        setDcaServerSkipLend(false);
+      });
+
+      it("refuses the swap", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Sent raw rather than through runAllTasks, which reports a failed run without the
+        // logs the error name is read from. The crank turner pays, as it does there.
+        const runTaskIxs = await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: crankTurner.publicKey,
+        });
+        const tx = new Transaction().add(
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+          ...runTaskIxs,
+        );
+        tx.recentBlockhash = (
+          await provider.connection.getLatestBlockhash("confirmed")
+        ).blockhash;
+        tx.feePayer = crankTurner.publicKey;
+        tx.sign(crankTurner);
+        await expectAnchorError(
+          provider.connection.sendRawTransaction(tx.serialize()),
+          "LendNotCalled",
+        );
+      });
+    });
+
+    // swap_v0 forwards instruction data it does not interpret, so the callee is pinned by
+    // address rather than taken from that data. A TESTING build pins a different program than
+    // mainnet does, so the pin itself is what this asserts, not which program it names.
+    it("refuses a swap against a program other than the pinned one", async () => {
+      await expectAnchorError(
+        program.methods
+          .swapV0({ data: Buffer.from([]) })
+          .accountsPartial({ dca, swapProgram: SystemProgram.programId })
+          .rpc(),
+        "ConstraintAddress",
       );
     });
 

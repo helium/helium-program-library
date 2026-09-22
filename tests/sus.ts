@@ -77,16 +77,39 @@ describe("sus", () => {
     });
 
     const { writableAccounts, balanceChanges } = susR[0];
-    expect(writableAccounts[0].name).to.eq("Native SOL Account");
-    expect(writableAccounts[0].address.toBase58()).to.eq(SUS.toBase58());
-    expect(writableAccounts[0].changedInSimulation).to.be.true;
+    const susHntAta = getAssociatedTokenAddressSync(HNT_MINT, SUS);
 
-    expect(writableAccounts[1].name).to.eq("HNT Token Account");
-    expect(writableAccounts[1].owner?.toBase58()).to.eq(destOwner.toBase58());
+    // `sus` reports accounts in the transaction message's own order, and message compilation
+    // orders accounts of equal privilege by base58 address. `dest` belongs to a freshly
+    // generated owner, so its address differs every run, and with it its position relative to
+    // SUS's token account. Both lists are addressed by account rather than by index; their
+    // lengths are asserted so an account appearing or disappearing still fails.
+    const writable = (address: PublicKey) => {
+      const found = writableAccounts.find((a) => a.address.equals(address));
+      expect(found, `writable account ${address.toBase58()}`).to.not.be
+        .undefined;
+      return found!;
+    };
+    const change = (address: PublicKey) => {
+      const found = balanceChanges.find((c) => c.address.equals(address));
+      expect(found, `balance change ${address.toBase58()}`).to.not.be.undefined;
+      return found!;
+    };
 
-    expect(writableAccounts[2].name).to.eq("HNT Token Account");
-    expect(writableAccounts[2].owner?.toBase58()).to.eq(SUS.toBase58());
-    expect(writableAccounts[2].metadata?.decimals).to.eq(8);
+    expect(writableAccounts).to.have.lengthOf(3);
+
+    const susNative = writable(SUS);
+    expect(susNative.name).to.eq("Native SOL Account");
+    expect(susNative.changedInSimulation).to.be.true;
+
+    const destToken = writable(dest);
+    expect(destToken.name).to.eq("HNT Token Account");
+    expect(destToken.owner?.toBase58()).to.eq(destOwner.toBase58());
+
+    const susToken = writable(susHntAta);
+    expect(susToken.name).to.eq("HNT Token Account");
+    expect(susToken.owner?.toBase58()).to.eq(SUS.toBase58());
+    expect(susToken.metadata?.decimals).to.eq(8);
 
     // SUS funds the token account this transaction creates and pays the fee, so its SOL
     // change is the rent-exempt minimum for that account plus the fee. Both are cluster
@@ -100,14 +123,19 @@ describe("sus", () => {
     expect(feeResponse.value, "fee for the simulated message").to.not.be.null;
     const expectedSolChange = BigInt(-(rentExemption + feeResponse.value!));
 
-    expect(balanceChanges[0].owner.toBase58()).to.eq(SUS.toBase58());
-    expect(balanceChanges[0].amount).to.eq(expectedSolChange);
+    expect(balanceChanges).to.have.lengthOf(3);
 
-    expect(balanceChanges[1].owner.toBase58()).to.eq(destOwner.toBase58());
-    expect(balanceChanges[1].amount).to.eq(BigInt(1000000000));
+    const solChange = change(SUS);
+    expect(solChange.owner.toBase58()).to.eq(SUS.toBase58());
+    expect(solChange.amount).to.eq(expectedSolChange);
 
-    expect(balanceChanges[2].owner.toBase58()).to.eq(SUS.toBase58());
-    expect(balanceChanges[2].amount).to.eq(BigInt(-1000000000));
+    const destChange = change(dest);
+    expect(destChange.owner.toBase58()).to.eq(destOwner.toBase58());
+    expect(destChange.amount).to.eq(BigInt(1000000000));
+
+    const susChange = change(susHntAta);
+    expect(susChange.owner.toBase58()).to.eq(SUS.toBase58());
+    expect(susChange.amount).to.eq(BigInt(-1000000000));
   });
 
   // TODO: Un-comment when devnet gets the latest IDLs

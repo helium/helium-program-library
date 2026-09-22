@@ -1,8 +1,17 @@
 import { BN } from "@coral-xyz/anchor";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  TransactionInstruction,
+} from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { expect } from "chai";
 import { FastifyInstance } from "fastify";
 import { dcaTaskBindingError } from "../packages/tuktuk-dca-service/src/binding";
+import {
+  pinnedSwapProgram,
+  planSwapWrapping,
+} from "../packages/tuktuk-dca-service/src/wrap";
 import { createDcaServer } from "./utils/dca-test-server";
 
 // The DCA account the stubbed program returns; the request has to name all three
@@ -107,5 +116,68 @@ describe("dca server task binding", () => {
     expect(JSON.parse(res.body).error).to.equal(
       "task_queued_at does not match dca queued_at",
     );
+  });
+});
+
+describe("dca server swap wrapping", () => {
+  const SWAP_PROGRAM = new PublicKey(
+    "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  );
+
+  function ix(programId: PublicKey) {
+    return new TransactionInstruction({ programId, keys: [], data: Buffer.from([]) });
+  }
+
+  // Anchor's `Program` constructor camelCases the IDL while the file on disk carries the Rust
+  // snake_case, and the service reads the former. Both spellings are exercised here because a
+  // lookup that matches only one returns undefined on the other and takes the whole service
+  // down on the first request.
+  for (const [spelling, instruction, account] of [
+    ["camelCase (what Program.idl carries)", "swapV0", "swapProgram"],
+    ["snake_case (what the IDL file carries)", "swap_v0", "swap_program"],
+  ] as const) {
+    it(`reads the pinned swap program from a ${spelling} IDL`, () => {
+      const idl = {
+        instructions: [
+          {
+            name: instruction,
+            accounts: [{ name: account, address: SWAP_PROGRAM.toBase58() }],
+          },
+        ],
+      } as any;
+      expect(pinnedSwapProgram(idl).toBase58()).to.equal(
+        SWAP_PROGRAM.toBase58(),
+      );
+    });
+  }
+
+  it("refuses an IDL whose swap_v0 carries no pinned address", () => {
+    const idl = {
+      instructions: [{ name: "swapV0", accounts: [{ name: "swapProgram" }] }],
+    } as any;
+    expect(() => pinnedSwapProgram(idl)).to.throw("no pinned address");
+  });
+
+  it("wraps the route instruction and leaves setup alone", () => {
+    const { toWrap } = planSwapWrapping(
+      [ix(TOKEN_PROGRAM_ID), ix(SWAP_PROGRAM), ix(TOKEN_PROGRAM_ID)],
+      SWAP_PROGRAM,
+    );
+    expect(toWrap).to.deep.equal([false, true, false]);
+  });
+
+  it("refuses a route that wraps nothing", () => {
+    expect(() =>
+      planSwapWrapping([ix(TOKEN_PROGRAM_ID)], SWAP_PROGRAM),
+    ).to.throw("wraps no instruction");
+  });
+
+  it("refuses an instruction against an unrecognized program", () => {
+    expect(() =>
+      planSwapWrapping(
+        [ix(SWAP_PROGRAM), ix(Keypair.generate().publicKey)],
+        SWAP_PROGRAM,
+      ),
+    ).to.throw("unrecognized program");
   });
 });
