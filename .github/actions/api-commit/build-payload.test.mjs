@@ -172,3 +172,23 @@ test("an empty expected-head-oid fails before any work", () => {
   assert.notEqual(status, 0);
   assert.match(stderr, /expected-head-oid/);
 });
+
+test("PATHS limits the commit to the paths it names", () => {
+  const { root, head } = makeRepo({ "a.txt": "a\n", "Cargo.lock": "lock\n" });
+  writeFileSync(path.join(root, "a.txt"), "changed\n");
+  writeFileSync(path.join(root, "Cargo.lock"), "drift\n");
+
+  const { status, stdout, stderr } = build(root, {
+    EXPECTED_HEAD_OID: head,
+    PATHS: "a.txt",
+  });
+  assert.equal(status, 0, stderr);
+
+  const { additions, deletions } =
+    JSON.parse(stdout).variables.input.fileChanges;
+  assert.deepEqual(
+    additions.map((a) => a.path),
+    ["a.txt"],
+  );
+  assert.deepEqual(deletions, []);
+});

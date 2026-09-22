@@ -5,7 +5,8 @@
 # nothing and exits 0 when there is nothing to commit.
 #
 # Inputs (environment): GITHUB_REPOSITORY, BRANCH, EXPECTED_HEAD_OID, HEADLINE,
-# and the optional BODY. The working directory is the checkout to commit.
+# and the optional BODY and PATHS. The working directory is the checkout to
+# commit.
 #
 # File contents reach jq through --rawfile as base64 text, and the body is a
 # file handed to `gh api --input`, so no file content ever crosses argv: Linux
@@ -24,7 +25,15 @@ require branch "${BRANCH:-}"
 require expected-head-oid "${EXPECTED_HEAD_OID:-}"
 require headline "${HEADLINE:-}"
 
-git add -A
+# PATHS holds space-separated pathspecs, so the commit carries only the files
+# the caller meant and not whatever else the build left in the checkout. Empty
+# stages everything.
+if [ -n "${PATHS:-}" ]; then
+  # shellcheck disable=SC2086 # PATHS is a list of pathspecs and must split.
+  git add -A -- $PATHS
+else
+  git add -A
+fi
 if git diff --cached --quiet "$EXPECTED_HEAD_OID"; then
   exit 0
 fi

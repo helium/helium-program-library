@@ -218,4 +218,5 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           branch: ${{ steps.pr.outputs.head-ref }}
           headline: "chore: add changesets"
+          paths: ${{ steps.write.outputs.files }}
           expected-head-oid: ${{ github.event.pull_request.head.sha || steps.pr.outputs.head-sha }}

@@ -18,6 +18,10 @@ inputs:
   expected-head-oid:
     description: "The commit the branch is expected to be at, and the commit the changes are computed against. A moved branch fails the step, and there is no retry: a later run recomputes from the new head."
     required: true
+  paths:
+    description: "Space-separated pathspecs to commit. Empty commits every change in the checkout, drift the build left included."
+    required: false
+    default: ""
 
 outputs:
   commit-oid:
@@ -39,6 +43,7 @@ runs:
         HEADLINE: ${{ inputs.headline }}
         BODY: ${{ inputs.body }}
         EXPECTED_HEAD_OID: ${{ inputs.expected-head-oid }}
+        PATHS: ${{ inputs.paths }}
       run: |
         set -euo pipefail
         payload="$RUNNER_TEMP/api-commit-payload.json"
