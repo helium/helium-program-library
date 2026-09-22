@@ -131,9 +131,12 @@ jobs:
       - name: Report programs that changed with no version bump
         run: |
           REPORT="$RUNNER_TEMP/missing-bump.json"
-          echo "## Programs changed with no version bump" >> "$GITHUB_STEP_SUMMARY"
           node scripts/missing-bump-check.mjs --json "$REPORT" || [ -s "$REPORT" ]
+          if [ "$(jq '.failing | length' "$REPORT")" -gt 0 ]; then
+            echo "## Programs changed with no version bump" >> "$GITHUB_STEP_SUMMARY"
+          fi
           jq -r '.failing[] | "\(.name) changed since program-\(.name)-\(.version) with no bump"' "$REPORT" |
             while read -r line; do
               echo "::warning title=No version bump::${line}"
+              echo "- $line" >> "$GITHUB_STEP_SUMMARY"
             done

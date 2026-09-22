@@ -9,7 +9,7 @@ env:
   BRANCH: program-release/develop
   # The commit lands here first, so the release branch never sits at a zero
   # diff between the reset and the commit. Deleted again in the same run.
-  SCRATCH_BRANCH: program-release/develop-${{ github.run_id }}
+  SCRATCH_BRANCH: program-release/develop-${{ github.run_id }}-${{ github.run_attempt }}
   TITLE: "chore: version programs"
 
 on:
