@@ -90,17 +90,40 @@ test("a PR with nothing changed on either side has nothing missing", () => {
 });
 
 test("parseChangeset reads quoted and bare names and rejects a file with no front matter", () => {
+  const parsed = parseChangeset(
+    '---\n"@helium/idls": minor\nlazy-distributor: none\n---\n\nText here.\n',
+  );
   assert.deepEqual(
-    parseChangeset(
-      '---\n"@helium/idls": minor\nlazy-distributor: none\n---\n\nText here.\n',
-    ),
+    { ...parsed, releases: { ...parsed.releases } },
     {
       releases: { "@helium/idls": "minor", "lazy-distributor": "none" },
       summary: "Text here.",
     },
   );
-  assert.deepEqual(parseChangeset("---\n---\n"), { releases: {}, summary: "" });
+  const empty = parseChangeset("---\n---\n");
+  assert.deepEqual({ ...empty, releases: { ...empty.releases } }, { releases: {}, summary: "" });
   assert.throws(() => parseChangeset("no front matter"), /no front matter/);
+});
+
+test("parseChangeset rejects __proto__ and reads constructor as a plain name", () => {
+  assert.throws(
+    () => parseChangeset("---\n__proto__: patch\n---\n"),
+    /bad front matter line "__proto__: patch"/,
+  );
+  const { releases } = parseChangeset("---\nconstructor: patch\n---\n");
+  assert.deepEqual(Object.keys(releases), ["constructor"]);
+  assert.equal(Object.getPrototypeOf(releases), null);
+
+  // An undeclared package stays missing next to a changeset that names only `constructor`.
+  const result = missingChangesets({
+    packages: ["@helium/spl-utils"],
+    programs: [],
+    idls: null,
+    changesets: [{ releases }],
+    programChangesets: [],
+  });
+  assert.deepEqual(result.npm, ["@helium/spl-utils"]);
+  assert.equal(result.nothingMissing, false);
 });
 
 test("a missing own-source program carries the IDL diff's level hint; a dependent program carries none", () => {

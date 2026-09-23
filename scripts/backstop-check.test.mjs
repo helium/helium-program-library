@@ -21,7 +21,7 @@ const changeset = (text) => parseChangeset(text);
 test("a changed package with no changeset fails, and the text names it", () => {
   const failure = backstopCheck({ ...changed, programs: [] });
   assert.match(failure, /@helium\/spl-utils/);
-  assert.match(failure, /write a changeset by hand or re-run the bot job$/);
+  assert.match(failure, /write a changeset by hand$/);
 });
 
 test("an empty changeset covers the packages but not the programs", () => {

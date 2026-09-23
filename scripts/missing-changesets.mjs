@@ -20,6 +20,9 @@ export const IDLS_PACKAGE = "@helium/idls";
 
 const FRONT_MATTER = /^---\n([\s\S]*?)---\n?([\s\S]*)$/;
 const ENTRY = /^"?([^":]+)"?:\s*(\w+)\s*$/;
+// An npm package name or a program directory name. A name like `__proto__`
+// fails it, so it cannot reach the releases object as a key.
+const NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
 
 /**
  * A changeset or program changeset: the `name: level` front matter and the
@@ -31,10 +34,13 @@ const ENTRY = /^"?([^":]+)"?:\s*(\w+)\s*$/;
 export const parseChangeset = (text) => {
   const match = text.match(FRONT_MATTER);
   if (!match) throw new Error("no front matter");
-  const releases = {};
+  // No prototype, so no name reads or writes an inherited key.
+  const releases = Object.create(null);
   for (const line of match[1].split("\n").filter((l) => l.trim())) {
     const [, name, level] = line.match(ENTRY) || [];
-    if (!name) throw new Error(`bad front matter line "${line}"`);
+    if (!name || !NAME.test(name)) {
+      throw new Error(`bad front matter line "${line}"`);
+    }
     releases[name] = level;
   }
   return { releases, summary: match[2].trim() };

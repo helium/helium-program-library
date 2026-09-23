@@ -3,8 +3,9 @@
  *
  * A program changed when the diff touches `programs/<name>/src/**` or
  * `programs/<name>/Cargo.toml`, or the same paths of a workspace crate it
- * depends on directly. Direct edges only. `Cargo.lock` and the root
- * `Cargo.toml` never mark a program.
+ * depends on, directly or through other crates: a program links every crate
+ * below it, so its binary changes too. `Cargo.lock` and the root `Cargo.toml`
+ * never mark a program.
  *
  * The dependency graph comes from `cargo metadata`: most programs write their
  * workspace deps as `workspace = true`, so `path =` lines in a program's own
@@ -78,10 +79,17 @@ export const buildGraph = (metadata) => {
   return { crateDirs, dependents, programs };
 };
 
-/** The crate a changed file belongs to, or undefined when no crate claims it. */
+/**
+ * The crate a changed file belongs to, or undefined when no crate claims it.
+ * `<dir>/idls/` counts: `declare_program!` compiles those IDLs into the crate.
+ */
 export const crateFor = (crateDirs, file) => {
   for (const [dir, name] of crateDirs) {
-    if (file === `${dir}/Cargo.toml` || file.startsWith(`${dir}/src/`)) {
+    if (
+      file === `${dir}/Cargo.toml` ||
+      file.startsWith(`${dir}/src/`) ||
+      file.startsWith(`${dir}/idls/`)
+    ) {
       return name;
     }
   }
@@ -93,6 +101,7 @@ export const crateFor = (crateDirs, file) => {
  *   `cargo metadata --format-version 1 --no-deps` output.
  * @returns {{ name: string, own: boolean, via: string[] }[]} one entry per
  *   changed program, sorted by name. `own: false` marks a dependent program.
+ *   `via` names the changed crates it depends on, directly or not.
  */
 export const changedPrograms = ({ metadata, files }) => {
   const { crateDirs, dependents, programs } = buildGraph(metadata);
@@ -108,7 +117,16 @@ export const changedPrograms = ({ metadata, files }) => {
     const crate = crateFor(crateDirs, file);
     if (!crate) continue;
     if (programs.has(crate)) entryFor(crate).own = true;
-    for (const dependent of dependents.get(crate) ?? []) {
+    const reached = new Set();
+    const queue = [crate];
+    while (queue.length > 0) {
+      for (const dependent of dependents.get(queue.shift()) ?? []) {
+        if (reached.has(dependent) || dependent === crate) continue;
+        reached.add(dependent);
+        queue.push(dependent);
+      }
+    }
+    for (const dependent of reached) {
       if (!programs.has(dependent)) continue;
       const entry = entryFor(dependent);
       if (!entry.via.includes(crate)) entry.via.push(crate);

@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 import { missingChangesets, missingFromArgv } from "./missing-changesets.mjs";
 
-const FIX = "write a changeset by hand or re-run the bot job";
+const FIX = "write a changeset by hand";
 
 /**
  * @param {{ npm: string[], programs: { name: string }[] }} missing
