@@ -6,8 +6,9 @@
  * proposal on another buffer is an older release; signers reject it, so the run
  * reports its index.
  *
- * Pending is Active or Approved: both can still execute. A proposal at or below
- * the multisig's stale transaction index cannot, so the scan starts above it.
+ * Pending is Approved at any index, or Active above the multisig's stale
+ * transaction index. An Approved vault transaction still executes after it goes
+ * stale; a stale Active proposal can no longer be approved.
  */
 import { pathToFileURL } from "node:url";
 
@@ -21,7 +22,10 @@ const BPF_LOADER_UPGRADEABLE = "BPFLoaderUpgradeab1e11111111111111111111111";
 // The loader's Upgrade instruction: a u32 LE enum tag and nothing else.
 // Accounts: programData, program, buffer, spill, rent, clock, authority.
 const UPGRADE_DATA = Buffer.from([3, 0, 0, 0]);
-const PENDING_STATUSES = ["Active", "Approved"];
+// Anchor's IDL instruction tag: sha256("anchor:idl")[..8] as a LE u64.
+const IDL_IX_TAG = Buffer.from([
+  0x40, 0xf4, 0xbc, 0x78, 0xa7, 0xe9, 0x69, 0x0a,
+]);
 // The `getMultipleAccounts` limit.
 const BATCH = 100;
 
@@ -30,16 +34,37 @@ const isVaultTransaction = (account) =>
     account.data.subarray(0, 8),
   );
 
-/** The buffer a vault transaction upgrades `programId` from, or null. */
-const upgradeBuffer = (message, programId) => {
+/**
+ * The buffer a vault transaction upgrades `programId` from, or null, and
+ * whether its message is exactly the upgrade this workflow builds: only the
+ * loader Upgrade (programData, program, buffer, ..., vault) and IDL
+ * instructions to the program.
+ */
+const upgradeBuffer = (message, programId, multisigPda) => {
   const key = (index) => message.accountKeys[index]?.toBase58();
-  const upgrade = message.instructions.find(
+  const isUpgrade = (ix) =>
+    key(ix.programIdIndex) === BPF_LOADER_UPGRADEABLE &&
+    UPGRADE_DATA.equals(Buffer.from(ix.data)) &&
+    key(ix.accountIndexes[1]) === programId.toBase58();
+  const upgrade = message.instructions.find(isUpgrade);
+  const buffer = upgrade ? (key(upgrade.accountIndexes[2]) ?? null) : null;
+  if (!buffer) return { buffer: null, exact: false };
+
+  const programData = PublicKey.findProgramAddressSync(
+    [programId.toBuffer()],
+    new PublicKey(BPF_LOADER_UPGRADEABLE),
+  )[0].toBase58();
+  const vault = multisig.getVaultPda({ multisigPda, index: 0 })[0].toBase58();
+  const exact = message.instructions.every(
     (ix) =>
-      key(ix.programIdIndex) === BPF_LOADER_UPGRADEABLE &&
-      UPGRADE_DATA.equals(Buffer.from(ix.data)) &&
-      key(ix.accountIndexes[1]) === programId.toBase58(),
+      (isUpgrade(ix) &&
+        key(ix.accountIndexes[0]) === programData &&
+        key(ix.accountIndexes[2]) === buffer &&
+        key(ix.accountIndexes[6]) === vault) ||
+      (key(ix.programIdIndex) === programId.toBase58() &&
+        IDL_IX_TAG.equals(Buffer.from(ix.data).subarray(0, 8))),
   );
-  return upgrade ? (key(upgrade.accountIndexes[2]) ?? null) : null;
+  return { buffer, exact };
 };
 
 /**
@@ -61,11 +86,7 @@ export const pendingUpgrades = async ({
     multisig.accounts.Multisig.fromAccountInfo(multisigAccount);
 
   const indexes = [];
-  for (
-    let index = Number(staleTransactionIndex) + 1;
-    index <= Number(transactionIndex);
-    index++
-  ) {
+  for (let index = 1; index <= Number(transactionIndex); index++) {
     indexes.push(index);
   }
 
@@ -91,21 +112,28 @@ export const pendingUpgrades = async ({
 
     const status =
       multisig.accounts.Proposal.fromAccountInfo(proposal)[0].status.__kind;
-    if (!PENDING_STATUSES.includes(status)) return [];
+    const pendingStatus =
+      status === "Approved" ||
+      (status === "Active" && index > Number(staleTransactionIndex));
+    if (!pendingStatus) return [];
 
     const [{ message }] =
       multisig.accounts.VaultTransaction.fromAccountInfo(transaction);
-    const buffer = upgradeBuffer(message, programId);
-    return buffer ? [{ index, status, buffer }] : [];
+    const { buffer, exact } = upgradeBuffer(message, programId, multisigPda);
+    return buffer ? [{ index, status, buffer, exact }] : [];
   });
 };
 
 /**
  * Split pending proposals by the buffer this run reuses. With no reused buffer
- * the run writes a new one, so every pending proposal is an older release.
+ * the run writes a new one, so every pending proposal is an older release. A
+ * proposal on the reused buffer that is not exactly this workflow's upgrade is
+ * an older one too.
  */
 export const classifyPending = (pending, buffer) => {
-  const same = buffer ? pending.find((p) => p.buffer === buffer) : undefined;
+  const same = buffer
+    ? pending.find((p) => p.buffer === buffer && p.exact)
+    : undefined;
   return {
     sameBuffer: same ? same.index : null,
     older: pending.filter((p) => p !== same).map((p) => p.index),

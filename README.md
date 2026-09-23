@@ -202,9 +202,10 @@ every later build in that shell test values, and the guard passes because the tw
 
 The binary a cluster runs is never a local build. `release-program.yaml` builds it in CI from a
 `program-*` tag via `.github/actions/build-verified`, which compiles in a container that
-receives neither variable; `write-program-buffer` uploads that artifact with the Squads vault as its
-buffer authority, and the upgrade is a multisig proposal. The guard's job is therefore the build
-that is _meant_ to be deployable picking up `TESTING` on its own.
+receives neither variable; `deploy-buffers` (with `write-program-buffer` and `write-idl-buffer`)
+uploads that artifact with the Squads vault as its buffer authority, and the upgrade is a
+multisig proposal. The guard's job is therefore the build that is _meant_ to be deployable
+picking up `TESTING` on its own.
 
 ## Repo layout
 
@@ -356,7 +357,7 @@ IDL buffers are never reused. Each run that goes on writes a new one.
 - **pending**: the chain holds an older release of this repo. This is normal while a proposal waits for votes. Once the newest tag is more than 3 days old, the run prints a `Pending upgrade` warning annotation and a summary line, and stays green: the vote is still open.
 - **unknown binary**: the chain holds a binary no release of this repo published. The run prints an `Unknown binary` error annotation and fails, so the check does not stay green while the question is open.
 
-A program whose releases carry no `<name>.so.sha256` asset is skipped and named in the run summary. A program enters the check at its first release through this flow.
+A program whose releases carry no `<name>.so.sha256` asset is skipped and named in the run summary. A `Skipped programs` warning annotation counts them. A program enters the check at its first release through this flow.
 
 When a release is rejected in Squads and will never deploy, delete that release's `<name>.so.sha256` asset. The check then compares against the newest release that still has one, and stops reporting the rejected version as pending.
 

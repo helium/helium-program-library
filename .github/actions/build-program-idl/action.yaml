@@ -24,7 +24,6 @@ runs:
         key: cargo-${{ runner.os }}-idl-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           cargo-${{ runner.os }}-idl-
-          cargo-${{ runner.os }}-cargo-build-
 
     # `anchor build` would also produce this IDL, but its SBF half is thrown away: the deploy
     # workflows take `target/deploy/<program>.so` from `build-verified`, which overwrites whatever

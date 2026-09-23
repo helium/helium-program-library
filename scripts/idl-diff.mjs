@@ -4,7 +4,8 @@
  * Both IDLs are flattened into a map of named entity -> shape, so a difference
  * is named ("type BurnArgsV0 field amount") instead of a JSON text diff. A
  * nested named collection becomes its own entities, so a struct that gains a
- * field reports the field, not the whole struct.
+ * field reports the field, not the whole struct. A member's shape holds its
+ * position, because Borsh layout and discriminants follow declaration order.
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -52,16 +53,16 @@ const entities = (idl) => {
       withoutKeys(instruction, ["name", "docs", "accounts", "args"]),
       instruction.docs,
     );
-    for (const account of instruction.accounts ?? []) {
+    for (const [index, account] of (instruction.accounts ?? []).entries()) {
       add(
         "instruction-account",
         `${at} account ${account.name}`,
-        withoutKeys(account, ["name", "docs"]),
+        { index, ...withoutKeys(account, ["name", "docs"]) },
         account.docs,
       );
     }
-    for (const arg of instruction.args ?? []) {
-      add("arg", `${at} arg ${arg.name}`, arg.type, arg.docs);
+    for (const [index, arg] of (instruction.args ?? []).entries()) {
+      add("arg", `${at} arg ${arg.name}`, { index, type: arg.type }, arg.docs);
     }
   }
 
@@ -107,13 +108,18 @@ const entities = (idl) => {
     for (const [index, field] of (type.type?.fields ?? []).entries()) {
       // A tuple struct's fields are bare types with no name.
       const name = field?.name ?? index;
-      add("field", `${at} field ${name}`, field?.type ?? field, field?.docs);
+      add(
+        "field",
+        `${at} field ${name}`,
+        { index, type: field?.type ?? field },
+        field?.docs,
+      );
     }
-    for (const variant of type.type?.variants ?? []) {
+    for (const [index, variant] of (type.type?.variants ?? []).entries()) {
       add(
         "variant",
         `${at} variant ${variant.name}`,
-        variant.fields,
+        { index, fields: variant.fields },
         variant.docs,
       );
     }

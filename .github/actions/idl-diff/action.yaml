@@ -15,18 +15,12 @@ inputs:
   target-artifact:
     description: "Artifact of this run holding the head build (`target/idl`). Empty runs the `build-idls` action instead."
     required: false
-    default: "anchor-build"
+    default: ""
 
 outputs:
   diff-file:
     description: "Path to the JSON from `scripts/idl-diff.mjs`: a level hint and a named difference list per program."
     value: ${{ steps.diff.outputs.file }}
-  idls-level:
-    description: "`minor`, `patch`, or empty when no IDL changed and `@helium/idls` is not named."
-    value: ${{ steps.diff.outputs.idls-level }}
-  idls-breaking:
-    description: "`true` when a removal or a changed type means the bot must flag a possible break."
-    value: ${{ steps.diff.outputs.idls-breaking }}
 
 runs:
   using: "composite"
@@ -93,7 +87,6 @@ runs:
         key: cargo-${{ runner.os }}-idl-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           cargo-${{ runner.os }}-idl-
-          cargo-${{ runner.os }}-cargo-build-
 
     - name: Build the base IDLs cold
       if: inputs.programs != '' && steps.base-idls.outputs.cache-hit != 'true'
@@ -137,11 +130,7 @@ runs:
           --base-dir "$RUNNER_TEMP/idl-base" \
           --head-dir "$RUNNER_TEMP/idl-head" \
           $PROGRAMS > "$file"
-        {
-          echo "file=$file"
-          echo "idls-level=$(jq -r '.idls.level // ""' "$file")"
-          echo "idls-breaking=$(jq -r '.idls.breaking // false' "$file")"
-        } >> "$GITHUB_OUTPUT"
+        echo "file=$file" >> "$GITHUB_OUTPUT"
         {
           echo "### IDL diff against $BASE_SHA"
           echo

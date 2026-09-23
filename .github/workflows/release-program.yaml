@@ -12,6 +12,12 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # The release uploads need `contents: write`. Turnstyle lists this workflow's runs.
+    permissions:
+      contents: write
+      actions: read
+    # Turnstyle waits for earlier runs, so a batch of tags needs room past one build.
+    timeout-minutes: 180
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -41,12 +47,12 @@ jobs:
           echo "Tag name: $TAG"
           # Strict: the tag list holds a `v`-prefixed tag and a `-test` suffixed one, and a loose
           # parse reads a program name or a version out of both.
-          if [[ ! "$TAG" =~ ^program-(.+)-([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+          if [[ ! "$TAG" =~ ^program-([a-z0-9]+(-[a-z0-9]+)*)-([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
             echo "::error::tag ${TAG} is not program-<name>-<x.y.z>"
             exit 1
           fi
           PROGRAM=${BASH_REMATCH[1]}
-          VERSION=${BASH_REMATCH[2]}
+          VERSION=${BASH_REMATCH[3]}
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
 
@@ -146,9 +152,30 @@ jobs:
           poll-interval-seconds: 30
           retries: 3
 
+      # The read in `deploy-buffers` ran before the wait, so a run that finished during it is
+      # missing from that list. Read the older proposals again now that earlier runs are done.
+      # A run that finished during the wait can also have proposed this same buffer: stop then.
+      - name: Read older pending proposals after the wait
+        id: pending
+        if: steps.deploy-buffers.outputs.skip != 'true'
+        env:
+          MULTISIG: ${{ secrets.MULTISIG }}
+          BUFFER: ${{ steps.deploy-buffers.outputs.buffer }}
+          NETWORK: ${{ secrets.SOLANA_DEPLOY_URL }}
+        run: |
+          RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs --multisig "$MULTISIG" --program-id "$PROGRAM_ID" --buffer "$BUFFER")
+          echo "$RESULT"
+          SAME=$(echo "$RESULT" | jq -r '.sameBuffer // empty')
+          if [ -n "$SAME" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "- \`$PROGRAM\`: pending proposal $SAME already names buffer \`$BUFFER\`. Stopped: no new proposal." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "pending-proposal-index=$(echo "$RESULT" | jq -r '.older | map(tostring) | join(",")')" >> "$GITHUB_OUTPUT"
+
       - name: Squads program upgrade
         # A skipped run has no buffers. The Squads action exits 1 on an empty address.
-        if: steps.deploy-buffers.outputs.skip != 'true'
+        if: steps.deploy-buffers.outputs.skip != 'true' && steps.pending.outputs.skip != 'true'
         uses: helium/squads-program-upgrade@v0.5.0
         with:
           network-url: "https://api.mainnet-beta.solana.com"
@@ -165,9 +192,9 @@ jobs:
       # execute of it after the new one rolls the program back. The annotation and the summary line
       # are the whole notice: the person who merged the Promotion PR is watching this run.
       - name: Report the older pending proposal
-        if: steps.deploy-buffers.outputs.skip != 'true' && steps.deploy-buffers.outputs.pending-proposal-index != ''
+        if: steps.deploy-buffers.outputs.skip != 'true' && steps.pending.outputs.pending-proposal-index != ''
         env:
-          PENDING: ${{ steps.deploy-buffers.outputs.pending-proposal-index }}
+          PENDING: ${{ steps.pending.outputs.pending-proposal-index }}
         run: |
           LINE="${PROGRAM} ${VERSION}: proposal ${PENDING} is still pending"
           echo "::notice title=Older pending proposal::${LINE}"

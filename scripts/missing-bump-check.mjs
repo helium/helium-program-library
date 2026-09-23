@@ -46,13 +46,13 @@ const NO_BASE = Symbol("no base");
 
 /**
  * The files that mark one program as changed, for the failure text: its own
- * source, plus the source of a crate it depends on directly.
+ * source, plus the source of the crates in its `via`.
  */
-const markingFiles = ({ crateDirs, dependents }, name, files) =>
+const markingFiles = ({ crateDirs }, { name, via }, files) =>
   files.filter((file) => {
     if (isNoReleasePath(file)) return false;
     const crate = crateFor(crateDirs, file);
-    return crate === name || (dependents.get(crate)?.has(name) ?? false);
+    return crate === name || via.includes(crate);
   });
 
 /**
@@ -125,7 +125,7 @@ export const missingBumpCheck = ({
       status: entry ? "missing-bump" : "clean",
       base,
       via: entry?.via ?? [],
-      files: entry ? markingFiles(graph, name, filesByBase[base]) : [],
+      files: entry ? markingFiles(graph, entry, filesByBase[base]) : [],
     };
   });
 

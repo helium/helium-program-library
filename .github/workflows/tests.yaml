@@ -59,12 +59,14 @@ jobs:
     # Skipped on the heads that carry releases rather than declare them: the
     # two release PRs, the Promotion PR (head develop) and the back-merge PR
     # (head master). Not a required check yet; issue 55 makes it required.
+    # A fork can name its branch anything, so the skips apply to this repository's heads only.
     if: >-
       github.event_name == 'pull_request'
-      && !startsWith(github.head_ref, 'changeset-release/')
-      && !startsWith(github.head_ref, 'program-release/')
-      && github.head_ref != 'develop'
-      && github.head_ref != 'master'
+      && (github.event.pull_request.head.repo.full_name != github.repository
+        || (!startsWith(github.head_ref, 'changeset-release/')
+          && !startsWith(github.head_ref, 'program-release/')
+          && github.head_ref != 'develop'
+          && github.head_ref != 'master'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -129,6 +131,23 @@ jobs:
       - name: Every changed program has a version bump
         run: |
           node scripts/missing-bump-check.mjs --json "$RUNNER_TEMP/missing-bump.json"
+
+  # The release scripts decide what deploys to mainnet. No develop-seed skip: a push to develop
+  # runs them too.
+  test-release-scripts:
+    name: Release Script Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      # The pending-proposal tests import `@sqds/multisig` from the workspace.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: node --test 'scripts/*.test.mjs'
 
   test-unit:
     name: Rust Unit Tests

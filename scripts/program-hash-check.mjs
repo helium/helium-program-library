@@ -21,7 +21,7 @@ const REPO = process.env.GITHUB_REPOSITORY ?? "helium/helium-program-library";
 // A `program-<name>-<x.y.z>` tag and nothing else: the tag list holds a
 // `v`-prefixed tag, a `-test` suffixed one, and a misspelled program name, and a
 // loose parse reads a program or a version out of all three.
-const PROGRAM_TAG = /^program-(.+)-(\d+\.\d+\.\d+)$/;
+const PROGRAM_TAG = /^program-([a-z0-9]+(?:-[a-z0-9]+)*)-(\d+\.\d+\.\d+)$/;
 
 // A vote and an execute take time, so a pending upgrade is normal for a few days.
 const PENDING_NOTICE_DAYS = 3;
@@ -41,8 +41,16 @@ const ageInDays = (taggedAt, now) =>
  *
  * `releases` are that program's releases, each with the release hash from its
  * `<name>.so.sha256` asset. `onChainHash` is what the chain holds.
+ * `preHashDeploy` is true when the program also has tags whose release carries
+ * no hash asset and the last deploy predates the oldest hashed release: the
+ * chain may still run one of those unhashed tags.
  */
-export const classify = ({ releases, onChainHash, now }) => {
+export const classify = ({
+  releases,
+  onChainHash,
+  now,
+  preHashDeploy = false,
+}) => {
   const sorted = [...releases].sort(byVersionDesc);
   const newest = sorted[0];
   // No release of this program published a hash asset. Nothing to compare with.
@@ -51,8 +59,12 @@ export const classify = ({ releases, onChainHash, now }) => {
   if (onChainHash === newest.hash) {
     return { status: "deployed", version: newest.version };
   }
-  // The chain holds a binary this repository never released.
-  if (!sorted.some((release) => release.hash === onChainHash)) {
+  // The chain holds a binary this repository never released, unless the deploy
+  // predates the hash assets and so may be an unhashed tag.
+  if (
+    !preHashDeploy &&
+    !sorted.some((release) => release.hash === onChainHash)
+  ) {
     return { status: "unknown binary", version: newest.version };
   }
   return {
@@ -83,7 +95,10 @@ const localnetPrograms = (anchorToml) => {
   );
 };
 
-/** Every `program-<name>-<x.y.z>` tag with the date it was created. */
+/**
+ * Every `program-<name>-<x.y.z>` tag with its creator date. For a lightweight
+ * tag that is the commit date, so `main` prefers the release's `created_at`.
+ */
 const programTags = () =>
   execFileSync(
     "git",
@@ -154,6 +169,43 @@ const onChainHash = (programId, url) =>
     encoding: "utf8",
   }).trim();
 
+/** One JSON-RPC call. The workflow installs no packages, so no web3.js. */
+const rpc = async (url, method, params) => {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  if (!response.ok) throw new Error(`${method} returned ${response.status}`);
+  const { result, error } = await response.json();
+  if (error) throw new Error(`${method}: ${error.message}`);
+  return result;
+};
+
+/**
+ * When the program was last deployed, or null. The program account names its
+ * ProgramData account, whose header is a u32 enum tag, then the u64 LE slot of
+ * the last deploy.
+ */
+const lastDeployTime = async (url, programId) => {
+  const program = await rpc(url, "getAccountInfo", [
+    programId,
+    { encoding: "jsonParsed" },
+  ]);
+  const programData = program?.value?.data?.parsed?.info?.programData;
+  if (!programData) return null;
+  const header = await rpc(url, "getAccountInfo", [
+    programData,
+    { encoding: "base64", dataSlice: { offset: 4, length: 8 } },
+  ]);
+  if (!header?.value) return null;
+  const slot = Number(
+    Buffer.from(header.value.data[0], "base64").readBigUInt64LE(0),
+  );
+  const blockTime = await rpc(url, "getBlockTime", [slot]);
+  return blockTime === null ? null : new Date(blockTime * 1000);
+};
+
 const main = async () => {
   const url = process.env.SOLANA_URL || DEFAULT_RPC;
   const now = new Date();
@@ -163,16 +215,38 @@ const main = async () => {
   const results = [];
   for (const program of localnetPrograms(readFileSync("Anchor.toml", "utf8"))) {
     const published = [];
+    let hasUnhashedTags = false;
     for (const tag of tags.filter((t) => t.name === program.name)) {
-      const hash = await releaseHash(releases.get(tag.tag), program.key);
-      if (hash) published.push({ ...tag, hash });
+      const release = releases.get(tag.tag);
+      const hash = await releaseHash(release, program.key);
+      if (hash) {
+        published.push({
+          ...tag,
+          taggedAt: release.created_at ?? tag.taggedAt,
+          hash,
+        });
+      } else {
+        hasUnhashedTags = true;
+      }
     }
+    // A null block time counts as a later deploy, so the check fails closed.
+    const deployedAt =
+      published.length && hasUnhashedTags
+        ? await lastDeployTime(url, program.programId)
+        : null;
+    const preHashDeploy =
+      deployedAt !== null &&
+      published.every(
+        (release) =>
+          deployedAt.getTime() < new Date(release.taggedAt).getTime(),
+      );
     // No release hash to compare with, so the chain is not read either.
     const result = published.length
       ? classify({
           releases: published,
           onChainHash: onChainHash(program.programId, url),
           now,
+          preHashDeploy,
         })
       : { status: "skipped" };
     results.push({

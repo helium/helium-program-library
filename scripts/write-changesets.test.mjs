@@ -22,6 +22,12 @@ const programDiff = (name, diff = {}) => ({
   diff: { ...emptyDiff, ...diff },
 });
 
+// `parseChangeset` returns releases with no prototype. A plain copy compares.
+const parsed = (text) => {
+  const { releases, summary } = parseChangeset(text);
+  return { releases: { ...releases }, summary };
+};
+
 const write = (overrides) =>
   writeChangesets({
     missing: { npm: [], programs: [], idls: null },
@@ -59,7 +65,7 @@ test("every missing npm package gets patch, and @helium/idls gets the fixed leve
     },
   });
   assert.deepEqual(Object.keys(files), [".changeset/bot-abc1234.md"]);
-  assert.deepEqual(parseChangeset(files[".changeset/bot-abc1234.md"]), {
+  assert.deepEqual(parsed(files[".changeset/bot-abc1234.md"]), {
     releases: { "@helium/idls": "minor", "@helium/spl-utils": "patch" },
     summary: "Bind the oracle signature to the task",
   });
@@ -77,7 +83,7 @@ test("@helium/idls with no IDL diff takes patch", () => {
       idls: null,
     },
   });
-  assert.deepEqual(parseChangeset(files[".changeset/bot-abc1234.md"]), {
+  assert.deepEqual(parsed(files[".changeset/bot-abc1234.md"]), {
     releases: { "@helium/idls": "patch" },
     summary: "Bind the oracle signature to the task",
   });

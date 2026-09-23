@@ -95,8 +95,8 @@ test("a changed arg type is a changed type: minor plus the breaking flag", () =>
     {
       kind: "arg",
       name: "instruction initialize_account_windowed_breaker_v0 arg window_size_seconds",
-      from: '"u64"',
-      to: '"i64"',
+      from: '{index:0,type:"u64"}',
+      to: '{index:0,type:"i64"}',
     },
   ]);
   assert.deepEqual(diff.added, []);
@@ -207,4 +207,51 @@ test("diffPrograms answers for every program asked, and names @helium/idls once"
   assert.deepEqual(result.programs[0].diff.added, [
     { kind: "instruction", name: "instruction remove_mint_authority_v0" },
   ]);
+});
+
+test("reordered struct fields and instruction args are changed types", () => {
+  // The fixture instruction has one arg, so both sides get a second one.
+  const withTwoArgs = () => {
+    const idl = fixture();
+    idl.instructions
+      .find((i) => i.name === "initialize_account_windowed_breaker_v0")
+      .args.push({ name: "threshold", type: "u64" });
+    return idl;
+  };
+  const base = withTwoArgs();
+  const head = withTwoArgs();
+  const fields = head.types.find(
+    (t) => t.name === "AccountWindowedCircuitBreakerV0",
+  ).type.fields;
+  [fields[0], fields[1]] = [fields[1], fields[0]];
+  const args = head.instructions.find(
+    (i) => i.name === "initialize_account_windowed_breaker_v0",
+  ).args;
+  [args[0], args[1]] = [args[1], args[0]];
+
+  const diff = idlDiff(base, head);
+
+  assert.deepEqual(
+    diff.changed.map(({ kind, name }) => ({ kind, name })),
+    [
+      {
+        kind: "arg",
+        name: "instruction initialize_account_windowed_breaker_v0 arg threshold",
+      },
+      {
+        kind: "arg",
+        name: "instruction initialize_account_windowed_breaker_v0 arg window_size_seconds",
+      },
+      {
+        kind: "field",
+        name: "type AccountWindowedCircuitBreakerV0 field authority",
+      },
+      {
+        kind: "field",
+        name: "type AccountWindowedCircuitBreakerV0 field token_account",
+      },
+    ],
+  );
+  assert.equal(diff.hasChanges, true);
+  assert.deepEqual(idlsLevel(diff), { level: "minor", breaking: true });
 });

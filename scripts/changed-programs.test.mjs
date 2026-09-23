@@ -21,7 +21,7 @@ const metadata = JSON.parse(
 const names = (changed) => changed.map((c) => c.name);
 const find = (changed, name) => changed.find((c) => c.name === name);
 
-test("a program's own src change marks it own and its direct dependents via it", () => {
+test("a program's own src change marks it own and its dependents via it", () => {
   const changed = changedPrograms({
     metadata,
     files: ["programs/helium-sub-daos/src/instructions/track_dc_burn_v0.rs"],
@@ -45,10 +45,11 @@ test("a program's own src change marks it own and its direct dependents via it",
     "hexboosting",
     "hpl-crons",
     "mobile-entity-manager",
+    "rewards-oracle",
   ]);
 });
 
-test("a utils crate's src change marks every program that depends on it directly", () => {
+test("a utils crate's src change marks every program that depends on it", () => {
   const changed = changedPrograms({
     metadata,
     files: ["utils/shared-utils/src/precise_number.rs"],
@@ -60,6 +61,7 @@ test("a utils crate's src change marks every program that depends on it directly
   );
   assert.deepEqual(names(changed), [
     "circuit-breaker",
+    "data-credits",
     "dc-auto-top",
     "fanout",
     "helium-entity-manager",
@@ -71,6 +73,7 @@ test("a utils crate's src change marks every program that depends on it directly
     "mini-fanout",
     "mobile-entity-manager",
     "no-emit",
+    "rewards-oracle",
     "treasury-management",
     "tuktuk-dca",
     "voter-stake-registry",
@@ -134,23 +137,65 @@ test("a workspace-excluded path dependency still marks its dependents", () => {
     files: ["utils/default-env/src/lib.rs"],
   });
 
-  // Every program but hpl-crons depends on default-env directly.
-  assert.equal(changed.length, 18);
+  // Every program but hpl-crons depends on default-env directly; hpl-crons
+  // links it through helium-sub-daos.
+  assert.equal(changed.length, 19);
   assert.equal(
     changed.every((c) => c.own === false && c.via[0] === "default-env"),
     true,
   );
-  assert.equal(names(changed).includes("hpl-crons"), false);
 });
 
-test("edges are direct only, never transitive", () => {
+test("edges are transitive, and via names the changed crate", () => {
   const changed = changedPrograms({
     metadata,
-    files: ["programs/treasury-management/src/lib.rs"],
+    files: ["programs/circuit-breaker/src/lib.rs"],
   });
 
-  // helium-sub-daos depends on treasury-management; its own dependents do not.
-  assert.deepEqual(names(changed), ["helium-sub-daos", "treasury-management"]);
+  // helium-entity-manager links circuit-breaker through data-credits.
+  assert.deepEqual(find(changed, "helium-entity-manager"), {
+    name: "helium-entity-manager",
+    own: false,
+    via: ["circuit-breaker"],
+  });
+  assert.deepEqual(names(changed), [
+    "circuit-breaker",
+    "data-credits",
+    "dc-auto-top",
+    "helium-entity-manager",
+    "helium-sub-daos",
+    "hexboosting",
+    "hpl-crons",
+    "lazy-distributor",
+    "mobile-entity-manager",
+    "rewards-oracle",
+    "treasury-management",
+    "welcome-pack",
+  ]);
+});
+
+test("an IDL under a crate's idls/ marks the programs that depend on it", () => {
+  const changed = changedPrograms({
+    metadata,
+    files: ["utils/modular-governance/idls/proposal.json"],
+  });
+
+  // `declare_program!` in modular-governance reads these IDLs.
+  assert.deepEqual(names(changed), [
+    "data-credits",
+    "dc-auto-top",
+    "helium-entity-manager",
+    "helium-sub-daos",
+    "hexboosting",
+    "hpl-crons",
+    "mobile-entity-manager",
+    "rewards-oracle",
+    "voter-stake-registry",
+  ]);
+  assert.equal(
+    changed.every((c) => !c.own && c.via[0] === "modular-governance"),
+    true,
+  );
 });
 
 test("a per-program base is honoured for that program only", () => {

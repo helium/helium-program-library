@@ -154,3 +154,47 @@ test("an unknown binary: no annotation", () => {
     [],
   );
 });
+
+test("the on-chain hash equals no release hash and the deploy predates the hashed releases: pending", () => {
+  assert.deepEqual(
+    classify({
+      releases: [
+        {
+          tag: "program-fanout-0.1.3",
+          version: "0.1.3",
+          hash: "bb",
+          taggedAt: day(4),
+        },
+      ],
+      onChainHash: "cc",
+      now: NOW,
+      preHashDeploy: true,
+    }),
+    {
+      status: "pending",
+      version: "0.1.3",
+      tag: "program-fanout-0.1.3",
+      tagAgeDays: 4,
+      notify: true,
+    },
+  );
+});
+
+test("the on-chain hash equals no release hash and the deploy is after the hashed releases: unknown binary", () => {
+  assert.deepEqual(
+    classify({
+      releases: [
+        {
+          tag: "program-fanout-0.1.3",
+          version: "0.1.3",
+          hash: "bb",
+          taggedAt: day(4),
+        },
+      ],
+      onChainHash: "cc",
+      now: NOW,
+      preHashDeploy: false,
+    }),
+    { status: "unknown binary", version: "0.1.3" },
+  );
+});
