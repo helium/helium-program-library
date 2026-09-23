@@ -4,4 +4,4 @@ On-chain rate limiter for SPL mints and token accounts. A `MintWindowedCircuitBr
 
 Used as the gate on the HNT, MOBILE, IOT, and DC mints — if any program (including an exploited one) tries to mint more than the DAO-approved rate, the CPI fails. SDK: [`@helium/circuit-breaker-sdk`](../../packages/circuit-breaker-sdk).
 
-Release / upgrade: add a program changeset that names `circuit-breaker` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-circuit-breaker-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `circuit-breaker` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-circuit-breaker-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

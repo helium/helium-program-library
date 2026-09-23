@@ -202,9 +202,10 @@ every later build in that shell test values, and the guard passes because the tw
 
 The binary a cluster runs is never a local build. `release-program.yaml` builds it in CI from a
 `program-*` tag via `.github/actions/build-verified`, which compiles in a container that
-receives neither variable; `buffer-deploy` uploads that artifact with the Squads vault as its
-buffer authority, and the upgrade is a multisig proposal. The guard's job is therefore the build
-that is *meant* to be deployable picking up `TESTING` on its own.
+receives neither variable; `deploy-buffers` (with `write-program-buffer` and `write-idl-buffer`)
+uploads that artifact with the Squads vault as its buffer authority, and the upgrade is a
+multisig proposal. The guard's job is therefore the build that is *meant* to be deployable
+picking up `TESTING` on its own.
 
 ## Repo layout
 
@@ -314,11 +315,28 @@ Mainnet program upgrades go through Squads (multisig) — this repo only builds 
    - opens a Squads proposal to upgrade the program to the new buffer.
 4. Sign and execute the Squads proposal.
 
+### Verify a deployed program
+
+Each program release carries a `<program>.so.sha256` asset: the hash of the release build. Compare it with the on-chain hash:
+
+```bash
+solana-verify get-program-hash <program-id>
+```
+
+To rebuild from the tagged source and compare with the chain:
+
+```bash
+solana-verify verify-from-repo https://github.com/helium/helium-program-library \
+  --program-id <program-id> \
+  --commit-hash "$(git rev-list -n 1 program-<program-name>-<version>)" \
+  --library-name <program_name>
+```
+
 ### Releasing a program to devnet
 
 Devnet uses a different lazy-signer seed (`devnethelium5` instead of the mainnet `nJWGUMOK`), so program binaries differ between networks. The workflows handle that automatically.
 
-- **Automatic:** any push to `develop` that touches `programs/<name>/**` (outside `shared-utils/`) triggers [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) for each changed program. On a PR into `develop`, add the `deploy-to-devnet` label to deploy preview-style.
+- **Automatic:** any push to `develop` that touches `programs/<name>/**` triggers [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) for each changed program. On a PR into `develop`, add the `deploy-to-devnet` label to deploy preview-style.
 - **Manual:** run [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml) from the Actions UI with the program name + branch. Same Squads-buffer + proposal flow as mainnet, but against the devnet multisig / RPC.
 
 ### Reusable composite actions
@@ -328,7 +346,7 @@ Each workflow above delegates to composite actions in [`.github/actions/`](.gith
 - `setup/`, `setup-ts/`, `setup-anchor/`, `setup-solana/` — tool installation.
 - `build-anchor/` — `anchor build` (with optional `testing`/`devnet` lazy-signer seeds).
 - `build-verified/` — verifiable build via `solana-verify` that produces a deterministic `.so`.
-- `buffer-deploy/` — uploads the `.so` and IDL to buffer accounts owned by the multisig.
+- `deploy-buffers/`, `write-program-buffer/`, `write-idl-buffer/` — upload the `.so` and IDL to buffer accounts owned by the multisig.
 
 If you're adding a new program / service, you shouldn't need to change the workflows themselves — just add the program to `Anchor.toml` / `docker-info.json` and the tag pattern above will pick it up.
 

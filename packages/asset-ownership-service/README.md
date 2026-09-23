@@ -15,4 +15,4 @@ Image: `public.ecr.aws/v0j6k5v6/asset-ownership-service`
 | oracle-cluster / prod | [manifests/oracle-cluster/prod/helium/asset-ownership-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/oracle-cluster/prod/helium/asset-ownership-service.yaml) |
 | oracle-cluster / sdlc | [manifests/oracle-cluster/sdlc/helium/asset-ownership.service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/oracle-cluster/sdlc/helium/asset-ownership.service.yaml) |
 
-Deploy: the service auto-tag bot pushes `docker-web-asset-ownership-service-<version>` on each merge to `develop` that changes it. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The k8s bump stays manual.
+Deploy: push a `docker-web-asset-ownership-service-<version>` tag by hand. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The k8s bump stays manual.

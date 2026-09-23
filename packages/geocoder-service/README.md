@@ -20,7 +20,7 @@ Image: `public.ecr.aws/v0j6k5v6/geocoder-service`
 | --- | --- |
 | web-cluster / prod | [manifests/web-cluster/prod/helium/geocoder-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/geocoder-service.yaml) |
 
-Deploy: the service auto-tag bot pushes `docker-web-geocoder-service-<version>` on each merge to `develop` that changes it. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The k8s bump stays manual.
+Deploy: push a `docker-web-geocoder-service-<version>` tag by hand. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The k8s bump stays manual.
 
 ## FAQ
 

@@ -4,4 +4,4 @@ An oracle-driven "lazy" rewards distributor. Each recipient is an NFT (typically
 
 See the [Oracle Architecture](../../README.md#oracle-architecture) section in the main README for the request/response contract. Reference oracle implementation: [`distributor-oracle`](../../packages/distributor-oracle). SDK: [`@helium/lazy-distributor-sdk`](../../packages/lazy-distributor-sdk).
 
-Release / upgrade: add a program changeset that names `lazy-distributor` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-lazy-distributor-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `lazy-distributor` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-lazy-distributor-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

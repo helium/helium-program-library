@@ -4,4 +4,4 @@ Commits a Merkle root of pre-authorised transactions on-chain and lets anyone ex
 
 Used by [`migration-service`](../../packages/migration-service) for the HNT L1 → Solana migration and by welcome-pack issuance. SDK: [`@helium/lazy-transactions-sdk`](../../packages/lazy-transactions-sdk).
 
-Release / upgrade: add a program changeset that names `lazy-transactions` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-lazy-transactions-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `lazy-transactions` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-lazy-transactions-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

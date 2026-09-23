@@ -62,11 +62,6 @@ may write `none` anywhere.
 
 ## Releasing
 
-A push to `develop` with program changesets present runs
-`.github/workflows/version-programs.yaml`, which runs
-`node scripts/version-programs.mjs` and opens or updates the **program release
-PR** from `program-release/develop`. Merging it bumps each `Cargo.toml`, writes
-each `programs/<name>/CHANGELOG.md`, and deletes the files used here.
-
-No tag comes from this PR. The tag bot creates `program-<name>-<version>` when
-the bump reaches `master`, which is what starts the deploy.
+The version step ships later. Until then, the author bumps the program's
+version in its `Cargo.toml` by hand. After the bump reaches `master`, the author
+pushes the `program-<name>-<version>` tag by hand. That tag starts the deploy.
