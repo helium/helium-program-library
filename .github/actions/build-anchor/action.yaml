@@ -51,8 +51,8 @@ runs:
         restore-keys: |
           build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-
     # A job that only consumes the build takes it from an artifact the run's own `build` job
-    # uploaded. Every `needs: build` job used to call this action itself, so one push restored (and
-    # on a prefix hit rebuilt) the same `target/` in 43 more legs.
+    # uploaded, so the `needs: build` legs do not each restore (and on a prefix hit rebuild) the
+    # same `target/`.
     - name: Download Anchor Build
       uses: actions/download-artifact@v4
       if: inputs.target-artifact != ''
@@ -75,10 +75,10 @@ runs:
         DEVNET: ${{ inputs.devnet }}
         TESTING_BUILD: ${{ inputs.testing }}
         PROGRAM: ${{ inputs.program }}
-    # Only develop and master save. The repo's 10 GB cache store sat at 9.72 GB with 7.7 GB of it
-    # per-PR `target/` copies, which evicted the develop seed the PRs are meant to restore. The cost
-    # is that a re-push of a PR that touches `programs/**` no longer hits its own earlier save: it
-    # restores the develop seed through the prefix above and rebuilds warm.
+    # Only develop and master save: per-PR `target/` copies fill the repo's 10 GB cache store and
+    # evict the develop seed the PRs are meant to restore. A re-push of a PR that touches
+    # `programs/**` therefore does not hit its own earlier save: it restores the develop seed
+    # through the prefix above and rebuilds warm.
     - name: Save Anchor Build
       uses: actions/cache/save@v4
       if: inputs.target-artifact == '' && steps.cache-anchor-build.outputs.cache-hit != 'true' && (github.ref_name == 'develop' || github.ref_name == 'master')

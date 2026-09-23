@@ -233,7 +233,7 @@ Everything this repo publishes to the world runs through one of seven GitHub Act
 | npm packages under `packages/*` | Merge to `develop` with a changeset | [`npm-publish.yaml`](.github/workflows/npm-publish.yaml) |
 | Docker images for services | Git tag `docker-<env>-<service>-<version>` | [`docker-push.yaml`](.github/workflows/docker-push.yaml) |
 | Solana programs on **mainnet** | Git tag `program-<name>-<version>` | [`release-program.yaml`](.github/workflows/release-program.yaml) |
-| Solana programs on **devnet** | Merge to `develop` touching `programs/*`, or the `deploy-to-devnet` PR label | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) |
+| Solana programs on **devnet** | Merge to `develop` that changes a program's `src/`, `Cargo.toml` or `idls/`, or a workspace crate it depends on, or the `deploy-to-devnet` PR label | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) |
 | Any program on devnet, manually | GitHub UI ("Run workflow") | [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml) |
 | Compares each program's on-chain hash with its release hashes | Daily schedule, or GitHub UI ("Run workflow") | [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) |
 | Closes program and IDL buffers the deployer key still owns | Weekly schedule, or GitHub UI ("Run workflow") | [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) |
@@ -331,17 +331,20 @@ A run closes its own program buffer and IDL buffer when it fails or is cancelled
 Each program release carries a `<program>.so.sha256` asset: the hash of the release build. Compare it with the on-chain hash:
 
 ```bash
-solana-verify get-program-hash <program-id>
+solana-verify get-program-hash -u https://api.mainnet-beta.solana.com <program-id>
 ```
 
 To rebuild from the tagged source and compare with the chain:
 
 ```bash
-solana-verify verify-from-repo https://github.com/helium/helium-program-library \
+solana-verify verify-from-repo -u https://api.mainnet-beta.solana.com \
+  https://github.com/helium/helium-program-library \
   --program-id <program-id> \
   --commit-hash "$(git rev-list -n 1 program-<program-name>-<version>)" \
   --library-name <program_name>
 ```
+
+Answer no when it asks to write verify data on chain, and do not pass `-y`.
 
 ### Releasing a program to devnet
 

@@ -52,8 +52,9 @@ hand decision; the changeset bot never writes it.
 
 `none` means "this change ships nothing on chain". No version bump and no
 changelog entry. The version script records the program and the commit it was
-reviewed up to in `skipped.json`, so the missing-bump check stops asking for a
-bump, and the program's next real release clears the entry.
+reviewed up to in `skipped.json`, so the missing-bump check asks for a bump only
+when the program changed since both its tag and that commit. The program's next
+real release clears the entry.
 
 The changeset bot writes `none` only for a **dependent program** — one marked
 changed only through a workspace dependency, where the change cannot reach the

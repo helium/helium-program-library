@@ -100,7 +100,7 @@ export const me = provider.wallet.publicKey;
 /**
  * Everything the helium-sub-daos suites share. The fields are filled in by the
  * hooks `useSubDaoPrograms` and `useDaoAndSubDaoWorld` register, so a shard file
- * reads them from the context rather than from a closure it no longer owns.
+ * reads them from the context rather than from a closure it does not own.
  */
 export interface SubDaoTestContext {
   program: Program<HeliumSubDaos>;

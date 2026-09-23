@@ -27,7 +27,7 @@ jobs:
   #
   # `anchor idl build` writes target/idl and target/types without the SBF
   # compile that `anchor build` paid for, and nothing here reads target/deploy.
-  # The build used to set TESTING, which changes no IDL: the only
+  # The build leaves TESTING unset because it changes no IDL: the only
   # TESTING-dependent addresses (ECC_VERIFIER, the VSR ledger-transfer
   # approver) reach the program through `Pubkey::from_str`, and anchor emits no
   # `address` in the IDL for those accounts.
