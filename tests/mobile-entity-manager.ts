@@ -26,7 +26,7 @@ import {
 } from "./utils/fixtures";
 const { expect } = chai;
 import chaiAsPromised from "chai-as-promised";
-import { getAccount } from "@solana/spl-token";
+import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { random } from "./utils/string";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -50,6 +50,7 @@ describe("mobile-entity-manager", () => {
   let dao: PublicKey;
   let subDao: PublicKey;
   let dcMint: PublicKey;
+  let hntMint: PublicKey;
   let programApproval: PublicKey;
 
   before(async () => {
@@ -85,7 +86,7 @@ describe("mobile-entity-manager", () => {
 
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
-    const hntMint = await createMint(provider, 8, me, me);
+    hntMint = await createMint(provider, 8, me, me);
     await createAtaAndMint(provider, hntMint, new BN("10000000000000"), me);
     ({ dao } = await initTestDao(
       hsdProgram,
@@ -209,6 +210,78 @@ describe("mobile-entity-manager", () => {
       expect(carrierAcc.approved).to.be.false;
     });
 
+    describe("closing the carrier", async () => {
+      const stake = new BN("10000000000000"); // CARRIER_STAKE_AMOUNT
+
+      it("refuses to close a carrier that is still approved", async () => {
+        await memProgram.methods
+          .approveCarrierV0()
+          .accountsPartial({ carrier })
+          .rpc({ skipPreflight: true });
+
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao,
+              carrier,
+              rentRefund: me,
+              destination: getAssociatedTokenAddressSync(hntMint, me),
+            })
+            .rpc({ skipPreflight: true })
+        ).to.be.rejected;
+      });
+
+      it("returns the stake to the update authority and closes the accounts", async () => {
+        const carrierAcc = await memProgram.account.carrierV0.fetch(carrier);
+        const escrow = carrierAcc.escrow;
+        expect((await getAccount(provider.connection, escrow)).amount).to.eq(
+          BigInt(stake.toString())
+        );
+
+        const destination = getAssociatedTokenAddressSync(hntMint, me);
+        const before = (await getAccount(provider.connection, destination)).amount;
+
+        await memProgram.methods
+          .closeCarrierV0()
+          .accountsPartial({ subDao, carrier, rentRefund: me, destination })
+          .rpc({ skipPreflight: true });
+
+        const after = (await getAccount(provider.connection, destination)).amount;
+        expect(after - before).to.eq(BigInt(stake.toString()));
+        expect(await provider.connection.getAccountInfo(carrier)).to.be.null;
+        expect(await provider.connection.getAccountInfo(escrow)).to.be.null;
+      });
+
+      it("refuses a destination the update authority does not own", async () => {
+        const stranger = Keypair.generate().publicKey;
+        const strangerAta = await createAtaAndMint(
+          provider,
+          hntMint,
+          new BN(0),
+          stranger
+        );
+
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao,
+              carrier,
+              rentRefund: me,
+              destination: strangerAta,
+            })
+            .rpc({ skipPreflight: true })
+        ).to.be.rejected;
+
+        // the stake is still where it was
+        const carrierAcc = await memProgram.account.carrierV0.fetch(carrier);
+        expect(
+          (await getAccount(provider.connection, carrierAcc.escrow)).amount
+        ).to.eq(BigInt(stake.toString()));
+      });
+    });
+
     it("allows the carrier to issue itself a rewardable NFT", async () => {
       await memProgram.methods
         .issueCarrierNftV0({
@@ -293,6 +366,72 @@ describe("mobile-entity-manager", () => {
         expect(incentiveEscrowProgramAcc2.startTs.toNumber()).to.eq(10);
         expect(incentiveEscrowProgramAcc2.stopTs.toNumber()).to.eq(15);
         expect(incentiveEscrowProgramAcc2.shares).to.eq(200);
+      });
+
+      it("closes an incentive program once it has ended", async () => {
+        const name = random();
+        const {
+          pubkeys: { incentiveEscrowProgram },
+        } = await memProgram.methods
+          .initializeIncentiveProgramV0({
+            metadataUrl: null,
+            name,
+            startTs: new BN(5),
+            stopTs: new BN(10), // already in the past
+            shares: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accountsPartial({
+            carrier,
+            recipient: me,
+            keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        await memProgram.methods
+          .closeIncentiveProgramV0()
+          .accountsPartial({ carrier, incentiveEscrowProgram, rentRefund: me })
+          .rpc({ skipPreflight: true });
+
+        expect(
+          await provider.connection.getAccountInfo(incentiveEscrowProgram!)
+        ).to.be.null;
+      });
+
+      it("refuses to close an incentive program that has not ended", async () => {
+        const name = random();
+        const future = new BN(Math.floor(Date.now() / 1000) + 86400);
+        const {
+          pubkeys: { incentiveEscrowProgram },
+        } = await memProgram.methods
+          .initializeIncentiveProgramV0({
+            metadataUrl: null,
+            name,
+            startTs: new BN(5),
+            stopTs: future,
+            shares: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accountsPartial({
+            carrier,
+            recipient: me,
+            keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        await expect(
+          memProgram.methods
+            .closeIncentiveProgramV0()
+            .accountsPartial({ carrier, incentiveEscrowProgram, rentRefund: me })
+            .rpc({ skipPreflight: true })
+        ).to.be.rejected;
+
+        expect(await provider.connection.getAccountInfo(incentiveEscrowProgram!))
+          .to.not.be.null;
       });
 
       it("can swap tree when it's full", async () => {
