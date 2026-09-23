@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "hexboosting"
-version = "0.2.5"
+version = "0.2.4"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1514,7 +1514,7 @@ dependencies = [
 
 [[package]]
 name = "price-oracle"
-version = "0.2.4"
+version = "0.2.3"
 dependencies = [
  "anchor-lang",
  "default-env",
