@@ -97,7 +97,9 @@ runs:
         NETWORK: ${{ inputs.network }}
 
     # A run that failed after the authority transfer leaves a vault-owned buffer that only a
-    # Squads proposal can close. The re-run takes it back instead of paying rent for a second.
+    # Squads proposal can close. A re-run that runs this step again takes it back instead of
+    # paying rent for a second. In the mainnet release that is "Re-run all jobs": "Re-run failed
+    # jobs" keeps the build job's old empty `reused-buffer` output and writes a second buffer.
     - name: Reuse a vault buffer that matches the build
       id: reuse
       if: steps.hash-match.outputs.skip != 'true'

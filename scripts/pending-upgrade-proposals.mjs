@@ -41,10 +41,12 @@ const isVaultTransaction = (account) =>
 
 /**
  * The buffer a vault transaction upgrades `programId` from, or null, and
- * whether its message is exactly the upgrade this workflow builds: only the
- * loader Upgrade (programData, program, buffer, spill, ..., vault) and IDL
- * instructions to the program. An IDL SetAuthority, or a SetBuffer or Close
- * that does not keep the IDL and its rent with the vault, is not this upgrade.
+ * whether its message matches this workflow's upgrade: only the loader Upgrade
+ * with this program's programData, the program, the buffer, `spill` and the
+ * vault 0 authority, and IDL instructions to the program. An IDL SetAuthority,
+ * or a SetBuffer or Close whose authority or rent destination is not the vault,
+ * does not match. The caller also requires vault index 0. The contents of an
+ * IDL buffer are not checked, so signers still review the message.
  */
 const upgradeBuffer = (message, programId, multisigPda, spill) => {
   const key = (index) => message.accountKeys[index]?.toBase58();
@@ -139,7 +141,7 @@ export const pendingUpgrades = async ({
       (status === "Active" && index > Number(staleTransactionIndex));
     if (!pendingStatus) return [];
 
-    const [{ message }] =
+    const [{ message, vaultIndex }] =
       multisig.accounts.VaultTransaction.fromAccountInfo(transaction);
     const { buffer, exact } = upgradeBuffer(
       message,
@@ -147,7 +149,11 @@ export const pendingUpgrades = async ({
       multisigPda,
       spill,
     );
-    return buffer ? [{ index, status, buffer, exact }] : [];
+    // The message names vault 0 as the upgrade authority, so it only executes
+    // as vault 0; at another vault index it still counts as an older release.
+    return buffer
+      ? [{ index, status, buffer, exact: exact && vaultIndex === 0 }]
+      : [];
   });
 };
 

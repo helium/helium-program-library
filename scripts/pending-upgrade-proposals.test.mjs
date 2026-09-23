@@ -318,3 +318,36 @@ test("an IDL SetBuffer with an authority that is not the vault makes the proposa
     ],
   );
 });
+
+test("an Upgrade whose authority is not the vault makes the proposal not exact", async () => {
+  // The recorded Upgrade's accounts; account index 6 is the spill, not the vault.
+  const pending = await withProposal(150, "Approved", (message) => ({
+    ...message,
+    instructions: message.instructions.map((ix) =>
+      Buffer.from(ix.data).equals(Buffer.from([3, 0, 0, 0]))
+        ? { ...ix, accountIndexes: new Uint8Array([4, 1, 5, 6, 8, 9, 6]) }
+        : ix,
+    ),
+  }))(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.exact]),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an otherwise exact proposal at vault index 1 is not exact", async () => {
+  // vault_index is the u8 after the discriminator, multisig, creator, index and bump.
+  const pending = await withProposal(150, "Approved", undefined, (data) =>
+    data.writeUInt8(1, 8 + 32 + 32 + 8 + 1),
+  )(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.buffer, p.exact]),
+    [
+      [150, PENDING_BUFFER, false],
+      [163, PENDING_BUFFER, true],
+    ],
+  );
+});

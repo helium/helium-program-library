@@ -11,6 +11,9 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: read
+
 jobs:
   detect_changed_programs:
     if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'deploy-to-devnet')
@@ -35,7 +38,13 @@ jobs:
           # `github.event.after` is empty on a pull_request, so the head is explicit.
           BASE: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || github.event.before }}
           HEAD: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.event.after }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
+          # The PR base sha is develop's tip, so a two-dot diff from it also holds develop's
+          # changes since the branch point. The merge base leaves only the PR's own.
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE=$(git merge-base "$BASE" "$HEAD")
+          fi
           CHANGED=$(node scripts/changed-programs.mjs "$BASE" "$HEAD")
           echo "$CHANGED"
           JSON=$(echo "$CHANGED" | jq -c '[.[].name]')

@@ -32,8 +32,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      # Installs the Solana CLI too.
+      # Installs the Solana CLI too. The sweep does not call `toml`, and the install runs
+      # third-party build scripts on the VM that later writes the deployer key.
       - uses: ./.github/actions/setup-anchor/
+        with:
+          toml-cli: false
 
       - name: Stop while a release runs
         env:

@@ -1,5 +1,9 @@
 name: "Setup Anchor"
 description: "Setup Anchor"
+inputs:
+  toml-cli:
+    description: "Install the toml CLI"
+    default: "true"
 runs:
   using: "composite"
   steps:
@@ -22,10 +26,11 @@ runs:
     - uses: actions/cache@v4
       name: Cache Toml Cli
       id: cache-toml-cli
+      if: inputs.toml-cli == 'true'
       with:
         path: |
           ~/.cargo/bin/toml
         key: toml-cli-${{ runner.os }}-v0002
     - run: (cargo install toml-cli || true)
-      if: steps.cache-toml-cli.outputs.cache-hit != 'true'
+      if: inputs.toml-cli == 'true' && steps.cache-toml-cli.outputs.cache-hit != 'true'
       shell: bash

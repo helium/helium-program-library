@@ -116,6 +116,7 @@ const addedChangesets = (base, head, dir) =>
   run("git", [
     "diff",
     "--name-only",
+    "--no-renames",
     "--diff-filter=A",
     base,
     head,

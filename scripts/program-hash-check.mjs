@@ -255,6 +255,13 @@ export const lastUpgradeTime = async (url, programId, since) => {
         signature,
         { encoding: "jsonParsed", maxSupportedTransactionVersion: 1 },
       ]);
+      // Moving on would return an older time and could mark an unknown binary
+      // as pending, so a transaction the RPC cannot serve is an error.
+      if (tx === null) {
+        throw new Error(
+          `${programId}: getTransaction returned null for ${signature}`,
+        );
+      }
       if (isUpgradeTransaction(tx)) {
         return tx.blockTime == null ? null : new Date(tx.blockTime * 1000);
       }

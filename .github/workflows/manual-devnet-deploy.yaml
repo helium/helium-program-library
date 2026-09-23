@@ -16,6 +16,9 @@ on:
         default: "develop"
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest

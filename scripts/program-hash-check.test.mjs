@@ -334,7 +334,9 @@ const stubRpc = (signatures, upgrades) => {
         return signatures.slice(start, start + params[1].limit);
       },
       getTransaction: () =>
-        upgrades[params[0]] ?? parsedTx([loaderIx("extendProgram")]),
+        params[0] in upgrades
+          ? upgrades[params[0]]
+          : parsedTx([loaderIx("extendProgram")]),
     }[method]();
     return { ok: true, json: async () => ({ result }) };
   };
@@ -392,6 +394,19 @@ test("more than 1000 signatures and no upgrade: an error", async (t) => {
   await assert.rejects(
     lastUpgradeTime("rpc", "program", SINCE),
     /no upgrade in the last 1000/,
+  );
+});
+
+test("a successful signature whose transaction the RPC cannot serve: an error", async (t) => {
+  t.after(
+    stubRpc([signature(0, secondsAgo(1)), signature(1, secondsAgo(2))], {
+      s0: null,
+      s1: { ...parsedTx([loaderIx("upgrade")]), blockTime: secondsAgo(2) },
+    }),
+  );
+  await assert.rejects(
+    lastUpgradeTime("rpc", "program", SINCE),
+    /program: getTransaction returned null for s0/,
   );
 });
 

@@ -311,7 +311,7 @@ Mainnet program upgrades go through Squads (multisig) — this repo only builds 
    ```
 
 3. [`release-program.yaml`](.github/workflows/release-program.yaml) runs:
-   - builds the IDL with `anchor build`,
+   - builds the IDL with `anchor idl build`,
    - runs a **verifiable** Solana build (`solana-verify`) so the on-chain hash is reproducible,
    - publishes the GitHub release with the IDL and the release hash, only after that build succeeds,
    - deploys the `.so` and IDL to a buffer account owned by the multisig vault,

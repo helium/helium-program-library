@@ -251,7 +251,9 @@ const main = (argv) => {
     metadata,
     programs: readPrograms(head, skipped),
     changedFiles: (base) =>
-      git("diff", "--name-only", base, head).split("\n").filter(Boolean),
+      git("diff", "--name-only", "--no-renames", base, head)
+        .split("\n")
+        .filter(Boolean),
   });
 
   const text = report(result);
