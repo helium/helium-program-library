@@ -422,6 +422,20 @@ test("a successful signature whose transaction the RPC cannot serve: an error", 
   );
 });
 
+test("an empty first signature page: error, not pending", async (t) => {
+  t.after(stubRpc([], {}));
+  assert.deepEqual(
+    await checkProgram(FANOUT, lookups({ lastUpgradeTime: undefined })),
+    {
+      program: "fanout",
+      programId: "fan",
+      status: "error",
+      version: "0.1.3",
+      message: "fan: ProgramData history ended with no deploy or upgrade found",
+    },
+  );
+});
+
 test("a program tag parses to its name and version", () => {
   assert.deepEqual(parseProgramTag("program-fanout-0.1.0"), {
     name: "fanout",

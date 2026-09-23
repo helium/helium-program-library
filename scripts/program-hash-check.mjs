@@ -6,7 +6,7 @@
  * and prints one JSON object for the workflow to turn into a run summary and annotations.
  *
  * A program whose releases carry no `<name>.so.sha256` asset is skipped, not
- * failed: a program enters the check at its first release through the new flow.
+ * failed: a program enters the check at its first release that carries one.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -223,7 +223,7 @@ export const isUpgradeTransaction = (tx, programData) =>
   );
 
 /**
- * When the program was last upgraded, or null. The ProgramData header slot is
+ * When the program was last upgraded. The ProgramData header slot is
  * not used: `solana program extend` before the vote rewrites it. The last
  * upgrade transaction touches the ProgramData account, so its signatures hold it.
  */
@@ -233,7 +233,9 @@ export const lastUpgradeTime = async (url, programId, since) => {
     { encoding: "jsonParsed" },
   ]);
   const programData = program?.value?.data?.parsed?.info?.programData;
-  if (!programData) return null;
+  if (!programData) {
+    throw new Error(`${programId}: no ProgramData address`);
+  }
   let before;
   let seen = 0;
   for (;;) {
@@ -241,7 +243,11 @@ export const lastUpgradeTime = async (url, programId, since) => {
       programData,
       { limit: 50, ...(before ? { before } : {}) },
     ]);
-    if (!signatures.length) return null;
+    if (!signatures.length) {
+      throw new Error(
+        `${programId}: ProgramData history ended with no deploy or upgrade found`,
+      );
+    }
     for (const { signature, err, blockTime } of signatures) {
       if (++seen > 1000) {
         throw new Error(
@@ -266,7 +272,12 @@ export const lastUpgradeTime = async (url, programId, since) => {
         );
       }
       if (isUpgradeTransaction(tx, programData)) {
-        return tx.blockTime == null ? null : new Date(tx.blockTime * 1000);
+        if (tx.blockTime == null) {
+          throw new Error(
+            `${programId}: upgrade transaction ${signature} has no blockTime`,
+          );
+        }
+        return new Date(tx.blockTime * 1000);
       }
     }
     before = signatures[signatures.length - 1].signature;
@@ -291,7 +302,7 @@ export const checkProgram = async (
 ) => {
   const published = [];
   let hasUnhashedTags = false;
-  // A null time means no upgrade was found in the whole history, so an
+  // A null time means the upgrade time was not looked up, so an
   // older-release match stays pending.
   let deployedAt = null;
   let newest;
