@@ -23,6 +23,6 @@ Revenue is split across **staked** shares, not across all shares. Every arrival 
 
 SDK: [`@helium/fanout-sdk`](../../packages/fanout-sdk). Metadata: [`fanout-metadata-service`](../../packages/fanout-metadata-service).
 
-Release / upgrade: add a program changeset that names `fanout` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-fanout-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `fanout` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/fanout/Cargo.toml`. After the change reaches `master`, push the `program-fanout-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
 
 Note that this isn't actively used (at least by helium) anymore since HST went away.

@@ -4,4 +4,4 @@ Helium's own on-chain price oracle. A whitelisted set of oracle keys each submit
 
 SDK: [`@helium/price-oracle-sdk`](../../packages/price-oracle-sdk).
 
-Release / upgrade: add a program changeset that names `price-oracle` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-price-oracle-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `price-oracle` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/price-oracle/Cargo.toml`. After the change reaches `master`, push the `program-price-oracle-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

@@ -4,4 +4,4 @@ Manages Data Credits (DC) — a non-transferable SPL token that hotspots and rou
 
 SDK: [`@helium/data-credits-sdk`](../../packages/data-credits-sdk).
 
-Release / upgrade: add a program changeset that names `data-credits` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-data-credits-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `data-credits` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/data-credits/Cargo.toml`. After the change reaches `master`, push the `program-data-credits-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

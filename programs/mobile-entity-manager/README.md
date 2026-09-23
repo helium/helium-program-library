@@ -6,4 +6,4 @@ Works in tandem with [`helium-entity-manager`](../helium-entity-manager) (which 
 
 SDK: [`@helium/mobile-entity-manager-sdk`](../../packages/mobile-entity-manager-sdk).
 
-Release / upgrade: add a program changeset that names `mobile-entity-manager` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-mobile-entity-manager-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `mobile-entity-manager` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/mobile-entity-manager/Cargo.toml`. After the change reaches `master`, push the `program-mobile-entity-manager-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

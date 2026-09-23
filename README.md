@@ -303,7 +303,7 @@ Once the image is in ECR, update the `image:` field in the matching manifest und
 Mainnet program upgrades go through Squads (multisig) — this repo only builds the verifiable `.so`, stages a buffer, and proposes the upgrade transaction.
 
 1. Bump the version in the program's `Cargo.toml`.
-2. Push a tag matching `program-<program-name>-<version>`, e.g.:
+2. Push a tag matching `program-<program-name>-<version>` on a commit that is on `master`, e.g.:
 
    ```bash
    git tag program-helium-sub-daos-0.2.7

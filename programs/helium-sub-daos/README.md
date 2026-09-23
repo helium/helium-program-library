@@ -6,4 +6,4 @@ Other programs CPI into this on every meaningful network event: [`data-credits`]
 
 SDK: [`@helium/helium-sub-daos-sdk`](../../packages/helium-sub-daos-sdk).
 
-Release / upgrade: add a program changeset that names `helium-sub-daos` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-helium-sub-daos-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `helium-sub-daos` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/helium-sub-daos/Cargo.toml`. After the change reaches `master`, push the `program-helium-sub-daos-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

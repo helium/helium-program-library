@@ -4,4 +4,4 @@ Thin wrapper around [lazy-distributor](../lazy-distributor) that is meant to eli
 
 SDK: [`@helium/rewards-oracle-sdk`](../../packages/rewards-oracle-sdk). Oracle server: [`distributor-oracle`](../../packages/distributor-oracle).
 
-Release / upgrade: add a program changeset that names `rewards-oracle` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-rewards-oracle-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `rewards-oracle` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/rewards-oracle/Cargo.toml`. After the change reaches `master`, push the `program-rewards-oracle-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

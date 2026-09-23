@@ -4,4 +4,4 @@ Stores on-chain "do this Helium action at time T" entries that the [tuktuk](http
 
 SDK: [`@helium/hpl-crons-sdk`](../../packages/hpl-crons-sdk).
 
-Release / upgrade: add a program changeset that names `hpl-crons` in [`.changeset-programs/`](../../.changeset-programs). After the change reaches `master`, push the `program-hpl-crons-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `hpl-crons` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/hpl-crons/Cargo.toml`. After the change reaches `master`, push the `program-hpl-crons-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
