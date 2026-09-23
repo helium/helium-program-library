@@ -351,3 +351,26 @@ test("an otherwise exact proposal at vault index 1 is not exact", async () => {
     ],
   );
 });
+
+test("an Upgrade with the buffer and program but another ProgramData makes the proposal not exact", async () => {
+  // The recorded Upgrade's accounts, with account 0 moved to index 8, which is
+  // not the program's ProgramData.
+  const pending = await withProposal(150, "Approved", (message) => ({
+    ...message,
+    instructions: message.instructions.map((ix) =>
+      Buffer.from(ix.data).equals(Buffer.from([3, 0, 0, 0]))
+        ? {
+            ...ix,
+            accountIndexes: new Uint8Array([8, ...ix.accountIndexes.slice(1)]),
+          }
+        : ix,
+    ),
+  }))(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.buffer, p.exact]),
+    [
+      [150, PENDING_BUFFER, false],
+      [163, PENDING_BUFFER, true],
+    ],
+  );
+});
