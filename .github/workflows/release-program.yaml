@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 # The deployer key reaches two jobs only, `buffers` and `propose`, and neither installs the
-# workspace. `@sqds/multisig` runs in `build` and `wait`, which hold no key.
+# workspace. `@sqds/multisig` runs in `plan` and `wait`, which hold no key and no write token.
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,8 +26,6 @@ jobs:
       version: ${{ steps.tag.outputs.VERSION }}
       program-id: ${{ steps.tag.outputs.PROGRAM_ID }}
       program-name: ${{ steps.tag.outputs.PROGRAM_NAME }}
-      skip: ${{ steps.plan.outputs.skip }}
-      reused-buffer: ${{ steps.plan.outputs.buffer }}
       artifact-sha256: ${{ steps.hash.outputs.artifact-sha256 }}
     steps:
       - name: Checkout code
@@ -36,23 +34,17 @@ jobs:
           # The master ancestry guard in "Set tag information" needs `origin/master` and the
           # history between it and the tag.
           fetch-depth: 0
-          # This job runs `@sqds/multisig` and has `contents: write`. The uploads pass their
-          # token themselves, so the checkout keeps none in `.git/config`.
+          # This job has `contents: write`. The uploads pass their token themselves, so the
+          # checkout keeps none in `.git/config`.
           persist-credentials: false
 
-      - uses: actions/cache@v4
-        name: Cache Toml Cli
-        id: cache-toml-cli
-        with:
-          path: |
-            ~/.cargo/bin/toml
-          key: toml-cli-${{ runner.os }}-v0002
+      # This job decides the released bytes, so it installs its CLIs fresh, not from a cache
+      # any workflow in the cache scope can write.
       # `--locked` builds against the crate's own lockfile, so a dependency that later requires a
       # newer rustc than this runner has cannot break the install. A failure here is fatal: the
       # next step reads the program id with this binary, and an empty id reaches `anchor idl
       # write-buffer` several steps later as a missing argument.
       - run: cargo install toml-cli --locked
-        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
 
       - name: Set tag information
@@ -111,12 +103,14 @@ jobs:
         with:
           devnet: false
           program: ${{ env.PROGRAM_NAME }}
+          cache: false
 
       - uses: ./.github/actions/build-verified/
         id: build-verified
         with:
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
+          cache: false
 
       # The release hash. The scheduled hash check compares the on-chain program with it. The
       # release carries it before `plan-deploy`, so a run that the hash-match skip stops still has it.
@@ -142,9 +136,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # `plan-deploy` runs workspace JavaScript in a job with `contents: write`, and that code can
-      # replace this artifact. The `buffers` job checks the artifact against the hash taken before
-      # `plan-deploy` ran.
+      # The `plan` and `buffers` jobs take the build from this artifact. `plan` runs workspace
+      # JavaScript, and that code can replace the artifact, so `buffers` checks it against the
+      # hash taken here.
       - name: Store the build
         uses: actions/upload-artifact@v4
         with:
@@ -153,21 +147,51 @@ jobs:
             ./target/deploy/${{ env.PROGRAM_NAME }}.so
             ./target/idl/${{ env.PROGRAM_NAME }}.json
 
+  # `plan-deploy` installs and runs workspace JavaScript, so it runs apart from the release
+  # upload's write token.
+  plan:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    outputs:
+      skip: ${{ steps.plan.outputs.skip }}
+      reused-buffer: ${{ steps.plan.outputs.buffer }}
+    steps:
+      # A tag push checks out the tagged commit, the one `build` built.
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # The build dependencies for the fresh `solana-verify` install in `plan-deploy`.
+      - uses: ./.github/actions/setup/
+      # `plan-deploy` needs the Solana CLI.
+      - uses: ./.github/actions/setup-solana/
+        with:
+          cache: false
+      # `upload-artifact` drops the common `./target/` prefix of the two paths.
+      - name: Download the build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: ./target/
       # Re-run rules live in this action: the hash-match skip, the vault buffer reuse and the
       # pending proposal check.
       - uses: ./.github/actions/plan-deploy/
         id: plan
         with:
           network: ${{ secrets.SOLANA_DEPLOY_URL }}
-          program: ${{ env.PROGRAM_NAME }}
-          program-id: ${{ env.PROGRAM_ID }}
+          program: ${{ needs.build.outputs.program-name }}
+          program-id: ${{ needs.build.outputs.program-id }}
           buffer-authority: ${{ secrets.MULTISIG_VAULT }}
           multisig: ${{ secrets.MULTISIG }}
           spill: ${{ secrets.DEPLOYER_ADDRESS }}
+          cache: false
 
   buffers:
-    needs: build
-    if: needs.build.outputs.skip != 'true'
+    needs: [build, plan]
+    if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-latest
     # The program buffer write retries up to 3 x 55 minutes.
     timeout-minutes: 180
@@ -210,7 +234,7 @@ jobs:
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
           program-id: ${{ needs.build.outputs.program-id }}
           buffer-authority: ${{ secrets.MULTISIG_VAULT }}
-          reused-buffer: ${{ needs.build.outputs.reused-buffer }}
+          reused-buffer: ${{ needs.plan.outputs.reused-buffer }}
 
   wait:
     needs: [build, buffers]
@@ -223,7 +247,7 @@ jobs:
     timeout-minutes: 180
     outputs:
       skip: ${{ steps.pending.outputs.skip }}
-      pending-proposal-index: ${{ steps.pending.outputs.pending-proposal-index }}
+      pending-proposal-index: ${{ steps.pending.outputs.older }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -245,7 +269,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .node-version
-          cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
       # The read in `plan-deploy` ran before the wait, so a run that finished during it is
@@ -253,23 +276,14 @@ jobs:
       # A run that finished during the wait can also have proposed this same buffer: stop then.
       - name: Read older pending proposals after the wait
         id: pending
-        env:
-          PROGRAM: ${{ needs.build.outputs.program }}
-          PROGRAM_ID: ${{ needs.build.outputs.program-id }}
-          MULTISIG: ${{ secrets.MULTISIG }}
-          SPILL: ${{ secrets.DEPLOYER_ADDRESS }}
-          BUFFER: ${{ needs.buffers.outputs.buffer }}
-          NETWORK: ${{ secrets.SOLANA_DEPLOY_URL }}
-        run: |
-          RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs --multisig "$MULTISIG" --program-id "$PROGRAM_ID" --spill "$SPILL" --buffer "$BUFFER")
-          echo "$RESULT"
-          SAME=$(echo "$RESULT" | jq -r '.sameBuffer // empty')
-          if [ -n "$SAME" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "- \`$PROGRAM\`: pending proposal $SAME already names buffer \`$BUFFER\`. Stopped: no new proposal." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          echo "pending-proposal-index=$(echo "$RESULT" | jq -r '.older | map(tostring) | join(",")')" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/pending-proposals/
+        with:
+          network: ${{ secrets.SOLANA_DEPLOY_URL }}
+          program: ${{ needs.build.outputs.program }}
+          program-id: ${{ needs.build.outputs.program-id }}
+          multisig: ${{ secrets.MULTISIG }}
+          spill: ${{ secrets.DEPLOYER_ADDRESS }}
+          buffer: ${{ needs.buffers.outputs.buffer }}
 
   propose:
     needs: [build, buffers, wait]

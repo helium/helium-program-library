@@ -33,7 +33,7 @@ jobs:
         id: list_changed_programs
         # A program changes when its own sources or a workspace crate it depends on
         # do. `shared-utils` is such a crate, so it now deploys its dependents; the
-        # hash-match skip in `deploy-buffers` stops the legs whose binary is the same.
+        # hash-match skip in `plan-deploy` stops the legs whose binary is the same.
         env:
           # `github.event.after` is empty on a pull_request, so the head is explicit.
           BASE: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || github.event.before }}

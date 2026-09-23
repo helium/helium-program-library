@@ -270,7 +270,7 @@ runs:
     # address is the one this run made. Parallel runs share the deployer key, so this never
     # closes by authority. After the transfer the vault owns the buffer and the close fails.
     # "Re-run all jobs" reuses the buffer. In the mainnet release, "Re-run failed jobs" keeps
-    # the build job's old empty `reused-buffer` output and writes a second buffer.
+    # the plan job's old empty `reused-buffer` output and writes a second buffer.
     - name: Close this run's buffer after a failure
       if: (failure() || cancelled()) && steps.write-buffer.outputs.buffer != ''
       shell: bash

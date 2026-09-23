@@ -15,15 +15,22 @@ inputs:
   program-id:
     description: "The program id of the program we are uploading"
     required: true
+  cache:
+    description: "Restore and save the Anchor and Solana CLI caches"
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
   steps:
     - uses: ./.github/actions/setup/
     - uses: ./.github/actions/setup-anchor/
+      with:
+        cache: ${{ inputs.cache }}
     - uses: actions/cache@v4
       name: Cache Cargo registry + index
       id: cache-cargo-registry
+      if: inputs.cache == 'true'
       with:
         path: |
           ~/.cargo/registry/index/
@@ -31,6 +38,8 @@ runs:
           ~/.cargo/git/db/
         key: cargo-${{ runner.os }}-v0001-${{ hashFiles('**/Cargo.lock') }}
     - uses: ./.github/actions/install-solana-verify/
+      with:
+        cache: ${{ inputs.cache }}
     # A verified build cannot be a test build: solana-verify compiles inside a container
     # that receives neither TESTING nor HELIUM_TEST_BUILD, so the binary would carry
     # production values under a test label.

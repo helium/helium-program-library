@@ -1,0 +1,67 @@
+# The pending proposal stop rule, shared by `plan-deploy` and the mainnet release's `wait`
+# job, so the two reads cannot drift apart.
+#
+# The caller installs the workspace first: the script needs `@sqds/multisig`.
+name: "Pending Proposals"
+description: "Reads a program's pending upgrade proposals and stops when one names the buffer"
+inputs:
+  network:
+    description: "Solana RPC URL. The script takes it from SOLANA_URL and keeps it out of its errors"
+    required: true
+  program:
+    description: "Program name, for the run summary"
+    required: true
+  program-id:
+    description: "The program id of the program to upgrade"
+    required: true
+  multisig:
+    description: "The Squads v4 multisig whose pending proposals are read"
+    required: true
+  spill:
+    description: "The spill address the Squads step passes"
+    required: true
+  buffer:
+    description: "The buffer this run proposes. Empty when there is none yet"
+    required: false
+    default: ""
+
+outputs:
+  skip:
+    description: "'true' when a pending proposal already names the buffer"
+    value: ${{ steps.read.outputs.skip }}
+  same:
+    description: "The pending proposal that names the buffer. Empty when there is none."
+    value: ${{ steps.read.outputs.same }}
+  older:
+    description: "Transaction indexes of older pending upgrade proposals, comma separated. Empty on a stop or when there are none."
+    value: ${{ steps.read.outputs.older }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Read the pending upgrade proposals
+      id: read
+      shell: bash
+      run: |
+        ARGS=(--multisig "$MULTISIG" --program-id "$PROGRAM_ID" --spill "$SPILL")
+        if [ -n "$BUFFER" ]; then ARGS+=(--buffer "$BUFFER"); fi
+        RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs "${ARGS[@]}")
+        echo "$RESULT"
+        SAME=$(echo "$RESULT" | jq -r '.sameBuffer // empty')
+        OLDER=$(echo "$RESULT" | jq -r '.older | map(tostring) | join(",")')
+
+        echo "same=$SAME" >> "$GITHUB_OUTPUT"
+        if [ -n "$SAME" ]; then
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          echo "- \`$PROGRAM\`: pending proposal $SAME already names buffer \`$BUFFER\`. Stopped: no new proposal." >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        echo "skip=false" >> "$GITHUB_OUTPUT"
+        echo "older=$OLDER" >> "$GITHUB_OUTPUT"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        MULTISIG: ${{ inputs.multisig }}
+        SPILL: ${{ inputs.spill }}
+        BUFFER: ${{ inputs.buffer }}
+        NETWORK: ${{ inputs.network }}
