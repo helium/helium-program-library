@@ -44,7 +44,7 @@ jobs:
       # newer rustc than this runner has cannot break the install. A failure here is fatal: the
       # next step reads the program id with this binary, and an empty id reaches `anchor idl
       # write-buffer` several steps later as a missing argument.
-      - run: cargo install toml-cli --locked
+      - run: cargo install toml-cli --version 0.2.3 --locked
         shell: bash
 
       - name: Set tag information

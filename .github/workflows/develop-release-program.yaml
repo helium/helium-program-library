@@ -32,8 +32,8 @@ jobs:
       - name: List changed programs
         id: list_changed_programs
         # A program changes when its own sources or a workspace crate it depends on
-        # do. `shared-utils` is such a crate, so it now deploys its dependents; the
-        # hash-match skip in `plan-deploy` stops the legs whose binary is the same.
+        # do. `shared-utils` is such a crate, so a change there deploys its dependents;
+        # the hash-match skip in `plan-deploy` stops the legs whose binary is the same.
         env:
           # `github.event.after` is empty on a pull_request, so the head is explicit.
           BASE: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || github.event.before }}
@@ -52,11 +52,16 @@ jobs:
 
           # No devnet tag and no version in the proposal name, so the run summary is
           # the record of what each deployed binary was built from.
+          # A pull_request build checks out the PR merge ref, not the PR head.
+          SOURCE="commit \`$HEAD\`"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            SOURCE="PR head \`$HEAD\` merged onto \`develop\`"
+          fi
           while IFS=$'\t' read -r PROGRAM VIA; do
             VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' "programs/$PROGRAM/Cargo.toml" | head -n 1)
             NOTE=""
             if [ -n "$VIA" ]; then NOTE=" (dependent of \`$VIA\`)"; fi
-            echo "- \`$PROGRAM\`: version \`$VERSION\`, commit \`$HEAD\`$NOTE" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`$PROGRAM\`: version \`$VERSION\`, $SOURCE$NOTE" >> "$GITHUB_STEP_SUMMARY"
           done < <(echo "$CHANGED" | jq -r '.[] | [.name, (if .own then "" else (.via | join(", ")) end)] | @tsv')
   build_programs:
     needs: [detect_changed_programs]
@@ -82,7 +87,7 @@ jobs:
             ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}-v0002
 
-      - run: (cargo install toml-cli || true)
+      - run: (cargo install toml-cli --version 0.2.3 || true)
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
 
