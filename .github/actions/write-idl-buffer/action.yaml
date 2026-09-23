@@ -160,6 +160,10 @@ runs:
         max_attempts: 3
         shell: bash
         command: |
+          if anchor idl authority "$IDL_BUFFER" --provider.cluster "$NETWORK" | grep -q "$AUTHORITY"; then
+            echo "IDL buffer authority is already $AUTHORITY"
+            exit 0
+          fi
           echo "Setting buffer authority..."
           anchor idl set-authority "$IDL_BUFFER" \
             --program-id "$PROGRAM_ID" \

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   classify,
   isUpgradeTransaction,
+  lastUpgradeTime,
   notice,
   parseProgramTag,
 } from "./program-hash-check.mjs";
@@ -295,6 +296,13 @@ test("an upgrade only in the inner instructions: an upgrade transaction", () => 
   );
 });
 
+test("a deployWithMaxDataLen instruction: an upgrade transaction", () => {
+  assert.equal(
+    isUpgradeTransaction(parsedTx([loaderIx("deployWithMaxDataLen")])),
+    true,
+  );
+});
+
 test("an extendProgram-only transaction: not an upgrade transaction", () => {
   assert.equal(
     isUpgradeTransaction(parsedTx([loaderIx("extendProgram")])),
@@ -306,6 +314,84 @@ test("a setAuthority transaction: not an upgrade transaction", () => {
   assert.equal(
     isUpgradeTransaction(parsedTx([loaderIx("setAuthority")])),
     false,
+  );
+});
+
+// Canned JSON-RPC answers: the ProgramData's signatures, newest first, in pages
+// of 50, and the parsed transaction of each upgrade signature.
+const stubRpc = (signatures, upgrades) => {
+  const fetch = globalThis.fetch;
+  globalThis.fetch = async (_url, { body }) => {
+    const { method, params } = JSON.parse(body);
+    const result = {
+      getAccountInfo: () => ({
+        value: { data: { parsed: { info: { programData: "PD" } } } },
+      }),
+      getSignaturesForAddress: () => {
+        const start = params[1].before
+          ? signatures.findIndex((s) => s.signature === params[1].before) + 1
+          : 0;
+        return signatures.slice(start, start + params[1].limit);
+      },
+      getTransaction: () =>
+        upgrades[params[0]] ?? parsedTx([loaderIx("extendProgram")]),
+    }[method]();
+    return { ok: true, json: async () => ({ result }) };
+  };
+  return () => {
+    globalThis.fetch = fetch;
+  };
+};
+const signature = (i, blockTime) => ({
+  signature: `s${i}`,
+  err: null,
+  blockTime,
+});
+const SINCE = new Date(day(10));
+const secondsAgo = (days) => Math.floor(new Date(day(days)).getTime() / 1000);
+
+test("the upgrade is on the second page: its time", async (t) => {
+  const signatures = Array.from({ length: 60 }, (_, i) =>
+    signature(i, secondsAgo(1)),
+  );
+  t.after(
+    stubRpc(signatures, {
+      s55: { ...parsedTx([loaderIx("upgrade")]), blockTime: secondsAgo(2) },
+    }),
+  );
+  assert.deepEqual(
+    await lastUpgradeTime("rpc", "program", SINCE),
+    new Date(secondsAgo(2) * 1000),
+  );
+});
+
+test("a signature older than the oldest release before any upgrade: its time", async (t) => {
+  t.after(
+    stubRpc(
+      [
+        signature(0, secondsAgo(1)),
+        { signature: "s1", err: {}, blockTime: secondsAgo(11) },
+        signature(2, secondsAgo(12)),
+      ],
+      { s2: { ...parsedTx([loaderIx("upgrade")]), blockTime: secondsAgo(12) } },
+    ),
+  );
+  assert.deepEqual(
+    await lastUpgradeTime("rpc", "program", SINCE),
+    new Date(secondsAgo(11) * 1000),
+  );
+});
+
+test("more than 1000 signatures and no upgrade: an error", async (t) => {
+  t.after(
+    stubRpc(
+      Array.from({ length: 1100 }, (_, i) => signature(i, secondsAgo(1))),
+      {},
+    ),
+  );
+  await assert.rejects(
+    lastUpgradeTime("rpc", "program", SINCE),
+    /no upgrade in the last 1000/,
   );
 });
 

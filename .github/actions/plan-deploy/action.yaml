@@ -169,7 +169,7 @@ runs:
         echo "skip=false" >> "$GITHUB_OUTPUT"
         echo "pending-proposal-index=$OLDER" >> "$GITHUB_OUTPUT"
         if [ -n "$OLDER" ]; then
-          echo "- \`$PROGRAM\`: older pending upgrade proposal(s) $OLDER name another buffer. This run makes a new proposal. Signers reject the older one(s)." >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`$PROGRAM\`: older pending upgrade proposal(s) $OLDER do not match this build. This run makes a new proposal. Signers reject the older one(s)." >> "$GITHUB_STEP_SUMMARY"
         fi
       env:
         PROGRAM: ${{ inputs.program }}

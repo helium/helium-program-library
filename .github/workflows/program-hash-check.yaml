@@ -96,7 +96,7 @@ jobs:
       # An older release deployed after the newest release was created. Nothing here acts on it;
       # the run fails so the check does not stay green while the question is open.
       - name: Fail on a rolled back program
-        if: steps.check.outputs.rolled-back != ''
+        if: ${{ !cancelled() && steps.check.outputs.rolled-back != '' }}
         env:
           ROLLED_BACK: ${{ steps.check.outputs.rolled-back }}
         run: |

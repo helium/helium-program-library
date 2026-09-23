@@ -128,7 +128,7 @@ jobs:
       # The release is made only after the verified build and its hash, so a failed build leaves
       # no release. A re-run replaces the assets.
       - name: Publish the release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           files: |
             target/idl/${{ env.PROGRAM_NAME }}.json
@@ -210,7 +210,7 @@ jobs:
       # `concurrency` group is not used because GitHub keeps only one pending run per group and
       # cancels the rest, which silently dropped releases when several tags were pushed at once.
       - name: Wait for earlier release runs
-        uses: softprops/turnstyle@v3.3.3
+        uses: softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4 # v3.3.3
         with:
           same-branch-only: false
           poll-interval-seconds: 30

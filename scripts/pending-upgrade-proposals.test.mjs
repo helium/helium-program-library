@@ -155,6 +155,7 @@ const withProposal = (
 };
 
 const OTHER_BUFFER = new PublicKey(LAZY_DISTRIBUTOR);
+const OTHER_SPILL = new PublicKey(LAZY_DISTRIBUTOR);
 const onBuffer = (buffer) => (message) => ({
   ...message,
   accountKeys: message.accountKeys.map((key, i) => (i === 5 ? buffer : key)),
@@ -244,7 +245,7 @@ test("an account at the transaction address that is not a vault transaction is n
 });
 
 test("a proposal with another spill is not the same-buffer proposal", async () => {
-  const pending = await read(LAZY_TRANSACTIONS, OTHER_BUFFER);
+  const pending = await read(LAZY_TRANSACTIONS, OTHER_SPILL);
   assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
     sameBuffer: null,
     older: [163],
@@ -252,7 +253,7 @@ test("a proposal with another spill is not the same-buffer proposal", async () =
 });
 
 // The recorded IDL instruction is SetBuffer (variant 3) with accounts
-// (idl, buffer, vault). `edit` rewrites it.
+// (buffer, idl, authority). `edit` rewrites it.
 const onIdl = (edit) => (message) => ({
   ...message,
   instructions: message.instructions.map((ix) =>
@@ -292,6 +293,22 @@ test("an IDL Close to a destination that is not the vault makes the proposal not
       ...withIdlVariant(5)(ix),
       accountIndexes: new Uint8Array([2, 0, 6]),
     })),
+  )(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.exact]),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an IDL SetBuffer with an authority that is not the vault makes the proposal not exact", async () => {
+  // Account index 6 is the spill, not the vault.
+  const pending = await withProposal(
+    150,
+    "Approved",
+    onIdl((ix) => ({ ...ix, accountIndexes: new Uint8Array([2, 3, 6]) })),
   )(LAZY_TRANSACTIONS);
   assert.deepEqual(
     pending.map((p) => [p.index, p.exact]),

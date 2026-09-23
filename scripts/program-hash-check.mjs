@@ -76,7 +76,9 @@ export const classify = ({
     return { status: "unknown binary", version: newest.version };
   }
   // An older release deployed after the newest one was created is a rollback,
-  // not an upgrade that has yet to execute.
+  // not an upgrade that has yet to execute. An older proposal that executes
+  // after a newer release was tagged also reads as rolled back, so a person
+  // must look at it.
   const matched = sorted.find((release) => release.hash === onChainHash);
   if (
     matched &&
@@ -222,28 +224,43 @@ export const isUpgradeTransaction = (tx) =>
  * not used: `solana program extend` before the vote rewrites it. The last
  * upgrade transaction touches the ProgramData account, so its signatures hold it.
  */
-const lastUpgradeTime = async (url, programId) => {
+export const lastUpgradeTime = async (url, programId, since) => {
   const program = await rpc(url, "getAccountInfo", [
     programId,
     { encoding: "jsonParsed" },
   ]);
   const programData = program?.value?.data?.parsed?.info?.programData;
   if (!programData) return null;
-  const signatures = await rpc(url, "getSignaturesForAddress", [
-    programData,
-    { limit: 50 },
-  ]);
-  for (const { signature, err } of signatures) {
-    if (err !== null) continue;
-    const tx = await rpc(url, "getTransaction", [
-      signature,
-      { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
+  let before;
+  let seen = 0;
+  for (;;) {
+    const signatures = await rpc(url, "getSignaturesForAddress", [
+      programData,
+      { limit: 50, ...(before ? { before } : {}) },
     ]);
-    if (isUpgradeTransaction(tx)) {
-      return tx.blockTime == null ? null : new Date(tx.blockTime * 1000);
+    if (!signatures.length) return null;
+    for (const { signature, err, blockTime } of signatures) {
+      if (++seen > 1000) {
+        throw new Error(
+          `${programId}: no upgrade in the last 1000 ProgramData signatures`,
+        );
+      }
+      // No upgrade is newer than this signature, and it predates every
+      // release, so its time bounds the upgrade time from above.
+      if (blockTime != null && blockTime * 1000 < since.getTime()) {
+        return new Date(blockTime * 1000);
+      }
+      if (err !== null) continue;
+      const tx = await rpc(url, "getTransaction", [
+        signature,
+        { encoding: "jsonParsed", maxSupportedTransactionVersion: 1 },
+      ]);
+      if (isUpgradeTransaction(tx)) {
+        return tx.blockTime == null ? null : new Date(tx.blockTime * 1000);
+      }
     }
+    before = signatures[signatures.length - 1].signature;
   }
-  return null;
 };
 
 const main = async () => {
@@ -278,10 +295,21 @@ const main = async () => {
       chainHash !== null &&
       chainHash !== newest.hash &&
       published.some((release) => release.hash === chainHash);
-    // A null block time counts as a later deploy, so the check fails closed.
+    // A null time means no upgrade was found in the whole history, so an
+    // older-release match stays pending.
     const deployedAt =
       published.length && (hasUnhashedTags || matchesOlder)
-        ? await lastUpgradeTime(url, program.programId)
+        ? await lastUpgradeTime(
+            url,
+            program.programId,
+            new Date(
+              Math.min(
+                ...published.map((release) =>
+                  new Date(release.taggedAt).getTime(),
+                ),
+              ),
+            ),
+          )
         : null;
     const preHashDeploy =
       deployedAt !== null &&

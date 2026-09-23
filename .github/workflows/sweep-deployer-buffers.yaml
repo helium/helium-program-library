@@ -112,7 +112,7 @@ jobs:
               }]
             }')
             set +e
-            RPC_OUT=$(curl -sS --fail-with-body -X POST -H 'Content-Type: application/json' -d "$REQUEST" "$NETWORK" 2>&1)
+            RPC_OUT=$(curl -sS --fail-with-body --max-time 120 -X POST -H 'Content-Type: application/json' -d "$REQUEST" "$NETWORK" 2>&1)
             EXIT_CODE=$?
             if [ "$EXIT_CODE" -eq 0 ]; then
               # An RPC error has no `.result`; that must count as a failure, not as "no buffers".
