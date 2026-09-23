@@ -90,8 +90,15 @@ const run = (command, args) =>
 const main = (argv) => {
   const [base, head = "HEAD"] = argv;
   if (!base) throw new Error(USAGE);
-  const files = run("git", ["diff", "--name-only", base, head])
-    .split("\n")
+  const files = run("git", [
+    "diff",
+    "--name-only",
+    "-z",
+    "--no-renames",
+    base,
+    head,
+  ])
+    .split("\0")
     .filter(Boolean);
   const changed = changedPackages({
     files,
