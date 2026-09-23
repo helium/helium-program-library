@@ -315,6 +315,10 @@ Mainnet program upgrades go through Squads (multisig) — this repo only builds 
    - opens a Squads proposal to upgrade the program to the new buffer.
 4. Sign and execute the Squads proposal.
 
+The deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key.
+
+A run closes its own buffer when it fails or is cancelled before the vault takes the buffer. A runner that dies there leaves the buffer with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) closes those buffers each week and returns the rent. It stops while a release runs.
+
 ### Verify a deployed program
 
 Each program release carries a `<program>.so.sha256` asset: the hash of the release build. Compare it with the on-chain hash:
@@ -346,6 +350,8 @@ Each workflow above delegates to composite actions in [`.github/actions/`](.gith
 - `setup/`, `setup-ts/`, `setup-anchor/`, `setup-solana/` — tool installation.
 - `build-anchor/` — `anchor build` (with optional `testing`/`devnet` lazy-signer seeds).
 - `build-verified/` — verifiable build via `solana-verify` that produces a deterministic `.so`.
+- `install-solana-verify/` — the one `solana-verify` pin. The release hash, the deploy skip and the daily hash check use it.
+- `plan-deploy/` — the re-run rules: skip a deploy the chain already has, reuse a matching vault buffer, stop on a pending proposal for it. It takes no keypair.
 - `deploy-buffers/`, `write-program-buffer/`, `write-idl-buffer/` — upload the `.so` and IDL to buffer accounts owned by the multisig.
 
 If you're adding a new program / service, you shouldn't need to change the workflows themselves — just add the program to `Anchor.toml` / `docker-info.json` and the tag pattern above will pick it up.

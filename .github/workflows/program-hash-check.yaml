@@ -27,18 +27,9 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - uses: actions/cache@v4
-        name: Cache Solana Verify
-        id: cache-solana-verify
-        with:
-          path: |
-            ~/.cargo/bin/solana-verify
-          key: cargo-${{ runner.os }}-solana-verify-0.5.0
-      # The same pin as `build-verified`, so this check hashes with the binary that
-      # produced the release hash. See that action for why 0.5.0.
-      - run: cargo install solana-verify --version 0.5.0 --locked --force
-        if: steps.cache-solana-verify.outputs.cache-hit != 'true'
-        shell: bash
+      # The action `build-verified` uses, so this check hashes with the binary that
+      # produced the release hash.
+      - uses: ./.github/actions/install-solana-verify/
       - run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
         shell: bash
 

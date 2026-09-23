@@ -159,21 +159,32 @@ jobs:
         with:
           name: ${{matrix.program}}-idl
           path: ./target/idl/
-      # Re-run rules live in this action: the hash-match skip, the vault buffer reuse, the
-      # pending proposal check, and the close of this run's buffer on a failure.
-      - uses: ./.github/actions/deploy-buffers/
-        id: deploy-buffers
+      # Re-run rules live in `plan-deploy`: the hash-match skip, the vault buffer reuse and the
+      # pending proposal check. It runs `@sqds/multisig` in the job with the devnet key: a matrix
+      # leg cannot pass its outputs to another job. The mainnet release runs it in a job with no key.
+      - uses: ./.github/actions/plan-deploy/
+        id: plan
         with:
           devnet: true
+          network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
+          program: ${{ env.PROGRAM_NAME }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          multisig: ${{ secrets.DEVNET_MULTISIG }}
+      # On a failure before the authority transfer, this closes the buffer it made.
+      - uses: ./.github/actions/deploy-buffers/
+        id: deploy-buffers
+        if: steps.plan.outputs.skip != 'true'
+        with:
           network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
-          multisig: ${{ secrets.DEVNET_MULTISIG }}
+          reused-buffer: ${{ steps.plan.outputs.buffer }}
       - name: Squads program upgrade
         # A skipped run has no buffers. The Squads action exits 1 on an empty address.
-        if: steps.deploy-buffers.outputs.skip != 'true'
+        if: steps.plan.outputs.skip != 'true'
         uses: helium/squads-program-upgrade@v0.5.0
         with:
           network-url: "https://api.devnet.solana.com"
