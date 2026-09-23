@@ -309,15 +309,16 @@ Mainnet program upgrades go through Squads (multisig) — this repo only builds 
    ```
 
 3. [`release-program.yaml`](.github/workflows/release-program.yaml) runs:
-   - builds the program with `anchor build` and uploads the IDL as a GitHub release asset,
+   - builds the IDL with `anchor build`,
    - runs a **verifiable** Solana build (`solana-verify`) so the on-chain hash is reproducible,
+   - publishes the GitHub release with the IDL and the release hash, only after that build succeeds,
    - deploys the `.so` and IDL to a buffer account owned by the multisig vault,
    - opens a Squads proposal to upgrade the program to the new buffer.
 4. Sign and execute the Squads proposal.
 
 The deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key.
 
-A run closes its own buffer when it fails or is cancelled before the vault takes the buffer. A runner that dies there leaves the buffer with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) closes those buffers each week and returns the rent. It stops while a release runs.
+A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. A runner that dies there leaves the buffers with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) runs each week, closes the program buffers and IDL buffers the deployer key still owns, and returns the rent. It stops while a release runs.
 
 ### Verify a deployed program
 
@@ -340,7 +341,7 @@ solana-verify verify-from-repo https://github.com/helium/helium-program-library 
 
 Devnet uses a different lazy-signer seed (`devnethelium5` instead of the mainnet `nJWGUMOK`), so program binaries differ between networks. The workflows handle that automatically.
 
-- **Automatic:** any push to `develop` that touches `programs/<name>/**` triggers [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) for each changed program. On a PR into `develop`, add the `deploy-to-devnet` label to deploy preview-style.
+- **Automatic:** any push to `develop` that changes a program's `src/`, `Cargo.toml` or `idls/`, or a workspace crate the program depends on, triggers [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) for each changed program. On a PR into `develop`, add the `deploy-to-devnet` label to deploy preview-style.
 - **Manual:** run [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml) from the Actions UI with the program name + branch. Same Squads-buffer + proposal flow as mainnet, but against the devnet multisig / RPC.
 
 ### Reusable composite actions

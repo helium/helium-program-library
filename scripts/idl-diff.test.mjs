@@ -255,3 +255,20 @@ test("reordered struct fields and instruction args are changed types", () => {
   assert.equal(diff.hasChanges, true);
   assert.deepEqual(idlsLevel(diff), { level: "minor", breaking: true });
 });
+
+test("a bytemuck type that becomes borsh with the same fields is a changed type", () => {
+  const base = fixture();
+  Object.assign(
+    base.types.find((t) => t.name === "AccountWindowedCircuitBreakerV0"),
+    { serialization: "bytemuck", repr: { kind: "c" } },
+  );
+
+  const diff = idlDiff(base, fixture());
+
+  assert.deepEqual(
+    diff.changed.map(({ kind, name }) => ({ kind, name })),
+    [{ kind: "type", name: "type AccountWindowedCircuitBreakerV0" }],
+  );
+  assert.deepEqual(diff.added, []);
+  assert.deepEqual(diff.removed, []);
+});

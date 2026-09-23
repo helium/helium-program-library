@@ -58,7 +58,7 @@ jobs:
     # is read-only, so its author reads the fix from this failure.
     # Skipped on the heads that carry releases rather than declare them: the
     # two release PRs, the Promotion PR (head develop) and the back-merge PR
-    # (head master). Not a required check yet; issue 55 makes it required.
+    # (head master). Not a required check.
     # A fork can name its branch anything, so the skips apply to this repository's heads only.
     # Anyone with push access can name a branch `changeset-release/` or `program-release/`, so
     # those skips also need a bot author. Only a GitHub App or the Actions token opens a PR as a
@@ -87,11 +87,12 @@ jobs:
         run: |
           node scripts/changed-packages.mjs "$BASE_SHA" > "$RUNNER_TEMP/packages.json"
           node scripts/changed-programs.mjs "$BASE_SHA" > "$RUNNER_TEMP/programs.json"
-          echo "programs=$(jq -r 'map(select(.own) | .name) | join(" ")' "$RUNNER_TEMP/programs.json")" >> "$GITHUB_OUTPUT"
+          echo "programs=$(jq -r 'map(.name) | join(" ")' "$RUNNER_TEMP/programs.json")" >> "$GITHUB_OUTPUT"
 
-      # The `@helium/idls` rule the removed `check-idls-changeset` job held:
-      # only an own-source change can move an IDL, and only a moved IDL makes
-      # the package a changed one. Every step is skipped when no program changed.
+      # A program's IDL moves with its own source or with a workspace crate
+      # whose types it embeds, so every changed program is diffed, and only a
+      # moved IDL makes `@helium/idls` a changed package. Every step is skipped
+      # when no program changed.
       - name: Diff the IDLs
         id: idl-diff
         uses: ./.github/actions/idl-diff/
@@ -117,8 +118,7 @@ jobs:
     # PR to declare its releases and an admin can bypass it; this one asks the
     # tags, which cannot be argued with: a program whose current version is
     # already tagged and whose source moved since that tag would deploy under a
-    # version that is already on chain. Not a required check yet; issue 50 adds
-    # it to the master ruleset after the shadow match.
+    # version that is already on chain. Not a required check.
     if: github.event_name == 'pull_request' && github.base_ref == 'master'
     runs-on: ubuntu-latest
     timeout-minutes: 45

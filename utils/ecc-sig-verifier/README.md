@@ -13,6 +13,6 @@ Image: `public.ecr.aws/v0j6k5v6/ecc-verifier`
 | web-cluster / prod | [manifests/web-cluster/prod/helium/ecc-verifier.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/ecc-verifier.yaml) |
 | web-cluster / sdlc | [manifests/web-cluster/sdlc/helium/ecc-verifier.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/sdlc/helium/ecc-verifier.yaml) |
 
-Deploy: push a `docker-web-ecc-verifier-<version>` tag by hand. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The k8s bump stays manual.
+Image release: push a `docker-web-ecc-verifier-<version>` tag by hand (see [repo README](../../README.md#deploying-docker-services)). The service deploy (the k8s bump) stays manual.
 
 For generating test signatures locally, see [`../generate-test-gateway-txn`](../generate-test-gateway-txn).

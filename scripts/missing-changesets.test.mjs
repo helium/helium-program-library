@@ -101,7 +101,10 @@ test("parseChangeset reads quoted and bare names and rejects a file with no fron
     },
   );
   const empty = parseChangeset("---\n---\n");
-  assert.deepEqual({ ...empty, releases: { ...empty.releases } }, { releases: {}, summary: "" });
+  assert.deepEqual(
+    { ...empty, releases: { ...empty.releases } },
+    { releases: {}, summary: "" },
+  );
   assert.throws(() => parseChangeset("no front matter"), /no front matter/);
 });
 
@@ -144,4 +147,29 @@ test("a missing own-source program carries the IDL diff's level hint; a dependen
     programChangesets: [],
   });
   assert.equal(noDiff.programs[0].hint, "patch");
+});
+
+test("parseChangeset rejects a release level it does not know", () => {
+  assert.throws(
+    () => parseChangeset("---\nlazy-distributor: pach\n---\n"),
+    /bad release level "pach" for lazy-distributor/,
+  );
+});
+
+test("parseChangeset reads a single-quoted name", () => {
+  const parsed = parseChangeset("---\n'@helium/idls': minor\n---\n\nText.\n");
+  assert.deepEqual({ ...parsed.releases }, { "@helium/idls": "minor" });
+});
+
+test("parseChangeset reads a file with CRLF line ends", () => {
+  const parsed = parseChangeset(
+    '---\r\n"@helium/idls": minor\r\nlazy-distributor: none\r\n---\r\n\r\nText here.\r\n',
+  );
+  assert.deepEqual(
+    { ...parsed, releases: { ...parsed.releases } },
+    {
+      releases: { "@helium/idls": "minor", "lazy-distributor": "none" },
+      summary: "Text here.",
+    },
+  );
 });

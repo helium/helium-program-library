@@ -111,34 +111,39 @@ jobs:
           devnet: false
           program: ${{ env.PROGRAM_NAME }}
 
-      - name: Push IDL to Github
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            target/idl/${{ env.PROGRAM_NAME }}.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: ./.github/actions/build-verified/
         id: build-verified
         with:
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
 
-      # The release hash. The scheduled hash check compares the on-chain program with it. It
-      # uploads before `plan-deploy`, so a run that the hash-match skip stops still has it.
+      # The release hash. The scheduled hash check compares the on-chain program with it. The
+      # release carries it before `plan-deploy`, so a run that the hash-match skip stops still has it.
       - name: Write the release hash
         run: |
           HASH=$(~/.cargo/bin/solana-verify get-executable-hash "target/deploy/${PROGRAM_NAME}.so")
           echo "$HASH" > "target/deploy/${PROGRAM_NAME}.so.sha256"
           echo "Release hash: $HASH"
 
-      # The IDL step above made the release for this tag. `--clobber` lets a re-run replace the
-      # asset, as the IDL step does.
-      - name: Push release hash to Github
+      # The release is made only after the verified build and its hash, so a failed build leaves
+      # no release. A re-run replaces the assets.
+      - name: Publish the release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/idl/${{ env.PROGRAM_NAME }}.json
+            target/deploy/${{ env.PROGRAM_NAME }}.so.sha256
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" "target/deploy/${PROGRAM_NAME}.so.sha256" --clobber
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Stored before `plan-deploy` runs workspace JavaScript, so that code cannot change the binary the `buffers` job writes.
+      - name: Store the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: |
+            ./target/deploy/${{ env.PROGRAM_NAME }}.so
+            ./target/idl/${{ env.PROGRAM_NAME }}.json
 
       # Re-run rules live in this action: the hash-match skip, the vault buffer reuse and the
       # pending proposal check.
@@ -150,15 +155,7 @@ jobs:
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.MULTISIG_VAULT }}
           multisig: ${{ secrets.MULTISIG }}
-
-      - name: Store the build
-        if: steps.plan.outputs.skip != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: |
-            ./target/deploy/${{ env.PROGRAM_NAME }}.so
-            ./target/idl/${{ env.PROGRAM_NAME }}.json
+          spill: ${{ secrets.DEPLOYER_ADDRESS }}
 
   buffers:
     needs: build
@@ -235,10 +232,11 @@ jobs:
           PROGRAM: ${{ needs.build.outputs.program }}
           PROGRAM_ID: ${{ needs.build.outputs.program-id }}
           MULTISIG: ${{ secrets.MULTISIG }}
+          SPILL: ${{ secrets.DEPLOYER_ADDRESS }}
           BUFFER: ${{ needs.buffers.outputs.buffer }}
           NETWORK: ${{ secrets.SOLANA_DEPLOY_URL }}
         run: |
-          RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs --multisig "$MULTISIG" --program-id "$PROGRAM_ID" --buffer "$BUFFER")
+          RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs --multisig "$MULTISIG" --program-id "$PROGRAM_ID" --spill "$SPILL" --buffer "$BUFFER")
           echo "$RESULT"
           SAME=$(echo "$RESULT" | jq -r '.sameBuffer // empty')
           if [ -n "$SAME" ]; then
@@ -255,7 +253,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Squads program upgrade
-        uses: helium/squads-program-upgrade@v0.5.0
+        uses: helium/squads-program-upgrade@58eb5cf41491c163e857e6ee3dcedb97a2859733 # v0.5.0
         with:
           network-url: "https://api.mainnet-beta.solana.com"
           program-multisig: ${{ secrets.MULTISIG }}

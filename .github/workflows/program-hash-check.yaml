@@ -42,13 +42,7 @@ jobs:
           SOLANA_URL: https://solana-rpc.web.helium.io
         run: |
           RESULT=$(node scripts/program-hash-check.mjs)
-          echo "$RESULT" | jq -r '.programs[] | "- `\(.program)`: \(.status)" + (if .version then " (newest release \(.version))" else "" end)' >> "$GITHUB_STEP_SUMMARY"
-          # A skipped program is compared with nothing. The run stays green, so the count is
-          # an annotation. It must only go down as releases carry a hash.
-          SKIPPED=$(echo "$RESULT" | jq '[.programs[] | select(.status == "skipped")] | length')
-          if [ "$SKIPPED" -gt 0 ]; then
-            echo "::warning title=Skipped programs::${SKIPPED} programs have no release hash to compare with"
-          fi
+          echo "$RESULT" | jq -r '.programs[] | "- `\(.program)`: \(.status)" + (if .status == "rolled back" then " (release \(.version))" elif .version then " (newest release \(.version))" else "" end)' >> "$GITHUB_STEP_SUMMARY"
           # A pending upgrade past the notice window. The run stays green: a vote is
           # still open, and the annotation is there for whoever reads the run.
           # GitHub keeps ten warning annotations per step and drops the rest without
@@ -74,6 +68,8 @@ jobs:
           fi
           UNKNOWN=$(echo "$RESULT" | jq -r '[.programs[] | select(.status == "unknown binary") | .program] | join(",")')
           echo "unknown=$UNKNOWN" >> "$GITHUB_OUTPUT"
+          ROLLED_BACK=$(echo "$RESULT" | jq -r '[.programs[] | select(.status == "rolled back") | "\(.program) \(.version)"] | join(",")')
+          echo "rolled-back=$ROLLED_BACK" >> "$GITHUB_OUTPUT"
 
       # A program the chain holds that no release published. Nothing here acts on it; the
       # run fails so the check does not stay green while the question is open.
@@ -94,5 +90,27 @@ jobs:
           done
           if [ "${#PROGRAMS[@]}" -gt "$SHOWN" ]; then
             echo "::error title=Unknown binary::$((${#PROGRAMS[@]} - SHOWN)) more programs hold a binary no release published"
+          fi
+          exit 1
+
+      # An older release deployed after the newest release was created. Nothing here acts on it;
+      # the run fails so the check does not stay green while the question is open.
+      - name: Fail on a rolled back program
+        if: steps.check.outputs.rolled-back != ''
+        env:
+          ROLLED_BACK: ${{ steps.check.outputs.rolled-back }}
+        run: |
+          IFS=',' read -ra PROGRAMS <<< "$ROLLED_BACK"
+          # Ten error annotations per step is GitHub's cap, and it drops the rest
+          # without a word, so past ten the tenth annotation counts how many are left.
+          SHOWN=${#PROGRAMS[@]}
+          if [ "$SHOWN" -gt 10 ]; then
+            SHOWN=9
+          fi
+          for PROGRAM in "${PROGRAMS[@]:0:$SHOWN}"; do
+            echo "::error title=Rolled back::${PROGRAM} is an older release, deployed after the newest release"
+          done
+          if [ "${#PROGRAMS[@]}" -gt "$SHOWN" ]; then
+            echo "::error title=Rolled back::$((${#PROGRAMS[@]} - SHOWN)) more programs run an older release, deployed after the newest release"
           fi
           exit 1

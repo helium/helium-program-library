@@ -36,6 +36,9 @@ inputs:
   multisig:
     description: "The Squads v4 multisig whose pending proposals are read"
     required: true
+  spill:
+    description: "The spill address the Squads step passes. A pending proposal with another spill does not name the same upgrade"
+    required: true
 
 outputs:
   skip:
@@ -149,7 +152,7 @@ runs:
       if: steps.hash-match.outputs.skip != 'true'
       shell: bash
       run: |
-        ARGS=(--multisig "$MULTISIG" --program-id "$PROGRAM_ID")
+        ARGS=(--multisig "$MULTISIG" --program-id "$PROGRAM_ID" --spill "$SPILL")
         if [ -n "$REUSED_BUFFER" ]; then ARGS+=(--buffer "$REUSED_BUFFER"); fi
         # The proposal is created against a public RPC. The read uses the RPC the buffer
         # writes use. The script takes it from SOLANA_URL and keeps it out of its errors.
@@ -172,5 +175,6 @@ runs:
         PROGRAM: ${{ inputs.program }}
         PROGRAM_ID: ${{ inputs.program-id }}
         MULTISIG: ${{ inputs.multisig }}
+        SPILL: ${{ inputs.spill }}
         REUSED_BUFFER: ${{ steps.reuse.outputs.buffer }}
         NETWORK: ${{ inputs.network }}

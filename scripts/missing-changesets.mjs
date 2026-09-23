@@ -19,7 +19,8 @@ const USAGE =
 export const IDLS_PACKAGE = "@helium/idls";
 
 const FRONT_MATTER = /^---\n([\s\S]*?)---\n?([\s\S]*)$/;
-const ENTRY = /^"?([^":]+)"?:\s*(\w+)\s*$/;
+const ENTRY = /^(["']?)([^"':]+)\1:\s*(\w+)\s*$/;
+const LEVELS = ["major", "minor", "patch", "none"];
 // An npm package name or a program directory name. A name like `__proto__`
 // fails it, so it cannot reach the releases object as a key.
 const NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
@@ -32,14 +33,17 @@ const NAME = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
  * @returns {{ releases: Record<string, string>, summary: string }}
  */
 export const parseChangeset = (text) => {
-  const match = text.match(FRONT_MATTER);
+  const match = text.replace(/\r/g, "").match(FRONT_MATTER);
   if (!match) throw new Error("no front matter");
   // No prototype, so no name reads or writes an inherited key.
   const releases = Object.create(null);
   for (const line of match[1].split("\n").filter((l) => l.trim())) {
-    const [, name, level] = line.match(ENTRY) || [];
+    const [, , name, level] = line.match(ENTRY) || [];
     if (!name || !NAME.test(name)) {
       throw new Error(`bad front matter line "${line}"`);
+    }
+    if (!LEVELS.includes(level)) {
+      throw new Error(`bad release level "${level}" for ${name}`);
     }
     releases[name] = level;
   }
@@ -82,8 +86,7 @@ export const missingChangesets = ({
     programChangesets.flatMap(({ releases }) => Object.keys(releases)),
   );
   // The hint is the IDL diff's fixed level for the program's own change. A
-  // dependent program has no hint: `write-changesets.mjs` picks `none` or
-  // `patch` from the dependency's changed files and IDL diff.
+  // dependent program has no hint.
   const missingPrograms = programs
     .filter(({ name }) => !namedPrograms.has(name))
     .map((program) =>

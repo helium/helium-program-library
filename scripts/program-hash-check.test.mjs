@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { classify, notice } from "./program-hash-check.mjs";
+import {
+  classify,
+  isUpgradeTransaction,
+  notice,
+  parseProgramTag,
+} from "./program-hash-check.mjs";
 
 const NOW = new Date("2026-09-21T00:00:00Z");
 const day = (n) => new Date(NOW.getTime() - n * 86400000).toISOString();
@@ -30,7 +35,7 @@ test("the on-chain hash equals the newest release hash: deployed", () => {
   );
 });
 
-test("the on-chain hash equals an older release hash, newest tag under 3 days: pending, silent", () => {
+test("the on-chain hash equals an older release hash, deployed before the newest tag under 3 days: pending, silent", () => {
   assert.deepEqual(
     classify({
       releases: [
@@ -49,6 +54,7 @@ test("the on-chain hash equals an older release hash, newest tag under 3 days: p
       ],
       onChainHash: "aa",
       now: NOW,
+      deployedAt: new Date(day(5)),
     }),
     {
       status: "pending",
@@ -197,4 +203,124 @@ test("the on-chain hash equals no release hash and the deploy is after the hashe
     }),
     { status: "unknown binary", version: "0.1.3" },
   );
+});
+
+test("the on-chain hash equals an older release hash deployed after the newest release: rolled back", () => {
+  assert.deepEqual(
+    classify({
+      releases: [
+        {
+          tag: "program-fanout-0.1.2",
+          version: "0.1.2",
+          hash: "aa",
+          taggedAt: day(9),
+        },
+        {
+          tag: "program-fanout-0.1.3",
+          version: "0.1.3",
+          hash: "bb",
+          taggedAt: day(2),
+        },
+      ],
+      onChainHash: "aa",
+      now: NOW,
+      deployedAt: new Date(day(1)),
+    }),
+    { status: "rolled back", version: "0.1.2" },
+  );
+});
+
+// The last upgrade time is not read, so the check cannot tell a rollback from a vote.
+test("the on-chain hash equals an older release hash and no upgrade time: pending", () => {
+  assert.deepEqual(
+    classify({
+      releases: [
+        {
+          tag: "program-fanout-0.1.2",
+          version: "0.1.2",
+          hash: "aa",
+          taggedAt: day(9),
+        },
+        {
+          tag: "program-fanout-0.1.3",
+          version: "0.1.3",
+          hash: "bb",
+          taggedAt: day(2),
+        },
+      ],
+      onChainHash: "aa",
+      now: NOW,
+      deployedAt: null,
+    }),
+    {
+      status: "pending",
+      version: "0.1.3",
+      tag: "program-fanout-0.1.3",
+      tagAgeDays: 2,
+      notify: false,
+    },
+  );
+});
+
+const LOADER = "BPFLoaderUpgradeab1e11111111111111111111111";
+const loaderIx = (type) => ({
+  program: "bpf-upgradeable-loader",
+  programId: LOADER,
+  parsed: { type, info: {} },
+});
+const parsedTx = (instructions, innerInstructions = []) => ({
+  blockTime: 1,
+  transaction: { message: { instructions } },
+  meta: { innerInstructions },
+});
+
+test("an outer upgrade instruction: an upgrade transaction", () => {
+  assert.equal(isUpgradeTransaction(parsedTx([loaderIx("upgrade")])), true);
+});
+
+test("an upgrade only in the inner instructions: an upgrade transaction", () => {
+  assert.equal(
+    isUpgradeTransaction(
+      parsedTx(
+        [
+          {
+            programId: "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf",
+            data: "",
+          },
+        ],
+        [{ index: 0, instructions: [loaderIx("upgrade")] }],
+      ),
+    ),
+    true,
+  );
+});
+
+test("an extendProgram-only transaction: not an upgrade transaction", () => {
+  assert.equal(
+    isUpgradeTransaction(parsedTx([loaderIx("extendProgram")])),
+    false,
+  );
+});
+
+test("a setAuthority transaction: not an upgrade transaction", () => {
+  assert.equal(
+    isUpgradeTransaction(parsedTx([loaderIx("setAuthority")])),
+    false,
+  );
+});
+
+test("a program tag parses to its name and version", () => {
+  assert.deepEqual(parseProgramTag("program-fanout-0.1.0"), {
+    name: "fanout",
+    version: "0.1.0",
+  });
+});
+
+test("a v-prefixed tag is not a program tag", () => {
+  assert.equal(parseProgramTag("vprogram-fanout-0.1.0"), null);
+  assert.equal(parseProgramTag("v0.1.0"), null);
+});
+
+test("a -test suffixed tag is not a program tag", () => {
+  assert.equal(parseProgramTag("program-fanout-0.1.0-test"), null);
 });

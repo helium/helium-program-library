@@ -78,7 +78,6 @@ jobs:
         shell: bash
 
       - name: Set program information
-        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           # Prefer a devnet-specific id (programs.devnet) when one exists;
@@ -134,7 +133,6 @@ jobs:
         uses: actions/checkout@v2
       - uses: ./.github/actions/setup-anchor/
       - name: Set program information
-        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           # Prefer a devnet-specific id (programs.devnet) when one exists;
@@ -171,6 +169,16 @@ jobs:
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
           multisig: ${{ secrets.DEVNET_MULTISIG }}
+          spill: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
+      # Signers must reject the older proposal, or an execute of it after the new one rolls the
+      # program back.
+      - name: Report the older pending proposal
+        if: steps.plan.outputs.pending-proposal-index != ''
+        env:
+          PROGRAM: ${{ matrix.program }}
+          PENDING: ${{ steps.plan.outputs.pending-proposal-index }}
+        run: |
+          echo "::notice title=Older pending proposal::${PROGRAM}: proposal ${PENDING} is still pending"
       # On a failure before the authority transfer, this closes the buffer it made.
       - uses: ./.github/actions/deploy-buffers/
         id: deploy-buffers
@@ -185,7 +193,7 @@ jobs:
       - name: Squads program upgrade
         # A skipped run has no buffers. The Squads action exits 1 on an empty address.
         if: steps.plan.outputs.skip != 'true'
-        uses: helium/squads-program-upgrade@v0.5.0
+        uses: helium/squads-program-upgrade@58eb5cf41491c163e857e6ee3dcedb97a2859733 # v0.5.0
         with:
           network-url: "https://api.devnet.solana.com"
           program-multisig: ${{ secrets.DEVNET_MULTISIG }}
