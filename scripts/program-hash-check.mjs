@@ -117,7 +117,8 @@ const localnetPrograms = (anchorToml) => {
 
 /**
  * Every `program-<name>-<x.y.z>` tag with its creator date. For a lightweight
- * tag that is the commit date, so `main` prefers the release's `created_at`.
+ * tag that is the commit date. A release's `created_at` is the same date, so
+ * `main` prefers `published_at`, the time the release went out.
  */
 const programTags = () =>
   execFileSync(
@@ -203,11 +204,12 @@ const rpc = async (url, method, params) => {
 const UPGRADEABLE_LOADER = "BPFLoaderUpgradeab1e11111111111111111111111";
 
 /**
- * Whether a `jsonParsed` transaction upgrades or first deploys a program. Pure.
+ * Whether a `jsonParsed` transaction upgrades or first deploys the program whose
+ * ProgramData is `programData`. Pure.
  * Squads executes the upgrade as a CPI, so the inner instructions count too.
  * An ExtendProgram alone is not an upgrade.
  */
-export const isUpgradeTransaction = (tx) =>
+export const isUpgradeTransaction = (tx, programData) =>
   [
     ...(tx?.transaction?.message?.instructions ?? []),
     ...(tx?.meta?.innerInstructions ?? []).flatMap(
@@ -216,7 +218,8 @@ export const isUpgradeTransaction = (tx) =>
   ].some(
     (ix) =>
       ix.programId === UPGRADEABLE_LOADER &&
-      ["upgrade", "deployWithMaxDataLen"].includes(ix.parsed?.type),
+      ["upgrade", "deployWithMaxDataLen"].includes(ix.parsed?.type) &&
+      ix.parsed?.info?.programDataAccount === programData,
   );
 
 /**
@@ -262,7 +265,7 @@ export const lastUpgradeTime = async (url, programId, since) => {
           `${programId}: getTransaction returned null for ${signature}`,
         );
       }
-      if (isUpgradeTransaction(tx)) {
+      if (isUpgradeTransaction(tx, programData)) {
         return tx.blockTime == null ? null : new Date(tx.blockTime * 1000);
       }
     }
@@ -286,7 +289,7 @@ const main = async () => {
       if (hash) {
         published.push({
           ...tag,
-          taggedAt: release.created_at ?? tag.taggedAt,
+          taggedAt: release.published_at ?? release.created_at ?? tag.taggedAt,
           hash,
         });
       } else {
@@ -304,20 +307,32 @@ const main = async () => {
       published.some((release) => release.hash === chainHash);
     // A null time means no upgrade was found in the whole history, so an
     // older-release match stays pending.
-    const deployedAt =
-      published.length && (hasUnhashedTags || matchesOlder)
-        ? await lastUpgradeTime(
-            url,
-            program.programId,
-            new Date(
-              Math.min(
-                ...published.map((release) =>
-                  new Date(release.taggedAt).getTime(),
-                ),
+    let deployedAt = null;
+    if (published.length && (hasUnhashedTags || matchesOlder)) {
+      // One program's failed lookup must not blank the report for the others.
+      try {
+        deployedAt = await lastUpgradeTime(
+          url,
+          program.programId,
+          new Date(
+            Math.min(
+              ...published.map((release) =>
+                new Date(release.taggedAt).getTime(),
               ),
             ),
-          )
-        : null;
+          ),
+        );
+      } catch (error) {
+        results.push({
+          program: program.name,
+          programId: program.programId,
+          status: "error",
+          version: newest.version,
+          message: String(error?.message ?? error),
+        });
+        continue;
+      }
+    }
     const preHashDeploy =
       deployedAt !== null &&
       published.every(

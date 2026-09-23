@@ -264,10 +264,10 @@ test("the on-chain hash equals an older release hash and no upgrade time: pendin
 });
 
 const LOADER = "BPFLoaderUpgradeab1e11111111111111111111111";
-const loaderIx = (type) => ({
+const loaderIx = (type, programDataAccount = "PD") => ({
   program: "bpf-upgradeable-loader",
   programId: LOADER,
-  parsed: { type, info: {} },
+  parsed: { type, info: { programDataAccount } },
 });
 const parsedTx = (instructions, innerInstructions = []) => ({
   blockTime: 1,
@@ -276,7 +276,10 @@ const parsedTx = (instructions, innerInstructions = []) => ({
 });
 
 test("an outer upgrade instruction: an upgrade transaction", () => {
-  assert.equal(isUpgradeTransaction(parsedTx([loaderIx("upgrade")])), true);
+  assert.equal(
+    isUpgradeTransaction(parsedTx([loaderIx("upgrade")]), "PD"),
+    true,
+  );
 });
 
 test("an upgrade only in the inner instructions: an upgrade transaction", () => {
@@ -291,6 +294,7 @@ test("an upgrade only in the inner instructions: an upgrade transaction", () => 
         ],
         [{ index: 0, instructions: [loaderIx("upgrade")] }],
       ),
+      "PD",
     ),
     true,
   );
@@ -298,21 +302,28 @@ test("an upgrade only in the inner instructions: an upgrade transaction", () => 
 
 test("a deployWithMaxDataLen instruction: an upgrade transaction", () => {
   assert.equal(
-    isUpgradeTransaction(parsedTx([loaderIx("deployWithMaxDataLen")])),
+    isUpgradeTransaction(parsedTx([loaderIx("deployWithMaxDataLen")]), "PD"),
     true,
   );
 });
 
 test("an extendProgram-only transaction: not an upgrade transaction", () => {
   assert.equal(
-    isUpgradeTransaction(parsedTx([loaderIx("extendProgram")])),
+    isUpgradeTransaction(parsedTx([loaderIx("extendProgram")]), "PD"),
     false,
   );
 });
 
 test("a setAuthority transaction: not an upgrade transaction", () => {
   assert.equal(
-    isUpgradeTransaction(parsedTx([loaderIx("setAuthority")])),
+    isUpgradeTransaction(parsedTx([loaderIx("setAuthority")]), "PD"),
+    false,
+  );
+});
+
+test("an upgrade of another ProgramData: not an upgrade transaction", () => {
+  assert.equal(
+    isUpgradeTransaction(parsedTx([loaderIx("upgrade", "OTHER")]), "PD"),
     false,
   );
 });
