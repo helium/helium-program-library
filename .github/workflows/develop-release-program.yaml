@@ -78,7 +78,7 @@ jobs:
         shell: bash
 
       - name: Set program information
-        if: steps.cache-toml.outputs.cache-hit != 'true'
+        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           # Prefer a devnet-specific id (programs.devnet) when one exists;
@@ -134,7 +134,7 @@ jobs:
         uses: actions/checkout@v2
       - uses: ./.github/actions/setup-anchor/
       - name: Set program information
-        if: steps.cache-toml.outputs.cache-hit != 'true'
+        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           # Prefer a devnet-specific id (programs.devnet) when one exists;

@@ -52,6 +52,12 @@ jobs:
         run: |
           RESULT=$(node scripts/program-hash-check.mjs)
           echo "$RESULT" | jq -r '.programs[] | "- `\(.program)`: \(.status)" + (if .version then " (newest release \(.version))" else "" end)' >> "$GITHUB_STEP_SUMMARY"
+          # A skipped program is compared with nothing. The run stays green, so the count is
+          # an annotation. It must only go down as releases carry a hash.
+          SKIPPED=$(echo "$RESULT" | jq '[.programs[] | select(.status == "skipped")] | length')
+          if [ "$SKIPPED" -gt 0 ]; then
+            echo "::warning title=Skipped programs::${SKIPPED} programs have no release hash to compare with"
+          fi
           # A pending upgrade past the notice window. The run stays green: a vote is
           # still open, and the annotation is there for whoever reads the run.
           # GitHub keeps ten warning annotations per step and drops the rest without

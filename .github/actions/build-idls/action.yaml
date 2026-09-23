@@ -33,7 +33,6 @@ runs:
         key: cargo-${{ runner.os }}-idl-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           cargo-${{ runner.os }}-idl-
-          cargo-${{ runner.os }}-cargo-build-
 
     # `anchor idl build` runs `cargo test --features idl-build` on the program lib
     # (NOT a BPF build), so target/debug is what gets populated.

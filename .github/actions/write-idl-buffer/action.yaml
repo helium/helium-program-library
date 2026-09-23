@@ -6,7 +6,7 @@
 #
 # Changes from upstream:
 # - Inputs reach the scripts through `env:`, not `${{ }}` text in the script body.
-# - Input names are the ones the deploy workflows already pass: `network`, `buffer-authority`, `devnet`.
+# - Input names are the ones the deploy workflows already pass: `network`, `buffer-authority`.
 #   The output is `idl-buffer`, the name the Squads step takes.
 # - Upstream skips every step when `anchor idl fetch` fails, and the output is then empty.
 #   `helium/squads-program-upgrade` needs an IDL buffer and an IDL account, so here that
@@ -16,10 +16,6 @@
 name: "Write IDL Buffer"
 description: "Writes the program IDL to an Anchor IDL buffer and hands the buffer to the buffer authority"
 inputs:
-  devnet:
-    description: "Whether the target is devnet. No step reads it. The devnet workflows pass it."
-    required: false
-    default: "false"
   network:
     description: "Solana RPC URL"
     required: true

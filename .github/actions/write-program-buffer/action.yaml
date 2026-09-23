@@ -4,7 +4,7 @@
 #
 # Changes from upstream:
 # - Inputs reach the scripts through `env:`, not `${{ }}` text in the script body.
-# - Input names are the ones the deploy workflows already pass: `network`, `buffer-authority`, `devnet`.
+# - Input names are the ones the deploy workflows already pass: `network`, `buffer-authority`.
 # - Upstream skips the extend and the authority transfer when `solana program show` fails.
 #   Here that failure stops the action, and so does a program size
 #   that does not parse. The `exists` conditions on the later steps are gone with it.
@@ -16,10 +16,6 @@
 name: "Write Program Buffer"
 description: "Writes the program binary to a buffer and hands the buffer to the buffer authority"
 inputs:
-  devnet:
-    description: "Whether the target is devnet. No step reads it. The devnet workflows pass it."
-    required: false
-    default: "false"
   network:
     description: "Solana RPC URL"
     required: true
@@ -275,7 +271,7 @@ runs:
     # closes by authority. After the transfer the vault owns the buffer, the close fails,
     # and a re-run reuses the buffer.
     - name: Close this run's buffer after a failure
-      if: failure() && steps.write-buffer.outputs.buffer != ''
+      if: (failure() || cancelled()) && steps.write-buffer.outputs.buffer != ''
       shell: bash
       run: |
         set +e

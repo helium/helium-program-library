@@ -124,9 +124,12 @@ runs:
           exit 1
         fi
 
+        # A parse failure must stop the run, not read as "no buffers".
+        CANDIDATES=$(echo "$BUFFERS_OUT" | jq -r '.buffers[].address')
+
         DUMPED_BUFFER=$(mktemp ./buffer-dump.XXXXXX.so)
         trap 'rm -f "$DUMPED_BUFFER"' EXIT
-        for CANDIDATE in $(echo "$BUFFERS_OUT" | jq -r '.buffers[].address'); do
+        for CANDIDATE in $CANDIDATES; do
           if solana program dump "$CANDIDATE" "$DUMPED_BUFFER" -u "$NETWORK" > /dev/null 2>&1 \
             && cmp -s "./target/deploy/$PROGRAM.so" "$DUMPED_BUFFER"; then
             echo "Buffer $CANDIDATE matches the build"
@@ -142,10 +145,12 @@ runs:
         AUTHORITY: ${{ inputs.buffer-authority }}
         NETWORK: ${{ inputs.network }}
 
-    # The proposal read needs `@sqds/multisig` from the workspace.
-    - uses: pnpm/action-setup@v4
+    # The proposal read needs `@sqds/multisig` from the workspace. It runs in the job that
+    # holds the deployer key, so every action here is pinned to a commit and the install
+    # takes the lockfile as is, with no install scripts.
+    - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
       if: steps.hash-match.outputs.skip != 'true'
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       if: steps.hash-match.outputs.skip != 'true'
       with:
         node-version-file: .node-version
@@ -185,25 +190,23 @@ runs:
         REUSED_BUFFER: ${{ steps.reuse.outputs.buffer }}
         NETWORK: ${{ inputs.network }}
 
-    # The IDL buffer goes first: it is cheap, so a failure there does not leave a
-    # vault-owned program buffer behind.
-    - uses: ./.github/actions/write-idl-buffer/
-      id: write-idl-buffer
-      if: steps.hash-match.outputs.skip != 'true' && steps.pending.outputs.skip != 'true'
+    # On a failure before the authority transfer, this action closes the buffer it made.
+    - uses: ./.github/actions/write-program-buffer/
+      id: write-program-buffer
+      if: steps.hash-match.outputs.skip != 'true' && steps.pending.outputs.skip != 'true' && steps.reuse.outputs.buffer == ''
       with:
-        devnet: ${{ inputs.devnet }}
         network: ${{ inputs.network }}
         program: ${{ inputs.program }}
         keypair: ${{ inputs.keypair }}
         program-id: ${{ inputs.program-id }}
         buffer-authority: ${{ inputs.buffer-authority }}
 
-    # On a failure before the authority transfer, this action closes the buffer it made.
-    - uses: ./.github/actions/write-program-buffer/
-      id: write-program-buffer
-      if: steps.hash-match.outputs.skip != 'true' && steps.pending.outputs.skip != 'true' && steps.reuse.outputs.buffer == ''
+    # The IDL buffer goes after the program buffer: once the vault owns it, only a multisig
+    # proposal can close it, so a failed program buffer write must not leave one behind.
+    - uses: ./.github/actions/write-idl-buffer/
+      id: write-idl-buffer
+      if: steps.hash-match.outputs.skip != 'true' && steps.pending.outputs.skip != 'true'
       with:
-        devnet: ${{ inputs.devnet }}
         network: ${{ inputs.network }}
         program: ${{ inputs.program }}
         keypair: ${{ inputs.keypair }}
