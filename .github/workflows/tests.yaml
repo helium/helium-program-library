@@ -60,13 +60,17 @@ jobs:
     # two release PRs, the Promotion PR (head develop) and the back-merge PR
     # (head master). Not a required check yet; issue 55 makes it required.
     # A fork can name its branch anything, so the skips apply to this repository's heads only.
+    # Anyone with push access can name a branch `changeset-release/` or `program-release/`, so
+    # those skips also need a bot author. Only a GitHub App or the Actions token opens a PR as a
+    # bot. `develop` and `master` already exist, so no one can open a new branch with that name.
     if: >-
       github.event_name == 'pull_request'
       && (github.event.pull_request.head.repo.full_name != github.repository
-        || (!startsWith(github.head_ref, 'changeset-release/')
-          && !startsWith(github.head_ref, 'program-release/')
-          && github.head_ref != 'develop'
-          && github.head_ref != 'master'))
+        || (github.head_ref != 'develop'
+          && github.head_ref != 'master'
+          && !(github.event.pull_request.user.type == 'Bot'
+            && (startsWith(github.head_ref, 'changeset-release/')
+              || startsWith(github.head_ref, 'program-release/')))))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

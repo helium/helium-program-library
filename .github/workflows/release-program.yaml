@@ -9,15 +9,25 @@ on:
     tags:
       - "program-*" # Push events to matching program-*, i.e. program-circuit-breaker-0.0.1
 
+permissions:
+  contents: read
+
+# The deployer key reaches two jobs only, `buffers` and `propose`, and neither installs the
+# workspace. `@sqds/multisig` runs in `build` and `wait`, which hold no key.
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
-    # The release uploads need `contents: write`. Turnstyle lists this workflow's runs.
+    # The release uploads need `contents: write`.
     permissions:
       contents: write
-      actions: read
-    # Turnstyle waits for earlier runs, so a batch of tags needs room past one build.
-    timeout-minutes: 180
+    timeout-minutes: 120
+    outputs:
+      program: ${{ steps.tag.outputs.PROGRAM }}
+      version: ${{ steps.tag.outputs.VERSION }}
+      program-id: ${{ steps.tag.outputs.PROGRAM_ID }}
+      program-name: ${{ steps.tag.outputs.PROGRAM_NAME }}
+      skip: ${{ steps.plan.outputs.skip }}
+      reused-buffer: ${{ steps.plan.outputs.buffer }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -25,6 +35,9 @@ jobs:
           # The master ancestry guard in "Set tag information" needs `origin/master` and the
           # history between it and the tag.
           fetch-depth: 0
+          # This job runs `@sqds/multisig` and has `contents: write`. The uploads pass their
+          # token themselves, so the checkout keeps none in `.git/config`.
+          persist-credentials: false
 
       - uses: actions/cache@v4
         name: Cache Toml Cli
@@ -42,6 +55,7 @@ jobs:
         shell: bash
 
       - name: Set tag information
+        id: tag
         run: |
           TAG=${GITHUB_REF#refs/tags/}  # Extract tag name from ref
           echo "Tag name: $TAG"
@@ -88,7 +102,7 @@ jobs:
             echo "VERSION=${VERSION}"
             echo "PROGRAM_ID=${PROGRAM_ID}"
             echo "PROGRAM_NAME=${PROGRAM_NAME}"
-          } >> "$GITHUB_ENV"
+          } | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"
 
       # Only the IDL is taken from anchor; `build-verified` below produces the `.so` that ships.
       - uses: ./.github/actions/build-program-idl/
@@ -112,7 +126,7 @@ jobs:
           program-id: ${{ env.PROGRAM_ID }}
 
       # The release hash. The scheduled hash check compares the on-chain program with it. It
-      # uploads before `deploy-buffers`, so a run that the hash-match skip stops still has it.
+      # uploads before `plan-deploy`, so a run that the hash-match skip stops still has it.
       - name: Write the release hash
         run: |
           HASH=$(~/.cargo/bin/solana-verify get-executable-hash "target/deploy/${PROGRAM_NAME}.so")
@@ -126,41 +140,102 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$GITHUB_REF_NAME" "target/deploy/${PROGRAM_NAME}.so.sha256" --clobber
 
-      # Re-run rules live in this action: the hash-match skip, the vault buffer reuse, the
-      # pending proposal check, and the close of this run's buffer on a failure.
-      - uses: ./.github/actions/deploy-buffers/
-        id: deploy-buffers
+      # Re-run rules live in this action: the hash-match skip, the vault buffer reuse and the
+      # pending proposal check.
+      - uses: ./.github/actions/plan-deploy/
+        id: plan
         with:
           network: ${{ secrets.SOLANA_DEPLOY_URL }}
           program: ${{ env.PROGRAM_NAME }}
-          keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.MULTISIG_VAULT }}
           multisig: ${{ secrets.MULTISIG }}
 
+      - name: Store the build
+        if: steps.plan.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: |
+            ./target/deploy/${{ env.PROGRAM_NAME }}.so
+            ./target/idl/${{ env.PROGRAM_NAME }}.json
+
+  buffers:
+    needs: build
+    if: needs.build.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    # The program buffer write retries up to 3 x 55 minutes.
+    timeout-minutes: 180
+    outputs:
+      buffer: ${{ steps.deploy-buffers.outputs.buffer }}
+      idl-buffer: ${{ steps.deploy-buffers.outputs.idl-buffer }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-anchor/
+      # `upload-artifact` drops the common `./target/` prefix of the two paths.
+      - name: Download the build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: ./target/
+      # On a failure before the authority transfer, this closes the buffer it made.
+      - uses: ./.github/actions/deploy-buffers/
+        id: deploy-buffers
+        with:
+          network: ${{ secrets.SOLANA_DEPLOY_URL }}
+          program: ${{ needs.build.outputs.program-name }}
+          keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
+          program-id: ${{ needs.build.outputs.program-id }}
+          buffer-authority: ${{ secrets.MULTISIG_VAULT }}
+          reused-buffer: ${{ needs.build.outputs.reused-buffer }}
+
+  wait:
+    needs: [build, buffers]
+    runs-on: ubuntu-latest
+    # Turnstyle lists this workflow's runs.
+    permissions:
+      contents: read
+      actions: read
+    # Turnstyle waits for earlier runs, so a batch of tags needs room past one release.
+    timeout-minutes: 180
+    outputs:
+      skip: ${{ steps.pending.outputs.skip }}
+      pending-proposal-index: ${{ steps.pending.outputs.pending-proposal-index }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       # Each run creates a Squads proposal at the multisig's next transaction index, and runs for
-      # tags pushed together race on that index; the losers fail with ConstraintSeeds. Only this
-      # last step needs serializing, so builds and buffer uploads run in parallel and each run
+      # tags pushed together race on that index; the losers fail with ConstraintSeeds. Only the
+      # proposal needs serializing, so builds and buffer uploads run in parallel and each run
       # waits here for every earlier-started run of this workflow to finish. A workflow-level
       # `concurrency` group is not used because GitHub keeps only one pending run per group and
       # cancels the rest, which silently dropped releases when several tags were pushed at once.
       - name: Wait for earlier release runs
-        if: steps.deploy-buffers.outputs.skip != 'true'
         uses: softprops/turnstyle@v3.3.3
         with:
           same-branch-only: false
           poll-interval-seconds: 30
           retries: 3
 
-      # The read in `deploy-buffers` ran before the wait, so a run that finished during it is
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # The read in `plan-deploy` ran before the wait, so a run that finished during it is
       # missing from that list. Read the older proposals again now that earlier runs are done.
       # A run that finished during the wait can also have proposed this same buffer: stop then.
       - name: Read older pending proposals after the wait
         id: pending
-        if: steps.deploy-buffers.outputs.skip != 'true'
         env:
+          PROGRAM: ${{ needs.build.outputs.program }}
+          PROGRAM_ID: ${{ needs.build.outputs.program-id }}
           MULTISIG: ${{ secrets.MULTISIG }}
-          BUFFER: ${{ steps.deploy-buffers.outputs.buffer }}
+          BUFFER: ${{ needs.buffers.outputs.buffer }}
           NETWORK: ${{ secrets.SOLANA_DEPLOY_URL }}
         run: |
           RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs --multisig "$MULTISIG" --program-id "$PROGRAM_ID" --buffer "$BUFFER")
@@ -173,28 +248,34 @@ jobs:
           fi
           echo "pending-proposal-index=$(echo "$RESULT" | jq -r '.older | map(tostring) | join(",")')" >> "$GITHUB_OUTPUT"
 
+  propose:
+    needs: [build, buffers, wait]
+    if: needs.wait.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
       - name: Squads program upgrade
-        # A skipped run has no buffers. The Squads action exits 1 on an empty address.
-        if: steps.deploy-buffers.outputs.skip != 'true' && steps.pending.outputs.skip != 'true'
         uses: helium/squads-program-upgrade@v0.5.0
         with:
           network-url: "https://api.mainnet-beta.solana.com"
           program-multisig: ${{ secrets.MULTISIG }}
-          program-id: ${{ env.PROGRAM_ID }}
-          buffer: ${{ steps.deploy-buffers.outputs.buffer }}
-          idl-buffer: ${{ steps.deploy-buffers.outputs.idl-buffer }}
+          program-id: ${{ needs.build.outputs.program-id }}
+          buffer: ${{ needs.buffers.outputs.buffer }}
+          idl-buffer: ${{ needs.buffers.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEPLOYER_ADDRESS }}
           authority: ${{ secrets.MULTISIG_VAULT }}
-          name: "Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}"
+          name: "Deploy ${{ needs.build.outputs.program-name }} ${{ needs.build.outputs.version }}"
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
 
       # A second proposal for the same program is open. Signers must reject the old one, or an
       # execute of it after the new one rolls the program back. The annotation and the summary line
       # are the whole notice: the person who merged the Promotion PR is watching this run.
       - name: Report the older pending proposal
-        if: steps.deploy-buffers.outputs.skip != 'true' && steps.pending.outputs.pending-proposal-index != ''
+        if: needs.wait.outputs.pending-proposal-index != ''
         env:
-          PENDING: ${{ steps.pending.outputs.pending-proposal-index }}
+          PROGRAM: ${{ needs.build.outputs.program }}
+          VERSION: ${{ needs.build.outputs.version }}
+          PENDING: ${{ needs.wait.outputs.pending-proposal-index }}
         run: |
           LINE="${PROGRAM} ${VERSION}: proposal ${PENDING} is still pending"
           echo "::notice title=Older pending proposal::${LINE}"

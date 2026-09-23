@@ -322,6 +322,8 @@ The tag starts `release-program.yaml`, which:
 
 Then sign and execute the proposal in Squads. That step stays manual.
 
+The deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key.
+
 Push a tag by hand when the tag bot is down:
 
 ```bash
@@ -333,13 +335,14 @@ A tag is never deleted, moved, or reused. A version is never reused. To correct 
 
 ### Re-running a failed program deploy
 
-Re-run the failed workflow run. The [`deploy-buffers`](.github/actions/deploy-buffers) action holds the rules, and all three deploy workflows use it, so devnet behaves like mainnet:
+Re-run the failed workflow run. The [`plan-deploy`](.github/actions/plan-deploy) action holds the rules, and all three deploy workflows use it, so devnet behaves like mainnet:
 
 - The on-chain program already matches the build: the run stops with success and writes nothing.
 - The Squads vault already owns a buffer whose bytes match the build: the run reuses that buffer, so a re-run pays the write once.
 - A pending proposal already names the reused buffer: the run stops with success. Vote on the proposal that is open.
 - An older pending proposal names a different buffer for the program: the run goes on, and prints an `Older pending proposal` notice annotation naming its index, plus the same line in the run summary, so the signers reject it. An execute of the older one after the newer would roll the program back.
 - This run's own buffer is closed when the run fails before the authority transfer.
+- A runner that dies before the authority transfer runs no close step, and the buffer stays with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) closes those buffers each week and returns the rent. It stops while a release runs.
 
 IDL buffers are never reused. Each run that goes on writes a new one.
 
@@ -435,7 +438,9 @@ Each workflow above delegates to composite actions in [`.github/actions/`](.gith
 - `build-anchor/`: `anchor build` (with optional `testing` and `devnet` lazy-signer seeds).
 - `build-program-idl/`, `build-idls/`: IDL builds without a full SBF compile.
 - `build-verified/`: verifiable build through `solana-verify` that produces a deterministic `.so`.
-- `deploy-buffers/`: the deploy re-run rules, in front of the two buffer writes.
+- `install-solana-verify/`: the one `solana-verify` pin. The release hash, the deploy skip and the daily hash check use it.
+- `plan-deploy/`: the deploy re-run rules, in front of the two buffer writes. It takes no keypair.
+- `deploy-buffers/`: the two buffer writes that `plan-deploy` asks for.
 - `write-program-buffer/`, `write-idl-buffer/`: upload the `.so` and the IDL to buffer accounts owned by the multisig. Vendored from `solana-foundation/github-actions`; the source SHA is at the top of each file.
 - `idl-diff/`: the IDL change the changeset bot reads.
 - `api-commit/`: the commit the changeset bot and the program release PR make, through the GitHub API, so it shows Verified.

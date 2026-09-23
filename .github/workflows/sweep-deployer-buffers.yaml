@@ -1,0 +1,92 @@
+name: Sweep Deployer Buffers
+
+env:
+  SOLANA_CLI_VERSION: 2.1.6
+
+# A release run closes its own buffer when it fails or is cancelled before the authority
+# transfer. A runner that dies there runs no close step, and the buffer stays with the
+# deployer key. The reuse scan in `plan-deploy` lists vault buffers only, so no later run
+# sees it. This sweep closes every mainnet buffer the deployer key still owns and returns
+# the rent to it.
+#
+# A buffer the deployer owns belongs to a release in flight or to no one, so the sweep
+# stops when a release run is not complete. A buffer written by hand with the deployer key
+# is closed too.
+on:
+  schedule:
+    # Weekly, off the hour: a run at :00 waits in GitHub's queue.
+    - cron: "43 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # The release run list.
+  actions: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-solana/
+
+      - name: Stop while a release runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUNNING=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release-program.yaml --limit 100 --json status --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$RUNNING" -gt 0 ]; then
+            echo "::error::${RUNNING} release runs are not complete. Re-run the sweep after they finish."
+            exit 1
+          fi
+
+      - name: Close the deployer's buffers
+        env:
+          DEPLOY_KEYPAIR: ${{ secrets.DEPLOYER_KEYPAIR }}
+          NETWORK: ${{ secrets.SOLANA_DEPLOY_URL }}
+        run: |
+          trap 'rm -f ./deploy-keypair.json' EXIT
+          echo "$DEPLOY_KEYPAIR" > ./deploy-keypair.json && chmod 600 ./deploy-keypair.json
+          DEPLOYER=$(solana-keygen pubkey ./deploy-keypair.json)
+
+          set +e
+          BUFFERS_OUT=$(solana program show --buffers --buffer-authority "$DEPLOYER" -u "$NETWORK" --output json 2>&1)
+          EXIT_CODE=$?
+          set -e
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            # The RPC URL is a secret and the CLI puts it in some errors.
+            echo "${BUFFERS_OUT//"$NETWORK"/<rpc-url>}"
+            echo "::error::Could not list the buffers of $DEPLOYER"
+            exit 1
+          fi
+          # A parse failure must stop the run, not read as "no buffers".
+          BUFFERS=$(echo "$BUFFERS_OUT" | jq -r '.buffers[] | "\(.address) \(.lamports)"')
+
+          if [ -z "$BUFFERS" ]; then
+            echo "- The deployer \`$DEPLOYER\` owns no buffers." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          FAILED=0
+          while read -r BUFFER LAMPORTS; do
+            SOL=$(awk -v l="$LAMPORTS" 'BEGIN { printf "%.9f", l / 1e9 }')
+            set +e
+            CLOSE_OUT=$(solana program close "$BUFFER" --keypair ./deploy-keypair.json --url "$NETWORK" 2>&1)
+            EXIT_CODE=$?
+            set -e
+            CLOSE_OUT=${CLOSE_OUT//"$NETWORK"/<rpc-url>}
+            echo "$CLOSE_OUT"
+            if [ "$EXIT_CODE" -eq 0 ]; then
+              echo "- Closed buffer \`$BUFFER\`: $SOL SOL back with the deployer." >> "$GITHUB_STEP_SUMMARY"
+            else
+              FAILED=$((FAILED + 1))
+              echo "- Buffer \`$BUFFER\` ($SOL SOL) not closed: $(echo "$CLOSE_OUT" | tail -n 1)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done <<< "$BUFFERS"
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::${FAILED} deployer buffers not closed, see the run summary"
+            exit 1
+          fi
