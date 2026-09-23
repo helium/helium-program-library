@@ -3,11 +3,13 @@ name: Sweep Deployer Buffers
 env:
   SOLANA_CLI_VERSION: 2.1.6
 
-# A release run closes its own buffer when it fails or is cancelled before the authority
-# transfer. A runner that dies there runs no close step, and the buffer stays with the
-# deployer key. The reuse scan in `plan-deploy` lists vault buffers only, so no later run
-# sees it. This sweep closes every mainnet buffer the deployer key still owns and returns
-# the rent to it.
+# A release run closes its own program buffer and IDL buffer when it fails or is cancelled
+# before the authority transfer. A runner that dies there runs no close step, and the
+# buffer stays with the deployer key. The reuse scan in `plan-deploy` lists vault buffers
+# only, so no later run sees it. A runner that dies during `anchor idl write-buffer` leaves
+# an IDL buffer whose address was never printed. This sweep closes every mainnet program
+# buffer (BPF upgradeable loader) and every Anchor IDL buffer the deployer key still owns,
+# and returns the rent to it.
 #
 # A buffer the deployer owns belongs to a release in flight or to no one, so the sweep
 # stops when a release run is not complete. A buffer written by hand with the deployer key
@@ -30,7 +32,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-solana/
+      # Installs the Solana CLI too. The sweep does not call `toml`, and the install runs
+      # third-party build scripts on the VM that later writes the deployer key. Any workflow in
+      # the cache scope can write a cache entry first, so the sweep installs the CLIs fresh.
+      - uses: ./.github/actions/setup-anchor/
+        with:
+          toml-cli: false
+          cache: false
 
       - name: Stop while a release runs
         env:
@@ -64,29 +72,98 @@ jobs:
           # A parse failure must stop the run, not read as "no buffers".
           BUFFERS=$(echo "$BUFFERS_OUT" | jq -r '.buffers[] | "\(.address) \(.lamports)"')
 
+          FAILED=0
           if [ -z "$BUFFERS" ]; then
-            echo "- The deployer \`$DEPLOYER\` owns no buffers." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo "- The deployer \`$DEPLOYER\` owns no program buffers." >> "$GITHUB_STEP_SUMMARY"
+          else
+            while read -r BUFFER LAMPORTS; do
+              SOL=$(awk -v l="$LAMPORTS" 'BEGIN { printf "%.9f", l / 1e9 }')
+              set +e
+              CLOSE_OUT=$(solana program close "$BUFFER" --keypair ./deploy-keypair.json --url "$NETWORK" 2>&1)
+              EXIT_CODE=$?
+              set -e
+              CLOSE_OUT=${CLOSE_OUT//"$NETWORK"/<rpc-url>}
+              echo "$CLOSE_OUT"
+              if [ "$EXIT_CODE" -eq 0 ]; then
+                echo "- Closed buffer \`$BUFFER\`: $SOL SOL back with the deployer." >> "$GITHUB_STEP_SUMMARY"
+              else
+                FAILED=$((FAILED + 1))
+                echo "- Buffer \`$BUFFER\` ($SOL SOL) not closed: $(echo "$CLOSE_OUT" | tail -n 1)" >> "$GITHUB_STEP_SUMMARY"
+              fi
+            done <<< "$BUFFERS"
           fi
 
-          FAILED=0
-          while read -r BUFFER LAMPORTS; do
-            SOL=$(awk -v l="$LAMPORTS" 'BEGIN { printf "%.9f", l / 1e9 }')
+          # The `[programs.localnet]` ids are the mainnet ids. This job holds the deployer key,
+          # so it parses Anchor.toml in the shell and runs no workspace JavaScript.
+          PROGRAMS=$(awk '/^\[/ { in_section = ($0 == "[programs.localnet]"); next } in_section && /=/ { gsub(/[" ]/, ""); split($0, kv, "="); print kv[1], kv[2] }' Anchor.toml)
+          if [ -z "$PROGRAMS" ]; then
+            echo "::error::Found no program ids in the [programs.localnet] section of Anchor.toml"
+            exit 1
+          fi
+
+          # An IDL buffer is an Anchor IdlAccount of the program. `GEZivzqQe54=` is the
+          # IdlAccount discriminator, sha256("internal:IdlAccount")[..8], in base64. The
+          # authority follows it at offset 8. dataSlice length 0 fetches no account data.
+          while read -r PROGRAM PROGRAM_ID; do
+            REQUEST=$(jq -cn --arg program_id "$PROGRAM_ID" --arg deployer "$DEPLOYER" '{
+              jsonrpc: "2.0", id: 1, method: "getProgramAccounts",
+              params: [$program_id, {
+                encoding: "base64",
+                dataSlice: {offset: 0, length: 0},
+                filters: [
+                  {memcmp: {offset: 0, bytes: "GEZivzqQe54=", encoding: "base64"}},
+                  {memcmp: {offset: 8, bytes: $deployer}}
+                ]
+              }]
+            }')
             set +e
-            CLOSE_OUT=$(solana program close "$BUFFER" --keypair ./deploy-keypair.json --url "$NETWORK" 2>&1)
+            RPC_OUT=$(curl -sS --fail-with-body --max-time 120 -X POST -H 'Content-Type: application/json' -d "$REQUEST" "$NETWORK" 2>&1)
             EXIT_CODE=$?
-            set -e
-            CLOSE_OUT=${CLOSE_OUT//"$NETWORK"/<rpc-url>}
-            echo "$CLOSE_OUT"
             if [ "$EXIT_CODE" -eq 0 ]; then
-              echo "- Closed buffer \`$BUFFER\`: $SOL SOL back with the deployer." >> "$GITHUB_STEP_SUMMARY"
-            else
-              FAILED=$((FAILED + 1))
-              echo "- Buffer \`$BUFFER\` ($SOL SOL) not closed: $(echo "$CLOSE_OUT" | tail -n 1)" >> "$GITHUB_STEP_SUMMARY"
+              # An RPC error has no `.result`; that must count as a failure, not as "no buffers".
+              IDL_BUFFERS=$(echo "$RPC_OUT" | jq -r '.result | if type == "array" then .[] | "\(.pubkey) \(.account.lamports)" else error("no .result") end' 2>&1)
+              EXIT_CODE=$?
             fi
-          done <<< "$BUFFERS"
+            set -e
+            if [ "$EXIT_CODE" -ne 0 ]; then
+              RPC_OUT=${RPC_OUT//"$NETWORK"/<rpc-url>}
+              echo "$RPC_OUT"
+              FAILED=$((FAILED + 1))
+              echo "- IDL buffers of \`$PROGRAM\` not listed: $(echo "$RPC_OUT" | tail -n 1)" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            if [ -z "$IDL_BUFFERS" ]; then
+              continue
+            fi
+
+            # The program's own IDL account matches too when its authority is still the deployer.
+            BASE=$(solana find-program-derived-address "$PROGRAM_ID")
+            IDL_ACCOUNT=$(solana create-address-with-seed anchor:idl "$PROGRAM_ID" --from "$BASE")
+
+            while read -r BUFFER LAMPORTS; do
+              SOL=$(awk -v l="$LAMPORTS" 'BEGIN { printf "%.9f", l / 1e9 }')
+              if [ "$BUFFER" = "$IDL_ACCOUNT" ]; then
+                echo "::warning::The IDL authority of $PROGRAM is still the deployer"
+                echo "- The IDL account \`$BUFFER\` of \`$PROGRAM\` has the deployer as its authority. Not closed." >> "$GITHUB_STEP_SUMMARY"
+                continue
+              fi
+              set +e
+              # stdin is the buffer list; the CLI must not read it.
+              CLOSE_OUT=$(anchor idl close "$PROGRAM_ID" --idl-address "$BUFFER" --provider.cluster "$NETWORK" --provider.wallet ./deploy-keypair.json < /dev/null 2>&1)
+              EXIT_CODE=$?
+              set -e
+              CLOSE_OUT=${CLOSE_OUT//"$NETWORK"/<rpc-url>}
+              echo "$CLOSE_OUT"
+              if [ "$EXIT_CODE" -eq 0 ]; then
+                echo "- Closed IDL buffer \`$BUFFER\` of \`$PROGRAM\`: $SOL SOL back with the deployer." >> "$GITHUB_STEP_SUMMARY"
+              else
+                FAILED=$((FAILED + 1))
+                echo "- IDL buffer \`$BUFFER\` of \`$PROGRAM\` ($SOL SOL) not closed: $(echo "$CLOSE_OUT" | tail -n 1)" >> "$GITHUB_STEP_SUMMARY"
+              fi
+            done <<< "$IDL_BUFFERS"
+          done <<< "$PROGRAMS"
 
           if [ "$FAILED" -gt 0 ]; then
-            echo "::error::${FAILED} deployer buffers not closed, see the run summary"
+            echo "::error::${FAILED} deployer program or IDL buffers not listed or not closed, see the run summary"
             exit 1
           fi

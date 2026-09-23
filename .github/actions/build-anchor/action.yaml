@@ -47,7 +47,7 @@ runs:
       with:
         path: |
           ./target/
-        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**') }}
+        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock') }}
         restore-keys: |
           build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-
     # A job that only consumes the build takes it from an artifact the run's own `build` job
@@ -85,4 +85,4 @@ runs:
       with:
         path: |
           ./target/
-        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**') }}
+        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock') }}

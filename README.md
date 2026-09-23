@@ -241,6 +241,7 @@ Three things leave this repo: npm packages, service images, and Solana programs.
 | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) | Push to `develop` touching `programs/*`, or the `deploy-to-devnet` PR label | The same deploy against devnet. It creates no tag.                                                                                           |
 | [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml)       | Manual dispatch                                                             | One program to devnet from any branch.                                                                                                       |
 | [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml)           | Daily at 13:17 UTC; manual dispatch                                         | Compares each mainnet program with the hash its newest release published.                                                                    |
+| [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml)   | Weekly on Monday at 14:43 UTC; manual dispatch                              | Closes the program and IDL buffers the deployer key still owns, and returns the rent.                                                        |
 | [`service-auto-tag.yaml`](.github/workflows/service-auto-tag.yaml)               | Push to `develop`; manual dispatch                                          | Pushes the next `docker-<env>-<service>-<version>` tag for each opted-in service that changed.                                               |
 | [`docker-push.yaml`](.github/workflows/docker-push.yaml)                         | Git tag `docker-<env>-<service>-<version>`                                  | Builds the service image and pushes it to ECR.                                                                                               |
 
@@ -315,8 +316,9 @@ Then merge the hotfix. `back-merge-pr.yaml` opens the `master` to `develop` back
 The tag starts `release-program.yaml`, which:
 
 - refuses the tag when its version differs from `programs/<name>/Cargo.toml` at the tagged commit, or when the commit is not an ancestor of `origin/master`;
-- builds the IDL and uploads it as a release asset;
-- runs a verifiable `solana-verify` build and uploads `<name>.so.sha256`, the **release hash**, next to the IDL;
+- builds the IDL with `anchor idl build`;
+- runs a verifiable `solana-verify` build;
+- publishes the GitHub release with the IDL and `<name>.so.sha256`, the **release hash**, only after that build succeeds;
 - writes the program and IDL buffers with the Squads vault as their authority;
 - opens the Squads proposal to upgrade the program to the new buffer.
 
@@ -341,8 +343,8 @@ Re-run the failed workflow run. The [`plan-deploy`](.github/actions/plan-deploy)
 - The Squads vault already owns a buffer whose bytes match the build: the run reuses that buffer, so a re-run pays the write once.
 - A pending proposal already names the reused buffer: the run stops with success. Vote on the proposal that is open.
 - An older pending proposal names a different buffer for the program: the run goes on, and prints an `Older pending proposal` notice annotation naming its index, plus the same line in the run summary, so the signers reject it. An execute of the older one after the newer would roll the program back.
-- This run's own buffer is closed when the run fails before the authority transfer.
-- A runner that dies before the authority transfer runs no close step, and the buffer stays with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) closes those buffers each week and returns the rent. It stops while a release runs.
+- This run's own program buffer and IDL buffer are closed when the run fails or is cancelled before the vault takes them.
+- A runner that dies before the authority transfer runs no close step, and the buffers stay with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) runs each week, closes the program buffers and IDL buffers the deployer key still owns, and returns the rent. It stops while a release runs.
 
 IDL buffers are never reused. Each run that goes on writes a new one.
 
@@ -354,11 +356,12 @@ IDL buffers are never reused. Each run that goes on writes a new one.
 
 ### The daily hash check
 
-`program-hash-check.yaml` compares each mainnet program with the release hash of its newest release. It takes no action, holds no state, and holds no deploy secret. Each program gets one of three results:
+`program-hash-check.yaml` compares each mainnet program with the release hash of its newest release. It takes no action, holds no state, and holds no deploy secret. Each program gets one of four results:
 
 - **deployed**: the chain holds the newest release's binary. Silent.
 - **pending**: the chain holds an older release of this repo. This is normal while a proposal waits for votes. Once the newest tag is more than 3 days old, the run prints a `Pending upgrade` warning annotation and a summary line, and stays green: the vote is still open.
 - **unknown binary**: the chain holds a binary no release of this repo published. The run prints an `Unknown binary` error annotation and fails, so the check does not stay green while the question is open.
+- **rolled back**: the chain holds an older release, and its last upgrade came after the newest tag. An older proposal executed after a newer release reads the same way. The run prints a `Rolled back` error annotation and fails, so a person looks at it.
 
 A program whose releases carry no `<name>.so.sha256` asset is skipped and named in the run summary. A `Skipped programs` warning annotation counts them. A program enters the check at its first release through this flow.
 

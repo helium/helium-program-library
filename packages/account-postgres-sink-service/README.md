@@ -17,4 +17,4 @@ Image: `public.ecr.aws/v0j6k5v6/account-postgres-sink-service`
 | oracle-cluster / prod | [manifests/oracle-cluster/prod/helium/account-postgres-sink-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/oracle-cluster/prod/helium/account-postgres-sink-service.yaml) |
 | oracle-cluster / sdlc | [manifests/oracle-cluster/sdlc/helium/account-postgres-sink-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/oracle-cluster/sdlc/helium/account-postgres-sink-service.yaml) |
 
-Deploy: the service auto-tag bot pushes `docker-web-account-postgres-sink-service-<version>` on each merge to `develop` that changes it. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The k8s bump stays manual.
+Image release: the service auto-tag bot pushes `docker-web-account-postgres-sink-service-<version>` on each merge to `develop` that changes it. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The service deploy (the k8s bump) stays manual.

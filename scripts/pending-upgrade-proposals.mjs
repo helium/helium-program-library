@@ -16,7 +16,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 
 const USAGE =
-  "Usage: SOLANA_URL=<rpc> node scripts/pending-upgrade-proposals.mjs --multisig <address> --program-id <address> [--buffer <address>]";
+  "Usage: SOLANA_URL=<rpc> node scripts/pending-upgrade-proposals.mjs --multisig <address> --program-id <address> --spill <address> [--buffer <address>]";
 
 const BPF_LOADER_UPGRADEABLE = "BPFLoaderUpgradeab1e11111111111111111111111";
 // The loader's Upgrade instruction: a u32 LE enum tag and nothing else.
@@ -26,6 +26,11 @@ const UPGRADE_DATA = Buffer.from([3, 0, 0, 0]);
 const IDL_IX_TAG = Buffer.from([
   0x40, 0xf4, 0xbc, 0x78, 0xa7, 0xe9, 0x69, 0x0a,
 ]);
+// The IDL instruction variant byte after the tag. Account 2 is SetBuffer's
+// authority and Close's sol_destination.
+const IDL_SET_BUFFER = 3;
+const IDL_SET_AUTHORITY = 4;
+const IDL_CLOSE = 5;
 // The `getMultipleAccounts` limit.
 const BATCH = 100;
 
@@ -36,11 +41,14 @@ const isVaultTransaction = (account) =>
 
 /**
  * The buffer a vault transaction upgrades `programId` from, or null, and
- * whether its message is exactly the upgrade this workflow builds: only the
- * loader Upgrade (programData, program, buffer, ..., vault) and IDL
- * instructions to the program.
+ * whether its message matches this workflow's upgrade: only the loader Upgrade
+ * with this program's programData, the program, the buffer, `spill` and the
+ * vault 0 authority, and IDL instructions to the program. An IDL SetAuthority,
+ * or a SetBuffer or Close whose authority or rent destination is not the vault,
+ * does not match. The caller also requires vault index 0. The contents of an
+ * IDL buffer are not checked, so signers still review the message.
  */
-const upgradeBuffer = (message, programId, multisigPda) => {
+const upgradeBuffer = (message, programId, multisigPda, spill) => {
   const key = (index) => message.accountKeys[index]?.toBase58();
   const isUpgrade = (ix) =>
     key(ix.programIdIndex) === BPF_LOADER_UPGRADEABLE &&
@@ -55,14 +63,29 @@ const upgradeBuffer = (message, programId, multisigPda) => {
     new PublicKey(BPF_LOADER_UPGRADEABLE),
   )[0].toBase58();
   const vault = multisig.getVaultPda({ multisigPda, index: 0 })[0].toBase58();
+  const isExactIdl = (ix) => {
+    const data = Buffer.from(ix.data);
+    if (
+      key(ix.programIdIndex) !== programId.toBase58() ||
+      !IDL_IX_TAG.equals(data.subarray(0, 8))
+    ) {
+      return false;
+    }
+    const variant = data[8];
+    if (variant === IDL_SET_AUTHORITY) return false;
+    if (variant === IDL_SET_BUFFER || variant === IDL_CLOSE) {
+      return key(ix.accountIndexes[2]) === vault;
+    }
+    return true;
+  };
   const exact = message.instructions.every(
     (ix) =>
       (isUpgrade(ix) &&
         key(ix.accountIndexes[0]) === programData &&
         key(ix.accountIndexes[2]) === buffer &&
+        key(ix.accountIndexes[3]) === spill.toBase58() &&
         key(ix.accountIndexes[6]) === vault) ||
-      (key(ix.programIdIndex) === programId.toBase58() &&
-        IDL_IX_TAG.equals(Buffer.from(ix.data).subarray(0, 8))),
+      isExactIdl(ix),
   );
   return { buffer, exact };
 };
@@ -77,6 +100,7 @@ export const pendingUpgrades = async ({
   getMultipleAccountsInfo,
   multisigPda,
   programId,
+  spill,
 }) => {
   const [multisigAccount] = await getMultipleAccountsInfo([multisigPda]);
   if (!multisigAccount) {
@@ -117,10 +141,19 @@ export const pendingUpgrades = async ({
       (status === "Active" && index > Number(staleTransactionIndex));
     if (!pendingStatus) return [];
 
-    const [{ message }] =
+    const [{ message, vaultIndex }] =
       multisig.accounts.VaultTransaction.fromAccountInfo(transaction);
-    const { buffer, exact } = upgradeBuffer(message, programId, multisigPda);
-    return buffer ? [{ index, status, buffer, exact }] : [];
+    const { buffer, exact } = upgradeBuffer(
+      message,
+      programId,
+      multisigPda,
+      spill,
+    );
+    // The message names vault 0 as the upgrade authority, so it only executes
+    // as vault 0; at another vault index it still counts as an older release.
+    return buffer
+      ? [{ index, status, buffer, exact: exact && vaultIndex === 0 }]
+      : [];
   });
 };
 
@@ -146,14 +179,16 @@ const parseArgs = (argv) => {
     const name = argv[i];
     const value = argv[i + 1];
     if (
-      !["--multisig", "--program-id", "--buffer"].includes(name) ||
+      !["--multisig", "--program-id", "--spill", "--buffer"].includes(name) ||
       value === undefined
     ) {
       throw new Error(USAGE);
     }
     args[name.slice(2)] = value;
   }
-  if (!args.multisig || !args["program-id"]) throw new Error(USAGE);
+  if (!args.multisig || !args["program-id"] || !args.spill) {
+    throw new Error(USAGE);
+  }
   return args;
 };
 
@@ -169,6 +204,7 @@ const main = async () => {
         connection.getMultipleAccountsInfo(keys),
       multisigPda: new PublicKey(args.multisig),
       programId: new PublicKey(args["program-id"]),
+      spill: new PublicKey(args.spill),
     });
     console.log(
       JSON.stringify({ pending, ...classifyPending(pending, args.buffer) }),

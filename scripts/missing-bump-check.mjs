@@ -17,6 +17,7 @@ import {
   crateFor,
   isNoReleasePath,
 } from "./changed-programs.mjs";
+import { parseProgramTag } from "./program-hash-check.mjs";
 
 const run = (command, args) =>
   execFileSync(command, args, {
@@ -157,7 +158,7 @@ export const report = ({ results, failing }) => {
       `${name} ${version} is tagged as \`program-${name}-${version}\`, and it changed since ${base}:`,
       ...files.map((file) => `  - ${file}`),
       via.length ? `  via its dependency on ${via.join(", ")}` : null,
-      `  Bump \`programs/${name}/Cargo.toml\`, or add a \`.changeset-programs/\` file that gives it a level.`,
+      `  Bump \`programs/${name}/Cargo.toml\`.`,
     ]
       .filter(Boolean)
       .join("\n"),
@@ -183,6 +184,13 @@ const showFile = (head, file) => {
   }
 };
 
+/** The versions `name`'s `program-<name>-<x.y.z>` tags in `tags` name. */
+export const taggedVersions = (name, tags) =>
+  tags
+    .map(parseProgramTag)
+    .filter((parsed) => parsed?.name === name)
+    .map(({ version }) => version);
+
 /**
  * Every `programs/*` directory with a `Cargo.toml`, with its version at `head`,
  * its tagged versions and the commit the tag for that version points at.
@@ -199,10 +207,10 @@ export const readPrograms = (head, skipped) =>
       const cargo = showFile(head, `programs/${name}/Cargo.toml`);
       if (!cargo) return null;
       const version = cargo.match(PACKAGE_VERSION)[1];
-      const tags = git("tag", "-l", `program-${name}-*`)
-        .split("\n")
-        .map((tag) => tag.match(`^program-${name}-(\\d+\\.\\d+\\.\\d+)$`)?.[1])
-        .filter(Boolean);
+      const tags = taggedVersions(
+        name,
+        git("tag", "-l", `program-${name}-*`).split("\n"),
+      );
       return {
         name,
         version,
@@ -243,7 +251,9 @@ const main = (argv) => {
     metadata,
     programs: readPrograms(head, skipped),
     changedFiles: (base) =>
-      git("diff", "--name-only", base, head).split("\n").filter(Boolean),
+      git("diff", "--name-only", "--no-renames", base, head)
+        .split("\n")
+        .filter(Boolean),
   });
 
   const text = report(result);

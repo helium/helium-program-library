@@ -36,6 +36,9 @@ inputs:
   multisig:
     description: "The Squads v4 multisig whose pending proposals are read"
     required: true
+  spill:
+    description: "The spill address the Squads step passes. A pending proposal with another spill does not name the same upgrade"
+    required: true
 
 outputs:
   skip:
@@ -94,7 +97,9 @@ runs:
         NETWORK: ${{ inputs.network }}
 
     # A run that failed after the authority transfer leaves a vault-owned buffer that only a
-    # Squads proposal can close. The re-run takes it back instead of paying rent for a second.
+    # Squads proposal can close. A re-run that runs this step again takes it back instead of
+    # paying rent for a second. In the mainnet release that is "Re-run all jobs": "Re-run failed
+    # jobs" keeps the build job's old empty `reused-buffer` output and writes a second buffer.
     - name: Reuse a vault buffer that matches the build
       id: reuse
       if: steps.hash-match.outputs.skip != 'true'
@@ -149,7 +154,7 @@ runs:
       if: steps.hash-match.outputs.skip != 'true'
       shell: bash
       run: |
-        ARGS=(--multisig "$MULTISIG" --program-id "$PROGRAM_ID")
+        ARGS=(--multisig "$MULTISIG" --program-id "$PROGRAM_ID" --spill "$SPILL")
         if [ -n "$REUSED_BUFFER" ]; then ARGS+=(--buffer "$REUSED_BUFFER"); fi
         # The proposal is created against a public RPC. The read uses the RPC the buffer
         # writes use. The script takes it from SOLANA_URL and keeps it out of its errors.
@@ -166,11 +171,12 @@ runs:
         echo "skip=false" >> "$GITHUB_OUTPUT"
         echo "pending-proposal-index=$OLDER" >> "$GITHUB_OUTPUT"
         if [ -n "$OLDER" ]; then
-          echo "- \`$PROGRAM\`: older pending upgrade proposal(s) $OLDER name another buffer. This run makes a new proposal. Signers reject the older one(s)." >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`$PROGRAM\`: older pending upgrade proposal(s) $OLDER do not match this build. This run makes a new proposal. Signers reject the older one(s)." >> "$GITHUB_STEP_SUMMARY"
         fi
       env:
         PROGRAM: ${{ inputs.program }}
         PROGRAM_ID: ${{ inputs.program-id }}
         MULTISIG: ${{ inputs.multisig }}
+        SPILL: ${{ inputs.spill }}
         REUSED_BUFFER: ${{ steps.reuse.outputs.buffer }}
         NETWORK: ${{ inputs.network }}

@@ -28,6 +28,7 @@ jobs:
       program-name: ${{ steps.tag.outputs.PROGRAM_NAME }}
       skip: ${{ steps.plan.outputs.skip }}
       reused-buffer: ${{ steps.plan.outputs.buffer }}
+      artifact-sha256: ${{ steps.hash.outputs.artifact-sha256 }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -111,34 +112,46 @@ jobs:
           devnet: false
           program: ${{ env.PROGRAM_NAME }}
 
-      - name: Push IDL to Github
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            target/idl/${{ env.PROGRAM_NAME }}.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: ./.github/actions/build-verified/
         id: build-verified
         with:
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
 
-      # The release hash. The scheduled hash check compares the on-chain program with it. It
-      # uploads before `plan-deploy`, so a run that the hash-match skip stops still has it.
+      # The release hash. The scheduled hash check compares the on-chain program with it. The
+      # release carries it before `plan-deploy`, so a run that the hash-match skip stops still has it.
+      # `artifact-sha256` covers the two files the build artifact stores, taken before `plan-deploy`.
       - name: Write the release hash
+        id: hash
         run: |
           HASH=$(~/.cargo/bin/solana-verify get-executable-hash "target/deploy/${PROGRAM_NAME}.so")
           echo "$HASH" > "target/deploy/${PROGRAM_NAME}.so.sha256"
           echo "Release hash: $HASH"
+          ARTIFACT_SHA256=$(sha256sum "target/deploy/${PROGRAM_NAME}.so" "target/idl/${PROGRAM_NAME}.json" | sha256sum | cut -d' ' -f1)
+          echo "Artifact hash: $ARTIFACT_SHA256"
+          echo "artifact-sha256=${ARTIFACT_SHA256}" >> "$GITHUB_OUTPUT"
 
-      # The IDL step above made the release for this tag. `--clobber` lets a re-run replace the
-      # asset, as the IDL step does.
-      - name: Push release hash to Github
+      # The release is made only after the verified build and its hash, so a failed build leaves
+      # no release. A re-run replaces the assets.
+      - name: Publish the release
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        with:
+          files: |
+            target/idl/${{ env.PROGRAM_NAME }}.json
+            target/deploy/${{ env.PROGRAM_NAME }}.so.sha256
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" "target/deploy/${PROGRAM_NAME}.so.sha256" --clobber
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # `plan-deploy` runs workspace JavaScript in a job with `contents: write`, and that code can
+      # replace this artifact. The `buffers` job checks the artifact against the hash taken before
+      # `plan-deploy` ran.
+      - name: Store the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: |
+            ./target/deploy/${{ env.PROGRAM_NAME }}.so
+            ./target/idl/${{ env.PROGRAM_NAME }}.json
 
       # Re-run rules live in this action: the hash-match skip, the vault buffer reuse and the
       # pending proposal check.
@@ -150,15 +163,7 @@ jobs:
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.MULTISIG_VAULT }}
           multisig: ${{ secrets.MULTISIG }}
-
-      - name: Store the build
-        if: steps.plan.outputs.skip != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: |
-            ./target/deploy/${{ env.PROGRAM_NAME }}.so
-            ./target/idl/${{ env.PROGRAM_NAME }}.json
+          spill: ${{ secrets.DEPLOYER_ADDRESS }}
 
   buffers:
     needs: build
@@ -173,12 +178,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - uses: ./.github/actions/setup-anchor/
+        # Neither this job nor its actions call `toml`, and the install runs third-party build
+        # scripts on the VM that later writes the deployer key. Any workflow in the cache scope
+        # can write a cache entry first, so this job installs the Anchor and Solana CLIs fresh.
+        with:
+          toml-cli: false
+          cache: false
       # `upload-artifact` drops the common `./target/` prefix of the two paths.
       - name: Download the build
         uses: actions/download-artifact@v4
         with:
           name: build
           path: ./target/
+      - name: Check the build against the hash taken before plan-deploy
+        env:
+          PROGRAM_NAME: ${{ needs.build.outputs.program-name }}
+          EXPECTED: ${{ needs.build.outputs.artifact-sha256 }}
+        # The file names are part of the hashed text, so they are spelled as in the build job.
+        run: |
+          ACTUAL=$(sha256sum "target/deploy/${PROGRAM_NAME}.so" "target/idl/${PROGRAM_NAME}.json" | sha256sum | cut -d' ' -f1)
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::build artifact hash ${ACTUAL} does not match '${EXPECTED}' from the build job"
+            exit 1
+          fi
       # On a failure before the authority transfer, this closes the buffer it made.
       - uses: ./.github/actions/deploy-buffers/
         id: deploy-buffers
@@ -213,7 +235,7 @@ jobs:
       # `concurrency` group is not used because GitHub keeps only one pending run per group and
       # cancels the rest, which silently dropped releases when several tags were pushed at once.
       - name: Wait for earlier release runs
-        uses: softprops/turnstyle@v3.3.3
+        uses: softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4 # v3.3.3
         with:
           same-branch-only: false
           poll-interval-seconds: 30
@@ -235,10 +257,11 @@ jobs:
           PROGRAM: ${{ needs.build.outputs.program }}
           PROGRAM_ID: ${{ needs.build.outputs.program-id }}
           MULTISIG: ${{ secrets.MULTISIG }}
+          SPILL: ${{ secrets.DEPLOYER_ADDRESS }}
           BUFFER: ${{ needs.buffers.outputs.buffer }}
           NETWORK: ${{ secrets.SOLANA_DEPLOY_URL }}
         run: |
-          RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs --multisig "$MULTISIG" --program-id "$PROGRAM_ID" --buffer "$BUFFER")
+          RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs --multisig "$MULTISIG" --program-id "$PROGRAM_ID" --spill "$SPILL" --buffer "$BUFFER")
           echo "$RESULT"
           SAME=$(echo "$RESULT" | jq -r '.sameBuffer // empty')
           if [ -n "$SAME" ]; then
@@ -255,7 +278,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Squads program upgrade
-        uses: helium/squads-program-upgrade@v0.5.0
+        uses: helium/squads-program-upgrade@58eb5cf41491c163e857e6ee3dcedb97a2859733 # v0.5.0
         with:
           network-url: "https://api.mainnet-beta.solana.com"
           program-multisig: ${{ secrets.MULTISIG }}
@@ -269,7 +292,7 @@ jobs:
 
       # A second proposal for the same program is open. Signers must reject the old one, or an
       # execute of it after the new one rolls the program back. The annotation and the summary line
-      # are the whole notice: the person who merged the Promotion PR is watching this run.
+      # are the whole notice: the person who pushed the tag is watching this run.
       - name: Report the older pending proposal
         if: needs.wait.outputs.pending-proposal-index != ''
         env:

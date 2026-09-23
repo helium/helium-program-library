@@ -28,6 +28,8 @@ const fixture = JSON.parse(
 const LAZY_TRANSACTIONS = "1atrmQs3eq1N2FEYWu6tyTXbCjP4uQwExpjtnhXtS8h";
 const LAZY_DISTRIBUTOR = "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w";
 const PENDING_BUFFER = "FuC5CA8q9QLoWURPtABjHpPbW3rcgX8EaXcBd1DxUzH4";
+// The spill account of the recorded upgrade at index 163.
+const SPILL = new PublicKey("propu8J469CCZuBxerEm3Yrzx1NDNSFkkn7SYD8MEyz");
 
 const getMultipleAccountsInfo = async (keys) =>
   keys.map((key) => {
@@ -40,11 +42,12 @@ const getMultipleAccountsInfo = async (keys) =>
       : null;
   });
 
-const read = (programId) =>
+const read = (programId, spill = SPILL) =>
   pendingUpgrades({
     getMultipleAccountsInfo,
     multisigPda: new PublicKey(fixture.multisig),
     programId: new PublicKey(programId),
+    spill,
   });
 
 test("an Active upgrade proposal for the program is pending, with its buffer", async () => {
@@ -63,6 +66,7 @@ test("a missing multisig account is an error, not an empty list", async () => {
       getMultipleAccountsInfo: async (keys) => keys.map(() => null),
       multisigPda: new PublicKey(fixture.multisig),
       programId: new PublicKey(LAZY_TRANSACTIONS),
+      spill: SPILL,
     }),
     /multisig account .* not found/,
   );
@@ -146,10 +150,12 @@ const withProposal = (
         ),
       multisigPda,
       programId: new PublicKey(programId),
+      spill: SPILL,
     });
 };
 
 const OTHER_BUFFER = new PublicKey(LAZY_DISTRIBUTOR);
+const OTHER_SPILL = new PublicKey(LAZY_DISTRIBUTOR);
 const onBuffer = (buffer) => (message) => ({
   ...message,
   accountKeys: message.accountKeys.map((key, i) => (i === 5 ? buffer : key)),
@@ -229,14 +235,119 @@ test("a loader instruction that is not an upgrade is not pending", async () => {
 });
 
 test("an account at the transaction address that is not a vault transaction is not pending", async () => {
-  const pending = await withProposal(
-    150,
-    "Approved",
-    undefined,
-    (data) => data.fill(0, 0, 8),
+  const pending = await withProposal(150, "Approved", undefined, (data) =>
+    data.fill(0, 0, 8),
   )(LAZY_TRANSACTIONS);
   assert.deepEqual(
     pending.map((p) => p.index),
     [163],
+  );
+});
+
+test("a proposal with another spill is not the same-buffer proposal", async () => {
+  const pending = await read(LAZY_TRANSACTIONS, OTHER_SPILL);
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: null,
+    older: [163],
+  });
+});
+
+// The recorded IDL instruction is SetBuffer (variant 3) with accounts
+// (buffer, idl, authority). `edit` rewrites it.
+const onIdl = (edit) => (message) => ({
+  ...message,
+  instructions: message.instructions.map((ix) =>
+    Buffer.from(ix.data).subarray(0, 8).equals(IDL_IX_TAG) ? edit(ix) : ix,
+  ),
+});
+const IDL_IX_TAG = Buffer.from([
+  0x40, 0xf4, 0xbc, 0x78, 0xa7, 0xe9, 0x69, 0x0a,
+]);
+const withIdlVariant = (variant) => (ix) => {
+  const data = Buffer.from(ix.data);
+  data[8] = variant;
+  return { ...ix, data: new Uint8Array(data) };
+};
+
+test("an IDL SetAuthority makes the proposal not exact", async () => {
+  const pending = await withProposal(
+    150,
+    "Approved",
+    onIdl(withIdlVariant(4)),
+  )(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.exact]),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an IDL Close to a destination that is not the vault makes the proposal not exact", async () => {
+  // Account index 6 is the spill, not the vault.
+  const pending = await withProposal(
+    150,
+    "Approved",
+    onIdl((ix) => ({
+      ...withIdlVariant(5)(ix),
+      accountIndexes: new Uint8Array([2, 0, 6]),
+    })),
+  )(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.exact]),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an IDL SetBuffer with an authority that is not the vault makes the proposal not exact", async () => {
+  // Account index 6 is the spill, not the vault.
+  const pending = await withProposal(
+    150,
+    "Approved",
+    onIdl((ix) => ({ ...ix, accountIndexes: new Uint8Array([2, 3, 6]) })),
+  )(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.exact]),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an Upgrade whose authority is not the vault makes the proposal not exact", async () => {
+  // The recorded Upgrade's accounts; account index 6 is the spill, not the vault.
+  const pending = await withProposal(150, "Approved", (message) => ({
+    ...message,
+    instructions: message.instructions.map((ix) =>
+      Buffer.from(ix.data).equals(Buffer.from([3, 0, 0, 0]))
+        ? { ...ix, accountIndexes: new Uint8Array([4, 1, 5, 6, 8, 9, 6]) }
+        : ix,
+    ),
+  }))(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.exact]),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an otherwise exact proposal at vault index 1 is not exact", async () => {
+  // vault_index is the u8 after the discriminator, multisig, creator, index and bump.
+  const pending = await withProposal(150, "Approved", undefined, (data) =>
+    data.writeUInt8(1, 8 + 32 + 32 + 8 + 1),
+  )(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.buffer, p.exact]),
+    [
+      [150, PENDING_BUFFER, false],
+      [163, PENDING_BUFFER, true],
+    ],
   );
 });

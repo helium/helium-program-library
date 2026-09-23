@@ -2,7 +2,7 @@
  * Compare each program's on-chain hash with its release hashes.
  *
  * A read-only witness, run on a schedule. It takes no action: it reports
- * deployed, pending, or unknown binary per program, and prints one JSON object
+ * deployed, pending, rolled back, or unknown binary per program, and prints one JSON object
  * for the workflow to turn into a run summary and annotations.
  *
  * A program whose releases carry no `<name>.so.sha256` asset is skipped, not
@@ -23,6 +23,12 @@ const REPO = process.env.GITHUB_REPOSITORY ?? "helium/helium-program-library";
 // loose parse reads a program or a version out of all three.
 const PROGRAM_TAG = /^program-([a-z0-9]+(?:-[a-z0-9]+)*)-(\d+\.\d+\.\d+)$/;
 
+/** The program name and version a `program-<name>-<x.y.z>` tag names, or null. */
+export const parseProgramTag = (tag) => {
+  const match = PROGRAM_TAG.exec(tag ?? "");
+  return match ? { name: match[1], version: match[2] } : null;
+};
+
 // A vote and an execute take time, so a pending upgrade is normal for a few days.
 const PENDING_NOTICE_DAYS = 3;
 
@@ -42,14 +48,16 @@ const ageInDays = (taggedAt, now) =>
  * `releases` are that program's releases, each with the release hash from its
  * `<name>.so.sha256` asset. `onChainHash` is what the chain holds.
  * `preHashDeploy` is true when the program also has tags whose release carries
- * no hash asset and the last deploy predates the oldest hashed release: the
- * chain may still run one of those unhashed tags.
+ * no hash asset and the last upgrade predates the oldest hashed release: the
+ * chain may still run one of those unhashed tags. `deployedAt` is the last
+ * upgrade time, or null when it was not read.
  */
 export const classify = ({
   releases,
   onChainHash,
   now,
   preHashDeploy = false,
+  deployedAt = null,
 }) => {
   const sorted = [...releases].sort(byVersionDesc);
   const newest = sorted[0];
@@ -66,6 +74,18 @@ export const classify = ({
     !sorted.some((release) => release.hash === onChainHash)
   ) {
     return { status: "unknown binary", version: newest.version };
+  }
+  // An older release deployed after the newest one was created is a rollback,
+  // not an upgrade that has yet to execute. An older proposal that executes
+  // after a newer release was tagged also reads as rolled back, so a person
+  // must look at it.
+  const matched = sorted.find((release) => release.hash === onChainHash);
+  if (
+    matched &&
+    deployedAt !== null &&
+    deployedAt.getTime() > new Date(newest.taggedAt).getTime()
+  ) {
+    return { status: "rolled back", version: matched.version };
   }
   return {
     status: "pending",
@@ -112,10 +132,8 @@ const programTags = () =>
     .split("\n")
     .flatMap((line) => {
       const [tag, taggedAt] = line.split("\t");
-      const match = PROGRAM_TAG.exec(tag ?? "");
-      return match
-        ? [{ tag, taggedAt, name: match[1], version: match[2] }]
-        : [];
+      const parsed = parseProgramTag(tag);
+      return parsed ? [{ tag, taggedAt, ...parsed }] : [];
     });
 
 const githubJson = async (path) => {
@@ -182,28 +200,74 @@ const rpc = async (url, method, params) => {
   return result;
 };
 
+const UPGRADEABLE_LOADER = "BPFLoaderUpgradeab1e11111111111111111111111";
+
 /**
- * When the program was last deployed, or null. The program account names its
- * ProgramData account, whose header is a u32 enum tag, then the u64 LE slot of
- * the last deploy.
+ * Whether a `jsonParsed` transaction upgrades or first deploys a program. Pure.
+ * Squads executes the upgrade as a CPI, so the inner instructions count too.
+ * An ExtendProgram alone is not an upgrade.
  */
-const lastDeployTime = async (url, programId) => {
+export const isUpgradeTransaction = (tx) =>
+  [
+    ...(tx?.transaction?.message?.instructions ?? []),
+    ...(tx?.meta?.innerInstructions ?? []).flatMap(
+      (inner) => inner.instructions,
+    ),
+  ].some(
+    (ix) =>
+      ix.programId === UPGRADEABLE_LOADER &&
+      ["upgrade", "deployWithMaxDataLen"].includes(ix.parsed?.type),
+  );
+
+/**
+ * When the program was last upgraded, or null. The ProgramData header slot is
+ * not used: `solana program extend` before the vote rewrites it. The last
+ * upgrade transaction touches the ProgramData account, so its signatures hold it.
+ */
+export const lastUpgradeTime = async (url, programId, since) => {
   const program = await rpc(url, "getAccountInfo", [
     programId,
     { encoding: "jsonParsed" },
   ]);
   const programData = program?.value?.data?.parsed?.info?.programData;
   if (!programData) return null;
-  const header = await rpc(url, "getAccountInfo", [
-    programData,
-    { encoding: "base64", dataSlice: { offset: 4, length: 8 } },
-  ]);
-  if (!header?.value) return null;
-  const slot = Number(
-    Buffer.from(header.value.data[0], "base64").readBigUInt64LE(0),
-  );
-  const blockTime = await rpc(url, "getBlockTime", [slot]);
-  return blockTime === null ? null : new Date(blockTime * 1000);
+  let before;
+  let seen = 0;
+  for (;;) {
+    const signatures = await rpc(url, "getSignaturesForAddress", [
+      programData,
+      { limit: 50, ...(before ? { before } : {}) },
+    ]);
+    if (!signatures.length) return null;
+    for (const { signature, err, blockTime } of signatures) {
+      if (++seen > 1000) {
+        throw new Error(
+          `${programId}: no upgrade in the last 1000 ProgramData signatures`,
+        );
+      }
+      // No upgrade is newer than this signature, and it predates every
+      // release, so its time bounds the upgrade time from above.
+      if (blockTime != null && blockTime * 1000 < since.getTime()) {
+        return new Date(blockTime * 1000);
+      }
+      if (err !== null) continue;
+      const tx = await rpc(url, "getTransaction", [
+        signature,
+        { encoding: "jsonParsed", maxSupportedTransactionVersion: 1 },
+      ]);
+      // Moving on would return an older time and could mark an unknown binary
+      // as pending, so a transaction the RPC cannot serve is an error.
+      if (tx === null) {
+        throw new Error(
+          `${programId}: getTransaction returned null for ${signature}`,
+        );
+      }
+      if (isUpgradeTransaction(tx)) {
+        return tx.blockTime == null ? null : new Date(tx.blockTime * 1000);
+      }
+    }
+    before = signatures[signatures.length - 1].signature;
+  }
 };
 
 const main = async () => {
@@ -229,10 +293,30 @@ const main = async () => {
         hasUnhashedTags = true;
       }
     }
-    // A null block time counts as a later deploy, so the check fails closed.
+    // No release hash to compare with, so the chain is not read either.
+    const chainHash = published.length
+      ? onChainHash(program.programId, url)
+      : null;
+    const [newest] = [...published].sort(byVersionDesc);
+    const matchesOlder =
+      chainHash !== null &&
+      chainHash !== newest.hash &&
+      published.some((release) => release.hash === chainHash);
+    // A null time means no upgrade was found in the whole history, so an
+    // older-release match stays pending.
     const deployedAt =
-      published.length && hasUnhashedTags
-        ? await lastDeployTime(url, program.programId)
+      published.length && (hasUnhashedTags || matchesOlder)
+        ? await lastUpgradeTime(
+            url,
+            program.programId,
+            new Date(
+              Math.min(
+                ...published.map((release) =>
+                  new Date(release.taggedAt).getTime(),
+                ),
+              ),
+            ),
+          )
         : null;
     const preHashDeploy =
       deployedAt !== null &&
@@ -240,13 +324,13 @@ const main = async () => {
         (release) =>
           deployedAt.getTime() < new Date(release.taggedAt).getTime(),
       );
-    // No release hash to compare with, so the chain is not read either.
     const result = published.length
       ? classify({
           releases: published,
-          onChainHash: onChainHash(program.programId, url),
+          onChainHash: chainHash,
           now,
           preHashDeploy,
+          deployedAt,
         })
       : { status: "skipped" };
     results.push({
@@ -256,9 +340,6 @@ const main = async () => {
     });
   }
 
-  // Issue 53 reads the OtterSec `/status` of every `deployed` entry here and
-  // submits a remote job when `is_verified` is false. Each entry carries the
-  // program id it needs.
   console.log(
     JSON.stringify({
       programs: results,
@@ -270,7 +351,8 @@ const main = async () => {
 /**
  * The `::warning::` bodies this run prints. Silent unless a person must act.
  *
- * An unknown binary is not here: it fails the run through its own step.
+ * An unknown binary and a rollback are not here: each fails the run through
+ * its own step.
  */
 export const notice = (result) => {
   if (result.status === "pending" && result.notify) {

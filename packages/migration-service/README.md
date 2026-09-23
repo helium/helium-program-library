@@ -13,4 +13,4 @@ Image: `public.ecr.aws/v0j6k5v6/migration-service`
 | web-cluster / prod | [manifests/web-cluster/prod/helium/migration-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/migration-service.yaml) |
 | web-cluster / sdlc | [manifests/web-cluster/sdlc/helium/migration-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/sdlc/helium/migration-service.yaml) |
 
-Deploy: the service auto-tag bot pushes `docker-web-migration-service-<version>` on each merge to `develop` that changes it. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The k8s bump stays manual.
+Image release: the service auto-tag bot pushes `docker-web-migration-service-<version>` on each merge to `develop` that changes it. Push the tag by hand for a hotfix, a minor, or a major (see [repo README](../../README.md#deploying-docker-services)). The service deploy (the k8s bump) stays manual.

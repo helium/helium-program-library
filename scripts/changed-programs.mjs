@@ -179,7 +179,9 @@ const run = (command, args) =>
   });
 
 const diffFiles = (base, head) =>
-  run("git", ["diff", "--name-only", base, head]).split("\n").filter(Boolean);
+  run("git", ["diff", "--name-only", "--no-renames", base, head])
+    .split("\n")
+    .filter(Boolean);
 
 const parseArgs = (argv) => {
   const positional = [];

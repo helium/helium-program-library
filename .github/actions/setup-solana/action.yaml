@@ -5,12 +5,16 @@ inputs:
     description: "Solana CLI version to install when SOLANA_CLI_VERSION is unset"
     required: false
     default: "2.1.6"
+  cache:
+    description: "Restore and save the Solana tool suite cache"
+    default: "true"
 runs:
   using: "composite"
   steps:
       - uses: actions/cache@v4
         name: Cache Solana Tool Suite
         id: cache-solana
+        if: inputs.cache == 'true'
         with:
           path: |
             ~/.cache/solana/

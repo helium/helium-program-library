@@ -15,7 +15,7 @@ runs:
           ./packages/idls/lib
           ./target/idl
           ./target/types
-        key: idls-lib-${{ runner.os }}-v0001-${{ env.ANCHOR_VERSION }}-${{ hashFiles('programs/**/*.rs', 'programs/**/Cargo.toml', 'Cargo.lock', 'Anchor.toml') }}
+        key: idls-lib-${{ runner.os }}-v0001-${{ env.ANCHOR_VERSION }}-${{ hashFiles('programs/**/*.rs', 'programs/**/Cargo.toml', 'utils/**/*.rs', 'utils/**/Cargo.toml', 'utils/**/idls/**', 'Cargo.lock', 'Anchor.toml') }}
         restore-keys: |
           idls-lib-${{ runner.os }}-v0001-${{ env.ANCHOR_VERSION }}-
 

@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { missingBumpCheck } from "./missing-bump-check.mjs";
+import { missingBumpCheck, taggedVersions } from "./missing-bump-check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -171,4 +171,19 @@ test("a tests-only change since the tag passes", () => {
   assert.equal(ok, true);
   assert.equal(results[0].status, "clean");
   assert.equal(results[0].base, "fanout-tag");
+});
+
+test("only exact program-<name>-<x.y.z> tags of the program name its versions", () => {
+  assert.deepEqual(
+    taggedVersions("fanout", [
+      "program-fanout-0.1.0",
+      "vprogram-fanout-0.1.1",
+      "v0.1.2",
+      "program-fanout-0.1.3-test",
+      "program-fanuot-0.1.4",
+      "program-fanout-extra-0.1.5",
+      "",
+    ]),
+    ["0.1.0"],
+  );
 });

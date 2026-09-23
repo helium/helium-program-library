@@ -102,7 +102,10 @@ const entities = (idl) => {
     add(
       "type",
       at,
-      withoutKeys(type.type, ["fields", "variants"]),
+      {
+        ...withoutKeys(type, ["name", "docs", "type"]),
+        ...withoutKeys(type.type, ["fields", "variants"]),
+      },
       type.docs ?? type.type?.docs,
     );
     for (const [index, field] of (type.type?.fields ?? []).entries()) {

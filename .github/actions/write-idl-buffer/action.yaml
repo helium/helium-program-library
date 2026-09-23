@@ -11,6 +11,7 @@
 # - Upstream skips every step when `anchor idl fetch` fails, and the output is then empty.
 #   `helium/squads-program-upgrade` needs an IDL buffer and an IDL account, so here that
 #   failure stops the action. The `buffer != ''` conditions on the later steps are gone with it.
+# - A failure before the buffer authority transfer closes the IDL buffer.
 #
 # The caller installs the Solana and Anchor CLIs first (`setup-anchor` does it).
 name: "Write IDL Buffer"
@@ -152,12 +153,17 @@ runs:
         IDL_BUFFER: ${{ steps.write-buffer.outputs.buffer }}
 
     - name: Set Buffer Authority
+      id: set-buffer-authority
       uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
       with:
         timeout_minutes: 5
         max_attempts: 3
         shell: bash
         command: |
+          if anchor idl authority "$IDL_BUFFER" --provider.cluster "$NETWORK" | grep -q "$AUTHORITY"; then
+            echo "IDL buffer authority is already $AUTHORITY"
+            exit 0
+          fi
           echo "Setting buffer authority..."
           anchor idl set-authority "$IDL_BUFFER" \
             --program-id "$PROGRAM_ID" \
@@ -178,17 +184,47 @@ runs:
         max_attempts: 3
         shell: bash
         command: |
+          if anchor idl authority "$PROGRAM_ID" --provider.cluster "$NETWORK" | grep -q "$AUTHORITY"; then
+            echo "Program IDL authority is already $AUTHORITY"
+            exit 0
+          fi
           echo "Setting program IDL authority..."
           anchor idl set-authority \
             --program-id "$PROGRAM_ID" \
             --new-authority "$AUTHORITY" \
             --provider.cluster "$NETWORK" \
             --priority-fee 100000 \
-            --provider.wallet ./deploy-keypair.json || echo "Failed to set program IDL authority (this is ok if the authority is already set to squads for example)"
+            --provider.wallet ./deploy-keypair.json
       env:
         PROGRAM_ID: ${{ inputs.program-id }}
         NETWORK: ${{ inputs.network }}
         AUTHORITY: ${{ inputs.buffer-authority }}
+
+    # Until the authority transfer the deployer key owns the IDL buffer and can take the rent
+    # back. The address is the one this run made; parallel runs share the deployer key. After
+    # the transfer only a multisig proposal can close it. A failed close warns and leaves the
+    # run's own failure as the result.
+    - name: Close this run's IDL buffer after a failure
+      if: (failure() || cancelled()) && steps.write-buffer.outputs.buffer != '' && steps.set-buffer-authority.outcome != 'success'
+      shell: bash
+      run: |
+        set +e
+        CLOSE_OUT=$(anchor idl close "$PROGRAM_ID" --idl-address "$IDL_BUFFER" --provider.cluster "$NETWORK" --provider.wallet ./deploy-keypair.json 2>&1)
+        EXIT_CODE=$?
+        set -e
+        # The RPC URL is a secret and the CLI puts it in some errors.
+        CLOSE_OUT=${CLOSE_OUT//"$NETWORK"/<rpc-url>}
+        echo "$CLOSE_OUT"
+        if [ "$EXIT_CODE" -eq 0 ]; then
+          echo "- \`$PROGRAM\`: closed IDL buffer \`$IDL_BUFFER\` after the failure. The rent is back with the deployer." >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "::warning::IDL buffer $IDL_BUFFER not closed: $(echo "$CLOSE_OUT" | tail -n 1)"
+        fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        IDL_BUFFER: ${{ steps.write-buffer.outputs.buffer }}
 
     - name: Cleanup
       if: always()
