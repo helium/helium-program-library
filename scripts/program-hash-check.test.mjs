@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  checkProgram,
   classify,
   isUpgradeTransaction,
   lastUpgradeTime,
@@ -435,4 +436,124 @@ test("a v-prefixed tag is not a program tag", () => {
 
 test("a -test suffixed tag is not a program tag", () => {
   assert.equal(parseProgramTag("program-fanout-0.1.0-test"), null);
+});
+
+// Two hashed fanout releases and one unhashed, with the lookups stubbed.
+const FANOUT = { key: "fanout", name: "fanout", programId: "fan" };
+const releaseTag = (version, days) => ({
+  tag: `program-fanout-${version}`,
+  taggedAt: day(days),
+  name: "fanout",
+  version,
+});
+const TAGS = [
+  releaseTag("0.1.1", 20),
+  releaseTag("0.1.2", 9),
+  releaseTag("0.1.3", 2),
+];
+const RELEASES = new Map([
+  ["program-fanout-0.1.1", { created_at: day(20) }],
+  ["program-fanout-0.1.2", { created_at: day(9), hash: "aa" }],
+  ["program-fanout-0.1.3", { created_at: day(2), hash: "bb" }],
+]);
+const lookups = (overrides) => ({
+  tags: TAGS,
+  releases: RELEASES,
+  url: "rpc",
+  now: NOW,
+  releaseHash: async (release) => release?.hash ?? null,
+  onChainHash: () => "aa",
+  lastUpgradeTime: async () => new Date(day(5)),
+  ...overrides,
+});
+
+test("the upgrade time lookup fails: error, and the next program still gets a result", async () => {
+  const results = [];
+  for (const [program, chain] of [
+    [FANOUT, "aa"],
+    [FANOUT, "bb"],
+  ]) {
+    results.push(
+      await checkProgram(
+        program,
+        lookups({
+          onChainHash: () => chain,
+          lastUpgradeTime: async () => {
+            throw new Error("getSignaturesForAddress returned 429");
+          },
+        }),
+      ),
+    );
+  }
+  assert.deepEqual(results, [
+    {
+      program: "fanout",
+      programId: "fan",
+      status: "error",
+      version: "0.1.3",
+      message: "getSignaturesForAddress returned 429",
+    },
+    {
+      program: "fanout",
+      programId: "fan",
+      status: "deployed",
+      version: "0.1.3",
+    },
+  ]);
+});
+
+test("the release hash lookup fails: error", async () => {
+  assert.deepEqual(
+    await checkProgram(
+      FANOUT,
+      lookups({
+        releaseHash: async () => {
+          throw new Error("GET fanout.so.sha256 returned 502");
+        },
+      }),
+    ),
+    {
+      program: "fanout",
+      programId: "fan",
+      status: "error",
+      version: undefined,
+      message: "GET fanout.so.sha256 returned 502",
+    },
+  );
+});
+
+test("a release published after its tag: the published time is the tag time", async () => {
+  // The upgrade at day 5 is after the 0.1.3 commit but before its release went out.
+  const releases = new Map(RELEASES);
+  releases.set("program-fanout-0.1.3", {
+    created_at: day(6),
+    published_at: day(2),
+    hash: "bb",
+  });
+  const result = await checkProgram(FANOUT, lookups({ releases }));
+  assert.equal(result.status, "pending");
+  assert.equal(Math.round(result.tagAgeDays), 2);
+});
+
+test("the chain runs the newest release and older tags are unhashed: deployed, no upgrade time lookup", async () => {
+  let lookedUp = false;
+  assert.deepEqual(
+    await checkProgram(
+      FANOUT,
+      lookups({
+        onChainHash: () => "bb",
+        lastUpgradeTime: async () => {
+          lookedUp = true;
+          return new Date(day(1));
+        },
+      }),
+    ),
+    {
+      program: "fanout",
+      programId: "fan",
+      status: "deployed",
+      version: "0.1.3",
+    },
+  );
+  assert.equal(lookedUp, false);
 });

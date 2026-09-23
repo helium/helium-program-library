@@ -38,6 +38,45 @@ outputs:
 runs:
   using: "composite"
   steps:
+    # `plan-deploy` runs workspace JavaScript, so the buffer it names is checked again here,
+    # before any step uses it.
+    - name: Check the reused buffer against the build
+      if: inputs.reused-buffer != ''
+      shell: bash
+      run: |
+        set +e
+        SHOW_OUT=$(solana program show "$BUFFER" -u "$NETWORK" --output json 2>&1)
+        EXIT_CODE=$?
+        set -e
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          # The RPC URL is a secret and the CLI puts it in some errors.
+          echo "${SHOW_OUT//"$NETWORK"/<rpc-url>}"
+          echo "::error::Could not read the reused buffer $BUFFER"
+          exit 1
+        fi
+        BUFFER_AUTHORITY=$(echo "$SHOW_OUT" | jq -r '.authority')
+        if [ "$BUFFER_AUTHORITY" != "$AUTHORITY" ]; then
+          echo "::error::The reused buffer $BUFFER has authority $BUFFER_AUTHORITY, not the buffer authority"
+          exit 1
+        fi
+
+        DUMPED_BUFFER=$(mktemp ./buffer-dump.XXXXXX.so)
+        trap 'rm -f "$DUMPED_BUFFER"' EXIT
+        if ! solana program dump "$BUFFER" "$DUMPED_BUFFER" -u "$NETWORK" > /dev/null 2>&1; then
+          echo "::error::Could not dump the reused buffer $BUFFER"
+          exit 1
+        fi
+        if ! cmp -s "./target/deploy/$PROGRAM.so" "$DUMPED_BUFFER"; then
+          echo "::error::The reused buffer $BUFFER does not match ./target/deploy/$PROGRAM.so"
+          exit 1
+        fi
+        echo "The reused buffer $BUFFER matches the build and has the buffer authority"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        BUFFER: ${{ inputs.reused-buffer }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+        NETWORK: ${{ inputs.network }}
+
     # On a failure before the authority transfer, this action closes the buffer it made.
     - uses: ./.github/actions/write-program-buffer/
       id: write-program-buffer

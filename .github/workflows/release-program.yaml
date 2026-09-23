@@ -111,6 +111,7 @@ jobs:
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
           cache: false
+          setup-anchor: false
 
       # The release hash. The scheduled hash check compares the on-chain program with it. The
       # release carries it before `plan-deploy`, so a run that the hash-match skip stops still has it.

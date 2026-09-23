@@ -2,8 +2,8 @@
  * Compare each program's on-chain hash with its release hashes.
  *
  * A read-only witness, run on a schedule. It takes no action: it reports
- * deployed, pending, rolled back, or unknown binary per program, and prints one JSON object
- * for the workflow to turn into a run summary and annotations.
+ * deployed, pending, rolled back, unknown binary, or error (a failed lookup) per program,
+ * and prints one JSON object for the workflow to turn into a run summary and annotations.
  *
  * A program whose releases carry no `<name>.so.sha256` asset is skipped, not
  * failed: a program enters the check at its first release through the new flow.
@@ -118,7 +118,7 @@ const localnetPrograms = (anchorToml) => {
 /**
  * Every `program-<name>-<x.y.z>` tag with its creator date. For a lightweight
  * tag that is the commit date. A release's `created_at` is the same date, so
- * `main` prefers `published_at`, the time the release went out.
+ * `checkProgram` prefers `published_at`, the time the release went out.
  */
 const programTags = () =>
   execFileSync(
@@ -273,19 +273,33 @@ export const lastUpgradeTime = async (url, programId, since) => {
   }
 };
 
-const main = async () => {
-  const url = process.env.SOLANA_URL || DEFAULT_RPC;
-  const now = new Date();
-  const releases = await releasesByTag();
-  const tags = programTags();
-
-  const results = [];
-  for (const program of localnetPrograms(readFileSync("Anchor.toml", "utf8"))) {
-    const published = [];
-    let hasUnhashedTags = false;
+/**
+ * One program's result. The release, chain and upgrade-time lookups default to
+ * the reads above; a test passes its own.
+ */
+export const checkProgram = async (
+  program,
+  {
+    tags,
+    releases,
+    url,
+    now,
+    releaseHash: readReleaseHash = releaseHash,
+    onChainHash: readOnChainHash = onChainHash,
+    lastUpgradeTime: readLastUpgradeTime = lastUpgradeTime,
+  },
+) => {
+  const published = [];
+  let hasUnhashedTags = false;
+  // A null time means no upgrade was found in the whole history, so an
+  // older-release match stays pending.
+  let deployedAt = null;
+  let newest;
+  // One program's failed lookup must not blank the report for the others.
+  try {
     for (const tag of tags.filter((t) => t.name === program.name)) {
       const release = releases.get(tag.tag);
-      const hash = await releaseHash(release, program.key);
+      const hash = await readReleaseHash(release, program.key);
       if (hash) {
         published.push({
           ...tag,
@@ -298,40 +312,27 @@ const main = async () => {
     }
     // No release hash to compare with, so the chain is not read either.
     const chainHash = published.length
-      ? onChainHash(program.programId, url)
+      ? readOnChainHash(program.programId, url)
       : null;
-    const [newest] = [...published].sort(byVersionDesc);
+    [newest] = [...published].sort(byVersionDesc);
     const matchesOlder =
       chainHash !== null &&
       chainHash !== newest.hash &&
       published.some((release) => release.hash === chainHash);
-    // A null time means no upgrade was found in the whole history, so an
-    // older-release match stays pending.
-    let deployedAt = null;
-    if (published.length && (hasUnhashedTags || matchesOlder)) {
-      // One program's failed lookup must not blank the report for the others.
-      try {
-        deployedAt = await lastUpgradeTime(
-          url,
-          program.programId,
-          new Date(
-            Math.min(
-              ...published.map((release) =>
-                new Date(release.taggedAt).getTime(),
-              ),
-            ),
+    if (
+      published.length &&
+      chainHash !== newest.hash &&
+      (hasUnhashedTags || matchesOlder)
+    ) {
+      deployedAt = await readLastUpgradeTime(
+        url,
+        program.programId,
+        new Date(
+          Math.min(
+            ...published.map((release) => new Date(release.taggedAt).getTime()),
           ),
-        );
-      } catch (error) {
-        results.push({
-          program: program.name,
-          programId: program.programId,
-          status: "error",
-          version: newest.version,
-          message: String(error?.message ?? error),
-        });
-        continue;
-      }
+        ),
+      );
     }
     const preHashDeploy =
       deployedAt !== null &&
@@ -348,11 +349,31 @@ const main = async () => {
           deployedAt,
         })
       : { status: "skipped" };
-    results.push({
+    return {
       program: program.name,
       programId: program.programId,
       ...result,
-    });
+    };
+  } catch (error) {
+    return {
+      program: program.name,
+      programId: program.programId,
+      status: "error",
+      version: newest?.version,
+      message: String(error?.message ?? error),
+    };
+  }
+};
+
+const main = async () => {
+  const url = process.env.SOLANA_URL || DEFAULT_RPC;
+  const now = new Date();
+  const releases = await releasesByTag();
+  const tags = programTags();
+
+  const results = [];
+  for (const program of localnetPrograms(readFileSync("Anchor.toml", "utf8"))) {
+    results.push(await checkProgram(program, { tags, releases, url, now }));
   }
 
   console.log(

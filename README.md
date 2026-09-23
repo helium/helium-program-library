@@ -322,7 +322,7 @@ The deployer key reaches only the jobs that write buffers and open the proposal.
 
 A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. A runner that dies there leaves the buffers with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) runs each week, closes the program buffers and IDL buffers the deployer key still owns, and returns the rent. It stops while a release runs.
 
-[`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) runs each day and compares each program's on-chain hash with its release hashes. Each program reads as deployed, pending, unknown binary, or rolled back. A pending program gets a warning when its newest tag is more than 3 days old. An unknown binary or a rollback fails the run. To quiet a rejected proposal, delete that release's `.so.sha256` asset.
+[`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) runs each day and compares each program's on-chain hash with its release hashes. Each program reads as deployed, pending, unknown binary, rolled back, or error when a lookup fails. A pending program gets a warning when its newest tag is more than 3 days old. An unknown binary, a rollback, or a lookup error fails the run. To quiet a rejected proposal, delete that release's `.so.sha256` asset.
 
 **`helium-admin close-buffers`: run it only when no upgrade proposal is pending.**
 

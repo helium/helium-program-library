@@ -16,7 +16,11 @@ inputs:
     description: "The program id of the program we are uploading"
     required: true
   cache:
-    description: "Restore and save the Anchor and Solana CLI caches"
+    description: "Restore and save the Anchor, Solana CLI, toml, solana-verify and Cargo registry caches"
+    required: false
+    default: "true"
+  setup-anchor:
+    description: "Run setup-anchor; pass false when an earlier step in the job already ran it"
     required: false
     default: "true"
 
@@ -27,6 +31,7 @@ runs:
     - uses: ./.github/actions/setup-anchor/
       with:
         cache: ${{ inputs.cache }}
+      if: inputs.setup-anchor == 'true'
     - uses: actions/cache@v4
       name: Cache Cargo registry + index
       id: cache-cargo-registry

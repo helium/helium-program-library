@@ -9,7 +9,7 @@ inputs:
     description: "The program to build the IDL for (snake_case, as in Anchor.toml)"
     required: true
   cache:
-    description: "Restore and save the Anchor and Solana CLI caches"
+    description: "Restore and save the Anchor, Solana CLI, toml and Cargo registry caches"
     required: false
     default: "true"
 runs:

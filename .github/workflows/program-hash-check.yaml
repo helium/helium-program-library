@@ -72,6 +72,19 @@ jobs:
           echo "rolled-back=$ROLLED_BACK" >> "$GITHUB_OUTPUT"
           ERRORS=$(echo "$RESULT" | jq -r '[.programs[] | select(.status == "error") | .program] | join(",")')
           echo "errors=$ERRORS" >> "$GITHUB_OUTPUT"
+          SKIPPED=$(echo "$RESULT" | jq -r '[.programs[] | select(.status == "skipped") | .program] | join(",")')
+          echo "skipped=$SKIPPED" >> "$GITHUB_OUTPUT"
+
+      # A skipped program is compared with nothing, so a run that skips every program is
+      # green while it checks nothing. The run stays green, and one warning names them. It
+      # is its own step because the check step can use all ten of its warning annotations.
+      - name: Warn on skipped programs
+        if: steps.check.outputs.skipped != ''
+        env:
+          SKIPPED: ${{ steps.check.outputs.skipped }}
+        run: |
+          IFS=',' read -ra PROGRAMS <<< "$SKIPPED"
+          echo "::warning title=Skipped programs::${#PROGRAMS[@]} programs have no <name>.so.sha256 release asset yet: ${SKIPPED//,/, }"
 
       # A program the chain holds that no release published. Nothing here acts on it; the
       # run fails so the check does not stay green while the question is open.

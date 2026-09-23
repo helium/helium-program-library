@@ -5,7 +5,7 @@ inputs:
     description: "Install the toml CLI"
     default: "true"
   cache:
-    description: "Restore and save the Anchor and Solana CLI caches"
+    description: "Restore and save the Anchor, Solana CLI and toml caches"
     default: "true"
 runs:
   using: "composite"
@@ -32,7 +32,7 @@ runs:
     - uses: actions/cache@v4
       name: Cache Toml Cli
       id: cache-toml-cli
-      if: inputs.toml-cli == 'true'
+      if: inputs.toml-cli == 'true' && inputs.cache == 'true'
       with:
         path: |
           ~/.cargo/bin/toml

@@ -114,6 +114,7 @@ jobs:
           devnet: true
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
+          setup-anchor: false
 
       - name: Store so files
         uses: actions/upload-artifact@v4
