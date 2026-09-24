@@ -1,9 +1,10 @@
 name: Changeset Bot
 
-# Writes the changesets a PR is missing, by fixed rules, and commits them to
-# the PR branch through the GitHub API under the App token. One job: detect,
-# write, commit. The rules and their invariants live in
-# scripts/write-changesets.mjs and its tests.
+# Finds and writes the changesets a PR is missing, by fixed rules, and holds
+# no secret: it runs the PR's own code. It hands the files to
+# changeset-bot-commit.yaml as an artifact, and that workflow commits them.
+# The rules and their invariants live in scripts/write-changesets.mjs and its
+# tests.
 env:
   # Dry run until go-live. A workflow_dispatch run overrides it.
   DRY_RUN: true
@@ -67,8 +68,8 @@ jobs:
         run: echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
 
       # The head the run works from. A pull_request event names it; a dispatch
-      # run has no payload and asks the API. The same sha is the commit's
-      # expected head below, so a branch that moved fails the commit.
+      # run has no payload and asks the API. changeset-bot-commit.yaml commits
+      # against the same sha, so a branch that moved fails the commit.
       - name: Resolve the pull request
         id: pr
         env:
@@ -197,26 +198,37 @@ jobs:
             done
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # The App token, so tests.yaml and the backstop start on the bot's
-      # commit. A GITHUB_TOKEN commit starts no workflow.
-      # Scoped to what this job does: commits to the PR branch.
-      - name: Get an App token
-        id: app-token
-        if: steps.missing.outputs.run == 'true' && steps.mode.outputs.dry_run != 'true'
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          permission-contents: write
+      # The commit workflow runs no PR code and trusts none of this: it checks
+      # each field against the event and the PR before it commits.
+      - name: Stage the changesets for the commit
+        if: steps.missing.outputs.run == 'true'
+        env:
+          FILES: ${{ steps.write.outputs.files }}
+          NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_REF: ${{ steps.pr.outputs.head-ref }}
+          HEAD_SHA: ${{ steps.pr.outputs.head-sha }}
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
+        run: |
+          out="$RUNNER_TEMP/changesets"
+          mkdir -p "$out/files"
+          jq -n \
+            --arg number "$NUMBER" \
+            --arg headRef "$HEAD_REF" \
+            --arg headSha "$HEAD_SHA" \
+            --arg dryRun "$DRY_RUN_EFFECTIVE" \
+            '{number: $number, headRef: $headRef, headSha: $headSha, dryRun: $dryRun}' \
+            > "$out/meta.json"
+          for file in $FILES; do
+            mkdir -p "$out/files/$(dirname "$file")"
+            cp "$file" "$out/files/$file"
+          done
 
-      # The API form of a no-force push: when the branch moved past the head
-      # this run saw, the commit fails and the newer run writes the files.
-      - name: Commit to the PR branch
-        if: steps.missing.outputs.run == 'true' && steps.mode.outputs.dry_run != 'true'
-        uses: ./.github/actions/api-commit
+      # Hidden files included: every path starts with `.changeset`.
+      - name: Upload the changesets
+        if: steps.missing.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          token: ${{ steps.app-token.outputs.token }}
-          branch: ${{ steps.pr.outputs.head-ref }}
-          headline: "chore: add changesets"
-          paths: ${{ steps.write.outputs.files }}
-          expected-head-oid: ${{ github.event.pull_request.head.sha || steps.pr.outputs.head-sha }}
+          name: changesets
+          path: ${{ runner.temp }}/changesets
+          retention-days: 1
+          include-hidden-files: true

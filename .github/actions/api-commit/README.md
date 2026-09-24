@@ -7,7 +7,7 @@ authored by the App's bot user and carries the **Verified** badge. Nothing in
 the workflow holds a signing key.
 
 The bots that write a commit use it: the program release PR
-(`version-programs.yaml`) and the changeset bot (`changeset-bot.yaml`). The tag
+(`version-programs.yaml`) and the changeset bot (`changeset-bot-commit.yaml`). The tag
 bots still `git push` a lightweight tag, which has no badge to lose.
 
 ## Inputs
