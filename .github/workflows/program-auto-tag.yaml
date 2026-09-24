@@ -57,7 +57,10 @@ jobs:
         id: mode
         env:
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
-        run: echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+        run: |
+          # Fail closed: only a literal `false` writes, so a missing or mistyped flag is a dry run.
+          if [ "${INPUT_DRY_RUN:-$DRY_RUN}" = "false" ]; then dry_run=false; else dry_run=true; fi
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
 
       - name: List the missing program tags
         id: list

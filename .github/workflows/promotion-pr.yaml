@@ -55,13 +55,18 @@ jobs:
             echo "::notice::$GITHUB_REF is not develop, so this run is a dry run whatever the input says."
             echo "dry_run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+            # Fail closed: only a literal `false` writes, so a missing or mistyped flag is a dry run.
+            if [ "${INPUT_DRY_RUN:-$DRY_RUN}" = "false" ]; then dry_run=false; else dry_run=true; fi
+            echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
           fi
 
+      # Changed files, not commits: a back-merge leaves a merge commit on
+      # develop that master lacks while the trees are equal, and that must not
+      # open an empty Promotion PR.
       - name: Is develop ahead of master?
         id: ahead
         run: |
-          count=$(git rev-list --count --no-merges origin/master..HEAD)
+          count=$(git diff --name-only origin/master HEAD | wc -l | tr -d ' ')
           echo "count=$count" >> "$GITHUB_OUTPUT"
           if [ "$count" -eq 0 ]; then
             echo "develop is not ahead of master. No Promotion PR." >> "$GITHUB_STEP_SUMMARY"
@@ -112,7 +117,7 @@ jobs:
             if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
               echo "## Promotion PR (dry run)"
               echo
-              echo "No PR was opened or edited. develop is $COUNT commits ahead of master, and the body below is what the PR would carry."
+              echo "No PR was opened or edited. develop differs from master in $COUNT files, and the body below is what the PR would carry."
             else
               echo "## Promotion PR"
             fi

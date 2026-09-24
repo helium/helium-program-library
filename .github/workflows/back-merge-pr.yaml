@@ -1,9 +1,10 @@
 name: Back-merge PR
 
-# A hotfix merged straight to master leaves master ahead of develop, and the
-# up-to-date rule then blocks every promotion. This opens the master -> develop
-# PR that fixes that. A person merges it, with a merge commit; the bot never
-# merges, never approves and never pushes to develop.
+# Every promotion leaves master ahead of develop, as its merge commit lands
+# only on master; so does a hotfix merged straight to master. The up-to-date
+# rule then blocks the next promotion. This opens the master -> develop PR that
+# fixes that. A person merges it, with a merge commit; the bot never merges,
+# never approves and never pushes to develop.
 env:
   # Dry run until go-live. A workflow_dispatch run overrides it.
   DRY_RUN: true
@@ -51,15 +52,17 @@ jobs:
             echo "::notice::$GITHUB_REF is not master, so this run is a dry run whatever the input says."
             echo "dry_run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+            # Fail closed: only a literal `false` writes, so a missing or mistyped flag is a dry run.
+            if [ "${INPUT_DRY_RUN:-$DRY_RUN}" = "false" ]; then dry_run=false; else dry_run=true; fi
+            echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
           fi
 
-      # Promotion merge commits are not counted, so the count is empty after a
-      # promotion merge and non-empty only when a hotfix reached master.
+      # Merge commits count: a promotion's merge commit lands only on master,
+      # and develop must hold it before the next promotion can merge.
       - name: Does master hold commits develop lacks?
         id: ahead
         run: |
-          count=$(git rev-list --count --no-merges origin/develop..HEAD)
+          count=$(git rev-list --count origin/develop..HEAD)
           echo "count=$count" >> "$GITHUB_OUTPUT"
           {
             echo "## Back-merge PR"
@@ -74,7 +77,7 @@ jobs:
         if: steps.ahead.outputs.count != '0'
         run: |
           {
-            echo "Brings the hotfixes on \`master\` back to \`develop\`. Merge it with a merge commit: until develop holds master, the up-to-date rule on master blocks every Promotion PR."
+            echo "Brings \`master\` back to \`develop\`. Merge it with a merge commit: until develop holds master, the up-to-date rule on master blocks every Promotion PR."
             echo
             echo "Commits on master that develop lacks:"
             echo

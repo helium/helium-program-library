@@ -120,7 +120,7 @@ export const promotionPrBody = ({
       ? [
           "## Blocked: back-merge open",
           "",
-          `A hotfix is on its way back to develop in ${backMerge.url}. Merge it first: master must be in develop before this PR can merge.`,
+          `\`master\` is on its way back to develop in ${backMerge.url}. Merge it first: master must be in develop before this PR can merge.`,
           "",
         ]
       : []),

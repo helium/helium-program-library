@@ -53,7 +53,9 @@ jobs:
             echo "::notice::$GITHUB_REF is not develop, so this run is a dry run whatever the input says."
             echo "dry_run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+            # Fail closed: only a literal `false` writes, so a missing or mistyped flag is a dry run.
+            if [ "${INPUT_DRY_RUN:-$DRY_RUN}" = "false" ]; then dry_run=false; else dry_run=true; fi
+            echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check for program changesets
