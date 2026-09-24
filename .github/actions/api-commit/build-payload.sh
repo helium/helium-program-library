@@ -5,7 +5,7 @@
 # nothing and exits 0 when there is nothing to commit.
 #
 # Inputs (environment): GITHUB_REPOSITORY, BRANCH, EXPECTED_HEAD_OID, HEADLINE,
-# and the optional BODY and PATHS. The working directory is the checkout to
+# and the optional PATHS. The working directory is the checkout to
 # commit.
 #
 # File contents reach jq through --rawfile as base64 text, and the body is a
@@ -29,8 +29,11 @@ require headline "${HEADLINE:-}"
 # the caller meant and not whatever else the build left in the checkout. Empty
 # stages everything.
 if [ -n "${PATHS:-}" ]; then
+  # No globbing, so git reads each pathspec and the shell expands none.
+  set -f
   # shellcheck disable=SC2086 # PATHS is a list of pathspecs and must split.
   git add -A -- $PATHS
+  set +f
 else
   git add -A
 fi
@@ -84,7 +87,6 @@ jq -n \
   --arg branch "$BRANCH" \
   --arg head "$EXPECTED_HEAD_OID" \
   --arg headline "$HEADLINE" \
-  --arg body "${BODY:-}" \
   --slurpfile fileChanges "$file_changes" \
   '{
     query: "mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid url } } }",
@@ -92,7 +94,7 @@ jq -n \
       input: {
         branch: {repositoryNameWithOwner: $repo, branchName: $branch},
         expectedHeadOid: $head,
-        message: ({headline: $headline} + (if $body == "" then {} else {body: $body} end)),
+        message: {headline: $headline},
         fileChanges: $fileChanges[0]
       }
     }

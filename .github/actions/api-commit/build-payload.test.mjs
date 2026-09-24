@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -142,21 +148,6 @@ test("a path with bytes past ASCII is not C-quoted", () => {
   );
 });
 
-test("a body becomes the commit message body", () => {
-  const { root, head } = makeRepo({ "a.txt": "a\n" });
-  writeFileSync(path.join(root, "a.txt"), "b\n");
-
-  const { status, stdout, stderr } = build(root, {
-    EXPECTED_HEAD_OID: head,
-    BODY: "Released: helium-sub-daos",
-  });
-  assert.equal(status, 0, stderr);
-  assert.deepEqual(JSON.parse(stdout).variables.input.message, {
-    headline: "chore: version programs",
-    body: "Released: helium-sub-daos",
-  });
-});
-
 test("nothing to commit writes nothing and exits 0", () => {
   const { root, head } = makeRepo({ "a.txt": "a\n" });
 
@@ -165,13 +156,43 @@ test("nothing to commit writes nothing and exits 0", () => {
   assert.equal(stdout, "");
 });
 
-test("an empty expected-head-oid fails before any work", () => {
-  const { root } = makeRepo({ "a.txt": "a\n" });
-  writeFileSync(path.join(root, "a.txt"), "b\n");
+for (const [variable, name] of [
+  ["EXPECTED_HEAD_OID", "expected-head-oid"],
+  ["GITHUB_REPOSITORY", "GITHUB_REPOSITORY"],
+  ["BRANCH", "branch"],
+  ["HEADLINE", "headline"],
+]) {
+  test(`an empty ${name} fails before any work`, () => {
+    const { root, head } = makeRepo({ "a.txt": "a\n" });
+    writeFileSync(path.join(root, "a.txt"), "b\n");
 
-  const { status, stderr } = build(root, { EXPECTED_HEAD_OID: "" });
-  assert.notEqual(status, 0);
-  assert.match(stderr, /expected-head-oid/);
+    const { status, stdout, stderr } = build(root, {
+      EXPECTED_HEAD_OID: head,
+      [variable]: "",
+    });
+    assert.notEqual(status, 0);
+    assert.equal(stdout, "");
+    assert.match(stderr, new RegExp(`${name} is required`));
+  });
+}
+
+test("the changes are computed against the expected head, not HEAD", () => {
+  const { root, head: expected } = makeRepo({ "a.txt": "a\n", "b.txt": "b\n" });
+  writeFileSync(path.join(root, "a.txt"), "committed after\n");
+  git(root, "commit", "--quiet", "-am", "after the expected head");
+  writeFileSync(path.join(root, "b.txt"), "worktree\n");
+
+  const { status, stdout, stderr } = build(root, {
+    EXPECTED_HEAD_OID: expected,
+  });
+  assert.equal(status, 0, stderr);
+
+  const { expectedHeadOid, fileChanges } = JSON.parse(stdout).variables.input;
+  assert.equal(expectedHeadOid, expected);
+  assert.deepEqual(fileChanges.additions.map((a) => a.path).sort(), [
+    "a.txt",
+    "b.txt",
+  ]);
 });
 
 test("PATHS limits the commit to the paths it names", () => {
@@ -192,6 +213,25 @@ test("PATHS limits the commit to the paths it names", () => {
     ["a.txt"],
   );
   assert.deepEqual(deletions, []);
+});
+
+test("PATHS reaches git as pathspecs: the shell expands no glob", () => {
+  const { root, head } = makeRepo({ "a.txt": "a\n", "c.md": "c\n" });
+  mkdirSync(path.join(root, "sub"));
+  writeFileSync(path.join(root, "sub", "b.txt"), "b\n");
+  writeFileSync(path.join(root, "a.txt"), "changed\n");
+  writeFileSync(path.join(root, "c.md"), "changed\n");
+
+  const { status, stdout, stderr } = build(root, {
+    EXPECTED_HEAD_OID: head,
+    PATHS: "*.txt",
+  });
+  assert.equal(status, 0, stderr);
+
+  // The shell would expand `*.txt` to `a.txt` only; git's pathspec also
+  // matches `sub/b.txt`.
+  const { additions } = JSON.parse(stdout).variables.input.fileChanges;
+  assert.deepEqual(additions.map((a) => a.path).sort(), ["a.txt", "sub/b.txt"]);
 });
 
 test("a status the script does not handle fails the build", () => {

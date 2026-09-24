@@ -43,7 +43,9 @@ export const serviceAutoTag = ({
   const result = { tags: [], unchanged: [], skipped: [] };
 
   for (const service of autoTag) {
-    const env = Object.keys(envs).find((name) => service in envs[name]);
+    const env = Object.keys(envs).find((name) =>
+      Object.hasOwn(envs[name], service),
+    );
     // `docker-push.yaml` has no guard for a name it cannot find: the tag would
     // build from the path `null`.
     if (!env) {
@@ -151,6 +153,7 @@ const main = (argv) => {
       const { name } = JSON.parse(
         fs.readFileSync(path.join(servicePath, "package.json"), "utf8"),
       );
+      // pnpm prints nothing, not `[]`, when no package matches the filter.
       const affected = JSON.parse(
         run("pnpm", [
           "--filter",
@@ -160,7 +163,7 @@ const main = (argv) => {
           "--depth",
           "-1",
           "--json",
-        ]),
+        ]).trim() || "[]",
       );
       return affected.some((pkg) => pkg.name === name);
     },

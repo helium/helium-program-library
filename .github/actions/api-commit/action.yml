@@ -11,10 +11,6 @@ inputs:
   headline:
     description: "The commit message headline."
     required: true
-  body:
-    description: "The commit message body. Omitted from the message when empty."
-    required: false
-    default: ""
   expected-head-oid:
     description: "The commit the branch is expected to be at, and the commit the changes are computed against. A moved branch fails the step, and there is no retry: a later run recomputes from the new head."
     required: true
@@ -46,7 +42,6 @@ runs:
         GH_TOKEN: ${{ inputs.token }}
         BRANCH: ${{ inputs.branch }}
         HEADLINE: ${{ inputs.headline }}
-        BODY: ${{ inputs.body }}
         EXPECTED_HEAD_OID: ${{ inputs.expected-head-oid }}
         PATHS: ${{ inputs.paths }}
       run: |
