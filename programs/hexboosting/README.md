@@ -6,6 +6,6 @@ Boost configs set the price-per-month and the allowed multiplier schedule; the [
 
 SDK: [`@helium/hexboosting-sdk`](../../packages/hexboosting-sdk).
 
-Release / upgrade: push a `program-hexboosting-<version>` git tag.
+Release / upgrade: add a program changeset that names `hexboosting` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/hexboosting/Cargo.toml`. After the change reaches `master`, push the `program-hexboosting-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
 
 This is deprecated, hexboosting is no longer a feature.

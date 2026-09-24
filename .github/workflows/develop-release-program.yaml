@@ -11,6 +11,9 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: read
+
 jobs:
   detect_changed_programs:
     if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'deploy-to-devnet')
@@ -21,22 +24,45 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
+          # The script diffs two commits, so both ends must be in the checkout.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
       - name: List changed programs
         id: list_changed_programs
+        # A program changes when its own sources or a workspace crate it depends on
+        # do. `shared-utils` is such a crate, so a change there deploys its dependents;
+        # the hash-match skip in `plan-deploy` stops the legs whose binary is the same.
+        env:
+          # `github.event.after` is empty on a pull_request, so the head is explicit.
+          BASE: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || github.event.before }}
+          HEAD: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.event.after }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          echo "Detecting changes in programs"
-          # Use git diff to get a list of changed programs and output it as JSON
-          changed_files=$(git diff --name-only ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || github.event.before }} ${{ github.event.after }})
-          changed_programs=($(echo "$changed_files" | grep "^programs/" | grep -v "/shared-utils/" | cut -d '/' -f 2 | sort -u))
-          echo "${changed_programs[@]}"
-          if [ ${#changed_programs[@]} -eq 0 ]; then
-            json="[]"
-          else
-            json="[$(printf '"%s",' "${changed_programs[@]}" | sed 's/,$//')]"
+          # The PR base sha is develop's tip, so a two-dot diff from it also holds develop's
+          # changes since the branch point. The merge base leaves only the PR's own.
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE=$(git merge-base "$BASE" "$HEAD")
           fi
-          echo $json
-          echo "programs_with_changes=$json" >> $GITHUB_OUTPUT
+          CHANGED=$(node scripts/changed-programs.mjs "$BASE" "$HEAD")
+          echo "$CHANGED"
+          JSON=$(echo "$CHANGED" | jq -c '[.[].name]')
+          echo "programs_with_changes=$JSON" >> "$GITHUB_OUTPUT"
+
+          # No devnet tag and no version in the proposal name, so the run summary is
+          # the record of what each deployed binary was built from.
+          # A pull_request build checks out the PR merge ref, not the PR head.
+          SOURCE="commit \`$HEAD\`"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            SOURCE="PR head \`$HEAD\` merged onto \`develop\`"
+          fi
+          while IFS=$'\t' read -r PROGRAM VIA; do
+            VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' "programs/$PROGRAM/Cargo.toml" | head -n 1)
+            NOTE=""
+            if [ -n "$VIA" ]; then NOTE=" (dependent of \`$VIA\`)"; fi
+            echo "- \`$PROGRAM\`: version \`$VERSION\`, $SOURCE$NOTE" >> "$GITHUB_STEP_SUMMARY"
+          done < <(echo "$CHANGED" | jq -r '.[] | [.name, (if .own then "" else (.via | join(", ")) end)] | @tsv')
   build_programs:
     needs: [detect_changed_programs]
     runs-on: ubuntu-latest
@@ -61,12 +87,11 @@ jobs:
             ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}-v0002
 
-      - run: (cargo install toml-cli || true)
+      - run: (cargo install toml-cli --version 0.2.3 || true)
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
 
       - name: Set program information
-        if: steps.cache-toml.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           # Prefer a devnet-specific id (programs.devnet) when one exists;
@@ -81,11 +106,10 @@ jobs:
         env:
           PROGRAM: ${{ matrix.program }}
 
-      # Build the program with anchor so we get the IDL
-      - uses: ./.github/actions/build-anchor/
-        id: build-anchor
+      # Only the IDL is taken from anchor; `build-verified` below produces the `.so` that ships.
+      - uses: ./.github/actions/build-program-idl/
+        id: build-program-idl
         with:
-          testing: false
           devnet: true
           program: ${{ env.PROGRAM_NAME }}
 
@@ -95,6 +119,7 @@ jobs:
           devnet: true
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
+          setup-anchor: false
 
       - name: Store so files
         uses: actions/upload-artifact@v4
@@ -123,7 +148,6 @@ jobs:
         uses: actions/checkout@v2
       - uses: ./.github/actions/setup-anchor/
       - name: Set program information
-        if: steps.cache-toml.outputs.cache-hit != 'true'
         run: |
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           # Prefer a devnet-specific id (programs.devnet) when one exists;
@@ -148,23 +172,49 @@ jobs:
         with:
           name: ${{matrix.program}}-idl
           path: ./target/idl/
-      - uses: ./.github/actions/buffer-deploy/
-        id: buffer-deploy
+      # Re-run rules live in `plan-deploy`: the hash-match skip, the vault buffer reuse and the
+      # pending proposal check. It runs `@sqds/multisig` in the job with the devnet key: a matrix
+      # leg cannot pass its outputs to another job. The mainnet release runs it in a job with no key.
+      - uses: ./.github/actions/plan-deploy/
+        id: plan
         with:
           devnet: true
+          network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
+          program: ${{ env.PROGRAM_NAME }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          multisig: ${{ secrets.DEVNET_MULTISIG }}
+          spill: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
+      # Signers must reject the older proposal, or an execute of it after the new one rolls the
+      # program back.
+      - name: Report the older pending proposal
+        if: steps.plan.outputs.pending-proposal-index != ''
+        env:
+          PROGRAM: ${{ matrix.program }}
+          PENDING: ${{ steps.plan.outputs.pending-proposal-index }}
+        run: |
+          echo "::notice title=Older pending proposal::${PROGRAM}: proposal ${PENDING} is still pending"
+      # On a failure before the authority transfer, this closes the buffer it made.
+      - uses: ./.github/actions/deploy-buffers/
+        id: deploy-buffers
+        if: steps.plan.outputs.skip != 'true'
+        with:
           network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          reused-buffer: ${{ steps.plan.outputs.buffer }}
       - name: Squads program upgrade
-        uses: helium/squads-program-upgrade@v0.5.0
+        # A skipped run has no buffers. The Squads action exits 1 on an empty address.
+        if: steps.plan.outputs.skip != 'true'
+        uses: helium/squads-program-upgrade@58eb5cf41491c163e857e6ee3dcedb97a2859733 # v0.5.0
         with:
           network-url: "https://api.devnet.solana.com"
           program-multisig: ${{ secrets.DEVNET_MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
-          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
-          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
+          buffer: ${{ steps.deploy-buffers.outputs.buffer }}
+          idl-buffer: ${{ steps.deploy-buffers.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
           authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
           name: "Deploy ${{ matrix.program }}"

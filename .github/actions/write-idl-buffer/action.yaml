@@ -1,0 +1,256 @@
+# Vendored from https://github.com/solana-foundation/github-actions
+#   write-idl-buffer/action.yaml @ d1e779ca332fc499507fadf97d9c780ffed5a71f
+# This copy is ours. Pull upstream fixes by hand, and update the SHA above when you do.
+# Anchor IDL accounts only. Upstream keeps its program-metadata path in other actions
+# (`write-metadata-buffer`, `metadata-upload`); none of it is here.
+#
+# Changes from upstream:
+# - Inputs reach the scripts through `env:`, not `${{ }}` text in the script body.
+# - Input names are the ones the deploy workflows already pass: `network`, `buffer-authority`.
+#   The output is `idl-buffer`, the name the Squads step takes.
+# - Upstream skips every step when `anchor idl fetch` fails, and the output is then empty.
+#   `helium/squads-program-upgrade` needs an IDL buffer and an IDL account, so here that
+#   failure stops the action. The `buffer != ''` conditions on the later steps are gone with it.
+# - A failure before the buffer authority transfer closes the IDL buffer.
+#
+# The caller installs the Solana and Anchor CLIs first (`setup-anchor` does it).
+name: "Write IDL Buffer"
+description: "Writes the program IDL to an Anchor IDL buffer and hands the buffer to the buffer authority"
+inputs:
+  network:
+    description: "Solana RPC URL"
+    required: true
+  program:
+    description: "Program name (snake_case). The IDL is ./target/idl/<program>.json"
+    required: true
+  program-id:
+    description: "The program id of the program to upgrade"
+    required: true
+  keypair:
+    description: "The keypair to use for buffer creation"
+    required: true
+  buffer-authority:
+    description: "The address that receives the IDL buffer authority (the Squads vault)"
+    required: true
+
+outputs:
+  idl-buffer:
+    description: "The idl buffer address."
+    value: ${{ steps.write-buffer.outputs.buffer }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Write keypair
+      shell: bash
+      run: echo "$DEPLOY_KEYPAIR" > ./deploy-keypair.json && chmod 600 ./deploy-keypair.json
+      env:
+        DEPLOY_KEYPAIR: ${{ inputs.keypair }}
+
+    - name: Require the IDL account
+      shell: bash
+      run: |
+        if ! anchor idl fetch "$PROGRAM_ID" --provider.cluster "$NETWORK" > /dev/null 2>&1; then
+          echo "::error title=$PROGRAM has no IDL account on the target cluster::anchor idl fetch failed for $PROGRAM_ID. The Squads step upgrades an IDL account that exists. Run anchor idl init once, then re-run."
+          exit 1
+        fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+
+    # The later "Set Program IDL Authority" step needs the deployer key or the vault to hold
+    # the program IDL authority. Once the buffer moves to the vault, a failure there leaves it
+    # for a multisig proposal to close, so a wrong authority stops the run before a buffer exists.
+    - name: Require a program IDL authority this run can use
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        shell: bash
+        command: |
+          set -euo pipefail
+          CURRENT=$(anchor idl authority "$PROGRAM_ID" --provider.cluster "$NETWORK")
+          DEPLOYER=$(solana-keygen pubkey ./deploy-keypair.json)
+          if ! grep -qF "$AUTHORITY" <<<"$CURRENT" && ! grep -qF "$DEPLOYER" <<<"$CURRENT"; then
+            echo "::error title=$PROGRAM IDL authority::The program IDL authority is not the vault or the deployer key: $CURRENT"
+            exit 1
+          fi
+          echo "Program IDL authority: $CURRENT"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+
+    - name: Write IDL buffer
+      id: write-buffer
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        shell: bash
+        command: |
+          # Write buffer with retries
+          for i in {1..5}; do
+            echo "Attempt $i to write IDL buffer..."
+            sleep $((i * 2))
+
+            anchor idl write-buffer "$PROGRAM_ID" \
+              --filepath "./target/idl/$PROGRAM.json" \
+              --provider.cluster "$NETWORK" \
+              --priority-fee 100000 \
+              --provider.wallet ./deploy-keypair.json > buffer.out
+
+            BUFFER=$(grep -o 'Idl buffer created: [^ ]*' buffer.out | cut -d' ' -f4)
+            if [ -n "$BUFFER" ]; then
+              echo "buffer=$BUFFER" >> "$GITHUB_OUTPUT"
+              break
+            fi
+          done
+
+          if [ -z "$BUFFER" ]; then
+            echo "Failed to create IDL buffer after 5 attempts"
+            exit 1
+          fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+
+    - name: Prefund IDL account rent
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        shell: bash
+        command: |
+          set -euo pipefail
+          echo "Pre-funding Anchor IDL account rent from deployer (so Squads needs no vault SOL top-up)..."
+
+          # Anchor IDL account = createWithSeed(base, "anchor:idl", programId)
+          # where base = findProgramDerivedAddress([], programId)
+          IDL_BASE=$(solana find-program-derived-address "$PROGRAM_ID")
+          IDL_ADDR=$(solana create-address-with-seed anchor:idl "$PROGRAM_ID" --from "$IDL_BASE")
+          if [ -z "$IDL_ADDR" ]; then
+            echo "Error: failed to derive Anchor IDL address"
+            exit 1
+          fi
+
+          BUFFER_LEN=$(solana account "$IDL_BUFFER" -u "$NETWORK" --output json | jq -r '.account.space')
+          if ! [[ "$BUFFER_LEN" =~ ^[0-9]+$ ]]; then
+            echo "Error: could not read IDL buffer account size for $IDL_BUFFER (got: $BUFFER_LEN)"
+            exit 1
+          fi
+
+          REQUIRED=$(solana rent "$BUFFER_LEN" --lamports -u "$NETWORK" | grep -oE '[0-9]+' | head -1)
+          if ! [[ "$REQUIRED" =~ ^[0-9]+$ ]]; then
+            echo "Error: could not calculate rent for $BUFFER_LEN bytes (got: $REQUIRED)"
+            exit 1
+          fi
+
+          CURRENT=$(solana balance "$IDL_ADDR" -u "$NETWORK" --lamports 2>/dev/null | awk '{print $1}' || true)
+          CURRENT=${CURRENT:-0}
+          if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
+            CURRENT=0
+          fi
+          SHORTFALL=$((REQUIRED - CURRENT))
+
+          echo "IDL account: $IDL_ADDR"
+          echo "Target size: $BUFFER_LEN bytes, required: $REQUIRED, current: $CURRENT, shortfall: $SHORTFALL"
+
+          if [ "$SHORTFALL" -le 0 ]; then
+            echo "Account already has enough lamports; skipping transfer"
+            exit 0
+          fi
+
+          AMOUNT_SOL=$(awk "BEGIN { printf \"%.9f\", $SHORTFALL / 1000000000 }")
+          solana transfer "$IDL_ADDR" "$AMOUNT_SOL" \
+            --from ./deploy-keypair.json \
+            --keypair ./deploy-keypair.json \
+            --url "$NETWORK" \
+            --allow-unfunded-recipient
+          echo "Pre-funded $SHORTFALL lamports ($AMOUNT_SOL SOL) -> $IDL_ADDR"
+      env:
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        IDL_BUFFER: ${{ steps.write-buffer.outputs.buffer }}
+
+    - name: Set Buffer Authority
+      id: set-buffer-authority
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        shell: bash
+        command: |
+          if anchor idl authority "$IDL_BUFFER" --provider.cluster "$NETWORK" | grep -q "$AUTHORITY"; then
+            echo "IDL buffer authority is already $AUTHORITY"
+            exit 0
+          fi
+          echo "Setting buffer authority..."
+          anchor idl set-authority "$IDL_BUFFER" \
+            --program-id "$PROGRAM_ID" \
+            --new-authority "$AUTHORITY" \
+            --provider.cluster "$NETWORK" \
+            --priority-fee 100000 \
+            --provider.wallet ./deploy-keypair.json
+      env:
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+        IDL_BUFFER: ${{ steps.write-buffer.outputs.buffer }}
+
+    - name: Set Program IDL Authority
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        shell: bash
+        command: |
+          if anchor idl authority "$PROGRAM_ID" --provider.cluster "$NETWORK" | grep -q "$AUTHORITY"; then
+            echo "Program IDL authority is already $AUTHORITY"
+            exit 0
+          fi
+          echo "Setting program IDL authority..."
+          anchor idl set-authority \
+            --program-id "$PROGRAM_ID" \
+            --new-authority "$AUTHORITY" \
+            --provider.cluster "$NETWORK" \
+            --priority-fee 100000 \
+            --provider.wallet ./deploy-keypair.json
+      env:
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+
+    # Until the authority transfer the deployer key owns the IDL buffer and can take the rent
+    # back. The address is the one this run made; parallel runs share the deployer key. After
+    # the transfer only a multisig proposal can close it. A failed close warns and leaves the
+    # run's own failure as the result.
+    - name: Close this run's IDL buffer after a failure
+      if: (failure() || cancelled()) && steps.write-buffer.outputs.buffer != '' && steps.set-buffer-authority.outcome != 'success'
+      shell: bash
+      run: |
+        set +e
+        CLOSE_OUT=$(anchor idl close "$PROGRAM_ID" --idl-address "$IDL_BUFFER" --provider.cluster "$NETWORK" --provider.wallet ./deploy-keypair.json 2>&1)
+        EXIT_CODE=$?
+        set -e
+        # The RPC URL is a secret and the CLI puts it in some errors.
+        CLOSE_OUT=${CLOSE_OUT//"$NETWORK"/<rpc-url>}
+        echo "$CLOSE_OUT"
+        if [ "$EXIT_CODE" -eq 0 ]; then
+          echo "- \`$PROGRAM\`: closed IDL buffer \`$IDL_BUFFER\` after the failure. The rent is back with the deployer." >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "::warning::IDL buffer $IDL_BUFFER not closed: $(echo "$CLOSE_OUT" | tail -n 1)"
+        fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        IDL_BUFFER: ${{ steps.write-buffer.outputs.buffer }}
+
+    - name: Cleanup
+      if: always()
+      shell: bash
+      run: rm -f ./deploy-keypair.json

@@ -1,31 +1,42 @@
 name: "Setup Anchor"
 description: "Setup Anchor"
+inputs:
+  toml-cli:
+    description: "Install the toml CLI"
+    default: "true"
+  cache:
+    description: "Restore and save the Anchor, Solana CLI and toml caches"
+    default: "true"
 runs:
   using: "composite"
   steps:
     - uses: ./.github/actions/setup/
     - uses: ./.github/actions/setup-solana/
+      with:
+        cache: ${{ inputs.cache }}
     - run: rustup install 1.85.0 && rustup default 1.85.0
       shell: bash
       if: steps.cache-anchor-cli.outputs.cache-hit != 'true'
     - uses: actions/cache@v4
       name: Cache Anchor Cli
       id: cache-anchor-cli
+      if: inputs.cache == 'true'
       with:
         path: |
           ~/.cargo/bin/anchor
-        key: anchor-cli-${{ runner.os }}-v0003-${{ env.ANCHOR_VERSION }}-${{ env.ANCHOR_SHA }}
+        key: anchor-cli-${{ runner.os }}-v0003-${{ env.ANCHOR_VERSION }}-${{ env.ANCHOR_SHA }}-${{ env.ANCHOR_VERSION_REV }}
     # if ANCHOR_VERSION is 0, then install the anchor-cli from source
-    - run: if [ $ANCHOR_VERSION -eq 0 ]; then cargo install --git https://github.com/coral-xyz/anchor --rev $ANCHOR_SHA anchor-cli --locked --force; else cargo install --git https://github.com/coral-xyz/anchor --tag "v$ANCHOR_VERSION" anchor-cli --locked --force; fi
+    - run: if [ $ANCHOR_VERSION -eq 0 ]; then cargo install --git https://github.com/coral-xyz/anchor --rev $ANCHOR_SHA anchor-cli --locked --force; else cargo install --git https://github.com/coral-xyz/anchor --rev "$ANCHOR_VERSION_REV" anchor-cli --locked --force; fi
       shell: bash
       if: steps.cache-anchor-cli.outputs.cache-hit != 'true'
     - uses: actions/cache@v4
       name: Cache Toml Cli
       id: cache-toml-cli
+      if: inputs.toml-cli == 'true' && inputs.cache == 'true'
       with:
         path: |
           ~/.cargo/bin/toml
         key: toml-cli-${{ runner.os }}-v0002
-    - run: (cargo install toml-cli || true)
-      if: steps.cache-toml-cli.outputs.cache-hit != 'true'
+    - run: (cargo install toml-cli --version 0.2.3 || true)
+      if: inputs.toml-cli == 'true' && steps.cache-toml-cli.outputs.cache-hit != 'true'
       shell: bash

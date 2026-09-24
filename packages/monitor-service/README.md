@@ -11,4 +11,4 @@ Deployed as **solana-monitor**. Image: `public.ecr.aws/v0j6k5v6/solana-monitor`.
 | web-cluster / prod | [manifests/web-cluster/prod/helium/solana-monitor.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/solana-monitor.yaml) |
 | web-cluster / sdlc | [manifests/web-cluster/sdlc/helium/solana-monitor.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/sdlc/helium/solana-monitor.yaml) |
 
-Deploy: push a `docker-web-solana-monitor-<version>` git tag.
+Image release: push a `docker-web-solana-monitor-<version>` tag by hand (see [repo README](../../README.md#deploying-docker-services)). The service deploy (the k8s bump) stays manual.

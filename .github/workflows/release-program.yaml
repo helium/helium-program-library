@@ -9,34 +9,58 @@ on:
     tags:
       - "program-*" # Push events to matching program-*, i.e. program-circuit-breaker-0.0.1
 
+permissions:
+  contents: read
+
+# In this workflow the deployer key reaches `buffers` and `propose` only, and neither installs
+# the workspace. The key is a repository secret, so this holds for this file alone: the sweep
+# workflow holds it too. `@sqds/multisig` runs in `plan` and `wait`, which hold no key and no
+# write token.
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
+    # The build runs crate build scripts, so it holds no write token. `release` uploads.
+    permissions:
+      contents: read
+    timeout-minutes: 120
+    outputs:
+      program: ${{ steps.tag.outputs.PROGRAM }}
+      version: ${{ steps.tag.outputs.VERSION }}
+      program-id: ${{ steps.tag.outputs.PROGRAM_ID }}
+      program-name: ${{ steps.tag.outputs.PROGRAM_NAME }}
+      artifact-sha256: ${{ steps.hash.outputs.artifact-sha256 }}
+      release-hash: ${{ steps.hash.outputs.release-hash }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-
-      - uses: actions/cache@v4
-        name: Cache Toml Cli
-        id: cache-toml-cli
         with:
-          path: |
-            ~/.cargo/bin/toml
-          key: toml-cli-${{ runner.os }}-v0002
+          # The master ancestry guard in "Set tag information" needs `origin/master` and the
+          # history between it and the tag.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # This job decides the released bytes, so it installs its CLIs fresh, not from a cache
+      # any workflow in the cache scope can write.
       # `--locked` builds against the crate's own lockfile, so a dependency that later requires a
       # newer rustc than this runner has cannot break the install. A failure here is fatal: the
       # next step reads the program id with this binary, and an empty id reaches `anchor idl
       # write-buffer` several steps later as a missing argument.
-      - run: cargo install toml-cli --locked
-        if: steps.cache-toml-cli.outputs.cache-hit != 'true'
+      - run: cargo install toml-cli --version 0.2.3 --locked
         shell: bash
 
       - name: Set tag information
+        id: tag
         run: |
           TAG=${GITHUB_REF#refs/tags/}  # Extract tag name from ref
           echo "Tag name: $TAG"
-          PROGRAM=$(echo $TAG | sed 's/program-\(.*\)-[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}/\1/')
-          VERSION=$(echo $TAG | sed 's/.*-\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)$/\1/')
+          # Strict: the tag list holds a `v`-prefixed tag and a `-test` suffixed one, and a loose
+          # parse reads a program name or a version out of both.
+          if [[ ! "$TAG" =~ ^program-([a-z0-9]+(-[a-z0-9]+)*)-([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::tag ${TAG} is not program-<name>-<x.y.z>"
+            exit 1
+          fi
+          PROGRAM=${BASH_REMATCH[1]}
+          VERSION=${BASH_REMATCH[3]}
           PROGRAM_NAME=${PROGRAM//-/_}  # Substitute dashes with underscores
           PROGRAM_ID=$(~/.cargo/bin/toml get Anchor.toml programs.localnet.${PROGRAM_NAME} | tr -d '"')
 
@@ -48,65 +72,287 @@ jobs:
             exit 1
           fi
 
+          # A tag is never moved or reused, so a tag that disagrees with the source it points at
+          # must stop here, before a build and before a release asset carries its name.
+          CARGO_VERSION=$(~/.cargo/bin/toml get "programs/${PROGRAM}/Cargo.toml" package.version | tr -d '"')
+          if [ "$CARGO_VERSION" != "$VERSION" ]; then
+            echo "::error::tag ${TAG} has version ${VERSION}, programs/${PROGRAM}/Cargo.toml at the tagged commit has '${CARGO_VERSION}'"
+            exit 1
+          fi
+
+          # develop -> master is the gate for a mainnet deploy. A hand tag on any other commit
+          # would deploy code that did not pass it.
+          COMMIT=$(git rev-parse HEAD)
+          if ! git merge-base --is-ancestor "$COMMIT" origin/master; then
+            echo "::error::tag ${TAG} points at commit ${COMMIT}, which is not an ancestor of origin/master"
+            exit 1
+          fi
+
           echo "Program: $PROGRAM"
           echo "Program: $PROGRAM_ID"
           echo "Version: $VERSION"
-          echo "PROGRAM_ID=${PROGRAM_ID}" >> $GITHUB_ENV
-          echo "PROGRAM_NAME=${PROGRAM_NAME}" >> $GITHUB_ENV
+          {
+            echo "PROGRAM=${PROGRAM}"
+            echo "VERSION=${VERSION}"
+            echo "PROGRAM_ID=${PROGRAM_ID}"
+            echo "PROGRAM_NAME=${PROGRAM_NAME}"
+          } | tee -a "$GITHUB_ENV" >> "$GITHUB_OUTPUT"
 
-      # Build the program with anchor so we get the IDL
-      - uses: ./.github/actions/build-anchor/
-        id: build-anchor
+      # Only the IDL is taken from anchor; `build-verified` below produces the `.so` that ships.
+      - uses: ./.github/actions/build-program-idl/
+        id: build-program-idl
         with:
-          testing: false
           devnet: false
           program: ${{ env.PROGRAM_NAME }}
-
-      - name: Push IDL to Github
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            target/idl/${{ env.PROGRAM_NAME }}.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          cache: false
 
       - uses: ./.github/actions/build-verified/
         id: build-verified
         with:
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
+          cache: false
+          setup-anchor: false
 
-      - uses: ./.github/actions/buffer-deploy/
-        id: buffer-deploy
+      # The release hash. The scheduled hash check compares the on-chain program with it.
+      # `artifact-sha256` covers the two files the build artifact stores, taken before `plan-deploy`.
+      - name: Take the release hash
+        id: hash
+        run: |
+          HASH=$(~/.cargo/bin/solana-verify get-executable-hash "target/deploy/${PROGRAM_NAME}.so" | tail -n 1)
+          echo "Release hash: $HASH"
+          echo "release-hash=${HASH}" >> "$GITHUB_OUTPUT"
+          ARTIFACT_SHA256=$(sha256sum "target/deploy/${PROGRAM_NAME}.so" "target/idl/${PROGRAM_NAME}.json" | sha256sum | cut -d' ' -f1)
+          echo "Artifact hash: $ARTIFACT_SHA256"
+          echo "artifact-sha256=${ARTIFACT_SHA256}" >> "$GITHUB_OUTPUT"
+
+      # The `release`, `plan` and `buffers` jobs take the build from this artifact. `plan` runs
+      # workspace JavaScript, and that code can replace the artifact, so `buffers` checks it
+      # against the hash taken here.
+      - name: Store the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: |
+            ./target/deploy/${{ env.PROGRAM_NAME }}.so
+            ./target/idl/${{ env.PROGRAM_NAME }}.json
+
+  # The only job with `contents: write`. It runs no checkout and no project code: it uploads
+  # the IDL from the build artifact and the release hash from the build job's output.
+  # `plan` waits for it, so a run that the hash-match skip stops still has the release hash.
+  # A failed build leaves no release. A re-run replaces the assets.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 15
+    steps:
+      - name: Download the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: build
+          path: ./target/
+      - name: Check the build and write the release hash
+        env:
+          PROGRAM_NAME: ${{ needs.build.outputs.program-name }}
+          EXPECTED: ${{ needs.build.outputs.artifact-sha256 }}
+          RELEASE_HASH: ${{ needs.build.outputs.release-hash }}
+        # The file names are part of the hashed text, so they are spelled as in the build job.
+        run: |
+          ACTUAL=$(sha256sum "target/deploy/${PROGRAM_NAME}.so" "target/idl/${PROGRAM_NAME}.json" | sha256sum | cut -d' ' -f1)
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::build artifact hash ${ACTUAL} does not match '${EXPECTED}' from the build job"
+            exit 1
+          fi
+          if [[ ! "$RELEASE_HASH" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::release hash '${RELEASE_HASH}' from the build job is not a sha256"
+            exit 1
+          fi
+          echo "$RELEASE_HASH" > "target/deploy/${PROGRAM_NAME}.so.sha256"
+      - name: Publish the release
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        with:
+          files: |
+            target/idl/${{ needs.build.outputs.program-name }}.json
+            target/deploy/${{ needs.build.outputs.program-name }}.so.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # `plan-deploy` installs and runs workspace JavaScript, so it runs apart from the release
+  # upload's write token.
+  plan:
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    outputs:
+      skip: ${{ steps.plan.outputs.skip }}
+      reused-buffer: ${{ steps.plan.outputs.buffer }}
+    steps:
+      # A tag push checks out the tagged commit, the one `build` built.
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # The build dependencies for the fresh `solana-verify` install in `plan-deploy`.
+      - uses: ./.github/actions/setup/
+      # `plan-deploy` needs the Solana CLI.
+      - uses: ./.github/actions/setup-solana/
+        with:
+          cache: false
+      # `upload-artifact` drops the common `./target/` prefix of the two paths.
+      - name: Download the build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: ./target/
+      # Re-run rules live in this action: the hash-match skip, the vault buffer reuse and the
+      # pending proposal check.
+      - uses: ./.github/actions/plan-deploy/
+        id: plan
         with:
           network: ${{ secrets.SOLANA_DEPLOY_URL }}
-          program: ${{ env.PROGRAM_NAME }}
-          keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
-          program-id: ${{ env.PROGRAM_ID }}
+          program: ${{ needs.build.outputs.program-name }}
+          program-id: ${{ needs.build.outputs.program-id }}
           buffer-authority: ${{ secrets.MULTISIG_VAULT }}
+          multisig: ${{ secrets.MULTISIG }}
+          spill: ${{ secrets.DEPLOYER_ADDRESS }}
+          cache: false
+
+  buffers:
+    needs: [build, plan]
+    if: needs.plan.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    # The program buffer write retries up to 3 x 55 minutes.
+    timeout-minutes: 180
+    outputs:
+      buffer: ${{ steps.deploy-buffers.outputs.buffer }}
+      idl-buffer: ${{ steps.deploy-buffers.outputs.idl-buffer }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-anchor/
+        # Neither this job nor its actions call `toml`, and the install runs third-party build
+        # scripts on the VM that later writes the deployer key. Any workflow in the cache scope
+        # can write a cache entry first, so this job installs the Anchor and Solana CLIs fresh.
+        with:
+          toml-cli: false
+          cache: false
+      # `upload-artifact` drops the common `./target/` prefix of the two paths.
+      - name: Download the build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: ./target/
+      - name: Check the build against the hash taken before plan-deploy
+        env:
+          PROGRAM_NAME: ${{ needs.build.outputs.program-name }}
+          EXPECTED: ${{ needs.build.outputs.artifact-sha256 }}
+        # The file names are part of the hashed text, so they are spelled as in the build job.
+        run: |
+          ACTUAL=$(sha256sum "target/deploy/${PROGRAM_NAME}.so" "target/idl/${PROGRAM_NAME}.json" | sha256sum | cut -d' ' -f1)
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::build artifact hash ${ACTUAL} does not match '${EXPECTED}' from the build job"
+            exit 1
+          fi
+      # On a failure before the authority transfer, this closes the buffer it made.
+      - uses: ./.github/actions/deploy-buffers/
+        id: deploy-buffers
+        with:
+          network: ${{ secrets.SOLANA_DEPLOY_URL }}
+          program: ${{ needs.build.outputs.program-name }}
+          keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
+          program-id: ${{ needs.build.outputs.program-id }}
+          buffer-authority: ${{ secrets.MULTISIG_VAULT }}
+          reused-buffer: ${{ needs.plan.outputs.reused-buffer }}
+
+  wait:
+    needs: [build, buffers]
+    runs-on: ubuntu-latest
+    # Turnstyle lists this workflow's runs.
+    permissions:
+      contents: read
+      actions: read
+    # Turnstyle waits for earlier runs, so a batch of tags needs room past one release.
+    timeout-minutes: 180
+    outputs:
+      skip: ${{ steps.pending.outputs.skip }}
+      pending-proposal-index: ${{ steps.pending.outputs.older }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       # Each run creates a Squads proposal at the multisig's next transaction index, and runs for
-      # tags pushed together race on that index; the losers fail with ConstraintSeeds. Only this
-      # last step needs serializing, so builds and buffer uploads run in parallel and each run
+      # tags pushed together race on that index; the losers fail with ConstraintSeeds. Only the
+      # proposal needs serializing, so builds and buffer uploads run in parallel and each run
       # waits here for every earlier-started run of this workflow to finish. A workflow-level
       # `concurrency` group is not used because GitHub keeps only one pending run per group and
       # cancels the rest, which silently dropped releases when several tags were pushed at once.
       - name: Wait for earlier release runs
-        uses: softprops/turnstyle@v3.3.3
+        uses: softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4 # v3.3.3
         with:
           same-branch-only: false
           poll-interval-seconds: 30
           retries: 3
 
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      # The pending proposal read compares IDL buffers with the build IDL.
+      - name: Download the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: build
+          path: ./target/
+
+      # The read in `plan-deploy` ran before the wait, so a run that finished during it is
+      # missing from that list. Read the older proposals again now that earlier runs are done.
+      # A run that finished during the wait can also have proposed this same buffer: stop then.
+      - name: Read older pending proposals after the wait
+        id: pending
+        uses: ./.github/actions/pending-proposals/
+        with:
+          network: ${{ secrets.SOLANA_DEPLOY_URL }}
+          program: ${{ needs.build.outputs.program }}
+          program-id: ${{ needs.build.outputs.program-id }}
+          multisig: ${{ secrets.MULTISIG }}
+          spill: ${{ secrets.DEPLOYER_ADDRESS }}
+          idl: ./target/idl/${{ needs.build.outputs.program-name }}.json
+          buffer: ${{ needs.buffers.outputs.buffer }}
+
+  propose:
+    needs: [build, buffers, wait]
+    if: needs.wait.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
       - name: Squads program upgrade
-        uses: helium/squads-program-upgrade@v0.5.0
+        uses: helium/squads-program-upgrade@58eb5cf41491c163e857e6ee3dcedb97a2859733 # v0.5.0
         with:
           network-url: "https://api.mainnet-beta.solana.com"
           program-multisig: ${{ secrets.MULTISIG }}
-          program-id: ${{ env.PROGRAM_ID }}
-          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
-          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
+          program-id: ${{ needs.build.outputs.program-id }}
+          buffer: ${{ needs.buffers.outputs.buffer }}
+          idl-buffer: ${{ needs.buffers.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEPLOYER_ADDRESS }}
           authority: ${{ secrets.MULTISIG_VAULT }}
-          name: "Deploy ${{env.PROGRAM_NAME}} ${{env.VERSION}}"
+          name: "Deploy ${{ needs.build.outputs.program-name }} ${{ needs.build.outputs.version }}"
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
+
+      # A second proposal for the same program is open. Signers must reject the old one, or an
+      # execute of it after the new one rolls the program back. The annotation and the summary line
+      # are the whole notice: the person who pushed the tag is watching this run.
+      - name: Report the older pending proposal
+        if: needs.wait.outputs.pending-proposal-index != ''
+        env:
+          PROGRAM: ${{ needs.build.outputs.program }}
+          VERSION: ${{ needs.build.outputs.version }}
+          PENDING: ${{ needs.wait.outputs.pending-proposal-index }}
+        run: |
+          LINE="${PROGRAM} ${VERSION}: proposal ${PENDING} is still pending"
+          echo "::notice title=Older pending proposal::${LINE}"
+          echo "$LINE" >> "$GITHUB_STEP_SUMMARY"

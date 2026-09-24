@@ -1,0 +1,109 @@
+# Writes the buffers `plan-deploy` asked for. It holds the deployer key and runs only the
+# Solana and Anchor CLIs, so no workspace JavaScript runs next to the key.
+# IDL buffers have no reuse. Each run writes a new one.
+#
+# The caller runs `plan-deploy` first and skips this action on its `skip`. The caller
+# installs the Solana and Anchor CLIs first (`setup-anchor` does it).
+name: "Deploy Buffers"
+description: "Writes or reuses the program buffer and writes the IDL buffer"
+inputs:
+  network:
+    description: "Solana RPC URL"
+    required: true
+  program:
+    description: "Program name (snake_case). The binary is ./target/deploy/<program>.so"
+    required: true
+  program-id:
+    description: "The program id of the program to upgrade"
+    required: true
+  keypair:
+    description: "The keypair to use for buffer creation"
+    required: true
+  buffer-authority:
+    description: "The Squads vault. It receives the buffer authorities"
+    required: true
+  reused-buffer:
+    description: "The vault buffer `plan-deploy` found. Empty writes a new program buffer."
+    required: false
+    default: ""
+
+outputs:
+  buffer:
+    description: "The program buffer address, reused or new"
+    value: ${{ inputs.reused-buffer || steps.write-program-buffer.outputs.buffer }}
+  idl-buffer:
+    description: "The idl buffer address"
+    value: ${{ steps.write-idl-buffer.outputs.idl-buffer }}
+
+runs:
+  using: "composite"
+  steps:
+    # `plan-deploy` runs workspace JavaScript, so the buffer it names is checked again here,
+    # before any step uses it.
+    - name: Check the reused buffer against the build
+      if: inputs.reused-buffer != ''
+      shell: bash
+      run: |
+        set +e
+        SHOW_OUT=$(solana program show "$BUFFER" -u "$NETWORK" --output json 2>&1)
+        EXIT_CODE=$?
+        set -e
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          # The RPC URL is a secret and the CLI puts it in some errors.
+          echo "${SHOW_OUT//"$NETWORK"/<rpc-url>}"
+          echo "::error::Could not read the reused buffer $BUFFER"
+          exit 1
+        fi
+        BUFFER_AUTHORITY=$(echo "$SHOW_OUT" | jq -r '.authority')
+        if [ "$BUFFER_AUTHORITY" != "$AUTHORITY" ]; then
+          echo "::error::The reused buffer $BUFFER has authority $BUFFER_AUTHORITY, not the buffer authority"
+          exit 1
+        fi
+
+        DUMPED_BUFFER=$(mktemp ./buffer-dump.XXXXXX.so)
+        trap 'rm -f "$DUMPED_BUFFER"' EXIT
+        if ! solana program dump "$BUFFER" "$DUMPED_BUFFER" -u "$NETWORK" > /dev/null 2>&1; then
+          echo "::error::Could not dump the reused buffer $BUFFER"
+          exit 1
+        fi
+        if ! cmp -s "./target/deploy/$PROGRAM.so" "$DUMPED_BUFFER"; then
+          echo "::error::The reused buffer $BUFFER does not match ./target/deploy/$PROGRAM.so"
+          exit 1
+        fi
+        echo "The reused buffer $BUFFER matches the build and has the buffer authority"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        BUFFER: ${{ inputs.reused-buffer }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+        NETWORK: ${{ inputs.network }}
+
+    # On a failure before the authority transfer, this action closes the buffer it made.
+    - uses: ./.github/actions/write-program-buffer/
+      id: write-program-buffer
+      if: inputs.reused-buffer == ''
+      with:
+        network: ${{ inputs.network }}
+        program: ${{ inputs.program }}
+        keypair: ${{ inputs.keypair }}
+        program-id: ${{ inputs.program-id }}
+        buffer-authority: ${{ inputs.buffer-authority }}
+
+    # The IDL buffer goes after the program buffer: once the vault owns it, only a multisig
+    # proposal can close it, so a failed program buffer write must not leave one behind.
+    - uses: ./.github/actions/write-idl-buffer/
+      id: write-idl-buffer
+      with:
+        network: ${{ inputs.network }}
+        program: ${{ inputs.program }}
+        keypair: ${{ inputs.keypair }}
+        program-id: ${{ inputs.program-id }}
+        buffer-authority: ${{ inputs.buffer-authority }}
+
+    - name: Summarize the new buffer
+      if: steps.write-program-buffer.outputs.buffer != ''
+      shell: bash
+      run: |
+        echo "- \`$PROGRAM\`: wrote new buffer \`$BUFFER\`" >> "$GITHUB_STEP_SUMMARY"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        BUFFER: ${{ steps.write-program-buffer.outputs.buffer }}

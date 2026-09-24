@@ -202,9 +202,10 @@ every later build in that shell test values, and the guard passes because the tw
 
 The binary a cluster runs is never a local build. `release-program.yaml` builds it in CI from a
 `program-*` tag via `.github/actions/build-verified`, which compiles in a container that
-receives neither variable; `buffer-deploy` uploads that artifact with the Squads vault as its
-buffer authority, and the upgrade is a multisig proposal. The guard's job is therefore the build
-that is *meant* to be deployable picking up `TESTING` on its own.
+receives neither variable; `deploy-buffers` (with `write-program-buffer` and `write-idl-buffer`)
+uploads that artifact with the Squads vault as its buffer authority, and the upgrade is a
+multisig proposal. The guard's job is therefore the build that is *meant* to be deployable
+picking up `TESTING` on its own.
 
 ## Repo layout
 
@@ -225,15 +226,17 @@ Every leaf under `programs/`, `packages/`, and `utils/` has its own README that 
 
 ## CI / deployment overview
 
-Everything this repo publishes to the world runs through one of four GitHub Actions workflows:
+Everything this repo publishes to the world runs through one of seven GitHub Actions workflows:
 
 | What changes | Triggered by | Workflow |
 | --- | --- | --- |
 | npm packages under `packages/*` | Merge to `develop` with a changeset | [`npm-publish.yaml`](.github/workflows/npm-publish.yaml) |
 | Docker images for services | Git tag `docker-<env>-<service>-<version>` | [`docker-push.yaml`](.github/workflows/docker-push.yaml) |
 | Solana programs on **mainnet** | Git tag `program-<name>-<version>` | [`release-program.yaml`](.github/workflows/release-program.yaml) |
-| Solana programs on **devnet** | Merge to `develop` touching `programs/*`, or the `deploy-to-devnet` PR label | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) |
+| Solana programs on **devnet** | Merge to `develop` that changes a program's `src/`, `Cargo.toml` or `idls/`, or a workspace crate it depends on, or the `deploy-to-devnet` PR label | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) |
 | Any program on devnet, manually | GitHub UI ("Run workflow") | [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml) |
+| Compares each program's on-chain hash with its release hashes | Daily schedule, or GitHub UI ("Run workflow") | [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) |
+| Closes program and IDL buffers the deployer key still owns | Weekly schedule, or GitHub UI ("Run workflow") | [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) |
 
 Each is described in more detail below.
 
@@ -300,7 +303,7 @@ Once the image is in ECR, update the `image:` field in the matching manifest und
 Mainnet program upgrades go through Squads (multisig) — this repo only builds the verifiable `.so`, stages a buffer, and proposes the upgrade transaction.
 
 1. Bump the version in the program's `Cargo.toml`.
-2. Push a tag matching `program-<program-name>-<version>`, e.g.:
+2. Push a tag matching `program-<program-name>-<version>` on a commit that is on `master`, e.g.:
 
    ```bash
    git tag program-helium-sub-daos-0.2.7
@@ -308,17 +311,48 @@ Mainnet program upgrades go through Squads (multisig) — this repo only builds 
    ```
 
 3. [`release-program.yaml`](.github/workflows/release-program.yaml) runs:
-   - builds the program with `anchor build` and uploads the IDL as a GitHub release asset,
+   - builds the IDL with `anchor idl build`,
    - runs a **verifiable** Solana build (`solana-verify`) so the on-chain hash is reproducible,
+   - publishes the GitHub release with the IDL and the release hash, only after that build succeeds, from a job that runs no build scripts,
    - deploys the `.so` and IDL to a buffer account owned by the multisig vault,
    - opens a Squads proposal to upgrade the program to the new buffer.
 4. Sign and execute the Squads proposal.
+
+A re-run skips a program only when both its on-chain hash and its on-chain IDL match the build. An IDL-only change upgrades the program to the same bytes and sets the new IDL. A pending proposal stops the run only when it names the same program buffer and its IDL buffer holds the build IDL.
+
+In the release workflow, the deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key. The weekly sweep also holds the key.
+
+A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. A runner that dies there leaves the buffers with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) runs each week, closes the program buffers and IDL buffers the deployer key still owns, and returns the rent. It stops while a release runs.
+
+[`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) runs each day and compares each program's on-chain hash with its release hashes. Each program reads as deployed, pending, unknown binary, rolled back, or error when a lookup fails. A program with no `.so.sha256` release asset is skipped and named in the summary. A pending program gets a warning when its newest tag is more than 3 days old. An unknown binary, a rollback, or a lookup error fails the run. To quiet a rejected proposal, delete that release's `.so.sha256` asset.
+
+**`helium-admin close-buffers`: run it only when no upgrade proposal is pending.**
+
+### Verify a deployed program
+
+Each program release carries a `<program>.so.sha256` asset: the hash of the release build. Compare it with the on-chain hash:
+
+```bash
+solana-verify get-program-hash -u https://api.mainnet-beta.solana.com <program-id>
+```
+
+To rebuild from the tagged source and compare with the chain:
+
+```bash
+solana-verify verify-from-repo -u https://api.mainnet-beta.solana.com \
+  https://github.com/helium/helium-program-library \
+  --program-id <program-id> \
+  --commit-hash "$(git rev-list -n 1 program-<program-name>-<version>)" \
+  --library-name <program_name>
+```
+
+Answer no when it asks to write verify data on chain, and do not pass `-y`.
 
 ### Releasing a program to devnet
 
 Devnet uses a different lazy-signer seed (`devnethelium5` instead of the mainnet `nJWGUMOK`), so program binaries differ between networks. The workflows handle that automatically.
 
-- **Automatic:** any push to `develop` that touches `programs/<name>/**` (outside `shared-utils/`) triggers [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) for each changed program. On a PR into `develop`, add the `deploy-to-devnet` label to deploy preview-style.
+- **Automatic:** any push to `develop` that changes a program's `src/`, `Cargo.toml` or `idls/`, or a workspace crate the program depends on, triggers [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) for each changed program. On a PR into `develop`, add the `deploy-to-devnet` label to deploy preview-style.
 - **Manual:** run [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml) from the Actions UI with the program name + branch. Same Squads-buffer + proposal flow as mainnet, but against the devnet multisig / RPC.
 
 ### Reusable composite actions
@@ -328,7 +362,9 @@ Each workflow above delegates to composite actions in [`.github/actions/`](.gith
 - `setup/`, `setup-ts/`, `setup-anchor/`, `setup-solana/` — tool installation.
 - `build-anchor/` — `anchor build` (with optional `testing`/`devnet` lazy-signer seeds).
 - `build-verified/` — verifiable build via `solana-verify` that produces a deterministic `.so`.
-- `buffer-deploy/` — uploads the `.so` and IDL to buffer accounts owned by the multisig.
+- `install-solana-verify/` — the one `solana-verify` pin. The release hash, the deploy skip and the daily hash check use it.
+- `plan-deploy/` — the re-run rules: skip a deploy the chain already has, reuse a matching vault buffer, stop on a pending proposal for it. It takes no keypair.
+- `deploy-buffers/`, `write-program-buffer/`, `write-idl-buffer/` — upload the `.so` and IDL to buffer accounts owned by the multisig.
 
 If you're adding a new program / service, you shouldn't need to change the workflows themselves — just add the program to `Anchor.toml` / `docker-info.json` and the tag pattern above will pick it up.
 

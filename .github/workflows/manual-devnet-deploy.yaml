@@ -16,6 +16,9 @@ on:
         default: "develop"
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
@@ -37,7 +40,7 @@ jobs:
             ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}-v0002
 
-      - run: (cargo install toml-cli || true)
+      - run: (cargo install toml-cli --version 0.2.3 || true)
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
 
@@ -56,11 +59,10 @@ jobs:
         env:
           PROGRAM: ${{ inputs.program }}
 
-      # Build the program with anchor so we get the IDL
-      - uses: ./.github/actions/build-anchor/
-        id: build-anchor
+      # Only the IDL is taken from anchor; `build-verified` below produces the `.so` that ships.
+      - uses: ./.github/actions/build-program-idl/
+        id: build-program-idl
         with:
-          testing: false
           devnet: true
           program: ${{ env.PROGRAM_NAME }}
 
@@ -70,27 +72,54 @@ jobs:
           devnet: true
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
+          setup-anchor: false
 
       - uses: ./.github/actions/setup-anchor/
 
-      - uses: ./.github/actions/buffer-deploy/
-        id: buffer-deploy
+      # Re-run rules live in `plan-deploy`: the hash-match skip, the vault buffer reuse and the
+      # pending proposal check. It runs `@sqds/multisig` in the job with the devnet key: a matrix
+      # leg cannot pass its outputs to another job. The mainnet release runs it in a job with no key.
+      - uses: ./.github/actions/plan-deploy/
+        id: plan
         with:
           devnet: true
+          network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
+          program: ${{ env.PROGRAM_NAME }}
+          program-id: ${{ env.PROGRAM_ID }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          multisig: ${{ secrets.DEVNET_MULTISIG }}
+          spill: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
+      # Signers must reject the older proposal, or an execute of it after the new one rolls the
+      # program back.
+      - name: Report the older pending proposal
+        if: steps.plan.outputs.pending-proposal-index != ''
+        env:
+          PROGRAM: ${{ inputs.program }}
+          PENDING: ${{ steps.plan.outputs.pending-proposal-index }}
+        run: |
+          echo "::notice title=Older pending proposal::${PROGRAM}: proposal ${PENDING} is still pending"
+      # On a failure before the authority transfer, this closes the buffer it made.
+      - uses: ./.github/actions/deploy-buffers/
+        id: deploy-buffers
+        if: steps.plan.outputs.skip != 'true'
+        with:
           network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
           program: ${{ env.PROGRAM_NAME }}
           keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          reused-buffer: ${{ steps.plan.outputs.buffer }}
 
       - name: Squads program upgrade
-        uses: helium/squads-program-upgrade@v0.5.0
+        # A skipped run has no buffers. The Squads action exits 1 on an empty address.
+        if: steps.plan.outputs.skip != 'true'
+        uses: helium/squads-program-upgrade@58eb5cf41491c163e857e6ee3dcedb97a2859733 # v0.5.0
         with:
           network-url: "https://api.devnet.solana.com"
           program-multisig: ${{ secrets.DEVNET_MULTISIG }}
           program-id: ${{ env.PROGRAM_ID }}
-          buffer: ${{ steps.buffer-deploy.outputs.buffer }}
-          idl-buffer: ${{ steps.buffer-deploy.outputs.idl-buffer }}
+          buffer: ${{ steps.deploy-buffers.outputs.buffer }}
+          idl-buffer: ${{ steps.deploy-buffers.outputs.idl-buffer }}
           spill-address: ${{ secrets.DEVNET_DEPLOYER_ADDRESS }}
           authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
           name: "Deploy ${{ inputs.program }}"

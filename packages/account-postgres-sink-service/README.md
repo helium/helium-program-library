@@ -17,4 +17,4 @@ Image: `public.ecr.aws/v0j6k5v6/account-postgres-sink-service`
 | oracle-cluster / prod | [manifests/oracle-cluster/prod/helium/account-postgres-sink-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/oracle-cluster/prod/helium/account-postgres-sink-service.yaml) |
 | oracle-cluster / sdlc | [manifests/oracle-cluster/sdlc/helium/account-postgres-sink-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/oracle-cluster/sdlc/helium/account-postgres-sink-service.yaml) |
 
-Deploy: push a `docker-web-account-postgres-sink-service-<version>` git tag (see the [repo README](../../README.md#deploying-docker-services)).
+Image release: push a `docker-web-account-postgres-sink-service-<version>` tag by hand (see [repo README](../../README.md#deploying-docker-services)). The service deploy (the k8s bump) stays manual.

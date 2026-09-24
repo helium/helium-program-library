@@ -34,4 +34,4 @@ Image: `public.ecr.aws/v0j6k5v6/tuktuk-dca-service`
 | --- | --- |
 | web-cluster / prod | [manifests/web-cluster/prod/helium/tuktuk-dca-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/tuktuk-dca-service.yaml) |
 
-Deploy: push a `docker-web-tuktuk-dca-service-<version>` git tag.
+Image release: push a `docker-web-tuktuk-dca-service-<version>` tag by hand (see [repo README](../../README.md#deploying-docker-services)). The service deploy (the k8s bump) stays manual.
