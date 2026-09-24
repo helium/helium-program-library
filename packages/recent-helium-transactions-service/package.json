@@ -19,7 +19,7 @@
     "poll-blocks": "ts-node-dev --project tsconfig.cjs.json src/blockPoller.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
+    "@anchor-lang/core": "^0.31.2",
     "@helium/lazy-distributor-sdk": "workspace:^",
     "@helium/spl-utils": "workspace:^",
     "@solana/spl-token": "^0.3.8",

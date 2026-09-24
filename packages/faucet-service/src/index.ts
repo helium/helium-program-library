@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import fastify from "fastify";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { createAtaAndTransfer, toBN } from "@helium/spl-utils";
 import { getMint } from "@solana/spl-token";
 

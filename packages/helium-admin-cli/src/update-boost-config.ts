@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { boostConfigKey, init as initHex } from "@helium/hexboosting-sdk";
 import { MOBILE_MINT } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";

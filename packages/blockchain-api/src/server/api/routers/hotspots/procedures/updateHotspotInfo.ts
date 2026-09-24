@@ -24,7 +24,7 @@ import { HNT_MINT } from "@helium/spl-utils";
 import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 
 import type { TransactionItem } from "@helium/blockchain-api/schemas/common";
-import type { IdlTypes, Program } from "@coral-xyz/anchor";
+import type { IdlTypes, Program } from "@anchor-lang/core";
 import type { z } from "zod";
 import { UpdateHotspotInfoInputSchema } from "@helium/blockchain-api/schemas/hotspots";
 import {

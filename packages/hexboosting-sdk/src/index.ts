@@ -1,5 +1,5 @@
 import { Hexboosting } from "@helium/idls/lib/types/hexboosting";
-import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Idl, Program } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { hexboostingResolvers } from "./resolvers";

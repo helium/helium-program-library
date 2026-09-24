@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { accountPayerKey } from "@helium/data-credits-sdk";
 import { init as hemInit } from "@helium/helium-entity-manager-sdk";

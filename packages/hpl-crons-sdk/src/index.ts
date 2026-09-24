@@ -1,4 +1,4 @@
-import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Idl, Program } from "@anchor-lang/core";
 import { heliumCommonResolver } from "@helium/anchor-resolvers";
 import { HplCrons } from "@helium/idls/lib/types/hpl_crons";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";

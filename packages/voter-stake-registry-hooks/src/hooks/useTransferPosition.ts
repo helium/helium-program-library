@@ -1,4 +1,4 @@
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import { sendInstructions, toBN } from "@helium/spl-utils";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";

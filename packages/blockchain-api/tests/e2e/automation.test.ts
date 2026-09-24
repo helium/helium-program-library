@@ -4,7 +4,7 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
 } from "@solana/web3.js";
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@anchor-lang/core";
 import {
   cronJobKey,
   cronJobNameMappingKey,

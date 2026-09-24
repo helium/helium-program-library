@@ -16,7 +16,7 @@ import {
   Instruction,
   Program,
   setProvider,
-} from "@coral-xyz/anchor";
+} from "@anchor-lang/core";
 import cors from "@fastify/cors";
 import { AccountFetchCache } from "@helium/account-fetch-cache";
 import {

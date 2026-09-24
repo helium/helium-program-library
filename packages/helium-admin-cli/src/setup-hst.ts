@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import Address from "@helium/address";
 import { ED25519_KEY_TYPE } from "@helium/address/build/KeyTypes";
 import { fanoutKey, init, membershipVoucherKey } from "@helium/fanout-sdk";

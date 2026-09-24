@@ -36,7 +36,7 @@
     "@solana/web3.js": "^1.91.1"
   },
   "peerDependencies": {
-    "@coral-xyz/anchor": "^0.31.0"
+    "@anchor-lang/core": "^0.31.2"
   },
   "devDependencies": {
     "git-format-staged": "^2.1.3",

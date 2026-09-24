@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init as initMfan } from "@helium/mini-fanout-sdk";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import { PublicKey } from "@solana/web3.js";

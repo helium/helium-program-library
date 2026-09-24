@@ -1,4 +1,4 @@
-import { AnchorProvider, Program, Provider } from "@coral-xyz/anchor";
+import { AnchorProvider, Program, Provider } from "@anchor-lang/core";
 import {
   AddressLookupTableAccount,
   Commitment,

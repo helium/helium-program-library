@@ -34,7 +34,7 @@
     "check-cu-table": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/check-cu-table.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
+    "@anchor-lang/core": "^0.31.2",
     "@helium/account-fetch-cache": "workspace:^",
     "@helium/address": "^4.12.0",
     "@helium/anchor-resolvers": "workspace:^",

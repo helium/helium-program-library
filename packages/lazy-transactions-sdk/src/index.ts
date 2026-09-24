@@ -1,5 +1,5 @@
-import { AnchorProvider, Idl, IdlTypes, Program } from "@coral-xyz/anchor";
-import { IdlCoder } from "@coral-xyz/anchor/dist/cjs/coder/borsh/idl";
+import { AnchorProvider, Idl, IdlTypes, Program } from "@anchor-lang/core";
+import { IdlCoder } from "@anchor-lang/core/dist/cjs/coder/borsh/idl";
 import { LazyTransactions } from "@helium/idls/lib/types/lazy_transactions";
 import {
   AccountMeta,

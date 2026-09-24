@@ -13,7 +13,7 @@ import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { PROGRAM_ID as HELIUM_ENTITY_MANAGER_PROGRAM_ID } from "@helium/helium-entity-manager-sdk";
 import { init } from "./init";
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@anchor-lang/core";
 import { incentiveProgramKey } from "./pdas";
 
 export const mobileEntityManagerResolvers = combineResolvers(

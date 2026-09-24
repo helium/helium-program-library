@@ -1,5 +1,5 @@
 import axios from "axios";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init } from "@helium/price-oracle-sdk";
 import { sendInstructionsWithPriorityFee } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";

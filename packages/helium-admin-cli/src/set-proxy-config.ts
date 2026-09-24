@@ -1,7 +1,7 @@
 import yargs from "yargs/yargs";
 import { exists, loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 import os from "os";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init } from "@helium/nft-proxy-sdk";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import fs from "fs";

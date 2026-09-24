@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init as initVsr } from "@helium/voter-stake-registry-sdk";
 import os from "os";
 import yargs from "yargs";

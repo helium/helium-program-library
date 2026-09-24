@@ -5,7 +5,7 @@ import {
   ENTITY_CLAIM_CRON_NAME,
   resolveScheduleToCron,
 } from "@/lib/utils/automation-helpers";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   cronJobKey,
   cronJobNameMappingKey,

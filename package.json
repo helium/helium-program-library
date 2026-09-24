@@ -17,8 +17,8 @@
   ],
   "private": true,
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.1",
-    "@coral-xyz/borsh": "^0.2.6",
+    "@anchor-lang/core": "^0.31.2",
+    "@anchor-lang/borsh": "^0.31.2",
     "@helium/crypto": "^4.14.2",
     "@helium/modular-governance-idls": "^0.1.5-alpha.0",
     "@helium/nft-proxy-sdk": "^0.1.5-alpha.0",
@@ -85,12 +85,9 @@
       "sha.js": "^2.4.12",
       "@helium/crypto": "^4.14.2",
       "@types/bn.js": "^5.2.0",
-      "@solana/web3.js": "1.99.0"
-    },
-    "peerDependencyRules": {
-      "allowedVersions": {
-        "anchor-bankrun>@coral-xyz/anchor": "0.31.1"
-      }
+      "@solana/web3.js": "1.99.0",
+      "@coral-xyz/anchor@^0.31": "npm:@anchor-lang/core@0.31.2",
+      "anchor-bankrun>@coral-xyz/anchor": "npm:@anchor-lang/core@0.31.2"
     }
   },
   "packageManager": "pnpm@9.15.4",

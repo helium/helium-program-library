@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
