@@ -329,15 +329,16 @@ test("an upgrade of another ProgramData: not an upgrade transaction", () => {
   );
 });
 
-// Canned JSON-RPC answers: the ProgramData's signatures, newest first, in pages
-// of 50, and the parsed transaction of each upgrade signature.
-const stubRpc = (signatures, upgrades) => {
+// Canned JSON-RPC answers: the program's ProgramData address, its signatures,
+// newest first, in pages of 50, and the parsed transaction of each upgrade
+// signature.
+const stubRpc = (signatures, upgrades, programData = "PD") => {
   const fetch = globalThis.fetch;
   globalThis.fetch = async (_url, { body }) => {
     const { method, params } = JSON.parse(body);
     const result = {
       getAccountInfo: () => ({
-        value: { data: { parsed: { info: { programData: "PD" } } } },
+        value: { data: { parsed: { info: { programData } } } },
       }),
       getSignaturesForAddress: () => {
         const start = params[1].before
@@ -432,6 +433,38 @@ test("an empty first signature page: error, not pending", async (t) => {
       status: "error",
       version: "0.1.3",
       message: "fan: ProgramData history ended with no deploy or upgrade found",
+    },
+  );
+});
+
+test("a program account with no ProgramData address: error, not pending", async (t) => {
+  t.after(stubRpc([], {}, null));
+  assert.deepEqual(
+    await checkProgram(FANOUT, lookups({ lastUpgradeTime: undefined })),
+    {
+      program: "fanout",
+      programId: "fan",
+      status: "error",
+      version: "0.1.3",
+      message: "fan: no ProgramData address",
+    },
+  );
+});
+
+test("an upgrade transaction with no blockTime: error, not pending", async (t) => {
+  t.after(
+    stubRpc([signature(0, secondsAgo(1))], {
+      s0: { ...parsedTx([loaderIx("upgrade")]), blockTime: null },
+    }),
+  );
+  assert.deepEqual(
+    await checkProgram(FANOUT, lookups({ lastUpgradeTime: undefined })),
+    {
+      program: "fanout",
+      programId: "fan",
+      status: "error",
+      version: "0.1.3",
+      message: "fan: upgrade transaction s0 has no blockTime",
     },
   );
 });

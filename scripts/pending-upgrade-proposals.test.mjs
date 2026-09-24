@@ -396,19 +396,33 @@ const recordedIdlBuffer = (() => {
   );
   return accountKeys[setBuffer.accountIndexes[0]].toBase58();
 })();
-const readWithIdl = (idlBufferData) =>
-  pendingUpgrades({
+// With `edit`, index 163's vault transaction carries the edited message.
+const readWithIdl = (idlBufferData, edit) => {
+  const transactionKey = multisig
+    .getTransactionPda({ multisigPda, index: 163n })[0]
+    .toBase58();
+  return pendingUpgrades({
     getMultipleAccountsInfo: async (keys) =>
-      (await getMultipleAccountsInfo(keys)).map((account, i) =>
-        keys[i].toBase58() === recordedIdlBuffer && idlBufferData
-          ? { data: idlBufferData }
-          : account,
-      ),
+      (await getMultipleAccountsInfo(keys)).map((account, i) => {
+        if (keys[i].toBase58() === recordedIdlBuffer && idlBufferData) {
+          return { data: idlBufferData };
+        }
+        if (keys[i].toBase58() === transactionKey && edit) {
+          return {
+            data: multisig.accounts.VaultTransaction.fromArgs({
+              ...recordedTransaction,
+              message: edit(recordedTransaction.message),
+            }).serialize()[0],
+          };
+        }
+        return account;
+      }),
     multisigPda,
     programId: new PublicKey(LAZY_TRANSACTIONS),
     spill: SPILL,
     idl: BUILD_IDL,
   });
+};
 
 test("a same-buffer proposal whose IDL buffer holds the build IDL stops the run", async () => {
   // Key order does not matter.
@@ -439,5 +453,31 @@ test("a same-buffer proposal whose IDL buffer is gone is an older one", async ()
   assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
     sameBuffer: null,
     older: [163],
+  });
+});
+
+test("an IDL Close to the vault ahead of the SetBuffer does not change the IDL buffer read", async () => {
+  // Close's accounts are (idl, authority, sol_destination). It closes the
+  // recorded SetBuffer's IDL account, so a read of that account would miss
+  // the build IDL.
+  const pending = await readWithIdl(idlAccountData(BUILD_IDL), (message) => {
+    const setBuffer = message.instructions.find((ix) =>
+      Buffer.from(ix.data).subarray(0, 8).equals(IDL_IX_TAG),
+    );
+    const [, idl, vault] = setBuffer.accountIndexes;
+    const close = {
+      ...withIdlVariant(5)(setBuffer),
+      accountIndexes: new Uint8Array([idl, vault, vault]),
+    };
+    return {
+      ...message,
+      instructions: message.instructions.flatMap((ix) =>
+        ix === setBuffer ? [close, ix] : [ix],
+      ),
+    };
+  });
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: 163,
+    older: [],
   });
 });
