@@ -235,3 +235,8 @@ jobs:
           path: ${{ runner.temp }}/changesets
           retention-days: 1
           include-hidden-files: true
+
+      # The job fails soft, so a failure would otherwise render as success.
+      - name: Flag the failure
+        if: failure()
+        run: echo "::warning::The changeset bot failed, so it wrote no changeset. The Release Declaration check still gates the PR."

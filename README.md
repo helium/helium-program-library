@@ -266,7 +266,7 @@ The bot writes at most one new file in each directory, and it never edits a file
 
 The bot commits through the GitHub API with the [`api-commit`](.github/actions/api-commit) action, not `git push`. GitHub signs such a commit with its own key, so the bot's commit shows **Verified**. The commit names the head the run read; a branch that moved since then fails the commit, and the next run writes the files against the new head.
 
-The bot skips drafts, its own commits, the release PR heads, the Promotion PR, and the back-merge PR. It also skips a PR from a fork, because a fork's token is read-only. For a fork PR, a maintainer pushes the file to the fork branch.
+The bot skips drafts, its own commits, the release PR heads, the Promotion PR, and the back-merge PR. It also skips a PR from a fork: the App commits only to branches in this repo, `changeset-bot-commit.yaml` refuses a fork head, and GitHub passes no secret to a fork PR. Never move either bot workflow to `pull_request_target`, which runs with secrets beside PR code. For a fork PR, a maintainer pushes the file to the fork branch.
 
 Write the files by hand when you prefer, or when the bot is down:
 
@@ -312,7 +312,11 @@ node scripts/version-programs.mjs
 
 Then merge the hotfix. `back-merge-pr.yaml` opens the `master` to `develop` back-merge PR, and a person merges it. Master ahead of develop blocks every later promotion, so merge it soon.
 
-**4. The tag and the deploy.** On each push to master, `program-auto-tag.yaml` creates `program-<name>-<Cargo.toml version>` at the head of master for every program whose version has no tag. It is a state rule, so the next run heals a missed or failed one. A program with no earlier tag is skipped and logged.
+**4. The tag and the deploy.** On each push to master, `program-auto-tag.yaml` creates `program-<name>-<Cargo.toml version>` at the head of master for every program whose version has no tag. It is a state rule, so the next run heals a missed or failed one. A program with no earlier tag is skipped and logged. Three cases follow from the state rule:
+
+- A reverted bump burns its version. Its tag, if the bot made one, stays, so the next bump must go above it.
+- Merges to master in quick succession cancel the pending run, so an intermediate version gets no tag and no deploy. Only the newest version is tagged.
+- A deleted tag comes back on the next run, at the master head of that time: other bytes under a version already deployed. Never delete a `program-*` tag. The tag ruleset in [The release App](#the-release-app) blocks it.
 
 The tag starts `release-program.yaml`, which:
 
@@ -416,8 +420,8 @@ On each push to develop, `service-auto-tag.yaml` pushes `docker-<env>-<service>-
 Tag a service by hand for a hotfix, a minor, or a major:
 
 ```bash
-git tag docker-web-blockchain-api-0.11.17
-git push origin docker-web-blockchain-api-0.11.17
+git tag docker-web-blockchain-api-<next version>
+git push origin docker-web-blockchain-api-<next version>
 ```
 
 The tag format is strict: `docker-<env>-<service>-<version>`. `docker-push.yaml` parses the tag, looks the source path up in `docker-info.json`, logs into the matching ECR with the env-scoped AWS credentials, and pushes `<registry>/<service>:<version>`. Two build styles are supported:
@@ -426,6 +430,18 @@ The tag format is strict: `docker-<env>-<service>-<version>`. `docker-push.yaml`
 - Otherwise (the Rust utils and `geocoder-service`), the build context is the service directory itself.
 
 **A tag makes an image and deploys nothing.** The k8s bump stays manual: update the `image:` field in the matching manifest under [`helium-foundation-k8s`](https://github.com/helium/helium-foundation-k8s) and merge. ArgoCD picks the change up within a few minutes. A full catalogue of where each image is deployed lives in the service's own README.
+
+### The release App
+
+Every bot write goes through one GitHub App. Its ID and private key are the `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY` secrets. This setup is the security contract of the workflows:
+
+- **Install scope.** Install the App on this repository only.
+- **Permissions.** Contents: write and Pull requests: write. Each job scopes its token to what it needs.
+- **Environment.** Keep the secrets in the `release-bots` environment, with a branch policy of `develop` and `master`. A dispatch from another branch then gets no secret.
+- **Where a token is minted.** Never in a `pull_request` job. `changeset-bot.yaml` runs PR code and gets no secret. `changeset-bot-commit.yaml` mints the token, and `workflow_run` runs it from the default branch.
+- **Ruleset bypass.** Grant none on `master` or `develop`. If a ruleset blocks the program release PR, grant a bypass for exactly `refs/heads/program-release/*`.
+- **Tags.** If a ruleset covers `refs/tags/program-*` or `refs/tags/docker-*`, give the App a creation bypass. Block deletion and update for everyone. That block is the only guard against a deleted tag coming back at a new head.
+- **Required check.** Make **New program versions are untagged** a required check on `develop`.
 
 ### Dry run, go-live, and rollback
 
