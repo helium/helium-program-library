@@ -232,6 +232,7 @@ Three things leave this repo: npm packages, service images, and Solana programs.
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`tests.yaml`](.github/workflows/tests.yaml)                                     | Every PR, and push to `develop` or `master`                                                                                                        | Tests and lint, plus two release gates: **Release Declaration** (the backstop check) and **Program Version Bumps** (the missing-bump check). |
 | [`changeset-bot.yaml`](.github/workflows/changeset-bot.yaml)                     | PR to `develop` or `master`; manual dispatch                                                                                                       | Writes the changeset and the program changeset a PR is missing.                                                                              |
+| [`changeset-bot-commit.yaml`](.github/workflows/changeset-bot-commit.yaml)       | A completed `changeset-bot.yaml` run                                                                                                               | Checks the files that run wrote, and commits them to the PR branch under the App token.                                                      |
 | [`version-programs.yaml`](.github/workflows/version-programs.yaml)               | Push to `develop`; PR to `develop`; manual dispatch                                                                                                | Turns `.changeset-programs/` into `Cargo.toml` bumps and changelogs on the program release PR.                                               |
 | [`npm-publish.yaml`](.github/workflows/npm-publish.yaml)                         | Push to `develop`                                                                                                                                  | Opens the "Version Packages" PR, and publishes to npm when that PR merges.                                                                   |
 | [`promotion-pr.yaml`](.github/workflows/promotion-pr.yaml)                       | Push to `develop`; manual dispatch                                                                                                                 | Keeps one `develop` to `master` **Promotion PR** open while develop is ahead.                                                                |
@@ -428,15 +429,17 @@ The tag format is strict: `docker-<env>-<service>-<version>`. `docker-push.yaml`
 
 ### Dry run, go-live, and rollback
 
-Each bot workflow starts with `env: DRY_RUN: true`. In dry run the bot writes what it would do to the run summary, and writes nothing outside the runner. A `workflow_dispatch` run overrides the flag with its `dry_run` input, for one run.
+Each bot workflow starts with `env: DRY_RUN: true`. In dry run the bot writes what it would do to the run summary, and writes nothing outside the runner. A `workflow_dispatch` run overrides the flag with its `dry_run` input, for one run. `version-programs.yaml` and `promotion-pr.yaml` run a dispatch from a branch other than `develop` as a dry run whatever the input says, and `back-merge-pr.yaml` does the same for a branch other than `master`. Once the `release-bots` environment has a `develop` and `master` branch policy, a dispatch from another branch fails at the environment gate instead of running as a dry run.
 
 A bot goes live on a **shadow match**: the run summaries say what it would have done, a person confirms that matches what was done by hand, and a one-line PR sets `DRY_RUN: false`. The bar per bot is the changeset bot over 10 PRs, service auto-tag over 3 image releases, the program release PR over 1 version, the Promotion PR bot over 1 cycle, and the tag bot over 1 promotion.
+
+The changeset bot has two `DRY_RUN` flags: one in `changeset-bot.yaml` and one in `changeset-bot-commit.yaml`. It commits only when both are false. The commit workflow runs from `master`, so its flip takes effect only after promotion.
 
 The backstop check and the missing-bump check have no flag. They start as non-required checks and become required at their bot's go-live.
 
 The deploy workflows have no dry run. Devnet is their rehearsal.
 
-To roll a bot back, disable the workflow in the Actions UI, then revert its PR.
+To roll a bot back, disable the workflow in the Actions UI, then revert its PR. To roll the changeset bot back, set `changeset-bot-commit.yaml`'s flag to true on `master`, or set either flag to true.
 
 ### Reusable composite actions
 

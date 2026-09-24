@@ -58,9 +58,9 @@ jobs:
             echo "## Service auto-tag"
             echo
             if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
-              echo "Dry run. No tag was pushed. The tags this run would push at \`${GITHUB_SHA}\`:"
+              echo "Dry run. No tag was pushed. The tags this run would push on the develop tip:"
             else
-              echo "Tags at \`${GITHUB_SHA}\`:"
+              echo "Tags on the develop tip:"
             fi
             echo
           } >> "$GITHUB_STEP_SUMMARY"

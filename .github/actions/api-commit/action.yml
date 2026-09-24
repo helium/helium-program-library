@@ -22,6 +22,10 @@ inputs:
     description: "Space-separated pathspecs to commit. Empty commits every change in the checkout, drift the build left included."
     required: false
     default: ""
+  working-directory:
+    description: "The checkout to diff and commit, relative to the workspace."
+    required: false
+    default: "."
 
 outputs:
   commit-oid:
@@ -37,6 +41,7 @@ runs:
     - name: Commit through the API
       id: commit
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         GH_TOKEN: ${{ inputs.token }}
         BRANCH: ${{ inputs.branch }}

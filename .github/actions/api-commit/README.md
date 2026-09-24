@@ -20,6 +20,7 @@ bots still `git push` a lightweight tag, which has no badge to lose.
 | `body`              | no       | The commit message body. Omitted from the message when empty.                                                                                    |
 | `expected-head-oid` | yes      | The commit the branch is expected to be at, and the commit the changes are computed against.                                                     |
 | `paths`             | no       | Space-separated pathspecs to commit. Empty commits every change in the checkout, drift the build left included.                                  |
+| `working-directory` | no       | The checkout to diff and commit, relative to the workspace. Defaults to `.`.                                                                     |
 
 ## Outputs
 

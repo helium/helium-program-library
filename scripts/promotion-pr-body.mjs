@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { readPrograms } from "./missing-bump-check.mjs";
+import { readPrograms, showFile } from "./missing-bump-check.mjs";
 import { parseChangeset } from "./missing-changesets.mjs";
 
 /**
@@ -130,18 +130,6 @@ export const promotionPrBody = ({
 
 const USAGE =
   "Usage: node scripts/promotion-pr-body.mjs [head] [--missing-bump <file>] [--back-merge <url>]";
-
-/** The file's content at `head`, or null when it is not in that tree. */
-const showFile = (head, file) => {
-  try {
-    return execFileSync("git", ["show", `${head}:${file}`], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-  } catch {
-    return null;
-  }
-};
 
 const bySemver = (a, b) => {
   const right = b.split(".").map(Number);

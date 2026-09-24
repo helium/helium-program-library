@@ -215,7 +215,7 @@ jobs:
             echo
             echo "Merging this PR bumps each \`Cargo.toml\` and writes each changelog. It creates no tag: the tag bot tags each program once the bump reaches \`master\`."
           } > "$RUNNER_TEMP/body.md"
-          number=$(gh pr list --head "$BRANCH" --base develop --state open --json number --jq '.[0].number')
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base develop --state open --json number,isCrossRepository --jq 'map(select(.isCrossRepository | not))[0].number // empty')
           if [ -n "$number" ]; then
             gh pr edit "$number" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
           else

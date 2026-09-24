@@ -6,7 +6,10 @@ name: Changeset Bot Commit
 # attacker-written: a PR can edit changeset-bot.yaml, so every field and file
 # is checked against what GitHub sets on the event and the PR.
 env:
-  # Dry run until go-live. A dispatch of changeset-bot.yaml overrides it.
+  # Dry run until go-live. Go-live needs both this flag and
+  # changeset-bot.yaml's flag false. workflow_run reads this file from the
+  # default branch (master), so this flip takes effect only once it reaches
+  # master. A dispatch of changeset-bot.yaml overrides it.
   DRY_RUN: true
 
 on:
@@ -16,9 +19,11 @@ on:
 
 permissions: {}
 
-# One run per branch. A new push makes the older run's files stale.
+# One run per branch of this repo. A new push makes the older run's files
+# stale. A fork branch of the same name and dispatch runs get their own group,
+# since the group is set before the job's fork gate.
 concurrency:
-  group: changeset-bot-commit-${{ github.event.workflow_run.head_branch }}
+  group: changeset-bot-commit-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.id || github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
@@ -99,11 +104,17 @@ jobs:
           [[ "$number" =~ ^[1-9][0-9]*$ ]] || fail "meta.json holds a bad PR number."
           [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || fail "meta.json holds a bad head sha."
 
-          # A dispatch leaves these fields on the dispatch ref, and only a
-          # writer can dispatch, so it skips them.
+          # A dispatch leaves these fields on the dispatch ref, so it skips
+          # them; it must run from develop or master, so the artifact comes
+          # from reviewed code.
           if [ "$EVENT" != "workflow_dispatch" ]; then
             [ "$head_sha" = "$EVENT_HEAD_SHA" ] || fail "headSha $head_sha is not the run's head $EVENT_HEAD_SHA."
             [ "$head_ref" = "$EVENT_HEAD_BRANCH" ] || fail "headRef is not the run's branch $EVENT_HEAD_BRANCH."
+          else
+            case "$EVENT_HEAD_BRANCH" in
+              develop | master) ;;
+              *) fail "A dispatch runs only from develop or master, not $EVENT_HEAD_BRANCH." ;;
+            esac
           fi
 
           pr=$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json headRefName,headRefOid,isCrossRepository,state)
@@ -165,7 +176,7 @@ jobs:
           if [ "$EVENT" = "workflow_dispatch" ]; then
             if [ "$meta_dry_run" = "false" ]; then dry_run=false; else dry_run=true; fi
           else
-            dry_run="$DRY_RUN"
+            if [ "$DRY_RUN" = "false" ] && [ "$meta_dry_run" = "false" ]; then dry_run=false; else dry_run=true; fi
           fi
           {
             echo "proceed=true"
@@ -235,23 +246,15 @@ jobs:
           permission-contents: write
 
       # The payload is diffed in the head checkout, so it holds only the new
-      # files, and the script comes from the default branch. The API form of
-      # a no-force push: a branch that moved past the head fails the commit.
+      # files. The action comes from the default-branch checkout. A branch
+      # that moved past the head fails the commit.
       - name: Commit to the PR branch
         if: steps.validate.outputs.proceed == 'true' && steps.validate.outputs.dry_run != 'true'
-        working-directory: head
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          BRANCH: ${{ steps.validate.outputs.head-ref }}
-          HEADLINE: "chore: add changesets"
-          EXPECTED_HEAD_OID: ${{ steps.validate.outputs.head-sha }}
-          PATHS: ${{ steps.validate.outputs.paths }}
-        run: |
-          set -euo pipefail
-          "$GITHUB_WORKSPACE/trusted/.github/actions/api-commit/build-payload.sh" > "$RUNNER_TEMP/payload.json"
-          if [ ! -s "$RUNNER_TEMP/payload.json" ]; then
-            echo "Nothing to commit."
-            exit 0
-          fi
-          oid=$(gh api graphql --input "$RUNNER_TEMP/payload.json" --jq '.data.createCommitOnBranch.commit.oid')
-          echo "Committed $oid on $BRANCH."
+        uses: ./trusted/.github/actions/api-commit
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: ${{ steps.validate.outputs.head-ref }}
+          headline: "chore: add changesets"
+          expected-head-oid: ${{ steps.validate.outputs.head-sha }}
+          paths: ${{ steps.validate.outputs.paths }}
+          working-directory: head
