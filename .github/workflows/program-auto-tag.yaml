@@ -36,6 +36,7 @@ jobs:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: release-bots
     permissions:
       contents: read
     steps:
@@ -46,6 +47,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -97,13 +99,13 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       # The App token, so release-program.yaml starts on each tag: a
-      # GITHUB_TOKEN push starts no workflow. The checkout above used
-      # GITHUB_TOKEN.
+      # GITHUB_TOKEN push starts no workflow. The checkout persists no
+      # credential, so the push carries only this token.
       # Scoped to what this job does: pushes tags.
       - name: Get an App token
         id: app-token
         if: steps.list.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

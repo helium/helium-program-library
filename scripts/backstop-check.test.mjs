@@ -86,3 +86,22 @@ test("an IDL change with no @helium/idls changeset fails", () => {
   });
   assert.match(failure, /@helium\/idls/);
 });
+
+test("a program changeset that names an unknown program fails", () => {
+  assert.throws(
+    () =>
+      backstopCheck({
+        ...changed,
+        programChangesets: [
+          {
+            file: ".changeset-programs/typo.md",
+            ...changeset(
+              "---\nlazy-distributor: patch\nwelcome-pak: none\n---\n\nOn chain.\n",
+            ),
+          },
+        ],
+        knownPrograms: ["lazy-distributor", "welcome-pack"],
+      }),
+    /\.changeset-programs\/typo\.md: unknown program "welcome-pak"/,
+  );
+});

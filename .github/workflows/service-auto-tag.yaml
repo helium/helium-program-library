@@ -1,6 +1,6 @@
 name: Service auto-tag
 
-# Pushes the next docker-<account>-<service>-<x.y.z> tag for each opted-in
+# Pushes the next docker-<env>-<service>-<x.y.z> tag for each opted-in
 # service (`autoTag` in docker-info.json) that changed since its last tag.
 # docker-push.yaml then builds the image. A tag makes an ECR image and deploys
 # nothing. Hand tags stay valid from any branch.
@@ -75,12 +75,14 @@ jobs:
     if: needs.plan.outputs.dry_run != 'true' && needs.plan.outputs.tags != '[]' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: release-bots
     strategy:
       fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.tags) }}
-    # One run per service, newest wins. A cancelled run leaves a version gap at
-    # most; the next run names its tag again from the tags that exist.
+    # One run per service, newest wins. Each run names and tags the develop
+    # tip, not its own event commit, so the last run to finish tags the newest
+    # code and an older run finds nothing new.
     concurrency:
       group: service-auto-tag-${{ matrix.service }}
       cancel-in-progress: true
@@ -88,10 +90,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: develop
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
@@ -100,6 +104,7 @@ jobs:
       # tagged this service since the plan job read the tags.
       - name: Name the tag
         id: name
+        shell: bash
         env:
           SERVICE: ${{ matrix.service }}
         run: |
@@ -110,12 +115,13 @@ jobs:
           fi
 
       # The App token, so docker-push.yaml starts on the tag: a GITHUB_TOKEN
-      # push starts no workflow. The checkout above used GITHUB_TOKEN.
+      # push starts no workflow. The checkout persists no credential, so the
+      # push carries only this token.
       # Scoped to what this job does: pushes one tag.
       - name: Get an App token
         id: app-token
         if: steps.name.outputs.tag != ''
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -129,7 +135,8 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.name.outputs.tag }}
         run: |
+          sha=$(git rev-parse HEAD)
           git push \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            "${GITHUB_SHA}:refs/tags/${TAG}"
-          echo "Pushed \`${TAG}\` at \`${GITHUB_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
+            "${sha}:refs/tags/${TAG}"
+          echo "Pushed \`${TAG}\` at \`${sha}\`." >> "$GITHUB_STEP_SUMMARY"

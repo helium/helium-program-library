@@ -5,16 +5,14 @@
  * in the PR covers; this script turns those names into at most one file per
  * side. Every level and every line of text is a rule, so the invariants the
  * bot commits under are this file's unit tests: names only from the missing
- * set, `none` only for a dependent program, never an empty changeset, never a
- * write over an existing file. The author edits the file when a rule falls
+ * set, never `none`, never an empty changeset, never a write over an existing
+ * file. The author edits the file when a rule falls
  * short.
  */
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isNoReleasePath } from "./changed-programs.mjs";
 import { IDLS_PACKAGE } from "./missing-changesets.mjs";
 
 const USAGE =
@@ -33,50 +31,25 @@ export const changesetTitle = (title) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
-const HANDLER_DIR = /^programs\/[^/]+\/src\/instructions\//;
-
 /**
- * The level for a program changed only through the crates in `via`. `none`
- * needs proof that the dependent's binary cannot have changed: every
- * dependency is a program whose IDL did not move and whose only changed files
- * are instruction handlers, which a dependent never runs. Anything else, a
- * shared crate above all, is `patch`.
+ * The level for a program changed only through the crates in `via`: always
+ * `patch`. The bot cannot prove a dependent's binary did not change, so it
+ * never writes `none`; a person who knows it did not sets `none` by hand.
  *
- * @param {{ via: string[], files: string[], idlDiff: { programs: { name: string, changed: boolean }[] } | null }} input
- *   `files` are the PR's changed paths; `idlDiff` is `idl-diff.mjs` output.
- * @returns {{ level: "none" | "patch", reason: string }}
+ * @param {{ via: string[], idlDiff: { programs: { name: string, changed: boolean }[] } | null }} input
+ *   `idlDiff` is `idl-diff.mjs` output.
+ * @returns {{ level: "patch", reason: string }}
  */
-export const dependentLevel = ({ via, files, idlDiff }) => {
-  const reasons = via.map((crate) => {
-    const prefix = `programs/${crate}/`;
-    const changed = files.filter(
-      (file) => file.startsWith(prefix) && !isNoReleasePath(file),
-    );
-    if (changed.length === 0) {
-      return { level: "patch", reason: `${crate} is not a program` };
-    }
-    const diff = idlDiff?.programs.find(({ name }) => name === crate);
-    if (!diff || diff.changed) {
-      return { level: "patch", reason: `the IDL of ${crate} changed` };
-    }
-    if (!changed.every((file) => HANDLER_DIR.test(file))) {
-      return {
-        level: "patch",
-        reason: `${crate} changed outside its instruction handlers`,
-      };
-    }
-    return {
-      level: "none",
-      reason: `only instruction handlers in ${crate} changed and its IDL did not`,
-    };
-  });
-  const patch = reasons.filter(({ level }) => level === "patch");
-  const chosen = patch.length > 0 ? patch : reasons;
-  return {
-    level: chosen[0].level,
-    reason: chosen.map(({ reason }) => reason).join("; "),
-  };
-};
+export const dependentLevel = ({ via, idlDiff }) => ({
+  level: "patch",
+  reason: via
+    .map((crate) =>
+      idlDiff?.programs.find(({ name }) => name === crate)?.changed
+        ? `the IDL of ${crate} changed`
+        : `${crate} changed`,
+    )
+    .join("; "),
+});
 
 const names = (entries) => entries.map(({ name }) => name).join(", ");
 
@@ -100,12 +73,11 @@ const file = (frontMatter, paragraphs) =>
  *   missing: { npm: string[], programs: { name: string, own: boolean, via: string[], hint?: string }[], idls: { level: string, breaking: boolean } | null },
  *   idlDiff: { programs: { name: string, changed: boolean, diff: object }[] } | null,
  *   title: string,
- *   files: string[],
  *   id: string,
- * }} input `missing` is `missing-changesets.mjs` output, `files` the PR's changed paths.
+ * }} input `missing` is `missing-changesets.mjs` output.
  * @returns {Record<string, string>} repo-relative path -> file text; empty when nothing is missing.
  */
-export const writeChangesets = ({ missing, idlDiff, title, files, id }) => {
+export const writeChangesets = ({ missing, idlDiff, title, id }) => {
   const text = changesetTitle(title);
   const out = {};
 
@@ -144,7 +116,6 @@ export const writeChangesets = ({ missing, idlDiff, title, files, id }) => {
       } else {
         const { level, reason } = dependentLevel({
           via: program.via,
-          files,
           idlDiff,
         });
         levels.push(`${program.name}: ${level}`);
@@ -206,18 +177,11 @@ const parseArgs = (argv) => {
 };
 
 const main = (argv) => {
-  const { base, head, options } = parseArgs(argv);
-  const files = execFileSync("git", ["diff", "--name-only", base, head], {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  })
-    .split("\n")
-    .filter(Boolean);
+  const { options } = parseArgs(argv);
   const outputs = writeChangesets({
     missing: readJson(options.missing),
     idlDiff: options.idlDiff ? readJson(options.idlDiff) : null,
     title: options.title,
-    files,
     id: options.id,
   });
   const written = writeFiles(outputs, process.cwd());

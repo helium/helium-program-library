@@ -173,3 +173,11 @@ test("parseChangeset reads a file with CRLF line ends", () => {
     },
   );
 });
+
+test("parseChangeset reads a closing --- with no trailing newline", () => {
+  const parsed = parseChangeset("---\nlazy-distributor: patch\n---");
+  assert.deepEqual(
+    { ...parsed, releases: { ...parsed.releases } },
+    { releases: { "lazy-distributor": "patch" }, summary: "" },
+  );
+});

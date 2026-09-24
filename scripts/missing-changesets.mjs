@@ -57,8 +57,10 @@ export const parseChangeset = (text) => {
  *   idls: { level: string, breaking: boolean } | null,
  *   programHints?: Record<string, string>,
  *   changesets: { releases: Record<string, string> }[],
- *   programChangesets: { releases: Record<string, string> }[],
- * }} input
+ *   programChangesets: { file: string, releases: Record<string, string> }[],
+ *   knownPrograms?: string[],
+ * }} input `knownPrograms` is the `programs/` directories at the head; a
+ *   program changeset that names anything else fails.
  * @returns {{ npm: string[], programs: { name: string, own: boolean, via: string[] }[], idls: object | null, nothingMissing: boolean }}
  */
 export const missingChangesets = ({
@@ -68,7 +70,20 @@ export const missingChangesets = ({
   programHints = {},
   changesets,
   programChangesets,
+  knownPrograms,
 }) => {
+  // A misspelt name would cover nothing and version-programs.mjs would reject
+  // it after the merge, so it fails here first.
+  if (knownPrograms) {
+    for (const { file, releases } of programChangesets) {
+      for (const name of Object.keys(releases)) {
+        if (!knownPrograms.includes(name)) {
+          throw new Error(`${file}: unknown program "${name}"`);
+        }
+      }
+    }
+  }
+
   const wanted = new Set(packages);
   if (idls) wanted.add(IDLS_PACKAGE);
 
@@ -169,6 +184,14 @@ export const missingFromArgv = (argv) => {
     ),
     changesets: addedChangesets(base, head, ".changeset"),
     programChangesets: addedChangesets(base, head, ".changeset-programs"),
+    knownPrograms: run("git", [
+      "ls-tree",
+      "-d",
+      "--name-only",
+      `${head}:programs`,
+    ])
+      .split("\n")
+      .filter(Boolean),
   });
 };
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,7 +76,8 @@ test("an addition, a change and a deletion become one mutation body", () => {
 });
 
 test("a 100 KB file round-trips: jq reads it, argv never does", () => {
-  // `Cargo.lock` is ~88 KB, past the 128 KiB argv cap once base64 grows it.
+  // `Cargo.lock` is ~88 KB, ~117 KB once base64 grows it: under the 128 KiB
+  // argv cap. This 120000-byte fixture is what exceeds the cap.
   const lock = 'package = { name = "helium" }\n'.repeat(4000);
   assert.ok(lock.length > 100 * 1024);
   const { root, head } = makeRepo({ "Cargo.lock": "empty\n" });
@@ -191,4 +192,15 @@ test("PATHS limits the commit to the paths it names", () => {
     ["a.txt"],
   );
   assert.deepEqual(deletions, []);
+});
+
+test("a status the script does not handle fails the build", () => {
+  const { root, head } = makeRepo({ "a.txt": "a\n", "b.txt": "b\n" });
+  // A tracked file turned into a symlink is a type change, status T.
+  rmSync(path.join(root, "a.txt"));
+  symlinkSync("b.txt", path.join(root, "a.txt"));
+
+  const { status, stderr } = build(root, { EXPECTED_HEAD_OID: head });
+  assert.notEqual(status, 0);
+  assert.match(stderr, /unhandled status T/);
 });

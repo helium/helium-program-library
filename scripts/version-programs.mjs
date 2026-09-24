@@ -15,6 +15,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { parseChangeset } from "./missing-changesets.mjs";
+
 const USAGE = "Usage: node scripts/version-programs.mjs [root]";
 
 const CHANGESET_DIR = ".changeset-programs";
@@ -24,8 +26,6 @@ const SKIPPED_FILE = "skipped.json";
 const LEVELS = ["none", "patch", "minor", "major"];
 const RELEASE_LEVELS = LEVELS.filter((level) => level !== "none");
 
-const FRONT_MATTER = /^(?:<!--.*?-->\s*)?---\n([\s\S]*?)\n---\n([\s\S]*)$/;
-const ENTRY = /^"?([^":]+)"?:\s*(\w+)\s*$/;
 // The first line-anchored `version =` is the [package] one; dependency
 // versions live in inline tables, so they never start a line.
 const PACKAGE_VERSION = /^version = "(\d+\.\d+\.\d+)"$/m;
@@ -56,26 +56,6 @@ const listChangesets = (root) =>
     .map((file) => path.join(root, CHANGESET_DIR, file));
 
 /**
- * One program changeset: its `<program>: <level>` entries and its text, or null
- * when the file carries no front matter. The Promotion PR body reads the
- * unversioned changesets through this, so the grammar lives in one place.
- */
-export const parseProgramChangeset = (content) => {
-  const match = content.match(FRONT_MATTER);
-  if (!match) return null;
-  return {
-    entries: match[1]
-      .split("\n")
-      .filter((line) => line.trim())
-      .map((line) => {
-        const [, name, level] = line.match(ENTRY) || [];
-        return { name, level };
-      }),
-    text: match[2].trim(),
-  };
-};
-
-/**
  * program -> { level, notes: [{ level, text }] }, with every name and level
  * validated. The whole plan is built before any write, so an unknown program or
  * level leaves the tree untouched.
@@ -83,10 +63,15 @@ export const parseProgramChangeset = (content) => {
 const plan = (programs, files) => {
   const releases = {};
   for (const file of files) {
-    const parsed = parseProgramChangeset(fs.readFileSync(file, "utf8"));
-    if (!parsed) throw new Error(`${file}: no front matter`);
-    const { entries, text } = parsed;
-    for (const { name, level } of entries) {
+    // One grammar with the backstop, so a file both accept means the same.
+    let parsed;
+    try {
+      parsed = parseChangeset(fs.readFileSync(file, "utf8"));
+    } catch (err) {
+      throw new Error(`${file}: ${err.message}`);
+    }
+    const { releases: entries, summary: text } = parsed;
+    for (const [name, level] of Object.entries(entries)) {
       if (!programs.includes(name))
         throw new Error(`${file}: unknown program "${name}"`);
       if (!LEVELS.includes(level))

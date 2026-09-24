@@ -257,7 +257,7 @@ Open the PR. The changeset bot adds the release notes it is missing:
 Nothing reads the diff for meaning. Fixed rules pick every level and every line, in [`scripts/write-changesets.mjs`](scripts/write-changesets.mjs), whose unit tests are those rules:
 
 - **npm level**: `patch` for each changed package. `@helium/idls` takes the level the IDL diff gives: `minor` when a program adds an instruction, an account, a type or a field; `minor` plus a "Possible breaking change: ..." line when one is removed or its type changed; `patch` otherwise. `@helium/idls` with no IDL diff at all — its own files changed and no program moved — is `patch`.
-- **program level**: a program you changed takes that same IDL-diff hint. A program you changed only through a dependency takes `none`, but only when every dependency it came through is a program whose IDL did not move and whose changed files are all instruction handlers, which a dependent never runs. Anything else, a shared crate above all, takes `patch`.
+- **program level**: a program you changed takes that same IDL-diff hint. A program you changed only through a dependency takes `patch`, because it links the whole crate it depends on. The bot never writes `none`; a person sets it by hand.
 - **text**: the PR title, with its `type(scope):` prefix stripped and the first letter capitalised. The program file adds a line per program that names the IDL change, or the reason for the level.
 - **no release**: a path that matches `*.md`, `tests/`, `*.test.ts`, `.github/`, or `.scratch/` declares no release, so a PR that touches only those gets no file. That filter is `NO_RELEASE_PATTERNS` in [`scripts/changed-programs.mjs`](scripts/changed-programs.mjs).
 
@@ -289,7 +289,7 @@ This repo uses [Changesets](https://github.com/changesets/changesets) for npm ve
 
 ### Releasing a program to mainnet
 
-A mainnet upgrade takes four steps. Nobody bumps a `Cargo.toml` and nobody pushes a `program-*` tag by hand.
+A mainnet upgrade takes four steps. Nobody bumps a `Cargo.toml` and nobody pushes a `program-*` tag by hand. While `DRY_RUN` is true the bots write nothing, so bump and tag by hand as [Dry run, go-live, and rollback](#dry-run-go-live-and-rollback) describes.
 
 **1. The program changeset.** It lands with your PR, as above.
 

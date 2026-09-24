@@ -33,6 +33,7 @@ jobs:
     name: Back-merge PR
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: release-bots
     permissions:
       contents: read
     steps:
@@ -45,13 +46,20 @@ jobs:
         id: mode
         env:
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
-        run: echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/master" ]; then
+            echo "::notice::$GITHUB_REF is not master, so this run is a dry run whatever the input says."
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+          fi
 
-      # Empty after a promotion merge: master then holds nothing develop lacks.
+      # Promotion merge commits are not counted, so the count is empty after a
+      # promotion merge and non-empty only when a hotfix reached master.
       - name: Does master hold commits develop lacks?
         id: ahead
         run: |
-          count=$(git rev-list --count origin/develop..HEAD)
+          count=$(git rev-list --count --no-merges origin/develop..HEAD)
           echo "count=$count" >> "$GITHUB_OUTPUT"
           {
             echo "## Back-merge PR"
@@ -98,7 +106,7 @@ jobs:
       - name: Get an App token
         id: app-token
         if: steps.ahead.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -110,7 +118,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head master --base develop --state open --json number --jq '.[0].number')
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head master --base develop --state open --json number,isCrossRepository --jq 'map(select(.isCrossRepository | not))[0].number // empty')
           if [ -n "$number" ]; then
             gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
           else

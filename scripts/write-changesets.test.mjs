@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -152,20 +158,12 @@ test("a handler-only own change gets the title alone", () => {
   );
 });
 
-test("a dependent program is none when the dependency is handler-only with an empty IDL diff", () => {
-  const files = [
-    "programs/lazy-distributor/src/instructions/set_v0.rs",
-    "programs/lazy-distributor/README.md",
-  ];
+test("a dependent program is patch even when the dependency is handler-only with an empty IDL diff", () => {
   const idlDiff = { programs: [programDiff("lazy-distributor")] };
-  assert.deepEqual(
-    dependentLevel({ via: ["lazy-distributor"], files, idlDiff }),
-    {
-      level: "none",
-      reason:
-        "only instruction handlers in lazy-distributor changed and its IDL did not",
-    },
-  );
+  assert.deepEqual(dependentLevel({ via: ["lazy-distributor"], idlDiff }), {
+    level: "patch",
+    reason: "lazy-distributor changed",
+  });
 
   const written = write({
     missing: {
@@ -177,44 +175,42 @@ test("a dependent program is none when the dependency is handler-only with an em
       idls: null,
     },
     idlDiff,
-    files,
   });
   assert.equal(
     written[".changeset-programs/bot-abc1234.md"],
-    "---\nlazy-distributor: patch\nwelcome-pack: none\n---\n\nBind the oracle signature to the task\n\n- welcome-pack: none, only instruction handlers in lazy-distributor changed and its IDL did not\n",
+    "---\nlazy-distributor: patch\nwelcome-pack: patch\n---\n\nBind the oracle signature to the task\n\n- welcome-pack: patch, lazy-distributor changed\n",
   );
+});
+
+// A dependent links the whole crate, handlers included: `instructions/mod.rs`
+// with an unchanged IDL still changes the dependent's binary.
+test("a change to tuktuk-dca's instructions/mod.rs with an unchanged IDL gives its dependent patch", () => {
+  const written = write({
+    missing: {
+      npm: [],
+      programs: [dependent("hpl-crons", ["tuktuk-dca"])],
+      idls: null,
+    },
+    idlDiff: { programs: [programDiff("tuktuk-dca")] },
+  });
+  assert.deepEqual(parsed(written[".changeset-programs/bot-abc1234.md"]), {
+    releases: { "hpl-crons": "patch" },
+    summary:
+      "Bind the oracle signature to the task\n\n- hpl-crons: patch, tuktuk-dca changed",
+  });
 });
 
 test("a dependent program is patch when the dependency is a shared crate", () => {
-  assert.deepEqual(
-    dependentLevel({
-      via: ["shared-utils"],
-      files: ["utils/shared-utils/src/precise_number.rs"],
-      idlDiff: null,
-    }),
-    { level: "patch", reason: "shared-utils is not a program" },
-  );
+  assert.deepEqual(dependentLevel({ via: ["shared-utils"], idlDiff: null }), {
+    level: "patch",
+    reason: "shared-utils changed",
+  });
 });
 
-test("a dependent program is patch when the dependency changed outside its handlers or its IDL moved", () => {
+test("a dependent program names the IDL move when its dependency's IDL changed", () => {
   assert.deepEqual(
     dependentLevel({
       via: ["lazy-distributor"],
-      files: [
-        "programs/lazy-distributor/src/instructions/set_v0.rs",
-        "programs/lazy-distributor/src/state.rs",
-      ],
-      idlDiff: { programs: [programDiff("lazy-distributor")] },
-    }),
-    {
-      level: "patch",
-      reason: "lazy-distributor changed outside its instruction handlers",
-    },
-  );
-  assert.deepEqual(
-    dependentLevel({
-      via: ["lazy-distributor"],
-      files: ["programs/lazy-distributor/src/instructions/set_v0.rs"],
       idlDiff: {
         programs: [
           programDiff("lazy-distributor", {
@@ -225,28 +221,23 @@ test("a dependent program is patch when the dependency changed outside its handl
     }),
     { level: "patch", reason: "the IDL of lazy-distributor changed" },
   );
-  // No diff entry for the dependency: nothing proves the binary is unchanged.
-  assert.equal(
-    dependentLevel({
-      via: ["lazy-distributor"],
-      files: ["programs/lazy-distributor/src/instructions/set_v0.rs"],
-      idlDiff: null,
-    }).level,
-    "patch",
+  // No diff entry for the dependency: the reason names the crate alone.
+  assert.deepEqual(
+    dependentLevel({ via: ["lazy-distributor"], idlDiff: null }),
+    { level: "patch", reason: "lazy-distributor changed" },
   );
 });
 
-test("one patch dependency makes the dependent patch, with that reason", () => {
+test("every dependency is named in the reason", () => {
   assert.deepEqual(
     dependentLevel({
       via: ["lazy-distributor", "shared-utils"],
-      files: [
-        "programs/lazy-distributor/src/instructions/set_v0.rs",
-        "utils/shared-utils/src/x.rs",
-      ],
       idlDiff: { programs: [programDiff("lazy-distributor")] },
     }),
-    { level: "patch", reason: "shared-utils is not a program" },
+    {
+      level: "patch",
+      reason: "lazy-distributor changed; shared-utils changed",
+    },
   );
 });
 
@@ -292,4 +283,26 @@ test("writeFiles creates the files and never touches an existing one", () => {
     readFileSync(path.join(root, ".changeset/bot-abc1234.md"), "utf8"),
     "also by hand\n",
   );
+});
+
+test("writeFiles checks every path before it writes the first", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "write-changesets-"));
+  mkdirSync(path.join(root, ".changeset"));
+  mkdirSync(path.join(root, ".changeset-programs"));
+  const second = path.join(root, ".changeset-programs/bot-abc1234.md");
+  writeFileSync(second, "written by hand\n");
+
+  assert.throws(
+    () =>
+      writeFiles(
+        {
+          ".changeset/bot-abc1234.md": "npm\n",
+          ".changeset-programs/bot-abc1234.md": "programs\n",
+        },
+        root,
+      ),
+    /\.changeset-programs\/bot-abc1234\.md exists/,
+  );
+  assert.equal(existsSync(path.join(root, ".changeset/bot-abc1234.md")), false);
+  assert.equal(readFileSync(second, "utf8"), "written by hand\n");
 });

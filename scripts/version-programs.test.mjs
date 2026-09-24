@@ -219,7 +219,7 @@ test("an unknown level fails before any write", () => {
 
   assert.throws(
     () => versionPrograms({ root, headSha: HEAD_SHA, cargoUpdate }),
-    /unknown level "breaking"/,
+    /wrong-level\.md: bad release level "breaking"/,
   );
 
   assert.equal(version(root, "mini-fanout"), "0.1.8");
@@ -338,4 +338,59 @@ test("a new entry is prepended above the existing changelog", () => {
 - Reject a fanout share of zero.
 `,
   );
+});
+
+// The same texts missing-changesets.test.mjs parses: the backstop and the
+// release read them through one parser.
+test("CRLF, empty front matter, a bare closing --- and a single-quoted name version as the backstop reads them", () => {
+  const root = makeRepo({
+    programs: {
+      "lazy-distributor": "0.3.11",
+      "mini-fanout": "0.1.8",
+      "welcome-pack": "0.0.4",
+    },
+    changesets: {
+      "crlf.md": "---\r\nlazy-distributor: patch\r\n---\r\n\r\nCRLF text.\r\n",
+      "empty.md": "---\n---\n\nNothing to release.\n",
+      "bare.md": "---\nmini-fanout: minor\n---",
+      "quoted.md": "---\n'welcome-pack': patch\n---\n\nQuoted text.\n",
+    },
+  });
+  const { cargoUpdate } = recorder();
+
+  const { released } = versionPrograms({
+    root,
+    headSha: HEAD_SHA,
+    cargoUpdate,
+  });
+
+  assert.deepEqual(released, [
+    {
+      name: "lazy-distributor",
+      from: "0.3.11",
+      to: "0.3.12",
+      level: "patch",
+    },
+    { name: "mini-fanout", from: "0.1.8", to: "0.2.0", level: "minor" },
+    { name: "welcome-pack", from: "0.0.4", to: "0.0.5", level: "patch" },
+  ]);
+  assert.match(
+    read(root, "programs", "lazy-distributor", "CHANGELOG.md"),
+    /- CRLF text\./,
+  );
+});
+
+test("a file with no front matter fails the plan and names the file", () => {
+  const root = makeRepo({
+    programs: { "mini-fanout": "0.1.8" },
+    changesets: { "no-front-matter.md": "Just text.\n" },
+  });
+  const { calls, cargoUpdate } = recorder();
+
+  assert.throws(
+    () => versionPrograms({ root, headSha: HEAD_SHA, cargoUpdate }),
+    /no-front-matter\.md: no front matter/,
+  );
+  assert.equal(version(root, "mini-fanout"), "0.1.8");
+  assert.deepEqual(calls, []);
 });

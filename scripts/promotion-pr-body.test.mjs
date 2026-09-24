@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   changelogSince,
+  deployingPrograms,
   lastRelease,
   promotionPrBody,
 } from "./promotion-pr-body.mjs";
@@ -160,4 +161,19 @@ test("the last release is the highest tag at or below the version on develop", (
 
 test("a program whose only tags are above its version has no last release", () => {
   assert.equal(lastRelease(["0.2.3"], "0.2.2"), null);
+});
+
+test("a program with no tag at all is not listed as deploying", () => {
+  const deploying = deployingPrograms(
+    [
+      { name: "data-credits", version: "0.2.8", tags: ["0.2.7"] },
+      { name: "tuktuk-dca", version: "0.1.0", tags: [] },
+      { name: "hexboosting", version: "0.2.4", tags: ["0.2.4"] },
+    ],
+    () => null,
+  );
+
+  assert.deepEqual(deploying, [
+    { name: "data-credits", from: "0.2.7", to: "0.2.8", changelog: "" },
+  ]);
 });

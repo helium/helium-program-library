@@ -10,7 +10,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { parseProgramChangeset } from "./version-programs.mjs";
+import { readPrograms } from "./missing-bump-check.mjs";
+import { parseChangeset } from "./missing-changesets.mjs";
 
 /**
  * The changelog sections a promotion adds: everything above the `## <from>`
@@ -130,14 +131,6 @@ export const promotionPrBody = ({
 const USAGE =
   "Usage: node scripts/promotion-pr-body.mjs [head] [--missing-bump <file>] [--back-merge <url>]";
 
-const run = (command, args) =>
-  execFileSync(command, args, {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
-
-const git = (...args) => run("git", args);
-
 /** The file's content at `head`, or null when it is not in that tree. */
 const showFile = (head, file) => {
   try {
@@ -149,8 +142,6 @@ const showFile = (head, file) => {
     return null;
   }
 };
-
-const PACKAGE_VERSION = /^version = "(\d+\.\d+\.\d+)"$/m;
 
 const bySemver = (a, b) => {
   const right = b.split(".").map(Number);
@@ -176,36 +167,32 @@ export const lastRelease = (tags, version) =>
     .at(-1) ?? null;
 
 /**
- * The programs whose version at `head` has no tag: merging the Promotion PR is
- * the decision to deploy each of them. `from` is the highest tagged version,
- * matched exactly as `program-<name>-<x>.<y>.<z>` so the repo's legacy `v`
- * tags and its one `-new` suffix are not read as versions.
+ * The programs whose version has no tag: merging the Promotion PR is the
+ * decision to deploy each of them. A program with no tag at all is left out,
+ * as the tag bot leaves it out: its first tag stays manual. `from` is the
+ * highest tagged version at or below the current one.
+ *
+ * @param {{ name: string, version: string, tags: string[] }[]} programs
+ *   `readPrograms` output.
+ * @param {(name: string) => string | null} readChangelog
  */
-const readDeploying = (head) =>
-  git("ls-tree", "-d", "--name-only", `${head}:programs`)
-    .split("\n")
-    .filter(Boolean)
-    .map((name) => {
-      const cargo = showFile(head, `programs/${name}/Cargo.toml`);
-      if (!cargo) return null;
-      const to = cargo.match(PACKAGE_VERSION)[1];
-      const tags = git("tag", "-l", `program-${name}-*`)
-        .split("\n")
-        .map((tag) => tag.match(`^program-${name}-(\\d+\\.\\d+\\.\\d+)$`)?.[1])
-        .filter(Boolean);
-      if (tags.includes(to)) return null;
-      const from = lastRelease(tags, to);
+export const deployingPrograms = (programs, readChangelog) =>
+  programs
+    .filter(({ version, tags }) => tags.length && !tags.includes(version))
+    .map(({ name, version, tags }) => {
+      const from = lastRelease(tags, version);
       return {
         name,
         from,
-        to,
-        changelog: changelogSince(
-          showFile(head, `programs/${name}/CHANGELOG.md`),
-          from,
-        ),
+        to: version,
+        changelog: changelogSince(readChangelog(name), from),
       };
-    })
-    .filter(Boolean);
+    });
+
+const readDeploying = (head) =>
+  deployingPrograms(readPrograms(head, {}), (name) =>
+    showFile(head, `programs/${name}/CHANGELOG.md`),
+  );
 
 /** The program changesets in the tree at `head` that no release has used yet. */
 const readUnversioned = (head) => {
@@ -225,8 +212,20 @@ const readUnversioned = (head) => {
     .filter((name) => name.endsWith(".md") && name !== "README.md")
     .map((name) => {
       const file = `.changeset-programs/${name}`;
-      const parsed = parseProgramChangeset(showFile(head, file) ?? "");
-      return parsed ? { file, ...parsed } : null;
+      let parsed;
+      try {
+        parsed = parseChangeset(showFile(head, file) ?? "");
+      } catch {
+        return null;
+      }
+      return {
+        file,
+        entries: Object.entries(parsed.releases).map(([program, level]) => ({
+          name: program,
+          level,
+        })),
+        text: parsed.summary,
+      };
     })
     .filter(Boolean);
 };

@@ -36,6 +36,8 @@ jobs:
     name: Program release PR
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release-bots
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -46,7 +48,13 @@ jobs:
         id: mode
         env:
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
-        run: echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
+            echo "::notice::$GITHUB_REF is not develop, so this run is a dry run whatever the input says."
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check for program changesets
         id: check
@@ -86,6 +94,8 @@ jobs:
             echo '```'
             echo
             echo '```diff'
+            # Intent-to-add, so the new changelogs show in the diff.
+            git add --intent-to-add --all
             git --no-pager diff
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -111,7 +121,7 @@ jobs:
       - name: Get an App token
         id: app-token
         if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -216,6 +226,7 @@ jobs:
     name: New program versions are untagged
     if: github.event_name == 'pull_request' && github.head_ref == 'program-release/develop'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

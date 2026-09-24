@@ -155,6 +155,7 @@ const main = (argv) => {
         run("pnpm", [
           "--filter",
           `...[${tag}]`,
+          "--changed-files-ignore-pattern=**/*.md",
           "list",
           "--depth",
           "-1",
@@ -163,9 +164,17 @@ const main = (argv) => {
       );
       return affected.some((pkg) => pkg.name === name);
     },
+    // A README or other Markdown change builds no different image.
     pathChanged: (servicePath, tag) =>
-      run("git", ["diff", "--name-only", tag, "HEAD", "--", servicePath]) !==
-      "",
+      run("git", [
+        "diff",
+        "--name-only",
+        tag,
+        "HEAD",
+        "--",
+        servicePath,
+        ":(exclude,glob)**/*.md",
+      ]) !== "",
   });
 
   for (const { service, reason } of result.skipped) {

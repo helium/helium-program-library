@@ -32,6 +32,7 @@ jobs:
     name: Promotion PR
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: release-bots
     permissions:
       contents: read
       # The back-merge lookup only. The PR itself goes through the App token.
@@ -49,12 +50,18 @@ jobs:
         id: mode
         env:
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
-        run: echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
+            echo "::notice::$GITHUB_REF is not develop, so this run is a dry run whatever the input says."
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dry_run=${INPUT_DRY_RUN:-$DRY_RUN}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Is develop ahead of master?
         id: ahead
         run: |
-          count=$(git rev-list --count origin/master..HEAD)
+          count=$(git rev-list --count --no-merges origin/master..HEAD)
           echo "count=$count" >> "$GITHUB_OUTPUT"
           if [ "$count" -eq 0 ]; then
             echo "develop is not ahead of master. No Promotion PR." >> "$GITHUB_STEP_SUMMARY"
@@ -80,7 +87,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --head master --base develop --state open --json url --jq '.[0].url // empty')
+          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --head master --base develop --state open --json url,isCrossRepository --jq 'map(select(.isCrossRepository | not))[0].url // empty')
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Build the body
@@ -119,7 +126,7 @@ jobs:
       - name: Get an App token
         id: app-token
         if: steps.ahead.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -132,7 +139,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head develop --base master --state open --json number --jq '.[0].number')
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head develop --base master --state open --json number,isCrossRepository --jq 'map(select(.isCrossRepository | not))[0].number // empty')
           if [ -n "$number" ]; then
             gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
           else
