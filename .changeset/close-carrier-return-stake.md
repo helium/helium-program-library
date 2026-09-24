@@ -1,5 +1,7 @@
 ---
 "@helium/idls": patch
+"@helium/spl-utils": patch
+"@helium/mobile-entity-manager-sdk": patch
 ---
 
 Add `close_carrier_v0` and `close_incentive_program_v0` to `mobile-entity-manager`, and fix `swap_carrier_stake` to record the escrow it moves the stake to.

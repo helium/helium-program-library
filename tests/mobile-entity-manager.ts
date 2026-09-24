@@ -243,9 +243,11 @@ describe("mobile-entity-manager", () => {
         const destination = getAssociatedTokenAddressSync(hntMint, me);
         const before = (await getAccount(provider.connection, destination)).amount;
 
+        // destination is deliberately omitted: the SDK resolver derives it, and the
+        // balance check below asserts the address it should have produced.
         await memProgram.methods
           .closeCarrierV0()
-          .accountsPartial({ subDao, carrier, rentRefund: me, destination })
+          .accountsPartial({ subDao, carrier, rentRefund: me })
           .rpc({ skipPreflight: true });
 
         const after = (await getAccount(provider.connection, destination)).amount;
@@ -295,6 +297,49 @@ describe("mobile-entity-manager", () => {
             })
             .rpc()
         ).to.be.rejectedWith(/ConstraintHasOne/);
+
+        expect(await provider.connection.getAccountInfo(carrier)).to.not.be.null;
+      });
+
+      it("refuses an escrow that is not the carrier's own", async () => {
+        const otherAta = await createAtaAndMint(
+          provider,
+          hntMint,
+          new BN(0),
+          Keypair.generate().publicKey
+        );
+
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao,
+              carrier,
+              escrow: otherAta,
+              rentRefund: me,
+              destination: getAssociatedTokenAddressSync(hntMint, me),
+            })
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintHasOne/);
+
+        expect(await provider.connection.getAccountInfo(carrier)).to.not.be.null;
+      });
+
+      it("refuses a destination on a different mint than the escrow", async () => {
+        const otherMint = await createMint(provider, 8, me, me);
+        const otherAta = await createAtaAndMint(provider, otherMint, new BN(0), me);
+
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao,
+              carrier,
+              rentRefund: me,
+              destination: otherAta,
+            })
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintTokenMint/);
 
         expect(await provider.connection.getAccountInfo(carrier)).to.not.be.null;
       });
@@ -495,6 +540,46 @@ describe("mobile-entity-manager", () => {
               incentiveEscrowProgram,
               rentRefund: me,
             })
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintHasOne/);
+
+        expect(await provider.connection.getAccountInfo(incentiveEscrowProgram!))
+          .to.not.be.null;
+      });
+
+      it("refuses to close an incentive program for a signer that is not the issuing authority", async () => {
+        const name = random();
+        const {
+          pubkeys: { incentiveEscrowProgram },
+        } = await memProgram.methods
+          .initializeIncentiveProgramV0({
+            metadataUrl: null,
+            name,
+            startTs: new BN(5),
+            stopTs: new BN(10), // already in the past
+            shares: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accountsPartial({
+            carrier,
+            recipient: me,
+            keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        const stranger = Keypair.generate();
+        await expect(
+          memProgram.methods
+            .closeIncentiveProgramV0()
+            .accountsPartial({
+              issuingAuthority: stranger.publicKey,
+              carrier,
+              incentiveEscrowProgram,
+              rentRefund: me,
+            })
+            .signers([stranger])
             .rpc()
         ).to.be.rejectedWith(/ConstraintHasOne/);
 

@@ -37,6 +37,7 @@
     "@helium/helium-entity-manager-sdk": "workspace:^",
     "@helium/idls": "workspace:^",
     "@helium/spl-utils": "workspace:^",
+    "@solana/spl-token": "^0.3.8",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"
   },
